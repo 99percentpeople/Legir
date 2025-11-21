@@ -1,5 +1,6 @@
+
 import * as pdfjsLib from 'pdfjs-dist';
-import { PDFDocument, rgb, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, StandardFonts, TextAlignment, PDFName, PDFString } from 'pdf-lib';
+import { PDFDocument, rgb, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, StandardFonts, TextAlignment, PDFName, PDFString, PDFSignature } from 'pdf-lib';
 import { FormField, FieldType, PageData, FieldStyle, PDFMetadata, PDFOutlineItem } from '../types';
 import { DEFAULT_FIELD_STYLE } from '../constants';
 
@@ -140,25 +141,30 @@ export const loadPDF = async (file: File): Promise<{ pdfBytes: Uint8Array; pages
             let type: FieldType | null = null;
             let options: string[] | undefined = undefined;
             let radioValue: string | undefined = undefined;
+            let isChecked = false;
 
             if (annotation.fieldType === 'Tx') {
                 type = FieldType.TEXT;
             } else if (annotation.fieldType === 'Btn') {
                  if (annotation.checkBox) {
                      type = FieldType.CHECKBOX;
+                     // annotation.fieldValue is often 'Yes' or 'Off' or undefined
+                     isChecked = annotation.fieldValue && annotation.fieldValue !== 'Off';
                  } else if (annotation.radioButton) {
                      type = FieldType.RADIO;
-                     // Try to extract export value from buttonValue or appearance states
                      radioValue = annotation.buttonValue;
+                     // Check if this button is the selected one in the group
+                     isChecked = annotation.fieldValue === radioValue;
                  }
             } else if (annotation.fieldType === 'Ch') {
                 type = FieldType.DROPDOWN;
-                // Extract options
                 if (Array.isArray(annotation.options)) {
                     options = annotation.options.map((opt: any) => 
                         typeof opt === 'string' ? opt : opt.display || opt.exportValue
                     );
                 }
+            } else if (annotation.fieldType === 'Sig') {
+                type = FieldType.SIGNATURE;
             }
 
             if (type) {
@@ -217,11 +223,17 @@ export const loadPDF = async (file: File): Promise<{ pdfBytes: Uint8Array; pages
                     toolTip: annotation.alternativeText || undefined,
                     style: importedStyle,
                     options: options,
-                    radioValue: radioValue || 'Choice',
+                    radioValue: radioValue || undefined,
+                    exportValue: radioValue, // Map radio value to exportValue
                     multiline: type === FieldType.TEXT ? !!(annotation.fieldFlags & 4096) : undefined,
                     maxLength: annotation.maxLen || undefined,
                     alignment: annotation.textAlignment === 1 ? 'center' : (annotation.textAlignment === 2 ? 'right' : 'left'),
-                    isChecked: false // Default assumption
+                    
+                    // Map Values
+                    value: typeof annotation.fieldValue === 'string' ? annotation.fieldValue : undefined,
+                    defaultValue: typeof annotation.defaultValue === 'string' ? annotation.defaultValue : undefined,
+                    isChecked: isChecked,
+                    isDefaultChecked: false // Hard to extract reliability from PDF.js annotation without parsing raw dict
                 });
             }
         }
@@ -276,19 +288,20 @@ export const exportPDF = async (originalBytes: Uint8Array, fields: FormField[], 
   // 1. Remove existing fields of types we manage
   const existingFields = form.getFields();
   for (const field of existingFields) {
-      // Need to check type instance roughly or just try removing by name if it exists in our list?
-      // Safest is to try removing all form fields that match names we are about to create
-      // But here we just remove what we can to avoid duplicates
       try {
-          // We only remove Text, Checkbox, Dropdown, Radio
-          if (field instanceof PDFTextField || 
-              field instanceof PDFCheckBox || 
-              field instanceof PDFDropdown || 
-              field instanceof PDFRadioGroup) {
+          // Robust check for field types including fallback to constructor name
+          const typeName = field.constructor.name;
+          const isText = field instanceof PDFTextField || typeName === 'PDFTextField';
+          const isCheck = field instanceof PDFCheckBox || typeName === 'PDFCheckBox';
+          const isDropdown = field instanceof PDFDropdown || typeName === 'PDFDropdown';
+          const isRadio = field instanceof PDFRadioGroup || typeName === 'PDFRadioGroup';
+          const isSig = (typeof PDFSignature !== 'undefined' && field instanceof PDFSignature) || typeName === 'PDFSignature';
+
+          if (isText || isCheck || isDropdown || isRadio || isSig) { 
               form.removeField(field);
           }
       } catch (e) {
-          // ignore
+          console.error('Failed to remove field:', field.getName(), e);
       }
   }
 
@@ -342,10 +355,18 @@ export const exportPDF = async (originalBytes: Uint8Array, fields: FormField[], 
       const fontSize = style.fontSize ?? 12;
 
       const createField = (name: string) => {
-          if (field.type === FieldType.TEXT) {
+          if (field.type === FieldType.TEXT || field.type === FieldType.SIGNATURE) {
+            // Handle Signature as Text for now
             const textField = form.createTextField(name);
             textField.addToPage(page, { ...commonOpts, font: font });
-            textField.setText('');
+            
+            // Set Value and Default Value
+            textField.setText(field.value || '');
+            if (field.defaultValue) {
+                // Low-level: Set Default Value (DV)
+                (textField as any).acroField.dict.set(PDFName.of('DV'), PDFString.of(field.defaultValue));
+            }
+
             if (fontSize) textField.setFontSize(fontSize);
             
             if (field.toolTip) (textField as any).acroField.dict.set(PDFName.of('TU'), PDFString.of(field.toolTip));
@@ -370,7 +391,17 @@ export const exportPDF = async (originalBytes: Uint8Array, fields: FormField[], 
             if (field.toolTip) (checkBox as any).acroField.dict.set(PDFName.of('TU'), PDFString.of(field.toolTip));
             if (field.required) checkBox.enableRequired();
             if (field.readOnly) checkBox.enableReadOnly();
+            
+            // Current State
             if (field.isChecked) checkBox.check();
+            
+            // Default State (DV)
+            if (field.isDefaultChecked) {
+                 // Assuming export value 'Yes' which is default in pdf-lib for created checkboxes
+                 (checkBox as any).acroField.dict.set(PDFName.of('DV'), PDFName.of('Yes'));
+            } else {
+                 (checkBox as any).acroField.dict.set(PDFName.of('DV'), PDFName.of('Off'));
+            }
 
           } else if (field.type === FieldType.DROPDOWN) {
             const dropdown = form.createDropdown(name);
@@ -378,6 +409,15 @@ export const exportPDF = async (originalBytes: Uint8Array, fields: FormField[], 
             if (field.options) {
                 dropdown.setOptions(field.options);
             }
+            
+            // Current Value
+            if (field.value) dropdown.select(field.value);
+
+            // Default Value
+            if (field.defaultValue) {
+                 (dropdown as any).acroField.dict.set(PDFName.of('DV'), PDFString.of(field.defaultValue));
+            }
+
             if (fontSize) dropdown.setFontSize(fontSize);
             
             if (field.toolTip) (dropdown as any).acroField.dict.set(PDFName.of('TU'), PDFString.of(field.toolTip));
@@ -410,15 +450,25 @@ export const exportPDF = async (originalBytes: Uint8Array, fields: FormField[], 
               if (firstField.readOnly) radioGroup.enableReadOnly();
           }
           
-          for (const field of groupFields) {
+          // Determine Default Value for the Group
+          const defaultSelectedField = groupFields.find(f => f.isDefaultChecked);
+          if (defaultSelectedField) {
+              const val = defaultSelectedField.radioValue || defaultSelectedField.exportValue || `Choice_${groupFields.indexOf(defaultSelectedField)}`;
+              // Set Default Value for Group (DV is a name)
+              (radioGroup as any).acroField.dict.set(PDFName.of('DV'), PDFName.of(val));
+          }
+
+          for (let i = 0; i < groupFields.length; i++) {
+              const field = groupFields[i];
               try {
                   const page = pdfDoc.getPage(field.pageIndex);
                   const { height: pageHeight } = page.getSize();
                   const commonOpts = getFieldOptions(field, page, pageHeight);
                   
                   // Ensure unique values for options in group
-                  const val = field.radioValue || `Choice_${Math.random().toString(36).substr(2, 5)}`;
+                  const val = field.radioValue || field.exportValue || `Choice_${i}`;
                   radioGroup.addOptionToPage(val, page, commonOpts);
+                  
                   if (field.isChecked) {
                       radioGroup.select(val);
                   }

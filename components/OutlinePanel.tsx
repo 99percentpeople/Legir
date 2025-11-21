@@ -3,6 +3,7 @@ import { PDFOutlineItem } from '../types';
 import { ChevronRight, ChevronDown, Book, File } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
+import { useLanguage } from './language-provider';
 
 interface OutlineItemProps {
   item: PDFOutlineItem;
@@ -71,10 +72,12 @@ interface OutlinePanelProps {
 }
 
 const OutlinePanel: React.FC<OutlinePanelProps> = ({ outline, onNavigate }) => {
+  const { t } = useLanguage();
+  
   if (!outline || outline.length === 0) {
       return (
           <div className="p-6 text-center text-muted-foreground text-sm italic">
-              No outline found in this document.
+              {t('sidebar.no_outline')}
           </div>
       );
   }

@@ -1,10 +1,12 @@
+
 import React, { useState, useMemo } from 'react';
 import { FormField, FieldType, PageData } from '../types';
-import { ChevronRight, ChevronDown, Type, CheckSquare, FileText, Search, List, CircleDot } from 'lucide-react';
+import { ChevronRight, ChevronDown, Type, CheckSquare, FileText, Search, List, CircleDot, PenLine } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { cn } from '../lib/utils';
+import { useLanguage } from './language-provider';
 
 interface FieldTreePanelProps {
   pages: PageData[];
@@ -19,6 +21,7 @@ const FieldTreePanel: React.FC<FieldTreePanelProps> = ({
   selectedFieldId,
   onSelectField,
 }) => {
+  const { t } = useLanguage();
   const [expandedPages, setExpandedPages] = useState<Set<number>>(new Set([0]));
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -73,6 +76,7 @@ const FieldTreePanel: React.FC<FieldTreePanelProps> = ({
           case FieldType.CHECKBOX: return CheckSquare;
           case FieldType.RADIO: return CircleDot;
           case FieldType.DROPDOWN: return List;
+          case FieldType.SIGNATURE: return PenLine;
           default: return Type;
       }
   }
@@ -85,7 +89,7 @@ const FieldTreePanel: React.FC<FieldTreePanelProps> = ({
             <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <Input 
                 type="text" 
-                placeholder="Filter fields..." 
+                placeholder={t('sidebar.filter')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 h-8"
@@ -116,7 +120,7 @@ const FieldTreePanel: React.FC<FieldTreePanelProps> = ({
                >
                  {isExpanded ? <ChevronDown size={14} className="mr-1 text-muted-foreground" /> : <ChevronRight size={14} className="mr-1 text-muted-foreground" />}
                  <FileText size={14} className="mr-2 text-muted-foreground" />
-                 <span className="text-sm">Page {page.pageIndex + 1}</span>
+                 <span className="text-sm">{t('sidebar.page', { page: page.pageIndex + 1 })}</span>
                  <Badge variant="secondary" className="ml-auto px-1.5 py-0 h-5 min-w-[1.25rem] justify-center">
                     {visibleFields.length}
                  </Badge>
@@ -144,7 +148,7 @@ const FieldTreePanel: React.FC<FieldTreePanelProps> = ({
                        )
                      })
                    ) : (
-                       <div className="px-2 py-1 text-xs text-muted-foreground italic ml-2">No fields</div>
+                       <div className="px-2 py-1 text-xs text-muted-foreground italic ml-2">{t('sidebar.no_fields')}</div>
                    )}
                  </div>
                )}
@@ -154,7 +158,7 @@ const FieldTreePanel: React.FC<FieldTreePanelProps> = ({
         
         {filteredPages.length === 0 && (
             <div className="text-center py-8 text-sm text-muted-foreground">
-                No results found
+                {t('sidebar.no_results')}
             </div>
         )}
       </div>

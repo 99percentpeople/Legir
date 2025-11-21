@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { FormField, FieldType, PDFMetadata } from '../types';
-import { Trash2, X, Pin, PinOff, FileText, Plus, Minus, ArrowUp, ArrowDown, Save, Settings, Type, MousePointer2, Palette, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Trash2, X, Pin, PinOff, FileText, Plus, Minus, ArrowUp, ArrowDown, Save, Settings, Type, MousePointer2, Palette, AlignLeft, AlignCenter, AlignRight, Database } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -9,6 +10,7 @@ import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
 import { cn } from '../lib/utils';
+import { useLanguage } from './language-provider';
 
 // --- Shared Layout Component ---
 interface PanelLayoutProps {
@@ -30,7 +32,7 @@ const PanelLayout: React.FC<PanelLayoutProps> = ({
 }) => (
   <div className={cn(
     "w-80 bg-background border-l border-border flex flex-col h-full transition-all duration-200",
-    isFloating ? 'absolute right-0 top-0 bottom-0 z-50 shadow-2xl' : 'relative z-20 shadow-none'
+    isFloating ? 'absolute right-0 top-0 bottom-0 shadow-2xl' : 'relative shadow-none'
   )}>
     {/* Header */}
     <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
@@ -94,19 +96,20 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
   onToggleFloating,
   onTriggerHistorySave
 }) => {
+  const { t } = useLanguage();
   return (
     <PanelLayout
-      title={<><FileText size={16} /> Document Info</>}
+      title={<><FileText size={16} /> {t('properties.document.title')}</>}
       isFloating={isFloating}
       onToggleFloating={onToggleFloating}
     >
        <div className="space-y-4">
          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md text-sm text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
-            Edit global PDF information. Select a field on the canvas to edit its properties.
+            {t('properties.document.hint')}
          </div>
 
          <div className="space-y-2">
-           <Label>Filename</Label>
+           <Label>{t('properties.filename')}</Label>
            <Input
              type="text"
              value={filename}
@@ -114,13 +117,13 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
              onChange={(e) => onFilenameChange(e.target.value)}
              placeholder="document.pdf"
            />
-           <p className="text-xs text-muted-foreground">The name used when exporting the file.</p>
+           <p className="text-xs text-muted-foreground">{t('properties.filename.desc')}</p>
          </div>
 
          <Separator />
 
          <div className="space-y-2">
-           <Label>Document Title</Label>
+           <Label>{t('properties.doc_title')}</Label>
            <Input
              type="text"
              value={metadata.title || ''}
@@ -131,7 +134,7 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
          </div>
 
          <div className="space-y-2">
-           <Label>Author</Label>
+           <Label>{t('properties.author')}</Label>
            <Input
              type="text"
              value={metadata.author || ''}
@@ -141,7 +144,7 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
          </div>
 
          <div className="space-y-2">
-           <Label>Subject</Label>
+           <Label>{t('properties.subject')}</Label>
            <Textarea
              rows={2}
              value={metadata.subject || ''}
@@ -152,7 +155,7 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
          </div>
 
          <div className="space-y-2">
-           <Label>Keywords</Label>
+           <Label>{t('properties.keywords')}</Label>
            <Input
              type="text"
              value={metadata.keywords || ''}
@@ -160,12 +163,12 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
              onChange={(e) => onMetadataChange({ keywords: e.target.value })}
              placeholder="invoice, receipt, 2024"
            />
-           <p className="text-xs text-muted-foreground">Comma separated values</p>
+           <p className="text-xs text-muted-foreground">{t('properties.keywords.desc')}</p>
          </div>
          
          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-               <Label>Creator</Label>
+               <Label>{t('properties.creator')}</Label>
                <Input
                  type="text"
                  value={metadata.creator || ''}
@@ -174,7 +177,7 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
                />
             </div>
             <div className="space-y-2">
-               <Label>Producer</Label>
+               <Label>{t('properties.producer')}</Label>
                <Input
                  type="text"
                  value={metadata.producer || ''}
@@ -208,6 +211,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
   onToggleFloating,
   onTriggerHistorySave
 }) => {
+  const { t } = useLanguage();
   const style = field.style || {};
   const [newOption, setNewOption] = useState('');
   const [isBulkEdit, setIsBulkEdit] = useState(false);
@@ -262,7 +266,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
 
   return (
     <PanelLayout
-      title="Field Properties"
+      title={t('properties.field.title')}
       isFloating={isFloating}
       onToggleFloating={onToggleFloating}
       onClose={onClose}
@@ -273,7 +277,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
           className="w-full"
         >
           <Trash2 size={16} className="mr-2" />
-          Delete Field
+          {t('properties.delete_field')}
         </Button>
       }
     >
@@ -281,25 +285,25 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
       <div>
         <h4 className="flex items-center text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             <Settings size={12} className="mr-1.5" />
-            General
+            {t('properties.general')}
         </h4>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label>Field Name</Label>
+            <Label>{t('properties.field_name')}</Label>
             <Input
               type="text"
               value={field.name}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onChange({ name: e.target.value })}
             />
-            <p className="text-xs text-muted-foreground">Unique ID in the PDF form.</p>
+            <p className="text-xs text-muted-foreground">{t('properties.field_name.desc')}</p>
             {field.type === FieldType.RADIO && (
-                <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">Same name = Same group.</p>
+                <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">{t('properties.radio_group.desc')}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label>Type</Label>
+            <Label>{t('properties.type')}</Label>
             <Select
               value={field.type}
               onValueChange={(value) => {
@@ -308,27 +312,166 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select field type" />
+                <SelectValue placeholder={t('common.select')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={FieldType.TEXT}>Text Field</SelectItem>
-                <SelectItem value={FieldType.CHECKBOX}>Checkbox</SelectItem>
-                <SelectItem value={FieldType.RADIO}>Radio Button</SelectItem>
-                <SelectItem value={FieldType.DROPDOWN}>Dropdown</SelectItem>
+                <SelectItem value={FieldType.TEXT}>{t('properties.type.text')}</SelectItem>
+                <SelectItem value={FieldType.CHECKBOX}>{t('properties.type.checkbox')}</SelectItem>
+                <SelectItem value={FieldType.RADIO}>{t('properties.type.radio')}</SelectItem>
+                <SelectItem value={FieldType.DROPDOWN}>{t('properties.type.dropdown')}</SelectItem>
+                <SelectItem value={FieldType.SIGNATURE}>{t('properties.type.signature')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-             <Label>Tooltip</Label>
+             <Label>{t('properties.tooltip')}</Label>
              <Input
                type="text"
                value={field.toolTip || ''}
                onFocus={onTriggerHistorySave}
                onChange={(e) => onChange({ toolTip: e.target.value })}
-               placeholder="Helper text on hover"
+               placeholder={t('properties.tooltip.ph')}
              />
           </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Values & Defaults Section */}
+      <div>
+        <h4 className="flex items-center text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            <Database size={12} className="mr-1.5" />
+            {t('properties.values_defaults')}
+        </h4>
+        <div className="space-y-3">
+          {/* Text / Signature */}
+          {(field.type === FieldType.TEXT || field.type === FieldType.SIGNATURE) && (
+             <>
+                <div className="space-y-2">
+                   <Label>{t('properties.value')}</Label>
+                   <Input
+                     type="text"
+                     value={field.value || ''}
+                     onFocus={onTriggerHistorySave}
+                     onChange={(e) => onChange({ value: e.target.value })}
+                   />
+                </div>
+                <div className="space-y-2">
+                   <Label>{t('properties.default_value')}</Label>
+                   <Input
+                     type="text"
+                     value={field.defaultValue || ''}
+                     onFocus={onTriggerHistorySave}
+                     onChange={(e) => onChange({ defaultValue: e.target.value })}
+                   />
+                </div>
+             </>
+          )}
+
+          {/* Dropdown */}
+          {field.type === FieldType.DROPDOWN && (
+             <>
+               <div className="space-y-2">
+                 <Label>{t('properties.value')}</Label>
+                 <Select
+                    value={field.value || ''}
+                    onValueChange={(val) => { onTriggerHistorySave(); onChange({ value: val }) }}
+                 >
+                   <SelectTrigger>
+                      <SelectValue placeholder={t('common.select')} />
+                   </SelectTrigger>
+                   <SelectContent>
+                      {(field.options || []).map((opt, i) => (
+                         <SelectItem key={i} value={opt}>{opt}</SelectItem>
+                      ))}
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="space-y-2">
+                 <Label>{t('properties.default_value')}</Label>
+                 <Select
+                    value={field.defaultValue || ''}
+                    onValueChange={(val) => { onTriggerHistorySave(); onChange({ defaultValue: val }) }}
+                 >
+                   <SelectTrigger>
+                      <SelectValue placeholder={t('common.select')} />
+                   </SelectTrigger>
+                   <SelectContent>
+                      {(field.options || []).map((opt, i) => (
+                         <SelectItem key={i} value={opt}>{opt}</SelectItem>
+                      ))}
+                   </SelectContent>
+                 </Select>
+               </div>
+             </>
+          )}
+
+          {/* Checkbox */}
+          {field.type === FieldType.CHECKBOX && (
+             <>
+                <div className="flex items-center justify-between">
+                   <Label htmlFor="check-val">{t('properties.checked')}</Label>
+                   <Switch 
+                      id="check-val"
+                      checked={field.isChecked || false}
+                      onCheckedChange={(checked) => { onTriggerHistorySave(); onChange({ isChecked: checked }) }}
+                   />
+                </div>
+                <div className="flex items-center justify-between">
+                   <Label htmlFor="check-def">{t('properties.default_checked')}</Label>
+                   <Switch 
+                      id="check-def"
+                      checked={field.isDefaultChecked || false}
+                      onCheckedChange={(checked) => { onTriggerHistorySave(); onChange({ isDefaultChecked: checked }) }}
+                   />
+                </div>
+                <div className="space-y-2">
+                   <Label>{t('properties.export_value')}</Label>
+                   <Input 
+                      type="text"
+                      value={field.exportValue || 'Yes'}
+                      onFocus={onTriggerHistorySave}
+                      onChange={(e) => onChange({ exportValue: e.target.value })}
+                      placeholder="Yes"
+                   />
+                   <p className="text-xs text-muted-foreground">{t('properties.export_value.desc')}</p>
+                </div>
+             </>
+          )}
+
+          {/* Radio */}
+          {field.type === FieldType.RADIO && (
+             <>
+                <div className="flex items-center justify-between">
+                   <Label htmlFor="radio-val">{t('properties.selected')}</Label>
+                   <Switch 
+                      id="radio-val"
+                      checked={field.isChecked || false}
+                      onCheckedChange={(checked) => { onTriggerHistorySave(); onChange({ isChecked: checked }) }}
+                   />
+                </div>
+                <div className="flex items-center justify-between">
+                   <Label htmlFor="radio-def">{t('properties.default_selected')}</Label>
+                   <Switch 
+                      id="radio-def"
+                      checked={field.isDefaultChecked || false}
+                      onCheckedChange={(checked) => { onTriggerHistorySave(); onChange({ isDefaultChecked: checked }) }}
+                   />
+                </div>
+                <div className="space-y-2">
+                   <Label>{t('properties.export_value')}</Label>
+                   <Input 
+                      type="text"
+                      value={field.radioValue || field.exportValue || ''}
+                      onFocus={onTriggerHistorySave}
+                      onChange={(e) => onChange({ radioValue: e.target.value, exportValue: e.target.value })}
+                   />
+                   <p className="text-xs text-muted-foreground">{t('properties.export_value.desc')}</p>
+                </div>
+             </>
+          )}
         </div>
       </div>
 
@@ -338,11 +481,11 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
       <div>
         <h4 className="flex items-center text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             <MousePointer2 size={12} className="mr-1.5" />
-            Settings
+            {t('properties.settings')}
         </h4>
         <div className="space-y-3">
             <div className="flex items-center justify-between">
-                <Label htmlFor="required-switch" className="cursor-pointer">Required</Label>
+                <Label htmlFor="required-switch" className="cursor-pointer">{t('properties.required')}</Label>
                 <Switch 
                     id="required-switch"
                     checked={field.required || false}
@@ -352,7 +495,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
             </div>
             
             <div className="flex items-center justify-between">
-                <Label htmlFor="readonly-switch" className="cursor-pointer">Read Only</Label>
+                <Label htmlFor="readonly-switch" className="cursor-pointer">{t('properties.readonly')}</Label>
                 <Switch 
                     id="readonly-switch"
                     checked={field.readOnly || false}
@@ -361,9 +504,9 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                 />
             </div>
 
-            {field.type === FieldType.TEXT && (
+            {(field.type === FieldType.TEXT || field.type === FieldType.SIGNATURE) && (
                  <div className="flex items-center justify-between">
-                    <Label htmlFor="multiline-switch" className="cursor-pointer">Multi-line</Label>
+                    <Label htmlFor="multiline-switch" className="cursor-pointer">{t('properties.multiline')}</Label>
                     <Switch 
                         id="multiline-switch"
                         checked={field.multiline || false}
@@ -372,62 +515,48 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                     />
                 </div>
             )}
-
-            {(field.type === FieldType.CHECKBOX || field.type === FieldType.RADIO) && (
-                 <div className="flex items-center justify-between">
-                    <Label htmlFor="checked-switch" className="cursor-pointer">
-                        {field.type === FieldType.RADIO ? 'Selected by Default' : 'Checked by Default'}
-                    </Label>
-                    <Switch 
-                        id="checked-switch"
-                        checked={field.isChecked || false}
-                        onMouseDown={onTriggerHistorySave}
-                        onCheckedChange={(checked) => onChange({ isChecked: checked })}
-                    />
-                </div>
-            )}
         </div>
       </div>
 
       {/* Specific Properties */}
-      {(field.type === FieldType.RADIO || field.type === FieldType.DROPDOWN || field.type === FieldType.TEXT) && <Separator />}
+      {(field.type === FieldType.DROPDOWN || field.type === FieldType.TEXT) && <Separator />}
       
       <div>
          {field.type === FieldType.TEXT && (
              <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                        <Label>Max Length</Label>
+                        <Label>{t('properties.max_length')}</Label>
                         <Input 
                             type="number"
                             min="0"
                             value={field.maxLength || ''}
                             onFocus={onTriggerHistorySave}
                             onChange={(e) => onChange({ maxLength: parseInt(e.target.value) || undefined })}
-                            placeholder="Unlim."
+                            placeholder={t('properties.unlimited')}
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label>Alignment</Label>
+                        <Label>{t('properties.alignment')}</Label>
                         <div className="flex bg-muted rounded-md p-1 border border-input">
                             <button 
                                 onClick={() => { onTriggerHistorySave(); onChange({ alignment: 'left' }) }}
                                 className={cn("flex-1 flex justify-center p-1 rounded text-foreground/50 hover:bg-background hover:text-foreground transition-colors", (field.alignment || 'left') === 'left' && "bg-background text-foreground shadow-sm")}
-                                title="Left"
+                                title={t('properties.alignment.left')}
                             >
                                 <AlignLeft size={16} />
                             </button>
                             <button 
                                 onClick={() => { onTriggerHistorySave(); onChange({ alignment: 'center' }) }}
                                 className={cn("flex-1 flex justify-center p-1 rounded text-foreground/50 hover:bg-background hover:text-foreground transition-colors", field.alignment === 'center' && "bg-background text-foreground shadow-sm")}
-                                title="Center"
+                                title={t('properties.alignment.center')}
                             >
                                 <AlignCenter size={16} />
                             </button>
                             <button 
                                 onClick={() => { onTriggerHistorySave(); onChange({ alignment: 'right' }) }}
                                 className={cn("flex-1 flex justify-center p-1 rounded text-foreground/50 hover:bg-background hover:text-foreground transition-colors", field.alignment === 'right' && "bg-background text-foreground shadow-sm")}
-                                title="Right"
+                                title={t('properties.alignment.right')}
                             >
                                 <AlignRight size={16} />
                             </button>
@@ -437,30 +566,17 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
              </div>
          )}
 
-         {field.type === FieldType.RADIO && (
-             <div className="space-y-2">
-                <Label>Export Value</Label>
-                <Input
-                  type="text"
-                  value={field.radioValue || ''}
-                  onFocus={onTriggerHistorySave}
-                  onChange={(e) => onChange({ radioValue: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground">Value sent when selected.</p>
-             </div>
-          )}
-
           {field.type === FieldType.DROPDOWN && (
              <div>
                 <div className="flex items-center justify-between mb-2">
-                    <Label>Options</Label>
+                    <Label>{t('properties.options')}</Label>
                     <Button
                         variant="link"
                         size="sm"
                         onClick={isBulkEdit ? () => setIsBulkEdit(false) : startBulkEdit}
                         className="h-auto p-0 text-xs"
                     >
-                        {isBulkEdit ? 'Switch to List' : 'Bulk Edit'}
+                        {isBulkEdit ? t('properties.switch_list') : t('properties.bulk_edit')}
                     </Button>
                 </div>
                 
@@ -475,7 +591,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                         />
                         <Button onClick={saveBulkEdit} size="sm" className="w-full">
                             <Save size={14} className="mr-2" />
-                            Save Options
+                            {t('properties.save_options')}
                         </Button>
                     </div>
                 ) : (
@@ -511,7 +627,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                                 </div>
                             ))}
                             {(field.options?.length || 0) === 0 && (
-                                <div className="text-xs text-muted-foreground italic text-center py-2">No options added</div>
+                                <div className="text-xs text-muted-foreground italic text-center py-2">{t('properties.no_options')}</div>
                             )}
                         </div>
                         <div className="flex gap-2">
@@ -520,7 +636,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                                 value={newOption}
                                 onChange={(e) => setNewOption(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleAddOption()}
-                                placeholder="Add option..."
+                                placeholder={t('properties.add_option')}
                                 className="flex-1"
                             />
                             <Button onClick={handleAddOption} size="icon" variant="secondary">
@@ -539,14 +655,14 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
       <div>
         <h4 className="flex items-center text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             <Palette size={12} className="mr-1.5" />
-            Appearance
+            {t('properties.appearance')}
         </h4>
         <div className="space-y-4">
           
           {/* Background */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label>Background</Label>
+              <Label>{t('properties.background')}</Label>
               <div className="flex items-center gap-2">
                 <Switch 
                   id="transparent"
@@ -554,7 +670,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                   onMouseDown={onTriggerHistorySave}
                   onCheckedChange={(checked) => handleStyleChange('isTransparent', checked)}
                 />
-                <Label htmlFor="transparent" className="text-xs font-normal">Transparent</Label>
+                <Label htmlFor="transparent" className="text-xs font-normal">{t('properties.transparent')}</Label>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -572,7 +688,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
           {/* Border */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Border Color</Label>
+              <Label>{t('properties.border_color')}</Label>
               <input
                 type="color"
                 value={style.borderColor || '#000000'}
@@ -582,7 +698,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
               />
             </div>
             <div className="space-y-2">
-              <Label>Border Width</Label>
+              <Label>{t('properties.border_width')}</Label>
               <Input
                 type="number"
                 min="0"
@@ -595,10 +711,10 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
           </div>
 
           {/* Text Settings (For Text and Dropdown) */}
-          {(field.type === FieldType.TEXT || field.type === FieldType.DROPDOWN) && (
+          {(field.type === FieldType.TEXT || field.type === FieldType.DROPDOWN || field.type === FieldType.SIGNATURE) && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Text Color</Label>
+                <Label>{t('properties.text_color')}</Label>
                 <input
                   type="color"
                   value={style.textColor || '#000000'}
@@ -608,7 +724,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Font Size</Label>
+                <Label>{t('properties.font_size')}</Label>
                 <Input
                   type="number"
                   min="6"
@@ -629,11 +745,11 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
       <div>
         <h4 className="flex items-center text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             <Type size={12} className="mr-1.5" />
-            Geometry
+            {t('properties.geometry')}
         </h4>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label className="text-xs">X</Label>
+            <Label className="text-xs">{t('properties.x')}</Label>
             <Input
               type="number"
               value={Math.round(field.rect.x)}
@@ -643,7 +759,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Y</Label>
+            <Label className="text-xs">{t('properties.y')}</Label>
             <Input
               type="number"
               value={Math.round(field.rect.y)}
@@ -653,7 +769,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Width</Label>
+            <Label className="text-xs">{t('properties.width')}</Label>
             <Input
               type="number"
               value={Math.round(field.rect.width)}
@@ -663,7 +779,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Height</Label>
+            <Label className="text-xs">{t('properties.height')}</Label>
             <Input
               type="number"
               value={Math.round(field.rect.height)}

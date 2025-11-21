@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { X, Layers, ListTree } from 'lucide-react';
 import { FormField, PageData, PDFOutlineItem } from '../types';
@@ -6,6 +5,7 @@ import FieldTreePanel from './FieldTreePanel';
 import OutlinePanel from './OutlinePanel';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { useLanguage } from './language-provider';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -28,6 +28,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectField,
   onNavigatePage
 }) => {
+  const { t } = useLanguage();
+
   if (!isOpen) return null;
 
   return (
@@ -38,11 +40,11 @@ const Sidebar: React.FC<SidebarProps> = ({
            <TabsList className="flex-1 h-8 grid grid-cols-2">
               <TabsTrigger value="fields" className="text-xs gap-2 h-full">
                   <Layers size={14} />
-                  Fields
+                  {t('sidebar.fields')}
               </TabsTrigger>
               <TabsTrigger value="outline" className="text-xs gap-2 h-full">
                   <ListTree size={14} />
-                  Outline
+                  {t('sidebar.outline')}
               </TabsTrigger>
            </TabsList>
            <Button 

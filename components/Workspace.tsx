@@ -2,8 +2,9 @@
 import React, { useRef, useState, useLayoutEffect, useEffect } from 'react';
 import { EditorState, FormField, FieldType } from '../types';
 import { DEFAULT_FIELD_STYLE } from '../constants';
-import { Check, ChevronDown, CircleDot } from 'lucide-react';
+import { Check, ChevronDown, CircleDot, PenLine } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useLanguage } from './language-provider';
 
 interface WorkspaceProps {
   editorState: EditorState;
@@ -29,6 +30,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onScaleChange,
   onTriggerHistorySave
 }) => {
+  const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   
@@ -561,6 +563,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         if (editorState.tool === 'draw_checkbox') type = FieldType.CHECKBOX;
         else if (editorState.tool === 'draw_radio') type = FieldType.RADIO;
         else if (editorState.tool === 'draw_dropdown') type = FieldType.DROPDOWN;
+        else if (editorState.tool === 'draw_signature') type = FieldType.SIGNATURE;
 
         const newField: FormField = {
           id: `field_${Date.now()}`,
@@ -779,9 +782,18 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
                           {field.type === FieldType.DROPDOWN && (
                             <div className="w-full h-full flex items-center justify-between pointer-events-none px-1">
-                                <span className="truncate opacity-70">Select...</span>
+                                <span className="truncate opacity-70">{t('common.select')}</span>
                                 <ChevronDown size={Math.min(16, field.rect.height * 0.8)} />
                             </div>
+                          )}
+                          
+                          {field.type === FieldType.SIGNATURE && (
+                             <div className="w-full h-full flex items-center justify-center pointer-events-none bg-red-500/5 text-red-600 dark:text-red-400">
+                                <div className="flex items-center gap-1 opacity-70">
+                                    <PenLine size={Math.min(16, field.rect.height * 0.6)} />
+                                    {field.rect.width > 60 && <span className="text-xs font-medium">{t('properties.type.signature')}</span>}
+                                </div>
+                             </div>
                           )}
                       </div>
 
@@ -843,7 +855,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         
         {editorState.pages.length === 0 && (
             <div className="text-gray-400 dark:text-gray-500 text-lg mt-20">
-                No PDF loaded. Use the upload button to start.
+                {t('workspace.no_pdf')}
             </div>
         )}
       </div>

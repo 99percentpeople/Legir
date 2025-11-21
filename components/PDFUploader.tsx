@@ -1,14 +1,17 @@
+
 import React, { useCallback } from 'react';
 import { Upload, FileText } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { buttonVariants } from './ui/button';
 import { cn } from '../lib/utils';
+import { useLanguage } from './language-provider';
 
 interface PDFUploaderProps {
   onUpload: (file: File) => void;
 }
 
 const PDFUploader: React.FC<PDFUploaderProps> = ({ onUpload }) => {
+  const { t } = useLanguage();
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
@@ -28,22 +31,21 @@ const PDFUploader: React.FC<PDFUploaderProps> = ({ onUpload }) => {
 
   return (
     <div 
-      className="flex-1 flex items-center justify-center bg-muted/30 p-4 transition-colors duration-200"
+      className="w-full"
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
     >
-      <div className="max-w-xl w-full text-center">
-        <Card className="border-dashed border-2 hover:border-primary/50 transition-colors">
-            <CardContent className="p-12 flex flex-col items-center">
-                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 text-primary">
+        <Card className="border-dashed border-2 border-muted-foreground/25 hover:border-primary/50 transition-colors bg-card/50 backdrop-blur-sm shadow-sm">
+            <CardContent className="p-12 flex flex-col items-center text-center">
+                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 text-primary animate-in zoom-in duration-500">
                     <FileText size={40} />
                 </div>
-                <h2 className="text-2xl font-bold text-foreground mb-2">Upload your PDF Form</h2>
-                <p className="text-muted-foreground mb-8">Drag and drop your file here, or click to browse</p>
+                <h2 className="text-2xl font-bold text-foreground mb-2">{t('uploader.title')}</h2>
+                <p className="text-muted-foreground mb-8 max-w-md">{t('uploader.desc')}</p>
                 
-                <label className={cn(buttonVariants({ size: "lg" }), "cursor-pointer")}>
+                <label className={cn(buttonVariants({ size: "lg" }), "cursor-pointer shadow-lg hover:shadow-primary/25 transition-all")}>
                     <Upload size={20} className="mr-2" />
-                    Select PDF File
+                    {t('uploader.btn')}
                     <input 
                     type="file" 
                     accept="application/pdf" 
@@ -53,10 +55,9 @@ const PDFUploader: React.FC<PDFUploaderProps> = ({ onUpload }) => {
                 </label>
             </CardContent>
         </Card>
-        <p className="mt-6 text-sm text-muted-foreground">
-          Your files are processed locally and securely.
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          {t('uploader.note')}
         </p>
-      </div>
     </div>
   );
 };

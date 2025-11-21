@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { ThemeProvider } from './components/theme-provider';
+import { LanguageProvider } from './components/language-provider';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Handle potential default export wrapper from CDN
@@ -19,6 +21,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <LanguageProvider defaultLanguage="en" storageKey="vite-ui-language">
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <App />
+      </ThemeProvider>
+    </LanguageProvider>
   </React.StrictMode>
 );

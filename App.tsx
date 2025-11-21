@@ -3,17 +3,20 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Toolbar from './components/Toolbar';
 import Workspace from './components/Workspace';
 import { PropertiesPanel } from './components/PropertiesPanel';
-import PDFUploader from './components/PDFUploader';
+import LandingPage from './components/LandingPage';
 import ZoomControls from './components/ZoomControls';
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp';
 import SettingsDialog from './components/SettingsDialog';
 import Sidebar from './components/Sidebar';
+import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
 import { EditorState, FormField, PDFMetadata, HistorySnapshot, PDFOutlineItem, PageData, SnappingOptions } from './types';
 import { loadPDF, exportPDF } from './services/pdfService';
 import { analyzePageForFields } from './services/geminiService';
 import { DEFAULT_FIELD_STYLE } from './constants';
+import { useLanguage } from './components/language-provider';
 
 const App: React.FC = () => {
+  const { t } = useLanguage();
   const [state, setState] = useState<EditorState>({
     pdfFile: null,
     pdfBytes: null,
@@ -44,29 +47,6 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default open
   
-  // Theme state
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark' || 
-             (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
-
-  const toggleTheme = useCallback(() => {
-    setIsDarkMode(prev => !prev);
-  }, []);
-
   // --- Zoom & Layout Calculations ---
 
   const calculateFitScale = useCallback((pagesList: PageData[]) => {
@@ -360,7 +340,7 @@ const App: React.FC = () => {
 
   const handleUpload = async (file: File) => {
     setState(prev => ({ ...prev, isProcessing: true }));
-    setProcessingStatus("Parsing PDF...");
+    setProcessingStatus(t('app.parsing'));
     try {
       const { pdfBytes, pages, fields, metadata, outline } = await loadPDF(file);
       
@@ -386,7 +366,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Error loading PDF:", error);
-      alert("Failed to load PDF. Please try another file.");
+      alert(t('app.load_error'));
       setState(prev => ({ ...prev, isProcessing: false }));
     } finally {
       setProcessingStatus(null);
@@ -435,13 +415,17 @@ const App: React.FC = () => {
 
         for (let i = 0; i < totalPages; i++) {
            const page = state.pages[i];
-           setProcessingStatus(`Analyzing page ${i + 1} of ${totalPages}...`);
+           setProcessingStatus(t('app.analyzing', { current: i + 1, total: totalPages }));
            
+           // Filter fields already on this page to provide context to the AI
+           const pageExistingFields = state.fields.filter(f => f.pageIndex === page.pageIndex);
+
            const fields = await analyzePageForFields(
                page.imageData, 
                page.pageIndex, 
                page.width, 
-               page.height
+               page.height,
+               pageExistingFields
             );
             
             const styledFields = fields.map(f => ({
@@ -463,13 +447,13 @@ const App: React.FC = () => {
                 isProcessing: false
             }));
         } else {
-            alert("No obvious form fields detected. Try adding them manually.");
+            alert(t('app.no_new_fields'));
             setState(prev => ({ ...prev, isProcessing: false }));
         }
 
     } catch (e) {
         console.error(e);
-        alert("Auto-detection failed. Please check your network or API key.");
+        alert(t('app.auto_detect_fail'));
         setState(prev => ({ ...prev, isProcessing: false }));
     } finally {
       setProcessingStatus(null);
@@ -500,7 +484,7 @@ const App: React.FC = () => {
 
   const handleExport = async () => {
     setState(prev => ({ ...prev, isProcessing: true }));
-    setProcessingStatus("Generating PDF...");
+    setProcessingStatus(t('app.generating'));
 
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -510,7 +494,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Export failed:", error);
-      alert("Failed to export PDF.");
+      alert(t('app.export_fail'));
     } finally {
       setState(prev => ({ ...prev, isProcessing: false }));
       setProcessingStatus(null);
@@ -519,7 +503,7 @@ const App: React.FC = () => {
 
   const handleSaveAndReopen = async () => {
     setState(prev => ({ ...prev, isProcessing: true }));
-    setProcessingStatus("Saving and Reloading...");
+    setProcessingStatus(t('app.saving_reloading'));
 
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -552,7 +536,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Save and Reopen failed:", error);
-      alert("Failed to save and reopen.");
+      alert(t('app.save_reopen_fail'));
       setState(prev => ({ ...prev, isProcessing: false }));
     } finally {
       setProcessingStatus(null);
@@ -561,7 +545,7 @@ const App: React.FC = () => {
 
   const handleSaveAndClose = async () => {
     setState(prev => ({ ...prev, isProcessing: true }));
-    setProcessingStatus("Saving and Closing...");
+    setProcessingStatus(t('app.saving_closing'));
 
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -590,7 +574,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Save and Close failed:", error);
-      alert("Failed to save and close.");
+      alert(t('app.save_close_fail'));
       setState(prev => ({ ...prev, isProcessing: false }));
     } finally {
       setProcessingStatus(null);
@@ -600,76 +584,76 @@ const App: React.FC = () => {
   const selectedField = state.fields.find(f => f.id === state.selectedFieldId) || null;
 
   return (
-    <div className="h-full w-full flex flex-col bg-gray-100 dark:bg-gray-900 transition-colors duration-200">
-      <Toolbar 
-        editorState={state}
-        onToolChange={(tool) => setState(prev => ({ ...prev, tool, selectedFieldId: null }))}
-        onExport={handleExport}
-        onSaveAndReopen={handleSaveAndReopen}
-        onSaveAndClose={handleSaveAndClose}
-        onAutoDetect={handleAutoDetect}
-        isDarkMode={isDarkMode}
-        onToggleTheme={toggleTheme}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={state.past.length > 0}
-        canRedo={state.future.length > 0}
-        onOpenShortcuts={() => setIsShortcutsHelpOpen(true)}
-        isFieldListOpen={isSidebarOpen}
-        onToggleFieldList={() => setIsSidebarOpen(!isSidebarOpen)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+    <div className="h-full w-full flex flex-col">
+      {state.pages.length === 0 ? (
+        <LandingPage 
+          onUpload={handleUpload}
+        />
+      ) : (
+        <>
+          <Toolbar 
+            editorState={state}
+            onToolChange={(tool) => setState(prev => ({ ...prev, tool, selectedFieldId: null }))}
+            onExport={handleExport}
+            onSaveAndReopen={handleSaveAndReopen}
+            onSaveAndClose={handleSaveAndClose}
+            onAutoDetect={handleAutoDetect}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={state.past.length > 0}
+            canRedo={state.future.length > 0}
+            onOpenShortcuts={() => setIsShortcutsHelpOpen(true)}
+            isFieldListOpen={isSidebarOpen}
+            onToggleFieldList={() => setIsSidebarOpen(!isSidebarOpen)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
 
-      <div className="flex-1 flex overflow-hidden relative">
-        {state.pages.length === 0 ? (
-          <PDFUploader onUpload={handleUpload} />
-        ) : (
-          <>
-            <Sidebar
-              isOpen={isSidebarOpen}
-              onClose={() => setIsSidebarOpen(false)}
-              pages={state.pages}
-              fields={state.fields}
-              outline={state.outline}
-              selectedFieldId={state.selectedFieldId}
-              onSelectField={(id) => setState(prev => ({ ...prev, selectedFieldId: id }))}
-              onNavigatePage={handleNavigatePage}
-            />
+          <div className="flex-1 flex overflow-hidden relative">
+              <Sidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                pages={state.pages}
+                fields={state.fields}
+                outline={state.outline}
+                selectedFieldId={state.selectedFieldId}
+                onSelectField={(id) => setState(prev => ({ ...prev, selectedFieldId: id }))}
+                onNavigatePage={handleNavigatePage}
+              />
 
-            <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden">
-                <Workspace
-                  editorState={state}
-                  onAddField={handleAddField}
-                  onSelectField={(id) => setState(prev => ({ ...prev, selectedFieldId: id }))}
-                  onUpdateField={handleUpdateField}
-                  onScaleChange={updateScale}
-                  onTriggerHistorySave={saveCheckpoint}
-                />
-                
-                <ZoomControls 
-                    scale={state.scale}
-                    onZoomIn={() => updateScale(state.scale + 0.25)}
-                    onZoomOut={() => updateScale(state.scale - 0.25)}
-                    onReset={() => updateScale(calculateFitScale(state.pages))}
-                />
-            </div>
+              <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden">
+                  <Workspace
+                    editorState={state}
+                    onAddField={handleAddField}
+                    onSelectField={(id) => setState(prev => ({ ...prev, selectedFieldId: id }))}
+                    onUpdateField={handleUpdateField}
+                    onScaleChange={updateScale}
+                    onTriggerHistorySave={saveCheckpoint}
+                  />
+                  
+                  <ZoomControls 
+                      scale={state.scale}
+                      onZoomIn={() => updateScale(state.scale + 0.25)}
+                      onZoomOut={() => updateScale(state.scale - 0.25)}
+                      onReset={() => updateScale(calculateFitScale(state.pages))}
+                  />
+              </div>
 
-            <PropertiesPanel
-              field={selectedField}
-              metadata={state.metadata}
-              filename={state.filename}
-              onChange={(updates) => selectedField && handleUpdateField(selectedField.id, updates)}
-              onMetadataChange={handleMetadataChange}
-              onFilenameChange={(name) => setState(prev => ({ ...prev, filename: name }))}
-              onDelete={handleDeleteField}
-              onClose={() => setState(prev => ({ ...prev, selectedFieldId: null }))}
-              isFloating={isPanelFloating}
-              onToggleFloating={() => setIsPanelFloating(!isPanelFloating)}
-              onTriggerHistorySave={saveCheckpoint}
-            />
-          </>
-        )}
-      </div>
+              <PropertiesPanel
+                field={selectedField}
+                metadata={state.metadata}
+                filename={state.filename}
+                onChange={(updates) => selectedField && handleUpdateField(selectedField.id, updates)}
+                onMetadataChange={handleMetadataChange}
+                onFilenameChange={(name) => setState(prev => ({ ...prev, filename: name }))}
+                onDelete={handleDeleteField}
+                onClose={() => setState(prev => ({ ...prev, selectedFieldId: null }))}
+                isFloating={isPanelFloating}
+                onToggleFloating={() => setIsPanelFloating(!isPanelFloating)}
+                onTriggerHistorySave={saveCheckpoint}
+              />
+          </div>
+        </>
+      )}
       
       <KeyboardShortcutsHelp 
         isOpen={isShortcutsHelpOpen} 
@@ -683,15 +667,19 @@ const App: React.FC = () => {
         onChange={handleSnappingOptionsChange}
       />
       
-      {state.isProcessing && (
-        <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 px-8 py-6 rounded-lg shadow-xl flex flex-col items-center min-w-[300px] border border-gray-200 dark:border-gray-700">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-gray-700 dark:text-gray-200 font-medium text-lg">{processingStatus || 'Processing...'}</p>
-            <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">This may take a moment</p>
-          </div>
-        </div>
-      )}
+      <Dialog open={state.isProcessing}>
+        <DialogContent 
+          showCloseButton={false} 
+          className="sm:max-w-[300px] flex flex-col items-center justify-center text-center outline-none"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogTitle className="sr-only">{t('common.processing')}</DialogTitle>
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-foreground font-medium text-lg">{processingStatus || t('common.processing')}</p>
+          <p className="text-muted-foreground text-sm mt-2">{t('app.wait')}</p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,60 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FormForge AI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FormForge AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style type="text/tailwindcss">
+    @layer base {
       :root {
         --background: 0 0% 100%;
-        --foreground: 240 10% 3.9%;
+        --foreground: 0 0% 3.9%;
         --card: 0 0% 100%;
-        --card-foreground: 240 10% 3.9%;
+        --card-foreground: 0 0% 3.9%;
         --popover: 0 0% 100%;
-        --popover-foreground: 240 10% 3.9%;
-        --primary: 240 5.9% 10%;
+        --popover-foreground: 0 0% 3.9%;
+        --primary: 0 0% 9%;
         --primary-foreground: 0 0% 98%;
-        --secondary: 240 4.8% 95.9%;
-        --secondary-foreground: 240 5.9% 10%;
-        --muted: 240 4.8% 95.9%;
-        --muted-foreground: 240 3.8% 46.1%;
-        --accent: 240 4.8% 95.9%;
-        --accent-foreground: 240 5.9% 10%;
+        --secondary: 0 0% 96.1%;
+        --secondary-foreground: 0 0% 9%;
+        --muted: 0 0% 96.1%;
+        --muted-foreground: 0 0% 45.1%;
+        --accent: 0 0% 96.1%;
+        --accent-foreground: 0 0% 9%;
         --destructive: 0 84.2% 60.2%;
         --destructive-foreground: 0 0% 98%;
-        --border: 240 5.9% 90%;
-        --input: 240 5.9% 90%;
-        --ring: 240 5.9% 10%;
+        --border: 0 0% 89.8%;
+        --input: 0 0% 89.8%;
+        --ring: 0 0% 3.9%;
         --radius: 0.5rem;
+        --chart-1: 12 76% 61%;
+        --chart-2: 173 58% 39%;
+        --chart-3: 197 37% 24%;
+        --chart-4: 43 74% 66%;
+        --chart-5: 27 87% 67%;
       }
       .dark {
-        --background: 240 10% 3.9%;
+        --background: 0 0% 3.9%;
         --foreground: 0 0% 98%;
-        --card: 240 10% 3.9%;
+        --card: 0 0% 3.9%;
         --card-foreground: 0 0% 98%;
-        --popover: 240 10% 3.9%;
+        --popover: 0 0% 3.9%;
         --popover-foreground: 0 0% 98%;
         --primary: 0 0% 98%;
-        --primary-foreground: 240 5.9% 10%;
-        --secondary: 240 3.7% 15.9%;
+        --primary-foreground: 0 0% 9%;
+        --secondary: 0 0% 14.9%;
         --secondary-foreground: 0 0% 98%;
-        --muted: 240 3.7% 15.9%;
-        --muted-foreground: 240 5% 64.9%;
-        --accent: 240 3.7% 15.9%;
+        --muted: 0 0% 14.9%;
+        --muted-foreground: 0 0% 63.9%;
+        --accent: 0 0% 14.9%;
         --accent-foreground: 0 0% 98%;
         --destructive: 0 62.8% 30.6%;
         --destructive-foreground: 0 0% 98%;
-        --border: 240 3.7% 15.9%;
-        --input: 240 3.7% 15.9%;
-        --ring: 240 4.9% 83.9%;
+        --border: 0 0% 14.9%;
+        --input: 0 0% 14.9%;
+        --ring: 0 0% 83.1%;
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
       }
+    }
+    @layer base {
       * {
-        border-color: hsl(var(--border));
+        @apply border-border outline-ring/50;
       }
-    </style>
-    <script>
-      tailwind.config = {
+      body {
+        @apply bg-background text-foreground;
+      }
+    }
+  </style>
+  <script>
+    tailwind.config = {
         darkMode: 'class',
         theme: {
           container: {
@@ -105,32 +123,15 @@
               md: "calc(var(--radius) - 2px)",
               sm: "calc(var(--radius) - 4px)",
             },
-            keyframes: {
-              "dialog-overlay-show": {
-                "0%": { opacity: "0" },
-                "100%": { opacity: "1" },
-              },
-              "dialog-content-show": {
-                "0%": { opacity: "0", transform: "translate(-50%, -50%) scale(0.96)" },
-                "100%": { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
-              },
-              "scale-in": {
-                "0%": { opacity: "0", transform: "scale(0.96)" },
-                "100%": { opacity: "1", transform: "scale(1)" },
-              }
-            },
-            animation: {
-              "dialog-overlay-show": "dialog-overlay-show 0.15s ease-out forwards",
-              "dialog-content-show": "dialog-content-show 0.15s ease-out forwards",
-              "scale-in": "scale-in 0.1s ease-out forwards",
-            }
           },
         },
       }
-    </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css" integrity="sha512-5qm+l5XJdJzXQZnFwS0DljTD3WjkN0wbM8YM0sX4+bF/IX2EJcSkTkVMbZn/U+dQVwyEbO32Ox1cCZnMdX4t5Q==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css"
+    integrity="sha512-5qm+l5XJdJzXQZnFwS0DljTD3WjkN0wbM8YM0sX4+bF/IX2EJcSkTkVMbZn/U+dQVwyEbO32Ox1cCZnMdX4t5Q=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
   <script type="importmap">
-{
+    {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0/",
     "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0/",
@@ -144,17 +145,22 @@
     "@radix-ui/react-label": "https://esm.sh/@radix-ui/react-label@2.1.0?external=react,react-dom",
     "@radix-ui/react-switch": "https://esm.sh/@radix-ui/react-switch@1.1.0?external=react,react-dom",
     "@radix-ui/react-separator": "https://esm.sh/@radix-ui/react-separator@1.1.0?external=react,react-dom",
-    "@radix-ui/react-select": "https://esm.sh/@radix-ui/react-select@2.1.1?external=react,react-dom",
-    "@radix-ui/react-dialog": "https://esm.sh/@radix-ui/react-dialog@1.1.1?external=react,react-dom",
+    "@radix-ui/react-select": "https://esm.sh/@radix-ui/react-select@2.2.6?external=react,react-dom",
+    "@radix-ui/react-dialog": "https://esm.sh/@radix-ui/react-dialog@1.1.15?external=react,react-dom",
     "@radix-ui/react-tabs": "https://esm.sh/@radix-ui/react-tabs@1.1.1?external=react,react-dom",
+    "@radix-ui/react-dropdown-menu": "https://esm.sh/@radix-ui/react-dropdown-menu@2.1.1?external=react,react-dom",
     "class-variance-authority": "https://esm.sh/class-variance-authority@0.7.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@radix-ui/react-toggle": "https://esm.sh/@radix-ui/react-toggle@1.1.0?external=react,react-dom",
+    "@radix-ui/react-toggle-group": "https://esm.sh/@radix-ui/react-toggle-group@1.1.0?external=react,react-dom"
   }
 }
 </script>
 </head>
-  <body class="bg-background text-foreground antialiased overflow-hidden transition-colors duration-200">
-    <div id="root" class="h-screen w-screen flex flex-col"></div>
-  </body>
+
+<body class="bg-background text-foreground antialiased overflow-hidden transition-colors duration-200">
+  <div id="root" class="h-screen w-screen flex flex-col"></div>
+</body>
+
 </html>

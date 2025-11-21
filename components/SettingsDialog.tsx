@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Settings2, Magnet } from 'lucide-react';
+import { Settings2, Magnet, Globe } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,9 @@ import {
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Button } from './ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { SnappingOptions } from '../types';
+import { useLanguage, Language } from './language-provider';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ interface SettingsDialogProps {
 }
 
 const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose, options, onChange }) => {
+  const { language, setLanguage, t } = useLanguage();
   
   const updateOption = (key: keyof SnappingOptions, value: boolean | number) => {
       onChange({
@@ -36,20 +38,39 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose, option
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5" />
-            Editor Settings
+            {t('settings.title')}
           </DialogTitle>
           <DialogDescription>
-            Configure the workspace behavior and snapping rules.
+            {t('settings.description')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4 space-y-6">
+            {/* Language Selection */}
+            <div className="flex flex-col space-y-2 bg-muted/30 p-3 rounded-lg border border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-primary" />
+                  <Label className="font-semibold">{t('settings.language')}</Label>
+                </div>
+                <Select value={language} onValueChange={(val) => setLanguage(val as Language)}>
+                  <SelectTrigger className="w-[120px] h-8">
+                    <SelectValue placeholder={t('common.select')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="zh">中文</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             {/* Master Toggle */}
             <div className="flex flex-col space-y-2 bg-muted/30 p-3 rounded-lg border border-border">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Magnet className="h-4 w-4 text-primary" />
-                        <Label htmlFor="snap-enabled" className="font-semibold">Snapping Enabled</Label>
+                        <Label htmlFor="snap-enabled" className="font-semibold">{t('settings.snapping.enabled')}</Label>
                     </div>
                     <Switch 
                         id="snap-enabled"
@@ -58,13 +79,13 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose, option
                     />
                 </div>
                 <p className="text-xs text-muted-foreground px-1">
-                    Align fields automatically when moving or resizing. Hold <span className="font-mono text-foreground">Alt</span> to temporarily disable.
+                    {t('settings.snapping.description')}
                 </p>
             </div>
 
             <div className="space-y-4 px-1">
                 <div className="flex items-center justify-between">
-                    <Label htmlFor="snap-borders" className="cursor-pointer">Snap to Borders</Label>
+                    <Label htmlFor="snap-borders" className="cursor-pointer">{t('settings.borders')}</Label>
                     <Switch 
                         id="snap-borders"
                         disabled={!options.enabled}
@@ -73,7 +94,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose, option
                     />
                 </div>
                 <div className="flex items-center justify-between">
-                    <Label htmlFor="snap-center" className="cursor-pointer">Snap to Centers</Label>
+                    <Label htmlFor="snap-center" className="cursor-pointer">{t('settings.centers')}</Label>
                     <Switch 
                         id="snap-center"
                         disabled={!options.enabled}
@@ -82,7 +103,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose, option
                     />
                 </div>
                 <div className="flex items-center justify-between">
-                    <Label htmlFor="snap-equal" className="cursor-pointer">Equidistant Snapping</Label>
+                    <Label htmlFor="snap-equal" className="cursor-pointer">{t('settings.equal')}</Label>
                     <Switch 
                         id="snap-equal"
                         disabled={!options.enabled}
@@ -94,7 +115,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen, onClose, option
         </div>
 
         <DialogFooter>
-            <Button onClick={onClose}>Done</Button>
+            <Button onClick={onClose}>{t('settings.done')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

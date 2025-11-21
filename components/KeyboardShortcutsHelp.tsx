@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Keyboard } from 'lucide-react';
 import {
@@ -9,6 +8,7 @@ import {
   DialogDescription,
 } from './ui/dialog';
 import { Badge } from './ui/badge';
+import { useLanguage } from './language-provider';
 
 interface KeyboardShortcutsHelpProps {
   isOpen: boolean;
@@ -16,23 +16,24 @@ interface KeyboardShortcutsHelpProps {
 }
 
 const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ isOpen, onClose }) => {
+  const { t } = useLanguage();
   const shortcuts = [
-    { key: 'Shift + Drag (Create)', action: 'Draw Square (Aspect Ratio 1:1)' },
-    { key: 'Shift + Drag (Move)', action: 'Lock Movement Axis (X or Y)' },
-    { key: 'Shift + Resize', action: 'Maintain Aspect Ratio' },
-    { key: 'Alt + Drag', action: 'Disable Snapping Temporarily' },
-    { key: 'Arrow Keys', action: 'Move selected field (1px)' },
-    { key: 'Shift + Arrow Keys', action: 'Move selected field (10px)' },
-    { key: 'Ctrl + Z', action: 'Undo' },
-    { key: 'Ctrl + Shift + Z', action: 'Redo' },
-    { key: 'Ctrl + C', action: 'Copy selected field' },
-    { key: 'Ctrl + V', action: 'Paste field' },
-    { key: 'Ctrl + X', action: 'Cut selected field' },
-    { key: 'Delete / Backspace', action: 'Delete selected field' },
-    { key: 'Escape', action: 'Deselect field' },
-    { key: 'Ctrl + S', action: 'Export PDF' },
-    { key: 'Ctrl + Scroll', action: 'Zoom In / Out' },
-    { key: 'Shift + ?', action: 'Open this help menu' },
+    { key: t('shortcuts.shift_drag_create'), action: t('shortcuts.draw_square') },
+    { key: t('shortcuts.shift_drag_move'), action: t('shortcuts.lock_axis') },
+    { key: t('shortcuts.shift_resize'), action: t('shortcuts.maintain_aspect') },
+    { key: t('shortcuts.alt_drag'), action: t('shortcuts.disable_snapping') },
+    { key: t('shortcuts.arrow_keys'), action: t('shortcuts.move_1px') },
+    { key: t('shortcuts.shift_arrow'), action: t('shortcuts.move_10px') },
+    { key: 'Ctrl + Z', action: t('toolbar.undo') },
+    { key: 'Ctrl + Shift + Z', action: t('toolbar.redo') },
+    { key: 'Ctrl + C', action: t('shortcuts.copy') },
+    { key: 'Ctrl + V', action: t('shortcuts.paste') },
+    { key: 'Ctrl + X', action: t('shortcuts.cut') },
+    { key: 'Delete / Backspace', action: t('shortcuts.delete') },
+    { key: 'Escape', action: t('shortcuts.deselect') },
+    { key: 'Ctrl + S', action: t('shortcuts.export') },
+    { key: 'Ctrl + Scroll', action: t('shortcuts.zoom') },
+    { key: 'Shift + ?', action: t('shortcuts.help') },
   ];
 
   return (
@@ -41,10 +42,10 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ isOpen, o
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Keyboard className="h-5 w-5" />
-            Keyboard Shortcuts
+            {t('shortcuts.title')}
           </DialogTitle>
           <DialogDescription>
-            Essential shortcuts for faster editing.
+            {t('shortcuts.desc')}
           </DialogDescription>
         </DialogHeader>
         
@@ -52,8 +53,8 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ isOpen, o
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
               <tr>
-                <th className="px-4 py-2 font-medium rounded-tl-md">Shortcut</th>
-                <th className="px-4 py-2 font-medium rounded-tr-md">Action</th>
+                <th className="px-4 py-2 font-medium rounded-tl-md">{t('shortcuts.header.key')}</th>
+                <th className="px-4 py-2 font-medium rounded-tr-md">{t('shortcuts.header.action')}</th>
               </tr>
             </thead>
             <tbody>

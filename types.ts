@@ -4,6 +4,7 @@ export enum FieldType {
   CHECKBOX = 'Checkbox',
   RADIO = 'Radio',
   DROPDOWN = 'Dropdown',
+  SIGNATURE = 'Signature',
 }
 
 export interface FieldStyle {
@@ -28,15 +29,24 @@ export interface FormField {
   };
   required?: boolean;
   style?: FieldStyle;
+  
+  // Value & Defaults
+  value?: string;         // Current Text / Selected Dropdown Option
+  defaultValue?: string;  // Default Text / Default Dropdown Option
+  
+  isChecked?: boolean;        // Current Checkbox/Radio state
+  isDefaultChecked?: boolean; // Default Checkbox/Radio state
+  
+  exportValue?: string;   // Export value for Checkbox (defaults to Yes) or Radio (alias for radioValue)
+  
   // Specific properties
   options?: string[]; // For Dropdown
-  radioValue?: string; // For Radio Button (the value when selected)
+  radioValue?: string; // For Radio Button (legacy/alias for exportValue)
 
   // Extended properties
   toolTip?: string;
   readOnly?: boolean;
   multiline?: boolean; // For Text
-  isChecked?: boolean; // For Checkbox/Radio default
   maxLength?: number; // For Text
   alignment?: 'left' | 'center' | 'right'; // For Text
 }
@@ -86,7 +96,7 @@ export interface EditorState {
   outline: PDFOutlineItem[];
   selectedFieldId: string | null;
   scale: number;
-  tool: 'select' | 'draw_text' | 'draw_checkbox' | 'draw_radio' | 'draw_dropdown';
+  tool: 'select' | 'draw_text' | 'draw_checkbox' | 'draw_radio' | 'draw_dropdown' | 'draw_signature';
   isProcessing: boolean;
   // History Stacks
   past: HistorySnapshot[];
