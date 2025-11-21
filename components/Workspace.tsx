@@ -702,6 +702,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   const isLandscape = field.rect.width > field.rect.height;
                   const applyStylesToContainer = !isRadio;
                   
+                  const textDisplay = field.value || field.defaultValue || field.name;
+                  const dropdownDisplay = field.value || field.defaultValue || t('common.select');
+                  const isDropdownPlaceholder = !field.value && !field.defaultValue;
+
                   return (
                     <div
                       key={field.id}
@@ -748,7 +752,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                 textAlign: field.alignment || 'left'
                               }}
                             >
-                              {field.name}
+                              {textDisplay}
                             </span>
                           )}
 
@@ -782,7 +786,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
                           {field.type === FieldType.DROPDOWN && (
                             <div className="w-full h-full flex items-center justify-between pointer-events-none px-1">
-                                <span className="truncate opacity-70">{t('common.select')}</span>
+                                <span className={cn("truncate", isDropdownPlaceholder ? "opacity-70" : "")}>{dropdownDisplay}</span>
                                 <ChevronDown size={Math.min(16, field.rect.height * 0.8)} />
                             </div>
                           )}
@@ -830,7 +834,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                       
                       {/* Tooltip only on hover if not selected */}
                       {!isSelected && (
-                         <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 px-1 rounded text-[10px] pointer-events-none select-none truncate max-w-full z-20 absolute -top-5 left-0 border border-gray-200 shadow-sm text-gray-800">
+                         <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-accent/95 px-2 py-1 rounded text-[10px] font-medium pointer-events-none select-none whitespace-nowrap z-50 absolute -top-8 left-0 border border-border shadow-sm text-popover-foreground w-max">
                            {field.name}
                          </span>
                       )}
