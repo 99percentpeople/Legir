@@ -1,6 +1,6 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
-import { PDFDocument, rgb, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, StandardFonts, TextAlignment, PDFName, PDFString, PDFSignature } from 'pdf-lib';
+import { PDFDocument, rgb, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, StandardFonts, TextAlignment, PDFName, PDFString, PDFSignature, PDFDict, PDFArray } from 'pdf-lib';
 import { FormField, FieldType, PageData, FieldStyle, PDFMetadata, PDFOutlineItem } from '../types';
 import { DEFAULT_FIELD_STYLE } from '../constants';
 
@@ -288,6 +288,7 @@ export const exportPDF = async (originalBytes: Uint8Array, fields: FormField[], 
   // 1. Remove existing fields of types we manage
   const existingFields = form.getFields();
   for (const field of existingFields) {
+      let shouldRemove = false;
       try {
           // Robust check for field types including fallback to constructor name
           const typeName = field.constructor.name;
@@ -297,11 +298,55 @@ export const exportPDF = async (originalBytes: Uint8Array, fields: FormField[], 
           const isRadio = field instanceof PDFRadioGroup || typeName === 'PDFRadioGroup';
           const isSig = (typeof PDFSignature !== 'undefined' && field instanceof PDFSignature) || typeName === 'PDFSignature';
 
-          if (isText || isCheck || isDropdown || isRadio || isSig) { 
+          shouldRemove = isText || isCheck || isDropdown || isRadio || isSig;
+
+          if (shouldRemove) { 
               form.removeField(field);
           }
       } catch (e) {
-          console.error('Failed to remove field:', field.getName(), e);
+          // Warning only - prevents crash on corrupt PDFs
+          console.warn(`Attempting manual removal for corrupt field: ${field.getName()}`);
+          
+          // Fallback: Try to remove from AcroForm fields array manually to prevent collisions
+          if (shouldRemove) {
+              try {
+                  const fieldRef = (field as any).ref;
+
+                  // 1. Detach from AcroForm
+                  const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
+                  if (acroForm instanceof PDFDict) {
+                      const acroFields = acroForm.get(PDFName.of('Fields'));
+                      if (acroFields instanceof PDFArray) {
+                          const idx = acroFields.indexOf(fieldRef);
+                          if (idx !== -1) {
+                              acroFields.remove(idx);
+                          }
+                      }
+                  }
+
+                  // 2. Detach visual widgets from pages
+                  const acroField = (field as any).acroField;
+                  if (acroField && typeof acroField.getWidgets === 'function') {
+                      const widgets = acroField.getWidgets();
+                      if (Array.isArray(widgets)) {
+                          const pages = pdfDoc.getPages();
+                          for (const page of pages) {
+                              const annots = page.node.Annots();
+                              if (annots instanceof PDFArray) {
+                                  for (const widget of widgets) {
+                                      const wIdx = annots.indexOf(widget);
+                                      if (wIdx !== -1) {
+                                          annots.remove(wIdx);
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  }
+              } catch (cleanupErr) {
+                  console.error('Manual cleanup failed:', cleanupErr);
+              }
+          }
       }
   }
 
