@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
 import { EditorState, FormField, PDFMetadata, HistorySnapshot, PDFOutlineItem, PageData, SnappingOptions } from './types';
 import { loadPDF, exportPDF } from './services/pdfService';
 import { analyzePageForFields } from './services/geminiService';
+import { saveDraft, getDraft, clearDraft } from './services/storageService';
 import { DEFAULT_FIELD_STYLE } from './constants';
 import { useLanguage } from './components/language-provider';
 
@@ -46,6 +47,40 @@ const App: React.FC = () => {
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default open
+  const [hasSavedSession, setHasSavedSession] = useState(false);
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    getDraft().then(draft => {
+      if (draft) {
+        setHasSavedSession(true);
+      }
+    });
+  }, []);
+
+  // Warn user before leaving if there is an active session
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (state.pages.length > 0) {
+        // Standard browser warning mechanism
+        e.preventDefault();
+        e.returnValue = ''; 
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [state.pages.length]);
+
+  // Auto-save mechanism
+  useEffect(() => {
+    if (state.pages.length > 0 && state.pdfBytes) {
+      const timer = setTimeout(() => {
+        handleSaveDraft(true); // Silent auto-save
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [state.fields, state.metadata, state.filename]);
   
   // --- Zoom & Layout Calculations ---
 
@@ -373,6 +408,41 @@ const App: React.FC = () => {
     }
   };
 
+  const handleResumeSession = async () => {
+    const draft = await getDraft();
+    if (!draft) return;
+
+    setState(prev => ({ ...prev, isProcessing: true }));
+    setProcessingStatus(t('app.loading_draft'));
+
+    try {
+        // Re-load PDF pages from stored bytes
+        const { pages, outline } = await loadPDF(draft.pdfBytes);
+        const fitScale = calculateFitScale(pages);
+
+        setState(prev => ({
+            ...prev,
+            pdfFile: null, // We rely on bytes now
+            pdfBytes: draft.pdfBytes,
+            pages,
+            outline,
+            fields: draft.fields, // Use fields from draft, ignoring re-detected ones
+            metadata: draft.metadata,
+            filename: draft.filename,
+            scale: fitScale,
+            past: [],
+            future: [],
+            isProcessing: false
+        }));
+    } catch (error) {
+        console.error("Failed to resume session:", error);
+        alert(t('app.load_error'));
+        setState(prev => ({ ...prev, isProcessing: false }));
+    } finally {
+        setProcessingStatus(null);
+    }
+  };
+
   const handleAddField = (field: FormField) => {
     saveCheckpoint(); // Save before adding
     setState(prev => ({
@@ -501,45 +571,35 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveAndReopen = async () => {
-    setState(prev => ({ ...prev, isProcessing: true }));
-    setProcessingStatus(t('app.saving_reloading'));
+  const handleSaveDraft = async (silent = false) => {
+    if (!state.pdfBytes) return;
+    
+    if (!silent) {
+      setState(prev => ({ ...prev, isProcessing: true }));
+      setProcessingStatus(t('app.saving_draft'));
+    }
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const modifiedBytes = await generatePDF();
-      
-      if (modifiedBytes) {
-        const finalName = getDownloadName();
-        downloadPDF(modifiedBytes, finalName);
-
-        const newFile = new File([modifiedBytes], finalName, { type: 'application/pdf' });
-        const { pdfBytes, pages, fields, metadata, outline } = await loadPDF(newFile);
+        await saveDraft({
+            pdfBytes: state.pdfBytes,
+            fields: state.fields,
+            metadata: state.metadata,
+            filename: state.filename
+        });
+        setHasSavedSession(true);
         
-        const fitScale = calculateFitScale(pages);
-
-        setState(prev => ({
-          ...prev,
-          pdfFile: newFile,
-          pdfBytes,
-          pages,
-          fields,
-          metadata,
-          outline,
-          filename: finalName,
-          selectedFieldId: null,
-          isProcessing: false,
-          scale: fitScale,
-          past: [], 
-          future: []
-        }));
-      }
+        if (!silent) {
+            // Just a small delay to show status if not silent
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
     } catch (error) {
-      console.error("Save and Reopen failed:", error);
-      alert(t('app.save_reopen_fail'));
-      setState(prev => ({ ...prev, isProcessing: false }));
+        console.error("Failed to save draft", error);
+        if (!silent) alert("Failed to save draft.");
     } finally {
-      setProcessingStatus(null);
+        if (!silent) {
+            setState(prev => ({ ...prev, isProcessing: false }));
+            setProcessingStatus(null);
+        }
     }
   };
 
@@ -554,6 +614,8 @@ const App: React.FC = () => {
       if (modifiedBytes) {
         downloadPDF(modifiedBytes, getDownloadName());
         
+        await clearDraft(); // Clear session on explicit close/export
+
         setState(prev => ({
             ...prev,
             pdfFile: null,
@@ -571,6 +633,7 @@ const App: React.FC = () => {
             future: [],
             clipboard: null
         }));
+        setHasSavedSession(false);
       }
     } catch (error) {
       console.error("Save and Close failed:", error);
@@ -588,6 +651,8 @@ const App: React.FC = () => {
       {state.pages.length === 0 ? (
         <LandingPage 
           onUpload={handleUpload}
+          hasSavedSession={hasSavedSession}
+          onResume={handleResumeSession}
         />
       ) : (
         <>
@@ -595,7 +660,7 @@ const App: React.FC = () => {
             editorState={state}
             onToolChange={(tool) => setState(prev => ({ ...prev, tool, selectedFieldId: null }))}
             onExport={handleExport}
-            onSaveAndReopen={handleSaveAndReopen}
+            onSaveDraft={() => handleSaveDraft(false)}
             onSaveAndClose={handleSaveAndClose}
             onAutoDetect={handleAutoDetect}
             onUndo={handleUndo}

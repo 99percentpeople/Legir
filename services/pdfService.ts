@@ -84,10 +84,17 @@ const mapOutline = async (pdf: any, items: any[]): Promise<PDFOutlineItem[]> => 
   return mapped;
 };
 
-export const loadPDF = async (file: File): Promise<{ pdfBytes: Uint8Array; pages: PageData[], fields: FormField[], metadata: PDFMetadata, outline: PDFOutlineItem[] }> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdfBytes = new Uint8Array(arrayBuffer.slice(0));
-  const renderBuffer = new Uint8Array(arrayBuffer.slice(0));
+export const loadPDF = async (input: File | Uint8Array): Promise<{ pdfBytes: Uint8Array; pages: PageData[], fields: FormField[], metadata: PDFMetadata, outline: PDFOutlineItem[] }> => {
+  let pdfBytes: Uint8Array;
+  
+  if (input instanceof File) {
+    const arrayBuffer = await input.arrayBuffer();
+    pdfBytes = new Uint8Array(arrayBuffer.slice(0));
+  } else {
+    pdfBytes = input;
+  }
+
+  const renderBuffer = new Uint8Array(pdfBytes.slice(0));
   
   // Provide password callback to handle default encrypted files
   const loadingTask = pdfJs.getDocument({

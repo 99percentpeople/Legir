@@ -5,8 +5,69 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FormForge AI</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
   <style type="text/tailwindcss">
+    @theme {
+      --color-border: hsl(var(--border));
+      --color-input: hsl(var(--input));
+      --color-ring: hsl(var(--ring));
+      --color-background: hsl(var(--background));
+      --color-foreground: hsl(var(--foreground));
+
+      --color-primary: hsl(var(--primary));
+      --color-primary-foreground: hsl(var(--primary-foreground));
+
+      --color-secondary: hsl(var(--secondary));
+      --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+      --color-destructive: hsl(var(--destructive));
+      --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+      --color-muted: hsl(var(--muted));
+      --color-muted-foreground: hsl(var(--muted-foreground));
+
+      --color-accent: hsl(var(--accent));
+      --color-accent-foreground: hsl(var(--accent-foreground));
+
+      --color-popover: hsl(var(--popover));
+      --color-popover-foreground: hsl(var(--popover-foreground));
+
+      --color-card: hsl(var(--card));
+      --color-card-foreground: hsl(var(--card-foreground));
+
+      --color-chart-1: hsl(var(--chart-1));
+      --color-chart-2: hsl(var(--chart-2));
+      --color-chart-3: hsl(var(--chart-3));
+      --color-chart-4: hsl(var(--chart-4));
+      --color-chart-5: hsl(var(--chart-5));
+
+      --radius-lg: var(--radius);
+      --radius-md: calc(var(--radius) - 2px);
+      --radius-sm: calc(var(--radius) - 4px);
+
+      --animate-accordion-down: accordion-down 0.2s ease-out;
+      --animate-accordion-up: accordion-up 0.2s ease-out;
+
+      @keyframes accordion-down {
+        from { height: 0 }
+        to { height: var(--radix-accordion-content-height) }
+      }
+      @keyframes accordion-up {
+        from { height: var(--radix-accordion-content-height) }
+        to { height: 0 }
+      }
+    }
+
+    @utility container {
+      margin-inline: auto;
+      padding-inline: 2rem;
+      @media (width >= 1400px) {
+        max-width: 1400px;
+      }
+    }
+
+    @variant dark (&:where(.dark, .dark *));
+
     @layer base {
       :root {
         --background: 0 0% 100%;
@@ -50,7 +111,7 @@
         --muted-foreground: 0 0% 63.9%;
         --accent: 0 0% 14.9%;
         --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
+        --destructive: 358.75 100% 70%;
         --destructive-foreground: 0 0% 98%;
         --border: 0 0% 14.9%;
         --input: 0 0% 14.9%;
@@ -71,62 +132,6 @@
       }
     }
   </style>
-  <script>
-    tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          container: {
-            center: true,
-            padding: "2rem",
-            screens: {
-              "2xl": "1400px",
-            },
-          },
-          extend: {
-            colors: {
-              border: "hsl(var(--border))",
-              input: "hsl(var(--input))",
-              ring: "hsl(var(--ring))",
-              background: "hsl(var(--background))",
-              foreground: "hsl(var(--foreground))",
-              primary: {
-                DEFAULT: "hsl(var(--primary))",
-                foreground: "hsl(var(--primary-foreground))",
-              },
-              secondary: {
-                DEFAULT: "hsl(var(--secondary))",
-                foreground: "hsl(var(--secondary-foreground))",
-              },
-              destructive: {
-                DEFAULT: "hsl(var(--destructive))",
-                foreground: "hsl(var(--destructive-foreground))",
-              },
-              muted: {
-                DEFAULT: "hsl(var(--muted))",
-                foreground: "hsl(var(--muted-foreground))",
-              },
-              accent: {
-                DEFAULT: "hsl(var(--accent))",
-                foreground: "hsl(var(--accent-foreground))",
-              },
-              popover: {
-                DEFAULT: "hsl(var(--popover))",
-                foreground: "hsl(var(--popover-foreground))",
-              },
-              card: {
-                DEFAULT: "hsl(var(--card))",
-                foreground: "hsl(var(--card-foreground))",
-              },
-            },
-            borderRadius: {
-              lg: "var(--radius)",
-              md: "calc(var(--radius) - 2px)",
-              sm: "calc(var(--radius) - 4px)",
-            },
-          },
-        },
-      }
-  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css"
     integrity="sha512-5qm+l5XJdJzXQZnFwS0DljTD3WjkN0wbM8YM0sX4+bF/IX2EJcSkTkVMbZn/U+dQVwyEbO32Ox1cCZnMdX4t5Q=="
     crossorigin="anonymous" referrerpolicy="no-referrer" />

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Sparkles, FileText, Shield, FileType, Globe, Check } from 'lucide-react';
+import { Sparkles, FileText, Shield, FileType, Globe, Check, History } from 'lucide-react';
 import { Button } from './ui/button';
 import { ModeToggle } from './mode-toggle';
 import PDFUploader from './PDFUploader';
@@ -14,9 +14,11 @@ import {
 
 interface LandingPageProps {
   onUpload: (file: File) => void;
+  hasSavedSession?: boolean;
+  onResume?: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onUpload }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onUpload, hasSavedSession, onResume }) => {
   const { t, language, setLanguage } = useLanguage();
 
   return (
@@ -67,8 +69,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onUpload }) => {
             </p>
          </div>
          
-         <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
+         <div className="w-full max-w-2xl flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
             <PDFUploader onUpload={onUpload} />
+            
+            {hasSavedSession && onResume && (
+                <Button 
+                    onClick={onResume} 
+                    variant="outline" 
+                    className="w-full md:w-auto gap-2 mt-2 border-dashed border-primary/50 hover:border-primary text-primary"
+                >
+                    <History size={16} />
+                    {t('landing.resume_session')}
+                </Button>
+            )}
          </div>
          
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full mt-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">

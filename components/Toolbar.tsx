@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MousePointer2, Type, CheckSquare, Download, Sparkles, ChevronDown, RefreshCw, LogOut, Undo2, Redo2, Keyboard, PanelLeft, List, CircleDot, Settings, Globe, Check, PenLine } from 'lucide-react';
+import { MousePointer2, Type, CheckSquare, Download, Sparkles, ChevronDown, RefreshCw, LogOut, Undo2, Redo2, Keyboard, PanelLeft, List, CircleDot, Settings, Globe, Check, PenLine, Save } from 'lucide-react';
 import { EditorState } from '../types';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
@@ -19,7 +19,7 @@ interface ToolbarProps {
   editorState: EditorState;
   onToolChange: (tool: EditorState['tool']) => void;
   onExport: () => void;
-  onSaveAndReopen: () => void;
+  onSaveDraft: () => void;
   onSaveAndClose: () => void;
   onAutoDetect: () => void;
   onUndo: () => void;
@@ -36,7 +36,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   editorState,
   onToolChange,
   onExport,
-  onSaveAndReopen,
+  onSaveDraft,
   onSaveAndClose,
   onAutoDetect,
   onUndo,
@@ -212,14 +212,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={onOpenSettings}>
-                <Settings size={16} className="mr-2" />
-                {t('toolbar.settings')}
-              </DropdownMenuItem>
-              <Separator className="my-1" />
-              <DropdownMenuItem onClick={onSaveAndReopen}>
-                <RefreshCw size={16} className="mr-2" />
-                {t('toolbar.save_reopen')}
+              <DropdownMenuItem onClick={onSaveDraft}>
+                <Save size={16} className="mr-2" />
+                {t('toolbar.save_draft')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onSaveAndClose} variant="destructive">
                 <LogOut size={16} className="mr-2" />
