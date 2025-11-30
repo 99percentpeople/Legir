@@ -1,9 +1,11 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useCallback } from 'react';
 import { FormField, FieldType, PDFMetadata } from '../types';
-import { Trash2, X, Pin, PinOff, FileText, Plus, Minus, ArrowUp, ArrowDown, Save, Settings, Type, MousePointer2, Palette, AlignLeft, AlignCenter, AlignRight, Database } from 'lucide-react';
-import { Button } from './ui/button';
+import { Trash2, X, Pin, PinOff, FileText, Plus, Minus, ArrowUp, ArrowDown, Save, Settings, Type, MousePointer2, Palette, AlignLeft, AlignCenter, AlignRight, Database, Upload } from 'lucide-react';
+import { Button, buttonVariants } from './ui/button';
 import { Input } from './ui/input';
+import { NumberInput } from './ui/number-input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
@@ -11,6 +13,7 @@ import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
 import { cn } from '../lib/utils';
 import { useLanguage } from './language-provider';
+import { FONT_FAMILY_MAP } from '../constants';
 
 // --- Shared Layout Component ---
 interface PanelLayoutProps {
@@ -20,6 +23,8 @@ interface PanelLayoutProps {
   title: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  width: number;
+  onResize: (width: number) => void;
 }
 
 const PanelLayout: React.FC<PanelLayoutProps> = ({ 
@@ -28,53 +33,90 @@ const PanelLayout: React.FC<PanelLayoutProps> = ({
   onClose, 
   title, 
   children,
-  footer
-}) => (
-  <div className={cn(
-    "w-80 bg-background border-l border-border flex flex-col h-full transition-all duration-200",
-    isFloating ? 'absolute right-0 top-0 bottom-0 shadow-2xl' : 'relative shadow-none'
-  )}>
-    {/* Header */}
-    <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
-      <h3 className="font-semibold text-foreground flex items-center gap-2">
-        {title}
-      </h3>
-      <div className="flex items-center gap-1">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8"
-          onClick={onToggleFloating}
-          title={isFloating ? "Pin panel to side" : "Unpin panel (float)"}
-        >
-          {isFloating ? <Pin size={16} /> : <PinOff size={16} />}
-        </Button>
-        {onClose && (
+  footer,
+  width,
+  onResize
+}) => {
+  const resizeHandler = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      // Dragging left edge: moving left (decreasing X) increases width
+      const newWidth = startWidth + (startX - moveEvent.clientX);
+      onResize(Math.max(240, Math.min(600, newWidth)));
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [width, onResize]);
+
+  return (
+    <div 
+      className={cn(
+        "bg-background border-l border-border flex flex-col h-full transition-colors duration-200",
+        isFloating ? 'absolute right-0 top-0 bottom-0 shadow-2xl' : 'relative shadow-none'
+      )}
+      style={{ width: width }}
+    >
+      {/* Resize Handle */}
+      <div 
+        className="absolute top-0 left-0 bottom-0 w-1 hover:bg-primary/50 cursor-col-resize z-50 transition-colors"
+        onMouseDown={resizeHandler}
+      />
+
+      {/* Header */}
+      <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
+        <h3 className="font-semibold text-foreground flex items-center gap-2">
+          {title}
+        </h3>
+        <div className="flex items-center gap-1">
           <Button 
             variant="ghost" 
             size="icon" 
             className="h-8 w-8"
-            onClick={onClose} 
+            onClick={onToggleFloating}
+            title={isFloating ? "Pin panel to side" : "Unpin panel (float)"}
           >
-            <X size={18} />
+            {isFloating ? <Pin size={16} /> : <PinOff size={16} />}
           </Button>
-        )}
+          {onClose && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={onClose} 
+            >
+              <X size={18} />
+            </Button>
+          )}
+        </div>
       </div>
-    </div>
 
-    {/* Body */}
-    <div className="p-4 space-y-6 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border">
-      {children}
-    </div>
-
-    {/* Footer */}
-    {footer && (
-      <div className="p-4 border-t border-border bg-muted/30">
-        {footer}
+      {/* Body */}
+      <div className="p-4 space-y-6 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border">
+        {children}
       </div>
-    )}
-  </div>
-);
+
+      {/* Footer */}
+      {footer && (
+        <div className="p-4 border-t border-border bg-muted/30">
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // --- Document Properties Sub-Component ---
 interface DocumentPropertiesPanelProps {
@@ -85,6 +127,8 @@ interface DocumentPropertiesPanelProps {
   isFloating: boolean;
   onToggleFloating: () => void;
   onTriggerHistorySave: () => void;
+  width: number;
+  onResize: (width: number) => void;
 }
 
 const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
@@ -94,7 +138,9 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
   onFilenameChange,
   isFloating,
   onToggleFloating,
-  onTriggerHistorySave
+  onTriggerHistorySave,
+  width,
+  onResize
 }) => {
   const { t } = useLanguage();
   return (
@@ -102,6 +148,8 @@ const DocumentPropertiesPanel: React.FC<DocumentPropertiesPanelProps> = ({
       title={<><FileText size={16} /> {t('properties.document.title')}</>}
       isFloating={isFloating}
       onToggleFloating={onToggleFloating}
+      width={width}
+      onResize={onResize}
     >
        <div className="space-y-4">
          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md text-sm text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
@@ -200,6 +248,8 @@ interface FieldPropertiesPanelProps {
   isFloating: boolean;
   onToggleFloating: () => void;
   onTriggerHistorySave: () => void;
+  width: number;
+  onResize: (width: number) => void;
 }
 
 const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
@@ -209,7 +259,9 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
   onClose,
   isFloating,
   onToggleFloating,
-  onTriggerHistorySave
+  onTriggerHistorySave,
+  width,
+  onResize
 }) => {
   const { t } = useLanguage();
   const style = field.style || {};
@@ -264,12 +316,27 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
     setIsBulkEdit(false);
   };
 
+  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          onTriggerHistorySave();
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+              if (ev.target?.result) {
+                  onChange({ signatureData: ev.target.result as string });
+              }
+          };
+          reader.readAsDataURL(e.target.files[0]);
+      }
+  };
+
   return (
     <PanelLayout
       title={t('properties.field.title')}
       isFloating={isFloating}
       onToggleFloating={onToggleFloating}
       onClose={onClose}
+      width={width}
+      onResize={onResize}
       footer={
         <Button
           variant="destructive"
@@ -346,28 +413,107 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
             {t('properties.values_defaults')}
         </h4>
         <div className="space-y-3">
-          {/* Text / Signature */}
-          {(field.type === FieldType.TEXT || field.type === FieldType.SIGNATURE) && (
+          {/* Text */}
+          {field.type === FieldType.TEXT && (
              <>
                 <div className="space-y-2">
                    <Label>{t('properties.value')}</Label>
-                   <Input
-                     type="text"
-                     value={field.value || ''}
-                     onFocus={onTriggerHistorySave}
-                     onChange={(e) => onChange({ value: e.target.value })}
-                   />
+                   {field.multiline ? (
+                       <Textarea
+                           value={field.value || ''}
+                           onFocus={onTriggerHistorySave}
+                           onChange={(e) => onChange({ value: e.target.value })}
+                           className="resize-y min-h-[4rem]"
+                       />
+                   ) : (
+                       <Input
+                           type="text"
+                           value={field.value || ''}
+                           onFocus={onTriggerHistorySave}
+                           onChange={(e) => onChange({ value: e.target.value })}
+                       />
+                   )}
                 </div>
                 <div className="space-y-2">
                    <Label>{t('properties.default_value')}</Label>
-                   <Input
-                     type="text"
-                     value={field.defaultValue || ''}
-                     onFocus={onTriggerHistorySave}
-                     onChange={(e) => onChange({ defaultValue: e.target.value })}
-                   />
+                   {field.multiline ? (
+                       <Textarea
+                           value={field.defaultValue || ''}
+                           onFocus={onTriggerHistorySave}
+                           onChange={(e) => onChange({ defaultValue: e.target.value })}
+                           className="resize-y min-h-[4rem]"
+                       />
+                   ) : (
+                       <Input
+                           type="text"
+                           value={field.defaultValue || ''}
+                           onFocus={onTriggerHistorySave}
+                           onChange={(e) => onChange({ defaultValue: e.target.value })}
+                       />
+                   )}
                 </div>
              </>
+          )}
+          
+          {/* Signature */}
+          {field.type === FieldType.SIGNATURE && (
+              <>
+                <div className="space-y-3">
+                    <Label>{t('properties.signature_image')}</Label>
+                    <div className="border border-dashed border-input rounded-md p-4 flex flex-col items-center justify-center gap-2 bg-muted/20">
+                        {field.signatureData ? (
+                            <div className="relative w-full aspect-video flex items-center justify-center bg-white rounded border border-border overflow-hidden">
+                                <img 
+                                    src={field.signatureData} 
+                                    alt="Signature" 
+                                    className={cn("max-w-full max-h-full", field.imageScaleMode === 'fill' ? 'object-fill w-full h-full' : 'object-contain')} 
+                                />
+                                <Button 
+                                    variant="destructive" 
+                                    size="icon" 
+                                    className="absolute top-1 right-1 h-6 w-6"
+                                    onClick={() => { onTriggerHistorySave(); onChange({ signatureData: undefined }); }}
+                                >
+                                    <Trash2 size={12} />
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="text-xs text-muted-foreground text-center">
+                                {t('properties.no_signature')}
+                            </div>
+                        )}
+                        
+                        <label className="cursor-pointer">
+                            <Input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={handleSignatureUpload}
+                            />
+                            <div className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
+                                <Upload size={14} className="mr-2" />
+                                {t('properties.upload_signature')}
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label>{t('properties.scale_mode')}</Label>
+                    <Select
+                        value={field.imageScaleMode || 'contain'}
+                        onValueChange={(val) => { onTriggerHistorySave(); onChange({ imageScaleMode: val as 'contain' | 'fill' }) }}
+                    >
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="contain">{t('properties.scale_mode.contain')}</SelectItem>
+                            <SelectItem value="fill">{t('properties.scale_mode.fill')}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+              </>
           )}
 
           {/* Dropdown */}
@@ -504,7 +650,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                 />
             </div>
 
-            {(field.type === FieldType.TEXT || field.type === FieldType.SIGNATURE) && (
+            {field.type === FieldType.TEXT && (
                  <div className="flex items-center justify-between">
                     <Label htmlFor="multiline-switch" className="cursor-pointer">{t('properties.multiline')}</Label>
                     <Switch 
@@ -527,13 +673,12 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                         <Label>{t('properties.max_length')}</Label>
-                        <Input 
-                            type="number"
-                            min="0"
-                            value={field.maxLength || ''}
+                        <NumberInput
+                            minValue={0}
+                            formatOptions={{ maximumFractionDigits: 0 }}
+                            value={field.maxLength || NaN}
                             onFocus={onTriggerHistorySave}
-                            onChange={(e) => onChange({ maxLength: parseInt(e.target.value) || undefined })}
-                            placeholder={t('properties.unlimited')}
+                            onChange={(val) => onChange({ maxLength: isNaN(val) ? undefined : val })}
                         />
                     </div>
                     <div className="space-y-2">
@@ -699,42 +844,60 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
             </div>
             <div className="space-y-2">
               <Label>{t('properties.border_width')}</Label>
-              <Input
-                type="number"
-                min="0"
-                max="10"
+              <NumberInput
+                minValue={0}
+                maxValue={10}
                 value={style.borderWidth ?? 1}
                 onFocus={onTriggerHistorySave}
-                onChange={(e) => handleStyleChange('borderWidth', Number(e.target.value))}
+                onChange={(val) => handleStyleChange('borderWidth', val)}
               />
             </div>
           </div>
 
           {/* Text Settings (For Text and Dropdown) */}
-          {(field.type === FieldType.TEXT || field.type === FieldType.DROPDOWN || field.type === FieldType.SIGNATURE) && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>{t('properties.text_color')}</Label>
-                <input
-                  type="color"
-                  value={style.textColor || '#000000'}
-                  onMouseDown={onTriggerHistorySave}
-                  onChange={(e) => handleStyleChange('textColor', e.target.value)}
-                  className="h-8 w-full cursor-pointer border border-input rounded bg-background"
-                />
+          {(field.type === FieldType.TEXT || field.type === FieldType.DROPDOWN) && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>{t('properties.text_color')}</Label>
+                  <input
+                    type="color"
+                    value={style.textColor || '#000000'}
+                    onMouseDown={onTriggerHistorySave}
+                    onChange={(e) => handleStyleChange('textColor', e.target.value)}
+                    className="h-8 w-full cursor-pointer border border-input rounded bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('properties.font_size')}</Label>
+                  <NumberInput
+                    minValue={6}
+                    maxValue={72}
+                    value={style.fontSize ?? 12}
+                    onFocus={onTriggerHistorySave}
+                    onChange={(val) => handleStyleChange('fontSize', val)}
+                  />
+                </div>
               </div>
+
+              {/* Font Family Selector */}
               <div className="space-y-2">
-                <Label>{t('properties.font_size')}</Label>
-                <Input
-                  type="number"
-                  min="6"
-                  max="72"
-                  value={style.fontSize ?? 12}
-                  onFocus={onTriggerHistorySave}
-                  onChange={(e) => handleStyleChange('fontSize', Number(e.target.value))}
-                />
+                <Label>Font Family</Label>
+                <Select
+                    value={style.fontFamily || 'Helvetica'}
+                    onValueChange={(val) => { onTriggerHistorySave(); handleStyleChange('fontFamily', val) }}
+                >
+                    <SelectTrigger className="w-full" style={{ fontFamily: FONT_FAMILY_MAP[style.fontFamily || 'Helvetica'] }}>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Helvetica" style={{ fontFamily: FONT_FAMILY_MAP['Helvetica'] }}>Helvetica</SelectItem>
+                        <SelectItem value="Times Roman" style={{ fontFamily: FONT_FAMILY_MAP['Times Roman'] }}>Times Roman</SelectItem>
+                        <SelectItem value="Courier" style={{ fontFamily: FONT_FAMILY_MAP['Courier'] }}>Courier</SelectItem>
+                    </SelectContent>
+                </Select>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -750,42 +913,38 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label className="text-xs">{t('properties.x')}</Label>
-            <Input
-              type="number"
+            <NumberInput
               value={Math.round(field.rect.x)}
+              formatOptions={{ maximumFractionDigits: 0 }}
               onFocus={onTriggerHistorySave}
-              onChange={(e) => onChange({ rect: { ...field.rect, x: Number(e.target.value) } })}
-              className="h-8"
+              onChange={(val) => onChange({ rect: { ...field.rect, x: val } })}
             />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">{t('properties.y')}</Label>
-            <Input
-              type="number"
+            <NumberInput
               value={Math.round(field.rect.y)}
+              formatOptions={{ maximumFractionDigits: 0 }}
               onFocus={onTriggerHistorySave}
-              onChange={(e) => onChange({ rect: { ...field.rect, y: Number(e.target.value) } })}
-              className="h-8"
+              onChange={(val) => onChange({ rect: { ...field.rect, y: val } })}
             />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">{t('properties.width')}</Label>
-            <Input
-              type="number"
+            <NumberInput
               value={Math.round(field.rect.width)}
+              formatOptions={{ maximumFractionDigits: 0 }}
               onFocus={onTriggerHistorySave}
-              onChange={(e) => onChange({ rect: { ...field.rect, width: Number(e.target.value) } })}
-              className="h-8"
+              onChange={(val) => onChange({ rect: { ...field.rect, width: val } })}
             />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">{t('properties.height')}</Label>
-            <Input
-              type="number"
+            <NumberInput
               value={Math.round(field.rect.height)}
+              formatOptions={{ maximumFractionDigits: 0 }}
               onFocus={onTriggerHistorySave}
-              onChange={(e) => onChange({ rect: { ...field.rect, height: Number(e.target.value) } })}
-              className="h-8"
+              onChange={(val) => onChange({ rect: { ...field.rect, height: val } })}
             />
           </div>
         </div>
@@ -807,6 +966,8 @@ interface PropertiesPanelProps {
   isFloating: boolean;
   onToggleFloating: () => void;
   onTriggerHistorySave: () => void;
+  width: number;
+  onResize: (width: number) => void;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -820,7 +981,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onClose,
   isFloating,
   onToggleFloating,
-  onTriggerHistorySave
+  onTriggerHistorySave,
+  width,
+  onResize
 }) => {
   if (field) {
     return (
@@ -832,6 +995,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         isFloating={isFloating}
         onToggleFloating={onToggleFloating}
         onTriggerHistorySave={onTriggerHistorySave}
+        width={width}
+        onResize={onResize}
       />
     );
   }
@@ -845,6 +1010,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       isFloating={isFloating}
       onToggleFloating={onToggleFloating}
       onTriggerHistorySave={onTriggerHistorySave}
+      width={width}
+      onResize={onResize}
     />
   );
 };

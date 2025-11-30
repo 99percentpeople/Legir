@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useCallback } from 'react';
 import { X, Layers, ListTree } from 'lucide-react';
 import { FormField, PageData, PDFOutlineItem } from '../types';
 import FieldTreePanel from './FieldTreePanel';
@@ -16,6 +17,8 @@ interface SidebarProps {
   selectedFieldId: string | null;
   onSelectField: (id: string) => void;
   onNavigatePage: (pageIndex: number) => void;
+  width: number;
+  onResize: (width: number) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -26,14 +29,42 @@ const Sidebar: React.FC<SidebarProps> = ({
   outline,
   selectedFieldId,
   onSelectField,
-  onNavigatePage
+  onNavigatePage,
+  width,
+  onResize
 }) => {
   const { t } = useLanguage();
+
+  const resizeHandler = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = startWidth + (moveEvent.clientX - startX);
+      onResize(Math.max(200, Math.min(600, newWidth)));
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [width, onResize]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="w-64 flex flex-col bg-background border-r border-border h-full transition-colors duration-200 flex-shrink-0 z-20">
+    <div 
+      className="flex flex-col bg-background border-r border-border h-full transition-colors duration-200 flex-shrink-0 z-20 relative"
+      style={{ width: width }}
+    >
       <Tabs defaultValue="fields" className="flex flex-col h-full">
         {/* Header */}
         <div className="p-2 flex items-center justify-between bg-muted/30 border-b border-border shrink-0 gap-2">
@@ -76,6 +107,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             </TabsContent>
         </div>
       </Tabs>
+
+      {/* Resize Handle */}
+      <div 
+        className="absolute top-0 right-0 bottom-0 w-1 hover:bg-primary/50 cursor-col-resize z-50 transition-colors"
+        onMouseDown={resizeHandler}
+      />
     </div>
   );
 };

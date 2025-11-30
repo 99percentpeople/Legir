@@ -7,12 +7,23 @@ export enum FieldType {
   SIGNATURE = 'Signature',
 }
 
+export type EditorMode = 'form' | 'annotation';
+
+export type Tool = 
+  // Common
+  | 'select' 
+  // Form Tools
+  | 'draw_text' | 'draw_checkbox' | 'draw_radio' | 'draw_dropdown' | 'draw_signature'
+  // Annotation Tools
+  | 'draw_highlight' | 'draw_ink' | 'draw_note' | 'eraser';
+
 export interface FieldStyle {
   borderColor?: string; // Hex
   backgroundColor?: string; // Hex
   borderWidth?: number;
   textColor?: string; // Hex
   fontSize?: number;
+  fontFamily?: string; // Font Family Name
   isTransparent?: boolean;
 }
 
@@ -42,6 +53,10 @@ export interface FormField {
   // Specific properties
   options?: string[]; // For Dropdown
   radioValue?: string; // For Radio Button (legacy/alias for exportValue)
+  
+  // Signature specific
+  signatureData?: string; // Base64 image data
+  imageScaleMode?: 'contain' | 'fill'; // Scaling mode for signature images
 
   // Extended properties
   toolTip?: string;
@@ -49,6 +64,19 @@ export interface FormField {
   multiline?: boolean; // For Text
   maxLength?: number; // For Text
   alignment?: 'left' | 'center' | 'right'; // For Text
+}
+
+export interface Annotation {
+  id: string;
+  pageIndex: number;
+  type: 'highlight' | 'ink' | 'note';
+  rect?: { x: number; y: number; width: number; height: number }; // For highlight / note bounds
+  points?: { x: number; y: number }[]; // For ink
+  text?: string; // For note
+  color?: string;
+  thickness?: number; // For ink
+  size?: number; // For text
+  alignment?: 'left' | 'center' | 'right'; // For note text alignment
 }
 
 export interface PDFMetadata {
@@ -70,11 +98,12 @@ export interface PageData {
   pageIndex: number;
   width: number;
   height: number;
-  imageData: string; // Base64 string of the rendered page
+  imageData?: string; // Base64 string (Optional now, used for lazy loading fallback or AI)
 }
 
 export interface HistorySnapshot {
   fields: FormField[];
+  annotations: Annotation[];
   metadata: PDFMetadata;
 }
 
@@ -89,20 +118,28 @@ export interface SnappingOptions {
 export interface EditorState {
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
+  pdfDocument: any | null; // PDF.js Document Proxy
   metadata: PDFMetadata;
   filename: string;
   pages: PageData[];
   fields: FormField[];
+  annotations: Annotation[];
   outline: PDFOutlineItem[];
+  
+  mode: EditorMode;
+  tool: Tool;
+  
   selectedFieldId: string | null;
+  selectedAnnotationId: string | null;
+  
   scale: number;
-  tool: 'select' | 'draw_text' | 'draw_checkbox' | 'draw_radio' | 'draw_dropdown' | 'draw_signature';
   isProcessing: boolean;
+  
   // History Stacks
   past: HistorySnapshot[];
   future: HistorySnapshot[];
   // Clipboard
-  clipboard: FormField | null;
+  clipboard: { type: 'field' | 'annotation', data: FormField | Annotation } | null;
   // Settings
   snappingOptions: SnappingOptions;
 }

@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react"
-import en from "../locales/en"
-import zh from "../locales/zh"
+import en from '../locales/en';
+import zh from '../locales/zh';
 
 export type Language = "en" | "zh"
 

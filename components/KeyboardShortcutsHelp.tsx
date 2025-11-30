@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Keyboard } from 'lucide-react';
 import {
@@ -20,6 +21,7 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ isOpen, o
   const shortcuts = [
     { key: t('shortcuts.shift_drag_create'), action: t('shortcuts.draw_square') },
     { key: t('shortcuts.shift_drag_move'), action: t('shortcuts.lock_axis') },
+    { key: t('shortcuts.ctrl_drag'), action: t('shortcuts.duplicate') },
     { key: t('shortcuts.shift_resize'), action: t('shortcuts.maintain_aspect') },
     { key: t('shortcuts.alt_drag'), action: t('shortcuts.disable_snapping') },
     { key: t('shortcuts.arrow_keys'), action: t('shortcuts.move_1px') },
