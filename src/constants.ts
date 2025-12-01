@@ -29,7 +29,8 @@ export const ANNOTATION_STYLES = {
   },
   ink: {
     color: '#ef4444', // Red
-    thickness: 2
+    thickness: 2,
+    opacity: 1.0
   },
   note: {
     color: '#000000',

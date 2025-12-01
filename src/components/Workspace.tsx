@@ -437,7 +437,17 @@ const Workspace: React.FC<WorkspaceProps> = ({
         if (annot && annot.rect) {
             let newX = coords.x - moveOffset.x;
             let newY = coords.y - moveOffset.y;
-            onUpdateAnnotation(movingAnnotationId, { rect: { ...annot.rect, x: newX, y: newY } });
+            
+            const updates: Partial<Annotation> = { rect: { ...annot.rect, x: newX, y: newY } };
+            
+            // If we have multiple rects (e.g. multi-line highlight), move them too
+            if (annot.rects) {
+                const dx = newX - annot.rect.x;
+                const dy = newY - annot.rect.y;
+                updates.rects = annot.rects.map(r => ({ ...r, x: r.x + dx, y: r.y + dy }));
+            }
+            
+            onUpdateAnnotation(movingAnnotationId, updates);
         }
     }
     // --- RESIZING ---
@@ -649,7 +659,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 type: 'ink',
                 points: currentPathRef.current,
                 color: ANNOTATION_STYLES.ink.color,
-                thickness: ANNOTATION_STYLES.ink.thickness
+                thickness: ANNOTATION_STYLES.ink.thickness,
+                opacity: ANNOTATION_STYLES.ink.opacity
             });
         }
         currentPathRef.current = [];
@@ -697,7 +708,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     pageIndex: activePageIndex,
                     type: 'highlight',
                     rect: { x, y, width, height },
-                    color: ANNOTATION_STYLES.highlight.color
+                    color: ANNOTATION_STYLES.highlight.color,
+                    opacity: ANNOTATION_STYLES.highlight.opacity
                 });
             } else if (editorState.tool === 'draw_note') {
                 onAddAnnotation({
@@ -806,8 +818,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
       setActivePageIndex(annotation.pageIndex);
       const coords = getRelativeCoords(e, annotation.pageIndex);
       
-      // Setup Move
-      if (annotation.rect) {
+      // Setup Move (Disable for Highlight to match Pen behavior)
+      if (annotation.rect && annotation.type !== 'highlight') {
           setGlobalCursor('move');
           setMovingAnnotationId(annotation.id);
           setMoveOffset({ x: coords.x - annotation.rect.x, y: coords.y - annotation.rect.y });
@@ -937,24 +949,33 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     const isSelected = editorState.selectedAnnotationId === annot.id;
                     
                     if (annot.type === 'highlight' && annot.rect) {
-                        return (
-                            <div
-                                key={annot.id}
-                                className={cn("absolute border-2 transition-colors", isSelected ? "border-blue-500 z-50" : "border-transparent")}
+                        const renderBox = (r: {x: number, y: number, width: number, height: number}, keySuffix: string = '') => (
+                             <div
+                                key={annot.id + keySuffix}
+                                className={cn("absolute transition-colors")}
                                 style={{
-                                    left: annot.rect.x * editorState.scale,
-                                    top: annot.rect.y * editorState.scale,
-                                    width: annot.rect.width * editorState.scale,
-                                    height: annot.rect.height * editorState.scale,
+                                    left: r.x * editorState.scale,
+                                    top: r.y * editorState.scale,
+                                    width: r.width * editorState.scale,
+                                    height: r.height * editorState.scale,
                                     backgroundColor: annot.color,
-                                    opacity: 0.4, // Visual opacity
-                                    cursor: editorState.tool === 'select' ? 'move' : 'inherit'
+                                    opacity: annot.opacity !== undefined ? annot.opacity : 0.4, // Use parsed opacity or default
+                                    cursor: 'inherit',
+                                    mixBlendMode: 'multiply' // Ensure highlights blend like real markers
                                 }}
                                 onMouseDown={(e) => handleAnnotationMouseDown(e, annot)}
-                            >
-                                {/* Removed delete button */}
-                            </div>
-                        )
+                            />
+                        );
+
+                        if (annot.rects && annot.rects.length > 0) {
+                             return (
+                                <React.Fragment key={annot.id}>
+                                    {annot.rects.map((r, idx) => renderBox(r, `_part_${idx}`))}
+                                </React.Fragment>
+                             );
+                        } else {
+                            return renderBox(annot.rect);
+                        }
                     } else if (annot.type === 'note' && annot.rect) {
                         const fontSize = (annot.size || 12) * editorState.scale;
                         return (
@@ -1277,11 +1298,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
                             stroke={a.color || 'red'}
                             strokeWidth={(a.thickness || 2)} 
                             fill="none"
-                            strokeLinecap="round"
+                            strokeLinecap={a.intent === 'InkHighlight' ? 'butt' : (a.subtype === 'ink' || !a.subtype ? 'round' : 'butt')}
                             strokeLinejoin="round"
+                            opacity={a.opacity ?? 1}
                             style={{ 
                                 pointerEvents: editorState.tool === 'select' ? 'auto' : 'none', 
-                                cursor: editorState.tool === 'select' ? 'pointer' : 'inherit' 
+                                cursor: 'inherit',
+                                mixBlendMode: a.intent === 'InkHighlight' ? 'multiply' : 'normal'
                             }}
                             onMouseDown={(e) => handleAnnotationMouseDown(e as any, a)}
                         />
@@ -1296,6 +1319,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                         fill="none"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+                        opacity={ANNOTATION_STYLES.ink.opacity}
                     />
                 )}
             </svg>

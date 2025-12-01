@@ -46,6 +46,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { GEMINI_API_AVAILABLE } from "@/services/geminiService";
+import { ANNOTATION_STYLES } from "../constants";
+import { InkPropertiesPopover } from "./InkPropertiesPopover";
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -91,6 +93,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const { t } = useLanguage();
   const { mode, tool } = editorState;
   const hasFileSystemAccess = "showSaveFilePicker" in window;
+
+  // Pen Style State
+  const [penColor, setPenColor] = React.useState(ANNOTATION_STYLES.ink.color);
+  const [penThickness, setPenThickness] = React.useState(ANNOTATION_STYLES.ink.thickness);
+
+  const handlePenColorChange = (color: string) => {
+    setPenColor(color);
+    ANNOTATION_STYLES.ink.color = color;
+  };
+
+  const handlePenThicknessChange = (val: number[]) => {
+    const v = val[0];
+    setPenThickness(v);
+    ANNOTATION_STYLES.ink.thickness = v;
+  };
 
   return (
     <div className="h-16 bg-background border-b border-border flex items-center justify-between px-4 relative text-foreground z-50">
@@ -222,9 +239,22 @@ const Toolbar: React.FC<ToolbarProps> = ({
             >
               <Highlighter size={18} />
             </ToggleGroupItem>
-            <ToggleGroupItem value="draw_ink" title={t("toolbar.ink")}>
-              <PenTool size={18} />
-            </ToggleGroupItem>
+            <div className="flex items-center gap-0">
+              <ToggleGroupItem 
+                value="draw_ink" 
+                title={t("toolbar.ink")}
+                className="rounded-r-none pr-1.5 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
+              >
+                <PenTool size={18} style={{ color: penColor }} />
+              </ToggleGroupItem>
+              <InkPropertiesPopover 
+                penColor={penColor}
+                penThickness={penThickness}
+                onColorChange={handlePenColorChange}
+                onThicknessChange={handlePenThicknessChange}
+                isActive={tool === 'draw_ink'}
+              />
+            </div>
             <ToggleGroupItem value="draw_note" title={t("toolbar.note")}>
               <StickyNote size={18} />
             </ToggleGroupItem>

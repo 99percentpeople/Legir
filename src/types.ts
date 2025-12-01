@@ -71,12 +71,16 @@ export interface Annotation {
   pageIndex: number;
   type: 'highlight' | 'ink' | 'note';
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / note bounds
+  rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
   text?: string; // For note
   color?: string;
+  opacity?: number; // For highlight
   thickness?: number; // For ink
   size?: number; // For text
   alignment?: 'left' | 'center' | 'right'; // For note text alignment
+  subtype?: 'ink' | 'polyline' | 'line'; // To preserve original PDF subtype
+  intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
 }
 
 export interface PDFMetadata {
