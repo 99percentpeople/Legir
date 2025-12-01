@@ -25,7 +25,7 @@ import {
   Edit3,
   Eraser,
 } from "lucide-react";
-import { EditorState, Tool } from "../types";
+import { EditorState, Tool, PenStyle } from "../types";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { cn } from "../lib/utils";
@@ -46,13 +46,15 @@ import {
   SelectValue,
 } from "./ui/select";
 import { GEMINI_API_AVAILABLE } from "@/services/geminiService";
-import { ANNOTATION_STYLES } from "../constants";
 import { InkPropertiesPopover } from "./InkPropertiesPopover";
+import { SaveStatusIndicator } from "./SaveStatusIndicator";
 
 interface ToolbarProps {
   editorState: EditorState;
+  isSaving?: boolean;
   onToolChange: (tool: Tool) => void;
   onModeChange: (mode: EditorState["mode"]) => void;
+  onPenStyleChange: (style: Partial<PenStyle>) => void;
   onExport: () => Promise<boolean>;
   onSaveDraft: () => void;
   onSaveAs: () => Promise<boolean>;
@@ -72,8 +74,10 @@ interface ToolbarProps {
 
 const Toolbar: React.FC<ToolbarProps> = ({
   editorState,
+  isSaving = false,
   onToolChange,
   onModeChange,
+  onPenStyleChange,
   onExport,
   onSaveDraft,
   onSaveAs,
@@ -93,21 +97,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const { t } = useLanguage();
   const { mode, tool } = editorState;
   const hasFileSystemAccess = "showSaveFilePicker" in window;
-
-  // Pen Style State
-  const [penColor, setPenColor] = React.useState(ANNOTATION_STYLES.ink.color);
-  const [penThickness, setPenThickness] = React.useState(ANNOTATION_STYLES.ink.thickness);
-
-  const handlePenColorChange = (color: string) => {
-    setPenColor(color);
-    ANNOTATION_STYLES.ink.color = color;
-  };
-
-  const handlePenThicknessChange = (val: number[]) => {
-    const v = val[0];
-    setPenThickness(v);
-    ANNOTATION_STYLES.ink.thickness = v;
-  };
 
   return (
     <div className="h-16 bg-background border-b border-border flex items-center justify-between px-4 relative text-foreground z-50">
@@ -241,19 +230,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
             </ToggleGroupItem>
             <div className="flex items-center gap-0">
               <ToggleGroupItem 
-                value="draw_ink" 
-                title={t("toolbar.ink")}
-                className="rounded-r-none pr-1.5 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
-              >
-                <PenTool size={18} style={{ color: penColor }} />
-              </ToggleGroupItem>
-              <InkPropertiesPopover 
-                penColor={penColor}
-                penThickness={penThickness}
-                onColorChange={handlePenColorChange}
-                onThicknessChange={handlePenThicknessChange}
-                isActive={tool === 'draw_ink'}
-              />
+              value="draw_ink" 
+              title={t("toolbar.ink")}
+              className="rounded-r-none pr-1.5 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
+            >
+              <PenTool size={18} style={{ color: editorState.penStyle.color }} />
+            </ToggleGroupItem>
+            <InkPropertiesPopover 
+              penStyle={editorState.penStyle}
+              onPenStyleChange={onPenStyleChange}
+              isActive={tool === 'draw_ink'}
+            />
             </div>
             <ToggleGroupItem value="draw_note" title={t("toolbar.note")}>
               <StickyNote size={18} />
@@ -264,6 +251,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* Right Section: Utilities & Export */}
       <div className="flex items-center gap-3">
+        <SaveStatusIndicator
+          isSaving={isSaving}
+          lastSavedAt={editorState.lastSavedAt}
+          className="mr-2 hidden md:flex"
+        />
+
         {/* Utilities Group */}
         <div className="flex items-center gap-1 mr-2">
           <Button

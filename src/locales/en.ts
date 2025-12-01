@@ -7,6 +7,8 @@ const en = {
   "common.close": "Close",
   "common.loading": "Loading...",
   "common.processing": "Processing...",
+  "status.saving": "Saving...",
+  "status.saved": "Saved",
   "mode.annotation": "Annotation Mode",
   "mode.form": "Form Mode",
   "toolbar.undo": "Undo (Ctrl+Z)",

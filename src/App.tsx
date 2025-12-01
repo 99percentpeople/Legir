@@ -25,7 +25,7 @@ import {
 import { loadPDF, exportPDF, renderPageToDataURL } from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
 import { saveDraft, getDraft, clearDraft } from "./services/storageService";
-import { DEFAULT_FIELD_STYLE } from "./constants";
+import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES } from "./constants";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
 
@@ -46,6 +46,11 @@ const App: React.FC = () => {
     scale: 1.0,
     mode: "annotation",
     tool: "select",
+    penStyle: {
+      color: ANNOTATION_STYLES.ink.color,
+      thickness: ANNOTATION_STYLES.ink.thickness,
+      opacity: ANNOTATION_STYLES.ink.opacity,
+    },
     isProcessing: false,
     past: [],
     future: [],
@@ -57,16 +62,19 @@ const App: React.FC = () => {
       snapToEqualDistances: false,
       threshold: 8,
     },
+    lastSavedAt: null,
   });
 
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [isPanelFloating, setIsPanelFloating] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isAIDetectOpen, setIsAIDetectOpen] = useState(false);
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [hasSavedSession, setHasSavedSession] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
@@ -80,14 +88,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (state.past.length > 0 && !isClosingRef.current) {
+      if (isDirty && !isClosingRef.current) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [state.past.length]);
+  }, [isDirty]);
 
   useEffect(() => {
     if (state.pages.length > 0 && state.pdfBytes) {
@@ -120,6 +128,7 @@ const App: React.FC = () => {
   };
 
   const saveCheckpoint = useCallback(() => {
+    setIsDirty(true);
     setState((prev) => {
       const snapshot: HistorySnapshot = {
         fields: prev.fields,
@@ -132,6 +141,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleUndo = useCallback(() => {
+    setIsDirty(true);
     setState((prev) => {
       if (prev.past.length === 0) return prev;
       const previous = prev.past[prev.past.length - 1];
@@ -155,6 +165,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleRedo = useCallback(() => {
+    setIsDirty(true);
     setState((prev) => {
       if (prev.future.length === 0) return prev;
       const next = prev.future[0];
@@ -301,6 +312,11 @@ const App: React.FC = () => {
         if (e.shiftKey) handleRedo();
         else handleUndo();
       }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        handleSaveDraft(false);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -329,6 +345,7 @@ const App: React.FC = () => {
         future: [],
         isProcessing: false,
       }));
+      setIsDirty(false);
     } catch (error) {
       console.error("Error loading PDF:", error);
       toast.error(t("app.load_error"));
@@ -345,7 +362,7 @@ const App: React.FC = () => {
     setProcessingStatus(t("app.loading_draft"));
     try {
       // Re-load the PDF document from bytes as it is not serializable in DB
-      const { pdfDocument, pages, annotations, outline } = await loadPDF(draft.pdfBytes);
+      const { pdfDocument, pages, annotations: fileAnnotations, outline } = await loadPDF(draft.pdfBytes);
       const fitScale = calculateFitScale(pages);
       setState((prev) => ({
         ...prev,
@@ -355,7 +372,7 @@ const App: React.FC = () => {
         pages,
         outline,
         fields: draft.fields,
-        annotations: annotations, // Recover annotations from PDF bytes
+        annotations: draft.annotations || fileAnnotations, // Recover annotations from PDF bytes or draft
         metadata: draft.metadata,
         filename: draft.filename,
         scale: fitScale,
@@ -363,6 +380,7 @@ const App: React.FC = () => {
         future: [],
         isProcessing: false,
       }));
+      setIsDirty(false);
     } catch (error) {
       console.error("Failed to resume session:", error);
       toast.error(t("app.load_error"));
@@ -391,6 +409,7 @@ const App: React.FC = () => {
   };
 
   const handleUpdateField = (id: string, updates: Partial<FormField>) => {
+    setIsDirty(true);
     setState((prev) => {
       let newFields = prev.fields;
       const targetField = prev.fields.find((f) => f.id === id);
@@ -456,6 +475,7 @@ const App: React.FC = () => {
   };
 
   const handleUpdateAnnotation = (id: string, updates: Partial<Annotation>) => {
+    setIsDirty(true);
     setState((prev) => ({
       ...prev,
       annotations: prev.annotations.map((a) =>
@@ -662,25 +682,25 @@ const App: React.FC = () => {
 
   const handleSaveDraft = async (silent = false) => {
     if (!state.pdfBytes) return;
-    if (!silent) {
-      setState((prev) => ({ ...prev, isProcessing: true }));
-      setProcessingStatus(t("app.saving_draft"));
-    }
+    
+    setIsSaving(true);
+
     try {
       await saveDraft({
         pdfBytes: state.pdfBytes,
         fields: state.fields,
+        annotations: state.annotations,
         metadata: state.metadata,
         filename: state.filename,
       });
       setHasSavedSession(true);
+      setIsDirty(false);
+      setState((prev) => ({ ...prev, lastSavedAt: new Date() }));
     } catch (error) {
+      console.error("Save draft failed:", error);
       if (!silent) toast.error("Failed to save draft.");
     } finally {
-      if (!silent) {
-        setState((prev) => ({ ...prev, isProcessing: false }));
-        setProcessingStatus(null);
-      }
+      setIsSaving(false);
     }
   };
 
@@ -697,6 +717,13 @@ const App: React.FC = () => {
   const selectedField =
     state.fields.find((f) => f.id === state.selectedFieldId) || null;
 
+  const handlePenStyleChange = (style: Partial<EditorState["penStyle"]>) => {
+    setState((prev) => ({
+      ...prev,
+      penStyle: { ...prev.penStyle, ...style },
+    }));
+  };
+
   return (
     <div className="h-full w-full flex flex-col">
       {state.pages.length === 0 ? (
@@ -709,6 +736,7 @@ const App: React.FC = () => {
         <>
           <Toolbar
             editorState={state}
+            isSaving={isSaving}
             onToolChange={(tool) =>
               setState((prev) => ({
                 ...prev,
@@ -720,6 +748,7 @@ const App: React.FC = () => {
             onModeChange={(mode) =>
               setState((prev) => ({ ...prev, mode, tool: "select" }))
             }
+            onPenStyleChange={handlePenStyleChange}
             onExport={handleExport}
             onSaveDraft={() => handleSaveDraft(false)}
             onSaveAs={handleSaveAs}

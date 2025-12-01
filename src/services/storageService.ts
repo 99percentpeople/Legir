@@ -1,4 +1,4 @@
-import { FormField, PDFMetadata } from "../types";
+import { FormField, PDFMetadata, Annotation } from "../types";
 
 const DB_NAME = "FormForgeDB";
 const STORE_NAME = "session";
@@ -7,6 +7,7 @@ const KEY = "latest";
 export interface DraftData {
   pdfBytes: Uint8Array;
   fields: FormField[];
+  annotations: Annotation[];
   metadata: PDFMetadata;
   filename: string;
   updatedAt: number;

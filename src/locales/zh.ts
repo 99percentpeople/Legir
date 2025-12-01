@@ -7,6 +7,8 @@ const zh  = {
   "common.close": "关闭",
   "common.loading": "加载中...",
   "common.processing": "处理中...",
+  "status.saving": "保存中...",
+  "status.saved": "已保存",
   "mode.annotation": "标注模式",
   "mode.form": "表单模式",
   "toolbar.undo": "撤销 (Ctrl+Z)",

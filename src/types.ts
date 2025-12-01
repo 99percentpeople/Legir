@@ -119,6 +119,12 @@ export interface SnappingOptions {
   threshold: number;
 }
 
+export interface PenStyle {
+  color: string;
+  thickness: number;
+  opacity: number;
+}
+
 export interface EditorState {
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
@@ -133,6 +139,8 @@ export interface EditorState {
   mode: EditorMode;
   tool: Tool;
   
+  penStyle: PenStyle;
+
   selectedFieldId: string | null;
   selectedAnnotationId: string | null;
   
@@ -146,4 +154,7 @@ export interface EditorState {
   clipboard: { type: 'field' | 'annotation', data: FormField | Annotation } | null;
   // Settings
   snappingOptions: SnappingOptions;
+
+  // Status
+  lastSavedAt: Date | null;
 }

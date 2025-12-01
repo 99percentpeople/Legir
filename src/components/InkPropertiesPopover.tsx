@@ -4,6 +4,7 @@ import { Slider } from "./ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Button } from "./ui/button";
 import { ChevronDown } from "lucide-react";
+import { PenStyle } from "../types";
 
 const PEN_COLORS = [
   // Row 1
@@ -19,18 +20,14 @@ const PEN_COLORS = [
 ];
 
 interface InkPropertiesPopoverProps {
-  penColor: string;
-  penThickness: number;
-  onColorChange: (color: string) => void;
-  onThicknessChange: (val: number[]) => void;
+  penStyle: PenStyle;
+  onPenStyleChange: (style: Partial<PenStyle>) => void;
   isActive?: boolean;
 }
 
 export const InkPropertiesPopover: React.FC<InkPropertiesPopoverProps> = ({
-  penColor,
-  penThickness,
-  onColorChange,
-  onThicknessChange,
+  penStyle,
+  onPenStyleChange,
   isActive = false
 }) => {
   return (
@@ -58,10 +55,10 @@ export const InkPropertiesPopover: React.FC<InkPropertiesPopoverProps> = ({
                   key={c}
                   className={cn(
                     "w-6 h-6 rounded-full border border-gray-200 hover:scale-110 transition-transform",
-                    penColor === c && "ring-2 ring-primary ring-offset-2 scale-110"
+                    penStyle.color === c && "ring-2 ring-primary ring-offset-2 scale-110"
                   )}
                   style={{ backgroundColor: c }}
-                  onClick={() => onColorChange(c)}
+                  onClick={() => onPenStyleChange({ color: c })}
                   title={c}
                 />
               ))}
@@ -73,8 +70,8 @@ export const InkPropertiesPopover: React.FC<InkPropertiesPopoverProps> = ({
                 <path
                   d="M 20 30 Q 60 10, 100 30 T 180 30"
                   fill="none"
-                  stroke={penColor}
-                  strokeWidth={penThickness}
+                  stroke={penStyle.color}
+                  strokeWidth={penStyle.thickness}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -84,15 +81,15 @@ export const InkPropertiesPopover: React.FC<InkPropertiesPopoverProps> = ({
           <div>
             <div className="flex justify-between mb-2 items-center">
               <label className="text-sm font-medium">粗细</label>
-              <span className="text-xs text-muted-foreground">{penThickness}px</span>
+              <span className="text-xs text-muted-foreground">{penStyle.thickness}px</span>
             </div>
             <Slider
-              defaultValue={[penThickness]}
-              value={[penThickness]}
+              defaultValue={[penStyle.thickness]}
+              value={[penStyle.thickness]}
               max={20}
               min={1}
               step={1}
-              onValueChange={onThicknessChange}
+              onValueChange={(val) => onPenStyleChange({ thickness: val[0] })}
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>细</span>

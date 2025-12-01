@@ -1,6 +1,6 @@
 import React, { useRef, useState, useLayoutEffect, useEffect } from 'react';
 import { EditorState, FormField, FieldType, Annotation } from '../types';
-import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES, FONT_FAMILY_MAP } from '../constants';
+import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES, FONT_FAMILY_MAP, ZOOM_BASE } from '../constants';
 import { Check, ChevronDown, CircleDot, PenLine, StickyNote, Trash2, Eraser, Image as ImageIcon } from 'lucide-react';
 import { cn, setGlobalCursor, resetGlobalCursor } from '../lib/utils';
 import { useLanguage } from './language-provider';
@@ -127,7 +127,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
         if (!content) return;
 
         const currentScale = editorState.scale;
-        const ZOOM_BASE = 1.1; 
         const steps = -e.deltaY / 100;
         let newScale = currentScale * Math.pow(ZOOM_BASE, steps);
         newScale = Math.max(0.25, Math.min(5.0, newScale));
@@ -658,9 +657,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 pageIndex: activePageIndex,
                 type: 'ink',
                 points: currentPathRef.current,
-                color: ANNOTATION_STYLES.ink.color,
-                thickness: ANNOTATION_STYLES.ink.thickness,
-                opacity: ANNOTATION_STYLES.ink.opacity
+                color: editorState.penStyle.color,
+                thickness: editorState.penStyle.thickness,
+                opacity: editorState.penStyle.opacity
             });
         }
         currentPathRef.current = [];
@@ -1314,12 +1313,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 {isDrawing && activePageIndex === page.pageIndex && (
                     <path 
                         d={pointsToPath(currentPathState)}
-                        stroke={ANNOTATION_STYLES.ink.color}
-                        strokeWidth={ANNOTATION_STYLES.ink.thickness}
+                        stroke={editorState.penStyle.color}
+                        strokeWidth={editorState.penStyle.thickness}
                         fill="none"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        opacity={ANNOTATION_STYLES.ink.opacity}
+                        opacity={editorState.penStyle.opacity}
                     />
                 )}
             </svg>

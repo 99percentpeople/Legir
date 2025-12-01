@@ -2,6 +2,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
 import en from '../locales/en';
 import zh from '../locales/zh';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import 'dayjs/locale/zh-cn';
+
+dayjs.extend(relativeTime);
 
 export type Language = "en" | "zh"
 
@@ -13,12 +18,14 @@ type LanguageProviderProps = {
 
 type LanguageProviderState = {
   language: Language
+  dayjsLocale: string
   setLanguage: (language: Language) => void
   t: (key: string, params?: Record<string, string | number>) => string
 }
 
 const initialState: LanguageProviderState = {
   language: "en",
+  dayjsLocale: "en",
   setLanguage: () => null,
   t: (key: string) => key,
 }
@@ -26,6 +33,11 @@ const initialState: LanguageProviderState = {
 const translations: Record<Language, Record<string, string>> = {
   en,
   zh
+}
+
+const DAYJS_LOCALE_MAP: Record<Language, string> = {
+  en: 'en',
+  zh: 'zh-cn'
 }
 
 const LanguageProviderContext = createContext<LanguageProviderState>(initialState)
@@ -40,9 +52,12 @@ export function LanguageProvider({
     () => (localStorage.getItem(storageKey) as Language) || defaultLanguage
   )
 
+  const dayjsLocale = DAYJS_LOCALE_MAP[language];
+
   useEffect(() => {
-    localStorage.setItem(storageKey, language)
-  }, [language, storageKey])
+    localStorage.setItem(storageKey, language);
+    dayjs.locale(dayjsLocale);
+  }, [language, storageKey, dayjsLocale])
 
   const t = (key: string, params?: Record<string, string | number>) => {
     let text = translations[language][key] || key;
@@ -56,6 +71,7 @@ export function LanguageProvider({
 
   const value = {
     language,
+    dayjsLocale,
     setLanguage,
     t,
   }

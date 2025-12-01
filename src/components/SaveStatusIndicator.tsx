@@ -1,0 +1,52 @@
+import React, { useEffect, useState } from 'react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { useLanguage } from './language-provider';
+import dayjs from 'dayjs';
+
+interface SaveStatusIndicatorProps {
+  isSaving: boolean;
+  lastSavedAt: Date | null;
+  className?: string;
+}
+
+export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
+  isSaving,
+  lastSavedAt,
+  className
+}) => {
+  const { t, dayjsLocale } = useLanguage();
+  const [timeAgo, setTimeAgo] = useState<string>('');
+
+  useEffect(() => {
+    if (!lastSavedAt) return;
+
+    const updateTimeAgo = () => {
+      setTimeAgo(dayjs(lastSavedAt).locale(dayjsLocale).fromNow());
+    };
+
+    updateTimeAgo();
+    const interval = setInterval(updateTimeAgo, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [lastSavedAt, dayjsLocale]); // Re-run when locale changes
+
+  if (isSaving) {
+    return (
+      <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", className)}>
+        <Loader2 size={12} className="animate-spin" />
+        <span>{t('status.saving')}</span>
+      </div>
+    );
+  }
+
+  if (lastSavedAt) {
+    return (
+      <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground/80", className)}>
+        <span>{t('status.saved')} {timeAgo}</span>
+      </div>
+    );
+  }
+
+  return null;
+};
