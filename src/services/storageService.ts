@@ -1,9 +1,8 @@
+import { FormField, PDFMetadata } from "../types";
 
-import { FormField, PDFMetadata } from '../types';
-
-const DB_NAME = 'FormForgeDB';
-const STORE_NAME = 'session';
-const KEY = 'latest';
+const DB_NAME = "FormForgeDB";
+const STORE_NAME = "session";
+const KEY = "latest";
 
 export interface DraftData {
   pdfBytes: Uint8Array;
@@ -27,10 +26,12 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveDraft(data: Omit<DraftData, 'updatedAt'>): Promise<void> {
+export async function saveDraft(
+  data: Omit<DraftData, "updatedAt">
+): Promise<void> {
   try {
     const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
     store.put({ ...data, updatedAt: Date.now() }, KEY);
     return new Promise((resolve, reject) => {
@@ -38,22 +39,22 @@ export async function saveDraft(data: Omit<DraftData, 'updatedAt'>): Promise<voi
       tx.onerror = () => reject(tx.error);
     });
   } catch (e) {
-    console.error('Failed to save draft', e);
+    console.error("Failed to save draft", e);
   }
 }
 
 export async function getDraft(): Promise<DraftData | null> {
   try {
     const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readonly');
+    const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const request = store.get(KEY);
     return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result as DraftData || null);
+      request.onsuccess = () => resolve((request.result as DraftData) || null);
       request.onerror = () => reject(request.error);
     });
   } catch (e) {
-    console.error('Failed to get draft', e);
+    console.error("Failed to get draft", e);
     return null;
   }
 }
@@ -61,7 +62,7 @@ export async function getDraft(): Promise<DraftData | null> {
 export async function clearDraft(): Promise<void> {
   try {
     const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
     store.delete(KEY);
     return new Promise((resolve, reject) => {
@@ -69,6 +70,6 @@ export async function clearDraft(): Promise<void> {
       tx.onerror = () => reject(tx.error);
     });
   } catch (e) {
-    console.error('Failed to clear draft', e);
+    console.error("Failed to clear draft", e);
   }
 }

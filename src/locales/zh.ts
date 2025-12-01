@@ -159,7 +159,7 @@ const zh  = {
   "ai_dialog.prompt_ph": "例如：“仅查找顶部区域的字段”或“忽略日期字段”",
   "ai_dialog.prompt_hint": "为 AI 模型提供上下文或特定规则。",
   "ai_dialog.start": "开始分析",
-  "landing.title": "将任意 PDF 转换为可填写表单",
+  "landing.title": "AI 驱动的 PDF 表单编辑器",
   "landing.subtitle": "隐私优先、AI 驱动的 PDF 表单构建器，完全在浏览器中运行。",
   "landing.resume_session": "恢复上一次会话",
   "landing.feature.ai.title": "AI 驱动",
@@ -179,7 +179,7 @@ const zh  = {
   "app.wait": "这可能需要一点时间",
   "app.load_error": "加载 PDF 失败。请尝试其他文件。",
   "app.no_new_fields": "未检测到新的表单字段。",
-  "app.auto_detect_fail": "自动检测失败。请检查网络或 API 密钥。",
+  "app.auto_detect_fail": "自动检测失败。错误：{error}",
   "app.export_fail": "导出 PDF 失败。",
   "app.save_reopen_fail": "保存并重新打开失败。",
   "app.save_close_fail": "保存并关闭失败。"

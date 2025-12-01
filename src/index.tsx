@@ -1,19 +1,22 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import { ThemeProvider } from './components/theme-provider';
-import { LanguageProvider } from './components/language-provider';
-import * as pdfjsLib from 'pdfjs-dist';
+import "./globals.css";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import { ThemeProvider } from "./components/theme-provider";
+import { LanguageProvider } from "./components/language-provider";
+import { Toaster } from "./components/ui/sonner";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
+import * as pdfjsLib from "pdfjs-dist";
 
 // Handle potential default export wrapper from CDN
 const pdfJs = (pdfjsLib as any).default || pdfjsLib;
 
 // Set up the PDF.js worker source to a CDN to ensure it works in the browser environment
 if (pdfJs.GlobalWorkerOptions) {
-  pdfJs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJs.version}/pdf.worker.min.js`;
+  pdfJs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
 
-const rootElement = document.getElementById('root');
+const rootElement = document.getElementById("root");
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
@@ -23,6 +26,7 @@ root.render(
   <React.StrictMode>
     <LanguageProvider defaultLanguage="en" storageKey="vite-ui-language">
       <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <Toaster position="top-center" />
         <App />
       </ThemeProvider>
     </LanguageProvider>

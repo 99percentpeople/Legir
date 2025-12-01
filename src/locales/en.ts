@@ -159,7 +159,7 @@ const en = {
   "ai_dialog.prompt_ph": "e.g., 'Only find fields in the top section' or 'Ignore date fields'",
   "ai_dialog.prompt_hint": "Provide context or specific rules for the AI model.",
   "ai_dialog.start": "Start Analysis",
-  "landing.title": "Turn any PDF into a Fillable Form",
+  "landing.title": "AI-Powered PDF Form Editor",
   "landing.subtitle": "A privacy-first, AI-powered PDF form builder running entirely in your browser.",
   "landing.resume_session": "Resume Previous Session",
   "landing.feature.ai.title": "AI-Powered",
@@ -179,7 +179,7 @@ const en = {
   "app.wait": "This may take a moment",
   "app.load_error": "Failed to load PDF. Please try another file.",
   "app.no_new_fields": "No new form fields were detected.",
-  "app.auto_detect_fail": "Auto-detection failed. Please check your network or API key.",
+  "app.auto_detect_fail": "Auto-detection failed. Error: {error}",
   "app.export_fail": "Failed to export PDF.",
   "app.save_reopen_fail": "Failed to save and reopen.",
   "app.save_close_fail": "Failed to save and close."

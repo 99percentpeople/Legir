@@ -196,21 +196,21 @@ const AIDetectionDialog: React.FC<AIDetectionDialogProps> = ({ isOpen, onClose, 
                 type="multiple" 
                 value={allowedTypes} 
                 onValueChange={handleTypeToggle}
-                className="flex flex-wrap gap-2 justify-start"
+                className="flex flex-wrap gap-1 justify-start"
               >
-                <ToggleGroupItem value={FieldType.TEXT} aria-label="Text" className="flex items-center gap-1.5 border border-input">
+                <ToggleGroupItem size="sm" value={FieldType.TEXT} aria-label="Text" className="flex items-center gap-1.5 border border-input">
                    <Type size={14} /> {t('toolbar.text')}
                 </ToggleGroupItem>
-                <ToggleGroupItem value={FieldType.CHECKBOX} aria-label="Checkbox" className="flex items-center gap-1.5 border border-input">
+                <ToggleGroupItem size="sm" value={FieldType.CHECKBOX} aria-label="Checkbox" className="flex items-center gap-1.5 border border-input">
                    <CheckSquare size={14} /> {t('toolbar.checkbox')}
                 </ToggleGroupItem>
-                <ToggleGroupItem value={FieldType.RADIO} aria-label="Radio" className="flex items-center gap-1.5 border border-input">
+                <ToggleGroupItem size="sm" value={FieldType.RADIO} aria-label="Radio" className="flex items-center gap-1.5 border border-input">
                    <CircleDot size={14} /> {t('toolbar.radio')}
                 </ToggleGroupItem>
-                <ToggleGroupItem value={FieldType.DROPDOWN} aria-label="Dropdown" className="flex items-center gap-1.5 border border-input">
+                <ToggleGroupItem size="sm" value={FieldType.DROPDOWN} aria-label="Dropdown" className="flex items-center gap-1.5 border border-input">
                    <List size={14} /> {t('toolbar.dropdown')}
                 </ToggleGroupItem>
-                <ToggleGroupItem value={FieldType.SIGNATURE} aria-label="Signature" className="flex items-center gap-1.5 border border-input">
+                <ToggleGroupItem size="sm" value={FieldType.SIGNATURE} aria-label="Signature" className="flex items-center gap-1.5 border border-input">
                    <PenLine size={14} /> {t('toolbar.signature')}
                 </ToggleGroupItem>
               </ToggleGroup>

@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import { FieldType, FormField, FieldStyle } from "../types";
 import { DEFAULT_FIELD_STYLE } from "../constants";
@@ -8,6 +7,8 @@ export interface AIAnalysisOptions {
   extraPrompt?: string;
 }
 
+export const GEMINI_API_AVAILABLE = !!process.env.API_KEY;
+
 export const analyzePageForFields = async (
   base64Image: string,
   pageIndex: number,
@@ -16,54 +17,62 @@ export const analyzePageForFields = async (
   existingFields: FormField[] = [],
   options?: AIAnalysisOptions
 ): Promise<FormField[]> => {
-  if (!process.env.API_KEY) {
-    console.warn("No API Key provided for Gemini.");
-    return [];
+  if (!GEMINI_API_AVAILABLE) {
+    throw new Error("No API Key provided for Gemini.");
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     // Clean base64 string
-    const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
+    const cleanBase64 = base64Image.replace(
+      /^data:image\/(png|jpeg|jpg);base64,/,
+      ""
+    );
 
     // Create a summary of existing fields to provide context to the AI
     // Convert to 0-1000 scale for the model
-    const existingFieldsSummary = existingFields.map(f => ({
-        id: f.id,
-        type: f.type,
-        // Provide coordinates in 0-1000 scale [ymin, xmin, ymax, xmax]
-        box_2d: [
-            Math.round((f.rect.y / pageHeight) * 1000),
-            Math.round((f.rect.x / pageWidth) * 1000),
-            Math.round(((f.rect.y + f.rect.height) / pageHeight) * 1000),
-            Math.round(((f.rect.x + f.rect.width) / pageWidth) * 1000)
-        ]
+    const existingFieldsSummary = existingFields.map((f) => ({
+      id: f.id,
+      type: f.type,
+      // Provide coordinates in 0-1000 scale [ymin, xmin, ymax, xmax]
+      box_2d: [
+        Math.round((f.rect.y / pageHeight) * 1000),
+        Math.round((f.rect.x / pageWidth) * 1000),
+        Math.round(((f.rect.y + f.rect.height) / pageHeight) * 1000),
+        Math.round(((f.rect.x + f.rect.width) / pageWidth) * 1000),
+      ],
     }));
 
     const allowedTypes = options?.allowedTypes || [
-      FieldType.TEXT, 
-      FieldType.CHECKBOX, 
-      FieldType.RADIO, 
-      FieldType.DROPDOWN, 
-      FieldType.SIGNATURE
+      FieldType.TEXT,
+      FieldType.CHECKBOX,
+      FieldType.RADIO,
+      FieldType.DROPDOWN,
+      FieldType.SIGNATURE,
     ];
 
     const typeDescriptions = [];
     if (allowedTypes.includes(FieldType.TEXT)) {
-      typeDescriptions.push("Text Input Areas: Blank rectangles, underlines, or comb boxes.");
+      typeDescriptions.push(
+        "Text Input Areas: Blank rectangles, underlines, or comb boxes."
+      );
     }
     if (allowedTypes.includes(FieldType.CHECKBOX)) {
       typeDescriptions.push("Checkboxes: Small squares intended for ticking.");
     }
     if (allowedTypes.includes(FieldType.RADIO)) {
-      typeDescriptions.push("Radio Buttons: Small circles intended for selection.");
+      typeDescriptions.push(
+        "Radio Buttons: Small circles intended for selection."
+      );
     }
     if (allowedTypes.includes(FieldType.DROPDOWN)) {
       typeDescriptions.push("Dropdowns: Boxes with a down arrow.");
     }
     if (allowedTypes.includes(FieldType.SIGNATURE)) {
-      typeDescriptions.push("Signature Fields: Lines marked with 'Sign here', 'Signature', or 'X'.");
+      typeDescriptions.push(
+        "Signature Fields: Lines marked with 'Sign here', 'Signature', or 'X'."
+      );
     }
 
     let typeEnum = ["text", "checkbox", "radio", "dropdown", "signature"];
@@ -72,9 +81,11 @@ export const analyzePageForFields = async (
       [FieldType.CHECKBOX]: "checkbox",
       [FieldType.RADIO]: "radio",
       [FieldType.DROPDOWN]: "dropdown",
-      [FieldType.SIGNATURE]: "signature"
+      [FieldType.SIGNATURE]: "signature",
     };
-    const currentSchemaEnum = allowedTypes.map(t => schemaEnumMap[t]).filter(Boolean);
+    const currentSchemaEnum = allowedTypes
+      .map((t) => schemaEnumMap[t])
+      .filter(Boolean);
 
     const prompt = `
       You are an expert PDF form digitizer. 
@@ -82,7 +93,9 @@ export const analyzePageForFields = async (
       
       Context:
       - Image Aspect Ratio: ${pageWidth}:${pageHeight}
-      - Existing Detected Fields (in 0-1000 scale [ymin, xmin, ymax, xmax]): ${JSON.stringify(existingFieldsSummary)}
+      - Existing Detected Fields (in 0-1000 scale [ymin, xmin, ymax, xmax]): ${JSON.stringify(
+        existingFieldsSummary
+      )}
       
       Task:
       1. Analyze the image to find form fields based on the Target Elements list below.
@@ -92,7 +105,7 @@ export const analyzePageForFields = async (
          - If an existing field is inaccurate, you may provide a better version.
       
       Target Elements (ONLY detect these types):
-      ${typeDescriptions.map((desc, i) => `${i + 1}. ${desc}`).join('\n      ')}
+      ${typeDescriptions.map((desc, i) => `${i + 1}. ${desc}`).join("\n      ")}
       
       Bounding Box Rules:
       - Coordinates must be on a scale of 0 to 1000 (relative to image dimensions).
@@ -126,21 +139,21 @@ export const analyzePageForFields = async (
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: "gemini-3-pro-preview",
       contents: {
         parts: [
           {
             inlineData: {
-              mimeType: 'image/jpeg',
-              data: cleanBase64
-            }
+              mimeType: "image/jpeg",
+              data: cleanBase64,
+            },
           },
-          { text: prompt }
-        ]
+          { text: prompt },
+        ],
       },
       config: {
         thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW
+          thinkingLevel: ThinkingLevel.LOW,
         },
         responseMimeType: "application/json",
         responseSchema: {
@@ -151,45 +164,71 @@ export const analyzePageForFields = async (
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  label: { type: Type.STRING, description: "The inferred label for this field (clean text only, no underscores)" },
+                  label: {
+                    type: Type.STRING,
+                    description:
+                      "The inferred label for this field (clean text only, no underscores)",
+                  },
                   type: { type: Type.STRING, enum: currentSchemaEnum },
                   box_2d: {
                     type: Type.ARRAY,
                     items: { type: Type.INTEGER },
-                    description: "[ymin, xmin, ymax, xmax] on 0-1000 scale"
+                    description: "[ymin, xmin, ymax, xmax] on 0-1000 scale",
                   },
                   options: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING },
-                    description: "For dropdowns, a list of inferred options. Null/Empty for other types.",
-                    nullable: true
+                    description:
+                      "For dropdowns, a list of inferred options. Null/Empty for other types.",
+                    nullable: true,
                   },
                   text_preferences: {
                     type: Type.OBJECT,
                     description: "Specific properties for text fields",
                     properties: {
-                      alignment: { type: Type.STRING, enum: ["left", "center", "right"], description: "Text alignment" },
-                      multiline: { type: Type.BOOLEAN, description: "True if the field appears to be a multi-line text area" }
+                      alignment: {
+                        type: Type.STRING,
+                        enum: ["left", "center", "right"],
+                        description: "Text alignment",
+                      },
+                      multiline: {
+                        type: Type.BOOLEAN,
+                        description:
+                          "True if the field appears to be a multi-line text area",
+                      },
                     },
-                    nullable: true
+                    nullable: true,
                   },
                   visual_characteristics: {
                     type: Type.OBJECT,
                     properties: {
-                      background_color: { type: Type.STRING, description: "Hex code (e.g. #F0F0F0) or 'transparent'" },
-                      border_color: { type: Type.STRING, description: "Hex code (e.g. #000000)" },
-                      border_width: { type: Type.INTEGER, description: "Set to 0 if border exists in image, 1 otherwise." },
-                      font_size: { type: Type.INTEGER, description: "Estimated font size in pt" }
+                      background_color: {
+                        type: Type.STRING,
+                        description: "Hex code (e.g. #F0F0F0) or 'transparent'",
+                      },
+                      border_color: {
+                        type: Type.STRING,
+                        description: "Hex code (e.g. #000000)",
+                      },
+                      border_width: {
+                        type: Type.INTEGER,
+                        description:
+                          "Set to 0 if border exists in image, 1 otherwise.",
+                      },
+                      font_size: {
+                        type: Type.INTEGER,
+                        description: "Estimated font size in pt",
+                      },
                     },
-                    nullable: true
-                  }
+                    nullable: true,
+                  },
                 },
-                required: ["label", "type", "box_2d"]
-              }
-            }
-          }
-        }
-      }
+                required: ["label", "type", "box_2d"],
+              },
+            },
+          },
+        },
+      },
     });
 
     const jsonText = response.text;
@@ -216,18 +255,18 @@ export const analyzePageForFields = async (
       // Sanitize label for ID generation and clean display
       let rawLabel = item.label || `Field_${index}`;
       // Remove leading/trailing non-alphanumerics
-      let cleanLabel = rawLabel.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+      let cleanLabel = rawLabel.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "");
       // Replace remaining non-alphanumerics with single underscore to keep it readable but valid
-      cleanLabel = cleanLabel.replace(/[^a-zA-Z0-9]+/g, '_');
-      
+      cleanLabel = cleanLabel.replace(/[^a-zA-Z0-9]+/g, "_");
+
       if (!cleanLabel) cleanLabel = `Field_${index}`;
 
       // Map string type to Enum
       let fieldType = FieldType.TEXT;
-      if (item.type === 'checkbox') fieldType = FieldType.CHECKBOX;
-      else if (item.type === 'radio') fieldType = FieldType.RADIO;
-      else if (item.type === 'dropdown') fieldType = FieldType.DROPDOWN;
-      else if (item.type === 'signature') fieldType = FieldType.SIGNATURE;
+      if (item.type === "checkbox") fieldType = FieldType.CHECKBOX;
+      else if (item.type === "radio") fieldType = FieldType.RADIO;
+      else if (item.type === "dropdown") fieldType = FieldType.DROPDOWN;
+      else if (item.type === "signature") fieldType = FieldType.SIGNATURE;
 
       // Parse Style (start with defaults)
       const style: FieldStyle = { ...DEFAULT_FIELD_STYLE };
@@ -236,21 +275,21 @@ export const analyzePageForFields = async (
         const vc = item.visual_characteristics;
 
         if (vc.background_color) {
-           const bg = vc.background_color.toLowerCase();
-           // Normalize white/off-white to transparent to avoid obscuring PDF content
-           if (bg === 'transparent' || bg === '#ffffff' || bg === '#fff') {
-              style.isTransparent = true;
-           } else {
-              style.backgroundColor = vc.background_color;
-              style.isTransparent = false;
-           }
-        } 
+          const bg = vc.background_color.toLowerCase();
+          // Normalize white/off-white to transparent to avoid obscuring PDF content
+          if (bg === "transparent" || bg === "#ffffff" || bg === "#fff") {
+            style.isTransparent = true;
+          } else {
+            style.backgroundColor = vc.background_color;
+            style.isTransparent = false;
+          }
+        }
 
         if (vc.border_color) {
           style.borderColor = vc.border_color;
         }
 
-        if (typeof vc.border_width === 'number') {
+        if (typeof vc.border_width === "number") {
           style.borderWidth = vc.border_width;
         }
 
@@ -260,17 +299,20 @@ export const analyzePageForFields = async (
       }
 
       // Enforce black text color for detected fields to prevent visibility issues
-      style.textColor = '#000000';
+      style.textColor = "#000000";
 
       // Parse Text Preferences
       let multiline = undefined;
-      let alignment: 'left' | 'center' | 'right' | undefined = undefined;
-      
+      let alignment: "left" | "center" | "right" | undefined = undefined;
+
       if (fieldType === FieldType.TEXT && item.text_preferences) {
-          multiline = item.text_preferences.multiline;
-          if (item.text_preferences.alignment) {
-              alignment = item.text_preferences.alignment as 'left' | 'center' | 'right';
-          }
+        multiline = item.text_preferences.multiline;
+        if (item.text_preferences.alignment) {
+          alignment = item.text_preferences.alignment as
+            | "left"
+            | "center"
+            | "right";
+        }
       }
 
       return {
@@ -282,15 +324,19 @@ export const analyzePageForFields = async (
         required: false,
         style: style,
         // Default options for dropdowns if detected, otherwise fall back to defaults
-        options: fieldType === FieldType.DROPDOWN 
-            ? (item.options && Array.isArray(item.options) && item.options.length > 0 ? item.options : ['Option 1', 'Option 2']) 
+        options:
+          fieldType === FieldType.DROPDOWN
+            ? item.options &&
+              Array.isArray(item.options) &&
+              item.options.length > 0
+              ? item.options
+              : ["Option 1", "Option 2"]
             : undefined,
-        radioValue: fieldType === FieldType.RADIO ? 'Choice1' : undefined,
+        radioValue: fieldType === FieldType.RADIO ? "Choice1" : undefined,
         multiline: multiline,
-        alignment: alignment
+        alignment: alignment,
       };
     });
-
   } catch (error) {
     console.error("Gemini analysis failed:", error);
     return [];

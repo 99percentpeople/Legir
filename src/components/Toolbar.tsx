@@ -16,6 +16,7 @@ import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import { ModeToggle } from './mode-toggle';
 import { useLanguage } from './language-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { GEMINI_API_AVAILABLE } from '@/services/geminiService';
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -78,7 +79,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 value={mode} 
                 onValueChange={(val) => onModeChange(val as any)}
             >
-                <SelectTrigger className="w-[160px] h-9 ml-2">
+                <SelectTrigger className="h-9 ml-2">
                     <SelectValue placeholder="Mode" />
                 </SelectTrigger>
                 <SelectContent>
@@ -214,7 +215,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <div className="flex shadow-sm rounded-md isolate mr-2">
                 <Button
                     onClick={onAutoDetect}
-                    disabled={editorState.isProcessing}
+                    disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
                     className="rounded-r-none text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800 dark:hover:bg-purple-900/50"
                     title={t('toolbar.ai_detect')}
                 >
@@ -224,7 +225,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                         <Button
-                             disabled={editorState.isProcessing}
+                             disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
                              className="rounded-l-none -ml-px px-2 border-l border-l-purple-200 dark:border-l-purple-800 text-purple-700 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
                         >
                             <ChevronDown size={16} />
