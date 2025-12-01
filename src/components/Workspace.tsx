@@ -751,11 +751,19 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
     // Check for Duplicate shortcut (Ctrl/Meta + Drag)
     if (e.ctrlKey || e.metaKey) {
-        const newId = `field_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        // If Radio, keep name to maintain group. For others, append copy to avoid unintentional grouping/duplicates
-        const newName = field.type === FieldType.RADIO 
-            ? field.name 
-            : `${field.name}_copy`;
+        const newId = `field_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        // If Radio, keep name to maintain group. For others, increment suffix number or append _1
+        let newName = field.name;
+        if (field.type !== FieldType.RADIO) {
+            const match = field.name.match(/^(.*)_(\d+)$/);
+            if (match) {
+                const prefix = match[1];
+                const num = parseInt(match[2], 10);
+                newName = `${prefix}_${num + 1}`;
+            } else {
+                newName = `${field.name}_1`;
+            }
+        }
 
         const newField: FormField = {
             ...field,
@@ -915,50 +923,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 placeholderImage={page.imageData}
             />
             
-            {/* SVG Layer for Ink Annotations */}
-            {/* Added viewBox to match unscaled page dimensions, ensuring proper scaling behavior for ink paths */}
-            <svg 
-                className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" 
-                style={{ zIndex: 5 }}
-                viewBox={`0 0 ${page.width} ${page.height}`}
-                preserveAspectRatio="none"
-            >
-                {editorState.annotations
-                    .filter(a => a.pageIndex === page.pageIndex && a.type === 'ink' && a.points)
-                    .map(a => (
-                        <path 
-                            key={a.id}
-                            d={pointsToPath(a.points!)}
-                            stroke={a.color || 'red'}
-                            strokeWidth={(a.thickness || 2)} 
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ 
-                                pointerEvents: editorState.tool === 'select' ? 'auto' : 'none', 
-                                cursor: editorState.tool === 'select' ? 'pointer' : 'inherit' 
-                            }}
-                            onMouseDown={(e) => handleAnnotationMouseDown(e as any, a)}
-                        />
-                    ))
-                }
-                {/* Current Drawing Path */}
-                {isDrawing && activePageIndex === page.pageIndex && (
-                    <path 
-                        d={pointsToPath(currentPathState)}
-                        stroke={ANNOTATION_STYLES.ink.color}
-                        strokeWidth={ANNOTATION_STYLES.ink.thickness}
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                )}
-            </svg>
-
+            
             {/* DOM Layer for Highlights, Notes, Form Fields */}
             <div 
               className="absolute inset-0"
-              style={{ cursor: getCursor(), zIndex: 10 }}
+              style={{ cursor: getCursor() }}
               onMouseDown={(e) => handleMouseDown(e, page.pageIndex)}
             >
               {/* Annotations: Highlight & Note */}
@@ -971,7 +940,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                         return (
                             <div
                                 key={annot.id}
-                                className={cn("absolute border-2 transition-colors", isSelected ? "border-blue-500 z-50" : "border-transparent z-20")}
+                                className={cn("absolute border-2 transition-colors", isSelected ? "border-blue-500 z-50" : "border-transparent")}
                                 style={{
                                     left: annot.rect.x * editorState.scale,
                                     top: annot.rect.y * editorState.scale,
@@ -999,7 +968,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                     />
                                 )}
                                 <div
-                                    className={cn("absolute p-1 group", isSelected ? "z-50" : "z-20")}
+                                    className={cn("absolute p-1 group", isSelected ? "z-50" : "")}
                                     style={{
                                         left: annot.rect.x * editorState.scale,
                                         top: annot.rect.y * editorState.scale,
@@ -1094,7 +1063,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                       tabIndex={isFormMode ? 0 : -1} // Make container focusable in Form Mode for navigation
                       className={cn(
                         "absolute group select-none pointer-events-auto outline-none", // outline-none to handle custom focus ring
-                        isSelected ? 'z-40' : 'z-30 hover:z-40'
+                        isSelected ? 'z-50' : 'hover:z-50'
                       )}
                       style={{
                         left: field.rect.x * editorState.scale,
@@ -1291,6 +1260,45 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 />
               )}
             </div>
+
+            {/* SVG Layer for Ink Annotations */}
+            {/* Added viewBox to match unscaled page dimensions, ensuring proper scaling behavior for ink paths */}
+            <svg 
+                className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" 
+                viewBox={`0 0 ${page.width} ${page.height}`}
+                preserveAspectRatio="none"
+            >
+                {editorState.annotations
+                    .filter(a => a.pageIndex === page.pageIndex && a.type === 'ink' && a.points)
+                    .map(a => (
+                        <path 
+                            key={a.id}
+                            d={pointsToPath(a.points!)}
+                            stroke={a.color || 'red'}
+                            strokeWidth={(a.thickness || 2)} 
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ 
+                                pointerEvents: editorState.tool === 'select' ? 'auto' : 'none', 
+                                cursor: editorState.tool === 'select' ? 'pointer' : 'inherit' 
+                            }}
+                            onMouseDown={(e) => handleAnnotationMouseDown(e as any, a)}
+                        />
+                    ))
+                }
+                {/* Current Drawing Path */}
+                {isDrawing && activePageIndex === page.pageIndex && (
+                    <path 
+                        d={pointsToPath(currentPathState)}
+                        stroke={ANNOTATION_STYLES.ink.color}
+                        strokeWidth={ANNOTATION_STYLES.ink.thickness}
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                )}
+            </svg>
             
             {/* Snap Guides Layer */}
             {activePageIndex === page.pageIndex && snapLines.length > 0 && (

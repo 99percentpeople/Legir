@@ -179,7 +179,7 @@ const AIDetectionDialog: React.FC<AIDetectionDialogProps> = ({ isOpen, onClose, 
               />
               
               <div className={cn(
-                  "text-xs flex items-start gap-1.5 transition-colors min-h-[1.25rem]",
+                  "text-xs flex items-start gap-1.5 transition-colors min-h-5",
                   validation.isError ? "text-destructive" : "text-muted-foreground"
               )}>
                   {validation.isError ? <AlertCircle size={14} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={14} className="mt-0.5 text-green-600 dark:text-green-400 shrink-0" />}

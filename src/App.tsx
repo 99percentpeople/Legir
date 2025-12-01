@@ -10,7 +10,8 @@ import AIDetectionDialog, {
   AIDetectionOptions,
 } from "./components/AIDetectionDialog";
 import Sidebar from "./components/Sidebar";
-import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogFooter, DialogDescription } from "./components/ui/dialog";
+import { Button } from "./components/ui/button";
 import {
   EditorState,
   FormField,
@@ -63,11 +64,13 @@ const App: React.FC = () => {
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAIDetectOpen, setIsAIDetectOpen] = useState(false);
+  const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [hasSavedSession, setHasSavedSession] = useState(false);
 
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const isClosingRef = React.useRef(false);
 
   useEffect(() => {
     getDraft().then((draft) => {
@@ -77,7 +80,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (state.past.length > 0) {
+      if (state.past.length > 0 && !isClosingRef.current) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -307,7 +310,7 @@ const App: React.FC = () => {
     setState((prev) => ({ ...prev, isProcessing: true }));
     setProcessingStatus(t("app.parsing"));
     try {
-      const { pdfBytes, pdfDocument, pages, fields, metadata, outline } =
+      const { pdfBytes, pdfDocument, pages, fields, annotations, metadata, outline } =
         await loadPDF(file);
       const fitScale = calculateFitScale(pages);
       setState((prev) => ({
@@ -319,7 +322,7 @@ const App: React.FC = () => {
         filename: file.name,
         pages,
         fields: fields,
-        annotations: [],
+        annotations: annotations,
         outline: outline,
         scale: fitScale,
         past: [],
@@ -342,7 +345,7 @@ const App: React.FC = () => {
     setProcessingStatus(t("app.loading_draft"));
     try {
       // Re-load the PDF document from bytes as it is not serializable in DB
-      const { pdfDocument, pages, outline } = await loadPDF(draft.pdfBytes);
+      const { pdfDocument, pages, annotations, outline } = await loadPDF(draft.pdfBytes);
       const fitScale = calculateFitScale(pages);
       setState((prev) => ({
         ...prev,
@@ -352,7 +355,7 @@ const App: React.FC = () => {
         pages,
         outline,
         fields: draft.fields,
-        annotations: [], // Annotations in session not fully supported yet in saving service
+        annotations: annotations, // Recover annotations from PDF bytes
         metadata: draft.metadata,
         filename: draft.filename,
         scale: fitScale,
@@ -390,11 +393,13 @@ const App: React.FC = () => {
   const handleUpdateField = (id: string, updates: Partial<FormField>) => {
     setState((prev) => {
       let newFields = prev.fields;
+      const targetField = prev.fields.find((f) => f.id === id);
+
+      if (!targetField) return prev;
 
       // Handle Radio Exclusivity
       if (updates.isChecked === true) {
-        const targetField = prev.fields.find((f) => f.id === id);
-        if (targetField && targetField.type === FieldType.RADIO) {
+        if (targetField.type === FieldType.RADIO) {
           newFields = newFields.map((f) =>
             f.name === targetField.name &&
             f.id !== id &&
@@ -403,6 +408,44 @@ const App: React.FC = () => {
               : f
           );
         }
+      }
+
+      // Sync same-name fields
+      const propsToSync = [
+        "value",
+        "defaultValue",
+        "options",
+        "required",
+        "readOnly",
+        "toolTip",
+        "multiline",
+        "maxLength",
+        "alignment",
+      ];
+
+      // Sync isChecked for non-radio fields (Radio logic is handled above)
+      if (targetField.type !== FieldType.RADIO) {
+        propsToSync.push("isChecked");
+        propsToSync.push("isDefaultChecked");
+      }
+
+      const syncUpdates: Partial<FormField> = {};
+      propsToSync.forEach((key) => {
+        const k = key as keyof FormField;
+        if (updates[k] !== undefined) {
+          // @ts-ignore
+          syncUpdates[k] = updates[k];
+        }
+      });
+
+      if (Object.keys(syncUpdates).length > 0) {
+        newFields = newFields.map((f) =>
+          f.name === targetField.name &&
+          f.id !== id &&
+          f.type === targetField.type
+            ? { ...f, ...syncUpdates }
+            : f
+        );
       }
 
       newFields = newFields.map((f) =>
@@ -537,7 +580,57 @@ const App: React.FC = () => {
     );
   };
 
-  const handleExport = async () => {
+  const handleSaveAs = async (): Promise<boolean> => {
+    if (!state.pdfBytes) return false;
+
+    // Strictly use File System Access API
+    if ("showSaveFilePicker" in window) {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: state.filename || "document.pdf",
+          types: [
+            {
+              description: "PDF Document",
+              accept: { "application/pdf": [".pdf"] },
+            },
+          ],
+        });
+
+        // User selected a file, NOW generate the PDF
+        setState((prev) => ({ ...prev, isProcessing: true }));
+        setProcessingStatus(t("app.generating"));
+
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          const modifiedBytes = await generatePDF();
+
+          if (modifiedBytes) {
+            const writable = await handle.createWritable();
+            await writable.write(modifiedBytes);
+            await writable.close();
+            toast.success(t("app.save_success"));
+            return true;
+          }
+        } finally {
+          setState((prev) => ({ ...prev, isProcessing: false }));
+          setProcessingStatus(null);
+        }
+        return false;
+      } catch (err: any) {
+        if (err.name === "AbortError") {
+          // User cancelled selection. Stop here.
+          return false;
+        }
+        console.error("Save As failed:", err);
+        toast.error(t("app.save_fail"));
+        return false;
+      }
+    }
+    
+    return false;
+  };
+
+  const handleExport = async (): Promise<boolean> => {
     setState((prev) => ({ ...prev, isProcessing: true }));
     setProcessingStatus(t("app.generating"));
     try {
@@ -554,14 +647,17 @@ const App: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        return true;
       }
     } catch (error) {
       console.error("Export failed:", error);
       toast.error(t("app.export_fail"));
+      return false;
     } finally {
       setState((prev) => ({ ...prev, isProcessing: false }));
       setProcessingStatus(null);
     }
+    return false;
   };
 
   const handleSaveDraft = async (silent = false) => {
@@ -588,11 +684,14 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveAndClose = async () => {
-    // ... similar logic
-    await handleExport();
+  const closeSession = async () => {
+    isClosingRef.current = true;
     await clearDraft();
     window.location.reload();
+  };
+
+  const handleCloseRequest = () => {
+    setIsCloseDialogOpen(true);
   };
 
   const selectedField =
@@ -623,7 +722,9 @@ const App: React.FC = () => {
             }
             onExport={handleExport}
             onSaveDraft={() => handleSaveDraft(false)}
-            onSaveAndClose={handleSaveAndClose}
+            onSaveAs={handleSaveAs}
+            onExit={closeSession}
+            onClose={handleCloseRequest}
             onAutoDetect={() =>
               handleAdvancedDetect({
                 pageRange: "All",
@@ -686,7 +787,7 @@ const App: React.FC = () => {
               onResize={setSidebarWidth}
             />
 
-            <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden">
+            <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden z-0">
               <Workspace
                 editorState={state}
                 onAddField={handleAddField}
@@ -768,6 +869,26 @@ const App: React.FC = () => {
         totalPages={state.pages.length}
       />
 
+      <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
+        <DialogContent>
+          <DialogTitle>{t("dialog.confirm_close.title")}</DialogTitle>
+          <DialogDescription>
+            {t("dialog.confirm_close.desc")}
+          </DialogDescription>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCloseDialogOpen(false)}
+            >
+              {t("dialog.confirm_close.cancel")}
+            </Button>
+            <Button variant="destructive" onClick={closeSession}>
+              {t("dialog.confirm_close.confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={state.isProcessing}>
         <DialogContent
           showCloseButton={false}
@@ -776,6 +897,9 @@ const App: React.FC = () => {
           <DialogTitle className="sr-only">
             {t("common.processing")}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {t("common.processing")}
+          </DialogDescription>
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-foreground font-medium text-lg">
             {processingStatus || t("common.processing")}

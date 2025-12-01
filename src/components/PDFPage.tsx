@@ -136,7 +136,7 @@ const PDFPage: React.FC<PDFPageProps> = ({ pageIndex, pdfDocument, scale, width,
   return (
     <div 
       ref={containerRef}
-      className="relative bg-white shadow-lg transition-shadow hover:shadow-xl origin-top"
+      className="relative bg-white shadow-lg transition-shadow hover:shadow-xl origin-top z-0"
       style={{ 
         width: width * scale, 
         height: height * scale 

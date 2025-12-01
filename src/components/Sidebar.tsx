@@ -62,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div 
-      className="flex flex-col bg-background border-r border-border h-full transition-colors duration-200 flex-shrink-0 z-20 relative"
+      className="flex flex-col bg-background border-r border-border h-full transition-colors duration-200 shrink-0 z-20 relative"
       style={{ width: width }}
     >
       <Tabs defaultValue="fields" className="flex flex-col h-full">

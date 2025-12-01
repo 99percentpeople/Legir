@@ -15,6 +15,7 @@ import {
   PDFArray,
   RotationTypes,
   grayscale,
+  PDFNumber,
 } from "pdf-lib";
 import {
   FormField,
@@ -310,6 +311,7 @@ export const loadPDF = async (
   pdfDocument: any;
   pages: PageData[];
   fields: FormField[];
+  annotations: Annotation[];
   metadata: PDFMetadata;
   outline: PDFOutlineItem[];
 }> => {
@@ -341,6 +343,7 @@ export const loadPDF = async (
   const numPages = pdf.numPages;
   const pages: PageData[] = [];
   const fields: FormField[] = [];
+  const annotations: Annotation[] = [];
 
   let metadata: PDFMetadata = {};
   try {
@@ -370,10 +373,185 @@ export const loadPDF = async (
   for (let i = 1; i <= numPages; i++) {
     const page = await pdf.getPage(i);
     const unscaledViewport = page.getViewport({ scale: 1.0 });
-    const annotations = await page.getAnnotations();
+    const pageAnnotations = await page.getAnnotations();
+    
+    // Extract Ink Annotations using pdf-lib (more robust access to raw data)
+    if (pdfDoc) {
+        try {
+            const pdfLibPage = pdfDoc.getPage(i - 1);
+            const annots = pdfLibPage.node.Annots();
+            
+            if (annots instanceof PDFArray) {
+                for (let idx = 0; idx < annots.size(); idx++) {
+                    const annot = annots.lookup(idx);
+                    if (annot instanceof PDFDict) {
+                        const subtype = annot.lookup(PDFName.of('Subtype'));
+                        if (subtype === PDFName.of('Ink')) {
+                            const inkList = annot.lookup(PDFName.of('InkList'));
+                            if (inkList instanceof PDFArray) {
+                                // Parse Color
+                                let color = "#000000";
+                                const c = annot.lookup(PDFName.of('C')); // C is Color in PDF Spec
+                                if (c instanceof PDFArray && c.size() === 3) {
+                                    const r = (c.lookup(0) as PDFNumber).asNumber();
+                                    const g = (c.lookup(1) as PDFNumber).asNumber();
+                                    const b = (c.lookup(2) as PDFNumber).asNumber();
+                                    color = rgbArrayToHex([r * 255, g * 255, b * 255]) || "#000000";
+                                }
 
-    annotations.forEach((annotation: any, index: number) => {
-      if (annotation.subtype === "Widget" && annotation.fieldName) {
+                                // Parse Thickness (BS -> W) or Border -> W
+                                let thickness = 2;
+                                const bs = annot.lookup(PDFName.of('BS'));
+                                if (bs instanceof PDFDict) {
+                                    const w = bs.lookup(PDFName.of('W'));
+                                    if (w instanceof PDFNumber) thickness = w.asNumber();
+                                } else {
+                                    const border = annot.lookup(PDFName.of('Border'));
+                                    if (border instanceof PDFArray && border.size() >= 3) {
+                                         const w = border.lookup(2);
+                                         if (w instanceof PDFNumber) thickness = w.asNumber();
+                                    }
+                                }
+
+                                // Parse Points
+                                for (let s = 0; s < inkList.size(); s++) {
+                                    const stroke = inkList.lookup(s);
+                                    if (stroke instanceof PDFArray) {
+                                        const points: {x: number, y: number}[] = [];
+                                        for (let p = 0; p < stroke.size(); p += 2) {
+                                            const px = (stroke.lookup(p) as PDFNumber).asNumber();
+                                            const py = (stroke.lookup(p + 1) as PDFNumber).asNumber();
+                                            const [vx, vy] = unscaledViewport.convertToViewportPoint(px, py);
+                                            points.push({ x: vx, y: vy });
+                                        }
+                                        
+                                        if (points.length > 0) {
+                                            annotations.push({
+                                                id: `imported_ink_lib_${i}_${idx}_${s}`,
+                                                pageIndex: i - 1,
+                                                type: "ink",
+                                                points: points,
+                                                color: color,
+                                                thickness: thickness,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn(`Failed to extract Ink annotations from page ${i} using pdf-lib`, e);
+        }
+    }
+
+    pageAnnotations.forEach((annotation: any, index: number) => {
+      const subtype = annotation.subtype;
+      // Skip Ink in pdf.js loop since we handle it via pdf-lib
+      const isInk = false; 
+      const isPolyLine = subtype === "PolyLine" || subtype === "polyline";
+      const isLine = subtype === "Line" || subtype === "line";
+
+      if (isInk || isPolyLine || isLine) {
+        let strokeLists: any[] = [];
+
+        if (isInk && Array.isArray(annotation.inkList)) {
+          strokeLists = annotation.inkList;
+        } else if (isPolyLine && Array.isArray(annotation.vertices)) {
+          // PolyLine has a single array of vertices
+          strokeLists = [annotation.vertices];
+        } else if (isLine && Array.isArray(annotation.lineCoordinates)) {
+          // Line has [x1, y1, x2, y2]
+          strokeLists = [annotation.lineCoordinates];
+        }
+
+        const color = annotation.color
+          ? rgbArrayToHex(annotation.color)
+          : "#000000";
+        const thickness = annotation.borderStyle?.width || 2;
+
+        strokeLists.forEach((pointsList: any[], strokeIndex: number) => {
+          if (!Array.isArray(pointsList) || pointsList.length === 0) return;
+
+          const points: { x: number; y: number }[] = [];
+
+          // Handle flat array [x1, y1, x2, y2...] vs object array [{x,y}, {x,y}...]
+          if (pointsList.length > 0 && typeof pointsList[0] === "number") {
+             for (let k = 0; k < pointsList.length; k += 2) {
+                const px = pointsList[k];
+                const py = pointsList[k+1];
+                if (typeof px === 'number' && typeof py === 'number') {
+                    const [vx, vy] = unscaledViewport.convertToViewportPoint(px, py);
+                    points.push({ x: vx, y: vy });
+                }
+             }
+          } else {
+             // Assume objects {x, y}
+             pointsList.forEach((p: any) => {
+                const px = typeof p.x === "number" ? p.x : 0;
+                const py = typeof p.y === "number" ? p.y : 0;
+                const [vx, vy] = unscaledViewport.convertToViewportPoint(px, py);
+                points.push({ x: vx, y: vy });
+             });
+          }
+
+          if (points.length > 0) {
+            annotations.push({
+                id: `imported_ink_${i}_${index}_${strokeIndex}`,
+                pageIndex: i - 1,
+                type: "ink",
+                points: points,
+                color: color,
+                thickness: thickness,
+            });
+          }
+        });
+      } else if (subtype === "Highlight" || subtype === "highlight") {
+         const color = annotation.color ? rgbArrayToHex(annotation.color) : "#FFFF00";
+         const [x1, y1, x2, y2] = annotation.rect;
+         const [vx1, vy1] = unscaledViewport.convertToViewportPoint(x1, y1);
+         const [vx2, vy2] = unscaledViewport.convertToViewportPoint(x2, y2);
+         
+         // Normalize rect (min/max) because rotation might flip coordinates
+         const x = Math.min(vx1, vx2);
+         const y = Math.min(vy1, vy2);
+         const width = Math.abs(vx2 - vx1);
+         const height = Math.abs(vy2 - vy1);
+
+         annotations.push({
+            id: `imported_highlight_${i}_${index}`,
+            pageIndex: i - 1,
+            type: "highlight",
+            rect: { x, y, width, height },
+             color: color
+          });
+       } else if (subtype === "Text" || subtype === "text" || subtype === "FreeText" || subtype === "freetext") {
+          const color = annotation.color ? rgbArrayToHex(annotation.color) : "#FFFF00";
+          const [x1, y1, x2, y2] = annotation.rect;
+          const [vx1, vy1] = unscaledViewport.convertToViewportPoint(x1, y1);
+          const [vx2, vy2] = unscaledViewport.convertToViewportPoint(x2, y2);
+          
+          // Normalize rect
+          const x = Math.min(vx1, vx2);
+          const y = Math.min(vy1, vy2);
+          let width = Math.abs(vx2 - vx1);
+          let height = Math.abs(vy2 - vy1);
+
+          // If width/height is too small (e.g. sticky note point), give it default size
+          if (width < 5) width = 30;
+          if (height < 5) height = 30;
+ 
+          annotations.push({
+             id: `imported_note_${i}_${index}`,
+             pageIndex: i - 1,
+             type: "note",
+             rect: { x, y, width, height },
+             color: color,
+             text: annotation.contents || ""
+          });
+       } else if (annotation.subtype === "Widget" && annotation.fieldName) {
         let type: FieldType | null = null;
         let options: string[] | undefined = undefined;
         let radioValue: string | undefined = undefined;
@@ -507,7 +685,7 @@ export const loadPDF = async (
       // imageData is now optional and will be generated on demand via renderPageToDataURL or PDFPage component
     });
   }
-  return { pdfBytes, pdfDocument: pdf, pages, fields, metadata, outline };
+  return { pdfBytes, pdfDocument: pdf, pages, fields, annotations, metadata, outline };
 };
 
 // New helper to render a single page to base64 on demand (e.g. for AI detection)
@@ -896,7 +1074,13 @@ export const exportPDF = async (
       const commonOpts = getCommonOpts(field, pageHeight);
 
       if (field.type === FieldType.TEXT || field.type === FieldType.SIGNATURE) {
-        const tf = form.createTextField(field.name);
+        let tf;
+        try {
+          tf = form.getTextField(field.name);
+        } catch (e) {
+          tf = form.createTextField(field.name);
+        }
+        
         tf.addToPage(page, { ...commonOpts, font: fieldFont });
 
         // Add fields properties AFTER setting style
@@ -917,14 +1101,28 @@ export const exportPDF = async (
         // Must be called AFTER setting text, size, alignment, etc.
         tf.updateAppearances(fieldFont);
       } else if (field.type === FieldType.CHECKBOX) {
-        const cb = form.createCheckBox(field.name);
+        let cb;
+        try {
+          cb = form.getCheckBox(field.name);
+        } catch (e) {
+          cb = form.createCheckBox(field.name);
+        }
+
         cb.addToPage(page, commonOpts); // Use defaults (ZapfDingbats) for check appearance
         if (field.isChecked) cb.check();
+        else cb.uncheck(); // Ensure state is synced
+
         if (field.toolTip) {
           cb.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
         }
       } else if (field.type === FieldType.DROPDOWN) {
-        const dd = form.createDropdown(field.name);
+        let dd;
+        try {
+          dd = form.getDropdown(field.name);
+        } catch (e) {
+          dd = form.createDropdown(field.name);
+        }
+
         dd.addToPage(page, { ...commonOpts, font: fieldFont });
         if (field.options) dd.setOptions(field.options);
         if (field.value) dd.select(field.value);
