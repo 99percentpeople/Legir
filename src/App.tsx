@@ -63,6 +63,13 @@ const App: React.FC = () => {
       threshold: 8,
     },
     lastSavedAt: null,
+    keys: {
+      ctrl: false,
+      shift: false,
+      alt: false,
+      meta: false,
+    },
+    actionSignal: null,
   });
 
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
@@ -79,6 +86,12 @@ const App: React.FC = () => {
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
   const isClosingRef = React.useRef(false);
+
+  // Keep a ref to access latest state in event handlers without re-binding
+  const stateRef = React.useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     getDraft().then((draft) => {
@@ -220,8 +233,52 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleMoveField = useCallback((actionType: string) => {
+    setState((prev) => {
+      if (!prev.selectedFieldId) return prev;
+      const fieldIndex = prev.fields.findIndex(
+        (f) => f.id === prev.selectedFieldId
+      );
+      if (fieldIndex === -1) return prev;
+
+      const field = prev.fields[fieldIndex];
+      let { x, y } = field.rect;
+      const isFast = actionType.endsWith("_FAST");
+      const step = isFast ? 10 : 1;
+
+      if (actionType.includes("UP")) y -= step;
+      else if (actionType.includes("DOWN")) y += step;
+      else if (actionType.includes("LEFT")) x -= step;
+      else if (actionType.includes("RIGHT")) x += step;
+
+      const newFields = [...prev.fields];
+      newFields[fieldIndex] = { ...field, rect: { ...field.rect, x, y } };
+
+      return { ...prev, fields: newFields };
+    });
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Update Modifier Keys
+      if (
+        e.key === "Control" ||
+        e.key === "Shift" ||
+        e.key === "Alt" ||
+        e.key === "Meta"
+      ) {
+        setState((prev) => ({
+          ...prev,
+          keys: {
+            ctrl: e.ctrlKey,
+            shift: e.shiftKey,
+            alt: e.altKey,
+            meta: e.metaKey,
+          },
+        }));
+        return;
+      }
+
       const target = e.target as HTMLElement;
       // Identify if we are inside a text editing context
       const isInput =
@@ -229,10 +286,110 @@ const App: React.FC = () => {
         target.tagName === "TEXTAREA" ||
         target.isContentEditable;
 
+      const currentState = stateRef.current;
+      const { selectedFieldId, mode } = currentState;
+
+      const dispatch = (type: any) => {
+        e.preventDefault();
+        setState((prev) => ({
+          ...prev,
+          keys: {
+            ...prev.keys,
+            ctrl: e.ctrlKey,
+            shift: e.shiftKey,
+            alt: e.altKey,
+            meta: e.metaKey,
+          },
+          actionSignal: { type, id: Date.now() },
+        }));
+      };
+
       // Handle Escape Key
       if (e.key === "Escape") {
         if (isInput) target.blur();
-        e.preventDefault();
+        dispatch("ESCAPE");
+        return;
+      }
+
+      // Handle Delete/Backspace
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (isInput && !(target as HTMLInputElement).readOnly) {
+          return;
+        }
+        if (mode === "annotation" && selectedFieldId) {
+          return;
+        }
+        dispatch("DELETE");
+        return;
+      }
+
+      // Block other shortcuts if typing in a writable input
+      if (isInput && !(target as HTMLInputElement).readOnly) {
+        return;
+      }
+
+      // Handle Arrow Keys for moving selected field
+      if (
+        selectedFieldId &&
+        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
+      ) {
+        let type = "";
+        const fast = e.shiftKey ? "_FAST" : "";
+        if (e.key === "ArrowUp") type = "MOVE_UP";
+        else if (e.key === "ArrowDown") type = "MOVE_DOWN";
+        else if (e.key === "ArrowLeft") type = "MOVE_LEFT";
+        else if (e.key === "ArrowRight") type = "MOVE_RIGHT";
+
+        if (type) dispatch(type + fast);
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        if (e.shiftKey) dispatch("REDO");
+        else dispatch("UNDO");
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        dispatch("SAVE");
+        return;
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (
+        e.key === "Control" ||
+        e.key === "Shift" ||
+        e.key === "Alt" ||
+        e.key === "Meta"
+      ) {
+        setState((prev) => ({
+          ...prev,
+          keys: {
+            ctrl: e.ctrlKey,
+            shift: e.shiftKey,
+            alt: e.altKey,
+            meta: e.metaKey,
+          },
+        }));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  // Process Action Signals
+  useEffect(() => {
+    if (!state.actionSignal) return;
+    const { type } = state.actionSignal;
+
+    switch (type) {
+      case "ESCAPE":
         setState((prev) => {
           if (prev.selectedFieldId || prev.selectedAnnotationId) {
             return {
@@ -246,81 +403,32 @@ const App: React.FC = () => {
           }
           return prev;
         });
-        return;
-      }
-
-      // Handle Delete/Backspace
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (isInput && !(target as HTMLInputElement).readOnly) {
-          return;
-        }
-        if (state.mode === "annotation" && state.selectedFieldId) {
-          return;
-        }
-        e.preventDefault();
+        break;
+      case "DELETE":
         handleDelete();
-        return;
-      }
-
-      // Block other shortcuts if typing in a writable input
-      if (isInput && !(target as HTMLInputElement).readOnly) {
-        return;
-      }
-
-      // Handle Arrow Keys for moving selected field
-      if (
-        state.selectedFieldId &&
-        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
-      ) {
-        e.preventDefault();
-        const step = e.shiftKey ? 10 : 1;
-
-        setState((prev) => {
-          const fieldIndex = prev.fields.findIndex(
-            (f) => f.id === prev.selectedFieldId
-          );
-          if (fieldIndex === -1) return prev;
-
-          const field = prev.fields[fieldIndex];
-          let { x, y } = field.rect;
-
-          switch (e.key) {
-            case "ArrowUp":
-              y -= step;
-              break;
-            case "ArrowDown":
-              y += step;
-              break;
-            case "ArrowLeft":
-              x -= step;
-              break;
-            case "ArrowRight":
-              x += step;
-              break;
-          }
-
-          const newFields = [...prev.fields];
-          newFields[fieldIndex] = { ...field, rect: { ...field.rect, x, y } };
-
-          return { ...prev, fields: newFields };
-        });
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
-        e.preventDefault();
-        if (e.shiftKey) handleRedo();
-        else handleUndo();
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
+        break;
+      case "UNDO":
+        handleUndo();
+        break;
+      case "REDO":
+        handleRedo();
+        break;
+      case "SAVE":
         handleSaveDraft(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleDelete, handleUndo, handleRedo, state.mode, state.selectedFieldId]);
+        break;
+      default:
+        if (typeof type === "string" && type.startsWith("MOVE_")) {
+          handleMoveField(type);
+        }
+        break;
+    }
+  }, [
+    state.actionSignal,
+    handleDelete,
+    handleUndo,
+    handleRedo,
+    handleMoveField,
+  ]);
 
   const handleUpload = async (file: File) => {
     setState((prev) => ({ ...prev, isProcessing: true }));
@@ -396,6 +504,7 @@ const App: React.FC = () => {
       ...prev,
       fields: [...prev.fields, field],
       selectedFieldId: field.id,
+      tool: prev.keys.ctrl || prev.keys.meta ? prev.tool : "select",
     }));
   };
 
@@ -737,6 +846,7 @@ const App: React.FC = () => {
           <Toolbar
             editorState={state}
             isSaving={isSaving}
+            isDirty={isDirty}
             onToolChange={(tool) =>
               setState((prev) => ({
                 ...prev,

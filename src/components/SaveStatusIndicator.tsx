@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from './language-provider';
 import dayjs from 'dayjs';
 
 interface SaveStatusIndicatorProps {
   isSaving: boolean;
+  isDirty?: boolean;
   lastSavedAt: Date | null;
   className?: string;
 }
 
 export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   isSaving,
+  isDirty = false,
   lastSavedAt,
   className
 }) => {
@@ -33,16 +35,26 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
   if (isSaving) {
     return (
-      <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", className)}>
-        <Loader2 size={12} className="animate-spin" />
+      <div className={cn("flex items-center gap-1.5 text-[10px] text-muted-foreground/60 transition-opacity duration-500", className)}>
+        <Loader2 size={10} className="animate-spin" />
         <span>{t('status.saving')}</span>
+      </div>
+    );
+  }
+
+  if (isDirty) {
+    return (
+      <div className={cn("flex items-center gap-1.5 text-[10px] text-muted-foreground/80 transition-opacity duration-500", className)}>
+        <div className="h-1.5 w-1.5 rounded-full bg-amber-500/70" />
+        <span>{t('status.unsaved')}</span>
       </div>
     );
   }
 
   if (lastSavedAt) {
     return (
-      <div className={cn("flex items-center gap-1.5 text-xs text-muted-foreground/80", className)}>
+      <div className={cn("flex items-center gap-1.5 text-[10px] text-muted-foreground/40 transition-opacity duration-500", className)}>
+        <CheckCircle2 size={10} />
         <span>{t('status.saved')} {timeAgo}</span>
       </div>
     );

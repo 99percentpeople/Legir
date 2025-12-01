@@ -157,4 +157,18 @@ export interface EditorState {
 
   // Status
   lastSavedAt: Date | null;
+
+  // Keyboard State
+  keys: {
+    ctrl: boolean;
+    shift: boolean;
+    alt: boolean;
+    meta: boolean;
+  };
+
+  // Command Signal
+  actionSignal: {
+    type: 'UNDO' | 'REDO' | 'SAVE' | 'DELETE' | 'ESCAPE' | 'COPY' | 'PASTE' | 'CUT' | 'MOVE_UP' | 'MOVE_DOWN' | 'MOVE_LEFT' | 'MOVE_RIGHT' | 'MOVE_UP_FAST' | 'MOVE_DOWN_FAST' | 'MOVE_LEFT_FAST' | 'MOVE_RIGHT_FAST';
+    id: number;
+  } | null;
 }

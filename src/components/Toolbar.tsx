@@ -52,6 +52,7 @@ import { SaveStatusIndicator } from "./SaveStatusIndicator";
 interface ToolbarProps {
   editorState: EditorState;
   isSaving?: boolean;
+  isDirty?: boolean;
   onToolChange: (tool: Tool) => void;
   onModeChange: (mode: EditorState["mode"]) => void;
   onPenStyleChange: (style: Partial<PenStyle>) => void;
@@ -75,6 +76,7 @@ interface ToolbarProps {
 const Toolbar: React.FC<ToolbarProps> = ({
   editorState,
   isSaving = false,
+  isDirty = false,
   onToolChange,
   onModeChange,
   onPenStyleChange,
@@ -253,6 +255,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
       <div className="flex items-center gap-3">
         <SaveStatusIndicator
           isSaving={isSaving}
+          isDirty={isDirty}
           lastSavedAt={editorState.lastSavedAt}
           className="mr-2 hidden md:flex"
         />

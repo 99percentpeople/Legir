@@ -375,7 +375,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     const coords = getRelativeCoords(e, activePageIndex);
     const { enabled, threshold: baseThreshold } = editorState.snappingOptions;
     const threshold = baseThreshold / editorState.scale;
-    const shouldSnap = enabled && !e.altKey && editorState.mode === 'form';
+    const shouldSnap = enabled && !editorState.keys.alt && editorState.mode === 'form';
 
     // --- INK DRAWING ---
     if (isDrawing && editorState.tool === 'draw_ink') {
@@ -396,7 +396,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       let newX = coords.x;
       let newY = coords.y;
 
-      if (e.shiftKey) {
+      if (editorState.keys.shift) {
           const dx = coords.x - dragStart.x;
           const dy = coords.y - dragStart.y;
           const maxDim = Math.max(Math.abs(dx), Math.abs(dy));
@@ -413,7 +413,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
           let newX = coords.x - moveOffset.x;
           let newY = coords.y - moveOffset.y;
           
-          if (e.shiftKey) {
+          if (editorState.keys.shift) {
               const totalDx = coords.x - moveStartRaw.x;
               const totalDy = coords.y - moveStartRaw.y;
               if (Math.abs(totalDx) > Math.abs(totalDy)) newY = moveStartRaw.originalRect.y;
@@ -471,7 +471,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }
 
         // 2. Aspect Ratio (Shift) - Only for corner resizing
-        if (e.shiftKey && resizeHandle.length === 2) {
+        if (editorState.keys.shift && resizeHandle.length === 2) {
              const aspect = resizeStart.originalRect.width / resizeStart.originalRect.height;
              const absDx = Math.abs(newW - resizeStart.originalRect.width);
              const absDy = Math.abs(newH - resizeStart.originalRect.height);
@@ -522,7 +522,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                  return { snapTo, guide };
              };
 
-             if (e.shiftKey && resizeHandle.length === 2) {
+             if (editorState.keys.shift && resizeHandle.length === 2) {
                  // Aspect Ratio Preserving Snapping Logic
                  // If Shift is held, we prioritize keeping aspect ratio. 
                  // We find the BEST snap (if any) and then recalculate the other dimension to match the aspect ratio.
@@ -644,7 +644,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e?: MouseEvent | React.MouseEvent) => {
     // Reset Global Cursor
     resetGlobalCursor();
 
@@ -861,9 +861,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
         handlersRef.current.handleMouseMove(e as unknown as React.MouseEvent);
       };
 
-      const handleGlobalUp = () => {
+      const handleGlobalUp = (e: MouseEvent) => {
          // Access via ref to get the closure from the latest render
-        handlersRef.current.handleMouseUp();
+        handlersRef.current.handleMouseUp(e);
       };
 
       window.addEventListener('mousemove', handleGlobalMove);

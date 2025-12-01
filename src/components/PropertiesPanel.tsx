@@ -378,7 +378,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                   onChange({ type: value as FieldType })
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder={t('common.select')} />
               </SelectTrigger>
               <SelectContent>
@@ -504,7 +504,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                         value={field.imageScaleMode || 'contain'}
                         onValueChange={(val) => { onTriggerHistorySave(); onChange({ imageScaleMode: val as 'contain' | 'fill' }) }}
                     >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -525,7 +525,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                     value={field.value || ''}
                     onValueChange={(val) => { onTriggerHistorySave(); onChange({ value: val }) }}
                  >
-                   <SelectTrigger>
+                   <SelectTrigger className="w-full">
                       <SelectValue placeholder={t('common.select')} />
                    </SelectTrigger>
                    <SelectContent>
@@ -541,7 +541,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                     value={field.defaultValue || ''}
                     onValueChange={(val) => { onTriggerHistorySave(); onChange({ defaultValue: val }) }}
                  >
-                   <SelectTrigger>
+                   <SelectTrigger className="w-full">
                       <SelectValue placeholder={t('common.select')} />
                    </SelectTrigger>
                    <SelectContent>
