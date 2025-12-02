@@ -59,7 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
     document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
+    // document.body.style.userSelect = 'none';
   }, [width, onResize]);
 
   if (!isOpen) return null;

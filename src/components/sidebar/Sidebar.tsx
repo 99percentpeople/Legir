@@ -2,6 +2,7 @@
 import React, { useCallback } from 'react';
 import { X, Layers, List, LayoutGrid } from 'lucide-react';
 import { FormField, PageData, PDFOutlineItem } from '../../types';
+import { setGlobalCursor, resetGlobalCursor, cn } from '../../lib/utils';
 import FieldTreePanel from './FieldTreePanel';
 import { ThumbnailsPanel, DocumentOutlinePanel } from './OutlinePanel';
 import { Button } from '../ui/button';
@@ -38,29 +39,46 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentPageIndex
 }) => {
   const { t } = useLanguage();
+  const [isResizing, setIsResizing] = React.useState(false);
+  const resizeStateRef = React.useRef<{ startX: number, startWidth: number } | null>(null);
+  const onResizeRef = React.useRef(onResize);
+  onResizeRef.current = onResize;
 
-  const resizeHandler = useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = width;
+    resizeStateRef.current = { startX: e.clientX, startWidth: width };
+    setIsResizing(true);
+  }, [width]);
+
+  React.useEffect(() => {
+    if (!isResizing) return;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizeStateRef.current) return;
+      const { startX, startWidth } = resizeStateRef.current;
       const newWidth = startWidth + (moveEvent.clientX - startX);
-      onResize(Math.max(200, Math.min(600, newWidth)));
+      if (onResizeRef.current) {
+        onResizeRef.current(Math.max(200, Math.min(600, newWidth)));
+      }
     };
 
     const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      setIsResizing(false);
+      resizeStateRef.current = null;
     };
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-    document.body.style.cursor = 'col-resize';
+    setGlobalCursor('col-resize', 'sidebar-resize');
     document.body.style.userSelect = 'none';
-  }, [width, onResize]);
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      resetGlobalCursor('sidebar-resize');
+      document.body.style.removeProperty('user-select');
+    };
+  }, [isResizing]); // Removed onResize dependency to prevent effect re-runs
 
   if (!isOpen) return null;
 
@@ -124,9 +142,17 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Resize Handle */}
       <div 
-        className="absolute top-0 right-0 bottom-0 w-1 hover:bg-primary/50 cursor-col-resize z-50 transition-colors"
-        onMouseDown={resizeHandler}
+        className={cn(
+          "absolute top-0 right-0 bottom-0 w-1 cursor-col-resize z-50 transition-colors",
+          isResizing ? "bg-primary/50" : "hover:bg-primary/50"
+        )}
+        onMouseDown={handleMouseDown}
       />
+
+      {/* Resize Overlay */}
+      {isResizing && (
+        <div className="fixed inset-0 z-[9999] cursor-col-resize bg-transparent" />
+      )}
     </div>
   );
 };

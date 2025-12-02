@@ -1,8 +1,10 @@
 import React, { useRef, useState, useLayoutEffect, useEffect } from 'react';
 import { EditorState, FormField, FieldType, Annotation } from '../../types';
 import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES, FONT_FAMILY_MAP, ZOOM_BASE } from '../../constants';
-import { Check, ChevronDown, CircleDot, PenLine, StickyNote, Trash2, Eraser, Image as ImageIcon } from 'lucide-react';
+import { Check, ChevronDown,  PenLine,  Trash2,  Image as ImageIcon } from 'lucide-react';
 import { cn, setGlobalCursor, resetGlobalCursor } from '../../lib/utils';
+import { usePointerCapture } from '../../hooks/usePointerCapture';
+import { useAutoScroll } from '../../hooks/useAutoScroll';
 import { useLanguage } from '../language-provider';
 import AnnotationToolbar from './AnnotationToolbar';
 import PDFPage from './PDFPage';
@@ -45,6 +47,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   
+  const { capture: capturePointer, release: releasePointer } = usePointerCapture(containerRef);
+
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragCurrent, setDragCurrent] = useState<{ x: number; y: number } | null>(null);
   const [activePageIndex, setActivePageIndex] = useState<number | null>(null);
@@ -67,67 +71,21 @@ const Workspace: React.FC<WorkspaceProps> = ({
       mouseY: number
   } | null>(null);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  
+  // Auto-scroll when interacting near edges
+  const isInteracting = !!(dragStart || isDrawing || isErasing || movingFieldId || movingAnnotationId || resizingFieldId);
+  useAutoScroll(containerRef, { enabled: isInteracting });
 
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
 
   const zoomAnchorRef = useRef<{ targetX: number; targetY: number; mouseX: number; mouseY: number; } | null>(null);
   const prevScaleRef = useRef(editorState.scale);
   const scrollPosRef = useRef({ x: 0, y: 0 });
+  const lastMousePosRef = useRef({ x: 0, y: 0 });
 
   // Track if any interactive operation is in progress
-  const isInteracting = !!(dragStart || isDrawing || isErasing || movingFieldId || movingAnnotationId || resizingFieldId);
-
-  const handleScroll = () => {
-    const container = containerRef.current;
-    if (container) {
-        scrollPosRef.current = {
-            x: container.scrollLeft,
-            y: container.scrollTop
-        };
-
-        if (onPageIndexChange) {
-          // Find visible page
-          const scrollTop = container.scrollTop;
-          const viewportHeight = container.clientHeight;
-          const middleY = scrollTop + viewportHeight / 2;
-          
-          let currentY = 32; // Top padding
-          const gap = 32;
-          const scale = editorState.scale;
-
-          for (let i = 0; i < editorState.pages.length; i++) {
-            const page = editorState.pages[i];
-            const pageHeight = page.height * scale;
-            
-            // Check if middleY is within this page (including half gap before and after?)
-            // Let's simpler: if middleY < currentY + pageHeight + gap, it's this page.
-            // Or rather, finding the page that contains the middle point.
-            if (middleY >= currentY && middleY <= currentY + pageHeight) {
-              onPageIndexChange(i);
-              return;
-            }
-            
-            // Also check if we are in the gap after this page, maybe still count as this page or next?
-            // If in gap, usually associate with the nearest page.
-            if (middleY > currentY + pageHeight && middleY < currentY + pageHeight + gap) {
-               // In gap, decide based on proximity. simpler to just keep previous or next.
-               // Let's say if passed half gap, it's next. 
-               if (middleY < currentY + pageHeight + gap / 2) {
-                 onPageIndexChange(i);
-                 return;
-               }
-            }
-
-            currentY += pageHeight + gap;
-          }
-          
-          // If we are past everything (shouldn't happen with correct math but just in case)
-          if (editorState.pages.length > 0 && middleY >= currentY) {
-             onPageIndexChange(editorState.pages.length - 1);
-          }
-        }
-    }
-  };
+  // NOTE: Definition moved up to be used by useAutoScroll hook
+  // const isInteracting = !!(dragStart || isDrawing || isErasing || movingFieldId || movingAnnotationId || resizingFieldId);
 
   // --- Zoom Effect (Same as before) ---
   useLayoutEffect(() => {
@@ -255,15 +213,19 @@ const Workspace: React.FC<WorkspaceProps> = ({
   }, [editorState.scale, onScaleChange, editorState.pages]);
 
 
-  const getRelativeCoords = (e: React.MouseEvent | MouseEvent, pageIndex: number) => {
-    // IMPORTANT: Get coords relative to the container wrapper using stable ID
+  const getRelativeCoordsFromPoint = (clientX: number, clientY: number, pageIndex: number) => {
     const pageEl = document.getElementById(`page-${pageIndex}`);
     if (!pageEl) return { x: 0, y: 0 };
     const rect = pageEl.getBoundingClientRect();
     return {
-      x: (e.clientX - rect.left) / editorState.scale,
-      y: (e.clientY - rect.top) / editorState.scale,
+      x: (clientX - rect.left) / editorState.scale,
+      y: (clientY - rect.top) / editorState.scale,
     };
+  };
+
+  const getRelativeCoords = (e: React.MouseEvent | MouseEvent, pageIndex: number) => {
+    // IMPORTANT: Get coords relative to the container wrapper using stable ID
+    return getRelativeCoordsFromPoint(e.clientX, e.clientY, pageIndex);
   };
 
   const dist2 = (p: {x: number, y: number}, v: {x: number, y: number}) => {
@@ -429,9 +391,342 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return { x, y, guides };
   };
 
+  // --- Helper to find page index from mouse coordinates ---
+  const getPageIndexFromPoint = (x: number, y: number) => {
+      // Check current active page first for performance
+      if (activePageIndex !== null) {
+           const pageEl = document.getElementById(`page-${activePageIndex}`);
+           if (pageEl) {
+               const rect = pageEl.getBoundingClientRect();
+               if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                   return activePageIndex;
+               }
+           }
+      }
+      
+      // Check other pages
+      for (let i = 0; i < editorState.pages.length; i++) {
+          if (i === activePageIndex) continue;
+          const pageEl = document.getElementById(`page-${i}`);
+          if (pageEl) {
+              const rect = pageEl.getBoundingClientRect();
+              if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                  return i;
+              }
+          }
+      }
+      return null;
+  };
+
+  const updateMovingField = (clientX: number, clientY: number) => {
+      if (!movingFieldId || !moveOffset || !moveStartRaw) return;
+      
+      const field = editorState.fields.find(f => f.id === movingFieldId);
+      if (field) {
+          let currentTargetPageIndex = activePageIndex;
+          const hoveredPageIndex = getPageIndexFromPoint(clientX, clientY);
+          
+          if (hoveredPageIndex !== null && hoveredPageIndex !== activePageIndex) {
+              currentTargetPageIndex = hoveredPageIndex;
+              setActivePageIndex(hoveredPageIndex);
+          }
+
+          const pageIndex = currentTargetPageIndex ?? 0;
+          const currentCoords = getRelativeCoordsFromPoint(clientX, clientY, pageIndex);
+
+          let newX = currentCoords.x - moveOffset.x;
+          let newY = currentCoords.y - moveOffset.y;
+          
+          if (editorState.keys.shift) {
+              const totalDx = currentCoords.x - moveStartRaw.x;
+              const totalDy = currentCoords.y - moveStartRaw.y;
+              if (Math.abs(totalDx) > Math.abs(totalDy)) newY = moveStartRaw.originalRect.y;
+              else newX = moveStartRaw.originalRect.x;
+          }
+
+          const { enabled, threshold: baseThreshold } = editorState.snappingOptions;
+          const threshold = baseThreshold / editorState.scale;
+          const shouldSnap = enabled && !editorState.keys.alt && editorState.mode === 'form';
+
+          if (shouldSnap) {
+              const snapResult = applySnapping({ x: newX, y: newY, width: field.rect.width, height: field.rect.height }, pageIndex, movingFieldId, threshold);
+              newX = snapResult.x;
+              newY = snapResult.y;
+              setSnapLines(snapResult.guides);
+          } else {
+              setSnapLines([]);
+          }
+
+          onUpdateField(movingFieldId, { 
+              rect: { ...field.rect, x: newX, y: newY },
+              pageIndex: pageIndex 
+          });
+      }
+  };
+
+  const updateResizingField = (clientX: number, clientY: number) => {
+      if (!resizingFieldId || !resizeStart || !resizeHandle || activePageIndex === null) return;
+
+      const coords = getRelativeCoordsFromPoint(clientX, clientY, activePageIndex);
+      const { enabled, threshold: baseThreshold } = editorState.snappingOptions;
+      const threshold = baseThreshold / editorState.scale;
+      const shouldSnap = enabled && !editorState.keys.alt && editorState.mode === 'form';
+
+      const dx = coords.x - resizeStart.mouseX;
+      const dy = coords.y - resizeStart.mouseY;
+      let newX = resizeStart.originalRect.x;
+      let newY = resizeStart.originalRect.y;
+      let newW = resizeStart.originalRect.width;
+      let newH = resizeStart.originalRect.height;
+      
+      // 1. Calculate rough dimensions
+      if (resizeHandle.includes('e')) newW = Math.max(10, resizeStart.originalRect.width + dx);
+      if (resizeHandle.includes('w')) {
+          const effDx = Math.min(dx, resizeStart.originalRect.width - 10);
+          newX += effDx; newW -= effDx;
+      }
+      if (resizeHandle.includes('s')) newH = Math.max(10, resizeStart.originalRect.height + dy);
+      if (resizeHandle.includes('n')) {
+           const effDy = Math.min(dy, resizeStart.originalRect.height - 10);
+           newY += effDy; newH -= effDy;
+      }
+
+      // 2. Aspect Ratio (Shift) - Only for corner resizing
+      if (editorState.keys.shift && resizeHandle.length === 2) {
+           const aspect = resizeStart.originalRect.width / resizeStart.originalRect.height;
+           const absDx = Math.abs(newW - resizeStart.originalRect.width);
+           const absDy = Math.abs(newH - resizeStart.originalRect.height);
+
+           // Use the larger delta to drive the size
+           if (absDx > absDy * aspect) {
+               // Width changed more (relative to aspect), adjust Height
+               const targetH = newW / aspect;
+               if (resizeHandle.includes('n')) {
+                   newY += (newH - targetH);
+               }
+               newH = targetH;
+           } else {
+               // Height changed more, adjust Width
+               const targetW = newH * aspect;
+               if (resizeHandle.includes('w')) {
+                   newX += (newW - targetW);
+               }
+               newW = targetW;
+           }
+      }
+
+      // 3. Snapping
+      const guides: SnapLine[] = [];
+      if (shouldSnap) {
+           const otherFields = editorState.fields.filter(f => f.pageIndex === activePageIndex && f.id !== resizingFieldId);
+           
+           // Helper to find snap
+           const findSnap = (val: number, type: 'vertical'|'horizontal') => {
+               let best = Infinity;
+               let snapTo = null;
+               let guide = null;
+               
+               otherFields.forEach(f => {
+                   const targets = type === 'vertical' 
+                       ? [f.rect.x, f.rect.x + f.rect.width]
+                       : [f.rect.y, f.rect.y + f.rect.height];
+                   
+                   targets.forEach(t => {
+                       const dist = t - val;
+                       if (Math.abs(dist) < threshold && Math.abs(dist) < Math.abs(best)) {
+                           best = dist;
+                           snapTo = t;
+                           guide = t;
+                       }
+                   });
+               });
+               return { snapTo, guide };
+           };
+
+           if (editorState.keys.shift && resizeHandle.length === 2) {
+               // Aspect Ratio Preserving Snapping Logic
+               // If Shift is held, we prioritize keeping aspect ratio. 
+               // We find the BEST snap (if any) and then recalculate the other dimension to match the aspect ratio.
+               const aspect = resizeStart.originalRect.width / resizeStart.originalRect.height;
+               let bestSnapDist = Infinity;
+               let bestSnapType: 'w' | 'e' | 'n' | 's' | null = null;
+               let bestSnapVal = null;
+               let bestGuide = null;
+
+               // Check all relevant sides for nearest snap
+               if (resizeHandle.includes('w')) {
+                   const { snapTo, guide } = findSnap(newX, 'vertical');
+                   if (snapTo !== null) {
+                       const dist = Math.abs(snapTo - newX);
+                       if (dist < bestSnapDist) { bestSnapDist = dist; bestSnapType = 'w'; bestSnapVal = snapTo; bestGuide = guide; }
+                   }
+               }
+               if (resizeHandle.includes('e')) {
+                   const { snapTo, guide } = findSnap(newX + newW, 'vertical');
+                   if (snapTo !== null) {
+                       const dist = Math.abs(snapTo - (newX + newW));
+                       if (dist < bestSnapDist) { bestSnapDist = dist; bestSnapType = 'e'; bestSnapVal = snapTo; bestGuide = guide; }
+                   }
+               }
+               if (resizeHandle.includes('n')) {
+                   const { snapTo, guide } = findSnap(newY, 'horizontal');
+                   if (snapTo !== null) {
+                       const dist = Math.abs(snapTo - newY);
+                       if (dist < bestSnapDist) { bestSnapDist = dist; bestSnapType = 'n'; bestSnapVal = snapTo; bestGuide = guide; }
+                   }
+               }
+               if (resizeHandle.includes('s')) {
+                   const { snapTo, guide } = findSnap(newY + newH, 'horizontal');
+                   if (snapTo !== null) {
+                       const dist = Math.abs(snapTo - (newY + newH));
+                       if (dist < bestSnapDist) { bestSnapDist = dist; bestSnapType = 's'; bestSnapVal = snapTo; bestGuide = guide; }
+                   }
+               }
+
+               // Apply only the BEST snap to preserve aspect ratio
+               if (bestSnapType && bestSnapVal !== null) {
+                   if (bestSnapType === 'w') {
+                       const diff = bestSnapVal - newX;
+                       newX = bestSnapVal;
+                       newW -= diff;
+                       // Recalc Height
+                       const targetH = newW / aspect;
+                       if (resizeHandle.includes('n')) newY += (newH - targetH);
+                       newH = targetH;
+                       guides.push({ type: 'vertical', pos: bestGuide as number, start: 0, end: 2000 });
+                   } else if (bestSnapType === 'e') {
+                       newW = bestSnapVal - newX;
+                       // Recalc Height
+                       const targetH = newW / aspect;
+                       if (resizeHandle.includes('n')) newY += (newH - targetH);
+                       newH = targetH;
+                       guides.push({ type: 'vertical', pos: bestGuide as number, start: 0, end: 2000 });
+                   } else if (bestSnapType === 'n') {
+                       const diff = bestSnapVal - newY;
+                       newY = bestSnapVal;
+                       newH -= diff;
+                       // Recalc Width
+                       const targetW = newH * aspect;
+                       if (resizeHandle.includes('w')) newX += (newW - targetW);
+                       newW = targetW;
+                       guides.push({ type: 'horizontal', pos: bestGuide as number, start: 0, end: 2000 });
+                   } else if (bestSnapType === 's') {
+                       newH = bestSnapVal - newY;
+                       // Recalc Width
+                       const targetW = newH * aspect;
+                       if (resizeHandle.includes('w')) newX += (newW - targetW);
+                       newW = targetW;
+                       guides.push({ type: 'horizontal', pos: bestGuide as number, start: 0, end: 2000 });
+                   }
+               }
+
+           } else {
+               // Standard Independent Snapping (No Shift or Side Handle)
+               // Snap Left
+               if (resizeHandle.includes('w')) {
+                   const { snapTo, guide } = findSnap(newX, 'vertical');
+                   if (snapTo !== null) {
+                       const diff = snapTo - newX;
+                       newX = snapTo;
+                       newW -= diff;
+                       guides.push({ type: 'vertical', pos: guide as number, start: 0, end: 2000 });
+                   }
+               }
+               // Snap Right
+               if (resizeHandle.includes('e')) {
+                   const { snapTo, guide } = findSnap(newX + newW, 'vertical');
+                   if (snapTo !== null) {
+                       newW = snapTo - newX;
+                       guides.push({ type: 'vertical', pos: guide as number, start: 0, end: 2000 });
+                   }
+               }
+               // Snap Top
+               if (resizeHandle.includes('n')) {
+                   const { snapTo, guide } = findSnap(newY, 'horizontal');
+                   if (snapTo !== null) {
+                       const diff = snapTo - newY;
+                       newY = snapTo;
+                       newH -= diff;
+                       guides.push({ type: 'horizontal', pos: guide as number, start: 0, end: 2000 });
+                   }
+               }
+               // Snap Bottom
+               if (resizeHandle.includes('s')) {
+                   const { snapTo, guide } = findSnap(newY + newH, 'horizontal');
+                   if (snapTo !== null) {
+                       newH = snapTo - newY;
+                       guides.push({ type: 'horizontal', pos: guide as number, start: 0, end: 2000 });
+                   }
+               }
+           }
+      }
+      setSnapLines(guides);
+      onUpdateField(resizingFieldId, { rect: { x: newX, y: newY, width: newW, height: newH } });
+  };
+
+  const handleScroll = () => {
+    const container = containerRef.current;
+    if (container) {
+        scrollPosRef.current = {
+            x: container.scrollLeft,
+            y: container.scrollTop
+        };
+
+        if (onPageIndexChange) {
+          const scrollTop = container.scrollTop;
+          const viewportHeight = container.clientHeight;
+          const middleY = scrollTop + viewportHeight / 2;
+          
+          let currentY = 32; 
+          const gap = 32;
+          const scale = editorState.scale;
+          let found = false;
+
+          for (let i = 0; i < editorState.pages.length; i++) {
+            const page = editorState.pages[i];
+            const pageHeight = page.height * scale;
+            
+            if (middleY >= currentY && middleY <= currentY + pageHeight) {
+              onPageIndexChange(i);
+              found = true;
+              break;
+            }
+            
+            if (middleY > currentY + pageHeight && middleY < currentY + pageHeight + gap) {
+               if (middleY < currentY + pageHeight + gap / 2) {
+                 onPageIndexChange(i);
+                 found = true;
+                 break;
+               }
+            }
+
+            currentY += pageHeight + gap;
+          }
+          
+          if (!found && editorState.pages.length > 0 && middleY >= currentY) {
+             onPageIndexChange(editorState.pages.length - 1);
+          }
+        }
+
+        if (isInteracting) {
+             if (movingFieldId) {
+                 updateMovingField(lastMousePosRef.current.x, lastMousePosRef.current.y);
+             } else if (resizingFieldId) {
+                 updateResizingField(lastMousePosRef.current.x, lastMousePosRef.current.y);
+             }
+        }
+    }
+  };
+
   // --- Handlers ---
-  const handleMouseDown = (e: React.MouseEvent, pageIndex: number) => {
+  const handlePointerDown = (e: React.PointerEvent, pageIndex: number) => {
     if (e.button === 1) return;
+    
+    // Ensure mouse position is tracked immediately
+    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+    // Capture pointer for all interactions initiated here
+    capturePointer(e);
 
     if (editorState.tool === 'select') {
        if (e.target === e.currentTarget) {
@@ -470,9 +765,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setDragCurrent(coords);
   };
 
-  const handleMouseMove = (e: React.MouseEvent | MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (activePageIndex === null) return;
     
+    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
     setSnapLines([]);
 
     const coords = getRelativeCoords(e, activePageIndex);
@@ -511,27 +807,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     } 
     // --- MOVING FIELD ---
     else if (movingFieldId && moveOffset && moveStartRaw) {
-      const field = editorState.fields.find(f => f.id === movingFieldId);
-      if (field) {
-          let newX = coords.x - moveOffset.x;
-          let newY = coords.y - moveOffset.y;
-          
-          if (editorState.keys.shift) {
-              const totalDx = coords.x - moveStartRaw.x;
-              const totalDy = coords.y - moveStartRaw.y;
-              if (Math.abs(totalDx) > Math.abs(totalDy)) newY = moveStartRaw.originalRect.y;
-              else newX = moveStartRaw.originalRect.x;
-          }
-
-          if (shouldSnap) {
-              const snapResult = applySnapping({ x: newX, y: newY, width: field.rect.width, height: field.rect.height }, activePageIndex, movingFieldId, threshold);
-              newX = snapResult.x;
-              newY = snapResult.y;
-              setSnapLines(snapResult.guides);
-          }
-
-          onUpdateField(movingFieldId, { rect: { ...field.rect, x: newX, y: newY } });
-      }
+      updateMovingField(e.clientX, e.clientY);
     } 
     // --- MOVING ANNOTATION ---
     else if (movingAnnotationId && moveOffset) {
@@ -554,200 +830,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
     }
     // --- RESIZING ---
     else if (resizingFieldId && resizeStart && resizeHandle) {
-        const dx = coords.x - resizeStart.mouseX;
-        const dy = coords.y - resizeStart.mouseY;
-        let newX = resizeStart.originalRect.x;
-        let newY = resizeStart.originalRect.y;
-        let newW = resizeStart.originalRect.width;
-        let newH = resizeStart.originalRect.height;
-        
-        // 1. Calculate rough dimensions
-        if (resizeHandle.includes('e')) newW = Math.max(10, resizeStart.originalRect.width + dx);
-        if (resizeHandle.includes('w')) {
-            const effDx = Math.min(dx, resizeStart.originalRect.width - 10);
-            newX += effDx; newW -= effDx;
-        }
-        if (resizeHandle.includes('s')) newH = Math.max(10, resizeStart.originalRect.height + dy);
-        if (resizeHandle.includes('n')) {
-             const effDy = Math.min(dy, resizeStart.originalRect.height - 10);
-             newY += effDy; newH -= effDy;
-        }
-
-        // 2. Aspect Ratio (Shift) - Only for corner resizing
-        if (editorState.keys.shift && resizeHandle.length === 2) {
-             const aspect = resizeStart.originalRect.width / resizeStart.originalRect.height;
-             const absDx = Math.abs(newW - resizeStart.originalRect.width);
-             const absDy = Math.abs(newH - resizeStart.originalRect.height);
-
-             // Use the larger delta to drive the size
-             if (absDx > absDy * aspect) {
-                 // Width changed more (relative to aspect), adjust Height
-                 const targetH = newW / aspect;
-                 if (resizeHandle.includes('n')) {
-                     newY += (newH - targetH);
-                 }
-                 newH = targetH;
-             } else {
-                 // Height changed more, adjust Width
-                 const targetW = newH * aspect;
-                 if (resizeHandle.includes('w')) {
-                     newX += (newW - targetW);
-                 }
-                 newW = targetW;
-             }
-        }
-
-        // 3. Snapping
-        const guides: SnapLine[] = [];
-        if (shouldSnap) {
-             const otherFields = editorState.fields.filter(f => f.pageIndex === activePageIndex && f.id !== resizingFieldId);
-             
-             // Helper to find snap
-             const findSnap = (val: number, type: 'vertical'|'horizontal') => {
-                 let best = Infinity;
-                 let snapTo = null;
-                 let guide = null;
-                 
-                 otherFields.forEach(f => {
-                     const targets = type === 'vertical' 
-                         ? [f.rect.x, f.rect.x + f.rect.width]
-                         : [f.rect.y, f.rect.y + f.rect.height];
-                     
-                     targets.forEach(t => {
-                         const dist = t - val;
-                         if (Math.abs(dist) < threshold && Math.abs(dist) < Math.abs(best)) {
-                             best = dist;
-                             snapTo = t;
-                             guide = t;
-                         }
-                     });
-                 });
-                 return { snapTo, guide };
-             };
-
-             if (editorState.keys.shift && resizeHandle.length === 2) {
-                 // Aspect Ratio Preserving Snapping Logic
-                 // If Shift is held, we prioritize keeping aspect ratio. 
-                 // We find the BEST snap (if any) and then recalculate the other dimension to match the aspect ratio.
-                 const aspect = resizeStart.originalRect.width / resizeStart.originalRect.height;
-                 let bestSnapDist = Infinity;
-                 let bestSnapType: 'w' | 'e' | 'n' | 's' | null = null;
-                 let bestSnapVal = null;
-                 let bestGuide = null;
-
-                 // Check all relevant sides for nearest snap
-                 if (resizeHandle.includes('w')) {
-                     const { snapTo, guide } = findSnap(newX, 'vertical');
-                     if (snapTo !== null) {
-                         const dist = Math.abs(snapTo - newX);
-                         if (dist < bestSnapDist) { bestSnapDist = dist; bestSnapType = 'w'; bestSnapVal = snapTo; bestGuide = guide; }
-                     }
-                 }
-                 if (resizeHandle.includes('e')) {
-                     const { snapTo, guide } = findSnap(newX + newW, 'vertical');
-                     if (snapTo !== null) {
-                         const dist = Math.abs(snapTo - (newX + newW));
-                         if (dist < bestSnapDist) { bestSnapDist = dist; bestSnapType = 'e'; bestSnapVal = snapTo; bestGuide = guide; }
-                     }
-                 }
-                 if (resizeHandle.includes('n')) {
-                     const { snapTo, guide } = findSnap(newY, 'horizontal');
-                     if (snapTo !== null) {
-                         const dist = Math.abs(snapTo - newY);
-                         if (dist < bestSnapDist) { bestSnapDist = dist; bestSnapType = 'n'; bestSnapVal = snapTo; bestGuide = guide; }
-                     }
-                 }
-                 if (resizeHandle.includes('s')) {
-                     const { snapTo, guide } = findSnap(newY + newH, 'horizontal');
-                     if (snapTo !== null) {
-                         const dist = Math.abs(snapTo - (newY + newH));
-                         if (dist < bestSnapDist) { bestSnapDist = dist; bestSnapType = 's'; bestSnapVal = snapTo; bestGuide = guide; }
-                     }
-                 }
-
-                 // Apply only the BEST snap to preserve aspect ratio
-                 if (bestSnapType && bestSnapVal !== null) {
-                     if (bestSnapType === 'w') {
-                         const diff = bestSnapVal - newX;
-                         newX = bestSnapVal;
-                         newW -= diff;
-                         // Recalc Height
-                         const targetH = newW / aspect;
-                         if (resizeHandle.includes('n')) newY += (newH - targetH);
-                         newH = targetH;
-                         guides.push({ type: 'vertical', pos: bestGuide as number, start: 0, end: 2000 });
-                     } else if (bestSnapType === 'e') {
-                         newW = bestSnapVal - newX;
-                         // Recalc Height
-                         const targetH = newW / aspect;
-                         if (resizeHandle.includes('n')) newY += (newH - targetH);
-                         newH = targetH;
-                         guides.push({ type: 'vertical', pos: bestGuide as number, start: 0, end: 2000 });
-                     } else if (bestSnapType === 'n') {
-                         const diff = bestSnapVal - newY;
-                         newY = bestSnapVal;
-                         newH -= diff;
-                         // Recalc Width
-                         const targetW = newH * aspect;
-                         if (resizeHandle.includes('w')) newX += (newW - targetW);
-                         newW = targetW;
-                         guides.push({ type: 'horizontal', pos: bestGuide as number, start: 0, end: 2000 });
-                     } else if (bestSnapType === 's') {
-                         newH = bestSnapVal - newY;
-                         // Recalc Width
-                         const targetW = newH * aspect;
-                         if (resizeHandle.includes('w')) newX += (newW - targetW);
-                         newW = targetW;
-                         guides.push({ type: 'horizontal', pos: bestGuide as number, start: 0, end: 2000 });
-                     }
-                 }
-
-             } else {
-                 // Standard Independent Snapping (No Shift or Side Handle)
-                 // Snap Left
-                 if (resizeHandle.includes('w')) {
-                     const { snapTo, guide } = findSnap(newX, 'vertical');
-                     if (snapTo !== null) {
-                         const diff = snapTo - newX;
-                         newX = snapTo;
-                         newW -= diff;
-                         guides.push({ type: 'vertical', pos: guide as number, start: 0, end: 2000 });
-                     }
-                 }
-                 // Snap Right
-                 if (resizeHandle.includes('e')) {
-                     const { snapTo, guide } = findSnap(newX + newW, 'vertical');
-                     if (snapTo !== null) {
-                         newW = snapTo - newX;
-                         guides.push({ type: 'vertical', pos: guide as number, start: 0, end: 2000 });
-                     }
-                 }
-                 // Snap Top
-                 if (resizeHandle.includes('n')) {
-                     const { snapTo, guide } = findSnap(newY, 'horizontal');
-                     if (snapTo !== null) {
-                         const diff = snapTo - newY;
-                         newY = snapTo;
-                         newH -= diff;
-                         guides.push({ type: 'horizontal', pos: guide as number, start: 0, end: 2000 });
-                     }
-                 }
-                 // Snap Bottom
-                 if (resizeHandle.includes('s')) {
-                     const { snapTo, guide } = findSnap(newY + newH, 'horizontal');
-                     if (snapTo !== null) {
-                         newH = snapTo - newY;
-                         guides.push({ type: 'horizontal', pos: guide as number, start: 0, end: 2000 });
-                     }
-                 }
-             }
-        }
-        setSnapLines(guides);
-        onUpdateField(resizingFieldId, { rect: { x: newX, y: newY, width: newW, height: newH } });
+        updateResizingField(e.clientX, e.clientY);
     }
   };
 
-  const handleMouseUp = (e?: MouseEvent | React.MouseEvent) => {
+  const handlePointerUp = (e?: React.PointerEvent | React.MouseEvent) => {
+    // Release capture if held
+    releasePointer(e);
+
     // Reset Global Cursor
     resetGlobalCursor();
 
@@ -839,7 +929,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setIsErasing(false);
   };
 
-  const handleFieldMouseDown = (e: React.MouseEvent, field: FormField) => {
+  const handleFieldPointerDown = (e: React.PointerEvent, field: FormField) => {
     // If we are in Annotation mode, we allow selection but prevent drag logic.
     // Instead we likely want to fill them out.
     if (editorState.mode === 'annotation') {
@@ -854,6 +944,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
     e.stopPropagation();
     e.preventDefault();
+    
+    // Ensure mouse position is tracked immediately
+    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+    // Capture pointer
+    capturePointer(e);
+
     onTriggerHistorySave();
 
     // Set Global Cursor
@@ -906,13 +1003,19 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setMoveStartRaw({ x: coords.x, y: coords.y, originalRect: { ...targetFieldRect } });
   };
 
-  const handleAnnotationMouseDown = (e: React.MouseEvent, annotation: Annotation) => {
+  const handleAnnotationPointerDown = (e: React.PointerEvent, annotation: Annotation) => {
       // Don't swallow event if erasing
       if (editorState.tool === 'eraser') return;
       e.stopPropagation();
       e.preventDefault();
       if (editorState.tool !== 'select') return;
       
+      // Ensure mouse position is tracked immediately
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+      // Capture pointer
+      capturePointer(e);
+
       onTriggerHistorySave();
       onSelectAnnotation(annotation.id);
       // App handles clearing the selectedFieldId when selectedAnnotationId is set.
@@ -928,8 +1031,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
   };
 
-  const handleResizeMouseDown = (e: React.MouseEvent, field: FormField, handle: string) => {
+  const handleResizePointerDown = (e: React.PointerEvent, field: FormField, handle: string) => {
       e.stopPropagation();
+      
+      // Ensure mouse position is tracked immediately
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+      // Capture pointer to ensure events track even over scrollbars/outside window
+      capturePointer(e);
+
       if (editorState.tool !== 'select') return;
       
       onTriggerHistorySave();
@@ -949,36 +1059,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       setGlobalCursor(cursor);
   }
 
-  // --- Global Event Listeners Setup with Ref to avoid Stale Closures ---
-  // Store the latest handlers in a ref so the effect always calls the current version
-  const handlersRef = useRef({ handleMouseMove, handleMouseUp });
-  
-  useLayoutEffect(() => {
-    handlersRef.current = { handleMouseMove, handleMouseUp };
-  });
-
-  useEffect(() => {
-    if (isInteracting) {
-      const handleGlobalMove = (e: MouseEvent) => {
-        // Access via ref to get the closure from the latest render
-        handlersRef.current.handleMouseMove(e as unknown as React.MouseEvent);
-      };
-
-      const handleGlobalUp = (e: MouseEvent) => {
-         // Access via ref to get the closure from the latest render
-        handlersRef.current.handleMouseUp(e);
-      };
-
-      window.addEventListener('mousemove', handleGlobalMove);
-      window.addEventListener('mouseup', handleGlobalUp);
-      
-      return () => {
-        window.removeEventListener('mousemove', handleGlobalMove);
-        window.removeEventListener('mouseup', handleGlobalUp);
-      };
-    }
-  }, [isInteracting]);
-
+  // --- Global Event Listeners Setup REMOVED in favor of Pointer Capture ---
 
   // --- Render Helpers ---
 
@@ -990,18 +1071,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   const getCursor = () => {
-      if (movingFieldId || movingAnnotationId) return 'move';
-      if (resizingFieldId && resizeHandle) {
-          if (['nw', 'se'].includes(resizeHandle)) return 'nwse-resize';
-          if (['ne', 'sw'].includes(resizeHandle)) return 'nesw-resize';
-          if (['n', 's'].includes(resizeHandle)) return 'ns-resize';
-          if (['e', 'w'].includes(resizeHandle)) return 'ew-resize';
-      }
-      
       switch(editorState.tool) {
           case 'draw_ink': return 'crosshair';
-          case 'eraser': return 'cell'; // Or a custom cursor in future
-          case 'select': return 'default';
+          case 'eraser': return 'cell'; 
+          case 'select': return undefined;
           case 'draw_highlight': 
           case 'draw_note': return 'crosshair';
           default: return 'crosshair';
@@ -1012,9 +1085,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
     <div 
       ref={containerRef}
       className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900 relative transition-colors duration-200"
-      onMouseMove={isInteracting ? undefined : handleMouseMove}
-      onMouseUp={isInteracting ? undefined : handleMouseUp}
-      onMouseLeave={isInteracting ? undefined : handleMouseUp}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
       onScroll={handleScroll}
     >
       <div ref={contentRef} className="flex flex-col items-center gap-8 min-h-full p-8 pb-20 w-fit mx-auto">
@@ -1042,7 +1115,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             <div 
               className="absolute inset-0"
               style={{ cursor: getCursor() }}
-              onMouseDown={(e) => handleMouseDown(e, page.pageIndex)}
+              onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
             >
               {/* Annotations: Highlight & Note */}
               {editorState.annotations
@@ -1065,7 +1138,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                     cursor: 'inherit',
                                     mixBlendMode: 'multiply' // Ensure highlights blend like real markers
                                 }}
-                                onMouseDown={(e) => handleAnnotationMouseDown(e, annot)}
+                                onPointerDown={(e) => handleAnnotationPointerDown(e, annot)}
                             />
                         );
 
@@ -1099,7 +1172,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                         height: annot.rect.height * editorState.scale,
                                         cursor: editorState.tool === 'select' ? 'move' : 'inherit',
                                     }}
-                                    onMouseDown={(e) => handleAnnotationMouseDown(e, annot)}
+                                    onPointerDown={(e) => handleAnnotationPointerDown(e, annot)}
                                 >
                                     {isSelected ? (
                                         <textarea
@@ -1180,7 +1253,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     <div
                       key={field.id}
                       id={`field-element-${field.id}`}
-                      onMouseDown={(e) => handleFieldMouseDown(e, field)}
+                      onPointerDown={(e) => handleFieldPointerDown(e, field)}
                       onClick={handleInteraction}
                       onFocus={() => { if (isFormMode) onSelectField(field.id); }}
                       tabIndex={isFormMode ? 0 : -1} // Make container focusable in Form Mode for navigation
@@ -1239,7 +1312,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                     value={isFormMode ? (field.value || field.defaultValue || field.name) : (field.value || '')}
                                     placeholder={isAnnotationMode ? field.name : undefined}
                                     onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
-                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => e.stopPropagation()}
                                     onFocus={() => { if(isAnnotationMode) onSelectField(field.id); }}
                                 />
                              ) : (
@@ -1255,7 +1328,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                     value={isFormMode ? (field.value || field.defaultValue || field.name) : (field.value || '')}
                                     placeholder={isAnnotationMode ? field.name : undefined}
                                     onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
-                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => e.stopPropagation()}
                                     onFocus={() => { if(isAnnotationMode) onSelectField(field.id); }}
                                 />
                              )
@@ -1280,10 +1353,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                      <select 
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                         value={field.value || ''}
-                                        onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        onFocus={() => { if(isAnnotationMode) onSelectField(field.id); }}
-                                        title={field.toolTip}
+                                       onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
+                                       onPointerDown={(e) => e.stopPropagation()}
+                                       onFocus={() => { if(isAnnotationMode) onSelectField(field.id); }}
+                                       title={field.toolTip}
                                      >
                                         <option value="" disabled>Select...</option>
                                         {(field.options || []).map((opt, i) => (
@@ -1357,7 +1430,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                     h==='ne' && "-top-1.5 -right-1.5 cursor-nesw-resize",
                                     h==='sw' && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
                                     h==='se' && "-bottom-1.5 -right-1.5 cursor-nwse-resize"
-                                )} onMouseDown={(e) => handleResizeMouseDown(e, field, h)} />
+                                )} onPointerDown={(e) => handleResizePointerDown(e, field, h)} />
                             ))}
                         </div>
                       )}
@@ -1408,7 +1481,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                 cursor: 'inherit',
                                 mixBlendMode: a.intent === 'InkHighlight' ? 'multiply' : 'normal'
                             }}
-                            onMouseDown={(e) => handleAnnotationMouseDown(e as any, a)}
+                            onPointerDown={(e) => handleAnnotationPointerDown(e, a)}
                         />
                     ))
                 }

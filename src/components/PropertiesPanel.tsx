@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
-import { cn } from '../lib/utils';
+import { cn, setGlobalCursor, resetGlobalCursor } from '../lib/utils';
 import { useLanguage } from './language-provider';
 import { FONT_FAMILY_MAP } from '../constants';
 
@@ -37,29 +37,47 @@ const PanelLayout: React.FC<PanelLayoutProps> = ({
   width,
   onResize
 }) => {
-  const resizeHandler = useCallback((e: React.MouseEvent) => {
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStateRef = React.useRef<{ startX: number, startWidth: number } | null>(null);
+  const onResizeRef = React.useRef(onResize);
+  onResizeRef.current = onResize;
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = width;
+    resizeStateRef.current = { startX: e.clientX, startWidth: width };
+    setIsResizing(true);
+  }, [width]);
+
+  React.useEffect(() => {
+    if (!isResizing) return;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizeStateRef.current) return;
+      const { startX, startWidth } = resizeStateRef.current;
       // Dragging left edge: moving left (decreasing X) increases width
       const newWidth = startWidth + (startX - moveEvent.clientX);
-      onResize(Math.max(240, Math.min(600, newWidth)));
+      if (onResizeRef.current) {
+        onResizeRef.current(Math.max(240, Math.min(600, newWidth)));
+      }
     };
 
     const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      setIsResizing(false);
+      resizeStateRef.current = null;
     };
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-    document.body.style.cursor = 'col-resize';
+    setGlobalCursor('col-resize', 'properties-resize');
     document.body.style.userSelect = 'none';
-  }, [width, onResize]);
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      resetGlobalCursor('properties-resize');
+      document.body.style.removeProperty('user-select');
+    };
+  }, [isResizing]);
 
   return (
     <div 
@@ -71,9 +89,17 @@ const PanelLayout: React.FC<PanelLayoutProps> = ({
     >
       {/* Resize Handle */}
       <div 
-        className="absolute top-0 left-0 bottom-0 w-1 hover:bg-primary/50 cursor-col-resize z-50 transition-colors"
-        onMouseDown={resizeHandler}
+        className={cn(
+          "absolute top-0 left-0 bottom-0 w-1 cursor-col-resize z-50 transition-colors",
+          isResizing ? "bg-primary/50" : "hover:bg-primary/50"
+        )}
+        onMouseDown={handleMouseDown}
       />
+
+      {/* Resize Overlay */}
+      {isResizing && (
+        <div className="fixed inset-0 z-[9999] cursor-col-resize bg-transparent" />
+      )}
 
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
