@@ -735,6 +735,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
        }
        return;
     }
+    
+    // Prevent default behavior (like text selection) for drawing tools
+    e.preventDefault();
 
     // Ink Drawing Start
     if (editorState.tool === 'draw_ink') {
@@ -1108,6 +1111,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 width={page.width}
                 height={page.height}
                 placeholderImage={page.imageData}
+                isSelectMode={editorState.tool === 'select'}
             />
             
             

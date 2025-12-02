@@ -169,18 +169,12 @@
 }
 
 .textLayer ::selection {
-  background: rgba(59, 130, 246, 0.3); /* blue-500 with opacity */
+  background: color-mix(in srgb, var(--color-blue-500) 30%, transparent);
   color: transparent;
+  mix-blend-mode: multiply;
 }
 
 /* Fix for PDF.js text layer structure wrappers */
 .textLayer .markedContent {
   display: contents;
-}
-
-/* Ensure text layer captures clicks correctly but doesn't select all on empty click */
-.textLayer {
-  /* Ensure touches pass through if not hitting text, but we want to allow drag selection */
-  /* The issue of selecting all text below often happens when a wrapper (markedContent) is 0x0 but contains text.
-     display: contents fixes the wrapper issue. */
 }

@@ -10,9 +10,10 @@ interface PDFPageProps {
   width: number;
   height: number;
   placeholderImage?: string; // Optional low-res image if we have one
+  isSelectMode?: boolean;
 }
 
-const PDFPage: React.FC<PDFPageProps> = ({ pageIndex, pdfDocument, scale, width, height, placeholderImage }) => {
+const PDFPage: React.FC<PDFPageProps> = ({ pageIndex, pdfDocument, scale, width, height, placeholderImage, isSelectMode = true }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Double buffering: Two canvases to prevent flickering during resize/re-render
@@ -252,7 +253,7 @@ const PDFPage: React.FC<PDFPageProps> = ({ pageIndex, pdfDocument, scale, width,
         {/* Text Layer */}
         <div 
             ref={textLayerRef} 
-            className="textLayer"
+            className={cn("textLayer", !isSelectMode && "pointer-events-none")}
             style={{
                 transform: textLayerRenderedScale ? `scale(${scale / textLayerRenderedScale})` : 'none',
                 transformOrigin: '0 0'
