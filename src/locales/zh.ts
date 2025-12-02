@@ -1,5 +1,4 @@
-
-const zh  = {
+const zh = {
   "common.select": "选择...",
   "common.cancel": "取消",
   "common.save": "保存",
@@ -41,7 +40,8 @@ const zh  = {
   "dialog.confirm_close.confirm": "关闭且不保存",
   "dialog.confirm_close.cancel": "取消",
   "properties.document.title": "文档信息",
-  "properties.document.hint": "编辑全局 PDF 信息。在画布上选择一个字段以编辑其属性。",
+  "properties.document.hint":
+    "编辑全局 PDF 信息。在画布上选择一个字段以编辑其属性。",
   "properties.filename": "文件名",
   "properties.filename.desc": "导出文件时使用的名称。",
   "properties.doc_title": "文档标题",
@@ -145,8 +145,12 @@ const zh  = {
   "shortcuts.help": "打开此帮助菜单",
   "sidebar.fields": "字段",
   "sidebar.outline": "大纲",
+  "sidebar.document": "文档",
+  "sidebar.thumbnails": "缩略图",
+  "sidebar.search_outline": "搜索大纲...",
   "sidebar.page": "第 {page} 页",
   "sidebar.no_fields": "无字段",
+  "sidebar.no_pages": "无页面",
   "sidebar.no_results": "未找到结果",
   "sidebar.filter": "过滤字段...",
   "sidebar.no_outline": "本文档中未找到大纲。",
@@ -154,7 +158,8 @@ const zh  = {
   "settings.description": "配置工作区行为和对齐规则。",
   "settings.language": "语言",
   "settings.snapping.enabled": "启用对齐",
-  "settings.snapping.description": "移动或调整大小时自动对齐字段。按住 Alt 键可临时禁用。",
+  "settings.snapping.description":
+    "移动或调整大小时自动对齐字段。按住 Alt 键可临时禁用。",
   "settings.borders": "对齐边框",
   "settings.centers": "对齐中心",
   "settings.equal": "等间距对齐",
@@ -174,7 +179,8 @@ const zh  = {
   "ai_dialog.prompt_hint": "为 AI 模型提供上下文或特定规则。",
   "ai_dialog.start": "开始分析",
   "landing.title": "AI 驱动的 PDF 表单编辑器",
-  "landing.subtitle": "隐私优先、AI 驱动的 PDF 表单构建器，完全在浏览器中运行。",
+  "landing.subtitle":
+    "隐私优先、AI 驱动的 PDF 表单构建器，完全在浏览器中运行。",
   "landing.resume_session": "恢复上一次会话",
   "landing.feature.ai.title": "AI 驱动",
   "landing.feature.ai.desc": "使用 Gemini 自动检测表单字段。",
@@ -198,7 +204,7 @@ const zh  = {
   "app.auto_detect_fail": "自动检测失败。错误：{error}",
   "app.export_fail": "导出 PDF 失败。",
   "app.save_reopen_fail": "保存并重新打开失败。",
-  "app.save_close_fail": "保存并关闭失败。"
-}
+  "app.save_close_fail": "保存并关闭失败。",
+} as const;
 
-export default zh
+export default zh;

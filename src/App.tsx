@@ -82,6 +82,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [hasSavedSession, setHasSavedSession] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
@@ -922,8 +923,10 @@ const App: React.FC = () => {
                   .getElementById(`page-${idx}`)
                   ?.scrollIntoView({ behavior: "smooth" });
               }}
+              currentPageIndex={currentPageIndex}
               width={sidebarWidth}
               onResize={setSidebarWidth}
+              pdfDocument={state.pdfDocument}
             />
 
             <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden z-0">
@@ -950,6 +953,7 @@ const App: React.FC = () => {
                 onDeleteAnnotation={handleDeleteAnnotation}
                 onScaleChange={updateScale}
                 onTriggerHistorySave={saveCheckpoint}
+                onPageIndexChange={setCurrentPageIndex}
               />
               <ZoomControls
                 scale={state.scale}

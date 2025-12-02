@@ -18,6 +18,7 @@ interface WorkspaceProps {
   onDeleteAnnotation: (id: string) => void;
   onScaleChange: (newScale: number) => void;
   onTriggerHistorySave: () => void;
+  onPageIndexChange?: (index: number) => void;
 }
 
 interface SnapLine {
@@ -37,7 +38,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onUpdateAnnotation,
   onDeleteAnnotation,
   onScaleChange,
-  onTriggerHistorySave
+  onTriggerHistorySave,
+  onPageIndexChange
 }) => {
   const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,11 +78,54 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const isInteracting = !!(dragStart || isDrawing || isErasing || movingFieldId || movingAnnotationId || resizingFieldId);
 
   const handleScroll = () => {
-    if (containerRef.current) {
+    const container = containerRef.current;
+    if (container) {
         scrollPosRef.current = {
-            x: containerRef.current.scrollLeft,
-            y: containerRef.current.scrollTop
+            x: container.scrollLeft,
+            y: container.scrollTop
         };
+
+        if (onPageIndexChange) {
+          // Find visible page
+          const scrollTop = container.scrollTop;
+          const viewportHeight = container.clientHeight;
+          const middleY = scrollTop + viewportHeight / 2;
+          
+          let currentY = 32; // Top padding
+          const gap = 32;
+          const scale = editorState.scale;
+
+          for (let i = 0; i < editorState.pages.length; i++) {
+            const page = editorState.pages[i];
+            const pageHeight = page.height * scale;
+            
+            // Check if middleY is within this page (including half gap before and after?)
+            // Let's simpler: if middleY < currentY + pageHeight + gap, it's this page.
+            // Or rather, finding the page that contains the middle point.
+            if (middleY >= currentY && middleY <= currentY + pageHeight) {
+              onPageIndexChange(i);
+              return;
+            }
+            
+            // Also check if we are in the gap after this page, maybe still count as this page or next?
+            // If in gap, usually associate with the nearest page.
+            if (middleY > currentY + pageHeight && middleY < currentY + pageHeight + gap) {
+               // In gap, decide based on proximity. simpler to just keep previous or next.
+               // Let's say if passed half gap, it's next. 
+               if (middleY < currentY + pageHeight + gap / 2) {
+                 onPageIndexChange(i);
+                 return;
+               }
+            }
+
+            currentY += pageHeight + gap;
+          }
+          
+          // If we are past everything (shouldn't happen with correct math but just in case)
+          if (editorState.pages.length > 0 && middleY >= currentY) {
+             onPageIndexChange(editorState.pages.length - 1);
+          }
+        }
     }
   };
 

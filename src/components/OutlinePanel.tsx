@@ -1,19 +1,135 @@
-import React, { useState } from 'react';
-import { PDFOutlineItem } from '../types';
-import { ChevronRight, ChevronDown, Book, File } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { PDFOutlineItem, PageData } from '../types';
+import { ChevronRight, ChevronDown, Book, File, Search, Image as ImageIcon, List, Grid } from 'lucide-react';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { cn } from '../lib/utils';
 import { useLanguage } from './language-provider';
+import { renderPageToDataURL } from '../services/pdfService';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
+// --- Thumbnail Item ---
+interface ThumbnailItemProps {
+  page: PageData;
+  pageIndex: number;
+  pdfDocument: any;
+  onNavigate: (pageIndex: number) => void;
+  isActive?: boolean;
+}
+
+const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ page, pageIndex, pdfDocument, onNavigate, isActive }) => {
+  const { t } = useLanguage();
+  const [imageUrl, setImageUrl] = useState<string | null>(page.imageData || null);
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isActive && ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isActive]);
+
+  useEffect(() => {
+      const observer = new IntersectionObserver(([entry]) => {
+          if (entry.isIntersecting) {
+              setIsVisible(true);
+              observer.disconnect();
+          }
+      });
+      if (ref.current) observer.observe(ref.current);
+      return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+      if (isVisible && !imageUrl && pdfDocument) {
+          // Increased scale from 0.2 to 0.6 for better quality in single column view
+          renderPageToDataURL(pdfDocument, pageIndex, 0.6).then(url => {
+              if (url) setImageUrl(url);
+          });
+      }
+  }, [isVisible, imageUrl, pdfDocument, pageIndex]);
+
+  const aspectRatio = page.width && page.height ? page.width / page.height : 0.75;
+
+  return (
+      <div 
+        ref={ref} 
+        className={cn(
+          "flex flex-col items-center gap-2 p-2 cursor-pointer hover:bg-accent/50 rounded-md group transition-colors",
+          isActive && "bg-accent"
+        )}
+        onClick={() => onNavigate(pageIndex)}
+      >
+          <div 
+            className={cn(
+              "border shadow-sm bg-white w-full relative overflow-hidden rounded-sm group-hover:shadow-md transition-all group-hover:ring-2 group-hover:ring-primary/20",
+              isActive && "ring-2 ring-primary shadow-md"
+            )}
+            style={{ aspectRatio: aspectRatio }}
+          >
+              {imageUrl ? (
+                  <img src={imageUrl} alt={`Page ${pageIndex + 1}`} className="w-full h-full object-contain" />
+              ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                      <ImageIcon size={20} className="opacity-20" />
+                  </div>
+              )}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+          </div>
+          <span className="text-xs text-muted-foreground font-medium">{t('sidebar.page', { page: pageIndex + 1 })}</span>
+      </div>
+  );
+};
+
+// --- Outline Item ---
 interface OutlineItemProps {
   item: PDFOutlineItem;
   onNavigate: (pageIndex: number) => void;
   depth?: number;
+  searchQuery?: string;
+  isActive?: boolean;
+  activeOutlineItem?: PDFOutlineItem | null;
 }
 
-const OutlineItem: React.FC<OutlineItemProps> = ({ item, onNavigate, depth = 0 }) => {
+const OutlineItem: React.FC<OutlineItemProps> = ({ item, onNavigate, depth = 0, searchQuery, isActive, activeOutlineItem }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const hasChildren = item.items && item.items.length > 0;
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isActive && ref.current) {
+        // Scroll into view, but maybe only if not already visible?
+        // 'nearest' tries to minimize scrolling.
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isActive]);
+  
+  // Auto-expand if matches search or children match search
+  // Also expand if a child is active!
+  useEffect(() => {
+    if (searchQuery) {
+       setIsExpanded(true);
+    }
+  }, [searchQuery]);
+
+  // Check if any child is the active item to auto-expand
+  useEffect(() => {
+      if (activeOutlineItem) {
+          // Helper to check if this item contains the active item in its subtree
+          const containsActive = (itm: PDFOutlineItem): boolean => {
+              if (itm === activeOutlineItem) return true;
+              if (itm.items) {
+                  return itm.items.some(child => containsActive(child));
+              }
+              return false;
+          };
+          
+          // If one of my children (direct or deep) is the active item, I should expand.
+          if (item.items && item.items.some(child => containsActive(child))) {
+              setIsExpanded(true);
+          }
+      }
+  }, [activeOutlineItem, item]);
 
   const handleTitleClick = () => {
       if (item.pageIndex !== undefined) {
@@ -28,12 +144,19 @@ const OutlineItem: React.FC<OutlineItemProps> = ({ item, onNavigate, depth = 0 }
       setIsExpanded(!isExpanded);
   };
 
+  // Simple search highlight logic could be added here, but for now we just filter at parent level
+  // Actually, filtering a tree is tricky. We usually show the path to the match.
+  // If we just filter at render time, we need to know if this item or any child matches.
+  
   return (
-    <div>
+    <div ref={ref}>
       <Button 
         variant="ghost"
         size="sm"
-        className="w-full justify-start h-auto py-1.5 px-2 font-normal hover:bg-accent hover:text-accent-foreground"
+        className={cn(
+          "w-full justify-start h-auto py-1.5 px-2 font-normal hover:bg-accent hover:text-accent-foreground",
+          isActive && "bg-accent text-accent-foreground font-medium"
+        )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={handleTitleClick}
       >
@@ -45,7 +168,7 @@ const OutlineItem: React.FC<OutlineItemProps> = ({ item, onNavigate, depth = 0 }
         </span>
         
         {item.pageIndex !== undefined ? (
-            <File size={14} className="mr-2 text-primary flex-shrink-0" />
+            <File size={14} className={cn("mr-2 flex-shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
         ) : (
             <Book size={14} className="mr-2 text-muted-foreground flex-shrink-0" />
         )}
@@ -58,7 +181,15 @@ const OutlineItem: React.FC<OutlineItemProps> = ({ item, onNavigate, depth = 0 }
       {isExpanded && hasChildren && (
         <div>
           {item.items.map((child, idx) => (
-            <OutlineItem key={idx} item={child} onNavigate={onNavigate} depth={depth + 1} />
+            <OutlineItem 
+                key={idx} 
+                item={child} 
+                onNavigate={onNavigate} 
+                depth={depth + 1} 
+                searchQuery={searchQuery}
+                isActive={child === activeOutlineItem}
+                activeOutlineItem={activeOutlineItem}
+            />
           ))}
         </div>
       )}
@@ -66,28 +197,139 @@ const OutlineItem: React.FC<OutlineItemProps> = ({ item, onNavigate, depth = 0 }
   );
 };
 
+// Helper to filter outline tree
+const filterOutline = (items: PDFOutlineItem[], query: string): PDFOutlineItem[] => {
+  if (!query) return items;
+  const lowerQuery = query.toLowerCase();
+  
+  return items.reduce((acc: PDFOutlineItem[], item) => {
+    const matches = item.title.toLowerCase().includes(lowerQuery);
+    const filteredChildren = filterOutline(item.items, query);
+    
+    if (matches || filteredChildren.length > 0) {
+      acc.push({
+        ...item,
+        items: filteredChildren // Keep hierarchy if children match
+      });
+    }
+    return acc;
+  }, []);
+};
+
 interface OutlinePanelProps {
   outline: PDFOutlineItem[];
+  pages?: PageData[];
+  pdfDocument?: any;
   onNavigate: (pageIndex: number) => void;
+  currentPageIndex?: number;
 }
 
-const OutlinePanel: React.FC<OutlinePanelProps> = ({ outline, onNavigate }) => {
+const OutlinePanel: React.FC<OutlinePanelProps> = ({ outline, pages, pdfDocument, onNavigate, currentPageIndex }) => {
   const { t } = useLanguage();
-  
-  if (!outline || outline.length === 0) {
-      return (
-          <div className="p-6 text-center text-muted-foreground text-sm italic">
-              {t('sidebar.no_outline')}
-          </div>
-      );
-  }
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredOutline = React.useMemo(() => 
+    filterOutline(outline, searchQuery), 
+    [outline, searchQuery]
+  );
+
+  // Calculate active item
+  const activeOutlineItem = React.useMemo(() => {
+      if (currentPageIndex === undefined) return null;
+      let bestMatch: PDFOutlineItem | null = null;
+      const traverse = (items: PDFOutlineItem[]) => {
+          for (const item of items) {
+              if (item.pageIndex !== undefined && item.pageIndex <= currentPageIndex) {
+                  // We want the item closest to the current page (but not after it)
+                  // Since outline is usually ordered, we can just keep updating if <= current
+                  // However, if outline is hierarchical, we need to be careful.
+                  // Usually depth-first traversal works if we assume order.
+                  if (!bestMatch || (item.pageIndex > (bestMatch.pageIndex || -1))) {
+                      bestMatch = item;
+                  }
+              }
+              if (item.items) traverse(item.items);
+          }
+      };
+      traverse(outline);
+      return bestMatch;
+  }, [outline, currentPageIndex]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-2 pb-10">
-      {outline.map((item, idx) => (
-        <OutlineItem key={idx} item={item} onNavigate={onNavigate} />
-      ))}
-    </div>
+    <Tabs className="flex flex-col h-full" defaultValue="outline">
+       <div className="flex justify-start px-2 pt-1">
+         <TabsList className="bg-transparent p-0 shrink-0 inline-flex">
+           <TabsTrigger 
+             className="data-[state=active]:bg-muted data-[state=active]:shadow-none text-xs h-8 px-2" 
+             value="outline"
+             title={t('sidebar.outline')}
+           > 
+             <List size={16} />
+           </TabsTrigger> 
+           <TabsTrigger 
+             className="data-[state=active]:bg-muted data-[state=active]:shadow-none text-xs h-8 px-2" 
+             value="thumbnails" 
+             title={t('sidebar.thumbnails')}
+           > 
+             <Grid size={16} />
+           </TabsTrigger> 
+         </TabsList>
+       </div>
+
+       <TabsContent value="outline" className="flex-1 flex flex-col h-full overflow-hidden mt-0 data-[state=inactive]:hidden">
+             <div className="p-2 border-b shrink-0">
+                <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground h-3 w-3" />
+                    <Input 
+                        placeholder={t('sidebar.search_outline')}
+                        className="h-8 pl-7 text-xs"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                 </div>
+             </div>
+             <div className="flex-1 overflow-y-auto p-2 pb-10">
+                {filteredOutline.length > 0 ? (
+                   filteredOutline.map((item, idx) => (
+                     <OutlineItem 
+                        key={idx} 
+                        item={item} 
+                        onNavigate={onNavigate} 
+                        searchQuery={searchQuery} 
+                        isActive={item === activeOutlineItem}
+                        activeOutlineItem={activeOutlineItem}
+                    />
+                   ))
+                ) : (
+                   <div className="p-6 text-center text-muted-foreground text-sm italic">
+                      {searchQuery ? t('sidebar.no_results') : t('sidebar.no_outline')}
+                   </div>
+                )}
+             </div>
+       </TabsContent>
+
+       <TabsContent value="thumbnails" className="flex-1 flex flex-col h-full overflow-hidden mt-0 data-[state=inactive]:hidden">
+            <div className="flex-1 overflow-y-auto p-2 pb-10">
+                <div className="grid grid-cols-1 gap-4">
+                   {pages?.map((page, idx) => (
+                       <ThumbnailItem 
+                          key={idx} 
+                          page={page} 
+                          pageIndex={idx} 
+                          pdfDocument={pdfDocument} 
+                          onNavigate={onNavigate} 
+                          isActive={idx === currentPageIndex}
+                        />
+                   ))}
+                   {(!pages || pages.length === 0) && (
+                       <div className="p-6 text-center text-muted-foreground text-sm italic">
+                           {t('sidebar.no_pages')}
+                       </div>
+                   )}
+                </div>
+            </div>
+       </TabsContent>
+    </Tabs>
   );
 };
 

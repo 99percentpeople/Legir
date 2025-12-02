@@ -26,10 +26,7 @@ import {
   PDFOutlineItem,
   Annotation,
 } from "../types";
-import { DEFAULT_FIELD_STYLE } from "../constants";
-
-// Handle potential default export wrapper from CDN
-const pdfJs = (pdfjsLib as any).default || pdfjsLib;
+import { DEFAULT_FIELD_STYLE } from "../constants";;
 
 // Helper to convert Hex to PDF RGB
 const hexToPdfColor = (hex: string | undefined) => {
@@ -338,7 +335,7 @@ export const loadPDF = async (
 
   // 2. Load with pdf.js for rendering and basic annotation extraction
   const renderBuffer = new Uint8Array(pdfBytes.slice(0));
-  const loadingTask = pdfJs.getDocument({ data: renderBuffer, password: "" });
+  const loadingTask = pdfjsLib.getDocument({ data: renderBuffer, password: "" });
   const pdf = await loadingTask.promise;
   const numPages = pdf.numPages;
   const pages: PageData[] = [];
@@ -350,12 +347,12 @@ export const loadPDF = async (
     const { info } = await pdf.getMetadata();
     if (info) {
       metadata = {
-        title: info.Title,
-        author: info.Author,
-        subject: info.Subject,
-        keywords: info.Keywords,
-        creator: info.Creator,
-        producer: info.Producer,
+        title: info["Title"],
+        author: info["Author"],
+        subject: info["Subject"],
+        keywords: info["Keywords"],
+        creator: info["Creator"],
+        producer: info["Producer"],
       };
     }
   } catch (e) {
@@ -377,99 +374,106 @@ export const loadPDF = async (
     if (pageAnnotations.length > 0) {
       console.log(`[Debug] Page ${i} Annotations:`, pageAnnotations);
     }
-    
+
     // Extract Ink Annotations using pdf-lib (more robust access to raw data)
     if (pdfDoc) {
-        try {
-            const pdfLibPage = pdfDoc.getPage(i - 1);
-            const annots = pdfLibPage.node.Annots();
-            
-            if (annots instanceof PDFArray) {
-                for (let idx = 0; idx < annots.size(); idx++) {
-                    const annot = annots.lookup(idx);
-                    if (annot instanceof PDFDict) {
-                        const subtype = annot.lookup(PDFName.of('Subtype'));
-                        if (subtype === PDFName.of('Ink')) {
-                            const inkList = annot.lookup(PDFName.of('InkList'));
-                            if (inkList instanceof PDFArray) {
-                                // Parse Color
-                                let color = "#000000";
-                                const c = annot.lookup(PDFName.of('C')); // C is Color in PDF Spec
-                                if (c instanceof PDFArray && c.size() === 3) {
-                                    const r = (c.lookup(0) as PDFNumber).asNumber();
-                                    const g = (c.lookup(1) as PDFNumber).asNumber();
-                                    const b = (c.lookup(2) as PDFNumber).asNumber();
-                                    color = rgbArrayToHex([r * 255, g * 255, b * 255]) || "#000000";
-                                }
+      try {
+        const pdfLibPage = pdfDoc.getPage(i - 1);
+        const annots = pdfLibPage.node.Annots();
 
-                                // Parse Thickness (BS -> W) or Border -> W
-                                let thickness = 2;
-                                const bs = annot.lookup(PDFName.of('BS'));
-                                if (bs instanceof PDFDict) {
-                                    const w = bs.lookup(PDFName.of('W'));
-                                    if (w instanceof PDFNumber) thickness = w.asNumber();
-                                } else {
-                                    const border = annot.lookup(PDFName.of('Border'));
-                                    if (border instanceof PDFArray && border.size() >= 3) {
-                                         const w = border.lookup(2);
-                                         if (w instanceof PDFNumber) thickness = w.asNumber();
-                                    }
-                                }
+        if (annots instanceof PDFArray) {
+          for (let idx = 0; idx < annots.size(); idx++) {
+            const annot = annots.lookup(idx);
+            if (annot instanceof PDFDict) {
+              const subtype = annot.lookup(PDFName.of("Subtype"));
+              if (subtype === PDFName.of("Ink")) {
+                const inkList = annot.lookup(PDFName.of("InkList"));
+                if (inkList instanceof PDFArray) {
+                  // Parse Color
+                  let color = "#000000";
+                  const c = annot.lookup(PDFName.of("C")); // C is Color in PDF Spec
+                  if (c instanceof PDFArray && c.size() === 3) {
+                    const r = (c.lookup(0) as PDFNumber).asNumber();
+                    const g = (c.lookup(1) as PDFNumber).asNumber();
+                    const b = (c.lookup(2) as PDFNumber).asNumber();
+                    color =
+                      rgbArrayToHex([r * 255, g * 255, b * 255]) || "#000000";
+                  }
 
-                                // Parse Opacity (CA/ca)
-                                let opacity = 1.0;
-                                const CA = annot.lookup(PDFName.of('CA'));
-                                const ca = annot.lookup(PDFName.of('ca'));
-                                if (CA instanceof PDFNumber) opacity = CA.asNumber();
-                                else if (ca instanceof PDFNumber) opacity = ca.asNumber();
-
-                                // Parse Intent (IT)
-                                let intent: string | undefined = undefined;
-                                const IT = annot.lookup(PDFName.of('IT'));
-                                if (IT instanceof PDFName) intent = IT.decodeText();
-                                else if (IT instanceof PDFString) intent = IT.decodeText();
-
-                                // Parse Points
-                                for (let s = 0; s < inkList.size(); s++) {
-                                    const stroke = inkList.lookup(s);
-                                    if (stroke instanceof PDFArray) {
-                                        const points: {x: number, y: number}[] = [];
-                                        for (let p = 0; p < stroke.size(); p += 2) {
-                                            const px = (stroke.lookup(p) as PDFNumber).asNumber();
-                                            const py = (stroke.lookup(p + 1) as PDFNumber).asNumber();
-                                            const [vx, vy] = unscaledViewport.convertToViewportPoint(px, py);
-                                            points.push({ x: vx, y: vy });
-                                        }
-                                        
-                                        if (points.length > 0) {
-                                            annotations.push({
-                                                id: `imported_ink_lib_${i}_${idx}_${s}`,
-                                                pageIndex: i - 1,
-                                                type: "ink",
-                                                subtype: "ink",
-                                                intent: intent,
-                                                points: points,
-                                                color: color,
-                                                thickness: thickness,
-                                                opacity: opacity
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                  // Parse Thickness (BS -> W) or Border -> W
+                  let thickness = 2;
+                  const bs = annot.lookup(PDFName.of("BS"));
+                  if (bs instanceof PDFDict) {
+                    const w = bs.lookup(PDFName.of("W"));
+                    if (w instanceof PDFNumber) thickness = w.asNumber();
+                  } else {
+                    const border = annot.lookup(PDFName.of("Border"));
+                    if (border instanceof PDFArray && border.size() >= 3) {
+                      const w = border.lookup(2);
+                      if (w instanceof PDFNumber) thickness = w.asNumber();
                     }
+                  }
+
+                  // Parse Opacity (CA/ca)
+                  let opacity = 1.0;
+                  const CA = annot.lookup(PDFName.of("CA"));
+                  const ca = annot.lookup(PDFName.of("ca"));
+                  if (CA instanceof PDFNumber) opacity = CA.asNumber();
+                  else if (ca instanceof PDFNumber) opacity = ca.asNumber();
+
+                  // Parse Intent (IT)
+                  let intent: string | undefined = undefined;
+                  const IT = annot.lookup(PDFName.of("IT"));
+                  if (IT instanceof PDFName) intent = IT.decodeText();
+                  else if (IT instanceof PDFString) intent = IT.decodeText();
+
+                  // Parse Points
+                  for (let s = 0; s < inkList.size(); s++) {
+                    const stroke = inkList.lookup(s);
+                    if (stroke instanceof PDFArray) {
+                      const points: { x: number; y: number }[] = [];
+                      for (let p = 0; p < stroke.size(); p += 2) {
+                        const px = (stroke.lookup(p) as PDFNumber).asNumber();
+                        const py = (
+                          stroke.lookup(p + 1) as PDFNumber
+                        ).asNumber();
+                        const [vx, vy] =
+                          unscaledViewport.convertToViewportPoint(px, py);
+                        points.push({ x: vx, y: vy });
+                      }
+
+                      if (points.length > 0) {
+                        annotations.push({
+                          id: `imported_ink_lib_${i}_${idx}_${s}`,
+                          pageIndex: i - 1,
+                          type: "ink",
+                          subtype: "ink",
+                          intent: intent,
+                          points: points,
+                          color: color,
+                          thickness: thickness,
+                          opacity: opacity,
+                        });
+                      }
+                    }
+                  }
                 }
+              }
             }
-        } catch (e) {
-            console.warn(`Failed to extract Ink annotations from page ${i} using pdf-lib`, e);
+          }
         }
+      } catch (e) {
+        console.warn(
+          `Failed to extract Ink annotations from page ${i} using pdf-lib`,
+          e
+        );
+      }
     }
 
     pageAnnotations.forEach((annotation: any, index: number) => {
       const subtype = annotation.subtype;
       // Skip Ink in pdf.js loop since we handle it via pdf-lib
-      const isInk = false; 
+      const isInk = false;
       const isPolyLine = subtype === "PolyLine" || subtype === "polyline";
       const isLine = subtype === "Line" || subtype === "line";
 
@@ -498,196 +502,217 @@ export const loadPDF = async (
 
           // Handle flat array [x1, y1, x2, y2...] vs object array [{x,y}, {x,y}...]
           if (pointsList.length > 0 && typeof pointsList[0] === "number") {
-             for (let k = 0; k < pointsList.length; k += 2) {
-                const px = pointsList[k];
-                const py = pointsList[k+1];
-                if (typeof px === 'number' && typeof py === 'number') {
-                    const [vx, vy] = unscaledViewport.convertToViewportPoint(px, py);
-                    points.push({ x: vx, y: vy });
-                }
-             }
-          } else {
-             // Assume objects {x, y}
-             pointsList.forEach((p: any) => {
-                const px = typeof p.x === "number" ? p.x : 0;
-                const py = typeof p.y === "number" ? p.y : 0;
-                const [vx, vy] = unscaledViewport.convertToViewportPoint(px, py);
+            for (let k = 0; k < pointsList.length; k += 2) {
+              const px = pointsList[k];
+              const py = pointsList[k + 1];
+              if (typeof px === "number" && typeof py === "number") {
+                const [vx, vy] = unscaledViewport.convertToViewportPoint(
+                  px,
+                  py
+                );
                 points.push({ x: vx, y: vy });
-             });
+              }
+            }
+          } else {
+            // Assume objects {x, y}
+            pointsList.forEach((p: any) => {
+              const px = typeof p.x === "number" ? p.x : 0;
+              const py = typeof p.y === "number" ? p.y : 0;
+              const [vx, vy] = unscaledViewport.convertToViewportPoint(px, py);
+              points.push({ x: vx, y: vy });
+            });
           }
 
           if (points.length > 0) {
             annotations.push({
-                id: `imported_ink_${i}_${index}_${strokeIndex}`,
-                pageIndex: i - 1,
-                type: "ink",
-                subtype: isPolyLine ? 'polyline' : (isLine ? 'line' : 'ink'),
-                points: points,
-                color: color,
-                thickness: thickness,
+              id: `imported_ink_${i}_${index}_${strokeIndex}`,
+              pageIndex: i - 1,
+              type: "ink",
+              subtype: isPolyLine ? "polyline" : isLine ? "line" : "ink",
+              points: points,
+              color: color,
+              thickness: thickness,
             });
           }
         });
       } else if (subtype === "Highlight" || subtype === "highlight") {
-         const color = annotation.color ? rgbArrayToHex(annotation.color) : "#FFFF00";
-         const [x1, y1, x2, y2] = annotation.rect;
-         const [vx1, vy1] = unscaledViewport.convertToViewportPoint(x1, y1);
-         const [vx2, vy2] = unscaledViewport.convertToViewportPoint(x2, y2);
-         
-         // Normalize rect (min/max) because rotation might flip coordinates
-         const x = Math.min(vx1, vx2);
-         const y = Math.min(vy1, vy2);
-         const width = Math.abs(vx2 - vx1);
-         const height = Math.abs(vy2 - vy1);
+        const color = annotation.color
+          ? rgbArrayToHex(annotation.color)
+          : "#FFFF00";
+        const [x1, y1, x2, y2] = annotation.rect;
+        const [vx1, vy1] = unscaledViewport.convertToViewportPoint(x1, y1);
+        const [vx2, vy2] = unscaledViewport.convertToViewportPoint(x2, y2);
 
-         // Process QuadPoints if available (for multi-line highlights)
-         let rects: { x: number; y: number; width: number; height: number }[] | undefined = undefined;
-         
-         // Try to get QuadPoints from PDF.js annotation or fallback to PDF-lib lookup
-         let qp = annotation.quadPoints;
+        // Normalize rect (min/max) because rotation might flip coordinates
+        const x = Math.min(vx1, vx2);
+        const y = Math.min(vy1, vy2);
+        const width = Math.abs(vx2 - vx1);
+        const height = Math.abs(vy2 - vy1);
 
-         if (!qp || !Array.isArray(qp) || qp.length === 0) {
-             try {
-                 const pdfLibPage = pdfDoc.getPage(i - 1);
-                 const libAnnots = pdfLibPage.node.Annots();
-                 if (libAnnots instanceof PDFArray) {
-                     for (let idx = 0; idx < libAnnots.size(); idx++) {
-                         const libAnnot = libAnnots.lookup(idx);
-                         if (libAnnot instanceof PDFDict) {
-                             const libSubtype = libAnnot.lookup(PDFName.of('Subtype'));
-                             if (libSubtype === PDFName.of('Highlight')) {
-                                 const libRect = libAnnot.lookup(PDFName.of('Rect'));
-                                 if (libRect instanceof PDFArray) {
-                                     // Simple check: match the first coordinate approximately
-                                     // We use loose epsilon because of potential float diffs
-                                     const rArray = libRect.asArray();
-                                     if (rArray.length >= 4) {
-                                         const lx1 = (rArray[0] as PDFNumber).asNumber();
-                                         const ly1 = (rArray[1] as PDFNumber).asNumber();
-                                         // Check if this matches our annotation.rect [x1, y1, x2, y2] (PDF coords)
-                                         if (Math.abs(lx1 - x1) < 1 && Math.abs(ly1 - y1) < 1) {
-                                             const libQP = libAnnot.lookup(PDFName.of('QuadPoints'));
-                                             if (libQP instanceof PDFArray) {
-                                                 qp = libQP.asArray().map(n => (n as PDFNumber).asNumber());
-                                                 break;
-                                             }
-                                         }
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 }
-             } catch (e) {
-                 console.warn("Fallback QuadPoints extraction failed", e);
-             }
-         }
+        // Process QuadPoints if available (for multi-line highlights)
+        let rects:
+          | { x: number; y: number; width: number; height: number }[]
+          | undefined = undefined;
 
-         if (qp && Array.isArray(qp)) {
-             rects = [];
-             // Each quad has 8 coordinates (4 points * 2 coords)
-             for (let k = 0; k < qp.length; k += 8) {
-                 let minVX = Infinity, minVY = Infinity, maxVX = -Infinity, maxVY = -Infinity;
-                 
-                 // Iterate through the 4 points of the quad
-                 for (let p = 0; p < 8; p += 2) {
-                     const qx = qp[k + p];
-                     const qy = qp[k + p + 1];
-                     const [vx, vy] = unscaledViewport.convertToViewportPoint(qx, qy);
-                     minVX = Math.min(minVX, vx);
-                     minVY = Math.min(minVY, vy);
-                     maxVX = Math.max(maxVX, vx);
-                     maxVY = Math.max(maxVY, vy);
-                 }
-                 
-                 if (minVX !== Infinity) {
-                     rects.push({
-                         x: minVX,
-                         y: minVY,
-                         width: maxVX - minVX,
-                         height: maxVY - minVY
-                     });
-                 }
-             }
-         }
+        // Try to get QuadPoints from PDF.js annotation or fallback to PDF-lib lookup
+        let qp = annotation.quadPoints;
 
-         // Try to parse opacity from CA (fill alpha) in the annotation dict
-         let opacity = 1.0;
-         try {
-             const pdfLibPage = pdfDoc.getPage(i - 1);
-             const libAnnots = pdfLibPage.node.Annots();
-             if (libAnnots instanceof PDFArray) {
-                 // We need to find the matching annotation again to get CA
-                 // Since we might have already found qp via fallback, we can reuse logic or just do it again.
-                 // To be safe and robust, let's iterate again or merge with the qp block if we refactor.
-                 // For now, let's just do a quick lookup loop similar to qp fallback.
-                 for (let idx = 0; idx < libAnnots.size(); idx++) {
-                     const libAnnot = libAnnots.lookup(idx);
-                     if (libAnnot instanceof PDFDict) {
-                         const libSubtype = libAnnot.lookup(PDFName.of('Subtype'));
-                         if (libSubtype === PDFName.of('Highlight')) {
-                             const libRect = libAnnot.lookup(PDFName.of('Rect'));
-                             if (libRect instanceof PDFArray) {
-                                 const rArray = libRect.asArray();
-                                 if (rArray.length >= 4) {
-                                     const lx1 = (rArray[0] as PDFNumber).asNumber();
-                                     const ly1 = (rArray[1] as PDFNumber).asNumber();
-                                     if (Math.abs(lx1 - x1) < 1 && Math.abs(ly1 - y1) < 1) {
-                                         // Found match, check for CA or ca
-                                         const CA = libAnnot.lookup(PDFName.of('CA')); // Uppercase usually for stroke, but often used for fill in annots
-                                         const ca = libAnnot.lookup(PDFName.of('ca')); // Lowercase for non-stroking (fill)
-                                         
-                                         if (ca instanceof PDFNumber) {
-                                             opacity = ca.asNumber();
-                                         } else if (CA instanceof PDFNumber) {
-                                              opacity = CA.asNumber();
-                                         }
-                                         break;
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                 }
-             }
-         } catch (e) {
-             console.warn("Failed to parse opacity", e);
-         }
+        if (!qp || !Array.isArray(qp) || qp.length === 0) {
+          try {
+            const pdfLibPage = pdfDoc.getPage(i - 1);
+            const libAnnots = pdfLibPage.node.Annots();
+            if (libAnnots instanceof PDFArray) {
+              for (let idx = 0; idx < libAnnots.size(); idx++) {
+                const libAnnot = libAnnots.lookup(idx);
+                if (libAnnot instanceof PDFDict) {
+                  const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
+                  if (libSubtype === PDFName.of("Highlight")) {
+                    const libRect = libAnnot.lookup(PDFName.of("Rect"));
+                    if (libRect instanceof PDFArray) {
+                      // Simple check: match the first coordinate approximately
+                      // We use loose epsilon because of potential float diffs
+                      const rArray = libRect.asArray();
+                      if (rArray.length >= 4) {
+                        const lx1 = (rArray[0] as PDFNumber).asNumber();
+                        const ly1 = (rArray[1] as PDFNumber).asNumber();
+                        // Check if this matches our annotation.rect [x1, y1, x2, y2] (PDF coords)
+                        if (Math.abs(lx1 - x1) < 1 && Math.abs(ly1 - y1) < 1) {
+                          const libQP = libAnnot.lookup(
+                            PDFName.of("QuadPoints")
+                          );
+                          if (libQP instanceof PDFArray) {
+                            qp = libQP
+                              .asArray()
+                              .map((n) => (n as PDFNumber).asNumber());
+                            break;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Fallback QuadPoints extraction failed", e);
+          }
+        }
 
-         annotations.push({
-            id: `imported_highlight_${i}_${index}`,
-            pageIndex: i - 1,
-            type: "highlight",
-            rect: { x, y, width, height },
-            rects: rects,
-             color: color,
-             opacity: opacity
-          });
-       } else if (subtype === "Text" || subtype === "text" || subtype === "FreeText" || subtype === "freetext") {
-          const color = annotation.color ? rgbArrayToHex(annotation.color) : "#FFFF00";
-          const [x1, y1, x2, y2] = annotation.rect;
-          const [vx1, vy1] = unscaledViewport.convertToViewportPoint(x1, y1);
-          const [vx2, vy2] = unscaledViewport.convertToViewportPoint(x2, y2);
-          
-          // Normalize rect
-          const x = Math.min(vx1, vx2);
-          const y = Math.min(vy1, vy2);
-          let width = Math.abs(vx2 - vx1);
-          let height = Math.abs(vy2 - vy1);
+        if (qp && Array.isArray(qp)) {
+          rects = [];
+          // Each quad has 8 coordinates (4 points * 2 coords)
+          for (let k = 0; k < qp.length; k += 8) {
+            let minVX = Infinity,
+              minVY = Infinity,
+              maxVX = -Infinity,
+              maxVY = -Infinity;
 
-          // If width/height is too small (e.g. sticky note point), give it default size
-          if (width < 5) width = 30;
-          if (height < 5) height = 30;
- 
-          annotations.push({
-             id: `imported_note_${i}_${index}`,
-             pageIndex: i - 1,
-             type: "note",
-             rect: { x, y, width, height },
-             color: color,
-             text: annotation.contents || ""
-          });
-       } else if (annotation.subtype === "Widget" && annotation.fieldName) {
+            // Iterate through the 4 points of the quad
+            for (let p = 0; p < 8; p += 2) {
+              const qx = qp[k + p];
+              const qy = qp[k + p + 1];
+              const [vx, vy] = unscaledViewport.convertToViewportPoint(qx, qy);
+              minVX = Math.min(minVX, vx);
+              minVY = Math.min(minVY, vy);
+              maxVX = Math.max(maxVX, vx);
+              maxVY = Math.max(maxVY, vy);
+            }
+
+            if (minVX !== Infinity) {
+              rects.push({
+                x: minVX,
+                y: minVY,
+                width: maxVX - minVX,
+                height: maxVY - minVY,
+              });
+            }
+          }
+        }
+
+        // Try to parse opacity from CA (fill alpha) in the annotation dict
+        let opacity = 1.0;
+        try {
+          const pdfLibPage = pdfDoc.getPage(i - 1);
+          const libAnnots = pdfLibPage.node.Annots();
+          if (libAnnots instanceof PDFArray) {
+            // We need to find the matching annotation again to get CA
+            // Since we might have already found qp via fallback, we can reuse logic or just do it again.
+            // To be safe and robust, let's iterate again or merge with the qp block if we refactor.
+            // For now, let's just do a quick lookup loop similar to qp fallback.
+            for (let idx = 0; idx < libAnnots.size(); idx++) {
+              const libAnnot = libAnnots.lookup(idx);
+              if (libAnnot instanceof PDFDict) {
+                const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
+                if (libSubtype === PDFName.of("Highlight")) {
+                  const libRect = libAnnot.lookup(PDFName.of("Rect"));
+                  if (libRect instanceof PDFArray) {
+                    const rArray = libRect.asArray();
+                    if (rArray.length >= 4) {
+                      const lx1 = (rArray[0] as PDFNumber).asNumber();
+                      const ly1 = (rArray[1] as PDFNumber).asNumber();
+                      if (Math.abs(lx1 - x1) < 1 && Math.abs(ly1 - y1) < 1) {
+                        // Found match, check for CA or ca
+                        const CA = libAnnot.lookup(PDFName.of("CA")); // Uppercase usually for stroke, but often used for fill in annots
+                        const ca = libAnnot.lookup(PDFName.of("ca")); // Lowercase for non-stroking (fill)
+
+                        if (ca instanceof PDFNumber) {
+                          opacity = ca.asNumber();
+                        } else if (CA instanceof PDFNumber) {
+                          opacity = CA.asNumber();
+                        }
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to parse opacity", e);
+        }
+
+        annotations.push({
+          id: `imported_highlight_${i}_${index}`,
+          pageIndex: i - 1,
+          type: "highlight",
+          rect: { x, y, width, height },
+          rects: rects,
+          color: color,
+          opacity: opacity,
+        });
+      } else if (
+        subtype === "Text" ||
+        subtype === "text" ||
+        subtype === "FreeText" ||
+        subtype === "freetext"
+      ) {
+        const color = annotation.color
+          ? rgbArrayToHex(annotation.color)
+          : "#FFFF00";
+        const [x1, y1, x2, y2] = annotation.rect;
+        const [vx1, vy1] = unscaledViewport.convertToViewportPoint(x1, y1);
+        const [vx2, vy2] = unscaledViewport.convertToViewportPoint(x2, y2);
+
+        // Normalize rect
+        const x = Math.min(vx1, vx2);
+        const y = Math.min(vy1, vy2);
+        let width = Math.abs(vx2 - vx1);
+        let height = Math.abs(vy2 - vy1);
+
+        // If width/height is too small (e.g. sticky note point), give it default size
+        if (width < 5) width = 30;
+        if (height < 5) height = 30;
+
+        annotations.push({
+          id: `imported_note_${i}_${index}`,
+          pageIndex: i - 1,
+          type: "note",
+          rect: { x, y, width, height },
+          color: color,
+          text: annotation.contents || "",
+        });
+      } else if (annotation.subtype === "Widget" && annotation.fieldName) {
         let type: FieldType | null = null;
         let options: string[] | undefined = undefined;
         let radioValue: string | undefined = undefined;
@@ -821,7 +846,15 @@ export const loadPDF = async (
       // imageData is now optional and will be generated on demand via renderPageToDataURL or PDFPage component
     });
   }
-  return { pdfBytes, pdfDocument: pdf, pages, fields, annotations, metadata, outline };
+  return {
+    pdfBytes,
+    pdfDocument: pdf,
+    pages,
+    fields,
+    annotations,
+    metadata,
+    outline,
+  };
 };
 
 // New helper to render a single page to base64 on demand (e.g. for AI detection)
@@ -842,7 +875,7 @@ export const renderPageToDataURL = async (
       await page.render({
         canvasContext: context,
         viewport: viewport,
-        annotationMode: pdfJs.AnnotationMode.DISABLE,
+        annotationMode: pdfjsLib.AnnotationMode.DISABLE,
       }).promise;
       return canvas.toDataURL("image/jpeg", 0.8);
     }
@@ -971,28 +1004,30 @@ export const exportPDF = async (
       const annots = page.node.Annots();
       if (annots instanceof PDFArray) {
         const toRemove: number[] = [];
-        
+
         for (let i = 0; i < annots.size(); i++) {
           const annot = annots.lookup(i);
           if (annot instanceof PDFDict) {
             const subtype = annot.lookup(PDFName.of("Subtype"));
-            
+
             // Remove types that we manage in the editor
             if (
-              subtype === PDFName.of("Ink") || 
+              subtype === PDFName.of("Ink") ||
               subtype === PDFName.of("Highlight") ||
               subtype === PDFName.of("Text") ||
               subtype === PDFName.of("FreeText")
             ) {
-               toRemove.push(i);
+              toRemove.push(i);
             }
           }
         }
 
         // Remove from back to front to maintain indices
-        toRemove.sort((a, b) => b - a).forEach(idx => {
-          annots.remove(idx);
-        });
+        toRemove
+          .sort((a, b) => b - a)
+          .forEach((idx) => {
+            annots.remove(idx);
+          });
       }
     } catch (e) {
       console.warn("Failed to cleanup annotations on page", e);
@@ -1010,63 +1045,70 @@ export const exportPDF = async (
 
       if (annot.type === "highlight" && annot.rect) {
         // Convert to proper PDF Highlight Annotation so it is editable/selectable
-        const targetRects = (annot.rects && annot.rects.length > 0) ? annot.rects : [annot.rect];
-        
+        const targetRects =
+          annot.rects && annot.rects.length > 0 ? annot.rects : [annot.rect];
+
         const quadPoints: number[] = [];
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
 
         for (const r of targetRects) {
-            // React coords: x, y(top), w, h
-            // PDF coords (Bottom-Left origin): 
-            // LLX = x
-            // LLY = pageHeight - (y + height)
-            // URX = x + width
-            // URY = pageHeight - y
-            
-            const llx = r.x;
-            const lly = pageHeight - (r.y + r.height);
-            const urx = r.x + r.width;
-            const ury = pageHeight - r.y;
+          // React coords: x, y(top), w, h
+          // PDF coords (Bottom-Left origin):
+          // LLX = x
+          // LLY = pageHeight - (y + height)
+          // URX = x + width
+          // URY = pageHeight - y
 
-            // Update global bounding box
-            minX = Math.min(minX, llx);
-            minY = Math.min(minY, lly);
-            maxX = Math.max(maxX, urx);
-            maxY = Math.max(maxY, ury);
+          const llx = r.x;
+          const lly = pageHeight - (r.y + r.height);
+          const urx = r.x + r.width;
+          const ury = pageHeight - r.y;
 
-            // QuadPoints Order: Top-Left, Top-Right, Bottom-Left, Bottom-Right
-            // TL
-            quadPoints.push(llx);
-            quadPoints.push(ury);
-            // TR
-            quadPoints.push(urx);
-            quadPoints.push(ury);
-            // BL
-            quadPoints.push(llx);
-            quadPoints.push(lly);
-            // BR
-            quadPoints.push(urx);
-            quadPoints.push(lly);
+          // Update global bounding box
+          minX = Math.min(minX, llx);
+          minY = Math.min(minY, lly);
+          maxX = Math.max(maxX, urx);
+          maxY = Math.max(maxY, ury);
+
+          // QuadPoints Order: Top-Left, Top-Right, Bottom-Left, Bottom-Right
+          // TL
+          quadPoints.push(llx);
+          quadPoints.push(ury);
+          // TR
+          quadPoints.push(urx);
+          quadPoints.push(ury);
+          // BL
+          quadPoints.push(llx);
+          quadPoints.push(lly);
+          // BR
+          quadPoints.push(urx);
+          quadPoints.push(lly);
         }
 
         const colorObj = hexToPdfColor(annot.color) || rgb(1, 1, 0);
         // Extract RGB components safely
-        const cr = (colorObj as any).red !== undefined ? (colorObj as any).red : 1;
-        const cg = (colorObj as any).green !== undefined ? (colorObj as any).green : 1;
-        const cb = (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+        const cr =
+          (colorObj as any).red !== undefined ? (colorObj as any).red : 1;
+        const cg =
+          (colorObj as any).green !== undefined ? (colorObj as any).green : 1;
+        const cb =
+          (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
 
         const highlightAnnot = pdfDoc.context.obj({
-            Type: 'Annot',
-            Subtype: 'Highlight',
-            Rect: [minX, minY, maxX, maxY],
-            QuadPoints: quadPoints,
-            C: [cr, cg, cb],
-            CA: annot.opacity ?? 0.4,
-            P: page.ref,
-            // Optional: Set title to Author if available
-            T: metadata?.author ? PDFString.of(metadata.author) : undefined,
+          Type: "Annot",
+          Subtype: "Highlight",
+          Rect: [minX, minY, maxX, maxY],
+          QuadPoints: quadPoints,
+          C: [cr, cg, cb],
+          CA: annot.opacity ?? 0.4,
+          P: page.ref,
+          // Optional: Set title to Author if available
+          T: metadata?.author ? PDFString.of(metadata.author) : undefined,
         });
-        
+
         const ref = pdfDoc.context.register(highlightAnnot);
         page.node.addAnnot(ref);
       } else if (annot.type === "note" && annot.rect && annot.text) {
@@ -1196,48 +1238,48 @@ export const exportPDF = async (
         // 4. Create Annotation Object based on subtype
         let annotObj;
 
-        if (annot.subtype === 'polyline') {
-             annotObj = pdfDoc.context.obj({
-                Type: "Annot",
-                Subtype: "PolyLine",
-                Rect: rect,
-                Vertices: pdfPoints,
-                C: [r, g, b],
-                BS: { W: thickness, S: 'S' }, 
-                CA: annot.opacity ?? 1.0,
-                P: page.ref,
-             });
-        } else if (annot.subtype === 'line') {
-             // Line expects L [x1, y1, x2, y2]
-             const x1 = pdfPoints[0];
-             const y1 = pdfPoints[1];
-             const x2 = pdfPoints[pdfPoints.length - 2];
-             const y2 = pdfPoints[pdfPoints.length - 1];
+        if (annot.subtype === "polyline") {
+          annotObj = pdfDoc.context.obj({
+            Type: "Annot",
+            Subtype: "PolyLine",
+            Rect: rect,
+            Vertices: pdfPoints,
+            C: [r, g, b],
+            BS: { W: thickness, S: "S" },
+            CA: annot.opacity ?? 1.0,
+            P: page.ref,
+          });
+        } else if (annot.subtype === "line") {
+          // Line expects L [x1, y1, x2, y2]
+          const x1 = pdfPoints[0];
+          const y1 = pdfPoints[1];
+          const x2 = pdfPoints[pdfPoints.length - 2];
+          const y2 = pdfPoints[pdfPoints.length - 1];
 
-             annotObj = pdfDoc.context.obj({
-                Type: "Annot",
-                Subtype: "Line",
-                Rect: rect,
-                L: [x1, y1, x2, y2],
-                C: [r, g, b],
-                BS: { W: thickness, S: 'S' },
-                CA: annot.opacity ?? 1.0,
-                P: page.ref,
-             });
+          annotObj = pdfDoc.context.obj({
+            Type: "Annot",
+            Subtype: "Line",
+            Rect: rect,
+            L: [x1, y1, x2, y2],
+            C: [r, g, b],
+            BS: { W: thickness, S: "S" },
+            CA: annot.opacity ?? 1.0,
+            P: page.ref,
+          });
         } else {
-             // Default Ink (Subtype: Ink)
-              annotObj = pdfDoc.context.obj({
-                 Type: "Annot",
-                 Subtype: "Ink",
-                 Rect: rect,
-                 InkList: [pdfPoints], // Single stroke (array of arrays)
-                 C: [r, g, b],
-                 Border: [0, 0, thickness],
-                 CA: annot.opacity ?? 1.0, 
-                 IT: annot.intent ? PDFName.of(annot.intent) : undefined,
-                 P: page.ref,
-              });
-         }
+          // Default Ink (Subtype: Ink)
+          annotObj = pdfDoc.context.obj({
+            Type: "Annot",
+            Subtype: "Ink",
+            Rect: rect,
+            InkList: [pdfPoints], // Single stroke (array of arrays)
+            C: [r, g, b],
+            Border: [0, 0, thickness],
+            CA: annot.opacity ?? 1.0,
+            IT: annot.intent ? PDFName.of(annot.intent) : undefined,
+            P: page.ref,
+          });
+        }
 
         const ref = pdfDoc.context.register(annotObj);
         page.node.addAnnot(ref);
@@ -1338,7 +1380,7 @@ export const exportPDF = async (
         } catch (e) {
           tf = form.createTextField(field.name);
         }
-        
+
         tf.addToPage(page, { ...commonOpts, font: fieldFont });
 
         // Add fields properties AFTER setting style

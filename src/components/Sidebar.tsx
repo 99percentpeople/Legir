@@ -19,6 +19,8 @@ interface SidebarProps {
   onNavigatePage: (pageIndex: number) => void;
   width: number;
   onResize: (width: number) => void;
+  pdfDocument?: any;
+  currentPageIndex?: number;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -31,7 +33,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectField,
   onNavigatePage,
   width,
-  onResize
+  onResize,
+  pdfDocument,
+  currentPageIndex
 }) => {
   const { t } = useLanguage();
 
@@ -65,17 +69,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       className="flex flex-col bg-background border-r border-border h-full transition-colors duration-200 shrink-0 z-20 relative"
       style={{ width: width }}
     >
-      <Tabs defaultValue="fields" className="flex flex-col h-full">
+      <Tabs defaultValue="outline" className="flex flex-col h-full">
         {/* Header */}
         <div className="p-2 flex items-center justify-between bg-muted/30 border-b border-border shrink-0 gap-2">
            <TabsList className="flex-1 h-8 grid grid-cols-2">
+              <TabsTrigger value="outline" className="text-xs gap-2 h-full">
+                  <ListTree size={14} />
+                  {t('sidebar.document')}
+              </TabsTrigger>
               <TabsTrigger value="fields" className="text-xs gap-2 h-full">
                   <Layers size={14} />
                   {t('sidebar.fields')}
-              </TabsTrigger>
-              <TabsTrigger value="outline" className="text-xs gap-2 h-full">
-                  <ListTree size={14} />
-                  {t('sidebar.outline')}
               </TabsTrigger>
            </TabsList>
            <Button 
@@ -91,18 +95,21 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-hidden flex flex-col relative">
+            <TabsContent value="outline" className="flex-1 flex flex-col h-full mt-0 data-[state=inactive]:hidden">
+                <OutlinePanel 
+                  outline={outline} 
+                  pages={pages}
+                  pdfDocument={pdfDocument}
+                  onNavigate={onNavigatePage}
+                  currentPageIndex={currentPageIndex}
+                />
+            </TabsContent>
             <TabsContent value="fields" className="flex-1 flex flex-col h-full mt-0 data-[state=inactive]:hidden">
                 <FieldTreePanel
                   pages={pages}
                   fields={fields}
                   selectedFieldId={selectedFieldId}
                   onSelectField={onSelectField}
-                />
-            </TabsContent>
-            <TabsContent value="outline" className="flex-1 flex flex-col h-full mt-0 data-[state=inactive]:hidden">
-                <OutlinePanel 
-                  outline={outline} 
-                  onNavigate={onNavigatePage}
                 />
             </TabsContent>
         </div>
