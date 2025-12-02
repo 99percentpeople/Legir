@@ -5,6 +5,7 @@ import {
   PDFTextField,
   PDFCheckBox,
   PDFDropdown,
+  PDFOptionList,
   PDFRadioGroup,
   StandardFonts,
   TextAlignment,
@@ -14,6 +15,7 @@ import {
   PDFDict,
   PDFArray,
   PDFNumber,
+  PDFHexString,
 } from "pdf-lib";
 import {
   FormField,
@@ -705,19 +707,60 @@ export const loadPDF = async (
         if (width < 5) width = 30;
         if (height < 5) height = 30;
 
+        let contents = annotation.contents || "";
+
+        // Fallback to pdf-lib for contents extraction if possible
+        if (pdfDoc) {
+          try {
+            const pdfLibPage = pdfDoc.getPage(i - 1);
+            const libAnnots = pdfLibPage.node.Annots();
+            if (libAnnots instanceof PDFArray) {
+              for (let idx = 0; idx < libAnnots.size(); idx++) {
+                const libAnnot = libAnnots.lookup(idx);
+                if (libAnnot instanceof PDFDict) {
+                  const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
+                  // Check for Text or FreeText
+                  const sName = libSubtype instanceof PDFName ? libSubtype.decodeText() : "";
+                  if (sName === "Text" || sName === "FreeText") {
+                    const libRect = libAnnot.lookup(PDFName.of("Rect"));
+                    if (libRect instanceof PDFArray) {
+                      const rArray = libRect.asArray();
+                      if (rArray.length >= 4) {
+                        const lx1 = (rArray[0] as PDFNumber).asNumber();
+                        const ly1 = (rArray[1] as PDFNumber).asNumber();
+                        // Approximate match
+                        if (Math.abs(lx1 - x1) < 2 && Math.abs(ly1 - y1) < 2) {
+                          const rawContents = libAnnot.lookup(PDFName.of("Contents"));
+                          if (rawContents instanceof PDFString || rawContents instanceof PDFHexString) {
+                            contents = rawContents.decodeText();
+                          }
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Fallback Text extraction failed", e);
+          }
+        }
+
         annotations.push({
           id: `imported_note_${i}_${index}`,
           pageIndex: i - 1,
           type: "note",
           rect: { x, y, width, height },
           color: color,
-          text: annotation.contents || "",
+          text: contents,
         });
       } else if (annotation.subtype === "Widget" && annotation.fieldName) {
         let type: FieldType | null = null;
         let options: string[] | undefined = undefined;
         let radioValue: string | undefined = undefined;
         let isChecked = false;
+        let isMultiSelect = false;
         let alignment: "left" | "center" | "right" = "left";
 
         if (annotation.fieldType === "Tx") {
@@ -734,6 +777,9 @@ export const loadPDF = async (
           }
         } else if (annotation.fieldType === "Ch") {
           type = FieldType.DROPDOWN;
+          if (annotation.fieldFlags && (annotation.fieldFlags & 2097152)) {
+             isMultiSelect = true;
+          }
           if (Array.isArray(annotation.options)) {
             options = annotation.options.map((opt: any) =>
               typeof opt === "string" ? opt : opt.display || opt.exportValue
@@ -826,9 +872,10 @@ export const loadPDF = async (
             radioValue: radioValue || undefined,
             exportValue: radioValue,
             value:
-              typeof annotation.fieldValue === "string"
-                ? annotation.fieldValue
-                : undefined,
+              Array.isArray(annotation.fieldValue)
+                ? annotation.fieldValue.join('\n')
+                : (typeof annotation.fieldValue === "string" ? annotation.fieldValue : undefined),
+            isMultiSelect: isMultiSelect,
             isChecked: isChecked,
             alignment: alignment,
             multiline: !!(annotation.fieldFlags & 4096),
@@ -934,6 +981,8 @@ export const exportPDF = async (
         field instanceof PDFCheckBox || typeName === "PDFCheckBox";
       const isDropdown =
         field instanceof PDFDropdown || typeName === "PDFDropdown";
+      const isOptionList =
+        field instanceof PDFOptionList || typeName === "PDFOptionList";
       const isRadio =
         field instanceof PDFRadioGroup || typeName === "PDFRadioGroup";
       const isSig =
@@ -941,7 +990,7 @@ export const exportPDF = async (
           field instanceof PDFSignature) ||
         typeName === "PDFSignature";
 
-      shouldRemove = isText || isCheck || isDropdown || isRadio || isSig;
+      shouldRemove = isText || isCheck || isDropdown || isOptionList || isRadio || isSig;
 
       if (shouldRemove) {
         form.removeField(field);
@@ -1107,90 +1156,36 @@ export const exportPDF = async (
           CA: annot.opacity ?? 0.4,
           P: page.ref,
           // Optional: Set title to Author if available
-          T: metadata?.author ? PDFString.of(metadata.author) : undefined,
+          T: metadata?.author ? PDFHexString.fromText(metadata.author) : undefined,
         });
 
         const ref = pdfDoc.context.register(highlightAnnot);
         page.node.addAnnot(ref);
-      } else if (annot.type === "note" && annot.rect && annot.text) {
-        // Draw a background box for the note
-        page.drawRectangle({
-          x: annot.rect.x,
-          y: flipY(annot.rect.y, annot.rect.height),
-          width: annot.rect.width,
-          height: annot.rect.height,
-          color: hexToPdfColor("#fff9c4"), // Light yellow
-          borderColor: hexToPdfColor("#fbc02d"),
-          borderWidth: 1,
+      } else if (annot.type === "note" && annot.rect) {
+        // Export as PDF Text Annotation (Sticky Note)
+        const x = annot.rect.x;
+        const y = pageHeight - annot.rect.y - annot.rect.height;
+        const w = annot.rect.width;
+        const h = annot.rect.height;
+
+        const colorObj = hexToPdfColor(annot.color) || rgb(1, 1, 0);
+        const r = (colorObj as any).red !== undefined ? (colorObj as any).red : 1;
+        const g = (colorObj as any).green !== undefined ? (colorObj as any).green : 1;
+        const b = (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+
+        const noteAnnot = pdfDoc.context.obj({
+          Type: "Annot",
+          Subtype: "Text",
+          Rect: [x, y, x + w, y + h],
+          Contents: PDFHexString.fromText(annot.text || ""),
+          C: [r, g, b],
+          Name: PDFName.of("Comment"), // Icon name
+          P: page.ref,
+          T: metadata?.author ? PDFHexString.fromText(metadata.author) : undefined,
         });
 
-        // Calculate font size (default 12 to match workspace)
-        const fontSize = annot.size || 12;
-        // Padding 4px (to match p-1)
-        const padding = 4;
-        const lineHeight = fontSize * 1.25;
-        const maxWidth = annot.rect.width - padding * 2;
-
-        const text = annot.text || "";
-
-        // Use Default Font (Helvetica) for notes
-        const noteFont = helvetica;
-
-        // Manual wrapping and alignment to support left/center/right
-        const paragraphs = text.split("\n");
-        const lines: string[] = [];
-
-        for (const paragraph of paragraphs) {
-          const words = paragraph.split(" ");
-          let currentLine = "";
-
-          for (let i = 0; i < words.length; i++) {
-            const word = words[i];
-            const testLine = currentLine ? `${currentLine} ${word}` : word;
-            const width = noteFont.widthOfTextAtSize(testLine, fontSize);
-
-            if (width <= maxWidth) {
-              currentLine = testLine;
-            } else {
-              if (currentLine) lines.push(currentLine);
-              currentLine = word;
-            }
-          }
-          lines.push(currentLine);
-        }
-
-        // Start y: Top of box - padding - fontSize (approx baseline for first line)
-        let currentY =
-          flipY(annot.rect.y, annot.rect.height) +
-          annot.rect.height -
-          padding -
-          fontSize;
-
-        for (const line of lines) {
-          if (!line) {
-            currentY -= lineHeight;
-            continue;
-          }
-
-          const lineWidth = noteFont.widthOfTextAtSize(line, fontSize);
-          let x = annot.rect.x + padding;
-
-          if (annot.alignment === "center") {
-            x = annot.rect.x + annot.rect.width / 2 - lineWidth / 2;
-          } else if (annot.alignment === "right") {
-            x = annot.rect.x + annot.rect.width - padding - lineWidth;
-          }
-
-          page.drawText(line, {
-            x: x,
-            y: currentY,
-            size: fontSize,
-            font: noteFont,
-            color: hexToPdfColor(annot.color),
-          });
-
-          currentY -= lineHeight;
-        }
+        const ref = pdfDoc.context.register(noteAnnot);
+        page.node.addAnnot(ref);
       } else if (
         annot.type === "ink" &&
         annot.points &&
@@ -1417,24 +1412,68 @@ export const exportPDF = async (
           cb.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
         }
       } else if (field.type === FieldType.DROPDOWN) {
-        let dd;
-        try {
-          dd = form.getDropdown(field.name);
-        } catch (e) {
-          dd = form.createDropdown(field.name);
+        if (field.isMultiSelect) {
+          let ol;
+          try {
+            ol = form.getOptionList(field.name);
+          } catch (e) {
+            ol = form.createOptionList(field.name);
+          }
+
+          ol.addToPage(page, { ...commonOpts, font: fieldFont });
+          if (field.options) ol.setOptions(field.options);
+
+          ol.enableMultiselect();
+
+          if (field.value) {
+            const vals = field.value.split('\n').filter((v) => v && v !== "");
+            try {
+              ol.select(vals);
+            } catch (e) {
+              console.warn("Failed to select values for option list", e);
+            }
+          }
+
+          if (field.toolTip) {
+            ol.acroField.dict.set(
+              PDFName.of("TU"),
+              PDFString.of(field.toolTip)
+            );
+          }
+
+          if (field.style?.fontSize) ol.setFontSize(field.style.fontSize);
+          ol.updateAppearances(fieldFont);
+        } else {
+          let dd;
+          try {
+            dd = form.getDropdown(field.name);
+          } catch (e) {
+            dd = form.createDropdown(field.name);
+          }
+
+          dd.addToPage(page, { ...commonOpts, font: fieldFont });
+          if (field.options) dd.setOptions(field.options);
+
+          if (field.value) {
+            try {
+              dd.select(field.value);
+            } catch (e) {
+              console.warn("Failed to select value for dropdown", e);
+            }
+          }
+
+          if (field.toolTip) {
+            dd.acroField.dict.set(
+              PDFName.of("TU"),
+              PDFString.of(field.toolTip)
+            );
+          }
+
+          if (field.style?.fontSize) dd.setFontSize(field.style.fontSize);
+
+          // Also update appearances for dropdowns to ensure font consistency
+          dd.updateAppearances(fieldFont);
         }
-
-        dd.addToPage(page, { ...commonOpts, font: fieldFont });
-        if (field.options) dd.setOptions(field.options);
-        if (field.value) dd.select(field.value);
-        if (field.toolTip) {
-          dd.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
-        }
-
-        if (field.style?.fontSize) dd.setFontSize(field.style.fontSize);
-
-        // Also update appearances for dropdowns to ensure font consistency
-        dd.updateAppearances(fieldFont);
       }
     } catch (e) {
       console.warn(`Skipping field ${field.name}`, e);

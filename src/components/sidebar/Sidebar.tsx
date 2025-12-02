@@ -1,9 +1,10 @@
 
 import React, { useCallback } from 'react';
-import { X, Layers, List, LayoutGrid } from 'lucide-react';
-import { FormField, PageData, PDFOutlineItem } from '../../types';
+import { X, Layers, List, LayoutGrid, MessageSquare } from 'lucide-react';
+import { FormField, PageData, PDFOutlineItem, Annotation } from '../../types';
 import { setGlobalCursor, resetGlobalCursor, cn } from '../../lib/utils';
 import FieldTreePanel from './FieldTreePanel';
+import CommentsPanel from './CommentsPanel';
 import { ThumbnailsPanel, DocumentOutlinePanel } from './OutlinePanel';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -14,14 +15,21 @@ interface SidebarProps {
   onClose: () => void;
   pages: PageData[];
   fields: FormField[];
+  annotations?: Annotation[];
   outline: PDFOutlineItem[];
   selectedFieldId: string | null;
+  selectedAnnotationId?: string | null;
   onSelectField: (id: string) => void;
+  onSelectAnnotation?: (id: string) => void;
+  onDeleteAnnotation?: (id: string) => void;
+  onUpdateAnnotation?: (id: string, updates: Partial<Annotation>) => void;
   onNavigatePage: (pageIndex: number) => void;
   width: number;
   onResize: (width: number) => void;
   pdfDocument?: any;
   currentPageIndex?: number;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -29,20 +37,35 @@ const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   pages,
   fields,
+  annotations = [],
   outline,
   selectedFieldId,
+  selectedAnnotationId = null,
   onSelectField,
+  onSelectAnnotation = () => {},
+  onDeleteAnnotation = () => {},
+  onUpdateAnnotation = () => {},
   onNavigatePage,
   width,
   onResize,
   pdfDocument,
-  currentPageIndex
+  currentPageIndex,
+  activeTab,
+  onTabChange
 }) => {
   const { t } = useLanguage();
   const [isResizing, setIsResizing] = React.useState(false);
   const resizeStateRef = React.useRef<{ startX: number, startWidth: number } | null>(null);
   const onResizeRef = React.useRef(onResize);
   onResizeRef.current = onResize;
+
+  // Local state for uncontrolled mode if activeTab is not provided
+  const [localTab, setLocalTab] = React.useState("thumbnails");
+  const currentTab = activeTab !== undefined ? activeTab : localTab;
+  const handleTabChange = (val: string) => {
+      if (onTabChange) onTabChange(val);
+      else setLocalTab(val);
+  };
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -87,7 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       className="flex flex-col bg-background border-r border-border h-full transition-colors duration-200 shrink-0 z-20 relative"
       style={{ width: width }}
     >
-      <Tabs defaultValue="thumbnails" className="flex flex-col h-full">
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="flex flex-col h-full">
         {/* Header */}
         <div className="p-2 flex items-center justify-between bg-muted/30 border-b border-border shrink-0 gap-2">
            <TabsList className="flex-1 h-8 flex justify-end">
@@ -99,6 +122,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               </TabsTrigger>
               <TabsTrigger value="fields" className="text-xs h-full w-9 p-0 data-[state=active]:bg-muted" title={t('sidebar.fields')}>
                   <Layers size={16} />
+              </TabsTrigger>
+              <TabsTrigger value="comments" className="text-xs h-full w-9 p-0 data-[state=active]:bg-muted" title={t('sidebar.comments')}>
+                  <MessageSquare size={16} />
               </TabsTrigger>
            </TabsList>
            <Button 
@@ -135,6 +161,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                   fields={fields}
                   selectedFieldId={selectedFieldId}
                   onSelectField={onSelectField}
+                />
+            </TabsContent>
+            <TabsContent value="comments" className="flex-1 flex flex-col h-full mt-0 data-[state=inactive]:hidden">
+                <CommentsPanel
+                  annotations={annotations}
+                  onSelectAnnotation={onSelectAnnotation}
+                  onDeleteAnnotation={onDeleteAnnotation}
+                  onUpdateAnnotation={onUpdateAnnotation}
+                  selectedAnnotationId={selectedAnnotationId}
                 />
             </TabsContent>
         </div>

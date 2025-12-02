@@ -1,7 +1,8 @@
 import React, { useRef, useState, useLayoutEffect, useEffect } from 'react';
 import { EditorState, FormField, FieldType, Annotation } from '../../types';
 import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES, FONT_FAMILY_MAP, ZOOM_BASE } from '../../constants';
-import { Check, ChevronDown,  PenLine,  Trash2,  Image as ImageIcon } from 'lucide-react';
+import { Check, ChevronDown,  PenLine,  Trash2,  Image as ImageIcon, MessageSquareText } from 'lucide-react';
+import { ListBox, ListBoxItem } from 'react-aria-components';
 import { cn, setGlobalCursor, resetGlobalCursor } from '../../lib/utils';
 import { usePointerCapture } from '../../hooks/usePointerCapture';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
@@ -18,6 +19,7 @@ interface WorkspaceProps {
   onUpdateField: (id: string, updates: Partial<FormField>) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   onDeleteAnnotation: (id: string) => void;
+  onEditAnnotation: (id: string) => void;
   onScaleChange: (newScale: number) => void;
   onTriggerHistorySave: () => void;
   onPageIndexChange?: (index: number) => void;
@@ -39,6 +41,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onUpdateField, 
   onUpdateAnnotation,
   onDeleteAnnotation,
+  onEditAnnotation,
   onScaleChange,
   onTriggerHistorySave,
   onPageIndexChange
@@ -418,6 +421,31 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return null;
   };
 
+  const updateMovingAnnotation = (clientX: number, clientY: number) => {
+      if (!movingAnnotationId || !moveOffset) return;
+      
+      const annot = editorState.annotations.find(a => a.id === movingAnnotationId);
+      if (annot && annot.type === 'note' && annot.rect) {
+          let currentTargetPageIndex = activePageIndex;
+          const hoveredPageIndex = getPageIndexFromPoint(clientX, clientY);
+          
+          if (hoveredPageIndex !== null && hoveredPageIndex !== activePageIndex) {
+              currentTargetPageIndex = hoveredPageIndex;
+              setActivePageIndex(hoveredPageIndex);
+          }
+
+          const pageIndex = currentTargetPageIndex ?? 0;
+          const currentCoords = getRelativeCoordsFromPoint(clientX, clientY, pageIndex);
+
+          let newX = currentCoords.x - moveOffset.x;
+          let newY = currentCoords.y - moveOffset.y;
+          
+          onUpdateAnnotation(movingAnnotationId, { 
+              rect: { ...annot.rect, x: newX, y: newY },
+              pageIndex: pageIndex 
+          });
+      }
+  };
   const updateMovingField = (clientX: number, clientY: number) => {
       if (!movingFieldId || !moveOffset || !moveStartRaw) return;
       
@@ -711,6 +739,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
         if (isInteracting) {
              if (movingFieldId) {
                  updateMovingField(lastMousePosRef.current.x, lastMousePosRef.current.y);
+             } else if (movingAnnotationId) {
+                 updateMovingAnnotation(lastMousePosRef.current.x, lastMousePosRef.current.y);
              } else if (resizingFieldId) {
                  updateResizingField(lastMousePosRef.current.x, lastMousePosRef.current.y);
              }
@@ -761,6 +791,29 @@ const Workspace: React.FC<WorkspaceProps> = ({
     }
 
     // Drag Drawing Start (Form Fields & Highlights)
+    if (editorState.tool === 'draw_note') {
+        const coords = getRelativeCoords(e, pageIndex);
+        const iconSize = 24;
+        // Center the icon on the click
+        const x = coords.x - iconSize / 2;
+        const y = coords.y - iconSize / 2;
+        
+        onAddAnnotation({
+            id: `note_${Date.now()}`,
+            pageIndex: pageIndex,
+            type: 'note',
+            rect: { x, y, width: iconSize, height: iconSize },
+            text: 'New Comment',
+            color: editorState.noteStyle?.color || ANNOTATION_STYLES.note.color,
+        });
+        // Reset to select tool after placing note
+        onSelectAnnotation(null); 
+        // Optionally switch back to select tool if desired, but usually users might want to place multiple.
+        // If single placement is desired:
+        // onToolChange('select'); // Need to pass this down or handle in parent
+        return;
+    }
+
     setGlobalCursor('crosshair');
     setActivePageIndex(pageIndex);
     const coords = getRelativeCoords(e, pageIndex);
@@ -814,22 +867,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     } 
     // --- MOVING ANNOTATION ---
     else if (movingAnnotationId && moveOffset) {
-        const annot = editorState.annotations.find(a => a.id === movingAnnotationId);
-        if (annot && annot.rect) {
-            let newX = coords.x - moveOffset.x;
-            let newY = coords.y - moveOffset.y;
-            
-            const updates: Partial<Annotation> = { rect: { ...annot.rect, x: newX, y: newY } };
-            
-            // If we have multiple rects (e.g. multi-line highlight), move them too
-            if (annot.rects) {
-                const dx = newX - annot.rect.x;
-                const dy = newY - annot.rect.y;
-                updates.rects = annot.rects.map(r => ({ ...r, x: r.x + dx, y: r.y + dy }));
-            }
-            
-            onUpdateAnnotation(movingAnnotationId, updates);
-        }
+        updateMovingAnnotation(e.clientX, e.clientY);
     }
     // --- RESIZING ---
     else if (resizingFieldId && resizeStart && resizeHandle) {
@@ -907,16 +945,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     opacity: ANNOTATION_STYLES.highlight.opacity
                 });
             } else if (editorState.tool === 'draw_note') {
-                onAddAnnotation({
-                    id: `note_${Date.now()}`,
-                    pageIndex: activePageIndex,
-                    type: 'note',
-                    rect: { x, y, width, height }, // Initial box
-                    text: 'New Note',
-                    color: ANNOTATION_STYLES.note.color,
-                    size: ANNOTATION_STYLES.note.fontSize,
-                    alignment: 'left'
-                });
+                // Handled in handlePointerDown now for immediate click-to-place
             }
         }
       }
@@ -1156,51 +1185,46 @@ const Workspace: React.FC<WorkspaceProps> = ({
                             return renderBox(annot.rect);
                         }
                     } else if (annot.type === 'note' && annot.rect) {
-                        const fontSize = (annot.size || 12) * editorState.scale;
                         return (
                             <React.Fragment key={annot.id}>
-                                {isSelected && (
-                                    <AnnotationToolbar 
-                                        annotation={annot} 
-                                        onUpdate={(updates) => onUpdateAnnotation(annot.id, updates)} 
-                                        onDelete={() => onDeleteAnnotation(annot.id)}
-                                        scale={editorState.scale}
-                                    />
-                                )}
                                 <div
-                                    className={cn("absolute p-1 group pointer-events-auto", isSelected ? "z-50" : "")}
+                                    id={`annotation-${annot.id}`}
+                                    className={cn("absolute group pointer-events-auto flex items-center justify-center", isSelected ? "z-50" : "")}
                                     style={{
                                         left: annot.rect.x * editorState.scale,
                                         top: annot.rect.y * editorState.scale,
                                         width: annot.rect.width * editorState.scale,
                                         height: annot.rect.height * editorState.scale,
-                                        cursor: editorState.tool === 'select' ? 'move' : 'inherit',
+                                        cursor: editorState.tool === 'select' ? 'pointer' : 'inherit',
                                     }}
                                     onPointerDown={(e) => handleAnnotationPointerDown(e, annot)}
+                                    title={annot.text}
                                 >
-                                    {isSelected ? (
-                                        <textarea
-                                            autoFocus
-                                            className="w-full h-full bg-yellow-100 text-black p-1 resize-none border border-yellow-300 shadow-sm focus:outline-none leading-tight"
-                                            style={{ fontSize: `${fontSize}px`, color: annot.color, textAlign: annot.alignment || 'left' }}
-                                            value={annot.text}
-                                            onChange={(e) => onUpdateAnnotation(annot.id, { text: e.target.value })}
-                                            onMouseDown={(e) => e.stopPropagation()} 
-                                            onFocus={(e) => {
-                                                if (annot.text === 'New Note') {
-                                                    e.target.select();
-                                                }
-                                            }}
-                                        />
-                                    ) : (
-                                        <div 
-                                            className="w-full h-full bg-yellow-100/80 text-black p-1 border border-yellow-300/50 overflow-hidden whitespace-pre-wrap wrap-break-word leading-tight"
-                                            style={{ fontSize: `${fontSize}px`, color: annot.color, textAlign: annot.alignment || 'left' }}
-                                        >
-                                            {annot.text}
-                                        </div>
-                                    )}
+                                    <MessageSquareText 
+                                        size={20 * editorState.scale} 
+                                        color={annot.color || "#facc15"}
+                                        className={cn("transition-transform", isSelected ? "scale-110 drop-shadow-md" : "hover:scale-105")}
+                                    />
                                 </div>
+                                {isSelected && (
+                                    <div 
+                                      className="absolute z-[60] flex justify-center pointer-events-none"
+                                      style={{
+                                        left: annot.rect.x * editorState.scale,
+                                        top: annot.rect.y * editorState.scale,
+                                        width: annot.rect.width * editorState.scale,
+                                        transform: 'translateY(-100%)'
+                                      }}
+                                    >
+                                      <AnnotationToolbar
+                                        annotation={annot}
+                                        scale={editorState.scale}
+                                        onUpdate={(updates) => onUpdateAnnotation(annot.id, updates)}
+                                        onDelete={() => onDeleteAnnotation(annot.id)}
+                                        onEdit={() => onEditAnnotation(annot.id)}
+                                      />
+                                    </div>
+                                )}
                             </React.Fragment>
                         )
                     }
@@ -1259,11 +1283,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
                       id={`field-element-${field.id}`}
                       onPointerDown={(e) => handleFieldPointerDown(e, field)}
                       onClick={handleInteraction}
-                      onFocus={() => { if (isFormMode) onSelectField(field.id); }}
+                      onFocus={() => {
+                        if (isFormMode) onSelectField(field.id);
+                      }}
                       tabIndex={isFormMode ? 0 : -1} // Make container focusable in Form Mode for navigation
                       className={cn(
                         "absolute group select-none pointer-events-auto outline-none", // outline-none to handle custom focus ring
-                        isSelected ? 'z-50' : 'hover:z-50'
+                        isSelected ? "z-50" : "hover:z-50"
                       )}
                       style={{
                         left: field.rect.x * editorState.scale,
@@ -1271,177 +1297,299 @@ const Workspace: React.FC<WorkspaceProps> = ({
                         width: field.rect.width * editorState.scale,
                         height: field.rect.height * editorState.scale,
                         // Fix 2: Explicit cursor logic for interactive fields in annotation mode
-                        cursor: isFormMode 
-                          ? (editorState.tool === 'select' ? 'move' : 'inherit') 
-                          : (isInteractive ? 'pointer' : (field.type === FieldType.TEXT ? 'text' : 'default')),
+                        cursor: isFormMode
+                          ? editorState.tool === "select"
+                            ? "move"
+                            : "inherit"
+                          : isInteractive
+                          ? "pointer"
+                          : field.type === FieldType.TEXT
+                          ? "text"
+                          : "default",
                       }}
                     >
-                      <div 
+                      <div
                         className={cn(
                           "w-full h-full relative transition-colors flex",
-                          (field.type === FieldType.TEXT && field.multiline) ? "items-start" : "items-center",
+                          field.type === FieldType.TEXT && field.multiline
+                            ? "items-start"
+                            : "items-center",
                           !isRadio && "overflow-hidden",
                           isRadio && "justify-center",
-                          showHelperBg && isFormMode && "bg-blue-500/10 dark:bg-blue-400/10 hover:bg-blue-500/20",
+                          showHelperBg &&
+                            isFormMode &&
+                            "bg-blue-500/10 dark:bg-blue-400/10 hover:bg-blue-500/20",
                           // Removed border helper class from here to avoid box-model shift
-                          isAnnotationMode && "hover:bg-black/5" 
+                          isAnnotationMode && "hover:bg-black/5"
                         )}
                         style={{
-                          backgroundColor: (applyStylesToContainer && !style.isTransparent) ? style.backgroundColor : undefined,
+                          backgroundColor:
+                            applyStylesToContainer && !style.isTransparent
+                              ? style.backgroundColor
+                              : undefined,
                           borderWidth: applyStylesToContainer ? style.borderWidth : undefined,
                           borderColor: applyStylesToContainer ? style.borderColor : undefined,
-                          borderStyle: applyStylesToContainer ? 'solid' : undefined,
+                          borderStyle: applyStylesToContainer ? "solid" : undefined,
                           color: style.textColor,
                           fontSize: `${(style.fontSize || 12) * editorState.scale}px`,
-                          fontFamily: FONT_FAMILY_MAP[style.fontFamily || 'Helvetica'] || 'Helvetica', // Apply Font Family
-                          boxSizing: 'border-box',
+                          fontFamily:
+                            FONT_FAMILY_MAP[style.fontFamily || "Helvetica"] || "Helvetica", // Apply Font Family
+                          boxSizing: "border-box",
                         }}
                       >
-                         {/* Helper Border Overlay - Absolute to prevent layout shift */}
-                         {showHelperBorder && isFormMode && applyStylesToContainer && (
-                             <div className="absolute inset-0 border border-dashed border-blue-400/50 pointer-events-none" style={{ zIndex: 1 }} />
-                         )}
+                        {/* Helper Border Overlay - Absolute to prevent layout shift */}
+                        {showHelperBorder && isFormMode && applyStylesToContainer && (
+                          <div
+                            className="absolute inset-0 border border-dashed border-blue-400/50 pointer-events-none"
+                            style={{ zIndex: 1 }}
+                          />
+                        )}
 
-                         {/* Text Field Logic: Unified Input/Textarea to prevent layout shift */}
-                         {field.type === FieldType.TEXT && (
-                             field.multiline ? (
-                                <textarea 
-                                    readOnly={isFormMode || field.readOnly}
-                                    tabIndex={isFormMode ? -1 : undefined} // Prevent focus in Form Mode
-                                    className={cn(
-                                        "w-full h-full bg-transparent resize-none border-none outline-none p-1 font-inherit text-inherit leading-tight block",
-                                        isFormMode && "pointer-events-none"
-                                    )}
-                                    style={{ textAlign: field.alignment }}
-                                    value={isFormMode ? (field.value || field.defaultValue || field.name) : (field.value || '')}
-                                    placeholder={isAnnotationMode ? field.name : undefined}
-                                    onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onFocus={() => { if(isAnnotationMode) onSelectField(field.id); }}
+                        {/* Text Field Logic: Unified Input/Textarea to prevent layout shift */}
+                        {field.type === FieldType.TEXT &&
+                          (field.multiline ? (
+                            <textarea
+                              readOnly={isFormMode || field.readOnly}
+                              tabIndex={isFormMode ? -1 : undefined} // Prevent focus in Form Mode
+                              className={cn(
+                                "w-full h-full bg-transparent resize-none border-none outline-none p-1 font-inherit text-inherit leading-tight block",
+                                isFormMode && "pointer-events-none"
+                              )}
+                              style={{ textAlign: field.alignment }}
+                              value={
+                                isFormMode
+                                  ? field.value || field.defaultValue || field.name
+                                  : field.value || ""
+                              }
+                              placeholder={isAnnotationMode ? field.name : undefined}
+                              onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onFocus={() => {
+                                if (isAnnotationMode) onSelectField(field.id);
+                              }}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              readOnly={isFormMode || field.readOnly}
+                              tabIndex={isFormMode ? -1 : undefined} // Prevent focus in Form Mode
+                              className={cn(
+                                "w-full h-full bg-transparent border-none outline-none px-1 font-inherit text-inherit leading-tight",
+                                isFormMode && "pointer-events-none"
+                              )}
+                              style={{ textAlign: field.alignment }}
+                              value={
+                                isFormMode
+                                  ? field.value || field.defaultValue || field.name
+                                  : field.value || ""
+                              }
+                              placeholder={isAnnotationMode ? field.name : undefined}
+                              onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onFocus={() => {
+                                if (isAnnotationMode) onSelectField(field.id);
+                              }}
+                            />
+                          ))}
+
+                        {/* Checkbox Logic */}
+                        {field.type === FieldType.CHECKBOX && (
+                          <div className="flex items-center justify-center w-full h-full">
+                            {field.isChecked && <Check size="80%" />}
+                          </div>
+                        )}
+
+                        {/* Dropdown Logic */}
+                        {field.type === FieldType.DROPDOWN && (
+                          <>
+                            {(!field.isMultiSelect || !isAnnotationMode) && (
+                              <div className="w-full flex justify-between items-center px-1">
+                                <span className="truncate">
+                                  {field.isMultiSelect
+                                    ? field.value
+                                      ? field.value.split("\n").join(", ")
+                                      : "Select..."
+                                    : field.value || "Select..."}
+                                </span>
+                                <ChevronDown size={12} className="shrink-0" />
+                              </div>
+                            )}
+                            <div
+                              className={cn(
+                                "absolute inset-0 w-full h-full flex items-center",
+                                isAnnotationMode ? "z-10" : "hidden"
+                              )}
+                            >
+                              {isAnnotationMode && (
+                                <>
+                                  {field.isMultiSelect ? (
+                                    <ListBox
+                                      className="w-full h-full p-1 space-y-0.5 overflow-auto bg-transparent outline-none font-inherit text-inherit"
+                                      selectionMode="multiple"
+                                      selectedKeys={
+                                        new Set(field.value ? field.value.split("\n") : [])
+                                      }
+                                      onSelectionChange={(keys) => {
+                                        const vals = Array.from(keys).map((k) => String(k));
+                                        onUpdateField(field.id, { value: vals.join("\n") });
+                                      }}
+                                      aria-label={field.toolTip || "Multi-select dropdown"}
+                                    >
+                                      {(field.options || []).map((opt, i) => (
+                                        <ListBoxItem
+                                          key={i}
+                                          id={opt}
+                                          textValue={opt}
+                                          className={({ isSelected }) =>
+                                            cn(
+                                              "cursor-pointer px-1 rounded hover:bg-black/5 data-focus-visible:border-ring data-focus-visible:ring-[3px] data-focus-visible:ring-ring/50 outline-none flex items-center justify-between w-full",
+                                              isSelected ? "bg-black/10 font-medium" : ""
+                                            )
+                                          }
+                                        >
+                                          {({ isSelected }) => (
+                                            <>
+                                              <span className="truncate flex-1 text-left">
+                                                {opt}
+                                              </span>
+                                              {isSelected && (
+                                                <Check size={12} className="ml-1 shrink-0" />
+                                              )}
+                                            </>
+                                          )}
+                                        </ListBoxItem>
+                                      ))}
+                                    </ListBox>
+                                  ) : (
+                                    <select
+                                      className="absolute inset-0 w-full h-full cursor-pointer opacity-0"
+                                      value={field.value || ""}
+                                      onChange={(e) =>
+                                        onUpdateField(field.id, { value: e.target.value })
+                                      }
+                                      onPointerDown={(e) => e.stopPropagation()}
+                                      onFocus={() => {
+                                        if (isAnnotationMode) onSelectField(field.id);
+                                      }}
+                                      title={field.toolTip}
+                                    >
+                                      <option value="" disabled>
+                                        Select...
+                                      </option>
+                                      {(field.options || []).map((opt, i) => (
+                                        <option key={i} value={opt}>
+                                          {opt}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Radio Logic */}
+                        {field.type === FieldType.RADIO && (
+                          <div className="flex items-center justify-center w-full h-full">
+                            <div
+                              className="rounded-full flex items-center justify-center relative border border-black box-border"
+                              style={{
+                                width: `${
+                                  (Math.min(field.rect.width, field.rect.height) /
+                                    field.rect.width) *
+                                  100
+                                }%`,
+                                height: `${
+                                  (Math.min(field.rect.width, field.rect.height) /
+                                    field.rect.height) *
+                                  100
+                                }%`,
+                                backgroundColor: !style.isTransparent
+                                  ? style.backgroundColor
+                                  : "white",
+                              }}
+                            >
+                              {field.isChecked && (
+                                <div className="w-1/2 h-1/2 rounded-full bg-black"></div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Signature Logic */}
+                        {field.type === FieldType.SIGNATURE && (
+                          <div className="w-full h-full flex justify-center items-center overflow-hidden relative">
+                            {field.signatureData ? (
+                              <>
+                                <img
+                                  src={field.signatureData}
+                                  alt="Signature"
+                                  className={cn(
+                                    "max-w-full max-h-full",
+                                    field.imageScaleMode === "fill"
+                                      ? "object-fill w-full h-full"
+                                      : "object-contain"
+                                  )}
                                 />
-                             ) : (
-                                <input 
-                                    type="text"
-                                    readOnly={isFormMode || field.readOnly}
-                                    tabIndex={isFormMode ? -1 : undefined} // Prevent focus in Form Mode
-                                    className={cn(
-                                        "w-full h-full bg-transparent border-none outline-none px-1 font-inherit text-inherit leading-tight",
-                                        isFormMode && "pointer-events-none"
-                                    )}
-                                    style={{ textAlign: field.alignment }}
-                                    value={isFormMode ? (field.value || field.defaultValue || field.name) : (field.value || '')}
-                                    placeholder={isAnnotationMode ? field.name : undefined}
-                                    onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onFocus={() => { if(isAnnotationMode) onSelectField(field.id); }}
-                                />
-                             )
-                         )}
-
-                         {/* Checkbox Logic */}
-                         {field.type === FieldType.CHECKBOX && (
-                             <div className="flex items-center justify-center w-full h-full">
-                                 {field.isChecked && <Check size="80%" />}
-                             </div>
-                         )}
-
-                         {/* Dropdown Logic */}
-                         {field.type === FieldType.DROPDOWN && (
-                             <>
-                                <div className="w-full flex justify-between items-center px-1">
-                                    <span className="truncate">{field.value || 'Select...'}</span>
-                                    <ChevronDown size={12} className="shrink-0" />
-                                </div>
-                                <div className={cn("absolute inset-0 w-full h-full flex items-center", isAnnotationMode ? "z-10" : "hidden")}>
-                                   {isAnnotationMode && (
-                                     <select 
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        value={field.value || ''}
-                                       onChange={(e) => onUpdateField(field.id, { value: e.target.value })}
-                                       onPointerDown={(e) => e.stopPropagation()}
-                                       onFocus={() => { if(isAnnotationMode) onSelectField(field.id); }}
-                                       title={field.toolTip}
-                                     >
-                                        <option value="" disabled>Select...</option>
-                                        {(field.options || []).map((opt, i) => (
-                                            <option key={i} value={opt}>{opt}</option>
-                                        ))}
-                                     </select>
-                                   )}
-                                </div>
-                             </>
-                         )}
-
-                         {/* Radio Logic */}
-                         {field.type === FieldType.RADIO && (
-                             <div className="flex items-center justify-center w-full h-full">
-                                <div 
-                                    className="rounded-full flex items-center justify-center relative border border-black box-border" 
-                                    style={{ 
-                                        width: `${(Math.min(field.rect.width, field.rect.height) / field.rect.width) * 100}%`,
-                                        height: `${(Math.min(field.rect.width, field.rect.height) / field.rect.height) * 100}%`,
-                                        backgroundColor: !style.isTransparent ? style.backgroundColor : 'white'
+                                {isAnnotationMode && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onUpdateField(field.id, { signatureData: undefined });
                                     }}
-                                >
-                                    {field.isChecked && <div className="w-1/2 h-1/2 rounded-full bg-black"></div>}
-                                </div>
-                             </div>
-                         )}
-
-                         {/* Signature Logic */}
-                         {field.type === FieldType.SIGNATURE && (
-                             <div className="w-full h-full flex justify-center items-center overflow-hidden relative">
-                                 {field.signatureData ? (
-                                     <>
-                                        <img 
-                                            src={field.signatureData} 
-                                            alt="Signature" 
-                                            className={cn("max-w-full max-h-full", field.imageScaleMode === 'fill' ? 'object-fill w-full h-full' : 'object-contain')} 
-                                        />
-                                        {isAnnotationMode && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onUpdateField(field.id, { signatureData: undefined });
-                                                }}
-                                                className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-sm shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/90 z-20"
-                                                title={t('common.delete')}
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
-                                        )}
-                                     </>
-                                 ) : (
-                                     <div className={cn("flex flex-col items-center justify-center text-muted-foreground/50", isAnnotationMode ? "cursor-pointer" : "")}>
-                                         {isAnnotationMode ? <ImageIcon size={16} /> : <PenLine size={16} />}
-                                         {isAnnotationMode && <span className="text-[10px] opacity-70">Click to Sign</span>}
-                                     </div>
-                                 )}
-                             </div>
-                         )}
+                                    className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-sm shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/90 z-20"
+                                    title={t("common.delete")}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <div
+                                className={cn(
+                                  "flex flex-col items-center justify-center text-muted-foreground/50",
+                                  isAnnotationMode ? "cursor-pointer" : ""
+                                )}
+                              >
+                                {isAnnotationMode ? <ImageIcon size={16} /> : <PenLine size={16} />}
+                                {isAnnotationMode && (
+                                  <span className="text-[10px] opacity-70">Click to Sign</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Selection Overlay (Form Mode Only) */}
-                      {isSelected && isFormMode && editorState.tool === 'select' && (
+                      {isSelected && isFormMode && editorState.tool === "select" && (
                         <div className="absolute inset-0 pointer-events-none">
-                            <div className="absolute -inset-[2px] border-2 border-blue-500 border-dashed" />
-                            <span className="absolute -top-6 left-0 bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-30">{field.name}</span>
-                            {/* Resize Handles */}
-                            {['nw', 'ne', 'sw', 'se'].map(h => (
-                                <div key={h} className={cn("absolute w-3 h-3 bg-white border border-blue-500 pointer-events-auto z-30", 
-                                    h==='nw' && "-top-1.5 -left-1.5 cursor-nwse-resize",
-                                    h==='ne' && "-top-1.5 -right-1.5 cursor-nesw-resize",
-                                    h==='sw' && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
-                                    h==='se' && "-bottom-1.5 -right-1.5 cursor-nwse-resize"
-                                )} onPointerDown={(e) => handleResizePointerDown(e, field, h)} />
-                            ))}
+                          <div className="absolute -inset-[2px] border-2 border-blue-500 border-dashed" />
+                          <span className="absolute -top-6 left-0 bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-30">
+                            {field.name}
+                          </span>
+                          {/* Resize Handles */}
+                          {["nw", "ne", "sw", "se"].map((h) => (
+                            <div
+                              key={h}
+                              className={cn(
+                                "absolute w-3 h-3 bg-white border border-blue-500 pointer-events-auto z-30",
+                                h === "nw" && "-top-1.5 -left-1.5 cursor-nwse-resize",
+                                h === "ne" && "-top-1.5 -right-1.5 cursor-nesw-resize",
+                                h === "sw" && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
+                                h === "se" && "-bottom-1.5 -right-1.5 cursor-nwse-resize"
+                              )}
+                              onPointerDown={(e) => handleResizePointerDown(e, field, h)}
+                            />
+                          ))}
                         </div>
                       )}
 
                       {/* NEW: Annotation Mode Selection Overlay - Moved OUTSIDE overflow-hidden container */}
                       {showAnnotationFocus && (
-                          <div className="absolute inset-0 border border-dashed border-blue-500 pointer-events-none z-50 animate-in fade-in duration-200" />
+                        <div className="absolute inset-0 border border-dashed border-blue-500 pointer-events-none z-50 animate-in fade-in duration-200" />
                       )}
                     </div>
                   );

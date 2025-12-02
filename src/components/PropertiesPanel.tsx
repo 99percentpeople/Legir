@@ -545,37 +545,107 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
           {/* Dropdown */}
           {field.type === FieldType.DROPDOWN && (
              <>
+               <div className="flex items-center justify-between">
+                  <Label htmlFor="multiselect-switch" className="cursor-pointer">{t('properties.multiselect')}</Label>
+                  <Switch 
+                      id="multiselect-switch"
+                      checked={field.isMultiSelect || false}
+                      onMouseDown={onTriggerHistorySave}
+                      onCheckedChange={(checked) => onChange({ isMultiSelect: checked, value: '', defaultValue: '' })}
+                  />
+               </div>
+
                <div className="space-y-2">
                  <Label>{t('properties.value')}</Label>
-                 <Select
-                    value={field.value || ''}
-                    onValueChange={(val) => { onTriggerHistorySave(); onChange({ value: val }) }}
-                 >
-                   <SelectTrigger className="w-full">
-                      <SelectValue placeholder={t('common.select')} />
-                   </SelectTrigger>
-                   <SelectContent>
-                      {(field.options || []).map((opt, i) => (
-                         <SelectItem key={i} value={opt}>{opt}</SelectItem>
-                      ))}
-                   </SelectContent>
-                 </Select>
+                 {!field.isMultiSelect ? (
+                    <Select
+                        value={field.value || ''}
+                        onValueChange={(val) => { onTriggerHistorySave(); onChange({ value: val }) }}
+                    >
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder={t('common.select')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {(field.options || []).map((opt, i) => (
+                            <SelectItem key={i} value={opt}>{opt}</SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                 ) : (
+                    <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-1 bg-background">
+                        {(field.options || []).map((opt, i) => {
+                            const selected = (field.value || '').split('\n').includes(opt);
+                            return (
+                                <div key={i} className="flex items-center gap-2">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selected}
+                                        onChange={(e) => {
+                                            onTriggerHistorySave();
+                                            const current = (field.value || '').split('\n').filter(v => v && v !== '');
+                                            let newVals;
+                                            if (e.target.checked) {
+                                                newVals = [...current, opt];
+                                            } else {
+                                                newVals = current.filter(v => v !== opt);
+                                            }
+                                            onChange({ value: newVals.join('\n') });
+                                        }}
+                                        className="h-4 w-4 rounded border-input accent-primary"
+                                    />
+                                    <span className="text-sm">{opt}</span>
+                                </div>
+                            );
+                        })}
+                        {(field.options?.length || 0) === 0 && <div className="text-xs text-muted-foreground">{t('properties.no_options')}</div>}
+                    </div>
+                 )}
                </div>
                <div className="space-y-2">
                  <Label>{t('properties.default_value')}</Label>
-                 <Select
-                    value={field.defaultValue || ''}
-                    onValueChange={(val) => { onTriggerHistorySave(); onChange({ defaultValue: val }) }}
-                 >
-                   <SelectTrigger className="w-full">
-                      <SelectValue placeholder={t('common.select')} />
-                   </SelectTrigger>
-                   <SelectContent>
-                      {(field.options || []).map((opt, i) => (
-                         <SelectItem key={i} value={opt}>{opt}</SelectItem>
-                      ))}
-                   </SelectContent>
-                 </Select>
+                 {!field.isMultiSelect ? (
+                    <Select
+                        value={field.defaultValue || ''}
+                        onValueChange={(val) => { onTriggerHistorySave(); onChange({ defaultValue: val }) }}
+                    >
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder={t('common.select')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {(field.options || []).map((opt, i) => (
+                            <SelectItem key={i} value={opt}>{opt}</SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                 ) : (
+                    <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-1 bg-background">
+                        {(field.options || []).map((opt, i) => {
+                            const selected = (field.defaultValue || '').split('\n').includes(opt);
+                            return (
+                                <div key={i} className="flex items-center gap-2">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selected}
+                                        onChange={(e) => {
+                                            onTriggerHistorySave();
+                                            const current = (field.defaultValue || '').split('\n').filter(v => v && v !== '');
+                                            let newVals;
+                                            if (e.target.checked) {
+                                                newVals = [...current, opt];
+                                            } else {
+                                                newVals = current.filter(v => v !== opt);
+                                            }
+                                            onChange({ defaultValue: newVals.join('\n') });
+                                        }}
+                                        className="h-4 w-4 rounded border-input accent-primary"
+                                    />
+                                    <span className="text-sm">{opt}</span>
+                                </div>
+                            );
+                        })}
+                        {(field.options?.length || 0) === 0 && <div className="text-xs text-muted-foreground">{t('properties.no_options')}</div>}
+                    </div>
+                 )}
                </div>
              </>
           )}

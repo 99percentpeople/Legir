@@ -39,6 +39,7 @@ export interface FormField {
     height: number;
   };
   required?: boolean;
+  isMultiSelect?: boolean;
   style?: FieldStyle;
   
   // Value & Defaults
@@ -140,6 +141,7 @@ export interface EditorState {
   tool: Tool;
   
   penStyle: PenStyle;
+  noteStyle?: { color: string };
 
   selectedFieldId: string | null;
   selectedAnnotationId: string | null;

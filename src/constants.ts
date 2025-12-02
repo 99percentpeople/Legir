@@ -25,19 +25,18 @@ export const DEFAULT_FIELD_STYLE = {
 
 export const ANNOTATION_STYLES = {
   highlight: {
-    color: '#ffeb3b', // Yellow
-    opacity: 0.4
+    color: "#ffeb3b", // Yellow
+    opacity: 0.4,
   },
   ink: {
-    color: '#ef4444', // Red
+    color: "#ef4444", // Red
     thickness: 2,
-    opacity: 1.0
+    opacity: 1.0,
   },
   note: {
-    color: '#000000',
+    color: "#facc15", // Yellow
     fontSize: 12,
-    backgroundColor: 'transparent'
-  }
+  },
 };
 
 export const FONT_FAMILY_MAP: Record<string, string> = {

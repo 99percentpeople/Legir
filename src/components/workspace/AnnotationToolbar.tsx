@@ -1,115 +1,93 @@
-
-
 import React from 'react';
+import { Edit2, Trash2, Palette } from 'lucide-react';
 import { Annotation } from '../../types';
 import { Button } from '../ui/button';
-import { AlignLeft, AlignCenter, AlignRight, Minus, Plus, Trash2 } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
-import { Separator } from '../ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { cn } from '../../lib/utils';
+
+const PEN_COLORS = [
+  // Row 1
+  "#000000", "#545454", "#737373", "#a6a6a6", "#d9d9d9", "#ffffff",
+  // Row 2
+  "#991b1b", "#ef4444", "#ea580c", "#f59e0b", "#facc15", "#ffff00",
+  // Row 3
+  "#84cc16", "#22c55e", "#10b981", "#06b6d4", "#3b82f6", "#6366f1",
+  // Row 4
+  "#8b5cf6", "#a855f7", "#d946ef", "#be185d", "#9f1239", "#881337",
+  // Row 5
+  "#ffaff3", "#ffcea0", "#fff9c4", "#bbf7d0", "#bfdbfe", "#e9d5ff"
+];
 
 interface AnnotationToolbarProps {
   annotation: Annotation;
   onUpdate: (updates: Partial<Annotation>) => void;
   onDelete: () => void;
+  onEdit: () => void;
   scale: number;
 }
 
-const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({
+export const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({
   annotation,
   onUpdate,
   onDelete,
+  onEdit,
   scale
 }) => {
-  // Only render for notes currently, but extensible
-  if (annotation.type !== 'note' || !annotation.rect) return null;
-
-  const currentSize = annotation.size || 12;
-
-  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onUpdate({ color: e.target.value });
-  };
+  // Only render for notes currently
+  if (annotation.type !== 'note') return null;
 
   return (
     <div 
-      className="absolute flex items-center gap-1 p-1 bg-white dark:bg-zinc-800 rounded-md shadow-xl border border-border z-50 transition-none"
-      style={{
-        left: annotation.rect.x * scale,
-        top: (annotation.rect.y * scale) - 46, // Position above the note
-        transition: 'none' // Explicitly disable transition for smooth dragging
-      }}
-      onMouseDown={(e) => e.stopPropagation()} // Prevent deselecting
+      className="mb-2 flex items-center gap-1 p-1 bg-background border border-border rounded-md shadow-md animate-in fade-in zoom-in-50 duration-300 pointer-events-auto origin-bottom"
+      onPointerDown={(e) => e.stopPropagation()}
     >
-      {/* Font Size */}
-      <div className="flex items-center gap-0.5">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => onUpdate({ size: Math.max(8, currentSize - 2) })}
-          title="Decrease Font Size"
-        >
-          <Minus size={14} />
-        </Button>
-        <span className="text-xs w-6 text-center tabular-nums">{currentSize}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => onUpdate({ size: Math.min(72, currentSize + 2) })}
-          title="Increase Font Size"
-        >
-          <Plus size={14} />
-        </Button>
-      </div>
-
-      <Separator orientation="vertical" className="h-4 mx-1" />
-
-      {/* Alignment */}
-      <ToggleGroup 
-        type="single" 
-        value={annotation.alignment || 'left'}
-        onValueChange={(val) => val && onUpdate({ alignment: val as 'left' | 'center' | 'right' })}
-        className="gap-0"
-      >
-        <ToggleGroupItem value="left" size="sm" className="h-7 w-7 p-0">
-          <AlignLeft size={14} />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="center" size="sm" className="h-7 w-7 p-0">
-          <AlignCenter size={14} />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="right" size="sm" className="h-7 w-7 p-0">
-          <AlignRight size={14} />
-        </ToggleGroupItem>
-      </ToggleGroup>
-
-      <Separator orientation="vertical" className="h-4 mx-1" />
-
-      {/* Color Picker */}
-      <div className="flex items-center justify-center w-7 h-7 relative">
-         <input
-            type="color"
-            value={annotation.color || '#000000'}
-            onChange={handleColorChange}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            title="Text Color"
-          />
-          <div 
-            className="w-4 h-4 rounded-full border border-gray-300 shadow-sm" 
-            style={{ backgroundColor: annotation.color || '#000000' }}
-          />
-      </div>
-
-      <Separator orientation="vertical" className="h-4 mx-1" />
-
-      {/* Delete */}
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-        onClick={onDelete}
-        title="Delete Note"
+        className="h-8 w-8"
+        onClick={onEdit}
+        title="Edit Content"
       >
-        <Trash2 size={14} />
+        <Edit2 size={16} />
+      </Button>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="Change Color"
+          >
+            <Palette size={16} style={{ color: annotation.color }} />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-4" side="top">
+            <div className="grid grid-cols-6 gap-2">
+              {PEN_COLORS.map((c) => (
+                <button
+                  key={c}
+                  className={cn(
+                    "w-6 h-6 rounded-full border border-gray-200 hover:scale-110 transition-transform",
+                    annotation.color === c && "ring-2 ring-primary ring-offset-2 scale-110"
+                  )}
+                  style={{ backgroundColor: c }}
+                  onClick={() => onUpdate({ color: c })}
+                  title={c}
+                />
+              ))}
+            </div>
+        </PopoverContent>
+      </Popover>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+        onClick={onDelete}
+        title="Delete"
+      >
+        <Trash2 size={16} />
       </Button>
     </div>
   );

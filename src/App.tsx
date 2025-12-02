@@ -49,6 +49,9 @@ const App: React.FC = () => {
       thickness: ANNOTATION_STYLES.ink.thickness,
       opacity: ANNOTATION_STYLES.ink.opacity,
     },
+    noteStyle: {
+      color: ANNOTATION_STYLES.note.color,
+    },
     isProcessing: false,
     past: [],
     future: [],
@@ -78,6 +81,7 @@ const App: React.FC = () => {
   const [isAIDetectOpen, setIsAIDetectOpen] = useState(false);
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [sidebarTab, setSidebarTab] = useState("thumbnails");
   const [hasSavedSession, setHasSavedSession] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -108,6 +112,29 @@ const App: React.FC = () => {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
+
+  const handleEditAnnotation = (id: string) => {
+    setIsSidebarOpen(true);
+    setSidebarTab("comments");
+    
+    setState((prev) => ({
+        ...prev,
+        selectedAnnotationId: id,
+        selectedFieldId: null,
+    }));
+
+    // Try to focus the textarea in the sidebar
+    setTimeout(() => {
+        // We need a way to identify the textarea in the sidebar.
+        // Let's assume we'll add an ID to the textarea in CommentsPanel
+        const el = document.getElementById(`comment-input-${id}`) as HTMLTextAreaElement;
+        if (el) {
+            el.focus();
+            const len = el.value.length;
+            el.setSelectionRange(len, len);
+        }
+    }, 100);
+  };
 
   useEffect(() => {
     if (state.pages.length > 0 && state.pdfBytes) {
@@ -329,6 +356,7 @@ const App: React.FC = () => {
 
       // Handle Arrow Keys for moving selected field
       if (
+        mode === "form" &&
         selectedFieldId &&
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
       ) {
@@ -843,6 +871,13 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleNoteStyleChange = (style: { color: string }) => {
+    setState((prev) => ({
+      ...prev,
+      noteStyle: { ...prev.noteStyle, ...style },
+    }));
+  };
+
   return (
     <div className="h-full w-full flex flex-col">
       {state.pages.length === 0 ? (
@@ -869,6 +904,7 @@ const App: React.FC = () => {
               setState((prev) => ({ ...prev, mode, tool: "select" }))
             }
             onPenStyleChange={handlePenStyleChange}
+            onNoteStyleChange={handleNoteStyleChange}
             onExport={handleExport}
             onSaveDraft={() => handleSaveDraft(false)}
             onSaveAs={handleSaveAs}
@@ -900,8 +936,10 @@ const App: React.FC = () => {
               onClose={() => setIsSidebarOpen(false)}
               pages={state.pages}
               fields={state.fields}
+              annotations={state.annotations}
               outline={state.outline}
               selectedFieldId={state.selectedFieldId}
+              selectedAnnotationId={state.selectedAnnotationId}
               onSelectField={(id) => {
                 setState((prev) => ({
                   ...prev,
@@ -927,6 +965,27 @@ const App: React.FC = () => {
                   }
                 }, 50);
               }}
+              onSelectAnnotation={(id) => {
+                setState((prev) => ({
+                  ...prev,
+                  selectedAnnotationId: id,
+                  selectedFieldId: null,
+                }));
+                if (id) {
+                  setTimeout(() => {
+                    const el = document.getElementById(`annotation-${id}`);
+                    if (el) {
+                      el.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                        inline: "center",
+                      });
+                    }
+                  }, 50);
+                }
+              }}
+              onDeleteAnnotation={handleDeleteAnnotation}
+              onUpdateAnnotation={handleUpdateAnnotation}
               onNavigatePage={(idx) => {
                 document
                   .getElementById(`page-${idx}`)
@@ -936,6 +995,8 @@ const App: React.FC = () => {
               width={sidebarWidth}
               onResize={setSidebarWidth}
               pdfDocument={state.pdfDocument}
+              activeTab={sidebarTab}
+              onTabChange={setSidebarTab}
             />
 
             <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden z-0">
@@ -960,6 +1021,7 @@ const App: React.FC = () => {
                 onUpdateField={handleUpdateField}
                 onUpdateAnnotation={handleUpdateAnnotation}
                 onDeleteAnnotation={handleDeleteAnnotation}
+                onEditAnnotation={handleEditAnnotation}
                 onScaleChange={updateScale}
                 onTriggerHistorySave={saveCheckpoint}
                 onPageIndexChange={setCurrentPageIndex}
