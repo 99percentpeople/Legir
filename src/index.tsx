@@ -8,12 +8,9 @@ import { Toaster } from "./components/ui/sonner";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 import * as pdfjsLib from "pdfjs-dist";
 
-// Handle potential default export wrapper from CDN
-const pdfJs = (pdfjsLib as any).default || pdfjsLib;
-
 // Set up the PDF.js worker source to a CDN to ensure it works in the browser environment
-if (pdfJs.GlobalWorkerOptions) {
-  pdfJs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+if (pdfjsLib.GlobalWorkerOptions) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
 
 const rootElement = document.getElementById("root");

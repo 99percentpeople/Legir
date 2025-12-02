@@ -13,8 +13,6 @@ import {
   PDFSignature,
   PDFDict,
   PDFArray,
-  RotationTypes,
-  grayscale,
   PDFNumber,
 } from "pdf-lib";
 import {
@@ -26,7 +24,7 @@ import {
   PDFOutlineItem,
   Annotation,
 } from "../types";
-import { DEFAULT_FIELD_STYLE } from "../constants";;
+import { DEFAULT_FIELD_STYLE } from "../constants";
 
 // Helper to convert Hex to PDF RGB
 const hexToPdfColor = (hex: string | undefined) => {
@@ -335,7 +333,10 @@ export const loadPDF = async (
 
   // 2. Load with pdf.js for rendering and basic annotation extraction
   const renderBuffer = new Uint8Array(pdfBytes.slice(0));
-  const loadingTask = pdfjsLib.getDocument({ data: renderBuffer, password: "" });
+  const loadingTask = pdfjsLib.getDocument({
+    data: renderBuffer,
+    password: "",
+  });
   const pdf = await loadingTask.promise;
   const numPages = pdf.numPages;
   const pages: PageData[] = [];

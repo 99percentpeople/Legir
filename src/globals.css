@@ -137,3 +137,50 @@
     @apply flex flex-col;
   }
 }
+
+/* PDF Text Layer */
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  line-height: 1.0;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 20; /* Above canvas (z-10) */
+}
+
+.textLayer span,
+.textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+/* Hide br tags to prevent them from being copied or affecting selection flow */
+.textLayer br[role="presentation"] {
+    display: none;
+}
+
+.textLayer ::selection {
+  background: rgba(59, 130, 246, 0.3); /* blue-500 with opacity */
+  color: transparent;
+}
+
+/* Fix for PDF.js text layer structure wrappers */
+.textLayer .markedContent {
+  display: contents;
+}
+
+/* Ensure text layer captures clicks correctly but doesn't select all on empty click */
+.textLayer {
+  /* Ensure touches pass through if not hitting text, but we want to allow drag selection */
+  /* The issue of selecting all text below often happens when a wrapper (markedContent) is 0x0 but contains text.
+     display: contents fixes the wrapper issue. */
+}

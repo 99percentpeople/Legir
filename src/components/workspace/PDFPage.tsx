@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/utils';
 import * as pdfjsLib from 'pdfjs-dist';
-
-// Handle potential default export wrapper from CDN
-const pdfJs = (pdfjsLib as any).default || pdfjsLib;
+import * as pdfjsViewer from 'pdfjs-dist/web/pdf_viewer.mjs';
 
 interface PDFPageProps {
   pageIndex: number;
@@ -27,6 +25,10 @@ const PDFPage: React.FC<PDFPageProps> = ({ pageIndex, pdfDocument, scale, width,
   
   const renderTaskRef = useRef<any>(null);
   const renderedScaleRef = useRef<number | null>(null);
+  
+  const textLayerRef = useRef<HTMLDivElement>(null);
+  const textRenderTaskRef = useRef<any>(null);
+  const [textLayerRenderedScale, setTextLayerRenderedScale] = useState<number | null>(null);
 
   // Intersection Observer
   useEffect(() => {
@@ -96,7 +98,7 @@ const PDFPage: React.FC<PDFPageProps> = ({ pageIndex, pdfDocument, scale, width,
             const renderContext = {
                 canvasContext: ctx,
                 viewport: viewport,
-                annotationMode: pdfJs.AnnotationMode.DISABLE
+                annotationMode: pdfjsLib.AnnotationMode.DISABLE
             };
 
             const renderTask = page.render(renderContext);
@@ -132,6 +134,77 @@ const PDFPage: React.FC<PDFPageProps> = ({ pageIndex, pdfDocument, scale, width,
     };
     // Re-run if visibility changes or scale/doc changes
   }, [isInView, pdfDocument, pageIndex, scale]); 
+
+  // --- Text Layer Rendering ---
+  useEffect(() => {
+    if (!pdfDocument || !isInView || !textLayerRef.current) return;
+
+    // Optimization: If already rendered at ANY scale, do NOT re-render.
+    // We rely purely on CSS scaling (transform: scale(...)) for zoom updates.
+    if (textLayerRenderedScale !== null) {
+        return;
+    }
+
+    let isCancelled = false;
+    
+    const renderText = async () => {
+      try {
+        if (textRenderTaskRef.current) {
+           // If there's a running task (unlikely given the check above, but for safety)
+           if (textRenderTaskRef.current.cancel) {
+             textRenderTaskRef.current.cancel();
+           }
+           textRenderTaskRef.current = null;
+        }
+
+        // Render at the CURRENT scale (whatever it is when first loaded)
+        const initialScale = scale;
+        const page = await pdfDocument.getPage(pageIndex + 1);
+        if (isCancelled) return;
+
+        const viewport = page.getViewport({ scale: initialScale });
+        
+        if (textLayerRef.current) {
+             textLayerRef.current.style.width = `${Math.floor(viewport.width)}px`;
+             textLayerRef.current.style.height = `${Math.floor(viewport.height)}px`;
+             textLayerRef.current.style.setProperty('--total-scale-factor', `${initialScale}`);
+        }
+        
+        if (pdfjsViewer.TextLayerBuilder) {
+             const textLayerBuilder = new pdfjsViewer.TextLayerBuilder({
+                pdfPage: page,
+            });
+            
+            await textLayerBuilder.render({
+                viewport: viewport
+            });
+            
+            if (isCancelled) return;
+
+            if (textLayerRef.current) {
+                textLayerRef.current.innerHTML = ''; 
+                textLayerRef.current.appendChild(textLayerBuilder.div);
+            }
+            
+            textRenderTaskRef.current = textLayerBuilder;
+            setTextLayerRenderedScale(initialScale);
+        }
+      } catch (error: any) {
+         if (error?.name !== 'RenderingCancelledException') {
+             console.error("Text Layer Render error:", error);
+         }
+      }
+    };
+
+    renderText();
+    
+    return () => {
+      isCancelled = true;
+      if (textRenderTaskRef.current && textRenderTaskRef.current.cancel) {
+          textRenderTaskRef.current.cancel();
+      }
+    };
+  }, [pdfDocument, pageIndex, scale, isInView]);
 
   return (
     <div 
@@ -174,6 +247,16 @@ const PDFPage: React.FC<PDFPageProps> = ({ pageIndex, pdfDocument, scale, width,
                 "absolute inset-0 w-full h-full block",
                 activeCanvas === 'B' ? "opacity-100 z-10" : "opacity-0 z-0"
             )}
+        />
+
+        {/* Text Layer */}
+        <div 
+            ref={textLayerRef} 
+            className="textLayer"
+            style={{
+                transform: textLayerRenderedScale ? `scale(${scale / textLayerRenderedScale})` : 'none',
+                transformOrigin: '0 0'
+            }}
         />
     </div>
   );

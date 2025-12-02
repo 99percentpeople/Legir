@@ -1113,7 +1113,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             
             {/* DOM Layer for Highlights, Notes, Form Fields */}
             <div 
-              className="absolute inset-0"
+              className={cn("absolute inset-0", editorState.tool === 'select' ? "pointer-events-none" : "")}
               style={{ cursor: getCursor() }}
               onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
             >
@@ -1127,7 +1127,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                         const renderBox = (r: {x: number, y: number, width: number, height: number}, keySuffix: string = '') => (
                              <div
                                 key={annot.id + keySuffix}
-                                className={cn("absolute transition-colors")}
+                                className={cn("absolute transition-colors pointer-events-auto")}
                                 style={{
                                     left: r.x * editorState.scale,
                                     top: r.y * editorState.scale,
@@ -1164,7 +1164,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                     />
                                 )}
                                 <div
-                                    className={cn("absolute p-1 group", isSelected ? "z-50" : "")}
+                                    className={cn("absolute p-1 group pointer-events-auto", isSelected ? "z-50" : "")}
                                     style={{
                                         left: annot.rect.x * editorState.scale,
                                         top: annot.rect.y * editorState.scale,

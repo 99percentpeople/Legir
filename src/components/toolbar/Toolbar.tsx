@@ -101,7 +101,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const hasFileSystemAccess = "showSaveFilePicker" in window;
 
   return (
-    <div className="h-16 bg-background border-b border-border flex items-center justify-between px-4 relative text-foreground z-50">
+    <div className="h-12 bg-background border-b border-border flex items-center justify-between px-4 relative text-foreground z-50">
       {/* Left Section: Mode Selection & History */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">

@@ -15,12 +15,10 @@ import { Button } from "./components/ui/button";
 import {
   EditorState,
   FormField,
-  PDFMetadata,
   HistorySnapshot,
   PageData,
-  SnappingOptions,
-  Annotation,
   FieldType,
+  Annotation,
 } from "./types";
 import { loadPDF, exportPDF, renderPageToDataURL } from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
