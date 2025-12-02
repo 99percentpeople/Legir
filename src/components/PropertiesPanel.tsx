@@ -423,7 +423,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                            value={field.value || ''}
                            onFocus={onTriggerHistorySave}
                            onChange={(e) => onChange({ value: e.target.value })}
-                           className="resize-y min-h-[4rem]"
+                           className="resize-y min-h-16"
                        />
                    ) : (
                        <Input
@@ -441,7 +441,7 @@ const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                            value={field.defaultValue || ''}
                            onFocus={onTriggerHistorySave}
                            onChange={(e) => onChange({ defaultValue: e.target.value })}
-                           className="resize-y min-h-[4rem]"
+                           className="resize-y min-h-16"
                        />
                    ) : (
                        <Input

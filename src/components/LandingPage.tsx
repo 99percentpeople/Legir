@@ -2,7 +2,7 @@
 import React from 'react';
 import { Sparkles, FileText, Shield, FileType, Globe, Check, History } from 'lucide-react';
 import { Button } from './ui/button';
-import { ModeToggle } from './mode-toggle';
+import { ModeToggle } from './toolbar/mode-toggle';
 import PDFUploader from './PDFUploader';
 import { useLanguage } from './language-provider';
 import {
@@ -61,7 +61,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onUpload, hasSavedSession, on
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 pt-24 gap-12">
          <div className="text-center space-y-4 max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <h1 className="text-4xl font-extrabold tracking-tight lg:text-6xl bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent pb-2">
+            <h1 className="text-4xl font-extrabold tracking-tight lg:text-6xl bg-linear-to-r from-primary to-blue-600 bg-clip-text text-transparent pb-2">
                {t('landing.title')}
             </h1>
             <p className="text-xl text-muted-foreground">

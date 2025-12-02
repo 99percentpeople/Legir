@@ -25,26 +25,26 @@ import {
   Edit3,
   Eraser,
 } from "lucide-react";
-import { EditorState, Tool, PenStyle } from "../types";
-import { Button } from "./ui/button";
-import { Separator } from "./ui/separator";
-import { cn } from "../lib/utils";
+import { EditorState, Tool, PenStyle } from "../../types";
+import { Button } from "../ui/button";
+import { Separator } from "../ui/separator";
+import { cn } from "../../lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+} from "../ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { ModeToggle } from "./mode-toggle";
-import { useLanguage } from "./language-provider";
+import { useLanguage } from "../language-provider";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "../ui/select";
 import { GEMINI_API_AVAILABLE } from "@/services/geminiService";
 import { InkPropertiesPopover } from "./InkPropertiesPopover";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
@@ -125,7 +125,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <SelectTrigger className="h-9 ml-2">
               <SelectValue placeholder="Mode" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent align="start">
               <SelectItem value="annotation">
                 <div className="flex items-center gap-2">
                   <PenTool size={14} />

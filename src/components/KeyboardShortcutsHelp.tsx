@@ -18,25 +18,46 @@ interface KeyboardShortcutsHelpProps {
 
 const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ isOpen, onClose }) => {
   const { t } = useLanguage();
-  const shortcuts = [
-    { key: t('shortcuts.shift_drag_create'), action: t('shortcuts.draw_square') },
-    { key: t('shortcuts.ctrl_create'), action: t('shortcuts.continuous_mode') },
-    { key: t('shortcuts.shift_drag_move'), action: t('shortcuts.lock_axis') },
-    { key: t('shortcuts.ctrl_drag'), action: t('shortcuts.duplicate') },
-    { key: t('shortcuts.shift_resize'), action: t('shortcuts.maintain_aspect') },
-    { key: t('shortcuts.alt_drag'), action: t('shortcuts.disable_snapping') },
-    { key: t('shortcuts.arrow_keys'), action: t('shortcuts.move_1px') },
-    { key: t('shortcuts.shift_arrow'), action: t('shortcuts.move_10px') },
-    { key: 'Ctrl + Z', action: t('toolbar.undo') },
-    { key: 'Ctrl + Shift + Z', action: t('toolbar.redo') },
-    { key: 'Ctrl + C', action: t('shortcuts.copy') },
-    { key: 'Ctrl + V', action: t('shortcuts.paste') },
-    { key: 'Ctrl + X', action: t('shortcuts.cut') },
-    { key: 'Delete / Backspace', action: t('shortcuts.delete') },
-    { key: 'Escape', action: t('shortcuts.deselect') },
-    { key: 'Ctrl + S', action: t('shortcuts.export') },
-    { key: 'Ctrl + Scroll', action: t('shortcuts.zoom') },
-    { key: 'Shift + ?', action: t('shortcuts.help') },
+  
+  const categories = [
+    {
+      title: t('shortcuts.category.general'),
+      items: [
+        { key: 'Ctrl + Z', action: t('toolbar.undo') },
+        { key: 'Ctrl + Y', action: t('toolbar.redo') },
+        { key: 'Ctrl + S', action: t('shortcuts.export') },
+        { key: 'Ctrl + Scroll', action: t('shortcuts.zoom') },
+        { key: 'Shift + ?', action: t('shortcuts.help') },
+        { key: 'Escape', action: t('shortcuts.deselect') },
+      ]
+    },
+    {
+      title: t('shortcuts.category.editing'),
+      items: [
+        { key: 'Ctrl + C', action: t('shortcuts.copy') },
+        { key: 'Ctrl + V', action: t('shortcuts.paste') },
+        { key: 'Ctrl + X', action: t('shortcuts.cut') },
+        { key: 'Delete / Backspace', action: t('shortcuts.delete') },
+        { key: t('shortcuts.ctrl_drag'), action: t('shortcuts.duplicate') },
+      ]
+    },
+    {
+      title: t('shortcuts.category.movement'),
+      items: [
+        { key: t('shortcuts.arrow_keys'), action: t('shortcuts.move_1px') },
+        { key: t('shortcuts.shift_arrow'), action: t('shortcuts.move_10px') },
+        { key: t('shortcuts.shift_drag_move'), action: t('shortcuts.lock_axis') },
+        { key: t('shortcuts.shift_resize'), action: t('shortcuts.maintain_aspect') },
+        { key: t('shortcuts.alt_drag'), action: t('shortcuts.disable_snapping') },
+      ]
+    },
+    {
+      title: t('shortcuts.category.creation'),
+      items: [
+        { key: t('shortcuts.shift_drag_create'), action: t('shortcuts.draw_square') },
+        { key: t('shortcuts.ctrl_create'), action: t('shortcuts.continuous_mode') },
+      ]
+    }
   ];
 
   return (
@@ -52,29 +73,32 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ isOpen, o
           </DialogDescription>
         </DialogHeader>
         
-        <div className="max-h-[60vh] overflow-y-auto pr-1">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
-              <tr>
-                <th className="px-4 py-2 font-medium rounded-tl-md">{t('shortcuts.header.key')}</th>
-                <th className="px-4 py-2 font-medium rounded-tr-md">{t('shortcuts.header.action')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shortcuts.map((s, i) => (
-                <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <Badge variant="secondary" className="font-mono text-xs whitespace-nowrap">
-                        {s.key}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-foreground">
-                    {s.action}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-6">
+          {categories.map((category, idx) => (
+            <div key={idx}>
+              <h3 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {category.title}
+              </h3>
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-sm text-left">
+                  <tbody className="divide-y divide-border">
+                    {category.items.map((s, i) => (
+                      <tr key={i} className="bg-background hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-2 w-[45%]">
+                          <Badge variant="secondary" className="font-mono text-xs whitespace-nowrap">
+                              {s.key}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-2 text-foreground">
+                          {s.action}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       </DialogContent>
     </Dialog>

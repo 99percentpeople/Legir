@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
-import Toolbar from "./components/Toolbar";
-import Workspace from "./components/Workspace";
+import Toolbar from "./components/toolbar/Toolbar";
+import Workspace from "./components/workspace/Workspace";
 import { PropertiesPanel } from "./components/PropertiesPanel";
 import LandingPage from "./components/LandingPage";
-import ZoomControls from "./components/ZoomControls";
+import ZoomControls from "./components/workspace/ZoomControls";
 import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import SettingsDialog from "./components/SettingsDialog";
 import AIDetectionDialog, {
   AIDetectionOptions,
 } from "./components/AIDetectionDialog";
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./components/sidebar/Sidebar";
 import { Dialog, DialogContent, DialogTitle, DialogFooter, DialogDescription } from "./components/ui/dialog";
 import { Button } from "./components/ui/button";
 import {
@@ -351,8 +351,19 @@ const App: React.FC = () => {
         return;
       }
 
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        dispatch("REDO");
+        return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         dispatch("SAVE");
+        return;
+      }
+
+      // Help Dialog
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        setIsShortcutsHelpOpen(true);
         return;
       }
     };

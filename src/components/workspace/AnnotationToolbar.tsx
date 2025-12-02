@@ -1,12 +1,12 @@
 
 
 import React from 'react';
-import { Annotation } from '../types';
-import { Button } from './ui/button';
+import { Annotation } from '../../types';
+import { Button } from '../ui/button';
 import { AlignLeft, AlignCenter, AlignRight, Minus, Plus, Trash2 } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
-import { Separator } from './ui/separator';
-import { cn } from '../lib/utils';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
+import { Separator } from '../ui/separator';
+import { cn } from '../../lib/utils';
 
 interface AnnotationToolbarProps {
   annotation: Annotation;

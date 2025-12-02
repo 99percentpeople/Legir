@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { useLanguage } from './language-provider';
+import { cn } from '../../lib/utils';
+import { useLanguage } from '../language-provider';
 import dayjs from 'dayjs';
 
 interface SaveStatusIndicatorProps {

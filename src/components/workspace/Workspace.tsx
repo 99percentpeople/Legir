@@ -1,11 +1,11 @@
 import React, { useRef, useState, useLayoutEffect, useEffect } from 'react';
-import { EditorState, FormField, FieldType, Annotation } from '../types';
-import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES, FONT_FAMILY_MAP, ZOOM_BASE } from '../constants';
+import { EditorState, FormField, FieldType, Annotation } from '../../types';
+import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES, FONT_FAMILY_MAP, ZOOM_BASE } from '../../constants';
 import { Check, ChevronDown, CircleDot, PenLine, StickyNote, Trash2, Eraser, Image as ImageIcon } from 'lucide-react';
-import { cn, setGlobalCursor, resetGlobalCursor } from '../lib/utils';
-import { useLanguage } from './language-provider';
-import AnnotationToolbar from './workspace/AnnotationToolbar';
-import PDFPage from './workspace/PDFPage';
+import { cn, setGlobalCursor, resetGlobalCursor } from '../../lib/utils';
+import { useLanguage } from '../language-provider';
+import AnnotationToolbar from './AnnotationToolbar';
+import PDFPage from './PDFPage';
 
 interface WorkspaceProps {
   editorState: EditorState;
@@ -320,7 +320,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       // Only run in form mode
       if (editorState.mode !== 'form') return { x: rect.x, y: rect.y, guides: [] };
       
-      const { snapToBorders, snapToCenter } = editorState.snappingOptions;
+      const { snapToBorders, snapToCenter, snapToEqualDistances } = editorState.snappingOptions;
       const guides: SnapLine[] = [];
       let { x, y } = rect;
       const otherFields = editorState.fields.filter(f => f.pageIndex === pageIndex && f.id !== excludeId);
@@ -345,6 +345,32 @@ const Workspace: React.FC<WorkspaceProps> = ({
               checkSnap(theirCenter - myCenter, theirCenter - rect.width / 2, theirCenter);
           }
       });
+
+      // Equal Distances (Horizontal)
+      if (snapToEqualDistances) {
+        const sameRow = otherFields.filter(f => 
+             Math.max(rect.y, f.rect.y) < Math.min(rect.y + rect.height, f.rect.y + f.rect.height)
+        ).sort((a, b) => a.rect.x - b.rect.x);
+
+        for (let i = 0; i < sameRow.length - 1; i++) {
+           const A = sameRow[i].rect;
+           const B = sameRow[i+1].rect;
+           const gap = B.x - (A.x + A.width);
+           
+           // 1. Snap to Right: A ... B ... [Me]
+           const targetRight = B.x + B.width + gap;
+           checkSnap(targetRight - x, targetRight, targetRight);
+
+           // 2. Snap to Left: [Me] ... A ... B
+           const targetLeft = A.x - gap - rect.width;
+           checkSnap(targetLeft - x, targetLeft, targetLeft);
+
+           // 3. Snap Between: A ... [Me] ... B
+           const targetMid = (A.x + A.width + B.x - rect.width) / 2;
+           checkSnap(targetMid - x, targetMid, targetMid);
+        }
+      }
+
       if (snapX !== null && guideX !== null) { x = snapX; guides.push({ type: 'vertical', pos: guideX as number, start: 0, end: 2000 }); }
 
       let bestDy = Infinity; let snapY = null; let guideY = null;
@@ -366,6 +392,38 @@ const Workspace: React.FC<WorkspaceProps> = ({
             checkSnapY(theirCenter - myCenter, theirCenter - rect.height / 2, theirCenter);
           }
       });
+
+      // Equal Distances (Vertical)
+      if (snapToEqualDistances) {
+        const sameCol = otherFields.filter(f => 
+             Math.max(rect.x, f.rect.x) < Math.min(rect.x + rect.width, f.rect.x + f.rect.width)
+        ).sort((a, b) => a.rect.y - b.rect.y);
+
+        for (let i = 0; i < sameCol.length - 1; i++) {
+           const A = sameCol[i].rect;
+           const B = sameCol[i+1].rect;
+           const gap = B.y - (A.y + A.height);
+           
+           // 1. Snap to Bottom: A
+           //                    B
+           //                   [Me]
+           const targetBottom = B.y + B.height + gap;
+           checkSnapY(targetBottom - y, targetBottom, targetBottom);
+
+           // 2. Snap to Top:   [Me]
+           //                    A
+           //                    B
+           const targetTop = A.y - gap - rect.height;
+           checkSnapY(targetTop - y, targetTop, targetTop);
+
+           // 3. Snap Between:   A
+           //                   [Me]
+           //                    B
+           const targetMid = (A.y + A.height + B.y - rect.height) / 2;
+           checkSnapY(targetMid - y, targetMid, targetMid);
+        }
+      }
+
       if (snapY !== null && guideY !== null) { y = snapY; guides.push({ type: 'horizontal', pos: guideY as number, start: 0, end: 2000 }); }
       
       return { x, y, guides };

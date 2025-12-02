@@ -1,10 +1,10 @@
 import React from "react";
-import { cn } from "../lib/utils";
-import { Slider } from "./ui/slider";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Button } from "./ui/button";
+import { cn } from "../../lib/utils";
+import { Slider } from "../ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Button } from "../ui/button";
 import { ChevronDown } from "lucide-react";
-import { PenStyle } from "../types";
+import { PenStyle } from "../../types";
 
 const PEN_COLORS = [
   // Row 1

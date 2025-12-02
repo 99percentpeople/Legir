@@ -1,12 +1,12 @@
 
 import React, { useCallback } from 'react';
 import { X, Layers, List, LayoutGrid } from 'lucide-react';
-import { FormField, PageData, PDFOutlineItem } from '../types';
-import FieldTreePanel from './sidebar/FieldTreePanel';
-import { ThumbnailsPanel, DocumentOutlinePanel } from './sidebar/OutlinePanel';
-import { Button } from './ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { useLanguage } from './language-provider';
+import { FormField, PageData, PDFOutlineItem } from '../../types';
+import FieldTreePanel from './FieldTreePanel';
+import { ThumbnailsPanel, DocumentOutlinePanel } from './OutlinePanel';
+import { Button } from '../ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { useLanguage } from '../language-provider';
 
 interface SidebarProps {
   isOpen: boolean;

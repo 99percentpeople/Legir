@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PDFOutlineItem, PageData } from '../types';
-import { ChevronRight, ChevronDown, Book, File, Search, Image as ImageIcon, List, Grid } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { cn } from '../lib/utils';
-import { useLanguage } from './language-provider';
-import { renderPageToDataURL } from '../services/pdfService';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { PDFOutlineItem, PageData } from '../../types';
+import { ChevronRight, ChevronDown, Book, File, Search, Image as ImageIcon } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { cn } from '../../lib/utils';
+import { useLanguage } from '../language-provider';
+import { renderPageToDataURL } from '../../services/pdfService';
 
 // --- Thumbnail Item ---
 interface ThumbnailItemProps {
@@ -168,9 +167,9 @@ const OutlineItem: React.FC<OutlineItemProps> = ({ item, onNavigate, depth = 0, 
         </span>
         
         {item.pageIndex !== undefined ? (
-            <File size={14} className={cn("mr-2 flex-shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
+            <File size={14} className={cn("mr-2 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
         ) : (
-            <Book size={14} className="mr-2 text-muted-foreground flex-shrink-0" />
+            <Book size={14} className="mr-2 text-muted-foreground shrink-0" />
         )}
         
         <span className={cn("truncate", item.pageIndex !== undefined ? 'underline decoration-dotted underline-offset-4' : '')}>
@@ -216,15 +215,49 @@ const filterOutline = (items: PDFOutlineItem[], query: string): PDFOutlineItem[]
   }, []);
 };
 
-interface OutlinePanelProps {
-  outline: PDFOutlineItem[];
+
+interface ThumbnailsPanelProps {
   pages?: PageData[];
   pdfDocument?: any;
   onNavigate: (pageIndex: number) => void;
   currentPageIndex?: number;
 }
 
-const OutlinePanel: React.FC<OutlinePanelProps> = ({ outline, pages, pdfDocument, onNavigate, currentPageIndex }) => {
+export const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({ pages, pdfDocument, onNavigate, currentPageIndex }) => {
+  const { t } = useLanguage();
+  
+  return (
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-2 pb-10">
+          <div className="grid grid-cols-1 gap-4">
+              {pages?.map((page, idx) => (
+                  <ThumbnailItem 
+                    key={idx} 
+                    page={page} 
+                    pageIndex={idx} 
+                    pdfDocument={pdfDocument} 
+                    onNavigate={onNavigate} 
+                    isActive={idx === currentPageIndex}
+                  />
+              ))}
+              {(!pages || pages.length === 0) && (
+                  <div className="p-6 text-center text-muted-foreground text-sm italic">
+                      {t('sidebar.no_pages')}
+                  </div>
+              )}
+          </div>
+      </div>
+    </div>
+  );
+};
+
+interface DocumentOutlinePanelProps {
+  outline: PDFOutlineItem[];
+  onNavigate: (pageIndex: number) => void;
+  currentPageIndex?: number;
+}
+
+export const DocumentOutlinePanel: React.FC<DocumentOutlinePanelProps> = ({ outline, onNavigate, currentPageIndex }) => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -241,9 +274,6 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({ outline, pages, pdfDocument
           for (const item of items) {
               if (item.pageIndex !== undefined && item.pageIndex <= currentPageIndex) {
                   // We want the item closest to the current page (but not after it)
-                  // Since outline is usually ordered, we can just keep updating if <= current
-                  // However, if outline is hierarchical, we need to be careful.
-                  // Usually depth-first traversal works if we assume order.
                   if (!bestMatch || (item.pageIndex > (bestMatch.pageIndex || -1))) {
                       bestMatch = item;
                   }
@@ -256,81 +286,37 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({ outline, pages, pdfDocument
   }, [outline, currentPageIndex]);
 
   return (
-    <Tabs className="flex flex-col h-full" defaultValue="outline">
-       <div className="flex justify-start px-2 pt-1">
-         <TabsList className="bg-transparent p-0 shrink-0 inline-flex">
-           <TabsTrigger 
-             className="data-[state=active]:bg-muted data-[state=active]:shadow-none text-xs h-8 px-2" 
-             value="outline"
-             title={t('sidebar.outline')}
-           > 
-             <List size={16} />
-           </TabsTrigger> 
-           <TabsTrigger 
-             className="data-[state=active]:bg-muted data-[state=active]:shadow-none text-xs h-8 px-2" 
-             value="thumbnails" 
-             title={t('sidebar.thumbnails')}
-           > 
-             <Grid size={16} />
-           </TabsTrigger> 
-         </TabsList>
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
+       <div className="p-2 border-b border-border bg-muted/30 shrink-0">
+          <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
+              <Input 
+                  placeholder={t('sidebar.search_outline')}
+                  className="h-8 pl-8 text-xs w-full bg-background"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+              />
+           </div>
        </div>
-
-       <TabsContent value="outline" className="flex-1 flex flex-col h-full overflow-hidden mt-0 data-[state=inactive]:hidden">
-             <div className="p-2 border-b shrink-0">
-                <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground h-3 w-3" />
-                    <Input 
-                        placeholder={t('sidebar.search_outline')}
-                        className="h-8 pl-7 text-xs"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                 </div>
+       <div className="flex-1 overflow-y-auto p-2 pb-10">
+          {filteredOutline.length > 0 ? (
+             filteredOutline.map((item, idx) => (
+               <OutlineItem 
+                  key={idx} 
+                  item={item} 
+                  onNavigate={onNavigate} 
+                  searchQuery={searchQuery} 
+                  isActive={item === activeOutlineItem}
+                  activeOutlineItem={activeOutlineItem}
+              />
+             ))
+          ) : (
+             <div className="p-6 text-center text-muted-foreground text-sm italic">
+                {searchQuery ? t('sidebar.no_results') : t('sidebar.no_outline')}
              </div>
-             <div className="flex-1 overflow-y-auto p-2 pb-10">
-                {filteredOutline.length > 0 ? (
-                   filteredOutline.map((item, idx) => (
-                     <OutlineItem 
-                        key={idx} 
-                        item={item} 
-                        onNavigate={onNavigate} 
-                        searchQuery={searchQuery} 
-                        isActive={item === activeOutlineItem}
-                        activeOutlineItem={activeOutlineItem}
-                    />
-                   ))
-                ) : (
-                   <div className="p-6 text-center text-muted-foreground text-sm italic">
-                      {searchQuery ? t('sidebar.no_results') : t('sidebar.no_outline')}
-                   </div>
-                )}
-             </div>
-       </TabsContent>
-
-       <TabsContent value="thumbnails" className="flex-1 flex flex-col h-full overflow-hidden mt-0 data-[state=inactive]:hidden">
-            <div className="flex-1 overflow-y-auto p-2 pb-10">
-                <div className="grid grid-cols-1 gap-4">
-                   {pages?.map((page, idx) => (
-                       <ThumbnailItem 
-                          key={idx} 
-                          page={page} 
-                          pageIndex={idx} 
-                          pdfDocument={pdfDocument} 
-                          onNavigate={onNavigate} 
-                          isActive={idx === currentPageIndex}
-                        />
-                   ))}
-                   {(!pages || pages.length === 0) && (
-                       <div className="p-6 text-center text-muted-foreground text-sm italic">
-                           {t('sidebar.no_pages')}
-                       </div>
-                   )}
-                </div>
-            </div>
-       </TabsContent>
-    </Tabs>
+          )}
+       </div>
+    </div>
   );
 };
 
-export default OutlinePanel;

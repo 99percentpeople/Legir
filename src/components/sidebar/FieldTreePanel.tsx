@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import { FormField, FieldType, PageData } from '../types';
+import { FormField, FieldType, PageData } from '../../types';
 import { ChevronRight, ChevronDown, Type, CheckSquare, FileText, Search, List, CircleDot, PenLine } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { cn } from '../lib/utils';
-import { useLanguage } from './language-provider';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
+import { cn } from '../../lib/utils';
+import { useLanguage } from '../language-provider';
 
 interface FieldTreePanelProps {
   pages: PageData[];

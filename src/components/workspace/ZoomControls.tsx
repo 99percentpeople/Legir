@@ -1,7 +1,7 @@
 import React from 'react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
-import { Button } from './ui/button';
-import { Separator } from './ui/separator';
+import { Button } from '../ui/button';
+import { Separator } from '../ui/separator';
 
 interface ZoomControlsProps {
   scale: number;
@@ -26,7 +26,7 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({ scale, onZoomIn, onZoomOut,
       </Button>
       
       <div 
-        className="px-2 min-w-[3rem] text-center text-sm font-medium text-foreground cursor-pointer hover:text-primary"
+        className="px-2 min-w-12 text-center text-sm font-medium text-foreground cursor-pointer hover:text-primary"
         onClick={onReset}
         title="Reset to 100%"
       >
