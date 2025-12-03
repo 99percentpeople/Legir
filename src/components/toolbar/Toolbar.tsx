@@ -104,7 +104,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const hasFileSystemAccess = "showSaveFilePicker" in window;
 
   return (
-    <div className="h-12 bg-background border-b border-border flex items-center justify-between px-4 relative text-foreground z-50">
+    <div className="bg-background border-border text-foreground relative z-50 flex h-12 items-center justify-between border-b px-4">
       {/* Left Section: Mode Selection & History */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">
@@ -113,7 +113,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             size="icon"
             onClick={onToggleFieldList}
             className={cn(
-              isFieldListOpen && "bg-accent text-accent-foreground"
+              isFieldListOpen && "bg-accent text-accent-foreground",
             )}
             title={t("toolbar.toggle_sidebar")}
           >
@@ -125,7 +125,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             value={mode}
             onValueChange={(val) => onModeChange(val as any)}
           >
-            <SelectTrigger className="h-9 ml-2">
+            <SelectTrigger className="ml-2 h-9">
               <SelectValue placeholder="Mode" />
             </SelectTrigger>
             <SelectContent align="start">
@@ -170,7 +170,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       {/* Center Section: Tools based on Mode */}
-      <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transform">
         {mode === "form" ? (
           <ToggleGroup
             type="single"
@@ -178,13 +178,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
             onValueChange={(value) => {
               if (value) onToolChange(value as Tool);
             }}
-            className="flex items-center p-1 gap-1 bg-muted/20 rounded-lg border border-border shadow-sm"
+            className="bg-muted/20 border-border flex items-center gap-1 rounded-lg border p-1 shadow-sm"
             spacing={1}
           >
             <ToggleGroupItem value="select" title={t("toolbar.select")}>
               <MousePointer2 size={18} />
             </ToggleGroupItem>
-            <Separator orientation="vertical" className="h-5 mx-1" />
+            <Separator orientation="vertical" className="mx-1 h-5" />
             <ToggleGroupItem value="draw_text" title={t("toolbar.text")}>
               <Type size={18} />
             </ToggleGroupItem>
@@ -217,7 +217,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             onValueChange={(value) => {
               if (value) onToolChange(value as Tool);
             }}
-            className="flex items-center p-1 gap-1 bg-muted/20 rounded-lg border border-border shadow-sm"
+            className="bg-muted/20 border-border flex items-center gap-1 rounded-lg border p-1 shadow-sm"
             spacing={1}
           >
             <ToggleGroupItem value="select" title={t("toolbar.select")}>
@@ -226,7 +226,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <ToggleGroupItem value="eraser" title={t("toolbar.eraser")}>
               <Eraser size={18} />
             </ToggleGroupItem>
-            <Separator orientation="vertical" className="h-5 mx-1" />
+            <Separator orientation="vertical" className="mx-1 h-5" />
             <ToggleGroupItem
               value="draw_highlight"
               title={t("toolbar.highlight")}
@@ -237,7 +237,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <ToggleGroupItem
                 value="draw_ink"
                 title={t("toolbar.ink")}
-                className="rounded-r-none pr-1.5 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
+                className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
               >
                 <PenTool
                   size={18}
@@ -259,7 +259,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <ToggleGroupItem
                 value="draw_comment"
                 title={t("toolbar.comment")}
-                className="rounded-r-none pr-1.5 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
+                className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
               >
                 <MessageSquarePlus
                   size={18}
@@ -293,7 +293,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         />
 
         {/* Utilities Group */}
-        <div className="flex items-center gap-1 mr-2">
+        <div className="mr-2 flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
@@ -316,11 +316,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </div>
 
         {editorState.pages.length > 0 && mode === "form" && (
-          <div className="flex shadow-sm rounded-md isolate mr-2">
+          <div className="isolate mr-2 flex rounded-md shadow-sm">
             <Button
               onClick={onAutoDetect}
               disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
-              className="rounded-r-none text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800 dark:hover:bg-purple-900/50"
+              className="rounded-r-none border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
               title={t("toolbar.ai_detect")}
             >
               <Sparkles size={16} />
@@ -330,7 +330,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <DropdownMenuTrigger asChild>
                 <Button
                   disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
-                  className="rounded-l-none -ml-px px-2 border-l border-l-purple-200 dark:border-l-purple-800 text-purple-700 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
+                  className="-ml-px rounded-l-none border-l border-l-purple-200 bg-purple-50 px-2 text-purple-700 hover:bg-purple-100 dark:border-l-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
                 >
                   <ChevronDown size={16} />
                 </Button>
@@ -346,7 +346,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* Export Dropdown */}
-        <div className="flex shadow-sm rounded-md isolate">
+        <div className="isolate flex rounded-md shadow-sm">
           <Button
             onClick={onExport}
             disabled={editorState.pages.length === 0}
@@ -360,7 +360,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <DropdownMenuTrigger asChild>
               <Button
                 disabled={editorState.pages.length === 0}
-                className="rounded-l-none -ml-px px-2 border-l border-l-border"
+                className="border-l-border -ml-px rounded-l-none border-l px-2"
               >
                 <ChevronDown size={16} />
               </Button>

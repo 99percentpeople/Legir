@@ -130,7 +130,9 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
-  html, body, #root {
+  html,
+  body,
+  #root {
     @apply h-full w-full;
   }
   #root {
@@ -147,7 +149,7 @@
   right: 0;
   bottom: 0;
   overflow: hidden;
-  line-height: 1.0;
+  line-height: 1;
   text-size-adjust: none;
   forced-color-adjust: none;
   transform-origin: 0 0;
@@ -165,7 +167,7 @@
 
 /* Hide br tags to prevent them from being copied or affecting selection flow */
 .textLayer br[role="presentation"] {
-    display: none;
+  display: none;
 }
 
 .textLayer ::selection {

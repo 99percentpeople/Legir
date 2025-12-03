@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 interface AutoScrollOptions {
   threshold?: number; // Distance from edge in pixels to trigger scroll
-  speed?: number;     // Max scroll speed in pixels per frame
-  enabled?: boolean;  // Whether auto-scroll is active
+  speed?: number; // Max scroll speed in pixels per frame
+  enabled?: boolean; // Whether auto-scroll is active
 }
 
 /**
@@ -12,7 +12,7 @@ interface AutoScrollOptions {
  */
 export const useAutoScroll = (
   containerRef: React.RefObject<HTMLElement>,
-  options: AutoScrollOptions = {}
+  options: AutoScrollOptions = {},
 ) => {
   const { threshold = 50, speed = 20, enabled = false } = options;
   const requestRef = useRef<number | null>(null);
@@ -25,11 +25,11 @@ export const useAutoScroll = (
     const handleMove = (e: PointerEvent | MouseEvent) => {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
     };
-    
-    window.addEventListener('pointermove', handleMove);
-    
+
+    window.addEventListener("pointermove", handleMove);
+
     return () => {
-        window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener("pointermove", handleMove);
     };
   }, [enabled]);
 
@@ -37,8 +37,8 @@ export const useAutoScroll = (
   useEffect(() => {
     if (!enabled) {
       if (requestRef.current) {
-          cancelAnimationFrame(requestRef.current);
-          requestRef.current = undefined;
+        cancelAnimationFrame(requestRef.current);
+        requestRef.current = undefined;
       }
       return;
     }
@@ -55,20 +55,32 @@ export const useAutoScroll = (
         // Calculate intensity based on distance from edge (0 to 1)
         // Horizontal
         if (mousePos.x < rect.left + threshold) {
-             const intensity = Math.min(1, (rect.left + threshold - mousePos.x) / threshold);
-             dx = -speed * intensity;
+          const intensity = Math.min(
+            1,
+            (rect.left + threshold - mousePos.x) / threshold,
+          );
+          dx = -speed * intensity;
         } else if (mousePos.x > rect.right - threshold) {
-             const intensity = Math.min(1, (mousePos.x - (rect.right - threshold)) / threshold);
-             dx = speed * intensity;
+          const intensity = Math.min(
+            1,
+            (mousePos.x - (rect.right - threshold)) / threshold,
+          );
+          dx = speed * intensity;
         }
 
         // Vertical
         if (mousePos.y < rect.top + threshold) {
-            const intensity = Math.min(1, (rect.top + threshold - mousePos.y) / threshold);
-            dy = -speed * intensity;
+          const intensity = Math.min(
+            1,
+            (rect.top + threshold - mousePos.y) / threshold,
+          );
+          dy = -speed * intensity;
         } else if (mousePos.y > rect.bottom - threshold) {
-            const intensity = Math.min(1, (mousePos.y - (rect.bottom - threshold)) / threshold);
-            dy = speed * intensity;
+          const intensity = Math.min(
+            1,
+            (mousePos.y - (rect.bottom - threshold)) / threshold,
+          );
+          dy = speed * intensity;
         }
 
         if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {

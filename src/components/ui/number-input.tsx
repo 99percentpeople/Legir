@@ -1,41 +1,50 @@
-import React from 'react';
-import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import React from "react";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import {
   Button,
   Group,
   Input,
   Label,
   NumberField,
-  NumberFieldProps
-} from 'react-aria-components';
-import { cn } from '../../lib/utils';
+  NumberFieldProps,
+} from "react-aria-components";
+import { cn } from "../../lib/utils";
 
-export interface NumberInputProps extends Omit<NumberFieldProps, 'onChange'> {
+export interface NumberInputProps extends Omit<NumberFieldProps, "onChange"> {
   className?: string;
   label?: string;
   onChange?: (value: number) => void;
 }
 
-export function NumberInput({ className, label, onChange, ...props }: NumberInputProps) {
+export function NumberInput({
+  className,
+  label,
+  onChange,
+  ...props
+}: NumberInputProps) {
   return (
     <NumberField
       {...props}
       onChange={onChange}
       className={cn("w-full gap-1.5", className)}
     >
-      {label && <Label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mb-1.5 block">{label}</Label>}
-      <Group className="relative inline-flex h-9 w-full items-center overflow-hidden whitespace-nowrap rounded-md border border-input text-sm shadow-xs outline-none transition-[color,box-shadow] data-focus-within:border-ring data-disabled:opacity-50 data-focus-within:ring-[3px] data-focus-within:ring-ring/50 data-focus-within:has-aria-invalid:border-destructive data-focus-within:has-aria-invalid:ring-destructive/20 dark:data-focus-within:has-aria-invalid:ring-destructive/40 bg-background">
-        <Input className="flex-1 min-w-0 bg-transparent px-3 py-2 text-foreground tabular-nums outline-none" />
-        <div className="flex flex-col border-l border-input shrink-0 h-full w-6">
+      {label && (
+        <Label className="mb-1.5 block text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          {label}
+        </Label>
+      )}
+      <Group className="border-input data-focus-within:border-ring data-focus-within:ring-ring/50 data-focus-within:has-aria-invalid:border-destructive data-focus-within:has-aria-invalid:ring-destructive/20 dark:data-focus-within:has-aria-invalid:ring-destructive/40 bg-background relative inline-flex h-9 w-full items-center overflow-hidden rounded-md border text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none data-disabled:opacity-50 data-focus-within:ring-[3px]">
+        <Input className="text-foreground min-w-0 flex-1 bg-transparent px-3 py-2 tabular-nums outline-none" />
+        <div className="border-input flex h-full w-6 shrink-0 flex-col border-l">
           <Button
             slot="increment"
-            className="flex-1 flex items-center justify-center bg-transparent text-muted-foreground/80 text-sm hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer border-b border-input"
+            className="text-muted-foreground/80 hover:bg-accent hover:text-foreground border-input flex flex-1 cursor-pointer items-center justify-center border-b bg-transparent text-sm disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ChevronUpIcon aria-hidden="true" size={12} />
           </Button>
           <Button
             slot="decrement"
-            className="flex-1 flex items-center justify-center bg-transparent text-muted-foreground/80 text-sm hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            className="text-muted-foreground/80 hover:bg-accent hover:text-foreground flex flex-1 cursor-pointer items-center justify-center bg-transparent text-sm disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ChevronDownIcon aria-hidden="true" size={12} />
           </Button>

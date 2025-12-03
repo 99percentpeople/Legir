@@ -15,7 +15,7 @@ export const analyzePageForFields = async (
   pageWidth: number,
   pageHeight: number,
   existingFields: FormField[] = [],
-  options?: AIAnalysisOptions
+  options?: AIAnalysisOptions,
 ): Promise<FormField[]> => {
   if (!GEMINI_API_AVAILABLE) {
     throw new Error("No API Key provided for Gemini.");
@@ -27,7 +27,7 @@ export const analyzePageForFields = async (
     // Clean base64 string
     const cleanBase64 = base64Image.replace(
       /^data:image\/(png|jpeg|jpg);base64,/,
-      ""
+      "",
     );
 
     // Create a summary of existing fields to provide context to the AI
@@ -55,7 +55,7 @@ export const analyzePageForFields = async (
     const typeDescriptions = [];
     if (allowedTypes.includes(FieldType.TEXT)) {
       typeDescriptions.push(
-        "Text Input Areas: Blank rectangles, underlines, or comb boxes."
+        "Text Input Areas: Blank rectangles, underlines, or comb boxes.",
       );
     }
     if (allowedTypes.includes(FieldType.CHECKBOX)) {
@@ -63,7 +63,7 @@ export const analyzePageForFields = async (
     }
     if (allowedTypes.includes(FieldType.RADIO)) {
       typeDescriptions.push(
-        "Radio Buttons: Small circles intended for selection."
+        "Radio Buttons: Small circles intended for selection.",
       );
     }
     if (allowedTypes.includes(FieldType.DROPDOWN)) {
@@ -71,7 +71,7 @@ export const analyzePageForFields = async (
     }
     if (allowedTypes.includes(FieldType.SIGNATURE)) {
       typeDescriptions.push(
-        "Signature Fields: Lines marked with 'Sign here', 'Signature', or 'X'."
+        "Signature Fields: Lines marked with 'Sign here', 'Signature', or 'X'.",
       );
     }
 
@@ -94,7 +94,7 @@ export const analyzePageForFields = async (
       Context:
       - Image Aspect Ratio: ${pageWidth}:${pageHeight}
       - Existing Detected Fields (in 0-1000 scale [ymin, xmin, ymax, xmax]): ${JSON.stringify(
-        existingFieldsSummary
+        existingFieldsSummary,
       )}
       
       Task:

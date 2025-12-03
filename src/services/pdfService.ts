@@ -36,13 +36,13 @@ const hexToPdfColor = (hex: string | undefined) => {
     ? rgb(
         parseInt(result[1], 16) / 255,
         parseInt(result[2], 16) / 255,
-        parseInt(result[3], 16) / 255
+        parseInt(result[3], 16) / 255,
       )
     : undefined;
 };
 
 const rgbArrayToHex = (
-  color: number[] | Uint8ClampedArray | null | undefined
+  color: number[] | Uint8ClampedArray | null | undefined,
 ): string | undefined => {
   if (!color || color.length < 3) return undefined;
   const toHex = (n: number) => {
@@ -74,7 +74,7 @@ const resolveDest = async (pdf: any, dest: any): Promise<number | null> => {
 
 const mapOutline = async (
   pdf: any,
-  items: any[]
+  items: any[],
 ): Promise<PDFOutlineItem[]> => {
   const mapped: PDFOutlineItem[] = [];
   for (const item of items) {
@@ -271,7 +271,7 @@ const parseDefaultAppearance = (da: string, fontMap: Map<string, string>) => {
 // New Helper: Get authoritative DA and Q from pdf-lib for a named field
 const getFieldPropertiesFromPdfLib = (
   pdfDoc: PDFDocument,
-  fieldName: string
+  fieldName: string,
 ) => {
   try {
     const form = pdfDoc.getForm();
@@ -302,7 +302,7 @@ const getFieldPropertiesFromPdfLib = (
 };
 
 export const loadPDF = async (
-  input: File | Uint8Array
+  input: File | Uint8Array,
 ): Promise<{
   pdfBytes: Uint8Array;
   pdfDocument: any;
@@ -468,7 +468,7 @@ export const loadPDF = async (
       } catch (e) {
         console.warn(
           `Failed to extract Ink annotations from page ${i} using pdf-lib`,
-          e
+          e,
         );
       }
     }
@@ -511,7 +511,7 @@ export const loadPDF = async (
               if (typeof px === "number" && typeof py === "number") {
                 const [vx, vy] = unscaledViewport.convertToViewportPoint(
                   px,
-                  py
+                  py,
                 );
                 points.push({ x: vx, y: vy });
               }
@@ -581,7 +581,7 @@ export const loadPDF = async (
                         // Check if this matches our annotation.rect [x1, y1, x2, y2] (PDF coords)
                         if (Math.abs(lx1 - x1) < 1 && Math.abs(ly1 - y1) < 1) {
                           const libQP = libAnnot.lookup(
-                            PDFName.of("QuadPoints")
+                            PDFName.of("QuadPoints"),
                           );
                           if (libQP instanceof PDFArray) {
                             qp = libQP
@@ -734,7 +734,7 @@ export const loadPDF = async (
                         // Approximate match
                         if (Math.abs(lx1 - x1) < 2 && Math.abs(ly1 - y1) < 2) {
                           const rawContents = libAnnot.lookup(
-                            PDFName.of("Contents")
+                            PDFName.of("Contents"),
                           );
                           if (
                             rawContents instanceof PDFString ||
@@ -790,7 +790,7 @@ export const loadPDF = async (
           }
           if (Array.isArray(annotation.options)) {
             options = annotation.options.map((opt: any) =>
-              typeof opt === "string" ? opt : opt.display || opt.exportValue
+              typeof opt === "string" ? opt : opt.display || opt.exportValue,
             );
           }
         } else if (annotation.fieldType === "Sig") {
@@ -832,7 +832,7 @@ export const loadPDF = async (
           if (pdfDoc && annotation.fieldName) {
             const libProps = getFieldPropertiesFromPdfLib(
               pdfDoc,
-              annotation.fieldName
+              annotation.fieldName,
             );
             if (libProps) {
               if (libProps.da) {
@@ -882,8 +882,8 @@ export const loadPDF = async (
             value: Array.isArray(annotation.fieldValue)
               ? annotation.fieldValue.join("\n")
               : typeof annotation.fieldValue === "string"
-              ? annotation.fieldValue
-              : undefined,
+                ? annotation.fieldValue
+                : undefined,
             isMultiSelect: isMultiSelect,
             isChecked: isChecked,
             alignment: alignment,
@@ -918,7 +918,7 @@ export const loadPDF = async (
 export const renderPageToDataURL = async (
   pdfDocument: any,
   pageIndex: number,
-  scale = 1.5
+  scale = 1.5,
 ): Promise<string | null> => {
   try {
     const page = await pdfDocument.getPage(pageIndex + 1);
@@ -947,7 +947,7 @@ export const exportPDF = async (
   originalBytes: Uint8Array,
   fields: FormField[],
   metadata?: PDFMetadata,
-  annotations: Annotation[] = []
+  annotations: Annotation[] = [],
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
   const pdfDoc = await PDFDocument.load(originalBytes, {
@@ -1008,7 +1008,7 @@ export const exportPDF = async (
     } catch (e) {
       // Warning only - prevents crash on corrupt PDFs
       console.warn(
-        `Attempting manual removal for corrupt field: ${field.getName()}`
+        `Attempting manual removal for corrupt field: ${field.getName()}`,
       );
 
       // Fallback: Try to remove from AcroForm fields array manually to prevent collisions
@@ -1338,7 +1338,7 @@ export const exportPDF = async (
       // Special Handling for Signature Images
       if (field.type === FieldType.SIGNATURE && field.signatureData) {
         const imageBytes = await fetch(field.signatureData).then((res) =>
-          res.arrayBuffer()
+          res.arrayBuffer(),
         );
         let image;
         if (field.signatureData.startsWith("data:image/png")) {
@@ -1455,7 +1455,7 @@ export const exportPDF = async (
           if (field.toolTip) {
             ol.acroField.dict.set(
               PDFName.of("TU"),
-              PDFString.of(field.toolTip)
+              PDFString.of(field.toolTip),
             );
           }
 
@@ -1483,7 +1483,7 @@ export const exportPDF = async (
           if (field.toolTip) {
             dd.acroField.dict.set(
               PDFName.of("TU"),
-              PDFString.of(field.toolTip)
+              PDFString.of(field.toolTip),
             );
           }
 

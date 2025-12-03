@@ -71,9 +71,9 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
           variant="ghost"
           size="sm"
           className={cn(
-            "h-9 w-5 p-0 rounded-l-none hover:bg-muted",
+            "hover:bg-muted h-9 w-5 rounded-l-none p-0",
             isActive &&
-              "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground"
+              "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
           )}
           title={title}
         >
@@ -83,7 +83,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
       <PopoverContent className="w-64 p-4" side="bottom" align="center">
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-2 block">
+            <label className="mb-2 block text-sm font-medium">
               {t("properties.color")}
             </label>
             <div className="grid grid-cols-6 gap-2">
@@ -91,8 +91,9 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
                 <button
                   key={c}
                   className={cn(
-                    "w-6 h-6 rounded-full border border-gray-200 hover:scale-110 transition-transform",
-                    color === c && "ring-2 ring-primary ring-offset-2 scale-110"
+                    "h-6 w-6 rounded-full border border-gray-200 transition-transform hover:scale-110",
+                    color === c &&
+                      "ring-primary scale-110 ring-2 ring-offset-2",
                   )}
                   style={{ backgroundColor: c }}
                   onClick={() => onColorChange(c)}
@@ -104,7 +105,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
 
           {showThickness && thickness !== undefined && onThicknessChange && (
             <>
-              <div className="h-16 flex items-center justify-center bg-muted/30 rounded-md border border-border overflow-hidden">
+              <div className="bg-muted/30 border-border flex h-16 items-center justify-center overflow-hidden rounded-md border">
                 <svg
                   width="100%"
                   height="100%"
@@ -123,11 +124,11 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
               </div>
 
               <div>
-                <div className="flex justify-between mb-2 items-center">
+                <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-medium">
                     {t("properties.thickness")}
                   </label>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     {thickness}px
                   </span>
                 </div>
@@ -139,7 +140,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
                   step={1}
                   onValueChange={(val) => onThicknessChange(val[0])}
                 />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <div className="text-muted-foreground mt-1 flex justify-between text-xs">
                   <span>Thin</span>
                   <span>Thick</span>
                 </div>

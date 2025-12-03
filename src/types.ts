@@ -149,8 +149,7 @@ export interface EditorState {
   penStyle: PenStyle;
   commentStyle?: { color: string; opacity: number };
 
-  selectedFieldId: string | null;
-  selectedAnnotationId: string | null;
+  selectedId: string | null;
 
   scale: number;
   isProcessing: boolean;

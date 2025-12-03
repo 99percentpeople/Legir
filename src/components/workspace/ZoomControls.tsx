@@ -1,7 +1,7 @@
-import React from 'react';
-import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Separator } from '../ui/separator';
+import React from "react";
+import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
+import { Button } from "../ui/button";
+import { Separator } from "../ui/separator";
 
 interface ZoomControlsProps {
   scale: number;
@@ -10,11 +10,16 @@ interface ZoomControlsProps {
   onReset: () => void;
 }
 
-const ZoomControls: React.FC<ZoomControlsProps> = ({ scale, onZoomIn, onZoomOut, onReset }) => {
+const ZoomControls: React.FC<ZoomControlsProps> = ({
+  scale,
+  onZoomIn,
+  onZoomOut,
+  onReset,
+}) => {
   const percentage = Math.round(scale * 100);
 
   return (
-    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-1 bg-background p-1 rounded-lg shadow-lg border border-border z-40 transition-colors duration-200">
+    <div className="bg-background border-border absolute bottom-6 left-1/2 z-40 flex -translate-x-1/2 transform items-center gap-1 rounded-lg border p-1 shadow-lg transition-colors duration-200">
       <Button
         variant="ghost"
         size="icon"
@@ -24,9 +29,9 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({ scale, onZoomIn, onZoomOut,
       >
         <ZoomOut size={16} />
       </Button>
-      
-      <div 
-        className="px-2 min-w-12 text-center text-sm font-medium text-foreground cursor-pointer hover:text-primary"
+
+      <div
+        className="text-foreground hover:text-primary min-w-12 cursor-pointer px-2 text-center text-sm font-medium"
         onClick={onReset}
         title="Reset to 100%"
       >
@@ -43,7 +48,7 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({ scale, onZoomIn, onZoomOut,
         <ZoomIn size={16} />
       </Button>
 
-      <Separator orientation="vertical" className="h-4 mx-1" />
+      <Separator orientation="vertical" className="mx-1 h-4" />
 
       <Button
         variant="ghost"

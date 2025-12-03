@@ -63,7 +63,7 @@ export const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({
 
   return (
     <div
-      className="mb-2 flex items-center gap-1 p-1 bg-background border border-border rounded-md shadow-md animate-in fade-in zoom-in-50 duration-300 pointer-events-auto origin-bottom"
+      className="bg-background border-border animate-in fade-in zoom-in-50 pointer-events-auto mb-2 flex origin-bottom items-center gap-1 rounded-md border p-1 shadow-md duration-300"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <Button
@@ -93,9 +93,9 @@ export const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({
               <button
                 key={c}
                 className={cn(
-                  "w-6 h-6 rounded-full border border-gray-200 hover:scale-110 transition-transform",
+                  "h-6 w-6 rounded-full border border-gray-200 transition-transform hover:scale-110",
                   annotation.color === c &&
-                    "ring-2 ring-primary ring-offset-2 scale-110"
+                    "ring-primary scale-110 ring-2 ring-offset-2",
                 )}
                 style={{ backgroundColor: c }}
                 onClick={() => onUpdate({ color: c })}
@@ -109,7 +109,7 @@ export const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+        className="hover:bg-destructive/10 hover:text-destructive h-8 w-8"
         onClick={onDelete}
         title="Delete"
       >

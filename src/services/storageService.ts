@@ -28,7 +28,7 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 export async function saveDraft(
-  data: Omit<DraftData, "updatedAt">
+  data: Omit<DraftData, "updatedAt">,
 ): Promise<void> {
   try {
     const db = await openDB();

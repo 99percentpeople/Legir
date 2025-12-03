@@ -10,7 +10,13 @@ import AIDetectionDialog, {
   AIDetectionOptions,
 } from "./components/AIDetectionDialog";
 import Sidebar from "./components/sidebar/Sidebar";
-import { Dialog, DialogContent, DialogTitle, DialogFooter, DialogDescription } from "./components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "./components/ui/dialog";
 import { Button } from "./components/ui/button";
 import {
   EditorState,
@@ -26,6 +32,7 @@ import { saveDraft, getDraft, clearDraft } from "./services/storageService";
 import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES } from "./constants";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
+import { shouldSwitchToSelectAfterUse } from "./lib/tool-behavior";
 
 const App: React.FC = () => {
   const { t } = useLanguage();
@@ -39,8 +46,7 @@ const App: React.FC = () => {
     fields: [],
     annotations: [],
     outline: [],
-    selectedFieldId: null,
-    selectedAnnotationId: null,
+    selectedId: null,
     scale: 1.0,
     mode: "annotation",
     tool: "select",
@@ -117,23 +123,24 @@ const App: React.FC = () => {
   const handleEditAnnotation = (id: string) => {
     setIsSidebarOpen(true);
     setSidebarTab("comments");
-    
+
     setState((prev) => ({
-        ...prev,
-        selectedAnnotationId: id,
-        selectedFieldId: null,
+      ...prev,
+      selectedId: id,
     }));
 
     // Try to focus the textarea in the sidebar
     setTimeout(() => {
-        // We need a way to identify the textarea in the sidebar.
-        // Let's assume we'll add an ID to the textarea in CommentsPanel
-        const el = document.getElementById(`comment-input-${id}`) as HTMLTextAreaElement;
-        if (el) {
-            el.focus();
-            const len = el.value.length;
-            el.setSelectionRange(len, len);
-        }
+      // We need a way to identify the textarea in the sidebar.
+      // Let's assume we'll add an ID to the textarea in CommentsPanel
+      const el = document.getElementById(
+        `comment-input-${id}`,
+      ) as HTMLTextAreaElement;
+      if (el) {
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      }
     }, 100);
   };
 
@@ -159,7 +166,7 @@ const App: React.FC = () => {
       const scale = availableWidth / page.width;
       return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
     },
-    [isSidebarOpen, isPanelFloating, sidebarWidth, rightPanelWidth]
+    [isSidebarOpen, isPanelFloating, sidebarWidth, rightPanelWidth],
   );
 
   const updateScale = (newScale: number) => {
@@ -198,8 +205,7 @@ const App: React.FC = () => {
         metadata: previous.metadata,
         past: newPast,
         future: [currentSnapshot, ...prev.future],
-        selectedFieldId: null,
-        selectedAnnotationId: null,
+        selectedId: null,
       };
     });
   }, []);
@@ -222,8 +228,7 @@ const App: React.FC = () => {
         metadata: next.metadata,
         past: [...prev.past, currentSnapshot],
         future: newFuture,
-        selectedFieldId: null,
-        selectedAnnotationId: null,
+        selectedId: null,
       };
     });
   }, []);
@@ -231,21 +236,27 @@ const App: React.FC = () => {
   const handleDelete = useCallback(() => {
     saveCheckpoint();
     setState((prev) => {
-      if (prev.selectedFieldId) {
-        return {
-          ...prev,
-          fields: prev.fields.filter((f) => f.id !== prev.selectedFieldId),
-          selectedFieldId: null,
-        };
-      }
-      if (prev.selectedAnnotationId) {
-        return {
-          ...prev,
-          annotations: prev.annotations.filter(
-            (a) => a.id !== prev.selectedAnnotationId
-          ),
-          selectedAnnotationId: null,
-        };
+      if (prev.selectedId) {
+        const isField = prev.fields.some((f) => f.id === prev.selectedId);
+        if (isField) {
+          return {
+            ...prev,
+            fields: prev.fields.filter((f) => f.id !== prev.selectedId),
+            selectedId: null,
+          };
+        }
+        const isAnnotation = prev.annotations.some(
+          (a) => a.id === prev.selectedId,
+        );
+        if (isAnnotation) {
+          return {
+            ...prev,
+            annotations: prev.annotations.filter(
+              (a) => a.id !== prev.selectedId,
+            ),
+            selectedId: null,
+          };
+        }
       }
       return prev;
     });
@@ -256,16 +267,14 @@ const App: React.FC = () => {
     setState((prev) => ({
       ...prev,
       annotations: prev.annotations.filter((a) => a.id !== id),
-      selectedAnnotationId: null,
+      selectedId: prev.selectedId === id ? null : prev.selectedId,
     }));
   };
 
   const handleMoveField = useCallback((actionType: string) => {
     setState((prev) => {
-      if (!prev.selectedFieldId) return prev;
-      const fieldIndex = prev.fields.findIndex(
-        (f) => f.id === prev.selectedFieldId
-      );
+      if (!prev.selectedId) return prev;
+      const fieldIndex = prev.fields.findIndex((f) => f.id === prev.selectedId);
       if (fieldIndex === -1) return prev;
 
       const field = prev.fields[fieldIndex];
@@ -314,7 +323,7 @@ const App: React.FC = () => {
         target.isContentEditable;
 
       const currentState = stateRef.current;
-      const { selectedFieldId, mode } = currentState;
+      const { selectedId, mode } = currentState;
 
       const dispatch = (type: any) => {
         e.preventDefault();
@@ -343,7 +352,10 @@ const App: React.FC = () => {
         if (isInput && !(target as HTMLInputElement).readOnly) {
           return;
         }
-        if (mode === "annotation" && selectedFieldId) {
+        const isSelectedField = currentState.fields.some(
+          (f) => f.id === selectedId,
+        );
+        if (mode === "annotation" && isSelectedField) {
           return;
         }
         dispatch("DELETE");
@@ -358,7 +370,8 @@ const App: React.FC = () => {
       // Handle Arrow Keys for moving selected field
       if (
         mode === "form" &&
-        selectedFieldId &&
+        selectedId &&
+        currentState.fields.some((f) => f.id === selectedId) &&
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
       ) {
         let type = "";
@@ -430,11 +443,10 @@ const App: React.FC = () => {
     switch (type) {
       case "ESCAPE":
         setState((prev) => {
-          if (prev.selectedFieldId || prev.selectedAnnotationId) {
+          if (prev.selectedId) {
             return {
               ...prev,
-              selectedFieldId: null,
-              selectedAnnotationId: null,
+              selectedId: null,
             };
           }
           if (prev.tool !== "select") {
@@ -473,8 +485,15 @@ const App: React.FC = () => {
     setState((prev) => ({ ...prev, isProcessing: true }));
     setProcessingStatus(t("app.parsing"));
     try {
-      const { pdfBytes, pdfDocument, pages, fields, annotations, metadata, outline } =
-        await loadPDF(file);
+      const {
+        pdfBytes,
+        pdfDocument,
+        pages,
+        fields,
+        annotations,
+        metadata,
+        outline,
+      } = await loadPDF(file);
       const fitScale = calculateFitScale(pages);
       setState((prev) => ({
         ...prev,
@@ -509,7 +528,12 @@ const App: React.FC = () => {
     setProcessingStatus(t("app.loading_draft"));
     try {
       // Re-load the PDF document from bytes as it is not serializable in DB
-      const { pdfDocument, pages, annotations: fileAnnotations, outline } = await loadPDF(draft.pdfBytes);
+      const {
+        pdfDocument,
+        pages,
+        annotations: fileAnnotations,
+        outline,
+      } = await loadPDF(draft.pdfBytes);
       const fitScale = calculateFitScale(pages);
       setState((prev) => ({
         ...prev,
@@ -539,21 +563,32 @@ const App: React.FC = () => {
 
   const handleAddField = (field: FormField) => {
     saveCheckpoint();
-    setState((prev) => ({
-      ...prev,
-      fields: [...prev.fields, field],
-      selectedFieldId: field.id,
-      tool: prev.keys.ctrl || prev.keys.meta ? prev.tool : "select",
-    }));
+    setState((prev) => {
+      const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
+      const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
+
+      return {
+        ...prev,
+        fields: [...prev.fields, field],
+        selectedId: field.id,
+        tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
+      };
+    });
   };
 
   const handleAddAnnotation = (annotation: Annotation) => {
     saveCheckpoint();
-    setState((prev) => ({
-      ...prev,
-      annotations: [...prev.annotations, annotation],
-      selectedAnnotationId: annotation.id,
-    }));
+    setState((prev) => {
+      const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
+      const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
+
+      return {
+        ...prev,
+        annotations: [...prev.annotations, annotation],
+        selectedId: annotation.id,
+        tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
+      };
+    });
   };
 
   const handleUpdateField = (id: string, updates: Partial<FormField>) => {
@@ -572,7 +607,7 @@ const App: React.FC = () => {
             f.id !== id &&
             f.type === FieldType.RADIO
               ? { ...f, isChecked: false }
-              : f
+              : f,
           );
         }
       }
@@ -611,12 +646,12 @@ const App: React.FC = () => {
           f.id !== id &&
           f.type === targetField.type
             ? { ...f, ...syncUpdates }
-            : f
+            : f,
         );
       }
 
       newFields = newFields.map((f) =>
-        f.id === id ? { ...f, ...updates } : f
+        f.id === id ? { ...f, ...updates } : f,
       );
       return { ...prev, fields: newFields };
     });
@@ -627,7 +662,7 @@ const App: React.FC = () => {
     setState((prev) => ({
       ...prev,
       annotations: prev.annotations.map((a) =>
-        a.id === id ? { ...a, ...updates } : a
+        a.id === id ? { ...a, ...updates } : a,
       ),
     }));
   };
@@ -683,12 +718,12 @@ const App: React.FC = () => {
           t("app.analyzing", {
             current: i + 1,
             total: targetPageIndices.length,
-          })
+          }),
         );
 
         const base64Image = await renderPageToDataURL(
           state.pdfDocument,
-          pageIndex
+          pageIndex,
         );
 
         if (base64Image) {
@@ -704,7 +739,7 @@ const App: React.FC = () => {
                   ? options.allowedTypes
                   : undefined,
               extraPrompt: options.extraPrompt,
-            }
+            },
           );
 
           // Apply custom style if needed
@@ -744,7 +779,7 @@ const App: React.FC = () => {
       state.pdfBytes,
       state.fields,
       state.metadata,
-      state.annotations
+      state.annotations,
     );
   };
 
@@ -794,8 +829,23 @@ const App: React.FC = () => {
         return false;
       }
     }
-    
+
     return false;
+  };
+
+  const handleSelectionChange = (id: string | null) => {
+    setState((prev) => ({
+      ...prev,
+      selectedId: id,
+    }));
+  };
+
+  const handleToolChange = (tool: any, preserveSelection?: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      tool,
+      selectedId: preserveSelection ? prev.selectedId : null,
+    }));
   };
 
   const handleExport = async (): Promise<boolean> => {
@@ -830,7 +880,7 @@ const App: React.FC = () => {
 
   const handleSaveDraft = async (silent = false) => {
     if (!state.pdfBytes) return;
-    
+
     setIsSaving(true);
 
     try {
@@ -863,7 +913,9 @@ const App: React.FC = () => {
   };
 
   const selectedField =
-    state.fields.find((f) => f.id === state.selectedFieldId) || null;
+    state.selectedId && state.fields.find((f) => f.id === state.selectedId)
+      ? state.fields.find((f) => f.id === state.selectedId) || null
+      : null;
 
   const handlePenStyleChange = (style: Partial<EditorState["penStyle"]>) => {
     setState((prev) => ({
@@ -880,7 +932,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="flex h-full w-full flex-col">
       {state.pages.length === 0 ? (
         <LandingPage
           onUpload={handleUpload}
@@ -897,8 +949,7 @@ const App: React.FC = () => {
               setState((prev) => ({
                 ...prev,
                 tool,
-                selectedFieldId: null,
-                selectedAnnotationId: null,
+                selectedId: null,
               }))
             }
             onModeChange={(mode) =>
@@ -931,7 +982,7 @@ const App: React.FC = () => {
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
 
-          <div className="flex-1 flex overflow-hidden relative">
+          <div className="relative flex flex-1 overflow-hidden">
             <Sidebar
               isOpen={isSidebarOpen}
               onClose={() => setIsSidebarOpen(false)}
@@ -939,48 +990,31 @@ const App: React.FC = () => {
               fields={state.fields}
               annotations={state.annotations}
               outline={state.outline}
-              selectedFieldId={state.selectedFieldId}
-              selectedAnnotationId={state.selectedAnnotationId}
-              onSelectField={(id) => {
+              selectedId={state.selectedId}
+              onSelectControl={(id) => {
                 setState((prev) => ({
                   ...prev,
-                  selectedFieldId: id,
-                  selectedAnnotationId: null,
-                }));
-                // Scroll to field and focus input
-                setTimeout(() => {
-                  const el = document.getElementById(`field-element-${id}`);
-                  if (el) {
-                    el.scrollIntoView({
-                      behavior: "smooth",
-                      block: "center",
-                      inline: "center",
-                    });
-                    // Try to find an input/textarea/select to focus
-                    const input = el.querySelector(
-                      "input, textarea, select"
-                    ) as HTMLElement;
-                    if (input) {
-                      input.focus({ preventScroll: true });
-                    }
-                  }
-                }, 50);
-              }}
-              onSelectAnnotation={(id) => {
-                setState((prev) => ({
-                  ...prev,
-                  selectedAnnotationId: id,
-                  selectedFieldId: null,
+                  selectedId: id,
                 }));
                 if (id) {
                   setTimeout(() => {
-                    const el = document.getElementById(`annotation-${id}`);
+                    let el = document.getElementById(`field-element-${id}`);
+                    if (!el) {
+                      el = document.getElementById(`annotation-${id}`);
+                    }
                     if (el) {
                       el.scrollIntoView({
                         behavior: "smooth",
                         block: "center",
                         inline: "center",
                       });
+                      // Try to find an input/textarea/select to focus
+                      const input = el.querySelector(
+                        "input, textarea, select",
+                      ) as HTMLElement;
+                      if (input) {
+                        input.focus({ preventScroll: true });
+                      }
                     }
                   }, 50);
                 }
@@ -1000,25 +1034,12 @@ const App: React.FC = () => {
               onTabChange={setSidebarTab}
             />
 
-            <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden z-0">
+            <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
               <Workspace
                 editorState={state}
                 onAddField={handleAddField}
                 onAddAnnotation={handleAddAnnotation}
-                onSelectField={(id) =>
-                  setState((prev) => ({
-                    ...prev,
-                    selectedFieldId: id,
-                    selectedAnnotationId: null,
-                  }))
-                }
-                onSelectAnnotation={(id) =>
-                  setState((prev) => ({
-                    ...prev,
-                    selectedAnnotationId: id,
-                    selectedFieldId: null,
-                  }))
-                }
+                onSelectControl={handleSelectionChange}
                 onUpdateField={handleUpdateField}
                 onUpdateAnnotation={handleUpdateAnnotation}
                 onDeleteAnnotation={handleDeleteAnnotation}
@@ -1026,6 +1047,7 @@ const App: React.FC = () => {
                 onScaleChange={updateScale}
                 onTriggerHistorySave={saveCheckpoint}
                 onPageIndexChange={setCurrentPageIndex}
+                onToolChange={handleToolChange}
               />
               <ZoomControls
                 scale={state.scale}
@@ -1054,7 +1076,7 @@ const App: React.FC = () => {
                 }
                 onDelete={handleDelete}
                 onClose={() =>
-                  setState((prev) => ({ ...prev, selectedFieldId: null }))
+                  setState((prev) => ({ ...prev, selectedId: null }))
                 }
                 isFloating={isPanelFloating}
                 onToggleFloating={() => setIsPanelFloating(!isPanelFloating)}
@@ -1107,7 +1129,7 @@ const App: React.FC = () => {
       <Dialog open={state.isProcessing}>
         <DialogContent
           showCloseButton={false}
-          className="sm:max-w-[300px] flex flex-col items-center justify-center text-center"
+          className="flex flex-col items-center justify-center text-center sm:max-w-[300px]"
         >
           <DialogTitle className="sr-only">
             {t("common.processing")}
@@ -1115,8 +1137,8 @@ const App: React.FC = () => {
           <DialogDescription className="sr-only">
             {t("common.processing")}
           </DialogDescription>
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-foreground font-medium text-lg">
+          <div className="border-primary mb-4 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
+          <p className="text-foreground text-lg font-medium">
             {processingStatus || t("common.processing")}
           </p>
         </DialogContent>

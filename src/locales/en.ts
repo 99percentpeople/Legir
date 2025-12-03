@@ -38,7 +38,8 @@ const en = {
   "toolbar.close": "Close",
   "toolbar.toggle_sidebar": "Toggle Sidebar",
   "dialog.confirm_close.title": "Close Document?",
-  "dialog.confirm_close.desc": "Are you sure you want to close? Any unsaved changes will be lost.",
+  "dialog.confirm_close.desc":
+    "Are you sure you want to close? Any unsaved changes will be lost.",
   "dialog.confirm_close.confirm": "Close Without Saving",
   "dialog.confirm_close.cancel": "Cancel",
   "properties.document.title": "Document Info",
@@ -167,7 +168,8 @@ const en = {
   "sidebar.filter": "Filter fields...",
   "sidebar.no_outline": "No outline found in this document.",
   "settings.title": "Editor Settings",
-  "settings.description": "Configure the workspace behavior and snapping rules.",
+  "settings.description":
+    "Configure the workspace behavior and snapping rules.",
   "settings.language": "Language",
   "settings.snapping.enabled": "Snapping Enabled",
   "settings.snapping.description":
@@ -177,18 +179,22 @@ const en = {
   "settings.equal": "Equidistant Snapping",
   "settings.done": "Done",
   "ai_dialog.title": "AI Field Detection",
-  "ai_dialog.desc": "Analyze pages to automatically detect and create form fields using Gemini.",
+  "ai_dialog.desc":
+    "Analyze pages to automatically detect and create form fields using Gemini.",
   "ai_dialog.page_range": "Page Range",
   "ai_dialog.page_range_hint": "e.g., 1-5, 8, 10-12 (Default: All)",
   "ai_dialog.valid_all": "All pages selected ({total} pages)",
-  "ai_dialog.err_format": "Invalid format. Use numbers and ranges (e.g. 1-3, 5).",
+  "ai_dialog.err_format":
+    "Invalid format. Use numbers and ranges (e.g. 1-3, 5).",
   "ai_dialog.err_bounds": "Page number out of bounds (1-{total}).",
   "ai_dialog.valid_selected": "Selected {count} pages: {pages}",
   "ai_dialog.types": "Field Types to Detect",
   "ai_dialog.style_override": "Override Default Style",
   "ai_dialog.prompt": "Additional Instructions (Optional)",
-  "ai_dialog.prompt_ph": "e.g., 'Only find fields in the top section' or 'Ignore date fields'",
-  "ai_dialog.prompt_hint": "Provide context or specific rules for the AI model.",
+  "ai_dialog.prompt_ph":
+    "e.g., 'Only find fields in the top section' or 'Ignore date fields'",
+  "ai_dialog.prompt_hint":
+    "Provide context or specific rules for the AI model.",
   "ai_dialog.start": "Start Analysis",
   "landing.title": "AI-Powered PDF Form Editor",
   "landing.subtitle":
@@ -197,7 +203,8 @@ const en = {
   "landing.feature.ai.title": "AI-Powered",
   "landing.feature.ai.desc": "Automatically detect form fields using Gemini.",
   "landing.feature.editor.title": "Visual Editor",
-  "landing.feature.editor.desc": "Drag & drop interface to customize your forms.",
+  "landing.feature.editor.desc":
+    "Drag & drop interface to customize your forms.",
   "landing.feature.local.title": "Privacy First",
   "landing.feature.local.desc": "Files are processed locally in your browser.",
   "app.parsing": "Parsing PDF...",

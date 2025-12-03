@@ -5,13 +5,6 @@ import App from "./App";
 import { ThemeProvider } from "./components/theme-provider";
 import { LanguageProvider } from "./components/language-provider";
 import { Toaster } from "./components/ui/sonner";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
-import * as pdfjsLib from "pdfjs-dist";
-
-// Set up the PDF.js worker source to a CDN to ensure it works in the browser environment
-if (pdfjsLib.GlobalWorkerOptions) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-}
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -27,5 +20,5 @@ root.render(
         <App />
       </ThemeProvider>
     </LanguageProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

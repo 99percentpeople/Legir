@@ -2,10 +2,16 @@ import React, { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
 import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs";
+import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
+import type { RenderParameters } from "pdfjs-dist/types/src/display/api";
+
+pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
+  name: "pdfjs-worker",
+});
 
 interface PDFPageProps {
   pageIndex: number;
-  pdfDocument: any;
+  pdfDocument: pdfjsLib.PDFDocumentProxy;
   scale: number;
   width: number;
   height: number;
@@ -32,12 +38,13 @@ const PDFPage: React.FC<PDFPageProps> = ({
   const [isRendered, setIsRendered] = useState(false);
   const [isInView, setIsInView] = useState(false);
 
-  const renderTaskRef = useRef<any>(null);
   const renderedScaleRef = useRef<number | null>(null);
 
   const textLayerRef = useRef<HTMLDivElement>(null);
   const textRenderTaskRef = useRef<any>(null);
-  const [textLayerRenderedScale, setTextLayerRenderedScale] = useState<number | null>(null);
+  const [textLayerRenderedScale, setTextLayerRenderedScale] = useState<
+    number | null
+  >(null);
 
   // Intersection Observer
   useEffect(() => {
@@ -47,7 +54,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
           setIsInView(entry.isIntersecting);
         });
       },
-      { rootMargin: "200px" }
+      { rootMargin: "200px" },
     );
 
     if (containerRef.current) {
@@ -75,74 +82,91 @@ const PDFPage: React.FC<PDFPageProps> = ({
       return;
     }
 
-    let isCancelled = false;
+    let activeRender: (Promise<boolean> & { cancel: () => void }) | null = null;
 
-    const render = async () => {
-      // Determine which canvas is currently in the background (buffer)
-      // We render to the background canvas, then swap.
-      const targetCanvasRef = activeCanvas === "A" ? canvasBRef : canvasARef;
-      const targetCanvas = targetCanvasRef.current;
-      const targetId = activeCanvas === "A" ? "B" : "A";
+    const render = (): Promise<boolean> & { cancel: () => void } => {
+      let renderTask: any = null;
+      let isRenderCancelled = false;
 
-      if (!targetCanvas) return;
+      const promise = (async () => {
+        // Determine which canvas is currently in the background (buffer)
+        // We render to the background canvas, then swap.
+        const targetCanvasRef = activeCanvas === "A" ? canvasBRef : canvasARef;
+        const targetCanvas = targetCanvasRef.current;
 
-      try {
-        if (renderTaskRef.current) {
-          try {
-            renderTaskRef.current.cancel();
-          } catch (e) {}
+        if (!targetCanvas) return;
+
+        try {
+          const page = await pdfDocument.getPage(pageIndex + 1);
+
+          if (isRenderCancelled) return;
+
+          const viewport = page.getViewport({
+            scale: scale * (window.devicePixelRatio || 1),
+          });
+
+          // Setup the buffer canvas
+          targetCanvas.width = viewport.width;
+          targetCanvas.height = viewport.height;
+
+          const ctx = targetCanvas.getContext("2d");
+          if (!ctx) return;
+
+          // Clear context to handle transparent PDFs correctly
+          ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+
+          const renderContext = {
+            canvas: targetCanvas,
+            viewport: viewport,
+            annotationMode: pdfjsLib.AnnotationMode.DISABLE,
+          } satisfies RenderParameters;
+
+          const newRenderTask = page.render(renderContext);
+          renderTask = newRenderTask;
+
+          await newRenderTask.promise;
+
+          // Return true if completed successfully
+          if (!isRenderCancelled) {
+            return true;
+          }
+        } catch (error: any) {
+          // Ignore cancellation errors
+          if (error?.name !== "RenderingCancelledException") {
+            console.error("Render error:", error);
+          }
+          return false;
         }
+      })();
 
-        const page = await pdfDocument.getPage(pageIndex + 1);
-        const viewport = page.getViewport({ scale: scale * (window.devicePixelRatio || 1) });
-
-        // Setup the buffer canvas
-        targetCanvas.width = viewport.width;
-        targetCanvas.height = viewport.height;
-
-        const ctx = targetCanvas.getContext("2d");
-        if (!ctx) return;
-
-        // Clear context to handle transparent PDFs correctly
-        ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
-
-        const renderContext = {
-          canvasContext: ctx,
-          viewport: viewport,
-          annotationMode: pdfjsLib.AnnotationMode.DISABLE,
-        };
-
-        const renderTask = page.render(renderContext);
-        renderTaskRef.current = renderTask;
-
-        await renderTask.promise;
-
-        if (!isCancelled) {
-          // Render complete: Swap to the new canvas
-          setActiveCanvas(targetId);
-          setIsRendered(true);
-          renderedScaleRef.current = scale;
+      const cancel = () => {
+        isRenderCancelled = true;
+        if (renderTask) {
+          renderTask.cancel();
         }
-      } catch (error: any) {
-        // Ignore cancellation errors
-        if (error?.name !== "RenderingCancelledException") {
-          console.error("Render error:", error);
-        }
-      }
+      };
+
+      (promise as any).cancel = cancel;
+      return promise as Promise<boolean> & { cancel: () => void };
     };
 
     // Debounce to handle continuous zooming
     const handleRender = requestAnimationFrame(() => {
-      render();
+      const task = render();
+      activeRender = task;
+      task.then((ok) => {
+        if (!ok) return;
+        const targetId = activeCanvas === "A" ? "B" : "A";
+        setActiveCanvas(targetId);
+        setIsRendered(true);
+        renderedScaleRef.current = scale;
+      });
     });
 
     return () => {
-      isCancelled = true;
       cancelAnimationFrame(handleRender);
-      if (renderTaskRef.current) {
-        try {
-          renderTaskRef.current.cancel();
-        } catch (e) {}
+      if (activeRender) {
+        activeRender.cancel();
       }
     };
     // Re-run if visibility changes or scale/doc changes
@@ -179,8 +203,13 @@ const PDFPage: React.FC<PDFPageProps> = ({
 
         if (textLayerRef.current) {
           textLayerRef.current.style.width = `${Math.floor(viewport.width)}px`;
-          textLayerRef.current.style.height = `${Math.floor(viewport.height)}px`;
-          textLayerRef.current.style.setProperty("--total-scale-factor", `${initialScale}`);
+          textLayerRef.current.style.height = `${Math.floor(
+            viewport.height,
+          )}px`;
+          textLayerRef.current.style.setProperty(
+            "--total-scale-factor",
+            `${initialScale}`,
+          );
         }
 
         if (pdfjsViewer.TextLayerBuilder) {
@@ -222,7 +251,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative bg-white shadow-lg transition-shadow hover:shadow-xl origin-top z-0"
+      className="relative z-0 origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
       style={{
         width: width * scale,
         height: height * scale,
@@ -232,15 +261,15 @@ const PDFPage: React.FC<PDFPageProps> = ({
       {!isRendered && placeholderImage && (
         <img
           src={placeholderImage}
-          className="absolute inset-0 w-full h-full object-contain opacity-50 blur-sm pointer-events-none"
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-50 blur-sm"
           alt="Loading..."
         />
       )}
 
       {/* Loading Spinner */}
       {!isRendered && !placeholderImage && (
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-gray-50 pointer-events-none">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <div className="text-muted-foreground pointer-events-none absolute inset-0 flex items-center justify-center bg-gray-50">
+          <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"></div>
         </div>
       )}
 
@@ -248,8 +277,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
       <canvas
         ref={canvasARef}
         className={cn(
-          "absolute inset-0 w-full h-full block",
-          activeCanvas === "A" ? "opacity-100 z-10" : "opacity-0 z-0"
+          "absolute inset-0 block h-full w-full",
+          activeCanvas === "A" ? "z-10 opacity-100" : "z-0 opacity-0",
         )}
       />
 
@@ -257,8 +286,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
       <canvas
         ref={canvasBRef}
         className={cn(
-          "absolute inset-0 w-full h-full block",
-          activeCanvas === "B" ? "opacity-100 z-10" : "opacity-0 z-0"
+          "absolute inset-0 block h-full w-full",
+          activeCanvas === "B" ? "z-10 opacity-100" : "z-0 opacity-0",
         )}
       />
 
@@ -267,7 +296,9 @@ const PDFPage: React.FC<PDFPageProps> = ({
         ref={textLayerRef}
         className={cn("textLayer", !isSelectMode && "pointer-events-none")}
         style={{
-          transform: textLayerRenderedScale ? `scale(${scale / textLayerRenderedScale})` : "none",
+          transform: textLayerRenderedScale
+            ? `scale(${scale / textLayerRenderedScale})`
+            : "none",
           transformOrigin: "0 0",
         }}
       />
