@@ -83,6 +83,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
     }
 
     let activeRender: (Promise<boolean> & { cancel: () => void }) | null = null;
+    let renderTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const render = (): Promise<boolean> & { cancel: () => void } => {
       let renderTask: any = null;
@@ -101,19 +102,27 @@ const PDFPage: React.FC<PDFPageProps> = ({
 
           if (isRenderCancelled) return;
 
+          // Optimization: Limit max DPR to 2. This significantly reduces pixel count
+          // on high-DPR screens (e.g., Retina @ 3x) while maintaining excellent visual quality.
+          // This is a trade-off to improve performance and reduce crash risks on large canvases.
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
           const viewport = page.getViewport({
-            scale: scale * (window.devicePixelRatio || 1),
+            scale: scale * dpr,
           });
 
           // Setup the buffer canvas
           targetCanvas.width = viewport.width;
           targetCanvas.height = viewport.height;
 
-          const ctx = targetCanvas.getContext("2d");
+          // Use alpha: false for better performance if transparency is not needed
+          // (Assuming standard white paper PDFs)
+          const ctx = targetCanvas.getContext("2d", { alpha: false });
           if (!ctx) return;
 
-          // Clear context to handle transparent PDFs correctly
-          ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+          // Clear context (even with alpha: false, it's good practice to ensure clean slate)
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
 
           const renderContext = {
             canvas: targetCanvas,
@@ -150,8 +159,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
       return promise as Promise<boolean> & { cancel: () => void };
     };
 
-    // Debounce to handle continuous zooming
-    const handleRender = requestAnimationFrame(() => {
+    // Debounce to handle continuous zooming - increased delay for large docs
+    renderTimeout = setTimeout(() => {
       const task = render();
       activeRender = task;
       task.then((ok) => {
@@ -161,10 +170,10 @@ const PDFPage: React.FC<PDFPageProps> = ({
         setIsRendered(true);
         renderedScaleRef.current = scale;
       });
-    });
+    }, 200); // 200ms delay to settle zoom
 
     return () => {
-      cancelAnimationFrame(handleRender);
+      if (renderTimeout) clearTimeout(renderTimeout);
       if (activeRender) {
         activeRender.cancel();
       }
