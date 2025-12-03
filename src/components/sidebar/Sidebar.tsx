@@ -186,7 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Resize Overlay */}
       {isResizing && (
-        <div className="fixed inset-0 z-[9999] cursor-col-resize bg-transparent" />
+        <div className="fixed inset-0 z-9999 cursor-col-resize bg-transparent" />
       )}
     </div>
   );

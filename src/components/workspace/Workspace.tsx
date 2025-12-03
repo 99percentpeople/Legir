@@ -266,7 +266,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 }
             }
         } 
-        // Box Detection (Highlight/Note)
+        // Box Detection (Highlight/Comment)
         else if (annot.rect) {
             const { x: rx, y: ry, width: rw, height: rh } = annot.rect;
             // Simple box overlap check with eraser point (expanded by radius)
@@ -425,7 +425,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (!movingAnnotationId || !moveOffset) return;
       
       const annot = editorState.annotations.find(a => a.id === movingAnnotationId);
-      if (annot && annot.type === 'note' && annot.rect) {
+      if (annot && annot.type === 'comment' && annot.rect) {
           let currentTargetPageIndex = activePageIndex;
           const hoveredPageIndex = getPageIndexFromPoint(clientX, clientY);
           
@@ -791,7 +791,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     }
 
     // Drag Drawing Start (Form Fields & Highlights)
-    if (editorState.tool === 'draw_note') {
+    if (editorState.tool === 'draw_comment') {
         const coords = getRelativeCoords(e, pageIndex);
         const iconSize = 24;
         // Center the icon on the click
@@ -799,12 +799,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
         const y = coords.y - iconSize / 2;
         
         onAddAnnotation({
-            id: `note_${Date.now()}`,
+            id: `comment_${Date.now()}`,
             pageIndex: pageIndex,
-            type: 'note',
+            type: 'comment',
             rect: { x, y, width: iconSize, height: iconSize },
             text: 'New Comment',
-            color: editorState.noteStyle?.color || ANNOTATION_STYLES.note.color,
+            color: editorState.commentStyle?.color || ANNOTATION_STYLES.comment.color,
+            opacity: editorState.commentStyle?.opacity || ANNOTATION_STYLES.comment.opacity,
         });
         // Reset to select tool after placing note
         onSelectAnnotation(null); 
@@ -944,7 +945,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     color: ANNOTATION_STYLES.highlight.color,
                     opacity: ANNOTATION_STYLES.highlight.opacity
                 });
-            } else if (editorState.tool === 'draw_note') {
+            } else if (editorState.tool === 'draw_comment') {
                 // Handled in handlePointerDown now for immediate click-to-place
             }
         }
@@ -1108,7 +1109,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
           case 'eraser': return 'cell'; 
           case 'select': return undefined;
           case 'draw_highlight': 
-          case 'draw_note': return 'crosshair';
+          case 'draw_comment': return 'crosshair';
           default: return 'crosshair';
       }
   }
@@ -1184,7 +1185,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                         } else {
                             return renderBox(annot.rect);
                         }
-                    } else if (annot.type === 'note' && annot.rect) {
+                    } else if (annot.type === 'comment' && annot.rect) {
                         return (
                             <React.Fragment key={annot.id}>
                                 <div
@@ -1202,7 +1203,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                 >
                                     <MessageSquareText 
                                         size={20 * editorState.scale} 
-                                        color={annot.color || "#facc15"}
+                                        color={annot.color || ANNOTATION_STYLES.comment.color}
+                                        opacity={annot.opacity || ANNOTATION_STYLES.comment.opacity}
                                         className={cn("transition-transform", isSelected ? "scale-110 drop-shadow-md" : "hover:scale-105")}
                                     />
                                 </div>

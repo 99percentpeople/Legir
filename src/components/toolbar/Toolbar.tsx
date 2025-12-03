@@ -38,10 +38,17 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { ModeToggle } from "./mode-toggle";
 import { useLanguage } from "../language-provider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { GEMINI_API_AVAILABLE } from "@/services/geminiService";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
+import { ANNOTATION_STYLES } from "@/constants";
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -50,7 +57,7 @@ interface ToolbarProps {
   onToolChange: (tool: Tool) => void;
   onModeChange: (mode: EditorState["mode"]) => void;
   onPenStyleChange: (style: Partial<PenStyle>) => void;
-  onNoteStyleChange?: (style: { color: string }) => void;
+  onCommentStyleChange?: (style: { color: string }) => void;
   onExport: () => Promise<boolean>;
   onSaveDraft: () => void;
   onSaveAs: () => Promise<boolean>;
@@ -75,7 +82,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onToolChange,
   onModeChange,
   onPenStyleChange,
-  onNoteStyleChange,
+  onCommentStyleChange: onCommentStyleChange,
   onExport,
   onSaveDraft,
   onSaveAs,
@@ -105,14 +112,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
             variant="ghost"
             size="icon"
             onClick={onToggleFieldList}
-            className={cn(isFieldListOpen && "bg-accent text-accent-foreground")}
+            className={cn(
+              isFieldListOpen && "bg-accent text-accent-foreground"
+            )}
             title={t("toolbar.toggle_sidebar")}
           >
             <PanelLeft size={20} />
           </Button>
 
           {/* Mode Selector */}
-          <Select value={mode} onValueChange={(val) => onModeChange(val as any)}>
+          <Select
+            value={mode}
+            onValueChange={(val) => onModeChange(val as any)}
+          >
             <SelectTrigger className="h-9 ml-2">
               <SelectValue placeholder="Mode" />
             </SelectTrigger>
@@ -176,16 +188,25 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <ToggleGroupItem value="draw_text" title={t("toolbar.text")}>
               <Type size={18} />
             </ToggleGroupItem>
-            <ToggleGroupItem value="draw_checkbox" title={t("toolbar.checkbox")}>
+            <ToggleGroupItem
+              value="draw_checkbox"
+              title={t("toolbar.checkbox")}
+            >
               <CheckSquare size={18} />
             </ToggleGroupItem>
             <ToggleGroupItem value="draw_radio" title={t("toolbar.radio")}>
               <CircleDot size={18} />
             </ToggleGroupItem>
-            <ToggleGroupItem value="draw_dropdown" title={t("toolbar.dropdown")}>
+            <ToggleGroupItem
+              value="draw_dropdown"
+              title={t("toolbar.dropdown")}
+            >
               <List size={18} />
             </ToggleGroupItem>
-            <ToggleGroupItem value="draw_signature" title={t("toolbar.signature")}>
+            <ToggleGroupItem
+              value="draw_signature"
+              title={t("toolbar.signature")}
+            >
               <PenLine size={18} />
             </ToggleGroupItem>
           </ToggleGroup>
@@ -206,7 +227,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <Eraser size={18} />
             </ToggleGroupItem>
             <Separator orientation="vertical" className="h-5 mx-1" />
-            <ToggleGroupItem value="draw_highlight" title={t("toolbar.highlight")}>
+            <ToggleGroupItem
+              value="draw_highlight"
+              title={t("toolbar.highlight")}
+            >
               <Highlighter size={18} />
             </ToggleGroupItem>
             <div className="flex items-center gap-0">
@@ -215,31 +239,44 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 title={t("toolbar.ink")}
                 className="rounded-r-none pr-1.5 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
               >
-                <PenTool size={18} style={{ color: editorState.penStyle.color }} />
+                <PenTool
+                  size={18}
+                  style={{ color: editorState.penStyle.color }}
+                />
               </ToggleGroupItem>
               <ColorPickerPopover
                 color={editorState.penStyle.color}
                 thickness={editorState.penStyle.thickness}
                 onColorChange={(color) => onPenStyleChange({ color })}
-                onThicknessChange={(thickness) => onPenStyleChange({ thickness })}
+                onThicknessChange={(thickness) =>
+                  onPenStyleChange({ thickness })
+                }
                 isActive={tool === "draw_ink"}
-                title="Ink Properties"
+                title={t("toolbar.ink_properties")}
               />
             </div>
             <div className="flex items-center gap-0">
               <ToggleGroupItem
-                value="draw_note"
-                title={t("toolbar.note")}
+                value="draw_comment"
+                title={t("toolbar.comment")}
                 className="rounded-r-none pr-1.5 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
               >
-                <MessageSquarePlus size={18} style={{ color: editorState.noteStyle?.color }} />
+                <MessageSquarePlus
+                  size={18}
+                  style={{ color: editorState.commentStyle?.color }}
+                />
               </ToggleGroupItem>
               <ColorPickerPopover
-                color={editorState.noteStyle?.color || "#ffeb3b"}
-                onColorChange={(color) => onNoteStyleChange && onNoteStyleChange({ color })}
-                isActive={tool === "draw_note"}
+                color={
+                  editorState.commentStyle?.color ||
+                  ANNOTATION_STYLES.comment.color
+                }
+                onColorChange={(color) =>
+                  onCommentStyleChange && onCommentStyleChange({ color })
+                }
+                isActive={tool === "draw_comment"}
                 showThickness={false}
-                title="Note Properties"
+                title={t("toolbar.comment_properties")}
               />
             </div>
           </ToggleGroup>

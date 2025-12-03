@@ -1,21 +1,27 @@
-
 export enum FieldType {
-  TEXT = 'Text',
-  CHECKBOX = 'Checkbox',
-  RADIO = 'Radio',
-  DROPDOWN = 'Dropdown',
-  SIGNATURE = 'Signature',
+  TEXT = "Text",
+  CHECKBOX = "Checkbox",
+  RADIO = "Radio",
+  DROPDOWN = "Dropdown",
+  SIGNATURE = "Signature",
 }
 
-export type EditorMode = 'form' | 'annotation';
+export type EditorMode = "form" | "annotation";
 
-export type Tool = 
+export type Tool =
   // Common
-  | 'select' 
+  | "select"
   // Form Tools
-  | 'draw_text' | 'draw_checkbox' | 'draw_radio' | 'draw_dropdown' | 'draw_signature'
+  | "draw_text"
+  | "draw_checkbox"
+  | "draw_radio"
+  | "draw_dropdown"
+  | "draw_signature"
   // Annotation Tools
-  | 'draw_highlight' | 'draw_ink' | 'draw_note' | 'eraser';
+  | "draw_highlight"
+  | "draw_ink"
+  | "draw_comment"
+  | "eraser";
 
 export interface FieldStyle {
   borderColor?: string; // Hex
@@ -41,46 +47,46 @@ export interface FormField {
   required?: boolean;
   isMultiSelect?: boolean;
   style?: FieldStyle;
-  
+
   // Value & Defaults
-  value?: string;         // Current Text / Selected Dropdown Option
-  defaultValue?: string;  // Default Text / Default Dropdown Option
-  
-  isChecked?: boolean;        // Current Checkbox/Radio state
+  value?: string; // Current Text / Selected Dropdown Option
+  defaultValue?: string; // Default Text / Default Dropdown Option
+
+  isChecked?: boolean; // Current Checkbox/Radio state
   isDefaultChecked?: boolean; // Default Checkbox/Radio state
-  
-  exportValue?: string;   // Export value for Checkbox (defaults to Yes) or Radio (alias for radioValue)
-  
+
+  exportValue?: string; // Export value for Checkbox (defaults to Yes) or Radio (alias for radioValue)
+
   // Specific properties
   options?: string[]; // For Dropdown
   radioValue?: string; // For Radio Button (legacy/alias for exportValue)
-  
+
   // Signature specific
   signatureData?: string; // Base64 image data
-  imageScaleMode?: 'contain' | 'fill'; // Scaling mode for signature images
+  imageScaleMode?: "contain" | "fill"; // Scaling mode for signature images
 
   // Extended properties
   toolTip?: string;
   readOnly?: boolean;
   multiline?: boolean; // For Text
   maxLength?: number; // For Text
-  alignment?: 'left' | 'center' | 'right'; // For Text
+  alignment?: "left" | "center" | "right"; // For Text
 }
 
 export interface Annotation {
   id: string;
   pageIndex: number;
-  type: 'highlight' | 'ink' | 'note';
-  rect?: { x: number; y: number; width: number; height: number }; // For highlight / note bounds
+  type: "highlight" | "ink" | "comment";
+  rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
-  text?: string; // For note
+  text?: string; // For comment
   color?: string;
   opacity?: number; // For highlight
   thickness?: number; // For ink
   size?: number; // For text
-  alignment?: 'left' | 'center' | 'right'; // For note text alignment
-  subtype?: 'ink' | 'polyline' | 'line'; // To preserve original PDF subtype
+  alignment?: "left" | "center" | "right"; // For comment text alignment
+  subtype?: "ink" | "polyline" | "line"; // To preserve original PDF subtype
   intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
 }
 
@@ -136,24 +142,27 @@ export interface EditorState {
   fields: FormField[];
   annotations: Annotation[];
   outline: PDFOutlineItem[];
-  
+
   mode: EditorMode;
   tool: Tool;
-  
+
   penStyle: PenStyle;
-  noteStyle?: { color: string };
+  commentStyle?: { color: string; opacity: number };
 
   selectedFieldId: string | null;
   selectedAnnotationId: string | null;
-  
+
   scale: number;
   isProcessing: boolean;
-  
+
   // History Stacks
   past: HistorySnapshot[];
   future: HistorySnapshot[];
   // Clipboard
-  clipboard: { type: 'field' | 'annotation', data: FormField | Annotation } | null;
+  clipboard: {
+    type: "field" | "annotation";
+    data: FormField | Annotation;
+  } | null;
   // Settings
   snappingOptions: SnappingOptions;
 
@@ -170,7 +179,23 @@ export interface EditorState {
 
   // Command Signal
   actionSignal: {
-    type: 'UNDO' | 'REDO' | 'SAVE' | 'DELETE' | 'ESCAPE' | 'COPY' | 'PASTE' | 'CUT' | 'MOVE_UP' | 'MOVE_DOWN' | 'MOVE_LEFT' | 'MOVE_RIGHT' | 'MOVE_UP_FAST' | 'MOVE_DOWN_FAST' | 'MOVE_LEFT_FAST' | 'MOVE_RIGHT_FAST';
+    type:
+      | "UNDO"
+      | "REDO"
+      | "SAVE"
+      | "DELETE"
+      | "ESCAPE"
+      | "COPY"
+      | "PASTE"
+      | "CUT"
+      | "MOVE_UP"
+      | "MOVE_DOWN"
+      | "MOVE_LEFT"
+      | "MOVE_RIGHT"
+      | "MOVE_UP_FAST"
+      | "MOVE_DOWN_FAST"
+      | "MOVE_LEFT_FAST"
+      | "MOVE_RIGHT_FAST";
     id: number;
   } | null;
 }

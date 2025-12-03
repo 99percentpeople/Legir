@@ -49,8 +49,9 @@ const App: React.FC = () => {
       thickness: ANNOTATION_STYLES.ink.thickness,
       opacity: ANNOTATION_STYLES.ink.opacity,
     },
-    noteStyle: {
-      color: ANNOTATION_STYLES.note.color,
+    commentStyle: {
+      color: ANNOTATION_STYLES.comment.color,
+      opacity: ANNOTATION_STYLES.comment.opacity,
     },
     isProcessing: false,
     past: [],
@@ -871,10 +872,10 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleNoteStyleChange = (style: { color: string }) => {
+  const handleCommentStyleChange = (style: { color: string }) => {
     setState((prev) => ({
       ...prev,
-      noteStyle: { ...prev.noteStyle, ...style },
+      commentStyle: { ...prev.commentStyle, ...style },
     }));
   };
 
@@ -904,7 +905,7 @@ const App: React.FC = () => {
               setState((prev) => ({ ...prev, mode, tool: "select" }))
             }
             onPenStyleChange={handlePenStyleChange}
-            onNoteStyleChange={handleNoteStyleChange}
+            onCommentStyleChange={handleCommentStyleChange}
             onExport={handleExport}
             onSaveDraft={() => handleSaveDraft(false)}
             onSaveAs={handleSaveAs}

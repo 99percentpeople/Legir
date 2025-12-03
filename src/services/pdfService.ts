@@ -703,7 +703,7 @@ export const loadPDF = async (
         let width = Math.abs(vx2 - vx1);
         let height = Math.abs(vy2 - vy1);
 
-        // If width/height is too small (e.g. sticky note point), give it default size
+        // If width/height is too small (e.g. comment point), give it default size
         if (width < 5) width = 30;
         if (height < 5) height = 30;
 
@@ -720,7 +720,10 @@ export const loadPDF = async (
                 if (libAnnot instanceof PDFDict) {
                   const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
                   // Check for Text or FreeText
-                  const sName = libSubtype instanceof PDFName ? libSubtype.decodeText() : "";
+                  const sName =
+                    libSubtype instanceof PDFName
+                      ? libSubtype.decodeText()
+                      : "";
                   if (sName === "Text" || sName === "FreeText") {
                     const libRect = libAnnot.lookup(PDFName.of("Rect"));
                     if (libRect instanceof PDFArray) {
@@ -730,8 +733,13 @@ export const loadPDF = async (
                         const ly1 = (rArray[1] as PDFNumber).asNumber();
                         // Approximate match
                         if (Math.abs(lx1 - x1) < 2 && Math.abs(ly1 - y1) < 2) {
-                          const rawContents = libAnnot.lookup(PDFName.of("Contents"));
-                          if (rawContents instanceof PDFString || rawContents instanceof PDFHexString) {
+                          const rawContents = libAnnot.lookup(
+                            PDFName.of("Contents")
+                          );
+                          if (
+                            rawContents instanceof PDFString ||
+                            rawContents instanceof PDFHexString
+                          ) {
                             contents = rawContents.decodeText();
                           }
                           break;
@@ -748,9 +756,9 @@ export const loadPDF = async (
         }
 
         annotations.push({
-          id: `imported_note_${i}_${index}`,
+          id: `imported_comment_${i}_${index}`,
           pageIndex: i - 1,
-          type: "note",
+          type: "comment",
           rect: { x, y, width, height },
           color: color,
           text: contents,
@@ -777,8 +785,8 @@ export const loadPDF = async (
           }
         } else if (annotation.fieldType === "Ch") {
           type = FieldType.DROPDOWN;
-          if (annotation.fieldFlags && (annotation.fieldFlags & 2097152)) {
-             isMultiSelect = true;
+          if (annotation.fieldFlags && annotation.fieldFlags & 2097152) {
+            isMultiSelect = true;
           }
           if (Array.isArray(annotation.options)) {
             options = annotation.options.map((opt: any) =>
@@ -871,10 +879,11 @@ export const loadPDF = async (
             options: options,
             radioValue: radioValue || undefined,
             exportValue: radioValue,
-            value:
-              Array.isArray(annotation.fieldValue)
-                ? annotation.fieldValue.join('\n')
-                : (typeof annotation.fieldValue === "string" ? annotation.fieldValue : undefined),
+            value: Array.isArray(annotation.fieldValue)
+              ? annotation.fieldValue.join("\n")
+              : typeof annotation.fieldValue === "string"
+              ? annotation.fieldValue
+              : undefined,
             isMultiSelect: isMultiSelect,
             isChecked: isChecked,
             alignment: alignment,
@@ -990,7 +999,8 @@ export const exportPDF = async (
           field instanceof PDFSignature) ||
         typeName === "PDFSignature";
 
-      shouldRemove = isText || isCheck || isDropdown || isOptionList || isRadio || isSig;
+      shouldRemove =
+        isText || isCheck || isDropdown || isOptionList || isRadio || isSig;
 
       if (shouldRemove) {
         form.removeField(field);
@@ -1045,7 +1055,7 @@ export const exportPDF = async (
     }
   }
 
-  // 1.5 Cleanup Existing Annotations (Ink, Highlight, Note)
+  // 1.5 Cleanup Existing Annotations (Ink, Highlight, Comment)
   // We must remove existing annotations of types we manage (Ink, Highlight, Text)
   // so that we don't duplicate them (if they were imported) and so we honor deletions.
   const pages = pdfDoc.getPages();
@@ -1156,35 +1166,43 @@ export const exportPDF = async (
           CA: annot.opacity ?? 0.4,
           P: page.ref,
           // Optional: Set title to Author if available
-          T: metadata?.author ? PDFHexString.fromText(metadata.author) : undefined,
+          T: metadata?.author
+            ? PDFHexString.fromText(metadata.author)
+            : undefined,
         });
 
         const ref = pdfDoc.context.register(highlightAnnot);
         page.node.addAnnot(ref);
-      } else if (annot.type === "note" && annot.rect) {
-        // Export as PDF Text Annotation (Sticky Note)
+      } else if (annot.type === "comment" && annot.rect) {
+        // Export as PDF Text Annotation (Comment)
         const x = annot.rect.x;
         const y = pageHeight - annot.rect.y - annot.rect.height;
         const w = annot.rect.width;
         const h = annot.rect.height;
 
         const colorObj = hexToPdfColor(annot.color) || rgb(1, 1, 0);
-        const r = (colorObj as any).red !== undefined ? (colorObj as any).red : 1;
-        const g = (colorObj as any).green !== undefined ? (colorObj as any).green : 1;
-        const b = (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+        const r =
+          (colorObj as any).red !== undefined ? (colorObj as any).red : 1;
+        const g =
+          (colorObj as any).green !== undefined ? (colorObj as any).green : 1;
+        const b =
+          (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
 
-        const noteAnnot = pdfDoc.context.obj({
+        const commentAnnot = pdfDoc.context.obj({
           Type: "Annot",
           Subtype: "Text",
           Rect: [x, y, x + w, y + h],
           Contents: PDFHexString.fromText(annot.text || ""),
           C: [r, g, b],
+          CA: annot.opacity,
           Name: PDFName.of("Comment"), // Icon name
           P: page.ref,
-          T: metadata?.author ? PDFHexString.fromText(metadata.author) : undefined,
+          T: metadata?.author
+            ? PDFHexString.fromText(metadata.author)
+            : undefined,
         });
 
-        const ref = pdfDoc.context.register(noteAnnot);
+        const ref = pdfDoc.context.register(commentAnnot);
         page.node.addAnnot(ref);
       } else if (
         annot.type === "ink" &&
@@ -1242,7 +1260,7 @@ export const exportPDF = async (
             Vertices: pdfPoints,
             C: [r, g, b],
             BS: { W: thickness, S: "S" },
-            CA: annot.opacity ?? 1.0,
+            CA: annot.opacity,
             P: page.ref,
           });
         } else if (annot.subtype === "line") {
@@ -1259,7 +1277,7 @@ export const exportPDF = async (
             L: [x1, y1, x2, y2],
             C: [r, g, b],
             BS: { W: thickness, S: "S" },
-            CA: annot.opacity ?? 1.0,
+            CA: annot.opacity,
             P: page.ref,
           });
         } else {
@@ -1271,7 +1289,7 @@ export const exportPDF = async (
             InkList: [pdfPoints], // Single stroke (array of arrays)
             C: [r, g, b],
             Border: [0, 0, thickness],
-            CA: annot.opacity ?? 1.0,
+            CA: annot.opacity,
             IT: annot.intent ? PDFName.of(annot.intent) : undefined,
             P: page.ref,
           });
@@ -1426,7 +1444,7 @@ export const exportPDF = async (
           ol.enableMultiselect();
 
           if (field.value) {
-            const vals = field.value.split('\n').filter((v) => v && v !== "");
+            const vals = field.value.split("\n").filter((v) => v && v !== "");
             try {
               ol.select(vals);
             } catch (e) {
