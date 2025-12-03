@@ -69,7 +69,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
       <div className="flex-1 overflow-auto">
         <div className="space-y-6 p-2">
           {filteredComments.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center text-sm">
+            <div className="text-muted-foreground py-6 text-center text-sm italic">
               {searchTerm ? t("sidebar.no_results") : t("sidebar.no_comments")}
             </div>
           ) : (
