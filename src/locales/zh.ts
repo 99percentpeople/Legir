@@ -147,6 +147,8 @@ const zh = {
   "shortcuts.deselect": "取消选择 / 切换选择工具",
   "shortcuts.export": "导出 PDF",
   "shortcuts.zoom": "放大 / 缩小",
+  "shortcuts.pan": "平移画布",
+  "shortcuts.middle_click_drag": "鼠标中键 + 拖动",
   "shortcuts.help": "打开此帮助菜单",
   "shortcuts.category.general": "通用",
   "shortcuts.category.editing": "编辑",

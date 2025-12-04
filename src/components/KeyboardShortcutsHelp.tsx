@@ -46,6 +46,10 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
     {
       title: t("shortcuts.category.movement"),
       items: [
+        {
+          key: t("shortcuts.middle_click_drag"),
+          action: t("shortcuts.pan"),
+        },
         { key: t("shortcuts.arrow_keys"), action: t("shortcuts.move_1px") },
         { key: t("shortcuts.shift_arrow"), action: t("shortcuts.move_10px") },
         {

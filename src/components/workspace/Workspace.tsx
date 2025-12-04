@@ -75,6 +75,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const { capture: capturePointer, release: releasePointer } =
     usePointerCapture(containerRef);
 
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef<{
+    x: number;
+    y: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
+
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -177,6 +185,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
+      if (isPanning) {
+        e.preventDefault();
+        return;
+      }
+
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const content = contentRef.current;
@@ -263,7 +276,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     };
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
-  }, [editorState.scale, onScaleChange, editorState.pages]);
+  }, [editorState.scale, onScaleChange, editorState.pages, isPanning]);
 
   const getRelativeCoordsFromPoint = (
     clientX: number,
@@ -1009,6 +1022,23 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   // --- Handlers ---
+  const handleContainerPointerDown = (e: React.PointerEvent) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      // Do not stop propagation, as this is the container handler
+
+      setIsPanning(true);
+      panStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: containerRef.current?.scrollLeft || 0,
+        scrollTop: containerRef.current?.scrollTop || 0,
+      };
+      setGlobalCursor("grabbing");
+      capturePointer(e);
+    }
+  };
+
   const handlePointerDown = (e: React.PointerEvent, pageIndex: number) => {
     if (e.button === 1) return;
 
@@ -1092,6 +1122,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    // Panning Logic
+    if (isPanning && panStartRef.current && containerRef.current) {
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      containerRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
+      containerRef.current.scrollTop = panStartRef.current.scrollTop - dy;
+      return;
+    }
+
     if (activePageIndex === null) return;
 
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -1147,6 +1186,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   const handlePointerUp = (e?: React.PointerEvent | React.MouseEvent) => {
+    if (isPanning) {
+      setIsPanning(false);
+      panStartRef.current = null;
+      resetGlobalCursor();
+      if (e) releasePointer(e);
+      return;
+    }
+
     // Release capture if held
     releasePointer(e);
 
@@ -1274,6 +1321,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   const handleFieldPointerDown = (e: React.PointerEvent, field: FormField) => {
+    if (e.button === 1) return;
+
     // If we are in Annotation mode, we allow selection but prevent drag logic.
     // Instead we likely want to fill them out.
     if (editorState.mode === "annotation") {
@@ -1359,6 +1408,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     e: React.PointerEvent,
     annotation: Annotation,
   ) => {
+    if (e.button === 1) return;
+
     // Don't swallow event if erasing
     if (editorState.tool === "eraser") return;
     e.stopPropagation();
@@ -1394,6 +1445,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     field: FormField,
     handle: string,
   ) => {
+    if (e.button === 1) return;
     e.stopPropagation();
 
     // Ensure mouse position is tracked immediately
@@ -1442,6 +1494,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     <div
       ref={containerRef}
       className="relative flex-1 overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
+      onPointerDown={handleContainerPointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}

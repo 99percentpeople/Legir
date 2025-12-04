@@ -148,6 +148,8 @@ const en = {
   "shortcuts.deselect": "Deselect / Switch to Select Tool",
   "shortcuts.export": "Export PDF",
   "shortcuts.zoom": "Zoom In / Out",
+  "shortcuts.pan": "Pan Canvas",
+  "shortcuts.middle_click_drag": "Middle Click + Drag",
   "shortcuts.help": "Open this help menu",
   "shortcuts.category.general": "General",
   "shortcuts.category.editing": "Editing",
