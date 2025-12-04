@@ -94,7 +94,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
     }
 
     let abortController: AbortController | null = null;
-    let renderTimeout: ReturnType<typeof setTimeout> | null = null;
+    let rafId: number | null = null;
 
     const render = async (signal: AbortSignal): Promise<boolean> => {
       // activeCanvas === "A", target is B.
@@ -196,8 +196,9 @@ const PDFPage: React.FC<PDFPageProps> = ({
       }
     };
 
-    // Debounce to handle continuous zooming - increased delay for large docs
-    renderTimeout = setTimeout(() => {
+    // Use requestAnimationFrame for immediate but throttled updates
+    // This removes the debounce delay for maximum responsiveness
+    rafId = requestAnimationFrame(() => {
       abortController = new AbortController();
       render(abortController.signal).then((ok) => {
         if (!ok) return;
@@ -206,10 +207,10 @@ const PDFPage: React.FC<PDFPageProps> = ({
         setIsRendered(true);
         renderedScaleRef.current = scale;
       });
-    }, 200); // 200ms delay to settle zoom
+    });
 
     return () => {
-      if (renderTimeout) clearTimeout(renderTimeout);
+      if (rafId) cancelAnimationFrame(rafId);
       if (abortController) {
         abortController.abort();
       }
@@ -372,10 +373,11 @@ const PDFPage: React.FC<PDFPageProps> = ({
       {/* Text Layer */}
       <div
         ref={textLayerRef}
-        className={cn("textLayer", !isSelectMode && "pointer-events-none")}
+        className={cn("textLayer")}
         style={{
           transform: textLayerTransform,
           transformOrigin: "0 0",
+          pointerEvents: isSelectMode ? undefined : "none",
         }}
       />
     </div>

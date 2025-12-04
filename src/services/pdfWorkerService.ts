@@ -29,7 +29,6 @@ class PDFWorkerService {
 
   private initWorker() {
     try {
-      // @ts-ignore
       this.worker = new PDFRenderWorker();
       if (this.worker) {
         this.worker.onmessage = (e) => {
