@@ -3,7 +3,7 @@ import { cn } from "../../lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
 import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
-import type { RenderParameters } from "pdfjs-dist/types/src/display/api";
+import { pdfWorkerService } from "../../services/pdfWorkerService";
 
 pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
   name: "pdfjs-worker",
@@ -46,6 +46,13 @@ const PDFPage: React.FC<PDFPageProps> = ({
     number | null
   >(null);
 
+  // Stable IDs for canvas elements to allow reuse in Worker
+  const componentId = useRef(Math.random().toString(36).substr(2, 9));
+  const canvasAId = useRef(`${componentId.current}-A`);
+  const canvasBId = useRef(`${componentId.current}-B`);
+  const isATransferred = useRef(false);
+  const isBTransferred = useRef(false);
+
   // Intersection Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -82,88 +89,74 @@ const PDFPage: React.FC<PDFPageProps> = ({
       return;
     }
 
-    let activeRender: (Promise<boolean> & { cancel: () => void }) | null = null;
+    let abortController: AbortController | null = null;
     let renderTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const render = (): Promise<boolean> & { cancel: () => void } => {
-      let renderTask: any = null;
-      let isRenderCancelled = false;
+    const render = async (signal: AbortSignal): Promise<boolean> => {
+      // activeCanvas === "A", target is B.
+      const targetCanvasRef = activeCanvas === "A" ? canvasBRef : canvasARef;
+      const targetCanvas = targetCanvasRef.current;
 
-      const promise = (async () => {
-        // Determine which canvas is currently in the background (buffer)
-        // We render to the background canvas, then swap.
-        const targetCanvasRef = activeCanvas === "A" ? canvasBRef : canvasARef;
-        const targetCanvas = targetCanvasRef.current;
+      if (!targetCanvas) return false;
 
-        if (!targetCanvas) return;
+      const targetId = activeCanvas === "A" ? canvasBId.current : canvasAId.current;
+      const isTransferred = activeCanvas === "A" ? isBTransferred.current : isATransferred.current;
 
-        try {
-          const page = await pdfDocument.getPage(pageIndex + 1);
+      try {
+        if (signal.aborted) return false;
 
-          if (isRenderCancelled) return;
+        // Optimization: Limit max DPR to 2
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        // Note: We don't set width/height here for OffscreenCanvas, 
+        // but we set it on the placeholder to ensure layout is correct.
+        // The worker handles the actual bitmap size.
+        
+        const viewport = (await pdfDocument.getPage(pageIndex + 1)).getViewport({
+          scale: scale * dpr,
+        });
 
-          // Optimization: Limit max DPR to 2. This significantly reduces pixel count
-          // on high-DPR screens (e.g., Retina @ 3x) while maintaining excellent visual quality.
-          // This is a trade-off to improve performance and reduce crash risks on large canvases.
-          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        let offscreenCanvas: OffscreenCanvas | undefined;
 
-          const viewport = page.getViewport({
-            scale: scale * dpr,
-          });
-
-          // Setup the buffer canvas
+        if (!isTransferred) {
           targetCanvas.width = viewport.width;
           targetCanvas.height = viewport.height;
-
-          // Use alpha: false for better performance if transparency is not needed
-          // (Assuming standard white paper PDFs)
-          const ctx = targetCanvas.getContext("2d", { alpha: false });
-          if (!ctx) return;
-
-          // Clear context (even with alpha: false, it's good practice to ensure clean slate)
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
-
-          const renderContext = {
-            canvas: targetCanvas,
-            viewport: viewport,
-            annotationMode: pdfjsLib.AnnotationMode.DISABLE,
-          } satisfies RenderParameters;
-
-          const newRenderTask = page.render(renderContext);
-          renderTask = newRenderTask;
-
-          await newRenderTask.promise;
-
-          // Return true if completed successfully
-          if (!isRenderCancelled) {
-            return true;
-          }
-        } catch (error: any) {
-          // Ignore cancellation errors
-          if (error?.name !== "RenderingCancelledException") {
-            console.error("Render error:", error);
-          }
-          return false;
+          offscreenCanvas = targetCanvas.transferControlToOffscreen();
+          
+          // Update transferred state immediately to prevent race conditions
+          if (activeCanvas === "A") isBTransferred.current = true;
+          else isATransferred.current = true;
         }
-      })();
+        
+        // We pass the tile size to the worker
+        const success = await pdfWorkerService.renderPage({
+            pageIndex,
+            scale: scale * dpr,
+            canvas: offscreenCanvas,
+            canvasId: targetId,
+            priority: isInView ? 1 : 0,
+            tileWidth: viewport.width,
+            tileHeight: viewport.height,
+            signal: signal,
+        });
 
-      const cancel = () => {
-        isRenderCancelled = true;
-        if (renderTask) {
-          renderTask.cancel();
+        // Return true if completed successfully
+        if (!signal.aborted) {
+          return success;
         }
-      };
-
-      (promise as any).cancel = cancel;
-      return promise as Promise<boolean> & { cancel: () => void };
+        return false;
+      } catch (error: any) {
+        // Ignore cancellation errors
+        if (error?.name !== "RenderingCancelledException" && error?.name !== "AbortError") {
+          console.error("Render error:", error);
+        }
+        return false;
+      }
     };
 
     // Debounce to handle continuous zooming - increased delay for large docs
     renderTimeout = setTimeout(() => {
-      const task = render();
-      activeRender = task;
-      task.then((ok) => {
+      abortController = new AbortController();
+      render(abortController.signal).then((ok) => {
         if (!ok) return;
         const targetId = activeCanvas === "A" ? "B" : "A";
         setActiveCanvas(targetId);
@@ -174,8 +167,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
 
     return () => {
       if (renderTimeout) clearTimeout(renderTimeout);
-      if (activeRender) {
-        activeRender.cancel();
+      if (abortController) {
+        abortController.abort();
       }
     };
     // Re-run if visibility changes or scale/doc changes
@@ -287,7 +280,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
         ref={canvasARef}
         className={cn(
           "absolute inset-0 block h-full w-full",
-          activeCanvas === "A" ? "z-10 opacity-100" : "z-0 opacity-0",
+          activeCanvas === "B" && "hidden",
         )}
       />
 
@@ -296,7 +289,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
         ref={canvasBRef}
         className={cn(
           "absolute inset-0 block h-full w-full",
-          activeCanvas === "B" ? "z-10 opacity-100" : "z-0 opacity-0",
+          activeCanvas === "A" && "hidden",
         )}
       />
 
