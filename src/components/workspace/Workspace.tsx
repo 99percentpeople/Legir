@@ -25,7 +25,10 @@ import { cn, setGlobalCursor, resetGlobalCursor } from "../../lib/utils";
 import { usePointerCapture } from "../../hooks/usePointerCapture";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import { useLanguage } from "../language-provider";
-import { shouldSwitchToSelectAfterUse } from "../../lib/tool-behavior";
+import {
+  getCursor,
+  shouldSwitchToSelectAfterUse,
+} from "../../lib/tool-behavior";
 import AnnotationToolbar from "./AnnotationToolbar";
 import PDFPage from "./PDFPage";
 
@@ -1435,26 +1438,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
     return d;
   };
 
-  const getCursor = () => {
-    switch (editorState.tool) {
-      case "draw_ink":
-        return "crosshair";
-      case "eraser":
-        return "cell";
-      case "select":
-        return undefined;
-      case "draw_highlight":
-      case "draw_comment":
-        return "crosshair";
-      default:
-        return "crosshair";
-    }
-  };
-
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 overflow-auto bg-gray-100 scheme-light transition-colors duration-200 dark:bg-gray-900"
+      className="relative flex-1 overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
@@ -1486,11 +1473,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
             {/* DOM Layer for Highlights, Notes, Form Fields */}
             <div
-              className={cn(
-                "absolute inset-0",
-                editorState.tool === "select" ? "pointer-events-none" : "",
-              )}
-              style={{ cursor: getCursor() }}
+              className={cn("absolute inset-0 scheme-light")}
+              style={{
+                cursor: getCursor(editorState.tool),
+                pointerEvents:
+                  editorState.tool === "select" ? "none" : undefined,
+              }}
               onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
             >
               {/* Annotations: Highlight & Note */}

@@ -85,7 +85,9 @@ class PDFWorkerService {
       const id = `render_${pageIndex}_${scale}_${Date.now()}`;
 
       if (signal?.aborted) {
-        reject(new DOMException("Aborted", "AbortError"));
+        const err = new DOMException("Aborted", "AbortError");
+        (err as any).phase = "pre-send";
+        reject(err);
         return;
       }
 

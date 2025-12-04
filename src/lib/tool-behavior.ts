@@ -24,3 +24,19 @@ export const getToolBehavior = (tool: Tool): ToolBehavior => {
 export const shouldSwitchToSelectAfterUse = (tool: Tool): boolean => {
   return !getToolBehavior(tool).isContinuous;
 };
+
+export const getCursor = (tool: Tool) => {
+  switch (tool) {
+    case "draw_ink":
+      return "crosshair";
+    case "eraser":
+      return "cell";
+    case "select":
+      return undefined;
+    case "draw_highlight":
+    case "draw_comment":
+      return "crosshair";
+    default:
+      return "crosshair";
+  }
+};

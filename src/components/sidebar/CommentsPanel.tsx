@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MessageSquare, Search } from "lucide-react";
+import { MessageSquareText, Search } from "lucide-react";
 import { Annotation } from "../../types";
 import { useLanguage } from "../language-provider";
 import { Input } from "../ui/input";
@@ -63,7 +63,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
         </div>
       </div>
       <h3 className="flex items-center gap-2 px-2 pt-2 text-sm font-semibold">
-        <MessageSquare size={16} />
+        <MessageSquareText size={16} />
         {t("sidebar.comments")} ({comments.length})
       </h3>
       <div className="flex-1 overflow-auto">

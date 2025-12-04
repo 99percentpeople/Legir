@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { MessageSquare, Trash2, Calendar } from "lucide-react";
+import { Trash2, Calendar, Circle } from "lucide-react";
 import { Annotation } from "../../types";
 import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";
@@ -59,7 +59,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <MessageSquare
+          <Circle
             style={{
               color: comment.color || "inherit",
               fill: comment.color || "inherit",

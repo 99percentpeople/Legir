@@ -269,6 +269,11 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
   }
 
   if (type === "render") {
+    // Early registration of canvas to prevent loss during cancellation or optimization
+    if (e.data.canvas && e.data.canvasId) {
+      canvasMap.set(e.data.canvasId, e.data.canvas);
+    }
+
     // Optimization: When scale changes, discard all pending tasks with different scale
     // This ensures we don't waste time on tiles that are no longer needed
     const incomingScale = e.data.scale;

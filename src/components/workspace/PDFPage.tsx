@@ -53,6 +53,9 @@ const PDFPage: React.FC<PDFPageProps> = ({
   const canvasBId = useRef(`${componentId.current}-B`);
   const isATransferred = useRef(false);
   const isBTransferred = useRef(false);
+  // Cache for detached OffscreenCanvas objects to prevent loss during pre-send aborts
+  const detachedCanvasARef = useRef<OffscreenCanvas | null>(null);
+  const detachedCanvasBRef = useRef<OffscreenCanvas | null>(null);
 
   // Intersection Observer
   useEffect(() => {
@@ -102,8 +105,12 @@ const PDFPage: React.FC<PDFPageProps> = ({
 
       const targetId =
         activeCanvas === "A" ? canvasBId.current : canvasAId.current;
-      const isTransferred =
-        activeCanvas === "A" ? isBTransferred.current : isATransferred.current;
+      const isTransferredRef =
+        activeCanvas === "A" ? isBTransferred : isATransferred;
+      const detachedCanvasRef =
+        activeCanvas === "A" ? detachedCanvasBRef : detachedCanvasARef;
+
+      let offscreenCanvas: OffscreenCanvas | undefined;
 
       try {
         if (signal.aborted) return false;
@@ -120,16 +127,22 @@ const PDFPage: React.FC<PDFPageProps> = ({
           },
         );
 
-        let offscreenCanvas: OffscreenCanvas | undefined;
+        if (!isTransferredRef.current) {
+          if (detachedCanvasRef.current) {
+            // Use cached canvas if available
+            offscreenCanvas = detachedCanvasRef.current;
+          } else {
+            // Transfer control
+            targetCanvas.width = viewport.width;
+            targetCanvas.height = viewport.height;
+            offscreenCanvas = targetCanvas.transferControlToOffscreen();
+            // Cache it immediately
+            detachedCanvasRef.current = offscreenCanvas;
+          }
 
-        if (!isTransferred) {
-          targetCanvas.width = viewport.width;
-          targetCanvas.height = viewport.height;
-          offscreenCanvas = targetCanvas.transferControlToOffscreen();
-
-          // Update transferred state immediately to prevent race conditions
-          if (activeCanvas === "A") isBTransferred.current = true;
-          else isATransferred.current = true;
+          // Optimistically set transferred to true to prevent concurrent transfers
+          // We will rollback if pre-send abort occurs
+          isTransferredRef.current = true;
         }
 
         // We pass the tile size to the worker
@@ -144,12 +157,34 @@ const PDFPage: React.FC<PDFPageProps> = ({
           signal: signal,
         });
 
+        // If we reached here, the message was sent successfully.
+        // Worker now owns the canvas. Clear our cache.
+        if (offscreenCanvas) {
+          detachedCanvasRef.current = null;
+        }
+
         // Return true if completed successfully
         if (!signal.aborted) {
           return success;
         }
         return false;
       } catch (error: any) {
+        // Handle pre-send aborts: Restore state so we can retry with the cached canvas
+        if (error?.phase === "pre-send") {
+          // If we were trying to send a canvas, rollback the transferred state
+          // The canvas remains in detachedCanvasRef for the next attempt
+          if (detachedCanvasRef.current) {
+            isTransferredRef.current = false;
+          }
+        } else {
+          // For other errors (including post-send aborts), assume transfer happened
+          // or failed in a way we can't recover the canvas.
+          // If it was a post-send abort, Worker owns it.
+          if (offscreenCanvas) {
+            detachedCanvasRef.current = null;
+          }
+        }
+
         // Ignore cancellation errors
         if (
           error?.name !== "RenderingCancelledException" &&
@@ -321,7 +356,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
         ref={canvasARef}
         className={cn(
           "absolute inset-0 block h-full w-full",
-          activeCanvas === "B" && "hidden",
+          (activeCanvas === "B" || !isInView) && "hidden",
         )}
       />
 
@@ -330,7 +365,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
         ref={canvasBRef}
         className={cn(
           "absolute inset-0 block h-full w-full",
-          activeCanvas === "A" && "hidden",
+          (activeCanvas === "A" || !isInView) && "hidden",
         )}
       />
 
