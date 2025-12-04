@@ -2,10 +2,10 @@ import * as pdfjsLib from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 
 // Polyfill document for pdf.js font rendering in worker
-if (typeof (self as any).document === 'undefined') {
+if (typeof (self as any).document === "undefined") {
   const fakeOwnerDocument = {
     createElement: (name: string) => {
-      if (name === 'canvas') {
+      if (name === "canvas") {
         return new OffscreenCanvas(1, 1);
       }
       return null;
@@ -37,9 +37,11 @@ interface RenderRequest {
   priority?: number; // Lower number = higher priority
 }
 
+type MaybePromise<T> = T | Promise<T>;
+
 let pdfDoc: pdfjsLib.PDFDocumentProxy | null = null;
 let docLoadingPromise: Promise<pdfjsLib.PDFDocumentProxy> | null = null;
-const pageCache = new Map<number, Promise<pdfjsLib.PDFPageProxy>>();
+const pageCache = new Map<number, MaybePromise<pdfjsLib.PDFPageProxy>>();
 const canvasMap = new Map<string, OffscreenCanvas>();
 
 // Store active render tasks to allow cancellation
@@ -47,46 +49,46 @@ const activeRenderTasks = new Map<string, { cancel: () => void }>();
 
 // Priority Queue Implementation
 interface QueueItem {
-    id: string;
-    priority: number;
-    data: RenderRequest;
+  id: string;
+  priority: number;
+  data: RenderRequest;
 }
 const taskQueue: QueueItem[] = [];
 let isProcessing = false;
 
 // Process the next task in the queue
 const processQueue = async () => {
-    if (isProcessing || taskQueue.length === 0) return;
-    
-    isProcessing = true;
-    // Get the highest priority task (lowest distance value)
-    const item = taskQueue.shift(); 
-    
-    if (!item) {
-        isProcessing = false;
-        return;
-    }
+  if (isProcessing || taskQueue.length === 0) return;
 
-    try {
-        await renderPage(item.data);
-    } catch (err) {
-        console.error("Error processing task:", err);
-    } finally {
-        isProcessing = false;
-        // Schedule next processing
-        requestAnimationFrame(processQueue);
-    }
+  isProcessing = true;
+  // Get the highest priority task (lowest distance value)
+  const item = taskQueue.shift();
+
+  if (!item) {
+    isProcessing = false;
+    return;
+  }
+
+  try {
+    await renderPage(item.data);
+  } catch (err) {
+    console.error("Error processing task:", err);
+  } finally {
+    isProcessing = false;
+    // Schedule next processing
+    requestAnimationFrame(processQueue);
+  }
 };
 
 const loadDocument = async (data: Uint8Array) => {
-    pageCache.clear();
-    const loadingTask = pdfjsLib.getDocument({
-        data: data,
-        password: "",
-    });
-    docLoadingPromise = loadingTask.promise;
-    pdfDoc = null; // Reset current doc while loading
-    pdfDoc = await docLoadingPromise;
+  pageCache.clear();
+  const loadingTask = pdfjsLib.getDocument({
+    data: data,
+    password: "",
+  });
+  docLoadingPromise = loadingTask.promise;
+  pdfDoc = null; // Reset current doc while loading
+  pdfDoc = await docLoadingPromise;
 };
 
 // Separated render logic
@@ -155,9 +157,12 @@ const renderPage = async (params: RenderRequest) => {
     const page = await pagePromise;
 
     // Resize canvas to match tile size (crucial for OffscreenCanvas)
-    if (targetCanvas.width !== tileWidth || targetCanvas.height !== tileHeight) {
-        targetCanvas.width = tileWidth;
-        targetCanvas.height = tileHeight;
+    if (
+      targetCanvas.width !== tileWidth ||
+      targetCanvas.height !== tileHeight
+    ) {
+      targetCanvas.width = tileWidth;
+      targetCanvas.height = tileHeight;
     }
 
     // Use transferred OffscreenCanvas
@@ -186,7 +191,7 @@ const renderPage = async (params: RenderRequest) => {
     };
 
     const renderTask = page.render(renderContext);
-    
+
     // Store cancel function
     activeRenderTasks.set(id, {
       cancel: () => {
@@ -195,10 +200,10 @@ const renderPage = async (params: RenderRequest) => {
     });
 
     await renderTask.promise;
-    
+
     // Clean up task from map on success
     activeRenderTasks.delete(id);
-    
+
     ctx.restore();
 
     // No need to transfer bitmap back, canvas is already updated
@@ -209,7 +214,7 @@ const renderPage = async (params: RenderRequest) => {
 
     if (error?.name === "RenderingCancelledException") {
       // Ignore cancelled errors, or notify if needed (usually we just ignore)
-      // self.postMessage({ id, success: false, error: "Cancelled" }); 
+      // self.postMessage({ id, success: false, error: "Cancelled" });
       return;
     }
 
@@ -230,12 +235,12 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
 
   if (type === "cancel") {
     // 1. Check if it's in the queue and remove it
-    const queueIndex = taskQueue.findIndex(item => item.id === id);
+    const queueIndex = taskQueue.findIndex((item) => item.id === id);
     if (queueIndex > -1) {
       taskQueue.splice(queueIndex, 1);
       // console.log(`Task ${id} removed from queue (cancelled)`);
     }
-    
+
     // 2. Check if it's currently running and cancel it
     const task = activeRenderTasks.get(id);
     if (task) {
@@ -268,25 +273,28 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     // This ensures we don't waste time on tiles that are no longer needed
     const incomingScale = e.data.scale;
     if (incomingScale !== undefined) {
-        for (let i = taskQueue.length - 1; i >= 0; i--) {
-            const taskScale = taskQueue[i].data.scale;
-            if (taskScale !== undefined && Math.abs(taskScale - incomingScale) > 0.001) {
-                taskQueue.splice(i, 1);
-            }
+      for (let i = taskQueue.length - 1; i >= 0; i--) {
+        const taskScale = taskQueue[i].data.scale;
+        if (
+          taskScale !== undefined &&
+          Math.abs(taskScale - incomingScale) > 0.001
+        ) {
+          taskQueue.splice(i, 1);
         }
+      }
     }
 
     // Add to queue
-    taskQueue.push({ 
-        id, 
-        priority, 
-        data: e.data 
+    taskQueue.push({
+      id,
+      priority,
+      data: e.data,
     });
-    
+
     // Sort queue: Lower priority value = Higher priority (closer to center)
     taskQueue.sort((a, b) => a.priority - b.priority);
-    
+
     // Trigger processing
-    processQueue();
+    requestAnimationFrame(processQueue);
   }
 };

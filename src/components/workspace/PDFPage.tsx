@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { cn } from "../../lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
 import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs";
@@ -45,6 +45,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
   const [textLayerRenderedScale, setTextLayerRenderedScale] = useState<
     number | null
   >(null);
+  const [pageRotation, setPageRotation] = useState(0);
 
   // Stable IDs for canvas elements to allow reuse in Worker
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
@@ -99,21 +100,25 @@ const PDFPage: React.FC<PDFPageProps> = ({
 
       if (!targetCanvas) return false;
 
-      const targetId = activeCanvas === "A" ? canvasBId.current : canvasAId.current;
-      const isTransferred = activeCanvas === "A" ? isBTransferred.current : isATransferred.current;
+      const targetId =
+        activeCanvas === "A" ? canvasBId.current : canvasAId.current;
+      const isTransferred =
+        activeCanvas === "A" ? isBTransferred.current : isATransferred.current;
 
       try {
         if (signal.aborted) return false;
 
         // Optimization: Limit max DPR to 2
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        // Note: We don't set width/height here for OffscreenCanvas, 
+        // Note: We don't set width/height here for OffscreenCanvas,
         // but we set it on the placeholder to ensure layout is correct.
         // The worker handles the actual bitmap size.
-        
-        const viewport = (await pdfDocument.getPage(pageIndex + 1)).getViewport({
-          scale: scale * dpr,
-        });
+
+        const viewport = (await pdfDocument.getPage(pageIndex + 1)).getViewport(
+          {
+            scale: scale * dpr,
+          },
+        );
 
         let offscreenCanvas: OffscreenCanvas | undefined;
 
@@ -121,22 +126,22 @@ const PDFPage: React.FC<PDFPageProps> = ({
           targetCanvas.width = viewport.width;
           targetCanvas.height = viewport.height;
           offscreenCanvas = targetCanvas.transferControlToOffscreen();
-          
+
           // Update transferred state immediately to prevent race conditions
           if (activeCanvas === "A") isBTransferred.current = true;
           else isATransferred.current = true;
         }
-        
+
         // We pass the tile size to the worker
         const success = await pdfWorkerService.renderPage({
-            pageIndex,
-            scale: scale * dpr,
-            canvas: offscreenCanvas,
-            canvasId: targetId,
-            priority: isInView ? 1 : 0,
-            tileWidth: viewport.width,
-            tileHeight: viewport.height,
-            signal: signal,
+          pageIndex,
+          scale: scale * dpr,
+          canvas: offscreenCanvas,
+          canvasId: targetId,
+          priority: isInView ? 1 : 0,
+          tileWidth: viewport.width,
+          tileHeight: viewport.height,
+          signal: signal,
         });
 
         // Return true if completed successfully
@@ -146,7 +151,10 @@ const PDFPage: React.FC<PDFPageProps> = ({
         return false;
       } catch (error: any) {
         // Ignore cancellation errors
-        if (error?.name !== "RenderingCancelledException" && error?.name !== "AbortError") {
+        if (
+          error?.name !== "RenderingCancelledException" &&
+          error?.name !== "AbortError"
+        ) {
           console.error("Render error:", error);
         }
         return false;
@@ -199,9 +207,13 @@ const PDFPage: React.FC<PDFPageProps> = ({
         // Render at the CURRENT scale (whatever it is when first loaded)
         const initialScale = scale;
         const page = await pdfDocument.getPage(pageIndex + 1);
+        setPageRotation(page.rotate);
         if (isCancelled) return;
 
-        const viewport = page.getViewport({ scale: initialScale });
+        const viewport = page.getViewport({
+          scale: initialScale,
+          rotation: 0, // Force 0 rotation so we can handle it via CSS
+        });
 
         if (textLayerRef.current) {
           textLayerRef.current.style.width = `${Math.floor(viewport.width)}px`;
@@ -249,6 +261,35 @@ const PDFPage: React.FC<PDFPageProps> = ({
       }
     };
   }, [pdfDocument, pageIndex, scale, isInView]);
+
+  // Calculate text layer transform
+  const textLayerTransform = useMemo(() => {
+    let transform = "";
+
+    // 1. Scale
+    if (textLayerRenderedScale) {
+      transform += `scale(${scale / textLayerRenderedScale})`;
+    }
+
+    // 2. Rotate and Translate
+    if (pageRotation !== 0) {
+      transform += ` rotate(${pageRotation}deg)`;
+
+      switch (pageRotation) {
+        case 90:
+          transform += ` translate(0, -100%)`;
+          break;
+        case 180:
+          transform += ` translate(-100%, -100%)`;
+          break;
+        case 270:
+          transform += ` translate(-100%, 0)`;
+          break;
+      }
+    }
+
+    return transform || "none";
+  }, [scale, textLayerRenderedScale, pageRotation]);
 
   return (
     <div
@@ -298,9 +339,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
         ref={textLayerRef}
         className={cn("textLayer", !isSelectMode && "pointer-events-none")}
         style={{
-          transform: textLayerRenderedScale
-            ? `scale(${scale / textLayerRenderedScale})`
-            : "none",
+          transform: textLayerTransform,
           transformOrigin: "0 0",
         }}
       />
