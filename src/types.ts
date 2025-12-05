@@ -174,6 +174,7 @@ export interface EditorState {
     shift: boolean;
     alt: boolean;
     meta: boolean;
+    space: boolean;
   };
 
   // Command Signal
@@ -182,6 +183,7 @@ export interface EditorState {
       | "UNDO"
       | "REDO"
       | "SAVE"
+      | "PRINT"
       | "DELETE"
       | "ESCAPE"
       | "COPY"

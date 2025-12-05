@@ -10,6 +10,7 @@ import {
   Redo2,
   Keyboard,
   PanelLeft,
+  PanelRight,
   List,
   CircleDot,
   Settings,
@@ -24,6 +25,7 @@ import {
   Edit3,
   Eraser,
   MessageSquarePlus,
+  Printer,
 } from "lucide-react";
 import { EditorState, Tool, PenStyle } from "../../types";
 import { Button } from "../ui/button";
@@ -36,7 +38,6 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
-import { ModeToggle } from "./mode-toggle";
 import { useLanguage } from "../language-provider";
 import {
   Select,
@@ -61,6 +62,7 @@ interface ToolbarProps {
   onExport: () => Promise<boolean>;
   onSaveDraft: () => void;
   onSaveAs: () => Promise<boolean>;
+  onPrint: () => void;
   onExit: () => void;
   onClose: () => void;
   onAutoDetect: () => void;
@@ -72,6 +74,8 @@ interface ToolbarProps {
   onOpenShortcuts: () => void;
   isFieldListOpen: boolean;
   onToggleFieldList: () => void;
+  isPropertiesPanelOpen: boolean;
+  onTogglePropertiesPanel: () => void;
   onOpenSettings: () => void;
 }
 
@@ -86,6 +90,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onExport,
   onSaveDraft,
   onSaveAs,
+  onPrint,
   onExit,
   onClose,
   onAutoDetect,
@@ -97,6 +102,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onOpenShortcuts,
   isFieldListOpen,
   onToggleFieldList,
+  isPropertiesPanelOpen,
+  onTogglePropertiesPanel,
   onOpenSettings,
 }) => {
   const { t } = useLanguage();
@@ -312,7 +319,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <Keyboard size={20} />
           </Button>
 
-          <ModeToggle />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onTogglePropertiesPanel}
+            className={cn(
+              isPropertiesPanelOpen && "bg-accent text-accent-foreground",
+            )}
+            title={t("toolbar.toggle_properties")}
+          >
+            <PanelRight size={20} />
+          </Button>
         </div>
 
         {editorState.pages.length > 0 && mode === "form" && (
@@ -399,6 +416,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
               )}
 
               <Separator className="my-1" />
+
+              <DropdownMenuItem onClick={onPrint}>
+                <Printer size={16} />
+                {t("toolbar.print")}
+              </DropdownMenuItem>
 
               <DropdownMenuItem onClick={onClose} variant="destructive">
                 <XCircle size={16} />

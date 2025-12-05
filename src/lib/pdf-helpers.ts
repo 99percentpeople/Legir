@@ -1,12 +1,4 @@
-import {
-  PDFDocument,
-  rgb,
-  PDFDict,
-  PDFName,
-  PDFString,
-  PDFArray,
-  PDFNumber,
-} from "pdf-lib";
+import { PDFDocument, rgb, PDFDict, PDFName, PDFString } from "pdf-lib";
 import { PDFOutlineItem } from "../types";
 
 // Helper to convert Hex to PDF RGB
@@ -33,7 +25,10 @@ export const rgbArrayToHex = (
   return `#${toHex(color[0])}${toHex(color[1])}${toHex(color[2])}`;
 };
 
-export const resolveDest = async (pdf: any, dest: any): Promise<number | null> => {
+export const resolveDest = async (
+  pdf: any,
+  dest: any,
+): Promise<number | null> => {
   if (typeof dest === "string") {
     try {
       dest = await pdf.getDestination(dest);
@@ -139,7 +134,7 @@ export const getFontMap = (pdfDoc: PDFDocument): Map<string, string> => {
     console.warn("Failed to extract font map", e);
   }
 
-  console.log("[PDF Import] Extracted Font Map:", map);
+  console.debug("[PDF Import] Extracted Font Map:", map);
   return map;
 };
 
@@ -160,7 +155,10 @@ export const getGlobalDA = (pdfDoc: PDFDocument): string | undefined => {
 };
 
 // Robust Token-based Parser for Default Appearance String
-export const parseDefaultAppearance = (da: string, fontMap: Map<string, string>) => {
+export const parseDefaultAppearance = (
+  da: string,
+  fontMap: Map<string, string>,
+) => {
   const style = {
     fontFamily: "Helvetica",
     fontSize: 12,

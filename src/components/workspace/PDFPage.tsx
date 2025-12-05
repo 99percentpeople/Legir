@@ -152,8 +152,6 @@ const PDFPage: React.FC<PDFPageProps> = ({
           canvas: offscreenCanvas,
           canvasId: targetId,
           priority: isInView ? 1 : 0,
-          tileWidth: viewport.width,
-          tileHeight: viewport.height,
           signal: signal,
         });
 

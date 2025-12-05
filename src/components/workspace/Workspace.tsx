@@ -45,6 +45,7 @@ interface WorkspaceProps {
   onTriggerHistorySave: () => void;
   onPageIndexChange?: (index: number) => void;
   onToolChange: (tool: Tool, preserveSelection?: boolean) => void;
+  fitTrigger?: number;
 }
 
 interface SnapLine {
@@ -67,6 +68,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onTriggerHistorySave,
   onPageIndexChange,
   onToolChange,
+  fitTrigger,
 }) => {
   const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1023,7 +1025,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   // --- Handlers ---
   const handleContainerPointerDown = (e: React.PointerEvent) => {
-    if (e.button === 1) {
+    if (editorState.keys.space && e.button === 0) {
       e.preventDefault();
       // Do not stop propagation, as this is the container handler
 
@@ -1041,6 +1043,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const handlePointerDown = (e: React.PointerEvent, pageIndex: number) => {
     if (e.button === 1) return;
+    if (editorState.keys.space) return;
 
     // Ensure mouse position is tracked immediately
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -1322,6 +1325,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const handleFieldPointerDown = (e: React.PointerEvent, field: FormField) => {
     if (e.button === 1) return;
+    if (editorState.keys.space) return;
 
     // If we are in Annotation mode, we allow selection but prevent drag logic.
     // Instead we likely want to fill them out.
@@ -1409,6 +1413,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     annotation: Annotation,
   ) => {
     if (e.button === 1) return;
+    if (editorState.keys.space) return;
 
     // Don't swallow event if erasing
     if (editorState.tool === "eraser") return;
@@ -1446,6 +1451,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     handle: string,
   ) => {
     if (e.button === 1) return;
+    if (editorState.keys.space) return;
     e.stopPropagation();
 
     // Ensure mouse position is tracked immediately
@@ -1477,7 +1483,29 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setGlobalCursor(cursor);
   };
 
-  // --- Global Event Listeners Setup REMOVED in favor of Pointer Capture ---
+  // --- Scroll to Center on Document Load, Page Count Change, or Fit Trigger ---
+  useEffect(() => {
+    if (
+      containerRef.current &&
+      contentRef.current &&
+      editorState.pages.length > 0
+    ) {
+      const container = containerRef.current;
+      const content = contentRef.current;
+
+      // Wait for layout to settle (especially for different page widths)
+      // We use requestAnimationFrame to ensure we calculate after render
+      // Adding a small timeout to ensure all child components have updated their dimensions
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          const scrollLeft = (content.scrollWidth - container.clientWidth) / 2;
+          if (scrollLeft > 0) {
+            container.scrollLeft = scrollLeft;
+          }
+        });
+      }, 10);
+    }
+  }, [editorState.pdfDocument, editorState.pages.length, fitTrigger]);
 
   // --- Render Helpers ---
 
@@ -1494,6 +1522,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
     <div
       ref={containerRef}
       className="relative flex-1 overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
+      style={{
+        cursor: editorState.keys.space ? "grab" : undefined,
+      }}
       onPointerDown={handleContainerPointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -1528,9 +1559,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
             <div
               className={cn("absolute inset-0 scheme-light")}
               style={{
-                cursor: getCursor(editorState.tool),
-                pointerEvents:
-                  editorState.tool === "select" ? "none" : undefined,
+                cursor: editorState.keys.space
+                  ? "grab"
+                  : getCursor(editorState.tool),
+                pointerEvents: editorState.keys.space
+                  ? "auto"
+                  : editorState.tool === "select"
+                    ? "none"
+                    : undefined,
               }}
               onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
             >

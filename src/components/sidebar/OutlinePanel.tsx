@@ -12,7 +12,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "../../lib/utils";
 import { useLanguage } from "../language-provider";
-import { renderPageToDataURL } from "../../services/pdfService";
+import { pdfWorkerService } from "../../services/pdfWorkerService";
 
 // --- Thumbnail Item ---
 interface ThumbnailItemProps {
@@ -31,11 +31,11 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
   isActive,
 }) => {
   const { t } = useLanguage();
-  const [imageUrl, setImageUrl] = useState<string | null>(
-    page.imageData || null,
-  );
+  const [isRendered, setIsRendered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isTransferred = useRef(false);
 
   useEffect(() => {
     if (isActive && ref.current) {
@@ -55,13 +55,40 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isVisible && !imageUrl && pdfDocument) {
-      // Increased scale from 0.2 to 0.6 for better quality in single column view
-      renderPageToDataURL(pdfDocument, pageIndex, 0.6).then((url) => {
-        if (url) setImageUrl(url);
-      });
+    if (
+      isVisible &&
+      !isRendered &&
+      pdfDocument &&
+      canvasRef.current &&
+      !isTransferred.current
+    ) {
+      const canvas = canvasRef.current;
+      try {
+        if (canvas.transferControlToOffscreen) {
+          const offscreen = canvas.transferControlToOffscreen();
+          isTransferred.current = true;
+          const canvasId = `thumbnail-${pageIndex}`;
+
+          pdfWorkerService
+            .renderPage({
+              pageIndex,
+              scale: 0.6,
+              canvas: offscreen,
+              canvasId,
+              priority: 10,
+            })
+            .then(() => {
+              setIsRendered(true);
+            })
+            .catch((err) => {
+              console.error("Thumbnail render error:", err);
+            });
+        }
+      } catch (e) {
+        console.error("Failed to render thumbnail", e);
+      }
     }
-  }, [isVisible, imageUrl, pdfDocument, pageIndex]);
+  }, [isVisible, isRendered, pdfDocument, pageIndex]);
 
   const aspectRatio =
     page.width && page.height ? page.width / page.height : 0.75;
@@ -82,16 +109,27 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
         )}
         style={{ aspectRatio: aspectRatio }}
       >
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={`Page ${pageIndex + 1}`}
-            className="h-full w-full object-contain"
-          />
-        ) : (
-          <div className="bg-muted text-muted-foreground flex h-full w-full items-center justify-center">
-            <ImageIcon size={20} className="opacity-20" />
-          </div>
+        <canvas
+          ref={canvasRef}
+          className={cn(
+            "h-full w-full object-contain",
+            !isRendered && "hidden",
+          )}
+        />
+        {!isRendered && (
+          <>
+            {page.imageData ? (
+              <img
+                src={page.imageData}
+                alt={`Page ${pageIndex + 1}`}
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <div className="bg-muted text-muted-foreground flex h-full w-full items-center justify-center">
+                <ImageIcon size={20} className="opacity-20" />
+              </div>
+            )}
+          </>
         )}
         <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/5" />
       </div>

@@ -67,7 +67,13 @@ class PDFWorkerService {
     canvas?: OffscreenCanvas;
     canvasId: string;
     priority?: number;
+    /** Defaults to 0 (render from left) if not provided */
+    tileX?: number;
+    /** Defaults to 0 (render from top) if not provided */
+    tileY?: number;
+    /** Defaults to full page width if not provided */
     tileWidth?: number;
+    /** Defaults to full page height if not provided */
     tileHeight?: number;
     signal?: AbortSignal;
   }): Promise<boolean> {
@@ -80,7 +86,18 @@ class PDFWorkerService {
         }
       }
 
-      const { pageIndex, scale, canvas, canvasId, priority, tileWidth, tileHeight, signal } = options;
+      const {
+        pageIndex,
+        scale,
+        canvas,
+        canvasId,
+        priority,
+        tileX,
+        tileY,
+        tileWidth,
+        tileHeight,
+        signal,
+      } = options;
       const id = `render_${pageIndex}_${scale}_${Date.now()}`;
 
       if (signal?.aborted) {
@@ -101,15 +118,15 @@ class PDFWorkerService {
       }
 
       try {
-        this.pendingRequests.set(id, { 
+        this.pendingRequests.set(id, {
           resolve: (val) => {
             if (signal) signal.removeEventListener("abort", onAbort);
             resolve(val);
-          }, 
+          },
           reject: (err) => {
             if (signal) signal.removeEventListener("abort", onAbort);
             reject(err);
-          } 
+          },
         });
 
         const message: RenderRequest = {
@@ -120,16 +137,11 @@ class PDFWorkerService {
           canvas,
           canvasId,
           priority: priority || 0,
-          tileX: 0,
-          tileY: 0,
+          tileX,
+          tileY,
           tileWidth,
           tileHeight,
         };
-
-        if (canvas) {
-          message.tileWidth = tileWidth ?? canvas.width;
-          message.tileHeight = tileHeight ?? canvas.height;
-        }
 
         this.worker.postMessage(message, canvas ? [canvas] : []);
       } catch (e) {

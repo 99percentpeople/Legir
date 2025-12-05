@@ -1,5 +1,5 @@
 export const DEFAULT_SCALE = 1.0;
-export const ZOOM_BASE = 1.1;
+export const ZOOM_BASE = 1.25;
 export const MIN_FIELD_SIZE = 10;
 export const PAGE_PADDING = 24; // px
 

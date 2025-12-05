@@ -76,6 +76,7 @@ const App: React.FC = () => {
       shift: false,
       alt: false,
       meta: false,
+      space: false,
     },
     actionSignal: null,
   });
@@ -88,6 +89,7 @@ const App: React.FC = () => {
   const [isAIDetectOpen, setIsAIDetectOpen] = useState(false);
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [sidebarTab, setSidebarTab] = useState("thumbnails");
   const [hasSavedSession, setHasSavedSession] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -95,6 +97,7 @@ const App: React.FC = () => {
 
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const [fitTrigger, setFitTrigger] = useState(0);
   const isClosingRef = React.useRef(false);
 
   // Keep a ref to access latest state in event handlers without re-binding
@@ -154,19 +157,31 @@ const App: React.FC = () => {
   }, [state.fields, state.annotations, state.metadata, state.filename]);
 
   const calculateFitScale = useCallback(
-    (pagesList: PageData[]) => {
+    (pagesList: PageData[], pageIndex: number = 0) => {
       if (!pagesList || pagesList.length === 0) return 1.0;
-      const page = pagesList[0];
+      // Ensure pageIndex is within bounds
+      const targetIndex = Math.max(
+        0,
+        Math.min(pageIndex, pagesList.length - 1),
+      );
+      const page = pagesList[targetIndex];
       if (!page.width) return 1.0;
       const SIDEBAR_WIDTH = isSidebarOpen ? sidebarWidth : 0;
-      const PANEL_WIDTH = !isPanelFloating ? rightPanelWidth : 0;
+      const PANEL_WIDTH =
+        !isPanelFloating && isRightPanelOpen ? rightPanelWidth : 0;
       const PADDING = 96;
       const availableWidth =
         window.innerWidth - SIDEBAR_WIDTH - PANEL_WIDTH - PADDING;
       const scale = availableWidth / page.width;
       return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
     },
-    [isSidebarOpen, isPanelFloating, sidebarWidth, rightPanelWidth],
+    [
+      isSidebarOpen,
+      isPanelFloating,
+      isRightPanelOpen,
+      sidebarWidth,
+      rightPanelWidth,
+    ],
   );
 
   const updateScale = (newScale: number) => {
@@ -310,6 +325,7 @@ const App: React.FC = () => {
             shift: e.shiftKey,
             alt: e.altKey,
             meta: e.metaKey,
+            space: prev.keys.space,
           },
         }));
         return;
@@ -321,6 +337,15 @@ const App: React.FC = () => {
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable;
+
+      if (e.key === " " && !isInput) {
+        e.preventDefault();
+        setState((prev) => ({
+          ...prev,
+          keys: { ...prev.keys, space: true },
+        }));
+        return;
+      }
 
       const currentState = stateRef.current;
       const { selectedId, mode } = currentState;
@@ -344,6 +369,20 @@ const App: React.FC = () => {
       if (e.key === "Escape") {
         if (isInput) target.blur();
         dispatch("ESCAPE");
+        return;
+      }
+
+      // Handle Ctrl+S (Save) - Allow even in inputs
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        dispatch("SAVE");
+        return;
+      }
+
+      // Handle Ctrl+P (Print) - Allow even in inputs
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault(); // Prevent browser print
+        dispatch("PRINT");
         return;
       }
 
@@ -396,11 +435,6 @@ const App: React.FC = () => {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        dispatch("SAVE");
-        return;
-      }
-
       // Help Dialog
       if (e.key === "?" || (e.shiftKey && e.key === "/")) {
         setIsShortcutsHelpOpen(true);
@@ -422,7 +456,15 @@ const App: React.FC = () => {
             shift: e.shiftKey,
             alt: e.altKey,
             meta: e.metaKey,
+            space: prev.keys.space,
           },
+        }));
+      }
+
+      if (e.key === " ") {
+        setState((prev) => ({
+          ...prev,
+          keys: { ...prev.keys, space: false },
         }));
       }
     };
@@ -466,6 +508,9 @@ const App: React.FC = () => {
         break;
       case "SAVE":
         handleSaveDraft(false);
+        break;
+      case "PRINT":
+        handlePrint();
         break;
       default:
         if (typeof type === "string" && type.startsWith("MOVE_")) {
@@ -852,7 +897,6 @@ const App: React.FC = () => {
     setState((prev) => ({ ...prev, isProcessing: true }));
     setProcessingStatus(t("app.generating"));
     try {
-      await new Promise((resolve) => setTimeout(resolve, 100));
       const modifiedBytes = await generatePDF();
       if (modifiedBytes) {
         const blob = new Blob([new Uint8Array(modifiedBytes)], {
@@ -876,6 +920,63 @@ const App: React.FC = () => {
       setProcessingStatus(null);
     }
     return false;
+  };
+
+  const handlePrint = async () => {
+    setState((prev) => ({ ...prev, isProcessing: true }));
+    setProcessingStatus(t("app.generating"));
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const modifiedBytes = await generatePDF();
+      if (modifiedBytes) {
+        const blob = new Blob([new Uint8Array(modifiedBytes)], {
+          type: "application/pdf",
+        });
+        const url = URL.createObjectURL(blob);
+
+        const iframe = document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "0";
+        iframe.src = url;
+
+        document.body.appendChild(iframe);
+
+        iframe.onload = () => {
+          const win = iframe.contentWindow;
+          if (!win) return;
+
+          const cleanup = () => {
+            try {
+              if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+              }
+              URL.revokeObjectURL(url);
+            } catch (e) {
+              console.warn("Print cleanup error:", e);
+            }
+          };
+
+          // Use afterprint event to detect when print dialog is closed (printed or cancelled)
+          win.addEventListener("afterprint", cleanup);
+
+          win.focus(); // Ensure focus for print
+          win.print();
+
+          // Fallback: 10 minutes safety timeout in case afterprint doesn't fire
+          setTimeout(cleanup, 600000);
+        };
+      }
+    } catch (error) {
+      console.error("Print failed:", error);
+      toast.error(t("app.export_fail"));
+    } finally {
+      setState((prev) => ({ ...prev, isProcessing: false }));
+      setProcessingStatus(null);
+    }
   };
 
   const handleSaveDraft = async (silent = false) => {
@@ -962,6 +1063,7 @@ const App: React.FC = () => {
             onSaveAs={handleSaveAs}
             onExit={closeSession}
             onClose={handleCloseRequest}
+            onPrint={handlePrint}
             onAutoDetect={() =>
               handleAdvancedDetect({
                 pageRange: "All",
@@ -979,6 +1081,10 @@ const App: React.FC = () => {
             onOpenShortcuts={() => setIsShortcutsHelpOpen(true)}
             isFieldListOpen={isSidebarOpen}
             onToggleFieldList={() => setIsSidebarOpen(!isSidebarOpen)}
+            isPropertiesPanelOpen={isRightPanelOpen}
+            onTogglePropertiesPanel={() =>
+              setIsRightPanelOpen(!isRightPanelOpen)
+            }
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
 
@@ -1048,16 +1154,20 @@ const App: React.FC = () => {
                 onTriggerHistorySave={saveCheckpoint}
                 onPageIndexChange={setCurrentPageIndex}
                 onToolChange={handleToolChange}
+                fitTrigger={fitTrigger}
               />
               <ZoomControls
                 scale={state.scale}
                 onZoomIn={() => updateScale(state.scale * 1.25)}
                 onZoomOut={() => updateScale(state.scale / 1.25)}
-                onReset={() => updateScale(calculateFitScale(state.pages))}
+                onReset={() => {
+                  updateScale(calculateFitScale(state.pages, currentPageIndex));
+                  setFitTrigger(Date.now());
+                }}
               />
             </div>
 
-            {state.mode === "form" && (
+            {state.mode === "form" && isRightPanelOpen && (
               <PropertiesPanel
                 field={selectedField}
                 metadata={state.metadata}

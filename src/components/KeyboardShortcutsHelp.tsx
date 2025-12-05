@@ -28,6 +28,7 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
         { key: "Ctrl + Z", action: t("toolbar.undo") },
         { key: "Ctrl + Y", action: t("toolbar.redo") },
         { key: "Ctrl + S", action: t("shortcuts.export") },
+        { key: "Ctrl + P", action: t("shortcuts.print") },
         { key: "Ctrl + Scroll", action: t("shortcuts.zoom") },
         { key: "Shift + ?", action: t("shortcuts.help") },
         { key: "Escape", action: t("shortcuts.deselect") },
@@ -47,7 +48,7 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
       title: t("shortcuts.category.movement"),
       items: [
         {
-          key: t("shortcuts.middle_click_drag"),
+          key: t("shortcuts.space_drag"),
           action: t("shortcuts.pan"),
         },
         { key: t("shortcuts.arrow_keys"), action: t("shortcuts.move_1px") },

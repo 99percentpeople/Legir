@@ -39,10 +39,6 @@ import {
 } from "../types";
 import { DEFAULT_FIELD_STYLE } from "../constants";
 
-
-
-
-
 export const loadPDF = async (
   input: File | Uint8Array,
 ): Promise<{
@@ -77,7 +73,7 @@ export const loadPDF = async (
 
   // 2. Load with pdf.js for rendering and basic annotation extraction
   const renderBuffer = new Uint8Array(pdfBytes.slice(0));
-  
+
   // Initialize worker with document data
   pdfWorkerService.loadDocument(renderBuffer);
 
@@ -121,7 +117,7 @@ export const loadPDF = async (
     const unscaledViewport = page.getViewport({ scale: 1.0 });
     const pageAnnotations = await page.getAnnotations();
     if (pageAnnotations.length > 0) {
-      console.log(`[Debug] Page ${i} Annotations:`, pageAnnotations);
+      console.debug(`[Debug] Page ${i} Annotations:`, pageAnnotations);
     }
 
     // Extract Ink Annotations using pdf-lib (more robust access to raw data)

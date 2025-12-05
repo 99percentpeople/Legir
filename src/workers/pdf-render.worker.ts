@@ -76,8 +76,22 @@ const processQueue = async () => {
   } finally {
     isProcessing = false;
     // Schedule next processing
-    requestAnimationFrame(processQueue);
+    scheduleNext();
   }
+};
+
+// MessageChannel for high-priority scheduling
+const channel = new MessageChannel();
+const port = channel.port2;
+channel.port1.onmessage = processQueue;
+
+const scheduleNext = () => {
+  if (isProcessing || taskQueue.length === 0) return;
+
+  // Use MessageChannel for all tasks
+  // This ensures minimal latency while yielding to the event loop
+  // so we can still handle 'cancel' or other messages.
+  port.postMessage(null);
 };
 
 const loadDocument = async (data: Uint8Array) => {
@@ -135,15 +149,7 @@ const renderPage = async (params: RenderRequest) => {
     }
 
     // Ensure we have all required parameters for render
-    if (
-      pageIndex === undefined ||
-      scale === undefined ||
-      tileX === undefined ||
-      tileY === undefined ||
-      tileWidth === undefined ||
-      tileHeight === undefined ||
-      !targetCanvas
-    ) {
+    if (pageIndex === undefined || scale === undefined || !targetCanvas) {
       throw new Error("Missing render parameters");
     }
 
@@ -156,13 +162,22 @@ const renderPage = async (params: RenderRequest) => {
     }
     const page = await pagePromise;
 
+    // Calculate viewport
+    const viewport = page.getViewport({ scale: scale, rotation: page.rotate });
+
+    // Determine tile parameters with defaults
+    const finalTileX = tileX ?? 0;
+    const finalTileY = tileY ?? 0;
+    const finalTileWidth = tileWidth ?? viewport.width;
+    const finalTileHeight = tileHeight ?? viewport.height;
+
     // Resize canvas to match tile size (crucial for OffscreenCanvas)
     if (
-      targetCanvas.width !== tileWidth ||
-      targetCanvas.height !== tileHeight
+      targetCanvas.width !== finalTileWidth ||
+      targetCanvas.height !== finalTileHeight
     ) {
-      targetCanvas.width = tileWidth;
-      targetCanvas.height = tileHeight;
+      targetCanvas.width = finalTileWidth;
+      targetCanvas.height = finalTileHeight;
     }
 
     // Use transferred OffscreenCanvas
@@ -174,14 +189,11 @@ const renderPage = async (params: RenderRequest) => {
 
     // Set white background
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, tileWidth, tileHeight);
-
-    // Calculate viewport
-    const viewport = page.getViewport({ scale: scale, rotation: page.rotate });
+    ctx.fillRect(0, 0, finalTileWidth, finalTileHeight);
 
     // Transform context to draw the correct tile
     ctx.save();
-    ctx.translate(-tileX, -tileY);
+    ctx.translate(-finalTileX, -finalTileY);
 
     const renderContext = {
       canvas: undefined,
@@ -277,12 +289,17 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     // Optimization: When scale changes, discard all pending tasks with different scale
     // This ensures we don't waste time on tiles that are no longer needed
     const incomingScale = e.data.scale;
+    const incomingPriority = priority;
+
     if (incomingScale !== undefined) {
       for (let i = taskQueue.length - 1; i >= 0; i--) {
         const taskScale = taskQueue[i].data.scale;
+        const taskPriority = taskQueue[i].priority;
+
         if (
           taskScale !== undefined &&
-          Math.abs(taskScale - incomingScale) > 0.001
+          Math.abs(taskScale - incomingScale) > 0.001 &&
+          taskPriority === incomingPriority
         ) {
           taskQueue.splice(i, 1);
         }
@@ -300,6 +317,6 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     taskQueue.sort((a, b) => a.priority - b.priority);
 
     // Trigger processing
-    requestAnimationFrame(processQueue);
+    scheduleNext();
   }
 };
