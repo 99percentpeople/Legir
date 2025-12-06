@@ -10,14 +10,9 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { ModeToggle } from "./toolbar/mode-toggle";
+import { LanguageToggle } from "./toolbar/language-toggle";
 import PDFUploader from "./PDFUploader";
 import { useLanguage } from "./language-provider";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
 
 interface LandingPageProps {
   onUpload: (file: File) => void;
@@ -43,34 +38,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
           <span>FormForge AI</span>
         </div>
         <div className="flex items-center gap-2">
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                title={t("settings.language")}
-              >
-                <Globe size={20} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => setLanguage("en")}
-                className="justify-between"
-              >
-                English
-                {language === "en" && <Check size={14} />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setLanguage("zh")}
-                className="justify-between"
-              >
-                中文
-                {language === "zh" && <Check size={14} />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
+          <LanguageToggle />
           <ModeToggle />
         </div>
       </div>

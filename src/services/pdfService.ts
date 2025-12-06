@@ -902,6 +902,7 @@ export const exportPDF = async (
         const highlightAnnot = pdfDoc.context.obj({
           Type: "Annot",
           Subtype: "Highlight",
+          F: 4, // Print
           Rect: [minX, minY, maxX, maxY],
           QuadPoints: quadPoints,
           C: [cr, cg, cb],
@@ -933,6 +934,7 @@ export const exportPDF = async (
         const commentAnnot = pdfDoc.context.obj({
           Type: "Annot",
           Subtype: "Text",
+          F: 4, // Print
           Rect: [x, y, x + w, y + h],
           Contents: PDFHexString.fromText(annot.text || ""),
           C: [r, g, b],
@@ -998,6 +1000,7 @@ export const exportPDF = async (
           annotObj = pdfDoc.context.obj({
             Type: "Annot",
             Subtype: "PolyLine",
+            F: 4, // Print
             Rect: rect,
             Vertices: pdfPoints,
             C: [r, g, b],
@@ -1015,6 +1018,7 @@ export const exportPDF = async (
           annotObj = pdfDoc.context.obj({
             Type: "Annot",
             Subtype: "Line",
+            F: 4, // Print
             Rect: rect,
             L: [x1, y1, x2, y2],
             C: [r, g, b],
@@ -1027,6 +1031,7 @@ export const exportPDF = async (
           annotObj = pdfDoc.context.obj({
             Type: "Annot",
             Subtype: "Ink",
+            F: 4, // Print
             Rect: rect,
             InkList: [pdfPoints], // Single stroke (array of arrays)
             C: [r, g, b],

@@ -1,4 +1,4 @@
-const zh = {
+const zhCN = {
   "common.select": "选择...",
   "common.cancel": "取消",
   "common.save": "保存",
@@ -14,6 +14,7 @@ const zh = {
   "toolbar.undo": "撤销 (Ctrl+Z)",
   "toolbar.redo": "重做 (Ctrl+Y)",
   "toolbar.select": "选择",
+  "toolbar.pan": "拖动",
   "toolbar.text": "文本",
   "toolbar.checkbox": "复选框",
   "toolbar.radio": "单选钮",
@@ -55,8 +56,10 @@ const zh = {
   "properties.keywords.desc": "逗号分隔值",
   "properties.creator": "创建者",
   "properties.producer": "制作工具",
+  "properties.annotation.title": "注释属性",
   "properties.field.title": "字段属性",
   "properties.delete_field": "删除字段",
+  "properties.delete": "删除",
   "properties.general": "常规",
   "properties.field_name": "字段名称",
   "properties.field_name.desc": "PDF 表单中的唯一 ID。",
@@ -112,6 +115,8 @@ const zh = {
   "properties.color": "颜色",
   "properties.thickness": "粗细",
   "properties.font_size": "字体大小",
+  "properties.font_family": "字体",
+  "properties.opacity": "不透明度",
   "properties.geometry": "几何",
   "properties.x": "X",
   "properties.y": "Y",
@@ -228,4 +233,4 @@ const zh = {
   "app.save_close_fail": "保存并关闭失败。",
 } as const;
 
-export default zh;
+export default zhCN;

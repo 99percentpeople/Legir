@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { SnappingOptions } from "../types";
-import { useLanguage, Language } from "./language-provider";
+import { useLanguage, Language, LANGUAGES } from "./language-provider";
 import { useTheme } from "./theme-provider";
 
 interface SettingsDialogProps {
@@ -77,8 +77,14 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   <SelectValue placeholder={t("common.select")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="zh">中文</SelectItem>
+                  {LANGUAGES.map((lang) => (
+                    <SelectItem key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="system">
+                    {t("settings.theme.system")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

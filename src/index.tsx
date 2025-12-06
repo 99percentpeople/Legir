@@ -5,6 +5,10 @@ import App from "./App";
 import { ThemeProvider } from "./components/theme-provider";
 import { LanguageProvider } from "./components/language-provider";
 import { Toaster } from "./components/ui/sonner";
+import { registerControls } from "./components/workspace/controls";
+
+// Register all controls
+registerControls();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

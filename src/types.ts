@@ -11,6 +11,7 @@ export type EditorMode = "form" | "annotation";
 export type Tool =
   // Common
   | "select"
+  | "pan"
   // Form Tools
   | "draw_text"
   | "draw_checkbox"

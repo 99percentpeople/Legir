@@ -121,16 +121,33 @@ const renderPage = async (params: RenderRequest) => {
     canvasId,
   } = params;
 
+  let renderTask: pdfjsLib.RenderTask | null = null;
+  let isCancelled = false;
+
+  // Register cancellation handler immediately to catch early cancels
+  activeRenderTasks.set(id, {
+    cancel: () => {
+      isCancelled = true;
+      if (renderTask) {
+        renderTask.cancel();
+      }
+    },
+  });
+
   try {
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
     // Load Document if needed
     if (isNewDoc && data) {
       await loadDocument(data);
     }
+    if (isCancelled) throw { name: "RenderingCancelledException" };
 
     // Wait for loading if it's in progress
     if (!pdfDoc && docLoadingPromise) {
       pdfDoc = await docLoadingPromise;
     }
+    if (isCancelled) throw { name: "RenderingCancelledException" };
 
     if (!pdfDoc) {
       throw new Error("PDF Document not loaded");
@@ -161,6 +178,7 @@ const renderPage = async (params: RenderRequest) => {
       pageCache.set(pageNumber, pagePromise);
     }
     const page = await pagePromise;
+    if (isCancelled) throw { name: "RenderingCancelledException" };
 
     // Calculate viewport
     const viewport = page.getViewport({ scale: scale, rotation: page.rotate });
@@ -202,31 +220,19 @@ const renderPage = async (params: RenderRequest) => {
       annotationMode: pdfjsLib.AnnotationMode.DISABLE,
     };
 
-    const renderTask = page.render(renderContext);
+    if (isCancelled) throw { name: "RenderingCancelledException" };
 
-    // Store cancel function
-    activeRenderTasks.set(id, {
-      cancel: () => {
-        renderTask.cancel();
-      },
-    });
+    renderTask = page.render(renderContext);
 
     await renderTask.promise;
-
-    // Clean up task from map on success
-    activeRenderTasks.delete(id);
 
     ctx.restore();
 
     // No need to transfer bitmap back, canvas is already updated
     self.postMessage({ id, success: true });
   } catch (error: any) {
-    // Clean up task from map on error
-    activeRenderTasks.delete(id);
-
     if (error?.name === "RenderingCancelledException") {
-      // Ignore cancelled errors, or notify if needed (usually we just ignore)
-      // self.postMessage({ id, success: false, error: "Cancelled" });
+      // Ignore cancelled errors
       return;
     }
 
@@ -235,6 +241,9 @@ const renderPage = async (params: RenderRequest) => {
       success: false,
       error: error.message || "Unknown error",
     });
+  } finally {
+    // Clean up task from map
+    activeRenderTasks.delete(id);
   }
 };
 

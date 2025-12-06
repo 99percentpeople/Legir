@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Toolbar from "./components/toolbar/Toolbar";
 import Workspace from "./components/workspace/Workspace";
-import { PropertiesPanel } from "./components/PropertiesPanel";
+import { PropertiesPanel } from "./components/properties-panel/PropertiesPanel";
 import LandingPage from "./components/LandingPage";
-import ZoomControls from "./components/workspace/ZoomControls";
+import ZoomControls from "./components/toolbar/ZoomControls";
 import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import SettingsDialog from "./components/SettingsDialog";
 import AIDetectionDialog, {
@@ -25,6 +25,7 @@ import {
   PageData,
   FieldType,
   Annotation,
+  PDFMetadata,
 } from "./types";
 import { loadPDF, exportPDF, renderPageToDataURL } from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
@@ -123,7 +124,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
-  const handleEditAnnotation = (id: string) => {
+  const handleEditAnnotation = useCallback((id: string) => {
     setIsSidebarOpen(true);
     setSidebarTab("comments");
 
@@ -145,7 +146,7 @@ const App: React.FC = () => {
         el.setSelectionRange(len, len);
       }
     }, 100);
-  };
+  }, []);
 
   useEffect(() => {
     if (state.pages.length > 0 && state.pdfBytes) {
@@ -318,16 +319,26 @@ const App: React.FC = () => {
         e.key === "Alt" ||
         e.key === "Meta"
       ) {
-        setState((prev) => ({
-          ...prev,
-          keys: {
-            ctrl: e.ctrlKey,
-            shift: e.shiftKey,
-            alt: e.altKey,
-            meta: e.metaKey,
-            space: prev.keys.space,
-          },
-        }));
+        setState((prev) => {
+          if (
+            prev.keys.ctrl === e.ctrlKey &&
+            prev.keys.shift === e.shiftKey &&
+            prev.keys.alt === e.altKey &&
+            prev.keys.meta === e.metaKey
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            keys: {
+              ctrl: e.ctrlKey,
+              shift: e.shiftKey,
+              alt: e.altKey,
+              meta: e.metaKey,
+              space: prev.keys.space,
+            },
+          };
+        });
         return;
       }
 
@@ -340,10 +351,14 @@ const App: React.FC = () => {
 
       if (e.key === " " && !isInput) {
         e.preventDefault();
-        setState((prev) => ({
-          ...prev,
-          keys: { ...prev.keys, space: true },
-        }));
+        e.stopPropagation();
+        setState((prev) => {
+          if (prev.keys.space) return prev;
+          return {
+            ...prev,
+            keys: { ...prev.keys, space: true },
+          };
+        });
         return;
       }
 
@@ -449,16 +464,26 @@ const App: React.FC = () => {
         e.key === "Alt" ||
         e.key === "Meta"
       ) {
-        setState((prev) => ({
-          ...prev,
-          keys: {
-            ctrl: e.ctrlKey,
-            shift: e.shiftKey,
-            alt: e.altKey,
-            meta: e.metaKey,
-            space: prev.keys.space,
-          },
-        }));
+        setState((prev) => {
+          if (
+            prev.keys.ctrl === e.ctrlKey &&
+            prev.keys.shift === e.shiftKey &&
+            prev.keys.alt === e.altKey &&
+            prev.keys.meta === e.metaKey
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            keys: {
+              ctrl: e.ctrlKey,
+              shift: e.shiftKey,
+              alt: e.altKey,
+              meta: e.metaKey,
+              space: prev.keys.space,
+            },
+          };
+        });
       }
 
       if (e.key === " ") {
@@ -469,11 +494,11 @@ const App: React.FC = () => {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
     };
   }, []);
 
@@ -606,111 +631,123 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddField = (field: FormField) => {
-    saveCheckpoint();
-    setState((prev) => {
-      const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
-      const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
+  const handleAddField = useCallback(
+    (field: FormField) => {
+      saveCheckpoint();
+      setState((prev) => {
+        const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
+        const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
 
-      return {
-        ...prev,
-        fields: [...prev.fields, field],
-        selectedId: field.id,
-        tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
-      };
-    });
-  };
+        return {
+          ...prev,
+          fields: [...prev.fields, field],
+          selectedId: field.id,
+          tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
+        };
+      });
+    },
+    [saveCheckpoint],
+  );
 
-  const handleAddAnnotation = (annotation: Annotation) => {
-    saveCheckpoint();
-    setState((prev) => {
-      const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
-      const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
+  const handleAddAnnotation = useCallback(
+    (annotation: Annotation) => {
+      saveCheckpoint();
+      setState((prev) => {
+        const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
+        const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
 
-      return {
-        ...prev,
-        annotations: [...prev.annotations, annotation],
-        selectedId: annotation.id,
-        tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
-      };
-    });
-  };
+        return {
+          ...prev,
+          annotations: [...prev.annotations, annotation],
+          selectedId: annotation.id,
+          tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
+        };
+      });
+    },
+    [saveCheckpoint],
+  );
 
-  const handleUpdateField = (id: string, updates: Partial<FormField>) => {
-    setIsDirty(true);
-    setState((prev) => {
-      let newFields = prev.fields;
-      const targetField = prev.fields.find((f) => f.id === id);
+  const handleUpdateField = useCallback(
+    (id: string, updates: Partial<FormField>) => {
+      setIsDirty(true);
+      setState((prev) => {
+        let newFields = prev.fields;
+        const targetField = prev.fields.find((f) => f.id === id);
 
-      if (!targetField) return prev;
+        if (!targetField) return prev;
 
-      // Handle Radio Exclusivity
-      if (updates.isChecked === true) {
-        if (targetField.type === FieldType.RADIO) {
+        // Handle Radio Exclusivity
+        if (updates.isChecked === true) {
+          if (targetField.type === FieldType.RADIO) {
+            newFields = newFields.map((f) =>
+              f.name === targetField.name &&
+              f.id !== id &&
+              f.type === FieldType.RADIO
+                ? { ...f, isChecked: false }
+                : f,
+            );
+          }
+        }
+
+        // Sync same-name fields
+        const propsToSync = [
+          "value",
+          "defaultValue",
+          "options",
+          "required",
+          "readOnly",
+          "toolTip",
+          "multiline",
+          "maxLength",
+          "alignment",
+        ];
+
+        // Sync isChecked for non-radio fields (Radio logic is handled above)
+        if (targetField.type !== FieldType.RADIO) {
+          propsToSync.push("isChecked");
+          propsToSync.push("isDefaultChecked");
+        }
+
+        const syncUpdates: Partial<FormField> = {};
+        propsToSync.forEach((key) => {
+          const k = key as keyof FormField;
+          if (updates[k] !== undefined) {
+            // @ts-ignore
+            syncUpdates[k] = updates[k];
+          }
+        });
+
+        if (Object.keys(syncUpdates).length > 0) {
           newFields = newFields.map((f) =>
             f.name === targetField.name &&
             f.id !== id &&
-            f.type === FieldType.RADIO
-              ? { ...f, isChecked: false }
+            f.type === targetField.type
+              ? { ...f, ...syncUpdates }
               : f,
           );
         }
-      }
 
-      // Sync same-name fields
-      const propsToSync = [
-        "value",
-        "defaultValue",
-        "options",
-        "required",
-        "readOnly",
-        "toolTip",
-        "multiline",
-        "maxLength",
-        "alignment",
-      ];
-
-      // Sync isChecked for non-radio fields (Radio logic is handled above)
-      if (targetField.type !== FieldType.RADIO) {
-        propsToSync.push("isChecked");
-        propsToSync.push("isDefaultChecked");
-      }
-
-      const syncUpdates: Partial<FormField> = {};
-      propsToSync.forEach((key) => {
-        const k = key as keyof FormField;
-        if (updates[k] !== undefined) {
-          // @ts-ignore
-          syncUpdates[k] = updates[k];
-        }
-      });
-
-      if (Object.keys(syncUpdates).length > 0) {
         newFields = newFields.map((f) =>
-          f.name === targetField.name &&
-          f.id !== id &&
-          f.type === targetField.type
-            ? { ...f, ...syncUpdates }
-            : f,
+          f.id === id ? { ...f, ...updates } : f,
         );
-      }
+        return { ...prev, fields: newFields };
+      });
+    },
+    [],
+  );
 
-      newFields = newFields.map((f) =>
-        f.id === id ? { ...f, ...updates } : f,
-      );
-      return { ...prev, fields: newFields };
-    });
-  };
-
-  const handleUpdateAnnotation = (id: string, updates: Partial<Annotation>) => {
-    setIsDirty(true);
-    setState((prev) => ({
-      ...prev,
-      annotations: prev.annotations.map((a) =>
-        a.id === id ? { ...a, ...updates } : a,
-      ),
-    }));
-  };
+  const handleUpdateAnnotation = useCallback(
+    (id: string, updates: Partial<Annotation>) => {
+      setIsDirty(true);
+      setState((prev) => ({
+        ...prev,
+        annotations: prev.annotations.map((a) =>
+          a.id === id ? { ...a, ...updates } : a,
+        ),
+      }));
+    },
+    [],
+  );
 
   const handleAdvancedDetect = async (options: AIDetectionOptions) => {
     if (state.pages.length === 0 || !state.pdfDocument) return;
@@ -878,12 +915,15 @@ const App: React.FC = () => {
     return false;
   };
 
-  const handleSelectionChange = (id: string | null) => {
+  const handleSelectionChange = useCallback((id: string | null) => {
     setState((prev) => ({
       ...prev,
       selectedId: id,
     }));
-  };
+    if (id) {
+      setIsRightPanelOpen(true);
+    }
+  }, []);
 
   const handleToolChange = (tool: any, preserveSelection?: boolean) => {
     setState((prev) => ({
@@ -1018,19 +1058,73 @@ const App: React.FC = () => {
       ? state.fields.find((f) => f.id === state.selectedId) || null
       : null;
 
-  const handlePenStyleChange = (style: Partial<EditorState["penStyle"]>) => {
-    setState((prev) => ({
-      ...prev,
-      penStyle: { ...prev.penStyle, ...style },
-    }));
-  };
+  const selectedAnnotation =
+    state.selectedId && state.annotations.find((a) => a.id === state.selectedId)
+      ? state.annotations.find((a) => a.id === state.selectedId) || null
+      : null;
 
-  const handleCommentStyleChange = (style: { color: string }) => {
+  const selectedControl = selectedField || selectedAnnotation;
+
+  const handlePenStyleChange = useCallback(
+    (style: Partial<EditorState["penStyle"]>) => {
+      setState((prev) => ({
+        ...prev,
+        penStyle: { ...prev.penStyle, ...style },
+      }));
+    },
+    [],
+  );
+
+  const handleCommentStyleChange = useCallback((style: { color: string }) => {
     setState((prev) => ({
       ...prev,
       commentStyle: { ...prev.commentStyle, ...style },
     }));
-  };
+  }, []);
+
+  const handlePropertiesChange = useCallback(
+    (updates: Partial<FormField | Annotation>) => {
+      const currentSelectedId = stateRef.current.selectedId;
+      if (!currentSelectedId) return;
+
+      const isField = stateRef.current.fields.some(
+        (f) => f.id === currentSelectedId,
+      );
+      if (isField) {
+        handleUpdateField(currentSelectedId, updates as Partial<FormField>);
+      } else {
+        const isAnnotation = stateRef.current.annotations.some(
+          (a) => a.id === currentSelectedId,
+        );
+        if (isAnnotation) {
+          handleUpdateAnnotation(
+            currentSelectedId,
+            updates as Partial<Annotation>,
+          );
+        }
+      }
+    },
+    [handleUpdateField, handleUpdateAnnotation],
+  );
+
+  const handleMetadataChange = useCallback((updates: Partial<PDFMetadata>) => {
+    setState((prev) => ({
+      ...prev,
+      metadata: { ...prev.metadata, ...updates },
+    }));
+  }, []);
+
+  const handleFilenameChange = useCallback((name: string) => {
+    setState((prev) => ({ ...prev, filename: name }));
+  }, []);
+
+  const handlePropertiesClose = useCallback(() => {
+    setState((prev) => ({ ...prev, selectedId: null }));
+  }, []);
+
+  const handleToggleFloating = useCallback(() => {
+    setIsPanelFloating((prev) => !prev);
+  }, []);
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -1167,29 +1261,18 @@ const App: React.FC = () => {
               />
             </div>
 
-            {state.mode === "form" && isRightPanelOpen && (
+            {(state.mode === "form" || selectedControl) && isRightPanelOpen && (
               <PropertiesPanel
-                field={selectedField}
+                selectedControl={selectedControl}
                 metadata={state.metadata}
                 filename={state.filename}
-                onChange={(updates) =>
-                  selectedField && handleUpdateField(selectedField.id, updates)
-                }
-                onMetadataChange={(m) =>
-                  setState((prev) => ({
-                    ...prev,
-                    metadata: { ...prev.metadata, ...m },
-                  }))
-                }
-                onFilenameChange={(name) =>
-                  setState((prev) => ({ ...prev, filename: name }))
-                }
+                onChange={handlePropertiesChange}
+                onMetadataChange={handleMetadataChange}
+                onFilenameChange={handleFilenameChange}
                 onDelete={handleDelete}
-                onClose={() =>
-                  setState((prev) => ({ ...prev, selectedId: null }))
-                }
+                onClose={handlePropertiesClose}
                 isFloating={isPanelFloating}
-                onToggleFloating={() => setIsPanelFloating(!isPanelFloating)}
+                onToggleFloating={handleToggleFloating}
                 onTriggerHistorySave={saveCheckpoint}
                 width={rightPanelWidth}
                 onResize={setRightPanelWidth}

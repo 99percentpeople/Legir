@@ -11,6 +11,20 @@ export const COLORS = {
   fieldSelectedBg: "rgba(37, 99, 235, 0.3)",
 };
 
+// prettier-ignore
+export const PEN_COLORS = [
+  // Row 1
+  "#000000", "#58595b", "#808285", "#a7a9ac", "#d1d3d4", "#ffffff",
+  // Row 2
+  "#b31564", "#e61b1b", "#ff5500", "#ffaa00", "#ffce00", "#ffe600",
+  // Row 3
+  "#a2e61b", "#26e600", "#008055", "#008055", "#004de6", "#3d00b8",
+  // Row 4
+  "#6600cc", "#600080", "#f7d7c4", "#bb9167", "#8e562e", "#613d30",
+  // Row 5
+  "#ff80ff", "#ffc680", "#ffff80", "#80ff9e", "#80d6ff", "#bcb3ff",
+];
+
 export const DEFAULT_FIELD_STYLE = {
   borderColor: "#000000",
   backgroundColor: "#e6f2ff", // Light blue-ish hint by default

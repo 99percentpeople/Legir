@@ -27,6 +27,7 @@ export function NumberInput({
       {...props}
       onChange={onChange}
       className={cn("w-full gap-1.5", className)}
+      aria-describedby={label ? `${label}-description` : ""}
     >
       {label && (
         <Label className="mb-1.5 block text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70">

@@ -52,6 +52,7 @@ interface ColorPickerPopoverProps {
   isActive?: boolean;
   showThickness?: boolean;
   title?: string;
+  children?: React.ReactNode;
 }
 
 export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
@@ -62,23 +63,28 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   isActive = false,
   showThickness = true,
   title = "Properties",
+  children,
 }) => {
   const { t } = useLanguage();
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "hover:bg-muted h-9 w-5 rounded-l-none p-0",
-            isActive &&
-              "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
-          )}
-          title={title}
-        >
-          <ChevronDown size={12} />
-        </Button>
+        {children ? (
+          children
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "hover:bg-muted h-9 w-5 rounded-l-none p-0",
+              isActive &&
+                "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+            title={title}
+          >
+            <ChevronDown size={12} />
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="w-64 p-4" side="bottom" align="center">
         <div className="space-y-4">

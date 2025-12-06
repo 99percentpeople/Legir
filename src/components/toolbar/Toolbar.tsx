@@ -26,6 +26,7 @@ import {
   Eraser,
   MessageSquarePlus,
   Printer,
+  Hand,
 } from "lucide-react";
 import { EditorState, Tool, PenStyle } from "../../types";
 import { Button } from "../ui/button";
@@ -181,13 +182,16 @@ const Toolbar: React.FC<ToolbarProps> = ({
         {mode === "form" ? (
           <ToggleGroup
             type="single"
-            value={tool}
+            value={editorState.keys.space ? "pan" : tool}
             onValueChange={(value) => {
               if (value) onToolChange(value as Tool);
             }}
             className="bg-muted/20 border-border flex items-center gap-1 rounded-lg border p-1 shadow-sm"
             spacing={1}
           >
+            <ToggleGroupItem value="pan" title={t("toolbar.pan")}>
+              <Hand size={18} />
+            </ToggleGroupItem>
             <ToggleGroupItem value="select" title={t("toolbar.select")}>
               <MousePointer2 size={18} />
             </ToggleGroupItem>
@@ -220,13 +224,16 @@ const Toolbar: React.FC<ToolbarProps> = ({
         ) : (
           <ToggleGroup
             type="single"
-            value={tool}
+            value={editorState.keys.space ? "pan" : tool}
             onValueChange={(value) => {
               if (value) onToolChange(value as Tool);
             }}
             className="bg-muted/20 border-border flex items-center gap-1 rounded-lg border p-1 shadow-sm"
             spacing={1}
           >
+            <ToggleGroupItem value="pan" title={t("toolbar.pan")}>
+              <Hand size={18} />
+            </ToggleGroupItem>
             <ToggleGroupItem value="select" title={t("toolbar.select")}>
               <MousePointer2 size={18} />
             </ToggleGroupItem>

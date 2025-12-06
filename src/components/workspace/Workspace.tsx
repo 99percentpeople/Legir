@@ -1,4 +1,12 @@
-import React, { useRef, useState, useLayoutEffect, useEffect } from "react";
+import React, {
+  useRef,
+  useState,
+  useLayoutEffect,
+  useEffect,
+  useCallback,
+  useMemo,
+  Suspense,
+} from "react";
 import {
   EditorState,
   FormField,
@@ -9,28 +17,19 @@ import {
 import {
   DEFAULT_FIELD_STYLE,
   ANNOTATION_STYLES,
-  FONT_FAMILY_MAP,
   ZOOM_BASE,
 } from "../../constants";
-import {
-  Check,
-  ChevronDown,
-  PenLine,
-  Trash2,
-  Image as ImageIcon,
-  MessageSquareText,
-} from "lucide-react";
-import { ListBox, ListBoxItem } from "react-aria-components";
 import { cn, setGlobalCursor, resetGlobalCursor } from "../../lib/utils";
 import { usePointerCapture } from "../../hooks/usePointerCapture";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
+import { useCanvasPanning } from "../../hooks/useCanvasPanning";
 import { useLanguage } from "../language-provider";
 import {
   getCursor,
   shouldSwitchToSelectAfterUse,
 } from "../../lib/tool-behavior";
-import AnnotationToolbar from "./AnnotationToolbar";
 import PDFPage from "./PDFPage";
+import { ControlRenderer } from "./controls";
 
 interface WorkspaceProps {
   editorState: EditorState;
@@ -77,13 +76,17 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const { capture: capturePointer, release: releasePointer } =
     usePointerCapture(containerRef);
 
-  const [isPanning, setIsPanning] = useState(false);
-  const panStartRef = useRef<{
-    x: number;
-    y: number;
-    scrollLeft: number;
-    scrollTop: number;
-  } | null>(null);
+  const { isPanning, startPan, movePan, endPan, isPanModeActive } =
+    useCanvasPanning({
+      containerRef,
+      editorState,
+      capturePointer,
+      releasePointer,
+    });
+
+  // Keep a ref to editorState for stable event handlers
+  const editorStateRef = useRef(editorState);
+  editorStateRef.current = editorState;
 
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(
     null,
@@ -149,6 +152,26 @@ const Workspace: React.FC<WorkspaceProps> = ({
   // Track if any interactive operation is in progress
   // NOTE: Definition moved up to be used by useAutoScroll hook
   // const isInteracting = !!(dragStart || isDrawing || isErasing || movingFieldId || movingAnnotationId || resizingFieldId);
+
+  // --- Register Controls ---
+  // Controls are now registered in index.tsx, so we don't need to do it here.
+  // But we keep this comment for reference.
+
+  // --- Optimization: Pre-calculate grouped controls ---
+  const pagesWithControls = useMemo(() => {
+    return editorState.pages.map((page) => ({
+      ...page,
+      pageAnnotations: editorState.annotations.filter(
+        (a) => a.pageIndex === page.pageIndex && a.type !== "ink",
+      ),
+      pageFields: editorState.fields.filter(
+        (f) => f.pageIndex === page.pageIndex,
+      ),
+      pageInk: editorState.annotations.filter(
+        (a) => a.pageIndex === page.pageIndex && a.type === "ink" && a.points,
+      ),
+    }));
+  }, [editorState.pages, editorState.annotations, editorState.fields]);
 
   // --- Zoom Effect (Same as before) ---
   useLayoutEffect(() => {
@@ -280,27 +303,27 @@ const Workspace: React.FC<WorkspaceProps> = ({
     return () => container.removeEventListener("wheel", handleWheel);
   }, [editorState.scale, onScaleChange, editorState.pages, isPanning]);
 
-  const getRelativeCoordsFromPoint = (
-    clientX: number,
-    clientY: number,
-    pageIndex: number,
-  ) => {
-    const pageEl = document.getElementById(`page-${pageIndex}`);
-    if (!pageEl) return { x: 0, y: 0 };
-    const rect = pageEl.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) / editorState.scale,
-      y: (clientY - rect.top) / editorState.scale,
-    };
-  };
+  const getRelativeCoordsFromPoint = useCallback(
+    (clientX: number, clientY: number, pageIndex: number) => {
+      const pageEl = document.getElementById(`page-${pageIndex}`);
+      if (!pageEl) return { x: 0, y: 0 };
+      const rect = pageEl.getBoundingClientRect();
+      const scale = editorStateRef.current.scale;
+      return {
+        x: (clientX - rect.left) / scale,
+        y: (clientY - rect.top) / scale,
+      };
+    },
+    [],
+  );
 
-  const getRelativeCoords = (
-    e: React.MouseEvent | MouseEvent,
-    pageIndex: number,
-  ) => {
-    // IMPORTANT: Get coords relative to the container wrapper using stable ID
-    return getRelativeCoordsFromPoint(e.clientX, e.clientY, pageIndex);
-  };
+  const getRelativeCoords = useCallback(
+    (e: React.MouseEvent | MouseEvent, pageIndex: number) => {
+      // IMPORTANT: Get coords relative to the container wrapper using stable ID
+      return getRelativeCoordsFromPoint(e.clientX, e.clientY, pageIndex);
+    },
+    [getRelativeCoordsFromPoint],
+  );
 
   const dist2 = (p: { x: number; y: number }, v: { x: number; y: number }) => {
     return (p.x - v.x) * (p.x - v.x) + (p.y - v.y) * (p.y - v.y);
@@ -1025,25 +1048,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   // --- Handlers ---
   const handleContainerPointerDown = (e: React.PointerEvent) => {
-    if (editorState.keys.space && e.button === 0) {
-      e.preventDefault();
-      // Do not stop propagation, as this is the container handler
-
-      setIsPanning(true);
-      panStartRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        scrollLeft: containerRef.current?.scrollLeft || 0,
-        scrollTop: containerRef.current?.scrollTop || 0,
-      };
-      setGlobalCursor("grabbing");
-      capturePointer(e);
-    }
+    if (startPan(e)) return;
   };
 
   const handlePointerDown = (e: React.PointerEvent, pageIndex: number) => {
     if (e.button === 1) return;
-    if (editorState.keys.space) return;
+    if (isPanModeActive) return;
 
     // Ensure mouse position is tracked immediately
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -1126,13 +1136,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const handlePointerMove = (e: React.PointerEvent) => {
     // Panning Logic
-    if (isPanning && panStartRef.current && containerRef.current) {
-      const dx = e.clientX - panStartRef.current.x;
-      const dy = e.clientY - panStartRef.current.y;
-      containerRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
-      containerRef.current.scrollTop = panStartRef.current.scrollTop - dy;
-      return;
-    }
+    if (movePan(e)) return;
 
     if (activePageIndex === null) return;
 
@@ -1189,13 +1193,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   const handlePointerUp = (e?: React.PointerEvent | React.MouseEvent) => {
-    if (isPanning) {
-      setIsPanning(false);
-      panStartRef.current = null;
-      resetGlobalCursor();
-      if (e) releasePointer(e);
-      return;
-    }
+    if (endPan(e)) return;
 
     // Release capture if held
     releasePointer(e);
@@ -1323,165 +1321,176 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setIsErasing(false);
   };
 
-  const handleFieldPointerDown = (e: React.PointerEvent, field: FormField) => {
-    if (e.button === 1) return;
-    if (editorState.keys.space) return;
+  const handleFieldPointerDown = useCallback(
+    (e: React.PointerEvent, field: FormField) => {
+      const state = editorStateRef.current;
+      if (e.button === 1) return;
+      if (state.keys.space || state.tool === "pan") return;
 
-    // If we are in Annotation mode, we allow selection but prevent drag logic.
-    // Instead we likely want to fill them out.
-    if (editorState.mode === "annotation") {
-      e.stopPropagation();
-      onSelectControl(field.id); // Sync selection with sidebar
-      return;
-    }
-
-    // If not using Select tool, we might be trying to draw a new field ON TOP of this one.
-    // In that case, we want the event to bubble up to the workspace to trigger 'handleMouseDown'.
-    if (editorState.tool !== "select") return;
-
-    e.stopPropagation();
-    e.preventDefault();
-
-    // Ensure mouse position is tracked immediately
-    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-
-    // Capture pointer
-    capturePointer(e);
-
-    onTriggerHistorySave();
-
-    // Set Global Cursor
-    setGlobalCursor("move");
-
-    let targetFieldId = field.id;
-    let targetFieldRect = field.rect;
-    let targetPageIndex = field.pageIndex;
-
-    // Check for Duplicate shortcut (Ctrl/Meta + Drag)
-    if (e.ctrlKey || e.metaKey) {
-      const newId = `field_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      // If Radio, keep name to maintain group. For others, increment suffix number or append _1
-      let newName = field.name;
-      if (field.type !== FieldType.RADIO) {
-        const match = field.name.match(/^(.*)_(\d+)$/);
-        if (match) {
-          const prefix = match[1];
-          const num = parseInt(match[2], 10);
-          newName = `${prefix}_${num + 1}`;
-        } else {
-          newName = `${field.name}_1`;
-        }
+      // If we are in Annotation mode, we allow selection but prevent drag logic.
+      // Instead we likely want to fill them out.
+      if (state.mode === "annotation") {
+        e.stopPropagation();
+        onSelectControl(field.id); // Sync selection with sidebar
+        return;
       }
 
-      const newField: FormField = {
-        ...field,
-        id: newId,
-        name: newName,
-        // Fix: If duplicating a Radio button in the same group, ensure it starts unchecked
-        // and not default checked to preserve single-selection logic.
-        isChecked: field.type === FieldType.RADIO ? false : field.isChecked,
-        isDefaultChecked:
-          field.type === FieldType.RADIO ? false : field.isDefaultChecked,
-      };
+      // If not using Select tool, we might be trying to draw a new field ON TOP of this one.
+      // In that case, we want the event to bubble up to the workspace to trigger 'handleMouseDown'.
+      if (state.tool !== "select") return;
 
-      // Add the new field
-      onAddField(newField);
+      e.stopPropagation();
+      e.preventDefault();
 
-      // Target the new field for the drag operation
-      targetFieldId = newId;
-      // Rect and Page are same as original
-    }
+      // Ensure mouse position is tracked immediately
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
 
-    onSelectControl(targetFieldId);
-    setActivePageIndex(targetPageIndex);
-    const coords = getRelativeCoords(e, targetPageIndex);
+      // Capture pointer
+      capturePointer(e);
 
-    setMovingFieldId(targetFieldId);
-    setMoveOffset({
-      x: coords.x - targetFieldRect.x,
-      y: coords.y - targetFieldRect.y,
-    });
-    setMoveStartRaw({
-      x: coords.x,
-      y: coords.y,
-      originalRect: { ...targetFieldRect },
-    });
-  };
+      onTriggerHistorySave();
 
-  const handleAnnotationPointerDown = (
-    e: React.PointerEvent,
-    annotation: Annotation,
-  ) => {
-    if (e.button === 1) return;
-    if (editorState.keys.space) return;
-
-    // Don't swallow event if erasing
-    if (editorState.tool === "eraser") return;
-    e.stopPropagation();
-    e.preventDefault();
-    if (editorState.tool !== "select") return;
-
-    // Ensure mouse position is tracked immediately
-    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-
-    // Capture pointer
-    capturePointer(e);
-
-    onTriggerHistorySave();
-    onSelectControl(annotation.id);
-    // App handles clearing the selectedId when needed.
-
-    setActivePageIndex(annotation.pageIndex);
-    const coords = getRelativeCoords(e, annotation.pageIndex);
-
-    // Setup Move (Disable for Highlight to match Pen behavior)
-    if (annotation.rect && annotation.type !== "highlight") {
+      // Set Global Cursor
       setGlobalCursor("move");
-      setMovingAnnotationId(annotation.id);
+
+      let targetFieldId = field.id;
+      let targetFieldRect = field.rect;
+      let targetPageIndex = field.pageIndex;
+
+      // Check for Duplicate shortcut (Ctrl/Meta + Drag)
+      if (e.ctrlKey || e.metaKey) {
+        const newId = `field_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        // If Radio, keep name to maintain group. For others, increment suffix number or append _1
+        let newName = field.name;
+        if (field.type !== FieldType.RADIO) {
+          const match = field.name.match(/^(.*)_(\d+)$/);
+          if (match) {
+            const prefix = match[1];
+            const num = parseInt(match[2], 10);
+            newName = `${prefix}_${num + 1}`;
+          } else {
+            newName = `${field.name}_1`;
+          }
+        }
+
+        const newField: FormField = {
+          ...field,
+          id: newId,
+          name: newName,
+          // Fix: If duplicating a Radio button in the same group, ensure it starts unchecked
+          // and not default checked to preserve single-selection logic.
+          isChecked: field.type === FieldType.RADIO ? false : field.isChecked,
+          isDefaultChecked:
+            field.type === FieldType.RADIO ? false : field.isDefaultChecked,
+        };
+
+        // Add the new field
+        onAddField(newField);
+
+        // Target the new field for the drag operation
+        targetFieldId = newId;
+        // Rect and Page are same as original
+      }
+
+      onSelectControl(targetFieldId);
+      setActivePageIndex(targetPageIndex);
+      const coords = getRelativeCoords(e, targetPageIndex);
+
+      setMovingFieldId(targetFieldId);
       setMoveOffset({
-        x: coords.x - annotation.rect.x,
-        y: coords.y - annotation.rect.y,
+        x: coords.x - targetFieldRect.x,
+        y: coords.y - targetFieldRect.y,
       });
-    }
-  };
+      setMoveStartRaw({
+        x: coords.x,
+        y: coords.y,
+        originalRect: { ...targetFieldRect },
+      });
+    },
+    [
+      capturePointer,
+      onTriggerHistorySave,
+      onSelectControl,
+      onAddField,
+      getRelativeCoords,
+    ],
+  );
 
-  const handleResizePointerDown = (
-    e: React.PointerEvent,
-    field: FormField,
-    handle: string,
-  ) => {
-    if (e.button === 1) return;
-    if (editorState.keys.space) return;
-    e.stopPropagation();
+  const handleAnnotationPointerDown = useCallback(
+    (e: React.PointerEvent, annotation: Annotation) => {
+      const state = editorStateRef.current;
+      if (e.button === 1) return;
+      if (state.keys.space || state.tool === "pan") return;
 
-    // Ensure mouse position is tracked immediately
-    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+      // Don't swallow event if erasing
+      if (state.tool === "eraser") return;
+      e.stopPropagation();
+      e.preventDefault();
+      if (state.tool !== "select") return;
 
-    // Capture pointer to ensure events track even over scrollbars/outside window
-    capturePointer(e);
+      // Ensure mouse position is tracked immediately
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
 
-    if (editorState.tool !== "select") return;
+      // Capture pointer
+      capturePointer(e);
 
-    onTriggerHistorySave();
-    setActivePageIndex(field.pageIndex);
-    const coords = getRelativeCoords(e, field.pageIndex);
-    setResizingFieldId(field.id);
-    setResizeHandle(handle);
-    setResizeStart({
-      originalRect: { ...field.rect },
-      mouseX: coords.x,
-      mouseY: coords.y,
-    });
+      onTriggerHistorySave();
+      onSelectControl(annotation.id);
+      // App handles clearing the selectedId when needed.
 
-    // Set Global Cursor based on handle
-    let cursor = "default";
-    if (["nw", "se"].includes(handle)) cursor = "nwse-resize";
-    else if (["ne", "sw"].includes(handle)) cursor = "nesw-resize";
-    else if (["n", "s"].includes(handle)) cursor = "ns-resize";
-    else if (["e", "w"].includes(handle)) cursor = "ew-resize";
+      setActivePageIndex(annotation.pageIndex);
+      const coords = getRelativeCoords(e, annotation.pageIndex);
 
-    setGlobalCursor(cursor);
-  };
+      // Setup Move (Disable for Highlight to match Pen behavior)
+      if (annotation.rect && annotation.type !== "highlight") {
+        setGlobalCursor("move");
+        setMovingAnnotationId(annotation.id);
+        setMoveOffset({
+          x: coords.x - annotation.rect.x,
+          y: coords.y - annotation.rect.y,
+        });
+      }
+    },
+    [capturePointer, onTriggerHistorySave, onSelectControl, getRelativeCoords],
+  );
+
+  const handleResizePointerDown = useCallback(
+    (handle: string, e: React.PointerEvent, field: FormField) => {
+      const state = editorStateRef.current;
+      if (e.button === 1) return;
+      if (state.keys.space || state.tool === "pan") return;
+      e.stopPropagation();
+
+      // Ensure mouse position is tracked immediately
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+      // Capture pointer to ensure events track even over scrollbars/outside window
+      capturePointer(e);
+
+      if (state.tool !== "select") return;
+
+      onTriggerHistorySave();
+      setActivePageIndex(field.pageIndex);
+      const coords = getRelativeCoords(e, field.pageIndex);
+      setResizingFieldId(field.id);
+      setResizeHandle(handle);
+      setResizeStart({
+        originalRect: { ...field.rect },
+        mouseX: coords.x,
+        mouseY: coords.y,
+      });
+
+      // Set Global Cursor based on handle
+      let cursor = "default";
+      if (["nw", "se"].includes(handle)) cursor = "nwse-resize";
+      else if (["ne", "sw"].includes(handle)) cursor = "nesw-resize";
+      else if (["n", "s"].includes(handle)) cursor = "ns-resize";
+      else if (["e", "w"].includes(handle)) cursor = "ew-resize";
+
+      setGlobalCursor(cursor);
+    },
+    [capturePointer, onTriggerHistorySave, getRelativeCoords],
+  );
 
   // --- Scroll to Center on Document Load, Page Count Change, or Fit Trigger ---
   useEffect(() => {
@@ -1523,7 +1532,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       ref={containerRef}
       className="relative flex-1 overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
       style={{
-        cursor: editorState.keys.space ? "grab" : undefined,
+        cursor: isPanModeActive ? "grab" : undefined,
       }}
       onPointerDown={handleContainerPointerDown}
       onPointerMove={handlePointerMove}
@@ -1535,7 +1544,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         ref={contentRef}
         className="mx-auto flex min-h-full w-fit flex-col items-center gap-8 p-8 pb-20"
       >
-        {editorState.pages.map((page) => (
+        {pagesWithControls.map((page) => (
           <div
             id={`page-${page.pageIndex}`}
             key={page.pageIndex}
@@ -1559,10 +1568,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
             <div
               className={cn("absolute inset-0 scheme-light")}
               style={{
-                cursor: editorState.keys.space
-                  ? "grab"
-                  : getCursor(editorState.tool),
-                pointerEvents: editorState.keys.space
+                cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
+                pointerEvents: isPanModeActive
                   ? "auto"
                   : editorState.tool === "select"
                     ? "none"
@@ -1570,561 +1577,44 @@ const Workspace: React.FC<WorkspaceProps> = ({
               }}
               onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
             >
-              {/* Annotations: Highlight & Note */}
-              {editorState.annotations
-                .filter(
-                  (a) => a.pageIndex === page.pageIndex && a.type !== "ink",
-                )
-                .map((annot) => {
-                  const isSelected = editorState.selectedId === annot.id;
+              <Suspense fallback={<div className="absolute inset-0" />}>
+                {/* Annotations: Highlight & Note */}
+                {page.pageAnnotations.map((annot) => (
+                  <ControlRenderer
+                    key={annot.id}
+                    data={annot}
+                    id={annot.id}
+                    isSelected={editorState.selectedId === annot.id}
+                    scale={editorState.scale}
+                    isAnnotationMode={editorState.mode === "annotation"}
+                    isFormMode={editorState.mode === "form"}
+                    isSelectable={isPanModeActive}
+                    onControlPointerDown={handleAnnotationPointerDown}
+                    onSelect={onSelectControl}
+                    onUpdate={onUpdateAnnotation}
+                    onDelete={onDeleteAnnotation}
+                    onEdit={onEditAnnotation}
+                  />
+                ))}
 
-                  if (annot.type === "highlight" && annot.rect) {
-                    const renderBox = (
-                      r: {
-                        x: number;
-                        y: number;
-                        width: number;
-                        height: number;
-                      },
-                      keySuffix: string = "",
-                    ) => (
-                      <div
-                        key={annot.id + keySuffix}
-                        className={cn(
-                          "pointer-events-auto absolute transition-colors",
-                        )}
-                        style={{
-                          left: r.x * editorState.scale,
-                          top: r.y * editorState.scale,
-                          width: r.width * editorState.scale,
-                          height: r.height * editorState.scale,
-                          backgroundColor: annot.color,
-                          opacity:
-                            annot.opacity !== undefined ? annot.opacity : 0.4, // Use parsed opacity or default
-                          cursor: "inherit",
-                          mixBlendMode: "multiply", // Ensure highlights blend like real markers
-                        }}
-                        onPointerDown={(e) =>
-                          handleAnnotationPointerDown(e, annot)
-                        }
-                      />
-                    );
-
-                    if (annot.rects && annot.rects.length > 0) {
-                      return (
-                        <React.Fragment key={annot.id}>
-                          {annot.rects.map((r, idx) =>
-                            renderBox(r, `_part_${idx}`),
-                          )}
-                        </React.Fragment>
-                      );
-                    } else {
-                      return renderBox(annot.rect);
-                    }
-                  } else if (annot.type === "comment" && annot.rect) {
-                    return (
-                      <React.Fragment key={annot.id}>
-                        <div
-                          id={`annotation-${annot.id}`}
-                          className={cn(
-                            "group pointer-events-auto absolute flex items-center justify-center",
-                            isSelected ? "z-50" : "",
-                          )}
-                          style={{
-                            left: annot.rect.x * editorState.scale,
-                            top: annot.rect.y * editorState.scale,
-                            width: annot.rect.width * editorState.scale,
-                            height: annot.rect.height * editorState.scale,
-                            cursor:
-                              editorState.tool === "select"
-                                ? "pointer"
-                                : "inherit",
-                          }}
-                          onPointerDown={(e) =>
-                            handleAnnotationPointerDown(e, annot)
-                          }
-                          title={annot.text}
-                        >
-                          <MessageSquareText
-                            size={20 * editorState.scale}
-                            color={
-                              annot.color || ANNOTATION_STYLES.comment.color
-                            }
-                            opacity={
-                              annot.opacity || ANNOTATION_STYLES.comment.opacity
-                            }
-                            className={cn(
-                              "transition-transform",
-                              isSelected
-                                ? "scale-110 drop-shadow-md"
-                                : "hover:scale-105",
-                            )}
-                          />
-                        </div>
-                        {isSelected && (
-                          <div
-                            className="pointer-events-none absolute z-60 flex justify-center"
-                            style={{
-                              left: annot.rect.x * editorState.scale,
-                              top: annot.rect.y * editorState.scale,
-                              width: annot.rect.width * editorState.scale,
-                              transform: "translateY(-100%)",
-                            }}
-                          >
-                            <AnnotationToolbar
-                              annotation={annot}
-                              scale={editorState.scale}
-                              onUpdate={(updates) =>
-                                onUpdateAnnotation(annot.id, updates)
-                              }
-                              onDelete={() => onDeleteAnnotation(annot.id)}
-                              onEdit={() => onEditAnnotation(annot.id)}
-                            />
-                          </div>
-                        )}
-                      </React.Fragment>
-                    );
-                  }
-                  return null;
-                })}
-
-              {/* Form Fields */}
-              {editorState.fields
-                .filter((f) => f.pageIndex === page.pageIndex)
-                .map((field) => {
-                  const isSelected = editorState.selectedId === field.id;
-                  const style = field.style || {};
-                  const isRadio = field.type === FieldType.RADIO;
-                  const isFormMode = editorState.mode === "form";
-                  const isAnnotationMode = editorState.mode === "annotation";
-                  const isInteractive =
-                    field.type === FieldType.CHECKBOX ||
-                    field.type === FieldType.RADIO ||
-                    field.type === FieldType.DROPDOWN ||
-                    field.type === FieldType.SIGNATURE;
-                  const showAnnotationFocus = isAnnotationMode && isSelected;
-
-                  // Visibility logic
-                  const showHelperBorder =
-                    (style.borderWidth ?? 1) === 0 && !isSelected;
-                  const showHelperBg = style.isTransparent && !isSelected;
-                  const applyStylesToContainer = !isRadio;
-
-                  const handleInteraction = () => {
-                    if (isAnnotationMode) {
-                      if (field.type === FieldType.CHECKBOX) {
-                        onUpdateField(field.id, {
-                          isChecked: !field.isChecked,
-                        });
-                      } else if (field.type === FieldType.RADIO) {
-                        onUpdateField(field.id, { isChecked: true });
-                      } else if (field.type === FieldType.SIGNATURE) {
-                        // Open File Dialog
-                        const input = document.createElement("input");
-                        input.type = "file";
-                        input.accept = "image/*";
-                        input.onchange = (e) => {
-                          const file = (e.target as HTMLInputElement)
-                            .files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              if (reader.result) {
-                                onUpdateField(field.id, {
-                                  signatureData: reader.result as string,
-                                });
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        };
-                        input.click();
-                      }
-                    }
-                  };
-
-                  return (
-                    <div
-                      key={field.id}
-                      id={`field-element-${field.id}`}
-                      onPointerDown={(e) => handleFieldPointerDown(e, field)}
-                      onClick={handleInteraction}
-                      onFocus={() => {
-                        if (isFormMode) onSelectControl(field.id);
-                      }}
-                      tabIndex={isFormMode ? 0 : -1} // Make container focusable in Form Mode for navigation
-                      className={cn(
-                        "group pointer-events-auto absolute outline-none select-none", // outline-none to handle custom focus ring
-                        isSelected ? "z-50" : "hover:z-50",
-                      )}
-                      style={{
-                        left: field.rect.x * editorState.scale,
-                        top: field.rect.y * editorState.scale,
-                        width: field.rect.width * editorState.scale,
-                        height: field.rect.height * editorState.scale,
-                        // Fix 2: Explicit cursor logic for interactive fields in annotation mode
-                        cursor: isFormMode
-                          ? editorState.tool === "select"
-                            ? "move"
-                            : "inherit"
-                          : isInteractive
-                            ? "pointer"
-                            : field.type === FieldType.TEXT
-                              ? "text"
-                              : "default",
-                      }}
-                    >
-                      <div
-                        className={cn(
-                          "relative flex h-full w-full transition-colors",
-                          field.type === FieldType.TEXT && field.multiline
-                            ? "items-start"
-                            : "items-center",
-                          !isRadio && "overflow-hidden",
-                          isRadio && "justify-center",
-                          showHelperBg &&
-                            isFormMode &&
-                            "bg-blue-500/10 hover:bg-blue-500/20 dark:bg-blue-400/10",
-                          // Removed border helper class from here to avoid box-model shift
-                          isAnnotationMode && "hover:bg-black/5",
-                        )}
-                        style={{
-                          backgroundColor:
-                            applyStylesToContainer && !style.isTransparent
-                              ? style.backgroundColor
-                              : undefined,
-                          borderWidth: applyStylesToContainer
-                            ? style.borderWidth
-                            : undefined,
-                          borderColor: applyStylesToContainer
-                            ? style.borderColor
-                            : undefined,
-                          borderStyle: applyStylesToContainer
-                            ? "solid"
-                            : undefined,
-                          color: style.textColor,
-                          fontSize: `${(style.fontSize || 12) * editorState.scale}px`,
-                          fontFamily:
-                            FONT_FAMILY_MAP[style.fontFamily || "Helvetica"] ||
-                            "Helvetica", // Apply Font Family
-                          boxSizing: "border-box",
-                        }}
-                      >
-                        {/* Helper Border Overlay - Absolute to prevent layout shift */}
-                        {showHelperBorder &&
-                          isFormMode &&
-                          applyStylesToContainer && (
-                            <div
-                              className="pointer-events-none absolute inset-0 border border-dashed border-blue-400/50"
-                              style={{ zIndex: 1 }}
-                            />
-                          )}
-
-                        {/* Text Field Logic: Unified Input/Textarea to prevent layout shift */}
-                        {field.type === FieldType.TEXT &&
-                          (field.multiline ? (
-                            <textarea
-                              readOnly={isFormMode || field.readOnly}
-                              tabIndex={isFormMode ? -1 : undefined} // Prevent focus in Form Mode
-                              className={cn(
-                                "font-inherit block h-full w-full resize-none border-none bg-transparent p-1 leading-tight text-inherit outline-none",
-                                isFormMode && "pointer-events-none",
-                              )}
-                              style={{ textAlign: field.alignment }}
-                              value={
-                                isFormMode
-                                  ? field.value ||
-                                    field.defaultValue ||
-                                    field.name
-                                  : field.value || ""
-                              }
-                              placeholder={
-                                isAnnotationMode ? field.name : undefined
-                              }
-                              onChange={(e) =>
-                                onUpdateField(field.id, {
-                                  value: e.target.value,
-                                })
-                              }
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onFocus={() => {
-                                if (isAnnotationMode) onSelectControl(field.id);
-                              }}
-                            />
-                          ) : (
-                            <input
-                              type="text"
-                              readOnly={isFormMode || field.readOnly}
-                              tabIndex={isFormMode ? -1 : undefined} // Prevent focus in Form Mode
-                              className={cn(
-                                "font-inherit h-full w-full border-none bg-transparent px-1 leading-tight text-inherit outline-none",
-                                isFormMode && "pointer-events-none",
-                              )}
-                              style={{ textAlign: field.alignment }}
-                              value={
-                                isFormMode
-                                  ? field.value ||
-                                    field.defaultValue ||
-                                    field.name
-                                  : field.value || ""
-                              }
-                              placeholder={
-                                isAnnotationMode ? field.name : undefined
-                              }
-                              onChange={(e) =>
-                                onUpdateField(field.id, {
-                                  value: e.target.value,
-                                })
-                              }
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onFocus={() => {
-                                if (isAnnotationMode) onSelectControl(field.id);
-                              }}
-                            />
-                          ))}
-
-                        {/* Checkbox Logic */}
-                        {field.type === FieldType.CHECKBOX && (
-                          <div className="flex h-full w-full items-center justify-center">
-                            {field.isChecked && <Check size="80%" />}
-                          </div>
-                        )}
-
-                        {/* Dropdown Logic */}
-                        {field.type === FieldType.DROPDOWN && (
-                          <>
-                            {(!field.isMultiSelect || !isAnnotationMode) && (
-                              <div className="flex w-full items-center justify-between px-1">
-                                <span className="truncate">
-                                  {field.isMultiSelect
-                                    ? field.value
-                                      ? field.value.split("\n").join(", ")
-                                      : "Select..."
-                                    : field.value || "Select..."}
-                                </span>
-                                <ChevronDown size={12} className="shrink-0" />
-                              </div>
-                            )}
-                            <div
-                              className={cn(
-                                "absolute inset-0 flex h-full w-full items-center",
-                                isAnnotationMode ? "z-10" : "hidden",
-                              )}
-                            >
-                              {isAnnotationMode && (
-                                <>
-                                  {field.isMultiSelect ? (
-                                    <ListBox
-                                      className="font-inherit h-full w-full space-y-0.5 overflow-auto bg-transparent p-1 text-inherit outline-none"
-                                      selectionMode="multiple"
-                                      selectedKeys={
-                                        new Set(
-                                          field.value
-                                            ? field.value.split("\n")
-                                            : [],
-                                        )
-                                      }
-                                      onSelectionChange={(keys) => {
-                                        const vals = Array.from(keys).map((k) =>
-                                          String(k),
-                                        );
-                                        onUpdateField(field.id, {
-                                          value: vals.join("\n"),
-                                        });
-                                      }}
-                                      aria-label={
-                                        field.toolTip || "Multi-select dropdown"
-                                      }
-                                    >
-                                      {(field.options || []).map((opt, i) => (
-                                        <ListBoxItem
-                                          key={i}
-                                          id={opt}
-                                          textValue={opt}
-                                          className={({ isSelected }) =>
-                                            cn(
-                                              "data-focus-visible:border-ring data-focus-visible:ring-ring/50 flex w-full cursor-pointer items-center justify-between rounded px-1 outline-none hover:bg-black/5 data-focus-visible:ring-[3px]",
-                                              isSelected
-                                                ? "bg-black/10 font-medium"
-                                                : "",
-                                            )
-                                          }
-                                        >
-                                          {({ isSelected }) => (
-                                            <>
-                                              <span className="flex-1 truncate text-left">
-                                                {opt}
-                                              </span>
-                                              {isSelected && (
-                                                <Check
-                                                  size={12}
-                                                  className="ml-1 shrink-0"
-                                                />
-                                              )}
-                                            </>
-                                          )}
-                                        </ListBoxItem>
-                                      ))}
-                                    </ListBox>
-                                  ) : (
-                                    <select
-                                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                      value={field.value || ""}
-                                      onChange={(e) =>
-                                        onUpdateField(field.id, {
-                                          value: e.target.value,
-                                        })
-                                      }
-                                      onPointerDown={(e) => e.stopPropagation()}
-                                      onFocus={() => {
-                                        if (isAnnotationMode)
-                                          onSelectControl(field.id);
-                                      }}
-                                      title={field.toolTip}
-                                    >
-                                      <option value="" disabled>
-                                        Select...
-                                      </option>
-                                      {(field.options || []).map((opt, i) => (
-                                        <option key={i} value={opt}>
-                                          {opt}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </>
-                        )}
-
-                        {/* Radio Logic */}
-                        {field.type === FieldType.RADIO && (
-                          <div className="flex h-full w-full items-center justify-center">
-                            <div
-                              className="relative box-border flex items-center justify-center rounded-full border border-black"
-                              style={{
-                                width: `${
-                                  (Math.min(
-                                    field.rect.width,
-                                    field.rect.height,
-                                  ) /
-                                    field.rect.width) *
-                                  100
-                                }%`,
-                                height: `${
-                                  (Math.min(
-                                    field.rect.width,
-                                    field.rect.height,
-                                  ) /
-                                    field.rect.height) *
-                                  100
-                                }%`,
-                                backgroundColor: !style.isTransparent
-                                  ? style.backgroundColor
-                                  : "white",
-                              }}
-                            >
-                              {field.isChecked && (
-                                <div className="h-1/2 w-1/2 rounded-full bg-black"></div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Signature Logic */}
-                        {field.type === FieldType.SIGNATURE && (
-                          <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
-                            {field.signatureData ? (
-                              <>
-                                <img
-                                  src={field.signatureData}
-                                  alt="Signature"
-                                  className={cn(
-                                    "max-h-full max-w-full",
-                                    field.imageScaleMode === "fill"
-                                      ? "h-full w-full object-fill"
-                                      : "object-contain",
-                                  )}
-                                />
-                                {isAnnotationMode && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onUpdateField(field.id, {
-                                        signatureData: undefined,
-                                      });
-                                    }}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 absolute top-1 right-1 z-20 rounded-sm p-1 opacity-0 shadow-md transition-opacity group-hover:opacity-100"
-                                    title={t("common.delete")}
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                )}
-                              </>
-                            ) : (
-                              <div
-                                className={cn(
-                                  "text-muted-foreground/50 flex flex-col items-center justify-center",
-                                  isAnnotationMode ? "cursor-pointer" : "",
-                                )}
-                              >
-                                {isAnnotationMode ? (
-                                  <ImageIcon size={16} />
-                                ) : (
-                                  <PenLine size={16} />
-                                )}
-                                {isAnnotationMode && (
-                                  <span className="text-[10px] opacity-70">
-                                    Click to Sign
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Selection Overlay (Form Mode Only) */}
-                      {isSelected &&
-                        isFormMode &&
-                        editorState.tool === "select" && (
-                          <div className="pointer-events-none absolute inset-0">
-                            <div className="absolute -inset-[2px] border-2 border-dashed border-blue-500" />
-                            <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap text-white shadow-sm">
-                              {field.name}
-                            </span>
-                            {/* Resize Handles */}
-                            {["nw", "ne", "sw", "se"].map((h) => (
-                              <div
-                                key={h}
-                                className={cn(
-                                  "pointer-events-auto absolute z-30 h-3 w-3 border border-blue-500 bg-white",
-                                  h === "nw" &&
-                                    "-top-1.5 -left-1.5 cursor-nwse-resize",
-                                  h === "ne" &&
-                                    "-top-1.5 -right-1.5 cursor-nesw-resize",
-                                  h === "sw" &&
-                                    "-bottom-1.5 -left-1.5 cursor-nesw-resize",
-                                  h === "se" &&
-                                    "-right-1.5 -bottom-1.5 cursor-nwse-resize",
-                                )}
-                                onPointerDown={(e) =>
-                                  handleResizePointerDown(e, field, h)
-                                }
-                              />
-                            ))}
-                          </div>
-                        )}
-
-                      {/* NEW: Annotation Mode Selection Overlay - Moved OUTSIDE overflow-hidden container */}
-                      {showAnnotationFocus && (
-                        <div className="animate-in fade-in pointer-events-none absolute inset-0 z-50 border border-dashed border-blue-500 duration-200" />
-                      )}
-                    </div>
-                  );
-                })}
+                {/* Form Fields */}
+                {page.pageFields.map((field) => (
+                  <ControlRenderer
+                    key={field.id}
+                    data={field}
+                    id={field.id}
+                    isSelected={editorState.selectedId === field.id}
+                    scale={editorState.scale}
+                    isAnnotationMode={editorState.mode === "annotation"}
+                    isFormMode={editorState.mode === "form"}
+                    isSelectable={isPanModeActive}
+                    onControlPointerDown={handleFieldPointerDown}
+                    onSelect={onSelectControl}
+                    onUpdate={onUpdateField}
+                    onControlResizeStart={handleResizePointerDown}
+                  />
+                ))}
+              </Suspense>
 
               {/* Drag Guide */}
               {dragStart &&
@@ -2162,39 +1652,32 @@ const Workspace: React.FC<WorkspaceProps> = ({
               viewBox={`0 0 ${page.width} ${page.height}`}
               preserveAspectRatio="none"
             >
-              {editorState.annotations
-                .filter(
-                  (a) =>
-                    a.pageIndex === page.pageIndex &&
-                    a.type === "ink" &&
-                    a.points,
-                )
-                .map((a) => (
-                  <path
-                    key={a.id}
-                    d={pointsToPath(a.points!)}
-                    stroke={a.color || "red"}
-                    strokeWidth={a.thickness || 2}
-                    fill="none"
-                    strokeLinecap={
-                      a.intent === "InkHighlight"
-                        ? "butt"
-                        : a.subtype === "ink" || !a.subtype
-                          ? "round"
-                          : "butt"
-                    }
-                    strokeLinejoin="round"
-                    opacity={a.opacity ?? 1}
-                    style={{
-                      pointerEvents:
-                        editorState.tool === "select" ? "auto" : "none",
-                      cursor: "inherit",
-                      mixBlendMode:
-                        a.intent === "InkHighlight" ? "multiply" : "normal",
-                    }}
-                    onPointerDown={(e) => handleAnnotationPointerDown(e, a)}
-                  />
-                ))}
+              {page.pageInk.map((a) => (
+                <path
+                  key={a.id}
+                  d={pointsToPath(a.points!)}
+                  stroke={a.color || "red"}
+                  strokeWidth={a.thickness || 2}
+                  fill="none"
+                  strokeLinecap={
+                    a.intent === "InkHighlight"
+                      ? "butt"
+                      : a.subtype === "ink" || !a.subtype
+                        ? "round"
+                        : "butt"
+                  }
+                  strokeLinejoin="round"
+                  opacity={a.opacity ?? 1}
+                  style={{
+                    pointerEvents:
+                      editorState.tool === "select" ? "auto" : "none",
+                    cursor: isPanModeActive ? "grab" : "inherit",
+                    mixBlendMode:
+                      a.intent === "InkHighlight" ? "multiply" : "normal",
+                  }}
+                  onPointerDown={(e) => handleAnnotationPointerDown(e, a)}
+                />
+              ))}
               {/* Current Drawing Path */}
               {isDrawing && activePageIndex === page.pageIndex && (
                 <path

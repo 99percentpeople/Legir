@@ -1,13 +1,30 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import en from "../locales/en";
-import zh from "../locales/zh";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import "dayjs/locale/zh-cn";
 
 dayjs.extend(relativeTime);
 
-export type Language = "en" | "zh";
+export type Language =
+  | "en"
+  | "zh-CN"
+  | "zh-TW"
+  | "ja"
+  | "fr"
+  | "de"
+  | "es"
+  | "system";
+type ConcreteLanguage = Exclude<Language, "system">;
+
+export const LANGUAGES: { value: ConcreteLanguage; label: string }[] = [
+  { value: "en", label: "English" },
+  { value: "zh-CN", label: "简体中文" },
+  { value: "zh-TW", label: "繁體中文" },
+  { value: "ja", label: "日本語" },
+  { value: "fr", label: "Français" },
+  { value: "de", label: "Deutsch" },
+  { value: "es", label: "Español" },
+];
 
 type LanguageProviderProps = {
   children: React.ReactNode;
@@ -17,34 +34,50 @@ type LanguageProviderProps = {
 
 type LanguageProviderState = {
   language: Language;
+  effectiveLanguage: ConcreteLanguage;
   dayjsLocale: string;
   setLanguage: (language: Language) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
 const initialState: LanguageProviderState = {
-  language: "en",
+  language: "system",
+  effectiveLanguage: "en",
   dayjsLocale: "en",
   setLanguage: () => null,
   t: (key: string) => key,
 };
 
-const translations: Record<Language, Record<string, string>> = {
-  en,
-  zh,
+// Map locale codes to dayjs locale strings
+const DAYJS_LOCALE_MAP: Record<ConcreteLanguage, string> = {
+  en: "en",
+  "zh-CN": "zh-cn",
+  "zh-TW": "zh-tw",
+  ja: "ja",
+  fr: "fr",
+  de: "de",
+  es: "es",
 };
 
-const DAYJS_LOCALE_MAP: Record<Language, string> = {
-  en: "en",
-  zh: "zh-cn",
+// Explicitly map dayjs loaders to ensure Vite can bundle them correctly
+const dayjsLocales: Record<string, () => Promise<any>> = {
+  "zh-cn": () => import("dayjs/locale/zh-cn"),
+  "zh-tw": () => import("dayjs/locale/zh-tw"),
+  ja: () => import("dayjs/locale/ja"),
+  fr: () => import("dayjs/locale/fr"),
+  de: () => import("dayjs/locale/de"),
+  es: () => import("dayjs/locale/es"),
 };
+
+// Use import.meta.glob to lazy load locales
+const localeModules = import.meta.glob("../locales/*.ts");
 
 const LanguageProviderContext =
   createContext<LanguageProviderState>(initialState);
 
 export function LanguageProvider({
   children,
-  defaultLanguage = "en",
+  defaultLanguage = "system",
   storageKey = "vite-ui-language",
   ...props
 }: LanguageProviderProps) {
@@ -52,15 +85,101 @@ export function LanguageProvider({
     () => (localStorage.getItem(storageKey) as Language) || defaultLanguage,
   );
 
-  const dayjsLocale = DAYJS_LOCALE_MAP[language];
+  const [effectiveLanguage, setEffectiveLanguage] =
+    useState<ConcreteLanguage>("en");
+
+  // Store loaded translations
+  const [translations, setTranslations] = useState<
+    Record<string, Record<string, string>>
+  >({ en });
+
+  useEffect(() => {
+    const resolveSystemLanguage = (): ConcreteLanguage => {
+      const browserLang = navigator.language;
+      if (browserLang.startsWith("zh")) {
+        if (browserLang.includes("TW") || browserLang.includes("HK"))
+          return "zh-TW";
+        return "zh-CN";
+      }
+      if (browserLang.startsWith("ja")) return "ja";
+      if (browserLang.startsWith("fr")) return "fr";
+      if (browserLang.startsWith("de")) return "de";
+      if (browserLang.startsWith("es")) return "es";
+      return "en";
+    };
+
+    const loadLocale = async (lang: ConcreteLanguage) => {
+      if (lang === "en") return; // en is already loaded
+      if (translations[lang]) return; // already loaded
+
+      try {
+        // Construct the key that matches import.meta.glob keys
+        const modulePath = `../locales/${lang}.ts`;
+        const loader = localeModules[modulePath];
+        if (loader) {
+          const mod = (await loader()) as { default: Record<string, string> };
+          setTranslations((prev) => ({ ...prev, [lang]: mod.default }));
+        } else {
+          console.warn(`No loader found for locale: ${lang}`);
+        }
+      } catch (error) {
+        console.error(`Failed to load locale: ${lang}`, error);
+      }
+    };
+
+    const loadDayjsLocale = async (lang: ConcreteLanguage) => {
+      if (lang === "en") {
+        dayjs.locale("en");
+        return;
+      }
+      const dayjsLocaleKey = DAYJS_LOCALE_MAP[lang];
+      if (!dayjsLocaleKey) return;
+
+      try {
+        const loader = dayjsLocales[dayjsLocaleKey];
+        if (loader) {
+          await loader();
+          dayjs.locale(dayjsLocaleKey);
+        } else {
+          console.warn(`No dayjs loader found for ${dayjsLocaleKey}`);
+          // Fallback to en if loader missing
+          dayjs.locale("en");
+        }
+      } catch (e) {
+        console.warn(`Failed to load dayjs locale: ${dayjsLocaleKey}`, e);
+        dayjs.locale("en");
+      }
+    };
+
+    const resolved =
+      language === "system"
+        ? resolveSystemLanguage()
+        : (language as ConcreteLanguage);
+
+    // Ensure we have a valid resolved language
+    const isSupported = LANGUAGES.some((l) => l.value === resolved);
+    const validated = isSupported ? resolved : "en";
+
+    // Load resources
+    loadLocale(validated).then(() => {
+      setEffectiveLanguage(validated);
+
+      // Update HTML lang attribute
+      const root = window.document.documentElement;
+      root.setAttribute("lang", validated);
+
+      // Load Dayjs locale
+      loadDayjsLocale(validated);
+    });
+  }, [language, translations]);
 
   useEffect(() => {
     localStorage.setItem(storageKey, language);
-    dayjs.locale(dayjsLocale);
-  }, [language, storageKey, dayjsLocale]);
+  }, [language, storageKey]);
 
   const t = (key: string, params?: Record<string, string | number>) => {
-    let text = translations[language][key] || key;
+    const langDict = translations[effectiveLanguage] || translations["en"];
+    let text = langDict[key] || translations["en"][key] || key;
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         text = text.replace(`{${k}}`, String(v));
@@ -71,7 +190,8 @@ export function LanguageProvider({
 
   const value = {
     language,
-    dayjsLocale,
+    effectiveLanguage,
+    dayjsLocale: DAYJS_LOCALE_MAP[effectiveLanguage],
     setLanguage,
     t,
   };
