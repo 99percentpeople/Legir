@@ -1,6 +1,9 @@
 import React, { useMemo } from "react";
 import { AnnotationControlProps } from "../types";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { useMouse } from "@/hooks/useMouse";
 
 export const InkControl: React.FC<AnnotationControlProps> = ({
   data,
@@ -9,6 +12,8 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
   isSelected,
   isSelectable,
 }) => {
+  const { ref, x, y } = useMouse<HTMLDivElement>();
+
   // Calculate bounding box
   const bounds = useMemo(() => {
     if (!data.points || data.points.length === 0) return null;
@@ -53,40 +58,68 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
   if (!bounds || !data.points) return null;
 
   return (
-    <div
-      className="pointer-events-none absolute"
-      style={{
-        left: bounds.x * scale,
-        top: bounds.y * scale,
-        width: bounds.width * scale,
-        height: bounds.height * scale,
-      }}
-    >
-      <svg width="100%" height="100%" className="overflow-visible">
-        <path
-          d={pathData}
-          fill="none"
-          stroke={data.color || "#000000"}
-          strokeWidth={(data.thickness || 1) * scale}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={cn(
-            "pointer-events-auto cursor-pointer transition-opacity",
-            isSelected
-              ? "opacity-100"
-              : cn("opacity-90", !isSelectable && "hover:opacity-100"),
-          )}
-          style={{ cursor: isSelectable ? "grab" : "pointer" }}
-          onPointerDown={(e) => {
-            if (isSelectable) return;
-            e.stopPropagation();
-            onSelect(data.id);
+    <Tooltip delayDuration={0} disableHoverableContent>
+      <TooltipTrigger asChild>
+        <div
+          ref={ref}
+          id={`annotation-${data.id}`}
+          className="pointer-events-none absolute"
+          style={{
+            left: bounds.x * scale,
+            top: bounds.y * scale,
+            width: bounds.width * scale,
+            height: bounds.height * scale,
           }}
-        />
-      </svg>
-      {isSelected && (
-        <div className="pointer-events-none absolute inset-0 border border-dashed border-blue-500" />
+        >
+          <svg width="100%" height="100%" className="overflow-visible">
+            <path
+              d={pathData}
+              fill="none"
+              stroke={data.color || "#000000"}
+              strokeWidth={(data.thickness || 1) * scale}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={data.opacity ?? 1}
+              className="pointer-events-auto cursor-pointer transition-opacity"
+              style={{ cursor: isSelectable ? "grab" : "pointer" }}
+              onPointerDown={(e) => {
+                if (isSelectable) return;
+                e.stopPropagation();
+                onSelect(data.id);
+              }}
+            />
+          </svg>
+          {isSelected && (
+            <div className="pointer-events-none absolute inset-0 border border-dashed border-blue-500" />
+          )}
+        </div>
+      </TooltipTrigger>
+      {data.text && (
+        <TooltipPrimitive.Portal>
+          <TooltipPrimitive.Content
+            align="center"
+            side="bottom"
+            sideOffset={36}
+            hideWhenDetached
+            className="group z-50"
+            style={{
+              transform: `translate(${x - (bounds.width * scale) / 2}px, ${
+                y - bounds.height * scale
+              }px)`,
+            }}
+          >
+            <div
+              className={cn(
+                "dark:bg-background dark:text-foreground pointer-events-none rounded-md px-2 py-1 text-xs whitespace-pre-wrap opacity-80 shadow-sm",
+                "animate-in fade-in-0 zoom-in-95 group-data-[side=bottom]:slide-in-from-top-2 group-data-[side=left]:slide-in-from-right-2 group-data-[side=right]:slide-in-from-left-2 group-data-[side=top]:slide-in-from-bottom-2",
+                "group-data-[state=closed]:animate-out group-data-[state=closed]:fade-out-0 group-data-[state=closed]:zoom-out-95",
+              )}
+            >
+              {data.text}
+            </div>
+          </TooltipPrimitive.Content>
+        </TooltipPrimitive.Portal>
       )}
-    </div>
+    </Tooltip>
   );
 };

@@ -82,6 +82,7 @@ export interface Annotation {
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
   text?: string; // For comment
+  author?: string; // Creator/Author of the annotation
   color?: string;
   opacity?: number; // For highlight
   thickness?: number; // For ink
@@ -89,13 +90,14 @@ export interface Annotation {
   alignment?: "left" | "center" | "right"; // For comment text alignment
   subtype?: "ink" | "polyline" | "line"; // To preserve original PDF subtype
   intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
+  updatedAt?: string; // ISO Date string for modification date
 }
 
 export interface PDFMetadata {
   title?: string;
   author?: string;
   subject?: string;
-  keywords?: string;
+  keywords?: string[];
   creator?: string;
   producer?: string;
 }

@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { X, Layers, List, LayoutGrid, MessageSquare } from "lucide-react";
+import { X, Layers, List, LayoutGrid, MessageCircle } from "lucide-react";
 import { FormField, PageData, PDFOutlineItem, Annotation } from "../../types";
 import { setGlobalCursor, resetGlobalCursor, cn } from "../../lib/utils";
 import FieldTreePanel from "./FieldTreePanel";
@@ -145,7 +145,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
               title={t("sidebar.comments")}
             >
-              <MessageSquare size={16} />
+              <MessageCircle size={16} />
             </TabsTrigger>
           </TabsList>
           <Button

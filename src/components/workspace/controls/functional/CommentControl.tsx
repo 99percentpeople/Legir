@@ -1,14 +1,38 @@
 import React from "react";
 import { AnnotationControlProps } from "../types";
 import { cn } from "@/lib/utils";
-import { MessageSquareText, Trash2, Palette, Pencil } from "lucide-react";
+import { Trash2, Palette, Pencil, MessageCircleMore } from "lucide-react";
 import { ControlWrapper } from "../ControlWrapper";
 import { Button } from "@/components/ui/button";
 import { ColorPickerPopover } from "@/components/toolbar/ColorPickerPopover";
 import { FloatingToolbar } from "../FloatingToolbar";
+import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { useMouse } from "@/hooks/useMouse";
+
+const getContrastColor = (hexColor: string) => {
+  if (!hexColor || !hexColor.startsWith("#")) return "#000000";
+  const hex = hexColor.replace("#", "");
+  const r = parseInt(
+    hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2),
+    16,
+  );
+  const g = parseInt(
+    hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4),
+    16,
+  );
+  const b = parseInt(
+    hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6),
+    16,
+  );
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return "#000000";
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 128 ? "#000000" : "#ffffff";
+};
 
 export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
   const { data, scale, isSelected, onUpdate, onDelete, onEdit } = props;
+  const { ref, x, y } = useMouse<HTMLDivElement>();
 
   // Ensure rect exists, otherwise default
   const rect = data.rect || { x: 0, y: 0, width: 30, height: 30 };
@@ -46,25 +70,56 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
         </Button>
       </FloatingToolbar>
 
-      <div
-        className={cn(
-          "flex h-full w-full items-center justify-center overflow-hidden",
-          "rounded shadow-sm transition-colors",
-          isSelected && "ring-primary ring-1",
+      <Tooltip delayDuration={0} disableHoverableContent>
+        <TooltipTrigger asChild>
+          <div
+            ref={ref}
+            className={cn(
+              "flex h-full w-full items-center justify-center overflow-hidden",
+              "rounded shadow-sm transition-colors",
+              isSelected && "ring-primary ring-1",
+            )}
+            style={{
+              backgroundColor: data.color || "#fff",
+              opacity: data.opacity ?? 1,
+              border: "1px solid rgba(0,0,0,0.1)",
+            }}
+          >
+            <MessageCircleMore
+              size={Math.min(rect.width, rect.height) * scale * 0.6}
+              className="text-foreground opacity-80"
+              fill={data.color ? data.color : "none"}
+              color={data.color ? getContrastColor(data.color) : "currentColor"}
+            />
+          </div>
+        </TooltipTrigger>
+        {data.text && (
+          <TooltipPrimitive.Portal>
+            <TooltipPrimitive.Content
+              align="center"
+              side="bottom"
+              sideOffset={36}
+              hideWhenDetached
+              className="group z-50"
+              style={{
+                transform: `translate(${x - (rect.width * scale) / 2}px, ${
+                  y - rect.height * scale
+                }px)`,
+              }}
+            >
+              <div
+                className={cn(
+                  "dark:bg-background dark:text-foreground pointer-events-none rounded-md px-2 py-1 text-xs whitespace-pre-wrap opacity-80 shadow-sm",
+                  "animate-in fade-in-0 zoom-in-95 group-data-[side=bottom]:slide-in-from-top-2 group-data-[side=left]:slide-in-from-right-2 group-data-[side=right]:slide-in-from-left-2 group-data-[side=top]:slide-in-from-bottom-2",
+                  "group-data-[state=closed]:animate-out group-data-[state=closed]:fade-out-0 group-data-[state=closed]:zoom-out-95",
+                )}
+              >
+                {data.text}
+              </div>
+            </TooltipPrimitive.Content>
+          </TooltipPrimitive.Portal>
         )}
-        style={{
-          backgroundColor: data.color || "#fff",
-          opacity: data.opacity ?? 1,
-          border: "1px solid rgba(0,0,0,0.1)",
-        }}
-      >
-        <MessageSquareText
-          size={Math.min(rect.width, rect.height) * scale * 0.6}
-          className="text-foreground opacity-80"
-          fill={data.color ? data.color : "none"}
-          color={data.color ? "white" : "currentColor"}
-        />
-      </div>
+      </Tooltip>
     </ControlWrapper>
   );
 };

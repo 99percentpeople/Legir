@@ -2,8 +2,10 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import en from "../locales/en";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import localizedFormat from "dayjs/plugin/localizedFormat";
 
 dayjs.extend(relativeTime);
+dayjs.extend(localizedFormat);
 
 export type Language =
   | "en"

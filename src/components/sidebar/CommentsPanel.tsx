@@ -1,8 +1,15 @@
 import React, { useState } from "react";
-import { MessageSquareText, Search } from "lucide-react";
+import { MessageCircle, Search, Filter } from "lucide-react";
 import { Annotation } from "../../types";
 import { useLanguage } from "../language-provider";
 import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import CommentCard from "./CommentCard";
 
 interface CommentsPanelProps {
@@ -22,36 +29,66 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
 }) => {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([
+    "comment",
+    "highlight",
+    "ink",
+  ]);
 
-  const comments = annotations.filter((a) => a.type === "comment");
+  // Include all annotation types that we want to display
+  const allAnnotations = annotations.filter((a) =>
+    ["comment", "highlight", "ink"].includes(a.type),
+  );
 
-  // Filter comments based on search term
-  const filteredComments = comments.filter((comment) => {
+  // Filter based on type and search term
+  const filteredAnnotations = allAnnotations.filter((annot) => {
+    // Type filter
+    if (!selectedTypes.includes(annot.type)) return false;
+
+    // Search filter
     if (!searchTerm) return true;
-    return (comment.text || "")
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
+    const textContent = annot.text || "";
+    const authorContent = annot.author || "";
+    const searchLower = searchTerm.toLowerCase();
+
+    return (
+      textContent.toLowerCase().includes(searchLower) ||
+      authorContent.toLowerCase().includes(searchLower)
+    );
   });
 
   // Group by page
-  const groupedComments = filteredComments.reduce(
-    (acc, comment) => {
-      const page = comment.pageIndex + 1;
+  const groupedAnnotations = filteredAnnotations.reduce(
+    (acc, annot) => {
+      const page = annot.pageIndex + 1;
       if (!acc[page]) acc[page] = [];
-      acc[page].push(comment);
+      acc[page].push(annot);
       return acc;
     },
     {} as Record<number, Annotation[]>,
   );
 
-  const sortedPages = Object.keys(groupedComments)
+  const sortedPages = Object.keys(groupedAnnotations)
     .map(Number)
     .sort((a, b) => a - b);
 
+  const handleSelect = (id: string) => {
+    onSelectControl(id);
+    // Scroll the main workspace to the annotation
+    // We use a small timeout to ensure the DOM is ready if needed,
+    // though usually the element should already exist.
+    setTimeout(() => {
+      const element = document.getElementById(`annotation-${id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 10);
+  };
+
   return (
     <div className="flex h-full flex-col">
-      <div className="border-border bg-muted/30 shrink-0 border-b p-2">
-        <div className="relative">
+      <div className="border-border bg-muted/30 flex shrink-0 items-center gap-2 border-b p-2">
+        <div className="relative flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2" />
           <Input
             type="text"
@@ -61,16 +98,64 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
             className="bg-background h-8 w-full pl-8 text-xs"
           />
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant={selectedTypes.length !== 3 ? "secondary" : "ghost"}
+              size="icon"
+              className="h-8 w-8"
+            >
+              <Filter className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[200px]">
+            <DropdownMenuCheckboxItem
+              checked={selectedTypes.includes("comment")}
+              onCheckedChange={(checked) => {
+                if (checked) setSelectedTypes([...selectedTypes, "comment"]);
+                else
+                  setSelectedTypes(
+                    selectedTypes.filter((t) => t !== "comment"),
+                  );
+              }}
+            >
+              Comments
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={selectedTypes.includes("highlight")}
+              onCheckedChange={(checked) => {
+                if (checked) setSelectedTypes([...selectedTypes, "highlight"]);
+                else
+                  setSelectedTypes(
+                    selectedTypes.filter((t) => t !== "highlight"),
+                  );
+              }}
+            >
+              Highlights
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={selectedTypes.includes("ink")}
+              onCheckedChange={(checked) => {
+                if (checked) setSelectedTypes([...selectedTypes, "ink"]);
+                else setSelectedTypes(selectedTypes.filter((t) => t !== "ink"));
+              }}
+            >
+              Ink
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <h3 className="flex items-center gap-2 px-2 pt-2 text-sm font-semibold">
-        <MessageSquareText size={16} />
-        {t("sidebar.comments")} ({comments.length})
+        <MessageCircle size={16} />
+        {t("sidebar.comments")} ({allAnnotations.length})
       </h3>
       <div className="flex-1 overflow-auto">
         <div className="space-y-6 p-2">
-          {filteredComments.length === 0 ? (
+          {filteredAnnotations.length === 0 ? (
             <div className="text-muted-foreground py-6 text-center text-sm italic">
-              {searchTerm ? t("sidebar.no_results") : t("sidebar.no_comments")}
+              {searchTerm || selectedTypes.length < 3
+                ? t("sidebar.no_results")
+                : t("sidebar.no_comments")}
             </div>
           ) : (
             sortedPages.map((page) => (
@@ -79,15 +164,15 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
                   {t("sidebar.page", { page })}
                 </div>
                 <div className="space-y-3">
-                  {groupedComments[page].map((comment) => (
+                  {groupedAnnotations[page].map((annot) => (
                     <CommentCard
-                      key={comment.id}
-                      comment={comment}
-                      isSelected={selectedId === comment.id}
-                      onSelect={() => onSelectControl(comment.id)}
-                      onDelete={() => onDeleteAnnotation(comment.id)}
+                      key={annot.id}
+                      comment={annot}
+                      isSelected={selectedId === annot.id}
+                      onSelect={() => handleSelect(annot.id)}
+                      onDelete={() => onDeleteAnnotation(annot.id)}
                       onUpdate={(updates) =>
-                        onUpdateAnnotation(comment.id, updates)
+                        onUpdateAnnotation(annot.id, updates)
                       }
                     />
                   ))}

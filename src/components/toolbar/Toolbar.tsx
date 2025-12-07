@@ -24,9 +24,10 @@ import {
   FileText,
   Edit3,
   Eraser,
-  MessageSquarePlus,
+  MessageCirclePlus,
   Printer,
   Hand,
+  Pen,
 } from "lucide-react";
 import { EditorState, Tool, PenStyle } from "../../types";
 import { Button } from "../ui/button";
@@ -253,7 +254,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 title={t("toolbar.ink")}
                 className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
               >
-                <PenTool
+                <PenLine
                   size={18}
                   style={{ color: editorState.penStyle.color }}
                 />
@@ -275,7 +276,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 title={t("toolbar.comment")}
                 className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
               >
-                <MessageSquarePlus
+                <MessageCirclePlus
                   size={18}
                   style={{ color: editorState.commentStyle?.color }}
                 />

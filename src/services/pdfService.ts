@@ -3,7 +3,6 @@ import { pdfWorkerService } from "./pdfWorkerService";
 import {
   hexToPdfColor,
   rgbArrayToHex,
-  resolveDest,
   mapOutline,
   getFontMap,
   getGlobalDA,
@@ -38,6 +37,82 @@ import {
   Annotation,
 } from "../types";
 import { DEFAULT_FIELD_STYLE } from "../constants";
+
+const parsePDFDate = (dateStr: string | undefined): string | undefined => {
+  if (!dateStr) return undefined;
+  try {
+    // Remove D: prefix
+    const str = dateStr.startsWith("D:") ? dateStr.substring(2) : dateStr;
+    // Standard format: YYYYMMDDHHmmSS
+
+    if (str.length >= 14) {
+      const year = str.substring(0, 4);
+      const month = str.substring(4, 6);
+      const day = str.substring(6, 8);
+      const hour = str.substring(8, 10);
+      const minute = str.substring(10, 12);
+      const second = str.substring(12, 14);
+
+      // Construct ISO string with Timezone
+      let iso = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+
+      if (str.length > 14) {
+        const rest = str.substring(14);
+        if (rest.startsWith("Z")) {
+          iso += "Z";
+        } else if (rest.startsWith("+") || rest.startsWith("-")) {
+          // Handle format: +HH'mm' or +HHmm or +HH
+          const sign = rest.charAt(0);
+          let tzPart = rest.substring(1).replace(/'/g, "");
+
+          let tzHour = "00";
+          let tzMinute = "00";
+
+          if (tzPart.length >= 2) {
+            tzHour = tzPart.substring(0, 2);
+            if (tzPart.length >= 4) {
+              tzMinute = tzPart.substring(2, 4);
+            }
+          }
+          iso += `${sign}${tzHour}:${tzMinute}`;
+        }
+      }
+
+      return iso;
+    }
+    return undefined;
+  } catch (e) {
+    return undefined;
+  }
+};
+
+interface PDFJsAnnotation {
+  fieldType?: string;
+  subtype: string;
+  rect: number[];
+  contents?: string;
+  title?: string;
+  modificationDate?: string;
+  color?: number[];
+  quadPoints?: number[];
+  inkList?: Array<Array<{ x: number; y: number } | number>> | Array<number[]>;
+  vertices?: number[];
+  lineCoordinates?: number[];
+  borderStyle?: { width: number };
+  id?: string;
+  checkBox?: boolean;
+  fieldName?: string;
+  fieldValue?: string;
+  radioButton?: boolean;
+  buttonValue?: string;
+  fieldFlags?: number;
+  textAlignment?: TextAlignment;
+  backgroundColor?: number[];
+  defaultAppearance?: any;
+  options?: string[];
+  alternativeText?: string;
+  DA?: string;
+}
 
 export const loadPDF = async (
   input: File | Uint8Array,
@@ -172,6 +247,27 @@ export const loadPDF = async (
                   if (IT instanceof PDFName) intent = IT.decodeText();
                   else if (IT instanceof PDFString) intent = IT.decodeText();
 
+                  // Parse Author (T)
+                  let author: string | undefined = undefined;
+                  const T = annot.lookup(PDFName.of("T"));
+                  if (T instanceof PDFString || T instanceof PDFHexString)
+                    author = T.decodeText();
+
+                  // Parse Contents
+                  let contents: string | undefined = undefined;
+                  const Contents = annot.lookup(PDFName.of("Contents"));
+                  if (
+                    Contents instanceof PDFString ||
+                    Contents instanceof PDFHexString
+                  )
+                    contents = Contents.decodeText();
+
+                  // Parse Modified Date (M)
+                  let updatedAt: string | undefined = undefined;
+                  const M = annot.lookup(PDFName.of("M"));
+                  if (M instanceof PDFString || M instanceof PDFHexString)
+                    updatedAt = parsePDFDate(M.decodeText());
+
                   // Parse Points
                   for (let s = 0; s < inkList.size(); s++) {
                     const stroke = inkList.lookup(s);
@@ -198,6 +294,9 @@ export const loadPDF = async (
                           color: color,
                           thickness: thickness,
                           opacity: opacity,
+                          author: author,
+                          text: contents,
+                          updatedAt: updatedAt,
                         });
                       }
                     }
@@ -215,7 +314,7 @@ export const loadPDF = async (
       }
     }
 
-    pageAnnotations.forEach((annotation: any, index: number) => {
+    pageAnnotations.forEach((annotation: PDFJsAnnotation, index: number) => {
       const subtype = annotation.subtype;
       // Skip Ink in pdf.js loop since we handle it via pdf-lib
       const isInk = false;
@@ -239,6 +338,9 @@ export const loadPDF = async (
           ? rgbArrayToHex(annotation.color)
           : "#000000";
         const thickness = annotation.borderStyle?.width || 2;
+        const author = annotation.title || undefined;
+        const contents = annotation.contents || undefined;
+        const updatedAt = parsePDFDate(annotation.modificationDate);
 
         strokeLists.forEach((pointsList: any[], strokeIndex: number) => {
           if (!Array.isArray(pointsList) || pointsList.length === 0) return;
@@ -277,6 +379,9 @@ export const loadPDF = async (
               points: points,
               color: color,
               thickness: thickness,
+              author: author,
+              text: contents,
+              updatedAt: updatedAt,
             });
           }
         });
@@ -298,6 +403,10 @@ export const loadPDF = async (
         let rects:
           | { x: number; y: number; width: number; height: number }[]
           | undefined = undefined;
+
+        let author = annotation.title || undefined;
+        let contents = annotation.contents || undefined;
+        let updatedAt = parsePDFDate(annotation.modificationDate);
 
         // Try to get QuadPoints from PDF.js annotation or fallback to PDF-lib lookup
         let qp = annotation.quadPoints;
@@ -322,6 +431,33 @@ export const loadPDF = async (
                         const ly1 = (rArray[1] as PDFNumber).asNumber();
                         // Check if this matches our annotation.rect [x1, y1, x2, y2] (PDF coords)
                         if (Math.abs(lx1 - x1) < 1 && Math.abs(ly1 - y1) < 1) {
+                          // Extract Author/Time fallback
+                          const rawTitle = libAnnot.lookup(PDFName.of("T"));
+                          if (
+                            rawTitle instanceof PDFString ||
+                            rawTitle instanceof PDFHexString
+                          ) {
+                            author = rawTitle.decodeText();
+                          }
+
+                          const rawModDate = libAnnot.lookup(PDFName.of("M"));
+                          if (
+                            rawModDate instanceof PDFString ||
+                            rawModDate instanceof PDFHexString
+                          ) {
+                            updatedAt = parsePDFDate(rawModDate.decodeText());
+                          }
+
+                          const rawContents = libAnnot.lookup(
+                            PDFName.of("Contents"),
+                          );
+                          if (
+                            rawContents instanceof PDFString ||
+                            rawContents instanceof PDFHexString
+                          ) {
+                            contents = rawContents.decodeText();
+                          }
+
                           const libQP = libAnnot.lookup(
                             PDFName.of("QuadPoints"),
                           );
@@ -425,6 +561,9 @@ export const loadPDF = async (
           rects: rects,
           color: color,
           opacity: opacity,
+          author: author,
+          text: contents,
+          updatedAt: updatedAt,
         });
       } else if (
         subtype === "Text" ||
@@ -450,6 +589,8 @@ export const loadPDF = async (
         if (height < 5) height = 30;
 
         let contents = annotation.contents || "";
+        let author = annotation.title || undefined;
+        let updatedAt = parsePDFDate(annotation.modificationDate);
 
         // Fallback to pdf-lib for contents extraction if possible
         if (pdfDoc) {
@@ -473,8 +614,9 @@ export const loadPDF = async (
                       if (rArray.length >= 4) {
                         const lx1 = (rArray[0] as PDFNumber).asNumber();
                         const ly1 = (rArray[1] as PDFNumber).asNumber();
-                        // Approximate match
-                        if (Math.abs(lx1 - x1) < 2 && Math.abs(ly1 - y1) < 2) {
+                        // Approximate match - Increased tolerance for float errors
+                        // Especially for newly created comments that might have slight position shifts
+                        if (Math.abs(lx1 - x1) < 5 && Math.abs(ly1 - y1) < 5) {
                           const rawContents = libAnnot.lookup(
                             PDFName.of("Contents"),
                           );
@@ -482,7 +624,41 @@ export const loadPDF = async (
                             rawContents instanceof PDFString ||
                             rawContents instanceof PDFHexString
                           ) {
-                            contents = rawContents.decodeText();
+                            const decoded = rawContents.decodeText();
+                            // If pdf.js failed to get content (empty string), ALWAYS use pdf-lib content
+                            // Or if we have content, but pdf-lib content is valid, it might be better decoded
+                            if (
+                              decoded &&
+                              (!contents || contents.trim() === "")
+                            ) {
+                              contents = decoded;
+                            }
+                          }
+
+                          const rawTitle = libAnnot.lookup(PDFName.of("T"));
+                          if (
+                            rawTitle instanceof PDFString ||
+                            rawTitle instanceof PDFHexString
+                          ) {
+                            const decodedAuthor = rawTitle.decodeText();
+                            if (
+                              decodedAuthor &&
+                              (!author || author.trim() === "")
+                            ) {
+                              author = decodedAuthor;
+                            }
+                          }
+
+                          const rawModDate = libAnnot.lookup(PDFName.of("M"));
+                          if (
+                            rawModDate instanceof PDFString ||
+                            rawModDate instanceof PDFHexString
+                          ) {
+                            const parsed = parsePDFDate(
+                              rawModDate.decodeText(),
+                            );
+                            // Prefer pdf-lib date if pdf.js date is missing
+                            if (parsed && !updatedAt) updatedAt = parsed;
                           }
                           break;
                         }
@@ -504,6 +680,8 @@ export const loadPDF = async (
           rect: { x, y, width, height },
           color: color,
           text: contents,
+          author: author,
+          updatedAt: updatedAt,
         });
       } else if (annotation.subtype === "Widget" && annotation.fieldName) {
         let type: FieldType | null = null;
@@ -702,8 +880,7 @@ export const exportPDF = async (
     if (metadata.author) pdfDoc.setAuthor(metadata.author);
     if (metadata.subject) pdfDoc.setSubject(metadata.subject);
     if (metadata.creator) pdfDoc.setCreator(metadata.creator);
-    if (metadata.keywords)
-      pdfDoc.setKeywords(metadata.keywords.split(/,|;/).map((k) => k.trim()));
+    if (metadata.keywords) pdfDoc.setKeywords(metadata.keywords);
   }
 
   // Embed Standard Fonts
@@ -909,9 +1086,15 @@ export const exportPDF = async (
           CA: annot.opacity ?? 0.4,
           P: page.ref,
           // Optional: Set title to Author if available
-          T: metadata?.author
-            ? PDFHexString.fromText(metadata.author)
-            : undefined,
+          T: annot.author // Use annotation specific author if available
+            ? PDFHexString.fromText(annot.author)
+            : metadata?.author
+              ? PDFHexString.fromText(metadata.author)
+              : undefined,
+          Contents: annot.text ? PDFHexString.fromText(annot.text) : undefined,
+          M: annot.updatedAt
+            ? PDFString.fromDate(new Date(annot.updatedAt))
+            : PDFString.fromDate(new Date()),
         });
 
         const ref = pdfDoc.context.register(highlightAnnot);
@@ -941,9 +1124,14 @@ export const exportPDF = async (
           CA: annot.opacity,
           Name: PDFName.of("Comment"), // Icon name
           P: page.ref,
-          T: metadata?.author
-            ? PDFHexString.fromText(metadata.author)
-            : undefined,
+          T: annot.author
+            ? PDFHexString.fromText(annot.author)
+            : metadata?.author
+              ? PDFHexString.fromText(metadata.author)
+              : undefined,
+          M: annot.updatedAt
+            ? PDFString.fromDate(new Date(annot.updatedAt))
+            : PDFString.fromDate(new Date()),
         });
 
         const ref = pdfDoc.context.register(commentAnnot);
@@ -1007,6 +1195,17 @@ export const exportPDF = async (
             BS: { W: thickness, S: "S" },
             CA: annot.opacity,
             P: page.ref,
+            T: annot.author
+              ? PDFHexString.fromText(annot.author)
+              : metadata?.author
+                ? PDFHexString.fromText(metadata.author)
+                : undefined,
+            Contents: annot.text
+              ? PDFHexString.fromText(annot.text)
+              : undefined,
+            M: annot.updatedAt
+              ? PDFString.fromDate(new Date(annot.updatedAt))
+              : PDFString.fromDate(new Date()),
           });
         } else if (annot.subtype === "line") {
           // Line expects L [x1, y1, x2, y2]
@@ -1025,6 +1224,17 @@ export const exportPDF = async (
             BS: { W: thickness, S: "S" },
             CA: annot.opacity,
             P: page.ref,
+            T: annot.author
+              ? PDFHexString.fromText(annot.author)
+              : metadata?.author
+                ? PDFHexString.fromText(metadata.author)
+                : undefined,
+            Contents: annot.text
+              ? PDFHexString.fromText(annot.text)
+              : undefined,
+            M: annot.updatedAt
+              ? PDFString.fromDate(new Date(annot.updatedAt))
+              : PDFString.fromDate(new Date()),
           });
         } else {
           // Default Ink (Subtype: Ink)
@@ -1039,6 +1249,17 @@ export const exportPDF = async (
             CA: annot.opacity,
             IT: annot.intent ? PDFName.of(annot.intent) : undefined,
             P: page.ref,
+            T: annot.author
+              ? PDFHexString.fromText(annot.author)
+              : metadata?.author
+                ? PDFHexString.fromText(metadata.author)
+                : undefined,
+            Contents: annot.text
+              ? PDFHexString.fromText(annot.text)
+              : undefined,
+            M: annot.updatedAt
+              ? PDFString.fromDate(new Date(annot.updatedAt))
+              : PDFString.fromDate(new Date()),
           });
         }
 

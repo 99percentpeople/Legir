@@ -652,14 +652,23 @@ const App: React.FC = () => {
   const handleAddAnnotation = useCallback(
     (annotation: Annotation) => {
       saveCheckpoint();
+      const now = new Date().toISOString();
+
       setState((prev) => {
+        const author = annotation.author || prev.metadata?.author || "User";
+        const annotationWithDetails = {
+          ...annotation,
+          updatedAt: now,
+          author: author,
+        };
+
         const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
         const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
 
         return {
           ...prev,
-          annotations: [...prev.annotations, annotation],
-          selectedId: annotation.id,
+          annotations: [...prev.annotations, annotationWithDetails],
+          selectedId: annotationWithDetails.id,
           tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
         };
       });
@@ -739,10 +748,14 @@ const App: React.FC = () => {
   const handleUpdateAnnotation = useCallback(
     (id: string, updates: Partial<Annotation>) => {
       setIsDirty(true);
+      const updatesWithTime = {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
       setState((prev) => ({
         ...prev,
         annotations: prev.annotations.map((a) =>
-          a.id === id ? { ...a, ...updates } : a,
+          a.id === id ? { ...a, ...updatesWithTime } : a,
         ),
       }));
     },
@@ -920,9 +933,6 @@ const App: React.FC = () => {
       ...prev,
       selectedId: id,
     }));
-    if (id) {
-      setIsRightPanelOpen(true);
-    }
   }, []);
 
   const handleToolChange = (tool: any, preserveSelection?: boolean) => {
@@ -1261,23 +1271,26 @@ const App: React.FC = () => {
               />
             </div>
 
-            {(state.mode === "form" || selectedControl) && isRightPanelOpen && (
-              <PropertiesPanel
-                selectedControl={selectedControl}
-                metadata={state.metadata}
-                filename={state.filename}
-                onChange={handlePropertiesChange}
-                onMetadataChange={handleMetadataChange}
-                onFilenameChange={handleFilenameChange}
-                onDelete={handleDelete}
-                onClose={handlePropertiesClose}
-                isFloating={isPanelFloating}
-                onToggleFloating={handleToggleFloating}
-                onTriggerHistorySave={saveCheckpoint}
-                width={rightPanelWidth}
-                onResize={setRightPanelWidth}
-              />
-            )}
+            {(state.mode === "form" ||
+              state.mode === "annotation" ||
+              selectedControl) &&
+              isRightPanelOpen && (
+                <PropertiesPanel
+                  selectedControl={selectedControl}
+                  metadata={state.metadata}
+                  filename={state.filename}
+                  onChange={handlePropertiesChange}
+                  onMetadataChange={handleMetadataChange}
+                  onFilenameChange={handleFilenameChange}
+                  onDelete={handleDelete}
+                  onClose={handlePropertiesClose}
+                  isFloating={isPanelFloating}
+                  onToggleFloating={handleToggleFloating}
+                  onTriggerHistorySave={saveCheckpoint}
+                  width={rightPanelWidth}
+                  onResize={setRightPanelWidth}
+                />
+              )}
           </div>
         </>
       )}

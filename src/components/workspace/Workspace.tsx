@@ -162,13 +162,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
     return editorState.pages.map((page) => ({
       ...page,
       pageAnnotations: editorState.annotations.filter(
-        (a) => a.pageIndex === page.pageIndex && a.type !== "ink",
+        (a) => a.pageIndex === page.pageIndex,
       ),
       pageFields: editorState.fields.filter(
         (f) => f.pageIndex === page.pageIndex,
-      ),
-      pageInk: editorState.annotations.filter(
-        (a) => a.pageIndex === page.pageIndex && a.type === "ink" && a.points,
       ),
     }));
   }, [editorState.pages, editorState.annotations, editorState.fields]);
@@ -1652,44 +1649,20 @@ const Workspace: React.FC<WorkspaceProps> = ({
               viewBox={`0 0 ${page.width} ${page.height}`}
               preserveAspectRatio="none"
             >
-              {page.pageInk.map((a) => (
-                <path
-                  key={a.id}
-                  d={pointsToPath(a.points!)}
-                  stroke={a.color || "red"}
-                  strokeWidth={a.thickness || 2}
-                  fill="none"
-                  strokeLinecap={
-                    a.intent === "InkHighlight"
-                      ? "butt"
-                      : a.subtype === "ink" || !a.subtype
-                        ? "round"
-                        : "butt"
-                  }
-                  strokeLinejoin="round"
-                  opacity={a.opacity ?? 1}
-                  style={{
-                    pointerEvents:
-                      editorState.tool === "select" ? "auto" : "none",
-                    cursor: isPanModeActive ? "grab" : "inherit",
-                    mixBlendMode:
-                      a.intent === "InkHighlight" ? "multiply" : "normal",
-                  }}
-                  onPointerDown={(e) => handleAnnotationPointerDown(e, a)}
-                />
-              ))}
-              {/* Current Drawing Path */}
-              {isDrawing && activePageIndex === page.pageIndex && (
-                <path
-                  d={pointsToPath(currentPathState)}
-                  stroke={editorState.penStyle.color}
-                  strokeWidth={editorState.penStyle.thickness}
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={editorState.penStyle.opacity}
-                />
-              )}
+              {
+                /* Current Drawing Path */
+                isDrawing && activePageIndex === page.pageIndex && (
+                  <path
+                    d={pointsToPath(currentPathState)}
+                    stroke={editorState.penStyle.color}
+                    strokeWidth={editorState.penStyle.thickness}
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={editorState.penStyle.opacity}
+                  />
+                )
+              }
             </svg>
 
             {/* Snap Guides Layer */}

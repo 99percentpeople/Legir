@@ -6,6 +6,7 @@ interface ToolBehavior {
 
 const TOOL_BEHAVIORS: Record<Tool, ToolBehavior> = {
   select: { isContinuous: true },
+  pan: { isContinuous: true },
   draw_text: { isContinuous: false },
   draw_checkbox: { isContinuous: false },
   draw_radio: { isContinuous: false },
