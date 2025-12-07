@@ -40,7 +40,7 @@ export const ControlWrapper: React.FC<
     <div
       id={elementId}
       onPointerDown={(e) => {
-        if (isSelectable) return;
+        if (!isSelectable) return;
         onPointerDown?.(e);
       }}
       className={cn(
@@ -53,8 +53,8 @@ export const ControlWrapper: React.FC<
         width: rect.width * scale,
         height: rect.height * scale,
         // Cursor logic should be passed or handled by child/wrapper
-        cursor: isSelectable
-          ? "grab"
+        cursor: !isSelectable
+          ? "inherit"
           : isFormMode
             ? isSelected
               ? "move"

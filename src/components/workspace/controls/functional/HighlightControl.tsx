@@ -39,10 +39,10 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
             top: r.y * scale,
             width: r.width * scale,
             height: r.height * scale,
-            cursor: isSelectable ? "grab" : "inherit",
+            cursor: !isSelectable ? "inherit" : "pointer",
           }}
           onPointerDown={(e) => {
-            if (isSelectable) return;
+            if (!isSelectable) return;
             e.stopPropagation();
             e.preventDefault();
             onSelect(data.id);

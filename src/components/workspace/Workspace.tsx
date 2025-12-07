@@ -84,6 +84,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
       releasePointer,
     });
 
+  // Only allow selection when tool is "select"
+  const isSelectable = editorState.tool === "select";
+
   // Keep a ref to editorState for stable event handlers
   const editorStateRef = useRef(editorState);
   editorStateRef.current = editorState;
@@ -1141,13 +1144,17 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setSnapLines([]);
 
     const coords = getRelativeCoords(e, activePageIndex);
-    const { enabled, threshold: baseThreshold } = editorState.snappingOptions;
-    const threshold = baseThreshold / editorState.scale;
-    const shouldSnap =
-      enabled && !editorState.keys.alt && editorState.mode === "form";
 
     // --- INK DRAWING ---
     if (isDrawing && editorState.tool === "draw_ink") {
+      const lastPoint =
+        currentPathRef.current[currentPathRef.current.length - 1];
+      if (lastPoint) {
+        const dist = Math.hypot(coords.x - lastPoint.x, coords.y - lastPoint.y);
+        // Ignore points that are too close to reduce noise and improve performance
+        if (dist < 4) return;
+      }
+
       currentPathRef.current.push(coords);
       // Optimization: Throttle state updates? For now, raw update
       setCurrentPathState([...currentPathRef.current]);
@@ -1204,8 +1211,23 @@ const Workspace: React.FC<WorkspaceProps> = ({
       editorState.tool === "draw_ink" &&
       activePageIndex !== null
     ) {
+      if (e) {
+        const coords = getRelativeCoords(e, activePageIndex);
+        const lastPoint =
+          currentPathRef.current[currentPathRef.current.length - 1];
+        if (lastPoint) {
+          const dist = Math.hypot(
+            coords.x - lastPoint.x,
+            coords.y - lastPoint.y,
+          );
+          if (dist > 1) {
+            currentPathRef.current.push(coords);
+          }
+        }
+      }
+
       setIsDrawing(false);
-      if (currentPathRef.current.length > 2) {
+      if (currentPathRef.current.length > 1) {
         onAddAnnotation({
           id: `ink_${Date.now()}`,
           pageIndex: activePageIndex,
@@ -1518,9 +1540,21 @@ const Workspace: React.FC<WorkspaceProps> = ({
   // Convert points array to SVG path
   const pointsToPath = (points: { x: number; y: number }[]) => {
     if (points.length === 0) return "";
-    const d = points
-      .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
-      .join(" ");
+    if (points.length < 2) return `M ${points[0].x} ${points[0].y}`;
+
+    let d = `M ${points[0].x} ${points[0].y}`;
+
+    for (let i = 1; i < points.length - 1; i++) {
+      const p = points[i];
+      const nextP = points[i + 1];
+      const midX = (p.x + nextP.x) / 2;
+      const midY = (p.y + nextP.y) / 2;
+      d += ` Q ${p.x} ${p.y}, ${midX} ${midY}`;
+    }
+
+    const lastP = points[points.length - 1];
+    d += ` L ${lastP.x} ${lastP.y}`;
+
     return d;
   };
 
@@ -1585,7 +1619,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     scale={editorState.scale}
                     isAnnotationMode={editorState.mode === "annotation"}
                     isFormMode={editorState.mode === "form"}
-                    isSelectable={isPanModeActive}
+                    isSelectable={isSelectable}
                     onControlPointerDown={handleAnnotationPointerDown}
                     onSelect={onSelectControl}
                     onUpdate={onUpdateAnnotation}
@@ -1604,7 +1638,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     scale={editorState.scale}
                     isAnnotationMode={editorState.mode === "annotation"}
                     isFormMode={editorState.mode === "form"}
-                    isSelectable={isPanModeActive}
+                    isSelectable={isSelectable}
                     onControlPointerDown={handleFieldPointerDown}
                     onSelect={onSelectControl}
                     onUpdate={onUpdateField}

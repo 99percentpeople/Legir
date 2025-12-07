@@ -43,16 +43,27 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
   // Construct path data relative to bounding box
   const pathData = useMemo(() => {
     if (!data.points || data.points.length < 2 || !bounds) return "";
-    return (
-      `M ${(data.points[0].x - bounds.originX) * scale} ${(data.points[0].y - bounds.originY) * scale} ` +
-      data.points
-        .slice(1)
-        .map(
-          (p) =>
-            `L ${(p.x - bounds.originX) * scale} ${(p.y - bounds.originY) * scale}`,
-        )
-        .join(" ")
-    );
+
+    const points = data.points.map((p) => ({
+      x: (p.x - bounds.originX) * scale,
+      y: (p.y - bounds.originY) * scale,
+    }));
+
+    let d = `M ${points[0].x} ${points[0].y}`;
+
+    // Use quadratic curves for smooth ink
+    for (let i = 1; i < points.length - 1; i++) {
+      const p = points[i];
+      const nextP = points[i + 1];
+      const midX = (p.x + nextP.x) / 2;
+      const midY = (p.y + nextP.y) / 2;
+      d += ` Q ${p.x} ${p.y}, ${midX} ${midY}`;
+    }
+
+    const lastP = points[points.length - 1];
+    d += ` L ${lastP.x} ${lastP.y}`;
+
+    return d;
   }, [data.points, bounds, scale]);
 
   if (!bounds || !data.points) return null;
@@ -81,9 +92,9 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
               strokeLinejoin="round"
               opacity={data.opacity ?? 1}
               className="pointer-events-auto cursor-pointer transition-opacity"
-              style={{ cursor: isSelectable ? "grab" : "pointer" }}
+              style={{ cursor: !isSelectable ? "inherit" : "pointer" }}
               onPointerDown={(e) => {
-                if (isSelectable) return;
+                if (!isSelectable) return;
                 e.stopPropagation();
                 onSelect(data.id);
               }}

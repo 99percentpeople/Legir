@@ -41,10 +41,9 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
               "bg-blue-500/10 dark:bg-blue-400/10",
               !isSelectable && "hover:bg-blue-500/20",
             ),
-          isAnnotationMode &&
-            !isSelectable &&
-            "cursor-pointer hover:bg-black/5",
-          isSelectable && "pointer-events-none",
+          isAnnotationMode && isSelectable && "cursor-pointer hover:bg-black/5",
+          isAnnotationMode && !isSelectable && "pointer-events-none",
+          isFormMode && isSelectable && "pointer-events-none",
         )}
         style={containerStyle}
         onClick={handleInteraction}

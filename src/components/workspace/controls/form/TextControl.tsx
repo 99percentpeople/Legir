@@ -39,7 +39,8 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
           "overflow-hidden",
           showHelperBg && isFormMode && "bg-blue-500/10 dark:bg-blue-400/10",
           showHelperBg && isFormMode && !isSelectable && "hover:bg-blue-500/20",
-          isAnnotationMode && !isSelectable && "hover:bg-black/5",
+          isAnnotationMode && isSelectable && "hover:bg-black/5",
+          isAnnotationMode && !isSelectable && "pointer-events-none",
         )}
         style={containerStyle}
         onPointerDown={(e) => {
@@ -63,7 +64,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
             tabIndex={isFormMode ? -1 : undefined}
             className={cn(
               "font-inherit block h-full w-full resize-none border-none bg-transparent p-1 leading-tight text-inherit outline-none",
-              (isFormMode || isSelectable) && "pointer-events-none",
+              (isFormMode || !isSelectable) && "pointer-events-none",
             )}
             style={{ textAlign: data.alignment }}
             value={
@@ -85,7 +86,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
             tabIndex={isFormMode ? -1 : undefined}
             className={cn(
               "font-inherit h-full w-full border-none bg-transparent px-1 leading-tight text-inherit outline-none",
-              (isFormMode || isSelectable) && "pointer-events-none",
+              (isFormMode || !isSelectable) && "pointer-events-none",
             )}
             style={{ textAlign: data.alignment }}
             value={

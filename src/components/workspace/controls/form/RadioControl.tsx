@@ -21,10 +21,9 @@ export const RadioControl: React.FC<FormControlProps> = (props) => {
       <div
         className={cn(
           "relative flex h-full w-full items-center justify-center transition-colors",
-          isAnnotationMode &&
-            !isSelectable &&
-            "cursor-pointer hover:bg-black/5",
-          isSelectable && "pointer-events-none",
+          isAnnotationMode && isSelectable && "cursor-pointer hover:bg-black/5",
+          isAnnotationMode && !isSelectable && "pointer-events-none",
+          isFormMode && isSelectable && "pointer-events-none",
         )}
         onClick={handleInteraction}
       >
