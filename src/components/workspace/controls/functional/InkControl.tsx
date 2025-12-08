@@ -29,7 +29,7 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
     });
 
     // Add some padding
-    const padding = (data.thickness || 1) / 2 + 2;
+    const padding = (data.thickness || 1) / 2;
     return {
       x: minX - padding,
       y: minY - padding,
@@ -42,12 +42,11 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
 
   // Construct path data relative to bounding box
   const pathData = useMemo(() => {
+    // Optimization: If we have an AP stream (svgPath), we don't need to calculate the path from points
+    if (data.svgPath) return data.svgPath;
     if (!data.points || data.points.length < 2 || !bounds) return "";
 
-    const points = data.points.map((p) => ({
-      x: (p.x - bounds.originX) * scale,
-      y: (p.y - bounds.originY) * scale,
-    }));
+    const points = data.points;
 
     let d = `M ${points[0].x} ${points[0].y}`;
 
@@ -64,11 +63,9 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
     d += ` L ${lastP.x} ${lastP.y}`;
 
     return d;
-  }, [data.points, bounds, scale]);
+  }, [data.points, bounds, data.svgPath]);
 
   if (!bounds || !data.points) return null;
-
-  const useAP = !!data.svgPath;
 
   return (
     <Tooltip delayDuration={0} disableHoverableContent>
@@ -88,19 +85,13 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
             width="100%"
             height="100%"
             className="overflow-visible"
-            viewBox={
-              useAP
-                ? `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`
-                : undefined
-            }
+            viewBox={`${bounds.originX} ${bounds.originY} ${bounds.width} ${bounds.height}`}
           >
             <path
-              d={useAP ? data.svgPath : pathData}
+              d={pathData}
               fill="none"
               stroke={data.color || "#000000"}
-              strokeWidth={
-                useAP ? data.thickness || 1 : (data.thickness || 1) * scale
-              }
+              strokeWidth={data.thickness || 1}
               strokeLinecap="round"
               strokeLinejoin="round"
               opacity={data.opacity ?? 1}

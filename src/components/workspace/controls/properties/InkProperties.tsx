@@ -27,7 +27,12 @@ export const InkProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             type="color"
             value={data.color || "#000000"}
             onMouseDown={onTriggerHistorySave}
-            onChange={(e) => onChange({ color: e.target.value })}
+            onChange={(e) =>
+              onChange({
+                color: e.target.value,
+                appearanceStreamContent: undefined,
+              })
+            }
             className="border-input bg-background h-8 w-full cursor-pointer rounded border"
           />
         </div>
@@ -50,7 +55,10 @@ export const InkProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             step={1}
             onValueChange={(vals) => {
               onTriggerHistorySave();
-              onChange({ thickness: vals[0] });
+              onChange({
+                thickness: vals[0],
+                appearanceStreamContent: undefined,
+              });
             }}
           />
         </div>

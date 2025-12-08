@@ -9,6 +9,7 @@ import {
   parseDefaultAppearance,
   getFieldPropertiesFromPdfLib,
   extractInkAppearance,
+  generateInkAppearanceOps,
 } from "../lib/pdf-helpers";
 import {
   PDFDocument,
@@ -1268,27 +1269,42 @@ export const exportPDF = async (
           });
         } else {
           // Default Ink (Subtype: Ink)
+          let appearanceStreamContent = annot.appearanceStreamContent;
+
+          if (
+            !appearanceStreamContent &&
+            annot.points &&
+            annot.points.length > 1
+          ) {
+            const apPoints = annot.points.map((p) => ({
+              x: p.x,
+              y: pageHeight - p.y,
+            }));
+            appearanceStreamContent = generateInkAppearanceOps(
+              apPoints,
+              { red: r, green: g, blue: b },
+              thickness,
+            );
+          }
+
           let appearanceStream;
 
-          if (annot.appearanceStreamContent) {
-            const stream = pdfDoc.context.stream(
-              annot.appearanceStreamContent,
-              {
-                Type: PDFName.of("XObject"),
-                Subtype: PDFName.of("Form"),
-                FormType: 1,
-                BBox: rect,
-                Resources: {
-                  ProcSet: [
-                    PDFName.of("PDF"),
-                    PDFName.of("Text"),
-                    PDFName.of("ImageB"),
-                    PDFName.of("ImageC"),
-                    PDFName.of("ImageI"),
-                  ],
-                },
+          if (appearanceStreamContent) {
+            const stream = pdfDoc.context.stream(appearanceStreamContent, {
+              Type: PDFName.of("XObject"),
+              Subtype: PDFName.of("Form"),
+              FormType: 1,
+              BBox: rect,
+              Resources: {
+                ProcSet: [
+                  PDFName.of("PDF"),
+                  PDFName.of("Text"),
+                  PDFName.of("ImageB"),
+                  PDFName.of("ImageC"),
+                  PDFName.of("ImageI"),
+                ],
               },
-            );
+            });
             appearanceStream = pdfDoc.context.register(stream);
           }
 

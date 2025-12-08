@@ -86,7 +86,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     });
 
   // Only allow selection when tool is "select"
-  const isSelectable = editorState.tool === "select";
+  const isSelectable = editorState.tool === "select" && !isPanModeActive;
 
   // Keep a ref to editorState for stable event handlers
   const editorStateRef = useRef(editorState);
@@ -1367,7 +1367,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     (e: React.PointerEvent, field: FormField) => {
       const state = editorStateRef.current;
       if (e.button === 1) return;
-      if (state.keys.space || state.tool === "pan") return;
+      if (isPanModeActive) return;
 
       // If we are in Annotation mode, we allow selection but prevent drag logic.
       // Instead we likely want to fill them out.
@@ -1455,6 +1455,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       onSelectControl,
       onAddField,
       getRelativeCoords,
+      isPanModeActive,
     ],
   );
 
@@ -1462,7 +1463,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     (e: React.PointerEvent, annotation: Annotation) => {
       const state = editorStateRef.current;
       if (e.button === 1) return;
-      if (state.keys.space || state.tool === "pan") return;
+      if (isPanModeActive) return;
 
       // Don't swallow event if erasing
       if (state.tool === "eraser") return;
@@ -1493,14 +1494,20 @@ const Workspace: React.FC<WorkspaceProps> = ({
         });
       }
     },
-    [capturePointer, onTriggerHistorySave, onSelectControl, getRelativeCoords],
+    [
+      capturePointer,
+      onTriggerHistorySave,
+      onSelectControl,
+      getRelativeCoords,
+      isPanModeActive,
+    ],
   );
 
   const handleResizePointerDown = useCallback(
     (handle: string, e: React.PointerEvent, field: FormField) => {
       const state = editorStateRef.current;
       if (e.button === 1) return;
-      if (state.keys.space || state.tool === "pan") return;
+      if (isPanModeActive) return;
       e.stopPropagation();
 
       // Ensure mouse position is tracked immediately
@@ -1531,7 +1538,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       setGlobalCursor(cursor);
     },
-    [capturePointer, onTriggerHistorySave, getRelativeCoords],
+    [capturePointer, onTriggerHistorySave, getRelativeCoords, isPanModeActive],
   );
 
   // --- Scroll to Center on Document Load, Page Count Change, or Fit Trigger ---
