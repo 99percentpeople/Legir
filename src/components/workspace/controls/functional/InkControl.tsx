@@ -68,6 +68,8 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
 
   if (!bounds || !data.points) return null;
 
+  const useAP = !!data.svgPath;
+
   return (
     <Tooltip delayDuration={0} disableHoverableContent>
       <TooltipTrigger asChild>
@@ -82,12 +84,23 @@ export const InkControl: React.FC<AnnotationControlProps> = ({
             height: bounds.height * scale,
           }}
         >
-          <svg width="100%" height="100%" className="overflow-visible">
+          <svg
+            width="100%"
+            height="100%"
+            className="overflow-visible"
+            viewBox={
+              useAP
+                ? `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`
+                : undefined
+            }
+          >
             <path
-              d={pathData}
+              d={useAP ? data.svgPath : pathData}
               fill="none"
               stroke={data.color || "#000000"}
-              strokeWidth={(data.thickness || 1) * scale}
+              strokeWidth={
+                useAP ? data.thickness || 1 : (data.thickness || 1) * scale
+              }
               strokeLinecap="round"
               strokeLinejoin="round"
               opacity={data.opacity ?? 1}

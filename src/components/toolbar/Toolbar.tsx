@@ -37,6 +37,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
@@ -130,28 +132,38 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </Button>
 
           {/* Mode Selector */}
-          <Select
-            value={mode}
-            onValueChange={(val) => onModeChange(val as any)}
-          >
-            <SelectTrigger className="ml-2 h-9">
-              <SelectValue placeholder="Mode" />
-            </SelectTrigger>
-            <SelectContent align="start">
-              <SelectItem value="annotation">
-                <div className="flex items-center gap-2">
-                  <PenTool size={14} />
-                  <span>{t("mode.annotation")}</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="form">
-                <div className="flex items-center gap-2">
-                  <Edit3 size={14} />
-                  <span>{t("mode.form")}</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="ml-2 h-9 w-9"
+                title={t("mode.select")}
+              >
+                {mode === "annotation" ? (
+                  <PenTool size={16} />
+                ) : (
+                  <Edit3 size={16} />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuRadioGroup value={mode} onValueChange={onModeChange}>
+                <DropdownMenuRadioItem value="annotation">
+                  <div className="flex items-center gap-2">
+                    <PenTool size={14} />
+                    <span>{t("mode.annotation")}</span>
+                  </div>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="form">
+                  <div className="flex items-center gap-2">
+                    <Edit3 size={14} />
+                    <span>{t("mode.form")}</span>
+                  </div>
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Separator orientation="vertical" className="h-6" />

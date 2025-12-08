@@ -11,6 +11,7 @@ const de = {
   "status.unsaved": "Ungespeicherte Änderungen",
   "mode.annotation": "Anmerkungsmodus",
   "mode.form": "Formularmodus",
+  "mode.select": "Auswahlmodus",
   "toolbar.undo": "Rückgängig (Ctrl+Z)",
   "toolbar.redo": "Wiederholen (Ctrl+Y)",
   "toolbar.select": "Auswählen",
@@ -178,7 +179,8 @@ const de = {
   "sidebar.no_comments": "Noch keine Kommentare",
   "sidebar.no_pages": "Keine Seiten gefunden",
   "sidebar.no_results": "Keine Ergebnisse gefunden",
-  "sidebar.filter": "Felder filtern...",
+  "sidebar.filter_fields": "Felder filtern...",
+  "sidebar.filter": "Filtern",
   "sidebar.no_outline": "Keine Gliederung in diesem Dokument gefunden.",
   "settings.title": "Editor-Einstellungen",
   "settings.description":

@@ -8,6 +8,7 @@ import {
   getGlobalDA,
   parseDefaultAppearance,
   getFieldPropertiesFromPdfLib,
+  extractInkAppearance,
 } from "../lib/pdf-helpers";
 import {
   PDFDocument,
@@ -26,6 +27,7 @@ import {
   PDFArray,
   PDFNumber,
   PDFHexString,
+  PDFStream,
 } from "pdf-lib";
 import {
   FormField,
@@ -268,6 +270,17 @@ export const loadPDF = async (
                   if (M instanceof PDFString || M instanceof PDFHexString)
                     updatedAt = parsePDFDate(M.decodeText());
 
+                  // Parse AP (Appearance Stream) for smoother rendering
+                  const { strokePaths, rawStrokeStreams } =
+                    extractInkAppearance(
+                      annot,
+                      (x, y) =>
+                        unscaledViewport.convertToViewportPoint(x, y) as [
+                          number,
+                          number,
+                        ],
+                    );
+
                   // Parse Points
                   for (let s = 0; s < inkList.size(); s++) {
                     const stroke = inkList.lookup(s);
@@ -284,6 +297,19 @@ export const loadPDF = async (
                       }
 
                       if (points.length > 0) {
+                        // Reconstruct AP stream content for this stroke
+                        let appearanceStreamContent: string | undefined =
+                          undefined;
+                        if (rawStrokeStreams[s]) {
+                          const pdfColor = hexToPdfColor(color);
+                          const header = pdfColor
+                            ? `${pdfColor.red} ${pdfColor.green} ${pdfColor.blue} RG\n${thickness} w\n1 J\n1 j`
+                            : "";
+                          appearanceStreamContent = header
+                            ? `${header}\n${rawStrokeStreams[s]}`
+                            : rawStrokeStreams[s];
+                        }
+
                         annotations.push({
                           id: `imported_ink_lib_${i}_${idx}_${s}`,
                           pageIndex: i - 1,
@@ -297,6 +323,8 @@ export const loadPDF = async (
                           author: author,
                           text: contents,
                           updatedAt: updatedAt,
+                          svgPath: strokePaths[s],
+                          appearanceStreamContent: appearanceStreamContent,
                         });
                       }
                     }
@@ -1146,6 +1174,7 @@ export const exportPDF = async (
         // 1. Convert points to PDF coordinates (Bottom-Left origin)
         // InkList expects flat array of numbers [x1, y1, x2, y2, ...] for each stroke
         const pdfPoints: number[] = [];
+        const convertedPoints: { x: number; y: number }[] = [];
         let minX = Infinity;
         let minY = Infinity;
         let maxX = -Infinity;
@@ -1157,6 +1186,7 @@ export const exportPDF = async (
 
           pdfPoints.push(pdfX);
           pdfPoints.push(pdfY);
+          convertedPoints.push({ x: pdfX, y: pdfY });
 
           if (pdfX < minX) minX = pdfX;
           if (pdfY < minY) minY = pdfY;
@@ -1238,6 +1268,30 @@ export const exportPDF = async (
           });
         } else {
           // Default Ink (Subtype: Ink)
+          let appearanceStream;
+
+          if (annot.appearanceStreamContent) {
+            const stream = pdfDoc.context.stream(
+              annot.appearanceStreamContent,
+              {
+                Type: PDFName.of("XObject"),
+                Subtype: PDFName.of("Form"),
+                FormType: 1,
+                BBox: rect,
+                Resources: {
+                  ProcSet: [
+                    PDFName.of("PDF"),
+                    PDFName.of("Text"),
+                    PDFName.of("ImageB"),
+                    PDFName.of("ImageC"),
+                    PDFName.of("ImageI"),
+                  ],
+                },
+              },
+            );
+            appearanceStream = pdfDoc.context.register(stream);
+          }
+
           annotObj = pdfDoc.context.obj({
             Type: "Annot",
             Subtype: "Ink",
@@ -1246,6 +1300,7 @@ export const exportPDF = async (
             InkList: [pdfPoints], // Single stroke (array of arrays)
             C: [r, g, b],
             Border: [0, 0, thickness],
+            AP: appearanceStream ? { N: appearanceStream } : undefined,
             CA: annot.opacity,
             IT: annot.intent ? PDFName.of(annot.intent) : undefined,
             P: page.ref,

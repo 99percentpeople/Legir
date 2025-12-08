@@ -11,6 +11,7 @@ const en = {
   "status.unsaved": "Unsaved changes",
   "mode.annotation": "Annotation Mode",
   "mode.form": "Form Mode",
+  "mode.select": "Select Mode",
   "toolbar.undo": "Undo (Ctrl+Z)",
   "toolbar.redo": "Redo (Ctrl+Y)",
   "toolbar.select": "Select",
@@ -175,7 +176,8 @@ const en = {
   "sidebar.no_comments": "No comments yet",
   "sidebar.no_pages": "No pages found",
   "sidebar.no_results": "No results found",
-  "sidebar.filter": "Filter fields...",
+  "sidebar.filter_fields": "Filter fields...",
+  "sidebar.filter": "Filter",
   "sidebar.no_outline": "No outline found in this document.",
   "settings.title": "Editor Settings",
   "settings.description":

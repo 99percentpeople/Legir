@@ -104,6 +104,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
               variant={selectedTypes.length !== 3 ? "secondary" : "ghost"}
               size="icon"
               className="h-8 w-8"
+              title={t("sidebar.filter")}
             >
               <Filter className="h-4 w-4" />
             </Button>
@@ -119,7 +120,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
                   );
               }}
             >
-              Comments
+              {t("toolbar.comment")}
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={selectedTypes.includes("highlight")}
@@ -131,7 +132,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
                   );
               }}
             >
-              Highlights
+              {t("toolbar.highlight")}
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={selectedTypes.includes("ink")}
@@ -140,7 +141,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
                 else setSelectedTypes(selectedTypes.filter((t) => t !== "ink"));
               }}
             >
-              Ink
+              {t("toolbar.ink")}
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>

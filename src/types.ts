@@ -91,6 +91,8 @@ export interface Annotation {
   subtype?: "ink" | "polyline" | "line"; // To preserve original PDF subtype
   intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
   updatedAt?: string; // ISO Date string for modification date
+  svgPath?: string; // Imported appearance path data
+  appearanceStreamContent?: string; // Raw PDF appearance stream operators
 }
 
 export interface PDFMetadata {

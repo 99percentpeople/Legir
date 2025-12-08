@@ -28,6 +28,7 @@ import {
   getCursor,
   shouldSwitchToSelectAfterUse,
 } from "../../lib/tool-behavior";
+import { hexToPdfColor, generateInkAppearanceOps } from "../../lib/pdf-helpers";
 import PDFPage from "./PDFPage";
 import { ControlRenderer } from "./controls";
 
@@ -1055,6 +1056,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (e.button === 1) return;
     if (isPanModeActive) return;
 
+    e.stopPropagation();
+
     // Ensure mouse position is tracked immediately
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
 
@@ -1062,9 +1065,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     capturePointer(e);
 
     if (editorState.tool === "select") {
-      if (e.target === e.currentTarget) {
-        onSelectControl(null);
-      }
+      onSelectControl(null);
       return;
     }
 
@@ -1228,6 +1229,27 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       setIsDrawing(false);
       if (currentPathRef.current.length > 1) {
+        // Generate PDF appearance stream operators immediately
+        const colorObj = hexToPdfColor(editorState.penStyle.color);
+
+        // Convert points to PDF coordinates (Bottom-Left origin) for appearance stream
+        let streamOps: string | undefined = undefined;
+        // Ensure page exists and use its height for coordinate conversion
+        if (activePageIndex !== null && editorState.pages[activePageIndex]) {
+          const pageHeight = editorState.pages[activePageIndex].height;
+          if (colorObj) {
+            const pdfPoints = currentPathRef.current.map((p) => ({
+              x: p.x,
+              y: pageHeight - p.y,
+            }));
+            streamOps = generateInkAppearanceOps(
+              pdfPoints,
+              colorObj,
+              editorState.penStyle.thickness,
+            );
+          }
+        }
+
         onAddAnnotation({
           id: `ink_${Date.now()}`,
           pageIndex: activePageIndex,
@@ -1236,6 +1258,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
           color: editorState.penStyle.color,
           thickness: editorState.penStyle.thickness,
           opacity: editorState.penStyle.opacity,
+          appearanceStreamContent: streamOps,
         });
 
         if (
@@ -1524,14 +1547,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
       // Wait for layout to settle (especially for different page widths)
       // We use requestAnimationFrame to ensure we calculate after render
       // Adding a small timeout to ensure all child components have updated their dimensions
-      setTimeout(() => {
-        requestAnimationFrame(() => {
-          const scrollLeft = (content.scrollWidth - container.clientWidth) / 2;
-          if (scrollLeft > 0) {
-            container.scrollLeft = scrollLeft;
-          }
-        });
-      }, 10);
+      requestAnimationFrame(() => {
+        const scrollLeft = (content.scrollWidth - container.clientWidth) / 2;
+        if (scrollLeft > 0) {
+          container.scrollLeft = scrollLeft;
+        }
+      });
     }
   }, [editorState.pdfDocument, editorState.pages.length, fitTrigger]);
 
@@ -1580,6 +1601,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             id={`page-${page.pageIndex}`}
             key={page.pageIndex}
             className="relative origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
+            onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
           >
             {/* 
                 Lazy Loaded PDF Page Rendering 

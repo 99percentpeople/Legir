@@ -11,6 +11,7 @@ const es = {
   "status.unsaved": "Cambios sin guardar",
   "mode.annotation": "Modo Anotación",
   "mode.form": "Modo Formulario",
+  "mode.select": "Modo Selección",
   "toolbar.undo": "Deshacer (Ctrl+Z)",
   "toolbar.redo": "Rehacer (Ctrl+Y)",
   "toolbar.select": "Seleccionar",
@@ -177,7 +178,8 @@ const es = {
   "sidebar.no_comments": "Sin comentarios aún",
   "sidebar.no_pages": "No se encontraron páginas",
   "sidebar.no_results": "No se encontraron resultados",
-  "sidebar.filter": "Filtrar campos...",
+  "sidebar.filter_fields": "Filtrar campos...",
+  "sidebar.filter": "Filtrar",
   "sidebar.no_outline": "No se encontró esquema en este documento.",
   "settings.title": "Configuración del editor",
   "settings.description":

@@ -11,6 +11,7 @@ const fr = {
   "status.unsaved": "Modifications non enregistrées",
   "mode.annotation": "Mode Annotation",
   "mode.form": "Mode Formulaire",
+  "mode.select": "Mode Sélection",
   "toolbar.undo": "Annuler (Ctrl+Z)",
   "toolbar.redo": "Rétablir (Ctrl+Y)",
   "toolbar.select": "Sélectionner",
@@ -178,7 +179,8 @@ const fr = {
   "sidebar.no_comments": "Aucun commentaire pour le moment",
   "sidebar.no_pages": "Aucune page trouvée",
   "sidebar.no_results": "Aucun résultat trouvé",
-  "sidebar.filter": "Filtrer les champs...",
+  "sidebar.filter_fields": "Filtrer les champs...",
+  "sidebar.filter": "Filtrer",
   "sidebar.no_outline": "Aucun plan trouvé dans ce document.",
   "settings.title": "Paramètres de l'éditeur",
   "settings.description":
