@@ -27,7 +27,7 @@ import {
   Annotation,
   PDFMetadata,
 } from "./types";
-import { loadPDF, exportPDF, renderPageToDataURL } from "./services/pdfService";
+import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
 import { saveDraft, getDraft, clearDraft } from "./services/storageService";
 import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES } from "./constants";
@@ -820,10 +820,7 @@ const App: React.FC = () => {
           }),
         );
 
-        const base64Image = await renderPageToDataURL(
-          state.pdfDocument,
-          pageIndex,
-        );
+        const base64Image = await renderPage(state.pdfDocument, pageIndex);
 
         if (base64Image) {
           const fields = await analyzePageForFields(
