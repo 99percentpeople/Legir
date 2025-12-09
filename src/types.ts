@@ -22,6 +22,7 @@ export type Tool =
   | "draw_highlight"
   | "draw_ink"
   | "draw_comment"
+  | "draw_freetext"
   | "eraser";
 
 export interface FieldStyle {
@@ -77,7 +78,7 @@ export interface FormField {
 export interface Annotation {
   id: string;
   pageIndex: number;
-  type: "highlight" | "ink" | "comment";
+  type: "highlight" | "ink" | "comment" | "freetext";
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
@@ -153,6 +154,7 @@ export interface EditorState {
 
   penStyle: PenStyle;
   commentStyle?: { color: string; opacity: number };
+  freetextStyle?: { color: string; size: number };
 
   selectedId: string | null;
 

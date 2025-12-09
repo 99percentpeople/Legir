@@ -1,0 +1,174 @@
+import React, { useState, useRef, useEffect } from "react";
+import { AnnotationControlProps } from "../types";
+import { cn } from "@/lib/utils";
+import { Trash2, Palette, Type, Pencil, MessageSquare } from "lucide-react";
+import { ControlWrapper } from "../ControlWrapper";
+import { Button } from "@/components/ui/button";
+import { ColorPickerPopover } from "@/components/toolbar/ColorPickerPopover";
+import { FloatingToolbar } from "../FloatingToolbar";
+import { Slider } from "@/components/ui/slider";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { getContrastColor } from "@/utils/colors";
+
+export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
+  const { data, scale, isSelected, onUpdate, onDelete, onEdit } = props;
+  const [isEditing, setIsEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const lastClickTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!isSelected) {
+      setIsEditing(false);
+    }
+  }, [isSelected]);
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    const now = Date.now();
+    if (now - lastClickTimeRef.current < 300) {
+      // Double click detected
+      // e.stopPropagation(); // Removed to allow double click to work properly
+      setIsEditing(true);
+    }
+    lastClickTimeRef.current = now;
+  };
+
+  const handleBlur = () => {
+    setIsEditing(false);
+  };
+
+  return (
+    <ControlWrapper {...props} showBorder={isSelected} resizable={true}>
+      <FloatingToolbar isVisible={isSelected && !isEditing}>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title="Font Size"
+            >
+              <Type size={16} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-64 p-3"
+            align="start"
+            side="top"
+            alignOffset={-6}
+            sideOffset={6}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 text-sm font-medium">
+                {data.size || 12}px
+              </span>
+              <Slider
+                value={[data.size || 12]}
+                min={8}
+                max={72}
+                step={1}
+                onValueChange={(vals) => onUpdate?.(data.id, { size: vals[0] })}
+                className="flex-1"
+              />
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <ColorPickerPopover
+          color={data.color || "#000000"}
+          onColorChange={(c) => onUpdate?.(data.id, { color: c })}
+          showThickness={false}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            style={{
+              backgroundColor: getContrastColor(data.color),
+            }}
+          >
+            <Palette size={16} style={{ color: data.color }} />
+          </Button>
+        </ColorPickerPopover>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setIsEditing(true)}
+          title="Edit Text"
+        >
+          <Pencil size={16} />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onEdit?.(data.id)}
+          title="Open in Comments Panel"
+        >
+          <MessageSquare size={16} />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+          onClick={() => onDelete?.(data.id)}
+        >
+          <Trash2 size={16} />
+        </Button>
+      </FloatingToolbar>
+
+      <div
+        className={cn(
+          "flex h-full w-full items-start overflow-hidden",
+          "rounded-sm transition-colors",
+          isSelected && !isEditing && "ring-primary ring-1",
+        )}
+        style={{
+          color: data.color || "#000000",
+          fontSize: `${(data.size || 12) * scale}px`,
+          fontFamily: "Helvetica, Arial, sans-serif",
+          lineHeight: 1.2,
+          padding: "2px",
+          opacity: data.text ? 1 : 0.5,
+        }}
+        onPointerDown={handlePointerDown}
+      >
+        {isEditing ? (
+          <textarea
+            ref={textareaRef}
+            className="h-full w-full resize-none bg-transparent outline-none"
+            value={data.text || ""}
+            onChange={(e) => onUpdate?.(data.id, { text: e.target.value })}
+            onBlur={handleBlur}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              fontFamily: "inherit",
+              fontSize: "inherit",
+              color: "inherit",
+              lineHeight: "inherit",
+            }}
+          />
+        ) : (
+          <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
+            {data.text || "Double click to edit"}
+          </div>
+        )}
+      </div>
+    </ControlWrapper>
+  );
+};

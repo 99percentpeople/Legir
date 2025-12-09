@@ -9,26 +9,7 @@ import { FloatingToolbar } from "../FloatingToolbar";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { useMouse } from "@/hooks/useMouse";
-
-const getContrastColor = (hexColor: string) => {
-  if (!hexColor || !hexColor.startsWith("#")) return "#000000";
-  const hex = hexColor.replace("#", "");
-  const r = parseInt(
-    hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2),
-    16,
-  );
-  const g = parseInt(
-    hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4),
-    16,
-  );
-  const b = parseInt(
-    hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6),
-    16,
-  );
-  if (isNaN(r) || isNaN(g) || isNaN(b)) return "#000000";
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-  return yiq >= 128 ? "#000000" : "#ffffff";
-};
+import { getContrastColor } from "@/utils/colors";
 
 export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
   const { data, scale, isSelected, onUpdate, onDelete, onEdit } = props;
@@ -38,14 +19,21 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
   const rect = data.rect || { x: 0, y: 0, width: 30, height: 30 };
 
   return (
-    <ControlWrapper {...props}>
+    <ControlWrapper {...props} showBorder={false}>
       <FloatingToolbar isVisible={isSelected}>
         <ColorPickerPopover
           color={data.color || "#000000"}
           onColorChange={(c) => onUpdate?.(data.id, { color: c })}
           showThickness={false}
         >
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            style={{
+              backgroundColor: getContrastColor(data.color),
+            }}
+          >
             <Palette size={16} style={{ color: data.color }} />
           </Button>
         </ColorPickerPopover>

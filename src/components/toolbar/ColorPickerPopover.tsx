@@ -67,7 +67,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
 }) => {
   const { t } = useLanguage();
   return (
-    <Popover>
+    <Popover modal>
       <PopoverTrigger asChild>
         {children ? (
           children

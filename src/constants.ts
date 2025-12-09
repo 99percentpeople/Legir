@@ -49,6 +49,10 @@ export const ANNOTATION_STYLES = {
     color: "#ffaa00", // Orange
     opacity: 1.0,
   },
+  freetext: {
+    color: "#000000",
+    size: 12,
+  },
 };
 
 export const FONT_FAMILY_MAP: Record<string, string> = {

@@ -54,6 +54,7 @@ import { GEMINI_API_AVAILABLE } from "@/services/geminiService";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { ANNOTATION_STYLES } from "@/constants";
+import { getContrastColor } from "@/utils/colors";
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -63,6 +64,7 @@ interface ToolbarProps {
   onModeChange: (mode: EditorState["mode"]) => void;
   onPenStyleChange: (style: Partial<PenStyle>) => void;
   onCommentStyleChange?: (style: { color: string }) => void;
+  onFreetextStyleChange?: (style: { color: string }) => void;
   onExport: () => Promise<boolean>;
   onSaveDraft: () => void;
   onSaveAs: () => Promise<boolean>;
@@ -91,6 +93,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onModeChange,
   onPenStyleChange,
   onCommentStyleChange: onCommentStyleChange,
+  onFreetextStyleChange: onFreetextStyleChange,
   onExport,
   onSaveDraft,
   onSaveAs,
@@ -266,10 +269,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 title={t("toolbar.ink")}
                 className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
               >
-                <PenLine
-                  size={18}
-                  style={{ color: editorState.penStyle.color }}
-                />
+                <div
+                  className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
+                  style={{
+                    backgroundColor: editorState.penStyle.color,
+                  }}
+                >
+                  <PenLine
+                    size={14}
+                    color={getContrastColor(editorState.penStyle.color)}
+                  />
+                </div>
               </ToggleGroupItem>
               <ColorPickerPopover
                 color={editorState.penStyle.color}
@@ -288,22 +298,54 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 title={t("toolbar.comment")}
                 className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
               >
-                <MessageCirclePlus
-                  size={18}
-                  style={{ color: editorState.commentStyle?.color }}
-                />
+                <div
+                  className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
+                  style={{
+                    backgroundColor: editorState.commentStyle?.color,
+                  }}
+                >
+                  <MessageCirclePlus
+                    size={14}
+                    color={getContrastColor(editorState.commentStyle?.color)}
+                  />
+                </div>
               </ToggleGroupItem>
               <ColorPickerPopover
-                color={
-                  editorState.commentStyle?.color ||
-                  ANNOTATION_STYLES.comment.color
-                }
+                color={editorState.commentStyle?.color}
                 onColorChange={(color) =>
                   onCommentStyleChange && onCommentStyleChange({ color })
                 }
                 isActive={tool === "draw_comment"}
                 showThickness={false}
                 title={t("toolbar.comment_properties")}
+              />
+            </div>
+            <div className="flex items-center gap-0">
+              <ToggleGroupItem
+                value="draw_freetext"
+                title={t("toolbar.freetext")}
+                className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
+              >
+                <div
+                  className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
+                  style={{
+                    backgroundColor: editorState.freetextStyle?.color,
+                  }}
+                >
+                  <Type
+                    size={14}
+                    color={getContrastColor(editorState.freetextStyle?.color)}
+                  />
+                </div>
+              </ToggleGroupItem>
+              <ColorPickerPopover
+                color={editorState.freetextStyle?.color}
+                onColorChange={(color) =>
+                  onFreetextStyleChange && onFreetextStyleChange({ color })
+                }
+                isActive={tool === "draw_freetext"}
+                showThickness={false}
+                title={t("toolbar.freetext_properties")}
               />
             </div>
           </ToggleGroup>

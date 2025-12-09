@@ -30,7 +30,11 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
   };
 
   return (
-    <ControlWrapper {...props}>
+    <ControlWrapper
+      {...props}
+      showBorder={props.isSelected && isFormMode}
+      resizable={true}
+    >
       <div
         className={cn(
           "relative flex h-full w-full items-center justify-center transition-colors",

@@ -6,6 +6,7 @@ import {
   Highlighter,
   Pen,
   MessageSquare,
+  Type,
 } from "lucide-react";
 import { Annotation } from "../../types";
 import { useLanguage } from "../language-provider";
@@ -59,6 +60,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
         return <Highlighter size={12} className="text-muted-foreground" />;
       case "ink":
         return <Pen size={12} className="text-muted-foreground" />;
+      case "freetext":
+        return <Type size={12} className="text-muted-foreground" />;
       default:
         return <MessageSquare size={12} className="text-muted-foreground" />;
     }

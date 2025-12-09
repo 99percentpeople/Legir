@@ -123,6 +123,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
   } | null>(null);
 
   const [resizingFieldId, setResizingFieldId] = useState<string | null>(null);
+  const [resizingAnnotationId, setResizingAnnotationId] = useState<
+    string | null
+  >(null);
   const [resizeStart, setResizeStart] = useState<{
     originalRect: { x: number; y: number; width: number; height: number };
     mouseX: number;
@@ -137,7 +140,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     isErasing ||
     movingFieldId ||
     movingAnnotationId ||
-    resizingFieldId
+    resizingFieldId ||
+    resizingAnnotationId
   );
   useAutoScroll(containerRef, { enabled: isInteracting });
 
@@ -611,7 +615,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     const annot = editorState.annotations.find(
       (a) => a.id === movingAnnotationId,
     );
-    if (annot && annot.type === "comment" && annot.rect) {
+    // Allow moving any annotation with a rect (comment, freetext, ink)
+    if (annot && annot.rect) {
       let currentTargetPageIndex = activePageIndex;
       const hoveredPageIndex = getPageIndexFromPoint(clientX, clientY);
 
@@ -636,6 +641,60 @@ const Workspace: React.FC<WorkspaceProps> = ({
       });
     }
   };
+
+  const updateResizingAnnotation = (clientX: number, clientY: number) => {
+    if (!resizingAnnotationId || !resizeStart || !resizeHandle) return;
+
+    const annot = editorState.annotations.find(
+      (a) => a.id === resizingAnnotationId,
+    );
+    if (annot && annot.rect) {
+      const pageIndex = annot.pageIndex;
+      const currentCoords = getRelativeCoordsFromPoint(
+        clientX,
+        clientY,
+        pageIndex,
+      );
+
+      let newX = resizeStart.originalRect.x;
+      let newY = resizeStart.originalRect.y;
+      let newW = resizeStart.originalRect.width;
+      let newH = resizeStart.originalRect.height;
+
+      const deltaX = currentCoords.x - resizeStart.mouseX;
+      const deltaY = currentCoords.y - resizeStart.mouseY;
+
+      if (resizeHandle.includes("e")) newW += deltaX;
+      if (resizeHandle.includes("w")) {
+        newX += deltaX;
+        newW -= deltaX;
+      }
+      if (resizeHandle.includes("s")) newH += deltaY;
+      if (resizeHandle.includes("n")) {
+        newY += deltaY;
+        newH -= deltaY;
+      }
+
+      // Minimum size check
+      if (newW < 5) {
+        if (resizeHandle.includes("w"))
+          newX =
+            resizeStart.originalRect.x + resizeStart.originalRect.width - 5;
+        newW = 5;
+      }
+      if (newH < 5) {
+        if (resizeHandle.includes("n"))
+          newY =
+            resizeStart.originalRect.y + resizeStart.originalRect.height - 5;
+        newH = 5;
+      }
+
+      onUpdateAnnotation(resizingAnnotationId, {
+        rect: { ...annot.rect, x: newX, y: newY, width: newW, height: newH },
+      });
+    }
+  };
+
   const updateMovingField = (clientX: number, clientY: number) => {
     if (!movingFieldId || !moveOffset || !moveStartRaw) return;
 
@@ -1042,6 +1101,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
             lastMousePosRef.current.x,
             lastMousePosRef.current.y,
           );
+        } else if (resizingAnnotationId) {
+          updateResizingAnnotation(
+            lastMousePosRef.current.x,
+            lastMousePosRef.current.y,
+          );
         }
       }
     }
@@ -1194,6 +1258,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     // --- RESIZING ---
     else if (resizingFieldId && resizeStart && resizeHandle) {
       updateResizingField(e.clientX, e.clientY);
+    } else if (resizingAnnotationId && resizeStart && resizeHandle) {
+      updateResizingAnnotation(e.clientX, e.clientY);
     }
   };
 
@@ -1342,9 +1408,56 @@ const Workspace: React.FC<WorkspaceProps> = ({
             ) {
               onToolChange("select", true);
             }
+          } else if (editorState.tool === "draw_freetext") {
+            onAddAnnotation({
+              id: `freetext_${Date.now()}`,
+              pageIndex: activePageIndex,
+              type: "freetext",
+              rect: { x, y, width, height },
+              color:
+                editorState.freetextStyle?.color ||
+                ANNOTATION_STYLES.freetext.color,
+              size:
+                editorState.freetextStyle?.size ||
+                ANNOTATION_STYLES.freetext.size,
+              text: "New Freetext",
+            });
+
+            if (
+              !editorState.keys.shift &&
+              !editorState.keys.ctrl &&
+              shouldSwitchToSelectAfterUse("draw_freetext")
+            ) {
+              onToolChange("select", true);
+            }
           } else if (editorState.tool === "draw_comment") {
             // Handled in handlePointerDown now for immediate click-to-place
           }
+        }
+      } else if (
+        editorState.tool === "draw_freetext" &&
+        editorState.mode === "annotation"
+      ) {
+        // Single click creation for FreeText
+        onAddAnnotation({
+          id: `freetext_${Date.now()}`,
+          pageIndex: activePageIndex,
+          type: "freetext",
+          rect: { x: dragStart.x, y: dragStart.y, width: 150, height: 30 },
+          color:
+            editorState.freetextStyle?.color ||
+            ANNOTATION_STYLES.freetext.color,
+          size:
+            editorState.freetextStyle?.size || ANNOTATION_STYLES.freetext.size,
+          text: "New Freetext",
+        });
+
+        if (
+          !editorState.keys.shift &&
+          !editorState.keys.ctrl &&
+          shouldSwitchToSelectAfterUse("draw_freetext")
+        ) {
+          onToolChange("select", true);
         }
       }
     }
@@ -1356,6 +1469,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setMoveStartRaw(null);
     setMovingAnnotationId(null);
     setResizingFieldId(null);
+    setResizingAnnotationId(null);
     setResizeStart(null);
     setResizeHandle(null);
     setSnapLines([]);
@@ -1504,7 +1618,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   );
 
   const handleResizePointerDown = useCallback(
-    (handle: string, e: React.PointerEvent, field: FormField) => {
+    (handle: string, e: React.PointerEvent, data: FormField | Annotation) => {
       const state = editorStateRef.current;
       if (e.button === 1) return;
       if (isPanModeActive) return;
@@ -1519,15 +1633,23 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (state.tool !== "select") return;
 
       onTriggerHistorySave();
-      setActivePageIndex(field.pageIndex);
-      const coords = getRelativeCoords(e, field.pageIndex);
-      setResizingFieldId(field.id);
+      setActivePageIndex(data.pageIndex);
+      const coords = getRelativeCoords(e, data.pageIndex);
+
+      if (["freetext", "ink", "highlight", "comment"].includes(data.type)) {
+        setResizingAnnotationId(data.id);
+      } else {
+        setResizingFieldId(data.id);
+      }
+
       setResizeHandle(handle);
-      setResizeStart({
-        originalRect: { ...field.rect },
-        mouseX: coords.x,
-        mouseY: coords.y,
-      });
+      if (data.rect) {
+        setResizeStart({
+          originalRect: { ...data.rect },
+          mouseX: coords.x,
+          mouseY: coords.y,
+        });
+      }
 
       // Set Global Cursor based on handle
       let cursor = "default";
@@ -1654,6 +1776,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     onUpdate={onUpdateAnnotation}
                     onDelete={onDeleteAnnotation}
                     onEdit={onEditAnnotation}
+                    onControlResizeStart={handleResizePointerDown}
                   />
                 ))}
 

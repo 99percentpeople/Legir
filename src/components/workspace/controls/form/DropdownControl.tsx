@@ -33,7 +33,11 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
   const showHelperBg = style.isTransparent && !props.isSelected;
 
   return (
-    <ControlWrapper {...props}>
+    <ControlWrapper
+      {...props}
+      showBorder={props.isSelected && isFormMode}
+      resizable={true}
+    >
       <div
         className={cn(
           "relative flex h-full w-full items-center transition-colors",

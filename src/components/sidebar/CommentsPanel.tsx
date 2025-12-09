@@ -33,11 +33,12 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
     "comment",
     "highlight",
     "ink",
+    "freetext",
   ]);
 
   // Include all annotation types that we want to display
   const allAnnotations = annotations.filter((a) =>
-    ["comment", "highlight", "ink"].includes(a.type),
+    ["comment", "highlight", "ink", "freetext"].includes(a.type),
   );
 
   // Filter based on type and search term

@@ -2,9 +2,16 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { ControlProps } from "./types";
 
-export const ControlWrapper: React.FC<
-  React.PropsWithChildren<ControlProps>
-> = ({
+export type ControlWrapperProps = ControlProps & {
+  customRect?: { x: number; y: number; width: number; height: number };
+  showBorder?: boolean;
+  resizable?: boolean;
+  customElementId?: string;
+  className?: string;
+  children?: React.ReactNode;
+};
+
+export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   children,
   id,
   isSelected,
@@ -15,9 +22,14 @@ export const ControlWrapper: React.FC<
   onResizeStart,
   data,
   onPointerDown,
+  customRect,
+  showBorder = false,
+  resizable = false,
+  customElementId,
+  className,
 }) => {
   // Extract rect safely
-  const rect = "rect" in data ? data.rect : undefined;
+  const rect = customRect || ("rect" in data ? data.rect : undefined);
 
   if (!rect) return null; // Skip if no rect (e.g. ink might be handled differently)
 
@@ -33,12 +45,18 @@ export const ControlWrapper: React.FC<
   const label = "name" in data ? (data as { name: string }).name : data.type;
 
   // Determine ID based on type for sidebar navigation
-  const isAnnotation = ["comment", "highlight", "ink"].includes(data.type);
-  const elementId = isAnnotation ? `annotation-${id}` : `field-element-${id}`;
+  const isAnnotation = ["comment", "highlight", "ink", "freetext"].includes(
+    data.type,
+  );
+  const defaultElementId = isAnnotation
+    ? `annotation-${id}`
+    : `field-element-${id}`;
+  const elementId =
+    customElementId !== undefined ? customElementId : defaultElementId;
 
   return (
     <div
-      id={elementId}
+      id={elementId || undefined}
       onPointerDown={(e) => {
         if (!isSelectable) return;
         onPointerDown?.(e);
@@ -46,6 +64,7 @@ export const ControlWrapper: React.FC<
       className={cn(
         "group pointer-events-auto absolute outline-none select-none",
         isSelected ? "z-50" : "hover:z-50",
+        className,
       )}
       style={{
         left: rect.x * scale,
@@ -64,8 +83,8 @@ export const ControlWrapper: React.FC<
     >
       {children}
 
-      {/* Selection Overlay (Form Mode Only) */}
-      {isSelected && isFormMode && (
+      {/* Selection Overlay (Form Mode Only or Resizable Annotations) */}
+      {showBorder && resizable && (
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
           <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap text-white shadow-sm">
@@ -89,7 +108,7 @@ export const ControlWrapper: React.FC<
       )}
 
       {/* Annotation Mode Focus Overlay */}
-      {isAnnotationMode && isSelected && (
+      {showBorder && !resizable && (
         <div className="animate-in fade-in pointer-events-none absolute inset-0 z-50 border border-dashed border-blue-500 duration-200" />
       )}
     </div>

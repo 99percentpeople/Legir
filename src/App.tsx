@@ -60,6 +60,10 @@ const App: React.FC = () => {
       color: ANNOTATION_STYLES.comment.color,
       opacity: ANNOTATION_STYLES.comment.opacity,
     },
+    freetextStyle: {
+      color: ANNOTATION_STYLES.freetext.color,
+      size: ANNOTATION_STYLES.freetext.size,
+    },
     isProcessing: false,
     past: [],
     future: [],
@@ -1092,6 +1096,13 @@ const App: React.FC = () => {
     }));
   }, []);
 
+  const handleFreetextStyleChange = useCallback((style: { color: string }) => {
+    setState((prev) => ({
+      ...prev,
+      freetextStyle: { ...prev.freetextStyle!, ...style },
+    }));
+  }, []);
+
   const handlePropertiesChange = useCallback(
     (updates: Partial<FormField | Annotation>) => {
       const currentSelectedId = stateRef.current.selectedId;
@@ -1162,6 +1173,7 @@ const App: React.FC = () => {
             }
             onPenStyleChange={handlePenStyleChange}
             onCommentStyleChange={handleCommentStyleChange}
+            onFreetextStyleChange={handleFreetextStyleChange}
             onExport={handleExport}
             onSaveDraft={() => handleSaveDraft(false)}
             onSaveAs={handleSaveAs}

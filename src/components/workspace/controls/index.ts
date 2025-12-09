@@ -30,17 +30,22 @@ const SignatureControl = React.lazy(() =>
 );
 
 const HighlightControl = React.lazy(() =>
-  import("./functional/HighlightControl").then((module) => ({
+  import("./annotation/HighlightControl").then((module) => ({
     default: module.HighlightControl,
   })),
 );
 const CommentControl = React.lazy(() =>
-  import("./functional/CommentControl").then((module) => ({
+  import("./annotation/CommentControl").then((module) => ({
     default: module.CommentControl,
   })),
 );
+const FreetextControl = React.lazy(() =>
+  import("./annotation/FreetextControl").then((module) => ({
+    default: module.FreetextControl,
+  })),
+);
 const InkControl = React.lazy(() =>
-  import("./functional/InkControl").then((module) => ({
+  import("./annotation/InkControl").then((module) => ({
     default: module.InkControl,
   })),
 );
@@ -79,6 +84,11 @@ const HighlightProperties = React.lazy(() =>
 const CommentProperties = React.lazy(() =>
   import("./properties/CommentProperties").then((module) => ({
     default: module.CommentProperties,
+  })),
+);
+const FreetextProperties = React.lazy(() =>
+  import("./properties/FreetextProperties").then((module) => ({
+    default: module.FreetextProperties,
   })),
 );
 const InkProperties = React.lazy(() =>
@@ -130,6 +140,12 @@ export const registerControls = () => {
     component: CommentControl,
     propertiesComponent: CommentProperties,
     label: "Comment",
+  });
+  registry.register({
+    type: "freetext",
+    component: FreetextControl,
+    propertiesComponent: FreetextProperties,
+    label: "FreeText",
   });
   registry.register({
     type: "ink",

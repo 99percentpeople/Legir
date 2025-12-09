@@ -9,7 +9,7 @@ interface UseMouseOptions {
   resetOnExit?: boolean;
 }
 
-export function useMouse<T extends HTMLElement = HTMLElement>(
+export function useMouse<T extends Element = HTMLElement>(
   options: UseMouseOptions = {},
 ) {
   const { resetOnExit = false } = options;
@@ -45,7 +45,7 @@ export function useMouse<T extends HTMLElement = HTMLElement>(
 
   useEffect(() => {
     // If no element is provided, default to document for global tracking
-    const target: HTMLElement | Document = element || document;
+    const target: T | Document = element || document;
     target.addEventListener("mousemove", handleMouseMove);
     if (resetOnExit) {
       target.addEventListener("mouseleave", handleMouseLeave);

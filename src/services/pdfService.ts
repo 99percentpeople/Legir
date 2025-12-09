@@ -29,6 +29,7 @@ import {
   PDFNumber,
   PDFHexString,
   PDFStream,
+  PDFBool,
 } from "pdf-lib";
 import {
   FormField,
@@ -347,8 +348,8 @@ export const loadPDF = async (
       const subtype = annotation.subtype;
       // Skip Ink in pdf.js loop since we handle it via pdf-lib
       const isInk = false;
-      const isPolyLine = subtype === "PolyLine" || subtype === "polyline";
-      const isLine = subtype === "Line" || subtype === "line";
+      const isPolyLine = subtype.toLowerCase() === "polylines";
+      const isLine = subtype.toLowerCase() === "line";
 
       if (isInk || isPolyLine || isLine) {
         let strokeLists: any[] = [];
@@ -414,7 +415,7 @@ export const loadPDF = async (
             });
           }
         });
-      } else if (subtype === "Highlight" || subtype === "highlight") {
+      } else if (subtype.toLowerCase() === "highlight") {
         const color = annotation.color
           ? rgbArrayToHex(annotation.color)
           : "#FFFF00";
@@ -594,12 +595,8 @@ export const loadPDF = async (
           text: contents,
           updatedAt: updatedAt,
         });
-      } else if (
-        subtype === "Text" ||
-        subtype === "text" ||
-        subtype === "FreeText" ||
-        subtype === "freetext"
-      ) {
+      } else if (subtype.toLowerCase() === "text") {
+        // Sticky Note (Comment)
         const color = annotation.color
           ? rgbArrayToHex(annotation.color)
           : "#FFFF00";
@@ -631,20 +628,17 @@ export const loadPDF = async (
                 const libAnnot = libAnnots.lookup(idx);
                 if (libAnnot instanceof PDFDict) {
                   const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
-                  // Check for Text or FreeText
                   const sName =
                     libSubtype instanceof PDFName
                       ? libSubtype.decodeText()
                       : "";
-                  if (sName === "Text" || sName === "FreeText") {
+                  if (sName === "Text") {
                     const libRect = libAnnot.lookup(PDFName.of("Rect"));
                     if (libRect instanceof PDFArray) {
                       const rArray = libRect.asArray();
                       if (rArray.length >= 4) {
                         const lx1 = (rArray[0] as PDFNumber).asNumber();
                         const ly1 = (rArray[1] as PDFNumber).asNumber();
-                        // Approximate match - Increased tolerance for float errors
-                        // Especially for newly created comments that might have slight position shifts
                         if (Math.abs(lx1 - x1) < 5 && Math.abs(ly1 - y1) < 5) {
                           const rawContents = libAnnot.lookup(
                             PDFName.of("Contents"),
@@ -654,8 +648,6 @@ export const loadPDF = async (
                             rawContents instanceof PDFHexString
                           ) {
                             const decoded = rawContents.decodeText();
-                            // If pdf.js failed to get content (empty string), ALWAYS use pdf-lib content
-                            // Or if we have content, but pdf-lib content is valid, it might be better decoded
                             if (
                               decoded &&
                               (!contents || contents.trim() === "")
@@ -686,7 +678,6 @@ export const loadPDF = async (
                             const parsed = parsePDFDate(
                               rawModDate.decodeText(),
                             );
-                            // Prefer pdf-lib date if pdf.js date is missing
                             if (parsed && !updatedAt) updatedAt = parsed;
                           }
                           break;
@@ -709,6 +700,140 @@ export const loadPDF = async (
           rect: { x, y, width, height },
           color: color,
           text: contents,
+          author: author,
+          updatedAt: updatedAt,
+        });
+      } else if (subtype.toLowerCase() === "freetext") {
+        // FreeText Annotation
+        let color = annotation.color
+          ? rgbArrayToHex(annotation.color)
+          : "#000000"; // Default text color is usually black if not specified
+        const [x1, y1, x2, y2] = annotation.rect;
+
+        const [vx1, vy1] = unscaledViewport.convertToViewportPoint(x1, y1);
+        const [vx2, vy2] = unscaledViewport.convertToViewportPoint(x2, y2);
+
+        // Normalize rect
+        const x = Math.min(vx1, vx2);
+        const y = Math.min(vy1, vy2);
+        const width = Math.abs(vx2 - vx1);
+        const height = Math.abs(vy2 - vy1);
+
+        let contents = annotation.contents || "";
+        let author = annotation.title || undefined;
+        let updatedAt = parsePDFDate(annotation.modificationDate);
+        let fontSize = 12; // Default font size
+
+        // Fallback to pdf-lib for contents and DA (Default Appearance) extraction
+        if (pdfDoc) {
+          try {
+            const pdfLibPage = pdfDoc.getPage(i - 1);
+            const libAnnots = pdfLibPage.node.Annots();
+            if (libAnnots instanceof PDFArray) {
+              for (let idx = 0; idx < libAnnots.size(); idx++) {
+                const libAnnot = libAnnots.lookup(idx);
+                if (libAnnot instanceof PDFDict) {
+                  const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
+                  const sName =
+                    libSubtype instanceof PDFName
+                      ? libSubtype.decodeText()
+                      : "";
+                  if (sName === "FreeText") {
+                    const libRect = libAnnot.lookup(PDFName.of("Rect"));
+                    if (libRect instanceof PDFArray) {
+                      const rArray = libRect.asArray();
+                      if (rArray.length >= 4) {
+                        const lx1 = (rArray[0] as PDFNumber).asNumber();
+                        const ly1 = (rArray[1] as PDFNumber).asNumber();
+                        if (Math.abs(lx1 - x1) < 5 && Math.abs(ly1 - y1) < 5) {
+                          const rawContents = libAnnot.lookup(
+                            PDFName.of("Contents"),
+                          );
+                          if (
+                            rawContents instanceof PDFString ||
+                            rawContents instanceof PDFHexString
+                          ) {
+                            const decoded = rawContents.decodeText();
+                            if (
+                              decoded &&
+                              (!contents || contents.trim() === "")
+                            ) {
+                              contents = decoded;
+                            }
+                          }
+
+                          // Extract Font Size from DA
+                          const da = libAnnot.lookup(PDFName.of("DA"));
+                          if (da instanceof PDFString) {
+                            const daStr = da.decodeText();
+                            // Simple regex to find font size (e.g. /Helv 12 Tf)
+                            const sizeMatch = daStr.match(/(\d+(\.\d+)?)\s+Tf/);
+                            if (sizeMatch) {
+                              fontSize = parseFloat(sizeMatch[1]);
+                            }
+
+                            // Extract Color from DA (e.g. 1 0 0 rg)
+                            const colorMatch = daStr.match(
+                              /(\d+(\.\d+)?)\s+(\d+(\.\d+)?)\s+(\d+(\.\d+)?)\s+[rR]g/,
+                            );
+                            if (colorMatch) {
+                              const r = parseFloat(colorMatch[1]);
+                              const g = parseFloat(colorMatch[3]);
+                              const b = parseFloat(colorMatch[5]);
+                              const hex = rgbArrayToHex([
+                                r * 255,
+                                g * 255,
+                                b * 255,
+                              ]);
+                              if (hex) color = hex;
+                            }
+                          }
+
+                          const rawTitle = libAnnot.lookup(PDFName.of("T"));
+                          if (
+                            rawTitle instanceof PDFString ||
+                            rawTitle instanceof PDFHexString
+                          ) {
+                            const decodedAuthor = rawTitle.decodeText();
+                            if (
+                              decodedAuthor &&
+                              (!author || author.trim() === "")
+                            ) {
+                              author = decodedAuthor;
+                            }
+                          }
+
+                          const rawModDate = libAnnot.lookup(PDFName.of("M"));
+                          if (
+                            rawModDate instanceof PDFString ||
+                            rawModDate instanceof PDFHexString
+                          ) {
+                            const parsed = parsePDFDate(
+                              rawModDate.decodeText(),
+                            );
+                            if (parsed && !updatedAt) updatedAt = parsed;
+                          }
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Fallback FreeText extraction failed", e);
+          }
+        }
+
+        annotations.push({
+          id: `imported_freetext_${i}_${index}`,
+          pageIndex: i - 1,
+          type: "freetext",
+          rect: { x, y, width, height },
+          color: color,
+          text: contents,
+          size: fontSize,
           author: author,
           updatedAt: updatedAt,
         });
@@ -924,6 +1049,21 @@ export const exportPDF = async (
   };
 
   const form = pdfDoc.getForm();
+
+  // Force NeedAppearances to true so viewers render FreeText/Ink appearances dynamically
+  try {
+    let acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
+    if (!acroForm) {
+      acroForm = pdfDoc.context.obj({});
+      pdfDoc.catalog.set(PDFName.of("AcroForm"), acroForm);
+    }
+
+    if (acroForm instanceof PDFDict) {
+      acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
+    }
+  } catch (e) {
+    console.warn("Failed to set NeedAppearances", e);
+  }
 
   // 1. Cleanup Existing Fields
   const existingFields = form.getFields();
@@ -1164,6 +1304,62 @@ export const exportPDF = async (
         });
 
         const ref = pdfDoc.context.register(commentAnnot);
+        page.node.addAnnot(ref);
+      } else if (annot.type === "freetext" && annot.rect) {
+        // Export as PDF FreeText Annotation
+        const x = annot.rect.x;
+        const y = pageHeight - annot.rect.y - annot.rect.height;
+        const w = annot.rect.width;
+        const h = annot.rect.height;
+
+        const colorObj = hexToPdfColor(annot.color) || rgb(0, 0, 0);
+        const r =
+          (colorObj as any).red !== undefined ? (colorObj as any).red : 0;
+        const g =
+          (colorObj as any).green !== undefined ? (colorObj as any).green : 0;
+        const b =
+          (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+
+        // Default Appearance string
+        const fontSize = annot.size || 12;
+        // Assuming Helvetica as default font for now
+        const da = `/Helv ${fontSize} Tf ${r} ${g} ${b} rg`;
+
+        // Ensure Helvetica is registered as /Helv in page resources for FreeText DA
+        const resources = page.node.Resources() || pdfDoc.context.obj({});
+        let fontDict = resources.lookup(PDFName.of("Font"));
+        if (!(fontDict instanceof PDFDict)) {
+          fontDict = pdfDoc.context.obj({});
+          resources.set(PDFName.of("Font"), fontDict);
+        }
+        // Register Helvetica as /Helv
+        (fontDict as PDFDict).set(PDFName.of("Helv"), helvetica.ref);
+
+        if (!page.node.Resources()) {
+          page.node.set(PDFName.of("Resources"), resources);
+        }
+
+        const freeTextAnnot = pdfDoc.context.obj({
+          Type: "Annot",
+          Subtype: "FreeText",
+          F: 4, // Print
+          Rect: [x, y, x + w, y + h],
+          Contents: PDFHexString.fromText(annot.text || ""),
+          DA: PDFString.of(da),
+          Q: 0, // Left alignment
+          BS: { W: 0 }, // No border
+          P: page.ref,
+          T: annot.author
+            ? PDFHexString.fromText(annot.author)
+            : metadata?.author
+              ? PDFHexString.fromText(metadata.author)
+              : undefined,
+          M: annot.updatedAt
+            ? PDFString.fromDate(new Date(annot.updatedAt))
+            : PDFString.fromDate(new Date()),
+        });
+
+        const ref = pdfDoc.context.register(freeTextAnnot);
         page.node.addAnnot(ref);
       } else if (
         annot.type === "ink" &&
