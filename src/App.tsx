@@ -34,65 +34,36 @@ import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES } from "./constants";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
 import { shouldSwitchToSelectAfterUse } from "./lib/tool-behavior";
+import { useEditorStore } from "./store/useEditorStore";
 
 const App: React.FC = () => {
   const { t } = useLanguage();
-  const [state, setState] = useState<EditorState>({
-    pdfFile: null,
-    pdfBytes: null,
-    pdfDocument: null,
-    metadata: {},
-    filename: "document.pdf",
-    pages: [],
-    fields: [],
-    annotations: [],
-    outline: [],
-    selectedId: null,
-    scale: 1.0,
-    mode: "annotation",
-    tool: "select",
-    penStyle: {
-      color: ANNOTATION_STYLES.ink.color,
-      thickness: ANNOTATION_STYLES.ink.thickness,
-      opacity: ANNOTATION_STYLES.ink.opacity,
-    },
-    commentStyle: {
-      color: ANNOTATION_STYLES.comment.color,
-      opacity: ANNOTATION_STYLES.comment.opacity,
-    },
-    freetextStyle: {
-      color: ANNOTATION_STYLES.freetext.color,
-      size: ANNOTATION_STYLES.freetext.size,
-    },
-    isProcessing: false,
-    past: [],
-    future: [],
-    clipboard: null,
-    snappingOptions: {
-      enabled: true,
-      snapToBorders: true,
-      snapToCenter: true,
-      snapToEqualDistances: false,
-      threshold: 8,
-    },
-    lastSavedAt: null,
-    keys: {
-      ctrl: false,
-      shift: false,
-      alt: false,
-      meta: false,
-      space: false,
-    },
-    actionSignal: null,
-  });
+
+  // Use Zustand store
+  const state = useEditorStore();
+  const {
+    setState,
+    loadDocument,
+    addField,
+    addAnnotation,
+    updateField,
+    updateAnnotation,
+    deleteSelection,
+    selectControl,
+    setTool,
+    saveCheckpoint,
+    undo,
+    redo,
+    openDialog,
+    closeDialog,
+    setKeys,
+    moveField,
+    deleteAnnotation,
+  } = state;
 
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [isPanelFloating, setIsPanelFloating] = useState(false);
-  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAIDetectOpen, setIsAIDetectOpen] = useState(false);
-  const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [sidebarTab, setSidebarTab] = useState("thumbnails");
@@ -105,11 +76,11 @@ const App: React.FC = () => {
   const [fitTrigger, setFitTrigger] = useState(0);
   const isClosingRef = React.useRef(false);
 
-  // Keep a ref to access latest state in event handlers without re-binding
-  const stateRef = React.useRef(state);
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+  // Refs for stable access in event listeners
+  const handlersRef = React.useRef<{
+    handleSaveDraft: (manual?: boolean) => Promise<void>;
+    handlePrint: () => void;
+  } | null>(null);
 
   useEffect(() => {
     getDraft().then((draft) => {
@@ -132,10 +103,7 @@ const App: React.FC = () => {
     setIsSidebarOpen(true);
     setSidebarTab("annotations");
 
-    setState((prev) => ({
-      ...prev,
-      selectedId: id,
-    }));
+    selectControl(id);
 
     // Try to focus the textarea in the sidebar
     requestAnimationFrame(() => {
@@ -191,131 +159,14 @@ const App: React.FC = () => {
 
   const updateScale = (newScale: number) => {
     const clamped = Math.max(0.25, Math.min(5.0, newScale));
-    setState((prev) => ({ ...prev, scale: clamped }));
+    setState({ scale: clamped });
   };
-
-  const saveCheckpoint = useCallback(() => {
-    setIsDirty(true);
-    setState((prev) => {
-      const snapshot: HistorySnapshot = {
-        fields: prev.fields,
-        annotations: prev.annotations,
-        metadata: prev.metadata,
-      };
-      const newPast = [...prev.past, snapshot].slice(-50);
-      return { ...prev, past: newPast, future: [] };
-    });
-  }, []);
-
-  const handleUndo = useCallback(() => {
-    setIsDirty(true);
-    setState((prev) => {
-      if (prev.past.length === 0) return prev;
-      const previous = prev.past[prev.past.length - 1];
-      const newPast = prev.past.slice(0, -1);
-      const currentSnapshot: HistorySnapshot = {
-        fields: prev.fields,
-        annotations: prev.annotations,
-        metadata: prev.metadata,
-      };
-      return {
-        ...prev,
-        fields: previous.fields,
-        annotations: previous.annotations,
-        metadata: previous.metadata,
-        past: newPast,
-        future: [currentSnapshot, ...prev.future],
-        selectedId: null,
-      };
-    });
-  }, []);
-
-  const handleRedo = useCallback(() => {
-    setIsDirty(true);
-    setState((prev) => {
-      if (prev.future.length === 0) return prev;
-      const next = prev.future[0];
-      const newFuture = prev.future.slice(1);
-      const currentSnapshot: HistorySnapshot = {
-        fields: prev.fields,
-        annotations: prev.annotations,
-        metadata: prev.metadata,
-      };
-      return {
-        ...prev,
-        fields: next.fields,
-        annotations: next.annotations,
-        metadata: next.metadata,
-        past: [...prev.past, currentSnapshot],
-        future: newFuture,
-        selectedId: null,
-      };
-    });
-  }, []);
-
-  const handleDelete = useCallback(() => {
-    saveCheckpoint();
-    setState((prev) => {
-      if (prev.selectedId) {
-        const isField = prev.fields.some((f) => f.id === prev.selectedId);
-        if (isField) {
-          return {
-            ...prev,
-            fields: prev.fields.filter((f) => f.id !== prev.selectedId),
-            selectedId: null,
-          };
-        }
-        const isAnnotation = prev.annotations.some(
-          (a) => a.id === prev.selectedId,
-        );
-        if (isAnnotation) {
-          return {
-            ...prev,
-            annotations: prev.annotations.filter(
-              (a) => a.id !== prev.selectedId,
-            ),
-            selectedId: null,
-          };
-        }
-      }
-      return prev;
-    });
-  }, [saveCheckpoint]);
-
-  const handleDeleteAnnotation = (id: string) => {
-    saveCheckpoint();
-    setState((prev) => ({
-      ...prev,
-      annotations: prev.annotations.filter((a) => a.id !== id),
-      selectedId: prev.selectedId === id ? null : prev.selectedId,
-    }));
-  };
-
-  const handleMoveField = useCallback((actionType: string) => {
-    setState((prev) => {
-      if (!prev.selectedId) return prev;
-      const fieldIndex = prev.fields.findIndex((f) => f.id === prev.selectedId);
-      if (fieldIndex === -1) return prev;
-
-      const field = prev.fields[fieldIndex];
-      let { x, y } = field.rect;
-      const isFast = actionType.endsWith("_FAST");
-      const step = isFast ? 10 : 1;
-
-      if (actionType.includes("UP")) y -= step;
-      else if (actionType.includes("DOWN")) y += step;
-      else if (actionType.includes("LEFT")) x -= step;
-      else if (actionType.includes("RIGHT")) x += step;
-
-      const newFields = [...prev.fields];
-      newFields[fieldIndex] = { ...field, rect: { ...field.rect, x, y } };
-
-      return { ...prev, fields: newFields };
-    });
-  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Access latest state directly from store without needing refs
+      const currentState = useEditorStore.getState();
+
       // Update Modifier Keys
       if (
         e.key === "Control" ||
@@ -323,31 +174,17 @@ const App: React.FC = () => {
         e.key === "Alt" ||
         e.key === "Meta"
       ) {
-        setState((prev) => {
-          if (
-            prev.keys.ctrl === e.ctrlKey &&
-            prev.keys.shift === e.shiftKey &&
-            prev.keys.alt === e.altKey &&
-            prev.keys.meta === e.metaKey
-          ) {
-            return prev;
-          }
-          return {
-            ...prev,
-            keys: {
-              ctrl: e.ctrlKey,
-              shift: e.shiftKey,
-              alt: e.altKey,
-              meta: e.metaKey,
-              space: prev.keys.space,
-            },
-          };
+        currentState.setKeys({
+          ctrl: e.ctrlKey,
+          shift: e.shiftKey,
+          alt: e.altKey,
+          meta: e.metaKey,
+          space: currentState.keys.space,
         });
         return;
       }
 
       const target = e.target as HTMLElement;
-      // Identify if we are inside a text editing context
       const isInput =
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
@@ -356,52 +193,40 @@ const App: React.FC = () => {
       if (e.key === " " && !isInput) {
         e.preventDefault();
         e.stopPropagation();
-        setState((prev) => {
-          if (prev.keys.space) return prev;
-          return {
-            ...prev,
-            keys: { ...prev.keys, space: true },
-          };
-        });
+        if (!currentState.keys.space) {
+          currentState.setKeys({ space: true });
+        }
         return;
       }
-
-      const currentState = stateRef.current;
-      const { selectedId, mode } = currentState;
-
-      const dispatch = (type: any) => {
-        e.preventDefault();
-        setState((prev) => ({
-          ...prev,
-          keys: {
-            ...prev.keys,
-            ctrl: e.ctrlKey,
-            shift: e.shiftKey,
-            alt: e.altKey,
-            meta: e.metaKey,
-          },
-          actionSignal: { type, id: Date.now() },
-        }));
-      };
 
       // Handle Escape Key
       if (e.key === "Escape") {
+        if (currentState.activeDialog) {
+          return;
+        }
+
         if (isInput) target.blur();
-        dispatch("ESCAPE");
+
+        // Escape Action Logic
+        if (currentState.selectedId) {
+          currentState.selectControl(null);
+        } else if (currentState.tool !== "select") {
+          currentState.setTool("select");
+        }
         return;
       }
 
-      // Handle Ctrl+S (Save) - Allow even in inputs
+      // Handle Ctrl+S (Save)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        dispatch("SAVE");
+        handlersRef.current?.handleSaveDraft(false);
         return;
       }
 
-      // Handle Ctrl+P (Print) - Allow even in inputs
+      // Handle Ctrl+P (Print)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
-        e.preventDefault(); // Prevent browser print
-        dispatch("PRINT");
+        e.preventDefault();
+        handlersRef.current?.handlePrint();
         return;
       }
 
@@ -411,12 +236,12 @@ const App: React.FC = () => {
           return;
         }
         const isSelectedField = currentState.fields.some(
-          (f) => f.id === selectedId,
+          (f) => f.id === currentState.selectedId,
         );
-        if (mode === "annotation" && isSelectedField) {
+        if (currentState.mode === "annotation" && isSelectedField) {
           return;
         }
-        dispatch("DELETE");
+        currentState.deleteSelection();
         return;
       }
 
@@ -425,76 +250,64 @@ const App: React.FC = () => {
         return;
       }
 
-      // Handle Arrow Keys for moving selected field
+      // Handle Arrow Keys
       if (
-        mode === "form" &&
-        selectedId &&
-        currentState.fields.some((f) => f.id === selectedId) &&
+        currentState.mode === "form" &&
+        currentState.selectedId &&
+        currentState.fields.some((f) => f.id === currentState.selectedId) &&
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
       ) {
-        let type = "";
-        const fast = e.shiftKey ? "_FAST" : "";
-        if (e.key === "ArrowUp") type = "MOVE_UP";
-        else if (e.key === "ArrowDown") type = "MOVE_DOWN";
-        else if (e.key === "ArrowLeft") type = "MOVE_LEFT";
-        else if (e.key === "ArrowRight") type = "MOVE_RIGHT";
+        e.preventDefault();
+        const isFast = e.shiftKey;
+        let direction: "UP" | "DOWN" | "LEFT" | "RIGHT" = "UP";
+        if (e.key === "ArrowUp") direction = "UP";
+        else if (e.key === "ArrowDown") direction = "DOWN";
+        else if (e.key === "ArrowLeft") direction = "LEFT";
+        else if (e.key === "ArrowRight") direction = "RIGHT";
 
-        if (type) dispatch(type + fast);
+        currentState.moveField(direction, isFast);
         return;
       }
 
+      // Undo/Redo
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-        if (e.shiftKey) dispatch("REDO");
-        else dispatch("UNDO");
+        if (e.shiftKey) currentState.redo();
+        else currentState.undo();
         return;
       }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-        dispatch("REDO");
+        currentState.redo();
         return;
       }
 
       // Help Dialog
       if (e.key === "?" || (e.shiftKey && e.key === "/")) {
-        setIsShortcutsHelpOpen(true);
+        currentState.openDialog("shortcuts");
         return;
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      const currentState = useEditorStore.getState();
+
       if (
         e.key === "Control" ||
         e.key === "Shift" ||
         e.key === "Alt" ||
         e.key === "Meta"
       ) {
-        setState((prev) => {
-          if (
-            prev.keys.ctrl === e.ctrlKey &&
-            prev.keys.shift === e.shiftKey &&
-            prev.keys.alt === e.altKey &&
-            prev.keys.meta === e.metaKey
-          ) {
-            return prev;
-          }
-          return {
-            ...prev,
-            keys: {
-              ctrl: e.ctrlKey,
-              shift: e.shiftKey,
-              alt: e.altKey,
-              meta: e.metaKey,
-              space: prev.keys.space,
-            },
-          };
+        currentState.setKeys({
+          ctrl: e.ctrlKey,
+          shift: e.shiftKey,
+          alt: e.altKey,
+          meta: e.metaKey,
+          space: currentState.keys.space,
         });
       }
 
       if (e.key === " ") {
-        setState((prev) => ({
-          ...prev,
-          keys: { ...prev.keys, space: false },
-        }));
+        currentState.setKeys({ space: false });
       }
     };
 
@@ -505,55 +318,6 @@ const App: React.FC = () => {
       window.removeEventListener("keyup", handleKeyUp, true);
     };
   }, []);
-
-  // Process Action Signals
-  useEffect(() => {
-    if (!state.actionSignal) return;
-    const { type } = state.actionSignal;
-
-    switch (type) {
-      case "ESCAPE":
-        setState((prev) => {
-          if (prev.selectedId) {
-            return {
-              ...prev,
-              selectedId: null,
-            };
-          }
-          if (prev.tool !== "select") {
-            return { ...prev, tool: "select" };
-          }
-          return prev;
-        });
-        break;
-      case "DELETE":
-        handleDelete();
-        break;
-      case "UNDO":
-        handleUndo();
-        break;
-      case "REDO":
-        handleRedo();
-        break;
-      case "SAVE":
-        handleSaveDraft(false);
-        break;
-      case "PRINT":
-        handlePrint();
-        break;
-      default:
-        if (typeof type === "string" && type.startsWith("MOVE_")) {
-          handleMoveField(type);
-        }
-        break;
-    }
-  }, [
-    state.actionSignal,
-    handleDelete,
-    handleUndo,
-    handleRedo,
-    handleMoveField,
-  ]);
 
   const handleUpload = async (file: File) => {
     setState((prev) => ({ ...prev, isProcessing: true }));
@@ -634,137 +398,6 @@ const App: React.FC = () => {
       setProcessingStatus(null);
     }
   };
-
-  const handleAddField = useCallback(
-    (field: FormField) => {
-      saveCheckpoint();
-      setState((prev) => {
-        const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
-        const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
-
-        return {
-          ...prev,
-          fields: [...prev.fields, field],
-          selectedId: field.id,
-          tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
-        };
-      });
-    },
-    [saveCheckpoint],
-  );
-
-  const handleAddAnnotation = useCallback(
-    (annotation: Annotation) => {
-      saveCheckpoint();
-      const now = new Date().toISOString();
-
-      setState((prev) => {
-        const author = annotation.author || prev.metadata?.author || "User";
-        const annotationWithDetails = {
-          ...annotation,
-          updatedAt: now,
-          author: author,
-        };
-
-        const shouldSwitch = shouldSwitchToSelectAfterUse(prev.tool);
-        const isForcedContinuous = prev.keys.ctrl || prev.keys.meta;
-
-        return {
-          ...prev,
-          annotations: [...prev.annotations, annotationWithDetails],
-          selectedId: annotationWithDetails.id,
-          tool: shouldSwitch && !isForcedContinuous ? "select" : prev.tool,
-        };
-      });
-    },
-    [saveCheckpoint],
-  );
-
-  const handleUpdateField = useCallback(
-    (id: string, updates: Partial<FormField>) => {
-      setIsDirty(true);
-      setState((prev) => {
-        let newFields = prev.fields;
-        const targetField = prev.fields.find((f) => f.id === id);
-
-        if (!targetField) return prev;
-
-        // Handle Radio Exclusivity
-        if (updates.isChecked === true) {
-          if (targetField.type === FieldType.RADIO) {
-            newFields = newFields.map((f) =>
-              f.name === targetField.name &&
-              f.id !== id &&
-              f.type === FieldType.RADIO
-                ? { ...f, isChecked: false }
-                : f,
-            );
-          }
-        }
-
-        // Sync same-name fields
-        const propsToSync = [
-          "value",
-          "defaultValue",
-          "options",
-          "required",
-          "readOnly",
-          "toolTip",
-          "multiline",
-          "maxLength",
-          "alignment",
-        ];
-
-        // Sync isChecked for non-radio fields (Radio logic is handled above)
-        if (targetField.type !== FieldType.RADIO) {
-          propsToSync.push("isChecked");
-          propsToSync.push("isDefaultChecked");
-        }
-
-        const syncUpdates: Partial<FormField> = {};
-        propsToSync.forEach((key) => {
-          const k = key as keyof FormField;
-          if (updates[k] !== undefined) {
-            // @ts-ignore
-            syncUpdates[k] = updates[k];
-          }
-        });
-
-        if (Object.keys(syncUpdates).length > 0) {
-          newFields = newFields.map((f) =>
-            f.name === targetField.name &&
-            f.id !== id &&
-            f.type === targetField.type
-              ? { ...f, ...syncUpdates }
-              : f,
-          );
-        }
-
-        newFields = newFields.map((f) =>
-          f.id === id ? { ...f, ...updates } : f,
-        );
-        return { ...prev, fields: newFields };
-      });
-    },
-    [],
-  );
-
-  const handleUpdateAnnotation = useCallback(
-    (id: string, updates: Partial<Annotation>) => {
-      setIsDirty(true);
-      const updatesWithTime = {
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      };
-      setState((prev) => ({
-        ...prev,
-        annotations: prev.annotations.map((a) =>
-          a.id === id ? { ...a, ...updatesWithTime } : a,
-        ),
-      }));
-    },
-    [],
-  );
 
   const handleAdvancedDetect = async (options: AIDetectionOptions) => {
     if (state.pages.length === 0 || !state.pdfDocument) return;
@@ -929,21 +562,6 @@ const App: React.FC = () => {
     return false;
   };
 
-  const handleSelectionChange = useCallback((id: string | null) => {
-    setState((prev) => ({
-      ...prev,
-      selectedId: id,
-    }));
-  }, []);
-
-  const handleToolChange = (tool: any, preserveSelection?: boolean) => {
-    setState((prev) => ({
-      ...prev,
-      tool,
-      selectedId: preserveSelection ? prev.selectedId : null,
-    }));
-  };
-
   const handleExport = async (): Promise<boolean> => {
     setState((prev) => ({ ...prev, isProcessing: true }));
     setProcessingStatus(t("app.generating"));
@@ -1014,11 +632,7 @@ const App: React.FC = () => {
           // Use afterprint event to detect when print dialog is closed (printed or cancelled)
           win.addEventListener("afterprint", cleanup);
 
-          win.focus(); // Ensure focus for print
           win.print();
-
-          // Fallback: 10 minutes safety timeout in case afterprint doesn't fire
-          setTimeout(cleanup, 600000);
         };
       }
     } catch (error) {
@@ -1054,6 +668,13 @@ const App: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    handlersRef.current = {
+      handleSaveDraft,
+      handlePrint,
+    };
+  }, [handleSaveDraft, handlePrint]);
+
   const closeSession = async () => {
     isClosingRef.current = true;
     await clearDraft();
@@ -1061,7 +682,7 @@ const App: React.FC = () => {
   };
 
   const handleCloseRequest = () => {
-    setIsCloseDialogOpen(true);
+    setState((prev) => ({ ...prev, activeDialog: "close_confirm" }));
   };
 
   const selectedField =
@@ -1102,43 +723,49 @@ const App: React.FC = () => {
 
   const handlePropertiesChange = useCallback(
     (updates: Partial<FormField | Annotation>) => {
-      const currentSelectedId = stateRef.current.selectedId;
+      const currentState = useEditorStore.getState();
+      const currentSelectedId = currentState.selectedId;
       if (!currentSelectedId) return;
 
-      const isField = stateRef.current.fields.some(
+      const isField = currentState.fields.some(
         (f) => f.id === currentSelectedId,
       );
       if (isField) {
-        handleUpdateField(currentSelectedId, updates as Partial<FormField>);
+        currentState.updateField(
+          currentSelectedId,
+          updates as Partial<FormField>,
+        );
       } else {
-        const isAnnotation = stateRef.current.annotations.some(
+        const isAnnotation = currentState.annotations.some(
           (a) => a.id === currentSelectedId,
         );
         if (isAnnotation) {
-          handleUpdateAnnotation(
+          currentState.updateAnnotation(
             currentSelectedId,
             updates as Partial<Annotation>,
           );
         }
       }
     },
-    [handleUpdateField, handleUpdateAnnotation],
+    [],
   );
 
-  const handleMetadataChange = useCallback((updates: Partial<PDFMetadata>) => {
-    setState((prev) => ({
-      ...prev,
-      metadata: { ...prev.metadata, ...updates },
-    }));
-  }, []);
+  const handleMetadataChange = useCallback(
+    (updates: Partial<PDFMetadata>) => {
+      setState((prev) => ({
+        ...prev,
+        metadata: { ...prev.metadata, ...updates },
+      }));
+    },
+    [setState],
+  );
 
-  const handleFilenameChange = useCallback((name: string) => {
-    setState((prev) => ({ ...prev, filename: name }));
-  }, []);
-
-  const handlePropertiesClose = useCallback(() => {
-    setState((prev) => ({ ...prev, selectedId: null }));
-  }, []);
+  const handleFilenameChange = useCallback(
+    (name: string) => {
+      setState((prev) => ({ ...prev, filename: name }));
+    },
+    [setState],
+  );
 
   const handleToggleFloating = useCallback(() => {
     setIsPanelFloating((prev) => !prev);
@@ -1158,16 +785,8 @@ const App: React.FC = () => {
             editorState={state}
             isSaving={isSaving}
             isDirty={isDirty}
-            onToolChange={(tool) =>
-              setState((prev) => ({
-                ...prev,
-                tool,
-                selectedId: null,
-              }))
-            }
-            onModeChange={(mode) =>
-              setState((prev) => ({ ...prev, mode, tool: "select" }))
-            }
+            onToolChange={(tool) => setTool(tool)}
+            onModeChange={(mode) => setState({ mode, tool: "select" })}
             onPenStyleChange={handlePenStyleChange}
             onCommentStyleChange={handleCommentStyleChange}
             onFreetextStyleChange={handleFreetextStyleChange}
@@ -1186,19 +805,25 @@ const App: React.FC = () => {
                 useCustomStyle: false,
               })
             }
-            onCustomAutoDetect={() => setIsAIDetectOpen(true)}
-            onUndo={handleUndo}
-            onRedo={handleRedo}
+            onCustomAutoDetect={() =>
+              setState((prev) => ({ ...prev, activeDialog: "ai_detect" }))
+            }
+            onUndo={undo}
+            onRedo={redo}
             canUndo={state.past.length > 0}
             canRedo={state.future.length > 0}
-            onOpenShortcuts={() => setIsShortcutsHelpOpen(true)}
+            onOpenShortcuts={() =>
+              setState((prev) => ({ ...prev, activeDialog: "shortcuts" }))
+            }
             isFieldListOpen={isSidebarOpen}
             onToggleFieldList={() => setIsSidebarOpen(!isSidebarOpen)}
             isPropertiesPanelOpen={isRightPanelOpen}
             onTogglePropertiesPanel={() =>
               setIsRightPanelOpen(!isRightPanelOpen)
             }
-            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSettings={() =>
+              setState((prev) => ({ ...prev, activeDialog: "settings" }))
+            }
           />
 
           <div className="relative flex flex-1 overflow-hidden">
@@ -1211,10 +836,7 @@ const App: React.FC = () => {
               outline={state.outline}
               selectedId={state.selectedId}
               onSelectControl={(id) => {
-                setState((prev) => ({
-                  ...prev,
-                  selectedId: id,
-                }));
+                selectControl(id);
                 if (id) {
                   setTimeout(() => {
                     let el = document.getElementById(`field-element-${id}`);
@@ -1238,8 +860,8 @@ const App: React.FC = () => {
                   }, 50);
                 }
               }}
-              onDeleteAnnotation={handleDeleteAnnotation}
-              onUpdateAnnotation={handleUpdateAnnotation}
+              onDeleteAnnotation={deleteAnnotation}
+              onUpdateAnnotation={updateAnnotation}
               onNavigatePage={(idx) => {
                 document
                   .getElementById(`page-${idx}`)
@@ -1256,17 +878,17 @@ const App: React.FC = () => {
             <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
               <Workspace
                 editorState={state}
-                onAddField={handleAddField}
-                onAddAnnotation={handleAddAnnotation}
-                onSelectControl={handleSelectionChange}
-                onUpdateField={handleUpdateField}
-                onUpdateAnnotation={handleUpdateAnnotation}
-                onDeleteAnnotation={handleDeleteAnnotation}
+                onAddField={addField}
+                onAddAnnotation={addAnnotation}
+                onSelectControl={selectControl}
+                onUpdateField={updateField}
+                onUpdateAnnotation={updateAnnotation}
+                onDeleteAnnotation={deleteAnnotation}
                 onEditAnnotation={handleEditAnnotation}
                 onScaleChange={updateScale}
                 onTriggerHistorySave={saveCheckpoint}
                 onPageIndexChange={setCurrentPageIndex}
-                onToolChange={handleToolChange}
+                onToolChange={(tool) => setTool(tool)}
                 fitTrigger={fitTrigger}
               />
               <ZoomControls
@@ -1291,8 +913,8 @@ const App: React.FC = () => {
                   onChange={handlePropertiesChange}
                   onMetadataChange={handleMetadataChange}
                   onFilenameChange={handleFilenameChange}
-                  onDelete={handleDelete}
-                  onClose={handlePropertiesClose}
+                  onDelete={deleteSelection}
+                  onClose={() => selectControl(null)}
                   isFloating={isPanelFloating}
                   onToggleFloating={handleToggleFloating}
                   onTriggerHistorySave={saveCheckpoint}
@@ -1305,23 +927,28 @@ const App: React.FC = () => {
       )}
 
       <KeyboardShortcutsHelp
-        isOpen={isShortcutsHelpOpen}
-        onClose={() => setIsShortcutsHelpOpen(false)}
+        isOpen={state.activeDialog === "shortcuts"}
+        onClose={() => setState((prev) => ({ ...prev, activeDialog: null }))}
       />
       <SettingsDialog
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        isOpen={state.activeDialog === "settings"}
+        onClose={() => setState((prev) => ({ ...prev, activeDialog: null }))}
         options={state.snappingOptions}
         onChange={(o) => setState((prev) => ({ ...prev, snappingOptions: o }))}
       />
       <AIDetectionDialog
-        isOpen={isAIDetectOpen}
-        onClose={() => setIsAIDetectOpen(false)}
+        isOpen={state.activeDialog === "ai_detect"}
+        onClose={() => setState((prev) => ({ ...prev, activeDialog: null }))}
         onConfirm={handleAdvancedDetect}
         totalPages={state.pages.length}
       />
 
-      <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
+      <Dialog
+        open={state.activeDialog === "close_confirm"}
+        onOpenChange={(open) => {
+          if (!open) setState((prev) => ({ ...prev, activeDialog: null }));
+        }}
+      >
         <DialogContent>
           <DialogTitle>{t("dialog.confirm_close.title")}</DialogTitle>
           <DialogDescription>
@@ -1330,7 +957,9 @@ const App: React.FC = () => {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setIsCloseDialogOpen(false)}
+              onClick={() =>
+                setState((prev) => ({ ...prev, activeDialog: null }))
+              }
             >
               {t("dialog.confirm_close.cancel")}
             </Button>

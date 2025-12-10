@@ -138,6 +138,13 @@ export interface PenStyle {
   opacity: number;
 }
 
+export type DialogName =
+  | "shortcuts"
+  | "settings"
+  | "ai_detect"
+  | "close_confirm"
+  | null;
+
 export interface EditorState {
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
@@ -171,6 +178,9 @@ export interface EditorState {
   } | null;
   // Settings
   snappingOptions: SnappingOptions;
+
+  // Dialog State
+  activeDialog: "shortcuts" | "settings" | "ai_detect" | "close_confirm" | null;
 
   // Status
   lastSavedAt: Date | null;

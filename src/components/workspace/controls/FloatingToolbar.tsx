@@ -19,7 +19,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   return (
     <div
       className={cn(
-        "bg-background absolute bottom-full left-1/2 z-[60] mb-2 flex -translate-x-1/2 items-center gap-1 rounded-md border p-1 shadow-md",
+        "bg-background absolute bottom-full left-1/2 z-60 mb-2 flex -translate-x-1/2 items-center gap-1 rounded-md border p-1 shadow-md",
         className,
       )}
       style={style}
