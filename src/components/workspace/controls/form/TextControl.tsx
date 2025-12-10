@@ -67,10 +67,13 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
             readOnly={isFormMode || data.readOnly}
             tabIndex={isFormMode ? -1 : undefined}
             className={cn(
-              "font-inherit block h-full w-full resize-none border-none bg-transparent p-1 leading-tight text-inherit outline-none",
+              "font-inherit block h-full w-full resize-none border-none bg-transparent leading-tight text-inherit outline-none",
               (isFormMode || !isSelectable) && "pointer-events-none",
             )}
-            style={{ textAlign: data.alignment }}
+            style={{
+              textAlign: data.alignment,
+              padding: `calc(var(--spacing) * ${scale})`,
+            }}
             value={
               isFormMode
                 ? data.value || data.defaultValue || data.name
@@ -89,10 +92,13 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
             readOnly={isFormMode || data.readOnly}
             tabIndex={isFormMode ? -1 : undefined}
             className={cn(
-              "font-inherit h-full w-full border-none bg-transparent px-1 leading-tight text-inherit outline-none",
+              "font-inherit h-full w-full border-none bg-transparent leading-tight text-inherit outline-none",
               (isFormMode || !isSelectable) && "pointer-events-none",
             )}
-            style={{ textAlign: data.alignment }}
+            style={{
+              textAlign: data.alignment,
+              paddingInline: `calc(var(--spacing) * ${scale})`,
+            }}
             value={
               isFormMode
                 ? data.value || data.defaultValue || data.name

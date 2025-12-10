@@ -1759,45 +1759,42 @@ const Workspace: React.FC<WorkspaceProps> = ({
               }}
               onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
             >
-              <Suspense fallback={<div className="absolute inset-0" />}>
-                {/* Annotations: Highlight & Note */}
-                {page.pageAnnotations.map((annot) => (
-                  <ControlRenderer
-                    key={annot.id}
-                    data={annot}
-                    id={annot.id}
-                    isSelected={editorState.selectedId === annot.id}
-                    scale={editorState.scale}
-                    isAnnotationMode={editorState.mode === "annotation"}
-                    isFormMode={editorState.mode === "form"}
-                    isSelectable={isSelectable}
-                    onControlPointerDown={handleAnnotationPointerDown}
-                    onSelect={onSelectControl}
-                    onUpdate={onUpdateAnnotation}
-                    onDelete={onDeleteAnnotation}
-                    onEdit={onEditAnnotation}
-                    onControlResizeStart={handleResizePointerDown}
-                  />
-                ))}
-
-                {/* Form Fields */}
-                {page.pageFields.map((field) => (
-                  <ControlRenderer
-                    key={field.id}
-                    data={field}
-                    id={field.id}
-                    isSelected={editorState.selectedId === field.id}
-                    scale={editorState.scale}
-                    isAnnotationMode={editorState.mode === "annotation"}
-                    isFormMode={editorState.mode === "form"}
-                    isSelectable={isSelectable}
-                    onControlPointerDown={handleFieldPointerDown}
-                    onSelect={onSelectControl}
-                    onUpdate={onUpdateField}
-                    onControlResizeStart={handleResizePointerDown}
-                  />
-                ))}
-              </Suspense>
+              {/* Form Fields */}
+              {page.pageFields.map((field) => (
+                <ControlRenderer
+                  key={field.id}
+                  data={field}
+                  id={field.id}
+                  isSelected={editorState.selectedId === field.id}
+                  scale={editorState.scale}
+                  isAnnotationMode={editorState.mode === "annotation"}
+                  isFormMode={editorState.mode === "form"}
+                  isSelectable={isSelectable}
+                  onControlPointerDown={handleFieldPointerDown}
+                  onSelect={onSelectControl}
+                  onUpdate={onUpdateField}
+                  onControlResizeStart={handleResizePointerDown}
+                />
+              ))}
+              {/* Annotations: Highlight & Note */}
+              {page.pageAnnotations.map((annot) => (
+                <ControlRenderer
+                  key={annot.id}
+                  data={annot}
+                  id={annot.id}
+                  isSelected={editorState.selectedId === annot.id}
+                  scale={editorState.scale}
+                  isAnnotationMode={editorState.mode === "annotation"}
+                  isFormMode={editorState.mode === "form"}
+                  isSelectable={isSelectable}
+                  onControlPointerDown={handleAnnotationPointerDown}
+                  onSelect={onSelectControl}
+                  onUpdate={onUpdateAnnotation}
+                  onDelete={onDeleteAnnotation}
+                  onEdit={onEditAnnotation}
+                  onControlResizeStart={handleResizePointerDown}
+                />
+              ))}
 
               {/* Drag Guide */}
               {dragStart &&

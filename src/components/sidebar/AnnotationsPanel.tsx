@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MessageCircle, Search, Filter } from "lucide-react";
-import { Annotation } from "../../types";
+import { Annotation } from "@/types";
 import { useLanguage } from "../language-provider";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
@@ -10,9 +10,9 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import CommentCard from "./CommentCard";
+import AnnotationCard from "./AnnotationCard";
 
-interface CommentsPanelProps {
+interface AnnotationsProps {
   annotations: Annotation[];
   onSelectControl: (id: string) => void;
   onDeleteAnnotation: (id: string) => void;
@@ -20,7 +20,7 @@ interface CommentsPanelProps {
   selectedId: string | null;
 }
 
-const CommentsPanel: React.FC<CommentsPanelProps> = ({
+const AnnotationsPanel: React.FC<AnnotationsProps> = ({
   annotations,
   onSelectControl,
   onDeleteAnnotation,
@@ -93,7 +93,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
           <Search className="text-muted-foreground absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2" />
           <Input
             type="text"
-            placeholder={t("sidebar.search_comments")}
+            placeholder={t("sidebar.search_annotations")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-background h-8 w-full pl-8 text-xs"
@@ -144,12 +144,31 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
             >
               {t("toolbar.ink")}
             </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={selectedTypes.includes("freetext")}
+              onCheckedChange={(checked) => {
+                if (checked) setSelectedTypes([...selectedTypes, "freetext"]);
+                else
+                  setSelectedTypes(
+                    selectedTypes.filter((t) => t !== "freetext"),
+                  );
+              }}
+            >
+              {t("toolbar.freetext")}
+            </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
       <h3 className="flex items-center gap-2 px-2 pt-2 text-sm font-semibold">
-        <MessageCircle size={16} />
-        {t("sidebar.comments")} ({allAnnotations.length})
+        {t(
+          allAnnotations.length === filteredAnnotations.length
+            ? "sidebar.all_annotations"
+            : "sidebar.all_annotations_filtered",
+          {
+            total: allAnnotations.length,
+            filtered: filteredAnnotations.length,
+          },
+        )}
       </h3>
       <div className="flex-1 overflow-auto">
         <div className="space-y-6 p-2">
@@ -157,7 +176,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
             <div className="text-muted-foreground py-6 text-center text-sm italic">
               {searchTerm || selectedTypes.length < 3
                 ? t("sidebar.no_results")
-                : t("sidebar.no_comments")}
+                : t("sidebar.no_annotations")}
             </div>
           ) : (
             sortedPages.map((page) => (
@@ -167,9 +186,9 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
                 </div>
                 <div className="space-y-3">
                   {groupedAnnotations[page].map((annot) => (
-                    <CommentCard
+                    <AnnotationCard
                       key={annot.id}
-                      comment={annot}
+                      annotation={annot}
                       isSelected={selectedId === annot.id}
                       onSelect={() => handleSelect(annot.id)}
                       onDelete={() => onDeleteAnnotation(annot.id)}
@@ -188,4 +207,4 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
   );
 };
 
-export default CommentsPanel;
+export default AnnotationsPanel;

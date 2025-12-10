@@ -2,11 +2,10 @@ import React, { useEffect, useRef } from "react";
 import {
   Trash2,
   Calendar,
-  Circle,
   Highlighter,
   Pen,
-  MessageSquare,
   Type,
+  MessageCircle,
 } from "lucide-react";
 import { Annotation } from "../../types";
 import { useLanguage } from "../language-provider";
@@ -15,26 +14,25 @@ import { Textarea } from "../ui/textarea";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { Separator } from "../ui/separator";
 
 dayjs.extend(relativeTime);
 
-interface CommentCardProps {
-  comment: Annotation;
+interface AnnotationCardProps {
+  annotation: Annotation;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: () => void;
   onUpdate: (updates: Partial<Annotation>) => void;
 }
 
-const CommentCard: React.FC<CommentCardProps> = ({
-  comment,
+const AnnotationCard: React.FC<AnnotationCardProps> = ({
+  annotation,
   isSelected,
   onSelect,
   onDelete,
   onUpdate,
 }) => {
-  const { dayjsLocale } = useLanguage();
+  const { t, dayjsLocale } = useLanguage();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +53,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
   }, [isSelected]);
 
   const getIcon = () => {
-    switch (comment.type) {
+    switch (annotation.type) {
       case "highlight":
         return <Highlighter size={12} className="text-muted-foreground" />;
       case "ink":
@@ -63,14 +61,14 @@ const CommentCard: React.FC<CommentCardProps> = ({
       case "freetext":
         return <Type size={12} className="text-muted-foreground" />;
       default:
-        return <MessageSquare size={12} className="text-muted-foreground" />;
+        return <MessageCircle size={12} className="text-muted-foreground" />;
     }
   };
 
   return (
     <div
       ref={cardRef}
-      id={`comment-card-${comment.id}`}
+      id={`annotation-card-${annotation.id}`}
       className={cn(
         "group relative rounded-l-lg rounded-r-lg border-none transition-all",
         isSelected
@@ -78,7 +76,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
           : "hover:ring-primary/50 hover:shadow-sm hover:ring-1",
       )}
       style={{
-        backgroundColor: comment.color || "#000000",
+        backgroundColor: annotation.color || "#000000",
       }}
       onClick={onSelect}
     >
@@ -91,7 +89,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
         <div className="flex items-center justify-between gap-2">
           <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
             {getIcon()}
-            <span className="max-w-[120px] truncate">{comment.author}</span>
+            <span className="max-w-[120px] truncate">{annotation.author}</span>
           </div>
           <Button
             variant="ghost"
@@ -107,11 +105,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
         </div>
 
         <Textarea
-          id={`comment-input-${comment.id}`}
+          id={`annotation-input-${annotation.id}`}
           ref={textareaRef}
           className="text-foreground placeholder:text-muted-foreground/50 min-h-[60px] w-full resize-none border-none bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
-          value={comment.text || ""}
-          placeholder="Add a comment..."
+          value={annotation.text || ""}
+          placeholder={t("sidebar.add_remark")}
           onChange={(e) =>
             onUpdate({
               text: e.target.value,
@@ -119,11 +117,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
           }
           onClick={(e) => e.stopPropagation()}
         />
-        {comment.updatedAt && (
+        {annotation.updatedAt && (
           <div className="border-border/50 text-muted-foreground mt-2 flex items-center justify-between border-t pt-2 text-[10px]">
             <span className="flex items-center gap-1">
               <Calendar size={10} />
-              {dayjs(comment.updatedAt).locale(dayjsLocale).format("LLL")}
+              {dayjs(annotation.updatedAt).locale(dayjsLocale).format("LLL")}
             </span>
           </div>
         )}
@@ -132,4 +130,4 @@ const CommentCard: React.FC<CommentCardProps> = ({
   );
 };
 
-export default CommentCard;
+export default AnnotationCard;

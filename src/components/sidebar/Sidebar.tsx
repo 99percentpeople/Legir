@@ -1,9 +1,9 @@
 import React, { useCallback } from "react";
-import { X, Layers, List, LayoutGrid, MessageCircle } from "lucide-react";
-import { FormField, PageData, PDFOutlineItem, Annotation } from "../../types";
-import { setGlobalCursor, resetGlobalCursor, cn } from "../../lib/utils";
+import { X, Layers, List, LayoutGrid, StickyNote } from "lucide-react";
+import { FormField, PageData, PDFOutlineItem, Annotation } from "@/types";
+import { setGlobalCursor, resetGlobalCursor, cn } from "@/lib/utils";
 import FieldTreePanel from "./FieldTreePanel";
-import CommentsPanel from "./CommentsPanel";
+import AnnotationsPanel from "./AnnotationsPanel";
 import { ThumbnailsPanel, DocumentOutlinePanel } from "./OutlinePanel";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -141,11 +141,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               <Layers size={16} />
             </TabsTrigger>
             <TabsTrigger
-              value="comments"
+              value="annotations"
               className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
-              title={t("sidebar.comments")}
+              title={t("sidebar.annotations")}
             >
-              <MessageCircle size={16} />
+              <StickyNote size={16} />
             </TabsTrigger>
           </TabsList>
           <Button
@@ -194,10 +194,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             />
           </TabsContent>
           <TabsContent
-            value="comments"
+            value="annotations"
             className="mt-0 flex h-full flex-1 flex-col data-[state=inactive]:hidden"
           >
-            <CommentsPanel
+            <AnnotationsPanel
               annotations={annotations}
               onSelectControl={onSelectControl}
               onDeleteAnnotation={onDeleteAnnotation}

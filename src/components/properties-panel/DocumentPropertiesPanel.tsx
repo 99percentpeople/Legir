@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { PDFMetadata } from "@/types";
 import { FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/components/language-provider";
 import { PanelLayout } from "./PanelLayout";
+import { type Tag, TagInput } from "emblor";
 
 export interface DocumentPropertiesPanelProps {
   metadata: PDFMetadata;
@@ -100,40 +101,97 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
 
           <div className="space-y-2">
             <Label>{t("properties.keywords")}</Label>
-            <Input
-              type="text"
-              value={metadata.keywords || ""}
-              onFocus={onTriggerHistorySave}
-              onChange={(e) => onMetadataChange({ keywords: e.target.value })}
-              placeholder="invoice, receipt, 2024"
+            <KeywordsInput
+              metadata={metadata}
+              onMetadataChange={onMetadataChange}
+              onTriggerHistorySave={onTriggerHistorySave}
             />
-            <p className="text-muted-foreground text-xs">
-              {t("properties.keywords.desc")}
-            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>{t("properties.creator")}</Label>
-              <Input
-                type="text"
-                value={metadata.creator || ""}
-                onFocus={onTriggerHistorySave}
-                onChange={(e) => onMetadataChange({ creator: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("properties.producer")}</Label>
-              <Input
-                type="text"
-                value={metadata.producer || ""}
-                onFocus={onTriggerHistorySave}
-                onChange={(e) => onMetadataChange({ producer: e.target.value })}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>{t("properties.creator")}</Label>
+            <Input
+              type="text"
+              value={metadata.creator || ""}
+              onFocus={onTriggerHistorySave}
+              onChange={(e) => onMetadataChange({ creator: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("properties.producer")}</Label>
+            <Input
+              type="text"
+              value={metadata.producer || ""}
+              onFocus={onTriggerHistorySave}
+              onChange={(e) => onMetadataChange({ producer: e.target.value })}
+            />
           </div>
         </div>
       </PanelLayout>
     );
   },
 );
+
+interface KeywordsInputProps {
+  metadata: {
+    keywords?: string[];
+    [key: string]: any;
+  };
+  onMetadataChange: (data: any) => void;
+  onTriggerHistorySave?: () => void;
+}
+
+function KeywordsInput({
+  metadata,
+  onMetadataChange,
+  onTriggerHistorySave,
+}: KeywordsInputProps) {
+  const [activeTagIndex, setActiveTagIndex] = useState<number | null>(null);
+
+  const tags: Tag[] = useMemo(() => {
+    return (metadata.keywords || []).map((keyword) => ({
+      id: keyword,
+      text: keyword,
+    }));
+  }, [metadata.keywords]);
+
+  const handleSetTags = (newTags: Tag[] | ((prevState: Tag[]) => Tag[])) => {
+    let updatedTags: Tag[];
+
+    if (typeof newTags === "function") {
+      updatedTags = newTags(tags);
+    } else {
+      updatedTags = newTags;
+    }
+
+    const cleanKeywords = updatedTags.map((tag) => tag.text);
+
+    onMetadataChange({
+      keywords: cleanKeywords,
+    });
+  };
+
+  return (
+    <TagInput
+      id="keywords-input"
+      placeholder="(e.g. invoice)"
+      tags={tags}
+      setTags={handleSetTags}
+      activeTagIndex={activeTagIndex}
+      setActiveTagIndex={setActiveTagIndex}
+      onFocus={onTriggerHistorySave}
+      styleClasses={{
+        inlineTagsContainer:
+          "border-input rounded-md bg-transparent dark:bg-input/30 shadow-xs transition-[color,box-shadow] focus-within:border-ring outline-none focus-within:ring-[3px] focus-within:ring-ring/50 p-1 gap-1",
+        input:
+          "w-full min-w-[80px] shadow-none px-2 h-7 focus-visible:outline-none",
+        tag: {
+          body: "h-7 relative bg-background border border-input hover:bg-background rounded-md font-medium text-xs ps-2 pe-7 flex items-center",
+          closeButton:
+            "absolute -inset-y-px -end-px p-0 rounded-e-md flex size-7 transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] text-muted-foreground/80 hover:text-foreground justify-center items-center",
+        },
+      }}
+    />
+  );
+}

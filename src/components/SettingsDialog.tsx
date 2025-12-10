@@ -15,6 +15,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
@@ -82,6 +83,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       {lang.label}
                     </SelectItem>
                   ))}
+                  <SelectSeparator />
                   <SelectItem value="system">
                     {t("settings.theme.system")}
                   </SelectItem>
