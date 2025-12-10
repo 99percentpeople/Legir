@@ -81,51 +81,49 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
     <ControlWrapper
       {...props}
       customRect={bounds}
-      className="pointer-events-none"
       showBorder={isSelected}
       resizable={false}
     >
+      <FloatingToolbar isVisible={isSelected}>
+        <ColorPickerPopover
+          color={data.color || "#000000"}
+          onColorChange={(c) => onUpdate?.(data.id, { color: c })}
+          showThickness={false}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            style={{
+              backgroundColor: getContrastColor(data.color),
+            }}
+          >
+            <Palette size={16} style={{ color: data.color }} />
+          </Button>
+        </ColorPickerPopover>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onEdit?.(data.id)}
+          title="Edit Comment"
+        >
+          <MessageSquare size={16} />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+          onClick={() => onDelete?.(data.id)}
+        >
+          <Trash2 size={16} />
+        </Button>
+      </FloatingToolbar>
       <Tooltip delayDuration={0} disableHoverableContent>
         <TooltipTrigger asChild>
           <div ref={ref} className="h-full w-full">
-            <FloatingToolbar isVisible={isSelected}>
-              <ColorPickerPopover
-                color={data.color || "#000000"}
-                onColorChange={(c) => onUpdate?.(data.id, { color: c })}
-                showThickness={false}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  style={{
-                    backgroundColor: getContrastColor(data.color),
-                  }}
-                >
-                  <Palette size={16} style={{ color: data.color }} />
-                </Button>
-              </ColorPickerPopover>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => onEdit?.(data.id)}
-                title="Edit Comment"
-              >
-                <MessageSquare size={16} />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                onClick={() => onDelete?.(data.id)}
-              >
-                <Trash2 size={16} />
-              </Button>
-            </FloatingToolbar>
-
             <svg
               width="100%"
               height="100%"

@@ -130,7 +130,7 @@ const App: React.FC = () => {
 
   const handleEditAnnotation = useCallback((id: string) => {
     setIsSidebarOpen(true);
-    setSidebarTab("comments");
+    setSidebarTab("annotations");
 
     setState((prev) => ({
       ...prev,
@@ -138,18 +138,18 @@ const App: React.FC = () => {
     }));
 
     // Try to focus the textarea in the sidebar
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       // We need a way to identify the textarea in the sidebar.
       // Let's assume we'll add an ID to the textarea in CommentsPanel
       const el = document.getElementById(
-        `comment-input-${id}`,
+        `annotation-input-${id}`,
       ) as HTMLTextAreaElement;
       if (el) {
         el.focus();
         const len = el.value.length;
         el.setSelectionRange(len, len);
       }
-    }, 100);
+    });
   }, []);
 
   useEffect(() => {
