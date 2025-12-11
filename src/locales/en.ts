@@ -60,6 +60,13 @@ const en = {
   "properties.keywords.desc": "Comma separated values",
   "properties.creator": "Creator",
   "properties.producer": "Producer",
+  "properties.producer_tooltip":
+    "Defaults to 'Formforge' on export unless manually locked.",
+  "properties.creation_date": "Creation Date",
+  "properties.modification_date": "Modification Date",
+  "properties.mod_date_auto": "Automatic (Updates on Export)",
+  "properties.mod_date_tooltip":
+    "Defaults to the imported date. Updates to current time on export unless manually locked.",
   "properties.annotation.title": "Annotation Properties",
   "properties.field.title": "Field Properties",
   "properties.delete_field": "Delete Field",

@@ -1,10 +1,12 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { pdfWorkerService } from "./pdfWorkerService";
 import { mapOutline, getFontMap, getGlobalDA } from "../lib/pdf-helpers";
+import { parsePDFDate } from "../utils/pdfUtils";
 import {
   PDFDocument,
   StandardFonts,
   PDFName,
+  PDFString,
   PDFDict,
   PDFBool,
   PDFArray,
@@ -137,13 +139,44 @@ export const loadPDF = async (
   try {
     const { info } = await pdf.getMetadata();
     if (info) {
+      const toLocalISO = (d: Date) => {
+        const pad = (n: number) => n.toString().padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      };
+
+      const cDateStr = parsePDFDate(info["CreationDate"]);
+      const mDateStr = parsePDFDate(info["ModDate"]);
+
+      const cDate = cDateStr ? new Date(cDateStr) : undefined;
+      const mDate = mDateStr ? new Date(mDateStr) : undefined;
+
+      // Normalize keywords to ensure it is always an array or undefined
+      let keywords = info["Keywords"];
+      if (typeof keywords === "string") {
+        keywords = [keywords];
+      } else if (!Array.isArray(keywords)) {
+        keywords = undefined;
+      }
+
+      // Filter out invalid keyword entries
+      if (keywords) {
+        keywords = keywords.filter(
+          (k: any) => typeof k === "string" && k.trim().length > 0,
+        );
+        if (keywords.length === 0) keywords = undefined;
+      }
+
       metadata = {
         title: info["Title"],
         author: info["Author"],
         subject: info["Subject"],
-        keywords: info["Keywords"],
+        keywords: keywords,
         creator: info["Creator"],
         producer: info["Producer"],
+        creationDate: cDate ? toLocalISO(cDate) : undefined,
+        modificationDate: mDate ? toLocalISO(mDate) : undefined,
+        isModDateManual: false,
+        isProducerManual: false,
       };
     }
   } catch (e) {
@@ -252,7 +285,41 @@ export const exportPDF = async (
     if (metadata.author) pdfDoc.setAuthor(metadata.author);
     if (metadata.subject) pdfDoc.setSubject(metadata.subject);
     if (metadata.creator) pdfDoc.setCreator(metadata.creator);
-    if (metadata.keywords) pdfDoc.setKeywords(metadata.keywords);
+    if (metadata.keywords && metadata.keywords.length > 0) {
+      pdfDoc.setKeywords(
+        Array.isArray(metadata.keywords)
+          ? metadata.keywords
+          : [metadata.keywords],
+      );
+    }
+
+    // Producer Logic
+    if (metadata.isProducerManual && metadata.producer) {
+      pdfDoc.setProducer(metadata.producer);
+    } else {
+      pdfDoc.setProducer("Formforge");
+    }
+
+    // Date Logic with explicit PDFString.fromDate formatting
+    const infoDict = pdfDoc.catalog.lookup(PDFName.of("Info"));
+    if (infoDict instanceof PDFDict) {
+      if (metadata.creationDate) {
+        infoDict.set(
+          PDFName.of("CreationDate"),
+          PDFString.fromDate(new Date(metadata.creationDate)),
+        );
+      }
+
+      // Modification Date Logic
+      let modDate: Date;
+      if (metadata.isModDateManual && metadata.modificationDate) {
+        modDate = new Date(metadata.modificationDate);
+      } else {
+        modDate = new Date();
+      }
+
+      infoDict.set(PDFName.of("ModDate"), PDFString.fromDate(modDate));
+    }
   }
 
   // Embed Standard Fonts

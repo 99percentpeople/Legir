@@ -1,13 +1,22 @@
 import React, { useState, useMemo } from "react";
 import { PDFMetadata } from "@/types";
-import { FileText } from "lucide-react";
+import { FileText, Lock, Unlock } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { DateField, DateInput } from "@/components/ui/datafield-rac";
+import { parseDateTime } from "@internationalized/date";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/components/language-provider";
 import { PanelLayout } from "./PanelLayout";
 import { type Tag, TagInput } from "emblor";
+import { cn } from "@/lib/utils";
 
 export interface DocumentPropertiesPanelProps {
   metadata: PDFMetadata;
@@ -34,6 +43,21 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
     onResize,
   }) => {
     const { t } = useLanguage();
+    const [creationEditable, setCreationEditable] = useState(false);
+
+    const toCalendarDateTime = (dateStr?: string) => {
+      if (!dateStr) return null;
+      try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return null;
+        const pad = (n: number) => n.toString().padStart(2, "0");
+        const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        return parseDateTime(iso);
+      } catch (e) {
+        return null;
+      }
+    };
+
     return (
       <PanelLayout
         title={
@@ -119,13 +143,157 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
           </div>
 
           <div className="space-y-2">
-            <Label>{t("properties.producer")}</Label>
-            <Input
-              type="text"
-              value={metadata.producer || ""}
-              onFocus={onTriggerHistorySave}
-              onChange={(e) => onMetadataChange({ producer: e.target.value })}
-            />
+            <Label className="flex items-center gap-1">
+              {t("properties.producer")}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-muted-foreground cursor-help text-xs">
+                      (?)
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-xs">
+                      {t("properties.producer_tooltip")}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Label>
+            <div className="relative">
+              <Input
+                type="text"
+                value={metadata.producer || ""}
+                disabled={!metadata.isProducerManual}
+                onFocus={onTriggerHistorySave}
+                onChange={(e) => onMetadataChange({ producer: e.target.value })}
+                className={
+                  !metadata.isProducerManual ? "text-muted-foreground pr-8" : ""
+                }
+              />
+              <button
+                onClick={() => {
+                  if (!metadata.isProducerManual) {
+                    // Switch to Manual: Keep current value but mark as manual
+                    onMetadataChange({
+                      isProducerManual: true,
+                    });
+                  } else {
+                    // Switch to Auto
+                    onMetadataChange({
+                      isProducerManual: false,
+                    });
+                  }
+                }}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
+              >
+                {metadata.isProducerManual ? (
+                  <Unlock size={14} />
+                ) : (
+                  <Lock size={14} />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("properties.creation_date")}</Label>
+            <div className="relative">
+              <DateField
+                value={toCalendarDateTime(metadata.creationDate)}
+                onChange={(date) => {
+                  if (date) {
+                    onMetadataChange({
+                      creationDate: date.toString(),
+                    });
+                  } else {
+                    onMetadataChange({ creationDate: undefined });
+                  }
+                }}
+                isDisabled={!creationEditable}
+                granularity="minute"
+                hourCycle={24}
+              >
+                <DateInput
+                  className={cn(
+                    creationEditable &&
+                      "dark:bg-input/30 text-muted-foreground bg-transparent",
+                  )}
+                />
+              </DateField>
+              <button
+                onClick={() => setCreationEditable(!creationEditable)}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 z-10 -translate-y-1/2"
+              >
+                {creationEditable ? <Unlock size={14} /> : <Lock size={14} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1">
+              {t("properties.modification_date")}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-muted-foreground cursor-help text-xs">
+                      (?)
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-xs">
+                      {t("properties.mod_date_tooltip")}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Label>
+            <div className="relative">
+              <DateField
+                value={toCalendarDateTime(metadata.modificationDate)}
+                onChange={(date) => {
+                  if (date) {
+                    onMetadataChange({
+                      modificationDate: date.toString(),
+                    });
+                  } else {
+                    onMetadataChange({ modificationDate: undefined });
+                  }
+                }}
+                isDisabled={!metadata.isModDateManual}
+                granularity="minute"
+                hourCycle={24}
+              >
+                <DateInput
+                  className={cn(
+                    metadata.isModDateManual &&
+                      "dark:bg-input/30 text-muted-foreground bg-transparent",
+                  )}
+                />
+              </DateField>
+              <button
+                onClick={() => {
+                  if (!metadata.isModDateManual) {
+                    // Switch to Manual
+                    onMetadataChange({
+                      isModDateManual: true,
+                    });
+                  } else {
+                    // Switch to Auto
+                    onMetadataChange({
+                      isModDateManual: false,
+                    });
+                  }
+                }}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 z-10 -translate-y-1/2"
+              >
+                {metadata.isModDateManual ? (
+                  <Unlock size={14} />
+                ) : (
+                  <Lock size={14} />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </PanelLayout>
@@ -135,7 +303,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
 
 interface KeywordsInputProps {
   metadata: {
-    keywords?: string[];
+    keywords?: string | string[];
     [key: string]: any;
   };
   onMetadataChange: (data: any) => void;
@@ -150,7 +318,10 @@ function KeywordsInput({
   const [activeTagIndex, setActiveTagIndex] = useState<number | null>(null);
 
   const tags: Tag[] = useMemo(() => {
-    return (metadata.keywords || []).map((keyword) => ({
+    const kw = metadata.keywords;
+    if (!kw) return [];
+    const arr = Array.isArray(kw) ? kw : [kw];
+    return arr.map((keyword) => ({
       id: keyword,
       text: keyword,
     }));

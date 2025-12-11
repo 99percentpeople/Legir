@@ -100,9 +100,13 @@ export interface PDFMetadata {
   title?: string;
   author?: string;
   subject?: string;
-  keywords?: string[];
+  keywords?: string | string[];
   creator?: string;
   producer?: string;
+  creationDate?: string;
+  modificationDate?: string;
+  isModDateManual?: boolean;
+  isProducerManual?: boolean;
 }
 
 export interface PDFOutlineItem {
