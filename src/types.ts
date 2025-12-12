@@ -82,6 +82,7 @@ export interface Annotation {
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
+  strokes?: { x: number; y: number }[][]; // For ink (multi-stroke)
   text?: string; // For comment
   author?: string; // Creator/Author of the annotation
   color?: string;

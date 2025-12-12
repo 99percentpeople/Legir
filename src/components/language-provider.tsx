@@ -72,7 +72,7 @@ const dayjsLocales: Record<string, () => Promise<any>> = {
 };
 
 // Use import.meta.glob to lazy load locales
-const localeModules = import.meta.glob("../locales/*.ts");
+const localeModules = import.meta.glob("../locales/*.ts", { eager: false });
 
 const LanguageProviderContext =
   createContext<LanguageProviderState>(initialState);

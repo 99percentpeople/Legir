@@ -24,18 +24,27 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
   } = props;
   const { ref, x, y } = useMouse<HTMLDivElement>();
 
+  const strokes = useMemo(() => {
+    if (data.strokes && data.strokes.length > 0) return data.strokes;
+    if (data.points && data.points.length > 0) return [data.points];
+    return [];
+  }, [data.points, data.strokes]);
+
   // Calculate bounding box
   const bounds = useMemo(() => {
-    if (!data.points || data.points.length === 0) return null;
+    if (strokes.length === 0) return null;
     let minX = Infinity,
       minY = Infinity,
       maxX = -Infinity,
       maxY = -Infinity;
-    data.points.forEach((p) => {
-      if (p.x < minX) minX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y > maxY) maxY = p.y;
+
+    strokes.forEach((stroke) => {
+      stroke.forEach((p) => {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      });
     });
 
     // Add some padding
@@ -48,34 +57,39 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
       originX: minX - padding,
       originY: minY - padding,
     };
-  }, [data.points, data.thickness]);
+  }, [strokes, data.thickness]);
 
   // Construct path data relative to bounding box
   const pathData = useMemo(() => {
     // Optimization: If we have an AP stream (svgPath), we don't need to calculate the path from points
     if (data.svgPath) return data.svgPath;
-    if (!data.points || data.points.length < 2 || !bounds) return "";
+    if (strokes.length === 0 || !bounds) return "";
 
-    const points = data.points;
+    const strokeToPath = (points: { x: number; y: number }[]) => {
+      if (points.length < 2) return "";
+      let d = `M ${points[0].x} ${points[0].y}`;
 
-    let d = `M ${points[0].x} ${points[0].y}`;
+      // Use quadratic curves for smooth ink
+      for (let i = 1; i < points.length - 1; i++) {
+        const p = points[i];
+        const nextP = points[i + 1];
+        const midX = (p.x + nextP.x) / 2;
+        const midY = (p.y + nextP.y) / 2;
+        d += ` Q ${p.x} ${p.y}, ${midX} ${midY}`;
+      }
 
-    // Use quadratic curves for smooth ink
-    for (let i = 1; i < points.length - 1; i++) {
-      const p = points[i];
-      const nextP = points[i + 1];
-      const midX = (p.x + nextP.x) / 2;
-      const midY = (p.y + nextP.y) / 2;
-      d += ` Q ${p.x} ${p.y}, ${midX} ${midY}`;
-    }
+      const lastP = points[points.length - 1];
+      d += ` L ${lastP.x} ${lastP.y}`;
+      return d;
+    };
 
-    const lastP = points[points.length - 1];
-    d += ` L ${lastP.x} ${lastP.y}`;
+    return strokes
+      .map((s) => strokeToPath(s))
+      .filter(Boolean)
+      .join(" ");
+  }, [strokes, bounds, data.svgPath]);
 
-    return d;
-  }, [data.points, bounds, data.svgPath]);
-
-  if (!bounds || !data.points) return null;
+  if (!bounds || strokes.length === 0) return null;
 
   return (
     <ControlWrapper
@@ -88,7 +102,10 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
       <Tooltip delayDuration={0} disableHoverableContent>
         <TooltipTrigger asChild>
           <div ref={ref} className="h-full w-full">
-            <FloatingToolbar isVisible={isSelected}>
+            <FloatingToolbar
+              isVisible={isSelected}
+              className="pointer-events-auto"
+            >
               <ColorPickerPopover
                 color={data.color || "#000000"}
                 onColorChange={(c) => onUpdate?.(data.id, { color: c })}
@@ -132,6 +149,18 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
               className="overflow-visible"
               viewBox={`${bounds.originX} ${bounds.originY} ${bounds.width} ${bounds.height}`}
             >
+              {isSelected && (
+                <path
+                  d={pathData}
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth={(data.thickness || 1) + 6}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.25}
+                  className="pointer-events-none"
+                />
+              )}
               <path
                 d={pathData}
                 fill="none"

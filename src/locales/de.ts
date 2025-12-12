@@ -61,6 +61,13 @@ const de = {
   "properties.keywords.desc": "Kommagetrennte Werte",
   "properties.creator": "Ersteller",
   "properties.producer": "Produzent",
+  "properties.producer_tooltip":
+    "Standardmäßig 'Formforge' auf Export, es wird manuell gesperrt.",
+  "properties.creation_date": "Erstellungsdatum",
+  "properties.modification_date": "Modifikationsdatum",
+  "properties.mod_date_auto": "Automatisch (aktualisiert bei Export)",
+  "properties.mod_date_tooltip":
+    "Standardmäßig auf das importierte Datum. Wird auf die aktuelle Uhrzeit aktualisiert, es wird manuell gesperrt.",
   "properties.annotation.title": "Anmerkungseigenschaften",
   "properties.field.title": "Feldeigenschaften",
   "properties.delete_field": "Feld löschen",

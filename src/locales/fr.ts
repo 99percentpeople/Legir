@@ -61,6 +61,13 @@ const fr = {
   "properties.keywords.desc": "Valeurs séparées par des virgules",
   "properties.creator": "Créateur",
   "properties.producer": "Producteur",
+  "properties.producer_tooltip":
+    "Default a 'Formforge' en exportation a moins que se bloque manuellement.",
+  "properties.creation_date": "Date de création",
+  "properties.modification_date": "Date de modification",
+  "properties.mod_date_auto": "Automatique (Mise à jour en exportation)",
+  "properties.mod_date_tooltip":
+    "Default a la date importée. Mise à jour à l'heure actuelle en exportation a moins que se bloque manuellement.",
   "properties.annotation.title": "Propriétés d'annotation",
   "properties.field.title": "Propriétés du champ",
   "properties.delete_field": "Supprimer le champ",

@@ -59,6 +59,12 @@ const zhCN = {
   "properties.keywords.desc": "逗号分隔值",
   "properties.creator": "创建者",
   "properties.producer": "制作工具",
+  "properties.producer_tooltip": "导出时默认为 'Formforge'，除非手动锁定。",
+  "properties.creation_date": "创建日期",
+  "properties.modification_date": "修改日期",
+  "properties.mod_date_auto": "自动更新",
+  "properties.mod_date_tooltip":
+    "导入时默认为当前日期。导出时更新为当前时间，除非手动锁定。",
   "properties.annotation.title": "注释属性",
   "properties.field.title": "字段属性",
   "properties.delete_field": "删除字段",

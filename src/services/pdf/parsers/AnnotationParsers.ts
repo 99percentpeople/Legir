@@ -7,11 +7,7 @@ import {
   PDFHexString,
 } from "pdf-lib";
 import { Annotation } from "@/types";
-import {
-  hexToPdfColor,
-  rgbArrayToHex,
-  extractInkAppearance,
-} from "@/lib/pdf-helpers";
+import { rgbArrayToHex, extractInkAppearance } from "@/lib/pdf-helpers";
 import { parsePDFDate } from "@/utils/pdfUtils";
 import { IAnnotationParser, ParserContext } from "../types";
 
@@ -94,17 +90,14 @@ export class InkParser implements IAnnotationParser {
                     updatedAt = parsePDFDate(M.decodeText());
 
                   // Parse AP
-                  const { strokePaths, rawStrokeStreams } =
-                    extractInkAppearance(
-                      annot,
-                      (x, y) =>
-                        viewport.convertToViewportPoint(x, y) as [
-                          number,
-                          number,
-                        ],
-                    );
+                  const { strokePaths } = extractInkAppearance(
+                    annot,
+                    (x, y) =>
+                      viewport.convertToViewportPoint(x, y) as [number, number],
+                  );
 
-                  // Parse Points
+                  // Parse Points (multi-stroke)
+                  const strokes: { x: number; y: number }[][] = [];
                   for (let s = 0; s < inkList.size(); s++) {
                     const stroke = inkList.lookup(s);
                     if (stroke instanceof PDFArray) {
@@ -120,38 +113,31 @@ export class InkParser implements IAnnotationParser {
                         );
                         points.push({ x: vx, y: vy });
                       }
-
-                      if (points.length > 0) {
-                        let appearanceStreamContent: string | undefined =
-                          undefined;
-                        if (rawStrokeStreams[s]) {
-                          const pdfColor = hexToPdfColor(color);
-                          const header = pdfColor
-                            ? `${pdfColor.red} ${pdfColor.green} ${pdfColor.blue} RG\n${thickness} w\n1 J\n1 j`
-                            : "";
-                          appearanceStreamContent = header
-                            ? `${header}\n${rawStrokeStreams[s]}`
-                            : rawStrokeStreams[s];
-                        }
-
-                        annotations.push({
-                          id: `imported_ink_lib_${pageIndex + 1}_${idx}_${s}`,
-                          pageIndex: pageIndex,
-                          type: "ink",
-                          subtype: "ink",
-                          intent: intent,
-                          points: points,
-                          color: color,
-                          thickness: thickness,
-                          opacity: opacity,
-                          author: author,
-                          text: contents,
-                          updatedAt: updatedAt,
-                          svgPath: strokePaths[s],
-                          appearanceStreamContent: appearanceStreamContent,
-                        });
-                      }
+                      if (points.length > 0) strokes.push(points);
                     }
+                  }
+
+                  if (strokes.length > 0) {
+                    annotations.push({
+                      id: `imported_ink_lib_${pageIndex + 1}_${idx}`,
+                      pageIndex: pageIndex,
+                      type: "ink",
+                      subtype: "ink",
+                      intent: intent,
+                      points: strokes[0],
+                      strokes: strokes,
+                      color: color,
+                      thickness: thickness,
+                      opacity: opacity,
+                      author: author,
+                      text: contents,
+                      updatedAt: updatedAt,
+                      svgPath:
+                        strokePaths && strokePaths.length > 0
+                          ? strokePaths.join(" ")
+                          : undefined,
+                      appearanceStreamContent: undefined,
+                    });
                   }
                 }
               }

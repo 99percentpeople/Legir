@@ -59,6 +59,13 @@ const ja = {
   "properties.keywords.desc": "カンマ区切り",
   "properties.creator": "作成者",
   "properties.producer": "プロデューサー",
+  "properties.producer_tooltip":
+    "エクスポート時、手動でロックしない限り 'Formforge' になります。",
+  "properties.creation_date": "作成日",
+  "properties.modification_date": "更新日",
+  "properties.mod_date_auto": "自動更新",
+  "properties.mod_date_tooltip":
+    "インポート時、手動でロックしない限り、インポート日になります。エクスポート時、手動でロックしない限り、現在時刻になります。",
   "properties.annotation.title": "注釈のプロパティ",
   "properties.field.title": "フィールドのプロパティ",
   "properties.delete_field": "フィールドを削除",

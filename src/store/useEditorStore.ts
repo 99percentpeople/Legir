@@ -52,7 +52,7 @@ interface EditorActions {
   deleteSelection: () => void;
 
   selectControl: (id: string | null) => void;
-  setTool: (tool: Tool, preserveSelection?: boolean) => void;
+  setTool: (tool: Tool) => void;
 
   saveCheckpoint: () => void;
   undo: () => void;
@@ -344,10 +344,10 @@ export const useEditorStore = create<EditorState & EditorActions>(
 
     selectControl: (id) => set({ selectedId: id }),
 
-    setTool: (tool, preserveSelection = false) =>
+    setTool: (tool) =>
       set((state) => ({
         tool,
-        selectedId: preserveSelection ? state.selectedId : null,
+        selectedId: tool === "select" ? state.selectedId : null,
       })),
 
     openDialog: (name) => set({ activeDialog: name }),

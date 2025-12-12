@@ -153,7 +153,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="max-w-xs text-xs">
+                    <p className="text-xs">
                       {t("properties.producer_tooltip")}
                     </p>
                   </TooltipContent>
@@ -200,6 +200,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Label>{t("properties.creation_date")}</Label>
             <div className="relative">
               <DateField
+                aria-label={t("properties.creation_date")}
                 value={toCalendarDateTime(metadata.creationDate)}
                 onChange={(date) => {
                   if (date) {
@@ -216,8 +217,9 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               >
                 <DateInput
                   className={cn(
-                    creationEditable &&
-                      "dark:bg-input/30 text-muted-foreground bg-transparent",
+                    "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:opacity-50 md:text-sm",
+                    "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
                   )}
                 />
               </DateField>
@@ -241,7 +243,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="max-w-xs text-xs">
+                    <p className="text-xs">
                       {t("properties.mod_date_tooltip")}
                     </p>
                   </TooltipContent>
@@ -250,6 +252,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             </Label>
             <div className="relative">
               <DateField
+                aria-label={t("properties.modification_date")}
                 value={toCalendarDateTime(metadata.modificationDate)}
                 onChange={(date) => {
                   if (date) {
@@ -266,8 +269,9 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               >
                 <DateInput
                   className={cn(
-                    metadata.isModDateManual &&
-                      "dark:bg-input/30 text-muted-foreground bg-transparent",
+                    "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:opacity-50 md:text-sm",
+                    "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
                   )}
                 />
               </DateField>

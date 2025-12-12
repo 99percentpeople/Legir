@@ -16,8 +16,6 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   id,
   isSelected,
   scale,
-  isFormMode,
-  isAnnotationMode,
   isSelectable,
   onResizeStart,
   data,
@@ -71,14 +69,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
         top: rect.y * scale,
         width: rect.width * scale,
         height: rect.height * scale,
-        // Cursor logic should be passed or handled by child/wrapper
-        cursor: !isSelectable
-          ? "inherit"
-          : isFormMode
-            ? isSelected
-              ? "move"
-              : "inherit"
-            : "pointer", // Default to pointer for interaction
+        cursor: isSelectable ? "pointer" : "inherit",
       }}
     >
       {children}

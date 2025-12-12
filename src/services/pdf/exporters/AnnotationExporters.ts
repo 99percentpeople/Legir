@@ -268,11 +268,14 @@ export class FreeTextExporter implements IAnnotationExporter {
 
 export class InkExporter implements IAnnotationExporter {
   shouldExport(annotation: Annotation): boolean {
-    return (
-      annotation.type === "ink" &&
-      !!annotation.points &&
-      annotation.points.length > 1
-    );
+    if (annotation.type !== "ink") return false;
+    const strokes =
+      annotation.strokes && annotation.strokes.length > 0
+        ? annotation.strokes
+        : annotation.points
+          ? [annotation.points]
+          : [];
+    return strokes.some((s) => s.length > 1);
   }
 
   save(
@@ -283,27 +286,43 @@ export class InkExporter implements IAnnotationExporter {
   ): void {
     const { height: pageHeight } = page.getSize();
 
+    const strokes =
+      annotation.strokes && annotation.strokes.length > 0
+        ? annotation.strokes
+        : annotation.points
+          ? [annotation.points]
+          : [];
+
     // 1. Convert points to PDF coordinates (Bottom-Left origin)
-    const pdfPoints: number[] = [];
+    const inkList: number[][] = [];
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
 
-    if (!annotation.points) return;
+    if (strokes.length === 0) return;
 
-    for (const p of annotation.points) {
-      const pdfX = p.x;
-      const pdfY = pageHeight - p.y;
+    for (const stroke of strokes) {
+      const pdfPoints: number[] = [];
+      for (const p of stroke) {
+        const pdfX = p.x;
+        const pdfY = pageHeight - p.y;
 
-      pdfPoints.push(pdfX);
-      pdfPoints.push(pdfY);
+        pdfPoints.push(pdfX);
+        pdfPoints.push(pdfY);
 
-      if (pdfX < minX) minX = pdfX;
-      if (pdfY < minY) minY = pdfY;
-      if (pdfX > maxX) maxX = pdfX;
-      if (pdfY > maxY) maxY = pdfY;
+        if (pdfX < minX) minX = pdfX;
+        if (pdfY < minY) minY = pdfY;
+        if (pdfX > maxX) maxX = pdfX;
+        if (pdfY > maxY) maxY = pdfY;
+      }
+
+      if (pdfPoints.length > 0) {
+        inkList.push(pdfPoints);
+      }
     }
+
+    if (inkList.length === 0) return;
 
     // 2. Padding
     const thickness = annotation.thickness || 2;
@@ -324,12 +343,13 @@ export class InkExporter implements IAnnotationExporter {
     let annotObj;
 
     if (annotation.subtype === "polyline") {
+      const polylinePoints = inkList[0] || [];
       annotObj = pdfDoc.context.obj({
         Type: "Annot",
         Subtype: "PolyLine",
         F: 4,
         Rect: rect,
-        Vertices: pdfPoints,
+        Vertices: polylinePoints,
         C: [r, g, b],
         BS: { W: thickness, S: "S" },
         CA: annotation.opacity,
@@ -345,10 +365,11 @@ export class InkExporter implements IAnnotationExporter {
           : PDFString.fromDate(new Date()),
       });
     } else if (annotation.subtype === "line") {
-      const x1 = pdfPoints[0];
-      const y1 = pdfPoints[1];
-      const x2 = pdfPoints[pdfPoints.length - 2];
-      const y2 = pdfPoints[pdfPoints.length - 1];
+      const linePoints = inkList[0] || [];
+      const x1 = linePoints[0];
+      const y1 = linePoints[1];
+      const x2 = linePoints[linePoints.length - 2];
+      const y2 = linePoints[linePoints.length - 1];
 
       annotObj = pdfDoc.context.obj({
         Type: "Annot",
@@ -374,20 +395,22 @@ export class InkExporter implements IAnnotationExporter {
       // Ink
       let appearanceStreamContent = annotation.appearanceStreamContent;
 
-      if (
-        !appearanceStreamContent &&
-        annotation.points &&
-        annotation.points.length > 1
-      ) {
-        const apPoints = annotation.points.map((p) => ({
-          x: p.x,
-          y: pageHeight - p.y,
-        }));
-        appearanceStreamContent = generateInkAppearanceOps(
-          apPoints,
-          { red: r, green: g, blue: b },
-          thickness,
-        );
+      if (!appearanceStreamContent && inkList.length > 0) {
+        const apOps = inkList
+          .map((strokeNums) => {
+            const apPoints: { x: number; y: number }[] = [];
+            for (let i = 0; i < strokeNums.length; i += 2) {
+              apPoints.push({ x: strokeNums[i], y: strokeNums[i + 1] });
+            }
+            return generateInkAppearanceOps(
+              apPoints,
+              { red: r, green: g, blue: b },
+              thickness,
+            );
+          })
+          .filter(Boolean) as string[];
+        appearanceStreamContent =
+          apOps.length > 0 ? apOps.join("\n") : undefined;
       }
 
       let appearanceStream;
@@ -415,7 +438,7 @@ export class InkExporter implements IAnnotationExporter {
         Subtype: "Ink",
         F: 4,
         Rect: rect,
-        InkList: [pdfPoints],
+        InkList: inkList,
         C: [r, g, b],
         Border: [0, 0, thickness],
         AP: appearanceStream ? { N: appearanceStream } : undefined,

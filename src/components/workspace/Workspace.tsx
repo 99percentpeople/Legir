@@ -23,12 +23,12 @@ import { cn, setGlobalCursor, resetGlobalCursor } from "../../lib/utils";
 import { usePointerCapture } from "../../hooks/usePointerCapture";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import { useCanvasPanning } from "../../hooks/useCanvasPanning";
+import { useInkSession } from "../../hooks/useInkSession";
 import { useLanguage } from "../language-provider";
 import {
   getCursor,
   shouldSwitchToSelectAfterUse,
 } from "../../lib/tool-behavior";
-import { hexToPdfColor, generateInkAppearanceOps } from "../../lib/pdf-helpers";
 import PDFPage from "./PDFPage";
 import { ControlRenderer } from "./controls";
 
@@ -44,7 +44,7 @@ interface WorkspaceProps {
   onScaleChange: (newScale: number) => void;
   onTriggerHistorySave: () => void;
   onPageIndexChange?: (index: number) => void;
-  onToolChange: (tool: Tool, preserveSelection?: boolean) => void;
+  onToolChange: (tool: Tool) => void;
   fitTrigger?: number;
 }
 
@@ -108,6 +108,21 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const [currentPathState, setCurrentPathState] = useState<
     { x: number; y: number }[]
   >([]); // For forcing re-render of current line
+
+  const cancelInProgressInkStroke = useCallback(() => {
+    setIsDrawing(false);
+    currentPathRef.current = [];
+    setCurrentPathState([]);
+  }, []);
+
+  const { appendStroke: appendInkStroke } = useInkSession({
+    editorState,
+    editorStateRef,
+    onAddAnnotation,
+    onUpdateAnnotation,
+    onSelectControl,
+    onCancelInProgressStroke: cancelInProgressInkStroke,
+  });
 
   const [movingFieldId, setMovingFieldId] = useState<string | null>(null);
   const [movingAnnotationId, setMovingAnnotationId] = useState<string | null>(
@@ -360,14 +375,23 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
     for (const annot of pageAnnotations) {
       // Ink Detection
-      if (annot.type === "ink" && annot.points) {
-        for (let i = 0; i < annot.points.length - 1; i++) {
-          const p1 = annot.points[i];
-          const p2 = annot.points[i + 1];
-          const distSq = distToSegmentSquared({ x, y }, p1, p2);
-          if (distSq < thresholdSq) {
-            onDeleteAnnotation(annot.id);
-            return; // Delete one at a time per move event to avoid conflicts
+      if (annot.type === "ink") {
+        const strokes =
+          annot.strokes && annot.strokes.length > 0
+            ? annot.strokes
+            : annot.points
+              ? [annot.points]
+              : [];
+
+        for (const stroke of strokes) {
+          for (let i = 0; i < stroke.length - 1; i++) {
+            const p1 = stroke[i];
+            const p2 = stroke[i + 1];
+            const distSq = distToSegmentSquared({ x, y }, p1, p2);
+            if (distSq < thresholdSq) {
+              onDeleteAnnotation(annot.id);
+              return; // Delete one at a time per move event to avoid conflicts
+            }
           }
         }
       }
@@ -1187,7 +1211,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         !editorState.keys.ctrl &&
         shouldSwitchToSelectAfterUse("draw_comment")
       ) {
-        onToolChange("select", true);
+        onToolChange("select");
       }
       return;
     }
@@ -1295,45 +1319,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       setIsDrawing(false);
       if (currentPathRef.current.length > 1) {
-        // Generate PDF appearance stream operators immediately
-        const colorObj = hexToPdfColor(editorState.penStyle.color);
-
-        // Convert points to PDF coordinates (Bottom-Left origin) for appearance stream
-        let streamOps: string | undefined = undefined;
-        // Ensure page exists and use its height for coordinate conversion
-        if (activePageIndex !== null && editorState.pages[activePageIndex]) {
-          const pageHeight = editorState.pages[activePageIndex].height;
-          if (colorObj) {
-            const pdfPoints = currentPathRef.current.map((p) => ({
-              x: p.x,
-              y: pageHeight - p.y,
-            }));
-            streamOps = generateInkAppearanceOps(
-              pdfPoints,
-              colorObj,
-              editorState.penStyle.thickness,
-            );
-          }
-        }
-
-        onAddAnnotation({
-          id: `ink_${Date.now()}`,
-          pageIndex: activePageIndex,
-          type: "ink",
-          points: currentPathRef.current,
-          color: editorState.penStyle.color,
-          thickness: editorState.penStyle.thickness,
-          opacity: editorState.penStyle.opacity,
-          appearanceStreamContent: streamOps,
-        });
-
-        if (
-          !editorState.keys.shift &&
-          !editorState.keys.ctrl &&
-          shouldSwitchToSelectAfterUse("draw_ink")
-        ) {
-          onToolChange("select", true);
-        }
+        appendInkStroke(activePageIndex, currentPathRef.current);
       }
       currentPathRef.current = [];
       setCurrentPathState([]);
@@ -1387,7 +1373,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
               !editorState.keys.ctrl &&
               shouldSwitchToSelectAfterUse(editorState.tool)
             ) {
-              onToolChange("select", true);
+              onToolChange("select");
             }
           }
         } else if (editorState.mode === "annotation") {
@@ -1406,7 +1392,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
               !editorState.keys.ctrl &&
               shouldSwitchToSelectAfterUse("draw_highlight")
             ) {
-              onToolChange("select", true);
+              onToolChange("select");
             }
           } else if (editorState.tool === "draw_freetext") {
             onAddAnnotation({
@@ -1428,7 +1414,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
               !editorState.keys.ctrl &&
               shouldSwitchToSelectAfterUse("draw_freetext")
             ) {
-              onToolChange("select", true);
+              onToolChange("select");
             }
           } else if (editorState.tool === "draw_comment") {
             // Handled in handlePointerDown now for immediate click-to-place
@@ -1457,7 +1443,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
           !editorState.keys.ctrl &&
           shouldSwitchToSelectAfterUse("draw_freetext")
         ) {
-          onToolChange("select", true);
+          onToolChange("select");
         }
       }
     }

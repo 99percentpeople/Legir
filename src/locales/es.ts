@@ -60,6 +60,13 @@ const es = {
   "properties.keywords.desc": "Valores separados por comas",
   "properties.creator": "Creador",
   "properties.producer": "Productor",
+  "properties.producer_tooltip":
+    "Default a 'Formforge' en exportación a menos que se bloque manualmente.",
+  "properties.creation_date": "Fecha de creación",
+  "properties.modification_date": "Fecha de modificación",
+  "properties.mod_date_auto": "Automático (Actualiza en exportación)",
+  "properties.mod_date_tooltip":
+    "Default a la fecha importada. Actualiza a la hora actual en exportación a menos que se bloque manualmente.",
   "properties.annotation.title": "Propiedades de anotación",
   "properties.field.title": "Propiedades del campo",
   "properties.delete_field": "Eliminar campo",

@@ -15,6 +15,7 @@ const TOOL_BEHAVIORS: Record<Tool, ToolBehavior> = {
   draw_ink: { isContinuous: true },
   draw_highlight: { isContinuous: true },
   draw_comment: { isContinuous: false },
+  draw_freetext: { isContinuous: false },
   eraser: { isContinuous: true },
 };
 
