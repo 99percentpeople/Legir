@@ -1,16 +1,23 @@
 import {
   PDFDocument,
   PDFPage,
+  rgb,
   PDFName,
   PDFString,
   PDFHexString,
-  PDFDict,
-  rgb,
   StandardFonts,
+  PDFDict,
 } from "pdf-lib";
 import { Annotation } from "@/types";
 import { IAnnotationExporter } from "../types";
-import { hexToPdfColor, generateInkAppearanceOps } from "@/lib/pdf-helpers";
+import { hexToPdfColor } from "../lib/colors";
+import { generateInkAppearanceOps } from "../lib/ink";
+import { containsNonAscii, isSerifFamily } from "../lib/text";
+import {
+  uiPointToPdfPoint,
+  uiRectToPdfAnnotRect,
+  uiRectToPdfBounds,
+} from "../lib/coords";
 
 export class HighlightExporter implements IAnnotationExporter {
   shouldExport(annotation: Annotation): boolean {
@@ -22,10 +29,10 @@ export class HighlightExporter implements IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, any>,
+    viewport?: any,
   ): void {
     if (!annotation.rect) return;
 
-    const { height: pageHeight } = page.getSize();
     const targetRects =
       annotation.rects && annotation.rects.length > 0
         ? annotation.rects
@@ -38,28 +45,23 @@ export class HighlightExporter implements IAnnotationExporter {
       maxY = -Infinity;
 
     for (const r of targetRects) {
-      const llx = r.x;
-      const lly = pageHeight - (r.y + r.height);
-      const urx = r.x + r.width;
-      const ury = pageHeight - r.y;
+      const b = uiRectToPdfBounds(page, r, viewport);
+      const llx = b.x;
+      const lly = b.y;
+      const urx = b.x + b.width;
+      const ury = b.y + b.height;
 
-      // Update global bounding box
       minX = Math.min(minX, llx);
       minY = Math.min(minY, lly);
       maxX = Math.max(maxX, urx);
       maxY = Math.max(maxY, ury);
 
-      // QuadPoints Order: Top-Left, Top-Right, Bottom-Left, Bottom-Right
-      // TL
       quadPoints.push(llx);
       quadPoints.push(ury);
-      // TR
       quadPoints.push(urx);
       quadPoints.push(ury);
-      // BL
       quadPoints.push(llx);
       quadPoints.push(lly);
-      // BR
       quadPoints.push(urx);
       quadPoints.push(lly);
     }
@@ -106,20 +108,22 @@ export class CommentExporter implements IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, any>,
+    viewport?: any,
   ): void {
     if (!annotation.rect) return;
 
-    const { height: pageHeight } = page.getSize();
-    const x = annotation.rect.x;
-    const y = pageHeight - annotation.rect.y - annotation.rect.height;
-    const w = annotation.rect.width;
-    const h = annotation.rect.height;
+    const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
+    const x = bounds.x;
+    const y = bounds.y;
+    const w = bounds.width;
+    const h = bounds.height;
 
     const colorObj = hexToPdfColor(annotation.color) || rgb(1, 1, 0);
     const r = (colorObj as any).red !== undefined ? (colorObj as any).red : 1;
     const g =
       (colorObj as any).green !== undefined ? (colorObj as any).green : 1;
-    const b = (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+    const bb =
+      (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
 
     const commentAnnot = pdfDoc.context.obj({
       Type: "Annot",
@@ -127,7 +131,7 @@ export class CommentExporter implements IAnnotationExporter {
       F: 4, // Print
       Rect: [x, y, x + w, y + h],
       Contents: PDFHexString.fromText(annotation.text || ""),
-      C: [r, g, b],
+      C: [r, g, bb],
       CA: annotation.opacity,
       Name: PDFName.of("Comment"),
       P: page.ref,
@@ -154,66 +158,288 @@ export class FreeTextExporter implements IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, any>,
+    viewport?: any,
   ): Promise<void> {
     if (!annotation.rect) return;
 
-    const { height: pageHeight } = page.getSize();
-    const x = annotation.rect.x;
-    const y = pageHeight - annotation.rect.y - annotation.rect.height;
-    const w = annotation.rect.width;
-    const h = annotation.rect.height;
+    const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
+    const x = bounds.x;
+    const y = bounds.y;
+    const w = bounds.width;
+    const h = bounds.height;
 
     const colorObj = hexToPdfColor(annotation.color) || rgb(0, 0, 0);
     const r = (colorObj as any).red !== undefined ? (colorObj as any).red : 0;
     const g =
       (colorObj as any).green !== undefined ? (colorObj as any).green : 0;
-    const b = (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+    const bb =
+      (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
 
     const fontSize = annotation.size || 12;
 
-    // 1. Embed the font properly
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontRef = font.ref;
+    const resolveStandardFont = (fontFamily: string | undefined) => {
+      const f = (fontFamily || "").toLowerCase();
+      if (f.includes("times")) {
+        return { font: StandardFonts.TimesRoman, resourceName: "TiRo" };
+      }
+      if (f.includes("courier")) {
+        return { font: StandardFonts.Courier, resourceName: "Cour" };
+      }
+      return { font: StandardFonts.Helvetica, resourceName: "Helv" };
+    };
+
+    const text = annotation.text || "";
+
+    const customFont = isSerifFamily(annotation.fontFamily)
+      ? fontMap?.get("CustomSerif") || fontMap?.get("Custom")
+      : fontMap?.get("CustomSans") || fontMap?.get("Custom");
+    const hasNonAscii = containsNonAscii(text);
+    const userSelectedFont =
+      annotation.fontFamily && fontMap?.has(annotation.fontFamily)
+        ? fontMap.get(annotation.fontFamily)
+        : undefined;
+    const userExplicitCustom =
+      annotation.fontFamily === "Custom" ||
+      annotation.fontFamily === "CustomSans" ||
+      annotation.fontFamily === "CustomSerif" ||
+      annotation.fontFamily === "Noto Sans SC" ||
+      annotation.fontFamily === "Source Han Serif SC" ||
+      (customFont && userSelectedFont && userSelectedFont === customFont);
+
+    // Base (ASCII) font selection
+    let baseFont: any | undefined;
+    let baseResourceName: string;
+    if (userExplicitCustom && customFont) {
+      // If user explicitly chose a CJK/custom font, render the entire annotation with it.
+      baseFont = customFont;
+      baseResourceName = "Cust";
+    } else if (userSelectedFont) {
+      baseFont = userSelectedFont;
+      // It's an embedded font (non-standard) but user didn't explicitly pick custom;
+      // keep resourceName distinct from the CJK resource.
+      baseResourceName = "Base";
+    } else {
+      const resolved = resolveStandardFont(annotation.fontFamily);
+      baseFont = fontMap?.get(
+        resolved.font === StandardFonts.TimesRoman
+          ? "Times Roman"
+          : resolved.font === StandardFonts.Courier
+            ? "Courier"
+            : "Helvetica",
+      );
+      baseResourceName = resolved.resourceName;
+      if (!baseFont) {
+        baseFont = await pdfDoc.embedFont(resolved.font);
+      }
+    }
+
+    // If the user explicitly chose the custom font, apply it to all text.
+    // Otherwise, only apply custom to non-ASCII runs.
+    const useMixedFonts = !!customFont && hasNonAscii && !userExplicitCustom;
+    const cjkFont = useMixedFonts ? customFont : undefined;
+    const cjkResourceName = cjkFont ? "Cust" : undefined;
+
+    const baseFontRef = baseFont.ref;
+    const cjkFontRef = cjkFont?.ref;
 
     // 2. Prepare text wrapping
-    const text = annotation.text || "";
     const paragraphs = text.split(/\r\n|\r|\n/);
     const lines: string[] = [];
+    const availableWidth = Math.max(0, w - 4);
 
-    for (const paragraph of paragraphs) {
-      const words = paragraph.split(" ");
-      let currentLine = "";
-
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const width = font.widthOfTextAtSize(testLine, fontSize);
-        if (width <= w) {
-          currentLine = testLine;
-        } else {
-          if (currentLine) lines.push(currentLine);
-          currentLine = word;
+    const measureWidth = (s: string) => {
+      if (!useMixedFonts || !cjkFont) {
+        try {
+          return baseFont.widthOfTextAtSize(s, fontSize);
+        } catch {
+          return Number.POSITIVE_INFINITY;
         }
       }
-      if (currentLine) lines.push(currentLine);
+
+      // Mixed fonts: sum widths by ASCII/non-ASCII runs.
+      let total = 0;
+      let buf = "";
+      let bufIsAscii: boolean | null = null;
+      const flush = () => {
+        if (!buf) return;
+        const f = bufIsAscii ? baseFont : cjkFont;
+        try {
+          total += f.widthOfTextAtSize(buf, fontSize);
+        } catch {
+          total += Number.POSITIVE_INFINITY;
+        }
+        buf = "";
+        bufIsAscii = null;
+      };
+
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        const isAscii = ch.charCodeAt(0) <= 0x7f;
+        if (bufIsAscii === null) {
+          bufIsAscii = isAscii;
+          buf = ch;
+          continue;
+        }
+        if (isAscii === bufIsAscii) {
+          buf += ch;
+        } else {
+          flush();
+          bufIsAscii = isAscii;
+          buf = ch;
+        }
+      }
+      flush();
+      return total;
+    };
+
+    const wrapParagraph = (paragraph: string) => {
+      if (paragraph === "") {
+        lines.push("");
+        return;
+      }
+
+      let current = "";
+      let lastBreakPos = -1; // position in `current` where we can break (after char)
+      let i = 0;
+
+      const recomputeLastBreakPos = () => {
+        lastBreakPos = -1;
+        for (let j = current.length - 1; j >= 0; j--) {
+          const ch = current[j];
+          const code = ch.charCodeAt(0);
+          if (ch === " " || ch === "\t" || ch === "-" || code > 0x7f) {
+            lastBreakPos = j + 1;
+            return;
+          }
+        }
+      };
+
+      while (i < paragraph.length) {
+        const ch = paragraph[i];
+        const next = current + ch;
+
+        let width = 0;
+        try {
+          width = measureWidth(next);
+        } catch {
+          width = Number.POSITIVE_INFINITY;
+        }
+
+        if (current === "" || width <= availableWidth) {
+          current = next;
+          const code = ch.charCodeAt(0);
+          if (ch === " " || ch === "\t" || ch === "-" || code > 0x7f) {
+            lastBreakPos = current.length;
+          }
+          i += 1;
+          continue;
+        }
+
+        // Overflow: break at last known opportunity; otherwise hard break.
+        if (lastBreakPos > 0 && lastBreakPos < current.length) {
+          lines.push(current.slice(0, lastBreakPos));
+          current = current.slice(lastBreakPos);
+          recomputeLastBreakPos();
+          continue;
+        }
+        if (lastBreakPos === current.length) {
+          lines.push(current);
+          current = "";
+          lastBreakPos = -1;
+          continue;
+        }
+
+        // No break opportunities; force break at current length.
+        lines.push(current);
+        current = "";
+        lastBreakPos = -1;
+      }
+
+      // Push remainder (including whitespace)
+      if (current !== "") lines.push(current);
+    };
+
+    for (const paragraph of paragraphs) {
+      wrapParagraph(paragraph);
     }
 
     // 3. Generate Appearance Stream (AP)
+    const apFontResources: Record<string, any> = {
+      [baseResourceName]: baseFontRef,
+    };
+    if (useMixedFonts && cjkFontRef && cjkResourceName) {
+      apFontResources[cjkResourceName] = cjkFontRef;
+    }
+
     const apResources = pdfDoc.context.obj({
-      Font: { Helv: fontRef },
+      Font: apFontResources,
       ProcSet: [PDFName.of("PDF"), PDFName.of("Text")],
     });
 
     const lineHeight = fontSize * 1.2;
     const startY = h - fontSize; // Start from top
 
-    let appearanceOps = `q ${r} ${g} ${b} rg BT /Helv ${fontSize} Tf ${lineHeight} TL`;
+    let appearanceOps = `q ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${lineHeight} TL`;
 
     // Initial position
     appearanceOps += ` 2 ${startY} Td`;
 
+    let currentResource = baseResourceName;
+
+    const encodeRun = (f: any, run: string) => {
+      try {
+        return f.encodeText(run);
+      } catch {
+        const sanitized = run.replace(/[^\x00-\x7F]/g, "?");
+        return f.encodeText(sanitized);
+      }
+    };
+
     for (const line of lines) {
-      const encodedText = font.encodeText(line);
-      appearanceOps += ` ${encodedText} Tj T*`;
+      if (!useMixedFonts || !cjkFont || !cjkResourceName) {
+        const encoded = encodeRun(
+          userExplicitCustom && customFont ? customFont : baseFont,
+          line,
+        );
+        appearanceOps += ` ${encoded} Tj T*`;
+        continue;
+      }
+
+      // Mixed: switch fonts per run
+      let buf = "";
+      let bufIsAscii: boolean | null = null;
+      const flush = () => {
+        if (!buf) return;
+        const runFont = bufIsAscii ? baseFont : cjkFont;
+        const runRes = bufIsAscii ? baseResourceName : cjkResourceName;
+        if (runRes !== currentResource) {
+          appearanceOps += ` /${runRes} ${fontSize} Tf`;
+          currentResource = runRes;
+        }
+        const encoded = encodeRun(runFont, buf);
+        appearanceOps += ` ${encoded} Tj`;
+        buf = "";
+        bufIsAscii = null;
+      };
+
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        const isAscii = ch.charCodeAt(0) <= 0x7f;
+        if (bufIsAscii === null) {
+          bufIsAscii = isAscii;
+          buf = ch;
+          continue;
+        }
+        if (isAscii === bufIsAscii) {
+          buf += ch;
+        } else {
+          flush();
+          bufIsAscii = isAscii;
+          buf = ch;
+        }
+      }
+      flush();
+      appearanceOps += " T*";
     }
 
     appearanceOps += " ET Q";
@@ -234,14 +460,17 @@ export class FreeTextExporter implements IAnnotationExporter {
       pageFontDict = pdfDoc.context.obj({});
       resources.set(PDFName.of("Font"), pageFontDict);
     }
-    (pageFontDict as PDFDict).set(PDFName.of("Helv"), fontRef);
+    (pageFontDict as PDFDict).set(PDFName.of(baseResourceName), baseFontRef);
+    if (useMixedFonts && cjkFontRef && cjkResourceName) {
+      (pageFontDict as PDFDict).set(PDFName.of(cjkResourceName), cjkFontRef);
+    }
 
     if (!page.node.Resources()) {
       page.node.set(PDFName.of("Resources"), resources);
     }
 
     // 5. Create Annotation
-    const da = `/Helv ${fontSize} Tf ${r} ${g} ${b} rg`;
+    const da = `/${baseResourceName} ${fontSize} Tf ${r} ${g} ${bb} rg`;
     const freeTextAnnot = pdfDoc.context.obj({
       Type: "Annot",
       Subtype: "FreeText",
@@ -283,6 +512,7 @@ export class InkExporter implements IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, any>,
+    viewport?: any,
   ): void {
     const { height: pageHeight } = page.getSize();
 
@@ -305,8 +535,9 @@ export class InkExporter implements IAnnotationExporter {
     for (const stroke of strokes) {
       const pdfPoints: number[] = [];
       for (const p of stroke) {
-        const pdfX = p.x;
-        const pdfY = pageHeight - p.y;
+        const pt = uiPointToPdfPoint(page, { x: p.x, y: p.y }, viewport);
+        const pdfX = pt.x;
+        const pdfY = pt.y;
 
         pdfPoints.push(pdfX);
         pdfPoints.push(pdfY);

@@ -1,75 +1,26 @@
-import { FormField, FieldType, FieldStyle } from "@/types";
-import { DEFAULT_FIELD_STYLE } from "@/constants";
-import {
-  rgbArrayToHex,
-  getFontMap,
-  getGlobalDA,
-  parseDefaultAppearance,
-  getFieldPropertiesFromPdfLib,
-} from "@/lib/pdf-helpers";
+import { FormField, FieldType } from "@/types";
 import { IControlParser, ParserContext } from "../types";
+import {
+  getStyleParsingResources,
+  parseFieldStyle,
+} from "../lib/control-parsing";
+import { pdfJsWidgetRectToUiRect } from "../lib/coords";
+import { pdfDebug } from "../lib/debug";
 
-// Shared helper to parse style
-const parseFieldStyle = (
-  annotation: any,
-  pdfDoc: any,
-  fontMap: Map<string, string>,
-  globalDA: string | undefined,
-): { style: FieldStyle; alignment: "left" | "center" | "right" } => {
-  let alignment: "left" | "center" | "right" = "left";
-  const importedStyle: FieldStyle = { ...DEFAULT_FIELD_STYLE };
-
-  if (annotation.color) {
-    const hex = rgbArrayToHex(annotation.color);
-    if (hex) importedStyle.borderColor = hex;
+const getViewportSummary = (viewport: any) => {
+  try {
+    return {
+      width: viewport?.width,
+      height: viewport?.height,
+      scale: viewport?.scale,
+      rotation: viewport?.rotation,
+      transform: viewport?.transform,
+      offsetX: viewport?.offsetX,
+      offsetY: viewport?.offsetY,
+    };
+  } catch {
+    return {};
   }
-
-  if (annotation.backgroundColor) {
-    const hex = rgbArrayToHex(annotation.backgroundColor);
-    if (hex) {
-      importedStyle.backgroundColor = hex;
-      importedStyle.isTransparent = false;
-    }
-  } else {
-    importedStyle.isTransparent = true;
-  }
-
-  if (
-    annotation.borderStyle &&
-    typeof annotation.borderStyle.width === "number"
-  ) {
-    importedStyle.borderWidth = annotation.borderStyle.width;
-  }
-
-  let da = annotation.defaultAppearance || annotation.DA;
-  if (pdfDoc && annotation.fieldName) {
-    const libProps = getFieldPropertiesFromPdfLib(pdfDoc, annotation.fieldName);
-    if (libProps) {
-      if (libProps.da) {
-        da = libProps.da;
-      }
-      if (libProps.q !== undefined) {
-        if (libProps.q === 1) alignment = "center";
-        else if (libProps.q === 2) alignment = "right";
-      }
-    }
-  }
-
-  const finalDa = da || globalDA;
-
-  if (finalDa) {
-    const parsed = parseDefaultAppearance(finalDa, fontMap);
-    importedStyle.fontFamily = parsed.fontFamily;
-    importedStyle.fontSize = parsed.fontSize;
-    importedStyle.textColor = parsed.textColor;
-  }
-
-  if (alignment === "left" && typeof annotation.textAlignment === "number") {
-    if (annotation.textAlignment === 1) alignment = "center";
-    else if (annotation.textAlignment === 2) alignment = "right";
-  }
-
-  return { style: importedStyle, alignment };
 };
 
 export class TextControlParser implements IControlParser {
@@ -77,14 +28,7 @@ export class TextControlParser implements IControlParser {
     const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
     const fields: FormField[] = [];
 
-    // Pre-calculate font map and globalDA if needed (or do it per field, simpler logic)
-    // For performance, we could pass these in context, but let's stick to the interface.
-    let fontMap = new Map<string, string>();
-    let globalDA: string | undefined = undefined;
-    if (pdfDoc) {
-      fontMap = getFontMap(pdfDoc);
-      globalDA = getGlobalDA(pdfDoc);
-    }
+    const { fontMap, globalDA } = getStyleParsingResources(context);
 
     pageAnnotations.forEach((annotation, index) => {
       if (
@@ -92,11 +36,20 @@ export class TextControlParser implements IControlParser {
         annotation.fieldName &&
         annotation.fieldType === "Tx"
       ) {
-        const [x1, y1, x2, y2] = annotation.rect;
-        const width = x2 - x1;
-        const height = y2 - y1;
-        const x = x1;
-        const y = viewport.height - y2;
+        const { x, y, width, height } = pdfJsWidgetRectToUiRect(
+          annotation.rect,
+          viewport,
+        );
+
+        pdfDebug("import:controls", "widget_parsed", {
+          pageIndex,
+          index,
+          fieldName: annotation.fieldName,
+          fieldType: annotation.fieldType,
+          rect: annotation.rect,
+          uiRect: { x, y, width, height },
+          viewport: getViewportSummary(viewport),
+        });
 
         const { style, alignment } = parseFieldStyle(
           annotation,
@@ -133,12 +86,7 @@ export class CheckboxControlParser implements IControlParser {
     const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
     const fields: FormField[] = [];
 
-    let fontMap = new Map<string, string>();
-    let globalDA: string | undefined = undefined;
-    if (pdfDoc) {
-      fontMap = getFontMap(pdfDoc);
-      globalDA = getGlobalDA(pdfDoc);
-    }
+    const { fontMap, globalDA } = getStyleParsingResources(context);
 
     pageAnnotations.forEach((annotation, index) => {
       if (
@@ -147,11 +95,20 @@ export class CheckboxControlParser implements IControlParser {
         annotation.fieldType === "Btn" &&
         annotation.checkBox
       ) {
-        const [x1, y1, x2, y2] = annotation.rect;
-        const width = x2 - x1;
-        const height = y2 - y1;
-        const x = x1;
-        const y = viewport.height - y2;
+        const { x, y, width, height } = pdfJsWidgetRectToUiRect(
+          annotation.rect,
+          viewport,
+        );
+
+        pdfDebug("import:controls", "widget_parsed", {
+          pageIndex,
+          index,
+          fieldName: annotation.fieldName,
+          fieldType: annotation.fieldType,
+          rect: annotation.rect,
+          uiRect: { x, y, width, height },
+          viewport: getViewportSummary(viewport),
+        });
 
         const { style } = parseFieldStyle(
           annotation,
@@ -185,12 +142,7 @@ export class RadioControlParser implements IControlParser {
     const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
     const fields: FormField[] = [];
 
-    let fontMap = new Map<string, string>();
-    let globalDA: string | undefined = undefined;
-    if (pdfDoc) {
-      fontMap = getFontMap(pdfDoc);
-      globalDA = getGlobalDA(pdfDoc);
-    }
+    const { fontMap, globalDA } = getStyleParsingResources(context);
 
     pageAnnotations.forEach((annotation, index) => {
       if (
@@ -199,11 +151,20 @@ export class RadioControlParser implements IControlParser {
         annotation.fieldType === "Btn" &&
         annotation.radioButton
       ) {
-        const [x1, y1, x2, y2] = annotation.rect;
-        const width = x2 - x1;
-        const height = y2 - y1;
-        const x = x1;
-        const y = viewport.height - y2;
+        const { x, y, width, height } = pdfJsWidgetRectToUiRect(
+          annotation.rect,
+          viewport,
+        );
+
+        pdfDebug("import:controls", "widget_parsed", {
+          pageIndex,
+          index,
+          fieldName: annotation.fieldName,
+          fieldType: annotation.fieldType,
+          rect: annotation.rect,
+          uiRect: { x, y, width, height },
+          viewport: getViewportSummary(viewport),
+        });
 
         const { style } = parseFieldStyle(
           annotation,
@@ -238,12 +199,7 @@ export class DropdownControlParser implements IControlParser {
     const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
     const fields: FormField[] = [];
 
-    let fontMap = new Map<string, string>();
-    let globalDA: string | undefined = undefined;
-    if (pdfDoc) {
-      fontMap = getFontMap(pdfDoc);
-      globalDA = getGlobalDA(pdfDoc);
-    }
+    const { fontMap, globalDA } = getStyleParsingResources(context);
 
     pageAnnotations.forEach((annotation, index) => {
       if (
@@ -251,11 +207,20 @@ export class DropdownControlParser implements IControlParser {
         annotation.fieldName &&
         annotation.fieldType === "Ch"
       ) {
-        const [x1, y1, x2, y2] = annotation.rect;
-        const width = x2 - x1;
-        const height = y2 - y1;
-        const x = x1;
-        const y = viewport.height - y2;
+        const { x, y, width, height } = pdfJsWidgetRectToUiRect(
+          annotation.rect,
+          viewport,
+        );
+
+        pdfDebug("import:controls", "widget_parsed", {
+          pageIndex,
+          index,
+          fieldName: annotation.fieldName,
+          fieldType: annotation.fieldType,
+          rect: annotation.rect,
+          uiRect: { x, y, width, height },
+          viewport: getViewportSummary(viewport),
+        });
 
         const { style, alignment } = parseFieldStyle(
           annotation,
@@ -304,12 +269,7 @@ export class SignatureControlParser implements IControlParser {
     const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
     const fields: FormField[] = [];
 
-    let fontMap = new Map<string, string>();
-    let globalDA: string | undefined = undefined;
-    if (pdfDoc) {
-      fontMap = getFontMap(pdfDoc);
-      globalDA = getGlobalDA(pdfDoc);
-    }
+    const { fontMap, globalDA } = getStyleParsingResources(context);
 
     pageAnnotations.forEach((annotation, index) => {
       if (
@@ -317,11 +277,20 @@ export class SignatureControlParser implements IControlParser {
         annotation.fieldName &&
         annotation.fieldType === "Sig"
       ) {
-        const [x1, y1, x2, y2] = annotation.rect;
-        const width = x2 - x1;
-        const height = y2 - y1;
-        const x = x1;
-        const y = viewport.height - y2;
+        const { x, y, width, height } = pdfJsWidgetRectToUiRect(
+          annotation.rect,
+          viewport,
+        );
+
+        pdfDebug("import:controls", "widget_parsed", {
+          pageIndex,
+          index,
+          fieldName: annotation.fieldName,
+          fieldType: annotation.fieldType,
+          rect: annotation.rect,
+          uiRect: { x, y, width, height },
+          viewport: getViewportSummary(viewport),
+        });
 
         const { style } = parseFieldStyle(
           annotation,

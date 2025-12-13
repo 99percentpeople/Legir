@@ -5,30 +5,16 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
-  Suspense,
 } from "react";
-import {
-  EditorState,
-  FormField,
-  FieldType,
-  Annotation,
-  Tool,
-} from "../../types";
-import {
-  DEFAULT_FIELD_STYLE,
-  ANNOTATION_STYLES,
-  ZOOM_BASE,
-} from "../../constants";
-import { cn, setGlobalCursor, resetGlobalCursor } from "../../lib/utils";
-import { usePointerCapture } from "../../hooks/usePointerCapture";
-import { useAutoScroll } from "../../hooks/useAutoScroll";
-import { useCanvasPanning } from "../../hooks/useCanvasPanning";
-import { useInkSession } from "../../hooks/useInkSession";
+import { EditorState, FormField, FieldType, Annotation, Tool } from "@/types";
+import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES, ZOOM_BASE } from "@/constants";
+import { cn, setGlobalCursor, resetGlobalCursor } from "@/lib/utils";
+import { usePointerCapture } from "@/hooks/usePointerCapture";
+import { useAutoScroll } from "@/hooks/useAutoScroll";
+import { useCanvasPanning } from "@/hooks/useCanvasPanning";
+import { useInkSession } from "@/hooks/useInkSession";
 import { useLanguage } from "../language-provider";
-import {
-  getCursor,
-  shouldSwitchToSelectAfterUse,
-} from "../../lib/tool-behavior";
+import { getCursor, shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
 import PDFPage from "./PDFPage";
 import { ControlRenderer } from "./controls";
 

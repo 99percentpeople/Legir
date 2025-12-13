@@ -6,6 +6,10 @@ export interface ParserContext {
   pageIndex: number;
   viewport: any;
   pdfDoc?: PDFDocument;
+  fontMap?: Map<string, string>;
+  globalDA?: string;
+  embeddedFontCache?: Map<string, Promise<string | undefined>>;
+  embeddedFontFaces?: Set<FontFace>;
 }
 
 export interface IAnnotationParser {
@@ -23,6 +27,7 @@ export interface IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, any>,
+    viewport?: any,
   ): Promise<void> | void;
 }
 
@@ -32,5 +37,6 @@ export interface IControlExporter {
     form: PDFForm,
     field: FormField,
     fontMap?: Map<string, any>,
+    viewport?: any,
   ): Promise<void> | void;
 }

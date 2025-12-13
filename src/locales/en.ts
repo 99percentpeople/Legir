@@ -118,6 +118,8 @@ const en = {
   "properties.add_option": "Add option...",
   "properties.no_options": "No options added",
   "properties.appearance": "Appearance",
+  "annotation.font_missing_warning":
+    "This PDF uses a subset/embedded font that may be missing glyphs. When you edit this text, it will be re-rendered using the default font.",
   "properties.background": "Background",
   "properties.transparent": "Transparent",
   "properties.border_color": "Border Color",

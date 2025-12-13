@@ -39,7 +39,7 @@ export const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({
         <Edit2 size={16} />
       </Button>
 
-      <Popover>
+      <Popover modal>
         <PopoverTrigger asChild>
           <Button
             variant="ghost"

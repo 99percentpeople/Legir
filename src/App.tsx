@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useCallback } from "react";
 import Toolbar from "./components/toolbar/Toolbar";
 import Workspace from "./components/workspace/Workspace";
 import { PropertiesPanel } from "./components/properties-panel/PropertiesPanel";
@@ -21,19 +21,16 @@ import { Button } from "./components/ui/button";
 import {
   EditorState,
   FormField,
-  HistorySnapshot,
   PageData,
-  FieldType,
   Annotation,
   PDFMetadata,
 } from "./types";
 import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
 import { saveDraft, getDraft, clearDraft } from "./services/storageService";
-import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES } from "./constants";
+import { DEFAULT_FIELD_STYLE } from "./constants";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
-import { shouldSwitchToSelectAfterUse } from "./lib/tool-behavior";
 import { useEditorStore } from "./store/useEditorStore";
 
 const App: React.FC = () => {
@@ -43,7 +40,6 @@ const App: React.FC = () => {
   const state = useEditorStore();
   const {
     setState,
-    loadDocument,
     addField,
     addAnnotation,
     updateField,
@@ -54,27 +50,10 @@ const App: React.FC = () => {
     saveCheckpoint,
     undo,
     redo,
-    openDialog,
-    closeDialog,
-    setKeys,
-    moveField,
     deleteAnnotation,
   } = state;
-
-  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
-  const [isPanelFloating, setIsPanelFloating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState("thumbnails");
-  const [hasSavedSession, setHasSavedSession] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
-
-  const [sidebarWidth, setSidebarWidth] = useState(256);
-  const [rightPanelWidth, setRightPanelWidth] = useState(320);
-  const [fitTrigger, setFitTrigger] = useState(0);
   const isClosingRef = React.useRef(false);
+  const pdfDisposeRef = React.useRef<null | (() => void)>(null);
 
   // Refs for stable access in event listeners
   const handlersRef = React.useRef<{
@@ -84,24 +63,30 @@ const App: React.FC = () => {
 
   useEffect(() => {
     getDraft().then((draft) => {
-      if (draft) setHasSavedSession(true);
+      if (draft) setState({ hasSavedSession: true });
     });
-  }, []);
+  }, [setState]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty && !isClosingRef.current) {
+      if (state.isDirty && !isClosingRef.current) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty]);
+  }, [state.isDirty]);
+
+  useEffect(() => {
+    return () => {
+      pdfDisposeRef.current?.();
+      pdfDisposeRef.current = null;
+    };
+  }, []);
 
   const handleEditAnnotation = useCallback((id: string) => {
-    setIsSidebarOpen(true);
-    setSidebarTab("annotations");
+    setState({ isSidebarOpen: true, sidebarTab: "annotations" });
 
     selectControl(id);
 
@@ -139,9 +124,11 @@ const App: React.FC = () => {
       );
       const page = pagesList[targetIndex];
       if (!page.width) return 1.0;
-      const SIDEBAR_WIDTH = isSidebarOpen ? sidebarWidth : 0;
+      const SIDEBAR_WIDTH = state.isSidebarOpen ? state.sidebarWidth : 0;
       const PANEL_WIDTH =
-        !isPanelFloating && isRightPanelOpen ? rightPanelWidth : 0;
+        !state.isPanelFloating && state.isRightPanelOpen
+          ? state.rightPanelWidth
+          : 0;
       const PADDING = 96;
       const availableWidth =
         window.innerWidth - SIDEBAR_WIDTH - PANEL_WIDTH - PADDING;
@@ -149,11 +136,11 @@ const App: React.FC = () => {
       return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
     },
     [
-      isSidebarOpen,
-      isPanelFloating,
-      isRightPanelOpen,
-      sidebarWidth,
-      rightPanelWidth,
+      state.isSidebarOpen,
+      state.isPanelFloating,
+      state.isRightPanelOpen,
+      state.sidebarWidth,
+      state.rightPanelWidth,
     ],
   );
 
@@ -321,8 +308,11 @@ const App: React.FC = () => {
 
   const handleUpload = async (file: File) => {
     setState((prev) => ({ ...prev, isProcessing: true }));
-    setProcessingStatus(t("app.parsing"));
+    setState({ processingStatus: t("app.parsing") });
     try {
+      pdfDisposeRef.current?.();
+      pdfDisposeRef.current = null;
+
       const {
         pdfBytes,
         pdfDocument,
@@ -331,7 +321,9 @@ const App: React.FC = () => {
         annotations,
         metadata,
         outline,
+        dispose,
       } = await loadPDF(file);
+      pdfDisposeRef.current = dispose;
       const fitScale = calculateFitScale(pages);
       setState((prev) => ({
         ...prev,
@@ -349,13 +341,13 @@ const App: React.FC = () => {
         future: [],
         isProcessing: false,
       }));
-      setIsDirty(false);
+      setState({ isDirty: false });
     } catch (error) {
       console.error("Error loading PDF:", error);
       toast.error(t("app.load_error"));
       setState((prev) => ({ ...prev, isProcessing: false }));
     } finally {
-      setProcessingStatus(null);
+      setState({ processingStatus: null });
     }
   };
 
@@ -363,15 +355,20 @@ const App: React.FC = () => {
     const draft = await getDraft();
     if (!draft) return;
     setState((prev) => ({ ...prev, isProcessing: true }));
-    setProcessingStatus(t("app.loading_draft"));
+    setState({ processingStatus: t("app.loading_draft") });
     try {
+      pdfDisposeRef.current?.();
+      pdfDisposeRef.current = null;
+
       // Re-load the PDF document from bytes as it is not serializable in DB
       const {
         pdfDocument,
         pages,
         annotations: fileAnnotations,
         outline,
+        dispose,
       } = await loadPDF(draft.pdfBytes);
+      pdfDisposeRef.current = dispose;
       const fitScale = calculateFitScale(pages);
       setState((prev) => ({
         ...prev,
@@ -389,13 +386,13 @@ const App: React.FC = () => {
         future: [],
         isProcessing: false,
       }));
-      setIsDirty(false);
+      setState({ isDirty: false });
     } catch (error) {
       console.error("Failed to resume session:", error);
       toast.error(t("app.load_error"));
       setState((prev) => ({ ...prev, isProcessing: false }));
     } finally {
-      setProcessingStatus(null);
+      setState({ processingStatus: null });
     }
   };
 
@@ -446,12 +443,12 @@ const App: React.FC = () => {
         const pageIndex = targetPageIndices[i];
         const page = state.pages[pageIndex];
 
-        setProcessingStatus(
-          t("app.analyzing", {
+        setState({
+          processingStatus: t("app.analyzing", {
             current: i + 1,
             total: targetPageIndices.length,
           }),
-        );
+        });
 
         const base64Image = await renderPage(state.pdfDocument, pageIndex);
 
@@ -488,6 +485,7 @@ const App: React.FC = () => {
           ...prev,
           fields: [...prev.fields, ...allNewFields],
           isProcessing: false,
+          isDirty: true,
         }));
       } else {
         toast.info(t("app.no_new_fields"));
@@ -498,7 +496,7 @@ const App: React.FC = () => {
       setState((prev) => ({ ...prev, isProcessing: false }));
       toast.error(t("app.auto_detect_fail", { error: e.message }));
     } finally {
-      setProcessingStatus(null);
+      setState({ processingStatus: null });
     }
   };
 
@@ -530,7 +528,7 @@ const App: React.FC = () => {
 
         // User selected a file, NOW generate the PDF
         setState((prev) => ({ ...prev, isProcessing: true }));
-        setProcessingStatus(t("app.generating"));
+        setState({ processingStatus: t("app.generating") });
 
         try {
           await new Promise((resolve) => setTimeout(resolve, 100));
@@ -545,7 +543,7 @@ const App: React.FC = () => {
           }
         } finally {
           setState((prev) => ({ ...prev, isProcessing: false }));
-          setProcessingStatus(null);
+          setState({ processingStatus: null });
         }
         return false;
       } catch (err: any) {
@@ -564,7 +562,7 @@ const App: React.FC = () => {
 
   const handleExport = async (): Promise<boolean> => {
     setState((prev) => ({ ...prev, isProcessing: true }));
-    setProcessingStatus(t("app.generating"));
+    setState({ processingStatus: t("app.generating") });
     try {
       const modifiedBytes = await generatePDF();
       if (modifiedBytes) {
@@ -586,14 +584,14 @@ const App: React.FC = () => {
       return false;
     } finally {
       setState((prev) => ({ ...prev, isProcessing: false }));
-      setProcessingStatus(null);
+      setState({ processingStatus: null });
     }
     return false;
   };
 
   const handlePrint = async () => {
     setState((prev) => ({ ...prev, isProcessing: true }));
-    setProcessingStatus(t("app.generating"));
+    setState({ processingStatus: t("app.generating") });
     try {
       await new Promise((resolve) => setTimeout(resolve, 100));
       const modifiedBytes = await generatePDF();
@@ -640,14 +638,14 @@ const App: React.FC = () => {
       toast.error(t("app.export_fail"));
     } finally {
       setState((prev) => ({ ...prev, isProcessing: false }));
-      setProcessingStatus(null);
+      setState({ processingStatus: null });
     }
   };
 
   const handleSaveDraft = async (silent = false) => {
     if (!state.pdfBytes) return;
 
-    setIsSaving(true);
+    setState({ isSaving: true });
 
     try {
       await saveDraft({
@@ -657,14 +655,16 @@ const App: React.FC = () => {
         metadata: state.metadata,
         filename: state.filename,
       });
-      setHasSavedSession(true);
-      setIsDirty(false);
-      setState((prev) => ({ ...prev, lastSavedAt: new Date() }));
+      setState({
+        hasSavedSession: true,
+        isDirty: false,
+        lastSavedAt: new Date(),
+      });
     } catch (error) {
       console.error("Save draft failed:", error);
       if (!silent) toast.error("Failed to save draft.");
     } finally {
-      setIsSaving(false);
+      setState({ isSaving: false });
     }
   };
 
@@ -755,6 +755,7 @@ const App: React.FC = () => {
       setState((prev) => ({
         ...prev,
         metadata: { ...prev.metadata, ...updates },
+        isDirty: true,
       }));
     },
     [setState],
@@ -762,29 +763,29 @@ const App: React.FC = () => {
 
   const handleFilenameChange = useCallback(
     (name: string) => {
-      setState((prev) => ({ ...prev, filename: name }));
+      setState((prev) => ({ ...prev, filename: name, isDirty: true }));
     },
     [setState],
   );
 
   const handleToggleFloating = useCallback(() => {
-    setIsPanelFloating((prev) => !prev);
-  }, []);
+    setState((prev) => ({ isPanelFloating: !prev.isPanelFloating }));
+  }, [setState]);
 
   return (
     <div className="flex h-full w-full flex-col">
       {state.pages.length === 0 ? (
         <LandingPage
           onUpload={handleUpload}
-          hasSavedSession={hasSavedSession}
+          hasSavedSession={state.hasSavedSession}
           onResume={handleResumeSession}
         />
       ) : (
         <>
           <Toolbar
             editorState={state}
-            isSaving={isSaving}
-            isDirty={isDirty}
+            isSaving={state.isSaving}
+            isDirty={state.isDirty}
             onToolChange={(tool) => setTool(tool)}
             onModeChange={(mode) => setState({ mode, tool: "select" })}
             onPenStyleChange={handlePenStyleChange}
@@ -815,11 +816,13 @@ const App: React.FC = () => {
             onOpenShortcuts={() =>
               setState((prev) => ({ ...prev, activeDialog: "shortcuts" }))
             }
-            isFieldListOpen={isSidebarOpen}
-            onToggleFieldList={() => setIsSidebarOpen(!isSidebarOpen)}
-            isPropertiesPanelOpen={isRightPanelOpen}
+            isFieldListOpen={state.isSidebarOpen}
+            onToggleFieldList={() =>
+              setState({ isSidebarOpen: !state.isSidebarOpen })
+            }
+            isPropertiesPanelOpen={state.isRightPanelOpen}
             onTogglePropertiesPanel={() =>
-              setIsRightPanelOpen(!isRightPanelOpen)
+              setState({ isRightPanelOpen: !state.isRightPanelOpen })
             }
             onOpenSettings={() =>
               setState((prev) => ({ ...prev, activeDialog: "settings" }))
@@ -828,8 +831,8 @@ const App: React.FC = () => {
 
           <div className="relative flex flex-1 overflow-hidden">
             <Sidebar
-              isOpen={isSidebarOpen}
-              onClose={() => setIsSidebarOpen(false)}
+              isOpen={state.isSidebarOpen}
+              onClose={() => setState({ isSidebarOpen: false })}
               pages={state.pages}
               fields={state.fields}
               annotations={state.annotations}
@@ -867,12 +870,12 @@ const App: React.FC = () => {
                   .getElementById(`page-${idx}`)
                   ?.scrollIntoView({ behavior: "smooth" });
               }}
-              currentPageIndex={currentPageIndex}
-              width={sidebarWidth}
-              onResize={setSidebarWidth}
+              currentPageIndex={state.currentPageIndex}
+              width={state.sidebarWidth}
+              onResize={(w) => setState({ sidebarWidth: w })}
               pdfDocument={state.pdfDocument}
-              activeTab={sidebarTab}
-              onTabChange={setSidebarTab}
+              activeTab={state.sidebarTab}
+              onTabChange={(tab) => setState({ sidebarTab: tab })}
             />
 
             <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -887,17 +890,19 @@ const App: React.FC = () => {
                 onEditAnnotation={handleEditAnnotation}
                 onScaleChange={updateScale}
                 onTriggerHistorySave={saveCheckpoint}
-                onPageIndexChange={setCurrentPageIndex}
+                onPageIndexChange={(idx) => setState({ currentPageIndex: idx })}
                 onToolChange={(tool) => setTool(tool)}
-                fitTrigger={fitTrigger}
+                fitTrigger={state.fitTrigger}
               />
               <ZoomControls
                 scale={state.scale}
                 onZoomIn={() => updateScale(state.scale * 1.25)}
                 onZoomOut={() => updateScale(state.scale / 1.25)}
                 onReset={() => {
-                  updateScale(calculateFitScale(state.pages, currentPageIndex));
-                  setFitTrigger(Date.now());
+                  updateScale(
+                    calculateFitScale(state.pages, state.currentPageIndex),
+                  );
+                  setState({ fitTrigger: Date.now() });
                 }}
               />
             </div>
@@ -905,7 +910,7 @@ const App: React.FC = () => {
             {(state.mode === "form" ||
               state.mode === "annotation" ||
               selectedControl) &&
-              isRightPanelOpen && (
+              state.isRightPanelOpen && (
                 <PropertiesPanel
                   selectedControl={selectedControl}
                   metadata={state.metadata}
@@ -915,11 +920,11 @@ const App: React.FC = () => {
                   onFilenameChange={handleFilenameChange}
                   onDelete={deleteSelection}
                   onClose={() => selectControl(null)}
-                  isFloating={isPanelFloating}
+                  isFloating={state.isPanelFloating}
                   onToggleFloating={handleToggleFloating}
                   onTriggerHistorySave={saveCheckpoint}
-                  width={rightPanelWidth}
-                  onResize={setRightPanelWidth}
+                  width={state.rightPanelWidth}
+                  onResize={(w) => setState({ rightPanelWidth: w })}
                 />
               )}
           </div>
@@ -983,7 +988,7 @@ const App: React.FC = () => {
           </DialogDescription>
           <div className="border-primary mb-4 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
           <p className="text-foreground text-lg font-medium">
-            {processingStatus || t("common.processing")}
+            {state.processingStatus || t("common.processing")}
           </p>
         </DialogContent>
       </Dialog>

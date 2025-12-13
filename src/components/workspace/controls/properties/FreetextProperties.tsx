@@ -5,6 +5,14 @@ import { Label } from "@/components/ui/label";
 import { Palette } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FONT_FAMILY_MAP } from "@/constants";
 
 export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   data,
@@ -12,6 +20,11 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   onTriggerHistorySave,
 }) => {
   const { t } = useLanguage();
+
+  const availableFontKeys = Object.keys(FONT_FAMILY_MAP);
+  const currentFontValue = data.fontFamily || "Helvetica";
+  const isCustomFontValue =
+    !!data.fontFamily && !availableFontKeys.includes(data.fontFamily);
 
   return (
     <div>
@@ -30,6 +43,33 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             onChange={(e) => onChange({ color: e.target.value })}
             className="border-input bg-background h-8 w-full cursor-pointer rounded border"
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label>{t("properties.font_family")}</Label>
+          <Select
+            value={currentFontValue}
+            onValueChange={(val) => {
+              onTriggerHistorySave();
+              onChange({ fontFamily: val });
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(FONT_FAMILY_MAP).map(([name, font]) => (
+                <SelectItem key={name} value={name}>
+                  <span style={{ fontFamily: font }}>{name}</span>
+                </SelectItem>
+              ))}
+              {isCustomFontValue && (
+                <SelectItem value={data.fontFamily as string}>
+                  Custom
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Font Size */}

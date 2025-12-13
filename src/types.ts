@@ -89,12 +89,19 @@ export interface Annotation {
   opacity?: number; // For highlight
   thickness?: number; // For ink
   size?: number; // For text
+  fontFamily?: string; // For text
   alignment?: "left" | "center" | "right"; // For comment text alignment
   subtype?: "ink" | "polyline" | "line"; // To preserve original PDF subtype
   intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
   updatedAt?: string; // ISO Date string for modification date
   svgPath?: string; // Imported appearance path data
   appearanceStreamContent?: string; // Raw PDF appearance stream operators
+
+  sourcePdfRef?: { objectNumber: number; generationNumber: number };
+  sourcePdfFontName?: string;
+  sourcePdfFontIsSubset?: boolean;
+  sourcePdfFontMissing?: boolean;
+  isEdited?: boolean;
 }
 
 export interface PDFMetadata {
@@ -189,6 +196,20 @@ export interface EditorState {
 
   // Status
   lastSavedAt: Date | null;
+
+  // UI State
+  processingStatus: string | null;
+  isPanelFloating: boolean;
+  isSaving: boolean;
+  isSidebarOpen: boolean;
+  isRightPanelOpen: boolean;
+  sidebarTab: string;
+  hasSavedSession: boolean;
+  isDirty: boolean;
+  currentPageIndex: number;
+  sidebarWidth: number;
+  rightPanelWidth: number;
+  fitTrigger: number;
 
   // Keyboard State
   keys: {

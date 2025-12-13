@@ -110,6 +110,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
                 color={data.color || "#000000"}
                 onColorChange={(c) => onUpdate?.(data.id, { color: c })}
                 showThickness={false}
+                side="top"
               >
                 <Button
                   variant="ghost"

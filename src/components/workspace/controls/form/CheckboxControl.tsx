@@ -3,7 +3,7 @@ import { Check } from "lucide-react";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { cn } from "@/lib/utils";
-import { FONT_FAMILY_MAP } from "@/constants";
+import { resolveFontStackWithCjkFallback } from "@/lib/fonts";
 
 export const CheckboxControl: React.FC<FormControlProps> = (props) => {
   const { data, isFormMode, isAnnotationMode, isSelectable, onUpdate, scale } =
@@ -11,12 +11,13 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
   const style = data.style || {};
 
   const containerStyle: React.CSSProperties = {
+    ["--scale" as any]: scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,
     borderStyle: "solid",
-    fontSize: `${(style.fontSize || 12) * scale}px`,
-    fontFamily: FONT_FAMILY_MAP[style.fontFamily || "Helvetica"] || "Helvetica",
+    fontSize: `calc(${style.fontSize || 12}px * var(--scale, 1))`,
+    fontFamily: resolveFontStackWithCjkFallback(style.fontFamily),
     boxSizing: "border-box",
   };
 

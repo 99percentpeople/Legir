@@ -3,13 +3,24 @@ import {
   PDFArray,
   PDFDict,
   PDFNumber,
+  PDFStream,
   PDFString,
   PDFHexString,
 } from "pdf-lib";
 import { Annotation } from "@/types";
-import { rgbArrayToHex, extractInkAppearance } from "@/lib/pdf-helpers";
 import { parsePDFDate } from "@/utils/pdfUtils";
 import { IAnnotationParser, ParserContext } from "../types";
+import { rgbArrayToHex } from "../lib/colors";
+import { pdfDebug } from "../lib/debug";
+import { extractInkAppearance } from "../lib/ink";
+import { ensurePdfEmbeddedFontLoaded } from "../lib/embedded-fonts";
+import { pdfJsRectToUiRect } from "../lib/coords";
+import { decodePdfString } from "../lib/pdf-objects";
+import {
+  normalizePdfFontName,
+  pdfFontToAppFontKey,
+  pdfFontToCssFontFamily,
+} from "../lib/pdf-font-names";
 
 export class InkParser implements IAnnotationParser {
   async parse(context: ParserContext): Promise<Annotation[]> {
@@ -71,23 +82,18 @@ export class InkParser implements IAnnotationParser {
                   // Parse Author
                   let author: string | undefined = undefined;
                   const T = annot.lookup(PDFName.of("T"));
-                  if (T instanceof PDFString || T instanceof PDFHexString)
-                    author = T.decodeText();
+                  author = decodePdfString(T);
 
                   // Parse Contents
                   let contents: string | undefined = undefined;
                   const Contents = annot.lookup(PDFName.of("Contents"));
-                  if (
-                    Contents instanceof PDFString ||
-                    Contents instanceof PDFHexString
-                  )
-                    contents = Contents.decodeText();
+                  contents = decodePdfString(Contents);
 
                   // Parse Modified Date
                   let updatedAt: string | undefined = undefined;
                   const M = annot.lookup(PDFName.of("M"));
-                  if (M instanceof PDFString || M instanceof PDFHexString)
-                    updatedAt = parsePDFDate(M.decodeText());
+                  const mDecoded = decodePdfString(M);
+                  if (mDecoded) updatedAt = parsePDFDate(mDecoded);
 
                   // Parse AP
                   const { strokePaths } = extractInkAppearance(
@@ -170,14 +176,11 @@ export class HighlightParser implements IAnnotationParser {
         const color = annotation.color
           ? rgbArrayToHex(annotation.color)
           : "#FFFF00";
-        const [x1, y1, x2, y2] = annotation.rect;
-        const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
-        const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
-
-        const x = Math.min(vx1, vx2);
-        const y = Math.min(vy1, vy2);
-        const width = Math.abs(vx2 - vx1);
-        const height = Math.abs(vy2 - vy1);
+        const [x1, y1] = annotation.rect;
+        const { x, y, width, height } = pdfJsRectToUiRect(
+          annotation.rect,
+          viewport,
+        );
 
         let rects:
           | { x: number; y: number; width: number; height: number }[]
@@ -209,28 +212,16 @@ export class HighlightParser implements IAnnotationParser {
                         if (Math.abs(lx1 - x1) < 1 && Math.abs(ly1 - y1) < 1) {
                           // Extract metadata
                           const rawTitle = libAnnot.lookup(PDFName.of("T"));
-                          if (
-                            rawTitle instanceof PDFString ||
-                            rawTitle instanceof PDFHexString
-                          ) {
-                            author = rawTitle.decodeText();
-                          }
+                          const titleDecoded = decodePdfString(rawTitle);
+                          if (titleDecoded) author = titleDecoded;
                           const rawModDate = libAnnot.lookup(PDFName.of("M"));
-                          if (
-                            rawModDate instanceof PDFString ||
-                            rawModDate instanceof PDFHexString
-                          ) {
-                            updatedAt = parsePDFDate(rawModDate.decodeText());
-                          }
+                          const modDecoded = decodePdfString(rawModDate);
+                          if (modDecoded) updatedAt = parsePDFDate(modDecoded);
                           const rawContents = libAnnot.lookup(
                             PDFName.of("Contents"),
                           );
-                          if (
-                            rawContents instanceof PDFString ||
-                            rawContents instanceof PDFHexString
-                          ) {
-                            contents = rawContents.decodeText();
-                          }
+                          const contentsDecoded = decodePdfString(rawContents);
+                          if (contentsDecoded) contents = contentsDecoded;
 
                           const libQP = libAnnot.lookup(
                             PDFName.of("QuadPoints"),
@@ -313,14 +304,11 @@ export class CommentParser implements IAnnotationParser {
         const color = annotation.color
           ? rgbArrayToHex(annotation.color)
           : "#FFFF00";
-        const [x1, y1, x2, y2] = annotation.rect;
-        const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
-        const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
-
-        const x = Math.min(vx1, vx2);
-        const y = Math.min(vy1, vy2);
-        let width = Math.abs(vx2 - vx1);
-        let height = Math.abs(vy2 - vy1);
+        const uiRect = pdfJsRectToUiRect(annotation.rect, viewport);
+        const x = uiRect.x;
+        const y = uiRect.y;
+        let width = uiRect.width;
+        let height = uiRect.height;
 
         if (width < 5) width = 30;
         if (height < 5) height = 30;
@@ -328,74 +316,6 @@ export class CommentParser implements IAnnotationParser {
         let contents = annotation.contents || "";
         let author = annotation.title || undefined;
         let updatedAt = parsePDFDate(annotation.modificationDate);
-
-        // Fallback to pdf-lib for contents
-        if (pdfDoc) {
-          try {
-            const pdfLibPage = pdfDoc.getPage(pageIndex);
-            const libAnnots = pdfLibPage.node.Annots();
-            if (libAnnots instanceof PDFArray) {
-              for (let idx = 0; idx < libAnnots.size(); idx++) {
-                const libAnnot = libAnnots.lookup(idx);
-                if (libAnnot instanceof PDFDict) {
-                  const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
-                  const sName =
-                    libSubtype instanceof PDFName
-                      ? libSubtype.decodeText()
-                      : "";
-                  if (sName === "Text") {
-                    const libRect = libAnnot.lookup(PDFName.of("Rect"));
-                    if (libRect instanceof PDFArray) {
-                      const rArray = libRect.asArray();
-                      if (rArray.length >= 4) {
-                        const lx1 = (rArray[0] as PDFNumber).asNumber();
-                        const ly1 = (rArray[1] as PDFNumber).asNumber();
-                        if (Math.abs(lx1 - x1) < 5 && Math.abs(ly1 - y1) < 5) {
-                          const rawContents = libAnnot.lookup(
-                            PDFName.of("Contents"),
-                          );
-                          if (
-                            rawContents instanceof PDFString ||
-                            rawContents instanceof PDFHexString
-                          ) {
-                            const decoded = rawContents.decodeText();
-                            if (
-                              decoded &&
-                              (!contents || contents.trim() === "")
-                            )
-                              contents = decoded;
-                          }
-                          const rawTitle = libAnnot.lookup(PDFName.of("T"));
-                          if (
-                            rawTitle instanceof PDFString ||
-                            rawTitle instanceof PDFHexString
-                          ) {
-                            const decoded = rawTitle.decodeText();
-                            if (decoded && (!author || author.trim() === ""))
-                              author = decoded;
-                          }
-                          const rawModDate = libAnnot.lookup(PDFName.of("M"));
-                          if (
-                            rawModDate instanceof PDFString ||
-                            rawModDate instanceof PDFHexString
-                          ) {
-                            const parsed = parsePDFDate(
-                              rawModDate.decodeText(),
-                            );
-                            if (parsed && !updatedAt) updatedAt = parsed;
-                          }
-                          break;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            console.warn("Fallback Text extraction failed", e);
-          }
-        }
 
         annotations.push({
           id: `imported_comment_${pageIndex + 1}_${index}`,
@@ -418,24 +338,327 @@ export class FreeTextParser implements IAnnotationParser {
     const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
     const annotations: Annotation[] = [];
 
-    pageAnnotations.forEach((annotation, index) => {
-      if (annotation.subtype === "FreeText") {
-        let color = annotation.color
-          ? rgbArrayToHex(annotation.color)
-          : "#000000";
-        const [x1, y1, x2, y2] = annotation.rect;
-        const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);
-        const [vx2, vy2] = viewport.convertToViewportPoint(x2, y2);
+    const normalizePdfJsColorToRgb255 = (
+      color: number[] | Uint8ClampedArray | null | undefined,
+    ) => {
+      if (!color || color.length < 3) return undefined;
+      const r = color[0];
+      const g = color[1];
+      const b = color[2];
+      const isNormalized01 =
+        r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1;
+      if (isNormalized01) return [r * 255, g * 255, b * 255];
+      return [r, g, b];
+    };
 
-        const x = Math.min(vx1, vx2);
-        const y = Math.min(vy1, vy2);
-        const width = Math.abs(vx2 - vx1);
-        const height = Math.abs(vy2 - vy1);
+    const resolveFontDictFromDR = (dr: any, resourceName: string) => {
+      if (!(dr instanceof PDFDict)) return undefined;
+      const fontRes = dr.lookup(PDFName.of("Font"));
+      if (!(fontRes instanceof PDFDict)) return undefined;
+      const fontDict = fontRes.lookup(PDFName.of(resourceName));
+      return fontDict instanceof PDFDict ? fontDict : undefined;
+    };
+
+    const resolveBaseFontName = (fontDictResolved: PDFDict | undefined) => {
+      if (!fontDictResolved) return undefined;
+      const baseFont = fontDictResolved.lookup(PDFName.of("BaseFont"));
+      if (baseFont instanceof PDFName) return baseFont.decodeText();
+      if (baseFont instanceof PDFString || baseFont instanceof PDFHexString)
+        return baseFont.decodeText();
+      return undefined;
+    };
+
+    const parseTextColorFromContentStream = (content: string) => {
+      const extractTextSection = () => {
+        try {
+          const matches = Array.from(
+            content.matchAll(/\bBT\b([\s\S]*?)\bET\b/g),
+          );
+          if (matches.length === 0) return content;
+          const last = matches[matches.length - 1];
+          return last?.[1] || content;
+        } catch {
+          return content;
+        }
+      };
+
+      const segment = extractTextSection();
+      const tokens = segment.trim().split(/\s+/);
+      let matchedAnyColor = false;
+      let outHex: string | undefined = undefined;
+      let outOp: "rg" | "g" | "k" | undefined = undefined;
+
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+
+        // Prefer nonstroking (lowercase) operators for text fill.
+        if ((token === "rg" || token === "RG") && i >= 3) {
+          const r = parseFloat(tokens[i - 3]);
+          const g = parseFloat(tokens[i - 2]);
+          const b = parseFloat(tokens[i - 1]);
+          if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+            const hex = rgbArrayToHex([r * 255, g * 255, b * 255]);
+            if (hex) {
+              outHex = hex;
+              outOp = "rg";
+              matchedAnyColor = true;
+            }
+          }
+        } else if ((token === "g" || token === "G") && i >= 1) {
+          const gray = parseFloat(tokens[i - 1]);
+          if (!isNaN(gray)) {
+            const val = gray * 255;
+            const hex = rgbArrayToHex([val, val, val]);
+            if (hex) {
+              outHex = hex;
+              outOp = "g";
+              matchedAnyColor = true;
+            }
+          }
+        } else if ((token === "k" || token === "K") && i >= 4) {
+          const c = parseFloat(tokens[i - 4]);
+          const m = parseFloat(tokens[i - 3]);
+          const y = parseFloat(tokens[i - 2]);
+          const k = parseFloat(tokens[i - 1]);
+          if (!isNaN(c) && !isNaN(m) && !isNaN(y) && !isNaN(k)) {
+            const rr = 255 * (1 - c) * (1 - k);
+            const gg = 255 * (1 - m) * (1 - k);
+            const bb = 255 * (1 - y) * (1 - k);
+            const hex = rgbArrayToHex([rr, gg, bb]);
+            if (hex) {
+              outHex = hex;
+              outOp = "k";
+              matchedAnyColor = true;
+            }
+          }
+        }
+      }
+
+      pdfDebug("import:freetext", "ap_color_parsed", {
+        pageIndex,
+        segmentUsed: segment !== content ? "BT..ET" : "full",
+        matchedAnyColor,
+        op: outOp,
+        hex: outHex,
+      });
+
+      return outHex;
+    };
+
+    const parseFontFromContentStream = (content: string) => {
+      const extractTextSection = () => {
+        try {
+          const matches = Array.from(
+            content.matchAll(/\bBT\b([\s\S]*?)\bET\b/g),
+          );
+          if (matches.length === 0) return content;
+          const last = matches[matches.length - 1];
+          return last?.[1] || content;
+        } catch {
+          return content;
+        }
+      };
+
+      const segment = extractTextSection();
+      const matches = Array.from(
+        segment.matchAll(/\/([^\s]+)\s+(\d+(?:\.\d+)?)\s+Tf/g),
+      );
+      if (matches.length === 0) return undefined;
+      const last = matches[matches.length - 1];
+      const name = last?.[1];
+      const size = last?.[2];
+      if (!name) return undefined;
+      const parsedSize = size ? parseFloat(size) : NaN;
+      return {
+        resourceName: normalizePdfFontName(name),
+        fontSize: !isNaN(parsedSize) ? parsedSize : undefined,
+      };
+    };
+
+    const decodeAppearanceStreamToText = async (n: PDFStream) => {
+      const bytes = n.getContents();
+      // Ensure we have a Uint8Array backed by ArrayBuffer (not SharedArrayBuffer) so Blob/streams work in TS/DOM types.
+      const safeBytes = new Uint8Array(bytes);
+      let decodedBytes: Uint8Array = safeBytes;
+
+      const filters: string[] = [];
+      try {
+        const f = n.dict.lookup(PDFName.of("Filter"));
+        if (f instanceof PDFName) {
+          filters.push(f.decodeText().replace(/^\//, ""));
+        } else if (f instanceof PDFArray) {
+          for (let i = 0; i < f.size(); i++) {
+            const item = f.lookup(i);
+            if (item instanceof PDFName) {
+              filters.push(item.decodeText().replace(/^\//, ""));
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      pdfDebug("import:freetext", "ap_filters", {
+        pageIndex,
+        filters,
+        byteLength: bytes.length,
+      });
+
+      // Common case: FlateDecode
+      if (
+        filters.includes("FlateDecode") &&
+        typeof (globalThis as any).DecompressionStream !== "undefined"
+      ) {
+        try {
+          const ds = new (globalThis as any).DecompressionStream("deflate");
+          const decompressed = await new Response(
+            new Blob([safeBytes]).stream().pipeThrough(ds),
+          ).arrayBuffer();
+          decodedBytes = new Uint8Array(decompressed);
+          pdfDebug("import:freetext", "ap_decompressed", {
+            pageIndex,
+            inBytes: safeBytes.length,
+            outBytes: decodedBytes.length,
+          });
+        } catch (e) {
+          pdfDebug("import:freetext", "ap_decompression_failed", {
+            pageIndex,
+            error: e,
+          });
+        }
+      }
+
+      return new TextDecoder().decode(decodedBytes);
+    };
+
+    for (let index = 0; index < pageAnnotations.length; index++) {
+      const annotation = pageAnnotations[index];
+      if (annotation.subtype === "FreeText") {
+        const initialColorArray = annotation.color;
+        const normalizedRgb = normalizePdfJsColorToRgb255(initialColorArray);
+        let color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#000000";
+        pdfDebug("import:freetext", "initial", {
+          pageIndex,
+          index,
+          pdfJsColor: initialColorArray,
+          normalizedRgb,
+          initialHex: color,
+          defaultAppearance: annotation.defaultAppearance,
+          DA: (annotation as any).DA,
+        });
+        const [x1, y1] = annotation.rect;
+        const { x, y, width, height } = pdfJsRectToUiRect(
+          annotation.rect,
+          viewport,
+        );
 
         let contents = annotation.contents || "";
         let author = annotation.title || undefined;
         let updatedAt = parsePDFDate(annotation.modificationDate);
         let fontSize = 12;
+        let fontFamily: string | undefined = undefined;
+        let sourcePdfRef:
+          | { objectNumber: number; generationNumber: number }
+          | undefined = undefined;
+        let sourcePdfFontName: string | undefined = undefined;
+        let sourcePdfFontIsSubset: boolean | undefined = undefined;
+        let sourcePdfFontMissing: boolean | undefined = undefined;
+
+        const parseDaString = (
+          daStr: string,
+          options?: { parseFontFamilyFromDa?: boolean },
+        ) => {
+          const parseFontFamilyFromDa =
+            options?.parseFontFamilyFromDa !== false;
+          const tfMatch = daStr.match(/\/([^\s]+)\s+(\d+(?:\.\d+)?)\s+Tf/);
+          if (tfMatch) {
+            const resourceName = normalizePdfFontName(tfMatch[1]);
+            fontSize = parseFloat(tfMatch[2]);
+            if (parseFontFamilyFromDa) {
+              const fontKey = pdfFontToAppFontKey(resourceName);
+              if (fontKey) fontFamily = fontKey;
+            }
+          } else {
+            const sizeMatch = daStr.match(/(\d+(\.\d+)?)\s+Tf/);
+            if (sizeMatch) fontSize = parseFloat(sizeMatch[1]);
+          }
+
+          const tokens = daStr.trim().split(/\s+/);
+          let matchedAnyColor = false;
+
+          for (let i = 0; i < tokens.length; i++) {
+            const token = tokens[i];
+
+            if ((token === "rg" || token === "RG") && i >= 3) {
+              const r = parseFloat(tokens[i - 3]);
+              const g = parseFloat(tokens[i - 2]);
+              const b = parseFloat(tokens[i - 1]);
+              if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+                const hex = rgbArrayToHex([r * 255, g * 255, b * 255]);
+                if (hex) color = hex;
+                matchedAnyColor = true;
+                pdfDebug("import:freetext", "da_color_rg", {
+                  pageIndex,
+                  index,
+                  daStr,
+                  parsed: { r, g, b },
+                  hex,
+                });
+              }
+            } else if ((token === "g" || token === "G") && i >= 1) {
+              const gray = parseFloat(tokens[i - 1]);
+              if (!isNaN(gray)) {
+                const val = gray * 255;
+                const hex = rgbArrayToHex([val, val, val]);
+                if (hex) color = hex;
+                matchedAnyColor = true;
+                pdfDebug("import:freetext", "da_color_g", {
+                  pageIndex,
+                  index,
+                  daStr,
+                  parsed: { gray },
+                  hex,
+                });
+              }
+            } else if ((token === "k" || token === "K") && i >= 4) {
+              const c = parseFloat(tokens[i - 4]);
+              const m = parseFloat(tokens[i - 3]);
+              const y = parseFloat(tokens[i - 2]);
+              const k = parseFloat(tokens[i - 1]);
+              if (!isNaN(c) && !isNaN(m) && !isNaN(y) && !isNaN(k)) {
+                const rr = 255 * (1 - c) * (1 - k);
+                const gg = 255 * (1 - m) * (1 - k);
+                const bb = 255 * (1 - y) * (1 - k);
+                const hex = rgbArrayToHex([rr, gg, bb]);
+                if (hex) color = hex;
+                matchedAnyColor = true;
+                pdfDebug("import:freetext", "da_color_k", {
+                  pageIndex,
+                  index,
+                  daStr,
+                  parsed: { c, m, y, k },
+                  hex,
+                });
+              }
+            }
+          }
+
+          if (!matchedAnyColor) {
+            pdfDebug("import:freetext", "da_color_none", {
+              pageIndex,
+              index,
+              daStr,
+            });
+          }
+        };
+
+        // Fallback: if pdf-lib isn't available, we still want standard fonts (Helv/TiRo/Cour) to round-trip.
+        const daFromPdfJs =
+          (annotation.defaultAppearance as string | undefined) ||
+          (annotation.DA as string | undefined);
+        if (!pdfDoc && daFromPdfJs) {
+          parseDaString(daFromPdfJs);
+        }
 
         if (pdfDoc) {
           try {
@@ -443,6 +666,9 @@ export class FreeTextParser implements IAnnotationParser {
             const libAnnots = pdfLibPage.node.Annots();
             if (libAnnots instanceof PDFArray) {
               for (let idx = 0; idx < libAnnots.size(); idx++) {
+                const rawRef = (libAnnots as any).get
+                  ? (libAnnots as any).get(idx)
+                  : undefined;
                 const libAnnot = libAnnots.lookup(idx);
                 if (libAnnot instanceof PDFDict) {
                   const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
@@ -458,60 +684,286 @@ export class FreeTextParser implements IAnnotationParser {
                         const lx1 = (rArray[0] as PDFNumber).asNumber();
                         const ly1 = (rArray[1] as PDFNumber).asNumber();
                         if (Math.abs(lx1 - x1) < 5 && Math.abs(ly1 - y1) < 5) {
+                          if (
+                            rawRef &&
+                            typeof (rawRef as any).objectNumber === "number" &&
+                            typeof (rawRef as any).generationNumber === "number"
+                          ) {
+                            sourcePdfRef = {
+                              objectNumber: (rawRef as any).objectNumber,
+                              generationNumber: (rawRef as any)
+                                .generationNumber,
+                            };
+                          }
+
                           const rawContents = libAnnot.lookup(
                             PDFName.of("Contents"),
                           );
+                          const contentsDecoded = decodePdfString(rawContents);
                           if (
-                            rawContents instanceof PDFString ||
-                            rawContents instanceof PDFHexString
+                            contentsDecoded &&
+                            (!contents || contents.trim() === "")
                           ) {
-                            const decoded = rawContents.decodeText();
-                            if (
-                              decoded &&
-                              (!contents || contents.trim() === "")
-                            )
-                              contents = decoded;
+                            contents = contentsDecoded;
                           }
 
                           // DA
                           const da = libAnnot.lookup(PDFName.of("DA"));
-                          if (da instanceof PDFString) {
+                          if (
+                            da instanceof PDFString ||
+                            da instanceof PDFHexString
+                          ) {
                             const daStr = da.decodeText();
-                            const sizeMatch = daStr.match(/(\d+(\.\d+)?)\s+Tf/);
-                            if (sizeMatch) fontSize = parseFloat(sizeMatch[1]);
-                            const colorMatch = daStr.match(
-                              /(\d+(\.\d+)?)\s+(\d+(\.\d+)?)\s+(\d+(\.\d+)?)\s+[rR]g/,
+
+                            // Always parse color (and best-effort size) from DA.
+                            // Font resolution/injection below may override fontFamily, but color should never be skipped.
+                            parseDaString(daStr, {
+                              parseFontFamilyFromDa: false,
+                            });
+
+                            const tfMatch = daStr.match(
+                              /\/([^\s]+)\s+(\d+(?:\.\d+)?)\s+Tf/,
                             );
-                            if (colorMatch) {
-                              const r = parseFloat(colorMatch[1]);
-                              const g = parseFloat(colorMatch[3]);
-                              const b = parseFloat(colorMatch[5]);
-                              const hex = rgbArrayToHex([
-                                r * 255,
-                                g * 255,
-                                b * 255,
-                              ]);
-                              if (hex) color = hex;
+                            if (tfMatch) {
+                              const resourceName = normalizePdfFontName(
+                                tfMatch[1],
+                              );
+                              fontSize = parseFloat(tfMatch[2]);
+
+                              let baseFontName: string | undefined = undefined;
+                              let fontDictResolved: PDFDict | undefined =
+                                undefined;
+                              // Resolve the font dict from multiple locations (annotation DR -> page resources -> AcroForm DR)
+                              fontDictResolved = resolveFontDictFromDR(
+                                libAnnot.lookup(PDFName.of("DR")),
+                                resourceName,
+                              );
+
+                              if (!fontDictResolved) {
+                                const pageRes = pdfLibPage.node.Resources();
+                                if (pageRes instanceof PDFDict) {
+                                  const pageFontRes = pageRes.lookup(
+                                    PDFName.of("Font"),
+                                  );
+                                  if (pageFontRes instanceof PDFDict) {
+                                    const pageFontDict = pageFontRes.lookup(
+                                      PDFName.of(resourceName),
+                                    );
+                                    if (pageFontDict instanceof PDFDict) {
+                                      fontDictResolved = pageFontDict;
+                                    }
+                                  }
+                                }
+                              }
+
+                              if (!fontDictResolved && pdfDoc) {
+                                try {
+                                  const acroForm = pdfDoc.catalog.lookup(
+                                    PDFName.of("AcroForm"),
+                                  );
+                                  if (acroForm instanceof PDFDict) {
+                                    const acroDR = acroForm.lookup(
+                                      PDFName.of("DR"),
+                                    );
+                                    fontDictResolved = resolveFontDictFromDR(
+                                      acroDR,
+                                      resourceName,
+                                    );
+                                  }
+                                } catch {
+                                  // ignore
+                                }
+                              }
+
+                              baseFontName =
+                                resolveBaseFontName(fontDictResolved);
+
+                              sourcePdfFontName = baseFontName || resourceName;
+                              sourcePdfFontIsSubset =
+                                !!sourcePdfFontName?.includes("+");
+
+                              // Try to load the embedded font program (FontFile2/OpenType) into the browser.
+                              // If this succeeds, we use the injected family name as the primary font.
+                              const injectedFamily =
+                                fontDictResolved &&
+                                (baseFontName || resourceName) &&
+                                context.embeddedFontCache
+                                  ? await ensurePdfEmbeddedFontLoaded(
+                                      fontDictResolved,
+                                      baseFontName || resourceName,
+                                      context.embeddedFontCache,
+                                      context.embeddedFontFaces,
+                                    )
+                                  : undefined;
+
+                              const fontKey =
+                                pdfFontToAppFontKey(baseFontName) ||
+                                pdfFontToAppFontKey(resourceName);
+
+                              sourcePdfFontMissing =
+                                !!sourcePdfFontIsSubset ||
+                                (!fontKey && !injectedFamily);
+
+                              if (injectedFamily) {
+                                const fallback =
+                                  pdfFontToCssFontFamily(baseFontName) ||
+                                  pdfFontToCssFontFamily(resourceName) ||
+                                  "Helvetica, Arial, sans-serif";
+                                fontFamily = `"${injectedFamily}", ${fallback}`;
+                              } else if (fontKey) {
+                                // Store internal key so properties panel + re-import/export round-trip stays stable
+                                fontFamily = fontKey;
+                              } else {
+                                fontFamily =
+                                  pdfFontToCssFontFamily(baseFontName) ||
+                                  pdfFontToCssFontFamily(resourceName);
+                              }
+                            } else {
+                              parseDaString(daStr);
                             }
                           }
                           const rawTitle = libAnnot.lookup(PDFName.of("T"));
+                          const titleDecoded = decodePdfString(rawTitle);
                           if (
-                            rawTitle instanceof PDFString ||
-                            rawTitle instanceof PDFHexString
+                            titleDecoded &&
+                            (!author || author.trim() === "")
                           ) {
-                            const decoded = rawTitle.decodeText();
-                            if (decoded && (!author || author.trim() === ""))
-                              author = decoded;
+                            author = titleDecoded;
                           }
                           const rawModDate = libAnnot.lookup(PDFName.of("M"));
-                          if (
-                            rawModDate instanceof PDFString ||
-                            rawModDate instanceof PDFHexString
-                          ) {
-                            const parsed = parsePDFDate(
-                              rawModDate.decodeText(),
-                            );
+                          const modDecoded = decodePdfString(rawModDate);
+                          if (modDecoded) {
+                            const parsed = parsePDFDate(modDecoded);
                             if (parsed && !updatedAt) updatedAt = parsed;
+                          }
+
+                          // AP (appearance): prefer actual appearance color over DA when available.
+                          // Some PDFs keep DA at 0 g (black) but draw colored text in AP.
+                          try {
+                            const ap = libAnnot.lookup(PDFName.of("AP"));
+                            if (ap instanceof PDFDict) {
+                              const n = ap.lookup(PDFName.of("N"));
+                              if (n instanceof PDFStream) {
+                                const apContent =
+                                  await decodeAppearanceStreamToText(n);
+                                pdfDebug("import:freetext", "ap_found", {
+                                  pageIndex,
+                                  index,
+                                  length: apContent.length,
+                                  head: apContent.slice(0, 200),
+                                });
+                                const apHex =
+                                  parseTextColorFromContentStream(apContent);
+                                if (apHex) color = apHex;
+
+                                const apFont =
+                                  parseFontFromContentStream(apContent);
+                                if (apFont?.fontSize)
+                                  fontSize = apFont.fontSize;
+
+                                if (apFont?.resourceName) {
+                                  let apFontDictResolved: PDFDict | undefined =
+                                    undefined;
+                                  try {
+                                    const apRes = n.dict.lookup(
+                                      PDFName.of("Resources"),
+                                    );
+                                    if (apRes instanceof PDFDict) {
+                                      const apFontRes = apRes.lookup(
+                                        PDFName.of("Font"),
+                                      );
+                                      if (apFontRes instanceof PDFDict) {
+                                        const d = apFontRes.lookup(
+                                          PDFName.of(apFont.resourceName),
+                                        );
+                                        if (d instanceof PDFDict) {
+                                          apFontDictResolved = d;
+                                        }
+                                      }
+                                    }
+                                  } catch {
+                                    // ignore
+                                  }
+
+                                  const resolvedBase =
+                                    resolveBaseFontName(apFontDictResolved);
+                                  const injectedFamily =
+                                    apFontDictResolved &&
+                                    (resolvedBase || apFont.resourceName) &&
+                                    context.embeddedFontCache
+                                      ? await ensurePdfEmbeddedFontLoaded(
+                                          apFontDictResolved,
+                                          resolvedBase || apFont.resourceName,
+                                          context.embeddedFontCache,
+                                          context.embeddedFontFaces,
+                                        )
+                                      : undefined;
+
+                                  const fontKey =
+                                    pdfFontToAppFontKey(resolvedBase) ||
+                                    pdfFontToAppFontKey(apFont.resourceName);
+
+                                  sourcePdfFontName =
+                                    resolvedBase || apFont.resourceName;
+                                  sourcePdfFontIsSubset =
+                                    !!sourcePdfFontName?.includes("+");
+                                  sourcePdfFontMissing =
+                                    !!sourcePdfFontIsSubset ||
+                                    (!fontKey && !injectedFamily);
+
+                                  if (injectedFamily) {
+                                    const fallback =
+                                      pdfFontToCssFontFamily(resolvedBase) ||
+                                      pdfFontToCssFontFamily(
+                                        apFont.resourceName,
+                                      ) ||
+                                      "Helvetica, Arial, sans-serif";
+                                    fontFamily = `"${injectedFamily}", ${fallback}`;
+                                  } else if (fontKey) {
+                                    fontFamily = fontKey;
+                                  } else {
+                                    fontFamily =
+                                      pdfFontToCssFontFamily(resolvedBase) ||
+                                      pdfFontToCssFontFamily(
+                                        apFont.resourceName,
+                                      );
+                                  }
+
+                                  pdfDebug(
+                                    "import:freetext",
+                                    "ap_font_parsed",
+                                    {
+                                      pageIndex,
+                                      index,
+                                      resourceName: apFont.resourceName,
+                                      baseFontName: resolvedBase,
+                                      injectedFamily,
+                                      fontKey,
+                                      fontFamily,
+                                    },
+                                  );
+                                }
+                              } else {
+                                pdfDebug("import:freetext", "ap_n_not_stream", {
+                                  pageIndex,
+                                  index,
+                                  nType: n
+                                    ? (n as any).constructor?.name
+                                    : null,
+                                });
+                              }
+                            } else {
+                              pdfDebug("import:freetext", "ap_missing", {
+                                pageIndex,
+                                index,
+                              });
+                            }
+                          } catch (e) {
+                            pdfDebug("import:freetext", "ap_parse_failed", {
+                              pageIndex,
+                              index,
+                              error: e,
+                            });
                           }
                           break;
                         }
@@ -534,11 +986,17 @@ export class FreeTextParser implements IAnnotationParser {
           color: color,
           text: contents,
           size: fontSize,
+          fontFamily: fontFamily,
           author: author,
           updatedAt: updatedAt,
+          sourcePdfRef,
+          sourcePdfFontName,
+          sourcePdfFontIsSubset,
+          sourcePdfFontMissing,
+          isEdited: false,
         });
       }
-    });
+    }
     return annotations;
   }
 }

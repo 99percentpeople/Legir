@@ -13,11 +13,23 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { getContrastColor } from "@/utils/colors";
+import { toast } from "sonner";
+import { useLanguage } from "@/components/language-provider";
+import {
+  resolveCjkFallbackFontStack,
+  resolveFontStackWithCjkFallback,
+  splitTextRuns,
+} from "@/lib/fonts";
 
 export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   const { data, scale, isSelected, onUpdate, onDelete, onEdit } = props;
+  const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const warnedMissingFontRef = useRef(false);
+
+  const resolvedFontFamily = resolveFontStackWithCjkFallback(data.fontFamily);
+  const cjkFontFamily = resolveCjkFallbackFontStack(data.fontFamily);
 
   const lastClickTimeRef = useRef<number>(0);
 
@@ -33,6 +45,14 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
       textareaRef.current.select();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    if (warnedMissingFontRef.current) return;
+    if (!data.sourcePdfFontMissing) return;
+    warnedMissingFontRef.current = true;
+    toast.warning(t("annotation.font_missing_warning"));
+  }, [isEditing, data.sourcePdfFontMissing, t]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     const now = Date.now();
@@ -89,6 +109,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           color={data.color || "#000000"}
           onColorChange={(c) => onUpdate?.(data.id, { color: c })}
           showThickness={false}
+          side="top"
         >
           <Button
             variant="ghost"
@@ -139,11 +160,11 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           isSelected && !isEditing && "ring-primary ring-1",
         )}
         style={{
+          ["--scale" as any]: scale,
           color: data.color || "#000000",
-          fontSize: `${(data.size || 12) * scale}px`,
-          fontFamily: "Helvetica, Arial, sans-serif",
+          fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
+          fontFamily: resolvedFontFamily,
           lineHeight: 1.2,
-          padding: "2px",
           opacity: data.text ? 1 : 0.5,
         }}
         onPointerDown={handlePointerDown}
@@ -165,7 +186,25 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           />
         ) : (
           <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
-            {data.text || "Double click to edit"}
+            {data.text
+              ? data.text.split(/\r\n|\r|\n/).map((line, idx, arr) => (
+                  <React.Fragment key={idx}>
+                    {splitTextRuns(line).map((run, rIdx) => (
+                      <span
+                        key={rIdx}
+                        style={{
+                          fontFamily: run.isAscii
+                            ? resolvedFontFamily
+                            : cjkFontFamily,
+                        }}
+                      >
+                        {run.text}
+                      </span>
+                    ))}
+                    {idx < arr.length - 1 ? "\n" : null}
+                  </React.Fragment>
+                ))
+              : "Double click to edit"}
           </div>
         )}
       </div>

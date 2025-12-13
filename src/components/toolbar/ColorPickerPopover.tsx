@@ -51,6 +51,7 @@ interface ColorPickerPopoverProps {
   onThicknessChange?: (thickness: number) => void;
   isActive?: boolean;
   showThickness?: boolean;
+  side?: React.ComponentProps<typeof PopoverContent>["side"];
   title?: string;
   children?: React.ReactNode;
 }
@@ -62,6 +63,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   onThicknessChange,
   isActive = false,
   showThickness = true,
+  side = "bottom",
   title = "Properties",
   children,
 }) => {
@@ -86,7 +88,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-4" side="bottom" align="center">
+      <PopoverContent className="w-64 p-4" side={side} align="center">
         <div className="space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium">

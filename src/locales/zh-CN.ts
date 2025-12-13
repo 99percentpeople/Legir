@@ -116,6 +116,8 @@ const zhCN = {
   "properties.add_option": "添加选项...",
   "properties.no_options": "未添加选项",
   "properties.appearance": "外观",
+  "annotation.font_missing_warning":
+    "该 PDF 使用了精简/嵌入字体，可能缺少字形。编辑此自由文本后将使用默认字体重新排版。",
   "properties.background": "背景",
   "properties.transparent": "透明",
   "properties.border_color": "边框颜色",

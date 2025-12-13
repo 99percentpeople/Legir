@@ -17,3 +17,9 @@ View your app in AI Studio: https://ai.studio/apps/drive/1Xj-3B0UFKvVa6LZcwJ3WvW
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Fonts
+
+This project bundles **Noto Sans SC** (sans-serif) and **Source Han Serif SC** (serif) for CJK text rendering/export.
+
+See `public/fonts/NOTICE.txt` for license and attribution details.

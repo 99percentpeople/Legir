@@ -104,6 +104,18 @@ const initialState: EditorState = {
     threshold: 8,
   },
   lastSavedAt: null,
+  processingStatus: null,
+  isPanelFloating: false,
+  isSaving: false,
+  isSidebarOpen: true,
+  isRightPanelOpen: true,
+  sidebarTab: "thumbnails",
+  hasSavedSession: false,
+  isDirty: false,
+  currentPageIndex: 0,
+  sidebarWidth: 256,
+  rightPanelWidth: 320,
+  fitTrigger: 0,
   keys: {
     ctrl: false,
     shift: false,
@@ -133,6 +145,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
         future: [],
         isProcessing: false,
         selectedId: null,
+        isDirty: false,
       }),
 
     saveCheckpoint: () => {
@@ -165,6 +178,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
           past: newPast,
           future: [currentSnapshot, ...state.future],
           selectedId: null,
+          isDirty: true,
         };
       });
     },
@@ -187,6 +201,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
           past: [...state.past, currentSnapshot],
           future: newFuture,
           selectedId: null,
+          isDirty: true,
         };
       });
     },
@@ -201,6 +216,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
           fields: [...state.fields, field],
           selectedId: field.id,
           tool: shouldSwitch && !isForcedContinuous ? "select" : state.tool,
+          isDirty: true,
         };
       });
     },
@@ -222,6 +238,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
           annotations: [...state.annotations, annotationWithDetails],
           selectedId: annotationWithDetails.id,
           tool: shouldSwitch && !isForcedContinuous ? "select" : state.tool,
+          isDirty: true,
         };
       });
     },
@@ -287,20 +304,33 @@ export const useEditorStore = create<EditorState & EditorActions>(
         newFields = newFields.map((f) =>
           f.id === id ? { ...f, ...updates } : f,
         );
-        return { ...state, fields: newFields };
+        return { ...state, fields: newFields, isDirty: true };
       });
     },
 
     updateAnnotation: (id, updates) => {
       set((state) => {
+        const current = state.annotations.find((a) => a.id === id);
+
+        const shouldMarkEdited =
+          !!current?.sourcePdfRef && current?.isEdited !== true;
+
+        const shouldResetFontOnFirstEdit =
+          shouldMarkEdited &&
+          !!current?.sourcePdfFontMissing &&
+          updates.fontFamily === undefined;
+
         const updatesWithTime = {
           ...updates,
           updatedAt: new Date().toISOString(),
+          ...(shouldMarkEdited ? { isEdited: true } : null),
+          ...(shouldResetFontOnFirstEdit ? { fontFamily: "Helvetica" } : null),
         };
         return {
           annotations: state.annotations.map((a) =>
             a.id === id ? { ...a, ...updatesWithTime } : a,
           ),
+          isDirty: true,
         };
       });
     },
@@ -311,6 +341,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
       set((state) => ({
         annotations: state.annotations.filter((a) => a.id !== id),
         selectedId: state.selectedId === id ? null : state.selectedId,
+        isDirty: true,
       }));
     },
 
@@ -324,6 +355,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
             return {
               fields: state.fields.filter((f) => f.id !== state.selectedId),
               selectedId: null,
+              isDirty: true,
             };
           }
           const isAnnotation = state.annotations.some(
@@ -335,6 +367,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
                 (a) => a.id !== state.selectedId,
               ),
               selectedId: null,
+              isDirty: true,
             };
           }
         }
@@ -375,7 +408,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
         const newFields = [...state.fields];
         newFields[fieldIndex] = { ...field, rect: { ...field.rect, x, y } };
 
-        return { ...state, fields: newFields };
+        return { ...state, fields: newFields, isDirty: true };
       });
     },
   }),

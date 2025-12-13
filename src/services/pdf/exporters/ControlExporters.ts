@@ -1,36 +1,36 @@
 import { PDFForm, PDFName, PDFString, TextAlignment } from "pdf-lib";
 import { FormField, FieldType } from "@/types";
 import { IControlExporter } from "../types";
-import { hexToPdfColor } from "@/lib/pdf-helpers";
-
-// Helper for common options
-const getCommonOpts = (field: FormField, pageHeight: number) => ({
-  x: field.rect.x,
-  y: pageHeight - field.rect.y - field.rect.height,
-  width: field.rect.width,
-  height: field.rect.height,
-  borderColor: hexToPdfColor(field.style?.borderColor),
-  backgroundColor: field.style?.isTransparent
-    ? undefined
-    : hexToPdfColor(field.style?.backgroundColor),
-  borderWidth: field.style?.borderWidth ?? 1,
-  textColor: hexToPdfColor(field.style?.textColor),
-});
+import { containsNonAscii, isExplicitCjkFontSelection } from "../lib/text";
+import { pickCjkFontFromMap } from "../lib/font-selection";
+import { getCommonControlExportOpts } from "../lib/control-export";
 
 export class TextControlExporter implements IControlExporter {
   shouldExport(field: FormField): boolean {
     return field.type === FieldType.TEXT;
   }
 
-  save(form: PDFForm, field: FormField, fontMap?: Map<string, any>): void {
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, any>,
+    viewport?: any,
+  ): void {
     const page = form.doc.getPage(field.pageIndex);
-    const pageHeight = page.getSize().height;
-    const commonOpts = getCommonOpts(field, pageHeight);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
     // Resolve font
     let fieldFont = fontMap?.get("Helvetica"); // Default
     if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
       fieldFont = fontMap.get(field.style.fontFamily);
+    }
+    if (
+      field.value &&
+      containsNonAscii(field.value) &&
+      !isExplicitCjkFontSelection(field.style?.fontFamily)
+    ) {
+      const cjk = pickCjkFontFromMap(fontMap, field.style?.fontFamily);
+      if (cjk) fieldFont = cjk;
     }
 
     let tf;
@@ -57,7 +57,11 @@ export class TextControlExporter implements IControlExporter {
     if (field.multiline) tf.enableMultiline();
 
     if (fieldFont) {
-      tf.updateAppearances(fieldFont);
+      try {
+        tf.updateAppearances(fieldFont);
+      } catch (e) {
+        console.warn("Failed to update text field appearances", e);
+      }
     }
   }
 }
@@ -67,10 +71,14 @@ export class CheckboxControlExporter implements IControlExporter {
     return field.type === FieldType.CHECKBOX;
   }
 
-  save(form: PDFForm, field: FormField, fontMap?: Map<string, any>): void {
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, any>,
+    viewport?: any,
+  ): void {
     const page = form.doc.getPage(field.pageIndex);
-    const pageHeight = page.getSize().height;
-    const commonOpts = getCommonOpts(field, pageHeight);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
     let cb;
     try {
@@ -94,15 +102,27 @@ export class DropdownControlExporter implements IControlExporter {
     return field.type === FieldType.DROPDOWN;
   }
 
-  save(form: PDFForm, field: FormField, fontMap?: Map<string, any>): void {
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, any>,
+    viewport?: any,
+  ): void {
     const page = form.doc.getPage(field.pageIndex);
-    const pageHeight = page.getSize().height;
-    const commonOpts = getCommonOpts(field, pageHeight);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
     // Resolve font
     let fieldFont = fontMap?.get("Helvetica");
     if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
       fieldFont = fontMap.get(field.style.fontFamily);
+    }
+    if (
+      field.value &&
+      containsNonAscii(field.value) &&
+      !isExplicitCjkFontSelection(field.style?.fontFamily)
+    ) {
+      const cjk = pickCjkFontFromMap(fontMap, field.style?.fontFamily);
+      if (cjk) fieldFont = cjk;
     }
 
     if (field.isMultiSelect) {
@@ -132,7 +152,13 @@ export class DropdownControlExporter implements IControlExporter {
       }
 
       if (field.style?.fontSize) ol.setFontSize(field.style.fontSize);
-      if (fieldFont) ol.updateAppearances(fieldFont);
+      if (fieldFont) {
+        try {
+          ol.updateAppearances(fieldFont);
+        } catch (e) {
+          console.warn("Failed to update option list appearances", e);
+        }
+      }
     } else {
       let dd;
       try {
@@ -157,7 +183,13 @@ export class DropdownControlExporter implements IControlExporter {
       }
 
       if (field.style?.fontSize) dd.setFontSize(field.style.fontSize);
-      if (fieldFont) dd.updateAppearances(fieldFont);
+      if (fieldFont) {
+        try {
+          dd.updateAppearances(fieldFont);
+        } catch (e) {
+          console.warn("Failed to update dropdown appearances", e);
+        }
+      }
     }
   }
 }
@@ -167,10 +199,14 @@ export class RadioControlExporter implements IControlExporter {
     return field.type === FieldType.RADIO;
   }
 
-  save(form: PDFForm, field: FormField, fontMap?: Map<string, any>): void {
+  save(
+    form: PDFForm,
+    field: FormField,
+    fontMap?: Map<string, any>,
+    viewport?: any,
+  ): void {
     const page = form.doc.getPage(field.pageIndex);
-    const pageHeight = page.getSize().height;
-    const commonOpts = getCommonOpts(field, pageHeight);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
     let rg;
     try {
@@ -200,9 +236,9 @@ export class SignatureControlExporter implements IControlExporter {
     form: PDFForm,
     field: FormField,
     fontMap?: Map<string, any>,
+    viewport?: any,
   ): Promise<void> {
     const page = form.doc.getPage(field.pageIndex);
-    const pageHeight = page.getSize().height;
 
     // 1. Handle Image Signature (flattened)
     if (field.signatureData) {
@@ -218,13 +254,14 @@ export class SignatureControlExporter implements IControlExporter {
       }
 
       const imgDims = image.scale(1);
-      const boxWidth = field.rect.width;
-      const boxHeight = field.rect.height;
+      const common = getCommonControlExportOpts(field, page, viewport);
+      const boxWidth = common.width;
+      const boxHeight = common.height;
 
       let drawWidth = boxWidth;
       let drawHeight = boxHeight;
-      let drawX = field.rect.x;
-      let drawY = pageHeight - field.rect.y - field.rect.height;
+      let drawX = common.x;
+      let drawY = common.y;
 
       const scaleMode = field.imageScaleMode || "contain";
 
@@ -253,7 +290,7 @@ export class SignatureControlExporter implements IControlExporter {
     }
 
     // 2. Handle Form Field Signature (widget)
-    const commonOpts = getCommonOpts(field, pageHeight);
+    const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
     // Resolve font
     let fieldFont = fontMap?.get("Helvetica");

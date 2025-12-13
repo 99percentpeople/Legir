@@ -4,7 +4,7 @@ import { ListBox, ListBoxItem } from "react-aria-components";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { cn } from "@/lib/utils";
-import { FONT_FAMILY_MAP } from "@/constants";
+import { resolveFormControlFontFamilyCss } from "@/lib/fonts";
 
 export const DropdownControl: React.FC<FormControlProps> = (props) => {
   const {
@@ -18,14 +18,24 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
   } = props;
   const style = data.style || {};
 
+  const displayedValue = data.isMultiSelect
+    ? data.value
+      ? data.value.split("\n").join(", ")
+      : "Select..."
+    : data.value || "Select...";
+
   const containerStyle: React.CSSProperties = {
+    ["--scale" as any]: scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,
     borderStyle: "solid",
     color: style.textColor,
-    fontSize: `${(style.fontSize || 12) * scale}px`,
-    fontFamily: FONT_FAMILY_MAP[style.fontFamily || "Helvetica"] || "Helvetica",
+    fontSize: `calc(${style.fontSize || 12}px * var(--scale, 1))`,
+    fontFamily: resolveFormControlFontFamilyCss(
+      style.fontFamily,
+      displayedValue,
+    ),
     boxSizing: "border-box",
   };
 

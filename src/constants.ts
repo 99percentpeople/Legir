@@ -59,4 +59,10 @@ export const FONT_FAMILY_MAP: Record<string, string> = {
   Helvetica: "Helvetica, Arial, sans-serif",
   "Times Roman": '"Times New Roman", Times, serif',
   Courier: '"Courier New", Courier, monospace',
+  "Noto Sans SC":
+    '"Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif',
+  "Source Han Serif SC": '"Source Han Serif SC", "Songti SC", "STSong", serif',
 };
+
+export const CJK_FALLBACK_SANS_FONT_KEY = "Noto Sans SC";
+export const CJK_FALLBACK_SERIF_FONT_KEY = "Source Han Serif SC";

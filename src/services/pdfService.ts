@@ -1,6 +1,8 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { pdfWorkerService } from "./pdfWorkerService";
-import { mapOutline, getFontMap, getGlobalDA } from "../lib/pdf-helpers";
+import { mapOutline } from "./pdf/lib/outline";
+import { getFontMap, getGlobalDA } from "./pdf/lib/appearance";
+import { loadAndEmbedExportFonts } from "./pdf/lib/built-in-fonts";
 import { parsePDFDate } from "../utils/pdfUtils";
 import {
   PDFDocument,
@@ -17,6 +19,7 @@ import {
   PDFRadioGroup,
   PDFSignature,
 } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import {
   FormField,
   PageData,
@@ -99,6 +102,7 @@ export const loadPDF = async (
   annotations: Annotation[];
   metadata: PDFMetadata;
   outline: PDFOutlineItem[];
+  dispose: () => void;
 }> => {
   let pdfBytes: Uint8Array;
   if (input instanceof File) {
@@ -108,37 +112,72 @@ export const loadPDF = async (
     pdfBytes = input;
   }
 
-  // 1. Load with pdf-lib
   let fontMap = new Map<string, string>();
   let globalDA: string | undefined = undefined;
   let pdfDoc: PDFDocument | null = null;
 
-  try {
-    pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-    fontMap = getFontMap(pdfDoc);
-    globalDA = getGlobalDA(pdfDoc);
-  } catch (e) {
-    console.warn("Failed to parse PDF resources with pdf-lib", e);
-  }
-
-  // 2. Load with pdf.js
   const renderBuffer = new Uint8Array(pdfBytes.slice(0));
   pdfWorkerService.loadDocument(renderBuffer);
 
-  const loadingTask = pdfjsLib.getDocument({
+  const pdfLibPromise = PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const pdfJsPromise = pdfjsLib.getDocument({
     data: renderBuffer,
     password: "",
-  });
-  const pdf = await loadingTask.promise;
+  }).promise;
+
+  const [pdfLibResult, pdfJsResult] = await Promise.allSettled([
+    pdfLibPromise,
+    pdfJsPromise,
+  ]);
+
+  if (pdfLibResult.status === "fulfilled") {
+    pdfDoc = pdfLibResult.value;
+    try {
+      fontMap = getFontMap(pdfDoc);
+      globalDA = getGlobalDA(pdfDoc);
+    } catch (e) {
+      console.warn("Failed to parse PDF resources with pdf-lib", e);
+    }
+  } else {
+    console.warn(
+      "Failed to parse PDF resources with pdf-lib",
+      pdfLibResult.reason,
+    );
+  }
+
+  if (pdfJsResult.status !== "fulfilled") {
+    throw pdfJsResult.reason;
+  }
+  const pdf = pdfJsResult.value;
+
   const numPages = pdf.numPages;
   const pages: PageData[] = [];
   const fields: FormField[] = [];
   const annotations: Annotation[] = [];
 
-  let metadata: PDFMetadata = {};
-  try {
-    const { info } = await pdf.getMetadata();
-    if (info) {
+  const embeddedFontCache = new Map<string, Promise<string | undefined>>();
+  const embeddedFontFaces = new Set<FontFace>();
+
+  const dispose = () => {
+    embeddedFontCache.clear();
+
+    if (typeof document !== "undefined" && (document as any).fonts) {
+      embeddedFontFaces.forEach((face) => {
+        try {
+          document.fonts.delete(face);
+        } catch {
+          // Ignore removal errors
+        }
+      });
+    }
+    embeddedFontFaces.clear();
+  };
+
+  const metadataPromise = (async (): Promise<PDFMetadata> => {
+    try {
+      const { info } = await pdf.getMetadata();
+      if (!info) return {};
+
       const toLocalISO = (d: Date) => {
         const pad = (n: number) => n.toString().padStart(2, "0");
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -150,7 +189,6 @@ export const loadPDF = async (
       const cDate = cDateStr ? new Date(cDateStr) : undefined;
       const mDate = mDateStr ? new Date(mDateStr) : undefined;
 
-      // Normalize keywords to ensure it is always an array or undefined
       let keywords = info["Keywords"];
       if (typeof keywords === "string") {
         keywords = [keywords];
@@ -158,7 +196,6 @@ export const loadPDF = async (
         keywords = undefined;
       }
 
-      // Filter out invalid keyword entries
       if (keywords) {
         keywords = keywords.filter(
           (k: any) => typeof k === "string" && k.trim().length > 0,
@@ -166,7 +203,7 @@ export const loadPDF = async (
         if (keywords.length === 0) keywords = undefined;
       }
 
-      metadata = {
+      return {
         title: info["Title"],
         author: info["Author"],
         subject: info["Subject"],
@@ -178,58 +215,100 @@ export const loadPDF = async (
         isModDateManual: false,
         isProducerManual: false,
       };
+    } catch (e) {
+      console.warn("Failed to extract metadata", e);
+      return {};
     }
-  } catch (e) {
-    console.warn("Failed to extract metadata", e);
-  }
+  })();
 
-  let outline: PDFOutlineItem[] = [];
-  try {
-    const rawOutline = await pdf.getOutline();
-    if (rawOutline) outline = await mapOutline(pdf, rawOutline);
-  } catch (e) {
-    console.warn("Failed to extract outline", e);
-  }
+  const outlinePromise = (async (): Promise<PDFOutlineItem[]> => {
+    try {
+      const rawOutline = await pdf.getOutline();
+      if (!rawOutline) return [];
+      return await mapOutline(pdf, rawOutline);
+    } catch (e) {
+      console.warn("Failed to extract outline", e);
+      return [];
+    }
+  })();
 
-  for (let i = 1; i <= numPages; i++) {
-    const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale: 1.0 });
-    const pageAnnotations = await page.getAnnotations();
+  const pageResults: {
+    page: PageData;
+    fields: FormField[];
+    annotations: Annotation[];
+  }[] = new Array(numPages);
 
-    // Create Context
-    const context: ParserContext = {
-      pageAnnotations,
-      pageIndex: i - 1,
-      viewport,
-      pdfDoc: pdfDoc || undefined,
-    };
+  const maxConcurrency = Math.min(4, numPages);
+  let nextPageIndex = 0;
 
-    // Run Annotation Parsers
-    for (const parser of annotationParsers) {
-      try {
-        const parsedAnnots = await parser.parse(context);
-        annotations.push(...parsedAnnots);
-      } catch (e) {
-        console.warn(`Annotation parser failed for page ${i}`, e);
+  const worker = async () => {
+    while (true) {
+      const idx = nextPageIndex;
+      nextPageIndex += 1;
+      if (idx >= numPages) return;
+
+      const pageNumber = idx + 1;
+      const page = await pdf.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 1.0 });
+      const pageAnnotations = await page.getAnnotations();
+
+      const context: ParserContext = {
+        pageAnnotations,
+        pageIndex: idx,
+        viewport,
+        pdfDoc: pdfDoc || undefined,
+        fontMap,
+        globalDA,
+        embeddedFontCache,
+        embeddedFontFaces,
+      };
+
+      const annotsForPage: Annotation[] = [];
+      for (const parser of annotationParsers) {
+        try {
+          const parsedAnnots = await parser.parse(context);
+          annotsForPage.push(...parsedAnnots);
+        } catch (e) {
+          console.warn(`Annotation parser failed for page ${pageNumber}`, e);
+        }
       }
-    }
 
-    // Run Control Parsers
-    for (const parser of controlParsers) {
-      try {
-        const parsedFields = await parser.parse(context);
-        fields.push(...parsedFields);
-      } catch (e) {
-        console.warn(`Control parser failed for page ${i}`, e);
+      const fieldsForPage: FormField[] = [];
+      for (const parser of controlParsers) {
+        try {
+          const parsedFields = await parser.parse(context);
+          fieldsForPage.push(...parsedFields);
+        } catch (e) {
+          console.warn(`Control parser failed for page ${pageNumber}`, e);
+        }
       }
-    }
 
-    pages.push({
-      pageIndex: i - 1,
-      width: viewport.width,
-      height: viewport.height,
-    });
+      pageResults[idx] = {
+        page: {
+          pageIndex: idx,
+          width: viewport.width,
+          height: viewport.height,
+        },
+        fields: fieldsForPage,
+        annotations: annotsForPage,
+      };
+    }
+  };
+
+  await Promise.all(new Array(maxConcurrency).fill(null).map(() => worker()));
+
+  for (let i = 0; i < pageResults.length; i++) {
+    const r = pageResults[i];
+    if (!r) continue;
+    pages.push(r.page);
+    fields.push(...r.fields);
+    annotations.push(...r.annotations);
   }
+
+  const [metadata, outline] = await Promise.all([
+    metadataPromise,
+    outlinePromise,
+  ]);
 
   return {
     pdfBytes,
@@ -239,6 +318,7 @@ export const loadPDF = async (
     annotations,
     metadata,
     outline,
+    dispose,
   };
 };
 
@@ -273,8 +353,36 @@ export const exportPDF = async (
   fields: FormField[],
   metadata?: PDFMetadata,
   annotations: Annotation[] = [],
+  customFont?: { bytes: Uint8Array; name?: string },
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
+
+  let pdfJsDoc: any | undefined;
+  try {
+    const renderBuffer = new Uint8Array(originalBytes.slice(0));
+    pdfJsDoc = await pdfjsLib.getDocument({ data: renderBuffer, password: "" })
+      .promise;
+  } catch (e) {
+    console.warn(
+      "[PDF Export] Failed to load PDF with pdf.js; rotation-aware export disabled",
+      e,
+    );
+  }
+
+  const viewportCache = new Map<number, any>();
+  const getViewportForPage = async (pageIndex: number) => {
+    if (!pdfJsDoc) return undefined;
+    if (viewportCache.has(pageIndex)) return viewportCache.get(pageIndex);
+    try {
+      const p = await pdfJsDoc.getPage(pageIndex + 1);
+      const vp = p.getViewport({ scale: 1.0 });
+      viewportCache.set(pageIndex, vp);
+      return vp;
+    } catch {
+      return undefined;
+    }
+  };
+
   const pdfDoc = await PDFDocument.load(originalBytes, {
     ignoreEncryption: true,
   });
@@ -332,7 +440,25 @@ export const exportPDF = async (
   fontMap.set("Times Roman", timesRoman);
   fontMap.set("Courier", courier);
 
+  await loadAndEmbedExportFonts({
+    pdfDoc,
+    fontMap,
+    fontkit,
+    customFont,
+  });
+
   const form = pdfDoc.getForm();
+
+  const keepAnnotRefKeysByPage = new Map<number, Set<string>>();
+  for (const a of annotations) {
+    if (!a?.sourcePdfRef) continue;
+    if (a.isEdited) continue;
+    const key = `${a.sourcePdfRef.objectNumber}:${a.sourcePdfRef.generationNumber}`;
+    const setForPage =
+      keepAnnotRefKeysByPage.get(a.pageIndex) || new Set<string>();
+    setForPage.add(key);
+    keepAnnotRefKeysByPage.set(a.pageIndex, setForPage);
+  }
 
   // Force NeedAppearances
   try {
@@ -422,13 +548,28 @@ export const exportPDF = async (
 
   // 1.5 Cleanup Existing Annotations (Ink, Highlight, Comment)
   const pages = pdfDoc.getPages();
-  for (const page of pages) {
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const page = pages[pageIndex];
     try {
       const annots = page.node.Annots();
       if (annots instanceof PDFArray) {
         const toRemove: number[] = [];
 
+        const keepKeys = keepAnnotRefKeysByPage.get(pageIndex);
+
         for (let i = 0; i < annots.size(); i++) {
+          if (keepKeys && (annots as any).get) {
+            const raw = (annots as any).get(i);
+            if (
+              raw &&
+              typeof (raw as any).objectNumber === "number" &&
+              typeof (raw as any).generationNumber === "number"
+            ) {
+              const k = `${(raw as any).objectNumber}:${(raw as any).generationNumber}`;
+              if (keepKeys.has(k)) continue;
+            }
+          }
+
           const annot = annots.lookup(i);
           if (annot instanceof PDFDict) {
             const subtype = annot.lookup(PDFName.of("Subtype"));
@@ -456,11 +597,13 @@ export const exportPDF = async (
 
   // 2. Export Annotations
   for (const annot of annotations) {
+    if (annot?.sourcePdfRef && !annot.isEdited) continue;
     const page = pdfDoc.getPage(annot.pageIndex);
     const exporter = annotationExporters.find((e) => e.shouldExport(annot));
     if (exporter) {
       try {
-        await exporter.save(pdfDoc, page, annot, fontMap);
+        const viewport = await getViewportForPage(annot.pageIndex);
+        await exporter.save(pdfDoc, page, annot, fontMap, viewport);
       } catch (e) {
         console.error(`Failed to export annotation ${annot.id}`, e);
       }
@@ -472,7 +615,8 @@ export const exportPDF = async (
     const exporter = controlExporters.find((e) => e.shouldExport(field));
     if (exporter) {
       try {
-        await exporter.save(form, field, fontMap);
+        const viewport = await getViewportForPage(field.pageIndex);
+        await exporter.save(form, field, fontMap, viewport);
       } catch (e) {
         console.error(`Failed to export field ${field.name}`, e);
       }
