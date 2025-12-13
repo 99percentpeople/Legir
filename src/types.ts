@@ -172,6 +172,7 @@ export interface EditorState {
   tool: Tool;
 
   penStyle: PenStyle;
+  highlightStyle?: PenStyle;
   commentStyle?: { color: string; opacity: number };
   freetextStyle?: { color: string; size: number };
 

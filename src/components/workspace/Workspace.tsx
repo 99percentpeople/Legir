@@ -15,6 +15,14 @@ import { useCanvasPanning } from "@/hooks/useCanvasPanning";
 import { useInkSession } from "@/hooks/useInkSession";
 import { useLanguage } from "../language-provider";
 import { getCursor, shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Highlighter, Search } from "lucide-react";
 import PDFPage from "./PDFPage";
 import { ControlRenderer } from "./controls";
 
@@ -108,7 +116,316 @@ const Workspace: React.FC<WorkspaceProps> = ({
     onUpdateAnnotation,
     onSelectControl,
     onCancelInProgressStroke: cancelInProgressInkStroke,
+    onTriggerHistorySave,
   });
+
+  const createTextHighlightFromSelection = useCallback(
+    (opts?: { force?: boolean }) => {
+      const state = editorStateRef.current;
+      if (state.mode !== "annotation") return;
+      if (!opts?.force && state.tool !== "draw_highlight") return;
+
+      const sel = window.getSelection?.();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+
+      const selectedText = sel.toString().trim();
+      if (!selectedText) {
+        sel.removeAllRanges();
+        return;
+      }
+
+      const range = sel.getRangeAt(0);
+      const rects = Array.from(range.getClientRects()).filter(
+        (r) => r.width > 1 && r.height > 1,
+      );
+      if (rects.length === 0) {
+        sel.removeAllRanges();
+        return;
+      }
+
+      const commonNode = range.commonAncestorContainer;
+      const commonEl =
+        commonNode instanceof Element
+          ? commonNode
+          : commonNode.parentElement || null;
+
+      const pageEl = commonEl?.closest?.("[id^='page-']") as HTMLElement | null;
+      const textLayerEl = commonEl?.closest?.(
+        ".textLayer",
+      ) as HTMLElement | null;
+
+      // Only create highlights from the actual PDF text layer.
+      if (!pageEl || !textLayerEl) return;
+
+      const pageId = pageEl.id;
+      const pageIndexStr = pageId.replace(/^page-/, "");
+      const pageIndex = Number.parseInt(pageIndexStr, 10);
+      if (!Number.isFinite(pageIndex)) return;
+
+      const scale = state.scale;
+      const pageRect = pageEl.getBoundingClientRect();
+
+      const uiRects = rects
+        .map((r) => ({
+          x: (r.left - pageRect.left) / scale,
+          y: (r.top - pageRect.top) / scale,
+          width: r.width / scale,
+          height: r.height / scale,
+        }))
+        .filter((r) => r.width > 0.5 && r.height > 0.5);
+
+      if (uiRects.length === 0) {
+        sel.removeAllRanges();
+        return;
+      }
+
+      const sorted = [...uiRects].sort((a, b) =>
+        Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y,
+      );
+
+      const deduped: { x: number; y: number; width: number; height: number }[] =
+        [];
+      const isNearSame = (
+        a: { x: number; y: number; width: number; height: number },
+        b: { x: number; y: number; width: number; height: number },
+      ) =>
+        Math.abs(a.x - b.x) < 1 &&
+        Math.abs(a.y - b.y) < 1 &&
+        Math.abs(a.width - b.width) < 1 &&
+        Math.abs(a.height - b.height) < 1;
+
+      for (const r of sorted) {
+        const exists = deduped.some((d) => isNearSame(d, r));
+        if (!exists) deduped.push(r);
+      }
+
+      const merged: { x: number; y: number; width: number; height: number }[] =
+        [];
+      for (const r of deduped) {
+        const last = merged[merged.length - 1];
+        if (
+          last &&
+          Math.abs(last.y - r.y) < 2 &&
+          Math.abs(last.height - r.height) < 2 &&
+          r.x <= last.x + last.width + 2
+        ) {
+          const newX = Math.min(last.x, r.x);
+          const newRight = Math.max(last.x + last.width, r.x + r.width);
+          last.x = newX;
+          last.width = newRight - newX;
+          last.y = Math.min(last.y, r.y);
+          last.height = Math.max(last.height, r.height);
+        } else {
+          merged.push({ ...r });
+        }
+      }
+
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+
+      for (const r of merged) {
+        minX = Math.min(minX, r.x);
+        minY = Math.min(minY, r.y);
+        maxX = Math.max(maxX, r.x + r.width);
+        maxY = Math.max(maxY, r.y + r.height);
+      }
+
+      if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+        sel.removeAllRanges();
+        return;
+      }
+
+      onAddAnnotation({
+        id: `highlight_${Date.now()}`,
+        pageIndex,
+        type: "highlight",
+        rect: {
+          x: minX,
+          y: minY,
+          width: Math.max(1, maxX - minX),
+          height: Math.max(1, maxY - minY),
+        },
+        rects: merged,
+        color: state.highlightStyle?.color || ANNOTATION_STYLES.highlight.color,
+        opacity:
+          state.highlightStyle?.opacity ?? ANNOTATION_STYLES.highlight.opacity,
+        text: selectedText,
+      });
+
+      // Text highlight should not be auto-selected; keep the tool ready for continuous highlighting.
+      onSelectControl(null);
+
+      sel.removeAllRanges();
+    },
+    [editorStateRef, onAddAnnotation, onSelectControl],
+  );
+
+  const [textSelectionToolbar, setTextSelectionToolbar] = useState<{
+    isVisible: boolean;
+    left: number;
+    top: number;
+    text: string;
+  }>({ isVisible: false, left: 0, top: 0, text: "" });
+
+  const textSelectionVirtualRef = useRef<any>({
+    getBoundingClientRect: () => new DOMRect(),
+    contextElement: document.body,
+  });
+
+  const isTextSelectingRef = useRef(false);
+
+  const updateTextSelectionToolbar = useCallback(() => {
+    if (editorState.tool !== "select" || editorState.mode !== "annotation") {
+      setTextSelectionToolbar((prev) =>
+        prev.isVisible ? { ...prev, isVisible: false } : prev,
+      );
+      return;
+    }
+
+    // Only show after selection ends (mouse/pointer released)
+    if (isTextSelectingRef.current) {
+      setTextSelectionToolbar((prev) =>
+        prev.isVisible ? { ...prev, isVisible: false } : prev,
+      );
+      return;
+    }
+
+    const sel = window.getSelection?.();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      setTextSelectionToolbar((prev) =>
+        prev.isVisible ? { ...prev, isVisible: false } : prev,
+      );
+      return;
+    }
+
+    const selectedText = sel.toString().trim();
+    if (!selectedText) {
+      setTextSelectionToolbar((prev) =>
+        prev.isVisible ? { ...prev, isVisible: false } : prev,
+      );
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const commonNode = range.commonAncestorContainer;
+    const commonEl =
+      commonNode instanceof Element
+        ? commonNode
+        : commonNode.parentElement || null;
+    const isFromTextLayer = !!commonEl?.closest?.(".textLayer");
+    if (!isFromTextLayer) {
+      setTextSelectionToolbar((prev) =>
+        prev.isVisible ? { ...prev, isVisible: false } : prev,
+      );
+      return;
+    }
+
+    const rect = range.getBoundingClientRect();
+    if (!rect || rect.width < 2 || rect.height < 2) {
+      setTextSelectionToolbar((prev) =>
+        prev.isVisible ? { ...prev, isVisible: false } : prev,
+      );
+      return;
+    }
+
+    let left = rect.left + rect.width / 2;
+    let top = rect.top;
+
+    // Clamp to viewport so it doesn't render off-screen.
+    const pad = 12;
+    left = Math.max(pad, Math.min(window.innerWidth - pad, left));
+    top = Math.max(pad, top);
+
+    textSelectionVirtualRef.current = {
+      getBoundingClientRect: () => new DOMRect(left, top, 1, 1),
+      contextElement: document.body,
+    };
+
+    setTextSelectionToolbar({ isVisible: true, left, top, text: selectedText });
+  }, [editorState.mode, editorState.tool]);
+
+  useEffect(() => {
+    if (!textSelectionToolbar.isVisible) return;
+    window.getSelection?.()?.removeAllRanges?.();
+    setTextSelectionToolbar((prev) => ({ ...prev, isVisible: false }));
+  }, [editorState.scale]);
+
+  useEffect(() => {
+    updateTextSelectionToolbar();
+
+    const handleSelectionChange = () => updateTextSelectionToolbar();
+    document.addEventListener("selectionchange", handleSelectionChange);
+    window.addEventListener("resize", handleSelectionChange);
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (editorStateRef.current.tool !== "select") return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.(".textLayer")) {
+        isTextSelectingRef.current = true;
+        setTextSelectionToolbar((prev) =>
+          prev.isVisible ? { ...prev, isVisible: false } : prev,
+        );
+      }
+    };
+
+    const handlePointerUp = () => {
+      if (!isTextSelectingRef.current) return;
+      // Defer one frame so the browser has time to finalize the selection range.
+      // Keep isTextSelectingRef=true during this frame to prevent selectionchange from
+      // prematurely showing a toolbar with a transient (0,0) bounding rect.
+      requestAnimationFrame(() => {
+        isTextSelectingRef.current = false;
+        updateTextSelectionToolbar();
+      });
+    };
+
+    const handlePointerCancel = () => {
+      if (!isTextSelectingRef.current) return;
+      isTextSelectingRef.current = false;
+      setTextSelectionToolbar((prev) =>
+        prev.isVisible ? { ...prev, isVisible: false } : prev,
+      );
+    };
+
+    // Use capture phase so we still detect selection start/end even if some layer stops propagation.
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("pointerup", handlePointerUp, true);
+    document.addEventListener("pointercancel", handlePointerCancel, true);
+
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+      window.removeEventListener("resize", handleSelectionChange);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("pointerup", handlePointerUp, true);
+      document.removeEventListener("pointercancel", handlePointerCancel, true);
+    };
+  }, [updateTextSelectionToolbar]);
+
+  useEffect(() => {
+    if (
+      editorState.mode !== "annotation" ||
+      editorState.tool !== "draw_highlight"
+    ) {
+      return;
+    }
+
+    const sel = window.getSelection?.();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+
+    // Only auto-convert selections that come from the PDF.js text layer.
+    const range = sel.getRangeAt(0);
+    const commonNode = range.commonAncestorContainer;
+    const commonEl =
+      commonNode instanceof Element
+        ? commonNode
+        : commonNode.parentElement || null;
+    const isFromTextLayer = !!commonEl?.closest?.(".textLayer");
+    if (!isFromTextLayer) return;
+
+    createTextHighlightFromSelection();
+  }, [editorState.mode, editorState.tool, createTextHighlightFromSelection]);
 
   const [movingFieldId, setMovingFieldId] = useState<string | null>(null);
   const [movingAnnotationId, setMovingAnnotationId] = useState<string | null>(
@@ -133,6 +450,31 @@ const Workspace: React.FC<WorkspaceProps> = ({
     mouseY: number;
   } | null>(null);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+
+  useEffect(() => {
+    const isTransforming =
+      !!movingFieldId ||
+      !!movingAnnotationId ||
+      !!resizingFieldId ||
+      !!resizingAnnotationId;
+
+    // Allow floating toolbars (Popover-based) to hide while dragging/resizing.
+    if (typeof document !== "undefined") {
+      document.body.dataset.ffControlTransforming = isTransforming ? "1" : "0";
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("ff-control-transforming", {
+          detail: { active: isTransforming },
+        }),
+      );
+    }
+  }, [
+    movingFieldId,
+    movingAnnotationId,
+    resizingFieldId,
+    resizingAnnotationId,
+  ]);
 
   // Auto-scroll when interacting near edges
   const isInteracting = !!(
@@ -1056,6 +1398,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
         y: container.scrollTop,
       };
 
+      if (textSelectionToolbar.isVisible) {
+        window.getSelection?.()?.removeAllRanges?.();
+        setTextSelectionToolbar((prev) =>
+          prev.isVisible ? { ...prev, isVisible: false } : prev,
+        );
+      }
+
       if (onPageIndexChange) {
         const scrollTop = container.scrollTop;
         const viewportHeight = container.clientHeight;
@@ -1130,6 +1479,30 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (e.button === 1) return;
     if (isPanModeActive) return;
 
+    // Unified highlight:
+    // - On text spans: allow native selection.
+    // - Otherwise: draw as an ink highlight (intent=InkHighlight).
+    if (
+      editorState.tool === "draw_highlight" &&
+      editorState.mode === "annotation"
+    ) {
+      const isTextHit = (() => {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest?.(".textLayer span")) return true;
+
+        // Some PDF.js text layers may dispatch pointer events from the layer container
+        // instead of the underlying spans. Detect spans under the pointer.
+        const els = document.elementsFromPoint(e.clientX, e.clientY);
+        return els.some((el) =>
+          (el as HTMLElement | null)?.closest?.(".textLayer span"),
+        );
+      })();
+      if (isTextHit) {
+        e.stopPropagation();
+        return;
+      }
+    }
+
     e.stopPropagation();
 
     // Ensure mouse position is tracked immediately
@@ -1146,8 +1519,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
     // Prevent default behavior (like text selection) for drawing tools
     e.preventDefault();
 
-    // Ink Drawing Start
-    if (editorState.tool === "draw_ink") {
+    // Ink Drawing Start (including ink-highlight via draw_highlight)
+    if (
+      editorState.tool === "draw_ink" ||
+      (editorState.tool === "draw_highlight" &&
+        editorState.mode === "annotation")
+    ) {
       setGlobalCursor("crosshair");
       setActivePageIndex(pageIndex);
       const coords = getRelativeCoords(e, pageIndex);
@@ -1221,7 +1598,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
     const coords = getRelativeCoords(e, activePageIndex);
 
     // --- INK DRAWING ---
-    if (isDrawing && editorState.tool === "draw_ink") {
+    if (
+      isDrawing &&
+      (editorState.tool === "draw_ink" || editorState.tool === "draw_highlight")
+    ) {
       const lastPoint =
         currentPathRef.current[currentPathRef.current.length - 1];
       if (lastPoint) {
@@ -1276,6 +1656,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const handlePointerUp = (e?: React.PointerEvent | React.MouseEvent) => {
     if (endPan(e)) return;
 
+    const shouldCreateTextHighlight =
+      editorStateRef.current.mode === "annotation" &&
+      editorStateRef.current.tool === "draw_highlight" &&
+      !isDrawing;
+
     // Release capture if held
     releasePointer(e);
 
@@ -1285,7 +1670,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     // Finish Ink Drawing
     if (
       isDrawing &&
-      editorState.tool === "draw_ink" &&
+      (editorState.tool === "draw_ink" ||
+        editorState.tool === "draw_highlight") &&
       activePageIndex !== null
     ) {
       if (e) {
@@ -1309,6 +1695,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
       currentPathRef.current = [];
       setCurrentPathState([]);
+    }
+
+    if (shouldCreateTextHighlight) {
+      createTextHighlightFromSelection();
     }
 
     // Finish Eraser
@@ -1363,24 +1753,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             }
           }
         } else if (editorState.mode === "annotation") {
-          if (editorState.tool === "draw_highlight") {
-            onAddAnnotation({
-              id: `highlight_${Date.now()}`,
-              pageIndex: activePageIndex,
-              type: "highlight",
-              rect: { x, y, width, height },
-              color: ANNOTATION_STYLES.highlight.color,
-              opacity: ANNOTATION_STYLES.highlight.opacity,
-            });
-
-            if (
-              !editorState.keys.shift &&
-              !editorState.keys.ctrl &&
-              shouldSwitchToSelectAfterUse("draw_highlight")
-            ) {
-              onToolChange("select");
-            }
-          } else if (editorState.tool === "draw_freetext") {
+          if (editorState.tool === "draw_freetext") {
             onAddAnnotation({
               id: `freetext_${Date.now()}`,
               pageIndex: activePageIndex,
@@ -1693,6 +2066,83 @@ const Workspace: React.FC<WorkspaceProps> = ({
       onPointerLeave={handlePointerUp}
       onScroll={handleScroll}
     >
+      <Popover
+        open={textSelectionToolbar.isVisible}
+        onOpenChange={(open) => {
+          if (open) return;
+          window.getSelection?.()?.removeAllRanges?.();
+          setTextSelectionToolbar((prev) =>
+            prev.isVisible ? { ...prev, isVisible: false } : prev,
+          );
+        }}
+      >
+        <PopoverAnchor virtualRef={textSelectionVirtualRef} />
+
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            className="pointer-events-none fixed z-60 h-px w-px opacity-0"
+            style={{
+              left: textSelectionToolbar.left,
+              top: textSelectionToolbar.top,
+            }}
+          />
+        </PopoverTrigger>
+
+        <PopoverContent
+          side="top"
+          align="center"
+          sideOffset={8}
+          className="z-60 w-auto rounded-md border p-1 shadow-md"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+        >
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title={t("toolbar.highlight")}
+              onClick={() => {
+                createTextHighlightFromSelection({ force: true });
+                setTextSelectionToolbar((prev) =>
+                  prev.isVisible ? { ...prev, isVisible: false } : prev,
+                );
+              }}
+            >
+              <Highlighter size={16} />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title={t("sidebar.search_outline")}
+              onClick={() => {
+                const q = textSelectionToolbar.text.trim();
+                if (q) {
+                  window.open(
+                    `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                }
+                window.getSelection?.()?.removeAllRanges?.();
+                setTextSelectionToolbar((prev) =>
+                  prev.isVisible ? { ...prev, isVisible: false } : prev,
+                );
+              }}
+            >
+              <Search size={16} />
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <div
         ref={contentRef}
         className="mx-auto flex min-h-full w-fit flex-col items-center gap-8 p-8 pb-20"
@@ -1702,6 +2152,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
             id={`page-${page.pageIndex}`}
             key={page.pageIndex}
             className="relative origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
+            style={{
+              cursor:
+                editorState.tool === "draw_highlight" ? "crosshair" : undefined,
+            }}
             onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
           >
             {/* 
@@ -1715,7 +2169,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
               width={page.width}
               height={page.height}
               placeholderImage={page.imageData}
-              isSelectMode={editorState.tool === "select"}
+              isSelectMode={
+                editorState.tool === "select" ||
+                editorState.tool === "draw_highlight"
+              }
+              textLayerCursor={
+                editorState.tool === "draw_highlight" ? "crosshair" : undefined
+              }
             />
 
             {/* DOM Layer for Highlights, Notes, Form Fields */}
@@ -1725,7 +2185,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
                 pointerEvents: isPanModeActive
                   ? "auto"
-                  : editorState.tool === "select"
+                  : editorState.tool === "select" ||
+                      editorState.tool === "draw_highlight"
                     ? "none"
                     : undefined,
               }}
@@ -1809,12 +2270,29 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 isDrawing && activePageIndex === page.pageIndex && (
                   <path
                     d={pointsToPath(currentPathState)}
-                    stroke={editorState.penStyle.color}
-                    strokeWidth={editorState.penStyle.thickness}
+                    stroke={
+                      editorState.tool === "draw_highlight"
+                        ? editorState.highlightStyle?.color ||
+                          ANNOTATION_STYLES.highlight.color
+                        : editorState.penStyle.color
+                    }
+                    strokeWidth={
+                      editorState.tool === "draw_highlight"
+                        ? editorState.highlightStyle?.thickness ||
+                          ANNOTATION_STYLES.highlight.thickness
+                        : editorState.penStyle.thickness
+                    }
                     fill="none"
-                    strokeLinecap="round"
+                    strokeLinecap={
+                      editorState.tool === "draw_highlight" ? "butt" : "round"
+                    }
                     strokeLinejoin="round"
-                    opacity={editorState.penStyle.opacity}
+                    opacity={
+                      editorState.tool === "draw_highlight"
+                        ? (editorState.highlightStyle?.opacity ??
+                          ANNOTATION_STYLES.highlight.opacity)
+                        : editorState.penStyle.opacity
+                    }
                   />
                 )
               }

@@ -53,6 +53,9 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   }, [isSelected]);
 
   const getIcon = () => {
+    if (annotation.type === "ink" && annotation.intent === "InkHighlight") {
+      return <Highlighter size={12} className="text-muted-foreground" />;
+    }
     switch (annotation.type) {
       case "highlight":
         return <Highlighter size={12} className="text-muted-foreground" />;

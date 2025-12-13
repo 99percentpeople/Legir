@@ -1,5 +1,10 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export interface FloatingToolbarProps {
   isVisible: boolean;
@@ -16,16 +21,50 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
 }) => {
   if (!isVisible) return null;
 
+  const [isTransforming, setIsTransforming] = useState(() => {
+    if (typeof document === "undefined") return false;
+    return document.body.dataset.ffControlTransforming === "1";
+  });
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ active?: boolean }>;
+      setIsTransforming(!!ce.detail?.active);
+    };
+    window.addEventListener(
+      "ff-control-transforming",
+      handler as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "ff-control-transforming",
+        handler as EventListener,
+      );
+    };
+  }, []);
+
   return (
-    <div
-      className={cn(
-        "bg-background absolute bottom-full left-1/2 z-60 mb-2 flex -translate-x-1/2 items-center gap-1 rounded-md border p-1 shadow-md",
-        className,
-      )}
-      style={style}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      {children}
-    </div>
+    <Popover open={!isTransforming}>
+      <PopoverTrigger asChild>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-full left-1/2 h-px w-px -translate-x-1/2 opacity-0"
+        />
+      </PopoverTrigger>
+
+      <PopoverContent
+        side="top"
+        align="center"
+        sideOffset={8}
+        className={cn(
+          "bg-background z-50 flex w-auto items-center gap-1 rounded-md border p-1 shadow-md",
+          className,
+        )}
+        style={style}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {children}
+      </PopoverContent>
+    </Popover>
   );
 };

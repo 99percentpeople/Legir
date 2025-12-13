@@ -637,6 +637,7 @@ export class InkExporter implements IAnnotationExporter {
               apPoints,
               { red: r, green: g, blue: b },
               thickness,
+              annotation.intent === "InkHighlight" ? { lineCap: 0 } : undefined,
             );
           })
           .filter(Boolean) as string[];
@@ -646,20 +647,37 @@ export class InkExporter implements IAnnotationExporter {
 
       let appearanceStream;
       if (appearanceStreamContent) {
+        const opacity = annotation.opacity ?? 1;
+        let resources: any = {
+          ProcSet: [
+            PDFName.of("PDF"),
+            PDFName.of("Text"),
+            PDFName.of("ImageB"),
+            PDFName.of("ImageC"),
+            PDFName.of("ImageI"),
+          ],
+        };
+
+        if (opacity < 1) {
+          const gsDict = pdfDoc.context.obj({ CA: opacity, ca: opacity });
+          const gsRef = pdfDoc.context.register(gsDict);
+          resources = {
+            ...resources,
+            ExtGState: {
+              GS0: gsRef,
+            },
+          };
+
+          // Apply opacity to the appearance stream drawing operations.
+          appearanceStreamContent = `q\n/GS0 gs\n${appearanceStreamContent}\nQ`;
+        }
+
         const stream = pdfDoc.context.stream(appearanceStreamContent, {
           Type: PDFName.of("XObject"),
           Subtype: PDFName.of("Form"),
           FormType: 1,
           BBox: rect,
-          Resources: {
-            ProcSet: [
-              PDFName.of("PDF"),
-              PDFName.of("Text"),
-              PDFName.of("ImageB"),
-              PDFName.of("ImageC"),
-              PDFName.of("ImageI"),
-            ],
-          },
+          Resources: pdfDoc.context.obj(resources),
         });
         appearanceStream = pdfDoc.context.register(stream);
       }

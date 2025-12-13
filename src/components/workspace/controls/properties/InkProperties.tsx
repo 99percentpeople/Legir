@@ -62,6 +62,29 @@ export const InkProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             }}
           />
         </div>
+
+        {/* Opacity */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>{t("properties.opacity")}</Label>
+            <span className="text-muted-foreground text-xs">
+              {Math.round(((data.opacity ?? 1) as number) * 100)}%
+            </span>
+          </div>
+          <Slider
+            value={[data.opacity ?? 1]}
+            min={0.05}
+            max={1}
+            step={0.05}
+            onValueChange={(vals) => {
+              onTriggerHistorySave();
+              onChange({
+                opacity: vals[0],
+                appearanceStreamContent: undefined,
+              });
+            }}
+          />
+        </div>
       </div>
     </div>
   );

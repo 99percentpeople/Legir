@@ -63,6 +63,7 @@ interface ToolbarProps {
   onToolChange: (tool: Tool) => void;
   onModeChange: (mode: EditorState["mode"]) => void;
   onPenStyleChange: (style: Partial<PenStyle>) => void;
+  onHighlightStyleChange?: (style: Partial<PenStyle>) => void;
   onCommentStyleChange?: (style: { color: string }) => void;
   onFreetextStyleChange?: (style: { color: string }) => void;
   onExport: () => Promise<boolean>;
@@ -92,6 +93,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onToolChange,
   onModeChange,
   onPenStyleChange,
+  onHighlightStyleChange,
   onCommentStyleChange: onCommentStyleChange,
   onFreetextStyleChange: onFreetextStyleChange,
   onExport,
@@ -259,10 +261,58 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <Separator orientation="vertical" className="mx-1 h-5" />
             <ToggleGroupItem
               value="draw_highlight"
-              title={t("toolbar.highlight")}
+              title={t("toolbar.highlight_text")}
+              className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
             >
-              <Highlighter size={18} />
+              <div
+                className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
+                style={{
+                  backgroundColor:
+                    editorState.highlightStyle?.color ||
+                    ANNOTATION_STYLES.highlight.color,
+                }}
+              >
+                <Highlighter
+                  size={14}
+                  color={getContrastColor(
+                    editorState.highlightStyle?.color ||
+                      ANNOTATION_STYLES.highlight.color,
+                  )}
+                />
+              </div>
             </ToggleGroupItem>
+            <ColorPickerPopover
+              color={
+                editorState.highlightStyle?.color ||
+                ANNOTATION_STYLES.highlight.color
+              }
+              thickness={
+                editorState.highlightStyle?.thickness ||
+                ANNOTATION_STYLES.highlight.thickness
+              }
+              opacity={
+                editorState.highlightStyle?.opacity ??
+                ANNOTATION_STYLES.highlight.opacity
+              }
+              previewStrokeLinecap="butt"
+              onColorChange={(color) =>
+                onHighlightStyleChange
+                  ? onHighlightStyleChange({ color })
+                  : onPenStyleChange({ color })
+              }
+              onThicknessChange={(thickness) =>
+                onHighlightStyleChange
+                  ? onHighlightStyleChange({ thickness })
+                  : onPenStyleChange({ thickness })
+              }
+              onOpacityChange={(opacity) =>
+                onHighlightStyleChange
+                  ? onHighlightStyleChange({ opacity })
+                  : onPenStyleChange({ opacity })
+              }
+              isActive={tool === "draw_highlight"}
+              title={t("toolbar.highlight_free_properties")}
+            />
             <div className="flex items-center gap-0">
               <ToggleGroupItem
                 value="draw_ink"
@@ -284,10 +334,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <ColorPickerPopover
                 color={editorState.penStyle.color}
                 thickness={editorState.penStyle.thickness}
+                opacity={editorState.penStyle.opacity}
                 onColorChange={(color) => onPenStyleChange({ color })}
                 onThicknessChange={(thickness) =>
                   onPenStyleChange({ thickness })
                 }
+                onOpacityChange={(opacity) => onPenStyleChange({ opacity })}
                 isActive={tool === "draw_ink"}
                 title={t("toolbar.ink_properties")}
               />

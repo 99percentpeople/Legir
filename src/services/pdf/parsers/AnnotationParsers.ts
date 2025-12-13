@@ -190,6 +190,11 @@ export class HighlightParser implements IAnnotationParser {
         let contents = annotation.contents || undefined;
         let updatedAt = parsePDFDate(annotation.modificationDate);
 
+        let opacity =
+          typeof (annotation as any).opacity === "number"
+            ? (annotation as any).opacity
+            : 0.4;
+
         // Try to get QuadPoints
         let qp = annotation.quadPoints;
 
@@ -222,6 +227,13 @@ export class HighlightParser implements IAnnotationParser {
                           );
                           const contentsDecoded = decodePdfString(rawContents);
                           if (contentsDecoded) contents = contentsDecoded;
+
+                          const libCA = libAnnot.lookup(PDFName.of("CA"));
+                          const libca = libAnnot.lookup(PDFName.of("ca"));
+                          if (libCA instanceof PDFNumber)
+                            opacity = libCA.asNumber();
+                          else if (libca instanceof PDFNumber)
+                            opacity = libca.asNumber();
 
                           const libQP = libAnnot.lookup(
                             PDFName.of("QuadPoints"),
@@ -271,10 +283,7 @@ export class HighlightParser implements IAnnotationParser {
           }
         }
 
-        let opacity = 1.0;
-        // Simplified opacity check (reuse previous logic or keep simplified)
-        // For brevity in this refactor, relying on defaults unless we strictly need to re-implement the deep lookup again.
-        // The original code did a deep lookup again for CA/ca.
+        opacity = Math.min(1, Math.max(0, opacity));
 
         annotations.push({
           id: `imported_highlight_${pageIndex + 1}_${index}`,

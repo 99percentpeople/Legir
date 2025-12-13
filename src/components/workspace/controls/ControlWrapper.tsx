@@ -52,6 +52,13 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const elementId =
     customElementId !== undefined ? customElementId : defaultElementId;
 
+  const isInkHighlight =
+    data.type === "ink" &&
+    "intent" in (data as any) &&
+    (data as any).intent === "InkHighlight";
+  const shouldRaiseZIndexOnHoverOrSelect =
+    data.type !== "highlight" && !isInkHighlight;
+
   return (
     <div
       id={elementId || undefined}
@@ -60,8 +67,12 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
         onPointerDown?.(e);
       }}
       className={cn(
-        "group pointer-events-auto absolute outline-none select-none",
-        isSelected ? "z-50" : "hover:z-50",
+        "group absolute outline-none select-none",
+        isSelectable
+          ? "pointer-events-auto"
+          : "pointer-events-none [&_*]:pointer-events-none",
+        shouldRaiseZIndexOnHoverOrSelect &&
+          (isSelected ? "z-50" : "hover:z-50"),
         className,
       )}
       style={{

@@ -28,7 +28,7 @@ import {
 import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
 import { saveDraft, getDraft, clearDraft } from "./services/storageService";
-import { DEFAULT_FIELD_STYLE } from "./constants";
+import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES } from "./constants";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
 import { useEditorStore } from "./store/useEditorStore";
@@ -707,6 +707,23 @@ const App: React.FC = () => {
     [],
   );
 
+  const handleHighlightStyleChange = useCallback(
+    (style: Partial<EditorState["penStyle"]>) => {
+      setState((prev) => ({
+        ...prev,
+        highlightStyle: {
+          ...(prev.highlightStyle || {
+            color: ANNOTATION_STYLES.highlight.color,
+            thickness: ANNOTATION_STYLES.highlight.thickness,
+            opacity: ANNOTATION_STYLES.highlight.opacity,
+          }),
+          ...style,
+        },
+      }));
+    },
+    [],
+  );
+
   const handleCommentStyleChange = useCallback((style: { color: string }) => {
     setState((prev) => ({
       ...prev,
@@ -789,6 +806,7 @@ const App: React.FC = () => {
             onToolChange={(tool) => setTool(tool)}
             onModeChange={(mode) => setState({ mode, tool: "select" })}
             onPenStyleChange={handlePenStyleChange}
+            onHighlightStyleChange={handleHighlightStyleChange}
             onCommentStyleChange={handleCommentStyleChange}
             onFreetextStyleChange={handleFreetextStyleChange}
             onExport={handleExport}

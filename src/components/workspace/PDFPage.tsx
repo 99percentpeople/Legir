@@ -17,6 +17,7 @@ interface PDFPageProps {
   height: number;
   placeholderImage?: string; // Optional low-res image if we have one
   isSelectMode?: boolean;
+  textLayerCursor?: React.CSSProperties["cursor"];
 }
 
 const PDFPage: React.FC<PDFPageProps> = ({
@@ -27,6 +28,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
   height,
   placeholderImage,
   isSelectMode = true,
+  textLayerCursor,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -372,10 +374,11 @@ const PDFPage: React.FC<PDFPageProps> = ({
       <div
         ref={textLayerRef}
         className={cn("textLayer")}
+        data-selectable={isSelectMode ? "true" : "false"}
         style={{
           transform: textLayerTransform,
           transformOrigin: "0 0",
-          pointerEvents: isSelectMode ? undefined : "none",
+          cursor: textLayerCursor,
         }}
       />
     </div>

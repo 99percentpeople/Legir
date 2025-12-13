@@ -43,8 +43,13 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
 
   // Filter based on type and search term
   const filteredAnnotations = allAnnotations.filter((annot) => {
+    const effectiveType =
+      annot.type === "ink" && annot.intent === "InkHighlight"
+        ? "highlight"
+        : annot.type;
+
     // Type filter
-    if (!selectedTypes.includes(annot.type)) return false;
+    if (!selectedTypes.includes(effectiveType)) return false;
 
     // Search filter
     if (!searchTerm) return true;

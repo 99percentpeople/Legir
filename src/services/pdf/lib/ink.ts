@@ -4,6 +4,7 @@ export const generateInkAppearanceOps = (
   points: { x: number; y: number }[],
   color: { red: number; green: number; blue: number },
   thickness: number,
+  options?: { lineCap?: 0 | 1 | 2; lineJoin?: 0 | 1 | 2 },
 ) => {
   if (points.length < 2) return undefined;
 
@@ -11,8 +12,8 @@ export const generateInkAppearanceOps = (
 
   operators.push(`${color.red} ${color.green} ${color.blue} RG`);
   operators.push(`${thickness} w`);
-  operators.push(`1 J`);
-  operators.push(`1 j`);
+  operators.push(`${options?.lineCap ?? 1} J`);
+  operators.push(`${options?.lineJoin ?? 1} j`);
 
   operators.push(`${points[0].x} ${points[0].y} m`);
 

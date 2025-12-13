@@ -91,6 +91,8 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
 
   if (!bounds || strokes.length === 0) return null;
 
+  const isInkHighlight = data.intent === "InkHighlight";
+
   return (
     <ControlWrapper
       {...props}
@@ -150,13 +152,15 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
               className="overflow-visible"
               viewBox={`${bounds.originX} ${bounds.originY} ${bounds.width} ${bounds.height}`}
             >
-              {isSelected && (
+              {isSelected && !isInkHighlight && (
                 <path
                   d={pathData}
                   fill="none"
                   stroke="#3b82f6"
                   strokeWidth={(data.thickness || 1) + 6}
-                  strokeLinecap="round"
+                  strokeLinecap={
+                    data.intent === "InkHighlight" ? "butt" : "round"
+                  }
                   strokeLinejoin="round"
                   opacity={0.25}
                   className="pointer-events-none"
@@ -167,11 +171,19 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
                 fill="none"
                 stroke={data.color || "#000000"}
                 strokeWidth={data.thickness || 1}
-                strokeLinecap="round"
+                strokeLinecap={
+                  data.intent === "InkHighlight" ? "butt" : "round"
+                }
                 strokeLinejoin="round"
-                opacity={data.opacity ?? 1}
+                opacity={
+                  data.opacity ?? (data.intent === "InkHighlight" ? 0.35 : 1)
+                }
                 className="pointer-events-auto cursor-pointer transition-opacity"
-                style={{ cursor: !isSelectable ? "inherit" : "pointer" }}
+                style={{
+                  cursor: !isSelectable ? "inherit" : "pointer",
+                  mixBlendMode:
+                    data.intent === "InkHighlight" ? "multiply" : undefined,
+                }}
                 onPointerDown={(e) => {
                   if (!isSelectable) return;
                   e.stopPropagation();

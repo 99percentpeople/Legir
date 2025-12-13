@@ -48,6 +48,8 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
     };
 
     const isField = isFormField(data);
+    const isHighlightAnnotation =
+      !isField && (data as Annotation).type === "highlight";
 
     return (
       <PanelLayout
@@ -111,7 +113,7 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
           or check if data has rect. 
           Highlight/Comment have rect. Ink has points (no rect).
       */}
-        {"rect" in data && (
+        {"rect" in data && !isHighlightAnnotation && (
           <>
             <Separator />
             <GeometryProperties

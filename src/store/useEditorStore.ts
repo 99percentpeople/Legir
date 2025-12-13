@@ -84,6 +84,11 @@ const initialState: EditorState = {
     thickness: ANNOTATION_STYLES.ink.thickness,
     opacity: ANNOTATION_STYLES.ink.opacity,
   },
+  highlightStyle: {
+    color: ANNOTATION_STYLES.highlight.color,
+    thickness: ANNOTATION_STYLES.highlight.thickness,
+    opacity: ANNOTATION_STYLES.highlight.opacity,
+  },
   commentStyle: {
     color: ANNOTATION_STYLES.comment.color,
     opacity: ANNOTATION_STYLES.comment.opacity,
@@ -378,10 +383,31 @@ export const useEditorStore = create<EditorState & EditorActions>(
     selectControl: (id) => set({ selectedId: id }),
 
     setTool: (tool) =>
-      set((state) => ({
-        tool,
-        selectedId: tool === "select" ? state.selectedId : null,
-      })),
+      set((state) => {
+        if (tool === "draw_highlight") {
+          return {
+            tool,
+            selectedId: null,
+            highlightStyle: {
+              color:
+                state.highlightStyle?.color ||
+                ANNOTATION_STYLES.highlight.color,
+              thickness: Math.max(
+                state.highlightStyle?.thickness ||
+                  ANNOTATION_STYLES.highlight.thickness,
+                ANNOTATION_STYLES.highlight.thickness,
+              ),
+              opacity:
+                state.highlightStyle?.opacity ??
+                ANNOTATION_STYLES.highlight.opacity,
+            },
+          };
+        }
+        return {
+          tool,
+          selectedId: tool === "select" ? state.selectedId : null,
+        };
+      }),
 
     openDialog: (name) => set({ activeDialog: name }),
     closeDialog: () => set({ activeDialog: null }),

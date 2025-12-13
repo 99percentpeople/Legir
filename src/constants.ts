@@ -37,7 +37,8 @@ export const DEFAULT_FIELD_STYLE = {
 
 export const ANNOTATION_STYLES = {
   highlight: {
-    color: "#e61b1b", // Yellow
+    color: "#ffce00", // Yellow
+    thickness: 12,
     opacity: 0.4,
   },
   ink: {

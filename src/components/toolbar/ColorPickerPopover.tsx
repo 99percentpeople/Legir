@@ -47,10 +47,14 @@ const PEN_COLORS = [
 interface ColorPickerPopoverProps {
   color: string;
   thickness?: number;
+  opacity?: number;
   onColorChange: (color: string) => void;
   onThicknessChange?: (thickness: number) => void;
+  onOpacityChange?: (opacity: number) => void;
   isActive?: boolean;
   showThickness?: boolean;
+  showOpacity?: boolean;
+  previewStrokeLinecap?: "round" | "butt" | "square";
   side?: React.ComponentProps<typeof PopoverContent>["side"];
   title?: string;
   children?: React.ReactNode;
@@ -59,10 +63,14 @@ interface ColorPickerPopoverProps {
 export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   color,
   thickness,
+  opacity,
   onColorChange,
   onThicknessChange,
+  onOpacityChange,
   isActive = false,
   showThickness = true,
+  showOpacity = true,
+  previewStrokeLinecap = "round",
   side = "bottom",
   title = "Properties",
   children,
@@ -125,7 +133,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
                     fill="none"
                     stroke={color}
                     strokeWidth={thickness}
-                    strokeLinecap="round"
+                    strokeLinecap={previewStrokeLinecap}
                     strokeLinejoin="round"
                   />
                 </svg>
@@ -154,6 +162,27 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
                 </div>
               </div>
             </>
+          )}
+
+          {showOpacity && opacity !== undefined && onOpacityChange && (
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-sm font-medium">
+                  {t("properties.opacity")}
+                </label>
+                <span className="text-muted-foreground text-xs">
+                  {Math.round(opacity * 100)}%
+                </span>
+              </div>
+              <Slider
+                defaultValue={[opacity]}
+                value={[opacity]}
+                max={1}
+                min={0.05}
+                step={0.05}
+                onValueChange={(val) => onOpacityChange(val[0])}
+              />
+            </div>
           )}
         </div>
       </PopoverContent>
