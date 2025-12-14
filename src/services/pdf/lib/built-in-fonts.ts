@@ -5,6 +5,7 @@ export type ExportFontConfig = {
   name: string;
   path: string;
   exportKeys: string[];
+  importAliases: string[];
 };
 
 export const BUILT_IN_EXPORT_FONTS: ExportFontConfig[] = [
@@ -13,12 +14,31 @@ export const BUILT_IN_EXPORT_FONTS: ExportFontConfig[] = [
     name: "Noto Sans SC",
     path: "fonts/NotoSansSC-Regular.ttf",
     exportKeys: ["Noto Sans SC", "CustomSans", "Custom"],
+    importAliases: [
+      "NotoSansSC",
+      "NotoSansSC-Regular",
+      "NotoSansCJKsc",
+      "NotoSansCJKsc-Regular",
+      "NotoSansCJKSC",
+      "NotoSansCJKSC-Regular",
+      "NotoSansCJK",
+      "NotoSansCJK-Regular",
+    ],
   },
   {
     id: "cjk_serif",
     name: "Source Han Serif SC",
     path: "fonts/SourceHanSerifSC-Regular.otf",
     exportKeys: ["Source Han Serif SC", "CustomSerif"],
+    importAliases: [
+      "SourceHanSerifSC",
+      "SourceHanSerifSC-Regular",
+      "SourceHanSerif",
+      "SourceHanSerif-Regular",
+      "STSong",
+      "SongtiSC",
+      "Songti SC",
+    ],
   },
 ];
 

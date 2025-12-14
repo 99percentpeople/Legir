@@ -473,9 +473,22 @@ export class FreeTextParser implements IAnnotationParser {
         segment.matchAll(/\/([^\s]+)\s+(\d+(?:\.\d+)?)\s+Tf/g),
       );
       if (matches.length === 0) return undefined;
-      const last = matches[matches.length - 1];
-      const name = last?.[1];
-      const size = last?.[2];
+
+      // Mixed-font FreeText (our exporter) typically uses a standard base font (Helv/TiRo/Cour)
+      // and switches to a CJK font for non-ASCII runs (e.g. Cust). For round-tripping, we want
+      // the base font to drive `annotation.fontFamily` so ASCII stays correct.
+      const pickPreferred = () => {
+        for (const m of matches) {
+          const n = normalizePdfFontName(m?.[1] || "");
+          const up = n.toUpperCase();
+          if (up === "HELV" || up === "TIRO" || up === "COUR") return m;
+        }
+        return matches[0];
+      };
+
+      const preferred = pickPreferred();
+      const name = preferred?.[1];
+      const size = preferred?.[2];
       if (!name) return undefined;
       const parsedSize = size ? parseFloat(size) : NaN;
       return {
@@ -810,18 +823,12 @@ export class FreeTextParser implements IAnnotationParser {
                                 pdfFontToAppFontKey(resourceName);
 
                               sourcePdfFontMissing =
-                                !!sourcePdfFontIsSubset ||
-                                (!fontKey && !injectedFamily);
+                                !fontKey && !injectedFamily;
 
-                              if (injectedFamily) {
-                                const fallback =
-                                  pdfFontToCssFontFamily(baseFontName) ||
-                                  pdfFontToCssFontFamily(resourceName) ||
-                                  "Helvetica, Arial, sans-serif";
-                                fontFamily = `"${injectedFamily}", ${fallback}`;
-                              } else if (fontKey) {
-                                // Store internal key so properties panel + re-import/export round-trip stays stable
+                              if (fontKey) {
                                 fontFamily = fontKey;
+                              } else if (injectedFamily) {
+                                fontFamily = `"${injectedFamily}"`;
                               } else {
                                 fontFamily =
                                   pdfFontToCssFontFamily(baseFontName) ||
@@ -917,19 +924,12 @@ export class FreeTextParser implements IAnnotationParser {
                                   sourcePdfFontIsSubset =
                                     !!sourcePdfFontName?.includes("+");
                                   sourcePdfFontMissing =
-                                    !!sourcePdfFontIsSubset ||
-                                    (!fontKey && !injectedFamily);
+                                    !fontKey && !injectedFamily;
 
-                                  if (injectedFamily) {
-                                    const fallback =
-                                      pdfFontToCssFontFamily(resolvedBase) ||
-                                      pdfFontToCssFontFamily(
-                                        apFont.resourceName,
-                                      ) ||
-                                      "Helvetica, Arial, sans-serif";
-                                    fontFamily = `"${injectedFamily}", ${fallback}`;
-                                  } else if (fontKey) {
+                                  if (fontKey) {
                                     fontFamily = fontKey;
+                                  } else if (injectedFamily) {
+                                    fontFamily = `"${injectedFamily}"`;
                                   } else {
                                     fontFamily =
                                       pdfFontToCssFontFamily(resolvedBase) ||

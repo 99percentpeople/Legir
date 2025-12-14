@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/components/language-provider";
 import {
   resolveCjkFallbackFontStack,
+  resolveFontStackForDisplay,
   resolveFontStackWithCjkFallback,
   splitTextRuns,
 } from "@/lib/fonts";
@@ -28,8 +29,9 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const warnedMissingFontRef = useRef(false);
 
-  const resolvedFontFamily = resolveFontStackWithCjkFallback(data.fontFamily);
+  const resolvedFontFamily = resolveFontStackForDisplay(data.fontFamily);
   const cjkFontFamily = resolveCjkFallbackFontStack(data.fontFamily);
+  const editFontFamily = resolveFontStackWithCjkFallback(data.fontFamily);
 
   const lastClickTimeRef = useRef<number>(0);
 
@@ -178,7 +180,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
             onBlur={handleBlur}
             onPointerDown={(e) => e.stopPropagation()}
             style={{
-              fontFamily: "inherit",
+              fontFamily: editFontFamily,
               fontSize: "inherit",
               color: "inherit",
               lineHeight: "inherit",

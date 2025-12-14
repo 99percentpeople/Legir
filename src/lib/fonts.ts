@@ -16,6 +16,12 @@ export const resolveFontStack = (fontKey?: string) => {
   return FONT_FAMILY_MAP[key] || fontKey || "Helvetica";
 };
 
+export const isKnownFontKey = (fontKey?: string) => {
+  if (!fontKey) return false;
+  const key = fontKey.trim();
+  return Object.prototype.hasOwnProperty.call(FONT_FAMILY_MAP, key);
+};
+
 export const isSerifFontKey = (fontKey?: string) => {
   const key = (fontKey || "").toLowerCase();
   if (key.includes("sans-serif")) return false;
@@ -73,6 +79,13 @@ export const resolveFontStackWithCjkFallback = (fontKey?: string) => {
   if (!fallback) return base;
   if (base.includes(cjkKey)) return base;
   return `${base}, ${fallback}`;
+};
+
+export const resolveFontStackForDisplay = (fontKey?: string) => {
+  // For imported/custom font-family strings, preserve the original look and do not
+  // force-inject our CJK fallback (which can override the PDF's intended font).
+  if (fontKey && !isKnownFontKey(fontKey)) return fontKey;
+  return resolveFontStackWithCjkFallback(fontKey);
 };
 
 export const resolveCjkFallbackFontStack = (baseFontKey?: string) =>

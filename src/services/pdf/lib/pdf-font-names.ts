@@ -1,3 +1,5 @@
+import { BUILT_IN_EXPORT_FONTS } from "./built-in-fonts";
+
 const normalizePdfFontNameForLookup = (name: string) => {
   const trimmed = name.trim();
   const noSubset = trimmed.includes("+")
@@ -13,6 +15,7 @@ export const pdfFontToAppFontKey = (pdfFontName: string | undefined) => {
   if (!pdfFontName) return undefined;
   const normalized = normalizePdfFontNameForLookup(pdfFontName);
   const upper = normalized.toUpperCase();
+  const compact = upper.replace(/[^A-Z0-9]+/g, "");
 
   if (
     upper === "HELV" ||
@@ -30,6 +33,21 @@ export const pdfFontToAppFontKey = (pdfFontName: string | undefined) => {
   }
   if (upper === "COUR" || upper.includes("COURIER")) {
     return "Courier";
+  }
+
+  // Data-driven mapping for embedded/built-in fonts.
+  // When you add new fonts, extend BUILT_IN_EXPORT_FONTS with `importAliases`.
+  for (const def of BUILT_IN_EXPORT_FONTS) {
+    // Match against the configured display name and any known aliases.
+    const candidates = [def.name, ...(def.importAliases || [])];
+    for (const c of candidates) {
+      const cUpper = (c || "").toUpperCase();
+      const cCompact = cUpper.replace(/[^A-Z0-9]+/g, "");
+      if (!cCompact) continue;
+
+      // `includes` handles suffixes like -Regular and PDF PS naming variations.
+      if (compact.includes(cCompact)) return def.name;
+    }
   }
 
   return undefined;
