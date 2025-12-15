@@ -3,8 +3,6 @@
   text-align: initial;
   left: 0;
   top: 0;
-  right: 0;
-  bottom: 0;
   overflow: hidden;
   line-height: 1;
   text-size-adjust: none;
@@ -13,17 +11,18 @@
   z-index: 20; /* Above canvas (z-10) */
 }
 
-.textLayer span,
-.textLayer br {
-  color: red;
+.textLayer span {
+  color: transparent;
   position: absolute;
+  white-space: pre;
+  transform-origin: 0 0;
   cursor: text;
   user-select: text;
 }
 
 /* Hide br tags to prevent them from being copied or affecting selection flow */
 .textLayer br[role="presentation"] {
-  user-select: none;
+  display: none;
 }
 
 .textLayer ::selection {

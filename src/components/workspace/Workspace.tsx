@@ -1479,6 +1479,19 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (e.button === 1) return;
     if (isPanModeActive) return;
 
+    const isTextLayerHit = (() => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.(".textLayer")) return true;
+      const els = document.elementsFromPoint(e.clientX, e.clientY);
+      return els.some((el) =>
+        (el as HTMLElement | null)?.closest?.(".textLayer span"),
+      );
+    })();
+
+    if (editorState.tool === "select" && isTextLayerHit) {
+      return;
+    }
+
     // Unified highlight:
     // - On text spans: allow native selection.
     // - Otherwise: draw as an ink highlight (intent=InkHighlight).

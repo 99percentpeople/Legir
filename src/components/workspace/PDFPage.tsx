@@ -252,14 +252,22 @@ const PDFPage: React.FC<PDFPageProps> = ({
         });
 
         if (textLayerRef.current) {
-          textLayerRef.current.style.width = `${Math.floor(viewport.width)}px`;
-          textLayerRef.current.style.height = `${Math.floor(
-            viewport.height,
-          )}px`;
+          textLayerRef.current.style.width = `${viewport.width}px`;
+          textLayerRef.current.style.height = `${viewport.height}px`;
           textLayerRef.current.style.setProperty(
-            "--total-scale-factor",
+            "--scale-factor",
             `${initialScale}`,
           );
+          textLayerRef.current.style.setProperty(
+            "--user-unit",
+            `${viewport.userUnit}`,
+          );
+          textLayerRef.current.style.setProperty(
+            "--total-scale-factor",
+            `calc(var(--scale-factor) * var(--user-unit))`,
+          );
+          textLayerRef.current.style.setProperty("--scale-round-x", "2px");
+          textLayerRef.current.style.setProperty("--scale-round-y", "2px");
         }
 
         if (pdfjsViewer.TextLayerBuilder) {
@@ -274,8 +282,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
           if (isCancelled) return;
 
           if (textLayerRef.current) {
-            textLayerRef.current.innerHTML = "";
-            textLayerRef.current.appendChild(textLayerBuilder.div);
+            textLayerRef.current.innerHTML = textLayerBuilder.div.innerHTML;
           }
 
           textRenderTaskRef.current = textLayerBuilder;
