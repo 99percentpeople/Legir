@@ -1,4 +1,11 @@
-import { PDFForm, PDFName, PDFString, TextAlignment } from "pdf-lib";
+import * as pdfjsLib from "pdfjs-dist";
+import {
+  PDFForm,
+  PDFName,
+  PDFString,
+  TextAlignment,
+  type PDFFont,
+} from "pdf-lib";
 import { FormField, FieldType } from "@/types";
 import { IControlExporter } from "../types";
 import { containsNonAscii, isExplicitCjkFontSelection } from "../lib/text";
@@ -13,8 +20,8 @@ export class TextControlExporter implements IControlExporter {
   save(
     form: PDFForm,
     field: FormField,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): void {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
@@ -74,8 +81,8 @@ export class CheckboxControlExporter implements IControlExporter {
   save(
     form: PDFForm,
     field: FormField,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): void {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
@@ -105,8 +112,8 @@ export class DropdownControlExporter implements IControlExporter {
   save(
     form: PDFForm,
     field: FormField,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): void {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
@@ -202,8 +209,8 @@ export class RadioControlExporter implements IControlExporter {
   save(
     form: PDFForm,
     field: FormField,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): void {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
@@ -235,8 +242,8 @@ export class SignatureControlExporter implements IControlExporter {
   async save(
     form: PDFForm,
     field: FormField,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): Promise<void> {
     const page = form.doc.getPage(field.pageIndex);
 

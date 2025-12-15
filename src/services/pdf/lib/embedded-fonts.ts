@@ -61,7 +61,8 @@ export const ensurePdfEmbeddedFontLoaded = async (
   loadedFaces?: Set<FontFace>,
 ): Promise<string | undefined> => {
   if (typeof window === "undefined") return undefined;
-  if (typeof (window as any).FontFace === "undefined") return undefined;
+  const w = window as unknown as { FontFace?: unknown };
+  if (typeof w.FontFace === "undefined") return undefined;
   if (!document?.fonts) return undefined;
 
   const embedded = extractEmbeddedFontProgram(fontDict);

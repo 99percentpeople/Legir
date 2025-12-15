@@ -6,8 +6,9 @@ import {
 } from "../lib/control-parsing";
 import { pdfJsWidgetRectToUiRect } from "../lib/coords";
 import { pdfDebug } from "../lib/debug";
+import type * as pdfjsLib from "pdfjs-dist";
 
-const getViewportSummary = (viewport: any) => {
+const getViewportSummary = (viewport: pdfjsLib.PageViewport) => {
   try {
     return {
       width: viewport?.width,
@@ -119,6 +120,11 @@ export class CheckboxControlParser implements IControlParser {
         const isChecked =
           annotation.fieldValue && annotation.fieldValue !== "Off";
 
+        const exportValue =
+          typeof annotation.fieldValue === "string"
+            ? annotation.fieldValue
+            : undefined;
+
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
           pageIndex: pageIndex,
@@ -128,7 +134,7 @@ export class CheckboxControlParser implements IControlParser {
           required: !!(annotation.fieldFlags & 2),
           style: style,
           isChecked: isChecked,
-          exportValue: annotation.fieldValue, // Might need refinement
+          exportValue: exportValue, // Might need refinement
           toolTip: annotation.alternativeText || undefined,
         });
       }
@@ -231,9 +237,20 @@ export class DropdownControlParser implements IControlParser {
 
         let options: string[] | undefined = undefined;
         if (Array.isArray(annotation.options)) {
-          options = annotation.options.map((opt: any) =>
-            typeof opt === "string" ? opt : opt.display || opt.exportValue,
-          );
+          options = annotation.options
+            .map((opt) => {
+              if (typeof opt === "string") return opt;
+              const display =
+                typeof opt?.display === "string" ? opt.display : undefined;
+              const exportValue =
+                typeof opt?.exportValue === "string"
+                  ? opt.exportValue
+                  : undefined;
+              return display || exportValue;
+            })
+            .filter(
+              (v): v is string => typeof v === "string" && v.trim() !== "",
+            );
         }
 
         const isMultiSelect = !!(

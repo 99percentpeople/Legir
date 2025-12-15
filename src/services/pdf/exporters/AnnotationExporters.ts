@@ -7,7 +7,10 @@ import {
   PDFHexString,
   StandardFonts,
   PDFDict,
+  type PDFFont,
+  PDFRef,
 } from "pdf-lib";
+import type * as pdfjsLib from "pdfjs-dist";
 import { Annotation } from "@/types";
 import { IAnnotationExporter } from "../types";
 import { hexToPdfColor } from "../lib/colors";
@@ -28,8 +31,8 @@ export class HighlightExporter implements IAnnotationExporter {
     pdfDoc: PDFDocument,
     page: PDFPage,
     annotation: Annotation,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): void {
     if (!annotation.rect) return;
 
@@ -67,11 +70,9 @@ export class HighlightExporter implements IAnnotationExporter {
     }
 
     const colorObj = hexToPdfColor(annotation.color) || rgb(1, 1, 0);
-    const cr = (colorObj as any).red !== undefined ? (colorObj as any).red : 1;
-    const cg =
-      (colorObj as any).green !== undefined ? (colorObj as any).green : 1;
-    const cb =
-      (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+    const cr = colorObj.red;
+    const cg = colorObj.green;
+    const cb = colorObj.blue;
 
     const highlightAnnot = pdfDoc.context.obj({
       Type: "Annot",
@@ -107,8 +108,8 @@ export class CommentExporter implements IAnnotationExporter {
     pdfDoc: PDFDocument,
     page: PDFPage,
     annotation: Annotation,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): void {
     if (!annotation.rect) return;
 
@@ -119,11 +120,9 @@ export class CommentExporter implements IAnnotationExporter {
     const h = bounds.height;
 
     const colorObj = hexToPdfColor(annotation.color) || rgb(1, 1, 0);
-    const r = (colorObj as any).red !== undefined ? (colorObj as any).red : 1;
-    const g =
-      (colorObj as any).green !== undefined ? (colorObj as any).green : 1;
-    const bb =
-      (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+    const r = colorObj.red;
+    const g = colorObj.green;
+    const bb = colorObj.blue;
 
     const commentAnnot = pdfDoc.context.obj({
       Type: "Annot",
@@ -157,8 +156,8 @@ export class FreeTextExporter implements IAnnotationExporter {
     pdfDoc: PDFDocument,
     page: PDFPage,
     annotation: Annotation,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): Promise<void> {
     if (!annotation.rect) return;
 
@@ -169,11 +168,9 @@ export class FreeTextExporter implements IAnnotationExporter {
     const h = bounds.height;
 
     const colorObj = hexToPdfColor(annotation.color) || rgb(0, 0, 0);
-    const r = (colorObj as any).red !== undefined ? (colorObj as any).red : 0;
-    const g =
-      (colorObj as any).green !== undefined ? (colorObj as any).green : 0;
-    const bb =
-      (colorObj as any).blue !== undefined ? (colorObj as any).blue : 0;
+    const r = colorObj.red;
+    const g = colorObj.green;
+    const bb = colorObj.blue;
 
     const fontSize = annotation.size || 12;
 
@@ -207,7 +204,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       (customFont && userSelectedFont && userSelectedFont === customFont);
 
     // Base (ASCII) font selection
-    let baseFont: any | undefined;
+    let baseFont: PDFFont | undefined;
     let baseResourceName: string;
     if (userExplicitCustom && customFont) {
       // If user explicitly chose a CJK/custom font, render the entire annotation with it.
@@ -364,7 +361,7 @@ export class FreeTextExporter implements IAnnotationExporter {
     }
 
     // 3. Generate Appearance Stream (AP)
-    const apFontResources: Record<string, any> = {
+    const apFontResources: Record<string, PDFRef> = {
       [baseResourceName]: baseFontRef,
     };
     if (useMixedFonts && cjkFontRef && cjkResourceName) {
@@ -386,7 +383,7 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     let currentResource = baseResourceName;
 
-    const encodeRun = (f: any, run: string) => {
+    const encodeRun = (f: PDFFont, run: string) => {
       try {
         return f.encodeText(run);
       } catch {
@@ -511,8 +508,8 @@ export class InkExporter implements IAnnotationExporter {
     pdfDoc: PDFDocument,
     page: PDFPage,
     annotation: Annotation,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): void {
     const { height: pageHeight } = page.getSize();
 
@@ -567,9 +564,9 @@ export class InkExporter implements IAnnotationExporter {
 
     // 3. Color
     const colorObj = hexToPdfColor(annotation.color) || rgb(1, 0, 0);
-    const r = (colorObj as any).red;
-    const g = (colorObj as any).green;
-    const b = (colorObj as any).blue;
+    const r = colorObj.red;
+    const g = colorObj.green;
+    const b = colorObj.blue;
 
     let annotObj;
 
@@ -648,7 +645,7 @@ export class InkExporter implements IAnnotationExporter {
       let appearanceStream;
       if (appearanceStreamContent) {
         const opacity = annotation.opacity ?? 1;
-        let resources: any = {
+        const baseResources = {
           ProcSet: [
             PDFName.of("PDF"),
             PDFName.of("Text"),
@@ -658,15 +655,17 @@ export class InkExporter implements IAnnotationExporter {
           ],
         };
 
+        let resourcesObj = pdfDoc.context.obj(baseResources);
+
         if (opacity < 1) {
           const gsDict = pdfDoc.context.obj({ CA: opacity, ca: opacity });
           const gsRef = pdfDoc.context.register(gsDict);
-          resources = {
-            ...resources,
+          resourcesObj = pdfDoc.context.obj({
+            ...baseResources,
             ExtGState: {
               GS0: gsRef,
             },
-          };
+          });
 
           // Apply opacity to the appearance stream drawing operations.
           appearanceStreamContent = `q\n/GS0 gs\n${appearanceStreamContent}\nQ`;
@@ -677,7 +676,7 @@ export class InkExporter implements IAnnotationExporter {
           Subtype: PDFName.of("Form"),
           FormType: 1,
           BBox: rect,
-          Resources: pdfDoc.context.obj(resources),
+          Resources: resourcesObj,
         });
         appearanceStream = pdfDoc.context.register(stream);
       }

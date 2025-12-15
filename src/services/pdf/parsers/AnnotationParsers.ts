@@ -191,9 +191,7 @@ export class HighlightParser implements IAnnotationParser {
         let updatedAt = parsePDFDate(annotation.modificationDate);
 
         let opacity =
-          typeof (annotation as any).opacity === "number"
-            ? (annotation as any).opacity
-            : 0.4;
+          typeof annotation.opacity === "number" ? annotation.opacity : 0.4;
 
         // Try to get QuadPoints
         let qp = annotation.quadPoints;
@@ -360,7 +358,7 @@ export class FreeTextParser implements IAnnotationParser {
       return [r, g, b];
     };
 
-    const resolveFontDictFromDR = (dr: any, resourceName: string) => {
+    const resolveFontDictFromDR = (dr: unknown, resourceName: string) => {
       if (!(dr instanceof PDFDict)) return undefined;
       const fontRes = dr.lookup(PDFName.of("Font"));
       if (!(fontRes instanceof PDFDict)) return undefined;
@@ -392,66 +390,200 @@ export class FreeTextParser implements IAnnotationParser {
       };
 
       const segment = extractTextSection();
-      const tokens = segment.trim().split(/\s+/);
-      let matchedAnyColor = false;
-      let outHex: string | undefined = undefined;
-      let outOp: "rg" | "g" | "k" | undefined = undefined;
+      const tryParse = (input: string, segmentUsed: string) => {
+        const tokens = input.trim().split(/\s+/);
+        let matchedAnyColor = false;
+        let outHex: string | undefined = undefined;
+        let outOp: "rg" | "g" | "k" | "sc" | "scn" | undefined = undefined;
+        let currentCs: string | undefined = undefined;
 
-      for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
+        const normalize01to255 = (vals: number[]) => {
+          const max = Math.max(...vals.map((v) => Math.abs(v)));
+          if (max <= 1.01) return vals.map((v) => v * 255);
+          return vals;
+        };
 
-        // Prefer nonstroking (lowercase) operators for text fill.
-        if ((token === "rg" || token === "RG") && i >= 3) {
-          const r = parseFloat(tokens[i - 3]);
-          const g = parseFloat(tokens[i - 2]);
-          const b = parseFloat(tokens[i - 1]);
-          if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
-            const hex = rgbArrayToHex([r * 255, g * 255, b * 255]);
-            if (hex) {
-              outHex = hex;
-              outOp = "rg";
-              matchedAnyColor = true;
-            }
+        const rgbHexFrom3 = (vals: number[]) => {
+          const rgb = normalize01to255(vals);
+          return rgbArrayToHex(rgb);
+        };
+
+        const grayHexFrom1 = (val: number) => {
+          const g255 = normalize01to255([val])[0];
+          return rgbArrayToHex([g255, g255, g255]);
+        };
+
+        const scnComponents = (opIndex: number) => {
+          const nums: number[] = [];
+          for (let j = opIndex - 1; j >= 0 && nums.length < 4; j--) {
+            const t = tokens[j];
+            if (!t) continue;
+            if (t.startsWith("/")) continue;
+            const v = parseFloat(t);
+            if (isNaN(v)) break;
+            nums.unshift(v);
           }
-        } else if ((token === "g" || token === "G") && i >= 1) {
-          const gray = parseFloat(tokens[i - 1]);
-          if (!isNaN(gray)) {
-            const val = gray * 255;
-            const hex = rgbArrayToHex([val, val, val]);
-            if (hex) {
-              outHex = hex;
-              outOp = "g";
-              matchedAnyColor = true;
+          return nums;
+        };
+
+        for (let i = 0; i < tokens.length; i++) {
+          const token = tokens[i];
+
+          // Prefer nonstroking (lowercase) operators for text fill.
+          if ((token === "rg" || token === "RG") && i >= 3) {
+            const r = parseFloat(tokens[i - 3]);
+            const g = parseFloat(tokens[i - 2]);
+            const b = parseFloat(tokens[i - 1]);
+            if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+              const hex = rgbHexFrom3([r, g, b]);
+              if (hex) {
+                outHex = hex;
+                outOp = "rg";
+                matchedAnyColor = true;
+              }
             }
-          }
-        } else if ((token === "k" || token === "K") && i >= 4) {
-          const c = parseFloat(tokens[i - 4]);
-          const m = parseFloat(tokens[i - 3]);
-          const y = parseFloat(tokens[i - 2]);
-          const k = parseFloat(tokens[i - 1]);
-          if (!isNaN(c) && !isNaN(m) && !isNaN(y) && !isNaN(k)) {
-            const rr = 255 * (1 - c) * (1 - k);
-            const gg = 255 * (1 - m) * (1 - k);
-            const bb = 255 * (1 - y) * (1 - k);
-            const hex = rgbArrayToHex([rr, gg, bb]);
-            if (hex) {
-              outHex = hex;
-              outOp = "k";
-              matchedAnyColor = true;
+          } else if ((token === "g" || token === "G") && i >= 1) {
+            const gray = parseFloat(tokens[i - 1]);
+            if (!isNaN(gray)) {
+              const hex = grayHexFrom1(gray);
+              if (hex) {
+                outHex = hex;
+                outOp = "g";
+                matchedAnyColor = true;
+              }
+            }
+          } else if ((token === "k" || token === "K") && i >= 4) {
+            const c = parseFloat(tokens[i - 4]);
+            const m = parseFloat(tokens[i - 3]);
+            const y = parseFloat(tokens[i - 2]);
+            const k = parseFloat(tokens[i - 1]);
+            if (!isNaN(c) && !isNaN(m) && !isNaN(y) && !isNaN(k)) {
+              const cmyk = normalize01to255([c, m, y, k]);
+              const c01 = cmyk[0] / 255;
+              const m01 = cmyk[1] / 255;
+              const y01 = cmyk[2] / 255;
+              const k01 = cmyk[3] / 255;
+              const rr = 255 * (1 - c01) * (1 - k01);
+              const gg = 255 * (1 - m01) * (1 - k01);
+              const bb = 255 * (1 - y01) * (1 - k01);
+              const hex = rgbArrayToHex([rr, gg, bb]);
+              if (hex) {
+                outHex = hex;
+                outOp = "k";
+                matchedAnyColor = true;
+              }
+            }
+          } else if ((token === "cs" || token === "CS") && i >= 1) {
+            const name = tokens[i - 1];
+            currentCs = name ? name.replace(/^\//, "") : undefined;
+          } else if ((token === "sc" || token === "SC") && i >= 1) {
+            const comps = scnComponents(i);
+            if (comps.length === 3) {
+              const hex = rgbHexFrom3(comps);
+              if (hex) {
+                outHex = hex;
+                outOp = "sc";
+                matchedAnyColor = true;
+              }
+            } else if (comps.length === 1) {
+              const hex = grayHexFrom1(comps[0]);
+              if (hex) {
+                outHex = hex;
+                outOp = "sc";
+                matchedAnyColor = true;
+              }
+            } else if (comps.length === 4) {
+              const cmyk = normalize01to255(comps);
+              const c01 = cmyk[0] / 255;
+              const m01 = cmyk[1] / 255;
+              const y01 = cmyk[2] / 255;
+              const k01 = cmyk[3] / 255;
+              const rr = 255 * (1 - c01) * (1 - k01);
+              const gg = 255 * (1 - m01) * (1 - k01);
+              const bb = 255 * (1 - y01) * (1 - k01);
+              const hex = rgbArrayToHex([rr, gg, bb]);
+              if (hex) {
+                outHex = hex;
+                outOp = "sc";
+                matchedAnyColor = true;
+              }
+            }
+
+            if (matchedAnyColor) {
+              pdfDebug("import:freetext", "ap_color_sc", {
+                pageIndex,
+                currentCs,
+                token,
+                hex: outHex,
+              });
+            }
+          } else if ((token === "scn" || token === "SCN") && i >= 1) {
+            const comps = scnComponents(i);
+            if (comps.length === 4) {
+              const cmyk = normalize01to255(comps);
+              const c01 = cmyk[0] / 255;
+              const m01 = cmyk[1] / 255;
+              const y01 = cmyk[2] / 255;
+              const k01 = cmyk[3] / 255;
+              const rr = 255 * (1 - c01) * (1 - k01);
+              const gg = 255 * (1 - m01) * (1 - k01);
+              const bb = 255 * (1 - y01) * (1 - k01);
+              const hex = rgbArrayToHex([rr, gg, bb]);
+              if (hex) {
+                outHex = hex;
+                outOp = "scn";
+                matchedAnyColor = true;
+              }
+            } else if (comps.length === 3) {
+              const hex = rgbHexFrom3(comps);
+              if (hex) {
+                outHex = hex;
+                outOp = "scn";
+                matchedAnyColor = true;
+              }
+            } else if (comps.length === 1) {
+              const hex = grayHexFrom1(comps[0]);
+              if (hex) {
+                outHex = hex;
+                outOp = "scn";
+                matchedAnyColor = true;
+              }
+            }
+
+            if (matchedAnyColor) {
+              pdfDebug("import:freetext", "ap_color_scn", {
+                pageIndex,
+                currentCs,
+                token,
+                hex: outHex,
+              });
             }
           }
         }
+
+        pdfDebug("import:freetext", "ap_color_parsed", {
+          pageIndex,
+          segmentUsed,
+          matchedAnyColor,
+          op: outOp,
+          hex: outHex,
+        });
+
+        return { outHex, matchedAnyColor };
+      };
+
+      const fromSegment = tryParse(
+        segment,
+        segment !== content ? "BT..ET" : "full",
+      );
+      if (fromSegment.matchedAnyColor) return fromSegment.outHex;
+
+      if (segment !== content) {
+        const fromFull = tryParse(content, "full_fallback");
+        if (fromFull.matchedAnyColor) return fromFull.outHex;
       }
 
-      pdfDebug("import:freetext", "ap_color_parsed", {
-        pageIndex,
-        segmentUsed: segment !== content ? "BT..ET" : "full",
-        matchedAnyColor,
-        op: outOp,
-        hex: outHex,
-      });
-
-      return outHex;
+      return undefined;
     };
 
     const parseFontFromContentStream = (content: string) => {
@@ -474,6 +606,67 @@ export class FreeTextParser implements IAnnotationParser {
       );
       if (matches.length === 0) return undefined;
 
+      const hypot = (a: number, b: number) => Math.sqrt(a * a + b * b);
+      const parseScaleFromMatrix = (
+        a: number,
+        b: number,
+        c: number,
+        d: number,
+      ) => {
+        const sx = hypot(a, b);
+        const sy = hypot(c, d);
+        const s = Math.max(sx, sy);
+        return Number.isFinite(s) && s > 0 ? s : 1;
+      };
+
+      const findLastTmScale = (input: string) => {
+        let scale = 1;
+        try {
+          const tms = Array.from(
+            input.matchAll(
+              /([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+Tm/g,
+            ),
+          );
+          const last = tms.length > 0 ? tms[tms.length - 1] : undefined;
+          if (last) {
+            const a = parseFloat(last[1]);
+            const b = parseFloat(last[2]);
+            const c = parseFloat(last[3]);
+            const d = parseFloat(last[4]);
+            if (!isNaN(a) && !isNaN(b) && !isNaN(c) && !isNaN(d)) {
+              scale = parseScaleFromMatrix(a, b, c, d);
+            }
+          }
+        } catch {
+          // ignore
+        }
+        return scale;
+      };
+
+      const findLastCmScale = (input: string) => {
+        let scale = 1;
+        try {
+          const cms = Array.from(
+            input.matchAll(
+              /([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+cm/g,
+            ),
+          );
+          const last = cms.length > 0 ? cms[cms.length - 1] : undefined;
+          if (last) {
+            const a = parseFloat(last[1]);
+            const b = parseFloat(last[2]);
+            const c = parseFloat(last[3]);
+            const d = parseFloat(last[4]);
+            if (!isNaN(a) && !isNaN(b) && !isNaN(c) && !isNaN(d)) {
+              scale = parseScaleFromMatrix(a, b, c, d);
+            }
+          }
+        } catch {
+          // ignore
+        }
+        return scale;
+      };
+
       // Mixed-font FreeText (our exporter) typically uses a standard base font (Helv/TiRo/Cour)
       // and switches to a CJK font for non-ASCII runs (e.g. Cust). For round-tripping, we want
       // the base font to drive `annotation.fontFamily` so ASCII stays correct.
@@ -491,9 +684,33 @@ export class FreeTextParser implements IAnnotationParser {
       const size = preferred?.[2];
       if (!name) return undefined;
       const parsedSize = size ? parseFloat(size) : NaN;
+
+      let effectiveSize = !isNaN(parsedSize) ? parsedSize : undefined;
+      // Some PDFs encode FreeText as `1 Tf` and rely on `Tm` / outer `cm` scaling.
+      if (
+        effectiveSize !== undefined &&
+        effectiveSize > 0 &&
+        effectiveSize <= 3
+      ) {
+        const tmScale = findLastTmScale(segment);
+        const cmScale = findLastCmScale(content);
+        const scaled = effectiveSize * tmScale * cmScale;
+        if (Number.isFinite(scaled) && scaled > 0 && scaled < 500) {
+          effectiveSize = scaled;
+          pdfDebug("import:freetext", "ap_font_scaled", {
+            pageIndex,
+            resourceName: normalizePdfFontName(name),
+            tf: parsedSize,
+            tmScale,
+            cmScale,
+            scaled,
+          });
+        }
+      }
+
       return {
         resourceName: normalizePdfFontName(name),
-        fontSize: !isNaN(parsedSize) ? parsedSize : undefined,
+        fontSize: effectiveSize,
       };
     };
 
@@ -526,13 +743,27 @@ export class FreeTextParser implements IAnnotationParser {
         byteLength: bytes.length,
       });
 
+      if (
+        filters.includes("ASCII85Decode") ||
+        filters.includes("ASCIIHexDecode")
+      ) {
+        pdfDebug("import:freetext", "ap_filters_unsupported", {
+          pageIndex,
+          filters,
+        });
+      }
+
       // Common case: FlateDecode
+      const g = globalThis as unknown as { DecompressionStream?: unknown };
       if (
         filters.includes("FlateDecode") &&
-        typeof (globalThis as any).DecompressionStream !== "undefined"
+        typeof g.DecompressionStream !== "undefined"
       ) {
         try {
-          const ds = new (globalThis as any).DecompressionStream("deflate");
+          const DS = g.DecompressionStream as unknown as new (
+            format: string,
+          ) => DecompressionStream;
+          const ds = new DS("deflate");
           const decompressed = await new Response(
             new Blob([safeBytes]).stream().pipeThrough(ds),
           ).arrayBuffer();
@@ -550,7 +781,21 @@ export class FreeTextParser implements IAnnotationParser {
         }
       }
 
-      return new TextDecoder().decode(decodedBytes);
+      const text = new TextDecoder().decode(decodedBytes);
+      pdfDebug("import:freetext", "ap_decoded_sample", {
+        pageIndex,
+        length: text.length,
+        head: text.slice(0, 300),
+        hasBT: /\bBT\b/.test(text),
+        hasET: /\bET\b/.test(text),
+        hasRg: /\brg\b/.test(text) || /\bRG\b/.test(text),
+        hasG: /\bg\b/.test(text) || /\bG\b/.test(text),
+        hasK: /\bk\b/.test(text) || /\bK\b/.test(text),
+        hasScn: /\bscn\b/.test(text) || /\bSCN\b/.test(text),
+        hasGs: /\bgs\b/.test(text),
+        hasCs: /\bcs\b/.test(text) || /\bCS\b/.test(text),
+      });
+      return text;
     };
 
     for (let index = 0; index < pageAnnotations.length; index++) {
@@ -566,7 +811,7 @@ export class FreeTextParser implements IAnnotationParser {
           normalizedRgb,
           initialHex: color,
           defaultAppearance: annotation.defaultAppearance,
-          DA: (annotation as any).DA,
+          DA: annotation.DA,
         });
         const [x1, y1] = annotation.rect;
         const { x, y, width, height } = pdfJsRectToUiRect(
@@ -675,9 +920,7 @@ export class FreeTextParser implements IAnnotationParser {
         };
 
         // Fallback: if pdf-lib isn't available, we still want standard fonts (Helv/TiRo/Cour) to round-trip.
-        const daFromPdfJs =
-          (annotation.defaultAppearance as string | undefined) ||
-          (annotation.DA as string | undefined);
+        const daFromPdfJs = annotation.defaultAppearance || annotation.DA;
         if (!pdfDoc && daFromPdfJs) {
           parseDaString(daFromPdfJs);
         }
@@ -688,9 +931,9 @@ export class FreeTextParser implements IAnnotationParser {
             const libAnnots = pdfLibPage.node.Annots();
             if (libAnnots instanceof PDFArray) {
               for (let idx = 0; idx < libAnnots.size(); idx++) {
-                const rawRef = (libAnnots as any).get
-                  ? (libAnnots as any).get(idx)
-                  : undefined;
+                const rawRef = (
+                  libAnnots as unknown as { get?: (i: number) => unknown }
+                ).get?.(idx);
                 const libAnnot = libAnnots.lookup(idx);
                 if (libAnnot instanceof PDFDict) {
                   const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
@@ -708,13 +951,17 @@ export class FreeTextParser implements IAnnotationParser {
                         if (Math.abs(lx1 - x1) < 5 && Math.abs(ly1 - y1) < 5) {
                           if (
                             rawRef &&
-                            typeof (rawRef as any).objectNumber === "number" &&
-                            typeof (rawRef as any).generationNumber === "number"
+                            typeof (rawRef as { objectNumber?: unknown })
+                              .objectNumber === "number" &&
+                            typeof (rawRef as { generationNumber?: unknown })
+                              .generationNumber === "number"
                           ) {
                             sourcePdfRef = {
-                              objectNumber: (rawRef as any).objectNumber,
-                              generationNumber: (rawRef as any)
-                                .generationNumber,
+                              objectNumber: (rawRef as { objectNumber: number })
+                                .objectNumber,
+                              generationNumber: (
+                                rawRef as { generationNumber: number }
+                              ).generationNumber,
                             };
                           }
 
@@ -868,6 +1115,32 @@ export class FreeTextParser implements IAnnotationParser {
                                   length: apContent.length,
                                   head: apContent.slice(0, 200),
                                 });
+
+                                const count = (re: RegExp) => {
+                                  try {
+                                    return Array.from(apContent.matchAll(re))
+                                      .length;
+                                  } catch {
+                                    return 0;
+                                  }
+                                };
+                                pdfDebug("import:freetext", "ap_ops", {
+                                  pageIndex,
+                                  index,
+                                  rg: count(/\brg\b/g),
+                                  RG: count(/\bRG\b/g),
+                                  g: count(/\bg\b/g),
+                                  G: count(/\bG\b/g),
+                                  k: count(/\bk\b/g),
+                                  K: count(/\bK\b/g),
+                                  sc: count(/\bsc\b/g),
+                                  SC: count(/\bSC\b/g),
+                                  scn: count(/\bscn\b/g),
+                                  SCN: count(/\bSCN\b/g),
+                                  cs: count(/\bcs\b/g),
+                                  CS: count(/\bCS\b/g),
+                                  gs: count(/\bgs\b/g),
+                                });
                                 const apHex =
                                   parseTextColorFromContentStream(apContent);
                                 if (apHex) color = apHex;
@@ -956,9 +1229,14 @@ export class FreeTextParser implements IAnnotationParser {
                                 pdfDebug("import:freetext", "ap_n_not_stream", {
                                   pageIndex,
                                   index,
-                                  nType: n
-                                    ? (n as any).constructor?.name
-                                    : null,
+                                  nType:
+                                    n && typeof n === "object"
+                                      ? ((
+                                          n as {
+                                            constructor?: { name?: string };
+                                          }
+                                        ).constructor?.name ?? null)
+                                      : null,
                                 });
                               }
                             } else {

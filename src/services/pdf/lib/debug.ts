@@ -12,9 +12,16 @@ export type PdfDebugConfig = {
   callback?: (entry: PdfDebugEntry) => void;
 };
 
+type DebugGlobals = {
+  __FF_PDF_DEBUG?: PdfDebugConfig;
+  __FF_DEBUG_PDF_IMPORT_COLORS?: boolean;
+  __FF_DEBUG_PDF_IMPORT?: boolean;
+};
+
 const getConfig = (): PdfDebugConfig | undefined => {
   try {
-    return (globalThis as any).__FF_PDF_DEBUG as PdfDebugConfig | undefined;
+    const g = globalThis as unknown as DebugGlobals;
+    return g.__FF_PDF_DEBUG;
   } catch {
     return undefined;
   }
@@ -22,7 +29,7 @@ const getConfig = (): PdfDebugConfig | undefined => {
 
 const legacyEnabled = () => {
   try {
-    const g = globalThis as any;
+    const g = globalThis as unknown as DebugGlobals;
     return (
       g?.__FF_DEBUG_PDF_IMPORT_COLORS === true ||
       g?.__FF_DEBUG_PDF_IMPORT === true
@@ -62,5 +69,6 @@ export const pdfDebug = (category: string, event: string, data?: unknown) => {
 };
 
 export const setPdfDebugConfig = (config: PdfDebugConfig | undefined) => {
-  (globalThis as any).__FF_PDF_DEBUG = config;
+  const g = globalThis as unknown as DebugGlobals;
+  g.__FF_PDF_DEBUG = config;
 };

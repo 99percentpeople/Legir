@@ -1,7 +1,8 @@
 import { isSerifFamily } from "./text";
+import type { PDFFont } from "pdf-lib";
 
 export const pickCjkFontFromMap = (
-  fontMap: Map<string, any> | undefined,
+  fontMap: Map<string, PDFFont> | undefined,
   baseFontFamily?: string,
 ) => {
   if (!fontMap) return undefined;

@@ -112,6 +112,7 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
                   minValue={6}
                   maxValue={72}
                   value={style.fontSize || 12}
+                  formatOptions={{ maximumFractionDigits: 0 }}
                   onFocus={onTriggerHistorySave}
                   onChange={(val) => handleStyleChange("fontSize", val)}
                 />

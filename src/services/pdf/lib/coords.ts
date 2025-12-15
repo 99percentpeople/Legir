@@ -1,7 +1,8 @@
 import { PDFPage } from "pdf-lib";
+import type * as pdfjsLib from "pdfjs-dist";
 import { pdfDebug } from "./debug";
 
-const getViewportSummary = (viewport: any) => {
+const getViewportSummary = (viewport: pdfjsLib.PageViewport | undefined) => {
   try {
     return {
       width: viewport?.width,
@@ -20,7 +21,7 @@ const getViewportSummary = (viewport: any) => {
 export const uiPointToPdfPoint = (
   page: PDFPage,
   point: { x: number; y: number },
-  viewport?: any,
+  viewport?: pdfjsLib.PageViewport,
 ): { x: number; y: number } => {
   if (viewport && typeof viewport.convertToPdfPoint === "function") {
     const [x, y] = viewport.convertToPdfPoint(point.x, point.y);
@@ -35,7 +36,7 @@ export const uiPointToPdfPoint = (
 export const uiRectToPdfBounds = (
   page: PDFPage,
   rect: { x: number; y: number; width: number; height: number },
-  viewport?: any,
+  viewport?: pdfjsLib.PageViewport,
 ): { x: number; y: number; width: number; height: number } => {
   const p1 = uiPointToPdfPoint(page, { x: rect.x, y: rect.y }, viewport);
   const p2 = uiPointToPdfPoint(
@@ -65,7 +66,7 @@ export const uiRectToPdfBounds = (
 export const uiRectToPdfAnnotRect = (
   page: PDFPage,
   rect: { x: number; y: number; width: number; height: number },
-  viewport?: any,
+  viewport?: pdfjsLib.PageViewport,
 ): [number, number, number, number] => {
   const b = uiRectToPdfBounds(page, rect, viewport);
   return [b.x, b.y, b.x + b.width, b.y + b.height];
@@ -73,7 +74,7 @@ export const uiRectToPdfAnnotRect = (
 
 export const pdfJsWidgetRectToUiRect = (
   rect: [number, number, number, number],
-  viewport: any,
+  viewport: pdfjsLib.PageViewport,
 ): { x: number; y: number; width: number; height: number } => {
   const [x1, y1, x2, y2] = rect;
   // Prefer pdf.js viewport conversion when available. This accounts for
@@ -110,7 +111,7 @@ export const pdfJsWidgetRectToUiRect = (
 
 export const pdfJsRectToUiRect = (
   rect: [number, number, number, number],
-  viewport: any,
+  viewport: pdfjsLib.PageViewport,
 ): { x: number; y: number; width: number; height: number } => {
   const [x1, y1, x2, y2] = rect;
   const [vx1, vy1] = viewport.convertToViewportPoint(x1, y1);

@@ -95,10 +95,5 @@ export const resolveFormControlFontFamilyCss = (
   fontKey: string | undefined,
   displayedValue: string | undefined,
 ) => {
-  // Match PDF export behavior: when we need CJK, the field appearance uses a single font.
-  // So in the browser, if the displayed value contains non-ASCII, force the configured CJK fallback font.
-  if (displayedValue && containsNonAscii(displayedValue)) {
-    return resolveFontStack(getCjkFallbackFontKeyForBase(fontKey));
-  }
   return resolveFontStackWithCjkFallback(fontKey);
 };

@@ -1,6 +1,7 @@
 import { DEFAULT_FIELD_STYLE } from "@/constants";
 import type { FieldStyle } from "@/types";
-import type { ParserContext } from "../types";
+import type { ParserContext, PdfJsAnnotation } from "../types";
+import type { PDFDocument } from "pdf-lib";
 import { rgbArrayToHex } from "./colors";
 import {
   getFieldPropertiesFromPdfLib,
@@ -28,8 +29,8 @@ export const getStyleParsingResources = (context: ParserContext) => {
 };
 
 export const parseFieldStyle = (
-  annotation: any,
-  pdfDoc: any,
+  annotation: PdfJsAnnotation,
+  pdfDoc: PDFDocument | undefined,
   fontMap: Map<string, string>,
   globalDA: string | undefined,
 ): { style: FieldStyle; alignment: "left" | "center" | "right" } => {

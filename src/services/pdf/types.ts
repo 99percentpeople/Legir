@@ -1,10 +1,49 @@
-import { PDFDocument, PDFForm, PDFPage } from "pdf-lib";
+import * as pdfjsLib from "pdfjs-dist";
+import { PDFDocument, PDFForm, PDFPage, type PDFFont } from "pdf-lib";
 import { Annotation, FormField } from "../../types";
 
+export type PdfJsAnnotationOption =
+  | string
+  | {
+      display?: string;
+      exportValue?: string;
+    };
+
+export type PdfJsAnnotation = Record<string, unknown> & {
+  subtype: string;
+  rect: [number, number, number, number];
+
+  fieldName?: string;
+  fieldType?: string;
+  fieldFlags?: number;
+  fieldValue?: unknown;
+  alternativeText?: string;
+  options?: PdfJsAnnotationOption[];
+
+  color?: number[] | Uint8ClampedArray;
+  backgroundColor?: number[] | Uint8ClampedArray;
+  borderStyle?: {
+    width?: number;
+  };
+  defaultAppearance?: string;
+  DA?: string;
+  textAlignment?: number;
+
+  checkBox?: boolean;
+  radioButton?: boolean;
+  buttonValue?: string;
+
+  title?: string;
+  contents?: string;
+  modificationDate?: string;
+  quadPoints?: number[];
+  opacity?: number;
+};
+
 export interface ParserContext {
-  pageAnnotations: any[];
+  pageAnnotations: PdfJsAnnotation[];
   pageIndex: number;
-  viewport: any;
+  viewport: pdfjsLib.PageViewport;
   pdfDoc?: PDFDocument;
   fontMap?: Map<string, string>;
   globalDA?: string;
@@ -26,8 +65,8 @@ export interface IAnnotationExporter {
     pdfDoc: PDFDocument,
     page: PDFPage,
     annotation: Annotation,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): Promise<void> | void;
 }
 
@@ -36,7 +75,7 @@ export interface IControlExporter {
   save(
     form: PDFForm,
     field: FormField,
-    fontMap?: Map<string, any>,
-    viewport?: any,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: pdfjsLib.PageViewport,
   ): Promise<void> | void;
 }

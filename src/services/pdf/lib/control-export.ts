@@ -1,12 +1,13 @@
 import type { FormField } from "@/types";
 import type { PDFPage } from "pdf-lib";
+import type * as pdfjsLib from "pdfjs-dist";
 import { hexToPdfColor } from "./colors";
 import { uiRectToPdfBounds } from "./coords";
 
 export const getCommonControlExportOpts = (
   field: FormField,
   page: PDFPage,
-  viewport?: any,
+  viewport?: pdfjsLib.PageViewport,
 ) => {
   const b = uiRectToPdfBounds(page, field.rect, viewport);
   const bw = field.style?.borderWidth ?? 1;

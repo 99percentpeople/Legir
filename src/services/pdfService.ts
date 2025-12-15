@@ -3,10 +3,17 @@ import { pdfWorkerService } from "./pdfWorkerService";
 import { mapOutline } from "./pdf/lib/outline";
 import { getFontMap, getGlobalDA } from "./pdf/lib/appearance";
 import { loadAndEmbedExportFonts } from "./pdf/lib/built-in-fonts";
+import {
+  containsNonAscii,
+  isSerifFamily,
+  isExplicitCjkFontSelection,
+} from "./pdf/lib/text";
 import { parsePDFDate } from "../utils/pdfUtils";
 import {
   PDFDocument,
   StandardFonts,
+  type PDFFont,
+  PDFRef,
   PDFName,
   PDFString,
   PDFDict,
@@ -19,7 +26,7 @@ import {
   PDFRadioGroup,
   PDFSignature,
 } from "pdf-lib";
-import fontkit from "@pdf-lib/fontkit";
+import fontkit from "pdf-fontkit";
 import {
   FormField,
   PageData,
@@ -96,7 +103,7 @@ export const loadPDF = async (
   input: File | Uint8Array,
 ): Promise<{
   pdfBytes: Uint8Array;
-  pdfDocument: any;
+  pdfDocument: pdfjsLib.PDFDocumentProxy;
   pages: PageData[];
   fields: FormField[];
   annotations: Annotation[];
@@ -161,7 +168,7 @@ export const loadPDF = async (
   const dispose = () => {
     embeddedFontCache.clear();
 
-    if (typeof document !== "undefined" && (document as any).fonts) {
+    if (typeof document !== "undefined" && document.fonts) {
       embeddedFontFaces.forEach((face) => {
         try {
           document.fonts.delete(face);
@@ -198,7 +205,7 @@ export const loadPDF = async (
 
       if (keywords) {
         keywords = keywords.filter(
-          (k: any) => typeof k === "string" && k.trim().length > 0,
+          (k: unknown) => typeof k === "string" && k.trim().length > 0,
         );
         if (keywords.length === 0) keywords = undefined;
       }
@@ -323,11 +330,11 @@ export const loadPDF = async (
 };
 
 export const renderPage = async (
-  page: any,
+  page: pdfjsLib.PDFPageProxy,
   scale: number = 1.0,
 ): Promise<string | null> => {
   try {
-    const viewport = page.getViewport({ scale });
+    const viewport: pdfjsLib.PageViewport = page.getViewport({ scale });
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
     canvas.height = viewport.height;
@@ -335,8 +342,9 @@ export const renderPage = async (
 
     if (context) {
       await page.render({
+        canvas,
         canvasContext: context,
-        viewport: viewport,
+        viewport,
         annotationMode: pdfjsLib.AnnotationMode.DISABLE,
       }).promise;
       return canvas.toDataURL("image/jpeg", 0.8);
@@ -357,7 +365,62 @@ export const exportPDF = async (
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
 
-  let pdfJsDoc: any | undefined;
+  const resolveExportFontNeeds = () => {
+    const includeFontIds = new Set<"cjk_sans" | "cjk_serif">();
+    let needsCustomFont = false;
+
+    const consider = (
+      text: string | undefined,
+      fontFamily: string | undefined,
+    ) => {
+      const hasText = typeof text === "string" && text.length > 0;
+      const hasNonAscii = hasText ? containsNonAscii(text) : false;
+      const explicitCjk = isExplicitCjkFontSelection(fontFamily);
+
+      if (explicitCjk) {
+        if (
+          fontFamily === "Source Han Serif SC" ||
+          fontFamily === "CustomSerif"
+        ) {
+          includeFontIds.add("cjk_serif");
+        } else {
+          includeFontIds.add("cjk_sans");
+        }
+        if (
+          fontFamily === "Custom" ||
+          fontFamily === "CustomSans" ||
+          fontFamily === "CustomSerif"
+        ) {
+          needsCustomFont = true;
+        }
+      }
+
+      if (hasNonAscii) {
+        if (isSerifFamily(fontFamily)) includeFontIds.add("cjk_serif");
+        else includeFontIds.add("cjk_sans");
+      }
+    };
+
+    for (const f of fields || []) {
+      const fontFamily = f.style?.fontFamily;
+      consider(f.value, fontFamily);
+      consider(f.toolTip, fontFamily);
+    }
+
+    for (const a of annotations || []) {
+      const fontFamily = a.fontFamily;
+      consider(a.text, fontFamily);
+      consider(a.author, fontFamily);
+    }
+
+    if (!customFont?.bytes || customFont.bytes.byteLength === 0) {
+      needsCustomFont = false;
+    }
+
+    return { includeFontIds, needsCustomFont };
+  };
+
+  let pdfJsDoc: pdfjsLib.PDFDocumentProxy | undefined;
   try {
     const renderBuffer = new Uint8Array(originalBytes.slice(0));
     pdfJsDoc = await pdfjsLib.getDocument({ data: renderBuffer, password: "" })
@@ -369,7 +432,7 @@ export const exportPDF = async (
     );
   }
 
-  const viewportCache = new Map<number, any>();
+  const viewportCache = new Map<number, pdfjsLib.PageViewport>();
   const getViewportForPage = async (pageIndex: number) => {
     if (!pdfJsDoc) return undefined;
     if (viewportCache.has(pageIndex)) return viewportCache.get(pageIndex);
@@ -435,16 +498,20 @@ export const exportPDF = async (
   const timesRoman = await pdfDoc.embedFont(StandardFonts.TimesRoman);
   const courier = await pdfDoc.embedFont(StandardFonts.Courier);
 
-  const fontMap = new Map<string, any>();
+  const fontMap = new Map<string, PDFFont>();
   fontMap.set("Helvetica", helvetica);
   fontMap.set("Times Roman", timesRoman);
   fontMap.set("Courier", courier);
+
+  const { includeFontIds, needsCustomFont } = resolveExportFontNeeds();
 
   await loadAndEmbedExportFonts({
     pdfDoc,
     fontMap,
     fontkit,
-    customFont,
+    customFont: needsCustomFont ? customFont : undefined,
+    includeFontIds,
+    subset: true,
   });
 
   const form = pdfDoc.getForm();
@@ -509,27 +576,36 @@ export const exportPDF = async (
 
       if (shouldRemove) {
         try {
-          const fieldRef = (field as any).ref;
+          const fieldRef = (field as unknown as { ref?: PDFRef }).ref;
           const acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
           if (acroForm instanceof PDFDict) {
             const acroFields = acroForm.lookup(PDFName.of("Fields"));
             if (acroFields instanceof PDFArray) {
-              const idx = acroFields.indexOf(fieldRef);
-              if (idx !== -1) {
-                acroFields.remove(idx);
+              if (fieldRef) {
+                const idx = acroFields.indexOf(fieldRef);
+                if (idx !== -1) {
+                  acroFields.remove(idx);
+                }
               }
             }
           }
 
-          const acroField = (field as any).acroField;
-          if (acroField && typeof acroField.getWidgets === "function") {
-            const widgets = acroField.getWidgets();
+          const acroField = (field as unknown as { acroField?: unknown })
+            .acroField;
+          const acroFieldWithWidgets = acroField as
+            | { getWidgets?: unknown }
+            | undefined;
+          if (typeof acroFieldWithWidgets?.getWidgets === "function") {
+            const widgets = (
+              acroFieldWithWidgets.getWidgets as () => unknown
+            )();
             if (Array.isArray(widgets)) {
               const pages = pdfDoc.getPages();
               for (const page of pages) {
                 const annots = page.node.Annots();
                 if (annots instanceof PDFArray) {
                   for (const widget of widgets) {
+                    if (!(widget instanceof PDFRef)) continue;
                     const wIdx = annots.indexOf(widget);
                     if (wIdx !== -1) {
                       annots.remove(wIdx);
@@ -558,14 +634,10 @@ export const exportPDF = async (
         const keepKeys = keepAnnotRefKeysByPage.get(pageIndex);
 
         for (let i = 0; i < annots.size(); i++) {
-          if (keepKeys && (annots as any).get) {
-            const raw = (annots as any).get(i);
-            if (
-              raw &&
-              typeof (raw as any).objectNumber === "number" &&
-              typeof (raw as any).generationNumber === "number"
-            ) {
-              const k = `${(raw as any).objectNumber}:${(raw as any).generationNumber}`;
+          if (keepKeys) {
+            const raw = annots.get(i);
+            if (raw instanceof PDFRef) {
+              const k = `${raw.objectNumber}:${raw.generationNumber}`;
               if (keepKeys.has(k)) continue;
             }
           }

@@ -1,4 +1,5 @@
-export type ExportFontKit = any;
+import type { PDFFont, PDFDocument } from "pdf-lib";
+import type { Fontkit } from "pdf-lib/cjs/types/fontkit";
 
 export type ExportFontConfig = {
   id: "cjk_sans" | "cjk_serif";
@@ -28,7 +29,7 @@ export const BUILT_IN_EXPORT_FONTS: ExportFontConfig[] = [
   {
     id: "cjk_serif",
     name: "Source Han Serif SC",
-    path: "fonts/SourceHanSerifSC-Regular.otf",
+    path: "fonts/SourceHanSerifSC-VF.ttf",
     exportKeys: ["Source Han Serif SC", "CustomSerif"],
     importAliases: [
       "SourceHanSerifSC",
@@ -58,9 +59,9 @@ const fetchFontBytes = async (
 };
 
 const setFontMapIfMissing = (
-  fontMap: Map<string, any>,
+  fontMap: Map<string, PDFFont>,
   key: string,
-  font: any,
+  font: PDFFont,
   onlyIfMissing: boolean,
 ) => {
   if (onlyIfMissing && fontMap.has(key)) return;
@@ -68,12 +69,15 @@ const setFontMapIfMissing = (
 };
 
 export const loadAndEmbedExportFonts = async (args: {
-  pdfDoc: any;
-  fontMap: Map<string, any>;
-  fontkit: ExportFontKit;
+  pdfDoc: PDFDocument;
+  fontMap: Map<string, PDFFont>;
+  fontkit: Fontkit;
   customFont?: { bytes: Uint8Array; name?: string };
+  includeFontIds?: Set<ExportFontConfig["id"]>;
+  subset?: boolean;
 }) => {
-  const { pdfDoc, fontMap, fontkit, customFont } = args;
+  const { pdfDoc, fontMap, fontkit, customFont, includeFontIds } = args;
+  const subset = args.subset ?? true;
 
   let fontkitRegistered = false;
   const ensureFontkit = () => {
@@ -83,38 +87,48 @@ export const loadAndEmbedExportFonts = async (args: {
     }
   };
 
+  // Helper: embed font with subset option
+  const embedFont = async (
+    bytes: Uint8Array,
+    useSubset: boolean,
+  ): Promise<PDFFont | undefined> => {
+    ensureFontkit();
+    try {
+      return await pdfDoc.embedFont(bytes, { subset: useSubset });
+    } catch (e) {
+      console.warn("[PDF Export] Font embed failed", e);
+      return undefined;
+    }
+  };
+
   // Optional user-provided font -> treat as default CJK sans fallback
   if (customFont?.bytes && customFont.bytes.byteLength > 0) {
-    try {
-      ensureFontkit();
-      const embedded = await pdfDoc.embedFont(customFont.bytes, {
-        subset: false,
-      });
+    const embedded = await embedFont(customFont.bytes, subset);
+    if (embedded) {
       const name = (customFont.name || "Custom").trim() || "Custom";
       fontMap.set("Custom", embedded);
       fontMap.set("CustomSans", embedded);
       fontMap.set(name, embedded);
-    } catch (e) {
-      console.warn("Failed to embed custom font for export", e);
     }
   }
 
   for (const def of BUILT_IN_EXPORT_FONTS) {
+    if (includeFontIds && !includeFontIds.has(def.id)) continue;
+
     const bytes = await fetchFontBytes(def.path);
     if (!bytes) {
       console.warn("[PDF Export] Built-in font not found", def.path);
       continue;
     }
 
-    try {
-      ensureFontkit();
-      const embedded = await pdfDoc.embedFont(bytes, { subset: false });
+    const embedded = await embedFont(bytes, subset);
+    if (embedded) {
       for (const key of def.exportKeys) {
         setFontMapIfMissing(fontMap, key, embedded, key.startsWith("Custom"));
       }
       console.info("[PDF Export] Loaded built-in font", def.path);
-    } catch (e) {
-      console.warn("Failed to embed built-in font for export", def.name, e);
+    } else {
+      console.warn("[PDF Export] Failed to embed built-in font", def.name);
     }
   }
 };

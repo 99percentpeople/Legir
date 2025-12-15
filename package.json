@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "format": "prettier --write .",
+    "lint": "tsc --noEmit",
     "prepare": "husky"
   },
   "lint-staged": {

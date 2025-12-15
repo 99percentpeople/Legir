@@ -29,6 +29,8 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const warnedMissingFontRef = useRef(false);
 
+  const displaySize = Math.round((data.size || 12) as number);
+
   const resolvedFontFamily = resolveFontStackForDisplay(data.fontFamily);
   const cjkFontFamily = resolveCjkFallbackFontStack(data.fontFamily);
   const editFontFamily = resolveFontStackWithCjkFallback(data.fontFamily);
@@ -92,11 +94,9 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
             sideOffset={6}
           >
             <div className="flex items-center gap-3">
-              <span className="w-8 text-sm font-medium">
-                {data.size || 12}px
-              </span>
+              <span className="w-8 text-sm font-medium">{displaySize}pt</span>
               <Slider
-                value={[data.size || 12]}
+                value={[displaySize]}
                 min={8}
                 max={72}
                 step={1}

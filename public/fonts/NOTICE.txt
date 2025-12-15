@@ -8,7 +8,7 @@ Noto Sans SC
 - Project page: https://fonts.google.com/noto/specimen/Noto+Sans+SC
 
 Source Han Serif SC
-- File: SourceHanSerifSC-Regular.otf
+- File: SourceHanSerifSC-VF.ttf
 - Copyright: Adobe
 - License: SIL Open Font License, Version 1.1
 - License text: https://scripts.sil.org/OFL

@@ -21,6 +21,8 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
 }) => {
   const { t } = useLanguage();
 
+  const displaySize = Math.round((data.size || 12) as number);
+
   const availableFontKeys = Object.keys(FONT_FAMILY_MAP);
   const currentFontValue = data.fontFamily || "Helvetica";
   const isCustomFontValue =
@@ -77,11 +79,11 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
           <div className="flex items-center justify-between">
             <Label>{t("properties.font_size") || "Font Size"}</Label>
             <span className="text-muted-foreground text-xs">
-              {data.size || 12}px
+              {displaySize}pt
             </span>
           </div>
           <Slider
-            value={[data.size || 12]}
+            value={[displaySize]}
             min={8}
             max={72}
             step={1}

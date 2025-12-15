@@ -1,4 +1,4 @@
-import { PDFDocument, PDFDict, PDFName } from "pdf-lib";
+import { PDFDocument, PDFDict, PDFName, PDFNumber } from "pdf-lib";
 import { rgbArrayToHex } from "./colors";
 import { pdfDebug } from "./debug";
 import { normalizePdfFontName } from "./pdf-font-names";
@@ -171,10 +171,10 @@ export const getFieldPropertiesFromPdfLib = (
     let q: number | undefined = undefined;
 
     da = decodePdfString(rawDa);
-    if (typeof rawQ === "number") {
+    if (rawQ instanceof PDFNumber) {
+      q = rawQ.asNumber();
+    } else if (typeof rawQ === "number") {
       q = rawQ;
-    } else if (rawQ && (rawQ as any).numberValue) {
-      q = (rawQ as any).numberValue;
     }
 
     return { da, q };

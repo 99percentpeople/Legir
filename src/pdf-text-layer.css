@@ -1,0 +1,38 @@
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 20; /* Above canvas (z-10) */
+}
+
+.textLayer span,
+.textLayer br {
+  color: red;
+  position: absolute;
+  cursor: text;
+  user-select: text;
+}
+
+/* Hide br tags to prevent them from being copied or affecting selection flow */
+.textLayer br[role="presentation"] {
+  user-select: none;
+}
+
+.textLayer ::selection {
+  background: color-mix(in srgb, var(--color-blue-500) 30%, transparent);
+  color: transparent;
+  mix-blend-mode: multiply;
+}
+
+/* Fix for PDF.js text layer structure wrappers */
+.textLayer .markedContent {
+  display: contents;
+}
