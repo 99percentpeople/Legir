@@ -46,6 +46,7 @@ const en = {
   "toolbar.close": "Close",
   "toolbar.toggle_sidebar": "Toggle Sidebar",
   "toolbar.toggle_properties": "Toggle Properties Panel",
+  "toolbar.search_web": "Search the web for “{text}”",
   "dialog.confirm_close.title": "Close Document?",
   "dialog.confirm_close.desc":
     "Are you sure you want to close? Any unsaved changes will be lost.",

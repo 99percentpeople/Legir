@@ -46,6 +46,7 @@ const zhCN = {
   "toolbar.close": "关闭",
   "toolbar.toggle_sidebar": "切换侧边栏",
   "toolbar.toggle_properties": "切换属性面板",
+  "toolbar.search_web": "在网络上搜索“{text}”",
   "dialog.confirm_close.title": "关闭文档？",
   "dialog.confirm_close.desc": "您确定要关闭吗？任何未保存的更改都将丢失。",
   "dialog.confirm_close.confirm": "关闭且不保存",

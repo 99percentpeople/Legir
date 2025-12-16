@@ -43,6 +43,7 @@ const de = {
   "toolbar.close": "Schließen",
   "toolbar.toggle_sidebar": "Seitenleiste umschalten",
   "toolbar.toggle_properties": "Eigenschaftenbereich umschalten",
+  "toolbar.search_web": "Im Web nach „{text}“ suchen",
   "dialog.confirm_close.title": "Dokument schließen?",
   "dialog.confirm_close.desc":
     "Sind Sie sicher, dass Sie schließen möchten? Alle ungespeicherten Änderungen gehen verloren.",

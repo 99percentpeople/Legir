@@ -20,6 +20,20 @@
   user-select: text;
 }
 
+@supports (selector(::-webkit-scrollbar)) {
+  .textLayer span[style*="serif"] {
+    font-family: Times, serif !important;
+  }
+
+  .textLayer span[style*="sans-serif"] {
+    font-family: Arial, sans-serif !important;
+  }
+
+  .textLayer span[style*="monospace"] {
+    font-family: Consolas, monospace !important;
+  }
+}
+
 /* Hide br tags to prevent them from being copied or affecting selection flow */
 .textLayer br[role="presentation"] {
   display: none;

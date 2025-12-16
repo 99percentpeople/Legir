@@ -251,7 +251,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
         color: state.highlightStyle?.color || ANNOTATION_STYLES.highlight.color,
         opacity:
           state.highlightStyle?.opacity ?? ANNOTATION_STYLES.highlight.opacity,
-        text: selectedText,
       });
 
       // Text highlight should not be auto-selected; keep the tool ready for continuous highlighting.
@@ -2109,6 +2108,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
           align="center"
           sideOffset={8}
           className="z-60 w-auto rounded-md border p-1 shadow-md"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+          }}
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+          }}
           onPointerDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
@@ -2134,7 +2139,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              title={t("sidebar.search_outline")}
+              title={t("toolbar.search_web", {
+                text: textSelectionToolbar.text.trim(),
+              })}
               onClick={() => {
                 const q = textSelectionToolbar.text.trim();
                 if (q) {

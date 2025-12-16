@@ -43,6 +43,7 @@ const es = {
   "toolbar.close": "Cerrar",
   "toolbar.toggle_sidebar": "Alternar barra lateral",
   "toolbar.toggle_properties": "Alternar panel de propiedades",
+  "toolbar.search_web": "Buscar “{text}” en la web",
   "dialog.confirm_close.title": "¿Cerrar documento?",
   "dialog.confirm_close.desc":
     "¿Está seguro de que desea cerrar? Se perderán los cambios no guardados.",

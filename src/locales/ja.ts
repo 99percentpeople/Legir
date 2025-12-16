@@ -43,6 +43,7 @@ const ja = {
   "toolbar.close": "閉じる",
   "toolbar.toggle_sidebar": "サイドバーの切り替え",
   "toolbar.toggle_properties": "プロパティパネルの切り替え",
+  "toolbar.search_web": "ウェブで「{text}」を検索",
   "dialog.confirm_close.title": "ドキュメントを閉じますか？",
   "dialog.confirm_close.desc": "本当に閉じますか？未保存の変更は失われます。",
   "dialog.confirm_close.confirm": "保存せずに閉じる",

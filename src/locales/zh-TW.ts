@@ -43,6 +43,7 @@ const zhTW = {
   "toolbar.close": "關閉",
   "toolbar.toggle_sidebar": "切換側邊欄",
   "toolbar.toggle_properties": "切換屬性面板",
+  "toolbar.search_web": "在網路上搜尋「{text}」",
   "dialog.confirm_close.title": "關閉文件？",
   "dialog.confirm_close.desc": "您確定要關閉嗎？任何未儲存的變更都將遺失。",
   "dialog.confirm_close.confirm": "關閉且不儲存",

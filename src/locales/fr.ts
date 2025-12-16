@@ -43,6 +43,7 @@ const fr = {
   "toolbar.close": "Fermer",
   "toolbar.toggle_sidebar": "Basculer la barre latérale",
   "toolbar.toggle_properties": "Basculer le panneau des propriétés",
+  "toolbar.search_web": "Rechercher “{text}” sur le Web",
   "dialog.confirm_close.title": "Fermer le document ?",
   "dialog.confirm_close.desc":
     "Êtes-vous sûr de vouloir fermer ? Toutes les modifications non enregistrées seront perdues.",
