@@ -1488,6 +1488,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     })();
 
     if (editorState.tool === "select" && isTextLayerHit) {
+      onSelectControl(null);
       return;
     }
 
