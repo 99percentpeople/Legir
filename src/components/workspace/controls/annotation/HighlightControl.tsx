@@ -105,12 +105,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
       isAnnotationMode={isAnnotationMode}
       isFormMode={false}
       isSelectable={isSelectable}
-      onPointerDown={(e) => {
-        if (!isSelectable) return;
-        e.stopPropagation();
-        e.preventDefault();
-        onSelect(data.id);
-      }}
+      onPointerDown={() => {}}
       onSelect={onSelect}
       onUpdate={onUpdate || (() => {})}
       customRect={r}
@@ -118,6 +113,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
       showBorder={isSelected}
       resizable={false}
       data={data}
+      className="pointer-events-none"
     >
       <FloatingToolbar isVisible={!!showToolbar}>
         <ColorPickerPopover
@@ -162,11 +158,17 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
         <TooltipTrigger asChild>
           <div
             ref={ref}
-            className="h-full w-full transition-colors"
+            className="pointer-events-auto h-full w-full cursor-pointer transition-colors"
             style={{
               backgroundColor: data.color,
               opacity: data.opacity !== undefined ? data.opacity : 0.4,
               mixBlendMode: "multiply",
+            }}
+            onPointerDown={(e) => {
+              if (!isSelectable) return;
+              e.stopPropagation();
+              e.preventDefault();
+              onSelect(data.id);
             }}
           />
         </TooltipTrigger>
@@ -227,12 +229,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
       isAnnotationMode={isAnnotationMode}
       isFormMode={false}
       isSelectable={isSelectable}
-      onPointerDown={(e) => {
-        if (!isSelectable) return;
-        e.stopPropagation();
-        e.preventDefault();
-        onSelect(data.id);
-      }}
+      onPointerDown={() => {}}
       onSelect={onSelect}
       onUpdate={onUpdate || (() => {})}
       customRect={bounds}
@@ -240,6 +237,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
       showBorder={isSelected}
       resizable={false}
       data={data}
+      className="pointer-events-none"
     >
       <FloatingToolbar isVisible={!!showToolbar}>
         <ColorPickerPopover
@@ -282,7 +280,10 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
 
       <Tooltip delayDuration={0} disableHoverableContent>
         <TooltipTrigger asChild>
-          <div ref={ref} className="h-full w-full">
+          <div
+            ref={ref}
+            className="pointer-events-auto h-full w-full cursor-default"
+          >
             <svg
               width="100%"
               height="100%"
@@ -294,7 +295,14 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
                 d={d}
                 fill={data.color}
                 opacity={data.opacity !== undefined ? data.opacity : 0.4}
+                className="pointer-events-auto cursor-pointer"
                 style={{ mixBlendMode: "multiply" }}
+                onPointerDown={(e) => {
+                  if (!isSelectable) return;
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onSelect(data.id);
+                }}
               />
             </svg>
           </div>
