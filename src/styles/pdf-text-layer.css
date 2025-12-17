@@ -17,7 +17,10 @@
   text-size-adjust: none;
   forced-color-adjust: none;
   transform-origin: 0 0;
-  z-index: 2;
+  --scale-round-x: 2px;
+  --scale-round-y: 2px;
+  --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  mix-blend-mode: multiply;
 }
 
 .textLayer :is(span, br) {
@@ -29,14 +32,29 @@
   transform-origin: 0 0;
 }
 
+.textLayer.selecting :is(span, br) {
+  /* Solve text selection flickering issue https://github.com/mozilla/pdf.js/issues/9168#issuecomment-1952529240 */
+  min-height: calc(100px * var(--total-scale-factor));
+}
+
 .textLayer br::selection {
   background: transparent;
 }
 
+.textLayer.highlighting {
+  --text-selection-bg: color-mix(
+    in srgb,
+    var(--highlight-color) calc(var(--highlight-opacity) * 100%),
+    transparent
+  );
+}
+
 .textLayer span::selection {
-  background: color-mix(in srgb, var(--color-blue-500) 30%, transparent);
+  background: var(
+    --text-selection-bg,
+    color-mix(in srgb, var(--color-blue-500) 30%, transparent)
+  );
   color: transparent;
-  mix-blend-mode: multiply;
 }
 
 /* Only necessary in Google Chrome, see issue 14205, and most unfortunately

@@ -9,6 +9,9 @@ interface PDFTextLayerProps {
   isInView: boolean;
   isSelectMode?: boolean;
   cursor?: React.CSSProperties["cursor"];
+  isHighlighting?: boolean;
+  highlightColor?: string;
+  highlightOpacity?: number;
 }
 
 const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
@@ -18,12 +21,42 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   isInView,
   isSelectMode = true,
   cursor,
+  isHighlighting = false,
+  highlightColor,
+  highlightOpacity,
 }) => {
   const textLayerRef = useRef<HTMLDivElement>(null);
   const textLayerInstanceRef = useRef<pdfjsLib.TextLayer | null>(null);
+  const pendingScaleRef = useRef<number | null>(null);
 
   const [renderedScale, setRenderedScale] = useState<number | null>(null);
   const [pageRotation, setPageRotation] = useState(0);
+  const [renderRetryToken, setRenderRetryToken] = useState(0);
+
+  const isActiveSelectionInThisLayer = () => {
+    const el = textLayerRef.current;
+    if (!el) return false;
+
+    const sel = window.getSelection?.();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
+
+    const range = sel.getRangeAt(0);
+    const commonNode = range.commonAncestorContainer;
+    const commonEl =
+      commonNode instanceof Element
+        ? commonNode
+        : commonNode.parentElement || null;
+    const layer = commonEl?.closest?.(".textLayer");
+    return layer === el;
+  };
+
+  const ensureEndOfContent = (container: HTMLDivElement) => {
+    const existing = container.querySelector(":scope > .endOfContent");
+    if (existing) return;
+    const end = document.createElement("div");
+    end.className = "endOfContent";
+    container.appendChild(end);
+  };
 
   // Reset state when page changes
   useEffect(() => {
@@ -43,9 +76,11 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     const el = textLayerRef.current;
     if (el && isSelectMode) {
       const onDown = (e: MouseEvent) => {
-        if (e.target === el) {
-          el.classList.add("selecting");
-        }
+        if (e.button !== 0) return;
+        const target = e.target as Node | null;
+        if (!target) return;
+        if (!el.contains(target)) return;
+        el.classList.add("selecting");
       };
       const onUp = () => el.classList.remove("selecting");
       el.addEventListener("mousedown", onDown);
@@ -60,6 +95,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
   useEffect(() => {
     if (!pdfDocument || !isInView || !textLayerRef.current) return;
+
+    if (isSelectMode && isActiveSelectionInThisLayer()) {
+      pendingScaleRef.current = scale;
+      return;
+    }
+    pendingScaleRef.current = null;
 
     let isCancelled = false;
     let renderTask: pdfjsLib.TextLayer | null = null;
@@ -91,12 +132,6 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
         container.style.height = `${viewport.height}px`;
         container.style.setProperty("--scale-factor", `${targetScale}`);
         container.style.setProperty("--user-unit", `${viewport.userUnit}`);
-        container.style.setProperty(
-          "--total-scale-factor",
-          `calc(var(--scale-factor) * var(--user-unit))`,
-        );
-        container.style.setProperty("--scale-round-x", "2px");
-        container.style.setProperty("--scale-round-y", "2px");
 
         const textContentSource = page.streamTextContent({});
 
@@ -111,6 +146,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
         await textLayer.render();
 
         if (isCancelled) return;
+        ensureEndOfContent(container);
         setRenderedScale(targetScale);
       } catch (error) {
         if (error?.name !== "RenderingCancelledException") {
@@ -136,7 +172,26 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
         renderTask.cancel();
       }
     };
-  }, [pdfDocument, pageIndex, scale, isInView]);
+  }, [pdfDocument, pageIndex, scale, isInView, isSelectMode, renderRetryToken]);
+
+  useEffect(() => {
+    if (!isSelectMode) return;
+
+    const handleSelectionChange = () => {
+      if (pendingScaleRef.current === null) return;
+
+      const sel = window.getSelection?.();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) return;
+
+      pendingScaleRef.current = null;
+      setRenderRetryToken((t) => t + 1);
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [isSelectMode]);
 
   // Calculate temporary transform if rendered scale doesn't match current scale (zooming)
   // Note: No rotation here because we use native viewport rotation
@@ -150,14 +205,19 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   return (
     <div
       ref={textLayerRef}
-      className="textLayer"
+      className={cn("textLayer", isHighlighting && "highlighting")}
       tabIndex={0}
       data-main-rotation={pageRotation}
       data-selectable={isSelectMode ? "true" : "false"}
       style={{
         transform: textLayerTransform,
-        transformOrigin: "0 0",
         cursor,
+        ...(isHighlighting
+          ? ({
+              "--highlight-color": highlightColor,
+              "--highlight-opacity": highlightOpacity,
+            } as React.CSSProperties)
+          : null),
       }}
     />
   );

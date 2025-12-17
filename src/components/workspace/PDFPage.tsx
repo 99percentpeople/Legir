@@ -18,6 +18,9 @@ interface PDFPageProps {
   placeholderImage?: string; // Optional low-res image if we have one
   isSelectMode?: boolean;
   textLayerCursor?: React.CSSProperties["cursor"];
+  isHighlighting?: boolean;
+  highlightColor?: string;
+  highlightOpacity?: number;
 }
 
 const PDFPage: React.FC<PDFPageProps> = ({
@@ -29,6 +32,9 @@ const PDFPage: React.FC<PDFPageProps> = ({
   placeholderImage,
   isSelectMode = true,
   textLayerCursor,
+  isHighlighting = false,
+  highlightColor,
+  highlightOpacity,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -262,6 +268,9 @@ const PDFPage: React.FC<PDFPageProps> = ({
         isInView={isInView}
         isSelectMode={isSelectMode}
         cursor={textLayerCursor}
+        isHighlighting={isHighlighting}
+        highlightColor={highlightColor}
+        highlightOpacity={highlightOpacity}
       />
     </div>
   );

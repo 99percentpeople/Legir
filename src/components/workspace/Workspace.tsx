@@ -135,14 +135,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
 
       const range = sel.getRangeAt(0);
-      const rects = Array.from(range.getClientRects()).filter(
-        (r) => r.width > 1 && r.height > 1,
-      );
-      if (rects.length === 0) {
-        sel.removeAllRanges();
-        return;
-      }
-
       const commonNode = range.commonAncestorContainer;
       const commonEl =
         commonNode instanceof Element
@@ -156,6 +148,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       // Only create highlights from the actual PDF text layer.
       if (!pageEl || !textLayerEl) return;
+
+      textLayerEl.classList.remove("selecting");
+
+      const rects = Array.from(range.getClientRects()).filter(
+        (r) => r.width > 1 && r.height > 1,
+      );
+      if (rects.length === 0) {
+        sel.removeAllRanges();
+        return;
+      }
 
       const pageId = pageEl.id;
       const pageIndexStr = pageId.replace(/^page-/, "");
@@ -308,12 +310,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
     }
 
     const range = sel.getRangeAt(0);
-    const commonNode = range.commonAncestorContainer;
-    const commonEl =
-      commonNode instanceof Element
-        ? commonNode
-        : commonNode.parentElement || null;
-    const isFromTextLayer = !!commonEl?.closest?.(".textLayer");
+    const getClosestTextLayer = (node: Node | null) => {
+      if (!node) return null;
+      const el = node instanceof Element ? node : node.parentElement;
+      return el?.closest?.(".textLayer") ?? null;
+    };
+
+    const startTextLayer = getClosestTextLayer(range.startContainer);
+    const endTextLayer = getClosestTextLayer(range.endContainer);
+    const isFromTextLayer = !!startTextLayer || !!endTextLayer;
     if (!isFromTextLayer) {
       setTextSelectionToolbar((prev) =>
         prev.isVisible ? { ...prev, isVisible: false } : prev,
@@ -321,7 +326,28 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return;
     }
 
-    const rect = range.getBoundingClientRect();
+    const clientRects = Array.from(range.getClientRects()).filter(
+      (r) => r.width >= 2 && r.height >= 2,
+    );
+    const isBackward = (() => {
+      const anchorNode = sel.anchorNode;
+      const focusNode = sel.focusNode;
+      if (!anchorNode || !focusNode) return false;
+      const a = document.createRange();
+      a.setStart(anchorNode, sel.anchorOffset);
+      a.collapse(true);
+      const f = document.createRange();
+      f.setStart(focusNode, sel.focusOffset);
+      f.collapse(true);
+      return a.compareBoundaryPoints(Range.START_TO_START, f) === 1;
+    })();
+
+    const rect =
+      (clientRects.length > 0
+        ? isBackward
+          ? clientRects[0]
+          : clientRects[clientRects.length - 1]
+        : null) ?? range.getBoundingClientRect();
     if (!rect || rect.width < 2 || rect.height < 2) {
       setTextSelectionToolbar((prev) =>
         prev.isVisible ? { ...prev, isVisible: false } : prev,
@@ -347,8 +373,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   useEffect(() => {
     if (!textSelectionToolbar.isVisible) return;
-    window.getSelection?.()?.removeAllRanges?.();
-    setTextSelectionToolbar((prev) => ({ ...prev, isVisible: false }));
+    requestAnimationFrame(() => {
+      updateTextSelectionToolbar();
+    });
   }, [editorState.scale]);
 
   useEffect(() => {
@@ -1398,10 +1425,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       };
 
       if (textSelectionToolbar.isVisible) {
-        window.getSelection?.()?.removeAllRanges?.();
-        setTextSelectionToolbar((prev) =>
-          prev.isVisible ? { ...prev, isVisible: false } : prev,
-        );
+        updateTextSelectionToolbar();
       }
 
       if (onPageIndexChange) {
@@ -2193,6 +2217,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
               isSelectMode={
                 editorState.tool === "select" ||
                 editorState.tool === "draw_highlight"
+              }
+              isHighlighting={editorState.tool === "draw_highlight"}
+              highlightColor={
+                editorState.highlightStyle?.color ||
+                ANNOTATION_STYLES.highlight.color
+              }
+              highlightOpacity={
+                editorState.highlightStyle?.opacity ??
+                ANNOTATION_STYLES.highlight.opacity
               }
               textLayerCursor={
                 editorState.tool === "draw_highlight" ? "crosshair" : undefined
