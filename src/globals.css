@@ -1,8 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@import "./font-faces.css";
-@import "./pdf-text-layer.css";
+@import "./styles/font-faces.css";
+@import "./styles/pdf-text-layer.css";
 
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";

@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
-import * as pdfjsViewer from "pdfjs-dist/web/pdf_viewer.mjs";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 import { pdfWorkerService } from "../../services/pdfWorkerService";
+import PDFTextLayer from "./PDFTextLayer";
 
 pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
   name: "pdfjs-worker",
@@ -41,13 +41,6 @@ const PDFPage: React.FC<PDFPageProps> = ({
   const [isInView, setIsInView] = useState(false);
 
   const renderedScaleRef = useRef<number | null>(null);
-
-  const textLayerRef = useRef<HTMLDivElement>(null);
-  const textRenderTaskRef = useRef<any>(null);
-  const [textLayerRenderedScale, setTextLayerRenderedScale] = useState<
-    number | null
-  >(null);
-  const [pageRotation, setPageRotation] = useState(0);
 
   // Stable IDs for canvas elements to allow reuse in Worker
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
@@ -218,122 +211,6 @@ const PDFPage: React.FC<PDFPageProps> = ({
     // Re-run if visibility changes or scale/doc changes
   }, [isInView, pdfDocument, pageIndex, scale]);
 
-  // --- Text Layer Rendering ---
-  useEffect(() => {
-    if (!pdfDocument || !isInView || !textLayerRef.current) return;
-
-    // Optimization: If already rendered at ANY scale, do NOT re-render.
-    // We rely purely on CSS scaling (transform: scale(...)) for zoom updates.
-    if (textLayerRenderedScale !== null) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    const renderText = async () => {
-      try {
-        if (textRenderTaskRef.current) {
-          // If there's a running task (unlikely given the check above, but for safety)
-          if (textRenderTaskRef.current.cancel) {
-            textRenderTaskRef.current.cancel();
-          }
-          textRenderTaskRef.current = null;
-        }
-
-        // Render at the CURRENT scale (whatever it is when first loaded)
-        const initialScale = scale;
-        const page = await pdfDocument.getPage(pageIndex + 1);
-        setPageRotation(page.rotate);
-        if (isCancelled) return;
-
-        const viewport = page.getViewport({
-          scale: initialScale,
-          rotation: 0, // Force 0 rotation so we can handle it via CSS
-        });
-
-        if (textLayerRef.current) {
-          textLayerRef.current.style.width = `${viewport.width}px`;
-          textLayerRef.current.style.height = `${viewport.height}px`;
-          textLayerRef.current.style.setProperty(
-            "--scale-factor",
-            `${initialScale}`,
-          );
-          textLayerRef.current.style.setProperty(
-            "--user-unit",
-            `${viewport.userUnit}`,
-          );
-          textLayerRef.current.style.setProperty(
-            "--total-scale-factor",
-            `calc(var(--scale-factor) * var(--user-unit))`,
-          );
-          textLayerRef.current.style.setProperty("--scale-round-x", "2px");
-          textLayerRef.current.style.setProperty("--scale-round-y", "2px");
-        }
-
-        if (pdfjsViewer.TextLayerBuilder) {
-          const textLayerBuilder = new pdfjsViewer.TextLayerBuilder({
-            pdfPage: page,
-          });
-
-          await textLayerBuilder.render({
-            viewport: viewport,
-          });
-
-          if (isCancelled) return;
-
-          if (textLayerRef.current) {
-            textLayerRef.current.innerHTML = textLayerBuilder.div.innerHTML;
-          }
-
-          textRenderTaskRef.current = textLayerBuilder;
-          setTextLayerRenderedScale(initialScale);
-        }
-      } catch (error: any) {
-        if (error?.name !== "RenderingCancelledException") {
-          console.error("Text Layer Render error:", error);
-        }
-      }
-    };
-
-    renderText();
-
-    return () => {
-      isCancelled = true;
-      if (textRenderTaskRef.current && textRenderTaskRef.current.cancel) {
-        textRenderTaskRef.current.cancel();
-      }
-    };
-  }, [pdfDocument, pageIndex, scale, isInView]);
-
-  // Calculate text layer transform
-  const textLayerTransform = useMemo(() => {
-    let transform = "";
-
-    // 1. Scale
-    if (textLayerRenderedScale) {
-      transform += `scale(${scale / textLayerRenderedScale})`;
-    }
-
-    // 2. Rotate and Translate
-    if (pageRotation !== 0) {
-      transform += ` rotate(${pageRotation}deg)`;
-
-      switch (pageRotation) {
-        case 90:
-          transform += ` translate(0, -100%)`;
-          break;
-        case 180:
-          transform += ` translate(-100%, -100%)`;
-          break;
-        case 270:
-          transform += ` translate(-100%, 0)`;
-          break;
-      }
-    }
-
-    return transform || "none";
-  }, [scale, textLayerRenderedScale, pageRotation]);
-
   return (
     <div
       ref={containerRef}
@@ -363,7 +240,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
       <canvas
         ref={canvasARef}
         className={cn(
-          "absolute inset-0 block h-full w-full",
+          "absolute inset-0 size-full",
           (activeCanvas === "B" || !isInView) && "hidden",
         )}
       />
@@ -372,21 +249,19 @@ const PDFPage: React.FC<PDFPageProps> = ({
       <canvas
         ref={canvasBRef}
         className={cn(
-          "absolute inset-0 block h-full w-full",
+          "absolute inset-0 size-full",
           (activeCanvas === "A" || !isInView) && "hidden",
         )}
       />
 
       {/* Text Layer */}
-      <div
-        ref={textLayerRef}
-        className={cn("textLayer")}
-        data-selectable={isSelectMode ? "true" : "false"}
-        style={{
-          transform: textLayerTransform,
-          transformOrigin: "0 0",
-          cursor: textLayerCursor,
-        }}
+      <PDFTextLayer
+        pageIndex={pageIndex}
+        pdfDocument={pdfDocument}
+        scale={scale}
+        isInView={isInView}
+        isSelectMode={isSelectMode}
+        cursor={textLayerCursor}
       />
     </div>
   );

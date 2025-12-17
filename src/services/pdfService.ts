@@ -68,6 +68,9 @@ import {
   SignatureControlExporter,
 } from "./pdf/exporters/ControlExporters";
 
+const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
+const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
+
 // Register parsers and exporters
 const annotationParsers: IAnnotationParser[] = [
   new InkParser(),
@@ -130,6 +133,11 @@ export const loadPDF = async (
   const pdfJsPromise = pdfjsLib.getDocument({
     data: renderBuffer,
     password: "",
+    cMapUrl: PDFJS_CMAP_URL,
+    cMapPacked: true,
+    standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
+    useSystemFonts: false,
+    disableFontFace: false,
   }).promise;
 
   const [pdfLibResult, pdfJsResult] = await Promise.allSettled([
@@ -423,8 +431,15 @@ export const exportPDF = async (
   let pdfJsDoc: pdfjsLib.PDFDocumentProxy | undefined;
   try {
     const renderBuffer = new Uint8Array(originalBytes.slice(0));
-    pdfJsDoc = await pdfjsLib.getDocument({ data: renderBuffer, password: "" })
-      .promise;
+    pdfJsDoc = await pdfjsLib.getDocument({
+      data: renderBuffer,
+      password: "",
+      cMapUrl: PDFJS_CMAP_URL,
+      cMapPacked: true,
+      standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
+      useSystemFonts: false,
+      disableFontFace: false,
+    }).promise;
   } catch (e) {
     console.warn(
       "[PDF Export] Failed to load PDF with pdf.js; rotation-aware export disabled",

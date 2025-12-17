@@ -1,6 +1,9 @@
 import * as pdfjsLib from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 
+const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
+const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
+
 // Polyfill document for pdf.js font rendering in worker
 if (typeof (self as any).document === "undefined") {
   const fakeOwnerDocument = {
@@ -99,6 +102,11 @@ const loadDocument = async (data: Uint8Array) => {
   const loadingTask = pdfjsLib.getDocument({
     data: data,
     password: "",
+    cMapUrl: PDFJS_CMAP_URL,
+    cMapPacked: true,
+    standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
+    useSystemFonts: false,
+    disableFontFace: false,
   });
   docLoadingPromise = loadingTask.promise;
   pdfDoc = null; // Reset current doc while loading
