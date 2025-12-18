@@ -1,0 +1,17 @@
+This directory contains font files used by Formforge.
+
+Noto Sans SC
+- File: NotoSansSC-Regular.ttf
+- Copyright: Google LLC
+- License: SIL Open Font License, Version 1.1
+- License text: https://scripts.sil.org/OFL
+- Project page: https://fonts.google.com/noto/specimen/Noto+Sans+SC
+
+Source Han Serif SC
+- File: SourceHanSerifSC-VF.ttf
+- Copyright: Adobe
+- License: SIL Open Font License, Version 1.1
+- License text: https://scripts.sil.org/OFL
+- Project page: https://github.com/adobe-fonts/source-han-serif
+
+If you redistribute this application, ensure you comply with the SIL Open Font License.

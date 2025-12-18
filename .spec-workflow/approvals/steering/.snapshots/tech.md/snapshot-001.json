@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1765282165226_ycis3ph7h",
+  "approvalId": "approval_1765282165223_wzbfc4n3h",
+  "approvalTitle": "Initial Tech Document",
+  "version": 1,
+  "timestamp": "2025-12-09T12:09:25.226Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# Technology Stack\n\n## Project Type\nWeb Application (Single Page Application)\n\n## Core Technologies\n\n### Primary Language(s)\n- **Language**: TypeScript\n- **Runtime**: Node.js (Development), Browser (Production)\n\n### Key Dependencies/Libraries\n- **UI Framework**: React 19\n- **Build Tool**: Vite 7\n- **Styling**: Tailwind CSS 4, Radix UI (Headless UI components)\n- **PDF Processing**: pdf-lib (Creation/Modification), pdfjs-dist (Rendering)\n- **AI Integration**: @google/genai (Gemini API)\n- **Icons**: Lucide React\n- **Internationalization**: i18n support (custom implementation in `src/locales`)\n\n### Application Architecture\n- **Client-Side Rendering (CSR)**: Fully client-side React application.\n- **Component-Based**: Modular UI using React components and hooks.\n- **Web Workers**: Uses `pdf-render.worker.ts` for off-main-thread PDF rendering to ensure UI responsiveness.\n\n## Development Environment\n\n### Build & Development Tools\n- **Package Manager**: Bun\n- **Linter/Formatter**: Prettier\n- **Git Hooks**: Husky (pre-commit)\n\n### Code Quality Tools\n- **TypeScript**: Strict type checking.\n- **Prettier**: Automatic code formatting.\n\n## Technical Decisions & Rationale\n1. **pdf-lib & pdfjs-dist**: `pdfjs-dist` is the standard for rendering PDFs in the browser, while `pdf-lib` provides powerful modification capabilities (filling forms, adding annotations) completely client-side.\n2. **Web Workers**: PDF rendering can be computationally expensive; offloading this to a worker prevents the main UI thread from freezing.\n3. **Tailwind CSS & Radix UI**: Provides a modern, accessible, and highly customizable UI foundation without the bloat of heavy component libraries.\n4. **Local-First AI**: The AI features (Gemini) are integrated directly via the client SDK, reducing the need for a complex backend proxy for this prototype phase.\n",
+  "fileStats": {
+    "size": 1840,
+    "lines": 42,
+    "lastModified": "2025-12-09T12:09:19.149Z"
+  },
+  "comments": []
+}

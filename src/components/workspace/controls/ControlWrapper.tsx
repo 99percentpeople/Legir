@@ -1,0 +1,118 @@
+import React from "react";
+import { cn } from "@/lib/utils";
+import { ControlProps } from "./types";
+
+export type ControlWrapperProps = ControlProps & {
+  customRect?: { x: number; y: number; width: number; height: number };
+  showBorder?: boolean;
+  resizable?: boolean;
+  customElementId?: string;
+  className?: string;
+  children?: React.ReactNode;
+};
+
+export const ControlWrapper: React.FC<ControlWrapperProps> = ({
+  children,
+  id,
+  isSelected,
+  scale,
+  isSelectable,
+  onResizeStart,
+  data,
+  onPointerDown,
+  customRect,
+  showBorder = false,
+  resizable = false,
+  customElementId,
+  className,
+}) => {
+  // Extract rect safely
+  const rect = customRect || ("rect" in data ? data.rect : undefined);
+
+  if (!rect) return null; // Skip if no rect (e.g. ink might be handled differently)
+
+  const handleResizePointerDown = (e: React.PointerEvent, handle: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onResizeStart) {
+      onResizeStart(handle, e);
+    }
+  };
+
+  // Get label for overlay
+  const label = "name" in data ? (data as { name: string }).name : data.type;
+
+  // Determine ID based on type for sidebar navigation
+  const isAnnotation = ["comment", "highlight", "ink", "freetext"].includes(
+    data.type,
+  );
+  const defaultElementId = isAnnotation
+    ? `annotation-${id}`
+    : `field-element-${id}`;
+  const elementId =
+    customElementId !== undefined ? customElementId : defaultElementId;
+
+  const isInkHighlight =
+    data.type === "ink" &&
+    "intent" in (data as any) &&
+    (data as any).intent === "InkHighlight";
+  const shouldRaiseZIndexOnHoverOrSelect =
+    data.type !== "highlight" && !isInkHighlight;
+
+  return (
+    <div
+      id={elementId || undefined}
+      onPointerDown={(e) => {
+        if (!isSelectable) return;
+        onPointerDown?.(e);
+      }}
+      className={cn(
+        "group absolute outline-none select-none",
+        isSelectable
+          ? "pointer-events-auto"
+          : "pointer-events-none [&_*]:pointer-events-none",
+        shouldRaiseZIndexOnHoverOrSelect &&
+          (isSelected ? "z-50" : "hover:z-50"),
+        className,
+      )}
+      style={{
+        left: rect.x * scale,
+        top: rect.y * scale,
+        width: rect.width * scale,
+        height: rect.height * scale,
+        cursor: isSelectable ? "pointer" : "inherit",
+      }}
+    >
+      {children}
+
+      {/* Selection Overlay (Form Mode Only or Resizable Annotations) */}
+      {showBorder && resizable && (
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
+          <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap text-white shadow-sm">
+            {label}
+          </span>
+          {/* Resize Handles */}
+          {["nw", "ne", "sw", "se"].map((h) => (
+            <div
+              key={h}
+              className={cn(
+                "pointer-events-auto absolute z-30 h-3 w-3 border border-blue-500 bg-white",
+                h === "nw" && "-top-1.5 -left-1.5 cursor-nwse-resize",
+                h === "ne" && "-top-1.5 -right-1.5 cursor-nesw-resize",
+                h === "sw" && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
+                h === "se" && "-right-1.5 -bottom-1.5 cursor-nwse-resize",
+              )}
+              onPointerDown={(e) => handleResizePointerDown(e, h)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Annotation Mode Focus Overlay */}
+      {showBorder && !resizable && (
+        <div className="animate-in fade-in pointer-events-none absolute inset-0 z-50 border border-dashed border-blue-500 duration-200" />
+      )}
+    </div>
+  );
+};

@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/steering/structure.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-12-09T12:13:10.910Z",
+      "trigger": "initial",
+      "approvalId": "approval_1765282390906_pku8juvpb",
+      "approvalTitle": "Initial Structure Document"
+    }
+  ]
+}
