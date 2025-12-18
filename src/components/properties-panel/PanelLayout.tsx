@@ -100,7 +100,7 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
           {title}
         </h3>
         <div className="flex items-center gap-1">
-          {onClose && (
+          {onClose ? (
             <Button
               variant="ghost"
               size="icon"
@@ -109,6 +109,8 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
             >
               <X size={18} />
             </Button>
+          ) : (
+            <div className="h-8 w-8" />
           )}
         </div>
       </div>

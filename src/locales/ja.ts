@@ -49,6 +49,7 @@ const ja = {
   "dialog.confirm_close.confirm": "保存せずに閉じる",
   "dialog.confirm_close.cancel": "キャンセル",
   "properties.document.title": "ドキュメント情報",
+  "right_panel.tabs.properties": "プロパティ編集",
   "properties.document.hint":
     "グローバル PDF 情報を編集します。キャンバス上のフィールドを選択してプロパティを編集します。",
   "properties.filename": "ファイル名",

@@ -52,6 +52,7 @@ const zhCN = {
   "dialog.confirm_close.confirm": "关闭且不保存",
   "dialog.confirm_close.cancel": "取消",
   "properties.document.title": "文档信息",
+  "right_panel.tabs.properties": "属性编辑",
   "properties.document.hint":
     "编辑全局 PDF 信息。在画布上选择一个字段以编辑其属性。",
   "properties.filename": "文件名",

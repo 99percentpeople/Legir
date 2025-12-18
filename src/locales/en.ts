@@ -53,6 +53,7 @@ const en = {
   "dialog.confirm_close.confirm": "Close Without Saving",
   "dialog.confirm_close.cancel": "Cancel",
   "properties.document.title": "Document Info",
+  "right_panel.tabs.properties": "Property Editing",
   "properties.document.hint":
     "Edit global PDF information. Select a field on the canvas to edit its properties.",
   "properties.filename": "Filename",

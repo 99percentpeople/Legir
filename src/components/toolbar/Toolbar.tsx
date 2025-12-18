@@ -471,18 +471,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <Keyboard size={20} />
           </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onTogglePropertiesPanel}
-            className={cn(
-              "h-8 w-8 sm:h-9 sm:w-9",
-              isPropertiesPanelOpen && "bg-accent text-accent-foreground",
-            )}
-            title={t("toolbar.toggle_properties")}
-          >
-            <PanelRight size={20} />
-          </Button>
+          {!editorState.isPanelFloating && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onTogglePropertiesPanel}
+              className={cn(
+                "h-8 w-8 sm:h-9 sm:w-9",
+                isPropertiesPanelOpen && "bg-accent text-accent-foreground",
+              )}
+              title={t("toolbar.toggle_properties")}
+            >
+              <PanelRight size={20} />
+            </Button>
+          )}
         </div>
 
         {editorState.pages.length > 0 && mode === "form" && (

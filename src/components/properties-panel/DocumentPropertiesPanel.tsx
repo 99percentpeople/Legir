@@ -23,6 +23,7 @@ export interface DocumentPropertiesPanelProps {
   onMetadataChange: (updates: Partial<PDFMetadata>) => void;
   filename: string;
   onFilenameChange: (name: string) => void;
+  onClose?: () => void;
   isFloating: boolean;
   onTriggerHistorySave: () => void;
   width: number;
@@ -35,6 +36,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
     onMetadataChange,
     filename,
     onFilenameChange,
+    onClose,
     isFloating,
     onTriggerHistorySave,
     width,
@@ -64,6 +66,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
           </>
         }
         isFloating={isFloating}
+        onClose={onClose}
         width={width}
         onResize={onResize}
       >

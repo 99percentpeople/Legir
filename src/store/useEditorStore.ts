@@ -117,6 +117,7 @@ const initialState: EditorState = {
   isSaving: false,
   isSidebarOpen: true,
   isRightPanelOpen: true,
+  rightPanelTab: "document",
   sidebarTab: "thumbnails",
   hasSavedSession: false,
   isDirty: false,

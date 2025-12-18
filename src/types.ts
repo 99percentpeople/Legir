@@ -207,6 +207,7 @@ export interface EditorState {
   isSaving: boolean;
   isSidebarOpen: boolean;
   isRightPanelOpen: boolean;
+  rightPanelTab: string;
   sidebarTab: string;
   hasSavedSession: boolean;
   isDirty: boolean;

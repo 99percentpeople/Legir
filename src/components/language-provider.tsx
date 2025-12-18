@@ -38,6 +38,7 @@ type LanguageProviderState = {
   language: Language;
   effectiveLanguage: ConcreteLanguage;
   dayjsLocale: string;
+  isCjk: boolean;
   setLanguage: (language: Language) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
@@ -46,6 +47,7 @@ const initialState: LanguageProviderState = {
   language: "system",
   effectiveLanguage: "en",
   dayjsLocale: "en",
+  isCjk: false,
   setLanguage: () => null,
   t: (key: string) => key,
 };
@@ -194,6 +196,10 @@ export function LanguageProvider({
     language,
     effectiveLanguage,
     dayjsLocale: DAYJS_LOCALE_MAP[effectiveLanguage],
+    isCjk:
+      effectiveLanguage === "zh-CN" ||
+      effectiveLanguage === "zh-TW" ||
+      effectiveLanguage === "ja",
     setLanguage,
     t,
   };

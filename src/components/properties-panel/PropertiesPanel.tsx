@@ -6,6 +6,7 @@ import { ControlPropertiesPanel } from "./ControlPropertiesPanel";
 // --- Main Container Component ---
 interface PropertiesPanelProps {
   selectedControl: FormField | Annotation | null;
+  activeTab: string;
   metadata: PDFMetadata;
   filename: string;
   onChange: (updates: Partial<FormField | Annotation>) => void;
@@ -13,6 +14,7 @@ interface PropertiesPanelProps {
   onFilenameChange: (name: string) => void;
   onDelete: () => void;
   onClose: () => void;
+  onCollapse: () => void;
   isFloating: boolean;
   onTriggerHistorySave: () => void;
   width: number;
@@ -22,6 +24,7 @@ interface PropertiesPanelProps {
 export const PropertiesPanel = React.memo<PropertiesPanelProps>(
   ({
     selectedControl,
+    activeTab,
     metadata,
     filename,
     onChange,
@@ -29,12 +32,13 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
     onFilenameChange,
     onDelete,
     onClose,
+    onCollapse,
     isFloating,
     onTriggerHistorySave,
     width,
     onResize,
   }) => {
-    if (selectedControl) {
+    if (activeTab === "properties" && selectedControl) {
       return (
         <ControlPropertiesPanel
           data={selectedControl}
@@ -55,6 +59,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         onMetadataChange={onMetadataChange}
         filename={filename}
         onFilenameChange={onFilenameChange}
+        onClose={onCollapse}
         isFloating={isFloating}
         onTriggerHistorySave={onTriggerHistorySave}
         width={width}

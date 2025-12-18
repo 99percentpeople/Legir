@@ -50,6 +50,7 @@ const es = {
   "dialog.confirm_close.confirm": "Cerrar sin guardar",
   "dialog.confirm_close.cancel": "Cancelar",
   "properties.document.title": "Información del documento",
+  "right_panel.tabs.properties": "Edición de propiedades",
   "properties.document.hint":
     "Editar información global del PDF. Seleccione un campo en el lienzo para editar sus propiedades.",
   "properties.filename": "Nombre de archivo",

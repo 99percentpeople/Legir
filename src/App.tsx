@@ -10,6 +10,7 @@ import AIDetectionDialog, {
   AIDetectionOptions,
 } from "./components/AIDetectionDialog";
 import Sidebar from "./components/sidebar/Sidebar";
+import { RightPanelTabDock } from "./components/properties-panel/RightPanelTabDock";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   } = state;
   const isClosingRef = React.useRef(false);
   const pdfDisposeRef = React.useRef<null | (() => void)>(null);
+  const prevSelectedIdRef = React.useRef<string | null>(null);
 
   // Refs for stable access in event listeners
   const handlersRef = React.useRef<{
@@ -718,6 +720,21 @@ const App: React.FC = () => {
 
   const selectedControl = selectedField || selectedAnnotation;
 
+  useEffect(() => {
+    const prev = prevSelectedIdRef.current;
+    const next = state.selectedId;
+    if (!prev && next) {
+      setState({ rightPanelTab: "properties" });
+    }
+    prevSelectedIdRef.current = next;
+  }, [state.selectedId, setState]);
+
+  useEffect(() => {
+    if (!state.selectedId && state.rightPanelTab === "properties") {
+      setState({ rightPanelTab: "document" });
+    }
+  }, [state.selectedId, state.rightPanelTab, setState]);
+
   const handlePenStyleChange = useCallback(
     (style: Partial<EditorState["penStyle"]>) => {
       setState((prev) => ({
@@ -976,19 +993,47 @@ const App: React.FC = () => {
               />
             </div>
 
+            <RightPanelTabDock
+              activeTab={state.rightPanelTab}
+              isRightPanelOpen={state.isRightPanelOpen}
+              isFloating={state.isPanelFloating}
+              rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
+              canOpenProperties={!!selectedControl}
+              onSelectTab={(tab) => {
+                if (tab === "properties" && !selectedControl) return;
+                setState((prev) => {
+                  const updates: any = {
+                    rightPanelTab: tab,
+                    isRightPanelOpen: true,
+                  };
+                  if (prev.isPanelFloating) {
+                    updates.isSidebarOpen = false;
+                  }
+                  return updates;
+                });
+              }}
+            />
+
             {(state.mode === "form" ||
               state.mode === "annotation" ||
               selectedControl) &&
               state.isRightPanelOpen && (
                 <PropertiesPanel
                   selectedControl={selectedControl}
+                  activeTab={state.rightPanelTab}
                   metadata={state.metadata}
                   filename={state.filename}
                   onChange={handlePropertiesChange}
                   onMetadataChange={handleMetadataChange}
                   onFilenameChange={handleFilenameChange}
                   onDelete={deleteSelection}
-                  onClose={() => selectControl(null)}
+                  onClose={() => {
+                    setState({ rightPanelTab: "document" });
+                    selectControl(null);
+                  }}
+                  onCollapse={() => {
+                    setState({ isRightPanelOpen: false });
+                  }}
                   isFloating={state.isPanelFloating}
                   onTriggerHistorySave={saveCheckpoint}
                   width={state.rightPanelWidth}

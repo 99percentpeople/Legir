@@ -1,6 +1,6 @@
 import React from "react";
 import { FormField, Annotation } from "@/types";
-import { Trash2 } from "lucide-react";
+import { SlidersHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/components/language-provider";
@@ -52,9 +52,14 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
     return (
       <PanelLayout
         title={
-          t(
-            isField ? "properties.field.title" : "properties.annotation.title",
-          ) || t("properties.settings")
+          <>
+            <SlidersHorizontal size={16} />
+            {t(
+              isField
+                ? "properties.field.title"
+                : "properties.annotation.title",
+            ) || t("properties.settings")}
+          </>
         }
         isFloating={isFloating}
         onClose={onClose}

@@ -50,6 +50,7 @@ const de = {
   "dialog.confirm_close.confirm": "Schließen ohne Speichern",
   "dialog.confirm_close.cancel": "Abbrechen",
   "properties.document.title": "Dokumentinfo",
+  "right_panel.tabs.properties": "Eigenschaften bearbeiten",
   "properties.document.hint":
     "Globale PDF-Informationen bearbeiten. Wählen Sie ein Feld auf der Leinwand aus, um dessen Eigenschaften zu bearbeiten.",
   "properties.filename": "Dateiname",

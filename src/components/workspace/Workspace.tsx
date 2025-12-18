@@ -2111,6 +2111,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   return (
     <div
       ref={containerRef}
+      data-workspace-scroll-container="true"
       className="relative flex-1 overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
       style={{
         cursor: isPanModeActive ? "grab" : undefined,

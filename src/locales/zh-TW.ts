@@ -49,6 +49,7 @@ const zhTW = {
   "dialog.confirm_close.confirm": "關閉且不儲存",
   "dialog.confirm_close.cancel": "取消",
   "properties.document.title": "文件資訊",
+  "right_panel.tabs.properties": "屬性編輯",
   "properties.document.hint":
     "編輯全域 PDF 資訊。在畫布上選擇一個欄位以編輯其屬性。",
   "properties.filename": "檔案名稱",

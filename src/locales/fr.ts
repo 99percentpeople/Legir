@@ -50,6 +50,7 @@ const fr = {
   "dialog.confirm_close.confirm": "Fermer sans enregistrer",
   "dialog.confirm_close.cancel": "Annuler",
   "properties.document.title": "Infos Document",
+  "right_panel.tabs.properties": "Édition des propriétés",
   "properties.document.hint":
     "Modifier les informations globales du PDF. Sélectionnez un champ sur le canevas pour modifier ses propriétés.",
   "properties.filename": "Nom de fichier",
