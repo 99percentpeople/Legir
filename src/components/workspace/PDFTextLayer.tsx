@@ -18,6 +18,7 @@ interface PDFTextLayerProps {
   isHighlighting?: boolean;
   highlightColor?: string;
   highlightOpacity?: number;
+  onSelectingChange?: (isSelecting: boolean) => void;
 }
 
 const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
@@ -30,6 +31,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   isHighlighting = false,
   highlightColor,
   highlightOpacity,
+  onSelectingChange,
 }) => {
   const textLayerRef = useRef<HTMLDivElement>(null);
   const textLayerInstanceRef = useRef<pdfjsLib.TextLayer | null>(null);
@@ -166,7 +168,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   useEffect(() => {
     const el = textLayerRef.current;
     if (el && isSelectMode) {
-      const onDown = (e: MouseEvent) => {
+      const onDown = (e: PointerEvent) => {
         if (e.button !== 0) return;
         const target = e.target as Node | null;
         if (!target) return;
@@ -174,16 +176,29 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
         setIsSelecting(true);
       };
       const onUp = () => setIsSelecting(false);
-      el.addEventListener("mousedown", onDown);
-      window.addEventListener("mouseup", onUp);
+      const onCancel = () => setIsSelecting(false);
+      el.addEventListener("pointerdown", onDown);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onCancel);
       return () => {
-        el.removeEventListener("mousedown", onDown);
-        window.removeEventListener("mouseup", onUp);
+        el.removeEventListener("pointerdown", onDown);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onCancel);
         setIsSelecting(false);
       };
     }
     setIsSelecting(false);
   }, [isSelectMode]);
+
+  useEffect(() => {
+    onSelectingChange?.(isSelecting);
+  }, [isSelecting, onSelectingChange]);
+
+  useEffect(() => {
+    return () => {
+      onSelectingChange?.(false);
+    };
+  }, [onSelectingChange]);
 
   useEffect(() => {
     if (!pageProxy || !isInView || !textLayerRef.current) return;

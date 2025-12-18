@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import PDFCanvasLayer from "./PDFCanvasLayer";
 import PDFTextLayer from "./PDFTextLayer";
@@ -15,6 +15,7 @@ interface PDFPageProps {
   isHighlighting?: boolean;
   highlightColor?: string;
   highlightOpacity?: number;
+  onTextSelectingChange?: (pageIndex: number, isSelecting: boolean) => void;
 }
 
 const PDFPage: React.FC<PDFPageProps> = ({
@@ -29,9 +30,17 @@ const PDFPage: React.FC<PDFPageProps> = ({
   isHighlighting = false,
   highlightColor,
   highlightOpacity,
+  onTextSelectingChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
+
+  const handleSelectingChange = useCallback(
+    (selecting: boolean) => {
+      onTextSelectingChange?.(pageIndex, selecting);
+    },
+    [onTextSelectingChange, pageIndex],
+  );
 
   // Intersection Observer
   useEffect(() => {
@@ -83,6 +92,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
         isHighlighting={isHighlighting}
         highlightColor={highlightColor}
         highlightOpacity={highlightOpacity}
+        onSelectingChange={handleSelectingChange}
       />
     </div>
   );

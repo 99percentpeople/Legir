@@ -219,7 +219,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
 }) => {
   const bounds = getRectBounds(rects);
   const d = rectsToPath(rects, { x: bounds.x, y: bounds.y });
-  const { ref, x, y } = useMouse<HTMLDivElement>();
+  const { ref, x, y } = useMouse<SVGPathElement>();
 
   return (
     <ControlWrapper
@@ -279,19 +279,17 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
       </FloatingToolbar>
 
       <Tooltip delayDuration={0} disableHoverableContent>
-        <TooltipTrigger asChild>
-          <div
-            ref={ref}
-            className="pointer-events-auto h-full w-full cursor-default"
+        <div className="pointer-events-none h-full w-full">
+          <svg
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${bounds.width} ${bounds.height}`}
+            preserveAspectRatio="none"
+            className="pointer-events-none"
           >
-            <svg
-              width="100%"
-              height="100%"
-              viewBox={`0 0 ${bounds.width} ${bounds.height}`}
-              preserveAspectRatio="none"
-              className="pointer-events-none"
-            >
+            <TooltipTrigger asChild>
               <path
+                ref={ref}
                 d={d}
                 fill={data.color}
                 opacity={data.opacity !== undefined ? data.opacity : 0.4}
@@ -304,9 +302,9 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
                   onSelect(data.id);
                 }}
               />
-            </svg>
-          </div>
-        </TooltipTrigger>
+            </TooltipTrigger>
+          </svg>
+        </div>
         {data.text && (
           <TooltipPrimitive.Portal>
             <TooltipPrimitive.Content

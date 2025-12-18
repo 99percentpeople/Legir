@@ -270,6 +270,24 @@ const Workspace: React.FC<WorkspaceProps> = ({
     text: string;
   }>({ isVisible: false, left: 0, top: 0, text: "" });
 
+  const [textSelectingPages, setTextSelectingPages] = useState<
+    Record<number, true>
+  >({});
+
+  const handleTextSelectingChange = useCallback(
+    (pageIndex: number, isSelecting: boolean) => {
+      setTextSelectingPages((prev) => {
+        const has = !!prev[pageIndex];
+        if (has === isSelecting) return prev;
+        const next = { ...prev };
+        if (isSelecting) next[pageIndex] = true;
+        else delete next[pageIndex];
+        return next;
+      });
+    },
+    [],
+  );
+
   const textSelectionVirtualRef = useRef<any>({
     getBoundingClientRect: () => new DOMRect(),
     contextElement: document.body,
@@ -2197,6 +2215,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
             id={`page-${page.pageIndex}`}
             key={page.pageIndex}
             className="relative origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
+            data-ff-text-selecting={
+              textSelectingPages[page.pageIndex] ? "1" : undefined
+            }
             style={{
               cursor:
                 editorState.tool === "draw_highlight" ? "crosshair" : undefined,
@@ -2229,6 +2250,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
               textLayerCursor={
                 editorState.tool === "draw_highlight" ? "crosshair" : undefined
               }
+              onTextSelectingChange={handleTextSelectingChange}
             />
 
             {/* DOM Layer for Highlights, Notes, Form Fields */}

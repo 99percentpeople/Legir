@@ -82,6 +82,11 @@
   top: 0;
 }
 
+[data-ff-text-selecting="1"] .scheme-light,
+[data-ff-text-selecting="1"] .scheme-light * {
+  pointer-events: none !important;
+}
+
 .hiddenCanvasElement {
   position: absolute;
   top: 0;
