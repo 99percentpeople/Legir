@@ -12,6 +12,7 @@ import { useLanguage } from "../language-provider";
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isFloating?: boolean;
   pages: PageData[];
   fields: FormField[];
   annotations?: Annotation[];
@@ -32,6 +33,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
+  isFloating = false,
   pages,
   fields,
   annotations = [],
@@ -108,7 +110,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div
-      className="bg-background border-border relative z-20 flex h-full shrink-0 flex-col border-r transition-colors duration-200"
+      className={cn(
+        "bg-background border-border flex h-full shrink-0 flex-col border-r transition-colors duration-200",
+        isFloating
+          ? "absolute top-0 bottom-0 left-0 z-40 shadow-2xl"
+          : "relative z-20",
+      )}
       style={{ width: width }}
     >
       <Tabs

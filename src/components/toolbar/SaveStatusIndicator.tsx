@@ -42,7 +42,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
         )}
       >
         <Loader2 size={10} className="animate-spin" />
-        <span>{t("status.saving")}</span>
+        <span className="hidden md:inline">{t("status.saving")}</span>
       </div>
     );
   }
@@ -56,7 +56,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
         )}
       >
         <div className="h-1.5 w-1.5 rounded-full bg-amber-500/70" />
-        <span>{t("status.unsaved")}</span>
+        <span className="hidden md:inline">{t("status.unsaved")}</span>
       </div>
     );
   }
@@ -70,7 +70,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
         )}
       >
         <CheckCircle2 size={10} />
-        <span>
+        <span className="hidden md:inline">
           {t("status.saved")} {timeAgo}
         </span>
       </div>

@@ -24,7 +24,6 @@ export interface DocumentPropertiesPanelProps {
   filename: string;
   onFilenameChange: (name: string) => void;
   isFloating: boolean;
-  onToggleFloating: () => void;
   onTriggerHistorySave: () => void;
   width: number;
   onResize: (width: number) => void;
@@ -37,7 +36,6 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
     filename,
     onFilenameChange,
     isFloating,
-    onToggleFloating,
     onTriggerHistorySave,
     width,
     onResize,
@@ -66,7 +64,6 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
           </>
         }
         isFloating={isFloating}
-        onToggleFloating={onToggleFloating}
         width={width}
         onResize={onResize}
       >

@@ -32,9 +32,12 @@ import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES } from "./constants";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
 import { useEditorStore } from "./store/useEditorStore";
+import { useIsMobile } from "./hooks/useIsMobile";
 
 const App: React.FC = () => {
   const { t } = useLanguage();
+
+  const isMobile = useIsMobile(768);
 
   // Use Zustand store
   const state = useEditorStore();
@@ -86,10 +89,26 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleEditAnnotation = useCallback((id: string) => {
-    setState({ isSidebarOpen: true, sidebarTab: "annotations" });
+  useEffect(() => {
+    setState({ isPanelFloating: isMobile });
 
-    selectControl(id);
+    if (isMobile) {
+      setState((prev) => {
+        if (!prev.isSidebarOpen || !prev.isRightPanelOpen) return prev;
+        return { isSidebarOpen: true, isRightPanelOpen: false };
+      });
+    }
+  }, [isMobile, setState]);
+
+  const handleEditAnnotation = useCallback((id: string) => {
+    const currentState = useEditorStore.getState();
+    currentState.setState((prev) => ({
+      isSidebarOpen: true,
+      sidebarTab: "annotations",
+      ...(prev.isPanelFloating ? { isRightPanelOpen: false } : {}),
+    }));
+
+    currentState.selectControl(id);
 
     // Try to focus the textarea in the sidebar
     requestAnimationFrame(() => {
@@ -787,9 +806,17 @@ const App: React.FC = () => {
     [setState],
   );
 
-  const handleToggleFloating = useCallback(() => {
-    setState((prev) => ({ isPanelFloating: !prev.isPanelFloating }));
-  }, [setState]);
+  useEffect(() => {
+    if (!state.isPanelFloating) return;
+    if (state.isSidebarOpen && state.isRightPanelOpen) {
+      setState({ isRightPanelOpen: false });
+    }
+  }, [
+    state.isPanelFloating,
+    state.isSidebarOpen,
+    state.isRightPanelOpen,
+    setState,
+  ]);
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -838,11 +865,21 @@ const App: React.FC = () => {
             }
             isFieldListOpen={state.isSidebarOpen}
             onToggleFieldList={() =>
-              setState({ isSidebarOpen: !state.isSidebarOpen })
+              setState((prev) => {
+                const next = !prev.isSidebarOpen;
+                if (prev.isPanelFloating && next)
+                  return { isSidebarOpen: true, isRightPanelOpen: false };
+                return { isSidebarOpen: next };
+              })
             }
             isPropertiesPanelOpen={state.isRightPanelOpen}
             onTogglePropertiesPanel={() =>
-              setState({ isRightPanelOpen: !state.isRightPanelOpen })
+              setState((prev) => {
+                const next = !prev.isRightPanelOpen;
+                if (prev.isPanelFloating && next)
+                  return { isRightPanelOpen: true, isSidebarOpen: false };
+                return { isRightPanelOpen: next };
+              })
             }
             onOpenSettings={() =>
               setState((prev) => ({ ...prev, activeDialog: "settings" }))
@@ -850,9 +887,21 @@ const App: React.FC = () => {
           />
 
           <div className="relative flex flex-1 overflow-hidden">
+            {state.isPanelFloating &&
+              (state.isSidebarOpen || state.isRightPanelOpen) && (
+                <div
+                  className="absolute inset-0 z-30 bg-black/20"
+                  onMouseDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    setState({ isSidebarOpen: false, isRightPanelOpen: false });
+                  }}
+                />
+              )}
+
             <Sidebar
               isOpen={state.isSidebarOpen}
               onClose={() => setState({ isSidebarOpen: false })}
+              isFloating={state.isPanelFloating}
               pages={state.pages}
               fields={state.fields}
               annotations={state.annotations}
@@ -941,7 +990,6 @@ const App: React.FC = () => {
                   onDelete={deleteSelection}
                   onClose={() => selectControl(null)}
                   isFloating={state.isPanelFloating}
-                  onToggleFloating={handleToggleFloating}
                   onTriggerHistorySave={saveCheckpoint}
                   width={state.rightPanelWidth}
                   onResize={(w) => setState({ rightPanelWidth: w })}

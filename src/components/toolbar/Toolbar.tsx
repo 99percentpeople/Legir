@@ -120,15 +120,16 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const hasFileSystemAccess = "showSaveFilePicker" in window;
 
   return (
-    <div className="bg-background border-border text-foreground relative z-50 flex h-12 items-center justify-between border-b px-4">
+    <div className="bg-background border-border text-foreground relative z-50 flex h-12 items-center gap-2 border-b px-2 sm:px-4">
       {/* Left Section: Mode Selection & History */}
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={onToggleFieldList}
             className={cn(
+              "h-8 w-8 sm:h-9 sm:w-9",
               isFieldListOpen && "bg-accent text-accent-foreground",
             )}
             title={t("toolbar.toggle_sidebar")}
@@ -142,7 +143,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="ml-2 h-9 w-9"
+                className="ml-2 h-8 w-8 sm:h-9 sm:w-9"
                 title={t("mode.select")}
               >
                 {mode === "annotation" ? (
@@ -179,6 +180,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             size="icon"
             onClick={onUndo}
             disabled={!canUndo}
+            className="h-8 w-8 sm:h-9 sm:w-9"
             title={t("toolbar.undo")}
           >
             <Undo2 size={20} />
@@ -188,6 +190,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             size="icon"
             onClick={onRedo}
             disabled={!canRedo}
+            className="h-8 w-8 sm:h-9 sm:w-9"
             title={t("toolbar.redo")}
           >
             <Redo2 size={20} />
@@ -196,229 +199,263 @@ const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       {/* Center Section: Tools based on Mode */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transform">
-        {mode === "form" ? (
-          <ToggleGroup
-            type="single"
-            value={editorState.keys.space ? "pan" : tool}
-            onValueChange={(value) => {
-              if (value) onToolChange(value as Tool);
-            }}
-            className="bg-muted/20 border-border flex items-center gap-1 rounded-lg border p-1 shadow-sm"
-            spacing={1}
-          >
-            <ToggleGroupItem value="pan" title={t("toolbar.pan")}>
-              <Hand size={18} />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="select" title={t("toolbar.select")}>
-              <MousePointer2 size={18} />
-            </ToggleGroupItem>
-            <Separator orientation="vertical" className="mx-1 h-5" />
-            <ToggleGroupItem value="draw_text" title={t("toolbar.text")}>
-              <Type size={18} />
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="draw_checkbox"
-              title={t("toolbar.checkbox")}
+      <div className="flex min-w-0 flex-1 justify-center">
+        <div className="no-scrollbar flex w-full overflow-x-auto px-1">
+          {mode === "form" ? (
+            <ToggleGroup
+              type="single"
+              value={editorState.keys.space ? "pan" : tool}
+              onValueChange={(value) => {
+                if (value) onToolChange(value as Tool);
+              }}
+              className="sm:bg-muted/20 mx-auto flex min-w-max items-center gap-1 rounded-lg p-1 sm:shadow-sm"
+              spacing={1}
             >
-              <CheckSquare size={18} />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="draw_radio" title={t("toolbar.radio")}>
-              <CircleDot size={18} />
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="draw_dropdown"
-              title={t("toolbar.dropdown")}
-            >
-              <List size={18} />
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="draw_signature"
-              title={t("toolbar.signature")}
-            >
-              <PenLine size={18} />
-            </ToggleGroupItem>
-          </ToggleGroup>
-        ) : (
-          <ToggleGroup
-            type="single"
-            value={editorState.keys.space ? "pan" : tool}
-            onValueChange={(value) => {
-              if (value) onToolChange(value as Tool);
-            }}
-            className="bg-muted/20 border-border flex items-center gap-1 rounded-lg border p-1 shadow-sm"
-            spacing={1}
-          >
-            <ToggleGroupItem value="pan" title={t("toolbar.pan")}>
-              <Hand size={18} />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="select" title={t("toolbar.select")}>
-              <MousePointer2 size={18} />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="eraser" title={t("toolbar.eraser")}>
-              <Eraser size={18} />
-            </ToggleGroupItem>
-            <Separator orientation="vertical" className="mx-1 h-5" />
-            <ToggleGroupItem
-              value="draw_highlight"
-              title={t("toolbar.highlight_text")}
-              className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
-            >
-              <div
-                className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
-                style={{
-                  backgroundColor:
-                    editorState.highlightStyle?.color ||
-                    ANNOTATION_STYLES.highlight.color,
-                }}
+              <ToggleGroupItem
+                value="pan"
+                title={t("toolbar.pan")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
               >
-                <Highlighter
-                  size={14}
-                  color={getContrastColor(
-                    editorState.highlightStyle?.color ||
+                <Hand size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="select"
+                title={t("toolbar.select")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <MousePointer2 size={18} />
+              </ToggleGroupItem>
+              <Separator orientation="vertical" className="mx-1 h-5" />
+              <ToggleGroupItem
+                value="draw_text"
+                title={t("toolbar.text")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <Type size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="draw_checkbox"
+                title={t("toolbar.checkbox")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <CheckSquare size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="draw_radio"
+                title={t("toolbar.radio")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <CircleDot size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="draw_dropdown"
+                title={t("toolbar.dropdown")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <List size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="draw_signature"
+                title={t("toolbar.signature")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <PenLine size={18} />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          ) : (
+            <ToggleGroup
+              type="single"
+              value={editorState.keys.space ? "pan" : tool}
+              onValueChange={(value) => {
+                if (value) onToolChange(value as Tool);
+              }}
+              className="sm:bg-muted/20 mx-auto flex min-w-max items-center gap-1 rounded-lg p-1 sm:shadow-sm"
+              spacing={1}
+            >
+              <ToggleGroupItem
+                value="pan"
+                title={t("toolbar.pan")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <Hand size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="select"
+                title={t("toolbar.select")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <MousePointer2 size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="eraser"
+                title={t("toolbar.eraser")}
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <Eraser size={18} />
+              </ToggleGroupItem>
+              <Separator orientation="vertical" className="mx-1 h-5" />
+              <ToggleGroupItem
+                value="draw_highlight"
+                title={t("toolbar.highlight_text")}
+                className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
+              >
+                <div
+                  className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
+                  style={{
+                    backgroundColor:
+                      editorState.highlightStyle?.color ||
                       ANNOTATION_STYLES.highlight.color,
-                  )}
+                  }}
+                >
+                  <Highlighter
+                    size={14}
+                    color={getContrastColor(
+                      editorState.highlightStyle?.color ||
+                        ANNOTATION_STYLES.highlight.color,
+                    )}
+                  />
+                </div>
+              </ToggleGroupItem>
+              <ColorPickerPopover
+                color={
+                  editorState.highlightStyle?.color ||
+                  ANNOTATION_STYLES.highlight.color
+                }
+                thickness={
+                  editorState.highlightStyle?.thickness ||
+                  ANNOTATION_STYLES.highlight.thickness
+                }
+                opacity={
+                  editorState.highlightStyle?.opacity ??
+                  ANNOTATION_STYLES.highlight.opacity
+                }
+                previewStrokeLinecap="butt"
+                onColorChange={(color) =>
+                  onHighlightStyleChange
+                    ? onHighlightStyleChange({ color })
+                    : onPenStyleChange({ color })
+                }
+                onThicknessChange={(thickness) =>
+                  onHighlightStyleChange
+                    ? onHighlightStyleChange({ thickness })
+                    : onPenStyleChange({ thickness })
+                }
+                onOpacityChange={(opacity) =>
+                  onHighlightStyleChange
+                    ? onHighlightStyleChange({ opacity })
+                    : onPenStyleChange({ opacity })
+                }
+                isActive={tool === "draw_highlight"}
+                title={t("toolbar.highlight_free_properties")}
+              />
+              <div className="flex items-center gap-0">
+                <ToggleGroupItem
+                  value="draw_ink"
+                  title={t("toolbar.ink")}
+                  className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
+                >
+                  <div
+                    className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
+                    style={{
+                      backgroundColor: editorState.penStyle.color,
+                    }}
+                  >
+                    <PenLine
+                      size={14}
+                      color={getContrastColor(editorState.penStyle.color)}
+                    />
+                  </div>
+                </ToggleGroupItem>
+                <ColorPickerPopover
+                  color={editorState.penStyle.color}
+                  thickness={editorState.penStyle.thickness}
+                  opacity={editorState.penStyle.opacity}
+                  onColorChange={(color) => onPenStyleChange({ color })}
+                  onThicknessChange={(thickness) =>
+                    onPenStyleChange({ thickness })
+                  }
+                  onOpacityChange={(opacity) => onPenStyleChange({ opacity })}
+                  isActive={tool === "draw_ink"}
+                  title={t("toolbar.ink_properties")}
                 />
               </div>
-            </ToggleGroupItem>
-            <ColorPickerPopover
-              color={
-                editorState.highlightStyle?.color ||
-                ANNOTATION_STYLES.highlight.color
-              }
-              thickness={
-                editorState.highlightStyle?.thickness ||
-                ANNOTATION_STYLES.highlight.thickness
-              }
-              opacity={
-                editorState.highlightStyle?.opacity ??
-                ANNOTATION_STYLES.highlight.opacity
-              }
-              previewStrokeLinecap="butt"
-              onColorChange={(color) =>
-                onHighlightStyleChange
-                  ? onHighlightStyleChange({ color })
-                  : onPenStyleChange({ color })
-              }
-              onThicknessChange={(thickness) =>
-                onHighlightStyleChange
-                  ? onHighlightStyleChange({ thickness })
-                  : onPenStyleChange({ thickness })
-              }
-              onOpacityChange={(opacity) =>
-                onHighlightStyleChange
-                  ? onHighlightStyleChange({ opacity })
-                  : onPenStyleChange({ opacity })
-              }
-              isActive={tool === "draw_highlight"}
-              title={t("toolbar.highlight_free_properties")}
-            />
-            <div className="flex items-center gap-0">
-              <ToggleGroupItem
-                value="draw_ink"
-                title={t("toolbar.ink")}
-                className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
-              >
-                <div
-                  className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
-                  style={{
-                    backgroundColor: editorState.penStyle.color,
-                  }}
+              <div className="flex items-center gap-0">
+                <ToggleGroupItem
+                  value="draw_comment"
+                  title={t("toolbar.comment")}
+                  className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
                 >
-                  <PenLine
-                    size={14}
-                    color={getContrastColor(editorState.penStyle.color)}
-                  />
-                </div>
-              </ToggleGroupItem>
-              <ColorPickerPopover
-                color={editorState.penStyle.color}
-                thickness={editorState.penStyle.thickness}
-                opacity={editorState.penStyle.opacity}
-                onColorChange={(color) => onPenStyleChange({ color })}
-                onThicknessChange={(thickness) =>
-                  onPenStyleChange({ thickness })
-                }
-                onOpacityChange={(opacity) => onPenStyleChange({ opacity })}
-                isActive={tool === "draw_ink"}
-                title={t("toolbar.ink_properties")}
-              />
-            </div>
-            <div className="flex items-center gap-0">
-              <ToggleGroupItem
-                value="draw_comment"
-                title={t("toolbar.comment")}
-                className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
-              >
-                <div
-                  className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
-                  style={{
-                    backgroundColor: editorState.commentStyle?.color,
-                  }}
+                  <div
+                    className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
+                    style={{
+                      backgroundColor: editorState.commentStyle?.color,
+                    }}
+                  >
+                    <MessageCirclePlus
+                      size={14}
+                      color={getContrastColor(editorState.commentStyle?.color)}
+                    />
+                  </div>
+                </ToggleGroupItem>
+                <ColorPickerPopover
+                  color={editorState.commentStyle?.color}
+                  onColorChange={(color) =>
+                    onCommentStyleChange && onCommentStyleChange({ color })
+                  }
+                  isActive={tool === "draw_comment"}
+                  showThickness={false}
+                  title={t("toolbar.comment_properties")}
+                />
+              </div>
+              <div className="flex items-center gap-0">
+                <ToggleGroupItem
+                  value="draw_freetext"
+                  title={t("toolbar.freetext")}
+                  className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
                 >
-                  <MessageCirclePlus
-                    size={14}
-                    color={getContrastColor(editorState.commentStyle?.color)}
-                  />
-                </div>
-              </ToggleGroupItem>
-              <ColorPickerPopover
-                color={editorState.commentStyle?.color}
-                onColorChange={(color) =>
-                  onCommentStyleChange && onCommentStyleChange({ color })
-                }
-                isActive={tool === "draw_comment"}
-                showThickness={false}
-                title={t("toolbar.comment_properties")}
-              />
-            </div>
-            <div className="flex items-center gap-0">
-              <ToggleGroupItem
-                value="draw_freetext"
-                title={t("toolbar.freetext")}
-                className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground rounded-r-none pr-1.5"
-              >
-                <div
-                  className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
-                  style={{
-                    backgroundColor: editorState.freetextStyle?.color,
-                  }}
-                >
-                  <Type
-                    size={14}
-                    color={getContrastColor(editorState.freetextStyle?.color)}
-                  />
-                </div>
-              </ToggleGroupItem>
-              <ColorPickerPopover
-                color={editorState.freetextStyle?.color}
-                onColorChange={(color) =>
-                  onFreetextStyleChange && onFreetextStyleChange({ color })
-                }
-                isActive={tool === "draw_freetext"}
-                showThickness={false}
-                title={t("toolbar.freetext_properties")}
-              />
-            </div>
-          </ToggleGroup>
-        )}
+                  <div
+                    className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
+                    style={{
+                      backgroundColor: editorState.freetextStyle?.color,
+                    }}
+                  >
+                    <Type
+                      size={14}
+                      color={getContrastColor(editorState.freetextStyle?.color)}
+                    />
+                  </div>
+                </ToggleGroupItem>
+                <ColorPickerPopover
+                  color={editorState.freetextStyle?.color}
+                  onColorChange={(color) =>
+                    onFreetextStyleChange && onFreetextStyleChange({ color })
+                  }
+                  isActive={tool === "draw_freetext"}
+                  showThickness={false}
+                  title={t("toolbar.freetext_properties")}
+                />
+              </div>
+            </ToggleGroup>
+          )}
+        </div>
       </div>
 
       {/* Right Section: Utilities & Export */}
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <SaveStatusIndicator
           isSaving={isSaving}
           isDirty={isDirty}
           lastSavedAt={editorState.lastSavedAt}
-          className="mr-2 hidden md:flex"
+          className="flex"
         />
 
         {/* Utilities Group */}
-        <div className="mr-2 flex items-center gap-1">
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={onOpenSettings}
+            className="h-8 w-8 sm:h-9 sm:w-9"
             title={t("toolbar.settings")}
           >
             <Settings size={20} />
@@ -428,6 +465,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             variant="ghost"
             size="icon"
             onClick={onOpenShortcuts}
+            className="h-8 w-8 sm:h-9 sm:w-9"
             title={t("toolbar.shortcuts")}
           >
             <Keyboard size={20} />
@@ -438,6 +476,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             size="icon"
             onClick={onTogglePropertiesPanel}
             className={cn(
+              "h-8 w-8 sm:h-9 sm:w-9",
               isPropertiesPanelOpen && "bg-accent text-accent-foreground",
             )}
             title={t("toolbar.toggle_properties")}
@@ -447,11 +486,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </div>
 
         {editorState.pages.length > 0 && mode === "form" && (
-          <div className="isolate mr-2 flex rounded-md shadow-sm">
+          <div className="isolate flex rounded-md shadow-sm">
             <Button
               onClick={onAutoDetect}
               disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
-              className="rounded-r-none border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
+              className="hidden rounded-r-none border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 sm:flex dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
               title={t("toolbar.ai_detect")}
             >
               <Sparkles size={16} />
@@ -461,12 +500,22 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <DropdownMenuTrigger asChild>
                 <Button
                   disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
-                  className="-ml-px rounded-l-none border-l border-l-purple-200 bg-purple-50 px-2 text-purple-700 hover:bg-purple-100 dark:border-l-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
+                  className="h-8 w-8 rounded-md border border-purple-200 bg-purple-50 p-0 text-purple-700 hover:bg-purple-100 sm:-ml-px sm:h-9 sm:w-auto sm:rounded-l-none sm:border-0 sm:border-l sm:border-l-purple-200 sm:px-2 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
                 >
-                  <ChevronDown size={16} />
+                  <Sparkles size={16} className="sm:hidden" />
+                  <ChevronDown size={16} className="hidden sm:block" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={onAutoDetect}
+                  className="sm:hidden"
+                  disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
+                >
+                  <Sparkles size={16} />
+                  {t("toolbar.ai_detect")}
+                </DropdownMenuItem>
+                <Separator className="my-1 sm:hidden" />
                 <DropdownMenuItem onClick={onCustomAutoDetect}>
                   <Settings2 size={16} />
                   {t("toolbar.ai_custom")}
@@ -481,7 +530,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <Button
             onClick={onExport}
             disabled={editorState.pages.length === 0}
-            className="rounded-r-none"
+            className="hidden rounded-r-none sm:flex"
           >
             <Download size={16} />
             <span className="hidden sm:inline">{t("toolbar.export")}</span>
@@ -491,12 +540,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <DropdownMenuTrigger asChild>
               <Button
                 disabled={editorState.pages.length === 0}
-                className="border-l-border -ml-px rounded-l-none border-l px-2"
+                className="border-l-border -ml-px h-8 w-8 rounded-l-md border-l-0 p-0 sm:h-9 sm:w-auto sm:rounded-l-none sm:border-l sm:px-2"
               >
-                <ChevronDown size={16} />
+                <Download size={16} className="sm:hidden" />
+                <ChevronDown size={16} className="hidden sm:block" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={onExport} className="sm:hidden">
+                <Download size={16} />
+                {t("toolbar.export")}
+              </DropdownMenuItem>
+              <Separator className="my-1 sm:hidden" />
+
               <DropdownMenuItem onClick={onSaveDraft}>
                 <Save size={16} />
                 {t("toolbar.save_draft")}

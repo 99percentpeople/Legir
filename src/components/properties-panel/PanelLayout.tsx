@@ -1,11 +1,10 @@
 import React, { useState, useCallback } from "react";
-import { Pin, PinOff, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, setGlobalCursor, resetGlobalCursor } from "@/lib/utils";
 
 export interface PanelLayoutProps {
   isFloating: boolean;
-  onToggleFloating: () => void;
   onClose?: () => void;
   title: React.ReactNode;
   children: React.ReactNode;
@@ -16,7 +15,6 @@ export interface PanelLayoutProps {
 
 export const PanelLayout: React.FC<PanelLayoutProps> = ({
   isFloating,
-  onToggleFloating,
   onClose,
   title,
   children,
@@ -77,7 +75,7 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
       className={cn(
         "bg-background border-border flex h-full flex-col border-l transition-colors duration-200",
         isFloating
-          ? "absolute top-0 right-0 bottom-0 shadow-2xl"
+          ? "absolute top-0 right-0 bottom-0 z-40 shadow-2xl"
           : "relative shadow-none",
       )}
       style={{ width: width }}
@@ -102,15 +100,6 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
           {title}
         </h3>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={onToggleFloating}
-            title={isFloating ? "Pin panel to side" : "Unpin panel (float)"}
-          >
-            {isFloating ? <Pin size={16} /> : <PinOff size={16} />}
-          </Button>
           {onClose && (
             <Button
               variant="ghost"

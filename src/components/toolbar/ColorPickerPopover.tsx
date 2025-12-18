@@ -86,7 +86,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
             variant="ghost"
             size="sm"
             className={cn(
-              "hover:bg-muted h-9 w-5 rounded-l-none p-0",
+              "hover:bg-muted h-8 w-8 rounded-l-none p-0 sm:h-9 sm:w-5",
               isActive &&
                 "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
             )}

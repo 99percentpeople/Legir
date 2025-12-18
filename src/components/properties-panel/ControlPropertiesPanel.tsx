@@ -16,7 +16,6 @@ export interface ControlPropertiesPanelProps {
   onDelete: () => void;
   onClose: () => void;
   isFloating: boolean;
-  onToggleFloating: () => void;
   onTriggerHistorySave: () => void;
   width: number;
   onResize: (width: number) => void;
@@ -29,7 +28,6 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
     onDelete,
     onClose,
     isFloating,
-    onToggleFloating,
     onTriggerHistorySave,
     width,
     onResize,
@@ -59,7 +57,6 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
           ) || t("properties.settings")
         }
         isFloating={isFloating}
-        onToggleFloating={onToggleFloating}
         onClose={onClose}
         width={width}
         onResize={onResize}
