@@ -7,13 +7,13 @@ import {
   PDFMetadata,
   PDFOutlineItem,
   Tool,
-  EditorMode,
   HistorySnapshot,
   DialogName,
   FieldType,
 } from "../types";
 import { ANNOTATION_STYLES } from "../constants";
 import { shouldSwitchToSelectAfterUse } from "../lib/tool-behavior";
+import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 
 // Define the Actions interface
 interface EditorActions {
@@ -24,11 +24,13 @@ interface EditorActions {
       | ((prev: EditorState) => Partial<EditorState>),
   ) => void;
 
+  getPageCached: (pageIndex: number) => Promise<PDFPageProxy>;
+
   // Complex Actions
   loadDocument: (data: {
     pdfFile: File | null;
     pdfBytes: Uint8Array;
-    pdfDocument: any;
+    pdfDocument: PDFDocumentProxy;
     pages: PageData[];
     fields: FormField[];
     annotations: Annotation[];
@@ -69,6 +71,7 @@ const initialState: EditorState = {
   pdfFile: null,
   pdfBytes: null,
   pdfDocument: null,
+  pageCache: new Map(),
   metadata: {},
   filename: "document.pdf",
   pages: [],
@@ -136,6 +139,20 @@ export const useEditorStore = create<EditorState & EditorActions>(
   (set, get) => ({
     ...initialState,
 
+    getPageCached: async (pageIndex) => {
+      const { pdfDocument, pageCache } = get();
+      if (!pdfDocument) {
+        throw new Error("PDF document not loaded");
+      }
+
+      let pagePromise = pageCache.get(pageIndex);
+      if (!pagePromise) {
+        pagePromise = pdfDocument.getPage(pageIndex + 1);
+        pageCache.set(pageIndex, pagePromise);
+      }
+      return await pagePromise;
+    },
+
     setState: (updates) =>
       set((state) => {
         const newValues =
@@ -146,6 +163,7 @@ export const useEditorStore = create<EditorState & EditorActions>(
     loadDocument: (data) =>
       set({
         ...data,
+        pageCache: new Map(),
         past: [],
         future: [],
         isProcessing: false,

@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const state = useEditorStore();
   const {
     setState,
+    getPageCached,
     addField,
     addAnnotation,
     updateField,
@@ -450,7 +451,8 @@ const App: React.FC = () => {
           }),
         });
 
-        const base64Image = await renderPage(state.pdfDocument, pageIndex);
+        const pageProxy = await getPageCached(pageIndex);
+        const base64Image = await renderPage(pageProxy);
 
         if (base64Image) {
           const fields = await analyzePageForFields(

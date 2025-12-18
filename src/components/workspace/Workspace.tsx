@@ -23,7 +23,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Highlighter, Search } from "lucide-react";
-import PDFPage from "./PDFPage";
+import PDFPageWithProxy from "./PDFPageWithProxy";
 import { ControlRenderer } from "./controls";
 
 interface WorkspaceProps {
@@ -2207,9 +2207,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 Lazy Loaded PDF Page Rendering 
                 Note: Container size is now controlled by PDFPage but we wrap it here for annotations layer relative positioning
             */}
-            <PDFPage
+            <PDFPageWithProxy
               pageIndex={page.pageIndex}
-              pdfDocument={editorState.pdfDocument}
               scale={editorState.scale}
               width={page.width}
               height={page.height}

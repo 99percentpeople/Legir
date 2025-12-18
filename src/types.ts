@@ -1,3 +1,5 @@
+import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
+
 export enum FieldType {
   TEXT = "Text",
   CHECKBOX = "Checkbox",
@@ -160,7 +162,8 @@ export type DialogName =
 export interface EditorState {
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
-  pdfDocument: any | null; // PDF.js Document Proxy
+  pdfDocument: PDFDocumentProxy | null; // PDF.js Document Proxy
+  pageCache: Map<number, Promise<PDFPageProxy>>;
   metadata: PDFMetadata;
   filename: string;
   pages: PageData[];

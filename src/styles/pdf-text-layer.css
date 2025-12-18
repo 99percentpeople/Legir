@@ -23,6 +23,11 @@
   mix-blend-mode: multiply;
 }
 
+.textLayer--rendering {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .textLayer :is(span, br) {
   color: transparent;
   position: absolute;
@@ -34,7 +39,7 @@
 
 .textLayer.selecting :is(span, br) {
   /* Solve text selection flickering issue https://github.com/mozilla/pdf.js/issues/9168#issuecomment-1952529240 */
-  min-height: calc(100px * var(--total-scale-factor));
+  min-height: calc(80px * var(--total-scale-factor));
 }
 
 .textLayer br::selection {

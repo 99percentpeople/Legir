@@ -1,10 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "../../lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
 
 interface PDFTextLayerProps {
   pageIndex: number;
-  pdfDocument: pdfjsLib.PDFDocumentProxy;
+  pageProxy: pdfjsLib.PDFPageProxy | null;
   scale: number;
   isInView: boolean;
   isSelectMode?: boolean;
@@ -16,7 +22,7 @@ interface PDFTextLayerProps {
 
 const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   pageIndex,
-  pdfDocument,
+  pageProxy,
   scale,
   isInView,
   isSelectMode = true,
@@ -32,6 +38,9 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   const [renderedScale, setRenderedScale] = useState<number | null>(null);
   const [pageRotation, setPageRotation] = useState(0);
   const [renderRetryToken, setRenderRetryToken] = useState(0);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
+  const renderSeqRef = useRef(0);
 
   const isActiveSelectionInThisLayer = () => {
     const el = textLayerRef.current;
@@ -58,10 +67,92 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     container.appendChild(end);
   };
 
+  const renderText = useCallback(
+    async ({
+      container,
+      targetScale,
+      isCancelled,
+      hideDuringRebuild,
+      showAfterStabilize,
+      setRenderTask,
+    }: {
+      container: HTMLDivElement;
+      targetScale: number;
+      isCancelled: () => boolean;
+      hideDuringRebuild: () => void;
+      showAfterStabilize: () => void;
+      setRenderTask: (task: pdfjsLib.TextLayer | null) => void;
+    }) => {
+      try {
+        if (!pageProxy) return;
+        setPageRotation(pageProxy.rotate);
+        if (isCancelled()) return;
+
+        const viewport = pageProxy.getViewport({
+          scale: targetScale,
+          rotation: pageProxy.rotate,
+        });
+
+        const applyLayerStyles = () => {
+          container.style.width = `${viewport.width}px`;
+          container.style.height = `${viewport.height}px`;
+          container.style.setProperty("--scale-factor", `${targetScale}`);
+          container.style.setProperty("--user-unit", `${viewport.userUnit}`);
+        };
+
+        applyLayerStyles();
+
+        const existingLayer = textLayerInstanceRef.current;
+        if (existingLayer) {
+          existingLayer.update({
+            viewport,
+            onBefore: applyLayerStyles,
+          });
+          if (isCancelled()) return;
+          setRenderedScale(targetScale);
+          return;
+        }
+
+        if (textLayerInstanceRef.current?.cancel) {
+          textLayerInstanceRef.current.cancel();
+        }
+        textLayerInstanceRef.current = null;
+
+        hideDuringRebuild();
+        container.innerHTML = "";
+
+        const textContentSource = pageProxy.streamTextContent({});
+
+        const textLayer = new pdfjsLib.TextLayer({
+          textContentSource,
+          container,
+          viewport,
+        });
+
+        textLayerInstanceRef.current = textLayer;
+        setRenderTask(textLayer);
+        await textLayer.render();
+
+        if (isCancelled()) return;
+        ensureEndOfContent(container);
+        setRenderedScale(targetScale);
+      } catch (error) {
+        // if (error?.name !== "RenderingCancelledException") {
+        console.error("Text Layer Render error:", error);
+        // }
+      } finally {
+        showAfterStabilize();
+      }
+    },
+    [pageProxy],
+  );
+
   // Reset state when page changes
   useEffect(() => {
     setRenderedScale(null);
     setPageRotation(0);
+    setIsSelecting(false);
+    setIsRendering(false);
     if (textLayerInstanceRef.current?.cancel) {
       textLayerInstanceRef.current.cancel();
     }
@@ -69,7 +160,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     if (textLayerRef.current) {
       textLayerRef.current.innerHTML = "";
     }
-  }, [pdfDocument, pageIndex]);
+  }, [pageProxy, pageIndex]);
 
   // Toggle .selecting class to assist CSS selection rules
   useEffect(() => {
@@ -80,21 +171,22 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
         const target = e.target as Node | null;
         if (!target) return;
         if (!el.contains(target)) return;
-        el.classList.add("selecting");
+        setIsSelecting(true);
       };
-      const onUp = () => el.classList.remove("selecting");
+      const onUp = () => setIsSelecting(false);
       el.addEventListener("mousedown", onDown);
       window.addEventListener("mouseup", onUp);
       return () => {
         el.removeEventListener("mousedown", onDown);
         window.removeEventListener("mouseup", onUp);
-        el.classList.remove("selecting");
+        setIsSelecting(false);
       };
     }
+    setIsSelecting(false);
   }, [isSelectMode]);
 
   useEffect(() => {
-    if (!pdfDocument || !isInView || !textLayerRef.current) return;
+    if (!pageProxy || !isInView || !textLayerRef.current) return;
 
     if (isSelectMode && isActiveSelectionInThisLayer()) {
       pendingScaleRef.current = scale;
@@ -104,55 +196,22 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
     let isCancelled = false;
     let renderTask: pdfjsLib.TextLayer | null = null;
+    const containerAtSchedule = textLayerRef.current;
+    const seq = ++renderSeqRef.current;
+    let didHide = false;
 
-    const renderText = async () => {
-      try {
-        if (textLayerInstanceRef.current?.cancel) {
-          textLayerInstanceRef.current.cancel();
-        }
-        textLayerInstanceRef.current = null;
+    const hideDuringRebuild = () => {
+      if (didHide) return;
+      setIsRendering(true);
+      didHide = true;
+    };
 
-        // Always render at the target scale for correct selection geometry
-        const targetScale = scale;
-        const page = await pdfDocument.getPage(pageIndex + 1);
-        setPageRotation(page.rotate);
-        if (isCancelled) return;
-
-        // Pass rotation to getViewport so PDF.js handles rotation natively
-        const viewport = page.getViewport({
-          scale: targetScale,
-          rotation: page.rotate,
-        });
-
-        const container = textLayerRef.current;
-        if (!container) return;
-
-        container.innerHTML = "";
-        container.style.width = `${viewport.width}px`;
-        container.style.height = `${viewport.height}px`;
-        container.style.setProperty("--scale-factor", `${targetScale}`);
-        container.style.setProperty("--user-unit", `${viewport.userUnit}`);
-
-        const textContentSource = page.streamTextContent({});
-
-        const textLayer = new pdfjsLib.TextLayer({
-          textContentSource,
-          container,
-          viewport,
-        });
-
-        textLayerInstanceRef.current = textLayer;
-        renderTask = textLayer;
-        await textLayer.render();
-
-        if (isCancelled) return;
-        ensureEndOfContent(container);
-        setRenderedScale(targetScale);
-      } catch (error) {
-        if (error?.name !== "RenderingCancelledException") {
-          console.error("Text Layer Render error:", error);
-        }
-      }
+    const showAfterStabilize = () => {
+      if (!didHide) return;
+      requestAnimationFrame(() => {
+        if (renderSeqRef.current !== seq) return;
+        setIsRendering(false);
+      });
     };
 
     // Debounce re-renders during zoom to improve performance,
@@ -160,7 +219,21 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     const isFirstRender = renderedScale === null;
     const debounceMs = isFirstRender ? 0 : 200;
 
-    const timer = setTimeout(renderText, debounceMs);
+    const timer = setTimeout(() => {
+      const container = containerAtSchedule;
+      if (!container) return;
+
+      void renderText({
+        container,
+        targetScale: scale,
+        isCancelled: () => isCancelled,
+        hideDuringRebuild,
+        showAfterStabilize,
+        setRenderTask: (task) => {
+          renderTask = task;
+        },
+      });
+    }, debounceMs);
 
     return () => {
       clearTimeout(timer);
@@ -171,8 +244,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       if (renderTask?.cancel) {
         renderTask.cancel();
       }
+
+      if (renderSeqRef.current === seq) {
+        setIsRendering(false);
+      }
     };
-  }, [pdfDocument, pageIndex, scale, isInView, isSelectMode, renderRetryToken]);
+  }, [isInView, isSelectMode, pageProxy, renderedScale, scale, renderText]);
 
   useEffect(() => {
     if (!isSelectMode) return;
@@ -205,7 +282,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   return (
     <div
       ref={textLayerRef}
-      className={cn("textLayer", isHighlighting && "highlighting")}
+      className={cn(
+        "textLayer",
+        isHighlighting && "highlighting",
+        isSelecting && "selecting",
+        isRendering && "textLayer--rendering",
+      )}
       tabIndex={0}
       data-main-rotation={pageRotation}
       data-selectable={isSelectMode ? "true" : "false"}

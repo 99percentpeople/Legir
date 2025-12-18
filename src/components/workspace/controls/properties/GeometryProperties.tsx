@@ -23,6 +23,7 @@ export const GeometryProperties: React.FC<PropertyPanelProps<FormField>> = ({
         <div className="space-y-1">
           <Label className="text-xs">{t("properties.x")}</Label>
           <NumberInput
+            aria-label={t("properties.x")}
             value={Math.round(data.rect.x)}
             formatOptions={{ maximumFractionDigits: 0 }}
             onFocus={onTriggerHistorySave}
@@ -32,6 +33,7 @@ export const GeometryProperties: React.FC<PropertyPanelProps<FormField>> = ({
         <div className="space-y-1">
           <Label className="text-xs">{t("properties.y")}</Label>
           <NumberInput
+            aria-label={t("properties.y")}
             value={Math.round(data.rect.y)}
             formatOptions={{ maximumFractionDigits: 0 }}
             onFocus={onTriggerHistorySave}
@@ -41,6 +43,7 @@ export const GeometryProperties: React.FC<PropertyPanelProps<FormField>> = ({
         <div className="space-y-1">
           <Label className="text-xs">{t("properties.width")}</Label>
           <NumberInput
+            aria-label={t("properties.width")}
             value={Math.round(data.rect.width)}
             formatOptions={{ maximumFractionDigits: 0 }}
             onFocus={onTriggerHistorySave}
@@ -50,6 +53,7 @@ export const GeometryProperties: React.FC<PropertyPanelProps<FormField>> = ({
         <div className="space-y-1">
           <Label className="text-xs">{t("properties.height")}</Label>
           <NumberInput
+            aria-label={t("properties.height")}
             value={Math.round(data.rect.height)}
             formatOptions={{ maximumFractionDigits: 0 }}
             onFocus={onTriggerHistorySave}
