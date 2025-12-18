@@ -1,7 +1,18 @@
+import type { EditorUiState } from "./types";
+
 export const DEFAULT_SCALE = 1.0;
 export const ZOOM_BASE = 1.25;
 export const MIN_FIELD_SIZE = 10;
 export const PAGE_PADDING = 24; // px
+
+export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
+  isSidebarOpen: !(typeof window !== "undefined" && window.innerWidth < 768),
+  isRightPanelOpen: !(typeof window !== "undefined" && window.innerWidth < 768),
+  rightPanelTab: "document",
+  sidebarTab: "thumbnails",
+  sidebarWidth: 256,
+  rightPanelWidth: 320,
+};
 
 export const COLORS = {
   primary: "blue-600",

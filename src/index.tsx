@@ -18,8 +18,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <LanguageProvider defaultLanguage="en" storageKey="vite-ui-language">
-      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+    <LanguageProvider defaultLanguage="en" storageKey="ff-ui-language">
+      <ThemeProvider defaultTheme="system" storageKey="ff-ui-theme">
         <Toaster position="top-center" />
         <App />
       </ThemeProvider>

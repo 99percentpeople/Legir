@@ -44,6 +44,7 @@ const App: React.FC = () => {
   const state = useEditorStore();
   const {
     setState,
+    setUiState,
     getPageCached,
     addField,
     addAnnotation,
@@ -95,16 +96,16 @@ const App: React.FC = () => {
     setState({ isPanelFloating: isMobile });
 
     if (isMobile) {
-      setState((prev) => {
+      setUiState((prev) => {
         if (!prev.isSidebarOpen || !prev.isRightPanelOpen) return prev;
         return { isSidebarOpen: true, isRightPanelOpen: false };
       });
     }
-  }, [isMobile, setState]);
+  }, [isMobile, setState, setUiState]);
 
   const handleEditAnnotation = useCallback((id: string) => {
     const currentState = useEditorStore.getState();
-    currentState.setState((prev) => ({
+    currentState.setUiState((prev) => ({
       isSidebarOpen: true,
       sidebarTab: "annotations",
       ...(prev.isPanelFloating ? { isRightPanelOpen: false } : {}),
@@ -724,16 +725,16 @@ const App: React.FC = () => {
     const prev = prevSelectedIdRef.current;
     const next = state.selectedId;
     if (!prev && next) {
-      setState({ rightPanelTab: "properties" });
+      setUiState({ rightPanelTab: "properties" });
     }
     prevSelectedIdRef.current = next;
-  }, [state.selectedId, setState]);
+  }, [state.selectedId, setUiState]);
 
   useEffect(() => {
     if (!state.selectedId && state.rightPanelTab === "properties") {
-      setState({ rightPanelTab: "document" });
+      setUiState({ rightPanelTab: "document" });
     }
-  }, [state.selectedId, state.rightPanelTab, setState]);
+  }, [state.selectedId, state.rightPanelTab, setUiState]);
 
   const handlePenStyleChange = useCallback(
     (style: Partial<EditorState["penStyle"]>) => {
@@ -826,13 +827,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!state.isPanelFloating) return;
     if (state.isSidebarOpen && state.isRightPanelOpen) {
-      setState({ isRightPanelOpen: false });
+      setUiState({ isRightPanelOpen: false });
     }
   }, [
     state.isPanelFloating,
     state.isSidebarOpen,
     state.isRightPanelOpen,
-    setState,
+    setUiState,
   ]);
 
   return (
@@ -882,7 +883,7 @@ const App: React.FC = () => {
             }
             isFieldListOpen={state.isSidebarOpen}
             onToggleFieldList={() =>
-              setState((prev) => {
+              setUiState((prev) => {
                 const next = !prev.isSidebarOpen;
                 if (prev.isPanelFloating && next)
                   return { isSidebarOpen: true, isRightPanelOpen: false };
@@ -891,7 +892,7 @@ const App: React.FC = () => {
             }
             isPropertiesPanelOpen={state.isRightPanelOpen}
             onTogglePropertiesPanel={() =>
-              setState((prev) => {
+              setUiState((prev) => {
                 const next = !prev.isRightPanelOpen;
                 if (prev.isPanelFloating && next)
                   return { isRightPanelOpen: true, isSidebarOpen: false };
@@ -910,14 +911,17 @@ const App: React.FC = () => {
                   className="absolute inset-0 z-30 bg-black/20"
                   onMouseDown={(e) => {
                     if (e.target !== e.currentTarget) return;
-                    setState({ isSidebarOpen: false, isRightPanelOpen: false });
+                    setUiState({
+                      isSidebarOpen: false,
+                      isRightPanelOpen: false,
+                    });
                   }}
                 />
               )}
 
             <Sidebar
               isOpen={state.isSidebarOpen}
-              onClose={() => setState({ isSidebarOpen: false })}
+              onClose={() => setUiState({ isSidebarOpen: false })}
               isFloating={state.isPanelFloating}
               pages={state.pages}
               fields={state.fields}
@@ -958,10 +962,10 @@ const App: React.FC = () => {
               }}
               currentPageIndex={state.currentPageIndex}
               width={state.sidebarWidth}
-              onResize={(w) => setState({ sidebarWidth: w })}
+              onResize={(w) => setUiState({ sidebarWidth: w })}
               pdfDocument={state.pdfDocument}
               activeTab={state.sidebarTab}
-              onTabChange={(tab) => setState({ sidebarTab: tab })}
+              onTabChange={(tab) => setUiState({ sidebarTab: tab })}
             />
 
             <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -1001,7 +1005,7 @@ const App: React.FC = () => {
               canOpenProperties={!!selectedControl}
               onSelectTab={(tab) => {
                 if (tab === "properties" && !selectedControl) return;
-                setState((prev) => {
+                setUiState((prev) => {
                   const updates: any = {
                     rightPanelTab: tab,
                     isRightPanelOpen: true,
@@ -1028,16 +1032,16 @@ const App: React.FC = () => {
                   onFilenameChange={handleFilenameChange}
                   onDelete={deleteSelection}
                   onClose={() => {
-                    setState({ rightPanelTab: "document" });
+                    setUiState({ rightPanelTab: "document" });
                     selectControl(null);
                   }}
                   onCollapse={() => {
-                    setState({ isRightPanelOpen: false });
+                    setUiState({ isRightPanelOpen: false });
                   }}
                   isFloating={state.isPanelFloating}
                   onTriggerHistorySave={saveCheckpoint}
                   width={state.rightPanelWidth}
-                  onResize={(w) => setState({ rightPanelWidth: w })}
+                  onResize={(w) => setUiState({ rightPanelWidth: w })}
                 />
               )}
           </div>

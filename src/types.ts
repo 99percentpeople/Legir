@@ -248,3 +248,13 @@ export interface EditorState {
     id: number;
   } | null;
 }
+
+export type EditorUiState = Pick<
+  EditorState,
+  | "isSidebarOpen"
+  | "isRightPanelOpen"
+  | "rightPanelTab"
+  | "sidebarTab"
+  | "sidebarWidth"
+  | "rightPanelWidth"
+>;

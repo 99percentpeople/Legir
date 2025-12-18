@@ -82,7 +82,7 @@ const LanguageProviderContext =
 export function LanguageProvider({
   children,
   defaultLanguage = "system",
-  storageKey = "vite-ui-language",
+  storageKey = "ff-ui-language",
   ...props
 }: LanguageProviderProps) {
   const [language, setLanguage] = useState<Language>(
