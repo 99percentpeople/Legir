@@ -1,5 +1,5 @@
 import React from "react";
-import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize, Maximize2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 
@@ -8,6 +8,7 @@ interface ZoomControlsProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onReset: () => void;
+  onFitScreen: () => void;
 }
 
 const ZoomControls: React.FC<ZoomControlsProps> = ({
@@ -15,6 +16,7 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
   onZoomIn,
   onZoomOut,
   onReset,
+  onFitScreen,
 }) => {
   const percentage = Math.round(scale * 100);
 
@@ -54,10 +56,20 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
         variant="ghost"
         size="icon"
         onClick={onReset}
-        title="Fit / Reset"
+        title="Fit Width"
         className="h-8 w-8"
       >
         <Maximize size={14} />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onFitScreen}
+        title="Fit Screen"
+        className="h-8 w-8"
+      >
+        <Maximize2 size={14} />
       </Button>
     </div>
   );

@@ -1,4 +1,5 @@
 const es = {
+  "app.name": "FormForge AI",
   "common.select": "Seleccionar...",
   "common.cancel": "Cancelar",
   "common.save": "Guardar",
@@ -47,8 +48,17 @@ const es = {
   "dialog.confirm_close.title": "¿Cerrar documento?",
   "dialog.confirm_close.desc":
     "¿Está seguro de que desea cerrar? Se perderán los cambios no guardados.",
+  "dialog.confirm_close.save_close": "Guardar y cerrar",
+  "dialog.confirm_close.export_close": "Exportar y cerrar",
+  "dialog.confirm_close.save_draft_close": "Guardar borrador y cerrar",
   "dialog.confirm_close.confirm": "Cerrar sin guardar",
   "dialog.confirm_close.cancel": "Cancelar",
+  "dialog.file_drop.title": "¿Abrir archivo soltado?",
+  "dialog.file_drop.desc":
+    "Ya hay un documento abierto. Elija qué hacer con el PDF soltado.",
+  "dialog.file_drop.open": "Abrir",
+  "dialog.file_drop.save_open": "Guardar y abrir",
+  "dialog.file_drop.save_draft_open": "Guardar borrador y abrir",
   "properties.document.title": "Información del documento",
   "right_panel.tabs.properties": "Edición de propiedades",
   "properties.document.hint":
@@ -242,6 +252,20 @@ const es = {
   "landing.feature.local.title": "Privacidad primero",
   "landing.feature.local.desc":
     "Los archivos se procesan localmente en su navegador.",
+  "landing.desktop.recent_title": "Archivos recientes",
+  "landing.desktop.recent_subtitle":
+    "Reabra rápidamente los PDF en los que trabajó.",
+  "landing.desktop.search_placeholder": "Buscar por nombre o ruta...",
+  "landing.desktop.open_pdf": "Abrir PDF",
+  "landing.desktop.clear_all": "Borrar todo",
+  "landing.desktop.file_count": "{count} archivo(s)",
+  "landing.desktop.no_recent_files": "No hay archivos recientes.",
+  "landing.desktop.pdf_badge": "PDF",
+  "landing.desktop.open": "Abrir",
+  "landing.desktop.open_fail": "No se pudo abrir el archivo.",
+  "landing.desktop.confirm_clear_all": "¿Borrar todos los archivos recientes?",
+  "landing.footer.copyright":
+    "© {year} {appName}. Todos los derechos reservados.",
   "app.parsing": "Analizando PDF...",
   "app.analyzing": "Analizando página {current} de {total}...",
   "app.generating": "Generando PDF...",

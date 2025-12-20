@@ -5,6 +5,13 @@ export const ZOOM_BASE = 1.25;
 export const MIN_FIELD_SIZE = 10;
 export const PAGE_PADDING = 24; // px
 
+export const WORKSPACE_SCROLL_CONTAINER_SELECTOR =
+  "[data-workspace-scroll-container='true']";
+
+export const FIT_WIDTH_PADDING_X = 96;
+export const FIT_SCREEN_PADDING_X = 96;
+export const FIT_SCREEN_PADDING_Y = 120;
+
 export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   isSidebarOpen: !(typeof window !== "undefined" && window.innerWidth < 768),
   isRightPanelOpen: !(typeof window !== "undefined" && window.innerWidth < 768),

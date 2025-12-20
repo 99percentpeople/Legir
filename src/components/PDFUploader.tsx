@@ -4,13 +4,16 @@ import { Card, CardContent } from "./ui/card";
 import { buttonVariants } from "./ui/button";
 import { cn } from "../lib/utils";
 import { useLanguage } from "./language-provider";
+import { canOpenWithPicker } from "../services/fileOps";
 
 interface PDFUploaderProps {
   onUpload: (file: File) => void;
+  onOpen?: () => Promise<void>;
 }
 
-const PDFUploader: React.FC<PDFUploaderProps> = ({ onUpload }) => {
+const PDFUploader: React.FC<PDFUploaderProps> = ({ onUpload, onOpen }) => {
   const { t } = useLanguage();
+  const canUseOpenPicker = !!onOpen && canOpenWithPicker();
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
@@ -46,21 +49,37 @@ const PDFUploader: React.FC<PDFUploaderProps> = ({ onUpload }) => {
             {t("uploader.desc")}
           </p>
 
-          <label
-            className={cn(
-              buttonVariants({ size: "lg" }),
-              "hover:shadow-primary/25 cursor-pointer shadow-lg transition-all",
-            )}
-          >
-            <Upload size={20} className="mr-2" />
-            {t("uploader.btn")}
-            <input
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={handleFileInput}
-            />
-          </label>
+          {canUseOpenPicker ? (
+            <button
+              type="button"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "hover:shadow-primary/25 cursor-pointer shadow-lg transition-all",
+              )}
+              onClick={() => {
+                void onOpen();
+              }}
+            >
+              <Upload size={20} className="mr-2" />
+              {t("uploader.btn")}
+            </button>
+          ) : (
+            <label
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "hover:shadow-primary/25 cursor-pointer shadow-lg transition-all",
+              )}
+            >
+              <Upload size={20} className="mr-2" />
+              {t("uploader.btn")}
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleFileInput}
+              />
+            </label>
+          )}
         </CardContent>
       </Card>
       <p className="text-muted-foreground mt-4 text-center text-sm">

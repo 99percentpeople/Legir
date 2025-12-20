@@ -1,4 +1,5 @@
 const de = {
+  "app.name": "FormForge AI",
   "common.select": "Auswählen...",
   "common.cancel": "Abbrechen",
   "common.save": "Speichern",
@@ -47,8 +48,17 @@ const de = {
   "dialog.confirm_close.title": "Dokument schließen?",
   "dialog.confirm_close.desc":
     "Sind Sie sicher, dass Sie schließen möchten? Alle ungespeicherten Änderungen gehen verloren.",
+  "dialog.confirm_close.save_close": "Speichern und schließen",
+  "dialog.confirm_close.export_close": "Exportieren und schließen",
+  "dialog.confirm_close.save_draft_close": "Entwurf speichern und schließen",
   "dialog.confirm_close.confirm": "Schließen ohne Speichern",
   "dialog.confirm_close.cancel": "Abbrechen",
+  "dialog.file_drop.title": "Abgelegte Datei öffnen?",
+  "dialog.file_drop.desc":
+    "Ein Dokument ist bereits geöffnet. Wählen Sie aus, was mit der abgelegten PDF geschehen soll.",
+  "dialog.file_drop.open": "Öffnen",
+  "dialog.file_drop.save_open": "Speichern und öffnen",
+  "dialog.file_drop.save_draft_open": "Entwurf speichern und öffnen",
   "properties.document.title": "Dokumentinfo",
   "right_panel.tabs.properties": "Eigenschaften bearbeiten",
   "properties.document.hint":
@@ -242,6 +252,20 @@ const de = {
   "landing.feature.local.title": "Datenschutz zuerst",
   "landing.feature.local.desc":
     "Dateien werden lokal in Ihrem Browser verarbeitet.",
+  "landing.desktop.recent_title": "Zuletzt verwendete Dateien",
+  "landing.desktop.recent_subtitle":
+    "Öffnen Sie bearbeitete PDFs schnell erneut.",
+  "landing.desktop.search_placeholder": "Nach Name oder Pfad suchen...",
+  "landing.desktop.open_pdf": "PDF öffnen",
+  "landing.desktop.clear_all": "Alles löschen",
+  "landing.desktop.file_count": "{count} Datei(en)",
+  "landing.desktop.no_recent_files": "Keine zuletzt verwendeten Dateien.",
+  "landing.desktop.pdf_badge": "PDF",
+  "landing.desktop.open": "Öffnen",
+  "landing.desktop.open_fail": "Datei konnte nicht geöffnet werden.",
+  "landing.desktop.confirm_clear_all":
+    "Alle zuletzt verwendeten Dateien löschen?",
+  "landing.footer.copyright": "© {year} {appName}. Alle Rechte vorbehalten.",
   "app.parsing": "PDF wird analysiert...",
   "app.analyzing": "Analysiere Seite {current} von {total}...",
   "app.generating": "PDF wird generiert...",

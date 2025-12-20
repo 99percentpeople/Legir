@@ -1,4 +1,5 @@
 const fr = {
+  "app.name": "FormForge AI",
   "common.select": "Sélectionner...",
   "common.cancel": "Annuler",
   "common.save": "Enregistrer",
@@ -47,8 +48,17 @@ const fr = {
   "dialog.confirm_close.title": "Fermer le document ?",
   "dialog.confirm_close.desc":
     "Êtes-vous sûr de vouloir fermer ? Toutes les modifications non enregistrées seront perdues.",
+  "dialog.confirm_close.save_close": "Enregistrer et fermer",
+  "dialog.confirm_close.export_close": "Exporter et fermer",
+  "dialog.confirm_close.save_draft_close": "Enregistrer le brouillon et fermer",
   "dialog.confirm_close.confirm": "Fermer sans enregistrer",
   "dialog.confirm_close.cancel": "Annuler",
+  "dialog.file_drop.title": "Ouvrir le fichier déposé ?",
+  "dialog.file_drop.desc":
+    "Un document est déjà ouvert. Choisissez quoi faire avec le PDF déposé.",
+  "dialog.file_drop.open": "Ouvrir",
+  "dialog.file_drop.save_open": "Enregistrer et ouvrir",
+  "dialog.file_drop.save_draft_open": "Enregistrer le brouillon et ouvrir",
   "properties.document.title": "Infos Document",
   "right_panel.tabs.properties": "Édition des propriétés",
   "properties.document.hint":
@@ -243,6 +253,19 @@ const fr = {
   "landing.feature.local.title": "Confidentialité d'abord",
   "landing.feature.local.desc":
     "Les fichiers sont traités localement dans votre navigateur.",
+  "landing.desktop.recent_title": "Fichiers récents",
+  "landing.desktop.recent_subtitle":
+    "Rouvrez rapidement les PDF sur lesquels vous avez travaillé.",
+  "landing.desktop.search_placeholder": "Rechercher par nom ou chemin...",
+  "landing.desktop.open_pdf": "Ouvrir un PDF",
+  "landing.desktop.clear_all": "Tout effacer",
+  "landing.desktop.file_count": "{count} fichier(s)",
+  "landing.desktop.no_recent_files": "Aucun fichier récent.",
+  "landing.desktop.pdf_badge": "PDF",
+  "landing.desktop.open": "Ouvrir",
+  "landing.desktop.open_fail": "Échec de l'ouverture du fichier.",
+  "landing.desktop.confirm_clear_all": "Effacer tous les fichiers récents ?",
+  "landing.footer.copyright": "© {year} {appName}. Tous droits réservés.",
   "app.parsing": "Analyse du PDF...",
   "app.analyzing": "Analyse de la page {current} sur {total}...",
   "app.generating": "Génération du PDF...",

@@ -6,7 +6,7 @@
     "module": "ESNext",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "skipLibCheck": true,
-    "types": ["vite/client"],
+    "types": ["vite/client", "wicg-file-system-access"],
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",

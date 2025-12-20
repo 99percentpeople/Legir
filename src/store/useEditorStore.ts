@@ -18,13 +18,19 @@ import { shouldSwitchToSelectAfterUse } from "../lib/tool-behavior";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 
 // Define the Actions interface
-interface EditorActions {
+export interface EditorActions {
   // Generic Setter (for gradual migration)
   setState: (
     updates:
       | Partial<EditorState>
       | ((prev: EditorState) => Partial<EditorState>),
   ) => void;
+
+  withProcessing: <T>(
+    status: string | null | undefined,
+    fn: () => Promise<T>,
+  ) => Promise<T>;
+  setProcessingStatus: (status: string | null) => void;
 
   setUiState: (
     updates:
@@ -48,6 +54,7 @@ interface EditorActions {
     metadata: PDFMetadata;
     filename: string;
     scale: number;
+    saveTarget: EditorState["saveTarget"] | null;
   }) => void;
 
   addField: (field: FormField) => void;
@@ -74,7 +81,11 @@ interface EditorActions {
   closeDialog: () => void;
 
   setKeys: (keys: Partial<EditorState["keys"]>) => void;
+
+  resetDocument: () => void;
 }
+
+export type EditorStore = EditorState & EditorActions;
 
 function pickEditorUiState(state: EditorState): EditorUiState {
   return {
@@ -95,6 +106,7 @@ const initialState: EditorState = {
   pageCache: new Map(),
   metadata: {},
   filename: "document.pdf",
+  saveTarget: null,
   pages: [],
   fields: [],
   annotations: [],
@@ -149,13 +161,42 @@ const initialState: EditorState = {
     space: false,
   },
   activeDialog: null,
+  closeConfirmSource: null,
   actionSignal: null, // Deprecated, but kept for interface compatibility
 };
+
+let processingDepth = 0;
+const processingStatusStack: Array<string | null> = [];
 
 export const useEditorStore = create<EditorState & EditorActions>()(
   persist(
     (set, get) => ({
       ...initialState,
+
+      withProcessing: async (status, fn) => {
+        const prevStatus = get().processingStatus;
+        processingDepth += 1;
+        processingStatusStack.push(prevStatus);
+
+        set({
+          isProcessing: true,
+          processingStatus: status ?? null,
+        });
+
+        try {
+          return await fn();
+        } finally {
+          processingDepth = Math.max(0, processingDepth - 1);
+          const restore = processingStatusStack.pop() ?? null;
+          if (processingDepth === 0) {
+            set({ isProcessing: false, processingStatus: null });
+          } else {
+            set({ isProcessing: true, processingStatus: restore });
+          }
+        }
+      },
+
+      setProcessingStatus: (status) => set({ processingStatus: status }),
 
       getPageCached: async (pageIndex) => {
         const { pdfDocument, pageCache } = get();
@@ -193,7 +234,6 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           pageCache: new Map(),
           past: [],
           future: [],
-          isProcessing: false,
           selectedId: null,
           isDirty: false,
         }),
@@ -456,10 +496,49 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           };
         }),
 
-      openDialog: (name) => set({ activeDialog: name }),
-      closeDialog: () => set({ activeDialog: null }),
+      openDialog: (name) =>
+        set({
+          activeDialog: name,
+          closeConfirmSource: null,
+        }),
+      closeDialog: () =>
+        set({
+          activeDialog: null,
+          closeConfirmSource: null,
+        }),
 
       setKeys: (keys) => set((state) => ({ keys: { ...state.keys, ...keys } })),
+
+      resetDocument: () =>
+        set(() => ({
+          pdfFile: initialState.pdfFile,
+          pdfBytes: initialState.pdfBytes,
+          pdfDocument: initialState.pdfDocument,
+          pageCache: new Map(),
+          metadata: initialState.metadata,
+          filename: initialState.filename,
+          saveTarget: initialState.saveTarget,
+          pages: initialState.pages,
+          fields: initialState.fields,
+          annotations: initialState.annotations,
+          outline: initialState.outline,
+          selectedId: initialState.selectedId,
+          scale: initialState.scale,
+          mode: initialState.mode,
+          tool: initialState.tool,
+          past: initialState.past,
+          future: initialState.future,
+          clipboard: initialState.clipboard,
+          isProcessing: initialState.isProcessing,
+          processingStatus: initialState.processingStatus,
+          isSaving: initialState.isSaving,
+          hasSavedSession: initialState.hasSavedSession,
+          isDirty: initialState.isDirty,
+          currentPageIndex: initialState.currentPageIndex,
+          fitTrigger: initialState.fitTrigger,
+          activeDialog: initialState.activeDialog,
+          closeConfirmSource: initialState.closeConfirmSource,
+        })),
 
       moveField: (direction, isFast) => {
         set((state) => {

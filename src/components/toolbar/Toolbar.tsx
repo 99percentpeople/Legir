@@ -1,9 +1,8 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   MousePointer2,
   Type,
   CheckSquare,
-  Download,
   Sparkles,
   ChevronDown,
   Undo2,
@@ -16,16 +15,12 @@ import {
   Settings,
   PenLine,
   Save,
-  SaveAll,
   Settings2,
-  XCircle,
   Highlighter,
   PenTool,
-  FileText,
   Edit3,
   Eraser,
   MessageCirclePlus,
-  Printer,
   Hand,
   Pen,
 } from "lucide-react";
@@ -43,6 +38,7 @@ import {
 } from "../ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { useLanguage } from "../language-provider";
+import { canSaveAs } from "../../services/fileOps";
 import {
   Select,
   SelectContent,
@@ -55,6 +51,8 @@ import { ColorPickerPopover } from "./ColorPickerPopover";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { ANNOTATION_STYLES } from "@/constants";
 import { getContrastColor } from "@/utils/colors";
+import ExportMenu from "./ExportMenu";
+import { isTauri } from "@tauri-apps/api/core";
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -117,10 +115,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   const { t } = useLanguage();
   const { mode, tool } = editorState;
-  const hasFileSystemAccess = "showSaveFilePicker" in window;
+  const hasSaveAs = useRef(canSaveAs());
+  const tauri = isTauri();
 
   return (
-    <div className="bg-background border-border text-foreground relative z-50 flex h-12 items-center gap-2 border-b px-2 sm:px-4">
+    <div className="bg-background border-border text-foreground relative z-50 flex h-12 items-center gap-2 border-b px-2 sm:px-4 lg:justify-between">
       {/* Left Section: Mode Selection & History */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         <div className="flex items-center gap-1">
@@ -199,8 +198,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       {/* Center Section: Tools based on Mode */}
-      <div className="flex min-w-0 flex-1 justify-center">
-        <div className="no-scrollbar flex w-full overflow-x-auto px-1">
+      <div className="flex min-w-0 flex-1 items-center justify-center xl:absolute xl:top-0 xl:left-1/2 xl:h-full xl:flex-none xl:-translate-x-1/2">
+        <div className="no-scrollbar flex w-full overflow-x-auto px-1 xl:w-auto">
           {mode === "form" ? (
             <ToggleGroup
               type="single"
@@ -528,79 +527,23 @@ const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* Export Dropdown */}
-        <div className="isolate flex rounded-md shadow-sm">
-          <Button
-            onClick={onExport}
-            disabled={editorState.pages.length === 0}
-            className="hidden rounded-r-none sm:flex"
-          >
-            <Download size={16} />
-            <span className="hidden sm:inline">{t("toolbar.export")}</span>
-          </Button>
-
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                disabled={editorState.pages.length === 0}
-                className="border-l-border -ml-px h-8 w-8 rounded-l-md border-l-0 p-0 sm:h-9 sm:w-auto sm:rounded-l-none sm:border-l sm:px-2"
-              >
-                <Download size={16} className="sm:hidden" />
-                <ChevronDown size={16} className="hidden sm:block" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={onExport} className="sm:hidden">
-                <Download size={16} />
-                {t("toolbar.export")}
-              </DropdownMenuItem>
-              <Separator className="my-1 sm:hidden" />
-
-              <DropdownMenuItem onClick={onSaveDraft}>
-                <Save size={16} />
-                {t("toolbar.save_draft")}
-              </DropdownMenuItem>
-              {hasFileSystemAccess && (
-                <DropdownMenuItem onClick={onSaveAs}>
-                  <SaveAll size={16} />
-                  {t("toolbar.save_as")}
-                </DropdownMenuItem>
-              )}
-
-              <Separator className="my-1" />
-
-              <DropdownMenuItem
-                onClick={async () => {
-                  if (await onExport()) onExit();
-                }}
-              >
-                <FileText size={16} />
-                {t("toolbar.save_close")}
-              </DropdownMenuItem>
-              {hasFileSystemAccess && (
-                <DropdownMenuItem
-                  onClick={async () => {
-                    if (await onSaveAs()) onExit();
-                  }}
-                >
-                  <FileText size={16} />
-                  {t("toolbar.save_as_close")}
-                </DropdownMenuItem>
-              )}
-
-              <Separator className="my-1" />
-
-              <DropdownMenuItem onClick={onPrint}>
-                <Printer size={16} />
-                {t("toolbar.print")}
-              </DropdownMenuItem>
-
-              <DropdownMenuItem onClick={onClose} variant="destructive">
-                <XCircle size={16} />
-                {t("toolbar.close")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <ExportMenu
+          disabled={editorState.pages.length === 0}
+          isDirty={!!isDirty}
+          hasSaveAs={hasSaveAs.current}
+          onPrimary={onExport}
+          onSaveDraft={onSaveDraft}
+          onSaveAs={onSaveAs}
+          onExit={onExit}
+          onPrint={onPrint}
+          onClose={() => {
+            if (tauri && !isDirty) {
+              onExit();
+              return;
+            }
+            onClose();
+          }}
+        />
       </div>
     </div>
   );

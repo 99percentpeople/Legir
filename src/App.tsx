@@ -1,16 +1,11 @@
-import React, { useEffect, useCallback } from "react";
-import Toolbar from "./components/toolbar/Toolbar";
-import Workspace from "./components/workspace/Workspace";
-import { PropertiesPanel } from "./components/properties-panel/PropertiesPanel";
-import LandingPage from "./components/LandingPage";
-import ZoomControls from "./components/toolbar/ZoomControls";
+import React, { useEffect, useCallback, useState } from "react";
+import LandingPage from "./pages/LandingPage";
 import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import SettingsDialog from "./components/SettingsDialog";
 import AIDetectionDialog, {
   AIDetectionOptions,
 } from "./components/AIDetectionDialog";
-import Sidebar from "./components/sidebar/Sidebar";
-import { RightPanelTabDock } from "./components/properties-panel/RightPanelTabDock";
+import EditorPage from "./pages/EditorPage";
 import {
   Dialog,
   DialogContent,
@@ -19,367 +14,381 @@ import {
   DialogDescription,
 } from "./components/ui/dialog";
 import { Button } from "./components/ui/button";
+import { EditorState, FormField } from "./types";
 import {
-  EditorState,
-  FormField,
-  PageData,
-  Annotation,
-  PDFMetadata,
-} from "./types";
-import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
+  loadPDF,
+  exportPDF,
+  renderPage,
+  renderPdfThumbnailFromPage,
+  renderPdfThumbnailFromPdfBytes,
+} from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
 import { saveDraft, getDraft, clearDraft } from "./services/storageService";
-import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES } from "./constants";
+import { DEFAULT_FIELD_STYLE } from "./constants";
+import {
+  exportPdfBytes,
+  openFileFromPath,
+  getStartupOpenPdfArg,
+  openFile,
+  pickSaveTarget,
+  writeToSaveTarget,
+} from "./services/fileOps";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
-import { useEditorStore } from "./store/useEditorStore";
-import { useIsMobile } from "./hooks/useIsMobile";
+import { useEditorStore, type EditorActions } from "./store/useEditorStore";
+import { useLocation } from "wouter";
+import AppRoutes from "./AppRoutes";
+import {
+  addRecentFile,
+  setRecentFileThumbnail,
+} from "./services/recentFilesService";
+import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+
+function useAppInitialization({
+  loadIntoEditor,
+  setState,
+  pdfDisposeRef,
+  openDroppedPdfPath,
+  setPendingFileDropPath,
+  setFileDropDialogOpen,
+}: {
+  loadIntoEditor: (options: {
+    input: File | Uint8Array;
+    pdfFile: File | null;
+    filename: string;
+    saveTarget: EditorState["saveTarget"] | null;
+  }) => Promise<void>;
+  setState: EditorActions["setState"];
+  pdfDisposeRef: React.RefObject<null | (() => void)>;
+  openDroppedPdfPath: (filePath: string) => Promise<void>;
+  setPendingFileDropPath: React.Dispatch<React.SetStateAction<string | null>>;
+  setFileDropDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: null | (() => void) = null;
+
+    void (async () => {
+      try {
+        const startupPath = await getStartupOpenPdfArg();
+        if (!cancelled && startupPath) {
+          const picked = await openFileFromPath(startupPath);
+          if (cancelled) return;
+          await loadIntoEditor({
+            input: picked.bytes,
+            pdfFile: null,
+            filename: picked.filename,
+            saveTarget: { kind: "tauri", path: startupPath },
+          });
+        }
+      } catch (e) {
+        console.error("Failed to fetch pending argv PDF:", e);
+      }
+
+      try {
+        const draft = await getDraft();
+        if (!cancelled && draft) setState({ hasSavedSession: true });
+      } catch {
+        // ignore
+      }
+
+      if (!isTauri() || cancelled) return;
+      try {
+        if (cancelled) return;
+        const webview = getCurrentWebview();
+        unlisten = await webview.onDragDropEvent((event: any) => {
+          const payload: any = event?.payload;
+          if (payload?.type !== "drop") return;
+
+          const paths: string[] = Array.isArray(payload?.paths)
+            ? payload.paths
+            : [];
+          const firstPdf = paths.find((p) => typeof p === "string") || null;
+          if (!firstPdf) return;
+
+          const { isProcessing, pages } = useEditorStore.getState();
+          if (isProcessing) return;
+
+          const hasOpenDocument = pages.length > 0;
+          if (!hasOpenDocument) {
+            void openDroppedPdfPath(firstPdf);
+            return;
+          }
+
+          setPendingFileDropPath(firstPdf);
+          setFileDropDialogOpen(true);
+        });
+
+        if (cancelled) {
+          try {
+            unlisten?.();
+          } catch {
+            // ignore
+          }
+          unlisten = null;
+        }
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try {
+        unlisten?.();
+      } catch {
+        // ignore
+      }
+      pdfDisposeRef.current?.();
+      pdfDisposeRef.current = null;
+    };
+  }, [
+    loadIntoEditor,
+    openDroppedPdfPath,
+    pdfDisposeRef,
+    setFileDropDialogOpen,
+    setPendingFileDropPath,
+    setState,
+  ]);
+}
 
 const App: React.FC = () => {
   const { t } = useLanguage();
 
-  const isMobile = useIsMobile(768);
+  const isTauriSaveTarget = (
+    target: any,
+  ): target is { kind: "tauri"; path: string } => {
+    return target?.kind === "tauri" && typeof target?.path === "string";
+  };
+
+  const [, navigate] = useLocation();
 
   // Use Zustand store
   const state = useEditorStore();
   const {
     setState,
-    setUiState,
     getPageCached,
-    addField,
-    addAnnotation,
-    updateField,
-    updateAnnotation,
-    deleteSelection,
-    selectControl,
-    setTool,
     saveCheckpoint,
-    undo,
-    redo,
-    deleteAnnotation,
+    resetDocument,
+    setProcessingStatus,
+    withProcessing,
+    loadDocument,
   } = state;
-  const isClosingRef = React.useRef(false);
   const pdfDisposeRef = React.useRef<null | (() => void)>(null);
-  const prevSelectedIdRef = React.useRef<string | null>(null);
+  const loadQueueRef = React.useRef<Promise<void>>(Promise.resolve());
+  const thumbnailQueueRef = React.useRef<Promise<void>>(Promise.resolve());
 
-  // Refs for stable access in event listeners
-  const handlersRef = React.useRef<{
-    handleSaveDraft: (manual?: boolean) => Promise<void>;
-    handlePrint: () => void;
-  } | null>(null);
-
-  useEffect(() => {
-    getDraft().then((draft) => {
-      if (draft) setState({ hasSavedSession: true });
-    });
-  }, [setState]);
-
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (state.isDirty && !isClosingRef.current) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [state.isDirty]);
-
-  useEffect(() => {
-    return () => {
-      pdfDisposeRef.current?.();
-      pdfDisposeRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    setState({ isPanelFloating: isMobile });
-
-    if (isMobile) {
-      setUiState((prev) => {
-        if (!prev.isSidebarOpen || !prev.isRightPanelOpen) return prev;
-        return { isSidebarOpen: true, isRightPanelOpen: false };
-      });
-    }
-  }, [isMobile, setState, setUiState]);
-
-  const handleEditAnnotation = useCallback((id: string) => {
-    const currentState = useEditorStore.getState();
-    currentState.setUiState((prev) => ({
-      isSidebarOpen: true,
-      sidebarTab: "annotations",
-      ...(prev.isPanelFloating ? { isRightPanelOpen: false } : {}),
-    }));
-
-    currentState.selectControl(id);
-
-    // Try to focus the textarea in the sidebar
-    requestAnimationFrame(() => {
-      // We need a way to identify the textarea in the sidebar.
-      // Let's assume we'll add an ID to the textarea in CommentsPanel
-      const el = document.getElementById(
-        `annotation-input-${id}`,
-      ) as HTMLTextAreaElement;
-      if (el) {
-        el.focus();
-        const len = el.value.length;
-        el.setSelectionRange(len, len);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (state.pages.length > 0 && state.pdfBytes) {
-      const timer = setTimeout(() => {
-        handleSaveDraft(true);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [state.fields, state.annotations, state.metadata, state.filename]);
-
-  const calculateFitScale = useCallback(
-    (pagesList: PageData[], pageIndex: number = 0) => {
-      if (!pagesList || pagesList.length === 0) return 1.0;
-      // Ensure pageIndex is within bounds
-      const targetIndex = Math.max(
-        0,
-        Math.min(pageIndex, pagesList.length - 1),
-      );
-      const page = pagesList[targetIndex];
-      if (!page.width) return 1.0;
-      const SIDEBAR_WIDTH = state.isSidebarOpen ? state.sidebarWidth : 0;
-      const PANEL_WIDTH =
-        !state.isPanelFloating && state.isRightPanelOpen
-          ? state.rightPanelWidth
-          : 0;
-      const PADDING = 96;
-      const availableWidth =
-        window.innerWidth - SIDEBAR_WIDTH - PANEL_WIDTH - PADDING;
-      const scale = availableWidth / page.width;
-      return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
-    },
-    [
-      state.isSidebarOpen,
-      state.isPanelFloating,
-      state.isRightPanelOpen,
-      state.sidebarWidth,
-      state.rightPanelWidth,
-    ],
+  const [fileDropDialogOpen, setFileDropDialogOpen] = useState(false);
+  const [pendingFileDropPath, setPendingFileDropPath] = useState<string | null>(
+    null,
   );
 
-  const updateScale = (newScale: number) => {
-    const clamped = Math.max(0.25, Math.min(5.0, newScale));
-    setState({ scale: clamped });
-  };
+  const loadIntoEditor = useCallback(
+    async (options: {
+      input: File | Uint8Array;
+      pdfFile: File | null;
+      filename: string;
+      saveTarget: EditorState["saveTarget"] | null;
+    }) => {
+      const run = async () => {
+        const prevPdfDocument = useEditorStore.getState().pdfDocument;
+        const prevHasSavedSession = useEditorStore.getState().hasSavedSession;
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Access latest state directly from store without needing refs
-      const currentState = useEditorStore.getState();
+        resetDocument();
+        setState({ hasSavedSession: prevHasSavedSession });
 
-      // Update Modifier Keys
-      if (
-        e.key === "Control" ||
-        e.key === "Shift" ||
-        e.key === "Alt" ||
-        e.key === "Meta"
-      ) {
-        currentState.setKeys({
-          ctrl: e.ctrlKey,
-          shift: e.shiftKey,
-          alt: e.altKey,
-          meta: e.metaKey,
-          space: currentState.keys.space,
+        await withProcessing(t("app.parsing"), async () => {
+          if (typeof requestAnimationFrame === "function") {
+            await new Promise<void>((resolve) =>
+              requestAnimationFrame(() => resolve()),
+            );
+          }
+
+          await Promise.race([
+            thumbnailQueueRef.current.catch(() => {
+              // ignore
+            }),
+            new Promise<void>((resolve) => setTimeout(resolve, 80)),
+          ]);
+
+          if (prevPdfDocument) {
+            try {
+              (prevPdfDocument as any).cleanup?.();
+            } catch {
+              // ignore
+            }
+            try {
+              await (prevPdfDocument as any).destroy?.();
+            } catch {
+              // ignore
+            }
+          }
+
+          pdfDisposeRef.current?.();
+          pdfDisposeRef.current = null;
+
+          if (typeof requestAnimationFrame === "function") {
+            await new Promise<void>((resolve) =>
+              requestAnimationFrame(() => resolve()),
+            );
+          }
+
+          const {
+            pdfBytes,
+            pdfDocument,
+            pages,
+            fields,
+            annotations,
+            metadata,
+            outline,
+            dispose,
+          } = await loadPDF(options.input);
+          pdfDisposeRef.current = dispose;
+
+          loadDocument({
+            pdfFile: options.pdfFile,
+            pdfBytes,
+            pdfDocument,
+            metadata,
+            filename: options.filename,
+            saveTarget: options.saveTarget,
+            pages,
+            fields,
+            annotations,
+            outline,
+            scale: 1.0,
+          });
+
+          if (options.saveTarget?.kind === "tauri") {
+            const tauriPath = options.saveTarget.path;
+            const expectedPdfDocument = pdfDocument;
+            addRecentFile({
+              path: tauriPath,
+              filename: options.filename,
+            });
+
+            thumbnailQueueRef.current = thumbnailQueueRef.current
+              .catch(() => {
+                // keep queue alive
+              })
+              .then(async () => {
+                try {
+                  const expectedPdfBytes = pdfBytes;
+                  const pageProxy = await useEditorStore
+                    .getState()
+                    .getPageCached(0);
+
+                  const currentPdfDocument =
+                    useEditorStore.getState().pdfDocument;
+                  const currentPdfBytes = useEditorStore.getState().pdfBytes;
+                  if (currentPdfDocument !== expectedPdfDocument) return;
+                  if (currentPdfBytes !== expectedPdfBytes) return;
+
+                  const thumb = await renderPdfThumbnailFromPage({
+                    page: pageProxy,
+                    targetWidth: 240,
+                  });
+                  if (!thumb) return;
+
+                  const latestPdfDocument =
+                    useEditorStore.getState().pdfDocument;
+                  const latestPdfBytes = useEditorStore.getState().pdfBytes;
+                  if (latestPdfDocument !== expectedPdfDocument) return;
+                  if (latestPdfBytes !== expectedPdfBytes) return;
+
+                  setRecentFileThumbnail({
+                    path: tauriPath,
+                    thumbnailDataUrl: thumb,
+                  });
+                } catch {
+                  // ignore
+                }
+              });
+          }
+
+          navigate("/editor");
+        }).catch((error) => {
+          console.error("Error loading PDF:", error);
+          toast.error(t("app.load_error"));
         });
-        return;
-      }
+      };
 
-      const target = e.target as HTMLElement;
-      const isInput =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
-
-      if (e.key === " " && !isInput) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!currentState.keys.space) {
-          currentState.setKeys({ space: true });
-        }
-        return;
-      }
-
-      // Handle Escape Key
-      if (e.key === "Escape") {
-        if (currentState.activeDialog) {
-          return;
-        }
-
-        if (isInput) target.blur();
-
-        // Escape Action Logic
-        if (currentState.selectedId) {
-          currentState.selectControl(null);
-        } else if (currentState.tool !== "select") {
-          currentState.setTool("select");
-        }
-        return;
-      }
-
-      // Handle Ctrl+S (Save)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        handlersRef.current?.handleSaveDraft(false);
-        return;
-      }
-
-      // Handle Ctrl+P (Print)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        handlersRef.current?.handlePrint();
-        return;
-      }
-
-      // Handle Delete/Backspace
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (isInput && !(target as HTMLInputElement).readOnly) {
-          return;
-        }
-        const isSelectedField = currentState.fields.some(
-          (f) => f.id === currentState.selectedId,
-        );
-        if (currentState.mode === "annotation" && isSelectedField) {
-          return;
-        }
-        currentState.deleteSelection();
-        return;
-      }
-
-      // Block other shortcuts if typing in a writable input
-      if (isInput && !(target as HTMLInputElement).readOnly) {
-        return;
-      }
-
-      // Handle Arrow Keys
-      if (
-        currentState.mode === "form" &&
-        currentState.selectedId &&
-        currentState.fields.some((f) => f.id === currentState.selectedId) &&
-        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
-      ) {
-        e.preventDefault();
-        const isFast = e.shiftKey;
-        let direction: "UP" | "DOWN" | "LEFT" | "RIGHT" = "UP";
-        if (e.key === "ArrowUp") direction = "UP";
-        else if (e.key === "ArrowDown") direction = "DOWN";
-        else if (e.key === "ArrowLeft") direction = "LEFT";
-        else if (e.key === "ArrowRight") direction = "RIGHT";
-
-        currentState.moveField(direction, isFast);
-        return;
-      }
-
-      // Undo/Redo
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-        if (e.shiftKey) currentState.redo();
-        else currentState.undo();
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-        currentState.redo();
-        return;
-      }
-
-      // Help Dialog
-      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
-        currentState.openDialog("shortcuts");
-        return;
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      const currentState = useEditorStore.getState();
-
-      if (
-        e.key === "Control" ||
-        e.key === "Shift" ||
-        e.key === "Alt" ||
-        e.key === "Meta"
-      ) {
-        currentState.setKeys({
-          ctrl: e.ctrlKey,
-          shift: e.shiftKey,
-          alt: e.altKey,
-          meta: e.metaKey,
-          space: currentState.keys.space,
-        });
-      }
-
-      if (e.key === " ") {
-        currentState.setKeys({ space: false });
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("keyup", handleKeyUp, true);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("keyup", handleKeyUp, true);
-    };
-  }, []);
+      loadQueueRef.current = loadQueueRef.current
+        .catch(() => {
+          // keep queue alive
+        })
+        .then(run);
+      return loadQueueRef.current;
+    },
+    [navigate, setState, t],
+  );
 
   const handleUpload = async (file: File) => {
-    setState((prev) => ({ ...prev, isProcessing: true }));
-    setState({ processingStatus: t("app.parsing") });
-    try {
-      pdfDisposeRef.current?.();
-      pdfDisposeRef.current = null;
-
-      const {
-        pdfBytes,
-        pdfDocument,
-        pages,
-        fields,
-        annotations,
-        metadata,
-        outline,
-        dispose,
-      } = await loadPDF(file);
-      pdfDisposeRef.current = dispose;
-      const fitScale = calculateFitScale(pages);
-      setState((prev) => ({
-        ...prev,
-        pdfFile: file,
-        pdfBytes,
-        pdfDocument,
-        metadata,
-        filename: file.name,
-        pages,
-        fields: fields,
-        annotations: annotations,
-        outline: outline,
-        scale: fitScale,
-        past: [],
-        future: [],
-        isProcessing: false,
-      }));
-      setState({ isDirty: false });
-    } catch (error) {
-      console.error("Error loading PDF:", error);
-      toast.error(t("app.load_error"));
-      setState((prev) => ({ ...prev, isProcessing: false }));
-    } finally {
-      setState({ processingStatus: null });
-    }
+    await loadIntoEditor({
+      input: file,
+      pdfFile: file,
+      filename: file.name,
+      saveTarget: null,
+    });
   };
+
+  const handleOpen = async () => {
+    const picked = await openFile({
+      filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+    });
+    if (!picked) return;
+
+    await loadIntoEditor({
+      input: picked.bytes,
+      pdfFile: null,
+      filename: picked.filename,
+      saveTarget: picked.filePath
+        ? { kind: "tauri", path: picked.filePath }
+        : picked.handle
+          ? { kind: "web", handle: picked.handle }
+          : null,
+    });
+  };
+
+  const handleOpenRecent = useCallback(
+    async (filePath: string) => {
+      const picked = await openFileFromPath(filePath);
+      await loadIntoEditor({
+        input: picked.bytes,
+        pdfFile: null,
+        filename: picked.filename,
+        saveTarget: { kind: "tauri", path: filePath },
+      });
+    },
+    [loadIntoEditor],
+  );
+
+  const openDroppedPdfPath = useCallback(
+    async (filePath: string) => {
+      if (!filePath.toLowerCase().endsWith(".pdf")) {
+        toast.error("Only PDF files are supported.");
+        return;
+      }
+
+      await handleOpenRecent(filePath);
+    },
+    [handleOpenRecent],
+  );
+
+  useAppInitialization({
+    loadIntoEditor,
+    setState,
+    pdfDisposeRef,
+    openDroppedPdfPath,
+    setPendingFileDropPath,
+    setFileDropDialogOpen,
+  });
 
   const handleResumeSession = async () => {
     const draft = await getDraft();
     if (!draft) return;
-    setState((prev) => ({ ...prev, isProcessing: true }));
-    setState({ processingStatus: t("app.loading_draft") });
-    try {
+    await withProcessing(t("app.loading_draft"), async () => {
       pdfDisposeRef.current?.();
       pdfDisposeRef.current = null;
 
@@ -392,31 +401,26 @@ const App: React.FC = () => {
         dispose,
       } = await loadPDF(draft.pdfBytes);
       pdfDisposeRef.current = dispose;
-      const fitScale = calculateFitScale(pages);
-      setState((prev) => ({
-        ...prev,
+
+      loadDocument({
         pdfFile: null,
         pdfBytes: draft.pdfBytes,
         pdfDocument,
         pages,
         outline,
         fields: draft.fields,
-        annotations: draft.annotations || fileAnnotations, // Recover annotations from PDF bytes or draft
+        annotations: draft.annotations || fileAnnotations,
         metadata: draft.metadata,
         filename: draft.filename,
-        scale: fitScale,
-        past: [],
-        future: [],
-        isProcessing: false,
-      }));
-      setState({ isDirty: false });
-    } catch (error) {
+        saveTarget: null,
+        scale: 1.0,
+      });
+
+      navigate("/editor");
+    }).catch((error) => {
       console.error("Failed to resume session:", error);
       toast.error(t("app.load_error"));
-      setState((prev) => ({ ...prev, isProcessing: false }));
-    } finally {
-      setState({ processingStatus: null });
-    }
+    });
   };
 
   const handleAdvancedDetect = async (options: AIDetectionOptions) => {
@@ -458,20 +462,19 @@ const App: React.FC = () => {
       return;
     }
 
-    setState((prev) => ({ ...prev, isProcessing: true }));
-    let allNewFields: FormField[] = [];
+    await withProcessing(null, async () => {
+      let allNewFields: FormField[] = [];
 
-    try {
       for (let i = 0; i < targetPageIndices.length; i++) {
         const pageIndex = targetPageIndices[i];
         const page = state.pages[pageIndex];
 
-        setState({
-          processingStatus: t("app.analyzing", {
+        setProcessingStatus(
+          t("app.analyzing", {
             current: i + 1,
             total: targetPageIndices.length,
           }),
-        });
+        );
 
         const pageProxy = await getPageCached(pageIndex);
         const base64Image = await renderPage(pageProxy);
@@ -508,20 +511,15 @@ const App: React.FC = () => {
         setState((prev) => ({
           ...prev,
           fields: [...prev.fields, ...allNewFields],
-          isProcessing: false,
           isDirty: true,
         }));
       } else {
         toast.info(t("app.no_new_fields"));
-        setState((prev) => ({ ...prev, isProcessing: false }));
       }
-    } catch (e) {
+    }).catch((e) => {
       console.error(e);
-      setState((prev) => ({ ...prev, isProcessing: false }));
       toast.error(t("app.auto_detect_fail", { error: e.message }));
-    } finally {
-      setState({ processingStatus: null });
-    }
+    });
   };
 
   const generatePDF = async () => {
@@ -536,87 +534,138 @@ const App: React.FC = () => {
 
   const handleSaveAs = async (): Promise<boolean> => {
     if (!state.pdfBytes) return false;
+    return await withProcessing(t("app.generating"), async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const modifiedBytes = await generatePDF();
+      if (!modifiedBytes) return false;
 
-    // Strictly use File System Access API
-    if ("showSaveFilePicker" in window) {
-      try {
-        const handle = await (window as any).showSaveFilePicker({
-          suggestedName: state.filename || "document.pdf",
-          types: [
-            {
-              description: "PDF Document",
-              accept: { "application/pdf": [".pdf"] },
-            },
-          ],
+      const target = await pickSaveTarget({
+        suggestedName: state.filename || "document.pdf",
+        filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+      });
+      if (!target) return false;
+
+      await writeToSaveTarget(target, modifiedBytes);
+      setState({
+        saveTarget: target as unknown as EditorState["saveTarget"],
+        lastSavedAt: new Date(),
+        isDirty: false,
+      });
+
+      if (isTauriSaveTarget(target)) {
+        const tauriTarget = target;
+        const expectedPdfDocument = state.pdfDocument;
+        addRecentFile({
+          path: tauriTarget.path,
+          filename: state.filename || "document.pdf",
         });
-
-        // User selected a file, NOW generate the PDF
-        setState((prev) => ({ ...prev, isProcessing: true }));
-        setState({ processingStatus: t("app.generating") });
-
-        try {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          const modifiedBytes = await generatePDF();
-
-          if (modifiedBytes) {
-            const writable = await handle.createWritable();
-            await writable.write(modifiedBytes);
-            await writable.close();
-            toast.success(t("app.save_success"));
-            return true;
-          }
-        } finally {
-          setState((prev) => ({ ...prev, isProcessing: false }));
-          setState({ processingStatus: null });
-        }
-        return false;
-      } catch (err: any) {
-        if (err.name === "AbortError") {
-          // User cancelled selection. Stop here.
-          return false;
-        }
-        console.error("Save As failed:", err);
-        toast.error(t("app.save_fail"));
-        return false;
+        thumbnailQueueRef.current = thumbnailQueueRef.current
+          .catch(() => {
+            // keep queue alive
+          })
+          .then(async () => {
+            try {
+              if (!expectedPdfDocument) return;
+              if (
+                useEditorStore.getState().pdfDocument !== expectedPdfDocument
+              ) {
+                return;
+              }
+              const thumb = await renderPdfThumbnailFromPdfBytes({
+                pdfBytes: modifiedBytes,
+                targetWidth: 240,
+                renderAnnotations: true,
+              });
+              if (!thumb) return;
+              setRecentFileThumbnail({
+                path: tauriTarget.path,
+                thumbnailDataUrl: thumb,
+              });
+            } catch {
+              // ignore
+            }
+          });
       }
-    }
 
-    return false;
+      toast.success(t("app.save_success"));
+      return true;
+    }).catch((err: any) => {
+      if (err?.name === "AbortError") return false;
+      console.error("Save As failed:", err);
+      toast.error(t("app.save_fail"));
+      return false;
+    });
   };
 
   const handleExport = async (): Promise<boolean> => {
-    setState((prev) => ({ ...prev, isProcessing: true }));
-    setState({ processingStatus: t("app.generating") });
-    try {
+    return await withProcessing(t("app.generating"), async () => {
       const modifiedBytes = await generatePDF();
-      if (modifiedBytes) {
-        const blob = new Blob([new Uint8Array(modifiedBytes)], {
-          type: "application/pdf",
+      if (!modifiedBytes) return false;
+
+      const result = await exportPdfBytes({
+        bytes: modifiedBytes,
+        filename: state.filename || "document.pdf",
+        existingTarget: state.saveTarget as any,
+        filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+      });
+
+      if (!result.ok) return false;
+
+      if (result.kind === "saved") {
+        setState({
+          saveTarget: result.target as unknown as EditorState["saveTarget"],
+          lastSavedAt: new Date(),
+          isDirty: false,
         });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = state.filename || "document.pdf";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return true;
+
+        const savedTarget = result.target;
+        if (isTauriSaveTarget(savedTarget)) {
+          const expectedPdfDocument = state.pdfDocument;
+          addRecentFile({
+            path: savedTarget.path,
+            filename: state.filename || "document.pdf",
+          });
+          thumbnailQueueRef.current = thumbnailQueueRef.current
+            .catch(() => {
+              // keep queue alive
+            })
+            .then(async () => {
+              try {
+                if (!expectedPdfDocument) return;
+                if (
+                  useEditorStore.getState().pdfDocument !== expectedPdfDocument
+                ) {
+                  return;
+                }
+                const thumb = await renderPdfThumbnailFromPdfBytes({
+                  pdfBytes: modifiedBytes,
+                  targetWidth: 240,
+                  renderAnnotations: true,
+                });
+                if (!thumb) return;
+                setRecentFileThumbnail({
+                  path: savedTarget.path,
+                  thumbnailDataUrl: thumb,
+                });
+              } catch {
+                // ignore
+              }
+            });
+        }
+
+        toast.success(t("app.save_success"));
       }
-    } catch (error) {
+
+      return true;
+    }).catch((error) => {
       console.error("Export failed:", error);
       toast.error(t("app.export_fail"));
       return false;
-    } finally {
-      setState((prev) => ({ ...prev, isProcessing: false }));
-      setState({ processingStatus: null });
-    }
-    return false;
+    });
   };
 
   const handlePrint = async () => {
-    setState((prev) => ({ ...prev, isProcessing: true }));
-    setState({ processingStatus: t("app.generating") });
-    try {
+    await withProcessing(t("app.generating"), async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       const modifiedBytes = await generatePDF();
       if (modifiedBytes) {
@@ -657,13 +706,10 @@ const App: React.FC = () => {
           win.print();
         };
       }
-    } catch (error) {
+    }).catch((error) => {
       console.error("Print failed:", error);
       toast.error(t("app.export_fail"));
-    } finally {
-      setState((prev) => ({ ...prev, isProcessing: false }));
-      setState({ processingStatus: null });
-    }
+    });
   };
 
   const handleSaveDraft = async (silent = false) => {
@@ -692,361 +738,65 @@ const App: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    handlersRef.current = {
-      handleSaveDraft,
-      handlePrint,
-    };
-  }, [handleSaveDraft, handlePrint]);
-
   const closeSession = async () => {
-    isClosingRef.current = true;
-    await clearDraft();
-    window.location.reload();
+    pdfDisposeRef.current?.();
+    pdfDisposeRef.current = null;
+
+    resetDocument();
+    navigate("/");
   };
 
-  const handleCloseRequest = () => {
-    setState((prev) => ({ ...prev, activeDialog: "close_confirm" }));
-  };
-
-  const selectedField =
-    state.selectedId && state.fields.find((f) => f.id === state.selectedId)
-      ? state.fields.find((f) => f.id === state.selectedId) || null
-      : null;
-
-  const selectedAnnotation =
-    state.selectedId && state.annotations.find((a) => a.id === state.selectedId)
-      ? state.annotations.find((a) => a.id === state.selectedId) || null
-      : null;
-
-  const selectedControl = selectedField || selectedAnnotation;
-
-  useEffect(() => {
-    const prev = prevSelectedIdRef.current;
-    const next = state.selectedId;
-    if (!prev && next) {
-      setUiState({ rightPanelTab: "properties" });
-    }
-    prevSelectedIdRef.current = next;
-  }, [state.selectedId, setUiState]);
-
-  useEffect(() => {
-    if (!state.selectedId && state.rightPanelTab === "properties") {
-      setUiState({ rightPanelTab: "document" });
-    }
-  }, [state.selectedId, state.rightPanelTab, setUiState]);
-
-  const handlePenStyleChange = useCallback(
-    (style: Partial<EditorState["penStyle"]>) => {
-      setState((prev) => ({
-        ...prev,
-        penStyle: { ...prev.penStyle, ...style },
-      }));
+  const onEditorSaveDraft = useCallback(
+    (silent?: boolean) => {
+      void handleSaveDraft(silent ?? false);
     },
-    [],
+    [handleSaveDraft],
   );
 
-  const handleHighlightStyleChange = useCallback(
-    (style: Partial<EditorState["penStyle"]>) => {
-      setState((prev) => ({
-        ...prev,
-        highlightStyle: {
-          ...(prev.highlightStyle || {
-            color: ANNOTATION_STYLES.highlight.color,
-            thickness: ANNOTATION_STYLES.highlight.thickness,
-            opacity: ANNOTATION_STYLES.highlight.opacity,
-          }),
-          ...style,
-        },
-      }));
-    },
-    [],
-  );
+  const onEditorExit = useCallback(() => {
+    void closeSession();
+  }, [closeSession]);
 
-  const handleCommentStyleChange = useCallback((style: { color: string }) => {
-    setState((prev) => ({
-      ...prev,
-      commentStyle: { ...prev.commentStyle, ...style },
-    }));
-  }, []);
+  const onEditorPrint = useCallback(() => {
+    void handlePrint();
+  }, [handlePrint]);
 
-  const handleFreetextStyleChange = useCallback((style: { color: string }) => {
-    setState((prev) => ({
-      ...prev,
-      freetextStyle: { ...prev.freetextStyle!, ...style },
-    }));
-  }, []);
-
-  const handlePropertiesChange = useCallback(
-    (updates: Partial<FormField | Annotation>) => {
-      const currentState = useEditorStore.getState();
-      const currentSelectedId = currentState.selectedId;
-      if (!currentSelectedId) return;
-
-      const isField = currentState.fields.some(
-        (f) => f.id === currentSelectedId,
-      );
-      if (isField) {
-        currentState.updateField(
-          currentSelectedId,
-          updates as Partial<FormField>,
-        );
-      } else {
-        const isAnnotation = currentState.annotations.some(
-          (a) => a.id === currentSelectedId,
-        );
-        if (isAnnotation) {
-          currentState.updateAnnotation(
-            currentSelectedId,
-            updates as Partial<Annotation>,
-          );
-        }
-      }
-    },
-    [],
-  );
-
-  const handleMetadataChange = useCallback(
-    (updates: Partial<PDFMetadata>) => {
-      setState((prev) => ({
-        ...prev,
-        metadata: { ...prev.metadata, ...updates },
-        isDirty: true,
-      }));
-    },
-    [setState],
-  );
-
-  const handleFilenameChange = useCallback(
-    (name: string) => {
-      setState((prev) => ({ ...prev, filename: name, isDirty: true }));
-    },
-    [setState],
-  );
-
-  useEffect(() => {
-    if (!state.isPanelFloating) return;
-    if (state.isSidebarOpen && state.isRightPanelOpen) {
-      setUiState({ isRightPanelOpen: false });
-    }
-  }, [
-    state.isPanelFloating,
-    state.isSidebarOpen,
-    state.isRightPanelOpen,
-    setUiState,
-  ]);
+  const onEditorAutoDetect = useCallback(() => {
+    void handleAdvancedDetect({
+      pageRange: "All",
+      allowedTypes: [],
+      extraPrompt: "",
+      defaultStyle: DEFAULT_FIELD_STYLE,
+      useCustomStyle: false,
+    });
+  }, [handleAdvancedDetect]);
 
   return (
     <div className="flex h-full w-full flex-col">
-      {state.pages.length === 0 ? (
-        <LandingPage
-          onUpload={handleUpload}
-          hasSavedSession={state.hasSavedSession}
-          onResume={handleResumeSession}
-        />
-      ) : (
-        <>
-          <Toolbar
-            editorState={state}
-            isSaving={state.isSaving}
-            isDirty={state.isDirty}
-            onToolChange={(tool) => setTool(tool)}
-            onModeChange={(mode) => setState({ mode, tool: "select" })}
-            onPenStyleChange={handlePenStyleChange}
-            onHighlightStyleChange={handleHighlightStyleChange}
-            onCommentStyleChange={handleCommentStyleChange}
-            onFreetextStyleChange={handleFreetextStyleChange}
-            onExport={handleExport}
-            onSaveDraft={() => handleSaveDraft(false)}
-            onSaveAs={handleSaveAs}
-            onExit={closeSession}
-            onClose={handleCloseRequest}
-            onPrint={handlePrint}
-            onAutoDetect={() =>
-              handleAdvancedDetect({
-                pageRange: "All",
-                allowedTypes: [],
-                extraPrompt: "",
-                defaultStyle: DEFAULT_FIELD_STYLE,
-                useCustomStyle: false,
-              })
-            }
-            onCustomAutoDetect={() =>
-              setState((prev) => ({ ...prev, activeDialog: "ai_detect" }))
-            }
-            onUndo={undo}
-            onRedo={redo}
-            canUndo={state.past.length > 0}
-            canRedo={state.future.length > 0}
-            onOpenShortcuts={() =>
-              setState((prev) => ({ ...prev, activeDialog: "shortcuts" }))
-            }
-            isFieldListOpen={state.isSidebarOpen}
-            onToggleFieldList={() =>
-              setUiState((prev) => {
-                const next = !prev.isSidebarOpen;
-                if (prev.isPanelFloating && next)
-                  return { isSidebarOpen: true, isRightPanelOpen: false };
-                return { isSidebarOpen: next };
-              })
-            }
-            isPropertiesPanelOpen={state.isRightPanelOpen}
-            onTogglePropertiesPanel={() =>
-              setUiState((prev) => {
-                const next = !prev.isRightPanelOpen;
-                if (prev.isPanelFloating && next)
-                  return { isRightPanelOpen: true, isSidebarOpen: false };
-                return { isRightPanelOpen: next };
-              })
-            }
-            onOpenSettings={() =>
-              setState((prev) => ({ ...prev, activeDialog: "settings" }))
-            }
+      <AppRoutes
+        canAccessEditor={state.pages.length > 0}
+        isLoading={state.isProcessing}
+        landing={
+          <LandingPage
+            onUpload={handleUpload}
+            onOpen={handleOpen}
+            onOpenRecent={handleOpenRecent}
+            hasSavedSession={state.hasSavedSession}
+            onResume={handleResumeSession}
           />
-
-          <div className="relative flex flex-1 overflow-hidden">
-            {state.isPanelFloating &&
-              (state.isSidebarOpen || state.isRightPanelOpen) && (
-                <div
-                  className="absolute inset-0 z-30 bg-black/20"
-                  onMouseDown={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    setUiState({
-                      isSidebarOpen: false,
-                      isRightPanelOpen: false,
-                    });
-                  }}
-                />
-              )}
-
-            <Sidebar
-              isOpen={state.isSidebarOpen}
-              onClose={() => setUiState({ isSidebarOpen: false })}
-              isFloating={state.isPanelFloating}
-              pages={state.pages}
-              fields={state.fields}
-              annotations={state.annotations}
-              outline={state.outline}
-              selectedId={state.selectedId}
-              onSelectControl={(id) => {
-                selectControl(id);
-                if (id) {
-                  setTimeout(() => {
-                    let el = document.getElementById(`field-element-${id}`);
-                    if (!el) {
-                      el = document.getElementById(`annotation-${id}`);
-                    }
-                    if (el) {
-                      el.scrollIntoView({
-                        behavior: "smooth",
-                        block: "center",
-                        inline: "center",
-                      });
-                      // Try to find an input/textarea/select to focus
-                      const input = el.querySelector(
-                        "input, textarea, select",
-                      ) as HTMLElement;
-                      if (input) {
-                        input.focus({ preventScroll: true });
-                      }
-                    }
-                  }, 50);
-                }
-              }}
-              onDeleteAnnotation={deleteAnnotation}
-              onUpdateAnnotation={updateAnnotation}
-              onNavigatePage={(idx) => {
-                document
-                  .getElementById(`page-${idx}`)
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }}
-              currentPageIndex={state.currentPageIndex}
-              width={state.sidebarWidth}
-              onResize={(w) => setUiState({ sidebarWidth: w })}
-              pdfDocument={state.pdfDocument}
-              activeTab={state.sidebarTab}
-              onTabChange={(tab) => setUiState({ sidebarTab: tab })}
-            />
-
-            <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
-              <Workspace
-                editorState={state}
-                onAddField={addField}
-                onAddAnnotation={addAnnotation}
-                onSelectControl={selectControl}
-                onUpdateField={updateField}
-                onUpdateAnnotation={updateAnnotation}
-                onDeleteAnnotation={deleteAnnotation}
-                onEditAnnotation={handleEditAnnotation}
-                onScaleChange={updateScale}
-                onTriggerHistorySave={saveCheckpoint}
-                onPageIndexChange={(idx) => setState({ currentPageIndex: idx })}
-                onToolChange={(tool) => setTool(tool)}
-                fitTrigger={state.fitTrigger}
-              />
-              <ZoomControls
-                scale={state.scale}
-                onZoomIn={() => updateScale(state.scale * 1.25)}
-                onZoomOut={() => updateScale(state.scale / 1.25)}
-                onReset={() => {
-                  updateScale(
-                    calculateFitScale(state.pages, state.currentPageIndex),
-                  );
-                  setState({ fitTrigger: Date.now() });
-                }}
-              />
-            </div>
-
-            <RightPanelTabDock
-              activeTab={state.rightPanelTab}
-              isRightPanelOpen={state.isRightPanelOpen}
-              isFloating={state.isPanelFloating}
-              rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
-              canOpenProperties={!!selectedControl}
-              onSelectTab={(tab) => {
-                if (tab === "properties" && !selectedControl) return;
-                setUiState((prev) => {
-                  const updates: any = {
-                    rightPanelTab: tab,
-                    isRightPanelOpen: true,
-                  };
-                  if (prev.isPanelFloating) {
-                    updates.isSidebarOpen = false;
-                  }
-                  return updates;
-                });
-              }}
-            />
-
-            {(state.mode === "form" ||
-              state.mode === "annotation" ||
-              selectedControl) &&
-              state.isRightPanelOpen && (
-                <PropertiesPanel
-                  selectedControl={selectedControl}
-                  activeTab={state.rightPanelTab}
-                  metadata={state.metadata}
-                  filename={state.filename}
-                  onChange={handlePropertiesChange}
-                  onMetadataChange={handleMetadataChange}
-                  onFilenameChange={handleFilenameChange}
-                  onDelete={deleteSelection}
-                  onClose={() => {
-                    setUiState({ rightPanelTab: "document" });
-                    selectControl(null);
-                  }}
-                  onCollapse={() => {
-                    setUiState({ isRightPanelOpen: false });
-                  }}
-                  isFloating={state.isPanelFloating}
-                  onTriggerHistorySave={saveCheckpoint}
-                  width={state.rightPanelWidth}
-                  onResize={(w) => setUiState({ rightPanelWidth: w })}
-                />
-              )}
-          </div>
-        </>
-      )}
+        }
+        editor={
+          <EditorPage
+            editorStore={state}
+            onExport={handleExport}
+            onSaveDraft={onEditorSaveDraft}
+            onSaveAs={handleSaveAs}
+            onExit={onEditorExit}
+            onPrint={onEditorPrint}
+            onAutoDetect={onEditorAutoDetect}
+          />
+        }
+      />
 
       <KeyboardShortcutsHelp
         isOpen={state.activeDialog === "shortcuts"}
@@ -1066,27 +816,61 @@ const App: React.FC = () => {
       />
 
       <Dialog
-        open={state.activeDialog === "close_confirm"}
+        open={fileDropDialogOpen}
         onOpenChange={(open) => {
-          if (!open) setState((prev) => ({ ...prev, activeDialog: null }));
+          if (!open) {
+            setFileDropDialogOpen(false);
+            setPendingFileDropPath(null);
+          }
         }}
       >
         <DialogContent>
-          <DialogTitle>{t("dialog.confirm_close.title")}</DialogTitle>
-          <DialogDescription>
-            {t("dialog.confirm_close.desc")}
-          </DialogDescription>
+          <DialogTitle>{t("dialog.file_drop.title")}</DialogTitle>
+          <DialogDescription>{t("dialog.file_drop.desc")}</DialogDescription>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() =>
-                setState((prev) => ({ ...prev, activeDialog: null }))
-              }
+              onClick={() => {
+                setFileDropDialogOpen(false);
+                setPendingFileDropPath(null);
+              }}
             >
-              {t("dialog.confirm_close.cancel")}
+              {t("common.cancel")}
             </Button>
-            <Button variant="destructive" onClick={closeSession}>
-              {t("dialog.confirm_close.confirm")}
+            {state.isDirty && (
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  const path = pendingFileDropPath;
+                  setFileDropDialogOpen(false);
+                  setPendingFileDropPath(null);
+                  if (!path) return;
+                  if (isTauri()) {
+                    const ok = await handleExport();
+                    if (!ok) return;
+                  } else {
+                    await handleSaveDraft(true);
+                  }
+                  await openDroppedPdfPath(path);
+                }}
+                disabled={!pendingFileDropPath}
+              >
+                {isTauri()
+                  ? t("dialog.file_drop.save_open")
+                  : t("dialog.file_drop.save_draft_open")}
+              </Button>
+            )}
+            <Button
+              onClick={async () => {
+                const path = pendingFileDropPath;
+                setFileDropDialogOpen(false);
+                setPendingFileDropPath(null);
+                if (!path) return;
+                await openDroppedPdfPath(path);
+              }}
+              disabled={!pendingFileDropPath}
+            >
+              {t("dialog.file_drop.open")}
             </Button>
           </DialogFooter>
         </DialogContent>

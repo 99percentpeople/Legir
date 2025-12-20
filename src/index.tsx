@@ -6,6 +6,8 @@ import { ThemeProvider } from "./components/theme-provider";
 import { LanguageProvider } from "./components/language-provider";
 import { Toaster } from "./components/ui/sonner";
 import { registerControls } from "./components/workspace/controls";
+import { Router } from "wouter";
+import { useHashLocation } from "wouter/use-hash-location";
 
 // Register all controls
 registerControls();
@@ -21,7 +23,9 @@ root.render(
     <LanguageProvider defaultLanguage="en" storageKey="ff-ui-language">
       <ThemeProvider defaultTheme="system" storageKey="ff-ui-theme">
         <Toaster position="top-center" />
-        <App />
+        <Router hook={useHashLocation}>
+          <App />
+        </Router>
       </ThemeProvider>
     </LanguageProvider>
   </React.StrictMode>,

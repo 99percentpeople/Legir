@@ -138,6 +138,10 @@ export interface HistorySnapshot {
   metadata: PDFMetadata;
 }
 
+export type EditorSaveTarget =
+  | { kind: "web"; handle: FileSystemFileHandle }
+  | { kind: "tauri"; path: string };
+
 export interface SnappingOptions {
   enabled: boolean;
   snapToBorders: boolean;
@@ -166,6 +170,7 @@ export interface EditorState {
   pageCache: Map<number, Promise<PDFPageProxy>>;
   metadata: PDFMetadata;
   filename: string;
+  saveTarget: EditorSaveTarget | null;
   pages: PageData[];
   fields: FormField[];
   annotations: Annotation[];
@@ -197,6 +202,7 @@ export interface EditorState {
 
   // Dialog State
   activeDialog: "shortcuts" | "settings" | "ai_detect" | "close_confirm" | null;
+  closeConfirmSource: "menu" | "window" | null;
 
   // Status
   lastSavedAt: Date | null;
