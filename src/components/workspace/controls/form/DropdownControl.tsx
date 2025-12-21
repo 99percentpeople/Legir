@@ -25,7 +25,7 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
     : data.value || "Select...";
 
   const containerStyle: React.CSSProperties = {
-    ["--scale" as any]: scale,
+    "--scale": scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,

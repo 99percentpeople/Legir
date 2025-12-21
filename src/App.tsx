@@ -214,12 +214,12 @@ const App: React.FC = () => {
 
           if (prevPdfDocument) {
             try {
-              (prevPdfDocument as any).cleanup?.();
+              prevPdfDocument.cleanup?.();
             } catch {
               // ignore
             }
             try {
-              await (prevPdfDocument as any).destroy?.();
+              await prevPdfDocument.destroy?.();
             } catch {
               // ignore
             }
@@ -605,7 +605,7 @@ const App: React.FC = () => {
       const result = await exportPdfBytes({
         bytes: modifiedBytes,
         filename: state.filename || "document.pdf",
-        existingTarget: state.saveTarget as any,
+        existingTarget: state.saveTarget,
         filters: [{ name: "PDF Document", extensions: ["pdf"] }],
       });
 

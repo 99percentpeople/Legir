@@ -5,7 +5,7 @@ const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
 const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
 
 // Polyfill document for pdf.js font rendering in worker
-if (typeof (self as any).document === "undefined") {
+if (typeof self.document === "undefined") {
   const fakeOwnerDocument = {
     createElement: (name: string) => {
       if (name === "canvas") {

@@ -53,9 +53,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     customElementId !== undefined ? customElementId : defaultElementId;
 
   const isInkHighlight =
-    data.type === "ink" &&
-    "intent" in (data as any) &&
-    (data as any).intent === "InkHighlight";
+    data.type === "ink" && "intent" in data && data.intent === "InkHighlight";
   const shouldRaiseZIndexOnHoverOrSelect =
     data.type !== "highlight" && !isInkHighlight;
 

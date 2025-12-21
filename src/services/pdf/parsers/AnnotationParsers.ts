@@ -306,11 +306,18 @@ export class CommentParser implements IAnnotationParser {
     const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
     const annotations: Annotation[] = [];
 
-    pageAnnotations.forEach((annotation, index) => {
+    const stripRichTextToPlainText = (input: string) => {
+      const withoutTags = input.replace(/<[^>]*>/g, " ");
+      return withoutTags.replace(/\s+/g, " ").trim();
+    };
+
+    for (let index = 0; index < pageAnnotations.length; index++) {
+      const annotation = pageAnnotations[index];
       if (annotation.subtype === "Text") {
         const color = annotation.color
           ? rgbArrayToHex(annotation.color)
           : "#FFFF00";
+        const [x1, y1] = annotation.rect;
         const uiRect = pdfJsRectToUiRect(annotation.rect, viewport);
         const x = uiRect.x;
         const y = uiRect.y;
@@ -324,6 +331,69 @@ export class CommentParser implements IAnnotationParser {
         let author = annotation.title || undefined;
         let updatedAt = parsePDFDate(annotation.modificationDate);
 
+        if (pdfDoc && (!contents || contents.trim() === "")) {
+          try {
+            const pdfLibPage = pdfDoc.getPage(pageIndex);
+            const libAnnots = pdfLibPage.node.Annots();
+            if (libAnnots instanceof PDFArray) {
+              for (let idx = 0; idx < libAnnots.size(); idx++) {
+                const libAnnot = libAnnots.lookup(idx);
+                if (!(libAnnot instanceof PDFDict)) continue;
+
+                const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
+                const sName =
+                  libSubtype instanceof PDFName
+                    ? libSubtype.decodeText()
+                    : libSubtype instanceof PDFString ||
+                        libSubtype instanceof PDFHexString
+                      ? libSubtype.decodeText()
+                      : "";
+                if (sName !== "Text") continue;
+
+                const libRect = libAnnot.lookup(PDFName.of("Rect"));
+                if (!(libRect instanceof PDFArray)) continue;
+                const rArray = libRect.asArray();
+                if (rArray.length < 4) continue;
+                const lx1 = (rArray[0] as PDFNumber).asNumber();
+                const ly1 = (rArray[1] as PDFNumber).asNumber();
+                if (Math.abs(lx1 - x1) > 5 || Math.abs(ly1 - y1) > 5) continue;
+
+                const rawContents = libAnnot.lookup(PDFName.of("Contents"));
+                const contentsDecoded = decodePdfString(rawContents);
+                if (contentsDecoded && contentsDecoded.trim() !== "") {
+                  contents = contentsDecoded;
+                } else {
+                  const rawRc = libAnnot.lookup(PDFName.of("RC"));
+                  const rcDecoded = decodePdfString(rawRc);
+                  if (rcDecoded && rcDecoded.trim() !== "") {
+                    contents = stripRichTextToPlainText(rcDecoded);
+                  }
+                }
+
+                const rawTitle = libAnnot.lookup(PDFName.of("T"));
+                const titleDecoded = decodePdfString(rawTitle);
+                if (titleDecoded && (!author || author.trim() === "")) {
+                  author = titleDecoded;
+                }
+
+                const rawModDate = libAnnot.lookup(PDFName.of("M"));
+                const modDecoded = decodePdfString(rawModDate);
+                if (modDecoded) {
+                  const parsed = parsePDFDate(modDecoded);
+                  if (parsed && !updatedAt) updatedAt = parsed;
+                }
+
+                break;
+              }
+            }
+          } catch (e) {
+            console.warn(
+              `Failed to extract comment Contents from page ${pageIndex + 1} using pdf-lib`,
+              e,
+            );
+          }
+        }
+
         annotations.push({
           id: `imported_comment_${pageIndex + 1}_${index}`,
           pageIndex: pageIndex,
@@ -335,7 +405,7 @@ export class CommentParser implements IAnnotationParser {
           updatedAt: updatedAt,
         });
       }
-    });
+    }
     return annotations;
   }
 }

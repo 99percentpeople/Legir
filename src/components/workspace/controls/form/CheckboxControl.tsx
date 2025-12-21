@@ -11,7 +11,7 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
   const style = data.style || {};
 
   const containerStyle: React.CSSProperties = {
-    ["--scale" as any]: scale,
+    "--scale": scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,

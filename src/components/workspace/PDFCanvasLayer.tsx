@@ -1,12 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
-import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 import { pdfWorkerService } from "../../services/pdfWorkerService";
-
-pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
-  name: "pdfjs-worker",
-});
 
 interface PDFCanvasLayerProps {
   pageIndex: number;

@@ -76,7 +76,7 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
           <>
             <CommonProperties
               data={data as FormField}
-              onChange={onChange as any}
+              onChange={onChange}
               onTriggerHistorySave={onTriggerHistorySave}
             />
             <Separator />
@@ -104,7 +104,7 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
             <Separator />
             <AppearanceProperties
               data={data as FormField}
-              onChange={onChange as any}
+              onChange={onChange}
               onTriggerHistorySave={onTriggerHistorySave}
             />
           </>
@@ -119,8 +119,8 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
           <>
             <Separator />
             <GeometryProperties
-              data={data as any}
-              onChange={onChange as any}
+              data={data as FormField}
+              onChange={onChange}
               onTriggerHistorySave={onTriggerHistorySave}
             />
           </>

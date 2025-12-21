@@ -162,7 +162,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           isSelected && !isEditing && "ring-primary ring-1",
         )}
         style={{
-          ["--scale" as any]: scale,
+          "--scale": scale,
           color: data.color || "#000000",
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,

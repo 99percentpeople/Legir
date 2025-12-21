@@ -7,8 +7,8 @@ const ensureGlobalPopoverCtrlWheelInterceptor = () => {
   if (typeof window === "undefined") return;
 
   const key = "__ff_popover_ctrl_wheel_interceptor_installed__";
-  if ((window as any)[key]) return;
-  (window as any)[key] = true;
+  if (window[key]) return;
+  window[key] = true;
 
   const handler = (e: WheelEvent) => {
     if (e.defaultPrevented) return;

@@ -69,10 +69,12 @@ export class HighlightExporter implements IAnnotationExporter {
       quadPoints.push(lly);
     }
 
-    const colorObj = hexToPdfColor(annotation.color) || rgb(1, 1, 0);
-    const cr = colorObj.red;
-    const cg = colorObj.green;
-    const cb = colorObj.blue;
+    const colorObj = annotation.color
+      ? hexToPdfColor(annotation.color)
+      : undefined;
+    const cr = colorObj?.red;
+    const cg = colorObj?.green;
+    const cb = colorObj?.blue;
 
     const highlightAnnot = pdfDoc.context.obj({
       Type: "Annot",
@@ -81,7 +83,8 @@ export class HighlightExporter implements IAnnotationExporter {
       Rect: [minX, minY, maxX, maxY],
       QuadPoints: quadPoints,
       C: [cr, cg, cb],
-      CA: annotation.opacity ?? 0.4,
+      CA:
+        typeof annotation.opacity === "number" ? annotation.opacity : undefined,
       P: page.ref,
       T: annotation.author
         ? PDFHexString.fromText(annotation.author)
@@ -119,19 +122,24 @@ export class CommentExporter implements IAnnotationExporter {
     const w = bounds.width;
     const h = bounds.height;
 
-    const colorObj = hexToPdfColor(annotation.color) || rgb(1, 1, 0);
-    const r = colorObj.red;
-    const g = colorObj.green;
-    const bb = colorObj.blue;
+    const colorObj = annotation.color
+      ? hexToPdfColor(annotation.color)
+      : undefined;
+    const r = colorObj?.red;
+    const g = colorObj?.green;
+    const bb = colorObj?.blue;
 
     const commentAnnot = pdfDoc.context.obj({
       Type: "Annot",
       Subtype: "Text",
       F: 4, // Print
       Rect: [x, y, x + w, y + h],
-      Contents: PDFHexString.fromText(annotation.text || ""),
+      Contents: annotation.text
+        ? PDFHexString.fromText(annotation.text)
+        : undefined,
       C: [r, g, bb],
-      CA: annotation.opacity,
+      CA:
+        typeof annotation.opacity === "number" ? annotation.opacity : undefined,
       Name: PDFName.of("Comment"),
       P: page.ref,
       T: annotation.author
@@ -468,6 +476,12 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     // 5. Create Annotation
     const da = `/${baseResourceName} ${fontSize} Tf ${r} ${g} ${bb} rg`;
+    const q =
+      annotation.alignment === "center"
+        ? 1
+        : annotation.alignment === "right"
+          ? 2
+          : 0;
     const freeTextAnnot = pdfDoc.context.obj({
       Type: "Annot",
       Subtype: "FreeText",
@@ -476,7 +490,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       Contents: PDFHexString.fromText(text),
       DA: PDFString.of(da),
       AP: { N: appearanceRef },
-      Q: 0, // Left alignment
+      Q: q,
       BS: { W: 0 },
       P: page.ref,
       T: annotation.author
@@ -563,10 +577,12 @@ export class InkExporter implements IAnnotationExporter {
     ];
 
     // 3. Color
-    const colorObj = hexToPdfColor(annotation.color) || rgb(1, 0, 0);
-    const r = colorObj.red;
-    const g = colorObj.green;
-    const b = colorObj.blue;
+    const colorObj = annotation.color
+      ? hexToPdfColor(annotation.color)
+      : undefined;
+    const r = colorObj?.red;
+    const g = colorObj?.green;
+    const b = colorObj?.blue;
 
     let annotObj;
 
@@ -578,9 +594,17 @@ export class InkExporter implements IAnnotationExporter {
         F: 4,
         Rect: rect,
         Vertices: polylinePoints,
-        C: [r, g, b],
+        C:
+          typeof r === "number" &&
+          typeof g === "number" &&
+          typeof b === "number"
+            ? [r, g, b]
+            : undefined,
         BS: { W: thickness, S: "S" },
-        CA: annotation.opacity,
+        CA:
+          typeof annotation.opacity === "number"
+            ? annotation.opacity
+            : undefined,
         P: page.ref,
         T: annotation.author
           ? PDFHexString.fromText(annotation.author)
@@ -607,7 +631,10 @@ export class InkExporter implements IAnnotationExporter {
         L: [x1, y1, x2, y2],
         C: [r, g, b],
         BS: { W: thickness, S: "S" },
-        CA: annotation.opacity,
+        CA:
+          typeof annotation.opacity === "number"
+            ? annotation.opacity
+            : undefined,
         P: page.ref,
         T: annotation.author
           ? PDFHexString.fromText(annotation.author)
@@ -690,7 +717,10 @@ export class InkExporter implements IAnnotationExporter {
         C: [r, g, b],
         Border: [0, 0, thickness],
         AP: appearanceStream ? { N: appearanceStream } : undefined,
-        CA: annotation.opacity,
+        CA:
+          typeof annotation.opacity === "number"
+            ? annotation.opacity
+            : undefined,
         IT: annotation.intent ? PDFName.of(annotation.intent) : undefined,
         P: page.ref,
         T: annotation.author

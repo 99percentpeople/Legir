@@ -336,9 +336,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
   useEffect(() => {
     if (!state.pages || state.pages.length === 0) return;
     const bytesLen =
-      typeof (state.pdfBytes as any)?.byteLength === "number"
-        ? (state.pdfBytes as any).byteLength
-        : (state.pdfBytes as any)?.length;
+      typeof state.pdfBytes?.byteLength === "number"
+        ? state.pdfBytes.byteLength
+        : state.pdfBytes?.length;
     const fitKey = `${state.filename || ""}:${state.pages.length}:${bytesLen || 0}`;
     if (lastFitKeyRef.current === fitKey) return;
     lastFitKeyRef.current = fitKey;

@@ -216,7 +216,7 @@ export const saveFileAs = async (options: {
 
   if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
     try {
-      const handle = await (window as any).showSaveFilePicker({
+      const handle = await window.showSaveFilePicker({
         suggestedName: options.suggestedName,
         types:
           options.filters && options.filters.length > 0
@@ -224,7 +224,7 @@ export const saveFileAs = async (options: {
                 description: f.name,
                 accept: {
                   [guessMimeType(f.extensions)]: f.extensions.map(
-                    (e) => `.${e}`,
+                    (e) => `.${e}` as const,
                   ),
                 },
               }))
@@ -232,7 +232,14 @@ export const saveFileAs = async (options: {
       });
 
       const writable = await handle.createWritable();
-      await writable.write(options.bytes);
+      const chunk: ArrayBuffer =
+        options.bytes.buffer instanceof ArrayBuffer
+          ? options.bytes.buffer.slice(
+              options.bytes.byteOffset,
+              options.bytes.byteOffset + options.bytes.byteLength,
+            )
+          : new Uint8Array(options.bytes).buffer;
+      await writable.write(chunk);
       await writable.close();
       return true;
     } catch (err: any) {
