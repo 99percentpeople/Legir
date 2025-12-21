@@ -7,7 +7,8 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "bun dev",
-    "beforeBuildCommand": "bun x turbo run build"
+    "beforeBuildCommand": "bun x turbo run build",
+    "removeUnusedCommands": true
   },
   "app": {
     "windows": [
