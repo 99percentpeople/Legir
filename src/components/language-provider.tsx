@@ -37,7 +37,7 @@ type LanguageProviderProps = {
 type LanguageProviderState = {
   language: Language;
   effectiveLanguage: ConcreteLanguage;
-  dayjsLocale: string;
+  dayjsLocale: string | null;
   isCjk: boolean;
   setLanguage: (language: Language) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
@@ -92,6 +92,8 @@ export function LanguageProvider({
   const [effectiveLanguage, setEffectiveLanguage] =
     useState<ConcreteLanguage>("en");
 
+  const [dayjsLocale, setDayjsLocale] = useState<string | null>("en");
+
   // Store loaded translations
   const [translations, setTranslations] = useState<
     Record<string, Record<string, string>>
@@ -134,24 +136,33 @@ export function LanguageProvider({
     const loadDayjsLocale = async (lang: ConcreteLanguage) => {
       if (lang === "en") {
         dayjs.locale("en");
+        setDayjsLocale("en");
         return;
       }
       const dayjsLocaleKey = DAYJS_LOCALE_MAP[lang];
-      if (!dayjsLocaleKey) return;
+      if (!dayjsLocaleKey) {
+        setDayjsLocale("en");
+        return;
+      }
+
+      setDayjsLocale(null);
 
       try {
         const loader = dayjsLocales[dayjsLocaleKey];
         if (loader) {
           await loader();
           dayjs.locale(dayjsLocaleKey);
+          setDayjsLocale(dayjsLocaleKey);
         } else {
           console.warn(`No dayjs loader found for ${dayjsLocaleKey}`);
           // Fallback to en if loader missing
           dayjs.locale("en");
+          setDayjsLocale("en");
         }
       } catch (e) {
         console.warn(`Failed to load dayjs locale: ${dayjsLocaleKey}`, e);
         dayjs.locale("en");
+        setDayjsLocale("en");
       }
     };
 
@@ -195,7 +206,7 @@ export function LanguageProvider({
   const value = {
     language,
     effectiveLanguage,
-    dayjsLocale: DAYJS_LOCALE_MAP[effectiveLanguage],
+    dayjsLocale,
     isCjk:
       effectiveLanguage === "zh-CN" ||
       effectiveLanguage === "zh-TW" ||

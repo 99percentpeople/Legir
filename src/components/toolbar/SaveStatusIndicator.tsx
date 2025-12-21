@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import React from "react";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useLanguage } from "../language-provider";
-import dayjs from "dayjs";
+import { TimeAgoText } from "../timeText";
 
 interface SaveStatusIndicatorProps {
   isSaving: boolean;
@@ -17,21 +17,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   lastSavedAt,
   className,
 }) => {
-  const { t, dayjsLocale } = useLanguage();
-  const [timeAgo, setTimeAgo] = useState<string>("");
-
-  useEffect(() => {
-    if (!lastSavedAt) return;
-
-    const updateTimeAgo = () => {
-      setTimeAgo(dayjs(lastSavedAt).locale(dayjsLocale).fromNow());
-    };
-
-    updateTimeAgo();
-    const interval = setInterval(updateTimeAgo, 60000); // Update every minute
-
-    return () => clearInterval(interval);
-  }, [lastSavedAt, dayjsLocale]); // Re-run when locale changes
+  const { t } = useLanguage();
 
   if (isSaving) {
     return (
@@ -71,7 +57,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
       >
         <CheckCircle2 size={10} />
         <span className="hidden md:inline">
-          {t("status.saved")} {timeAgo}
+          {t("status.saved")} <TimeAgoText time={lastSavedAt} />
         </span>
       </div>
     );

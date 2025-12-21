@@ -12,10 +12,7 @@ import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { cn } from "@/lib/utils";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-
-dayjs.extend(relativeTime);
+import { TimeText } from "../timeText";
 
 interface AnnotationCardProps {
   annotation: Annotation;
@@ -32,7 +29,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   onDelete,
   onUpdate,
 }) => {
-  const { t, dayjsLocale } = useLanguage();
+  const { t } = useLanguage();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -124,7 +121,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
           <div className="border-border/50 text-muted-foreground mt-2 flex items-center justify-between border-t pt-2 text-[10px]">
             <span className="flex items-center gap-1">
               <Calendar size={10} />
-              {dayjs(annotation.updatedAt).locale(dayjsLocale).format("LLL")}
+              <TimeText time={annotation.updatedAt} format="LLL" />
             </span>
           </div>
         )}

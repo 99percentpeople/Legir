@@ -24,8 +24,8 @@ import {
   type RecentFileEntry,
 } from "../services/recentFilesService";
 import { toast } from "sonner";
-import dayjs from "dayjs";
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { TimeAgoText } from "../components/timeText";
 export interface LandingPageProps {
   onUpload: (file: File) => void;
   onOpen?: () => Promise<void>;
@@ -173,7 +173,8 @@ const LandingPage: React.FC<LandingPageProps> = ({
                 filteredRecentFiles.map((entry) => (
                   <div
                     key={entry.path}
-                    className="hover:bg-accent/40 flex items-center justify-between gap-4 p-4 transition-colors"
+                    tabIndex={0}
+                    className="group hover:bg-accent/40 flex items-center justify-between gap-4 p-4 transition-colors outline-none"
                   >
                     <div className="flex min-w-0 items-center gap-4">
                       <div className="bg-muted ring-border relative h-16 w-16 shrink-0 overflow-hidden rounded-md ring-1">
@@ -199,12 +200,13 @@ const LandingPage: React.FC<LandingPageProps> = ({
                           {entry.path}
                         </div>
                         <div className="text-muted-foreground mt-1 text-xs">
-                          {dayjs(entry.lastOpenedAt).fromNow()}
+                          <TimeAgoText time={entry.lastOpenedAt} />
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
+                    {/* recent action buttons */}
+                    <div className="invisible flex shrink-0 items-center gap-2 opacity-0 transition-all duration-200 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
                       <Button
                         variant="secondary"
                         onClick={() => void handleOpenRecent(entry)}
