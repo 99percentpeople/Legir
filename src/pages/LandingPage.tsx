@@ -92,7 +92,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
             <div className="bg-primary text-primary-foreground rounded-md p-1.5">
               <FileType size={20} strokeWidth={2.5} />
             </div>
-            <span>{t("app.name")}</span>
+            <span>{process.env.APP_NAME}</span>
           </div>
           <div className="flex items-center gap-2">
             <LanguageToggle />
@@ -241,7 +241,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
           <div className="bg-primary text-primary-foreground rounded-md p-1.5">
             <FileType size={20} strokeWidth={2.5} />
           </div>
-          <span>{t("app.name")}</span>
+          <span>{process.env.APP_NAME}</span>
         </div>
         <div className="flex items-center gap-2">
           <LanguageToggle />
@@ -299,7 +299,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
         <p>
           {t("landing.footer.copyright", {
             year: new Date().getFullYear(),
-            appName: t("app.name"),
+            appName: process.env.APP_NAME,
           })}
         </p>
       </div>

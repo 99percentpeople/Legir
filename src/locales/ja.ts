@@ -1,5 +1,4 @@
 const ja = {
-  "app.name": "FormForge AI",
   "common.select": "選択...",
   "common.cancel": "キャンセル",
   "common.save": "保存",
@@ -38,7 +37,8 @@ const ja = {
   "toolbar.save_as": "名前を付けて保存...",
   "toolbar.save_draft": "下書きを保存",
   "toolbar.save_reopen": "保存して再開",
-  "toolbar.save_close": "エクスポートして閉じる",
+  "toolbar.save_close": "保存して閉じる",
+  "toolbar.export_close": "エクスポートして閉じる",
   "toolbar.save_as_close": "名前を付けて保存して閉じる",
   "toolbar.print": "印刷",
   "toolbar.close": "閉じる",

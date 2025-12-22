@@ -14,7 +14,6 @@ Add your font file to `public/fonts/`.
 Recommended formats:
 
 - `.ttf`
-- `.otf`
 
 ### 2) Register it for in-app preview
 
@@ -52,6 +51,6 @@ PDF export embedding is configured in `src/services/pdf/lib/built-in-fonts.ts`.
 
 ### 5) Update licensing / attribution
 
-Edit `public/fonts/NOTICE.txt` and add an entry for your font (copyright + license).
+Edit [NOTICE.txt](NOTICE.txt) and add an entry for your font (copyright + license).
 
 If you redistribute this application, you must comply with each font's license.

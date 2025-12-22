@@ -1,5 +1,4 @@
 const zhTW = {
-  "app.name": "FormForge AI",
   "common.select": "選擇...",
   "common.cancel": "取消",
   "common.save": "儲存",
@@ -38,7 +37,8 @@ const zhTW = {
   "toolbar.save_as": "另存為...",
   "toolbar.save_draft": "儲存草稿",
   "toolbar.save_reopen": "儲存並重新開啟",
-  "toolbar.save_close": "匯出並關閉",
+  "toolbar.save_close": "儲存並關閉",
+  "toolbar.export_close": "匯出並關閉",
   "toolbar.save_as_close": "另存為並關閉",
   "toolbar.print": "列印",
   "toolbar.close": "關閉",

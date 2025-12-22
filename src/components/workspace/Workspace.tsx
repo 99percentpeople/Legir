@@ -25,7 +25,8 @@ import {
 import { Highlighter, Search } from "lucide-react";
 import PDFPageWithProxy from "./PDFPageWithProxy";
 import { ControlRenderer } from "./controls";
-
+import { isTauri } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 // Workspace = the editor canvas.
 //
 // Responsibilities:
@@ -2201,11 +2202,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
               onClick={() => {
                 const q = textSelectionToolbar.text.trim();
                 if (q) {
-                  window.open(
-                    `https://www.google.com/search?q=${encodeURIComponent(q)}`,
-                    "_blank",
-                    "noopener,noreferrer",
-                  );
+                  const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+                  if (isTauri()) {
+                    openUrl(url);
+                  } else {
+                    window.open(url, "_blank", "noopener,noreferrer");
+                  }
                 }
                 window.getSelection?.()?.removeAllRanges?.();
                 setTextSelectionToolbar((prev) =>

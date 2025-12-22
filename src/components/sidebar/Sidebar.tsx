@@ -8,6 +8,7 @@ import { ThumbnailsPanel, DocumentOutlinePanel } from "./OutlinePanel";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useLanguage } from "../language-provider";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ interface SidebarProps {
   onNavigatePage: (pageIndex: number) => void;
   width: number;
   onResize: (width: number) => void;
-  pdfDocument?: any;
+  pdfDocument?: PDFDocumentProxy;
   currentPageIndex?: number;
   activeTab?: string;
   onTabChange?: (tab: string) => void;

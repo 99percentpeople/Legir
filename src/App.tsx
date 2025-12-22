@@ -32,6 +32,7 @@ import {
   openFile,
   pickSaveTarget,
   writeToSaveTarget,
+  type SaveTarget,
 } from "./services/fileOps";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
@@ -170,7 +171,7 @@ const App: React.FC = () => {
   const { t } = useLanguage();
 
   const isTauriSaveTarget = (
-    target: any,
+    target: SaveTarget,
   ): target is { kind: "tauri"; path: string } => {
     return target?.kind === "tauri" && typeof target?.path === "string";
   };

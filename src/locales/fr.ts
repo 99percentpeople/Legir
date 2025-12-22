@@ -1,5 +1,4 @@
 const fr = {
-  "app.name": "FormForge AI",
   "common.select": "Sélectionner...",
   "common.cancel": "Annuler",
   "common.save": "Enregistrer",
@@ -38,7 +37,8 @@ const fr = {
   "toolbar.save_as": "Enregistrer sous...",
   "toolbar.save_draft": "Enregistrer le brouillon",
   "toolbar.save_reopen": "Enregistrer et rouvrir",
-  "toolbar.save_close": "Exporter et fermer",
+  "toolbar.save_close": "Enregistrer et fermer",
+  "toolbar.export_close": "Exporter et fermer",
   "toolbar.save_as_close": "Enregistrer sous et fermer",
   "toolbar.print": "Imprimer",
   "toolbar.close": "Fermer",

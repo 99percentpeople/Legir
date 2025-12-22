@@ -13,12 +13,13 @@ import { Input } from "../ui/input";
 import { cn } from "../../lib/utils";
 import { useLanguage } from "../language-provider";
 import { pdfWorkerService } from "../../services/pdfWorkerService";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 
 // --- Thumbnail Item ---
 interface ThumbnailItemProps {
   page: PageData;
   pageIndex: number;
-  pdfDocument: any;
+  pdfDocument: PDFDocumentProxy;
   onNavigate: (pageIndex: number) => void;
   isActive?: boolean;
 }
@@ -307,7 +308,7 @@ const filterOutline = (
 
 interface ThumbnailsPanelProps {
   pages?: PageData[];
-  pdfDocument?: any;
+  pdfDocument?: PDFDocumentProxy;
   onNavigate: (pageIndex: number) => void;
   currentPageIndex?: number;
 }

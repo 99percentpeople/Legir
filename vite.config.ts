@@ -3,8 +3,11 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { readFileSync } from "fs";
 
 const host = process.env.TAURI_DEV_HOST;
+
+const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "");
@@ -52,6 +55,8 @@ export default defineConfig(({ mode }) => {
     define: {
       "process.env.API_KEY": JSON.stringify(env.GEMINI_API_KEY),
       "process.env.GEMINI_API_KEY": JSON.stringify(env.GEMINI_API_KEY),
+      // Add package.json displayName to global scope
+      "process.env.APP_NAME": JSON.stringify(packageJson.displayName),
     },
     resolve: {
       alias: {
