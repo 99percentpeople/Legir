@@ -2,6 +2,19 @@ import React from "react";
 import { registry } from "./registry/ControlRegistry";
 import { FieldType } from "@/types";
 
+// Workspace control system.
+//
+// Controls are registered once at app startup (see `src/index.tsx`).
+// Rendering is dispatched by `data.type` in `ControlRenderer`.
+//
+// To add a new Form control:
+// - Add a `FieldType` in `src/types.ts`
+// - Create a control component under `./form/`
+// - Create an optional properties panel under `./properties/`
+// - Register it in `registerControls()` below
+//
+// For PDF import/export support, also add parser/exporter implementations under `services/pdf/...`.
+
 // Lazy load controls
 const TextControl = React.lazy(() =>
   import("./form/TextControl").then((module) => ({

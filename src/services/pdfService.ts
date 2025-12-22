@@ -69,10 +69,27 @@ import {
 } from "./pdf/exporters/ControlExporters";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 
+// PDF pipeline service.
+//
+// This module is the authoritative boundary for:
+// - Loading a PDF (bytes -> pdfjs document/pages/outline + pdf-lib document resources)
+// - Rendering pages/thumbnails (mostly via worker for responsiveness)
+// - Importing existing PDF form fields / annotations into our internal models
+// - Exporting internal models back into a new PDF
+//
+// Key design: we use BOTH libraries for different responsibilities.
+// - `pdfjs-dist`: viewing/metadata/outline + render surfaces
+// - `pdf-lib`: writing/export + certain resource introspection (fonts/DA)
+//
+// Extension points:
+// - Add a new control/annotation type by implementing a Parser + Exporter and registering it
+//   in the arrays below. The rest of the app treats `FormField` / `Annotation` as plain data.
+
 const BASE_URL = import.meta.env.BASE_URL || "/";
 const PDFJS_CMAP_URL = `${BASE_URL}pdfjs/cmaps/`;
 const PDFJS_STANDARD_FONT_URL = `${BASE_URL}pdfjs/standard_fonts/`;
 
+// pdfjs worker for parsing/render internals.
 pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
   name: "pdfjs-worker",
 });

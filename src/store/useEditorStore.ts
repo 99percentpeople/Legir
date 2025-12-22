@@ -17,6 +17,22 @@ import { ANNOTATION_STYLES, DEFAULT_EDITOR_UI_STATE } from "../constants";
 import { shouldSwitchToSelectAfterUse } from "../lib/tool-behavior";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 
+// Editor store = single source of truth (SSOT) for the editor.
+//
+// This store intentionally contains BOTH:
+// - Document state: `pdfBytes/pages/fields/annotations/metadata/...`
+// - UI state: sidebar/panels, tool selection, dialogs, etc.
+//
+// Persistence policy:
+// - Only UI-related state is persisted to localStorage (see `partialize()` below).
+// - Large/binary document data must NOT be persisted here.
+//   Web drafts are handled by `services/storageService.ts` (IndexedDB).
+//
+// Extension guidance:
+// - Adding a new Tool/FieldType usually means updating `types.ts` AND the reducers here
+//   (e.g. selection rules, history snapshot scope).
+// - If you add new editor UI state, decide whether it should be persisted in `pickEditorUiState()`.
+
 // Define the Actions interface
 export interface EditorActions {
   // Generic Setter (for gradual migration)
