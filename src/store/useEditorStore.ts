@@ -64,16 +64,6 @@ export interface EditorActions {
       | Partial<EditorOptions>
       | ((prev: EditorOptions) => Partial<EditorOptions>),
   ) => void;
-  setSnappingOptions: (
-    updates:
-      | Partial<SnappingOptions>
-      | ((prev: SnappingOptions) => Partial<SnappingOptions>),
-  ) => void;
-  setDebugOptions: (
-    updates:
-      | Partial<DebugOptions>
-      | ((prev: DebugOptions) => Partial<DebugOptions>),
-  ) => void;
 
   getPageCached: (pageIndex: number) => Promise<PDFPageProxy>;
 
@@ -181,7 +171,7 @@ const initialState: EditorState = {
       threshold: 8,
     },
     debugOptions: {
-      pdfTextLayer: import.meta.env.DEV,
+      pdfTextLayer: false,
     },
   },
   lastSavedAt: null,
@@ -296,37 +286,6 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             },
           };
         }),
-
-      setSnappingOptions: (updates) =>
-        set((state) => {
-          const patch =
-            typeof updates === "function"
-              ? updates(state.options.snappingOptions)
-              : updates;
-          return {
-            ...state,
-            options: {
-              ...state.options,
-              snappingOptions: { ...state.options.snappingOptions, ...patch },
-            },
-          };
-        }),
-
-      setDebugOptions: (updates) =>
-        set((state) => {
-          const patch =
-            typeof updates === "function"
-              ? updates(state.options.debugOptions)
-              : updates;
-          return {
-            ...state,
-            options: {
-              ...state.options,
-              debugOptions: { ...state.options.debugOptions, ...patch },
-            },
-          };
-        }),
-
       loadDocument: (data) =>
         set({
           ...data,

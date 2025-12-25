@@ -50,14 +50,14 @@
   --text-selection-bg: color-mix(
     in srgb,
     var(--highlight-color) calc(var(--highlight-opacity) * 100%),
-    transparent
+    white
   );
 }
 
 .textLayer span::selection {
   background: var(
     --text-selection-bg,
-    color-mix(in srgb, var(--color-blue-500) 30%, transparent)
+    color-mix(in srgb, var(--color-blue-500, #3b82f6) 30%, white)
   );
   color: transparent;
 }
@@ -87,11 +87,11 @@
   pointer-events: none !important;
 }
 
-.textLayer[data-debug="1"] {
+.textLayer.textLayer-debug {
   mix-blend-mode: normal;
 }
 
-.textLayer[data-debug="1"] span {
+.textLayer.textLayer-debug span {
   color: red;
 }
 
