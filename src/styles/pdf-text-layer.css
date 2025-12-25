@@ -82,9 +82,17 @@
   top: 0;
 }
 
-[data-ff-text-selecting="1"] .scheme-light,
-[data-ff-text-selecting="1"] .scheme-light * {
+.textLayer[data-ff-text-selecting="1"] .scheme-light,
+.textLayer[data-ff-text-selecting="1"] .scheme-light * {
   pointer-events: none !important;
+}
+
+.textLayer[data-debug="1"] {
+  mix-blend-mode: normal;
+}
+
+.textLayer[data-debug="1"] span {
+  color: red;
 }
 
 .hiddenCanvasElement {

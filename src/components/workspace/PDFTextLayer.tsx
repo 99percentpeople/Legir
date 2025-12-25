@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { cn } from "../../lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
+import { useEditorStore } from "@/store/useEditorStore";
 
 interface PDFTextLayerProps {
   pageIndex: number;
@@ -36,6 +37,10 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   const textLayerRef = useRef<HTMLDivElement>(null);
   const textLayerInstanceRef = useRef<pdfjsLib.TextLayer | null>(null);
   const pendingScaleRef = useRef<number | null>(null);
+
+  const pdfTextLayerDebug = useEditorStore(
+    (s) => s.options.debugOptions.pdfTextLayer,
+  );
 
   const [renderedScale, setRenderedScale] = useState<number | null>(null);
   const [pageRotation, setPageRotation] = useState(0);
@@ -305,16 +310,15 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       )}
       tabIndex={0}
       data-main-rotation={pageRotation}
-      data-selectable={isSelectMode ? "true" : "false"}
+      data-selectable={isSelectMode}
+      data-debug={pdfTextLayerDebug ? "1" : undefined}
       style={{
         transform: textLayerTransform,
         cursor,
-        ...(isHighlighting
-          ? ({
-              "--highlight-color": highlightColor,
-              "--highlight-opacity": highlightOpacity,
-            } as React.CSSProperties)
-          : null),
+        ...(isHighlighting && {
+          "--highlight-color": highlightColor,
+          "--highlight-opacity": highlightOpacity,
+        }),
       }}
     />
   );

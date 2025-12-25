@@ -26,7 +26,7 @@ export interface ExportMenuProps {
   isDirty: boolean;
   hasSaveAs: boolean;
   onPrimary: () => Promise<boolean>;
-  onSaveDraft: () => void;
+  onSaveDraft: (silent?: boolean) => Promise<void>;
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
@@ -85,7 +85,11 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
           <Separator className="my-1 sm:hidden" />
 
           {!tauri && (
-            <DropdownMenuItem onClick={onSaveDraft}>
+            <DropdownMenuItem
+              onClick={() => {
+                void onSaveDraft(false);
+              }}
+            >
               <Save size={16} />
               {t("toolbar.save_draft")}
             </DropdownMenuItem>
@@ -101,7 +105,13 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
 
           <DropdownMenuItem
             onClick={async () => {
-              if (await onPrimary()) onExit();
+              const ok = await onPrimary();
+              if (!ok) return;
+
+              if (!tauri) {
+                await onSaveDraft(false);
+              }
+              onExit();
             }}
             disabled={saveDisabled}
           >
@@ -111,7 +121,13 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
           {hasSaveAs && (
             <DropdownMenuItem
               onClick={async () => {
-                if (await onSaveAs()) onExit();
+                const ok = await onSaveAs();
+                if (!ok) return;
+
+                if (!tauri) {
+                  await onSaveDraft(false);
+                }
+                onExit();
               }}
             >
               <FileText size={16} />

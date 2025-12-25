@@ -65,7 +65,7 @@ interface ToolbarProps {
   onCommentStyleChange?: (style: { color: string }) => void;
   onFreetextStyleChange?: (style: { color: string }) => void;
   onExport: () => Promise<boolean>;
-  onSaveDraft: () => void;
+  onSaveDraft: (silent?: boolean) => Promise<void>;
   onSaveAs: () => Promise<boolean>;
   onPrint: () => void;
   onExit: () => void;

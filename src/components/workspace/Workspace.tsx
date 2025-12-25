@@ -797,7 +797,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return { x: rect.x, y: rect.y, guides: [] };
 
     const { snapToBorders, snapToCenter, snapToEqualDistances } =
-      editorState.snappingOptions;
+      editorState.options.snappingOptions;
     const guides: SnapLine[] = [];
     let { x, y } = rect;
     const otherFields = editorState.fields.filter(
@@ -1117,12 +1117,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (editorState.keys.shift) {
         const totalDx = currentCoords.x - moveStartRaw.x;
         const totalDy = currentCoords.y - moveStartRaw.y;
-        if (Math.abs(totalDx) > Math.abs(totalDy))
+        if (Math.abs(totalDx) > Math.abs(totalDy)) {
           newY = moveStartRaw.originalRect.y;
-        else newX = moveStartRaw.originalRect.x;
+        } else {
+          newX = moveStartRaw.originalRect.x;
+        }
       }
 
-      const { enabled, threshold: baseThreshold } = editorState.snappingOptions;
+      const { enabled, threshold: baseThreshold } =
+        editorState.options.snappingOptions;
       const threshold = baseThreshold / editorState.scale;
       const shouldSnap =
         enabled && !editorState.keys.alt && editorState.mode === "form";
@@ -1167,7 +1170,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
       clientY,
       activePageIndex,
     );
-    const { enabled, threshold: baseThreshold } = editorState.snappingOptions;
+    const { enabled, threshold: baseThreshold } =
+      editorState.options.snappingOptions;
     const threshold = baseThreshold / editorState.scale;
     const shouldSnap =
       enabled && !editorState.keys.alt && editorState.mode === "form";

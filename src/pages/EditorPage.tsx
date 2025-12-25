@@ -37,7 +37,7 @@ export interface EditorPageProps {
   editorStore: EditorStore;
 
   onExport: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => void;
+  onSaveDraft: (silent?: boolean) => Promise<void>;
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
@@ -256,7 +256,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
     if (state.pages.length > 0 && state.pdfBytes) {
       const timer = setTimeout(() => {
         if (!state.isDirty) return;
-        onSaveDraft(true);
+        void onSaveDraft(true);
       }, 2000);
       return () => clearTimeout(timer);
     }
@@ -639,7 +639,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         onSaveAs={onSaveAs}
         onExit={onExit}
         onClose={() => {
-          if (tauri && !state.isDirty) {
+          if (!state.isDirty) {
             onExit();
             return;
           }
@@ -710,7 +710,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
                 }
 
                 if (state.isDirty) {
-                  onSaveDraft(false);
+                  await onSaveDraft(false);
                 }
                 closeDialog();
                 onExit();

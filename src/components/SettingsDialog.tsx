@@ -1,5 +1,5 @@
 import React from "react";
-import { Settings2, Magnet, Globe, Moon, Sun, Laptop } from "lucide-react";
+import { Settings2, Magnet, Globe, Moon, Sun, Laptop, Bug } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,15 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { SnappingOptions } from "../types";
+import { DebugOptions, EditorOptions, SnappingOptions } from "../types";
 import { useLanguage, Language, LANGUAGES } from "./language-provider";
 import { useTheme } from "./theme-provider";
 
 interface SettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  options: SnappingOptions;
-  onChange: (options: SnappingOptions) => void;
+  options: EditorOptions;
+  onChange: (options: EditorOptions) => void;
 }
 
 const SettingsDialog: React.FC<SettingsDialogProps> = ({
@@ -45,7 +45,20 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   ) => {
     onChange({
       ...options,
-      [key]: value,
+      snappingOptions: {
+        ...options.snappingOptions,
+        [key]: value,
+      },
+    });
+  };
+
+  const updateDebugOption = (key: keyof DebugOptions, value: boolean) => {
+    onChange({
+      ...options,
+      debugOptions: {
+        ...options.debugOptions,
+        [key]: value,
+      },
     });
   };
 
@@ -137,7 +150,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
               </div>
               <Switch
                 id="snap-enabled"
-                checked={options.enabled}
+                checked={options.snappingOptions.enabled}
                 onCheckedChange={(c) => updateOption("enabled", c)}
               />
             </div>
@@ -153,8 +166,8 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
               </Label>
               <Switch
                 id="snap-borders"
-                disabled={!options.enabled}
-                checked={options.snapToBorders}
+                disabled={!options.snappingOptions.enabled}
+                checked={options.snappingOptions.snapToBorders}
                 onCheckedChange={(c) => updateOption("snapToBorders", c)}
               />
             </div>
@@ -164,8 +177,8 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
               </Label>
               <Switch
                 id="snap-center"
-                disabled={!options.enabled}
-                checked={options.snapToCenter}
+                disabled={!options.snappingOptions.enabled}
+                checked={options.snappingOptions.snapToCenter}
                 onCheckedChange={(c) => updateOption("snapToCenter", c)}
               />
             </div>
@@ -175,11 +188,33 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
               </Label>
               <Switch
                 id="snap-equal"
-                disabled={!options.enabled}
-                checked={options.snapToEqualDistances}
+                disabled={!options.snappingOptions.enabled}
+                checked={options.snappingOptions.snapToEqualDistances}
                 onCheckedChange={(c) => updateOption("snapToEqualDistances", c)}
               />
             </div>
+          </div>
+
+          <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bug className="text-primary h-4 w-4" />
+                <Label
+                  htmlFor="debug-pdf-text-layer"
+                  className="mb-0 font-semibold"
+                >
+                  PDF Text Layer Debug
+                </Label>
+              </div>
+              <Switch
+                id="debug-pdf-text-layer"
+                checked={options.debugOptions.pdfTextLayer}
+                onCheckedChange={(c) => updateDebugOption("pdfTextLayer", c)}
+              />
+            </div>
+            <p className="text-muted-foreground px-1 text-xs">
+              Show the PDF.js text layer
+            </p>
           </div>
         </div>
 

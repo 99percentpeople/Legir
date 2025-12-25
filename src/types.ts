@@ -150,6 +150,15 @@ export interface SnappingOptions {
   threshold: number;
 }
 
+export interface DebugOptions {
+  pdfTextLayer: boolean;
+}
+
+export interface EditorOptions {
+  snappingOptions: SnappingOptions;
+  debugOptions: DebugOptions;
+}
+
 export interface PenStyle {
   color: string;
   thickness: number;
@@ -198,7 +207,7 @@ export interface EditorState {
     data: FormField | Annotation;
   } | null;
   // Settings
-  snappingOptions: SnappingOptions;
+  options: EditorOptions;
 
   // Dialog State
   activeDialog: "shortcuts" | "settings" | "ai_detect" | "close_confirm" | null;

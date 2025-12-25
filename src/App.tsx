@@ -168,6 +168,7 @@ const App: React.FC = () => {
   const state = useEditorStore();
   const {
     setState,
+    setOptions,
     getPageCached,
     saveCheckpoint,
     resetDocument,
@@ -193,10 +194,8 @@ const App: React.FC = () => {
     }) => {
       const run = async () => {
         const prevPdfDocument = useEditorStore.getState().pdfDocument;
-        const prevHasSavedSession = useEditorStore.getState().hasSavedSession;
 
         resetDocument();
-        setState({ hasSavedSession: prevHasSavedSession });
 
         await withProcessing(t("app.parsing"), async () => {
           if (typeof requestAnimationFrame === "function") {
@@ -259,6 +258,27 @@ const App: React.FC = () => {
             outline,
             scale: 1.0,
           });
+
+          // Web: overwrite any previous draft immediately so the latest opened file
+          // becomes the resumable session (even before the user makes edits).
+          if (!isTauri()) {
+            try {
+              await saveDraft({
+                pdfBytes,
+                fields,
+                annotations,
+                metadata,
+                filename: options.filename,
+              });
+              setState({
+                hasSavedSession: true,
+                lastSavedAt: new Date(),
+                isDirty: false,
+              });
+            } catch {
+              // ignore
+            }
+          }
 
           if (options.saveTarget?.kind === "tauri") {
             const tauriPath = options.saveTarget.path;
@@ -713,17 +733,18 @@ const App: React.FC = () => {
   };
 
   const handleSaveDraft = async (silent = false) => {
-    if (!state.pdfBytes) return;
+    const snapshot = useEditorStore.getState();
+    if (!snapshot.pdfBytes) return;
 
     setState({ isSaving: true });
 
     try {
       await saveDraft({
-        pdfBytes: state.pdfBytes,
-        fields: state.fields,
-        annotations: state.annotations,
-        metadata: state.metadata,
-        filename: state.filename,
+        pdfBytes: snapshot.pdfBytes,
+        fields: snapshot.fields,
+        annotations: snapshot.annotations,
+        metadata: snapshot.metadata,
+        filename: snapshot.filename,
       });
       setState({
         hasSavedSession: true,
@@ -742,13 +763,27 @@ const App: React.FC = () => {
     pdfDisposeRef.current?.();
     pdfDisposeRef.current = null;
 
+    // Web: refresh hasSavedSession immediately so LandingPage can show resume
+    // without requiring a full refresh.
+    let hasDraft = false;
+    if (!isTauri()) {
+      try {
+        hasDraft = !!(await getDraft());
+      } catch {
+        hasDraft = false;
+      }
+    }
+
     resetDocument();
+    if (!isTauri()) {
+      setState({ hasSavedSession: hasDraft });
+    }
     navigate("/");
   };
 
   const onEditorSaveDraft = useCallback(
-    (silent?: boolean) => {
-      void handleSaveDraft(silent ?? false);
+    async (silent?: boolean) => {
+      await handleSaveDraft(silent ?? false);
     },
     [handleSaveDraft],
   );
@@ -805,8 +840,8 @@ const App: React.FC = () => {
       <SettingsDialog
         isOpen={state.activeDialog === "settings"}
         onClose={() => setState((prev) => ({ ...prev, activeDialog: null }))}
-        options={state.snappingOptions}
-        onChange={(o) => setState((prev) => ({ ...prev, snappingOptions: o }))}
+        options={state.options}
+        onChange={(o) => setOptions(o)}
       />
       <AIDetectionDialog
         isOpen={state.activeDialog === "ai_detect"}

@@ -12,6 +12,9 @@ import {
   HistorySnapshot,
   DialogName,
   FieldType,
+  EditorOptions,
+  SnappingOptions,
+  DebugOptions,
 } from "../types";
 import { ANNOTATION_STYLES, DEFAULT_EDITOR_UI_STATE } from "../constants";
 import { shouldSwitchToSelectAfterUse } from "../lib/tool-behavior";
@@ -39,6 +42,22 @@ export interface EditorActions {
   ) => void;
 
   resetUiState: () => void;
+
+  setOptions: (
+    updates:
+      | Partial<EditorOptions>
+      | ((prev: EditorOptions) => Partial<EditorOptions>),
+  ) => void;
+  setSnappingOptions: (
+    updates:
+      | Partial<SnappingOptions>
+      | ((prev: SnappingOptions) => Partial<SnappingOptions>),
+  ) => void;
+  setDebugOptions: (
+    updates:
+      | Partial<DebugOptions>
+      | ((prev: DebugOptions) => Partial<DebugOptions>),
+  ) => void;
 
   getPageCached: (pageIndex: number) => Promise<PDFPageProxy>;
 
@@ -137,12 +156,17 @@ const initialState: EditorState = {
   past: [],
   future: [],
   clipboard: null,
-  snappingOptions: {
-    enabled: true,
-    snapToBorders: true,
-    snapToCenter: true,
-    snapToEqualDistances: false,
-    threshold: 8,
+  options: {
+    snappingOptions: {
+      enabled: true,
+      snapToBorders: true,
+      snapToCenter: true,
+      snapToEqualDistances: false,
+      threshold: 8,
+    },
+    debugOptions: {
+      pdfTextLayer: import.meta.env.DEV,
+    },
   },
   lastSavedAt: null,
   processingStatus: null,
@@ -227,6 +251,65 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         }),
 
       resetUiState: () => set({ ...DEFAULT_EDITOR_UI_STATE }),
+
+      setOptions: (updates) =>
+        set((state) => {
+          const patch =
+            typeof updates === "function" ? updates(state.options) : updates;
+          return {
+            ...state,
+            options: {
+              ...state.options,
+              ...patch,
+              ...(patch.snappingOptions
+                ? {
+                    snappingOptions: {
+                      ...state.options.snappingOptions,
+                      ...patch.snappingOptions,
+                    },
+                  }
+                : null),
+              ...(patch.debugOptions
+                ? {
+                    debugOptions: {
+                      ...state.options.debugOptions,
+                      ...patch.debugOptions,
+                    },
+                  }
+                : null),
+            },
+          };
+        }),
+
+      setSnappingOptions: (updates) =>
+        set((state) => {
+          const patch =
+            typeof updates === "function"
+              ? updates(state.options.snappingOptions)
+              : updates;
+          return {
+            ...state,
+            options: {
+              ...state.options,
+              snappingOptions: { ...state.options.snappingOptions, ...patch },
+            },
+          };
+        }),
+
+      setDebugOptions: (updates) =>
+        set((state) => {
+          const patch =
+            typeof updates === "function"
+              ? updates(state.options.debugOptions)
+              : updates;
+          return {
+            ...state,
+            options: {
+              ...state.options,
+              debugOptions: { ...state.options.debugOptions, ...patch },
+            },
+          };
+        }),
 
       loadDocument: (data) =>
         set({
