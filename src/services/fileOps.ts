@@ -1,5 +1,13 @@
 import { isTauri } from "@tauri-apps/api/core";
 
+// File open/save abstraction.
+//
+// We support two runtimes:
+// - Web: uses File System Access API when available, otherwise falls back to download
+// - Tauri: uses native dialogs + filesystem plugin
+//
+// Keep platform branching in this module so the rest of the app can stay runtime-agnostic.
+
 export type FilePickerFilter = {
   name: string;
   extensions: string[];

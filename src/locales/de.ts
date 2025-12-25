@@ -1,5 +1,4 @@
 const de = {
-  "app.name": "FormForge AI",
   "common.select": "Auswählen...",
   "common.cancel": "Abbrechen",
   "common.save": "Speichern",
@@ -38,7 +37,8 @@ const de = {
   "toolbar.save_as": "Speichern unter...",
   "toolbar.save_draft": "Entwurf speichern",
   "toolbar.save_reopen": "Speichern und erneut öffnen",
-  "toolbar.save_close": "Exportieren und schließen",
+  "toolbar.save_close": "Speichern und schließen",
+  "toolbar.export_close": "Exportieren und schließen",
   "toolbar.save_as_close": "Speichern unter und schließen",
   "toolbar.print": "Drucken",
   "toolbar.close": "Schließen",

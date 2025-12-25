@@ -32,6 +32,7 @@ import {
   openFile,
   pickSaveTarget,
   writeToSaveTarget,
+  type SaveTarget,
 } from "./services/fileOps";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
@@ -45,6 +46,19 @@ import {
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
+// App orchestrator (not just UI).
+//
+// This file coordinates the main user journeys:
+// - Open/parse a PDF -> populate the editor store
+// - Render landing/editor routes
+// - Save/export (Web vs Tauri) via `fileOps`
+// - Web draft persistence via `storageService`
+// - AI field detection via `geminiService`
+//
+// Rule of thumb:
+// - Rendering/interaction logic lives in `pages/EditorPage.tsx` and `components/workspace/Workspace.tsx`.
+// - Authoritative editor state lives in `store/useEditorStore.ts`.
+// - PDF import/export pipeline lives in `services/pdfService.ts`.
 function useAppInitialization({
   loadIntoEditor,
   setState,
@@ -157,7 +171,7 @@ const App: React.FC = () => {
   const { t } = useLanguage();
 
   const isTauriSaveTarget = (
-    target: any,
+    target: SaveTarget,
   ): target is { kind: "tauri"; path: string } => {
     return target?.kind === "tauri" && typeof target?.path === "string";
   };
@@ -192,6 +206,12 @@ const App: React.FC = () => {
       filename: string;
       saveTarget: EditorState["saveTarget"] | null;
     }) => {
+      // Main import pipeline entry.
+      //
+      // Important invariants:
+      // - Must cleanup previous pdfjs document + embedded font faces (see `pdfDisposeRef`).
+      // - Must reset store before loading, but preserve cross-document UI bits (e.g. `hasSavedSession`).
+      // - All heavy work should be wrapped by `withProcessing()` so UI can display status/spinners.
       const run = async () => {
         const prevPdfDocument = useEditorStore.getState().pdfDocument;
 
@@ -213,12 +233,8 @@ const App: React.FC = () => {
 
           if (prevPdfDocument) {
             try {
-              prevPdfDocument.cleanup?.();
-            } catch {
-              // ignore
-            }
-            try {
-              await prevPdfDocument.destroy?.();
+              prevPdfDocument.cleanup();
+              await prevPdfDocument.destroy();
             } catch {
               // ignore
             }

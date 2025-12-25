@@ -73,7 +73,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
     openDialog,
   } = editorStore;
 
-  const isMobile = useIsMobile(768);
+  const isMobile = useIsMobile();
   const prevSelectedIdRef = useRef<string | null>(null);
   const lastFitKeyRef = useRef<string | null>(null);
   const skipNextWindowCloseRef = useRef(false);
@@ -130,7 +130,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   }, [state.selectedId, state.rightPanelTab, setUiState]);
 
   useEffect(() => {
-    const appName = t("app.name");
+    const appName = process.env.APP_NAME;
 
     if (!tauri && typeof document !== "undefined") {
       if (initialTitleRef.current === null) {

@@ -4,6 +4,11 @@ import { BaseControlProps } from "./types";
 import { FormField, Annotation } from "@/types";
 import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
 
+// Dynamic control dispatcher.
+//
+// This component bridges plain data (`FormField` / `Annotation`) to the actual React component
+// registered in `ControlRegistry`. This keeps the workspace generic and makes new control
+// types pluggable via registration.
 export type ControlRendererProps<T extends FormField | Annotation> = Omit<
   BaseControlProps<T>,
   "onPointerDown"

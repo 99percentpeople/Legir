@@ -9,6 +9,15 @@ import { registerControls } from "./components/workspace/controls";
 import { Router } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 
+// App entrypoint.
+//
+// Key responsibilities:
+// - Register workspace controls once at startup (Field/Annotation rendering + properties panels)
+// - Mount global providers (i18n/theme/toast)
+// - Use hash-based routing for compatibility with static hosting + Tauri
+//
+// If you add a new field/annotation control type, update `registerControls()`.
+// Do NOT register controls inside React render to avoid duplicate registration in StrictMode.
 // Register all controls
 registerControls();
 

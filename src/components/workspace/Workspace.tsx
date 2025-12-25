@@ -25,6 +25,19 @@ import {
 import { Highlighter, Search } from "lucide-react";
 import PDFPageWithProxy from "./PDFPageWithProxy";
 import { ControlRenderer } from "./controls";
+import { isTauri } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
+// Workspace = the editor canvas.
+//
+// Responsibilities:
+// - Render PDF pages (via `PDFPageWithProxy` which uses worker rendering)
+// - Overlay controls/annotations on top of pages (via `ControlRenderer`)
+// - Handle pointer/keyboard driven interactions: selection, draw-to-create, drag/resize, panning
+//
+// Coordinate system note:
+// - Source of truth for control geometry is `FormField.rect` / `Annotation.rect` in *PDF space*.
+// - Rendering converts to screen coordinates by multiplying by `editorState.scale`.
+// - When adding new tools/controls, keep this separation (data in PDF space, render in screen space).
 
 interface WorkspaceProps {
   editorState: EditorState;
@@ -2193,11 +2206,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
               onClick={() => {
                 const q = textSelectionToolbar.text.trim();
                 if (q) {
-                  window.open(
-                    `https://www.google.com/search?q=${encodeURIComponent(q)}`,
-                    "_blank",
-                    "noopener,noreferrer",
-                  );
+                  const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+                  if (isTauri()) {
+                    openUrl(url);
+                  } else {
+                    window.open(url, "_blank", "noopener,noreferrer");
+                  }
                 }
                 window.getSelection?.()?.removeAllRanges?.();
                 setTextSelectionToolbar((prev) =>

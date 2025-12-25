@@ -1,5 +1,4 @@
 const zhCN = {
-  "app.name": "FormForge AI",
   "common.select": "选择...",
   "common.cancel": "取消",
   "common.save": "保存",
@@ -41,7 +40,8 @@ const zhCN = {
   "toolbar.save_as": "另存为...",
   "toolbar.save_draft": "保存草稿",
   "toolbar.save_reopen": "保存并重新打开",
-  "toolbar.save_close": "导出并关闭",
+  "toolbar.save_close": "保存并关闭",
+  "toolbar.export_close": "导出并关闭",
   "toolbar.save_as_close": "另存为并关闭",
   "toolbar.print": "打印",
   "toolbar.close": "关闭",

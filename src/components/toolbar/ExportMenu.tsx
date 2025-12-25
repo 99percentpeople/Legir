@@ -49,7 +49,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
 
   const saveDisabled = disabled || (tauri && !isDirty);
 
-  const primaryLabel = tauri ? t("common.save") : t("toolbar.export");
+  const primaryLabel = t(tauri ? "common.save" : "toolbar.export");
   const PrimaryIcon = tauri ? Save : Download;
 
   return (
@@ -116,7 +116,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
             disabled={saveDisabled}
           >
             <FileText size={16} />
-            {t("toolbar.save_close")}
+            {t(tauri ? "toolbar.save_close" : "toolbar.export_close")}
           </DropdownMenuItem>
           {hasSaveAs && (
             <DropdownMenuItem

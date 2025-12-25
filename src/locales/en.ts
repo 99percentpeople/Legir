@@ -1,5 +1,4 @@
 const en = {
-  "app.name": "FormForge AI",
   "common.select": "Select...",
   "common.cancel": "Cancel",
   "common.save": "Save",
@@ -41,7 +40,8 @@ const en = {
   "toolbar.save_as": "Save As...",
   "toolbar.save_draft": "Save Draft",
   "toolbar.save_reopen": "Save and Reopen",
-  "toolbar.save_close": "Export and Close",
+  "toolbar.save_close": "Save and Close",
+  "toolbar.export_close": "Export and Close",
   "toolbar.save_as_close": "Save As and Close",
   "toolbar.print": "Print",
   "toolbar.close": "Close",

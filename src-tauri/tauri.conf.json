@@ -13,7 +13,7 @@
   "app": {
     "windows": [
       {
-        "title": "formforge-pdf-editor",
+        "title": "Formforge",
         "width": 1280,
         "height": 800,
         "minWidth": 640,
