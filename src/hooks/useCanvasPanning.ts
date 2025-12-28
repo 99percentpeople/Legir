@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from "react";
-import { setGlobalCursor, resetGlobalCursor } from "../lib/utils";
+import { setGlobalCursor, resetGlobalCursor } from "../lib/cn";
 
 interface UseCanvasPanningProps {
   containerRef: React.RefObject<HTMLElement>;

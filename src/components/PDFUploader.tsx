@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import { Upload, FileText } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { buttonVariants } from "./ui/button";
-import { cn } from "../lib/utils";
+import { cn } from "../lib/cn";
 import { useLanguage } from "./language-provider";
 import { canOpenWithPicker } from "../services/fileOps";
 

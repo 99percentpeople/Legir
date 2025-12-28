@@ -14,7 +14,7 @@ import {
   type TimeValue as TimeValueRac,
 } from "react-aria-components";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/cn";
 
 function DateField<T extends DateValueRac>({
   className,

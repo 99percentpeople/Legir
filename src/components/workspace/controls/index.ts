@@ -4,7 +4,7 @@ import { FieldType } from "@/types";
 
 // Workspace control system.
 //
-// Controls are registered once at app startup (see `src/index.tsx`).
+// Controls are registered/preloaded once when the Workspace module is loaded.
 // Rendering is dispatched by `data.type` in `ControlRenderer`.
 //
 // To add a new Form control:
@@ -15,157 +15,199 @@ import { FieldType } from "@/types";
 //
 // For PDF import/export support, also add parser/exporter implementations under `services/pdf/...`.
 
-// Lazy load controls
-const TextControl = React.lazy(() =>
-  import("./form/TextControl").then((module) => ({
-    default: module.TextControl,
-  })),
-);
-const CheckboxControl = React.lazy(() =>
-  import("./form/CheckboxControl").then((module) => ({
-    default: module.CheckboxControl,
-  })),
-);
-const RadioControl = React.lazy(() =>
-  import("./form/RadioControl").then((module) => ({
-    default: module.RadioControl,
-  })),
-);
-const DropdownControl = React.lazy(() =>
-  import("./form/DropdownControl").then((module) => ({
-    default: module.DropdownControl,
-  })),
-);
-const SignatureControl = React.lazy(() =>
-  import("./form/SignatureControl").then((module) => ({
-    default: module.SignatureControl,
-  })),
-);
+type LazyWithPreload<T extends React.ComponentType<any>> =
+  React.LazyExoticComponent<T> & {
+    preload?: () => Promise<{ default: T }>;
+  };
 
-const HighlightControl = React.lazy(() =>
-  import("./annotation/HighlightControl").then((module) => ({
-    default: module.HighlightControl,
-  })),
-);
-const CommentControl = React.lazy(() =>
-  import("./annotation/CommentControl").then((module) => ({
-    default: module.CommentControl,
-  })),
-);
-const FreetextControl = React.lazy(() =>
-  import("./annotation/FreetextControl").then((module) => ({
-    default: module.FreetextControl,
-  })),
-);
-const InkControl = React.lazy(() =>
-  import("./annotation/InkControl").then((module) => ({
-    default: module.InkControl,
-  })),
-);
+const lazyWithPreload = <T extends React.ComponentType<any>>(
+  loader: () => Promise<{ default: T }>,
+) => {
+  const Comp = React.lazy(loader) as LazyWithPreload<T>;
+  Comp.preload = loader;
+  return Comp;
+};
 
-// Lazy load properties
-const TextProperties = React.lazy(() =>
-  import("./properties/TextProperties").then((module) => ({
-    default: module.TextProperties,
-  })),
-);
-const CheckboxProperties = React.lazy(() =>
-  import("./properties/CheckboxProperties").then((module) => ({
-    default: module.CheckboxProperties,
-  })),
-);
-const RadioProperties = React.lazy(() =>
-  import("./properties/RadioProperties").then((module) => ({
-    default: module.RadioProperties,
-  })),
-);
-const DropdownProperties = React.lazy(() =>
-  import("./properties/DropdownProperties").then((module) => ({
-    default: module.DropdownProperties,
-  })),
-);
-const SignatureProperties = React.lazy(() =>
-  import("./properties/SignatureProperties").then((module) => ({
-    default: module.SignatureProperties,
-  })),
-);
-const HighlightProperties = React.lazy(() =>
-  import("./properties/HighlightProperties").then((module) => ({
-    default: module.HighlightProperties,
-  })),
-);
-const CommentProperties = React.lazy(() =>
-  import("./properties/CommentProperties").then((module) => ({
-    default: module.CommentProperties,
-  })),
-);
-const FreetextProperties = React.lazy(() =>
-  import("./properties/FreetextProperties").then((module) => ({
-    default: module.FreetextProperties,
-  })),
-);
-const InkProperties = React.lazy(() =>
-  import("./properties/InkProperties").then((module) => ({
-    default: module.InkProperties,
-  })),
-);
+type ControlConfig = {
+  type: FieldType | string;
+  component: LazyWithPreload<React.ComponentType<any>>;
+  propertiesComponent: LazyWithPreload<React.ComponentType<any>>;
+  label: string;
+};
+
+const CONTROL_CONFIGS: ControlConfig[] = [
+  {
+    type: FieldType.TEXT,
+    component: lazyWithPreload(() =>
+      import("./form/TextControl").then((module) => ({
+        default: module.TextControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/TextProperties").then((module) => ({
+        default: module.TextProperties,
+      })),
+    ),
+    label: "Text Field",
+  },
+  {
+    type: FieldType.CHECKBOX,
+    component: lazyWithPreload(() =>
+      import("./form/CheckboxControl").then((module) => ({
+        default: module.CheckboxControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/CheckboxProperties").then((module) => ({
+        default: module.CheckboxProperties,
+      })),
+    ),
+    label: "Checkbox",
+  },
+  {
+    type: FieldType.RADIO,
+    component: lazyWithPreload(() =>
+      import("./form/RadioControl").then((module) => ({
+        default: module.RadioControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/RadioProperties").then((module) => ({
+        default: module.RadioProperties,
+      })),
+    ),
+    label: "Radio Button",
+  },
+  {
+    type: FieldType.DROPDOWN,
+    component: lazyWithPreload(() =>
+      import("./form/DropdownControl").then((module) => ({
+        default: module.DropdownControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/DropdownProperties").then((module) => ({
+        default: module.DropdownProperties,
+      })),
+    ),
+    label: "Dropdown",
+  },
+  {
+    type: FieldType.SIGNATURE,
+    component: lazyWithPreload(() =>
+      import("./form/SignatureControl").then((module) => ({
+        default: module.SignatureControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/SignatureProperties").then((module) => ({
+        default: module.SignatureProperties,
+      })),
+    ),
+    label: "Signature",
+  },
+  {
+    type: "highlight",
+    component: lazyWithPreload(() =>
+      import("./annotation/HighlightControl").then((module) => ({
+        default: module.HighlightControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/HighlightProperties").then((module) => ({
+        default: module.HighlightProperties,
+      })),
+    ),
+    label: "Highlight",
+  },
+  {
+    type: "comment",
+    component: lazyWithPreload(() =>
+      import("./annotation/CommentControl").then((module) => ({
+        default: module.CommentControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/CommentProperties").then((module) => ({
+        default: module.CommentProperties,
+      })),
+    ),
+    label: "Comment",
+  },
+  {
+    type: "freetext",
+    component: lazyWithPreload(() =>
+      import("./annotation/FreetextControl").then((module) => ({
+        default: module.FreetextControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/FreetextProperties").then((module) => ({
+        default: module.FreetextProperties,
+      })),
+    ),
+    label: "FreeText",
+  },
+  {
+    type: "ink",
+    component: lazyWithPreload(() =>
+      import("./annotation/InkControl").then((module) => ({
+        default: module.InkControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/InkProperties").then((module) => ({
+        default: module.InkProperties,
+      })),
+    ),
+    label: "Ink",
+  },
+];
+
+let controlsPreloaded = false;
+
+const warmLazy = async (lazyComp: any) => {
+  if (!lazyComp || typeof lazyComp._init !== "function") return;
+  try {
+    lazyComp._init(lazyComp._payload);
+  } catch (thrown: any) {
+    if (thrown && typeof thrown.then === "function") {
+      try {
+        await thrown;
+      } catch {
+        return;
+      }
+      try {
+        lazyComp._init(lazyComp._payload);
+      } catch {
+        return;
+      }
+    }
+  }
+};
+
+export const preloadControls = () => {
+  if (controlsPreloaded) return;
+  controlsPreloaded = true;
+
+  const lazyList = CONTROL_CONFIGS.flatMap((c) => [
+    c.component,
+    c.propertiesComponent,
+  ]);
+
+  for (const c of lazyList) void (c as any).preload?.();
+  void Promise.all(lazyList.map((c) => warmLazy(c)));
+};
+
+let controlsRegistered = false;
 
 export const registerControls = () => {
-  registry.register({
-    type: FieldType.TEXT,
-    component: TextControl,
-    propertiesComponent: TextProperties,
-    label: "Text Field",
-  });
-  registry.register({
-    type: FieldType.CHECKBOX,
-    component: CheckboxControl,
-    propertiesComponent: CheckboxProperties,
-    label: "Checkbox",
-  });
-  registry.register({
-    type: FieldType.RADIO,
-    component: RadioControl,
-    propertiesComponent: RadioProperties,
-    label: "Radio Button",
-  });
-  registry.register({
-    type: FieldType.DROPDOWN,
-    component: DropdownControl,
-    propertiesComponent: DropdownProperties,
-    label: "Dropdown",
-  });
-  registry.register({
-    type: FieldType.SIGNATURE,
-    component: SignatureControl,
-    propertiesComponent: SignatureProperties,
-    label: "Signature",
-  });
+  if (controlsRegistered) return;
+  controlsRegistered = true;
 
-  registry.register({
-    type: "highlight",
-    component: HighlightControl,
-    propertiesComponent: HighlightProperties,
-    label: "Highlight",
-  });
-  registry.register({
-    type: "comment",
-    component: CommentControl,
-    propertiesComponent: CommentProperties,
-    label: "Comment",
-  });
-  registry.register({
-    type: "freetext",
-    component: FreetextControl,
-    propertiesComponent: FreetextProperties,
-    label: "FreeText",
-  });
-  registry.register({
-    type: "ink",
-    component: InkControl,
-    propertiesComponent: InkProperties,
-    label: "Ink",
-  });
+  for (const config of CONTROL_CONFIGS) {
+    registry.register(config);
+  }
 };
 
 export * from "./types";

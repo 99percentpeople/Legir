@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn, setGlobalCursor, resetGlobalCursor } from "@/lib/utils";
+import { cn, setGlobalCursor, resetGlobalCursor } from "@/lib/cn";
 
 export interface PanelLayoutProps {
   isFloating: boolean;

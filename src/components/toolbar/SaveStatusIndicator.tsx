@@ -1,6 +1,6 @@
 import React from "react";
 import { Loader2, CheckCircle2 } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/cn";
 import { useLanguage } from "../language-provider";
 import { TimeAgoText } from "../timeText";
 

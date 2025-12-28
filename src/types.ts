@@ -10,6 +10,8 @@ export enum FieldType {
 
 export type EditorMode = "form" | "annotation";
 
+export type PageLayoutMode = "single" | "double";
+
 export type Tool =
   // Common
   | "select"
@@ -165,12 +167,7 @@ export interface PenStyle {
   opacity: number;
 }
 
-export type DialogName =
-  | "shortcuts"
-  | "settings"
-  | "ai_detect"
-  | "close_confirm"
-  | null;
+export type DialogName = "shortcuts" | "settings" | "close_confirm" | null;
 
 export interface EditorState {
   pdfFile: File | null;
@@ -210,7 +207,7 @@ export interface EditorState {
   options: EditorOptions;
 
   // Dialog State
-  activeDialog: "shortcuts" | "settings" | "ai_detect" | "close_confirm" | null;
+  activeDialog: "shortcuts" | "settings" | "close_confirm" | null;
   closeConfirmSource: "menu" | "window" | null;
 
   // Status
@@ -220,6 +217,7 @@ export interface EditorState {
   processingStatus: string | null;
   isPanelFloating: boolean;
   isSaving: boolean;
+  pageLayout: PageLayoutMode;
   isSidebarOpen: boolean;
   isRightPanelOpen: boolean;
   rightPanelTab: string;
@@ -270,6 +268,7 @@ export type EditorUiState = Pick<
   | "isRightPanelOpen"
   | "rightPanelTab"
   | "sidebarTab"
+  | "pageLayout"
   | "sidebarWidth"
   | "rightPanelWidth"
 >;

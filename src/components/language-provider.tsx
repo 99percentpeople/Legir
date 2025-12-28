@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import en from "../locales/en";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -6,6 +12,10 @@ import localizedFormat from "dayjs/plugin/localizedFormat";
 
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
+
+export interface LocaleDict {
+  [key: string]: string | LocaleDict;
+}
 
 export type Language =
   | "en"
@@ -79,51 +89,99 @@ const localeModules = import.meta.glob("../locales/*.ts", { eager: false });
 const LanguageProviderContext =
   createContext<LanguageProviderState>(initialState);
 
+const LOCALE_DICT_CACHE_PREFIX = "ff-locale-dict-cache:";
+
+const resolveSystemLanguage = (): ConcreteLanguage => {
+  const browserLang = navigator.language;
+  if (browserLang.startsWith("zh")) {
+    if (browserLang.includes("TW") || browserLang.includes("HK"))
+      return "zh-TW";
+    return "zh-CN";
+  }
+  if (browserLang.startsWith("ja")) return "ja";
+  if (browserLang.startsWith("fr")) return "fr";
+  if (browserLang.startsWith("de")) return "de";
+  if (browserLang.startsWith("es")) return "es";
+  return "en";
+};
+
+const resolveEffectiveLanguage = (language: Language): ConcreteLanguage => {
+  const resolved =
+    language === "system"
+      ? resolveSystemLanguage()
+      : (language as ConcreteLanguage);
+  const isSupported = LANGUAGES.some((l) => l.value === resolved);
+  return isSupported ? resolved : "en";
+};
+
+const readCachedDict = (lang: ConcreteLanguage): LocaleDict | null => {
+  if (lang === "en") return null;
+  try {
+    const raw = localStorage.getItem(`${LOCALE_DICT_CACHE_PREFIX}${lang}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as LocaleDict;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedDict = (lang: ConcreteLanguage, dict: LocaleDict) => {
+  if (lang === "en") return;
+  try {
+    localStorage.setItem(
+      `${LOCALE_DICT_CACHE_PREFIX}${lang}`,
+      JSON.stringify(dict),
+    );
+  } catch {
+    // ignore
+  }
+};
+
 export function LanguageProvider({
   children,
   defaultLanguage = "system",
   storageKey = "ff-ui-language",
   ...props
 }: LanguageProviderProps) {
-  const [language, setLanguage] = useState<Language>(
-    () => (localStorage.getItem(storageKey) as Language) || defaultLanguage,
-  );
+  const [language, setLanguage] = useState<Language>(() => {
+    return (localStorage.getItem(storageKey) as Language) || defaultLanguage;
+  });
 
-  const [effectiveLanguage, setEffectiveLanguage] =
-    useState<ConcreteLanguage>("en");
+  const [effectiveLanguage, setEffectiveLanguage] = useState<ConcreteLanguage>(
+    () => {
+      const initialLanguage =
+        (localStorage.getItem(storageKey) as Language) || defaultLanguage;
+      return resolveEffectiveLanguage(initialLanguage);
+    },
+  );
 
   const [dayjsLocale, setDayjsLocale] = useState<string | null>("en");
 
+  const refreshedLocaleRef = useRef<Set<ConcreteLanguage>>(new Set());
+
   // Store loaded translations
-  const [translations, setTranslations] = useState<
-    Record<string, Record<string, string>>
-  >({ en });
+  const [translations, setTranslations] = useState<Record<string, LocaleDict>>(
+    () => {
+      const initialLanguage =
+        (localStorage.getItem(storageKey) as Language) || defaultLanguage;
+      const initialEffective = resolveEffectiveLanguage(initialLanguage);
+      const cached = readCachedDict(initialEffective);
+      return cached ? { en, [initialEffective]: cached } : { en };
+    },
+  );
 
   useEffect(() => {
-    const resolveSystemLanguage = (): ConcreteLanguage => {
-      const browserLang = navigator.language;
-      if (browserLang.startsWith("zh")) {
-        if (browserLang.includes("TW") || browserLang.includes("HK"))
-          return "zh-TW";
-        return "zh-CN";
-      }
-      if (browserLang.startsWith("ja")) return "ja";
-      if (browserLang.startsWith("fr")) return "fr";
-      if (browserLang.startsWith("de")) return "de";
-      if (browserLang.startsWith("es")) return "es";
-      return "en";
-    };
-
-    const loadLocale = async (lang: ConcreteLanguage) => {
+    const loadLocale = async (lang: ConcreteLanguage, force?: boolean) => {
       if (lang === "en") return; // en is already loaded
-      if (translations[lang]) return; // already loaded
+      if (!force && translations[lang]) return; // already loaded
 
       try {
         // Construct the key that matches import.meta.glob keys
         const modulePath = `../locales/${lang}.ts`;
         const loader = localeModules[modulePath];
         if (loader) {
-          const mod = (await loader()) as { default: Record<string, string> };
+          const mod = (await loader()) as { default: LocaleDict };
+          writeCachedDict(lang, mod.default);
           setTranslations((prev) => ({ ...prev, [lang]: mod.default }));
         } else {
           console.warn(`No loader found for locale: ${lang}`);
@@ -151,32 +209,28 @@ export function LanguageProvider({
         const loader = dayjsLocales[dayjsLocaleKey];
         if (loader) {
           await loader();
-          dayjs.locale(dayjsLocaleKey);
           setDayjsLocale(dayjsLocaleKey);
         } else {
           console.warn(`No dayjs loader found for ${dayjsLocaleKey}`);
           // Fallback to en if loader missing
-          dayjs.locale("en");
           setDayjsLocale("en");
         }
       } catch (e) {
         console.warn(`Failed to load dayjs locale: ${dayjsLocaleKey}`, e);
-        dayjs.locale("en");
         setDayjsLocale("en");
       }
+      // apply locale
+      dayjs.locale(dayjsLocaleKey || "en");
     };
 
-    const resolved =
-      language === "system"
-        ? resolveSystemLanguage()
-        : (language as ConcreteLanguage);
+    const validated = resolveEffectiveLanguage(language);
 
-    // Ensure we have a valid resolved language
-    const isSupported = LANGUAGES.some((l) => l.value === resolved);
-    const validated = isSupported ? resolved : "en";
+    const shouldRefreshLocale =
+      validated !== "en" && !refreshedLocaleRef.current.has(validated);
+    if (validated !== "en") refreshedLocaleRef.current.add(validated);
 
     // Load resources
-    loadLocale(validated).then(() => {
+    loadLocale(validated, shouldRefreshLocale).then(() => {
       setEffectiveLanguage(validated);
 
       // Update HTML lang attribute
@@ -192,9 +246,30 @@ export function LanguageProvider({
     localStorage.setItem(storageKey, language);
   }, [language, storageKey]);
 
+  const resolveTranslation = (dict: LocaleDict | undefined, key: string) => {
+    if (!dict) return undefined;
+
+    const direct = dict[key];
+    if (typeof direct === "string") return direct;
+
+    const parts = key.split(".").filter(Boolean);
+    if (parts.length === 0) return undefined;
+
+    let current: any = dict;
+    for (const part of parts) {
+      if (!current || typeof current !== "object") return undefined;
+      current = current[part];
+    }
+
+    return typeof current === "string" ? current : undefined;
+  };
+
   const t = (key: string, params?: Record<string, string | number>) => {
     const langDict = translations[effectiveLanguage] || translations["en"];
-    let text = langDict[key] || translations["en"][key] || key;
+    let text =
+      resolveTranslation(langDict, key) ||
+      resolveTranslation(translations["en"], key) ||
+      key;
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         text = text.replace(`{${k}}`, String(v));

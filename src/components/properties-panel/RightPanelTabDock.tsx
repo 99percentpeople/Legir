@@ -1,10 +1,14 @@
 import React from "react";
-import { FileText, SlidersHorizontal } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { FileText, SlidersHorizontal, Sparkles } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { useScrollbarWidthOffset } from "@/hooks/useScrollbarWidthOffset";
 import { useLanguage } from "@/components/language-provider";
 
-export type RightPanelTabId = "document" | "properties" | (string & {});
+export type RightPanelTabId =
+  | "document"
+  | "properties"
+  | "ai_detect"
+  | (string & {});
 
 export interface RightPanelDockTab {
   id: RightPanelTabId;
@@ -79,6 +83,7 @@ export function RightPanelTabDock({
 
   const defaultTabs: RightPanelDockTab[] = [
     { id: "document", title: t("properties.document.title"), Icon: FileText },
+    { id: "ai_detect", title: t("right_panel.tabs.ai_detect"), Icon: Sparkles },
     {
       id: "properties",
       title: t("right_panel.tabs.properties"),

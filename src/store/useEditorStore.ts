@@ -118,6 +118,7 @@ function pickEditorUiState(state: EditorState): EditorUiState {
     isRightPanelOpen: state.isRightPanelOpen,
     rightPanelTab: state.rightPanelTab,
     sidebarTab: state.sidebarTab,
+    pageLayout: state.pageLayout,
     sidebarWidth: state.sidebarWidth,
     rightPanelWidth: state.rightPanelWidth,
   };
@@ -179,6 +180,7 @@ const initialState: EditorState = {
   isPanelFloating: false,
   isSaving: false,
   ...DEFAULT_EDITOR_UI_STATE,
+  pageLayout: "single",
   hasSavedSession: false,
   isDirty: false,
   currentPageIndex: 0,

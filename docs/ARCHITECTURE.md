@@ -38,7 +38,7 @@
 
 ```text
 src/
-  index.tsx                  # 应用入口：Provider + Router + registerControls
+  index.tsx                  # 应用入口：Provider + Router
   App.tsx                    # 应用编排：打开/解析/导出/草稿恢复/AI 识别/路由跳转
   AppRoutes.tsx              # 路由与 editor 访问保护
   pages/

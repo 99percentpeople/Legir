@@ -54,6 +54,11 @@
   );
 }
 
+.textLayer.textLayer-rendering {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .textLayer span::selection {
   background: var(
     --text-selection-bg,

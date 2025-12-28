@@ -1,6 +1,6 @@
 import React from "react";
 import { AnnotationControlProps } from "../types";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/cn";
 import { Trash2, Palette, Pencil, MessageCircleMore } from "lucide-react";
 import { ControlWrapper } from "../ControlWrapper";
 import { Button } from "@/components/ui/button";

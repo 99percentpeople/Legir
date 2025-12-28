@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { FONT_FAMILY_MAP } from "@/constants";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/cn";
 
 export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
   data,

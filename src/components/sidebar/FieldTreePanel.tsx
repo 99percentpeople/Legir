@@ -14,7 +14,7 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/cn";
 import { useLanguage } from "../language-provider";
 
 interface FieldTreePanelProps {

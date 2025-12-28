@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { Suspense, useCallback, useEffect, useRef } from "react";
 import Toolbar from "../components/toolbar/Toolbar";
-import Workspace from "../components/workspace/Workspace";
+const Workspace = React.lazy(() => import("../components/workspace/Workspace"));
 import Sidebar from "../components/sidebar/Sidebar";
 import ZoomControls from "../components/toolbar/ZoomControls";
+import { Spinner } from "../components/ui/spinner";
+import { Skeleton } from "../components/ui/skeleton";
 import { RightPanelTabDock } from "../components/properties-panel/RightPanelTabDock";
 import { PropertiesPanel } from "../components/properties-panel/PropertiesPanel";
+import { AIDetectionPanel } from "../components/properties-panel/AIDetectionPanel";
 import { useIsMobile } from "../hooks/useIsMobile";
 import {
   Dialog,
@@ -22,12 +25,14 @@ import type {
   PDFMetadata,
   Tool,
 } from "../types";
+import type { AIDetectionOptions } from "../components/AIDetectionOptionsForm";
 import { useEditorStore, type EditorStore } from "../store/useEditorStore";
 import {
   ANNOTATION_STYLES,
   FIT_SCREEN_PADDING_X,
   FIT_SCREEN_PADDING_Y,
   FIT_WIDTH_PADDING_X,
+  WORKSPACE_BASE_PAGE_GAP_PX,
   WORKSPACE_SCROLL_CONTAINER_SELECTOR,
 } from "../constants";
 import { isTauri } from "@tauri-apps/api/core";
@@ -41,7 +46,7 @@ export interface EditorPageProps {
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
-  onAutoDetect: () => void;
+  onAdvancedDetect: (options: AIDetectionOptions) => void;
 }
 
 const EditorPage: React.FC<EditorPageProps> = ({
@@ -51,7 +56,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   onSaveAs,
   onExit,
   onPrint,
-  onAutoDetect,
+  onAdvancedDetect,
 }) => {
   const state = editorStore;
   const tauri = isTauri();
@@ -297,10 +302,16 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
       const { width } = getWorkspaceViewport();
       const availableWidth = width - FIT_WIDTH_PADDING_X;
+      if (state.pageLayout === "double") {
+        const denom = page.width * 2 + WORKSPACE_BASE_PAGE_GAP_PX;
+        const scale = denom > 0 ? availableWidth / denom : 1.0;
+        return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
+      }
+
       const scale = availableWidth / page.width;
       return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
     },
-    [state.pages, getWorkspaceViewport],
+    [state.pages, state.pageLayout, getWorkspaceViewport],
   );
 
   const calculateFitScreenScale = useCallback(
@@ -317,12 +328,18 @@ const EditorPage: React.FC<EditorPageProps> = ({
       const availableWidth = width - FIT_SCREEN_PADDING_X;
       const availableHeight = height - FIT_SCREEN_PADDING_Y;
 
-      const widthScale = availableWidth / page.width;
+      const widthScale =
+        state.pageLayout === "double"
+          ? (() => {
+              const denom = page.width * 2 + WORKSPACE_BASE_PAGE_GAP_PX;
+              return denom > 0 ? availableWidth / denom : 1.0;
+            })()
+          : availableWidth / page.width;
       const heightScale = availableHeight / page.height;
       const scale = Math.min(widthScale, heightScale);
       return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
     },
-    [state.pages, getWorkspaceViewport],
+    [state.pages, state.pageLayout, getWorkspaceViewport],
   );
 
   const updateScale = useCallback(
@@ -649,8 +666,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
           });
         }}
         onPrint={onPrint}
-        onAutoDetect={onAutoDetect}
-        onCustomAutoDetect={() => openDialog("ai_detect")}
         onUndo={undo}
         onRedo={redo}
         canUndo={state.past.length > 0}
@@ -801,26 +816,41 @@ const EditorPage: React.FC<EditorPageProps> = ({
         />
 
         <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
-          <Workspace
-            editorState={state}
-            onAddField={addField}
-            onAddAnnotation={addAnnotation}
-            onSelectControl={selectControl}
-            onUpdateField={updateField}
-            onUpdateAnnotation={updateAnnotation}
-            onDeleteAnnotation={deleteAnnotation}
-            onEditAnnotation={handleEditAnnotation}
-            onScaleChange={updateScale}
-            onTriggerHistorySave={saveCheckpoint}
-            onPageIndexChange={(idx) => setState({ currentPageIndex: idx })}
-            onToolChange={(tool) => setTool(tool)}
-            fitTrigger={state.fitTrigger}
-          />
+          <Suspense
+            fallback={
+              <div className="flex flex-1 items-center justify-center p-4">
+                <div className="flex gap-6">
+                  <Skeleton className="h-[70vh] w-[48vh]" />
+                  <Skeleton className="hidden h-[70vh] w-[48vh] md:block" />
+                </div>
+              </div>
+            }
+          >
+            <Workspace
+              editorState={state}
+              onAddField={addField}
+              onAddAnnotation={addAnnotation}
+              onSelectControl={selectControl}
+              onUpdateField={updateField}
+              onUpdateAnnotation={updateAnnotation}
+              onDeleteAnnotation={deleteAnnotation}
+              onEditAnnotation={handleEditAnnotation}
+              onScaleChange={updateScale}
+              onTriggerHistorySave={saveCheckpoint}
+              onPageIndexChange={(idx) => setState({ currentPageIndex: idx })}
+              onToolChange={(tool) => setTool(tool)}
+              fitTrigger={state.fitTrigger}
+            />
+          </Suspense>
           <ZoomControls
             scale={state.scale}
+            pageLayout={state.pageLayout}
+            onPageLayoutChange={(layout) => {
+              setState({ pageLayout: layout, fitTrigger: Date.now() });
+            }}
             onZoomIn={() => updateScale(state.scale * 1.25)}
             onZoomOut={() => updateScale(state.scale / 1.25)}
-            onReset={() => {
+            onFitWidth={() => {
               updateScale(calculateFitWidthScale(state.currentPageIndex));
               setState({ fitTrigger: Date.now() });
             }}
@@ -852,29 +882,42 @@ const EditorPage: React.FC<EditorPageProps> = ({
           }}
         />
 
-        {showPropertiesPanel && (
-          <PropertiesPanel
-            selectedControl={selectedControl}
-            activeTab={state.rightPanelTab}
-            metadata={state.metadata}
-            filename={state.filename}
-            onChange={handlePropertiesChange}
-            onMetadataChange={handleMetadataChange}
-            onFilenameChange={handleFilenameChange}
-            onDelete={deleteSelection}
-            onClose={() => {
-              setUiState({ rightPanelTab: "document" });
-              selectControl(null);
-            }}
-            onCollapse={() => {
-              setUiState({ isRightPanelOpen: false });
-            }}
-            isFloating={state.isPanelFloating}
-            onTriggerHistorySave={saveCheckpoint}
-            width={state.rightPanelWidth}
-            onResize={(w) => setUiState({ rightPanelWidth: w })}
-          />
-        )}
+        {showPropertiesPanel &&
+          (state.rightPanelTab === "ai_detect" ? (
+            <AIDetectionPanel
+              isFloating={state.isPanelFloating}
+              width={state.rightPanelWidth}
+              onResize={(w) => setUiState({ rightPanelWidth: w })}
+              onCollapse={() => setUiState({ isRightPanelOpen: false })}
+              totalPages={state.pages.length}
+              isProcessing={state.isProcessing}
+              onDetect={(options) => {
+                onAdvancedDetect(options);
+              }}
+            />
+          ) : (
+            <PropertiesPanel
+              selectedControl={selectedControl}
+              activeTab={state.rightPanelTab}
+              metadata={state.metadata}
+              filename={state.filename}
+              onChange={handlePropertiesChange}
+              onMetadataChange={handleMetadataChange}
+              onFilenameChange={handleFilenameChange}
+              onDelete={deleteSelection}
+              onClose={() => {
+                setUiState({ rightPanelTab: "document" });
+                selectControl(null);
+              }}
+              onCollapse={() => {
+                setUiState({ isRightPanelOpen: false });
+              }}
+              isFloating={state.isPanelFloating}
+              onTriggerHistorySave={saveCheckpoint}
+              width={state.rightPanelWidth}
+              onResize={(w) => setUiState({ rightPanelWidth: w })}
+            />
+          ))}
       </div>
     </>
   );

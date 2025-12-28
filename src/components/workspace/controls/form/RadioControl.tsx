@@ -1,7 +1,7 @@
 import React from "react";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/cn";
 
 export const RadioControl: React.FC<FormControlProps> = (props) => {
   const { data, isFormMode, isAnnotationMode, isSelectable, onUpdate } = props;

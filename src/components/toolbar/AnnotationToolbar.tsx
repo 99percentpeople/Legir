@@ -3,7 +3,7 @@ import { Edit2, Trash2, Palette } from "lucide-react";
 import { Annotation } from "../../types";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/cn";
 import { PEN_COLORS } from "../../constants";
 
 interface AnnotationToolbarProps {

@@ -1,10 +1,12 @@
 import React, { useCallback } from "react";
 import { X, Layers, List, LayoutGrid, StickyNote } from "lucide-react";
 import { FormField, PageData, PDFOutlineItem, Annotation } from "@/types";
-import { setGlobalCursor, resetGlobalCursor, cn } from "@/lib/utils";
+import { cn } from "@/lib/cn";
+import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import FieldTreePanel from "./FieldTreePanel";
 import AnnotationsPanel from "./AnnotationsPanel";
-import { ThumbnailsPanel, DocumentOutlinePanel } from "./OutlinePanel";
+import DocumentOutlinePanel from "./OutlinePanel";
+import ThumbnailsPanel from "./ThumbnailsPanel";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useLanguage } from "../language-provider";

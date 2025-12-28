@@ -7,8 +7,15 @@ import React, {
   useMemo,
 } from "react";
 import { EditorState, FormField, FieldType, Annotation, Tool } from "@/types";
-import { DEFAULT_FIELD_STYLE, ANNOTATION_STYLES, ZOOM_BASE } from "@/constants";
-import { cn, setGlobalCursor, resetGlobalCursor } from "@/lib/utils";
+import {
+  DEFAULT_FIELD_STYLE,
+  ANNOTATION_STYLES,
+  ZOOM_BASE,
+  WORKSPACE_BASE_PADDING_PX,
+  WORKSPACE_BASE_PAGE_GAP_PX,
+} from "@/constants";
+import { cn } from "@/lib/cn";
+import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import { usePointerCapture } from "@/hooks/usePointerCapture";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useCanvasPanning } from "@/hooks/useCanvasPanning";
@@ -24,7 +31,7 @@ import {
 } from "@/components/ui/popover";
 import { Highlighter, Search } from "lucide-react";
 import PDFPageWithProxy from "./PDFPageWithProxy";
-import { ControlRenderer } from "./controls";
+import { ControlRenderer, preloadControls, registerControls } from "./controls";
 import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 // Workspace = the editor canvas.
@@ -38,6 +45,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 // - Source of truth for control geometry is `FormField.rect` / `Annotation.rect` in *PDF space*.
 // - Rendering converts to screen coordinates by multiplying by `editorState.scale`.
 // - When adding new tools/controls, keep this separation (data in PDF space, render in screen space).
+
+registerControls();
+preloadControls();
 
 interface WorkspaceProps {
   editorState: EditorState;
@@ -61,6 +71,13 @@ interface SnapLine {
   start: number;
   end: number;
 }
+
+type Rect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 const Workspace: React.FC<WorkspaceProps> = ({
   editorState,
@@ -488,24 +505,25 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const [movingAnnotationId, setMovingAnnotationId] = useState<string | null>(
     null,
   );
+  const [resizingFieldId, setResizingFieldId] = useState<string | null>(null);
+  const [resizingAnnotationId, setResizingAnnotationId] = useState<
+    string | null
+  >(null);
   const [moveOffset, setMoveOffset] = useState<{ x: number; y: number } | null>(
     null,
   );
   const [moveStartRaw, setMoveStartRaw] = useState<{
     x: number;
     y: number;
-    originalRect: { x: number; y: number };
+    originalRect: Rect;
   } | null>(null);
 
-  const [resizingFieldId, setResizingFieldId] = useState<string | null>(null);
-  const [resizingAnnotationId, setResizingAnnotationId] = useState<
-    string | null
-  >(null);
   const [resizeStart, setResizeStart] = useState<{
-    originalRect: { x: number; y: number; width: number; height: number };
+    originalRect: Rect;
     mouseX: number;
     mouseY: number;
   } | null>(null);
+
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
 
   useEffect(() => {
@@ -547,15 +565,45 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
 
-  const zoomAnchorRef = useRef<{
-    targetX: number;
-    targetY: number;
-    mouseX: number;
-    mouseY: number;
+  const zoomAnchorRef = useRef<
+    | {
+        kind: "content";
+        targetX: number;
+        targetY: number;
+        mouseX: number;
+        mouseY: number;
+      }
+    | {
+        kind: "page";
+        pageIndex: number;
+        pageX: number;
+        pageY: number;
+        mouseX: number;
+        mouseY: number;
+      }
+    | null
+  >(null);
+
+  const viewportAnchorRef = useRef<{
+    scale: number;
+    pageIndex: number;
+    pageX: number;
+    pageY: number;
   } | null>(null);
+  const scrollRafRef = useRef<number | null>(null);
   const prevScaleRef = useRef(editorState.scale);
   const scrollPosRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    return () => {
+      if (typeof window === "undefined") return;
+      if (scrollRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+    };
+  }, []);
 
   // Track if any interactive operation is in progress
   // NOTE: Definition moved up to be used by useAutoScroll hook
@@ -566,17 +614,42 @@ const Workspace: React.FC<WorkspaceProps> = ({
   // But we keep this comment for reference.
 
   // --- Optimization: Pre-calculate grouped controls ---
+  const controlsByPage = useMemo(() => {
+    const fieldsByPage = new Map<number, FormField[]>();
+    const annotationsByPage = new Map<number, Annotation[]>();
+
+    for (const f of editorState.fields) {
+      const arr = fieldsByPage.get(f.pageIndex);
+      if (arr) arr.push(f);
+      else fieldsByPage.set(f.pageIndex, [f]);
+    }
+
+    for (const a of editorState.annotations) {
+      const arr = annotationsByPage.get(a.pageIndex);
+      if (arr) arr.push(a);
+      else annotationsByPage.set(a.pageIndex, [a]);
+    }
+
+    return { fieldsByPage, annotationsByPage };
+  }, [editorState.fields, editorState.annotations]);
+
   const pagesWithControls = useMemo(() => {
     return editorState.pages.map((page) => ({
       ...page,
-      pageAnnotations: editorState.annotations.filter(
-        (a) => a.pageIndex === page.pageIndex,
-      ),
-      pageFields: editorState.fields.filter(
-        (f) => f.pageIndex === page.pageIndex,
-      ),
+      pageAnnotations:
+        controlsByPage.annotationsByPage.get(page.pageIndex) ?? [],
+      pageFields: controlsByPage.fieldsByPage.get(page.pageIndex) ?? [],
     }));
-  }, [editorState.pages, editorState.annotations, editorState.fields]);
+  }, [editorState.pages, controlsByPage]);
+
+  const pageRows = useMemo(() => {
+    if (editorState.pageLayout !== "double") return [];
+    const rows: Array<typeof pagesWithControls> = [];
+    for (let i = 0; i < pagesWithControls.length; i += 2) {
+      rows.push(pagesWithControls.slice(i, i + 2));
+    }
+    return rows;
+  }, [editorState.pageLayout, pagesWithControls]);
 
   // --- Zoom Effect (Same as before) ---
   useLayoutEffect(() => {
@@ -584,26 +657,83 @@ const Workspace: React.FC<WorkspaceProps> = ({
     const content = contentRef.current;
     if (!container || !content) return;
 
+    const applyPageAnchor = (
+      anchor: {
+        pageIndex: number;
+        pageX: number;
+        pageY: number;
+      },
+      mouseX: number,
+      mouseY: number,
+    ) => {
+      const pageEl = document.getElementById(`page-${anchor.pageIndex}`);
+      if (!pageEl) return false;
+
+      const containerRect = container.getBoundingClientRect();
+      const pageRect = pageEl.getBoundingClientRect();
+
+      const contentX =
+        container.scrollLeft +
+        (pageRect.left - containerRect.left) +
+        anchor.pageX * editorState.scale;
+      const contentY =
+        container.scrollTop +
+        (pageRect.top - containerRect.top) +
+        anchor.pageY * editorState.scale;
+
+      container.scrollLeft = contentX - mouseX;
+      container.scrollTop = contentY - mouseY;
+      return true;
+    };
+
     if (zoomAnchorRef.current) {
-      const { targetX, targetY, mouseX, mouseY } = zoomAnchorRef.current;
-      container.scrollLeft = targetX - mouseX;
-      container.scrollTop = targetY - mouseY;
+      const anchor = zoomAnchorRef.current;
+      if (anchor.kind === "page") {
+        applyPageAnchor(
+          {
+            pageIndex: anchor.pageIndex,
+            pageX: anchor.pageX,
+            pageY: anchor.pageY,
+          },
+          anchor.mouseX,
+          anchor.mouseY,
+        );
+      } else {
+        container.scrollLeft = anchor.targetX - anchor.mouseX;
+        container.scrollTop = anchor.targetY - anchor.mouseY;
+      }
       zoomAnchorRef.current = null;
     } else if (prevScaleRef.current !== editorState.scale) {
-      const oldScale = prevScaleRef.current;
-      const newScale = editorState.scale;
-      const scaleRatio = newScale / oldScale;
       const rect = container.getBoundingClientRect();
       const viewportW = rect.width;
       const viewportH = rect.height;
-      const oldScrollLeft = scrollPosRef.current.x;
-      const oldScrollTop = scrollPosRef.current.y;
-      const centerX_old = oldScrollLeft + viewportW / 2;
-      const centerY_old = oldScrollTop + viewportH / 2;
-      const centerX_new = centerX_old * scaleRatio;
-      const centerY_new = centerY_old * scaleRatio;
-      container.scrollLeft = centerX_new - viewportW / 2;
-      container.scrollTop = centerY_new - viewportH / 2;
+
+      const pre = viewportAnchorRef.current;
+      const usedPre =
+        editorState.pageLayout === "double" &&
+        pre &&
+        Math.abs(pre.scale - prevScaleRef.current) < 0.0001 &&
+        applyPageAnchor(
+          { pageIndex: pre.pageIndex, pageX: pre.pageX, pageY: pre.pageY },
+          viewportW / 2,
+          viewportH / 2,
+        );
+
+      if (usedPre) {
+        // Intentionally skip the simple scaling math below.
+      } else {
+        const oldScale = prevScaleRef.current;
+        const newScale = editorState.scale;
+        const scaleRatio = newScale / oldScale;
+        const oldScrollLeft = scrollPosRef.current.x;
+        const oldScrollTop = scrollPosRef.current.y;
+        const centerX_old = oldScrollLeft + viewportW / 2;
+        const centerY_old = oldScrollTop + viewportH / 2;
+        const centerX_new = centerX_old * scaleRatio;
+        const centerY_new = centerY_old * scaleRatio;
+        container.scrollLeft = centerX_new - viewportW / 2;
+        container.scrollTop = centerY_new - viewportH / 2;
+      }
     }
     prevScaleRef.current = editorState.scale;
     scrollPosRef.current = { x: container.scrollLeft, y: container.scrollTop };
@@ -625,6 +755,130 @@ const Workspace: React.FC<WorkspaceProps> = ({
         const content = contentRef.current;
         if (!content) return;
 
+        const distToRectSquared = (x: number, y: number, r: DOMRect) => {
+          const inside =
+            x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+          const dx = inside
+            ? 0
+            : x < r.left
+              ? r.left - x
+              : x > r.right
+                ? x - r.right
+                : 0;
+          const dy = inside
+            ? 0
+            : y < r.top
+              ? r.top - y
+              : y > r.bottom
+                ? y - r.bottom
+                : 0;
+          return dx * dx + dy * dy;
+        };
+
+        const pickClosestHit = <T extends { pageIndex: number; rect: DOMRect }>(
+          x: number,
+          y: number,
+          candidates: T[],
+        ) => {
+          let best: T | null = null;
+          let bestDist = Infinity;
+          for (const c of candidates) {
+            const dist = distToRectSquared(x, y, c.rect);
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = c;
+              if (dist === 0) break;
+            }
+          }
+          return best;
+        };
+
+        const findPageAtPoint = (clientX: number, clientY: number) => {
+          const els =
+            typeof document.elementsFromPoint === "function"
+              ? document.elementsFromPoint(clientX, clientY)
+              : [];
+          for (const el of els) {
+            const pageEl = (el as HTMLElement | null)?.closest?.(
+              '[id^="page-"]',
+            );
+            if (
+              pageEl instanceof HTMLElement &&
+              pageEl.id.startsWith("page-")
+            ) {
+              const pageIndex = Number(pageEl.id.slice("page-".length));
+              if (!Number.isNaN(pageIndex)) {
+                return {
+                  pageIndex,
+                  rect: pageEl.getBoundingClientRect(),
+                  dist: 0,
+                };
+              }
+            }
+          }
+
+          let best: { pageIndex: number; rect: DOMRect; dist: number } | null =
+            null;
+
+          for (let i = 0; i < editorState.pages.length; i++) {
+            const pageIndex = editorState.pages[i]?.pageIndex;
+            if (typeof pageIndex !== "number") continue;
+            const el = document.getElementById(`page-${pageIndex}`);
+            if (!el) continue;
+            const r = el.getBoundingClientRect();
+
+            const dist = distToRectSquared(clientX, clientY, r);
+
+            if (!best || dist < best.dist) {
+              best = { pageIndex, rect: r, dist };
+              if (dist === 0) break;
+            }
+          }
+
+          return best;
+        };
+
+        const findPageNearPointByDom = (
+          clientX: number,
+          clientY: number,
+          probeDy: number,
+        ) => {
+          const getHit = (x: number, y: number) => {
+            const els =
+              typeof document.elementsFromPoint === "function"
+                ? document.elementsFromPoint(x, y)
+                : [];
+            for (const el of els) {
+              const pageEl = (el as HTMLElement | null)?.closest?.(
+                '[id^="page-"]',
+              );
+              if (
+                pageEl instanceof HTMLElement &&
+                pageEl.id.startsWith("page-")
+              ) {
+                const pageIndex = Number(pageEl.id.slice("page-".length));
+                if (!Number.isNaN(pageIndex)) {
+                  return {
+                    pageIndex,
+                    rect: pageEl.getBoundingClientRect(),
+                  };
+                }
+              }
+            }
+            return null;
+          };
+
+          const candidates = [
+            getHit(clientX, clientY),
+            probeDy > 0 ? getHit(clientX, clientY - probeDy) : null,
+            probeDy > 0 ? getHit(clientX, clientY + probeDy) : null,
+          ].filter(Boolean) as Array<{ pageIndex: number; rect: DOMRect }>;
+
+          if (candidates.length === 0) return null;
+          // Pick the closest page rect to the pointer (works even when pointer is in the gap).
+          return pickClosestHit(clientX, clientY, candidates);
+        };
+
         const currentScale = editorState.scale;
         const steps = -e.deltaY / 100;
         let newScale = currentScale * Math.pow(ZOOM_BASE, steps);
@@ -640,73 +894,148 @@ const Workspace: React.FC<WorkspaceProps> = ({
         const relX = e.clientX - contentRect.left;
         const relY = e.clientY - contentRect.top;
 
-        // Decompose Y coordinate into Fixed (padding/gap) and Scaled (pages) parts
-        let accumulatedH = 32; // Top padding (p-8 = 32px)
-        let fixedY = 32;
-        let scaledY = 0;
+        let targetX = 0;
+        let targetY = 0;
 
-        if (relY < 32) {
-          // Mouse in top padding
-          fixedY = relY;
-          scaledY = 0;
+        if (editorState.pageLayout === "double") {
+          const rect = container.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+
+          const hit = findPageAtPoint(e.clientX, e.clientY);
+          if (hit) {
+            const { pageIndex, rect: pageRect } = hit;
+            const pageX = (e.clientX - pageRect.left) / currentScale;
+            const pageY = (e.clientY - pageRect.top) / currentScale;
+            const pageW = pageRect.width / currentScale;
+            const pageH = pageRect.height / currentScale;
+
+            zoomAnchorRef.current = {
+              kind: "page",
+              pageIndex,
+              pageX: Math.max(0, Math.min(pageW, pageX)),
+              pageY: Math.max(0, Math.min(pageH, pageY)),
+              mouseX,
+              mouseY,
+            };
+            onScaleChange(newScale);
+            return;
+          }
+
+          const scaleRatio = newScale / currentScale;
+          targetX = relX * scaleRatio;
+          targetY = relY * scaleRatio;
         } else {
-          let found = false;
-          for (let i = 0; i < editorState.pages.length; i++) {
-            const page = editorState.pages[i];
-            const pageH = page.height * currentScale;
+          const rect = container.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
 
-            // Check if mouse is on this page
-            if (relY < accumulatedH + pageH) {
-              scaledY += relY - accumulatedH;
-              found = true;
-              break;
-            }
-            accumulatedH += pageH;
-            scaledY += pageH;
+          // Prefer page anchoring in single-page mode as well.
+          // When the cursor is in the inter-page gap, we probe ±gap/2 to snap to the nearest page.
+          const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * currentScale;
+          const probeDy = Math.max(8, Math.min(256, gapPx / 2));
+          const domHit = findPageNearPointByDom(e.clientX, e.clientY, probeDy);
+          if (domHit) {
+            const { pageIndex, rect: pageRect } = domHit;
+            const pageX = (e.clientX - pageRect.left) / currentScale;
+            const pageY = (e.clientY - pageRect.top) / currentScale;
+            const pageW = pageRect.width / currentScale;
+            const pageH = pageRect.height / currentScale;
 
-            // Check if mouse is in gap (only if not last page)
-            if (i < editorState.pages.length - 1) {
-              const gap = 32; // gap-8 = 32px
-              if (relY < accumulatedH + gap) {
-                fixedY += relY - accumulatedH;
+            zoomAnchorRef.current = {
+              kind: "page",
+              pageIndex,
+              pageX: Math.max(0, Math.min(pageW, pageX)),
+              pageY: Math.max(0, Math.min(pageH, pageY)),
+              mouseX,
+              mouseY,
+            };
+            onScaleChange(newScale);
+            return;
+          }
+
+          // Decompose Y coordinate into Fixed (padding/gap) and Scaled (pages) parts
+          const paddingPx = WORKSPACE_BASE_PADDING_PX;
+          const gapPx2 = gapPx;
+          let accumulatedH = paddingPx;
+          let fixedY = paddingPx;
+          let scaledY = 0;
+
+          if (relY < paddingPx) {
+            // Mouse in top padding
+            fixedY = relY;
+            scaledY = 0;
+          } else {
+            let found = false;
+            for (let i = 0; i < editorState.pages.length; i++) {
+              const page = editorState.pages[i];
+              const pageH = page.height * currentScale;
+
+              // Check if mouse is on this page
+              if (relY < accumulatedH + pageH) {
+                scaledY += relY - accumulatedH;
                 found = true;
                 break;
               }
-              accumulatedH += gap;
-              fixedY += gap;
+              accumulatedH += pageH;
+              scaledY += pageH;
+
+              // Check if mouse is in gap (only if not last page)
+              if (i < editorState.pages.length - 1) {
+                if (relY < accumulatedH + gapPx2) {
+                  scaledY += relY - accumulatedH;
+                  found = true;
+                  break;
+                }
+                accumulatedH += gapPx2;
+                scaledY += gapPx2;
+              }
+            }
+            if (!found) {
+              // Mouse is below last page (bottom padding)
+              fixedY += relY - accumulatedH;
             }
           }
-          if (!found) {
-            // Mouse is below last page (bottom padding)
-            fixedY += relY - accumulatedH;
+
+          // Decompose X coordinate (Simple assumption of fixed side padding)
+          const fixedXPadding = WORKSPACE_BASE_PADDING_PX;
+          let fixedX = fixedXPadding;
+          let scaledX = 0;
+          if (relX < fixedXPadding) {
+            fixedX = relX;
+            scaledX = 0;
+          } else {
+            fixedX = fixedXPadding;
+            scaledX = relX - fixedXPadding;
           }
-        }
 
-        // Decompose X coordinate (Simple assumption of fixed side padding)
-        let fixedX = 32; // p-8 = 32px
-        let scaledX = 0;
-        if (relX < 32) {
-          fixedX = relX;
-          scaledX = 0;
-        } else {
-          fixedX = 32;
-          scaledX = relX - 32;
+          // Calculate predicted position at new scale
+          targetX = scaledX * (newScale / currentScale) + fixedX;
+          targetY = scaledY * (newScale / currentScale) + fixedY;
         }
-
-        // Calculate predicted position at new scale
-        const targetX = scaledX * (newScale / currentScale) + fixedX;
-        const targetY = scaledY * (newScale / currentScale) + fixedY;
 
         const mouseX = e.clientX - containerRect.left;
         const mouseY = e.clientY - containerRect.top;
 
-        zoomAnchorRef.current = { targetX, targetY, mouseX, mouseY };
+        zoomAnchorRef.current = {
+          kind: "content",
+          targetX,
+          targetY,
+          mouseX,
+          mouseY,
+        };
         onScaleChange(newScale);
       }
     };
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
-  }, [editorState.scale, onScaleChange, editorState.pages, isPanning]);
+  }, [
+    editorState.scale,
+    editorState.pageLayout,
+    onScaleChange,
+    editorState.pages,
+    isPanning,
+  ]);
 
   const getRelativeCoordsFromPoint = useCallback(
     (clientX: number, clientY: number, pageIndex: number) => {
@@ -1459,49 +1788,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
         y: container.scrollTop,
       };
 
-      if (textSelectionToolbar.isVisible) {
-        updateTextSelectionToolbar();
-      }
-
-      if (onPageIndexChange) {
-        const scrollTop = container.scrollTop;
-        const viewportHeight = container.clientHeight;
-        const middleY = scrollTop + viewportHeight / 2;
-
-        let currentY = 32;
-        const gap = 32;
-        const scale = editorState.scale;
-        let found = false;
-
-        for (let i = 0; i < editorState.pages.length; i++) {
-          const page = editorState.pages[i];
-          const pageHeight = page.height * scale;
-
-          if (middleY >= currentY && middleY <= currentY + pageHeight) {
-            onPageIndexChange(i);
-            found = true;
-            break;
-          }
-
-          if (
-            middleY > currentY + pageHeight &&
-            middleY < currentY + pageHeight + gap
-          ) {
-            if (middleY < currentY + pageHeight + gap / 2) {
-              onPageIndexChange(i);
-              found = true;
-              break;
-            }
-          }
-
-          currentY += pageHeight + gap;
-        }
-
-        if (!found && editorState.pages.length > 0 && middleY >= currentY) {
-          onPageIndexChange(editorState.pages.length - 1);
-        }
-      }
-
       if (isInteracting) {
         if (movingFieldId) {
           updateMovingField(
@@ -1524,6 +1810,119 @@ const Workspace: React.FC<WorkspaceProps> = ({
             lastMousePosRef.current.y,
           );
         }
+      }
+
+      if (typeof window !== "undefined" && scrollRafRef.current === null) {
+        scrollRafRef.current = window.requestAnimationFrame(() => {
+          scrollRafRef.current = null;
+          const c = containerRef.current;
+          if (!c) return;
+
+          if (textSelectionToolbar.isVisible) {
+            updateTextSelectionToolbar();
+          }
+
+          const isDoubleLayout = editorState.pageLayout === "double";
+          const shouldNotifyPageIndex = typeof onPageIndexChange === "function";
+
+          // In double-page layout we must maintain `viewportAnchorRef` on scroll.
+          // This anchor is used to keep button/fit zoom stable around the viewport center.
+          // Page index notification is optional.
+          if (isDoubleLayout) {
+            const rect = c.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const hitPageElAt = (x: number, y: number) => {
+              if (typeof document.elementFromPoint !== "function") return null;
+              const hitEl = document.elementFromPoint(
+                x,
+                y,
+              ) as HTMLElement | null;
+              const pageEl = hitEl?.closest?.('[id^="page-"]');
+              return pageEl instanceof HTMLElement &&
+                pageEl.id.startsWith("page-")
+                ? pageEl
+                : null;
+            };
+
+            // When fit-width centers the spread, the viewport center can land on the gap.
+            // Probe nearby points to snap to the nearest page without scanning all pages.
+            const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale;
+            const probe = Math.max(8, Math.min(256, gapPx / 2 + 4));
+            const pageEl =
+              hitPageElAt(centerX, centerY) ||
+              hitPageElAt(centerX - probe, centerY) ||
+              hitPageElAt(centerX + probe, centerY) ||
+              hitPageElAt(centerX, centerY - probe) ||
+              hitPageElAt(centerX, centerY + probe);
+
+            if (!pageEl) return;
+
+            const idx = Number(pageEl.id.slice("page-".length));
+            if (Number.isNaN(idx)) return;
+
+            const r = pageEl.getBoundingClientRect();
+            const pageW = r.width / editorState.scale;
+            const pageH = r.height / editorState.scale;
+            viewportAnchorRef.current = {
+              scale: editorState.scale,
+              pageIndex: idx,
+              pageX: Math.max(
+                0,
+                Math.min(pageW, (centerX - r.left) / editorState.scale),
+              ),
+              pageY: Math.max(
+                0,
+                Math.min(pageH, (centerY - r.top) / editorState.scale),
+              ),
+            };
+            if (shouldNotifyPageIndex) onPageIndexChange(idx);
+            return;
+          } else {
+            // In single-page layout, the scroll logic here only exists to notify the current
+            // page index; skip all computations if the consumer didn't subscribe.
+            if (!shouldNotifyPageIndex) return;
+            const scrollTop = c.scrollTop;
+            const viewportHeight = c.clientHeight;
+            const middleY = scrollTop + viewportHeight / 2;
+
+            const scale = editorState.scale;
+            const paddingPx = WORKSPACE_BASE_PADDING_PX;
+            const gap = WORKSPACE_BASE_PAGE_GAP_PX * scale;
+
+            let currentY = paddingPx;
+            let found = false;
+
+            for (let i = 0; i < editorState.pages.length; i++) {
+              const page = editorState.pages[i];
+              const pageHeight = page.height * scale;
+
+              if (middleY >= currentY && middleY <= currentY + pageHeight) {
+                onPageIndexChange(i);
+                found = true;
+                break;
+              }
+
+              if (
+                middleY > currentY + pageHeight &&
+                middleY < currentY + pageHeight + gap
+              ) {
+                if (middleY < currentY + pageHeight + gap / 2) {
+                  onPageIndexChange(i);
+                  found = true;
+                  break;
+                }
+              }
+
+              currentY += pageHeight + gap;
+            }
+
+            if (!found && editorState.pages.length > 0 && middleY >= currentY) {
+              onPageIndexChange(editorState.pages.length - 1);
+            }
+          }
+        });
       }
     }
   };
@@ -2125,6 +2524,168 @@ const Workspace: React.FC<WorkspaceProps> = ({
     return d;
   };
 
+  const renderPage = (page: (typeof pagesWithControls)[number]) => (
+    <div
+      id={`page-${page.pageIndex}`}
+      key={page.pageIndex}
+      className="relative flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
+      data-ff-text-selecting={
+        textSelectingPages[page.pageIndex] ? "1" : undefined
+      }
+      style={{
+        cursor: editorState.tool === "draw_highlight" ? "crosshair" : undefined,
+      }}
+      onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
+    >
+      <PDFPageWithProxy
+        pageIndex={page.pageIndex}
+        scale={editorState.scale}
+        width={page.width}
+        height={page.height}
+        placeholderImage={page.imageData}
+        isSelectMode={
+          editorState.tool === "select" || editorState.tool === "draw_highlight"
+        }
+        isHighlighting={editorState.tool === "draw_highlight"}
+        highlightColor={
+          editorState.highlightStyle?.color || ANNOTATION_STYLES.highlight.color
+        }
+        highlightOpacity={
+          editorState.highlightStyle?.opacity ??
+          ANNOTATION_STYLES.highlight.opacity
+        }
+        textLayerCursor={
+          editorState.tool === "draw_highlight" ? "crosshair" : undefined
+        }
+        onTextSelectingChange={handleTextSelectingChange}
+      />
+
+      <div
+        className={cn("absolute inset-0 scheme-light")}
+        style={{
+          cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
+          pointerEvents: isPanModeActive
+            ? "auto"
+            : editorState.tool === "select" ||
+                editorState.tool === "draw_highlight"
+              ? "none"
+              : undefined,
+        }}
+        onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
+      >
+        {page.pageFields.map((field) => (
+          <ControlRenderer
+            key={field.id}
+            data={field}
+            id={field.id}
+            isSelected={editorState.selectedId === field.id}
+            scale={editorState.scale}
+            isAnnotationMode={editorState.mode === "annotation"}
+            isFormMode={editorState.mode === "form"}
+            isSelectable={isSelectable}
+            onControlPointerDown={handleFieldPointerDown}
+            onSelect={onSelectControl}
+            onUpdate={onUpdateField}
+            onControlResizeStart={handleResizePointerDown}
+          />
+        ))}
+        {page.pageAnnotations.map((annot) => (
+          <ControlRenderer
+            key={annot.id}
+            data={annot}
+            id={annot.id}
+            isSelected={editorState.selectedId === annot.id}
+            scale={editorState.scale}
+            isAnnotationMode={editorState.mode === "annotation"}
+            isFormMode={editorState.mode === "form"}
+            isSelectable={isSelectable}
+            onControlPointerDown={handleAnnotationPointerDown}
+            onSelect={onSelectControl}
+            onUpdate={onUpdateAnnotation}
+            onDelete={onDeleteAnnotation}
+            onEdit={onEditAnnotation}
+            onControlResizeStart={handleResizePointerDown}
+          />
+        ))}
+
+        {dragStart && dragCurrent && activePageIndex === page.pageIndex && (
+          <div
+            className={cn(
+              "pointer-events-none absolute border-2",
+              editorState.mode === "form"
+                ? "border-blue-500 bg-blue-500/20"
+                : "border-yellow-500 bg-yellow-500/20",
+            )}
+            style={{
+              left: Math.min(dragStart.x, dragCurrent.x) * editorState.scale,
+              top: Math.min(dragStart.y, dragCurrent.y) * editorState.scale,
+              width: Math.abs(dragCurrent.x - dragStart.x) * editorState.scale,
+              height: Math.abs(dragCurrent.y - dragStart.y) * editorState.scale,
+            }}
+          />
+        )}
+      </div>
+
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+        viewBox={`0 0 ${page.width} ${page.height}`}
+        preserveAspectRatio="none"
+      >
+        {isDrawing && activePageIndex === page.pageIndex && (
+          <path
+            d={pointsToPath(currentPathState)}
+            stroke={
+              editorState.tool === "draw_highlight"
+                ? editorState.highlightStyle?.color ||
+                  ANNOTATION_STYLES.highlight.color
+                : editorState.penStyle.color
+            }
+            strokeWidth={
+              editorState.tool === "draw_highlight"
+                ? editorState.highlightStyle?.thickness ||
+                  ANNOTATION_STYLES.highlight.thickness
+                : editorState.penStyle.thickness
+            }
+            fill="none"
+            strokeLinecap={
+              editorState.tool === "draw_highlight" ? "butt" : "round"
+            }
+            strokeLinejoin="round"
+            opacity={
+              editorState.tool === "draw_highlight"
+                ? (editorState.highlightStyle?.opacity ??
+                  ANNOTATION_STYLES.highlight.opacity)
+                : editorState.penStyle.opacity
+            }
+          />
+        )}
+      </svg>
+
+      {activePageIndex === page.pageIndex && snapLines.length > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-50">
+          {snapLines.map((line, idx) => (
+            <div
+              key={idx}
+              className="absolute border-dashed border-red-500 opacity-70"
+              style={{
+                borderWidth: 0,
+                [line.type === "vertical"
+                  ? "borderLeftWidth"
+                  : "borderTopWidth"]: "1px",
+                left:
+                  line.type === "vertical" ? line.pos * editorState.scale : 0,
+                top:
+                  line.type === "horizontal" ? line.pos * editorState.scale : 0,
+                width: line.type === "vertical" ? "1px" : "100%",
+                height: line.type === "horizontal" ? "1px" : "100%",
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div
       ref={containerRef}
@@ -2227,200 +2788,27 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       <div
         ref={contentRef}
-        className="mx-auto flex min-h-full w-fit flex-col items-center gap-8 p-8 pb-20"
+        className={cn(
+          "mx-auto min-h-full p-8 pb-20",
+          editorState.pageLayout === "double"
+            ? "flex w-fit flex-col items-center"
+            : "flex w-fit flex-col items-center",
+        )}
+        style={{ gap: `${WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale}px` }}
       >
-        {pagesWithControls.map((page) => (
-          <div
-            id={`page-${page.pageIndex}`}
-            key={page.pageIndex}
-            className="relative origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
-            data-ff-text-selecting={
-              textSelectingPages[page.pageIndex] ? "1" : undefined
-            }
-            style={{
-              cursor:
-                editorState.tool === "draw_highlight" ? "crosshair" : undefined,
-            }}
-            onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
-          >
-            {/* 
-                Lazy Loaded PDF Page Rendering 
-                Note: Container size is now controlled by PDFPage but we wrap it here for annotations layer relative positioning
-            */}
-            <PDFPageWithProxy
-              pageIndex={page.pageIndex}
-              scale={editorState.scale}
-              width={page.width}
-              height={page.height}
-              placeholderImage={page.imageData}
-              isSelectMode={
-                editorState.tool === "select" ||
-                editorState.tool === "draw_highlight"
-              }
-              isHighlighting={editorState.tool === "draw_highlight"}
-              highlightColor={
-                editorState.highlightStyle?.color ||
-                ANNOTATION_STYLES.highlight.color
-              }
-              highlightOpacity={
-                editorState.highlightStyle?.opacity ??
-                ANNOTATION_STYLES.highlight.opacity
-              }
-              textLayerCursor={
-                editorState.tool === "draw_highlight" ? "crosshair" : undefined
-              }
-              onTextSelectingChange={handleTextSelectingChange}
-            />
-
-            {/* DOM Layer for Highlights, Notes, Form Fields */}
-            <div
-              className={cn("absolute inset-0 scheme-light")}
-              style={{
-                cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
-                pointerEvents: isPanModeActive
-                  ? "auto"
-                  : editorState.tool === "select" ||
-                      editorState.tool === "draw_highlight"
-                    ? "none"
-                    : undefined,
-              }}
-              onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
-            >
-              {/* Form Fields */}
-              {page.pageFields.map((field) => (
-                <ControlRenderer
-                  key={field.id}
-                  data={field}
-                  id={field.id}
-                  isSelected={editorState.selectedId === field.id}
-                  scale={editorState.scale}
-                  isAnnotationMode={editorState.mode === "annotation"}
-                  isFormMode={editorState.mode === "form"}
-                  isSelectable={isSelectable}
-                  onControlPointerDown={handleFieldPointerDown}
-                  onSelect={onSelectControl}
-                  onUpdate={onUpdateField}
-                  onControlResizeStart={handleResizePointerDown}
-                />
-              ))}
-              {/* Annotations: Highlight & Note */}
-              {page.pageAnnotations.map((annot) => (
-                <ControlRenderer
-                  key={annot.id}
-                  data={annot}
-                  id={annot.id}
-                  isSelected={editorState.selectedId === annot.id}
-                  scale={editorState.scale}
-                  isAnnotationMode={editorState.mode === "annotation"}
-                  isFormMode={editorState.mode === "form"}
-                  isSelectable={isSelectable}
-                  onControlPointerDown={handleAnnotationPointerDown}
-                  onSelect={onSelectControl}
-                  onUpdate={onUpdateAnnotation}
-                  onDelete={onDeleteAnnotation}
-                  onEdit={onEditAnnotation}
-                  onControlResizeStart={handleResizePointerDown}
-                />
-              ))}
-
-              {/* Drag Guide */}
-              {dragStart &&
-                dragCurrent &&
-                activePageIndex === page.pageIndex && (
-                  <div
-                    className={cn(
-                      "pointer-events-none absolute border-2",
-                      editorState.mode === "form"
-                        ? "border-blue-500 bg-blue-500/20"
-                        : "border-yellow-500 bg-yellow-500/20",
-                    )}
-                    style={{
-                      left:
-                        Math.min(dragStart.x, dragCurrent.x) *
-                        editorState.scale,
-                      top:
-                        Math.min(dragStart.y, dragCurrent.y) *
-                        editorState.scale,
-                      width:
-                        Math.abs(dragCurrent.x - dragStart.x) *
-                        editorState.scale,
-                      height:
-                        Math.abs(dragCurrent.y - dragStart.y) *
-                        editorState.scale,
-                    }}
-                  />
-                )}
-            </div>
-
-            {/* SVG Layer for Ink Annotations */}
-            {/* Added viewBox to match unscaled page dimensions, ensuring proper scaling behavior for ink paths */}
-            <svg
-              className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-              viewBox={`0 0 ${page.width} ${page.height}`}
-              preserveAspectRatio="none"
-            >
-              {
-                /* Current Drawing Path */
-                isDrawing && activePageIndex === page.pageIndex && (
-                  <path
-                    d={pointsToPath(currentPathState)}
-                    stroke={
-                      editorState.tool === "draw_highlight"
-                        ? editorState.highlightStyle?.color ||
-                          ANNOTATION_STYLES.highlight.color
-                        : editorState.penStyle.color
-                    }
-                    strokeWidth={
-                      editorState.tool === "draw_highlight"
-                        ? editorState.highlightStyle?.thickness ||
-                          ANNOTATION_STYLES.highlight.thickness
-                        : editorState.penStyle.thickness
-                    }
-                    fill="none"
-                    strokeLinecap={
-                      editorState.tool === "draw_highlight" ? "butt" : "round"
-                    }
-                    strokeLinejoin="round"
-                    opacity={
-                      editorState.tool === "draw_highlight"
-                        ? (editorState.highlightStyle?.opacity ??
-                          ANNOTATION_STYLES.highlight.opacity)
-                        : editorState.penStyle.opacity
-                    }
-                  />
-                )
-              }
-            </svg>
-
-            {/* Snap Guides Layer */}
-            {activePageIndex === page.pageIndex && snapLines.length > 0 && (
-              <div className="pointer-events-none absolute inset-0 z-50">
-                {snapLines.map((line, idx) => (
-                  <div
-                    key={idx}
-                    className="absolute border-dashed border-red-500 opacity-70"
-                    style={{
-                      borderWidth: 0,
-                      [line.type === "vertical"
-                        ? "borderLeftWidth"
-                        : "borderTopWidth"]: "1px",
-                      left:
-                        line.type === "vertical"
-                          ? line.pos * editorState.scale
-                          : 0,
-                      top:
-                        line.type === "horizontal"
-                          ? line.pos * editorState.scale
-                          : 0,
-                      width: line.type === "vertical" ? "1px" : "100%",
-                      height: line.type === "horizontal" ? "1px" : "100%",
-                    }}
-                  />
-                ))}
+        {editorState.pageLayout === "double"
+          ? pageRows.map((row, rowIdx) => (
+              <div
+                key={rowIdx}
+                className="flex w-fit items-start"
+                style={{
+                  gap: `${WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale}px`,
+                }}
+              >
+                {row.map(renderPage)}
               </div>
-            )}
-          </div>
-        ))}
+            ))
+          : pagesWithControls.map(renderPage)}
       </div>
     </div>
   );

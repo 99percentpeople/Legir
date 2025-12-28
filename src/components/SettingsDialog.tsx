@@ -22,6 +22,7 @@ import {
 import { DebugOptions, EditorOptions, SnappingOptions } from "../types";
 import { useLanguage, Language, LANGUAGES } from "./language-provider";
 import { useTheme } from "./theme-provider";
+import { Separator } from "./ui/separator";
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -98,7 +99,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   ))}
                   <SelectSeparator />
                   <SelectItem value="system">
-                    {t("settings.theme.system")}
+                    {t("settings.theme_options.system")}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -126,13 +127,13 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="light">
-                    {t("settings.theme.light")}
+                    {t("settings.theme_options.light")}
                   </SelectItem>
                   <SelectItem value="dark">
-                    {t("settings.theme.dark")}
+                    {t("settings.theme_options.dark")}
                   </SelectItem>
                   <SelectItem value="system">
-                    {t("settings.theme.system")}
+                    {t("settings.theme_options.system")}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -157,9 +158,8 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
             <p className="text-muted-foreground px-1 text-xs">
               {t("settings.snapping.description")}
             </p>
-          </div>
+            <Separator />
 
-          <div className="space-y-4 px-1">
             <div className="flex items-center justify-between">
               <Label htmlFor="snap-borders" className="mb-0 cursor-pointer">
                 {t("settings.borders")}
@@ -203,7 +203,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   htmlFor="debug-pdf-text-layer"
                   className="mb-0 font-semibold"
                 >
-                  PDF Text Layer Debug
+                  {t("settings.debug.pdf_text_layer_debug")}
                 </Label>
               </div>
               <Switch
@@ -213,7 +213,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
               />
             </div>
             <p className="text-muted-foreground px-1 text-xs">
-              Show the PDF.js text layer
+              {t("settings.debug.pdf_text_layer_debug_desc")}
             </p>
           </div>
         </div>

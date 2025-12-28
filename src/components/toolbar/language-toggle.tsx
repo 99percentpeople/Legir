@@ -32,7 +32,7 @@ export function LanguageToggle() {
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => setLanguage("system")}>
-          <span className="flex-1">{t("settings.theme.system")}</span>
+          <span className="flex-1">{t("settings.theme_options.system")}</span>
           {language === "system" && <Check className="ml-2 h-4 w-4" />}
         </DropdownMenuItem>
       </DropdownMenuContent>

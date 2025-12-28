@@ -3,8 +3,6 @@ import {
   MousePointer2,
   Type,
   CheckSquare,
-  Sparkles,
-  ChevronDown,
   Undo2,
   Redo2,
   Keyboard,
@@ -15,7 +13,6 @@ import {
   Settings,
   PenLine,
   Save,
-  Settings2,
   Highlighter,
   PenTool,
   Edit3,
@@ -27,7 +24,7 @@ import {
 import { EditorState, Tool, PenStyle } from "../../types";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/cn";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +43,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { GEMINI_API_AVAILABLE } from "@/services/geminiService";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { ANNOTATION_STYLES } from "@/constants";
@@ -70,8 +66,6 @@ interface ToolbarProps {
   onPrint: () => void;
   onExit: () => void;
   onClose: () => void;
-  onAutoDetect: () => void;
-  onCustomAutoDetect: () => void;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
@@ -100,8 +94,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onPrint,
   onExit,
   onClose,
-  onAutoDetect,
-  onCustomAutoDetect,
   onUndo,
   onRedo,
   canUndo,
@@ -485,46 +477,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
             </Button>
           )}
         </div>
-
-        {editorState.pages.length > 0 && mode === "form" && (
-          <div className="isolate flex rounded-md shadow-sm">
-            <Button
-              onClick={onAutoDetect}
-              disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
-              className="hidden rounded-r-none border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 sm:flex dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
-              title={t("toolbar.ai_detect")}
-            >
-              <Sparkles size={16} />
-              <span className="hidden lg:inline">{t("toolbar.ai_detect")}</span>
-            </Button>
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
-                  className="h-8 w-8 rounded-md border border-purple-200 bg-purple-50 p-0 text-purple-700 hover:bg-purple-100 sm:-ml-px sm:h-9 sm:w-auto sm:rounded-l-none sm:border-0 sm:border-l sm:border-l-purple-200 sm:px-2 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
-                >
-                  <Sparkles size={16} className="sm:hidden" />
-                  <ChevronDown size={16} className="hidden sm:block" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={onAutoDetect}
-                  className="sm:hidden"
-                  disabled={!GEMINI_API_AVAILABLE || editorState.isProcessing}
-                >
-                  <Sparkles size={16} />
-                  {t("toolbar.ai_detect")}
-                </DropdownMenuItem>
-                <Separator className="my-1 sm:hidden" />
-                <DropdownMenuItem onClick={onCustomAutoDetect}>
-                  <Settings2 size={16} />
-                  {t("toolbar.ai_custom")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
 
         {/* Export Dropdown */}
         <ExportMenu

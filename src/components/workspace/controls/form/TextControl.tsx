@@ -1,7 +1,7 @@
 import React from "react";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/cn";
 import { resolveFormControlFontFamilyCss } from "@/lib/fonts";
 
 export const TextControl: React.FC<FormControlProps> = (props) => {

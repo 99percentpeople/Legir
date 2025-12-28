@@ -1,11 +1,7 @@
 import React, { useEffect, useCallback, useState } from "react";
-import LandingPage from "./pages/LandingPage";
 import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import SettingsDialog from "./components/SettingsDialog";
-import AIDetectionDialog, {
-  AIDetectionOptions,
-} from "./components/AIDetectionDialog";
-import EditorPage from "./pages/EditorPage";
+import type { AIDetectionOptions } from "./components/AIDetectionOptionsForm";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +20,6 @@ import {
 } from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
 import { saveDraft, getDraft, clearDraft } from "./services/storageService";
-import { DEFAULT_FIELD_STYLE } from "./constants";
 import {
   exportPdfBytes,
   openFileFromPath,
@@ -39,12 +34,13 @@ import { toast } from "sonner";
 import { useEditorStore, type EditorActions } from "./store/useEditorStore";
 import { useLocation } from "wouter";
 import AppRoutes from "./AppRoutes";
+import { useAppInitialization } from "./app/useAppInitialization";
+import { Spinner } from "./components/ui/spinner";
 import {
   addRecentFile,
   setRecentFileThumbnail,
 } from "./services/recentFilesService";
 import { isTauri } from "@tauri-apps/api/core";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 // App orchestrator (not just UI).
 //
@@ -59,113 +55,6 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 // - Rendering/interaction logic lives in `pages/EditorPage.tsx` and `components/workspace/Workspace.tsx`.
 // - Authoritative editor state lives in `store/useEditorStore.ts`.
 // - PDF import/export pipeline lives in `services/pdfService.ts`.
-function useAppInitialization({
-  loadIntoEditor,
-  setState,
-  pdfDisposeRef,
-  openDroppedPdfPath,
-  setPendingFileDropPath,
-  setFileDropDialogOpen,
-}: {
-  loadIntoEditor: (options: {
-    input: File | Uint8Array;
-    pdfFile: File | null;
-    filename: string;
-    saveTarget: EditorState["saveTarget"] | null;
-  }) => Promise<void>;
-  setState: EditorActions["setState"];
-  pdfDisposeRef: React.RefObject<null | (() => void)>;
-  openDroppedPdfPath: (filePath: string) => Promise<void>;
-  setPendingFileDropPath: React.Dispatch<React.SetStateAction<string | null>>;
-  setFileDropDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
-}) {
-  useEffect(() => {
-    let cancelled = false;
-    let unlisten: null | (() => void) = null;
-
-    void (async () => {
-      try {
-        const startupPath = await getStartupOpenPdfArg();
-        if (!cancelled && startupPath) {
-          const picked = await openFileFromPath(startupPath);
-          if (cancelled) return;
-          await loadIntoEditor({
-            input: picked.bytes,
-            pdfFile: null,
-            filename: picked.filename,
-            saveTarget: { kind: "tauri", path: startupPath },
-          });
-        }
-      } catch (e) {
-        console.error("Failed to fetch pending argv PDF:", e);
-      }
-
-      try {
-        const draft = await getDraft();
-        if (!cancelled && draft) setState({ hasSavedSession: true });
-      } catch {
-        // ignore
-      }
-
-      if (!isTauri() || cancelled) return;
-      try {
-        if (cancelled) return;
-        const webview = getCurrentWebview();
-        unlisten = await webview.onDragDropEvent((event: any) => {
-          const payload: any = event?.payload;
-          if (payload?.type !== "drop") return;
-
-          const paths: string[] = Array.isArray(payload?.paths)
-            ? payload.paths
-            : [];
-          const firstPdf = paths.find((p) => typeof p === "string") || null;
-          if (!firstPdf) return;
-
-          const { isProcessing, pages } = useEditorStore.getState();
-          if (isProcessing) return;
-
-          const hasOpenDocument = pages.length > 0;
-          if (!hasOpenDocument) {
-            void openDroppedPdfPath(firstPdf);
-            return;
-          }
-
-          setPendingFileDropPath(firstPdf);
-          setFileDropDialogOpen(true);
-        });
-
-        if (cancelled) {
-          try {
-            unlisten?.();
-          } catch {
-            // ignore
-          }
-          unlisten = null;
-        }
-      } catch {
-        // ignore
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      try {
-        unlisten?.();
-      } catch {
-        // ignore
-      }
-      pdfDisposeRef.current?.();
-      pdfDisposeRef.current = null;
-    };
-  }, [
-    loadIntoEditor,
-    openDroppedPdfPath,
-    pdfDisposeRef,
-    setFileDropDialogOpen,
-    setPendingFileDropPath,
-    setState,
-  ]);
-}
 
 const App: React.FC = () => {
   const { t } = useLanguage();
@@ -812,41 +701,27 @@ const App: React.FC = () => {
     void handlePrint();
   }, [handlePrint]);
 
-  const onEditorAutoDetect = useCallback(() => {
-    void handleAdvancedDetect({
-      pageRange: "All",
-      allowedTypes: [],
-      extraPrompt: "",
-      defaultStyle: DEFAULT_FIELD_STYLE,
-      useCustomStyle: false,
-    });
-  }, [handleAdvancedDetect]);
-
   return (
     <div className="flex h-full w-full flex-col">
       <AppRoutes
         canAccessEditor={state.pages.length > 0}
         isLoading={state.isProcessing}
-        landing={
-          <LandingPage
-            onUpload={handleUpload}
-            onOpen={handleOpen}
-            onOpenRecent={handleOpenRecent}
-            hasSavedSession={state.hasSavedSession}
-            onResume={handleResumeSession}
-          />
-        }
-        editor={
-          <EditorPage
-            editorStore={state}
-            onExport={handleExport}
-            onSaveDraft={onEditorSaveDraft}
-            onSaveAs={handleSaveAs}
-            onExit={onEditorExit}
-            onPrint={onEditorPrint}
-            onAutoDetect={onEditorAutoDetect}
-          />
-        }
+        landingProps={{
+          onUpload: handleUpload,
+          onOpen: handleOpen,
+          onOpenRecent: handleOpenRecent,
+          hasSavedSession: state.hasSavedSession,
+          onResume: handleResumeSession,
+        }}
+        editorProps={{
+          editorStore: state,
+          onExport: handleExport,
+          onSaveDraft: onEditorSaveDraft,
+          onSaveAs: handleSaveAs,
+          onExit: onEditorExit,
+          onPrint: onEditorPrint,
+          onAdvancedDetect: handleAdvancedDetect,
+        }}
       />
 
       <KeyboardShortcutsHelp
@@ -858,12 +733,6 @@ const App: React.FC = () => {
         onClose={() => setState((prev) => ({ ...prev, activeDialog: null }))}
         options={state.options}
         onChange={(o) => setOptions(o)}
-      />
-      <AIDetectionDialog
-        isOpen={state.activeDialog === "ai_detect"}
-        onClose={() => setState((prev) => ({ ...prev, activeDialog: null }))}
-        onConfirm={handleAdvancedDetect}
-        totalPages={state.pages.length}
       />
 
       <Dialog
@@ -938,7 +807,7 @@ const App: React.FC = () => {
           <DialogDescription className="sr-only">
             {t("common.processing")}
           </DialogDescription>
-          <div className="border-primary mb-4 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
+          <Spinner size="lg" className="text-primary mb-4" />
           <p className="text-foreground text-lg font-medium">
             {state.processingStatus || t("common.processing")}
           </p>

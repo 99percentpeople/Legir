@@ -2,7 +2,7 @@ import React from "react";
 import { Trash2, Image as ImageIcon, PenLine } from "lucide-react";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/cn";
 import { useLanguage } from "@/components/language-provider";
 
 export const SignatureControl: React.FC<FormControlProps> = (props) => {
