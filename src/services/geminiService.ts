@@ -2,12 +2,151 @@ import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import { FieldType, FormField, FieldStyle } from "../types";
 import { DEFAULT_FIELD_STYLE } from "../constants";
 
+export type GeminiModelId = "gemini-3-flash-preview" | "gemini-2.5-flash";
+
+export const GEMINI_MODEL_OPTIONS: { value: GeminiModelId; label: string }[] = [
+  { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+];
+
+const getGeminiApiKey = () => {
+  return process.env.GEMINI_API_KEY || process.env.API_KEY;
+};
+
 export interface AIAnalysisOptions {
   allowedTypes?: FieldType[];
   extraPrompt?: string;
+  model?: GeminiModelId;
 }
 
-export const GEMINI_API_AVAILABLE = !!process.env.API_KEY;
+export const GEMINI_API_AVAILABLE = !!getGeminiApiKey();
+
+const createGeminiClient = () => {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error("No API Key provided for Gemini.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+export interface TranslateTextOptions {
+  model?: GeminiModelId;
+  targetLanguage: string;
+  sourceLanguage?: string;
+}
+
+export interface TranslateTextStreamOptions extends TranslateTextOptions {
+  signal?: AbortSignal;
+}
+
+const extractGeminiText = (value: any): string => {
+  if (!value) return "";
+  if (typeof value.text === "string") return value.text;
+
+  const parts = value?.candidates?.[0]?.content?.parts;
+  if (Array.isArray(parts)) {
+    return parts
+      .map((p: any) => (typeof p?.text === "string" ? p.text : ""))
+      .join("");
+  }
+
+  return "";
+};
+
+export async function* translateTextStream(
+  text: string,
+  opts: TranslateTextStreamOptions,
+): AsyncGenerator<string> {
+  if (!GEMINI_API_AVAILABLE) {
+    throw new Error("No API Key provided for Gemini.");
+  }
+
+  const ai = createGeminiClient();
+  const model =
+    opts.model ?? GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash";
+
+  const prompt = `
+You are a professional translator.
+
+Task:
+- Translate the following text${opts.sourceLanguage ? ` from ${opts.sourceLanguage}` : ""} to ${opts.targetLanguage}.
+- Preserve the original meaning.
+- Keep formatting (line breaks) where appropriate.
+- Output ONLY the translated text. No explanations.
+
+Text:
+${text}
+`.trim();
+
+  const req: any = {
+    model,
+    contents: {
+      parts: [{ text: prompt }],
+    },
+    config: {
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.MINIMAL,
+      },
+    },
+  };
+  if (opts.signal) req.signal = opts.signal;
+
+  const generateStream = ai.models?.generateContentStream;
+  if (typeof generateStream !== "function") {
+    const full = await translateText(text, opts);
+    if (full) yield full;
+    return;
+  }
+
+  const streamResult = await generateStream.call(ai.models, req);
+  const stream = streamResult?.stream ?? streamResult;
+
+  if (stream && typeof stream[Symbol.asyncIterator] === "function") {
+    for await (const chunk of stream) {
+      const delta = extractGeminiText(chunk);
+      if (delta) yield delta;
+    }
+    return;
+  }
+
+  const full = await translateText(text, opts);
+  if (full) yield full;
+}
+
+export const translateText = async (
+  text: string,
+  opts: TranslateTextOptions,
+): Promise<string> => {
+  if (!GEMINI_API_AVAILABLE) {
+    throw new Error("No API Key provided for Gemini.");
+  }
+
+  const ai = createGeminiClient();
+  const model =
+    opts.model ?? GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash";
+
+  const prompt = `
+You are a professional translator.
+
+Task:
+- Translate the following text${opts.sourceLanguage ? ` from ${opts.sourceLanguage}` : ""} to ${opts.targetLanguage}.
+- Preserve the original meaning.
+- Keep formatting (line breaks) where appropriate.
+- Output ONLY the translated text. No explanations.
+
+Text:
+${text}
+`.trim();
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: {
+      parts: [{ text: prompt }],
+    },
+  });
+
+  return (response.text || "").trim();
+};
 
 export const analyzePageForFields = async (
   base64Image: string,
@@ -22,7 +161,7 @@ export const analyzePageForFields = async (
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = createGeminiClient();
 
     // Clean base64 string
     const cleanBase64 = base64Image.replace(
@@ -139,7 +278,8 @@ export const analyzePageForFields = async (
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model:
+        options?.model ?? GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash",
       contents: {
         parts: [
           {
@@ -153,7 +293,7 @@ export const analyzePageForFields = async (
       },
       config: {
         thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW,
+          thinkingLevel: ThinkingLevel.MINIMAL,
         },
         responseMimeType: "application/json",
         responseSchema: {

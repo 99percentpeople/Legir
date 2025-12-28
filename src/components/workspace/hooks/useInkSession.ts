@@ -1,16 +1,17 @@
-import { useEffect, useRef, useCallback, type MutableRefObject } from "react";
+import { useEffect, useRef, useCallback, type RefObject } from "react";
 import { Annotation, EditorState, Tool } from "@/types";
 
 type Point = { x: number; y: number };
 
 interface UseInkSessionParams {
   editorState: Pick<EditorState, "tool" | "penStyle" | "highlightStyle">;
-  editorStateRef: MutableRefObject<EditorState>;
+  editorStateRef: RefObject<EditorState>;
   onAddAnnotation: (annotation: Annotation) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   onSelectControl: (id: string | null) => void;
   onCancelInProgressStroke: () => void;
   onTriggerHistorySave: () => void;
+  pointSpacingPx?: number;
 }
 
 export const useInkSession = ({
@@ -21,6 +22,7 @@ export const useInkSession = ({
   onSelectControl,
   onCancelInProgressStroke,
   onTriggerHistorySave,
+  pointSpacingPx = 4,
 }: UseInkSessionParams) => {
   const inkSessionIdRef = useRef<string | null>(null);
   const inkSessionPageIndexRef = useRef<number | null>(null);
@@ -52,11 +54,40 @@ export const useInkSession = ({
     prevToolRef.current = next;
   }, [editorState.tool, onCancelInProgressStroke, resetSession]);
 
+  const getMinPointDistancePdf = useCallback(() => {
+    const desiredScreenPx = pointSpacingPx;
+    const scale = editorStateRef.current?.scale ?? 1;
+
+    // Convert desired visual spacing (CSS pixels) -> PDF-space distance.
+    // ScreenDistancePx ~= PdfDistance * scale
+    // => PdfDistance = ScreenDistancePx / scale
+    const safeScale = Math.max(0.0001, scale);
+    const raw = desiredScreenPx / safeScale;
+
+    // Clamp to avoid too many points when zoomed in, or too few points when zoomed out.
+    const minPdf = 0.5;
+    const maxPdf = 24;
+    return Math.max(minPdf, Math.min(maxPdf, raw));
+  }, [editorStateRef, pointSpacingPx]);
+
+  const shouldAppendPoint = useCallback(
+    (prev: Point | undefined, next: Point) => {
+      if (!prev) return true;
+      const minDist = getMinPointDistancePdf();
+      const dist = Math.hypot(next.x - prev.x, next.y - prev.y);
+      return dist >= minDist;
+    },
+    [getMinPointDistancePdf],
+  );
+
   const appendStroke = useCallback(
     (pageIndex: number, stroke: Point[]) => {
       if (stroke.length <= 1) return;
 
-      const activeTool = editorStateRef.current.tool;
+      const state = editorStateRef.current;
+      if (!state) return;
+
+      const activeTool = state.tool;
       const isHighlight = activeTool === "draw_highlight";
 
       const style = isHighlight
@@ -73,7 +104,7 @@ export const useInkSession = ({
 
       if (canContinueSession) {
         const sessionId = inkSessionIdRef.current;
-        const currentAnnotations = editorStateRef.current.annotations;
+        const currentAnnotations = state.annotations;
         const currentAnnot = currentAnnotations.find((a) => a.id === sessionId);
 
         // If user has undone the annotation (or it was deleted), the cached session id becomes stale.
@@ -101,7 +132,7 @@ export const useInkSession = ({
       }
 
       const id = `ink_${Date.now()}`;
-      const prevSelectedId = editorStateRef.current.selectedId;
+      const prevSelectedId = state.selectedId;
 
       inkSessionIdRef.current = id;
       inkSessionPageIndexRef.current = pageIndex;
@@ -139,5 +170,7 @@ export const useInkSession = ({
     inkSessionIdRef,
     inkSessionPageIndexRef,
     inkSessionStrokesRef,
+    getMinPointDistancePdf,
+    shouldAppendPoint,
   };
 };

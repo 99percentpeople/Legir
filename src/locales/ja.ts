@@ -60,6 +60,16 @@ const ja = {
     page_layout_single: "単一ページ表示",
     page_layout_double: "見開き表示",
     search_web: "Web で「{text}」を検索",
+    translate: "翻訳",
+  },
+  translate: {
+    title: "翻訳",
+    model: "モデル",
+    target: "対象言語",
+    source_text: "原文",
+    action: "翻訳",
+    copy: "コピー",
+    result: "結果",
   },
   dialog: {
     confirm_close: {

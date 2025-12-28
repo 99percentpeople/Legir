@@ -63,6 +63,16 @@ const zhCN = {
     page_layout_single: "单页",
     page_layout_double: "双页",
     search_web: "在网络上搜索“{text}”",
+    translate: "翻译",
+  },
+  translate: {
+    title: "翻译",
+    model: "模型",
+    target: "目标语言",
+    source_text: "原文",
+    action: "翻译",
+    copy: "复制",
+    result: "结果",
   },
   dialog: {
     confirm_close: {

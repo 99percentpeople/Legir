@@ -60,6 +60,16 @@ const es = {
     page_layout_single: "Página única",
     page_layout_double: "Doble página",
     search_web: "Buscar “{text}” en la web",
+    translate: "Traducir",
+  },
+  translate: {
+    title: "Traducir",
+    model: "Modelo",
+    target: "Idioma de destino",
+    source_text: "Origen",
+    action: "Traducir",
+    copy: "Copiar",
+    result: "Resultado",
   },
   dialog: {
     confirm_close: {

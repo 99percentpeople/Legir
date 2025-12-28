@@ -60,6 +60,16 @@ const zhTW = {
     page_layout_single: "單頁",
     page_layout_double: "雙頁",
     search_web: "在網路上搜尋「{text}」",
+    translate: "翻譯",
+  },
+  translate: {
+    title: "翻譯",
+    model: "模型",
+    target: "目標語言",
+    source_text: "原文",
+    action: "翻譯",
+    copy: "複製",
+    result: "結果",
   },
   dialog: {
     confirm_close: {

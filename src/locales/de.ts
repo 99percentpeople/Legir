@@ -60,6 +60,16 @@ const de = {
     page_layout_single: "Einzelseite",
     page_layout_double: "Doppelseite",
     search_web: "Im Web nach „{text}“ suchen",
+    translate: "Übersetzen",
+  },
+  translate: {
+    title: "Übersetzen",
+    model: "Modell",
+    target: "Zielsprache",
+    source_text: "Original",
+    action: "Übersetzen",
+    copy: "Kopieren",
+    result: "Ergebnis",
   },
   dialog: {
     confirm_close: {
