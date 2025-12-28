@@ -5,7 +5,7 @@ import {
   type SetStateAction,
 } from "react";
 import { getStartupOpenPdfArg, openFileFromPath } from "../services/fileOps";
-import { getDraft } from "../services/storageService";
+import { getWebHasSavedSession } from "../services/recentFilesService";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEditorStore, type EditorActions } from "../store/useEditorStore";
@@ -52,11 +52,8 @@ export function useAppInitialization({
         console.error("Failed to fetch pending argv PDF:", e);
       }
 
-      try {
-        const draft = await getDraft();
-        if (!cancelled && draft) setState({ hasSavedSession: true });
-      } catch {
-        // ignore
+      if (!cancelled) {
+        setState({ hasSavedSession: getWebHasSavedSession() });
       }
 
       if (!isTauri() || cancelled) return;

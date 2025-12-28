@@ -14,7 +14,6 @@ interface PDFPageWithProxyProps {
   isHighlighting?: boolean;
   highlightColor?: string;
   highlightOpacity?: number;
-  onTextSelectingChange?: (pageIndex: number, isSelecting: boolean) => void;
 }
 
 const PDFPageWithProxy: React.FC<PDFPageWithProxyProps> = ({
@@ -28,7 +27,6 @@ const PDFPageWithProxy: React.FC<PDFPageWithProxyProps> = ({
   isHighlighting,
   highlightColor,
   highlightOpacity,
-  onTextSelectingChange,
 }) => {
   const pdfDocument = useEditorStore((s) => s.pdfDocument);
   const getPageCached = useEditorStore((s) => s.getPageCached);
@@ -68,7 +66,6 @@ const PDFPageWithProxy: React.FC<PDFPageWithProxyProps> = ({
       highlightColor={highlightColor}
       highlightOpacity={highlightOpacity}
       textLayerCursor={textLayerCursor}
-      onTextSelectingChange={onTextSelectingChange}
     />
   );
 };

@@ -1,6 +1,12 @@
 import React, { useCallback } from "react";
 import { X, Layers, List, LayoutGrid, StickyNote } from "lucide-react";
-import { FormField, PageData, PDFOutlineItem, Annotation } from "@/types";
+import {
+  FormField,
+  PageData,
+  PDFOutlineItem,
+  Annotation,
+  PageLayoutMode,
+} from "@/types";
 import { cn } from "@/lib/cn";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import FieldTreePanel from "./FieldTreePanel";
@@ -29,6 +35,7 @@ interface SidebarProps {
   onResize: (width: number) => void;
   pdfDocument?: PDFDocumentProxy;
   currentPageIndex?: number;
+  pageLayout?: PageLayoutMode;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
 }
@@ -50,6 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onResize,
   pdfDocument,
   currentPageIndex,
+  pageLayout,
   activeTab,
   onTabChange,
 }) => {
@@ -180,6 +188,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               pdfDocument={pdfDocument}
               onNavigate={onNavigatePage}
               currentPageIndex={currentPageIndex}
+              pageLayout={pageLayout}
             />
           </TabsContent>
           <TabsContent

@@ -16,6 +16,8 @@ import {
 } from "@/constants";
 import { cn } from "@/lib/cn";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
+import { appEventBus } from "@/lib/eventBus";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 import { usePointerCapture } from "@/hooks/usePointerCapture";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useCanvasPanning } from "@/hooks/useCanvasPanning";
@@ -304,19 +306,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
     Record<number, true>
   >({});
 
-  const handleTextSelectingChange = useCallback(
-    (pageIndex: number, isSelecting: boolean) => {
-      setTextSelectingPages((prev) => {
-        const has = !!prev[pageIndex];
-        if (has === isSelecting) return prev;
-        const next = { ...prev };
-        if (isSelecting) next[pageIndex] = true;
-        else delete next[pageIndex];
-        return next;
-      });
-    },
-    [],
-  );
+  useAppEvent("workspace:textSelectingChange", (payload) => {
+    setTextSelectingPages((prev) => {
+      const has = !!prev[payload.pageIndex];
+      if (has === payload.isSelecting) return prev;
+      const next = { ...prev };
+      if (payload.isSelecting) next[payload.pageIndex] = true;
+      else delete next[payload.pageIndex];
+      return next;
+    });
+  });
 
   const textSelectionVirtualRef = useRef<any>({
     getBoundingClientRect: () => new DOMRect(),
@@ -2484,7 +2483,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (
       containerRef.current &&
       contentRef.current &&
-      editorState.pages.length > 0
+      editorState.pages.length > 0 &&
+      !editorState.pendingViewStateRestore
     ) {
       const container = containerRef.current;
       const content = contentRef.current;
@@ -2499,7 +2499,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }
       });
     }
-  }, [editorState.pdfDocument, editorState.pages.length, fitTrigger]);
+  }, [
+    editorState.pdfDocument,
+    editorState.pages.length,
+    editorState.pendingViewStateRestore,
+    fitTrigger,
+  ]);
 
   // --- Render Helpers ---
 
@@ -2557,7 +2562,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
         textLayerCursor={
           editorState.tool === "draw_highlight" ? "crosshair" : undefined
         }
-        onTextSelectingChange={handleTextSelectingChange}
       />
 
       <div

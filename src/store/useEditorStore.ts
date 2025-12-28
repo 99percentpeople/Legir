@@ -184,6 +184,7 @@ const initialState: EditorState = {
   hasSavedSession: false,
   isDirty: false,
   currentPageIndex: 0,
+  pendingViewStateRestore: null,
   fitTrigger: 0,
   keys: {
     ctrl: false,
@@ -595,6 +596,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           hasSavedSession: initialState.hasSavedSession,
           isDirty: initialState.isDirty,
           currentPageIndex: initialState.currentPageIndex,
+          pendingViewStateRestore: initialState.pendingViewStateRestore,
           fitTrigger: initialState.fitTrigger,
           activeDialog: initialState.activeDialog,
           closeConfirmSource: initialState.closeConfirmSource,

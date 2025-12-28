@@ -11,15 +11,9 @@ import {
 } from "./components/ui/dialog";
 import { Button } from "./components/ui/button";
 import { EditorState, FormField } from "./types";
-import {
-  loadPDF,
-  exportPDF,
-  renderPage,
-  renderPdfThumbnailFromPage,
-  renderPdfThumbnailFromPdfBytes,
-} from "./services/pdfService";
+import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
 import { analyzePageForFields } from "./services/geminiService";
-import { saveDraft, getDraft, clearDraft } from "./services/storageService";
+import { saveDraft, getDraft } from "./services/storageService";
 import {
   exportPdfBytes,
   openFileFromPath,
@@ -37,8 +31,14 @@ import AppRoutes from "./AppRoutes";
 import { useAppInitialization } from "./app/useAppInitialization";
 import { Spinner } from "./components/ui/spinner";
 import {
-  addRecentFile,
-  setRecentFileThumbnail,
+  getRecentFileViewState,
+  getWebHasSavedSession,
+  getWebDraftViewState,
+  setWebHasSavedSession,
+  upsertRecentFileWithPreviewFromPdfBytes,
+  waitForRecentFilePreviewQueue,
+  persistTauriRecentFileViewStateFromDom,
+  persistWebDraftViewStateFromDom,
 } from "./services/recentFilesService";
 import { isTauri } from "@tauri-apps/api/core";
 
@@ -81,7 +81,6 @@ const App: React.FC = () => {
   } = state;
   const pdfDisposeRef = React.useRef<null | (() => void)>(null);
   const loadQueueRef = React.useRef<Promise<void>>(Promise.resolve());
-  const thumbnailQueueRef = React.useRef<Promise<void>>(Promise.resolve());
 
   const [fileDropDialogOpen, setFileDropDialogOpen] = useState(false);
   const [pendingFileDropPath, setPendingFileDropPath] = useState<string | null>(
@@ -104,6 +103,21 @@ const App: React.FC = () => {
       const run = async () => {
         const prevPdfDocument = useEditorStore.getState().pdfDocument;
 
+        if (isTauri() && typeof document !== "undefined") {
+          const snapshot = useEditorStore.getState();
+          const tauriPath =
+            snapshot.saveTarget?.kind === "tauri"
+              ? snapshot.saveTarget.path
+              : null;
+          if (tauriPath) {
+            persistTauriRecentFileViewStateFromDom({
+              path: tauriPath,
+              scale: snapshot.scale,
+              pageIndex: snapshot.currentPageIndex,
+            });
+          }
+        }
+
         resetDocument();
 
         await withProcessing(t("app.parsing"), async () => {
@@ -114,7 +128,7 @@ const App: React.FC = () => {
           }
 
           await Promise.race([
-            thumbnailQueueRef.current.catch(() => {
+            waitForRecentFilePreviewQueue().catch(() => {
               // ignore
             }),
             new Promise<void>((resolve) => setTimeout(resolve, 80)),
@@ -175,6 +189,7 @@ const App: React.FC = () => {
                 metadata,
                 filename: options.filename,
               });
+              setWebHasSavedSession(true);
               setState({
                 hasSavedSession: true,
                 lastSavedAt: new Date(),
@@ -187,49 +202,24 @@ const App: React.FC = () => {
 
           if (options.saveTarget?.kind === "tauri") {
             const tauriPath = options.saveTarget.path;
-            const expectedPdfDocument = pdfDocument;
-            addRecentFile({
+            upsertRecentFileWithPreviewFromPdfBytes({
               path: tauriPath,
               filename: options.filename,
+              pdfBytes,
+              targetWidth: 240,
+              renderAnnotations: true,
             });
 
-            thumbnailQueueRef.current = thumbnailQueueRef.current
-              .catch(() => {
-                // keep queue alive
-              })
-              .then(async () => {
-                try {
-                  const expectedPdfBytes = pdfBytes;
-                  const pageProxy = await useEditorStore
-                    .getState()
-                    .getPageCached(0);
-
-                  const currentPdfDocument =
-                    useEditorStore.getState().pdfDocument;
-                  const currentPdfBytes = useEditorStore.getState().pdfBytes;
-                  if (currentPdfDocument !== expectedPdfDocument) return;
-                  if (currentPdfBytes !== expectedPdfBytes) return;
-
-                  const thumb = await renderPdfThumbnailFromPage({
-                    page: pageProxy,
-                    targetWidth: 240,
-                  });
-                  if (!thumb) return;
-
-                  const latestPdfDocument =
-                    useEditorStore.getState().pdfDocument;
-                  const latestPdfBytes = useEditorStore.getState().pdfBytes;
-                  if (latestPdfDocument !== expectedPdfDocument) return;
-                  if (latestPdfBytes !== expectedPdfBytes) return;
-
-                  setRecentFileThumbnail({
-                    path: tauriPath,
-                    thumbnailDataUrl: thumb,
-                  });
-                } catch {
-                  // ignore
-                }
+            const lastViewState = getRecentFileViewState(tauriPath);
+            if (lastViewState) {
+              setState({
+                pendingViewStateRestore: {
+                  scale: lastViewState.scale,
+                  scrollLeft: lastViewState.scrollLeft,
+                  scrollTop: lastViewState.scrollTop,
+                },
               });
+            }
           }
 
           navigate("/editor");
@@ -312,7 +302,12 @@ const App: React.FC = () => {
 
   const handleResumeSession = async () => {
     const draft = await getDraft();
-    if (!draft) return;
+    if (!draft) {
+      setWebHasSavedSession(false);
+      setState({ hasSavedSession: false });
+      return;
+    }
+    const viewState = getWebDraftViewState();
     await withProcessing(t("app.loading_draft"), async () => {
       pdfDisposeRef.current?.();
       pdfDisposeRef.current = null;
@@ -338,8 +333,18 @@ const App: React.FC = () => {
         metadata: draft.metadata,
         filename: draft.filename,
         saveTarget: null,
-        scale: 1.0,
+        scale: viewState?.scale ?? 1.0,
       });
+
+      if (viewState) {
+        setState({
+          pendingViewStateRestore: {
+            scale: viewState.scale,
+            scrollLeft: viewState.scrollLeft,
+            scrollTop: viewState.scrollTop,
+          },
+        });
+      }
 
       navigate("/editor");
     }).catch((error) => {
@@ -471,45 +476,44 @@ const App: React.FC = () => {
       if (!target) return false;
 
       await writeToSaveTarget(target, modifiedBytes);
+
+      const nextFilename = (() => {
+        if (isTauriSaveTarget(target)) {
+          const normalized = target.path.replace(/\\/g, "/");
+          const parts = normalized.split("/").filter(Boolean);
+          return parts.length > 0 ? parts[parts.length - 1] : state.filename;
+        }
+        if (target?.kind === "web") {
+          return target.handle?.name || state.filename;
+        }
+        return state.filename;
+      })();
+
       setState({
         saveTarget: target as unknown as EditorState["saveTarget"],
+        filename: nextFilename,
         lastSavedAt: new Date(),
         isDirty: false,
       });
 
       if (isTauriSaveTarget(target)) {
         const tauriTarget = target;
-        const expectedPdfDocument = state.pdfDocument;
-        addRecentFile({
+        upsertRecentFileWithPreviewFromPdfBytes({
           path: tauriTarget.path,
-          filename: state.filename || "document.pdf",
+          filename: nextFilename || "document.pdf",
+          pdfBytes: modifiedBytes,
+          targetWidth: 240,
+          renderAnnotations: true,
         });
-        thumbnailQueueRef.current = thumbnailQueueRef.current
-          .catch(() => {
-            // keep queue alive
-          })
-          .then(async () => {
-            try {
-              if (!expectedPdfDocument) return;
-              if (
-                useEditorStore.getState().pdfDocument !== expectedPdfDocument
-              ) {
-                return;
-              }
-              const thumb = await renderPdfThumbnailFromPdfBytes({
-                pdfBytes: modifiedBytes,
-                targetWidth: 240,
-                renderAnnotations: true,
-              });
-              if (!thumb) return;
-              setRecentFileThumbnail({
-                path: tauriTarget.path,
-                thumbnailDataUrl: thumb,
-              });
-            } catch {
-              // ignore
-            }
+
+        if (typeof document !== "undefined") {
+          const snapshot = useEditorStore.getState();
+          persistTauriRecentFileViewStateFromDom({
+            path: tauriTarget.path,
+            scale: snapshot.scale,
+            pageIndex: snapshot.currentPageIndex,
           });
+        }
       }
 
       toast.success(t("app.save_success"));
@@ -545,37 +549,13 @@ const App: React.FC = () => {
 
         const savedTarget = result.target;
         if (isTauriSaveTarget(savedTarget)) {
-          const expectedPdfDocument = state.pdfDocument;
-          addRecentFile({
+          upsertRecentFileWithPreviewFromPdfBytes({
             path: savedTarget.path,
             filename: state.filename || "document.pdf",
+            pdfBytes: modifiedBytes,
+            targetWidth: 240,
+            renderAnnotations: true,
           });
-          thumbnailQueueRef.current = thumbnailQueueRef.current
-            .catch(() => {
-              // keep queue alive
-            })
-            .then(async () => {
-              try {
-                if (!expectedPdfDocument) return;
-                if (
-                  useEditorStore.getState().pdfDocument !== expectedPdfDocument
-                ) {
-                  return;
-                }
-                const thumb = await renderPdfThumbnailFromPdfBytes({
-                  pdfBytes: modifiedBytes,
-                  targetWidth: 240,
-                  renderAnnotations: true,
-                });
-                if (!thumb) return;
-                setRecentFileThumbnail({
-                  path: savedTarget.path,
-                  thumbnailDataUrl: thumb,
-                });
-              } catch {
-                // ignore
-              }
-            });
         }
 
         toast.success(t("app.save_success"));
@@ -591,7 +571,6 @@ const App: React.FC = () => {
 
   const handlePrint = async () => {
     await withProcessing(t("app.generating"), async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
       const modifiedBytes = await generatePDF();
       if (modifiedBytes) {
         const blob = new Blob([new Uint8Array(modifiedBytes)], {
@@ -651,6 +630,7 @@ const App: React.FC = () => {
         metadata: snapshot.metadata,
         filename: snapshot.filename,
       });
+      setWebHasSavedSession(true);
       setState({
         hasSavedSession: true,
         isDirty: false,
@@ -665,19 +645,33 @@ const App: React.FC = () => {
   };
 
   const closeSession = async () => {
+    if (isTauri()) {
+      const snapshot = useEditorStore.getState();
+      const tauriPath =
+        snapshot.saveTarget?.kind === "tauri" ? snapshot.saveTarget.path : null;
+
+      if (tauriPath) {
+        persistTauriRecentFileViewStateFromDom({
+          path: tauriPath,
+          scale: snapshot.scale,
+          pageIndex: snapshot.currentPageIndex,
+        });
+      }
+    }
+
+    if (!isTauri() && typeof document !== "undefined") {
+      const snapshot = useEditorStore.getState();
+      if (snapshot.pages.length > 0) {
+        persistWebDraftViewStateFromDom({
+          scale: snapshot.scale,
+        });
+      }
+    }
+
     pdfDisposeRef.current?.();
     pdfDisposeRef.current = null;
 
-    // Web: refresh hasSavedSession immediately so LandingPage can show resume
-    // without requiring a full refresh.
-    let hasDraft = false;
-    if (!isTauri()) {
-      try {
-        hasDraft = !!(await getDraft());
-      } catch {
-        hasDraft = false;
-      }
-    }
+    const hasDraft = !isTauri() ? getWebHasSavedSession() : false;
 
     resetDocument();
     if (!isTauri()) {

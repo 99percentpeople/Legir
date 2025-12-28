@@ -225,6 +225,11 @@ export interface EditorState {
   hasSavedSession: boolean;
   isDirty: boolean;
   currentPageIndex: number;
+  pendingViewStateRestore: {
+    scale: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null;
   sidebarWidth: number;
   rightPanelWidth: number;
   fitTrigger: number;

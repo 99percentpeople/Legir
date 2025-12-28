@@ -1,6 +1,8 @@
 import React from "react";
 import { cn } from "@/lib/cn";
 import { ControlProps } from "./types";
+import { appEventBus } from "@/lib/eventBus";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 
 export type ControlWrapperProps = ControlProps & {
   customRect?: { x: number; y: number; width: number; height: number };
@@ -26,6 +28,52 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   customElementId,
   className,
 }) => {
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const pendingFocusRef = React.useRef(false);
+  const focusInputRef = React.useRef(true);
+
+  useAppEvent(
+    "workspace:focusControl",
+    (payload) => {
+      if (payload.id !== id) return;
+      pendingFocusRef.current = true;
+      focusInputRef.current = payload.focusInput !== false;
+    },
+    { replayLast: true },
+  );
+
+  React.useEffect(() => {
+    if (!isSelected) return;
+    if (!pendingFocusRef.current) return;
+    pendingFocusRef.current = false;
+
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    el.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "center",
+    });
+
+    if (focusInputRef.current) {
+      const input = el.querySelector(
+        "input, textarea, select, [contenteditable='true']",
+      ) as HTMLElement | null;
+      try {
+        (input as any)?.focus?.({ preventScroll: true });
+      } catch {
+        try {
+          input?.focus();
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    appEventBus.clearSticky("workspace:focusControl");
+  }, [isSelected]);
+
   // Extract rect safely
   const rect = customRect || ("rect" in data ? data.rect : undefined);
 
@@ -59,6 +107,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
 
   return (
     <div
+      ref={wrapperRef}
       id={elementId || undefined}
       onPointerDown={(e) => {
         if (!isSelectable) return;

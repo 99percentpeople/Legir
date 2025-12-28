@@ -178,9 +178,9 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   >
                     <div className="flex min-w-0 items-center gap-4">
                       <div className="bg-muted ring-border relative h-16 w-16 shrink-0 overflow-hidden rounded-md ring-1">
-                        {entry.thumbnailDataUrl ? (
+                        {entry.previewDataUrl ? (
                           <img
-                            src={entry.thumbnailDataUrl}
+                            src={entry.previewDataUrl}
                             alt={entry.filename}
                             className="h-full w-full object-contain"
                             loading="lazy"
@@ -201,6 +201,14 @@ const LandingPage: React.FC<LandingPageProps> = ({
                         </div>
                         <div className="text-muted-foreground mt-1 text-xs">
                           <TimeAgoText time={entry.lastOpenedAt} />
+                          {typeof entry.lastViewState?.pageIndex ===
+                            "number" && (
+                            <span className="ml-2">
+                              {t("sidebar.page", {
+                                page: entry.lastViewState.pageIndex + 1,
+                              })}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

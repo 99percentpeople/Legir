@@ -1,0 +1,68 @@
+export type Unsubscribe = () => void;
+
+export class EventBus<Events extends Record<string, unknown>> {
+  private listeners = new Map<keyof Events, Set<(payload: any) => void>>();
+  private lastPayload = new Map<keyof Events, unknown>();
+
+  on<K extends keyof Events>(
+    event: K,
+    handler: (payload: Events[K]) => void,
+    options?: { replayLast?: boolean },
+  ): Unsubscribe {
+    const set = this.listeners.get(event) ?? new Set();
+    set.add(handler);
+    this.listeners.set(event, set);
+
+    if (options?.replayLast && this.lastPayload.has(event)) {
+      handler(this.lastPayload.get(event) as Events[K]);
+    }
+
+    return () => {
+      const cur = this.listeners.get(event);
+      if (!cur) return;
+      cur.delete(handler);
+      if (cur.size === 0) this.listeners.delete(event);
+    };
+  }
+
+  emit<K extends keyof Events>(
+    event: K,
+    payload: Events[K],
+    options?: { sticky?: boolean },
+  ) {
+    if (options?.sticky) {
+      this.lastPayload.set(event, payload);
+    }
+
+    const set = this.listeners.get(event);
+    if (!set) return;
+    for (const handler of Array.from(set)) {
+      try {
+        handler(payload);
+      } catch {
+        console.error("EventBus: Error in handler", event, payload);
+      }
+    }
+  }
+
+  // Removes the last emitted payload tracking for a given event in the EventBus.
+  clearSticky<K extends keyof Events>(event: K) {
+    this.lastPayload.delete(event);
+  }
+}
+
+export type AppEventMap = {
+  "workspace:textSelectingChange": {
+    pageIndex: number;
+    isSelecting: boolean;
+  };
+  "workspace:focusControl": {
+    id: string;
+    focusInput?: boolean;
+  };
+  "sidebar:focusAnnotation": {
+    id: string;
+  };
+};
+
+export const appEventBus = new EventBus<AppEventMap>();

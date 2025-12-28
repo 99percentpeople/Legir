@@ -1,14 +1,17 @@
 import React, { Suspense, useCallback, useEffect, useRef } from "react";
 import Toolbar from "../components/toolbar/Toolbar";
-const Workspace = React.lazy(() => import("../components/workspace/Workspace"));
 import Sidebar from "../components/sidebar/Sidebar";
 import ZoomControls from "../components/toolbar/ZoomControls";
-import { Spinner } from "../components/ui/spinner";
 import { Skeleton } from "../components/ui/skeleton";
+import { useEditorStore, type EditorStore } from "../store/useEditorStore";
+import { Button } from "../components/ui/button";
+import { appEventBus } from "@/lib/eventBus";
 import { RightPanelTabDock } from "../components/properties-panel/RightPanelTabDock";
 import { PropertiesPanel } from "../components/properties-panel/PropertiesPanel";
 import { AIDetectionPanel } from "../components/properties-panel/AIDetectionPanel";
 import { useIsMobile } from "../hooks/useIsMobile";
+
+const Workspace = React.lazy(() => import("../components/workspace/Workspace"));
 import {
   Dialog,
   DialogContent,
@@ -16,7 +19,6 @@ import {
   DialogFooter,
   DialogTitle,
 } from "../components/ui/dialog";
-import { Button } from "../components/ui/button";
 import { useLanguage } from "../components/language-provider";
 import type {
   Annotation,
@@ -26,7 +28,6 @@ import type {
   Tool,
 } from "../types";
 import type { AIDetectionOptions } from "../components/AIDetectionOptionsForm";
-import { useEditorStore, type EditorStore } from "../store/useEditorStore";
 import {
   ANNOTATION_STYLES,
   FIT_SCREEN_PADDING_X,
@@ -37,6 +38,10 @@ import {
 } from "../constants";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  persistTauriRecentFileViewStateFromDom,
+  persistWebDraftViewStateFromDom,
+} from "../services/recentFilesService";
 
 export interface EditorPageProps {
   editorStore: EditorStore;
@@ -201,6 +206,20 @@ const EditorPage: React.FC<EditorPageProps> = ({
           const { isDirty, pages, setState } = useEditorStore.getState();
           if (!pages || pages.length === 0) return;
 
+          const snapshot = useEditorStore.getState();
+          const tauriPath =
+            snapshot.saveTarget?.kind === "tauri"
+              ? snapshot.saveTarget.path
+              : null;
+          if (tauriPath) {
+            persistTauriRecentFileViewStateFromDom({
+              path: tauriPath,
+              scale: snapshot.scale,
+              pageIndex: snapshot.currentPageIndex,
+              selector: WORKSPACE_SCROLL_CONTAINER_SELECTOR,
+            });
+          }
+
           if (!isDirty) return;
           try {
             event?.preventDefault?.();
@@ -252,9 +271,57 @@ const EditorPage: React.FC<EditorPageProps> = ({
   };
 
   const closeWindow = async () => {
+    const snapshot = useEditorStore.getState();
+    const tauriPath =
+      snapshot.saveTarget?.kind === "tauri" ? snapshot.saveTarget.path : null;
+    if (tauriPath) {
+      persistTauriRecentFileViewStateFromDom({
+        path: tauriPath,
+        scale: snapshot.scale,
+        pageIndex: snapshot.currentPageIndex,
+        selector: WORKSPACE_SCROLL_CONTAINER_SELECTOR,
+      });
+    }
+
     skipNextWindowCloseRef.current = true;
     await getCurrentWindow().close();
   };
+
+  useEffect(() => {
+    if (tauri) return;
+    if (typeof document === "undefined") return;
+
+    const persistViewState = () => {
+      const snapshot = useEditorStore.getState();
+      if (!snapshot.pages || snapshot.pages.length === 0) return;
+
+      persistWebDraftViewStateFromDom({
+        scale: snapshot.scale,
+        selector: WORKSPACE_SCROLL_CONTAINER_SELECTOR,
+      });
+    };
+
+    const handlePageHide = () => {
+      persistViewState();
+      const snapshot = useEditorStore.getState();
+      if (snapshot.isDirty) {
+        void onSaveDraft(true);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        handlePageHide();
+      }
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [tauri, onSaveDraft]);
 
   useEffect(() => {
     if (tauri) return;
@@ -360,6 +427,22 @@ const EditorPage: React.FC<EditorPageProps> = ({
     if (lastFitKeyRef.current === fitKey) return;
     lastFitKeyRef.current = fitKey;
 
+    if (state.pendingViewStateRestore) {
+      const restore = state.pendingViewStateRestore;
+      updateScale(restore.scale);
+
+      requestAnimationFrame(() => {
+        const el = document.querySelector(
+          WORKSPACE_SCROLL_CONTAINER_SELECTOR,
+        ) as HTMLElement | null;
+        if (!el) return;
+        el.scrollLeft = restore.scrollLeft;
+        el.scrollTop = restore.scrollTop;
+        setState({ pendingViewStateRestore: null });
+      });
+      return;
+    }
+
     updateScale(calculateFitScreenScale(state.currentPageIndex));
     setState({ fitTrigger: Date.now() });
   }, [
@@ -367,6 +450,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
     state.pdfBytes,
     state.filename,
     state.currentPageIndex,
+    state.pendingViewStateRestore,
     calculateFitScreenScale,
     updateScale,
     setState,
@@ -574,16 +658,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
       selectControl(id);
 
-      requestAnimationFrame(() => {
-        const el = document.getElementById(
-          `annotation-input-${id}`,
-        ) as HTMLTextAreaElement;
-        if (el) {
-          el.focus();
-          const len = el.value.length;
-          el.setSelectionRange(len, len);
-        }
-      });
+      appEventBus.emit(
+        "sidebar:focusAnnotation",
+        { id },
+        {
+          sticky: true,
+        },
+      );
     },
     [selectControl, setUiState],
   );
@@ -776,28 +857,15 @@ const EditorPage: React.FC<EditorPageProps> = ({
           annotations={state.annotations}
           outline={state.outline}
           selectedId={state.selectedId}
+          pageLayout={state.pageLayout}
           onSelectControl={(id) => {
             selectControl(id);
             if (id) {
-              setTimeout(() => {
-                let el = document.getElementById(`field-element-${id}`);
-                if (!el) {
-                  el = document.getElementById(`annotation-${id}`);
-                }
-                if (el) {
-                  el.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center",
-                    inline: "center",
-                  });
-                  const input = el.querySelector(
-                    "input, textarea, select",
-                  ) as HTMLElement;
-                  if (input) {
-                    input.focus({ preventScroll: true });
-                  }
-                }
-              }, 50);
+              appEventBus.emit(
+                "workspace:focusControl",
+                { id, focusInput: true },
+                { sticky: true },
+              );
             }
           }}
           onDeleteAnnotation={deleteAnnotation}

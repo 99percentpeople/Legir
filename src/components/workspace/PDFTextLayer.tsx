@@ -8,6 +8,7 @@ import React, {
 import { cn } from "../../lib/cn"; // Adjust path as needed
 import * as pdfjsLib from "pdfjs-dist";
 import { useEditorStore } from "@/store/useEditorStore";
+import { appEventBus } from "@/lib/eventBus";
 
 interface PDFTextLayerProps {
   pageIndex: number;
@@ -19,7 +20,6 @@ interface PDFTextLayerProps {
   isHighlighting?: boolean;
   highlightColor?: string;
   highlightOpacity?: number;
-  onSelectingChange?: (isSelecting: boolean) => void;
 }
 
 const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
@@ -32,7 +32,6 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   isHighlighting = false,
   highlightColor,
   highlightOpacity,
-  onSelectingChange,
 }) => {
   const textLayerRef = useRef<HTMLDivElement>(null);
   const textLayerInstanceRef = useRef<pdfjsLib.TextLayer | null>(null);
@@ -254,15 +253,23 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     };
   }, [isSelectMode]);
 
-  // 4. Propagate state change to parent
+  // 4. Propagate state change (via global event bus)
   useEffect(() => {
-    onSelectingChange?.(isSelecting);
-  }, [isSelecting, onSelectingChange]);
+    appEventBus.emit("workspace:textSelectingChange", {
+      pageIndex,
+      isSelecting,
+    });
+  }, [isSelecting, pageIndex]);
 
   // 5. Cleanup on unmount
   useEffect(() => {
-    return () => onSelectingChange?.(false);
-  }, [onSelectingChange]);
+    return () => {
+      appEventBus.emit("workspace:textSelectingChange", {
+        pageIndex,
+        isSelecting: false,
+      });
+    };
+  }, [pageIndex]);
 
   // 6. Rendering Loop & Zoom Handling
   useEffect(() => {

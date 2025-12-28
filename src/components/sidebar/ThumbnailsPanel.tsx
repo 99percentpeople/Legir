@@ -137,6 +137,7 @@ interface ThumbnailsPanelProps {
   pdfDocument?: PDFDocumentProxy;
   onNavigate: (pageIndex: number) => void;
   currentPageIndex?: number;
+  pageLayout?: "single" | "double";
 }
 
 const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
@@ -144,13 +145,19 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
   pdfDocument,
   onNavigate,
   currentPageIndex,
+  pageLayout,
 }) => {
   const { t } = useLanguage();
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto p-2 pb-10">
-        <div className="grid grid-cols-1 gap-4">
+        <div
+          className={cn(
+            "grid gap-4",
+            pageLayout === "double" ? "grid-cols-2" : "grid-cols-1",
+          )}
+        >
           {pages?.map((page, idx) => (
             <ThumbnailItem
               key={idx}

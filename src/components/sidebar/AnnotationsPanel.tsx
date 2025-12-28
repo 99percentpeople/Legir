@@ -22,6 +22,8 @@ import {
 import { TimeText } from "../timeText";
 import { Textarea } from "../ui/textarea";
 import { cn } from "@/lib/cn";
+import { appEventBus } from "@/lib/eventBus";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 
 // --- Annotation Card ---
 interface AnnotationCardProps {
@@ -42,6 +44,16 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   const { t } = useLanguage();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const pendingFocusRef = useRef(false);
+
+  useAppEvent(
+    "sidebar:focusAnnotation",
+    (payload) => {
+      if (payload.id !== annotation.id) return;
+      pendingFocusRef.current = true;
+    },
+    { replayLast: true },
+  );
 
   useEffect(() => {
     if (isSelected) {
@@ -55,6 +67,14 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
         activeElement !== textareaRef.current
       ) {
         activeElement.blur();
+      }
+
+      if (pendingFocusRef.current && textareaRef.current) {
+        pendingFocusRef.current = false;
+        textareaRef.current.focus();
+        const len = textareaRef.current.value.length;
+        textareaRef.current.setSelectionRange(len, len);
+        appEventBus.clearSticky("sidebar:focusAnnotation");
       }
     }
   }, [isSelected]);
@@ -231,15 +251,11 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
 
   const handleSelect = (id: string) => {
     onSelectControl(id);
-    // Scroll the main workspace to the annotation
-    // We use a small timeout to ensure the DOM is ready if needed,
-    // though usually the element should already exist.
-    setTimeout(() => {
-      const element = document.getElementById(`annotation-${id}`);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }, 10);
+    appEventBus.emit(
+      "workspace:focusControl",
+      { id, focusInput: false },
+      { sticky: true },
+    );
   };
 
   return (
