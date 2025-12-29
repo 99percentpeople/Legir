@@ -30,6 +30,10 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
   const isTransferred = useRef(false);
 
   useEffect(() => {
+    setIsRendered(false);
+  }, [pdfDocument]);
+
+  useEffect(() => {
     if (isActive && ref.current) {
       ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
@@ -47,38 +51,40 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
   }, []);
 
   useEffect(() => {
-    if (
-      isVisible &&
-      !isRendered &&
-      pdfDocument &&
-      canvasRef.current &&
-      !isTransferred.current
-    ) {
+    if (isVisible && !isRendered && pdfDocument && canvasRef.current) {
       const canvas = canvasRef.current;
+      const abortController = new AbortController();
       try {
-        if (canvas.transferControlToOffscreen) {
-          const offscreen = canvas.transferControlToOffscreen();
+        const canvasId = `thumbnail-${pageIndex}`;
+        const offscreen = (() => {
+          if (isTransferred.current) return undefined;
+          if (!canvas.transferControlToOffscreen) return undefined;
           isTransferred.current = true;
-          const canvasId = `thumbnail-${pageIndex}`;
+          return canvas.transferControlToOffscreen();
+        })();
 
-          pdfWorkerService
-            .renderPage({
-              pageIndex,
-              scale: 0.6,
-              canvas: offscreen,
-              canvasId,
-              priority: 10,
-            })
-            .then(() => {
-              setIsRendered(true);
-            })
-            .catch((err) => {
-              console.error("Thumbnail render error:", err);
-            });
-        }
+        pdfWorkerService
+          .renderPage({
+            pageIndex,
+            scale: 0.6,
+            canvas: offscreen,
+            canvasId,
+            priority: 10,
+            signal: abortController.signal,
+          })
+          .then(() => {
+            setIsRendered(true);
+          })
+          .catch((err) => {
+            console.error("Thumbnail render error:", err);
+          });
       } catch (e) {
         console.error("Failed to render thumbnail", e);
       }
+
+      return () => {
+        abortController.abort();
+      };
     }
   }, [isVisible, isRendered, pdfDocument, pageIndex]);
 

@@ -10,12 +10,19 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
     props;
   const style = data.style || {};
 
+  const effectiveBorderStyle =
+    style.borderStyle === "dashed"
+      ? "dashed"
+      : style.borderStyle === "underline"
+        ? "solid"
+        : "solid";
+
   const containerStyle: React.CSSProperties = {
     "--scale": scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,
-    borderStyle: "solid",
+    borderStyle: effectiveBorderStyle,
     fontSize: `calc(${style.fontSize || 12}px * var(--scale, 1))`,
     fontFamily: resolveFontStackWithCjkFallback(style.fontFamily),
     boxSizing: "border-box",

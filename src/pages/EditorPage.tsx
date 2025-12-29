@@ -38,10 +38,7 @@ import {
 } from "../constants";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import {
-  persistTauriRecentFileViewStateFromDom,
-  persistWebDraftViewStateFromDom,
-} from "../services/recentFilesService";
+import { recentFilesService } from "../services/recentFilesService";
 
 export interface EditorPageProps {
   editorStore: EditorStore;
@@ -203,6 +200,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
             return;
           }
 
+          recentFilesService.cancelAllRecentFilePreviewTasks();
+
           const { isDirty, pages, setState } = useEditorStore.getState();
           if (!pages || pages.length === 0) return;
 
@@ -212,7 +211,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
               ? snapshot.saveTarget.path
               : null;
           if (tauriPath) {
-            persistTauriRecentFileViewStateFromDom({
+            recentFilesService.persistTauriRecentFileViewStateFromDom({
               path: tauriPath,
               scale: snapshot.scale,
               pageIndex: snapshot.currentPageIndex,
@@ -271,11 +270,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
   };
 
   const closeWindow = async () => {
+    recentFilesService.cancelAllRecentFilePreviewTasks();
     const snapshot = useEditorStore.getState();
     const tauriPath =
       snapshot.saveTarget?.kind === "tauri" ? snapshot.saveTarget.path : null;
     if (tauriPath) {
-      persistTauriRecentFileViewStateFromDom({
+      recentFilesService.persistTauriRecentFileViewStateFromDom({
         path: tauriPath,
         scale: snapshot.scale,
         pageIndex: snapshot.currentPageIndex,
@@ -295,7 +295,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
       const snapshot = useEditorStore.getState();
       if (!snapshot.pages || snapshot.pages.length === 0) return;
 
-      persistWebDraftViewStateFromDom({
+      recentFilesService.persistWebDraftViewStateFromDom({
         scale: snapshot.scale,
         selector: WORKSPACE_SCROLL_CONTAINER_SELECTOR,
       });

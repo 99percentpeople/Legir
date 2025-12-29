@@ -95,12 +95,14 @@ const fr = {
       hint: "Modifier les informations globales du PDF. Sélectionnez un champ sur le canevas pour modifier ses propriétés.",
     },
     filename: {
+      label: "Nom de fichier",
       desc: "Le nom utilisé lors de l'exportation du fichier.",
     },
     doc_title: "Titre du document",
     author: "Auteur",
     subject: "Sujet",
     keywords: {
+      label: "Mots-clés",
       desc: "Valeurs séparées par des virgules",
     },
     creator: "Créateur",
@@ -122,12 +124,14 @@ const fr = {
     delete: "Supprimer",
     general: "Général",
     field_name: {
+      label: "Nom du champ",
       desc: "ID unique dans le formulaire PDF.",
     },
     radio_group: {
       desc: "Même nom = Même groupe.",
     },
     type: {
+      label: "Type",
       text: "Champ texte",
       checkbox: "Case à cocher",
       radio: "Bouton Radio",
@@ -135,6 +139,7 @@ const fr = {
       signature: "Signature",
     },
     tooltip: {
+      label: "Info-bulle",
       ph: "Texte d'aide au survol",
     },
     values_defaults: "Valeurs et défauts",
@@ -160,6 +165,12 @@ const fr = {
     max_length: "Longueur max",
     unlimited: "Illimité",
     alignment: {
+      label: "Alignement",
+      left: "Gauche",
+      center: "Centrer",
+      right: "Droite",
+    },
+    alignment_options: {
       left: "Gauche",
       center: "Centrer",
       right: "Droite",

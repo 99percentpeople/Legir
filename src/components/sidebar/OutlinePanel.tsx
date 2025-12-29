@@ -177,7 +177,7 @@ interface DocumentOutlinePanelProps {
   currentPageIndex?: number;
 }
 
-export const DocumentOutlinePanel: React.FC<DocumentOutlinePanelProps> = ({
+const DocumentOutlinePanel: React.FC<DocumentOutlinePanelProps> = ({
   outline,
   onNavigate,
   currentPageIndex,

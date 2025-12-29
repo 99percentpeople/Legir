@@ -98,12 +98,14 @@ const zhCN = {
       hint: "编辑全局 PDF 信息。在画布上选择一个字段以编辑其属性。",
     },
     filename: {
+      label: "文件名",
       desc: "导出文件时使用的名称。",
     },
     doc_title: "文档标题",
     author: "作者",
     subject: "主题",
     keywords: {
+      label: "关键词",
       desc: "逗号分隔值",
     },
     creator: "创建者",
@@ -124,12 +126,14 @@ const zhCN = {
     delete: "删除",
     general: "常规",
     field_name: {
+      label: "字段名称",
       desc: "PDF 表单中的唯一 ID。",
     },
     radio_group: {
       desc: "相同名称 = 相同组。",
     },
     type: {
+      label: "类型",
       text: "文本字段",
       checkbox: "复选框",
       radio: "单选按钮",
@@ -137,6 +141,7 @@ const zhCN = {
       signature: "签名",
     },
     tooltip: {
+      label: "提示",
       ph: "悬停时的帮助文本",
     },
     values_defaults: "值与默认值",
@@ -162,6 +167,12 @@ const zhCN = {
     max_length: "最大长度",
     unlimited: "不限",
     alignment: {
+      label: "对齐",
+      left: "左对齐",
+      center: "居中",
+      right: "右对齐",
+    },
+    alignment_options: {
       left: "左对齐",
       center: "居中",
       right: "右对齐",

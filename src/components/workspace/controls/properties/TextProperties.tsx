@@ -149,7 +149,7 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
                   (data.alignment || "left") === "left" &&
                     "bg-background text-foreground shadow-sm",
                 )}
-                title={t("properties.alignment.left")}
+                title={t("properties.alignment_options.left")}
               >
                 <AlignLeft size={16} />
               </button>
@@ -163,7 +163,7 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
                   data.alignment === "center" &&
                     "bg-background text-foreground shadow-sm",
                 )}
-                title={t("properties.alignment.center")}
+                title={t("properties.alignment_options.center")}
               >
                 <AlignCenter size={16} />
               </button>
@@ -177,7 +177,7 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
                   data.alignment === "right" &&
                     "bg-background text-foreground shadow-sm",
                 )}
-                title={t("properties.alignment.right")}
+                title={t("properties.alignment_options.right")}
               >
                 <AlignRight size={16} />
               </button>

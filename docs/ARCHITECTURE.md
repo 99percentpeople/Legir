@@ -49,7 +49,7 @@ src/
   services/
     fileOps.ts               # 文件打开/保存抽象（Web vs Tauri）
     storageService.ts        # Web 草稿存储（IndexedDB）
-    recentFilesService.ts    # 桌面最近文件（localStorage）
+    recentFilesService.ts    # 桌面最近文件 + 预览缩略图队列（localStorage，单例服务）
     geminiService.ts         # AI 识别：从页面截图推断字段位置/类型
     pdfService/
       index.ts               # PDF 解析/渲染/导出中心（pdfjs-dist + pdf-lib）
@@ -99,6 +99,28 @@ public/
   - `pdf-lib`：资源解析（字体映射、DA 等）与导出写回
 - **落地状态**：`src/store/useEditorStore.ts` 的 `loadDocument(...)`
 - **路由**：`src/AppRoutes.tsx` 控制是否可进入编辑器
+
+#### 桌面端最近文件与缩略图（Tauri）
+
+`src/services/recentFilesService.ts` 负责：
+
+- 维护最近文件列表（localStorage）
+- 维护最近文件的视图状态（scale/scroll/pageIndex）
+- 生成并缓存最近文件的预览缩略图（DataURL）
+
+实现方式：
+
+- 提供单例 `recentFilesService`（推荐在业务代码里直接使用实例方法）
+- 缩略图生成使用 **串行队列**（避免并行渲染导致卡顿）
+- 支持 **去重**（同 path/参数不会重复渲染）
+- 支持 **取消**（在切换文档/退出时中止缩略图渲染，减少卡顿）
+
+推荐用法：
+
+- 打开 PDF 后：优先调用 `recentFilesService.upsertRecentFileWithPreviewFromPdfDocument(...)`
+  - 复用主加载流程已创建的 `PDFDocumentProxy`，避免二次 `getDocument()`
+- 保存/导出后：调用 `recentFilesService.upsertRecentFileWithPreviewFromPdfBytes(..., { forcePreviewRender: true })`
+- 路由切换/退出：调用 `recentFilesService.cancelAllRecentFilePreviewTasks()`
 
 ### 2) Workspace 渲染：PDF 页 + 控件叠加
 

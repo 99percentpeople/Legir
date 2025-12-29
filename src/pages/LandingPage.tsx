@@ -18,9 +18,7 @@ import { useLanguage } from "../components/language-provider";
 import { isTauri } from "@tauri-apps/api/core";
 import { Input } from "../components/ui/input";
 import {
-  clearRecentFiles,
-  getRecentFiles,
-  removeRecentFile,
+  recentFilesService,
   type RecentFileEntry,
 } from "../services/recentFilesService";
 import { toast } from "sonner";
@@ -50,7 +48,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
   useEffect(() => {
     if (!isDesktop) return;
-    setRecentFiles(getRecentFiles());
+    setRecentFiles(recentFilesService.getRecentFiles());
   }, [isDesktop]);
 
   const filteredRecentFiles = useMemo(() => {
@@ -64,14 +62,14 @@ const LandingPage: React.FC<LandingPageProps> = ({
   }, [query, recentFiles]);
 
   const handleDeleteRecent = (path: string) => {
-    const next = removeRecentFile(path);
+    const next = recentFilesService.removeRecentFile(path);
     setRecentFiles(next);
   };
 
   const handleClearAll = async () => {
     const ok = await confirm(t("landing.desktop.confirm_clear_all"));
     if (!ok) return;
-    const next = clearRecentFiles();
+    const next = recentFilesService.clearRecentFiles();
     setRecentFiles(next);
   };
 

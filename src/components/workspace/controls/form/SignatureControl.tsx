@@ -10,11 +10,18 @@ export const SignatureControl: React.FC<FormControlProps> = (props) => {
   const { t } = useLanguage();
   const style = data.style || {};
 
+  const effectiveBorderStyle =
+    style.borderStyle === "dashed"
+      ? "dashed"
+      : style.borderStyle === "underline"
+        ? "solid"
+        : "solid";
+
   const containerStyle: React.CSSProperties = {
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,
-    borderStyle: "solid",
+    borderStyle: effectiveBorderStyle,
     boxSizing: "border-box",
   };
 

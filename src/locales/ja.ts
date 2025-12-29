@@ -95,12 +95,14 @@ const ja = {
       hint: "PDF 全体の情報を編集します。キャンバス上のフィールドを選択して設定を変更します。",
     },
     filename: {
+      label: "ファイル名",
       desc: "ファイルのエクスポート時に使用される名前。",
     },
     doc_title: "ドキュメントタイトル",
     author: "作成者",
     subject: "件名",
     keywords: {
+      label: "キーワード",
       desc: "カンマ区切り",
     },
     creator: "作成者",
@@ -122,12 +124,14 @@ const ja = {
     delete: "削除",
     general: "一般",
     field_name: {
+      label: "フィールド名",
       desc: "PDF フォーム内の一意の ID。",
     },
     radio_group: {
       desc: "同じ名前 = 同じグループ。",
     },
     type: {
+      label: "種類",
       text: "テキストフィールド",
       checkbox: "チェックボックス",
       radio: "ラジオボタン",
@@ -135,6 +139,7 @@ const ja = {
       signature: "署名",
     },
     tooltip: {
+      label: "ツールチップ",
       ph: "ホバー時のヘルプテキスト",
     },
     values_defaults: "値と初期値",
@@ -160,6 +165,12 @@ const ja = {
     max_length: "最大長",
     unlimited: "無制限",
     alignment: {
+      label: "配置",
+      left: "左揃え",
+      center: "中央揃え",
+      right: "右揃え",
+    },
+    alignment_options: {
       left: "左揃え",
       center: "中央揃え",
       right: "右揃え",

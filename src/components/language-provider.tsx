@@ -246,11 +246,17 @@ export function LanguageProvider({
     localStorage.setItem(storageKey, language);
   }, [language, storageKey]);
 
-  const resolveTranslation = (dict: LocaleDict | undefined, key: string) => {
+  const resolveTranslation = (dict: LocaleDict, key: string) => {
     if (!dict) return undefined;
 
     const direct = dict[key];
     if (typeof direct === "string") return direct;
+    if (
+      direct &&
+      typeof direct === "object" &&
+      typeof direct.label === "string"
+    )
+      return direct.label;
 
     const parts = key.split(".").filter(Boolean);
     if (parts.length === 0) return undefined;
@@ -261,7 +267,14 @@ export function LanguageProvider({
       current = current[part];
     }
 
-    return typeof current === "string" ? current : undefined;
+    if (typeof current === "string") return current;
+    if (
+      current &&
+      typeof current === "object" &&
+      typeof current.label === "string"
+    )
+      return current.label;
+    return undefined;
   };
 
   const t = (key: string, params?: Record<string, string | number>) => {

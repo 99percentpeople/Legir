@@ -98,12 +98,14 @@ const en = {
       hint: "Edit global PDF information. Select a field on the canvas to edit its properties.",
     },
     filename: {
+      label: "Filename",
       desc: "The name used when exporting the file.",
     },
     doc_title: "Document Title",
     author: "Author",
     subject: "Subject",
     keywords: {
+      label: "Keywords",
       desc: "Comma separated values",
     },
     creator: "Creator",
@@ -125,12 +127,14 @@ const en = {
     delete: "Delete",
     general: "General",
     field_name: {
+      label: "Field Name",
       desc: "Unique ID in the PDF form.",
     },
     radio_group: {
       desc: "Same name = Same group.",
     },
     type: {
+      label: "Type",
       text: "Text Field",
       checkbox: "Checkbox",
       radio: "Radio Button",
@@ -138,6 +142,7 @@ const en = {
       signature: "Signature",
     },
     tooltip: {
+      label: "Tooltip",
       ph: "Helper text on hover",
     },
     values_defaults: "Values & Defaults",
@@ -162,7 +167,8 @@ const en = {
     selected_default: "Selected by Default",
     max_length: "Max Length",
     unlimited: "Unlim.",
-    alignment: {
+    alignment: "Alignment",
+    alignment_options: {
       left: "Left",
       center: "Center",
       right: "Right",

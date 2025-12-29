@@ -4,6 +4,10 @@ import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
 const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
 
+pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
+  name: "pdfjs-worker-render",
+});
+
 // Polyfill document for pdf.js font rendering in worker
 if (typeof self.document === "undefined") {
   const fakeOwnerDocument = {
@@ -19,17 +23,17 @@ if (typeof self.document === "undefined") {
   (self as any).document = fakeOwnerDocument;
 }
 
-// Set up worker for the worker thread
-pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
-  name: "pdfjs-worker-render",
-});
-
 interface RenderRequest {
-  type?: "render" | "cancel" | "load";
+  type?: "render" | "cancel" | "load" | "unload" | "renderImage";
   id: string;
+  docId?: string;
   data?: Uint8Array | null;
   pageIndex?: number;
   scale?: number;
+  targetWidth?: number;
+  renderAnnotations?: boolean;
+  mimeType?: string;
+  quality?: number;
   tileX?: number;
   tileY?: number;
   tileWidth?: number;
@@ -42,9 +46,28 @@ interface RenderRequest {
 
 type MaybePromise<T> = T | Promise<T>;
 
-let pdfDoc: pdfjsLib.PDFDocumentProxy | null = null;
-let docLoadingPromise: Promise<pdfjsLib.PDFDocumentProxy> | null = null;
-const pageCache = new Map<number, MaybePromise<pdfjsLib.PDFPageProxy>>();
+type DocState = {
+  pdfDoc: pdfjsLib.PDFDocumentProxy | null;
+  docLoadingPromise: Promise<pdfjsLib.PDFDocumentProxy> | null;
+  pageCache: Map<number, MaybePromise<pdfjsLib.PDFPageProxy>>;
+};
+
+const docs = new Map<string, DocState>();
+
+const getDocId = (docId?: string) => docId || "default";
+
+const getDocState = (docId?: string): DocState => {
+  const id = getDocId(docId);
+  const existing = docs.get(id);
+  if (existing) return existing;
+  const created: DocState = {
+    pdfDoc: null,
+    docLoadingPromise: null,
+    pageCache: new Map<number, MaybePromise<pdfjsLib.PDFPageProxy>>(),
+  };
+  docs.set(id, created);
+  return created;
+};
 const canvasMap = new Map<string, OffscreenCanvas>();
 
 // Store active render tasks to allow cancellation
@@ -73,7 +96,7 @@ const processQueue = async () => {
   }
 
   try {
-    await renderPage(item.data);
+    await handleQueuedTask(item.data);
   } catch (err) {
     console.error("Error processing task:", err);
   } finally {
@@ -97,8 +120,12 @@ const scheduleNext = () => {
   port.postMessage(null);
 };
 
-const loadDocument = async (data: Uint8Array) => {
-  pageCache.clear();
+const loadDocument = async (docId: string, data: Uint8Array) => {
+  const state = getDocState(docId);
+  try {
+    await state.pdfDoc?.destroy();
+  } catch {}
+  state.pageCache.clear();
   const loadingTask = pdfjsLib.getDocument({
     data: data,
     password: "",
@@ -108,13 +135,59 @@ const loadDocument = async (data: Uint8Array) => {
     useSystemFonts: false,
     disableFontFace: false,
   });
-  docLoadingPromise = loadingTask.promise;
-  pdfDoc = null; // Reset current doc while loading
-  pdfDoc = await docLoadingPromise;
+  state.docLoadingPromise = loadingTask.promise;
+  state.pdfDoc = null;
+  state.pdfDoc = await state.docLoadingPromise;
 };
 
-// Separated render logic
-const renderPage = async (params: RenderRequest) => {
+const disposeDocument = async (docId: string) => {
+  const state = docs.get(docId);
+  if (!state) return;
+  try {
+    await state.pdfDoc?.destroy();
+  } catch {}
+  docs.delete(docId);
+};
+
+const ensureDocumentLoaded = async (
+  docId: string,
+  options?: {
+    isNewDoc?: boolean;
+    data?: Uint8Array | null;
+  },
+) => {
+  const state = getDocState(docId);
+  if (options?.isNewDoc && options.data) {
+    await loadDocument(docId, options.data);
+    return;
+  }
+
+  if (!state.pdfDoc && state.docLoadingPromise) {
+    state.pdfDoc = await state.docLoadingPromise;
+    return;
+  }
+
+  if (!state.pdfDoc) {
+    throw new Error("PDF Document not loaded");
+  }
+};
+
+const getPageForDoc = async (docId: string, pageIndex: number) => {
+  const state = getDocState(docId);
+  if (!state.pdfDoc) {
+    throw new Error("PDF Document not loaded");
+  }
+
+  const pageNumber = pageIndex + 1;
+  let pagePromise = state.pageCache.get(pageNumber);
+  if (!pagePromise) {
+    pagePromise = state.pdfDoc.getPage(pageNumber);
+    state.pageCache.set(pageNumber, pagePromise);
+  }
+  return await pagePromise;
+};
+
+const renderToCanvas = async (params: RenderRequest) => {
   const {
     id,
     data,
@@ -127,7 +200,11 @@ const renderPage = async (params: RenderRequest) => {
     isNewDoc,
     canvas: transferredCanvas,
     canvasId,
+    docId,
+    renderAnnotations,
   } = params;
+
+  const resolvedDocId = getDocId(docId);
 
   let renderTask: pdfjsLib.RenderTask | null = null;
   let isCancelled = false;
@@ -145,21 +222,8 @@ const renderPage = async (params: RenderRequest) => {
   try {
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
-    // Load Document if needed
-    if (isNewDoc && data) {
-      await loadDocument(data);
-    }
+    await ensureDocumentLoaded(resolvedDocId, { isNewDoc, data });
     if (isCancelled) throw { name: "RenderingCancelledException" };
-
-    // Wait for loading if it's in progress
-    if (!pdfDoc && docLoadingPromise) {
-      pdfDoc = await docLoadingPromise;
-    }
-    if (isCancelled) throw { name: "RenderingCancelledException" };
-
-    if (!pdfDoc) {
-      throw new Error("PDF Document not loaded");
-    }
 
     // Resolve Canvas
     let targetCanvas: OffscreenCanvas | undefined = transferredCanvas;
@@ -178,14 +242,7 @@ const renderPage = async (params: RenderRequest) => {
       throw new Error("Missing render parameters");
     }
 
-    // Get page from cache or load it
-    const pageNumber = pageIndex + 1;
-    let pagePromise = pageCache.get(pageNumber);
-    if (!pagePromise) {
-      pagePromise = pdfDoc.getPage(pageNumber);
-      pageCache.set(pageNumber, pagePromise);
-    }
-    const page = await pagePromise;
+    const page = await getPageForDoc(resolvedDocId, pageIndex);
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
     // Calculate viewport
@@ -225,7 +282,9 @@ const renderPage = async (params: RenderRequest) => {
       canvas: undefined,
       canvasContext: ctx as any, // Type cast for OffscreenCanvasRenderingContext2D compatibility
       viewport: viewport,
-      annotationMode: pdfjsLib.AnnotationMode.DISABLE,
+      annotationMode: renderAnnotations
+        ? pdfjsLib.AnnotationMode.ENABLE
+        : pdfjsLib.AnnotationMode.DISABLE,
     };
 
     if (isCancelled) throw { name: "RenderingCancelledException" };
@@ -255,6 +314,125 @@ const renderPage = async (params: RenderRequest) => {
   }
 };
 
+const renderToImage = async (params: RenderRequest) => {
+  const {
+    id,
+    data,
+    pageIndex,
+    scale,
+    targetWidth,
+    renderAnnotations,
+    mimeType,
+    quality,
+    isNewDoc,
+    docId,
+  } = params;
+
+  const resolvedDocId = getDocId(docId);
+
+  let renderTask: pdfjsLib.RenderTask | null = null;
+  let isCancelled = false;
+
+  activeRenderTasks.set(id, {
+    cancel: () => {
+      isCancelled = true;
+      if (renderTask) {
+        renderTask.cancel();
+      }
+    },
+  });
+
+  try {
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+    if (pageIndex === undefined) throw new Error("Missing render parameters");
+
+    await ensureDocumentLoaded(resolvedDocId, { isNewDoc, data });
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
+    const page = await getPageForDoc(resolvedDocId, pageIndex);
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
+    const baseViewport = page.getViewport({
+      scale: 1.0,
+      rotation: page.rotate,
+    });
+    const finalScale =
+      typeof scale === "number"
+        ? scale
+        : typeof targetWidth === "number"
+          ? Math.min(1.0, Math.max(0.05, targetWidth / baseViewport.width))
+          : 1.0;
+
+    const viewport = page.getViewport({
+      scale: finalScale,
+      rotation: page.rotate,
+    });
+    const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("Could not get context");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+    const annotationMode = renderAnnotations
+      ? pdfjsLib.AnnotationMode.ENABLE
+      : pdfjsLib.AnnotationMode.DISABLE;
+
+    renderTask = page.render({
+      canvas: undefined,
+      canvasContext: ctx as any,
+      viewport,
+      annotationMode,
+    });
+
+    await renderTask.promise;
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
+    const outMimeType = mimeType || "image/jpeg";
+    const blob = await canvas.convertToBlob({
+      type: outMimeType,
+      quality: typeof quality === "number" ? quality : 0.8,
+    });
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
+    const buf = await blob.arrayBuffer();
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
+    (self as any).postMessage(
+      {
+        id,
+        success: true,
+        payload: {
+          mimeType: outMimeType,
+          imageBytes: buf,
+        },
+      },
+      [buf],
+    );
+  } catch (error: any) {
+    if (error?.name === "RenderingCancelledException") {
+      return;
+    }
+
+    self.postMessage({
+      id,
+      success: false,
+      error: error.message || "Unknown error",
+    });
+  } finally {
+    activeRenderTasks.delete(id);
+  }
+};
+
+const handleQueuedTask = async (data: RenderRequest) => {
+  const type = data.type || "render";
+  if (type === "renderImage") {
+    await renderToImage(data);
+    return;
+  }
+  await renderToCanvas(data);
+};
+
 self.onmessage = async (e: MessageEvent<RenderRequest>) => {
   const {
     type = "render",
@@ -281,8 +459,9 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
 
   if (type === "load") {
     try {
+      const resolvedDocId = getDocId(e.data.docId);
       if (e.data.data) {
-        await loadDocument(e.data.data);
+        await loadDocument(resolvedDocId, e.data.data);
         self.postMessage({ id, success: true });
       } else {
         throw new Error("No data provided for load");
@@ -297,7 +476,22 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     return;
   }
 
-  if (type === "render") {
+  if (type === "unload") {
+    try {
+      const resolvedDocId = getDocId(e.data.docId);
+      await disposeDocument(resolvedDocId);
+      self.postMessage({ id, success: true });
+    } catch (error: any) {
+      self.postMessage({
+        id,
+        success: false,
+        error: error.message || "Unload error",
+      });
+    }
+    return;
+  }
+
+  if (type === "render" || type === "renderImage") {
     // Early registration of canvas to prevent loss during cancellation or optimization
     if (e.data.canvas && e.data.canvasId) {
       canvasMap.set(e.data.canvasId, e.data.canvas);
@@ -307,13 +501,16 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     // This ensures we don't waste time on tiles that are no longer needed
     const incomingScale = e.data.scale;
     const incomingPriority = priority;
+    const incomingDocId = getDocId(e.data.docId);
 
     if (incomingScale !== undefined) {
       for (let i = taskQueue.length - 1; i >= 0; i--) {
         const taskScale = taskQueue[i].data.scale;
         const taskPriority = taskQueue[i].priority;
+        const taskDocId = getDocId(taskQueue[i].data.docId);
 
         if (
+          taskDocId === incomingDocId &&
           taskScale !== undefined &&
           Math.abs(taskScale - incomingScale) > 0.001 &&
           taskPriority === incomingPriority

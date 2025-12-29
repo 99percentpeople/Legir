@@ -1,11 +1,16 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
 
 export interface RenderRequest {
-  type?: "render" | "cancel" | "load";
+  type?: "render" | "cancel" | "load" | "unload" | "renderImage";
   id: string;
+  docId?: string;
   data?: Uint8Array | null;
   pageIndex?: number;
   scale?: number;
+  targetWidth?: number;
+  renderAnnotations?: boolean;
+  mimeType?: string;
+  quality?: number;
   tileX?: number;
   tileY?: number;
   tileWidth?: number;
@@ -20,8 +25,10 @@ class PDFWorkerService {
   private worker: Worker | null = null;
   private pendingRequests = new Map<
     string,
-    { resolve: (val: boolean) => void; reject: (err: any) => void }
+    { resolve: (val: any) => void; reject: (err: any) => void }
   >();
+
+  private readonly defaultDocId: string = "default";
 
   constructor() {
     this.initWorker();
@@ -32,11 +39,11 @@ class PDFWorkerService {
       this.worker = new PDFRenderWorker();
       if (this.worker) {
         this.worker.onmessage = (e) => {
-          const { id, success, error } = e.data;
+          const { id, success, error, payload } = e.data;
           const request = this.pendingRequests.get(id);
           if (request) {
             if (success) {
-              request.resolve(true);
+              request.resolve(payload ?? true);
             } else {
               request.reject(new Error(error || "Worker error"));
             }
@@ -49,15 +56,174 @@ class PDFWorkerService {
     }
   }
 
-  public loadDocument(data: Uint8Array) {
+  public loadDocument(
+    data: Uint8Array,
+    options?: { docId?: string; signal?: AbortSignal },
+  ): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (!this.worker) {
+        this.initWorker();
+        if (!this.worker) {
+          reject(new Error("Worker not initialized"));
+          return;
+        }
+      }
+
+      const docId = options?.docId ?? this.defaultDocId;
+
+      const id = `load_${docId}_${Date.now()}`;
+      const signal = options?.signal;
+
+      if (signal?.aborted) {
+        const err = new DOMException("Aborted", "AbortError");
+        (err as any).phase = "pre-send";
+        reject(err);
+        return;
+      }
+
+      const onAbort = () => {
+        this.worker?.postMessage({ type: "cancel", id });
+        this.pendingRequests.delete(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        this.pendingRequests.set(id, {
+          resolve: (val) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            resolve(Boolean(val));
+          },
+          reject: (err) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            reject(err);
+          },
+        });
+
+        const message: RenderRequest = {
+          type: "load",
+          id,
+          docId,
+          data,
+        };
+
+        this.worker.postMessage(message);
+      } catch (e) {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    });
+  }
+
+  public unloadDocument(docId: string) {
     if (!this.worker) this.initWorker();
     if (!this.worker) return;
+    const id = `unload_${docId}_${Date.now()}`;
+    const message: RenderRequest = { type: "unload", id, docId };
+    this.worker.postMessage(message);
+  }
 
-    const id = "load_" + Date.now();
-    this.worker.postMessage({
-      type: "load",
-      id,
-      data,
+  public renderPageImage(options: {
+    pageIndex: number;
+    scale?: number;
+    targetWidth?: number;
+    renderAnnotations?: boolean;
+    mimeType?: string;
+    quality?: number;
+    priority?: number;
+    docId?: string;
+    data?: Uint8Array;
+    isNewDoc?: boolean;
+    signal?: AbortSignal;
+  }): Promise<{ bytes: Uint8Array; mimeType: string }> {
+    return new Promise((resolve, reject) => {
+      if (!this.worker) {
+        this.initWorker();
+        if (!this.worker) {
+          reject(new Error("Worker not initialized"));
+          return;
+        }
+      }
+
+      const {
+        pageIndex,
+        scale,
+        targetWidth,
+        renderAnnotations,
+        mimeType,
+        quality,
+        priority,
+        docId: requestedDocId,
+        data,
+        isNewDoc,
+        signal,
+      } = options;
+
+      const docId = requestedDocId ?? this.defaultDocId;
+
+      const id = `renderImage_${docId ?? "default"}_${pageIndex}_${Date.now()}`;
+
+      if (signal?.aborted) {
+        const err = new DOMException("Aborted", "AbortError");
+        (err as any).phase = "pre-send";
+        reject(err);
+        return;
+      }
+
+      const onAbort = () => {
+        this.worker?.postMessage({ type: "cancel", id });
+        this.pendingRequests.delete(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        this.pendingRequests.set(id, {
+          resolve: (payload) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            const outMime =
+              (payload as any)?.mimeType || mimeType || "image/jpeg";
+            const bytesBuf = (payload as any)?.imageBytes as
+              | ArrayBuffer
+              | undefined;
+            if (!bytesBuf) {
+              resolve({ bytes: new Uint8Array(), mimeType: outMime });
+              return;
+            }
+            resolve({ bytes: new Uint8Array(bytesBuf), mimeType: outMime });
+          },
+          reject: (err) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            reject(err);
+          },
+        });
+
+        const message: RenderRequest = {
+          type: "renderImage",
+          id,
+          docId,
+          data: data ?? null,
+          isNewDoc,
+          pageIndex,
+          scale,
+          targetWidth,
+          renderAnnotations,
+          mimeType,
+          quality,
+          priority: priority || 0,
+        };
+
+        this.worker.postMessage(message);
+      } catch (e) {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
     });
   }
 
@@ -75,6 +241,7 @@ class PDFWorkerService {
     tileWidth?: number;
     /** Defaults to full page height if not provided */
     tileHeight?: number;
+    docId?: string;
     signal?: AbortSignal;
   }): Promise<boolean> {
     return new Promise((resolve, reject) => {
@@ -96,9 +263,12 @@ class PDFWorkerService {
         tileY,
         tileWidth,
         tileHeight,
+        docId: requestedDocId,
         signal,
       } = options;
-      const id = `render_${pageIndex}_${scale}_${Date.now()}`;
+
+      const docId = requestedDocId ?? this.defaultDocId;
+      const id = `render_${docId}_${pageIndex}_${scale}_${Date.now()}`;
 
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");
@@ -132,6 +302,7 @@ class PDFWorkerService {
         const message: RenderRequest = {
           type: "render",
           id,
+          docId,
           pageIndex,
           scale,
           canvas,

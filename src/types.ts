@@ -33,6 +33,7 @@ export interface FieldStyle {
   borderColor?: string; // Hex
   backgroundColor?: string; // Hex
   borderWidth?: number;
+  borderStyle?: "solid" | "dashed" | "underline";
   textColor?: string; // Hex
   fontSize?: number;
   fontFamily?: string; // Font Family Name

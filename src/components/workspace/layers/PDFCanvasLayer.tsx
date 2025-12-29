@@ -27,6 +27,11 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
   const renderedScaleRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    renderedScaleRef.current = null;
+    setIsRendered(false);
+  }, [pageProxy]);
+
   // Stable IDs for canvas elements to allow reuse in Worker
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
   const canvasAId = useRef(`${componentId.current}-A`);

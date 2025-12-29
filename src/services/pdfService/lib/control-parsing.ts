@@ -54,11 +54,28 @@ export const parseFieldStyle = (
     importedStyle.isTransparent = true;
   }
 
-  if (
-    annotation.borderStyle &&
-    typeof annotation.borderStyle.width === "number"
-  ) {
-    importedStyle.borderWidth = annotation.borderStyle.width;
+  // Border import rules:
+  // - If the PDF provides no border info at all, treat it as "no border" (width = 0)
+  //   to avoid falling back to DEFAULT_FIELD_STYLE.borderWidth = 1.
+  // - If the PDF explicitly provides a border width, always respect it (including 0).
+  // - If the PDF provides only a border style (e.g. via appearance stream heuristics)
+  //   but no explicit width, default the width to 1.
+  const hasBorderWidth = typeof annotation.borderStyle?.width === "number";
+  const hasBorderStyle = typeof annotation.borderStyle?.style === "string";
+
+  if (!hasBorderWidth && !hasBorderStyle) {
+    importedStyle.borderWidth = 0;
+  }
+
+  if (hasBorderWidth) {
+    importedStyle.borderWidth = annotation.borderStyle!.width;
+  }
+
+  if (hasBorderStyle) {
+    importedStyle.borderStyle = annotation.borderStyle!.style;
+    if (!hasBorderWidth) {
+      importedStyle.borderWidth = 1;
+    }
   }
 
   let da = annotation.defaultAppearance || annotation.DA;

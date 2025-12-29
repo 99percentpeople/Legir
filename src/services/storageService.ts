@@ -34,7 +34,14 @@ export async function saveDraft(
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
-    store.put({ ...data, updatedAt: Date.now() }, KEY);
+    store.put(
+      {
+        ...data,
+        pdfBytes: new Uint8Array(data.pdfBytes),
+        updatedAt: Date.now(),
+      },
+      KEY,
+    );
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);

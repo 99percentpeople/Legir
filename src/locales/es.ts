@@ -95,12 +95,14 @@ const es = {
       hint: "Editar información global del PDF. Seleccione un campo en el lienzo para editar sus propiedades.",
     },
     filename: {
+      label: "Nombre de archivo",
       desc: "El nombre utilizado al exportar el archivo.",
     },
     doc_title: "Título del documento",
     author: "Autor",
     subject: "Asunto",
     keywords: {
+      label: "Palabras clave",
       desc: "Valores separados por comas",
     },
     creator: "Creador",
@@ -122,12 +124,14 @@ const es = {
     delete: "Eliminar",
     general: "General",
     field_name: {
+      label: "Nombre del campo",
       desc: "ID único en el formulario PDF.",
     },
     radio_group: {
       desc: "Mismo nombre = Mismo grupo.",
     },
     type: {
+      label: "Tipo",
       text: "Campo de texto",
       checkbox: "Casilla de verificación",
       radio: "Botón de opción",
@@ -135,6 +139,7 @@ const es = {
       signature: "Firma",
     },
     tooltip: {
+      label: "Tooltip",
       ph: "Texto de ayuda al pasar el ratón",
     },
     values_defaults: "Valores y predeterminados",
@@ -160,6 +165,12 @@ const es = {
     max_length: "Longitud máxima",
     unlimited: "Ilimitado",
     alignment: {
+      label: "Alineación",
+      left: "Izquierda",
+      center: "Centro",
+      right: "Derecha",
+    },
+    alignment_options: {
       left: "Izquierda",
       center: "Centro",
       right: "Derecha",

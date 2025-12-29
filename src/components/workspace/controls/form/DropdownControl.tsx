@@ -24,12 +24,19 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
       : "Select..."
     : data.value || "Select...";
 
+  const effectiveBorderStyle =
+    style.borderStyle === "dashed"
+      ? "dashed"
+      : style.borderStyle === "underline"
+        ? "solid"
+        : "solid";
+
   const containerStyle: React.CSSProperties = {
     "--scale": scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,
-    borderStyle: "solid",
+    borderStyle: effectiveBorderStyle,
     color: style.textColor,
     fontSize: `calc(${style.fontSize || 12}px * var(--scale, 1))`,
     fontFamily: resolveFormControlFontFamilyCss(

@@ -5,7 +5,7 @@ import {
   type SetStateAction,
 } from "react";
 import { getStartupOpenPdfArg, openFileFromPath } from "../services/fileOps";
-import { getWebHasSavedSession } from "../services/recentFilesService";
+import { recentFilesService } from "../services/recentFilesService";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEditorStore, type EditorActions } from "../store/useEditorStore";
@@ -53,7 +53,9 @@ export function useAppInitialization({
       }
 
       if (!cancelled) {
-        setState({ hasSavedSession: getWebHasSavedSession() });
+        setState({
+          hasSavedSession: recentFilesService.getWebHasSavedSession(),
+        });
       }
 
       if (!isTauri() || cancelled) return;

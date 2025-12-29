@@ -95,12 +95,14 @@ const de = {
       hint: "Globale PDF-Informationen bearbeiten. Wählen Sie ein Feld auf der Leinwand aus, um dessen Eigenschaften zu bearbeiten.",
     },
     filename: {
+      label: "Dateiname",
       desc: "Der Name, der beim Exportieren der Datei verwendet wird.",
     },
     doc_title: "Dokumenttitel",
     author: "Autor",
     subject: "Betreff",
     keywords: {
+      label: "Schlüsselwörter",
       desc: "Kommagetrennte Werte",
     },
     creator: "Ersteller",
@@ -122,12 +124,14 @@ const de = {
     delete: "Löschen",
     general: "Allgemein",
     field_name: {
+      label: "Feldname",
       desc: "Eindeutige ID im PDF-Formular.",
     },
     radio_group: {
       desc: "Gleicher Name = Gleiche Gruppe.",
     },
     type: {
+      label: "Typ",
       text: "Textfeld",
       checkbox: "Kontrollkästchen",
       radio: "Optionsfeld",
@@ -135,6 +139,7 @@ const de = {
       signature: "Unterschrift",
     },
     tooltip: {
+      label: "Tooltip",
       ph: "Hilfetext beim Überfahren",
     },
     values_defaults: "Werte & Standardwerte",
@@ -160,6 +165,12 @@ const de = {
     max_length: "Max. Länge",
     unlimited: "Unbegrenzt",
     alignment: {
+      label: "Ausrichtung",
+      left: "Links",
+      center: "Zentriert",
+      right: "Rechts",
+    },
+    alignment_options: {
       left: "Links",
       center: "Zentriert",
       right: "Rechts",

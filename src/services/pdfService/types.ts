@@ -26,6 +26,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   backgroundColor?: number[] | Uint8ClampedArray;
   borderStyle?: {
     width?: number;
+    style?: "solid" | "dashed" | "underline";
   };
   defaultAppearance?: string;
   DA?: string;

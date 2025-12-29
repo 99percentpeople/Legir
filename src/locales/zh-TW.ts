@@ -95,12 +95,14 @@ const zhTW = {
       hint: "編輯全域 PDF 資訊。在畫布上選擇一個欄位以編輯其屬性。",
     },
     filename: {
+      label: "檔名",
       desc: "匯出檔案時使用的名稱。",
     },
     doc_title: "文件標題",
     author: "作者",
     subject: "主旨",
     keywords: {
+      label: "關鍵字",
       desc: "逗號分隔值",
     },
     creator: "建立者",
@@ -121,12 +123,14 @@ const zhTW = {
     delete: "刪除",
     general: "一般",
     field_name: {
+      label: "欄位名稱",
       desc: "PDF 表單中的唯一 ID。",
     },
     radio_group: {
       desc: "相同名稱 = 相同群組。",
     },
     type: {
+      label: "類型",
       text: "文字欄位",
       checkbox: "核取方塊",
       radio: "單選按鈕",
@@ -134,6 +138,7 @@ const zhTW = {
       signature: "簽名",
     },
     tooltip: {
+      label: "提示",
       ph: "懸停時的說明文字",
     },
     values_defaults: "值與預設值",
@@ -159,6 +164,12 @@ const zhTW = {
     max_length: "最大長度",
     unlimited: "不限",
     alignment: {
+      label: "對齊",
+      left: "靠左對齊",
+      center: "置中",
+      right: "靠右對齊",
+    },
+    alignment_options: {
       left: "靠左對齊",
       center: "置中",
       right: "靠右對齊",

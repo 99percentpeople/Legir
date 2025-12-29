@@ -21,6 +21,7 @@ import {
   PDFDict,
   PDFBool,
   PDFArray,
+  PDFStream,
   PDFNumber,
   PDFTextField,
   PDFCheckBox,
@@ -30,6 +31,7 @@ import {
   PDFSignature,
 } from "pdf-lib";
 import fontkit from "pdf-fontkit";
+import { pdfDebug, pdfDebugEnabled } from "./lib/debug";
 import {
   FormField,
   PageData,
@@ -133,6 +135,165 @@ const pdfObjToString = (obj: unknown): string | undefined => {
   return decodePdfString(obj);
 };
 
+const summarizePdfObjForDebug = (obj: unknown): unknown => {
+  try {
+    if (obj === undefined) return undefined;
+    if (obj === null) return null;
+
+    if (obj instanceof PDFName)
+      return { type: "PDFName", value: obj.decodeText() };
+    if (obj instanceof PDFNumber)
+      return { type: "PDFNumber", value: obj.asNumber() };
+    if (obj instanceof PDFBool)
+      return { type: "PDFBool", value: obj.asBoolean() };
+    if (obj instanceof PDFString || obj instanceof PDFHexString)
+      return { type: obj.constructor.name, value: obj.decodeText() };
+
+    if (obj instanceof PDFArray) {
+      const out: unknown[] = [];
+      for (let i = 0; i < Math.min(obj.size(), 12); i++) {
+        out.push(summarizePdfObjForDebug(obj.lookup(i)));
+      }
+      return { type: "PDFArray", size: obj.size(), items: out };
+    }
+
+    if (obj instanceof PDFDict) {
+      const keys: string[] = [];
+      for (const [k] of obj.entries()) {
+        keys.push(k.decodeText());
+        if (keys.length >= 30) break;
+      }
+      return { type: "PDFDict", keys };
+    }
+
+    return {
+      type: (obj as any)?.constructor?.name ?? typeof obj,
+      value: (obj as any)?.toString?.(),
+    };
+  } catch {
+    return { type: "unknown" };
+  }
+};
+
+const extractPdfStreamFilters = (stream: PDFStream): string[] => {
+  try {
+    const filter = stream.dict.lookup(PDFName.of("Filter"));
+    if (filter instanceof PDFName) {
+      return [filter.decodeText().replace(/^\//, "")];
+    }
+    if (filter instanceof PDFArray) {
+      const out: string[] = [];
+      for (let i = 0; i < filter.size(); i++) {
+        const item = filter.lookup(i);
+        if (item instanceof PDFName) {
+          out.push(item.decodeText().replace(/^\//, ""));
+        }
+      }
+      return out;
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+};
+
+const decodePdfStreamToText = async (stream: PDFStream): Promise<string> => {
+  const bytes = stream.getContents();
+  const safeBytes = new Uint8Array(bytes);
+  const filters = extractPdfStreamFilters(stream);
+
+  let decodedBytes: Uint8Array = safeBytes;
+
+  const g = globalThis as unknown as { DecompressionStream?: unknown };
+  if (
+    filters.includes("FlateDecode") &&
+    typeof g.DecompressionStream !== "undefined"
+  ) {
+    const tryInflate = async (format: "deflate" | "deflate-raw") => {
+      const DS = g.DecompressionStream as unknown as new (
+        fmt: string,
+      ) => DecompressionStream;
+      const ds = new DS(format);
+      const decompressed = await new Response(
+        new Blob([safeBytes]).stream().pipeThrough(ds),
+      ).arrayBuffer();
+      return new Uint8Array(decompressed);
+    };
+
+    try {
+      decodedBytes = await tryInflate("deflate");
+    } catch {
+      try {
+        decodedBytes = await tryInflate("deflate-raw");
+      } catch {
+        decodedBytes = safeBytes;
+      }
+    }
+  }
+
+  try {
+    return new TextDecoder().decode(decodedBytes);
+  } catch {
+    return "";
+  }
+};
+
+const parseBorderFromAppearanceStream = (
+  content: string,
+): { width?: number; style?: "solid" | "dashed" } => {
+  // Conservative heuristic:
+  // - Require a rectangle path op ('re') and a subsequent stroke op ('s'/'S'/'b'/'B')
+  // - Width comes from last 'w' operator, defaulting to 1 when stroking occurs
+  // - Dashed if any 'd' operator is present
+  let sawRect = false;
+  let sawStrokeAfterRect = false;
+  let sawDash = false;
+  let lastLineWidth: number | undefined = undefined;
+
+  const lines = content.split(/\r\n|\r|\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const parts = line.split(/\s+/);
+    if (parts.length === 0) continue;
+    const op = parts[parts.length - 1];
+
+    if (op === "w" && parts.length >= 2) {
+      const v = parseFloat(parts[0]);
+      if (!Number.isNaN(v) && Number.isFinite(v)) lastLineWidth = v;
+      continue;
+    }
+
+    if (op === "d") {
+      sawDash = true;
+      continue;
+    }
+
+    if (op === "re" && parts.length >= 5) {
+      // x y w h re
+      const nums = parts.slice(0, parts.length - 1).map((x) => parseFloat(x));
+      if (
+        nums.length >= 4 &&
+        nums.slice(0, 4).every((n) => Number.isFinite(n))
+      ) {
+        sawRect = true;
+      }
+      continue;
+    }
+
+    if (op === "S" || op === "s" || op === "B" || op === "b") {
+      if (sawRect) sawStrokeAfterRect = true;
+      continue;
+    }
+  }
+
+  if (!sawStrokeAfterRect) return {};
+  return {
+    width: typeof lastLineWidth === "number" ? lastLineWidth : 1,
+    style: sawDash ? "dashed" : "solid",
+  };
+};
+
 const pdfArrayToNumberList = (obj: unknown): number[] | undefined => {
   if (!(obj instanceof PDFArray)) return undefined;
   const out: number[] = [];
@@ -175,6 +336,39 @@ const lookupInFieldChain = (
     }
     break;
   }
+  return undefined;
+};
+
+const extractBorderStyle = (
+  widgetDict: PDFDict,
+): "solid" | "dashed" | "underline" | undefined => {
+  // Strict mode: only parse style when explicitly present.
+  try {
+    const bs = lookupInFieldChain(widgetDict, "BS");
+    if (bs instanceof PDFDict) {
+      const s = bs.lookup(PDFName.of("S"));
+      if (s instanceof PDFName) {
+        const v = s.decodeText();
+        if (v === "D") return "dashed";
+        if (v === "U") return "underline";
+        if (v === "S" || v === "B" || v === "I") return "solid";
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const border = lookupInFieldChain(widgetDict, "Border");
+    if (border instanceof PDFArray && border.size() >= 4) {
+      const dash = border.lookup(3);
+      if (dash instanceof PDFArray && dash.size() > 0) return "dashed";
+      if (dash instanceof PDFArray && dash.size() === 0) return "solid";
+    }
+  } catch {
+    // ignore
+  }
+
   return undefined;
 };
 
@@ -232,8 +426,9 @@ const extractWidgetOnValue = (widgetDict: PDFDict): string | undefined => {
 };
 
 const extractBorderWidth = (widgetDict: PDFDict): number | undefined => {
+  // Strict mode: only parse width when explicitly present.
   try {
-    const bs = widgetDict.lookup(PDFName.of("BS"));
+    const bs = lookupInFieldChain(widgetDict, "BS");
     if (bs instanceof PDFDict) {
       const w = bs.lookup(PDFName.of("W"));
       if (w instanceof PDFNumber) return w.asNumber();
@@ -243,7 +438,7 @@ const extractBorderWidth = (widgetDict: PDFDict): number | undefined => {
   }
 
   try {
-    const border = widgetDict.lookup(PDFName.of("Border"));
+    const border = lookupInFieldChain(widgetDict, "Border");
     if (border instanceof PDFArray && border.size() >= 3) {
       const w = border.lookup(2);
       if (w instanceof PDFNumber) return w.asNumber();
@@ -260,7 +455,7 @@ const extractMkColor = (
   key: "BC" | "BG",
 ): number[] | undefined => {
   try {
-    const mk = widgetDict.lookup(PDFName.of("MK"));
+    const mk = lookupInFieldChain(widgetDict, "MK");
     if (!(mk instanceof PDFDict)) return undefined;
     const c = mk.lookup(PDFName.of(key));
     const nums = pdfArrayToNumberList(c);
@@ -312,7 +507,7 @@ const extractFieldValue = (vObj: unknown): unknown => {
   return undefined;
 };
 
-const buildPdfLibAnnotsByPageIndex = (pdfDoc: PDFDocument) => {
+const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
   const out = new Map<number, PdfJsAnnotation[]>();
   const pages = pdfDoc.getPages();
 
@@ -388,9 +583,140 @@ const buildPdfLibAnnotsByPageIndex = (pdfDoc: PDFDocument) => {
         const optObj = lookupInFieldChain(annot, "Opt");
         const options = extractChoiceOptions(optObj);
 
-        const borderWidth = extractBorderWidth(annot);
+        const bsDirect = (() => {
+          try {
+            return annot.lookup(PDFName.of("BS"));
+          } catch {
+            return undefined;
+          }
+        })();
+        const borderDirect = (() => {
+          try {
+            return annot.lookup(PDFName.of("Border"));
+          } catch {
+            return undefined;
+          }
+        })();
+        const mkDirect = (() => {
+          try {
+            return annot.lookup(PDFName.of("MK"));
+          } catch {
+            return undefined;
+          }
+        })();
+        const apDirect = (() => {
+          try {
+            return annot.lookup(PDFName.of("AP"));
+          } catch {
+            return undefined;
+          }
+        })();
+
+        const bsChain = lookupInFieldChain(annot, "BS");
+        const borderChain = lookupInFieldChain(annot, "Border");
+        const mkChain = lookupInFieldChain(annot, "MK");
+
+        const debugRaw = {
+          bsDirect: summarizePdfObjForDebug(bsDirect),
+          bsChain: summarizePdfObjForDebug(bsChain),
+          borderDirect: summarizePdfObjForDebug(borderDirect),
+          borderChain: summarizePdfObjForDebug(borderChain),
+          mkDirect: summarizePdfObjForDebug(mkDirect),
+          mkChain: summarizePdfObjForDebug(mkChain),
+          apDirect: summarizePdfObjForDebug(apDirect),
+        };
+
         const color = extractMkColor(annot, "BC");
         const backgroundColor = extractMkColor(annot, "BG");
+
+        const borderWidth = extractBorderWidth(annot);
+        const borderStyle = extractBorderStyle(annot);
+
+        let finalBorderWidth: number | undefined = borderWidth;
+        let finalBorderStyle: "solid" | "dashed" | "underline" | undefined =
+          borderStyle;
+
+        // Fallback: Some PDFs draw widget borders only inside the appearance stream (AP/N)
+        // and omit BS/Border entirely.
+        if (
+          typeof finalBorderWidth !== "number" &&
+          typeof finalBorderStyle !== "string"
+        ) {
+          try {
+            const ap = apDirect;
+            if (ap instanceof PDFDict) {
+              const n = ap.lookup(PDFName.of("N"));
+              let stream: PDFStream | undefined = undefined;
+              if (n instanceof PDFStream) {
+                stream = n;
+              } else if (n instanceof PDFDict) {
+                // pick first appearance state stream
+                for (const [k] of n.entries()) {
+                  const candidate = n.lookup(k);
+                  if (candidate instanceof PDFStream) {
+                    stream = candidate;
+                    break;
+                  }
+                }
+              }
+
+              if (stream) {
+                const apContent = await decodePdfStreamToText(stream);
+                const parsed = parseBorderFromAppearanceStream(apContent);
+                if (typeof parsed.width === "number")
+                  finalBorderWidth = parsed.width;
+                if (parsed.style) finalBorderStyle = parsed.style;
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        if (pdfDebugEnabled("import:controls")) {
+          let apInfo: unknown = undefined;
+          try {
+            const ap = apDirect;
+            if (ap instanceof PDFDict) {
+              const n = ap.lookup(PDFName.of("N"));
+              let stream: PDFStream | undefined = undefined;
+              let state: string | undefined = undefined;
+              if (n instanceof PDFStream) {
+                stream = n;
+              } else if (n instanceof PDFDict) {
+                for (const [k] of n.entries()) {
+                  const candidate = n.lookup(k);
+                  if (candidate instanceof PDFStream) {
+                    stream = candidate;
+                    state = k.decodeText();
+                    break;
+                  }
+                }
+              }
+
+              if (stream) {
+                const filters = extractPdfStreamFilters(stream);
+                const content = await decodePdfStreamToText(stream);
+                apInfo = {
+                  state,
+                  filters,
+                  length: content.length,
+                  head: content.slice(0, 600),
+                };
+              }
+            }
+          } catch (e) {
+            apInfo = { error: e };
+          }
+
+          pdfDebug("import:controls", "widget_border_debug", () => ({
+            fieldName,
+            raw: debugRaw,
+            ap: apInfo,
+            borderWidth: finalBorderWidth,
+            borderStyle: finalBorderStyle,
+          }));
+        }
 
         const isRadio = (fieldFlags & (1 << 15)) !== 0;
         const isPushButton = (fieldFlags & (1 << 16)) !== 0;
@@ -413,8 +739,8 @@ const buildPdfLibAnnotsByPageIndex = (pdfDoc: PDFDocument) => {
           color,
           backgroundColor,
           borderStyle:
-            typeof borderWidth === "number"
-              ? { width: borderWidth }
+            typeof finalBorderWidth === "number" || finalBorderStyle
+              ? { width: finalBorderWidth, style: finalBorderStyle }
               : undefined,
           defaultAppearance: da,
           DA: da,
@@ -510,21 +836,26 @@ export const loadPDF = async (
   let pdfBytes: Uint8Array;
   if (input instanceof File) {
     const arrayBuffer = await input.arrayBuffer();
-    pdfBytes = new Uint8Array(arrayBuffer.slice(0));
+    pdfBytes = new Uint8Array(arrayBuffer);
   } else {
-    pdfBytes = input;
+    pdfBytes = new Uint8Array(input);
   }
 
   let fontMap = new Map<string, string>();
   let globalDA: string | undefined = undefined;
   let pdfDoc: PDFDocument | null = null;
 
-  const renderBuffer = new Uint8Array(pdfBytes.slice(0));
-  pdfWorkerService.loadDocument(renderBuffer);
+  const renderBuffer = pdfBytes;
+  try {
+    await pdfWorkerService.loadDocument(renderBuffer);
+  } catch (e) {
+    console.warn("Failed to load PDF into render worker", e);
+  }
 
   const pdfLibPromise = PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const pdfJsData = new Uint8Array(pdfBytes);
   const pdfJsPromise = pdfjsLib.getDocument({
-    data: renderBuffer,
+    data: pdfJsData,
     password: "",
     cMapUrl: PDFJS_CMAP_URL,
     cMapPacked: true,
@@ -567,7 +898,7 @@ export const loadPDF = async (
     undefined;
   if (pdfDoc) {
     try {
-      pdfLibAnnotsByPageIndex = buildPdfLibAnnotsByPageIndex(pdfDoc);
+      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc);
     } catch (e) {
       console.warn("Failed to extract annotations with pdf-lib", e);
     }
@@ -1089,8 +1420,4 @@ export const exportPDF = async (
   return await pdfDoc.save();
 };
 
-export {
-  renderPdfThumbnailFromPdfBytes,
-  renderPdfThumbnailFromPage,
-  renderPage,
-} from "./pdfRenderer";
+export { renderPage, renderPageBytes } from "./pdfRenderer";
