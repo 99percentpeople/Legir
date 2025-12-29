@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { cn } from "../../lib/cn";
+import { cn } from "../../../lib/cn";
 import * as pdfjsLib from "pdfjs-dist";
-import { pdfWorkerService } from "../../services/pdfWorkerService";
+import { pdfWorkerService } from "../../../services/pdfService/pdfWorkerService";
 
 interface PDFCanvasLayerProps {
   pageIndex: number;

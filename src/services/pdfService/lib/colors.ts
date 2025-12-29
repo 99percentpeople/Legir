@@ -22,9 +22,9 @@ export const rgbArrayToHex = (
     return val.toString(16).padStart(2, "0");
   };
   const hex = `#${toHex(color[0])}${toHex(color[1])}${toHex(color[2])}`;
-  pdfDebug("import:colors", "rgbArrayToHex", {
+  pdfDebug("import:colors", "rgbArrayToHex", () => ({
     input: [color[0], color[1], color[2]],
     hex,
-  });
+  }));
   return hex;
 };

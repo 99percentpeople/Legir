@@ -42,7 +42,7 @@ export class TextControlParser implements IControlParser {
           viewport,
         );
 
-        pdfDebug("import:controls", "widget_parsed", {
+        pdfDebug("import:controls", "widget_parsed", () => ({
           pageIndex,
           index,
           fieldName: annotation.fieldName,
@@ -50,7 +50,7 @@ export class TextControlParser implements IControlParser {
           rect: annotation.rect,
           uiRect: { x, y, width, height },
           viewport: getViewportSummary(viewport),
-        });
+        }));
 
         const { style, alignment } = parseFieldStyle(
           annotation,
@@ -101,7 +101,7 @@ export class CheckboxControlParser implements IControlParser {
           viewport,
         );
 
-        pdfDebug("import:controls", "widget_parsed", {
+        pdfDebug("import:controls", "widget_parsed", () => ({
           pageIndex,
           index,
           fieldName: annotation.fieldName,
@@ -109,7 +109,7 @@ export class CheckboxControlParser implements IControlParser {
           rect: annotation.rect,
           uiRect: { x, y, width, height },
           viewport: getViewportSummary(viewport),
-        });
+        }));
 
         const { style } = parseFieldStyle(
           annotation,
@@ -162,7 +162,7 @@ export class RadioControlParser implements IControlParser {
           viewport,
         );
 
-        pdfDebug("import:controls", "widget_parsed", {
+        pdfDebug("import:controls", "widget_parsed", () => ({
           pageIndex,
           index,
           fieldName: annotation.fieldName,
@@ -170,7 +170,7 @@ export class RadioControlParser implements IControlParser {
           rect: annotation.rect,
           uiRect: { x, y, width, height },
           viewport: getViewportSummary(viewport),
-        });
+        }));
 
         const { style } = parseFieldStyle(
           annotation,
@@ -218,7 +218,7 @@ export class DropdownControlParser implements IControlParser {
           viewport,
         );
 
-        pdfDebug("import:controls", "widget_parsed", {
+        pdfDebug("import:controls", "widget_parsed", () => ({
           pageIndex,
           index,
           fieldName: annotation.fieldName,
@@ -226,7 +226,7 @@ export class DropdownControlParser implements IControlParser {
           rect: annotation.rect,
           uiRect: { x, y, width, height },
           viewport: getViewportSummary(viewport),
-        });
+        }));
 
         const { style, alignment } = parseFieldStyle(
           annotation,
@@ -299,7 +299,7 @@ export class SignatureControlParser implements IControlParser {
           viewport,
         );
 
-        pdfDebug("import:controls", "widget_parsed", {
+        pdfDebug("import:controls", "widget_parsed", () => ({
           pageIndex,
           index,
           fieldName: annotation.fieldName,
@@ -307,7 +307,7 @@ export class SignatureControlParser implements IControlParser {
           rect: annotation.rect,
           uiRect: { x, y, width, height },
           viewport: getViewportSummary(viewport),
-        });
+        }));
 
         const { style } = parseFieldStyle(
           annotation,

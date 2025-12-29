@@ -13,10 +13,9 @@ import { useCanvasPanning } from "@/hooks/useCanvasPanning";
 import { useInkSession } from "./hooks/useInkSession";
 import { useLanguage } from "../language-provider";
 import { getCursor, shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
-import { Button } from "@/components/ui/button";
-import { WorkspaceTextSelectionPopover } from "./WorkspaceTextSelectionPopover";
-import { TranslationFloatingWindow } from "./TranslationFloatingWindow";
-import PDFPageWithProxy from "./PDFPageWithProxy";
+import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionPopover";
+import { TranslationFloatingWindow } from "./widgets/TranslationFloatingWindow";
+import PDFPageWithProxy from "./layers/PDFPageWithProxy";
 import { ControlRenderer, preloadControls, registerControls } from "./controls";
 import { useWorkspaceDerivedPages } from "./hooks/useWorkspaceDerivedPages";
 import { useWorkspaceTextSelection } from "./hooks/useWorkspaceTextSelection";
@@ -31,6 +30,7 @@ import { getPageIndexFromPoint as getPageIndexFromPointLib } from "./lib/getPage
 import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
 import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
+
 // Workspace = the editor canvas.
 //
 // Responsibilities:
@@ -84,7 +84,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onToolChange,
   fitTrigger,
 }) => {
-  const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 

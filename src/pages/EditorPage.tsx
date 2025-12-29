@@ -889,7 +889,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
               <div className="flex flex-1 items-center justify-center p-4">
                 <div className="flex gap-6">
                   <Skeleton className="h-[70vh] w-[48vh]" />
-                  <Skeleton className="hidden h-[70vh] w-[48vh] md:block" />
                 </div>
               </div>
             }

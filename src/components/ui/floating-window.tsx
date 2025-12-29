@@ -22,7 +22,7 @@ export interface FloatingWindowRenderContext {
 export interface FloatingWindowProps {
   isOpen: boolean;
   title: React.ReactNode;
-  headerRight?:
+  header?:
     | React.ReactNode
     | ((ctx: FloatingWindowRenderContext) => React.ReactNode);
   onClose: () => void;
@@ -46,7 +46,7 @@ export interface FloatingWindowProps {
 export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   isOpen,
   title,
-  headerRight,
+  header,
   onClose,
   closeLabel = "Close",
   headerClassName,
@@ -303,11 +303,9 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     setPortalContainer(el);
   }, []);
 
-  const content =
-    typeof children === "function" ? (children as any)(ctx) : children;
+  const content = typeof children === "function" ? children(ctx) : children;
 
-  const headerRightEl =
-    typeof headerRight === "function" ? (headerRight as any)(ctx) : headerRight;
+  const headerEl = typeof header === "function" ? header(ctx) : header;
 
   if (!isOpen) return null;
   if (typeof document === "undefined") return null;
@@ -331,7 +329,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     >
       <div
         className={cn(
-          "flex cursor-move items-center justify-between border-b px-3 py-2",
+          "flex cursor-move items-center justify-between gap-2 border-b px-3 py-2",
           headerClassName,
         )}
         onPointerDown={(e) => {
@@ -352,13 +350,15 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           {title}
         </div>
         <div
-          className="flex items-center gap-2"
           data-floating-window-no-drag
           onPointerDown={(e) => {
             e.stopPropagation();
           }}
+          className="w-fit"
         >
-          {headerRightEl}
+          {headerEl}
+        </div>
+        <div>
           <Button
             variant="ghost"
             size="icon"

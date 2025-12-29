@@ -3,6 +3,7 @@ import {
   PDFArray,
   PDFDict,
   PDFNumber,
+  PDFRef,
   PDFStream,
   PDFString,
   PDFHexString,
@@ -168,7 +169,7 @@ export class InkParser implements IAnnotationParser {
 
 export class HighlightParser implements IAnnotationParser {
   async parse(context: ParserContext): Promise<Annotation[]> {
-    const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
+    const { pageAnnotations, pageIndex, viewport } = context;
     const annotations: Annotation[] = [];
 
     pageAnnotations.forEach((annotation, index) => {
@@ -176,7 +177,6 @@ export class HighlightParser implements IAnnotationParser {
         const color = annotation.color
           ? rgbArrayToHex(annotation.color)
           : "#FFFF00";
-        const [x1, y1] = annotation.rect;
         const { x, y, width, height } = pdfJsRectToUiRect(
           annotation.rect,
           viewport,
@@ -195,64 +195,6 @@ export class HighlightParser implements IAnnotationParser {
 
         // Try to get QuadPoints
         let qp = annotation.quadPoints;
-
-        if ((!qp || !Array.isArray(qp) || qp.length === 0) && pdfDoc) {
-          try {
-            const pdfLibPage = pdfDoc.getPage(pageIndex);
-            const libAnnots = pdfLibPage.node.Annots();
-            if (libAnnots instanceof PDFArray) {
-              for (let idx = 0; idx < libAnnots.size(); idx++) {
-                const libAnnot = libAnnots.lookup(idx);
-                if (libAnnot instanceof PDFDict) {
-                  const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
-                  if (libSubtype === PDFName.of("Highlight")) {
-                    const libRect = libAnnot.lookup(PDFName.of("Rect"));
-                    if (libRect instanceof PDFArray) {
-                      const rArray = libRect.asArray();
-                      if (rArray.length >= 4) {
-                        const lx1 = (rArray[0] as PDFNumber).asNumber();
-                        const ly1 = (rArray[1] as PDFNumber).asNumber();
-                        if (Math.abs(lx1 - x1) < 1 && Math.abs(ly1 - y1) < 1) {
-                          // Extract metadata
-                          const rawTitle = libAnnot.lookup(PDFName.of("T"));
-                          const titleDecoded = decodePdfString(rawTitle);
-                          if (titleDecoded) author = titleDecoded;
-                          const rawModDate = libAnnot.lookup(PDFName.of("M"));
-                          const modDecoded = decodePdfString(rawModDate);
-                          if (modDecoded) updatedAt = parsePDFDate(modDecoded);
-                          const rawContents = libAnnot.lookup(
-                            PDFName.of("Contents"),
-                          );
-                          const contentsDecoded = decodePdfString(rawContents);
-                          if (contentsDecoded) contents = contentsDecoded;
-
-                          const libCA = libAnnot.lookup(PDFName.of("CA"));
-                          const libca = libAnnot.lookup(PDFName.of("ca"));
-                          if (libCA instanceof PDFNumber)
-                            opacity = libCA.asNumber();
-                          else if (libca instanceof PDFNumber)
-                            opacity = libca.asNumber();
-
-                          const libQP = libAnnot.lookup(
-                            PDFName.of("QuadPoints"),
-                          );
-                          if (libQP instanceof PDFArray) {
-                            qp = libQP
-                              .asArray()
-                              .map((n) => (n as PDFNumber).asNumber());
-                            break;
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            console.warn("Fallback QuadPoints extraction failed", e);
-          }
-        }
 
         if (qp && Array.isArray(qp)) {
           rects = [];
@@ -303,7 +245,7 @@ export class HighlightParser implements IAnnotationParser {
 
 export class CommentParser implements IAnnotationParser {
   async parse(context: ParserContext): Promise<Annotation[]> {
-    const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
+    const { pageAnnotations, pageIndex, viewport } = context;
     const annotations: Annotation[] = [];
 
     const stripRichTextToPlainText = (input: string) => {
@@ -317,7 +259,6 @@ export class CommentParser implements IAnnotationParser {
         const color = annotation.color
           ? rgbArrayToHex(annotation.color)
           : "#FFFF00";
-        const [x1, y1] = annotation.rect;
         const uiRect = pdfJsRectToUiRect(annotation.rect, viewport);
         const x = uiRect.x;
         const y = uiRect.y;
@@ -328,70 +269,18 @@ export class CommentParser implements IAnnotationParser {
         if (height < 5) height = 30;
 
         let contents = annotation.contents || "";
+        if ((!contents || contents.trim() === "") && annotation.richText) {
+          contents = stripRichTextToPlainText(annotation.richText);
+        }
         let author = annotation.title || undefined;
         let updatedAt = parsePDFDate(annotation.modificationDate);
 
-        if (pdfDoc && (!contents || contents.trim() === "")) {
-          try {
-            const pdfLibPage = pdfDoc.getPage(pageIndex);
-            const libAnnots = pdfLibPage.node.Annots();
-            if (libAnnots instanceof PDFArray) {
-              for (let idx = 0; idx < libAnnots.size(); idx++) {
-                const libAnnot = libAnnots.lookup(idx);
-                if (!(libAnnot instanceof PDFDict)) continue;
-
-                const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
-                const sName =
-                  libSubtype instanceof PDFName
-                    ? libSubtype.decodeText()
-                    : libSubtype instanceof PDFString ||
-                        libSubtype instanceof PDFHexString
-                      ? libSubtype.decodeText()
-                      : "";
-                if (sName !== "Text") continue;
-
-                const libRect = libAnnot.lookup(PDFName.of("Rect"));
-                if (!(libRect instanceof PDFArray)) continue;
-                const rArray = libRect.asArray();
-                if (rArray.length < 4) continue;
-                const lx1 = (rArray[0] as PDFNumber).asNumber();
-                const ly1 = (rArray[1] as PDFNumber).asNumber();
-                if (Math.abs(lx1 - x1) > 5 || Math.abs(ly1 - y1) > 5) continue;
-
-                const rawContents = libAnnot.lookup(PDFName.of("Contents"));
-                const contentsDecoded = decodePdfString(rawContents);
-                if (contentsDecoded && contentsDecoded.trim() !== "") {
-                  contents = contentsDecoded;
-                } else {
-                  const rawRc = libAnnot.lookup(PDFName.of("RC"));
-                  const rcDecoded = decodePdfString(rawRc);
-                  if (rcDecoded && rcDecoded.trim() !== "") {
-                    contents = stripRichTextToPlainText(rcDecoded);
-                  }
-                }
-
-                const rawTitle = libAnnot.lookup(PDFName.of("T"));
-                const titleDecoded = decodePdfString(rawTitle);
-                if (titleDecoded && (!author || author.trim() === "")) {
-                  author = titleDecoded;
-                }
-
-                const rawModDate = libAnnot.lookup(PDFName.of("M"));
-                const modDecoded = decodePdfString(rawModDate);
-                if (modDecoded) {
-                  const parsed = parsePDFDate(modDecoded);
-                  if (parsed && !updatedAt) updatedAt = parsed;
-                }
-
-                break;
-              }
-            }
-          } catch (e) {
-            console.warn(
-              `Failed to extract comment Contents from page ${pageIndex + 1} using pdf-lib`,
-              e,
-            );
-          }
+        if (!contents || contents.trim() === "") {
+          console.warn(`Failed to parse comment contents`, {
+            pageIndex,
+            index,
+            sourcePdfRef: annotation.sourcePdfRef,
+          });
         }
 
         annotations.push({
@@ -580,12 +469,12 @@ export class FreeTextParser implements IAnnotationParser {
             }
 
             if (matchedAnyColor) {
-              pdfDebug("import:freetext", "ap_color_sc", {
+              pdfDebug("import:freetext", "ap_color_sc", () => ({
                 pageIndex,
                 currentCs,
                 token,
                 hex: outHex,
-              });
+              }));
             }
           } else if ((token === "scn" || token === "SCN") && i >= 1) {
             const comps = scnComponents(i);
@@ -621,23 +510,23 @@ export class FreeTextParser implements IAnnotationParser {
             }
 
             if (matchedAnyColor) {
-              pdfDebug("import:freetext", "ap_color_scn", {
+              pdfDebug("import:freetext", "ap_color_scn", () => ({
                 pageIndex,
                 currentCs,
                 token,
                 hex: outHex,
-              });
+              }));
             }
           }
         }
 
-        pdfDebug("import:freetext", "ap_color_parsed", {
+        pdfDebug("import:freetext", "ap_color_parsed", () => ({
           pageIndex,
           segmentUsed,
           matchedAnyColor,
           op: outOp,
           hex: outHex,
-        });
+        }));
 
         return { outHex, matchedAnyColor };
       };
@@ -767,14 +656,14 @@ export class FreeTextParser implements IAnnotationParser {
         const scaled = effectiveSize * tmScale * cmScale;
         if (Number.isFinite(scaled) && scaled > 0 && scaled < 500) {
           effectiveSize = scaled;
-          pdfDebug("import:freetext", "ap_font_scaled", {
+          pdfDebug("import:freetext", "ap_font_scaled", () => ({
             pageIndex,
             resourceName: normalizePdfFontName(name),
             tf: parsedSize,
             tmScale,
             cmScale,
             scaled,
-          });
+          }));
         }
       }
 
@@ -807,20 +696,20 @@ export class FreeTextParser implements IAnnotationParser {
         // ignore
       }
 
-      pdfDebug("import:freetext", "ap_filters", {
+      pdfDebug("import:freetext", "ap_filters", () => ({
         pageIndex,
         filters,
         byteLength: bytes.length,
-      });
+      }));
 
       if (
         filters.includes("ASCII85Decode") ||
         filters.includes("ASCIIHexDecode")
       ) {
-        pdfDebug("import:freetext", "ap_filters_unsupported", {
+        pdfDebug("import:freetext", "ap_filters_unsupported", () => ({
           pageIndex,
           filters,
-        });
+        }));
       }
 
       // Common case: FlateDecode
@@ -838,21 +727,21 @@ export class FreeTextParser implements IAnnotationParser {
             new Blob([safeBytes]).stream().pipeThrough(ds),
           ).arrayBuffer();
           decodedBytes = new Uint8Array(decompressed);
-          pdfDebug("import:freetext", "ap_decompressed", {
+          pdfDebug("import:freetext", "ap_decompressed", () => ({
             pageIndex,
             inBytes: safeBytes.length,
             outBytes: decodedBytes.length,
-          });
+          }));
         } catch (e) {
-          pdfDebug("import:freetext", "ap_decompression_failed", {
+          pdfDebug("import:freetext", "ap_decompression_failed", () => ({
             pageIndex,
             error: e,
-          });
+          }));
         }
       }
 
       const text = new TextDecoder().decode(decodedBytes);
-      pdfDebug("import:freetext", "ap_decoded_sample", {
+      pdfDebug("import:freetext", "ap_decoded_sample", () => ({
         pageIndex,
         length: text.length,
         head: text.slice(0, 300),
@@ -864,7 +753,7 @@ export class FreeTextParser implements IAnnotationParser {
         hasScn: /\bscn\b/.test(text) || /\bSCN\b/.test(text),
         hasGs: /\bgs\b/.test(text),
         hasCs: /\bcs\b/.test(text) || /\bCS\b/.test(text),
-      });
+      }));
       return text;
     };
 
@@ -874,7 +763,7 @@ export class FreeTextParser implements IAnnotationParser {
         const initialColorArray = annotation.color;
         const normalizedRgb = normalizePdfJsColorToRgb255(initialColorArray);
         let color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#000000";
-        pdfDebug("import:freetext", "initial", {
+        pdfDebug("import:freetext", "initial", () => ({
           pageIndex,
           index,
           pdfJsColor: initialColorArray,
@@ -882,7 +771,7 @@ export class FreeTextParser implements IAnnotationParser {
           initialHex: color,
           defaultAppearance: annotation.defaultAppearance,
           DA: annotation.DA,
-        });
+        }));
         const [x1, y1] = annotation.rect;
         const { x, y, width, height } = pdfJsRectToUiRect(
           annotation.rect,
@@ -896,7 +785,7 @@ export class FreeTextParser implements IAnnotationParser {
         let fontFamily: string | undefined = undefined;
         let sourcePdfRef:
           | { objectNumber: number; generationNumber: number }
-          | undefined = undefined;
+          | undefined = annotation.sourcePdfRef;
         let sourcePdfFontName: string | undefined = undefined;
         let sourcePdfFontIsSubset: boolean | undefined = undefined;
         let sourcePdfFontMissing: boolean | undefined = undefined;
@@ -934,13 +823,13 @@ export class FreeTextParser implements IAnnotationParser {
                 const hex = rgbArrayToHex([r * 255, g * 255, b * 255]);
                 if (hex) color = hex;
                 matchedAnyColor = true;
-                pdfDebug("import:freetext", "da_color_rg", {
+                pdfDebug("import:freetext", "da_color_rg", () => ({
                   pageIndex,
                   index,
                   daStr,
                   parsed: { r, g, b },
                   hex,
-                });
+                }));
               }
             } else if ((token === "g" || token === "G") && i >= 1) {
               const gray = parseFloat(tokens[i - 1]);
@@ -949,13 +838,13 @@ export class FreeTextParser implements IAnnotationParser {
                 const hex = rgbArrayToHex([val, val, val]);
                 if (hex) color = hex;
                 matchedAnyColor = true;
-                pdfDebug("import:freetext", "da_color_g", {
+                pdfDebug("import:freetext", "da_color_g", () => ({
                   pageIndex,
                   index,
                   daStr,
                   parsed: { gray },
                   hex,
-                });
+                }));
               }
             } else if ((token === "k" || token === "K") && i >= 4) {
               const c = parseFloat(tokens[i - 4]);
@@ -969,23 +858,23 @@ export class FreeTextParser implements IAnnotationParser {
                 const hex = rgbArrayToHex([rr, gg, bb]);
                 if (hex) color = hex;
                 matchedAnyColor = true;
-                pdfDebug("import:freetext", "da_color_k", {
+                pdfDebug("import:freetext", "da_color_k", () => ({
                   pageIndex,
                   index,
                   daStr,
                   parsed: { c, m, y, k },
                   hex,
-                });
+                }));
               }
             }
           }
 
           if (!matchedAnyColor) {
-            pdfDebug("import:freetext", "da_color_none", {
+            pdfDebug("import:freetext", "da_color_none", () => ({
               pageIndex,
               index,
               daStr,
-            });
+            }));
           }
         };
 
@@ -996,342 +885,368 @@ export class FreeTextParser implements IAnnotationParser {
         }
 
         if (pdfDoc) {
-          try {
-            const pdfLibPage = pdfDoc.getPage(pageIndex);
-            const libAnnots = pdfLibPage.node.Annots();
-            if (libAnnots instanceof PDFArray) {
-              for (let idx = 0; idx < libAnnots.size(); idx++) {
-                const rawRef = (
-                  libAnnots as unknown as { get?: (i: number) => unknown }
-                ).get?.(idx);
-                const libAnnot = libAnnots.lookup(idx);
-                if (libAnnot instanceof PDFDict) {
-                  const libSubtype = libAnnot.lookup(PDFName.of("Subtype"));
-                  const sName =
-                    libSubtype instanceof PDFName
-                      ? libSubtype.decodeText()
-                      : "";
-                  if (sName === "FreeText") {
-                    const libRect = libAnnot.lookup(PDFName.of("Rect"));
-                    if (libRect instanceof PDFArray) {
-                      const rArray = libRect.asArray();
-                      if (rArray.length >= 4) {
-                        const lx1 = (rArray[0] as PDFNumber).asNumber();
-                        const ly1 = (rArray[1] as PDFNumber).asNumber();
-                        if (Math.abs(lx1 - x1) < 5 && Math.abs(ly1 - y1) < 5) {
-                          if (
-                            rawRef &&
-                            typeof (rawRef as { objectNumber?: unknown })
-                              .objectNumber === "number" &&
-                            typeof (rawRef as { generationNumber?: unknown })
-                              .generationNumber === "number"
-                          ) {
-                            sourcePdfRef = {
-                              objectNumber: (rawRef as { objectNumber: number })
-                                .objectNumber,
-                              generationNumber: (
-                                rawRef as { generationNumber: number }
-                              ).generationNumber,
-                            };
-                          }
+          const ref = annotation.sourcePdfRef;
+          if (!ref) {
+            console.warn(
+              `Failed to parse FreeText advanced properties (missing sourcePdfRef)`,
+              {
+                pageIndex,
+                index,
+              },
+            );
+          } else {
+            try {
+              const pdfLibPage = pdfDoc.getPage(pageIndex);
+              const lookedUp = pdfDoc.context.lookup(
+                PDFRef.of(ref.objectNumber, ref.generationNumber),
+              );
+              if (!(lookedUp instanceof PDFDict)) {
+                console.warn(
+                  `Failed to parse FreeText advanced properties (lookup not dict)`,
+                  {
+                    pageIndex,
+                    index,
+                    sourcePdfRef: ref,
+                  },
+                );
+              } else {
+                const libAnnot = lookedUp;
 
-                          const rawContents = libAnnot.lookup(
-                            PDFName.of("Contents"),
+                const rawContents = libAnnot.lookup(PDFName.of("Contents"));
+                const contentsDecoded = decodePdfString(rawContents);
+                if (contentsDecoded && (!contents || contents.trim() === "")) {
+                  contents = contentsDecoded;
+                }
+
+                // DA
+                const da = libAnnot.lookup(PDFName.of("DA"));
+                if (da instanceof PDFString || da instanceof PDFHexString) {
+                  const daStr = da.decodeText();
+
+                  // Always parse color (and best-effort size) from DA.
+                  // Font resolution/injection below may override fontFamily, but color should never be skipped.
+                  parseDaString(daStr, {
+                    parseFontFamilyFromDa: false,
+                  });
+
+                  const tfMatch = daStr.match(
+                    /\/([^\s]+)\s+(\d+(?:\.\d+)?)\s+Tf/,
+                  );
+                  if (tfMatch) {
+                    const resourceName = normalizePdfFontName(tfMatch[1]);
+                    fontSize = parseFloat(tfMatch[2]);
+
+                    let baseFontName: string | undefined = undefined;
+                    let fontDictResolved: PDFDict | undefined = undefined;
+                    // Resolve the font dict from multiple locations (annotation DR -> page resources -> AcroForm DR)
+                    fontDictResolved = resolveFontDictFromDR(
+                      libAnnot.lookup(PDFName.of("DR")),
+                      resourceName,
+                    );
+
+                    if (!fontDictResolved) {
+                      const pageRes = pdfLibPage.node.Resources();
+                      if (pageRes instanceof PDFDict) {
+                        const pageFontRes = pageRes.lookup(PDFName.of("Font"));
+                        if (pageFontRes instanceof PDFDict) {
+                          const pageFontDict = pageFontRes.lookup(
+                            PDFName.of(resourceName),
                           );
-                          const contentsDecoded = decodePdfString(rawContents);
-                          if (
-                            contentsDecoded &&
-                            (!contents || contents.trim() === "")
-                          ) {
-                            contents = contentsDecoded;
+                          if (pageFontDict instanceof PDFDict) {
+                            fontDictResolved = pageFontDict;
                           }
-
-                          // DA
-                          const da = libAnnot.lookup(PDFName.of("DA"));
-                          if (
-                            da instanceof PDFString ||
-                            da instanceof PDFHexString
-                          ) {
-                            const daStr = da.decodeText();
-
-                            // Always parse color (and best-effort size) from DA.
-                            // Font resolution/injection below may override fontFamily, but color should never be skipped.
-                            parseDaString(daStr, {
-                              parseFontFamilyFromDa: false,
-                            });
-
-                            const tfMatch = daStr.match(
-                              /\/([^\s]+)\s+(\d+(?:\.\d+)?)\s+Tf/,
-                            );
-                            if (tfMatch) {
-                              const resourceName = normalizePdfFontName(
-                                tfMatch[1],
-                              );
-                              fontSize = parseFloat(tfMatch[2]);
-
-                              let baseFontName: string | undefined = undefined;
-                              let fontDictResolved: PDFDict | undefined =
-                                undefined;
-                              // Resolve the font dict from multiple locations (annotation DR -> page resources -> AcroForm DR)
-                              fontDictResolved = resolveFontDictFromDR(
-                                libAnnot.lookup(PDFName.of("DR")),
-                                resourceName,
-                              );
-
-                              if (!fontDictResolved) {
-                                const pageRes = pdfLibPage.node.Resources();
-                                if (pageRes instanceof PDFDict) {
-                                  const pageFontRes = pageRes.lookup(
-                                    PDFName.of("Font"),
-                                  );
-                                  if (pageFontRes instanceof PDFDict) {
-                                    const pageFontDict = pageFontRes.lookup(
-                                      PDFName.of(resourceName),
-                                    );
-                                    if (pageFontDict instanceof PDFDict) {
-                                      fontDictResolved = pageFontDict;
-                                    }
-                                  }
-                                }
-                              }
-
-                              if (!fontDictResolved && pdfDoc) {
-                                try {
-                                  const acroForm = pdfDoc.catalog.lookup(
-                                    PDFName.of("AcroForm"),
-                                  );
-                                  if (acroForm instanceof PDFDict) {
-                                    const acroDR = acroForm.lookup(
-                                      PDFName.of("DR"),
-                                    );
-                                    fontDictResolved = resolveFontDictFromDR(
-                                      acroDR,
-                                      resourceName,
-                                    );
-                                  }
-                                } catch {
-                                  // ignore
-                                }
-                              }
-
-                              baseFontName =
-                                resolveBaseFontName(fontDictResolved);
-
-                              sourcePdfFontName = baseFontName || resourceName;
-                              sourcePdfFontIsSubset =
-                                !!sourcePdfFontName?.includes("+");
-
-                              // Try to load the embedded font program (FontFile2/OpenType) into the browser.
-                              // If this succeeds, we use the injected family name as the primary font.
-                              const injectedFamily =
-                                fontDictResolved &&
-                                (baseFontName || resourceName) &&
-                                context.embeddedFontCache
-                                  ? await ensurePdfEmbeddedFontLoaded(
-                                      fontDictResolved,
-                                      baseFontName || resourceName,
-                                      context.embeddedFontCache,
-                                      context.embeddedFontFaces,
-                                    )
-                                  : undefined;
-
-                              const fontKey =
-                                pdfFontToAppFontKey(baseFontName) ||
-                                pdfFontToAppFontKey(resourceName);
-
-                              sourcePdfFontMissing =
-                                !fontKey && !injectedFamily;
-
-                              if (fontKey) {
-                                fontFamily = fontKey;
-                              } else if (injectedFamily) {
-                                fontFamily = `"${injectedFamily}"`;
-                              } else {
-                                fontFamily =
-                                  pdfFontToCssFontFamily(baseFontName) ||
-                                  pdfFontToCssFontFamily(resourceName);
-                              }
-                            } else {
-                              parseDaString(daStr);
-                            }
-                          }
-                          const rawTitle = libAnnot.lookup(PDFName.of("T"));
-                          const titleDecoded = decodePdfString(rawTitle);
-                          if (
-                            titleDecoded &&
-                            (!author || author.trim() === "")
-                          ) {
-                            author = titleDecoded;
-                          }
-                          const rawModDate = libAnnot.lookup(PDFName.of("M"));
-                          const modDecoded = decodePdfString(rawModDate);
-                          if (modDecoded) {
-                            const parsed = parsePDFDate(modDecoded);
-                            if (parsed && !updatedAt) updatedAt = parsed;
-                          }
-
-                          // AP (appearance): prefer actual appearance color over DA when available.
-                          // Some PDFs keep DA at 0 g (black) but draw colored text in AP.
-                          try {
-                            const ap = libAnnot.lookup(PDFName.of("AP"));
-                            if (ap instanceof PDFDict) {
-                              const n = ap.lookup(PDFName.of("N"));
-                              if (n instanceof PDFStream) {
-                                const apContent =
-                                  await decodeAppearanceStreamToText(n);
-                                pdfDebug("import:freetext", "ap_found", {
-                                  pageIndex,
-                                  index,
-                                  length: apContent.length,
-                                  head: apContent.slice(0, 200),
-                                });
-
-                                const count = (re: RegExp) => {
-                                  try {
-                                    return Array.from(apContent.matchAll(re))
-                                      .length;
-                                  } catch {
-                                    return 0;
-                                  }
-                                };
-                                pdfDebug("import:freetext", "ap_ops", {
-                                  pageIndex,
-                                  index,
-                                  rg: count(/\brg\b/g),
-                                  RG: count(/\bRG\b/g),
-                                  g: count(/\bg\b/g),
-                                  G: count(/\bG\b/g),
-                                  k: count(/\bk\b/g),
-                                  K: count(/\bK\b/g),
-                                  sc: count(/\bsc\b/g),
-                                  SC: count(/\bSC\b/g),
-                                  scn: count(/\bscn\b/g),
-                                  SCN: count(/\bSCN\b/g),
-                                  cs: count(/\bcs\b/g),
-                                  CS: count(/\bCS\b/g),
-                                  gs: count(/\bgs\b/g),
-                                });
-                                const apHex =
-                                  parseTextColorFromContentStream(apContent);
-                                if (apHex) color = apHex;
-
-                                const apFont =
-                                  parseFontFromContentStream(apContent);
-                                if (apFont?.fontSize)
-                                  fontSize = apFont.fontSize;
-
-                                if (apFont?.resourceName) {
-                                  let apFontDictResolved: PDFDict | undefined =
-                                    undefined;
-                                  try {
-                                    const apRes = n.dict.lookup(
-                                      PDFName.of("Resources"),
-                                    );
-                                    if (apRes instanceof PDFDict) {
-                                      const apFontRes = apRes.lookup(
-                                        PDFName.of("Font"),
-                                      );
-                                      if (apFontRes instanceof PDFDict) {
-                                        const d = apFontRes.lookup(
-                                          PDFName.of(apFont.resourceName),
-                                        );
-                                        if (d instanceof PDFDict) {
-                                          apFontDictResolved = d;
-                                        }
-                                      }
-                                    }
-                                  } catch {
-                                    // ignore
-                                  }
-
-                                  const resolvedBase =
-                                    resolveBaseFontName(apFontDictResolved);
-                                  const injectedFamily =
-                                    apFontDictResolved &&
-                                    (resolvedBase || apFont.resourceName) &&
-                                    context.embeddedFontCache
-                                      ? await ensurePdfEmbeddedFontLoaded(
-                                          apFontDictResolved,
-                                          resolvedBase || apFont.resourceName,
-                                          context.embeddedFontCache,
-                                          context.embeddedFontFaces,
-                                        )
-                                      : undefined;
-
-                                  const fontKey =
-                                    pdfFontToAppFontKey(resolvedBase) ||
-                                    pdfFontToAppFontKey(apFont.resourceName);
-
-                                  sourcePdfFontName =
-                                    resolvedBase || apFont.resourceName;
-                                  sourcePdfFontIsSubset =
-                                    !!sourcePdfFontName?.includes("+");
-                                  sourcePdfFontMissing =
-                                    !fontKey && !injectedFamily;
-
-                                  if (fontKey) {
-                                    fontFamily = fontKey;
-                                  } else if (injectedFamily) {
-                                    fontFamily = `"${injectedFamily}"`;
-                                  } else {
-                                    fontFamily =
-                                      pdfFontToCssFontFamily(resolvedBase) ||
-                                      pdfFontToCssFontFamily(
-                                        apFont.resourceName,
-                                      );
-                                  }
-
-                                  pdfDebug(
-                                    "import:freetext",
-                                    "ap_font_parsed",
-                                    {
-                                      pageIndex,
-                                      index,
-                                      resourceName: apFont.resourceName,
-                                      baseFontName: resolvedBase,
-                                      injectedFamily,
-                                      fontKey,
-                                      fontFamily,
-                                    },
-                                  );
-                                }
-                              } else {
-                                pdfDebug("import:freetext", "ap_n_not_stream", {
-                                  pageIndex,
-                                  index,
-                                  nType:
-                                    n && typeof n === "object"
-                                      ? ((
-                                          n as {
-                                            constructor?: { name?: string };
-                                          }
-                                        ).constructor?.name ?? null)
-                                      : null,
-                                });
-                              }
-                            } else {
-                              pdfDebug("import:freetext", "ap_missing", {
-                                pageIndex,
-                                index,
-                              });
-                            }
-                          } catch (e) {
-                            pdfDebug("import:freetext", "ap_parse_failed", {
-                              pageIndex,
-                              index,
-                              error: e,
-                            });
-                          }
-                          break;
                         }
                       }
                     }
+
+                    if (!fontDictResolved) {
+                      try {
+                        const acroForm = pdfDoc.catalog.lookup(
+                          PDFName.of("AcroForm"),
+                        );
+                        if (acroForm instanceof PDFDict) {
+                          const acroDR = acroForm.lookup(PDFName.of("DR"));
+                          fontDictResolved = resolveFontDictFromDR(
+                            acroDR,
+                            resourceName,
+                          );
+                        }
+                      } catch {
+                        // ignore
+                      }
+                    }
+
+                    baseFontName = resolveBaseFontName(fontDictResolved);
+
+                    sourcePdfFontName = baseFontName || resourceName;
+                    sourcePdfFontIsSubset = !!sourcePdfFontName?.includes("+");
+
+                    pdfDebug("import:freetext", "font_inject_gate", () => ({
+                      stage: "DA",
+                      pageIndex,
+                      index,
+                      resourceName,
+                      baseFontName,
+                      sourcePdfFontName,
+                      hasPdfDoc: !!pdfDoc,
+                      hasFontDict: !!fontDictResolved,
+                      hasEmbeddedFontCache: !!context.embeddedFontCache,
+                      willAttempt:
+                        !!fontDictResolved &&
+                        !!(baseFontName || resourceName) &&
+                        !!context.embeddedFontCache,
+                    }));
+
+                    // Try to load the embedded font program (FontFile2/OpenType) into the browser.
+                    // If this succeeds, we use the injected family name as the primary font.
+                    const injectedFamily =
+                      fontDictResolved &&
+                      (baseFontName || resourceName) &&
+                      context.embeddedFontCache
+                        ? await ensurePdfEmbeddedFontLoaded(
+                            fontDictResolved,
+                            baseFontName || resourceName,
+                            context.embeddedFontCache,
+                            context.embeddedFontFaces,
+                          )
+                        : undefined;
+
+                    pdfDebug("import:freetext", "font_inject_result", () => ({
+                      stage: "DA",
+                      pageIndex,
+                      index,
+                      resourceName,
+                      baseFontName,
+                      sourcePdfFontName,
+                      injectedFamily,
+                    }));
+
+                    const fontKey =
+                      pdfFontToAppFontKey(baseFontName) ||
+                      pdfFontToAppFontKey(resourceName);
+
+                    sourcePdfFontMissing = !fontKey && !injectedFamily;
+
+                    if (fontKey) {
+                      fontFamily = fontKey;
+                    } else if (injectedFamily) {
+                      const fallback =
+                        pdfFontToCssFontFamily(baseFontName) ||
+                        pdfFontToCssFontFamily(resourceName);
+                      fontFamily = fallback
+                        ? `"${injectedFamily}", ${fallback}`
+                        : `"${injectedFamily}"`;
+                    } else {
+                      const fallback =
+                        pdfFontToCssFontFamily(baseFontName) ||
+                        pdfFontToCssFontFamily(resourceName);
+                      fontFamily = fallback;
+                    }
+                  } else {
+                    parseDaString(daStr);
                   }
+                } else if (daFromPdfJs) {
+                  parseDaString(daFromPdfJs);
+                }
+
+                const rawTitle = libAnnot.lookup(PDFName.of("T"));
+                const titleDecoded = decodePdfString(rawTitle);
+                if (titleDecoded && (!author || author.trim() === "")) {
+                  author = titleDecoded;
+                }
+
+                const rawModDate = libAnnot.lookup(PDFName.of("M"));
+                const modDecoded = decodePdfString(rawModDate);
+                if (modDecoded) {
+                  const parsed = parsePDFDate(modDecoded);
+                  if (parsed && !updatedAt) updatedAt = parsed;
+                }
+
+                // AP (appearance): prefer actual appearance color over DA when available.
+                // Some PDFs keep DA at 0 g (black) but draw colored text in AP.
+                try {
+                  const ap = libAnnot.lookup(PDFName.of("AP"));
+                  if (ap instanceof PDFDict) {
+                    const n = ap.lookup(PDFName.of("N"));
+                    if (n instanceof PDFStream) {
+                      const apContent = await decodeAppearanceStreamToText(n);
+                      pdfDebug("import:freetext", "ap_found", () => ({
+                        pageIndex,
+                        index,
+                        length: apContent.length,
+                        head: apContent.slice(0, 200),
+                      }));
+
+                      const count = (re: RegExp) => {
+                        try {
+                          return Array.from(apContent.matchAll(re)).length;
+                        } catch {
+                          return 0;
+                        }
+                      };
+                      pdfDebug("import:freetext", "ap_ops", () => ({
+                        pageIndex,
+                        index,
+                        rg: count(/\brg\b/g),
+                        RG: count(/\bRG\b/g),
+                        g: count(/\bg\b/g),
+                        G: count(/\bG\b/g),
+                        k: count(/\bk\b/g),
+                        K: count(/\bK\b/g),
+                        sc: count(/\bsc\b/g),
+                        SC: count(/\bSC\b/g),
+                        scn: count(/\bscn\b/g),
+                        SCN: count(/\bSCN\b/g),
+                        cs: count(/\bcs\b/g),
+                        CS: count(/\bCS\b/g),
+                        gs: count(/\bgs\b/g),
+                      }));
+                      const apHex = parseTextColorFromContentStream(apContent);
+                      if (apHex) color = apHex;
+
+                      const apFont = parseFontFromContentStream(apContent);
+                      if (apFont?.fontSize) fontSize = apFont.fontSize;
+
+                      if (apFont?.resourceName) {
+                        let apFontDictResolved: PDFDict | undefined = undefined;
+                        try {
+                          const apRes = n.dict.lookup(PDFName.of("Resources"));
+                          if (apRes instanceof PDFDict) {
+                            const apFontRes = apRes.lookup(PDFName.of("Font"));
+                            if (apFontRes instanceof PDFDict) {
+                              const d = apFontRes.lookup(
+                                PDFName.of(apFont.resourceName),
+                              );
+                              if (d instanceof PDFDict) {
+                                apFontDictResolved = d;
+                              }
+                            }
+                          }
+                        } catch {
+                          // ignore
+                        }
+
+                        const resolvedBase =
+                          resolveBaseFontName(apFontDictResolved);
+
+                        pdfDebug("import:freetext", "font_inject_gate", () => ({
+                          stage: "AP",
+                          pageIndex,
+                          index,
+                          resourceName: apFont.resourceName,
+                          baseFontName: resolvedBase,
+                          hasPdfDoc: !!pdfDoc,
+                          hasFontDict: !!apFontDictResolved,
+                          hasEmbeddedFontCache: !!context.embeddedFontCache,
+                          willAttempt:
+                            !!apFontDictResolved &&
+                            !!(resolvedBase || apFont.resourceName) &&
+                            !!context.embeddedFontCache,
+                        }));
+
+                        const injectedFamily =
+                          apFontDictResolved &&
+                          (resolvedBase || apFont.resourceName) &&
+                          context.embeddedFontCache
+                            ? await ensurePdfEmbeddedFontLoaded(
+                                apFontDictResolved,
+                                resolvedBase || apFont.resourceName,
+                                context.embeddedFontCache,
+                                context.embeddedFontFaces,
+                              )
+                            : undefined;
+
+                        pdfDebug(
+                          "import:freetext",
+                          "font_inject_result",
+                          () => ({
+                            stage: "AP",
+                            pageIndex,
+                            index,
+                            resourceName: apFont.resourceName,
+                            baseFontName: resolvedBase,
+                            injectedFamily,
+                          }),
+                        );
+
+                        const fontKey =
+                          pdfFontToAppFontKey(resolvedBase) ||
+                          pdfFontToAppFontKey(apFont.resourceName);
+
+                        sourcePdfFontName = resolvedBase || apFont.resourceName;
+                        sourcePdfFontIsSubset =
+                          !!sourcePdfFontName?.includes("+");
+                        sourcePdfFontMissing = !fontKey && !injectedFamily;
+
+                        if (fontKey) {
+                          fontFamily = fontKey;
+                        } else if (injectedFamily) {
+                          const fallback =
+                            pdfFontToCssFontFamily(resolvedBase) ||
+                            pdfFontToCssFontFamily(apFont.resourceName);
+                          fontFamily = fallback
+                            ? `"${injectedFamily}", ${fallback}`
+                            : `"${injectedFamily}"`;
+                        } else {
+                          const fallback =
+                            pdfFontToCssFontFamily(resolvedBase) ||
+                            pdfFontToCssFontFamily(apFont.resourceName);
+                          fontFamily = fallback;
+                        }
+
+                        pdfDebug("import:freetext", "ap_font_parsed", () => ({
+                          pageIndex,
+                          index,
+                          resourceName: apFont.resourceName,
+                          baseFontName: resolvedBase,
+                          injectedFamily,
+                          fontKey,
+                          fontFamily,
+                        }));
+                      }
+                    } else {
+                      pdfDebug("import:freetext", "ap_n_not_stream", () => ({
+                        pageIndex,
+                        index,
+                        nType:
+                          n && typeof n === "object"
+                            ? ((
+                                n as {
+                                  constructor?: { name?: string };
+                                }
+                              ).constructor?.name ?? null)
+                            : null,
+                      }));
+                    }
+                  } else {
+                    pdfDebug("import:freetext", "ap_missing", () => ({
+                      pageIndex,
+                      index,
+                    }));
+                  }
+                } catch (e) {
+                  pdfDebug("import:freetext", "ap_parse_failed", () => ({
+                    pageIndex,
+                    index,
+                    error: e,
+                  }));
+                }
+              }
+            } catch (e) {
+              console.warn(`Failed to parse FreeText advanced properties`, {
+                pageIndex,
+                index,
+                sourcePdfRef: ref,
+                error: e,
+              });
+              if (daFromPdfJs) {
+                try {
+                  parseDaString(daFromPdfJs);
+                } catch {
+                  // ignore
                 }
               }
             }
-          } catch (e) {
-            console.warn("Fallback FreeText extraction failed", e);
           }
         }
 

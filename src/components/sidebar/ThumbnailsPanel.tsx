@@ -3,7 +3,7 @@ import { PageData } from "../../types";
 import { ImageIcon } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useLanguage } from "../language-provider";
-import { pdfWorkerService } from "../../services/pdfWorkerService";
+import { pdfWorkerService } from "../../services/pdfService/pdfWorkerService";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 // --- Thumbnail Item ---

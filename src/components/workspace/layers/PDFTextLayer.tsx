@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { cn } from "../../lib/cn"; // Adjust path as needed
+import { cn } from "../../../lib/cn"; // Adjust path as needed
 import * as pdfjsLib from "pdfjs-dist";
 import { useEditorStore } from "@/store/useEditorStore";
 import { appEventBus } from "@/lib/eventBus";

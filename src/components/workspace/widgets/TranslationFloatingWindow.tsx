@@ -130,7 +130,7 @@ export const TranslationFloatingWindow: React.FC<
           // user cancelled
           return;
         }
-        setError(e?.message || String(e));
+        setError(e?.message);
       } finally {
         setIsLoading(false);
         abortRef.current = null;
@@ -175,37 +175,6 @@ export const TranslationFloatingWindow: React.FC<
           <Sparkles size={16} /> {t("translate.title")}
         </>
       }
-      headerRight={({ portalContainer, width }) => {
-        const triggerW = Math.max(140, Math.min(220, Math.floor(width * 0.35)));
-
-        return (
-          <div className="flex items-center gap-2" data-floating-window-no-drag>
-            <Select
-              value={model}
-              onValueChange={(v) => setModel(v as GeminiModelId)}
-            >
-              <SelectTrigger
-                className="h-7! text-xs"
-                style={{ width: triggerW }}
-                size="sm"
-                title={t("translate.model")}
-              >
-                <SelectValue placeholder={t("translate.model")} />
-              </SelectTrigger>
-              <SelectContent
-                portalContainer={portalContainer}
-                className="z-9999"
-              >
-                {GEMINI_MODEL_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-      }}
       closeLabel={t("common.close")}
       onClose={() => {
         cancelStream();
@@ -237,6 +206,28 @@ export const TranslationFloatingWindow: React.FC<
                     {t("translate.source_text")}
                   </div>
                   <div className="flex items-center gap-2">
+                    <Select
+                      value={model}
+                      onValueChange={(v) => setModel(v as GeminiModelId)}
+                    >
+                      <SelectTrigger
+                        className="h-7! text-xs"
+                        size="sm"
+                        title={t("translate.model")}
+                      >
+                        <SelectValue placeholder={t("translate.model")} />
+                      </SelectTrigger>
+                      <SelectContent
+                        portalContainer={portalContainer}
+                        className="z-9999"
+                      >
+                        {GEMINI_MODEL_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Select value={targetLang} onValueChange={setTargetLang}>
                       <SelectTrigger
                         className="h-7! text-xs"
@@ -245,10 +236,7 @@ export const TranslationFloatingWindow: React.FC<
                       >
                         <SelectValue placeholder={t("translate.target")} />
                       </SelectTrigger>
-                      <SelectContent
-                        portalContainer={portalContainer}
-                        className="z-9999"
-                      >
+                      <SelectContent portalContainer={portalContainer}>
                         {TARGET_LANG_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
                             {opt.label}
@@ -280,12 +268,6 @@ export const TranslationFloatingWindow: React.FC<
                     className="field-sizing-fixed h-full min-h-0 resize-none overflow-auto text-sm"
                   />
                 </div>
-
-                {error && (
-                  <div className="text-destructive text-[11px] leading-4">
-                    {error}
-                  </div>
-                )}
               </div>
 
               <div className="flex min-h-0 flex-col gap-1.5">
@@ -310,6 +292,9 @@ export const TranslationFloatingWindow: React.FC<
                     <span className="text-muted-foreground inline-block animate-pulse">
                       ▍
                     </span>
+                  )}
+                  {error && (
+                    <span className="text-destructive text-xs">{error}</span>
                   )}
                 </div>
               </div>
@@ -350,6 +335,28 @@ export const TranslationFloatingWindow: React.FC<
                 <div className="ml-auto flex items-center gap-2">
                   {activeTab === "source" ? (
                     <>
+                      <Select
+                        value={model}
+                        onValueChange={(v) => setModel(v as GeminiModelId)}
+                      >
+                        <SelectTrigger
+                          className="h-7! text-xs"
+                          size="sm"
+                          title={t("translate.model")}
+                        >
+                          <SelectValue placeholder={t("translate.model")} />
+                        </SelectTrigger>
+                        <SelectContent
+                          portalContainer={portalContainer}
+                          className="z-9999"
+                        >
+                          {GEMINI_MODEL_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Select value={targetLang} onValueChange={setTargetLang}>
                         <SelectTrigger
                           className="h-7! w-32 text-xs"
@@ -358,10 +365,7 @@ export const TranslationFloatingWindow: React.FC<
                         >
                           <SelectValue placeholder={t("translate.target")} />
                         </SelectTrigger>
-                        <SelectContent
-                          portalContainer={portalContainer}
-                          className="z-9999"
-                        >
+                        <SelectContent portalContainer={portalContainer}>
                           {TARGET_LANG_OPTIONS.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
                               {opt.label}
@@ -407,12 +411,6 @@ export const TranslationFloatingWindow: React.FC<
                       className="field-sizing-fixed h-full min-h-0 resize-none overflow-auto text-sm"
                     />
                   </div>
-
-                  {error && (
-                    <div className="text-destructive text-[11px] leading-4">
-                      {error}
-                    </div>
-                  )}
                 </div>
               </TabsContent>
 
@@ -425,13 +423,10 @@ export const TranslationFloatingWindow: React.FC<
                         ▍
                       </span>
                     )}
+                    {error && (
+                      <span className="text-destructive text-xs">{error}</span>
+                    )}
                   </div>
-
-                  {error && (
-                    <div className="text-destructive text-[11px] leading-4">
-                      {error}
-                    </div>
-                  )}
                 </div>
               </TabsContent>
             </Tabs>

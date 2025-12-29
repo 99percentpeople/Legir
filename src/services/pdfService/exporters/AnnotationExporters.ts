@@ -16,11 +16,7 @@ import { IAnnotationExporter } from "../types";
 import { hexToPdfColor } from "../lib/colors";
 import { generateInkAppearanceOps } from "../lib/ink";
 import { containsNonAscii, isSerifFamily } from "../lib/text";
-import {
-  uiPointToPdfPoint,
-  uiRectToPdfAnnotRect,
-  uiRectToPdfBounds,
-} from "../lib/coords";
+import { uiPointToPdfPoint, uiRectToPdfBounds } from "../lib/coords";
 
 export class HighlightExporter implements IAnnotationExporter {
   shouldExport(annotation: Annotation): boolean {

@@ -1,4 +1,4 @@
-import PDFRenderWorker from "../workers/pdf-render.worker?worker";
+import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
 
 export interface RenderRequest {
   type?: "render" | "cancel" | "load";

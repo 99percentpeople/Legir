@@ -51,9 +51,9 @@ src/
     storageService.ts        # Web 草稿存储（IndexedDB）
     recentFilesService.ts    # 桌面最近文件（localStorage）
     geminiService.ts         # AI 识别：从页面截图推断字段位置/类型
-    pdfWorkerService.ts      # 渲染 worker 编排层（给 workspace 使用）
-    pdfService.ts            # PDF 解析/渲染/导出中心（pdfjs-dist + pdf-lib）
-    pdf/                     # PDF“领域层”实现（导入/导出/资源解析的可扩展管线）
+    pdfService/
+      index.ts               # PDF 解析/渲染/导出中心（pdfjs-dist + pdf-lib）
+      pdfWorkerService.ts    # 渲染 worker 编排层（给 workspace 使用）
       parsers/               # 将 PDF 原生对象 -> FormField/Annotation
       exporters/             # 将 FormField/Annotation -> 写回 PDF
       lib/                   # PDF 资源/字体/appearance/outline 等工具库

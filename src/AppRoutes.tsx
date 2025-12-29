@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect } from "react";
 import { Route, Switch, useLocation } from "wouter";
 
+import { Spinner } from "./components/ui/spinner";
 import { Skeleton } from "./components/ui/skeleton";
 import type { LandingPageProps } from "./pages/LandingPage";
 import type { EditorPageProps } from "./pages/EditorPage";
@@ -35,16 +36,8 @@ const EditorRouteGuard: React.FC<{
 
 function LandingRouteFallback() {
   return (
-    <div className="flex flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-[720px] space-y-4">
-        <Skeleton className="h-10 w-2/3" />
-        <Skeleton className="h-32 w-full" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      </div>
+    <div className="flex flex-1 items-center justify-center">
+      <Spinner size="xl" />
     </div>
   );
 }

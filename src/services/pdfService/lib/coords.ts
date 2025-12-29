@@ -86,13 +86,13 @@ export const pdfJsWidgetRectToUiRect = (
     const y = Math.min(vy1, vy2);
     const width = Math.abs(vx2 - vx1);
     const height = Math.abs(vy2 - vy1);
-    pdfDebug("import:coords", "widget_rect_to_ui", {
+    pdfDebug("import:coords", "widget_rect_to_ui", () => ({
       rect,
       viewport: getViewportSummary(viewport),
       converted: { vx1, vy1, vx2, vy2 },
       out: { x, y, width, height },
       method: "convertToViewportPoint",
-    });
+    }));
     return { x, y, width, height };
   }
 
@@ -100,12 +100,12 @@ export const pdfJsWidgetRectToUiRect = (
   const height = y2 - y1;
   const x = x1;
   const y = viewport.height - y2;
-  pdfDebug("import:coords", "widget_rect_to_ui", {
+  pdfDebug("import:coords", "widget_rect_to_ui", () => ({
     rect,
     viewport: getViewportSummary(viewport),
     out: { x, y, width, height },
     method: "height_flip_fallback",
-  });
+  }));
   return { x, y, width, height };
 };
 
@@ -122,12 +122,12 @@ export const pdfJsRectToUiRect = (
   const width = Math.abs(vx2 - vx1);
   const height = Math.abs(vy2 - vy1);
 
-  pdfDebug("import:coords", "rect_to_ui", {
+  pdfDebug("import:coords", "rect_to_ui", () => ({
     rect,
     viewport: getViewportSummary(viewport),
     converted: { vx1, vy1, vx2, vy2 },
     out: { x, y, width, height },
-  });
+  }));
 
   return { x, y, width, height };
 };

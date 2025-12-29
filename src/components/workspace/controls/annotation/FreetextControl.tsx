@@ -19,6 +19,7 @@ import {
   resolveCjkFallbackFontStack,
   resolveFontStackForDisplay,
   resolveFontStackWithCjkFallback,
+  isKnownFontKey,
   splitTextRuns,
 } from "@/lib/fonts";
 
@@ -34,6 +35,36 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   const resolvedFontFamily = resolveFontStackForDisplay(data.fontFamily);
   const cjkFontFamily = resolveCjkFallbackFontStack(data.fontFamily);
   const editFontFamily = resolveFontStackWithCjkFallback(data.fontFamily);
+
+  const sourcePdfFallbackFontFamily = (() => {
+    const raw = (data.sourcePdfFontName || "").trim();
+    const derivedFromInjected = (() => {
+      const s = (data.fontFamily || "").trim();
+      const m = s.match(/^pdf-(.+)-[0-9a-f]{8}$/i);
+      return m?.[1]?.trim() || "";
+    })();
+
+    const candidate = raw || derivedFromInjected;
+    if (!candidate) return undefined;
+
+    const noPrefix = candidate.replace(/^\//, "");
+    const noSubset = noPrefix.includes("+")
+      ? noPrefix.split("+").slice(1).join("+")
+      : noPrefix;
+    const cleaned = noSubset.trim();
+    if (!cleaned) return undefined;
+    return `"${cleaned}"`;
+  })();
+
+  const nonAsciiFontFamily =
+    data.fontFamily && !isKnownFontKey(data.fontFamily)
+      ? (() => {
+          const base = resolveFontStackWithCjkFallback(data.fontFamily);
+          if (!sourcePdfFallbackFontFamily) return base;
+          if (base.includes(sourcePdfFallbackFontFamily)) return base;
+          return `${data.fontFamily}, ${sourcePdfFallbackFontFamily}, ${cjkFontFamily}`;
+        })()
+      : cjkFontFamily;
 
   const lastClickTimeRef = useRef<number>(0);
 
@@ -166,7 +197,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           color: data.color || "#000000",
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
-          lineHeight: 1.2,
+          lineHeight: 1,
           opacity: data.text ? 1 : 0.5,
         }}
         onPointerDown={handlePointerDown}
@@ -197,7 +228,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                         style={{
                           fontFamily: run.isAscii
                             ? resolvedFontFamily
-                            : cjkFontFamily,
+                            : nonAsciiFontFamily,
                         }}
                       >
                         {run.text}

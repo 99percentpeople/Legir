@@ -13,6 +13,8 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   subtype: string;
   rect: [number, number, number, number];
 
+  sourcePdfRef?: { objectNumber: number; generationNumber: number };
+
   fieldName?: string;
   fieldType?: string;
   fieldFlags?: number;
@@ -35,6 +37,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
 
   title?: string;
   contents?: string;
+  richText?: string;
   modificationDate?: string;
   quadPoints?: number[];
   opacity?: number;

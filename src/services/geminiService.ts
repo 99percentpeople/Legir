@@ -1,4 +1,9 @@
-import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
+import {
+  GenerateContentParameters,
+  GoogleGenAI,
+  ThinkingLevel,
+  Type,
+} from "@google/genai";
 import { FieldType, FormField, FieldStyle } from "../types";
 import { DEFAULT_FIELD_STYLE } from "../constants";
 
@@ -33,11 +38,10 @@ export interface TranslateTextOptions {
   model?: GeminiModelId;
   targetLanguage: string;
   sourceLanguage?: string;
-}
-
-export interface TranslateTextStreamOptions extends TranslateTextOptions {
   signal?: AbortSignal;
 }
+
+export interface TranslateTextStreamOptions extends TranslateTextOptions {}
 
 const extractGeminiText = (value: any): string => {
   if (!value) return "";
@@ -78,7 +82,7 @@ Text:
 ${text}
 `.trim();
 
-  const req: any = {
+  const req: GenerateContentParameters = {
     model,
     contents: {
       parts: [{ text: prompt }],
@@ -87,30 +91,16 @@ ${text}
       thinkingConfig: {
         thinkingLevel: ThinkingLevel.MINIMAL,
       },
+      abortSignal: opts.signal,
     },
   };
-  if (opts.signal) req.signal = opts.signal;
 
-  const generateStream = ai.models?.generateContentStream;
-  if (typeof generateStream !== "function") {
-    const full = await translateText(text, opts);
-    if (full) yield full;
-    return;
+  const stream = await ai.models.generateContentStream(req);
+
+  for await (const chunk of stream) {
+    const delta = extractGeminiText(chunk);
+    if (delta) yield delta;
   }
-
-  const streamResult = await generateStream.call(ai.models, req);
-  const stream = streamResult?.stream ?? streamResult;
-
-  if (stream && typeof stream[Symbol.asyncIterator] === "function") {
-    for await (const chunk of stream) {
-      const delta = extractGeminiText(chunk);
-      if (delta) yield delta;
-    }
-    return;
-  }
-
-  const full = await translateText(text, opts);
-  if (full) yield full;
 }
 
 export const translateText = async (
@@ -142,6 +132,12 @@ ${text}
     model,
     contents: {
       parts: [{ text: prompt }],
+    },
+    config: {
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.MINIMAL,
+      },
+      abortSignal: opts.signal,
     },
   });
 

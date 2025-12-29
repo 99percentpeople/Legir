@@ -56,10 +56,11 @@ export const getFontMap = (pdfDoc: PDFDocument): Map<string, string> => {
     console.warn("Failed to extract font map", e);
   }
 
-  pdfDebug("import:fonts", "font_map_extracted", {
+  pdfDebug("import:fonts", "font_map_extracted", () => ({
     size: map.size,
     entries: Array.from(map.entries()),
-  });
+  }));
+
   return map;
 };
 

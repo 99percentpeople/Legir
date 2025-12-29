@@ -1,14 +1,15 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { pdfWorkerService } from "./pdfWorkerService";
-import { mapOutline } from "./pdf/lib/outline";
-import { getFontMap, getGlobalDA } from "./pdf/lib/appearance";
-import { loadAndEmbedExportFonts } from "./pdf/lib/built-in-fonts";
+import { mapOutline } from "./lib/outline";
+import { getFontMap, getGlobalDA } from "./lib/appearance";
+import { loadAndEmbedExportFonts } from "./lib/built-in-fonts";
 import {
   containsNonAscii,
   isSerifFamily,
   isExplicitCjkFontSelection,
-} from "./pdf/lib/text";
-import { parsePDFDate } from "../utils/pdfUtils";
+} from "./lib/text";
+import { parsePDFDate } from "@/utils/pdfUtils";
+import { decodePdfString } from "./lib/pdf-objects";
 import {
   PDFDocument,
   StandardFonts,
@@ -16,9 +17,11 @@ import {
   PDFRef,
   PDFName,
   PDFString,
+  PDFHexString,
   PDFDict,
   PDFBool,
   PDFArray,
+  PDFNumber,
   PDFTextField,
   PDFCheckBox,
   PDFDropdown,
@@ -33,41 +36,43 @@ import {
   PDFMetadata,
   PDFOutlineItem,
   Annotation,
-} from "../types";
+} from "@/types";
 import {
   IAnnotationParser,
   IControlParser,
   IAnnotationExporter,
   IControlExporter,
   ParserContext,
-} from "./pdf/types";
+} from "./types";
+import type { PdfJsAnnotation, PdfJsAnnotationOption } from "./types";
 import {
   InkParser,
   HighlightParser,
   CommentParser,
   FreeTextParser,
-} from "./pdf/parsers/AnnotationParsers";
+} from "./parsers/AnnotationParsers";
 import {
   TextControlParser,
   CheckboxControlParser,
   RadioControlParser,
   DropdownControlParser,
   SignatureControlParser,
-} from "./pdf/parsers/ControlParsers";
+} from "./parsers/ControlParsers";
 import {
   InkExporter,
   HighlightExporter,
   CommentExporter,
   FreeTextExporter,
-} from "./pdf/exporters/AnnotationExporters";
+} from "./exporters/AnnotationExporters";
 import {
   TextControlExporter,
   CheckboxControlExporter,
   RadioControlExporter,
   DropdownControlExporter,
   SignatureControlExporter,
-} from "./pdf/exporters/ControlExporters";
+} from "./exporters/ControlExporters";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
+import { PDFJS_CMAP_URL, PDFJS_STANDARD_FONT_URL } from "./pdfRenderer";
 
 // PDF pipeline service.
 //
@@ -84,10 +89,6 @@ import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 // Extension points:
 // - Add a new control/annotation type by implementing a Parser + Exporter and registering it
 //   in the arrays below. The rest of the app treats `FormField` / `Annotation` as plain data.
-
-const BASE_URL = import.meta.env.BASE_URL || "/";
-const PDFJS_CMAP_URL = `${BASE_URL}pdfjs/cmaps/`;
-const PDFJS_STANDARD_FONT_URL = `${BASE_URL}pdfjs/standard_fonts/`;
 
 // pdfjs worker for parsing/render internals.
 pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
@@ -124,6 +125,375 @@ const controlExporters: IControlExporter[] = [
   new DropdownControlExporter(),
   new SignatureControlExporter(),
 ];
+
+const pdfObjToString = (obj: unknown): string | undefined => {
+  if (obj instanceof PDFName) return obj.decodeText();
+  if (obj instanceof PDFString || obj instanceof PDFHexString)
+    return obj.decodeText();
+  return decodePdfString(obj);
+};
+
+const pdfArrayToNumberList = (obj: unknown): number[] | undefined => {
+  if (!(obj instanceof PDFArray)) return undefined;
+  const out: number[] = [];
+  for (let i = 0; i < obj.size(); i++) {
+    const v = obj.lookup(i);
+    if (v instanceof PDFNumber) out.push(v.asNumber());
+  }
+  return out.length > 0 ? out : undefined;
+};
+
+const pdfRectFromObj = (
+  rectObj: unknown,
+): [number, number, number, number] | undefined => {
+  const nums = pdfArrayToNumberList(rectObj);
+  if (!nums || nums.length < 4) return undefined;
+  return [nums[0], nums[1], nums[2], nums[3]];
+};
+
+const lookupInFieldChain = (
+  start: PDFDict,
+  key: string,
+): unknown | undefined => {
+  let cur: PDFDict | undefined = start;
+  for (let depth = 0; depth < 20 && cur; depth++) {
+    try {
+      const v = cur.lookup(PDFName.of(key));
+      if (v !== undefined) return v;
+    } catch {
+      // ignore
+    }
+
+    try {
+      const parent = cur.lookup(PDFName.of("Parent"));
+      if (parent instanceof PDFDict) {
+        cur = parent;
+        continue;
+      }
+    } catch {
+      // ignore
+    }
+    break;
+  }
+  return undefined;
+};
+
+const buildFullFieldNameFromChain = (start: PDFDict): string | undefined => {
+  const parts: string[] = [];
+  let cur: PDFDict | undefined = start;
+  for (let depth = 0; depth < 20 && cur; depth++) {
+    try {
+      const t = pdfObjToString(cur.lookup(PDFName.of("T")));
+      if (t) parts.unshift(t);
+    } catch {
+      // ignore
+    }
+
+    try {
+      const parent = cur.lookup(PDFName.of("Parent"));
+      if (parent instanceof PDFDict) {
+        cur = parent;
+        continue;
+      }
+    } catch {
+      // ignore
+    }
+    break;
+  }
+
+  if (parts.length === 0) return undefined;
+  return parts.join(".");
+};
+
+const extractWidgetOnValue = (widgetDict: PDFDict): string | undefined => {
+  try {
+    const ap = widgetDict.lookup(PDFName.of("AP"));
+    if (!(ap instanceof PDFDict)) return undefined;
+    const n = ap.lookup(PDFName.of("N"));
+    if (!(n instanceof PDFDict)) return undefined;
+
+    for (const [k] of n.entries()) {
+      const name = k.decodeText();
+      if (name && name !== "Off") return name;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const as = widgetDict.lookup(PDFName.of("AS"));
+    const asStr = pdfObjToString(as);
+    if (asStr && asStr !== "Off") return asStr;
+  } catch {
+    // ignore
+  }
+
+  return undefined;
+};
+
+const extractBorderWidth = (widgetDict: PDFDict): number | undefined => {
+  try {
+    const bs = widgetDict.lookup(PDFName.of("BS"));
+    if (bs instanceof PDFDict) {
+      const w = bs.lookup(PDFName.of("W"));
+      if (w instanceof PDFNumber) return w.asNumber();
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const border = widgetDict.lookup(PDFName.of("Border"));
+    if (border instanceof PDFArray && border.size() >= 3) {
+      const w = border.lookup(2);
+      if (w instanceof PDFNumber) return w.asNumber();
+    }
+  } catch {
+    // ignore
+  }
+
+  return undefined;
+};
+
+const extractMkColor = (
+  widgetDict: PDFDict,
+  key: "BC" | "BG",
+): number[] | undefined => {
+  try {
+    const mk = widgetDict.lookup(PDFName.of("MK"));
+    if (!(mk instanceof PDFDict)) return undefined;
+    const c = mk.lookup(PDFName.of(key));
+    const nums = pdfArrayToNumberList(c);
+    if (!nums) return undefined;
+    if (nums.length === 1) return [nums[0], nums[0], nums[0]];
+    return nums;
+  } catch {
+    return undefined;
+  }
+};
+
+const extractChoiceOptions = (
+  optObj: unknown,
+): PdfJsAnnotationOption[] | undefined => {
+  if (!(optObj instanceof PDFArray)) return undefined;
+  const out: PdfJsAnnotationOption[] = [];
+
+  for (let i = 0; i < optObj.size(); i++) {
+    const item = optObj.lookup(i);
+    if (item instanceof PDFString || item instanceof PDFHexString) {
+      out.push(item.decodeText());
+      continue;
+    }
+
+    if (item instanceof PDFArray) {
+      const exportValue = pdfObjToString(item.lookup(0));
+      const display = pdfObjToString(item.lookup(1));
+      out.push({ display, exportValue });
+      continue;
+    }
+  }
+
+  return out.length > 0 ? out : undefined;
+};
+
+const extractFieldValue = (vObj: unknown): unknown => {
+  if (vObj instanceof PDFName) return vObj.decodeText();
+  if (vObj instanceof PDFString || vObj instanceof PDFHexString)
+    return vObj.decodeText();
+  if (vObj instanceof PDFArray) {
+    const vals: string[] = [];
+    for (let i = 0; i < vObj.size(); i++) {
+      const item = vObj.lookup(i);
+      const s = pdfObjToString(item);
+      if (s) vals.push(s);
+    }
+    return vals;
+  }
+  return undefined;
+};
+
+const buildPdfLibAnnotsByPageIndex = (pdfDoc: PDFDocument) => {
+  const out = new Map<number, PdfJsAnnotation[]>();
+  const pages = pdfDoc.getPages();
+
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const page = pages[pageIndex];
+    let annots: unknown;
+    try {
+      annots = page.node.Annots();
+    } catch {
+      annots = undefined;
+    }
+    if (!(annots instanceof PDFArray)) continue;
+
+    for (let i = 0; i < annots.size(); i++) {
+      let sourcePdfRef:
+        | { objectNumber: number; generationNumber: number }
+        | undefined = undefined;
+      try {
+        const rawRef = (
+          annots as unknown as { get?: (i: number) => unknown }
+        ).get?.(i);
+        if (rawRef instanceof PDFRef) {
+          sourcePdfRef = {
+            objectNumber: rawRef.objectNumber,
+            generationNumber: rawRef.generationNumber,
+          };
+        }
+      } catch {
+        // ignore
+      }
+
+      const annot = annots.lookup(i);
+      if (!(annot instanceof PDFDict)) continue;
+
+      const subtype = annot.lookup(PDFName.of("Subtype"));
+
+      const subtypeName =
+        subtype instanceof PDFName ? subtype.decodeText() : undefined;
+      if (!subtypeName) continue;
+
+      const rect = pdfRectFromObj(annot.lookup(PDFName.of("Rect")));
+      if (!rect) continue;
+
+      const pushForPage = (a: PdfJsAnnotation) => {
+        const arr = out.get(pageIndex) || [];
+        arr.push(a);
+        out.set(pageIndex, arr);
+      };
+
+      if (subtypeName === "Widget") {
+        const fieldName = buildFullFieldNameFromChain(annot);
+        if (!fieldName) continue;
+
+        const fieldType = pdfObjToString(lookupInFieldChain(annot, "FT"));
+        if (!fieldType) continue;
+
+        const rawFf = lookupInFieldChain(annot, "Ff");
+        const fieldFlags = rawFf instanceof PDFNumber ? rawFf.asNumber() : 0;
+
+        const rawDa = lookupInFieldChain(annot, "DA");
+        const da = pdfObjToString(rawDa);
+
+        const rawQ = lookupInFieldChain(annot, "Q");
+        const textAlignment =
+          rawQ instanceof PDFNumber ? rawQ.asNumber() : undefined;
+
+        const rawTu = lookupInFieldChain(annot, "TU");
+        const tu = pdfObjToString(rawTu);
+
+        const rawV = lookupInFieldChain(annot, "V");
+        const fieldValue = extractFieldValue(rawV);
+
+        const optObj = lookupInFieldChain(annot, "Opt");
+        const options = extractChoiceOptions(optObj);
+
+        const borderWidth = extractBorderWidth(annot);
+        const color = extractMkColor(annot, "BC");
+        const backgroundColor = extractMkColor(annot, "BG");
+
+        const isRadio = (fieldFlags & (1 << 15)) !== 0;
+        const isPushButton = (fieldFlags & (1 << 16)) !== 0;
+        const isBtn = fieldType === "Btn";
+        const checkBox = isBtn && !isRadio && !isPushButton;
+        const radioButton = isBtn && isRadio;
+
+        const buttonValue = isBtn ? extractWidgetOnValue(annot) : undefined;
+
+        pushForPage({
+          subtype: "Widget",
+          rect,
+          sourcePdfRef,
+          fieldName,
+          fieldType,
+          fieldFlags,
+          fieldValue,
+          alternativeText: tu,
+          options,
+          color,
+          backgroundColor,
+          borderStyle:
+            typeof borderWidth === "number"
+              ? { width: borderWidth }
+              : undefined,
+          defaultAppearance: da,
+          DA: da,
+          textAlignment,
+          checkBox: checkBox || undefined,
+          radioButton: radioButton || undefined,
+          buttonValue,
+        });
+        continue;
+      }
+
+      if (
+        subtypeName !== "Highlight" &&
+        subtypeName !== "Text" &&
+        subtypeName !== "FreeText"
+      ) {
+        continue;
+      }
+
+      const c = annot.lookup(PDFName.of("C"));
+      const color = pdfArrayToNumberList(c);
+
+      const caObj = annot.lookup(PDFName.of("CA"));
+      const caObjLower = annot.lookup(PDFName.of("ca"));
+      const opacity =
+        caObj instanceof PDFNumber
+          ? caObj.asNumber()
+          : caObjLower instanceof PDFNumber
+            ? caObjLower.asNumber()
+            : undefined;
+
+      const title = pdfObjToString(annot.lookup(PDFName.of("T")));
+      const contents = pdfObjToString(annot.lookup(PDFName.of("Contents")));
+      const modificationDate = pdfObjToString(annot.lookup(PDFName.of("M")));
+
+      const base: PdfJsAnnotation = {
+        subtype: subtypeName,
+        rect,
+        sourcePdfRef,
+        color,
+        opacity,
+        title,
+        contents,
+        modificationDate,
+      };
+
+      if (subtypeName === "Highlight") {
+        const qp = pdfArrayToNumberList(annot.lookup(PDFName.of("QuadPoints")));
+        pushForPage({
+          ...base,
+          quadPoints: qp,
+        });
+        continue;
+      }
+
+      if (subtypeName === "FreeText") {
+        const da = pdfObjToString(annot.lookup(PDFName.of("DA")));
+        const q = annot.lookup(PDFName.of("Q"));
+        const textAlignment = q instanceof PDFNumber ? q.asNumber() : undefined;
+        pushForPage({
+          ...base,
+          defaultAppearance: da,
+          DA: da,
+          textAlignment,
+        });
+        continue;
+      }
+
+      // subtypeName === "Text" (comment)
+      const richText = pdfObjToString(annot.lookup(PDFName.of("RC")));
+      pushForPage({
+        ...base,
+        richText,
+      });
+    }
+  }
+
+  return out;
+};
 
 export const loadPDF = async (
   input: File | Uint8Array,
@@ -192,6 +562,16 @@ export const loadPDF = async (
   const pages: PageData[] = [];
   const fields: FormField[] = [];
   const annotations: Annotation[] = [];
+
+  let pdfLibAnnotsByPageIndex: Map<number, PdfJsAnnotation[]> | undefined =
+    undefined;
+  if (pdfDoc) {
+    try {
+      pdfLibAnnotsByPageIndex = buildPdfLibAnnotsByPageIndex(pdfDoc);
+    } catch (e) {
+      console.warn("Failed to extract annotations with pdf-lib", e);
+    }
+  }
 
   const embeddedFontCache = new Map<string, Promise<string | undefined>>();
   const embeddedFontFaces = new Set<FontFace>();
@@ -288,7 +668,7 @@ export const loadPDF = async (
       const pageNumber = idx + 1;
       const page = await pdf.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 1.0 });
-      const pageAnnotations = await page.getAnnotations();
+      const pageAnnotations = (pdfLibAnnotsByPageIndex?.get(idx) || []) as any;
 
       const context: ParserContext = {
         pageAnnotations,
@@ -358,106 +738,6 @@ export const loadPDF = async (
     outline,
     dispose,
   };
-};
-
-export const renderPage = async (
-  page: pdfjsLib.PDFPageProxy,
-  scale: number = 1.0,
-  options?: {
-    renderAnnotations?: boolean;
-  },
-): Promise<string | null> => {
-  try {
-    const viewport: pdfjsLib.PageViewport = page.getViewport({ scale });
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-
-    if (context) {
-      const annotationMode = options?.renderAnnotations
-        ? pdfjsLib.AnnotationMode.ENABLE
-        : pdfjsLib.AnnotationMode.DISABLE;
-
-      await page.render({
-        canvas,
-        canvasContext: context,
-        viewport,
-        annotationMode,
-      }).promise;
-      return canvas.toDataURL("image/jpeg", 0.8);
-    }
-    return null;
-  } catch (e) {
-    console.error("Failed to render page to DataURL", e);
-    return null;
-  }
-};
-
-export const renderPdfThumbnailFromPdfBytes = async (options: {
-  pdfBytes: Uint8Array;
-  targetWidth?: number;
-  renderAnnotations?: boolean;
-}): Promise<string | null> => {
-  let doc: pdfjsLib.PDFDocumentProxy | null = null;
-  try {
-    const renderBuffer = new Uint8Array(options.pdfBytes.slice(0));
-    doc = await pdfjsLib.getDocument({
-      data: renderBuffer,
-      password: "",
-      cMapUrl: PDFJS_CMAP_URL,
-      cMapPacked: true,
-      standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
-      useSystemFonts: false,
-      disableFontFace: false,
-    }).promise;
-
-    const page = await doc.getPage(1);
-    const baseViewport = page.getViewport({
-      scale: 1.0,
-      rotation: page.rotate,
-    });
-    const targetWidth = options.targetWidth ?? 240;
-    const scale = Math.min(
-      1.0,
-      Math.max(0.05, targetWidth / baseViewport.width),
-    );
-    return await renderPage(page, scale, {
-      renderAnnotations: options.renderAnnotations ?? true,
-    });
-  } catch (e) {
-    console.warn("Failed to render PDF thumbnail", e);
-    return null;
-  } finally {
-    try {
-      await doc?.destroy();
-    } catch {
-      // ignore
-    }
-  }
-};
-
-export const renderPdfThumbnailFromPage = async (options: {
-  page: pdfjsLib.PDFPageProxy;
-  targetWidth?: number;
-}): Promise<string | null> => {
-  try {
-    const baseViewport = options.page.getViewport({
-      scale: 1.0,
-      rotation: options.page.rotate,
-    });
-    const targetWidth = options.targetWidth ?? 240;
-    const scale = Math.min(
-      1.0,
-      Math.max(0.05, targetWidth / baseViewport.width),
-    );
-    return await renderPage(options.page, scale, {
-      renderAnnotations: true,
-    });
-  } catch (e) {
-    console.warn("Failed to render PDF thumbnail", e);
-    return null;
-  }
 };
 
 export const exportPDF = async (
@@ -808,3 +1088,9 @@ export const exportPDF = async (
 
   return await pdfDoc.save();
 };
+
+export {
+  renderPdfThumbnailFromPdfBytes,
+  renderPdfThumbnailFromPage,
+  renderPage,
+} from "./pdfRenderer";
