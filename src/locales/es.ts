@@ -64,6 +64,11 @@ const es = {
   },
   translate: {
     title: "Traducir",
+    provider: "Proveedor",
+    provider_gemini: "Gemini (IA)",
+    provider_cloud: "Cloud Translation API",
+    cloud_api_key_missing:
+      "Falta la clave de Cloud Translation API. Establece GOOGLE_TRANSLATE_API_KEY en .env.local y reinicia la aplicación.",
     model: "Modelo",
     target: "Idioma de destino",
     source_text: "Origen",

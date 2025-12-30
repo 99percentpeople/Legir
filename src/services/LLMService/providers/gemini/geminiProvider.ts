@@ -1,16 +1,39 @@
 import {
-  GenerateContentParameters,
   GoogleGenAI,
   ThinkingLevel,
   Type,
+  type GenerateContentParameters,
 } from "@google/genai";
-import { FieldType, FormField, FieldStyle } from "../types";
-import { DEFAULT_FIELD_STYLE } from "../constants";
+
+import { DEFAULT_FIELD_STYLE } from "@/constants";
+import type { FieldStyle, FormField } from "@/types";
+import { FieldType } from "@/types";
+import { translateService } from "@/services/translateService";
+
+import type {
+  LLMAnalyzePageForFieldsProvider,
+  LLMTranslateProvider,
+  LLMTranslateTextOptions,
+} from "../../types";
 
 export type GeminiModelId = "gemini-3-flash-preview" | "gemini-2.5-flash";
 
-export const GEMINI_MODEL_OPTIONS: { value: GeminiModelId; label: string }[] = [
-  { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview" },
+export type GeminiModelOption = {
+  value: GeminiModelId;
+  label: string;
+  config?: {
+    thinkingLevel?: ThinkingLevel;
+  };
+};
+
+export const GEMINI_MODEL_OPTIONS: GeminiModelOption[] = [
+  {
+    value: "gemini-3-flash-preview",
+    label: "Gemini 3 Flash Preview",
+    config: {
+      thinkingLevel: ThinkingLevel.MINIMAL,
+    },
+  },
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
 ];
 
@@ -18,28 +41,15 @@ const getGeminiApiKey = () => {
   return process.env.GEMINI_API_KEY || process.env.API_KEY;
 };
 
+export const GEMINI_API_AVAILABLE = !!getGeminiApiKey();
+
 export interface AIAnalysisOptions {
   allowedTypes?: FieldType[];
   extraPrompt?: string;
   model?: GeminiModelId;
 }
 
-export const GEMINI_API_AVAILABLE = !!getGeminiApiKey();
-
-const createGeminiClient = () => {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error("No API Key provided for Gemini.");
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
-export interface TranslateTextOptions {
-  model?: GeminiModelId;
-  targetLanguage: string;
-  sourceLanguage?: string;
-  signal?: AbortSignal;
-}
+export interface TranslateTextOptions extends LLMTranslateTextOptions<GeminiModelId> {}
 
 export interface TranslateTextStreamOptions extends TranslateTextOptions {}
 
@@ -57,19 +67,41 @@ const extractGeminiText = (value: any): string => {
   return "";
 };
 
-export async function* translateTextStream(
-  text: string,
-  opts: TranslateTextStreamOptions,
-): AsyncGenerator<string> {
-  if (!GEMINI_API_AVAILABLE) {
-    throw new Error("No API Key provided for Gemini.");
-  }
+const getGeminiModelId = (raw: string | undefined): GeminiModelId => {
+  const fallback = GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash";
+  if (!raw) return fallback;
+  const known = GEMINI_MODEL_OPTIONS.some((m) => m.value === raw);
+  return known ? (raw as GeminiModelId) : fallback;
+};
 
-  const ai = createGeminiClient();
-  const model =
-    opts.model ?? GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash";
+const getGeminiModelOption = (model: GeminiModelId): GeminiModelOption => {
+  return (
+    GEMINI_MODEL_OPTIONS.find((m) => m.value === model) ?? {
+      value: model,
+      label: model,
+    }
+  );
+};
 
-  const prompt = `
+const buildGeminiConfig = (
+  model: GeminiModelId,
+  opts?: { signal?: AbortSignal },
+) => {
+  const modelOpt = getGeminiModelOption(model);
+  return {
+    ...(modelOpt.config?.thinkingLevel
+      ? {
+          thinkingConfig: {
+            thinkingLevel: modelOpt.config.thinkingLevel,
+          },
+        }
+      : {}),
+    abortSignal: opts?.signal,
+  };
+};
+
+const buildTranslationPrompt = (text: string, opts: TranslateTextOptions) => {
+  return `
 You are a professional translator.
 
 Task:
@@ -81,83 +113,91 @@ Task:
 Text:
 ${text}
 `.trim();
+};
 
-  const req: GenerateContentParameters = {
-    model,
-    contents: {
-      parts: [{ text: prompt }],
-    },
-    config: {
-      thinkingConfig: {
-        thinkingLevel: ThinkingLevel.MINIMAL,
-      },
-      abortSignal: opts.signal,
-    },
-  };
+class GeminiClient {
+  isAvailable() {
+    return !!getGeminiApiKey();
+  }
 
-  const stream = await ai.models.generateContentStream(req);
+  private createClient() {
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      throw new Error("No API Key provided for Gemini.");
+    }
+    return new GoogleGenAI({ apiKey });
+  }
 
-  for await (const chunk of stream) {
-    const delta = extractGeminiText(chunk);
-    if (delta) yield delta;
+  async generateContent(req: GenerateContentParameters) {
+    if (!this.isAvailable()) {
+      throw new Error("No API Key provided for Gemini.");
+    }
+    const ai = this.createClient();
+    return await ai.models.generateContent(req);
+  }
+
+  async generateContentStream(req: GenerateContentParameters) {
+    if (!this.isAvailable()) {
+      throw new Error("No API Key provided for Gemini.");
+    }
+    const ai = this.createClient();
+    return await ai.models.generateContentStream(req);
   }
 }
 
-export const translateText = async (
-  text: string,
-  opts: TranslateTextOptions,
-): Promise<string> => {
-  if (!GEMINI_API_AVAILABLE) {
-    throw new Error("No API Key provided for Gemini.");
-  }
+const client = new GeminiClient();
 
-  const ai = createGeminiClient();
-  const model =
-    opts.model ?? GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash";
+export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
+  LLMAnalyzePageForFieldsProvider = {
+  id: "gemini",
+  isAvailable: () => client.isAvailable(),
 
-  const prompt = `
-You are a professional translator.
+  translateText: async (text, opts) => {
+    const model = getGeminiModelId(opts.model);
+    const prompt = buildTranslationPrompt(text, opts);
 
-Task:
-- Translate the following text${opts.sourceLanguage ? ` from ${opts.sourceLanguage}` : ""} to ${opts.targetLanguage}.
-- Preserve the original meaning.
-- Keep formatting (line breaks) where appropriate.
-- Output ONLY the translated text. No explanations.
-
-Text:
-${text}
-`.trim();
-
-  const response = await ai.models.generateContent({
-    model,
-    contents: {
-      parts: [{ text: prompt }],
-    },
-    config: {
-      thinkingConfig: {
-        thinkingLevel: ThinkingLevel.MINIMAL,
+    const response = await client.generateContent({
+      model,
+      contents: {
+        parts: [{ text: prompt }],
       },
-      abortSignal: opts.signal,
-    },
-  });
+      config: buildGeminiConfig(model, { signal: opts.signal }),
+    });
 
-  return (response.text || "").trim();
-};
+    return (response.text || "").trim();
+  },
 
-export const analyzePageForFields = async (
-  base64Image: string,
-  pageIndex: number,
-  pageWidth: number,
-  pageHeight: number,
-  existingFields: FormField[] = [],
-  options?: AIAnalysisOptions,
-): Promise<FormField[]> => {
-  if (!GEMINI_API_AVAILABLE) {
-    throw new Error("No API Key provided for Gemini.");
-  }
+  translateTextStream: async function* (text, opts) {
+    const model = getGeminiModelId(opts.model);
+    const prompt = buildTranslationPrompt(text, opts);
 
-  try {
-    const ai = createGeminiClient();
+    const req: GenerateContentParameters = {
+      model,
+      contents: {
+        parts: [{ text: prompt }],
+      },
+      config: buildGeminiConfig(model, { signal: opts.signal }),
+    };
+
+    const stream = await client.generateContentStream(req);
+    for await (const chunk of stream) {
+      const delta = extractGeminiText(chunk);
+      if (delta) yield delta;
+    }
+  },
+
+  analyzePageForFields: async (
+    base64Image,
+    pageIndex,
+    pageWidth,
+    pageHeight,
+    existingFields = [],
+    options,
+  ) => {
+    const typedExistingFields = existingFields as FormField[];
+    const typedOptions = options as AIAnalysisOptions | undefined;
+
+    const model = getGeminiModelId(typedOptions?.model);
 
     // Clean base64 string
     const cleanBase64 = base64Image.replace(
@@ -167,7 +207,7 @@ export const analyzePageForFields = async (
 
     // Create a summary of existing fields to provide context to the AI
     // Convert to 0-1000 scale for the model
-    const existingFieldsSummary = existingFields.map((f) => ({
+    const existingFieldsSummary = typedExistingFields.map((f) => ({
       id: f.id,
       type: f.type,
       // Provide coordinates in 0-1000 scale [ymin, xmin, ymax, xmax]
@@ -179,7 +219,7 @@ export const analyzePageForFields = async (
       ],
     }));
 
-    const allowedTypes = options?.allowedTypes || [
+    const allowedTypes = typedOptions?.allowedTypes || [
       FieldType.TEXT,
       FieldType.CHECKBOX,
       FieldType.RADIO,
@@ -210,7 +250,6 @@ export const analyzePageForFields = async (
       );
     }
 
-    let typeEnum = ["text", "checkbox", "radio", "dropdown", "signature"];
     const schemaEnumMap: Record<string, string> = {
       [FieldType.TEXT]: "text",
       [FieldType.CHECKBOX]: "checkbox",
@@ -267,15 +306,14 @@ export const analyzePageForFields = async (
       - If a field is identified as a "dropdown", attempt to infer logical options based on the label or context.
 
       Additional User Instructions:
-      ${options?.extraPrompt || "None"}
+      ${typedOptions?.extraPrompt || "None"}
 
       Output Schema:
       Return a JSON object with a "fields" array.
     `;
 
-    const response = await ai.models.generateContent({
-      model:
-        options?.model ?? GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash",
+    const response = await client.generateContent({
+      model,
       contents: {
         parts: [
           {
@@ -288,9 +326,7 @@ export const analyzePageForFields = async (
         ],
       },
       config: {
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.MINIMAL,
-        },
+        ...buildGeminiConfig(model),
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -471,10 +507,49 @@ export const analyzePageForFields = async (
         radioValue: fieldType === FieldType.RADIO ? "Choice1" : undefined,
         multiline: multiline,
         alignment: alignment,
-      };
+      } satisfies FormField;
     });
-  } catch (error) {
-    console.error("Gemini analysis failed:", error);
-    return [];
-  }
+  },
 };
+
+translateService.registerOptionGroup({
+  id: "gemini",
+  label: "Gemini (AI)",
+  labelKey: "translate.provider_gemini",
+  options: GEMINI_MODEL_OPTIONS.map((opt) => ({
+    id: `gemini:${opt.value}`,
+    label: opt.label,
+  })),
+  isAvailable: () => client.isAvailable(),
+  unavailableMessageKey: "ai_panel.api_key_missing",
+  translate: async (text, optionId, opts) => {
+    const model = getGeminiModelId(
+      optionId.startsWith("gemini:")
+        ? optionId.slice("gemini:".length)
+        : undefined,
+    );
+    return await geminiProvider.translateText(text, {
+      model,
+      targetLanguage: opts.targetLanguage,
+      sourceLanguage: opts.sourceLanguage,
+      signal: opts.signal,
+    });
+  },
+  translateStream: (text, optionId, opts) => {
+    const model = getGeminiModelId(
+      optionId.startsWith("gemini:")
+        ? optionId.slice("gemini:".length)
+        : undefined,
+    );
+    return geminiProvider.translateTextStream!(text, {
+      model,
+      targetLanguage: opts.targetLanguage,
+      sourceLanguage: opts.sourceLanguage,
+      signal: opts.signal,
+    });
+  },
+});
+
+translateService.setDefaultOptionId(
+  `gemini:${GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash"}`,
+);

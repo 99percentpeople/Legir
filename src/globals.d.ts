@@ -3,6 +3,15 @@
 
 import "react";
 
+declare const process: {
+  env: {
+    API_KEY?: string;
+    GEMINI_API_KEY?: string;
+    GOOGLE_TRANSLATE_API_KEY?: string;
+    APP_NAME?: string;
+  };
+};
+
 declare module "react" {
   interface CSSProperties {
     [key: `--${string}`]: string | number;

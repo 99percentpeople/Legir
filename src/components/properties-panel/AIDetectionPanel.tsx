@@ -8,7 +8,7 @@ import {
   AIDetectionOptions,
   AIDetectionOptionsForm,
 } from "@/components/AIDetectionOptionsForm";
-import { GEMINI_API_AVAILABLE } from "@/services/geminiService";
+import { GEMINI_API_AVAILABLE } from "@/services/LLMService";
 
 export interface AIDetectionPanelProps {
   isFloating: boolean;

@@ -64,6 +64,11 @@ const zhTW = {
   },
   translate: {
     title: "翻譯",
+    provider: "翻譯服務",
+    provider_gemini: "Gemini（AI）",
+    provider_cloud: "Cloud Translation API",
+    cloud_api_key_missing:
+      "缺少 Cloud Translation API Key。請在 .env.local 中設定 GOOGLE_TRANSLATE_API_KEY 並重啟應用。",
     model: "模型",
     target: "目標語言",
     source_text: "原文",

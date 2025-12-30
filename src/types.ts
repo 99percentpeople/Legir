@@ -170,6 +170,8 @@ export interface PenStyle {
 
 export type DialogName = "shortcuts" | "settings" | "close_confirm" | null;
 
+export type TranslateOptionId = string;
+
 export interface EditorState {
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
@@ -206,6 +208,9 @@ export interface EditorState {
   } | null;
   // Settings
   options: EditorOptions;
+
+  // Translate (UI preference)
+  translateOption: TranslateOptionId;
 
   // Dialog State
   activeDialog: "shortcuts" | "settings" | "close_confirm" | null;
@@ -277,4 +282,5 @@ export type EditorUiState = Pick<
   | "pageLayout"
   | "sidebarWidth"
   | "rightPanelWidth"
+  | "translateOption"
 >;

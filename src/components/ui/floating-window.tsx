@@ -67,7 +67,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   const [pos, setPos] = useState({ left: 0, top: 0 });
   const [size, setSize] = useState(defaultSize);
 
+  const posRef = useRef(pos);
+  const sizeRef = useRef(size);
+
   const hasPositionedOnceRef = useRef(false);
+  const hasUserMovedRef = useRef(false);
 
   const dragStateRef = useRef<{
     startX: number;
@@ -99,6 +103,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     (e: React.PointerEvent, dir: ResizeDir) => {
       e.preventDefault();
       e.stopPropagation();
+      hasUserMovedRef.current = true;
       resizeStateRef.current = {
         startX: e.clientX,
         startY: e.clientY,
@@ -113,6 +118,126 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     },
     [pos.left, pos.top, size.height, size.width],
   );
+
+  useEffect(() => {
+    posRef.current = pos;
+  }, [pos]);
+
+  useEffect(() => {
+    sizeRef.current = size;
+  }, [size]);
+
+  const getViewportSize = useCallback(() => {
+    const vv = window.visualViewport;
+    return {
+      width: Math.round(vv?.width ?? window.innerWidth),
+      height: Math.round(vv?.height ?? window.innerHeight),
+    };
+  }, []);
+
+  const clampToViewport = useCallback(
+    (
+      nextPos: { left: number; top: number },
+      nextSize: { width: number; height: number },
+    ) => {
+      const pad = 12;
+      const vp = getViewportSize();
+
+      const maxWByViewport = Math.max(0, vp.width - pad * 2);
+      const maxHByViewport = Math.max(0, vp.height - pad * 2);
+
+      const effMinW = Math.max(0, Math.min(minSize.width, maxWByViewport));
+      const effMinH = Math.max(0, Math.min(minSize.height, maxHByViewport));
+      const effMaxW = Math.max(
+        effMinW,
+        Math.min(maxSize.width, maxWByViewport),
+      );
+      const effMaxH = Math.max(
+        effMinH,
+        Math.min(maxSize.height, maxHByViewport),
+      );
+
+      const width = Math.min(Math.max(nextSize.width, effMinW), effMaxW);
+      const height = Math.min(Math.max(nextSize.height, effMinH), effMaxH);
+
+      const left = Math.max(
+        pad,
+        Math.min(vp.width - width - pad, nextPos.left),
+      );
+      const top = Math.max(
+        pad,
+        Math.min(vp.height - height - pad, nextPos.top),
+      );
+
+      return {
+        pos: { left, top },
+        size: { width, height },
+      };
+    },
+    [
+      getViewportSize,
+      maxSize.height,
+      maxSize.width,
+      minSize.height,
+      minSize.width,
+    ],
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onViewportChange = () => {
+      if (dragStateRef.current || resizeStateRef.current) return;
+
+      const currentPos = posRef.current;
+      const currentSize = sizeRef.current;
+
+      const vp = getViewportSize();
+      const shouldRecenter =
+        defaultPosition === "center" && !hasUserMovedRef.current;
+      const basePos = shouldRecenter
+        ? {
+            left: Math.round((vp.width - currentSize.width) / 2),
+            top: Math.round((vp.height - currentSize.height) / 2),
+          }
+        : currentPos;
+
+      const next = clampToViewport(basePos, currentSize);
+
+      if (
+        next.size.width !== currentSize.width ||
+        next.size.height !== currentSize.height
+      ) {
+        setSize(next.size);
+      }
+      if (
+        next.pos.left !== currentPos.left ||
+        next.pos.top !== currentPos.top
+      ) {
+        setPos(next.pos);
+      }
+    };
+
+    let raf = 0;
+    const schedule = () => {
+      window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(onViewportChange);
+    };
+
+    window.addEventListener("resize", schedule);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", schedule);
+    vv?.addEventListener("scroll", schedule);
+
+    schedule();
+
+    return () => {
+      window.removeEventListener("resize", schedule);
+      vv?.removeEventListener("resize", schedule);
+      vv?.removeEventListener("scroll", schedule);
+      window.cancelAnimationFrame(raf);
+    };
+  }, [clampToViewport, defaultPosition, getViewportSize, isOpen]);
 
   useLayoutEffect(() => {
     if (!isOpen) return;
@@ -336,6 +461,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           const target = e.target as HTMLElement | null;
           if (target?.closest?.("[data-floating-window-no-drag]")) return;
           e.preventDefault();
+          hasUserMovedRef.current = true;
           dragStateRef.current = {
             startX: e.clientX,
             startY: e.clientY,
@@ -346,18 +472,8 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           document.body.style.userSelect = "none";
         }}
       >
-        <div className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-          {title}
-        </div>
-        <div
-          data-floating-window-no-drag
-          onPointerDown={(e) => {
-            e.stopPropagation();
-          }}
-          className="w-fit"
-        >
-          {headerEl}
-        </div>
+        <div className="flex min-w-0 gap-2 text-sm font-semibold">{title}</div>
+        {headerEl}
         <div>
           <Button
             variant="ghost"

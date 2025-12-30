@@ -121,6 +121,7 @@ function pickEditorUiState(state: EditorState): EditorUiState {
     pageLayout: state.pageLayout,
     sidebarWidth: state.sidebarWidth,
     rightPanelWidth: state.rightPanelWidth,
+    translateOption: state.translateOption,
   };
 }
 
@@ -175,6 +176,7 @@ const initialState: EditorState = {
       pdfTextLayer: false,
     },
   },
+  translateOption: "gemini:gemini-2.5-flash",
   lastSavedAt: null,
   processingStatus: null,
   isPanelFloating: false,
@@ -628,9 +630,28 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     }),
     {
       name: "ff-editor-ui",
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => pickEditorUiState(state),
+      migrate: (persisted: any, version) => {
+        if (!persisted || typeof persisted !== "object") return persisted;
+        if (version !== 1) return persisted;
+
+        const engine = persisted.translateEngine;
+        const model = persisted.translateGeminiModel;
+        const nextTranslateOption =
+          engine === "cloud"
+            ? "cloud"
+            : typeof model === "string" && model
+              ? `gemini:${model}`
+              : "gemini:gemini-2.5-flash";
+
+        const { translateEngine, translateGeminiModel, ...rest } = persisted;
+        return {
+          ...rest,
+          translateOption: nextTranslateOption,
+        };
+      },
     },
   ),
 );

@@ -13,19 +13,21 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { useLanguage } from "@/components/language-provider";
 import {
-  GEMINI_API_AVAILABLE,
-  GEMINI_MODEL_OPTIONS,
-  translateText,
-  translateTextStream,
-  type GeminiModelId,
-} from "@/services/geminiService";
+  translateService,
+  type TranslateOptionGroup,
+} from "@/services/translateService";
 import { FloatingWindow } from "@/components/ui/floating-window";
+import { cn } from "@/lib/cn";
+import { useEditorStore } from "@/store/useEditorStore";
 
 export interface TranslationFloatingWindowProps {
   isOpen: boolean;
@@ -48,9 +50,25 @@ export const TranslationFloatingWindow: React.FC<
   TranslationFloatingWindowProps
 > = ({ isOpen, sourceText, autoTranslateToken, onClose }) => {
   const { t, effectiveLanguage } = useLanguage();
-  const [model, setModel] = useState<GeminiModelId>(
-    GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash",
-  );
+  const translateOptionRaw = useEditorStore((s) => s.translateOption);
+  const setState = useEditorStore((s) => s.setState);
+
+  const [registryVersion, setRegistryVersion] = useState(0);
+
+  const translateOption = useMemo(() => {
+    return translateService.normalizeTranslateOption(translateOptionRaw);
+  }, [translateOptionRaw]);
+
+  useEffect(() => {
+    return translateService.subscribe(() => {
+      setRegistryVersion((v) => v + 1);
+    });
+  }, []);
+
+  const optionGroups = useMemo<TranslateOptionGroup[]>(() => {
+    void registryVersion;
+    return translateService.getOptionGroups();
+  }, [registryVersion]);
   const [targetLang, setTargetLang] = useState<string>(effectiveLanguage);
 
   const [input, setInput] = useState<string>(sourceText);
@@ -89,8 +107,17 @@ export const TranslationFloatingWindow: React.FC<
   }, [cancelStream]);
 
   const canTranslate = useMemo(() => {
-    return GEMINI_API_AVAILABLE && !isLoading && input.trim().length > 0;
-  }, [input, isLoading]);
+    return (
+      translateService.isOptionAvailable(translateOption) &&
+      !isLoading &&
+      input.trim().length > 0
+    );
+  }, [input, isLoading, translateOption]);
+
+  const unavailableMessageKey = useMemo(() => {
+    if (translateService.isOptionAvailable(translateOption)) return undefined;
+    return translateService.getOptionUnavailableMessageKey(translateOption);
+  }, [translateOption]);
 
   const handleTranslate = useCallback(
     async (overrideText?: string) => {
@@ -107,20 +134,23 @@ export const TranslationFloatingWindow: React.FC<
 
       try {
         let receivedAny = false;
-        for await (const chunk of translateTextStream(textToTranslate, {
-          model,
-          targetLanguage: targetLang,
-          signal: controller.signal,
-        })) {
+        for await (const chunk of translateService.translateStream(
+          textToTranslate,
+          {
+            translateOption,
+            targetLanguage: targetLang,
+            signal: controller.signal,
+          },
+        )) {
           receivedAny = true;
           setOutput((prev) => prev + chunk);
         }
 
         // If the stream API isn't available and we fell back to non-stream,
-        // translateTextStream will yield the full response as a single chunk.
+        // translateService.translateStream will yield the full response as a single chunk.
         if (!receivedAny) {
-          const res = await translateText(textToTranslate, {
-            model,
+          const res = await translateService.translate(textToTranslate, {
+            translateOption,
             targetLanguage: targetLang,
           });
           setOutput(res);
@@ -136,7 +166,7 @@ export const TranslationFloatingWindow: React.FC<
         abortRef.current = null;
       }
     },
-    [cancelStream, input, model, targetLang],
+    [cancelStream, input, targetLang, translateOption],
   );
 
   useEffect(() => {
@@ -187,17 +217,78 @@ export const TranslationFloatingWindow: React.FC<
       className="rounded-xl"
       headerClassName="px-2 py-1.5"
       closeButtonClassName="h-7 w-7"
+      header={({ width, portalContainer }) => (
+        <div className={cn("flex flex-1", width >= 720 && "justify-center")}>
+          <div
+            className="flex cursor-auto items-center gap-2 **:cursor-auto"
+            data-floating-window-no-drag
+          >
+            {width >= 720 && (
+              <div className="text-muted-foreground text-[11px] leading-4">
+                {t("translate.provider")}
+              </div>
+            )}
+            <Select
+              value={translateOption}
+              onValueChange={(v) => {
+                setState({
+                  translateOption: translateService.normalizeTranslateOption(v),
+                });
+              }}
+            >
+              <SelectTrigger
+                className="h-7! border-none text-xs"
+                size="sm"
+                title={t("translate.provider")}
+              >
+                <SelectValue placeholder={t("translate.provider")} />
+              </SelectTrigger>
+              <SelectContent portalContainer={portalContainer}>
+                {optionGroups.map((group, idx) => {
+                  const groupLabel = group.labelKey
+                    ? t(group.labelKey)
+                    : group.label;
+                  return (
+                    <React.Fragment key={group.id}>
+                      <SelectGroup>
+                        <SelectLabel>{groupLabel}</SelectLabel>
+                        {group.options.map((opt) => {
+                          const optLabel = opt.labelKey
+                            ? t(opt.labelKey)
+                            : opt.label;
+                          return (
+                            <SelectItem
+                              key={opt.id}
+                              value={opt.id}
+                              disabled={
+                                !translateService.isOptionAvailable(opt.id)
+                              }
+                            >
+                              {optLabel}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectGroup>
+                      {idx < optionGroups.length - 1 && <SelectSeparator />}
+                    </React.Fragment>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
     >
-      {({ width, height, portalContainer }) => {
+      {({ width, portalContainer }) => {
         const isHorizontal = width >= 720;
 
         if (isHorizontal) {
           return (
             <div className="grid h-full min-h-0 grid-cols-2 gap-2 p-2">
               <div className="flex min-h-0 flex-col gap-1.5">
-                {!GEMINI_API_AVAILABLE && (
+                {unavailableMessageKey && (
                   <div className="text-muted-foreground text-[11px] leading-4">
-                    {t("ai_panel.api_key_missing")}
+                    {t(unavailableMessageKey)}
                   </div>
                 )}
 
@@ -206,28 +297,6 @@ export const TranslationFloatingWindow: React.FC<
                     {t("translate.source_text")}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Select
-                      value={model}
-                      onValueChange={(v) => setModel(v as GeminiModelId)}
-                    >
-                      <SelectTrigger
-                        className="h-7! text-xs"
-                        size="sm"
-                        title={t("translate.model")}
-                      >
-                        <SelectValue placeholder={t("translate.model")} />
-                      </SelectTrigger>
-                      <SelectContent
-                        portalContainer={portalContainer}
-                        className="z-9999"
-                      >
-                        {GEMINI_MODEL_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                     <Select value={targetLang} onValueChange={setTargetLang}>
                       <SelectTrigger
                         className="h-7! text-xs"
@@ -286,7 +355,7 @@ export const TranslationFloatingWindow: React.FC<
                   </Button>
                 </div>
 
-                <div className="bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border p-1.5 text-sm whitespace-pre-wrap">
+                <div className="bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border p-1 text-sm whitespace-pre-wrap">
                   {output}
                   {isLoading && (
                     <span className="text-muted-foreground inline-block animate-pulse">
@@ -305,9 +374,9 @@ export const TranslationFloatingWindow: React.FC<
         // Vertical: tabs switch between source and result
         return (
           <div className="flex h-full min-h-0 flex-col p-2">
-            {!GEMINI_API_AVAILABLE && (
+            {unavailableMessageKey && (
               <div className="text-muted-foreground mb-1.5 text-[11px] leading-4">
-                {t("ai_panel.api_key_missing")}
+                {t(unavailableMessageKey)}
               </div>
             )}
 
@@ -335,28 +404,6 @@ export const TranslationFloatingWindow: React.FC<
                 <div className="ml-auto flex items-center gap-2">
                   {activeTab === "source" ? (
                     <>
-                      <Select
-                        value={model}
-                        onValueChange={(v) => setModel(v as GeminiModelId)}
-                      >
-                        <SelectTrigger
-                          className="h-7! text-xs"
-                          size="sm"
-                          title={t("translate.model")}
-                        >
-                          <SelectValue placeholder={t("translate.model")} />
-                        </SelectTrigger>
-                        <SelectContent
-                          portalContainer={portalContainer}
-                          className="z-9999"
-                        >
-                          {GEMINI_MODEL_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                       <Select value={targetLang} onValueChange={setTargetLang}>
                         <SelectTrigger
                           className="h-7! w-32 text-xs"
@@ -403,7 +450,7 @@ export const TranslationFloatingWindow: React.FC<
               </div>
 
               <TabsContent value="source" className="min-h-0 w-full">
-                <div className="flex h-full min-h-0 flex-col gap-2 pt-2">
+                <div className="flex h-full min-h-0 flex-col gap-2">
                   <div className="min-h-0 flex-1">
                     <Textarea
                       value={input}
@@ -415,7 +462,7 @@ export const TranslationFloatingWindow: React.FC<
               </TabsContent>
 
               <TabsContent value="result" className="min-h-0 w-full">
-                <div className="flex h-full min-h-0 flex-col gap-2 pt-2">
+                <div className="flex h-full min-h-0 flex-col gap-2">
                   <div className="bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border p-1.5 text-sm whitespace-pre-wrap">
                     {output}
                     {isLoading && (

@@ -23,6 +23,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   pageLayout: "single",
   sidebarWidth: 256,
   rightPanelWidth: 320,
+  translateOption: "gemini:gemini-2.5-flash",
 };
 
 // prettier-ignore

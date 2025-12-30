@@ -12,7 +12,7 @@ import {
 import { Button } from "./components/ui/button";
 import { EditorState, FormField } from "./types";
 import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
-import { analyzePageForFields } from "./services/geminiService";
+import { analyzePageForFields } from "./services/LLMService";
 import { saveDraft, getDraft } from "./services/storageService";
 import {
   exportPdfBytes,

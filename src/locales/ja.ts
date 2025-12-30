@@ -64,6 +64,11 @@ const ja = {
   },
   translate: {
     title: "翻訳",
+    provider: "翻訳サービス",
+    provider_gemini: "Gemini（AI）",
+    provider_cloud: "Cloud Translation API",
+    cloud_api_key_missing:
+      "Cloud Translation API のキーがありません。.env.local に GOOGLE_TRANSLATE_API_KEY を設定して再起動してください。",
     model: "モデル",
     target: "対象言語",
     source_text: "原文",
