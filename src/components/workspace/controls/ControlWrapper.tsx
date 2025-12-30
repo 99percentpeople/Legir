@@ -3,7 +3,6 @@ import { cn } from "@/lib/cn";
 import { ControlProps } from "./types";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
-import { COLORS } from "@/constants";
 
 export type ControlWrapperProps = ControlProps & {
   customRect?: { x: number; y: number; width: number; height: number };
@@ -106,14 +105,6 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const shouldRaiseZIndexOnHoverOrSelect =
     data.type !== "highlight" && !isInkHighlight;
 
-  const selectionBorderStyle =
-    !isAnnotation &&
-    "style" in data &&
-    (data as { style?: { borderStyle?: string } }).style?.borderStyle ===
-      "dashed"
-      ? "dashed"
-      : "solid";
-
   return (
     <div
       ref={wrapperRef}
@@ -126,7 +117,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
         "group absolute outline-none select-none",
         isSelectable
           ? "pointer-events-auto"
-          : "pointer-events-none [&_*]:pointer-events-none",
+          : "pointer-events-none **:pointer-events-none",
         shouldRaiseZIndexOnHoverOrSelect &&
           (isSelected ? "z-50" : "hover:z-50"),
         className,
@@ -141,51 +132,34 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     >
       {children}
 
-      {/* Selection Border */}
-      {isSelected && showBorder && (
-        <div
-          className="pointer-events-none absolute inset-0 border-2"
-          style={{
-            borderColor: COLORS.fieldSelectedBorder,
-            borderStyle: selectionBorderStyle,
-            zIndex: 10,
-          }}
-        />
-      )}
-
-      {/* Annotation Mode Focus Overlay */}
-      {showBorder && !resizable && (
-        <div className="animate-in fade-in pointer-events-none absolute inset-0 z-50 border border-dashed border-blue-500 duration-200" />
-      )}
-
-      {/* Resizable Annotation Mode */}
-      {showBorder && resizable && (
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
-          <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap text-white shadow-sm">
-            {label}
-          </span>
-          {/* Resize Handles */}
-          {["nw", "ne", "sw", "se"].map((h) => (
-            <div
-              key={h}
-              className={cn(
-                "pointer-events-auto absolute z-30 h-3 w-3 border border-blue-500 bg-white",
-                h === "nw" && "-top-1.5 -left-1.5 cursor-nwse-resize",
-                h === "ne" && "-top-1.5 -right-1.5 cursor-nesw-resize",
-                h === "sw" && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
-                h === "se" && "-right-1.5 -bottom-1.5 cursor-nwse-resize",
-              )}
-              onPointerDown={(e) => handleResizePointerDown(e, h)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Annotation Mode Focus Overlay */}
-      {showBorder && !resizable && (
-        <div className="animate-in fade-in pointer-events-none absolute inset-0 z-50 border border-dashed border-blue-500 duration-200" />
-      )}
+      {/* Selection Overlay */}
+      {showBorder &&
+        (resizable ? (
+          /* Resizable Overlay */
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
+            <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap shadow-sm">
+              {label}
+            </span>
+            {/* Resize Handles */}
+            {["nw", "ne", "sw", "se"].map((h) => (
+              <div
+                key={h}
+                className={cn(
+                  "pointer-events-auto absolute z-30 h-3 w-3 border border-blue-500 bg-white",
+                  h === "nw" && "-top-1.5 -left-1.5 cursor-nwse-resize",
+                  h === "ne" && "-top-1.5 -right-1.5 cursor-nesw-resize",
+                  h === "sw" && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
+                  h === "se" && "-right-1.5 -bottom-1.5 cursor-nwse-resize",
+                )}
+                onPointerDown={(e) => handleResizePointerDown(e, h)}
+              />
+            ))}
+          </div>
+        ) : (
+          /* Non-Resizable Annotation Focus Overlay */
+          <div className="pointer-events-none absolute inset-0 z-50 border border-dashed border-blue-500" />
+        ))}
     </div>
   );
 };

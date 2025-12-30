@@ -30,7 +30,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
   const containerStyle: React.CSSProperties = {
     "--scale": scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
-    borderWidth: style.borderWidth,
+    borderWidth: `calc(${style.borderWidth}px * var(--scale, 1))`,
     borderColor: style.borderColor,
     borderStyle: effectiveBorderStyle,
     color: style.textColor,

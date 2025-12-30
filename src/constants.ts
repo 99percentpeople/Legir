@@ -25,14 +25,6 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   rightPanelWidth: 320,
 };
 
-export const COLORS = {
-  primary: "blue-600",
-  fieldBorder: "#3b82f6",
-  fieldBg: "rgba(59, 130, 246, 0.15)",
-  fieldSelectedBorder: "#2563eb",
-  fieldSelectedBg: "rgba(37, 99, 235, 0.3)",
-};
-
 // prettier-ignore
 export const PEN_COLORS = [
   // Row 1

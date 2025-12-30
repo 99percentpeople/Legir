@@ -19,7 +19,7 @@ export const SignatureControl: React.FC<FormControlProps> = (props) => {
 
   const containerStyle: React.CSSProperties = {
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
-    borderWidth: style.borderWidth,
+    borderWidth: `calc(${style.borderWidth}px * var(--scale, 1))`,
     borderColor: style.borderColor,
     borderStyle: effectiveBorderStyle,
     boxSizing: "border-box",
