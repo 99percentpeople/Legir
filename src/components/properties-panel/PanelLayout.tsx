@@ -1,12 +1,19 @@
-import React, { useState, useCallback } from "react";
+import React from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import { cn } from "@/lib/cn";
+import {
+  RIGHT_PANEL_MAX_WIDTH_PX,
+  RIGHT_PANEL_MIN_WIDTH_PX,
+} from "@/constants";
+import { useResizableSidePanel } from "@/hooks/useResizableSidePanel";
 
 export interface PanelLayoutProps {
   isFloating: boolean;
+  isOpen: boolean;
+  onOpen: () => void;
   onClose?: () => void;
+  onCollapse?: () => void;
   title: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -16,65 +23,51 @@ export interface PanelLayoutProps {
 
 export const PanelLayout: React.FC<PanelLayoutProps> = ({
   isFloating,
+  isOpen,
+  onOpen,
   onClose,
+  onCollapse,
   title,
   children,
   footer,
   width,
   onResize,
 }) => {
-  const [isResizing, setIsResizing] = useState(false);
-  const resizeStateRef = React.useRef<{
-    startX: number;
-    startWidth: number;
-  } | null>(null);
-  const onResizeRef = React.useRef(onResize);
-  onResizeRef.current = onResize;
+  const { isResizing, handleMouseDown } = useResizableSidePanel({
+    side: "right",
+    isOpen,
+    width,
+    minWidth: RIGHT_PANEL_MIN_WIDTH_PX,
+    maxWidth: RIGHT_PANEL_MAX_WIDTH_PX,
+    onResize,
+    onCollapse,
+    onExpand: onOpen,
+    cursorSource: "properties-resize",
+  });
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      resizeStateRef.current = { startX: e.clientX, startWidth: width };
-      setIsResizing(true);
-    },
-    [width],
-  );
+  if (!isOpen) {
+    return (
+      <>
+        <div
+          className={cn(
+            "absolute top-0 right-0 bottom-0 z-40 w-1 cursor-col-resize transition-colors",
+            isResizing ? "bg-border" : "hover:bg-primary/50",
+          )}
+          onMouseDown={handleMouseDown}
+        />
 
-  React.useEffect(() => {
-    if (!isResizing) return;
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      if (!resizeStateRef.current) return;
-      const { startX, startWidth } = resizeStateRef.current;
-      // Dragging left edge: moving left (decreasing X) increases width
-      const newWidth = startWidth + (startX - moveEvent.clientX);
-      if (onResizeRef.current) {
-        onResizeRef.current(Math.max(240, Math.min(600, newWidth)));
-      }
-    };
-
-    const onMouseUp = () => {
-      setIsResizing(false);
-      resizeStateRef.current = null;
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    setGlobalCursor("col-resize", "properties-resize");
-    document.body.style.userSelect = "none";
-
-    return () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      resetGlobalCursor("properties-resize");
-      document.body.style.removeProperty("user-select");
-    };
-  }, [isResizing]);
+        {isResizing && (
+          <div className="fixed inset-0 z-9999 cursor-col-resize bg-transparent" />
+        )}
+      </>
+    );
+  }
 
   return (
     <div
       className={cn(
-        "bg-background border-border flex h-full flex-col border-l transition-colors duration-200",
+        "bg-background border-border flex h-full flex-col border-l duration-200",
+        isResizing ? "transition-none" : "transition-colors",
         isFloating
           ? "absolute top-0 right-0 bottom-0 z-40 shadow-2xl"
           : "relative shadow-none",
@@ -84,7 +77,8 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
       {/* Resize Handle */}
       <div
         className={cn(
-          "absolute top-0 bottom-0 left-0 z-50 w-1 cursor-col-resize transition-colors",
+          "absolute top-0 bottom-0 left-0 z-50 w-1 cursor-col-resize",
+          isResizing ? "transition-none" : "transition-colors",
           isResizing ? "bg-primary/50" : "hover:bg-primary/50",
         )}
         onMouseDown={handleMouseDown}

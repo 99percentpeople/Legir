@@ -15,6 +15,8 @@ interface PropertiesPanelProps {
   onDelete: () => void;
   onClose: () => void;
   onCollapse: () => void;
+  isOpen: boolean;
+  onOpen: () => void;
   isFloating: boolean;
   onTriggerHistorySave: () => void;
   width: number;
@@ -33,6 +35,8 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
     onDelete,
     onClose,
     onCollapse,
+    isOpen,
+    onOpen,
     isFloating,
     onTriggerHistorySave,
     width,
@@ -45,6 +49,9 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
           onChange={onChange}
           onDelete={onDelete}
           onClose={onClose}
+          isOpen={isOpen}
+          onOpen={onOpen}
+          onCollapse={onCollapse}
           isFloating={isFloating}
           onTriggerHistorySave={onTriggerHistorySave}
           width={width}
@@ -59,6 +66,9 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         onMetadataChange={onMetadataChange}
         filename={filename}
         onFilenameChange={onFilenameChange}
+        isOpen={isOpen}
+        onOpen={onOpen}
+        onCollapse={onCollapse}
         onClose={onCollapse}
         isFloating={isFloating}
         onTriggerHistorySave={onTriggerHistorySave}

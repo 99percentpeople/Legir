@@ -1,4 +1,5 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
+import { Tile } from "./types";
 
 export interface RenderRequest {
   type?: "render" | "cancel" | "load" | "unload" | "renderImage";
@@ -11,10 +12,7 @@ export interface RenderRequest {
   renderAnnotations?: boolean;
   mimeType?: string;
   quality?: number;
-  tileX?: number;
-  tileY?: number;
-  tileWidth?: number;
-  tileHeight?: number;
+  tile?: Tile;
   isNewDoc?: boolean;
   canvas?: OffscreenCanvas;
   canvasId?: string;
@@ -233,14 +231,8 @@ class PDFWorkerService {
     canvas?: OffscreenCanvas;
     canvasId: string;
     priority?: number;
-    /** Defaults to 0 (render from left) if not provided */
-    tileX?: number;
-    /** Defaults to 0 (render from top) if not provided */
-    tileY?: number;
-    /** Defaults to full page width if not provided */
-    tileWidth?: number;
-    /** Defaults to full page height if not provided */
-    tileHeight?: number;
+    /** Defaults to full page if not provided */
+    tile?: Tile;
     docId?: string;
     signal?: AbortSignal;
   }): Promise<boolean> {
@@ -259,10 +251,7 @@ class PDFWorkerService {
         canvas,
         canvasId,
         priority,
-        tileX,
-        tileY,
-        tileWidth,
-        tileHeight,
+        tile,
         docId: requestedDocId,
         signal,
       } = options;
@@ -308,13 +297,10 @@ class PDFWorkerService {
           canvas,
           canvasId,
           priority: priority || 0,
-          tileX,
-          tileY,
-          tileWidth,
-          tileHeight,
+          tile,
         };
 
-        this.worker.postMessage(message, canvas ? [canvas] : []);
+        this.worker.postMessage(message, canvas ? [canvas] : undefined);
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);

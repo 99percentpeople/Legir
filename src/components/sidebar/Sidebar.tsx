@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React from "react";
 import { X, Layers, List, LayoutGrid, StickyNote } from "lucide-react";
 import {
   FormField,
@@ -8,8 +8,11 @@ import {
   PageLayoutMode,
 } from "@/types";
 import { cn } from "@/lib/cn";
-import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
-import { useEventListener } from "@/hooks/useEventListener";
+import {
+  LEFT_SIDEBAR_MAX_WIDTH_PX,
+  LEFT_SIDEBAR_MIN_WIDTH_PX,
+} from "@/constants";
+import { useResizableSidePanel } from "@/hooks/useResizableSidePanel";
 import FieldTreePanel from "./FieldTreePanel";
 import AnnotationsPanel from "./AnnotationsPanel";
 import DocumentOutlinePanel from "./OutlinePanel";
@@ -21,6 +24,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 
 interface SidebarProps {
   isOpen: boolean;
+  onOpen: () => void;
   onClose: () => void;
   isFloating?: boolean;
   pages: PageData[];
@@ -43,6 +47,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
+  onOpen,
   onClose,
   isFloating = false,
   pages,
@@ -63,13 +68,18 @@ const Sidebar: React.FC<SidebarProps> = ({
   onTabChange,
 }) => {
   const { t } = useLanguage();
-  const [isResizing, setIsResizing] = React.useState(false);
-  const resizeStateRef = React.useRef<{
-    startX: number;
-    startWidth: number;
-  } | null>(null);
-  const onResizeRef = React.useRef(onResize);
-  onResizeRef.current = onResize;
+
+  const { isResizing, handleMouseDown } = useResizableSidePanel({
+    side: "left",
+    isOpen,
+    width,
+    minWidth: LEFT_SIDEBAR_MIN_WIDTH_PX,
+    maxWidth: LEFT_SIDEBAR_MAX_WIDTH_PX,
+    onResize,
+    onCollapse: onClose,
+    onExpand: onOpen,
+    cursorSource: "sidebar-resize",
+  });
 
   // Local state for uncontrolled mode if activeTab is not provided
   const [localTab, setLocalTab] = React.useState("thumbnails");
@@ -79,50 +89,29 @@ const Sidebar: React.FC<SidebarProps> = ({
     else setLocalTab(val);
   };
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      resizeStateRef.current = { startX: e.clientX, startWidth: width };
-      setIsResizing(true);
-    },
-    [width],
-  );
+  if (!isOpen) {
+    return (
+      <>
+        <div
+          className={cn(
+            "absolute top-0 bottom-0 left-0 z-40 w-1 cursor-col-resize transition-colors",
+            isResizing ? "bg-border" : "hover:bg-primary/50",
+          )}
+          onMouseDown={handleMouseDown}
+        />
 
-  useEventListener<MouseEvent>(
-    isResizing ? document : null,
-    "mousemove",
-    (moveEvent) => {
-      if (!resizeStateRef.current) return;
-      const { startX, startWidth } = resizeStateRef.current;
-      const newWidth = startWidth + (moveEvent.clientX - startX);
-      if (onResizeRef.current) {
-        onResizeRef.current(Math.max(200, Math.min(600, newWidth)));
-      }
-    },
-  );
-
-  useEventListener(isResizing ? document : null, "mouseup", () => {
-    setIsResizing(false);
-    resizeStateRef.current = null;
-  });
-
-  React.useEffect(() => {
-    if (!isResizing) return;
-    setGlobalCursor("col-resize", "sidebar-resize");
-    document.body.style.userSelect = "none";
-
-    return () => {
-      resetGlobalCursor("sidebar-resize");
-      document.body.style.removeProperty("user-select");
-    };
-  }, [isResizing]); // Removed onResize dependency to prevent effect re-runs
-
-  if (!isOpen) return null;
+        {isResizing && (
+          <div className="fixed inset-0 z-9999 cursor-col-resize bg-transparent" />
+        )}
+      </>
+    );
+  }
 
   return (
     <div
       className={cn(
-        "bg-background border-border flex h-full shrink-0 flex-col border-r transition-colors duration-200",
+        "bg-background border-border flex h-full shrink-0 flex-col border-r duration-200",
+        isResizing ? "transition-none" : "transition-colors",
         isFloating
           ? "absolute top-0 bottom-0 left-0 z-40 shadow-2xl"
           : "relative z-20",
@@ -230,7 +219,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Resize Handle */}
       <div
         className={cn(
-          "absolute top-0 right-0 bottom-0 z-50 w-1 cursor-col-resize transition-colors",
+          "absolute top-0 right-0 bottom-0 z-50 w-1 cursor-col-resize",
+          isResizing ? "transition-none" : "transition-colors",
           isResizing ? "bg-primary/50" : "hover:bg-primary/50",
         )}
         onMouseDown={handleMouseDown}

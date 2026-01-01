@@ -1,6 +1,9 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { PDFDocument, PDFForm, PDFPage, type PDFFont } from "pdf-lib";
-import { Annotation, FormField } from "../../types";
+import { Annotation, FormField } from "@/types";
+
+// [x, y, width, height]
+export type Tile = [number, number, number, number];
 
 export type PdfJsAnnotationOption =
   | string

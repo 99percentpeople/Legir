@@ -125,7 +125,7 @@
 
 核心设计：
 
-- 以 `tileX/tileY/tileWidth/tileHeight` 为接口（现已有字段）
+- 以 `Tile` 为接口（现已有字段）
 - 每次渲染只输出一个 tile 到同一个 OffscreenCanvas
 - 需要约定：
   - tile 的 viewport/transform

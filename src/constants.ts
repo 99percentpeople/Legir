@@ -79,3 +79,9 @@ export const FONT_FAMILY_MAP: Record<string, string> = {
 
 export const CJK_FALLBACK_SANS_FONT_KEY = "Noto Sans SC";
 export const CJK_FALLBACK_SERIF_FONT_KEY = "Source Han Serif SC";
+
+export const LEFT_SIDEBAR_MIN_WIDTH_PX = 200;
+export const LEFT_SIDEBAR_MAX_WIDTH_PX = 600;
+
+export const RIGHT_PANEL_MIN_WIDTH_PX = 240;
+export const RIGHT_PANEL_MAX_WIDTH_PX = 600;

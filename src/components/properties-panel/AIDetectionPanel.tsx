@@ -12,6 +12,8 @@ import { GEMINI_API_AVAILABLE } from "@/services/LLMService";
 
 export interface AIDetectionPanelProps {
   isFloating: boolean;
+  isOpen: boolean;
+  onOpen: () => void;
   width: number;
   onResize: (width: number) => void;
   onCollapse: () => void;
@@ -24,6 +26,8 @@ export interface AIDetectionPanelProps {
 
 export function AIDetectionPanel({
   isFloating,
+  isOpen,
+  onOpen,
   width,
   onResize,
   onCollapse,
@@ -41,6 +45,9 @@ export function AIDetectionPanel({
         </>
       }
       isFloating={isFloating}
+      isOpen={isOpen}
+      onOpen={onOpen}
+      onCollapse={onCollapse}
       onClose={onCollapse}
       width={width}
       onResize={onResize}

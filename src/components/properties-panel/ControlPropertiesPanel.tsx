@@ -15,6 +15,9 @@ export interface ControlPropertiesPanelProps {
   onChange: (updates: Partial<FormField | Annotation>) => void;
   onDelete: () => void;
   onClose: () => void;
+  isOpen: boolean;
+  onOpen: () => void;
+  onCollapse: () => void;
   isFloating: boolean;
   onTriggerHistorySave: () => void;
   width: number;
@@ -27,6 +30,9 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
     onChange,
     onDelete,
     onClose,
+    isOpen,
+    onOpen,
+    onCollapse,
     isFloating,
     onTriggerHistorySave,
     width,
@@ -62,7 +68,10 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
           </>
         }
         isFloating={isFloating}
+        isOpen={isOpen}
+        onOpen={onOpen}
         onClose={onClose}
+        onCollapse={onCollapse}
         width={width}
         onResize={onResize}
         footer={

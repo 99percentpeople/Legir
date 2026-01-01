@@ -725,9 +725,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
     [setState],
   );
 
-  const showPropertiesPanel =
-    (state.mode === "form" || state.mode === "annotation" || selectedControl) &&
-    state.isRightPanelOpen;
+  const canRenderRightPanel =
+    state.mode === "form" || state.mode === "annotation" || selectedControl;
 
   return (
     <>
@@ -859,6 +858,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
         <Sidebar
           isOpen={state.isSidebarOpen}
+          onOpen={() => {
+            setUiState((prev) => {
+              if (prev.isPanelFloating) {
+                return { isSidebarOpen: true, isRightPanelOpen: false };
+              }
+              return { isSidebarOpen: true };
+            });
+          }}
           onClose={() => setUiState({ isSidebarOpen: false })}
           isFloating={state.isPanelFloating}
           pages={state.pages}
@@ -958,10 +965,19 @@ const EditorPage: React.FC<EditorPageProps> = ({
           }}
         />
 
-        {showPropertiesPanel &&
+        {canRenderRightPanel &&
           (state.rightPanelTab === "ai_detect" ? (
             <AIDetectionPanel
               isFloating={state.isPanelFloating}
+              isOpen={state.isRightPanelOpen}
+              onOpen={() => {
+                setUiState((prev) => {
+                  if (prev.isPanelFloating) {
+                    return { isRightPanelOpen: true, isSidebarOpen: false };
+                  }
+                  return { isRightPanelOpen: true };
+                });
+              }}
               width={state.rightPanelWidth}
               onResize={(w) => setUiState({ rightPanelWidth: w })}
               onCollapse={() => setUiState({ isRightPanelOpen: false })}
@@ -987,6 +1003,15 @@ const EditorPage: React.FC<EditorPageProps> = ({
               }}
               onCollapse={() => {
                 setUiState({ isRightPanelOpen: false });
+              }}
+              isOpen={state.isRightPanelOpen}
+              onOpen={() => {
+                setUiState((prev) => {
+                  if (prev.isPanelFloating) {
+                    return { isRightPanelOpen: true, isSidebarOpen: false };
+                  }
+                  return { isRightPanelOpen: true };
+                });
               }}
               isFloating={state.isPanelFloating}
               onTriggerHistorySave={saveCheckpoint}
