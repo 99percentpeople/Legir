@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useEventListener } from "@/hooks/useEventListener";
 
 interface AutoScrollOptions {
   threshold?: number; // Distance from edge in pixels to trigger scroll
@@ -18,20 +19,13 @@ export const useAutoScroll = (
   const requestRef = useRef<number | null>(null);
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Track mouse position globally when enabled
-  useEffect(() => {
-    if (!enabled) return;
-
-    const handleMove = (e: PointerEvent | MouseEvent) => {
+  useEventListener<PointerEvent>(
+    enabled && typeof window !== "undefined" ? window : null,
+    "pointermove",
+    (e) => {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
-    };
-
-    window.addEventListener("pointermove", handleMove);
-
-    return () => {
-      window.removeEventListener("pointermove", handleMove);
-    };
-  }, [enabled]);
+    },
+  );
 
   // Animation loop
   useEffect(() => {

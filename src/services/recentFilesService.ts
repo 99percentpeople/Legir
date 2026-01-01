@@ -141,7 +141,7 @@ export class RecentFilesService {
     previewDataUrl: string;
     previewUpdatedAt?: number;
   }) {
-    const current = this.getRecentFiles();
+    const current = this.getAll();
     const now = options.previewUpdatedAt ?? Date.now();
 
     const next = current.map((e) =>
@@ -213,7 +213,7 @@ export class RecentFilesService {
   }
 
   /** Cancel all in-flight or queued preview render tasks. */
-  cancelAllRecentFilePreviewTasks() {
+  cancelPreviewTasks() {
     for (const key of Array.from(this.previewControllersByKey.keys())) {
       this.cancelPreviewTaskByKey(key);
     }
@@ -221,7 +221,7 @@ export class RecentFilesService {
   }
 
   /** Await the internal preview queue. */
-  waitForRecentFilePreviewQueue() {
+  waitForPreviewQueue() {
     return this.previewQueue;
   }
 
@@ -242,20 +242,16 @@ export class RecentFilesService {
    * Read and return recent files (sorted by `lastOpenedAt` desc).
    * Desktop-only: on Web it always returns an empty list.
    */
-  getRecentFiles(): RecentFileEntry[] {
+  getAll(): RecentFileEntry[] {
     if (typeof window === "undefined") return [];
     const items = this.safeParse(window.localStorage.getItem(this.STORAGE_KEY));
     return items.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
   }
 
   /** Upsert a recent file entry without updating preview. */
-  upsertRecentFile(entry: {
-    path: string;
-    filename: string;
-    lastOpenedAt?: number;
-  }) {
+  upsert(entry: { path: string; filename: string; lastOpenedAt?: number }) {
     const now = entry.lastOpenedAt ?? Date.now();
-    const current = this.getRecentFiles();
+    const current = this.getAll();
     const filtered = current.filter((e) => e.path !== entry.path);
     const previous = current.find((e) => e.path === entry.path);
     const next: RecentFileEntry[] = [
@@ -274,22 +270,22 @@ export class RecentFilesService {
   }
 
   /** Remove a single recent file entry by path. */
-  removeRecentFile(path: string) {
-    const current = this.getRecentFiles();
+  remove(path: string) {
+    const current = this.getAll();
     const next = current.filter((e) => e.path !== path);
     this.setRecentFiles(next);
     return next;
   }
 
   /** Clear all recent files. */
-  clearRecentFiles() {
+  clear() {
     this.setRecentFiles([]);
     return [] as RecentFileEntry[];
   }
 
   /** Get the persisted last view state for a recent file path. */
-  getRecentFileViewState(path: string) {
-    const current = this.getRecentFiles();
+  getViewState(path: string) {
+    const current = this.getAll();
     return current.find((e) => e.path === path)?.lastViewState ?? null;
   }
 
@@ -301,7 +297,7 @@ export class RecentFilesService {
     updatedAt?: number;
     pageIndex?: number;
   }) {
-    const current = this.getRecentFiles();
+    const current = this.getAll();
     const now = options.updatedAt ?? Date.now();
     const next = current.map((e) =>
       e.path === options.path
@@ -324,31 +320,26 @@ export class RecentFilesService {
     return next;
   }
 
-  /** Persist Tauri view state from DOM scroll container into recent file entry. */
-  persistTauriRecentFileViewStateFromDom(options: {
+  /** Persist Tauri view state from a caller-provided scroll container. */
+  saveTauriViewState(options: {
     path: string;
     scale: number;
     pageIndex?: number;
-    selector?: string;
+    element: HTMLElement;
     updatedAt?: number;
   }) {
-    if (typeof document === "undefined") return;
-    const el = document.querySelector(
-      options.selector ?? "[data-workspace-scroll-container='true']",
-    ) as HTMLElement | null;
-    if (!el) return;
     this.setRecentFileViewState({
       path: options.path,
       scale: options.scale,
-      scrollLeft: el.scrollLeft,
-      scrollTop: el.scrollTop,
+      scrollLeft: options.element.scrollLeft,
+      scrollTop: options.element.scrollTop,
       pageIndex: options.pageIndex,
       updatedAt: options.updatedAt,
     });
   }
 
   /** Upsert a recent file and schedule preview generation from PDF bytes. */
-  upsertRecentFileWithPreviewFromPdfBytes(options: {
+  upsertWithBytesPreview(options: {
     path: string;
     filename: string;
     pdfBytes: Uint8Array;
@@ -358,16 +349,14 @@ export class RecentFilesService {
     previewUpdatedAt?: number;
     forcePreviewRender?: boolean;
   }) {
-    const next = this.upsertRecentFile({
+    const next = this.upsert({
       path: options.path,
       filename: options.filename,
       lastOpenedAt: options.lastOpenedAt,
     });
 
     if (!options.forcePreviewRender) {
-      const existing = this.getRecentFiles().find(
-        (e) => e.path === options.path,
-      );
+      const existing = this.getAll().find((e) => e.path === options.path);
       if (existing?.previewDataUrl) {
         return next;
       }
@@ -409,7 +398,7 @@ export class RecentFilesService {
    * Upsert a recent file and schedule preview generation from an existing pdfjs
    * `PDFDocumentProxy` (no second `getDocument()` call).
    */
-  upsertRecentFileWithPreviewFromPdfDocument(options: {
+  upsertWithDocPreview(options: {
     path: string;
     filename: string;
     pdfDocument: PDFDocumentProxy;
@@ -418,16 +407,14 @@ export class RecentFilesService {
     previewUpdatedAt?: number;
     forcePreviewRender?: boolean;
   }) {
-    const next = this.upsertRecentFile({
+    const next = this.upsert({
       path: options.path,
       filename: options.filename,
       lastOpenedAt: options.lastOpenedAt,
     });
 
     if (!options.forcePreviewRender) {
-      const existing = this.getRecentFiles().find(
-        (e) => e.path === options.path,
-      );
+      const existing = this.getAll().find((e) => e.path === options.path);
       if (existing?.previewDataUrl) {
         return next;
       }
@@ -462,14 +449,14 @@ export class RecentFilesService {
   }
 
   /** Whether the Web build has a resumable saved session. */
-  getWebHasSavedSession(): boolean {
+  hasWebSession(): boolean {
     if (typeof window === "undefined") return false;
     const raw = window.localStorage.getItem(this.WEB_SAVED_SESSION_KEY);
     return raw === "1" || raw === "true";
   }
 
   /** Update whether the Web build has a resumable saved session. */
-  setWebHasSavedSession(hasSaved: boolean) {
+  setWebSession(hasSaved: boolean) {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(
       this.WEB_SAVED_SESSION_KEY,
@@ -478,7 +465,7 @@ export class RecentFilesService {
   }
 
   /** Read the persisted Web draft view state. */
-  getWebDraftViewState(): {
+  getWebDraftView(): {
     scale: number;
     scrollLeft: number;
     scrollTop: number;
@@ -527,21 +514,16 @@ export class RecentFilesService {
     );
   }
 
-  /** Persist Web draft view state from DOM scroll container. */
-  persistWebDraftViewStateFromDom(options: {
+  /** Persist Web draft view state from a caller-provided scroll container. */
+  saveWebDraftView(options: {
     scale: number;
-    selector?: string;
+    element: HTMLElement;
     updatedAt?: number;
   }) {
-    if (typeof document === "undefined") return;
-    const el = document.querySelector(
-      options.selector ?? "[data-workspace-scroll-container='true']",
-    ) as HTMLElement | null;
-    if (!el) return;
     this.setWebDraftViewState({
       scale: options.scale,
-      scrollLeft: el.scrollLeft,
-      scrollTop: el.scrollTop,
+      scrollLeft: options.element.scrollLeft,
+      scrollTop: options.element.scrollTop,
       updatedAt: options.updatedAt,
     });
   }

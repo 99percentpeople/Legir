@@ -11,7 +11,7 @@ import {
 import { Annotation } from "@/types";
 import { parsePDFDate } from "@/utils/pdfUtils";
 import { IAnnotationParser, ParserContext } from "../types";
-import { rgbArrayToHex } from "../lib/colors";
+import { normalizePdfColorToRgb255, rgbArrayToHex } from "../lib/colors";
 import { pdfDebug } from "../lib/debug";
 import { extractInkAppearance } from "../lib/ink";
 import { ensurePdfEmbeddedFontLoaded } from "../lib/embedded-fonts";
@@ -45,12 +45,16 @@ export class InkParser implements IAnnotationParser {
                   // Parse Color
                   let color = "#000000";
                   const c = annot.lookup(PDFName.of("C"));
-                  if (c instanceof PDFArray && c.size() === 3) {
-                    const r = (c.lookup(0) as PDFNumber).asNumber();
-                    const g = (c.lookup(1) as PDFNumber).asNumber();
-                    const b = (c.lookup(2) as PDFNumber).asNumber();
-                    color =
-                      rgbArrayToHex([r * 255, g * 255, b * 255]) || "#000000";
+                  if (c instanceof PDFArray) {
+                    const nums: number[] = [];
+                    for (let i = 0; i < Math.min(3, c.size()); i++) {
+                      const v = c.lookup(i);
+                      if (v instanceof PDFNumber) nums.push(v.asNumber());
+                    }
+                    const normalizedRgb = normalizePdfColorToRgb255(nums);
+                    color = normalizedRgb
+                      ? rgbArrayToHex(normalizedRgb)
+                      : "#000000";
                   }
 
                   // Parse Thickness
@@ -174,9 +178,8 @@ export class HighlightParser implements IAnnotationParser {
 
     pageAnnotations.forEach((annotation, index) => {
       if (annotation.subtype === "Highlight") {
-        const color = annotation.color
-          ? rgbArrayToHex(annotation.color)
-          : "#FFFF00";
+        const normalizedRgb = normalizePdfColorToRgb255(annotation.color);
+        const color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#FFFF00";
         const { x, y, width, height } = pdfJsRectToUiRect(
           annotation.rect,
           viewport,
@@ -256,9 +259,8 @@ export class CommentParser implements IAnnotationParser {
     for (let index = 0; index < pageAnnotations.length; index++) {
       const annotation = pageAnnotations[index];
       if (annotation.subtype === "Text") {
-        const color = annotation.color
-          ? rgbArrayToHex(annotation.color)
-          : "#FFFF00";
+        const normalizedRgb = normalizePdfColorToRgb255(annotation.color);
+        const color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#FFFF00";
         const uiRect = pdfJsRectToUiRect(annotation.rect, viewport);
         const x = uiRect.x;
         const y = uiRect.y;
@@ -275,6 +277,10 @@ export class CommentParser implements IAnnotationParser {
         let author = annotation.title || undefined;
         let updatedAt = parsePDFDate(annotation.modificationDate);
 
+        let opacity =
+          typeof annotation.opacity === "number" ? annotation.opacity : 1;
+        opacity = Math.min(1, Math.max(0, opacity));
+
         if (!contents || contents.trim() === "") {
           console.warn(`Failed to parse comment contents`, {
             pageIndex,
@@ -289,6 +295,7 @@ export class CommentParser implements IAnnotationParser {
           type: "comment",
           rect: { x, y, width, height },
           color: color,
+          opacity: opacity,
           text: contents,
           author: author,
           updatedAt: updatedAt,
@@ -303,19 +310,6 @@ export class FreeTextParser implements IAnnotationParser {
   async parse(context: ParserContext): Promise<Annotation[]> {
     const { pageAnnotations, pageIndex, viewport, pdfDoc } = context;
     const annotations: Annotation[] = [];
-
-    const normalizePdfJsColorToRgb255 = (
-      color: number[] | Uint8ClampedArray | null | undefined,
-    ) => {
-      if (!color || color.length < 3) return undefined;
-      const r = color[0];
-      const g = color[1];
-      const b = color[2];
-      const isNormalized01 =
-        r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1;
-      if (isNormalized01) return [r * 255, g * 255, b * 255];
-      return [r, g, b];
-    };
 
     const resolveFontDictFromDR = (dr: unknown, resourceName: string) => {
       if (!(dr instanceof PDFDict)) return undefined;
@@ -761,7 +755,7 @@ export class FreeTextParser implements IAnnotationParser {
       const annotation = pageAnnotations[index];
       if (annotation.subtype === "FreeText") {
         const initialColorArray = annotation.color;
-        const normalizedRgb = normalizePdfJsColorToRgb255(initialColorArray);
+        const normalizedRgb = normalizePdfColorToRgb255(initialColorArray);
         let color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#000000";
         pdfDebug("import:freetext", "initial", () => ({
           pageIndex,
@@ -781,6 +775,9 @@ export class FreeTextParser implements IAnnotationParser {
         let contents = annotation.contents || "";
         let author = annotation.title || undefined;
         let updatedAt = parsePDFDate(annotation.modificationDate);
+        let opacity =
+          typeof annotation.opacity === "number" ? annotation.opacity : 1;
+        opacity = Math.min(1, Math.max(0, opacity));
         let fontSize = 12;
         let fontFamily: string | undefined = undefined;
         let sourcePdfRef:
@@ -1256,6 +1253,7 @@ export class FreeTextParser implements IAnnotationParser {
           type: "freetext",
           rect: { x, y, width, height },
           color: color,
+          opacity: opacity,
           text: contents,
           size: fontSize,
           fontFamily: fontFamily,

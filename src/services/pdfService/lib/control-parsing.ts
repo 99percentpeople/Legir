@@ -2,24 +2,11 @@ import { DEFAULT_FIELD_STYLE } from "@/constants";
 import type { FieldStyle } from "@/types";
 import type { ParserContext, PdfJsAnnotation } from "../types";
 import type { PDFDocument } from "pdf-lib";
-import { rgbArrayToHex } from "./colors";
+import { normalizePdfColorToRgb255, rgbArrayToHex } from "./colors";
 import {
   getFieldPropertiesFromPdfLib,
   parseDefaultAppearance,
 } from "./appearance";
-
-const normalizePdfJsColorToRgb255 = (
-  color: number[] | Uint8ClampedArray | null | undefined,
-) => {
-  if (!color || color.length < 3) return undefined;
-  const r = color[0];
-  const g = color[1];
-  const b = color[2];
-  const isNormalized01 =
-    r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1;
-  if (isNormalized01) return [r * 255, g * 255, b * 255];
-  return [r, g, b];
-};
 
 export const getStyleParsingResources = (context: ParserContext) => {
   return {
@@ -38,13 +25,13 @@ export const parseFieldStyle = (
   const importedStyle: FieldStyle = { ...DEFAULT_FIELD_STYLE };
 
   if (annotation.color) {
-    const rgb = normalizePdfJsColorToRgb255(annotation.color);
+    const rgb = normalizePdfColorToRgb255(annotation.color);
     const hex = rgb ? rgbArrayToHex(rgb) : undefined;
     if (hex) importedStyle.borderColor = hex;
   }
 
   if (annotation.backgroundColor) {
-    const rgb = normalizePdfJsColorToRgb255(annotation.backgroundColor);
+    const rgb = normalizePdfColorToRgb255(annotation.backgroundColor);
     const hex = rgb ? rgbArrayToHex(rgb) : undefined;
     if (hex) {
       importedStyle.backgroundColor = hex;

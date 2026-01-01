@@ -68,6 +68,8 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
 
   const lastClickTimeRef = useRef<number>(0);
 
+  const baseOpacity = Math.min(1, Math.max(0, data.opacity ?? 1));
+
   useEffect(() => {
     if (!isSelected) {
       setIsEditing(false);
@@ -198,7 +200,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
           lineHeight: 1,
-          opacity: data.text ? 1 : 0.5,
+          opacity: baseOpacity * (data.text ? 1 : 0.5),
         }}
         onPointerDown={handlePointerDown}
       >

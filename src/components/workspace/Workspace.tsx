@@ -30,6 +30,7 @@ import { getPageIndexFromPoint as getPageIndexFromPointLib } from "./lib/getPage
 import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
 import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { appEventBus } from "@/lib/eventBus";
 
 // Workspace = the editor canvas.
 //
@@ -86,6 +87,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    appEventBus.emit(
+      "workspace:scrollContainerReady",
+      { element: containerRef.current },
+      { sticky: true },
+    );
+  }, []);
 
   const { capture: capturePointer, release: releasePointer } =
     usePointerCapture(containerRef);

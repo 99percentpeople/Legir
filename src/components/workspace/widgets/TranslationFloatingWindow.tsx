@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Copy, Sparkles } from "lucide-react";
+import { Copy, CopyCheck, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,6 +28,7 @@ import {
 import { FloatingWindow } from "@/components/ui/floating-window";
 import { cn } from "@/lib/cn";
 import { useEditorStore } from "@/store/useEditorStore";
+import type { TranslateOptionId } from "@/types";
 
 export interface TranslationFloatingWindowProps {
   isOpen: boolean;
@@ -45,6 +46,54 @@ const TARGET_LANG_OPTIONS = [
   { value: "de", label: "Deutsch" },
   { value: "es", label: "Español" },
 ] as const;
+
+function ResultOutputBox({
+  output,
+  isLoading,
+  error,
+  className,
+}: {
+  output: string;
+  isLoading: boolean;
+  error: string | null;
+  className?: string;
+}) {
+  return (
+    <div
+      tabIndex={0}
+      role="textbox"
+      aria-readonly="true"
+      onMouseDownCapture={(e) => {
+        e.currentTarget.focus();
+      }}
+      onKeyDownCapture={(e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const sel = window.getSelection();
+          if (!sel) return;
+          const range = document.createRange();
+          range.selectNodeContents(e.currentTarget);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }}
+      className={cn(
+        "bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border text-sm whitespace-pre-wrap outline-none select-text",
+        className,
+      )}
+    >
+      {output}
+      {isLoading && (
+        <span className="text-muted-foreground animation-duration-[.5s] inline-block animate-pulse">
+          ⬤
+        </span>
+      )}
+      {error && <span className="text-destructive text-xs">{error}</span>}
+    </div>
+  );
+}
 
 export const TranslationFloatingWindow: React.FC<
   TranslationFloatingWindowProps
@@ -69,6 +118,24 @@ export const TranslationFloatingWindow: React.FC<
     void registryVersion;
     return translateService.getOptionGroups();
   }, [registryVersion]);
+
+  const firstAvailableOption = useMemo<TranslateOptionId | undefined>(() => {
+    for (const group of optionGroups) {
+      for (const opt of group.options) {
+        if (translateService.isOptionAvailable(opt.id)) return opt.id;
+      }
+    }
+    return undefined;
+  }, [optionGroups]);
+  useEffect(() => {
+    if (translateService.isOptionAvailable(translateOption)) return;
+    if (!firstAvailableOption) return;
+
+    setState({
+      translateOption:
+        translateService.normalizeTranslateOption(firstAvailableOption),
+    });
+  }, [firstAvailableOption, setState, translateOption]);
   const [targetLang, setTargetLang] = useState<string>(effectiveLanguage);
 
   const [input, setInput] = useState<string>(sourceText);
@@ -187,11 +254,19 @@ export const TranslationFloatingWindow: React.FC<
     setIsLoading(false);
   }, [cancelStream]);
 
+  const [copied, setCopied] = useState(false);
+  let copiedTimeout: NodeJS.Timeout | null = null;
+
   const handleCopy = useCallback(async () => {
     const text = output.trim();
     if (!text) return;
+    if (copiedTimeout) clearTimeout(copiedTimeout);
     try {
       await navigator.clipboard.writeText(text);
+      setCopied(true);
+      copiedTimeout = setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     } catch {
       // ignore
     }
@@ -350,22 +425,17 @@ export const TranslationFloatingWindow: React.FC<
                     disabled={!output.trim()}
                     onClick={handleCopy}
                   >
-                    <Copy size={16} className="mr-2" />
+                    {copied ? <CopyCheck size={16} /> : <Copy size={16} />}
                     {t("translate.copy")}
                   </Button>
                 </div>
 
-                <div className="bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border p-1 text-sm whitespace-pre-wrap">
-                  {output}
-                  {isLoading && (
-                    <span className="text-muted-foreground inline-block animate-pulse">
-                      ▍
-                    </span>
-                  )}
-                  {error && (
-                    <span className="text-destructive text-xs">{error}</span>
-                  )}
-                </div>
+                <ResultOutputBox
+                  output={output}
+                  isLoading={isLoading}
+                  error={error}
+                  className="p-1"
+                />
               </div>
             </div>
           );
@@ -385,7 +455,7 @@ export const TranslationFloatingWindow: React.FC<
               onValueChange={(v) => setActiveTab(v as "source" | "result")}
               className="min-h-0 flex-1"
             >
-              <div className="flex items-center gap-2 border-b py-1">
+              <div className="flex items-center gap-2 border-b">
                 <TabsList className="text-foreground h-auto gap-2 rounded-none bg-transparent px-0 py-0">
                   <TabsTrigger
                     value="source"
@@ -442,7 +512,7 @@ export const TranslationFloatingWindow: React.FC<
                       disabled={!output.trim()}
                       onClick={handleCopy}
                     >
-                      <Copy size={16} />
+                      {copied ? <CopyCheck size={16} /> : <Copy size={16} />}
                       {t("translate.copy")}
                     </Button>
                   )}
@@ -463,17 +533,12 @@ export const TranslationFloatingWindow: React.FC<
 
               <TabsContent value="result" className="min-h-0 w-full">
                 <div className="flex h-full min-h-0 flex-col gap-2">
-                  <div className="bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border p-1.5 text-sm whitespace-pre-wrap">
-                    {output}
-                    {isLoading && (
-                      <span className="text-muted-foreground inline-block animate-pulse">
-                        ▍
-                      </span>
-                    )}
-                    {error && (
-                      <span className="text-destructive text-xs">{error}</span>
-                    )}
-                  </div>
+                  <ResultOutputBox
+                    output={output}
+                    isLoading={isLoading}
+                    error={error}
+                    className="p-1.5"
+                  />
                 </div>
               </TabsContent>
             </Tabs>

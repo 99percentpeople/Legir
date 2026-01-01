@@ -170,7 +170,7 @@ export interface PenStyle {
 
 export type DialogName = "shortcuts" | "settings" | "close_confirm" | null;
 
-export type TranslateOptionId = string;
+export type TranslateOptionId = `${string}:${string}`;
 
 export interface EditorState {
   pdfFile: File | null;

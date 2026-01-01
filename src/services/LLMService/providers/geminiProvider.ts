@@ -14,7 +14,7 @@ import type {
   LLMAnalyzePageForFieldsProvider,
   LLMTranslateProvider,
   LLMTranslateTextOptions,
-} from "../../types";
+} from "../types";
 
 export type GeminiModelId = "gemini-3-flash-preview" | "gemini-2.5-flash";
 
@@ -517,17 +517,13 @@ translateService.registerOptionGroup({
   label: "Gemini (AI)",
   labelKey: "translate.provider_gemini",
   options: GEMINI_MODEL_OPTIONS.map((opt) => ({
-    id: `gemini:${opt.value}`,
+    id: opt.value,
     label: opt.label,
   })),
   isAvailable: () => client.isAvailable(),
   unavailableMessageKey: "ai_panel.api_key_missing",
   translate: async (text, optionId, opts) => {
-    const model = getGeminiModelId(
-      optionId.startsWith("gemini:")
-        ? optionId.slice("gemini:".length)
-        : undefined,
-    );
+    const model = getGeminiModelId(optionId);
     return await geminiProvider.translateText(text, {
       model,
       targetLanguage: opts.targetLanguage,
@@ -536,11 +532,7 @@ translateService.registerOptionGroup({
     });
   },
   translateStream: (text, optionId, opts) => {
-    const model = getGeminiModelId(
-      optionId.startsWith("gemini:")
-        ? optionId.slice("gemini:".length)
-        : undefined,
-    );
+    const model = getGeminiModelId(optionId);
     return geminiProvider.translateTextStream!(text, {
       model,
       targetLanguage: opts.targetLanguage,

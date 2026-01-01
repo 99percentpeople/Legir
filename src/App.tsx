@@ -32,6 +32,7 @@ import { useAppInitialization } from "./app/useAppInitialization";
 import { Spinner } from "./components/ui/spinner";
 import { recentFilesService } from "./services/recentFilesService";
 import { isTauri } from "@tauri-apps/api/core";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 
 // App orchestrator (not just UI).
 //
@@ -49,6 +50,16 @@ import { isTauri } from "@tauri-apps/api/core";
 
 const App: React.FC = () => {
   const { t } = useLanguage();
+
+  const workspaceScrollContainerRef = React.useRef<HTMLElement | null>(null);
+
+  useAppEvent(
+    "workspace:scrollContainerReady",
+    ({ element }) => {
+      workspaceScrollContainerRef.current = element;
+    },
+    { replayLast: true },
+  );
 
   const isTauriSaveTarget = (
     target: SaveTarget,
@@ -92,7 +103,7 @@ const App: React.FC = () => {
       // - Must reset store before loading, but preserve cross-document UI bits (e.g. `hasSavedSession`).
       // - All heavy work should be wrapped by `withProcessing()` so UI can display status/spinners.
       const run = async () => {
-        recentFilesService.cancelAllRecentFilePreviewTasks();
+        recentFilesService.cancelPreviewTasks();
         const prevPdfDocument = useEditorStore.getState().pdfDocument;
 
         if (isTauri() && typeof document !== "undefined") {
@@ -102,11 +113,15 @@ const App: React.FC = () => {
               ? snapshot.saveTarget.path
               : null;
           if (tauriPath) {
-            recentFilesService.persistTauriRecentFileViewStateFromDom({
-              path: tauriPath,
-              scale: snapshot.scale,
-              pageIndex: snapshot.currentPageIndex,
-            });
+            const el = workspaceScrollContainerRef.current;
+            if (el) {
+              recentFilesService.saveTauriViewState({
+                path: tauriPath,
+                scale: snapshot.scale,
+                pageIndex: snapshot.currentPageIndex,
+                element: el,
+              });
+            }
           }
         }
 
@@ -120,7 +135,7 @@ const App: React.FC = () => {
           }
 
           await Promise.race([
-            recentFilesService.waitForRecentFilePreviewQueue().catch(() => {
+            recentFilesService.waitForPreviewQueue().catch(() => {
               // ignore
             }),
             new Promise<void>((resolve) => setTimeout(resolve, 80)),
@@ -181,7 +196,7 @@ const App: React.FC = () => {
                 metadata,
                 filename: options.filename,
               });
-              recentFilesService.setWebHasSavedSession(true);
+              recentFilesService.setWebSession(true);
               setState({
                 hasSavedSession: true,
                 lastSavedAt: new Date(),
@@ -194,15 +209,14 @@ const App: React.FC = () => {
 
           if (options.saveTarget?.kind === "tauri") {
             const tauriPath = options.saveTarget.path;
-            recentFilesService.upsertRecentFileWithPreviewFromPdfDocument({
+            recentFilesService.upsertWithDocPreview({
               path: tauriPath,
               filename: options.filename,
               pdfDocument,
               targetWidth: 240,
             });
 
-            const lastViewState =
-              recentFilesService.getRecentFileViewState(tauriPath);
+            const lastViewState = recentFilesService.getViewState(tauriPath);
             if (lastViewState) {
               setState({
                 pendingViewStateRestore: {
@@ -295,11 +309,11 @@ const App: React.FC = () => {
   const handleResumeSession = async () => {
     const draft = await getDraft();
     if (!draft) {
-      recentFilesService.setWebHasSavedSession(false);
+      recentFilesService.setWebSession(false);
       setState({ hasSavedSession: false });
       return;
     }
-    const viewState = recentFilesService.getWebDraftViewState();
+    const viewState = recentFilesService.getWebDraftView();
     await withProcessing(t("app.loading_draft"), async () => {
       pdfDisposeRef.current?.();
       pdfDisposeRef.current = null;
@@ -490,7 +504,7 @@ const App: React.FC = () => {
 
       if (isTauriSaveTarget(target)) {
         const tauriTarget = target;
-        recentFilesService.upsertRecentFileWithPreviewFromPdfBytes({
+        recentFilesService.upsertWithBytesPreview({
           path: tauriTarget.path,
           filename: nextFilename || "document.pdf",
           pdfBytes: modifiedBytes,
@@ -501,11 +515,15 @@ const App: React.FC = () => {
 
         if (typeof document !== "undefined") {
           const snapshot = useEditorStore.getState();
-          recentFilesService.persistTauriRecentFileViewStateFromDom({
-            path: tauriTarget.path,
-            scale: snapshot.scale,
-            pageIndex: snapshot.currentPageIndex,
-          });
+          const el = workspaceScrollContainerRef.current;
+          if (el) {
+            recentFilesService.saveTauriViewState({
+              path: tauriTarget.path,
+              scale: snapshot.scale,
+              pageIndex: snapshot.currentPageIndex,
+              element: el,
+            });
+          }
         }
       }
 
@@ -542,7 +560,7 @@ const App: React.FC = () => {
 
         const savedTarget = result.target;
         if (isTauriSaveTarget(savedTarget)) {
-          recentFilesService.upsertRecentFileWithPreviewFromPdfBytes({
+          recentFilesService.upsertWithBytesPreview({
             path: savedTarget.path,
             filename: state.filename || "document.pdf",
             pdfBytes: modifiedBytes,
@@ -624,7 +642,7 @@ const App: React.FC = () => {
         metadata: snapshot.metadata,
         filename: snapshot.filename,
       });
-      recentFilesService.setWebHasSavedSession(true);
+      recentFilesService.setWebSession(true);
       setState({
         hasSavedSession: true,
         isDirty: false,
@@ -639,36 +657,42 @@ const App: React.FC = () => {
   };
 
   const closeSession = async () => {
-    recentFilesService.cancelAllRecentFilePreviewTasks();
+    recentFilesService.cancelPreviewTasks();
     if (isTauri()) {
       const snapshot = useEditorStore.getState();
       const tauriPath =
         snapshot.saveTarget?.kind === "tauri" ? snapshot.saveTarget.path : null;
 
       if (tauriPath) {
-        recentFilesService.persistTauriRecentFileViewStateFromDom({
-          path: tauriPath,
-          scale: snapshot.scale,
-          pageIndex: snapshot.currentPageIndex,
-        });
+        const el = workspaceScrollContainerRef.current;
+        if (el) {
+          recentFilesService.saveTauriViewState({
+            path: tauriPath,
+            scale: snapshot.scale,
+            pageIndex: snapshot.currentPageIndex,
+            element: el,
+          });
+        }
       }
     }
 
     if (!isTauri() && typeof document !== "undefined") {
       const snapshot = useEditorStore.getState();
       if (snapshot.pages.length > 0) {
-        recentFilesService.persistWebDraftViewStateFromDom({
-          scale: snapshot.scale,
-        });
+        const el = workspaceScrollContainerRef.current;
+        if (el) {
+          recentFilesService.saveWebDraftView({
+            scale: snapshot.scale,
+            element: el,
+          });
+        }
       }
     }
 
     pdfDisposeRef.current?.();
     pdfDisposeRef.current = null;
 
-    const hasDraft = !isTauri()
-      ? recentFilesService.getWebHasSavedSession()
-      : false;
+    const hasDraft = !isTauri() ? recentFilesService.hasWebSession() : false;
 
     resetDocument();
     if (!isTauri()) {

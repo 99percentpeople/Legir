@@ -3,6 +3,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type RefObject,
 } from "react";
 import {
@@ -11,6 +12,7 @@ import {
   ZOOM_BASE,
 } from "@/constants";
 import type { EditorState } from "@/types";
+import { useEventListener } from "@/hooks/useEventListener";
 
 export const useWorkspaceViewport = (opts: {
   containerRef: RefObject<HTMLDivElement>;
@@ -152,11 +154,11 @@ export const useWorkspaceViewport = (opts: {
   }, [opts.editorState.scale]);
 
   // --- Wheel Zoom ---
-  useEffect(() => {
-    const container = opts.containerRef.current;
-    if (!container) return;
+  const handleWheel = useCallback(
+    (e: WheelEvent) => {
+      const container = opts.containerRef.current;
+      if (!container) return;
 
-    const handleWheel = (e: WheelEvent) => {
       if (opts.isPanning) {
         e.preventDefault();
         return;
@@ -438,16 +440,25 @@ export const useWorkspaceViewport = (opts: {
         };
         opts.onScaleChange(newScale);
       }
-    };
-    container.addEventListener("wheel", handleWheel, { passive: false });
-    return () => container.removeEventListener("wheel", handleWheel);
-  }, [
-    opts.editorState.scale,
-    opts.editorState.pageLayout,
-    opts.onScaleChange,
-    opts.editorState.pages,
-    opts.isPanning,
-  ]);
+    },
+    [
+      opts.containerRef,
+      opts.editorState.pageLayout,
+      opts.editorState.pages,
+      opts.editorState.scale,
+      opts.isPanning,
+      opts.onScaleChange,
+    ],
+  );
+
+  useEventListener<WheelEvent>(
+    opts.containerRef.current,
+    "wheel",
+    handleWheel,
+    {
+      passive: false,
+    },
+  );
 
   const handleViewportScroll = useCallback(() => {
     const container = opts.containerRef.current;

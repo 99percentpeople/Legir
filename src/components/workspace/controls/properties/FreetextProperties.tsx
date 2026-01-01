@@ -22,6 +22,7 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   const { t } = useLanguage();
 
   const displaySize = Math.round((data.size || 12) as number);
+  const displayOpacity = Math.round(((data.opacity ?? 1) as number) * 100);
 
   const availableFontKeys = Object.keys(FONT_FAMILY_MAP);
   const currentFontValue = data.fontFamily || "Helvetica";
@@ -44,6 +45,24 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             onMouseDown={onTriggerHistorySave}
             onChange={(e) => onChange({ color: e.target.value })}
             className="border-input bg-background h-8 w-full cursor-pointer rounded border"
+          />
+        </div>
+
+        {/* Opacity */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>{t("properties.opacity")}</Label>
+            <span className="text-muted-foreground text-xs">
+              {displayOpacity}%
+            </span>
+          </div>
+          <Slider
+            value={[data.opacity ?? 1]}
+            min={0.05}
+            max={1}
+            step={0.05}
+            onValueCommit={onTriggerHistorySave}
+            onValueChange={(vals) => onChange({ opacity: vals[0] })}
           />
         </div>
 

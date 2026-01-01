@@ -1,4 +1,5 @@
 import React from "react";
+import { useEventListener } from "@/hooks/useEventListener";
 
 export function useScrollbarWidthOffset(options: {
   scrollElement: HTMLElement | null;
@@ -76,12 +77,14 @@ export function useScrollbarWidthOffset(options: {
     options.scrollElement,
   ]);
 
+  useEventListener(
+    typeof window !== "undefined" ? window : null,
+    "resize",
+    measureScrollbarWidth,
+  );
+
   React.useEffect(() => {
     measureScrollbarWidth();
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", measureScrollbarWidth);
-    }
 
     let ro: ResizeObserver | null = null;
     if (options.scrollElement && typeof ResizeObserver !== "undefined") {
@@ -104,9 +107,6 @@ export function useScrollbarWidthOffset(options: {
     }
 
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("resize", measureScrollbarWidth);
-      }
       ro?.disconnect();
       mo?.disconnect();
     };

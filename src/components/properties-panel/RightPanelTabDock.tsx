@@ -3,6 +3,7 @@ import { FileText, SlidersHorizontal, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useScrollbarWidthOffset } from "@/hooks/useScrollbarWidthOffset";
 import { useLanguage } from "@/components/language-provider";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 
 export type RightPanelTabId =
   | "document"
@@ -42,13 +43,14 @@ export function RightPanelTabDock({
   const [scrollElement, setScrollElement] = React.useState<HTMLElement | null>(
     null,
   );
-  React.useEffect(() => {
-    setScrollElement(
-      document.querySelector(
-        "[data-workspace-scroll-container='true']",
-      ) as HTMLElement | null,
-    );
-  }, []);
+
+  useAppEvent(
+    "workspace:scrollContainerReady",
+    ({ element }) => {
+      setScrollElement(element);
+    },
+    { replayLast: true },
+  );
 
   const { scrollbarWidthPx } = useScrollbarWidthOffset({
     scrollElement,

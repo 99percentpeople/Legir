@@ -48,7 +48,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
   useEffect(() => {
     if (!isDesktop) return;
-    setRecentFiles(recentFilesService.getRecentFiles());
+    setRecentFiles(recentFilesService.getAll());
   }, [isDesktop]);
 
   const filteredRecentFiles = useMemo(() => {
@@ -62,14 +62,14 @@ const LandingPage: React.FC<LandingPageProps> = ({
   }, [query, recentFiles]);
 
   const handleDeleteRecent = (path: string) => {
-    const next = recentFilesService.removeRecentFile(path);
+    const next = recentFilesService.remove(path);
     setRecentFiles(next);
   };
 
   const handleClearAll = async () => {
     const ok = await confirm(t("landing.desktop.confirm_clear_all"));
     if (!ok) return;
-    const next = recentFilesService.clearRecentFiles();
+    const next = recentFilesService.clear();
     setRecentFiles(next);
   };
 

@@ -9,6 +9,7 @@ import {
 } from "@/types";
 import { cn } from "@/lib/cn";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
+import { useEventListener } from "@/hooks/useEventListener";
 import FieldTreePanel from "./FieldTreePanel";
 import AnnotationsPanel from "./AnnotationsPanel";
 import DocumentOutlinePanel from "./OutlinePanel";
@@ -87,31 +88,30 @@ const Sidebar: React.FC<SidebarProps> = ({
     [width],
   );
 
-  React.useEffect(() => {
-    if (!isResizing) return;
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
+  useEventListener<MouseEvent>(
+    isResizing ? document : null,
+    "mousemove",
+    (moveEvent) => {
       if (!resizeStateRef.current) return;
       const { startX, startWidth } = resizeStateRef.current;
       const newWidth = startWidth + (moveEvent.clientX - startX);
       if (onResizeRef.current) {
         onResizeRef.current(Math.max(200, Math.min(600, newWidth)));
       }
-    };
+    },
+  );
 
-    const onMouseUp = () => {
-      setIsResizing(false);
-      resizeStateRef.current = null;
-    };
+  useEventListener(isResizing ? document : null, "mouseup", () => {
+    setIsResizing(false);
+    resizeStateRef.current = null;
+  });
 
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
+  React.useEffect(() => {
+    if (!isResizing) return;
     setGlobalCursor("col-resize", "sidebar-resize");
     document.body.style.userSelect = "none";
 
     return () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
       resetGlobalCursor("sidebar-resize");
       document.body.style.removeProperty("user-select");
     };

@@ -176,6 +176,11 @@ export class FreeTextExporter implements IAnnotationExporter {
     const g = colorObj.green;
     const bb = colorObj.blue;
 
+    const opacity =
+      typeof annotation.opacity === "number"
+        ? Math.min(1, Math.max(0, annotation.opacity))
+        : undefined;
+
     const fontSize = annotation.size || 12;
 
     const resolveStandardFont = (fontFamily: string | undefined) => {
@@ -372,15 +377,25 @@ export class FreeTextExporter implements IAnnotationExporter {
       apFontResources[cjkResourceName] = cjkFontRef;
     }
 
-    const apResources = pdfDoc.context.obj({
+    let apResources = pdfDoc.context.obj({
       Font: apFontResources,
       ProcSet: [PDFName.of("PDF"), PDFName.of("Text")],
     });
 
+    if (typeof opacity === "number" && opacity < 1) {
+      const gsDict = pdfDoc.context.obj({ CA: opacity, ca: opacity });
+      const gsRef = pdfDoc.context.register(gsDict);
+      apResources = pdfDoc.context.obj({
+        Font: apFontResources,
+        ProcSet: [PDFName.of("PDF"), PDFName.of("Text")],
+        ExtGState: { GS0: gsRef },
+      });
+    }
+
     const lineHeight = fontSize * 1.2;
     const startY = h - fontSize; // Start from top
 
-    let appearanceOps = `q ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${lineHeight} TL`;
+    let appearanceOps = `q${typeof opacity === "number" && opacity < 1 ? " /GS0 gs" : ""} ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${lineHeight} TL`;
 
     // Initial position
     appearanceOps += ` 2 ${startY} Td`;
@@ -488,6 +503,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       AP: { N: appearanceRef },
       Q: q,
       BS: { W: 0 },
+      CA: typeof opacity === "number" ? opacity : undefined,
       P: page.ref,
       T: annotation.author
         ? PDFHexString.fromText(annotation.author)

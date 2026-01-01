@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
+import { useEventListener } from "@/hooks/useEventListener";
 
 interface MousePosition {
   x: number;
@@ -43,20 +44,14 @@ export function useMouse<T extends Element = HTMLElement>(
     setPosition({ x: 0, y: 0 });
   }, []);
 
-  useEffect(() => {
-    // If no element is provided, default to document for global tracking
-    const target: T | Document = element || document;
-    target.addEventListener("mousemove", handleMouseMove);
-    if (resetOnExit) {
-      target.addEventListener("mouseleave", handleMouseLeave);
-    }
-    return () => {
-      target.removeEventListener("mousemove", handleMouseMove);
-      if (resetOnExit) {
-        target.removeEventListener("mouseleave", handleMouseLeave);
-      }
-    };
-  }, [element, handleMouseMove, handleMouseLeave, resetOnExit]);
+  const target: T | Document | null =
+    typeof document !== "undefined" ? element || document : null;
+
+  useEventListener<MouseEvent>(target, "mousemove", handleMouseMove);
+
+  useEventListener(resetOnExit ? target : null, "mouseleave", () =>
+    handleMouseLeave(),
+  );
 
   return { ref, ...position };
 }

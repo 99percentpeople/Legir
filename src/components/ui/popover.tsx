@@ -40,7 +40,10 @@ const ensureGlobalPopoverCtrlWheelInterceptor = () => {
     );
   };
 
-  window.addEventListener("wheel", handler, { passive: false, capture: true });
+  window.addEventListener("wheel", handler, {
+    passive: false,
+    capture: true,
+  });
 };
 
 function Popover({

@@ -13,7 +13,7 @@ import {
   type TranslateTextOptions,
   type TranslateTextStreamOptions,
   type AIAnalysisOptions,
-} from "./providers/gemini/geminiProvider";
+} from "./providers/geminiProvider";
 
 llmService.registerProvider(geminiProvider);
 llmService.setDefaultProviderId(geminiProvider.id);

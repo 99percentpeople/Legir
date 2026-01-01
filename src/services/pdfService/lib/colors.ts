@@ -28,3 +28,16 @@ export const rgbArrayToHex = (
   }));
   return hex;
 };
+
+export const normalizePdfColorToRgb255 = (
+  color: number[] | Uint8ClampedArray | null | undefined,
+): [number, number, number] | undefined => {
+  if (!color || color.length < 1) return undefined;
+  const r = color[0];
+  const g = color.length > 1 ? color[1] : r;
+  const b = color.length > 2 ? color[2] : r;
+  const isNormalized01 =
+    r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1;
+  if (isNormalized01) return [r * 255, g * 255, b * 255];
+  return [r, g, b];
+};

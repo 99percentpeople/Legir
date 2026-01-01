@@ -54,7 +54,7 @@ export function useAppInitialization({
 
       if (!cancelled) {
         setState({
-          hasSavedSession: recentFilesService.getWebHasSavedSession(),
+          hasSavedSession: recentFilesService.hasWebSession(),
         });
       }
 

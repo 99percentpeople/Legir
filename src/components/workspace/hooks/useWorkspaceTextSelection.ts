@@ -8,6 +8,7 @@ import {
 import type { Annotation, EditorState } from "@/types";
 import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useEventListener } from "@/hooks/useEventListener";
 
 export type TextSelectionToolbarState = {
   isVisible: boolean;
@@ -307,12 +308,24 @@ export const useWorkspaceTextSelection = (opts: {
 
   useEffect(() => {
     updateTextSelectionToolbar();
+  }, [updateTextSelectionToolbar, editorStateRef]);
 
-    const handleSelectionChange = () => updateTextSelectionToolbar();
-    document.addEventListener("selectionchange", handleSelectionChange);
-    window.addEventListener("resize", handleSelectionChange);
+  useEventListener(
+    typeof document !== "undefined" ? document : null,
+    "selectionchange",
+    () => updateTextSelectionToolbar(),
+  );
 
-    const handlePointerDown = (e: PointerEvent) => {
+  useEventListener(
+    typeof window !== "undefined" ? window : null,
+    "resize",
+    () => updateTextSelectionToolbar(),
+  );
+
+  useEventListener<PointerEvent>(
+    typeof document !== "undefined" ? document : null,
+    "pointerdown",
+    (e) => {
       const state = editorStateRef.current;
       if (!state) return;
       if (state.tool !== "select") return;
@@ -323,9 +336,14 @@ export const useWorkspaceTextSelection = (opts: {
           prev.isVisible ? { ...prev, isVisible: false } : prev,
         );
       }
-    };
+    },
+    true,
+  );
 
-    const handlePointerUp = () => {
+  useEventListener(
+    typeof document !== "undefined" ? document : null,
+    "pointerup",
+    () => {
       if (!isTextSelectingRef.current) return;
       // Defer one frame so the browser has time to finalize the selection range.
       // Keep isTextSelectingRef=true during this frame to prevent selectionchange from
@@ -334,29 +352,22 @@ export const useWorkspaceTextSelection = (opts: {
         isTextSelectingRef.current = false;
         updateTextSelectionToolbar();
       });
-    };
+    },
+    true,
+  );
 
-    const handlePointerCancel = () => {
+  useEventListener(
+    typeof document !== "undefined" ? document : null,
+    "pointercancel",
+    () => {
       if (!isTextSelectingRef.current) return;
       isTextSelectingRef.current = false;
       setTextSelectionToolbar((prev) =>
         prev.isVisible ? { ...prev, isVisible: false } : prev,
       );
-    };
-
-    // Use capture phase so we still detect selection start/end even if some layer stops propagation.
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    document.addEventListener("pointerup", handlePointerUp, true);
-    document.addEventListener("pointercancel", handlePointerCancel, true);
-
-    return () => {
-      document.removeEventListener("selectionchange", handleSelectionChange);
-      window.removeEventListener("resize", handleSelectionChange);
-      document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("pointerup", handlePointerUp, true);
-      document.removeEventListener("pointercancel", handlePointerCancel, true);
-    };
-  }, [updateTextSelectionToolbar, editorStateRef]);
+    },
+    true,
+  );
 
   useEffect(() => {
     if (

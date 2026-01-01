@@ -10,6 +10,8 @@ import { RightPanelTabDock } from "../components/properties-panel/RightPanelTabD
 import { PropertiesPanel } from "../components/properties-panel/PropertiesPanel";
 import { AIDetectionPanel } from "../components/properties-panel/AIDetectionPanel";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useEventListener } from "@/hooks/useEventListener";
 
 const Workspace = React.lazy(() => import("../components/workspace/Workspace"));
 import {
@@ -34,7 +36,6 @@ import {
   FIT_SCREEN_PADDING_Y,
   FIT_WIDTH_PADDING_X,
   WORKSPACE_BASE_PAGE_GAP_PX,
-  WORKSPACE_SCROLL_CONTAINER_SELECTOR,
 } from "../constants";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -85,6 +86,15 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const lastFitKeyRef = useRef<string | null>(null);
   const skipNextWindowCloseRef = useRef(false);
   const initialTitleRef = useRef<string | null>(null);
+  const workspaceScrollContainerRef = useRef<HTMLElement | null>(null);
+
+  useAppEvent(
+    "workspace:scrollContainerReady",
+    ({ element }) => {
+      workspaceScrollContainerRef.current = element;
+    },
+    { replayLast: true },
+  );
 
   const selectedField =
     state.selectedId && state.fields.find((f) => f.id === state.selectedId)
@@ -200,7 +210,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
             return;
           }
 
-          recentFilesService.cancelAllRecentFilePreviewTasks();
+          recentFilesService.cancelPreviewTasks();
 
           const { isDirty, pages, setState } = useEditorStore.getState();
           if (!pages || pages.length === 0) return;
@@ -211,12 +221,15 @@ const EditorPage: React.FC<EditorPageProps> = ({
               ? snapshot.saveTarget.path
               : null;
           if (tauriPath) {
-            recentFilesService.persistTauriRecentFileViewStateFromDom({
-              path: tauriPath,
-              scale: snapshot.scale,
-              pageIndex: snapshot.currentPageIndex,
-              selector: WORKSPACE_SCROLL_CONTAINER_SELECTOR,
-            });
+            const el = workspaceScrollContainerRef.current;
+            if (el) {
+              recentFilesService.saveTauriViewState({
+                path: tauriPath,
+                scale: snapshot.scale,
+                pageIndex: snapshot.currentPageIndex,
+                element: el,
+              });
+            }
           }
 
           if (!isDirty) return;
@@ -250,16 +263,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
         }
       };
     }
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (state.pages.length > 0 && state.isDirty) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [tauri, state.isDirty, state.pages.length]);
 
   const closeConfirmOpen = state.activeDialog === "close_confirm";
@@ -270,58 +273,69 @@ const EditorPage: React.FC<EditorPageProps> = ({
   };
 
   const closeWindow = async () => {
-    recentFilesService.cancelAllRecentFilePreviewTasks();
+    recentFilesService.cancelPreviewTasks();
     const snapshot = useEditorStore.getState();
     const tauriPath =
       snapshot.saveTarget?.kind === "tauri" ? snapshot.saveTarget.path : null;
     if (tauriPath) {
-      recentFilesService.persistTauriRecentFileViewStateFromDom({
-        path: tauriPath,
-        scale: snapshot.scale,
-        pageIndex: snapshot.currentPageIndex,
-        selector: WORKSPACE_SCROLL_CONTAINER_SELECTOR,
-      });
+      const el = workspaceScrollContainerRef.current;
+      if (el) {
+        recentFilesService.saveTauriViewState({
+          path: tauriPath,
+          scale: snapshot.scale,
+          pageIndex: snapshot.currentPageIndex,
+          element: el,
+        });
+      }
     }
 
     skipNextWindowCloseRef.current = true;
     await getCurrentWindow().close();
   };
 
-  useEffect(() => {
-    if (tauri) return;
-    if (typeof document === "undefined") return;
+  const persistWebViewState = useCallback(() => {
+    const snapshot = useEditorStore.getState();
+    if (!snapshot.pages || snapshot.pages.length === 0) return;
+    const el = workspaceScrollContainerRef.current;
+    if (!el) return;
+    recentFilesService.saveWebDraftView({ scale: snapshot.scale, element: el });
+  }, []);
 
-    const persistViewState = () => {
-      const snapshot = useEditorStore.getState();
-      if (!snapshot.pages || snapshot.pages.length === 0) return;
+  useEventListener<BeforeUnloadEvent>(
+    !tauri && typeof window !== "undefined" ? window : null,
+    "beforeunload",
+    (e) => {
+      if (state.pages.length > 0 && state.isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    },
+  );
 
-      recentFilesService.persistWebDraftViewStateFromDom({
-        scale: snapshot.scale,
-        selector: WORKSPACE_SCROLL_CONTAINER_SELECTOR,
-      });
-    };
-
-    const handlePageHide = () => {
-      persistViewState();
+  useEventListener(
+    !tauri && typeof window !== "undefined" ? window : null,
+    "pagehide",
+    () => {
+      persistWebViewState();
       const snapshot = useEditorStore.getState();
       if (snapshot.isDirty) {
         void onSaveDraft(true);
       }
-    };
+    },
+  );
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        handlePageHide();
+  useEventListener(
+    !tauri && typeof document !== "undefined" ? document : null,
+    "visibilitychange",
+    () => {
+      if (document.visibilityState !== "hidden") return;
+      persistWebViewState();
+      const snapshot = useEditorStore.getState();
+      if (snapshot.isDirty) {
+        void onSaveDraft(true);
       }
-    };
-
-    window.addEventListener("pagehide", handlePageHide);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.removeEventListener("pagehide", handlePageHide);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [tauri, onSaveDraft]);
+    },
+  );
 
   useEffect(() => {
     if (tauri) return;
@@ -345,16 +359,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
   ]);
 
   const getWorkspaceViewport = useCallback(() => {
-    if (typeof document === "undefined") {
+    const el = workspaceScrollContainerRef.current;
+    if (el) return { width: el.clientWidth, height: el.clientHeight };
+    if (typeof window !== "undefined") {
       return { width: window.innerWidth, height: window.innerHeight };
     }
-    const el = document.querySelector(
-      WORKSPACE_SCROLL_CONTAINER_SELECTOR,
-    ) as HTMLElement | null;
-    if (el) {
-      return { width: el.clientWidth, height: el.clientHeight };
-    }
-    return { width: window.innerWidth, height: window.innerHeight };
+    return { width: 0, height: 0 };
   }, []);
 
   const calculateFitWidthScale = useCallback(
@@ -432,9 +442,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
       updateScale(restore.scale);
 
       requestAnimationFrame(() => {
-        const el = document.querySelector(
-          WORKSPACE_SCROLL_CONTAINER_SELECTOR,
-        ) as HTMLElement | null;
+        const el = workspaceScrollContainerRef.current;
         if (!el) return;
         el.scrollLeft = restore.scrollLeft;
         el.scrollTop = restore.scrollTop;
@@ -456,8 +464,10 @@ const EditorPage: React.FC<EditorPageProps> = ({
     setState,
   ]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+  useEventListener<KeyboardEvent>(
+    typeof window !== "undefined" ? window : null,
+    "keydown",
+    (e) => {
       const currentState = useEditorStore.getState();
 
       if (
@@ -569,9 +579,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
         currentState.openDialog("shortcuts");
         return;
       }
-    };
+    },
+    true,
+  );
 
-    const handleKeyUp = (e: KeyboardEvent) => {
+  useEventListener<KeyboardEvent>(
+    typeof window !== "undefined" ? window : null,
+    "keyup",
+    (e) => {
       const currentState = useEditorStore.getState();
       if (
         e.key === "Control" ||
@@ -591,15 +606,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
       if (e.key === " ") {
         currentState.setKeys({ space: false });
       }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("keyup", handleKeyUp, true);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("keyup", handleKeyUp, true);
-    };
-  }, [onSaveDraft, onPrint]);
+    },
+    true,
+  );
 
   const handlePenStyleChange = useCallback(
     (style: Partial<EditorState["penStyle"]>) => {

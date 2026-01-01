@@ -6,23 +6,36 @@ export interface TranslateOption {
   labelKey?: string;
 }
 
+export interface TranslateOptionRegistration {
+  id: string;
+  label: string;
+  labelKey?: string;
+}
+
 export interface TranslateOptionGroup {
   id: string;
   label: string;
   labelKey?: string;
   options: TranslateOption[];
+}
 
-  isAvailable: (optionId: TranslateOptionId) => boolean;
+export interface TranslateOptionGroupRegistration {
+  id: string;
+  label: string;
+  labelKey?: string;
+  options: TranslateOptionRegistration[];
+
+  isAvailable: (optionId: string) => boolean;
   unavailableMessageKey?: string;
 
   translate: (
     text: string,
-    optionId: TranslateOptionId,
+    optionId: string,
     opts: TranslateTextOptions,
   ) => Promise<string>;
   translateStream?: (
     text: string,
-    optionId: TranslateOptionId,
+    optionId: string,
     opts: TranslateTextOptions,
   ) => AsyncGenerator<string>;
 }
@@ -105,9 +118,12 @@ class CloudTranslateV2 {
 }
 
 export class TranslateService {
-  private groups: TranslateOptionGroup[] = [];
-  private optionToGroup = new Map<TranslateOptionId, TranslateOptionGroup>();
-  private defaultOptionId: TranslateOptionId = "cloud";
+  private groups: TranslateOptionGroupRegistration[] = [];
+  private optionToGroup = new Map<
+    TranslateOptionId,
+    { group: TranslateOptionGroupRegistration; localOptionId: string }
+  >();
+  private defaultOptionId: TranslateOptionId = "cloud:cloudv2";
   private registryListeners = new Set<() => void>();
 
   private cloudV2 = new CloudTranslateV2();
@@ -119,7 +135,7 @@ export class TranslateService {
       labelKey: "translate.provider_cloud",
       options: [
         {
-          id: "cloud",
+          id: "cloudv2",
           label: "Cloud Translation API",
           labelKey: "translate.provider_cloud",
         },
@@ -135,16 +151,39 @@ export class TranslateService {
     });
   }
 
-  registerOptionGroup(group: TranslateOptionGroup) {
+  private buildFullOptionId(
+    groupId: string,
+    optionId: string,
+  ): TranslateOptionId {
+    return `${groupId}:${optionId}` as TranslateOptionId;
+  }
+
+  private parseFullOptionId(
+    input: string,
+  ): { groupId: string; optionId: string } | null {
+    const idx = input.indexOf(":");
+    if (idx <= 0) return null;
+    return {
+      groupId: input.slice(0, idx),
+      optionId: input.slice(idx + 1),
+    };
+  }
+
+  registerOptionGroup(group: TranslateOptionGroupRegistration) {
     this.groups = [...this.groups.filter((g) => g.id !== group.id), group];
 
     for (const opt of group.options) {
-      this.optionToGroup.set(opt.id, group);
+      const fullId = this.buildFullOptionId(group.id, opt.id);
+      this.optionToGroup.set(fullId, { group, localOptionId: opt.id });
     }
 
-    const first = this.groups[0]?.options?.[0]?.id;
-    if (first && !this.optionToGroup.has(this.defaultOptionId)) {
-      this.defaultOptionId = first;
+    const firstGroup = this.groups[0];
+    const firstLocalId = firstGroup?.options?.[0]?.id;
+    if (firstGroup && firstLocalId) {
+      const firstFullId = this.buildFullOptionId(firstGroup.id, firstLocalId);
+      if (!this.optionToGroup.has(this.defaultOptionId)) {
+        this.defaultOptionId = firstFullId;
+      }
     }
 
     for (const listener of this.registryListeners) listener();
@@ -158,7 +197,16 @@ export class TranslateService {
   }
 
   getOptionGroups(): TranslateOptionGroup[] {
-    return this.groups;
+    return this.groups.map((g) => ({
+      id: g.id,
+      label: g.label,
+      labelKey: g.labelKey,
+      options: g.options.map((opt) => ({
+        id: this.buildFullOptionId(g.id, opt.id),
+        label: opt.label,
+        labelKey: opt.labelKey,
+      })),
+    }));
   }
 
   setDefaultOptionId(optionId: TranslateOptionId) {
@@ -169,8 +217,14 @@ export class TranslateService {
   normalizeTranslateOption(input: unknown): TranslateOptionId {
     const fallback: TranslateOptionId = this.defaultOptionId;
     if (typeof input !== "string") return fallback;
-    const asId = input as TranslateOptionId;
-    return this.optionToGroup.has(asId) ? asId : fallback;
+
+    const parsed = this.parseFullOptionId(input);
+    if (parsed) {
+      const asId = input as TranslateOptionId;
+      return this.optionToGroup.has(asId) ? asId : fallback;
+    }
+
+    return fallback;
   }
 
   private resolveTranslateOption(
@@ -197,28 +251,28 @@ export class TranslateService {
 
   isOptionAvailable(option: TranslateOptionId) {
     const normalized = this.normalizeTranslateOption(option);
-    const group = this.optionToGroup.get(normalized);
-    if (!group) return false;
-    return group.isAvailable(normalized);
+    const entry = this.optionToGroup.get(normalized);
+    if (!entry) return false;
+    return entry.group.isAvailable(entry.localOptionId);
   }
 
   getOptionUnavailableMessageKey(
     option: TranslateOptionId,
   ): string | undefined {
     const normalized = this.normalizeTranslateOption(option);
-    const group = this.optionToGroup.get(normalized);
-    if (!group) return undefined;
-    return group.unavailableMessageKey;
+    const entry = this.optionToGroup.get(normalized);
+    if (!entry) return undefined;
+    return entry.group.unavailableMessageKey;
   }
 
   async translate(text: string, opts: TranslateTextOptions): Promise<string> {
     const option = this.resolveTranslateOption(opts);
-    const group = this.optionToGroup.get(option);
-    if (!group) {
+    const entry = this.optionToGroup.get(option);
+    if (!entry) {
       throw new Error(`Unknown translate option: ${option}`);
     }
 
-    return await group.translate(text, option, opts);
+    return await entry.group.translate(text, entry.localOptionId, opts);
   }
 
   async *translateStream(
@@ -226,17 +280,17 @@ export class TranslateService {
     opts: TranslateTextOptions,
   ): AsyncGenerator<string> {
     const option = this.resolveTranslateOption(opts);
-    const group = this.optionToGroup.get(option);
-    if (!group) {
+    const entry = this.optionToGroup.get(option);
+    if (!entry) {
       throw new Error(`Unknown translate option: ${option}`);
     }
 
-    if (group.translateStream) {
-      yield* group.translateStream(text, option, opts);
+    if (entry.group.translateStream) {
+      yield* entry.group.translateStream(text, entry.localOptionId, opts);
       return;
     }
 
-    yield await group.translate(text, option, opts);
+    yield await entry.group.translate(text, entry.localOptionId, opts);
   }
 }
 

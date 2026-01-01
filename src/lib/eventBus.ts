@@ -56,6 +56,9 @@ export type AppEventMap = {
     pageIndex: number;
     isSelecting: boolean;
   };
+  "workspace:scrollContainerReady": {
+    element: HTMLElement;
+  };
   "workspace:focusControl": {
     id: string;
     focusInput?: boolean;
