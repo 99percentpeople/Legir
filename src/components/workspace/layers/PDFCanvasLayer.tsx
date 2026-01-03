@@ -1,5 +1,4 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { cn } from "@/lib/cn";
 import * as pdfjsLib from "pdfjs-dist";
 import { MAX_PIXELS_PER_PAGE } from "@/constants";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
@@ -232,6 +231,15 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     !hasUsableTileBuffer &&
     (tileState.tileMode || (!tileState.tileMode && !isRendered));
   const showSpinner = !hasUsableTileBuffer && !isRendered && !placeholderImage;
+  const placeholderZIndex = tileState.tileMode ? 0 : 10;
+  const canvasADisplay =
+    activeCanvas === "B" || !isInView || shouldHidePageCanvasForTiles
+      ? "none"
+      : "block";
+  const canvasBDisplay =
+    activeCanvas === "A" || !isInView || shouldHidePageCanvasForTiles
+      ? "none"
+      : "block";
 
   return (
     <>
@@ -239,10 +247,8 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       {showPlaceholderImage && (
         <img
           src={placeholderImage}
-          className={cn(
-            "pointer-events-none absolute inset-0 h-full w-full object-contain opacity-50 blur-sm",
-            tileState.tileMode ? "z-0" : "z-10",
-          )}
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-50 blur-sm"
+          style={{ zIndex: placeholderZIndex }}
           alt="Loading..."
         />
       )}
@@ -257,25 +263,15 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       {/* Canvas A */}
       <canvas
         ref={canvasARef}
-        className={cn(
-          "absolute inset-0 size-full",
-          // NOTE: Keep page-mode canvas visible until there is a usable tile buffer AND
-          // at least one tile has rendered. Hiding early can create a temporary blank
-          // region during page->tile transitions.
-          (activeCanvas === "B" || !isInView || shouldHidePageCanvasForTiles) &&
-            "hidden",
-        )}
+        className="absolute inset-0 size-full"
+        style={{ display: canvasADisplay }}
       />
 
       {/* Canvas B */}
       <canvas
         ref={canvasBRef}
-        className={cn(
-          "absolute inset-0 size-full",
-          // NOTE: Same invariant as Canvas A.
-          (activeCanvas === "A" || !isInView || shouldHidePageCanvasForTiles) &&
-            "hidden",
-        )}
+        className="absolute inset-0 size-full"
+        style={{ display: canvasBDisplay }}
       />
 
       <PDFTileLayer

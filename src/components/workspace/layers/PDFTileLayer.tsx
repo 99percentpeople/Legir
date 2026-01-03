@@ -1,5 +1,4 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { cn } from "@/lib/cn";
 import * as pdfjsLib from "pdfjs-dist";
 import { MAX_PIXELS_PER_PAGE, TILE_MAX_DIM } from "@/constants";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
@@ -39,6 +38,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 }) => {
   const [hasAnyTileRendered, setHasAnyTileRendered] = useState(false);
   const [tileProgressVersion, setTileProgressVersion] = useState(0);
+  const [viewportVersion, setViewportVersion] = useState(0);
   const [frontHasAnyRendered, setFrontHasAnyRendered] = useState(false);
 
   const renderEpochRef = useRef(0);
@@ -108,6 +108,12 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
   const reprioritizeRafRef = useRef<number | null>(null);
   const viewportCenterRef = useRef<[number, number] | null>(null);
+  const viewportRectNormRef = useRef<[number, number, number, number] | null>(
+    null,
+  );
+  const lastViewportRectNormRef = useRef<
+    [number, number, number, number] | null
+  >(null);
   const lastReprioritizeCenterRef = useRef<[number, number] | null>(null);
   const reprioritizeBusyRef = useRef(false);
   const reprioritizeQueuedCenterRef = useRef<[number, number] | null>(null);
@@ -136,6 +142,45 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         const cssY = Math.min(Math.max(vcy - pRect.top, 0), pRect.height);
         const centerX = cssX * dpr;
         const centerY = cssY * dpr;
+
+        // Track viewport rect in normalized (0..1) page coordinates so we can hide
+        // offscreen tiles without caring about exact page pixel dimensions.
+        const leftCss = Math.min(
+          Math.max(cRect.left - pRect.left, 0),
+          pRect.width,
+        );
+        const topCss = Math.min(
+          Math.max(cRect.top - pRect.top, 0),
+          pRect.height,
+        );
+        const rightCss = Math.min(
+          Math.max(cRect.right - pRect.left, 0),
+          pRect.width,
+        );
+        const bottomCss = Math.min(
+          Math.max(cRect.bottom - pRect.top, 0),
+          pRect.height,
+        );
+        const w = pRect.width || 1;
+        const h = pRect.height || 1;
+        const rectNorm: [number, number, number, number] = [
+          leftCss / w,
+          topCss / h,
+          rightCss / w,
+          bottomCss / h,
+        ];
+        viewportRectNormRef.current = rectNorm;
+        const prev = lastViewportRectNormRef.current;
+        if (
+          !prev ||
+          Math.abs(prev[0] - rectNorm[0]) > 0.01 ||
+          Math.abs(prev[1] - rectNorm[1]) > 0.01 ||
+          Math.abs(prev[2] - rectNorm[2]) > 0.01 ||
+          Math.abs(prev[3] - rectNorm[3]) > 0.01
+        ) {
+          lastViewportRectNormRef.current = rectNorm;
+          setViewportVersion((v) => v + 1);
+        }
 
         viewportCenterRef.current = [centerX, centerY];
 
@@ -730,13 +775,16 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     return null;
   }
 
+  // Used to re-render tiles when the viewport changes (per-tile hidden optimization).
+  void viewportVersion;
+
   return (
     <>
       {allTiles.map((t) => {
         const isBack = backTileIdSet.has(t.canvasId);
         const isMid = midTileIdSet.has(t.canvasId);
         const isFront = frontTileIdSet.has(t.canvasId);
-        const zClass = isBack ? "z-30" : isMid ? "z-20" : "z-10";
+        const zIndex = isBack ? 30 : isMid ? 20 : 10;
 
         const baseW = isBack
           ? backTilesPageW
@@ -748,6 +796,31 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           : isMid
             ? midTilesPageH
             : frontTilesPageH;
+
+        const hideByViewport = (() => {
+          if (!tileMode) return false;
+          const rect = viewportRectNormRef.current;
+          if (!rect) return false;
+          if (!baseW || !baseH) return false;
+
+          const [vl, vt, vr, vb] = rect;
+          const marginX = Math.min(0.25, (TILE_MAX_DIM / baseW) * 1.5);
+          const marginY = Math.min(0.25, (TILE_MAX_DIM / baseH) * 1.5);
+          const l = vl - marginX;
+          const t0 = vt - marginY;
+          const r = vr + marginX;
+          const b = vb + marginY;
+
+          const x0 = t.x / baseW;
+          const y0 = t.y / baseH;
+          const x1 = (t.x + t.w) / baseW;
+          const y1 = (t.y + t.h) / baseH;
+
+          const intersects = x1 >= l && x0 <= r && y1 >= t0 && y0 <= b;
+          return !intersects;
+        })();
+
+        const tileDisplay = !isInView || hideByViewport ? "none" : "block";
 
         return (
           <canvas
@@ -763,8 +836,10 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
                 tileCanvasElsRef.current.delete(t.canvasId);
               }
             }}
-            className={cn("absolute", zClass, !isInView && "hidden")}
+            className="absolute"
             style={{
+              zIndex,
+              display: tileDisplay,
               left: baseW ? `${(t.x / baseW) * 100}%` : t.x / dprRef.current,
               top: baseH ? `${(t.y / baseH) * 100}%` : t.y / dprRef.current,
               width: baseW ? `${(t.w / baseW) * 100}%` : t.w / dprRef.current,
