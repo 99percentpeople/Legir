@@ -13,12 +13,37 @@ import {
   DialogName,
   FieldType,
   EditorOptions,
-  SnappingOptions,
-  DebugOptions,
 } from "../types";
-import { ANNOTATION_STYLES, DEFAULT_EDITOR_UI_STATE } from "../constants";
+import {
+  ANNOTATION_STYLES,
+  DEFAULT_EDITOR_UI_STATE,
+  THUMBNAIL_JPEG_QUALITY,
+  THUMBNAIL_MIME_TYPE,
+  THUMBNAIL_TARGET_WIDTH,
+  THUMBNAIL_WARMUP_PRIORITY,
+} from "../constants";
 import { shouldSwitchToSelectAfterUse } from "../lib/tool-behavior";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
+import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
+
+let thumbnailWarmupEpoch = 0;
+let thumbnailWarmupAbort: AbortController | null = null;
+
+const revokeObjectUrlIfNeeded = (url: string | undefined | null) => {
+  if (!url) return;
+  if (!url.startsWith("blob:")) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    // ignore
+  }
+};
+
+const revokeThumbnailObjectUrls = (pages: PageData[]) => {
+  for (const p of pages) {
+    revokeObjectUrlIfNeeded(p.imageData);
+  }
+};
 
 // Editor store = single source of truth (SSOT) for the editor.
 //
@@ -66,6 +91,8 @@ export interface EditorActions {
   ) => void;
 
   getPageCached: (pageIndex: number) => Promise<PDFPageProxy>;
+
+  warmupThumbnails: () => void;
 
   // Complex Actions
   loadDocument: (data: {
@@ -247,6 +274,83 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         return await pagePromise;
       },
 
+      warmupThumbnails: () => {
+        const { pdfBytes } = get();
+        if (!pdfBytes || pdfBytes.byteLength === 0) return;
+
+        thumbnailWarmupEpoch += 1;
+        const epoch = thumbnailWarmupEpoch;
+        thumbnailWarmupAbort?.abort();
+        thumbnailWarmupAbort = new AbortController();
+        const { signal } = thumbnailWarmupAbort;
+
+        void (async () => {
+          try {
+            await pdfWorkerService.loadDocument(pdfBytes, { signal });
+          } catch {
+            return;
+          }
+
+          for (let pageIndex = 0; ; pageIndex++) {
+            if (signal.aborted) return;
+            if (thumbnailWarmupEpoch !== epoch) return;
+
+            const state = get();
+            if (pageIndex >= state.pages.length) return;
+            const page = state.pages[pageIndex];
+            if (!page || page.imageData) continue;
+
+            try {
+              const { bytes, mimeType } =
+                await pdfWorkerService.renderPageImage({
+                  pageIndex,
+                  targetWidth: THUMBNAIL_TARGET_WIDTH,
+                  mimeType: THUMBNAIL_MIME_TYPE,
+                  quality: THUMBNAIL_JPEG_QUALITY,
+                  priority: THUMBNAIL_WARMUP_PRIORITY,
+                  signal,
+                });
+
+              if (signal.aborted) return;
+              if (!bytes || bytes.byteLength === 0) continue;
+
+              const blobBytes = new Uint8Array(bytes);
+              const objectUrl = URL.createObjectURL(
+                new Blob([blobBytes], { type: mimeType }),
+              );
+
+              if (signal.aborted) {
+                revokeObjectUrlIfNeeded(objectUrl);
+                return;
+              }
+              if (thumbnailWarmupEpoch !== epoch) {
+                revokeObjectUrlIfNeeded(objectUrl);
+                return;
+              }
+
+              let didSet = false;
+
+              set((s) => {
+                const p = s.pages[pageIndex];
+                if (!p || p.imageData) return {};
+                const nextPages = s.pages.slice();
+                didSet = true;
+                nextPages[pageIndex] = { ...p, imageData: objectUrl };
+                return { pages: nextPages };
+              });
+
+              if (!didSet) {
+                revokeObjectUrlIfNeeded(objectUrl);
+              }
+            } catch {
+              // ignore
+            }
+
+            await new Promise<void>((r) => setTimeout(r, 0));
+          }
+        })();
+      },
+
       setState: (updates) =>
         set((state) => {
           const newValues =
@@ -291,7 +395,8 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             },
           };
         }),
-      loadDocument: (data) =>
+      loadDocument: (data) => {
+        revokeThumbnailObjectUrls(get().pages);
         set({
           ...data,
           pageCache: new Map(),
@@ -299,7 +404,9 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           future: [],
           selectedId: null,
           isDirty: false,
-        }),
+        });
+        get().warmupThumbnails();
+      },
 
       saveCheckpoint: () => {
         set((state) => {
@@ -572,7 +679,13 @@ export const useEditorStore = create<EditorState & EditorActions>()(
 
       setKeys: (keys) => set((state) => ({ keys: { ...state.keys, ...keys } })),
 
-      resetDocument: () =>
+      resetDocument: () => {
+        thumbnailWarmupEpoch += 1;
+        thumbnailWarmupAbort?.abort();
+        thumbnailWarmupAbort = null;
+
+        revokeThumbnailObjectUrls(get().pages);
+
         set(() => ({
           pdfFile: initialState.pdfFile,
           pdfBytes: initialState.pdfBytes,
@@ -596,13 +709,16 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           processingStatus: initialState.processingStatus,
           isSaving: initialState.isSaving,
           hasSavedSession: initialState.hasSavedSession,
+          lastSavedAt: initialState.lastSavedAt,
           isDirty: initialState.isDirty,
           currentPageIndex: initialState.currentPageIndex,
           pendingViewStateRestore: initialState.pendingViewStateRestore,
           fitTrigger: initialState.fitTrigger,
+          keys: { ...initialState.keys },
           activeDialog: initialState.activeDialog,
           closeConfirmSource: initialState.closeConfirmSource,
-        })),
+        }));
+      },
 
       moveField: (direction, isFast) => {
         set((state) => {

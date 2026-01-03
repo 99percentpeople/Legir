@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { PageData } from "../../types";
 import { ImageIcon } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useLanguage } from "../language-provider";
-import { pdfWorkerService } from "../../services/pdfService/pdfWorkerService";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 // --- Thumbnail Item ---
@@ -18,75 +17,17 @@ interface ThumbnailItemProps {
 const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
   page,
   pageIndex,
-  pdfDocument,
   onNavigate,
   isActive,
 }) => {
   const { t } = useLanguage();
-  const [isRendered, setIsRendered] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const isTransferred = useRef(false);
-
-  useEffect(() => {
-    setIsRendered(false);
-  }, [pdfDocument]);
 
   useEffect(() => {
     if (isActive && ref.current) {
       ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [isActive]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setIsVisible(true);
-        observer.disconnect();
-      }
-    });
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (isVisible && !isRendered && pdfDocument && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const abortController = new AbortController();
-      try {
-        const canvasId = `thumbnail-${pageIndex}`;
-        const offscreen = (() => {
-          if (isTransferred.current) return undefined;
-          if (!canvas.transferControlToOffscreen) return undefined;
-          isTransferred.current = true;
-          return canvas.transferControlToOffscreen();
-        })();
-
-        pdfWorkerService
-          .renderPage({
-            pageIndex,
-            scale: 0.6,
-            canvas: offscreen,
-            canvasId,
-            priority: 10,
-            signal: abortController.signal,
-          })
-          .then(() => {
-            setIsRendered(true);
-          })
-          .catch((err) => {
-            console.error("Thumbnail render error:", err);
-          });
-      } catch (e) {
-        console.error("Failed to render thumbnail", e);
-      }
-
-      return () => {
-        abortController.abort();
-      };
-    }
-  }, [isVisible, isRendered, pdfDocument, pageIndex]);
 
   const aspectRatio =
     page.width && page.height ? page.width / page.height : 0.75;
@@ -107,27 +48,16 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
         )}
         style={{ aspectRatio: aspectRatio }}
       >
-        <canvas
-          ref={canvasRef}
-          className={cn(
-            "h-full w-full object-contain",
-            !isRendered && "hidden",
-          )}
-        />
-        {!isRendered && (
-          <>
-            {page.imageData ? (
-              <img
-                src={page.imageData}
-                alt={`Page ${pageIndex + 1}`}
-                className="h-full w-full object-contain"
-              />
-            ) : (
-              <div className="bg-muted text-muted-foreground flex h-full w-full items-center justify-center">
-                <ImageIcon size={20} className="opacity-20" />
-              </div>
-            )}
-          </>
+        {page.imageData ? (
+          <img
+            src={page.imageData}
+            alt={`Page ${pageIndex + 1}`}
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <div className="bg-muted text-muted-foreground flex h-full w-full items-center justify-center">
+            <ImageIcon size={20} className="opacity-20" />
+          </div>
         )}
         <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/5" />
       </div>

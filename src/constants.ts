@@ -8,6 +8,15 @@ export const PAGE_PADDING = 24; // px
 export const MAX_PIXELS_PER_PAGE = 16_000_000;
 export const TILE_MAX_DIM = 2048;
 
+// Thumbnail warmup (generate page preview images once per document).
+// Primary usage:
+// - `src/store/useEditorStore.ts` -> `warmupThumbnails()` (calls `pdfWorkerService.renderPageImage`)
+// - Cached value stored in `PageData.imageData` and displayed by `src/components/sidebar/ThumbnailsPanel.tsx`
+export const THUMBNAIL_TARGET_WIDTH = 500;
+export const THUMBNAIL_MIME_TYPE = "image/jpeg";
+export const THUMBNAIL_JPEG_QUALITY = 0.7;
+export const THUMBNAIL_WARMUP_PRIORITY = 10000;
+
 export const FIT_WIDTH_PADDING_X = 96;
 export const FIT_SCREEN_PADDING_X = 96;
 export const FIT_SCREEN_PADDING_Y = 120;

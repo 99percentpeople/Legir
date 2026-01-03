@@ -247,7 +247,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       {showPlaceholderImage && (
         <img
           src={placeholderImage}
-          className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-50 blur-sm"
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain blur-sm"
           style={{ zIndex: placeholderZIndex }}
           alt="Loading..."
         />

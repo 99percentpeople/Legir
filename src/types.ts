@@ -132,7 +132,7 @@ export interface PageData {
   pageIndex: number;
   width: number;
   height: number;
-  imageData?: string; // Base64 string (Optional now, used for lazy loading fallback or AI)
+  imageData?: string; // Base64 string (Optional now, used for lazy loading fallback)
 }
 
 export interface HistorySnapshot {
