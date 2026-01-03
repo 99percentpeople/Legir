@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import * as pdfjsLib from "pdfjs-dist";
+import { MAX_PIXELS_PER_PAGE } from "@/constants";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import PDFTileLayer from "./PDFTileLayer";
 
 interface PDFCanvasLayerProps {
   pageIndex: number;
@@ -24,13 +26,30 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
   const [activeCanvas, setActiveCanvas] = useState<"A" | "B">("A");
   const [isRendered, setIsRendered] = useState(false);
+  const [tileState, setTileState] = useState<{
+    tileMode: boolean;
+    hasUsableTileBuffer: boolean;
+    hasAnyTileRendered: boolean;
+    hasAllTilesRendered: boolean;
+  }>({
+    tileMode: false,
+    hasUsableTileBuffer: false,
+    hasAnyTileRendered: false,
+    hasAllTilesRendered: false,
+  });
 
   const renderedScaleRef = useRef<number | null>(null);
+  const renderEpochRef = useRef(0);
+  const dprRef = useRef<number>(1);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     renderedScaleRef.current = null;
     setIsRendered(false);
   }, [pageProxy]);
+
+  useLayoutEffect(() => {
+    renderEpochRef.current += 1;
+  }, [pageProxy, pageIndex, scale]);
 
   // Stable IDs for canvas elements to allow reuse in Worker
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
@@ -42,9 +61,21 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   const detachedCanvasARef = useRef<OffscreenCanvas | null>(null);
   const detachedCanvasBRef = useRef<OffscreenCanvas | null>(null);
 
+  useEffect(() => {
+    return () => {
+      void pdfWorkerService.releaseCanvas({
+        canvasIds: [canvasAId.current, canvasBId.current],
+      });
+    };
+  }, []);
+
   // Rendering Logic with Double Buffering and Debounce
   useEffect(() => {
     if (!pageProxy) return;
+
+    if (tileState.tileMode) {
+      return;
+    }
 
     // Only render if in viewport
     if (!isInView) {
@@ -56,6 +87,16 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       return;
     }
 
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dprRef.current = dpr;
+    const viewportCheck = pageProxy.getViewport({ scale: scale * dpr });
+    const pixelsCheck =
+      Math.ceil(viewportCheck.width) * Math.ceil(viewportCheck.height);
+    if (pixelsCheck > MAX_PIXELS_PER_PAGE) {
+      return;
+    }
+
+    const epoch = renderEpochRef.current;
     let abortController: AbortController | null = null;
     let rafId: number | null = null;
 
@@ -78,9 +119,10 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
       try {
         if (signal.aborted) return false;
+        if (renderEpochRef.current !== epoch) return false;
 
         // Optimization: Limit max DPR to 2
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const dpr = dprRef.current;
         // Note: We don't set width/height here for OffscreenCanvas,
         // but we set it on the placeholder to ensure layout is correct.
         // The worker handles the actual bitmap size.
@@ -113,7 +155,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
           scale: scale * dpr,
           canvas: offscreenCanvas,
           canvasId: targetId,
-          priority: isInView ? 1 : 0,
+          priority: isInView ? -1 : 0,
           signal: signal,
         });
 
@@ -162,6 +204,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       abortController = new AbortController();
       render(abortController.signal).then((ok) => {
         if (!ok) return;
+        if (renderEpochRef.current !== epoch) return;
         const targetId = activeCanvas === "A" ? "B" : "A";
         setActiveCanvas(targetId);
         setIsRendered(true);
@@ -176,22 +219,37 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       }
     };
     // Re-run if visibility changes or scale/doc changes
-  }, [activeCanvas, isInView, pageProxy, pageIndex, scale]);
+  }, [activeCanvas, isInView, pageProxy, pageIndex, scale, tileState.tileMode]);
+
+  const hasUsableTileBuffer = tileState.hasUsableTileBuffer;
+  const shouldHidePageCanvasForTiles =
+    tileState.tileMode &&
+    hasUsableTileBuffer &&
+    tileState.hasAnyTileRendered &&
+    tileState.hasAllTilesRendered;
+  const showPlaceholderImage =
+    !!placeholderImage &&
+    !hasUsableTileBuffer &&
+    (tileState.tileMode || (!tileState.tileMode && !isRendered));
+  const showSpinner = !hasUsableTileBuffer && !isRendered && !placeholderImage;
 
   return (
     <>
       {/* Placeholder Image (Low Res / Lazy Load) */}
-      {!isRendered && placeholderImage && (
+      {showPlaceholderImage && (
         <img
           src={placeholderImage}
-          className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-50 blur-sm"
+          className={cn(
+            "pointer-events-none absolute inset-0 h-full w-full object-contain opacity-50 blur-sm",
+            tileState.tileMode ? "z-0" : "z-10",
+          )}
           alt="Loading..."
         />
       )}
 
       {/* Loading Spinner */}
-      {!isRendered && !placeholderImage && (
-        <div className="text-muted-foreground pointer-events-none absolute inset-0 flex items-center justify-center bg-gray-50">
+      {showSpinner && (
+        <div className="text-muted-foreground pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-gray-50">
           <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"></div>
         </div>
       )}
@@ -201,7 +259,11 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         ref={canvasARef}
         className={cn(
           "absolute inset-0 size-full",
-          (activeCanvas === "B" || !isInView) && "hidden",
+          // NOTE: Keep page-mode canvas visible until there is a usable tile buffer AND
+          // at least one tile has rendered. Hiding early can create a temporary blank
+          // region during page->tile transitions.
+          (activeCanvas === "B" || !isInView || shouldHidePageCanvasForTiles) &&
+            "hidden",
         )}
       />
 
@@ -210,8 +272,19 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         ref={canvasBRef}
         className={cn(
           "absolute inset-0 size-full",
-          (activeCanvas === "A" || !isInView) && "hidden",
+          // NOTE: Same invariant as Canvas A.
+          (activeCanvas === "A" || !isInView || shouldHidePageCanvasForTiles) &&
+            "hidden",
         )}
+      />
+
+      <PDFTileLayer
+        pageIndex={pageIndex}
+        pageProxy={pageProxy}
+        scale={scale}
+        isInView={isInView}
+        isRendered={isRendered}
+        onStateChange={setTileState}
       />
     </>
   );

@@ -2,7 +2,14 @@ import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
 import { Tile } from "./types";
 
 export interface RenderRequest {
-  type?: "render" | "cancel" | "load" | "unload" | "renderImage";
+  type?:
+    | "render"
+    | "cancel"
+    | "load"
+    | "unload"
+    | "renderImage"
+    | "releaseCanvas"
+    | "reprioritize";
   id: string;
   docId?: string;
   data?: Uint8Array | null;
@@ -13,9 +20,11 @@ export interface RenderRequest {
   mimeType?: string;
   quality?: number;
   tile?: Tile;
+  viewportCenter?: [number, number];
   isNewDoc?: boolean;
   canvas?: OffscreenCanvas;
   canvasId?: string;
+  canvasIds?: string[];
   priority?: number;
 }
 
@@ -25,11 +34,84 @@ class PDFWorkerService {
     string,
     { resolve: (val: any) => void; reject: (err: any) => void }
   >();
+  private requestSeq = 0;
 
   private readonly defaultDocId: string = "default";
 
   constructor() {
     this.initWorker();
+  }
+
+  public reprioritize(options: {
+    pageIndex: number;
+    scale: number;
+    viewportCenter: [number, number];
+    docId?: string;
+    signal?: AbortSignal;
+  }): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (!this.worker) {
+        this.initWorker();
+        if (!this.worker) {
+          reject(new Error("Worker not initialized"));
+          return;
+        }
+      }
+
+      const {
+        pageIndex,
+        scale,
+        viewportCenter,
+        docId: requestedDocId,
+        signal,
+      } = options;
+      const docId = requestedDocId ?? this.defaultDocId;
+      const id = `reprioritize_${docId}_${pageIndex}_${scale}_${this.requestSeq++}_${Date.now()}`;
+
+      if (signal?.aborted) {
+        const err = new DOMException("Aborted", "AbortError");
+        (err as any).phase = "pre-send";
+        reject(err);
+        return;
+      }
+
+      const onAbort = () => {
+        this.worker?.postMessage({ type: "cancel", id });
+        this.pendingRequests.delete(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        this.pendingRequests.set(id, {
+          resolve: (val) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            resolve(Boolean(val));
+          },
+          reject: (err) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            reject(err);
+          },
+        });
+
+        const message: RenderRequest = {
+          type: "reprioritize",
+          id,
+          docId,
+          pageIndex,
+          scale,
+          viewportCenter,
+        };
+
+        this.worker.postMessage(message);
+      } catch (e) {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    });
   }
 
   private initWorker() {
@@ -124,6 +206,65 @@ class PDFWorkerService {
     this.worker.postMessage(message);
   }
 
+  public releaseCanvas(options: {
+    canvasIds: string[];
+    signal?: AbortSignal;
+  }): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (!this.worker) {
+        this.initWorker();
+        if (!this.worker) {
+          reject(new Error("Worker not initialized"));
+          return;
+        }
+      }
+
+      const { canvasIds, signal } = options;
+      const id = `releaseCanvas_${Date.now()}`;
+
+      if (signal?.aborted) {
+        const err = new DOMException("Aborted", "AbortError");
+        (err as any).phase = "pre-send";
+        reject(err);
+        return;
+      }
+
+      const onAbort = () => {
+        this.worker?.postMessage({ type: "cancel", id });
+        this.pendingRequests.delete(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        this.pendingRequests.set(id, {
+          resolve: (val) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            resolve(Boolean(val));
+          },
+          reject: (err) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            reject(err);
+          },
+        });
+
+        const message: RenderRequest = {
+          type: "releaseCanvas",
+          id,
+          canvasIds,
+        };
+
+        this.worker.postMessage(message);
+      } catch (e) {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    });
+  }
+
   public renderPageImage(options: {
     pageIndex: number;
     scale?: number;
@@ -162,7 +303,7 @@ class PDFWorkerService {
 
       const docId = requestedDocId ?? this.defaultDocId;
 
-      const id = `renderImage_${docId ?? "default"}_${pageIndex}_${Date.now()}`;
+      const id = `renderImage_${docId}_${pageIndex}_${this.requestSeq++}_${Date.now()}`;
 
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");
@@ -257,7 +398,7 @@ class PDFWorkerService {
       } = options;
 
       const docId = requestedDocId ?? this.defaultDocId;
-      const id = `render_${docId}_${pageIndex}_${scale}_${Date.now()}`;
+      const id = `render_${docId}_${pageIndex}_${scale}_${canvasId}_${this.requestSeq++}_${Date.now()}`;
 
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");

@@ -5,6 +5,9 @@ export const ZOOM_BASE = 1.25;
 export const MIN_FIELD_SIZE = 10;
 export const PAGE_PADDING = 24; // px
 
+export const MAX_PIXELS_PER_PAGE = 16_000_000;
+export const TILE_MAX_DIM = 2048;
+
 export const FIT_WIDTH_PADDING_X = 96;
 export const FIT_SCREEN_PADDING_X = 96;
 export const FIT_SCREEN_PADDING_Y = 120;

@@ -1,5 +1,6 @@
 import * as pdfjsLib from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
+import type { Tile } from "@/services/pdfService/types";
 
 const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
 const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
@@ -24,7 +25,14 @@ if (typeof self.document === "undefined") {
 }
 
 interface RenderRequest {
-  type?: "render" | "cancel" | "load" | "unload" | "renderImage";
+  type?:
+    | "render"
+    | "cancel"
+    | "load"
+    | "unload"
+    | "renderImage"
+    | "releaseCanvas"
+    | "reprioritize";
   id: string;
   docId?: string;
   data?: Uint8Array | null;
@@ -34,13 +42,12 @@ interface RenderRequest {
   renderAnnotations?: boolean;
   mimeType?: string;
   quality?: number;
-  tileX?: number;
-  tileY?: number;
-  tileWidth?: number;
-  tileHeight?: number;
+  tile?: Tile;
+  viewportCenter?: [number, number];
   isNewDoc?: boolean;
   canvas?: OffscreenCanvas;
   canvasId?: string;
+  canvasIds?: string[];
   priority?: number; // Lower number = higher priority
 }
 
@@ -193,10 +200,7 @@ const renderToCanvas = async (params: RenderRequest) => {
     data,
     pageIndex,
     scale,
-    tileX,
-    tileY,
-    tileWidth,
-    tileHeight,
+    tile,
     isNewDoc,
     canvas: transferredCanvas,
     canvasId,
@@ -249,10 +253,10 @@ const renderToCanvas = async (params: RenderRequest) => {
     const viewport = page.getViewport({ scale: scale, rotation: page.rotate });
 
     // Determine tile parameters with defaults
-    const finalTileX = tileX ?? 0;
-    const finalTileY = tileY ?? 0;
-    const finalTileWidth = tileWidth ?? viewport.width;
-    const finalTileHeight = tileHeight ?? viewport.height;
+    const finalTileX = tile ? tile[0] : 0;
+    const finalTileY = tile ? tile[1] : 0;
+    const finalTileWidth = tile ? tile[2] : viewport.width;
+    const finalTileHeight = tile ? tile[3] : viewport.height;
 
     // Resize canvas to match tile size (crucial for OffscreenCanvas)
     if (
@@ -299,7 +303,7 @@ const renderToCanvas = async (params: RenderRequest) => {
     self.postMessage({ id, success: true });
   } catch (error: any) {
     if (error?.name === "RenderingCancelledException") {
-      // Ignore cancelled errors
+      self.postMessage({ id, success: true, payload: false });
       return;
     }
 
@@ -411,6 +415,7 @@ const renderToImage = async (params: RenderRequest) => {
     );
   } catch (error: any) {
     if (error?.name === "RenderingCancelledException") {
+      self.postMessage({ id, success: true, payload: false });
       return;
     }
 
@@ -491,6 +496,77 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     return;
   }
 
+  if (type === "releaseCanvas") {
+    const idsToRelease = new Set<string>();
+    if (e.data.canvasId) idsToRelease.add(e.data.canvasId);
+    if (Array.isArray(e.data.canvasIds)) {
+      for (const cid of e.data.canvasIds) idsToRelease.add(cid);
+    }
+
+    if (idsToRelease.size > 0) {
+      for (let i = taskQueue.length - 1; i >= 0; i--) {
+        const cid = taskQueue[i].data.canvasId;
+        if (cid && idsToRelease.has(cid)) {
+          const removed = taskQueue.splice(i, 1)[0];
+          if (removed) {
+            self.postMessage({ id: removed.id, success: true, payload: false });
+          }
+        }
+      }
+      for (const cid of idsToRelease) {
+        canvasMap.delete(cid);
+      }
+    }
+
+    self.postMessage({ id, success: true });
+    return;
+  }
+
+  if (type === "reprioritize") {
+    const incomingDocId = getDocId(e.data.docId);
+    const incomingPageIndex = e.data.pageIndex;
+    const incomingScale = e.data.scale;
+    const vc = e.data.viewportCenter;
+
+    if (
+      vc &&
+      incomingPageIndex !== undefined &&
+      incomingScale !== undefined &&
+      taskQueue.length > 0
+    ) {
+      const vcx = vc[0];
+      const vcy = vc[1];
+
+      for (const item of taskQueue) {
+        const queuedType = item.data.type || "render";
+        if (queuedType !== "render") continue;
+        if (getDocId(item.data.docId) !== incomingDocId) continue;
+        if (item.data.pageIndex !== incomingPageIndex) continue;
+
+        const taskScale = item.data.scale;
+        if (
+          taskScale === undefined ||
+          Math.abs(taskScale - incomingScale) > 0.001
+        ) {
+          continue;
+        }
+
+        const t = item.data.tile;
+        const cx = t ? t[0] + t[2] / 2 : vcx;
+        const cy = t ? t[1] + t[3] / 2 : vcy;
+        const newPriority = Math.hypot(cx - vcx, cy - vcy);
+        item.priority = newPriority;
+        item.data.priority = newPriority;
+      }
+
+      taskQueue.sort((a, b) => a.priority - b.priority);
+      scheduleNext();
+    }
+
+    self.postMessage({ id, success: true });
+    return;
+  }
+
   if (type === "render" || type === "renderImage") {
     // Early registration of canvas to prevent loss during cancellation or optimization
     if (e.data.canvas && e.data.canvasId) {
@@ -500,22 +576,32 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     // Optimization: When scale changes, discard all pending tasks with different scale
     // This ensures we don't waste time on tiles that are no longer needed
     const incomingScale = e.data.scale;
-    const incomingPriority = priority;
     const incomingDocId = getDocId(e.data.docId);
+    const incomingPageIndex = e.data.pageIndex;
 
-    if (incomingScale !== undefined) {
+    if (
+      type === "render" &&
+      incomingScale !== undefined &&
+      incomingPageIndex !== undefined
+    ) {
       for (let i = taskQueue.length - 1; i >= 0; i--) {
-        const taskScale = taskQueue[i].data.scale;
-        const taskPriority = taskQueue[i].priority;
-        const taskDocId = getDocId(taskQueue[i].data.docId);
+        const queued = taskQueue[i];
+        const queuedType = queued.data.type || "render";
+        if (queuedType !== "render") continue;
 
+        const taskDocId = getDocId(queued.data.docId);
+        if (taskDocId !== incomingDocId) continue;
+        if (queued.data.pageIndex !== incomingPageIndex) continue;
+
+        const taskScale = queued.data.scale;
         if (
-          taskDocId === incomingDocId &&
           taskScale !== undefined &&
-          Math.abs(taskScale - incomingScale) > 0.001 &&
-          taskPriority === incomingPriority
+          Math.abs(taskScale - incomingScale) > 0.001
         ) {
-          taskQueue.splice(i, 1);
+          const removed = taskQueue.splice(i, 1)[0];
+          if (removed) {
+            self.postMessage({ id: removed.id, success: true, payload: false });
+          }
         }
       }
     }
