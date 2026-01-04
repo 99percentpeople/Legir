@@ -124,7 +124,7 @@ export const useWorkspaceViewport = (opts: {
 
       const pre = viewportAnchorRef.current;
       const usedPre =
-        opts.editorState.pageLayout === "double" &&
+        opts.editorState.pageLayout !== "single" &&
         pre &&
         Math.abs(pre.scale - prevScaleRef.current) < 0.0001 &&
         applyPageAnchor(
@@ -255,6 +255,7 @@ export const useWorkspaceViewport = (opts: {
         const findPageNearPointByDom = (
           clientX: number,
           clientY: number,
+          probeDx: number,
           probeDy: number,
         ) => {
           const getHit = (x: number, y: number) => {
@@ -284,6 +285,8 @@ export const useWorkspaceViewport = (opts: {
 
           const candidates = [
             getHit(clientX, clientY),
+            probeDx > 0 ? getHit(clientX - probeDx, clientY) : null,
+            probeDx > 0 ? getHit(clientX + probeDx, clientY) : null,
             probeDy > 0 ? getHit(clientX, clientY - probeDy) : null,
             probeDy > 0 ? getHit(clientX, clientY + probeDy) : null,
           ].filter(Boolean) as Array<{ pageIndex: number; rect: DOMRect }>;
@@ -311,7 +314,7 @@ export const useWorkspaceViewport = (opts: {
         let targetX = 0;
         let targetY = 0;
 
-        if (opts.editorState.pageLayout === "double") {
+        if (opts.editorState.pageLayout !== "single") {
           const rect = container.getBoundingClientRect();
           const mouseX = e.clientX - rect.left;
           const mouseY = e.clientY - rect.top;
@@ -347,8 +350,12 @@ export const useWorkspaceViewport = (opts: {
           // Prefer page anchoring in single-page mode as well.
           // When the cursor is in the inter-page gap, we probe ±gap/2 to snap to the nearest page.
           const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * currentScale;
-          const probeDy = Math.max(8, Math.min(256, gapPx / 2));
-          const domHit = findPageNearPointByDom(e.clientX, e.clientY, probeDy);
+
+          const probe = Math.max(8, Math.min(256, gapPx / 2));
+          const domHit =
+            opts.editorState.pageFlow === "horizontal"
+              ? findPageNearPointByDom(e.clientX, e.clientY, probe, 0)
+              : findPageNearPointByDom(e.clientX, e.clientY, 0, probe);
           if (domHit) {
             const { pageIndex, rect: pageRect } = domHit;
             const pageX = (e.clientX - pageRect.left) / currentScale;
@@ -368,64 +375,70 @@ export const useWorkspaceViewport = (opts: {
             return;
           }
 
-          // Decompose Y coordinate into Fixed (padding/gap) and Scaled (pages) parts
-          const paddingPx = WORKSPACE_BASE_PADDING_PX;
-          const gapPx2 = gapPx;
-          let accumulatedH = paddingPx;
-          let fixedY = paddingPx;
-          let scaledY = 0;
-
-          if (relY < paddingPx) {
-            // Mouse in top padding
-            fixedY = relY;
-            scaledY = 0;
+          if (opts.editorState.pageFlow === "horizontal") {
+            const scaleRatio = newScale / currentScale;
+            targetX = relX * scaleRatio;
+            targetY = relY * scaleRatio;
           } else {
-            let found = false;
-            for (let i = 0; i < opts.editorState.pages.length; i++) {
-              const page = opts.editorState.pages[i];
-              const pageH = page.height * currentScale;
+            // Decompose Y coordinate into Fixed (padding/gap) and Scaled (pages) parts
+            const paddingPx = WORKSPACE_BASE_PADDING_PX;
+            const gapPx2 = gapPx;
+            let accumulatedH = paddingPx;
+            let fixedY = paddingPx;
+            let scaledY = 0;
 
-              // Check if mouse is on this page
-              if (relY < accumulatedH + pageH) {
-                scaledY += relY - accumulatedH;
-                found = true;
-                break;
-              }
-              accumulatedH += pageH;
-              scaledY += pageH;
+            if (relY < paddingPx) {
+              // Mouse in top padding
+              fixedY = relY;
+              scaledY = 0;
+            } else {
+              let found = false;
+              for (let i = 0; i < opts.editorState.pages.length; i++) {
+                const page = opts.editorState.pages[i];
+                const pageH = page.height * currentScale;
 
-              // Check if mouse is in gap (only if not last page)
-              if (i < opts.editorState.pages.length - 1) {
-                if (relY < accumulatedH + gapPx2) {
+                // Check if mouse is on this page
+                if (relY < accumulatedH + pageH) {
                   scaledY += relY - accumulatedH;
                   found = true;
                   break;
                 }
-                accumulatedH += gapPx2;
-                scaledY += gapPx2;
+                accumulatedH += pageH;
+                scaledY += pageH;
+
+                // Check if mouse is in gap (only if not last page)
+                if (i < opts.editorState.pages.length - 1) {
+                  if (relY < accumulatedH + gapPx2) {
+                    scaledY += relY - accumulatedH;
+                    found = true;
+                    break;
+                  }
+                  accumulatedH += gapPx2;
+                  scaledY += gapPx2;
+                }
+              }
+              if (!found) {
+                // Mouse is below last page (bottom padding)
+                fixedY += relY - accumulatedH;
               }
             }
-            if (!found) {
-              // Mouse is below last page (bottom padding)
-              fixedY += relY - accumulatedH;
+
+            // Decompose X coordinate (Simple assumption of fixed side padding)
+            const fixedXPadding = WORKSPACE_BASE_PADDING_PX;
+            let fixedX = fixedXPadding;
+            let scaledX = 0;
+            if (relX < fixedXPadding) {
+              fixedX = relX;
+              scaledX = 0;
+            } else {
+              fixedX = fixedXPadding;
+              scaledX = relX - fixedXPadding;
             }
-          }
 
-          // Decompose X coordinate (Simple assumption of fixed side padding)
-          const fixedXPadding = WORKSPACE_BASE_PADDING_PX;
-          let fixedX = fixedXPadding;
-          let scaledX = 0;
-          if (relX < fixedXPadding) {
-            fixedX = relX;
-            scaledX = 0;
-          } else {
-            fixedX = fixedXPadding;
-            scaledX = relX - fixedXPadding;
+            // Calculate predicted position at new scale
+            targetX = scaledX * (newScale / currentScale) + fixedX;
+            targetY = scaledY * (newScale / currentScale) + fixedY;
           }
-
-          // Calculate predicted position at new scale
-          targetX = scaledX * (newScale / currentScale) + fixedX;
-          targetY = scaledY * (newScale / currentScale) + fixedY;
         }
 
         const mouseX = e.clientX - containerRect.left;
@@ -444,6 +457,7 @@ export const useWorkspaceViewport = (opts: {
     [
       opts.containerRef,
       opts.editorState.pageLayout,
+      opts.editorState.pageFlow,
       opts.editorState.pages,
       opts.editorState.scale,
       opts.isPanning,
@@ -479,7 +493,7 @@ export const useWorkspaceViewport = (opts: {
           opts.updateTextSelectionToolbar();
         }
 
-        const isDoubleLayout = opts.editorState.pageLayout === "double";
+        const isDoubleLayout = opts.editorState.pageLayout !== "single";
         const shouldNotifyPageIndex =
           typeof opts.onPageIndexChange === "function";
 
@@ -538,47 +552,88 @@ export const useWorkspaceViewport = (opts: {
           // In single-page layout, the scroll logic here only exists to notify the current
           // page index; skip all computations if the consumer didn't subscribe.
           if (!shouldNotifyPageIndex) return;
-          const scrollTop = c.scrollTop;
-          const viewportHeight = c.clientHeight;
-          const middleY = scrollTop + viewportHeight / 2;
-
           const scale = opts.editorState.scale;
           const paddingPx = WORKSPACE_BASE_PADDING_PX;
           const gap = WORKSPACE_BASE_PAGE_GAP_PX * scale;
 
-          let currentY = paddingPx;
-          let found = false;
+          if (opts.editorState.pageFlow === "horizontal") {
+            const scrollLeft = c.scrollLeft;
+            const viewportWidth = c.clientWidth;
+            const middleX = scrollLeft + viewportWidth / 2;
 
-          for (let i = 0; i < opts.editorState.pages.length; i++) {
-            const page = opts.editorState.pages[i];
-            const pageHeight = page.height * scale;
+            let currentX = paddingPx;
+            let found = false;
 
-            if (middleY >= currentY && middleY <= currentY + pageHeight) {
-              opts.onPageIndexChange?.(i);
-              found = true;
-              break;
-            }
+            for (let i = 0; i < opts.editorState.pages.length; i++) {
+              const page = opts.editorState.pages[i];
+              const pageWidth = page.width * scale;
 
-            if (
-              middleY > currentY + pageHeight &&
-              middleY < currentY + pageHeight + gap
-            ) {
-              if (middleY < currentY + pageHeight + gap / 2) {
+              if (middleX >= currentX && middleX <= currentX + pageWidth) {
                 opts.onPageIndexChange?.(i);
                 found = true;
                 break;
               }
+
+              if (
+                middleX > currentX + pageWidth &&
+                middleX < currentX + pageWidth + gap
+              ) {
+                if (middleX < currentX + pageWidth + gap / 2) {
+                  opts.onPageIndexChange?.(i);
+                  found = true;
+                  break;
+                }
+              }
+
+              currentX += pageWidth + gap;
             }
 
-            currentY += pageHeight + gap;
-          }
+            if (
+              !found &&
+              opts.editorState.pages.length > 0 &&
+              middleX >= currentX
+            ) {
+              opts.onPageIndexChange?.(opts.editorState.pages.length - 1);
+            }
+          } else {
+            const scrollTop = c.scrollTop;
+            const viewportHeight = c.clientHeight;
+            const middleY = scrollTop + viewportHeight / 2;
 
-          if (
-            !found &&
-            opts.editorState.pages.length > 0 &&
-            middleY >= currentY
-          ) {
-            opts.onPageIndexChange?.(opts.editorState.pages.length - 1);
+            let currentY = paddingPx;
+            let found = false;
+
+            for (let i = 0; i < opts.editorState.pages.length; i++) {
+              const page = opts.editorState.pages[i];
+              const pageHeight = page.height * scale;
+
+              if (middleY >= currentY && middleY <= currentY + pageHeight) {
+                opts.onPageIndexChange?.(i);
+                found = true;
+                break;
+              }
+
+              if (
+                middleY > currentY + pageHeight &&
+                middleY < currentY + pageHeight + gap
+              ) {
+                if (middleY < currentY + pageHeight + gap / 2) {
+                  opts.onPageIndexChange?.(i);
+                  found = true;
+                  break;
+                }
+              }
+
+              currentY += pageHeight + gap;
+            }
+
+            if (
+              !found &&
+              opts.editorState.pages.length > 0 &&
+              middleY >= currentY
+            ) {
+              opts.onPageIndexChange?.(opts.editorState.pages.length - 1);
+            }
           }
         }
       });
@@ -586,6 +641,7 @@ export const useWorkspaceViewport = (opts: {
   }, [
     opts.containerRef,
     opts.editorState.pageLayout,
+    opts.editorState.pageFlow,
     opts.editorState.pages,
     opts.editorState.scale,
     opts.onPageIndexChange,

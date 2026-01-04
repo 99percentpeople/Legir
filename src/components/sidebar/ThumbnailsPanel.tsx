@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
-import { PageData } from "../../types";
+import type { PageData, PageLayoutMode } from "@/types";
 import { ImageIcon } from "lucide-react";
-import { cn } from "../../lib/cn";
+import { cn } from "@/lib/cn";
 import { useLanguage } from "../language-provider";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
@@ -73,7 +73,7 @@ interface ThumbnailsPanelProps {
   pdfDocument?: PDFDocumentProxy;
   onNavigate: (pageIndex: number) => void;
   currentPageIndex?: number;
-  pageLayout?: "single" | "double";
+  pageLayout?: PageLayoutMode;
 }
 
 const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
@@ -91,7 +91,9 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
         <div
           className={cn(
             "grid gap-4",
-            pageLayout === "double" ? "grid-cols-2" : "grid-cols-1",
+            pageLayout && pageLayout !== "single"
+              ? "grid-cols-2"
+              : "grid-cols-1",
           )}
         >
           {pages?.map((page, idx) => (

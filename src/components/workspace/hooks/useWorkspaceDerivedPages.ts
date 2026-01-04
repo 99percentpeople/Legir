@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Annotation, FormField } from "@/types";
+import type { Annotation, FormField, PageLayoutMode } from "@/types";
 
 export const useWorkspaceDerivedPages = <
   TPage extends { pageIndex: number },
@@ -7,7 +7,7 @@ export const useWorkspaceDerivedPages = <
   pages: TPage[];
   fields: FormField[];
   annotations: Annotation[];
-  pageLayout: "single" | "double";
+  pageLayout: PageLayoutMode;
 }) => {
   const controlsByPage = useMemo(() => {
     const fieldsByPage = new Map<number, FormField[]>();
@@ -40,12 +40,25 @@ export const useWorkspaceDerivedPages = <
   }, [opts.pages, controlsByPage]);
 
   const pageRows = useMemo(() => {
-    if (opts.pageLayout !== "double")
-      return [] as Array<typeof pagesWithControls>;
-    const rows: Array<typeof pagesWithControls> = [];
-    for (let i = 0; i < pagesWithControls.length; i += 2) {
-      rows.push(pagesWithControls.slice(i, i + 2));
+    if (opts.pageLayout === "single")
+      return [] as Array<Array<(typeof pagesWithControls)[number]>>;
+
+    const rows: Array<Array<(typeof pagesWithControls)[number]>> = [];
+    if (pagesWithControls.length === 0) return rows;
+
+    const startIndex = opts.pageLayout === "double_even" ? 1 : 0;
+    if (opts.pageLayout === "double_even") {
+      if (pagesWithControls[0]) rows.push([pagesWithControls[0]]);
     }
+
+    for (let i = startIndex; i < pagesWithControls.length; i += 2) {
+      const left = pagesWithControls[i];
+      if (!left) continue;
+      const right = pagesWithControls[i + 1];
+      if (right) rows.push([left, right]);
+      else rows.push([left]);
+    }
+
     return rows;
   }, [opts.pageLayout, pagesWithControls]);
 

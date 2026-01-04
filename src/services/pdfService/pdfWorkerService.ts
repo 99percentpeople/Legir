@@ -1,47 +1,99 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
-import { Tile } from "./types";
+import type { Tile } from "./types";
+import type {
+  WorkerCommandType,
+  WorkerErrorResponse,
+  WorkerRequest,
+  WorkerResponse,
+  WorkerSuccessResponse,
+} from "./workerProtocol";
 
-export interface RenderRequest {
-  type?:
-    | "render"
-    | "cancel"
-    | "load"
-    | "unload"
-    | "renderImage"
-    | "releaseCanvas"
-    | "reprioritize";
-  id: string;
-  docId?: string;
-  data?: Uint8Array | null;
-  pageIndex?: number;
-  scale?: number;
-  targetWidth?: number;
-  renderAnnotations?: boolean;
-  mimeType?: string;
-  quality?: number;
-  tile?: Tile;
-  viewportCenter?: [number, number];
-  isNewDoc?: boolean;
-  canvas?: OffscreenCanvas;
-  canvasId?: string;
-  canvasIds?: string[];
-  priority?: number;
-}
+type WorkerHost = {
+  worker: Worker | null;
+  initWorker: () => void;
+};
+
+const RequireWorkerPromise = (throwError = true) => {
+  return <T extends (...args: unknown[]) => Promise<unknown>>(
+    _target: unknown,
+    _propertyKey: string | symbol,
+    descriptor: TypedPropertyDescriptor<T>,
+  ) => {
+    const original = descriptor.value;
+    if (!original) return;
+
+    const wrapped = function (this: WorkerHost, ...args: Parameters<T>) {
+      if (!this.worker) {
+        this.initWorker();
+        if (!this.worker) {
+          if (throwError) {
+            return Promise.reject(
+              new Error("Worker not initialized"),
+            ) as ReturnType<T>;
+          } else {
+            return;
+          }
+        }
+      }
+      return original.apply(this as unknown as ThisParameterType<T>, args);
+    } as T;
+
+    descriptor.value = wrapped;
+  };
+};
+
+const RequireWorkerVoid = () => {
+  return <T extends (...args: unknown[]) => void>(
+    _target: unknown,
+    _propertyKey: string | symbol,
+    descriptor: TypedPropertyDescriptor<T>,
+  ) => {
+    const original = descriptor.value;
+    if (!original) return;
+
+    const wrapped = function (this: WorkerHost, ...args: Parameters<T>) {
+      if (!this.worker) {
+        this.initWorker();
+        if (!this.worker) {
+          return;
+        }
+      }
+      return original.apply(this as unknown as ThisParameterType<T>, args);
+    } as T;
+
+    descriptor.value = wrapped;
+  };
+};
+
+type PendingRequestHandlers<TType extends WorkerCommandType> = {
+  resolve: (msg: WorkerSuccessResponse<TType>) => void;
+  reject: (msg: WorkerErrorResponse) => void;
+};
 
 class PDFWorkerService {
   private worker: Worker | null = null;
   private pendingRequests = new Map<
     string,
-    { resolve: (val: any) => void; reject: (err: any) => void }
+    PendingRequestHandlers<WorkerCommandType>
   >();
   private requestSeq = 0;
 
   private readonly defaultDocId: string = "default";
 
+  private lastRenderScaleByDocPage = new Map<string, number>();
+
+  private clearLastRenderScaleForDoc(docId: string) {
+    const prefix = `${docId}|`;
+    for (const key of Array.from(this.lastRenderScaleByDocPage.keys())) {
+      if (key.startsWith(prefix)) this.lastRenderScaleByDocPage.delete(key);
+    }
+  }
+
   constructor() {
     this.initWorker();
   }
 
+  @RequireWorkerPromise()
   public reprioritize(options: {
     pageIndex: number;
     scale: number;
@@ -50,14 +102,6 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (!this.worker) {
-        this.initWorker();
-        if (!this.worker) {
-          reject(new Error("Worker not initialized"));
-          return;
-        }
-      }
-
       const {
         pageIndex,
         scale,
@@ -70,13 +114,14 @@ class PDFWorkerService {
 
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");
-        (err as any).phase = "pre-send";
+        (err as DOMException & { phase?: string }).phase = "pre-send";
         reject(err);
         return;
       }
 
       const onAbort = () => {
-        this.worker?.postMessage({ type: "cancel", id });
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
         this.pendingRequests.delete(id);
         reject(new DOMException("Aborted", "AbortError"));
       };
@@ -87,17 +132,17 @@ class PDFWorkerService {
 
       try {
         this.pendingRequests.set(id, {
-          resolve: (val) => {
+          resolve: (msg: WorkerSuccessResponse<"reprioritize">) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            resolve(Boolean(val));
+            resolve(Boolean(msg.payload ?? true));
           },
-          reject: (err) => {
+          reject: (msg: WorkerErrorResponse) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            reject(err);
+            reject(new Error(msg.error));
           },
         });
 
-        const message: RenderRequest = {
+        const message: WorkerRequest = {
           type: "reprioritize",
           id,
           docId,
@@ -118,16 +163,16 @@ class PDFWorkerService {
     try {
       this.worker = new PDFRenderWorker();
       if (this.worker) {
-        this.worker.onmessage = (e) => {
-          const { id, success, error, payload } = e.data;
-          const request = this.pendingRequests.get(id);
+        this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+          const msg = e.data;
+          const request = this.pendingRequests.get(msg.id);
           if (request) {
-            if (success) {
-              request.resolve(payload ?? true);
+            if (msg.success === true) {
+              request.resolve(msg);
             } else {
-              request.reject(new Error(error || "Worker error"));
+              request.reject(msg);
             }
-            this.pendingRequests.delete(id);
+            this.pendingRequests.delete(msg.id);
           }
         };
       }
@@ -136,33 +181,28 @@ class PDFWorkerService {
     }
   }
 
+  @RequireWorkerPromise()
   public loadDocument(
     data: Uint8Array,
     options?: { docId?: string; signal?: AbortSignal },
   ): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (!this.worker) {
-        this.initWorker();
-        if (!this.worker) {
-          reject(new Error("Worker not initialized"));
-          return;
-        }
-      }
-
       const docId = options?.docId ?? this.defaultDocId;
+      this.clearLastRenderScaleForDoc(docId);
 
       const id = `load_${docId}_${Date.now()}`;
       const signal = options?.signal;
 
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");
-        (err as any).phase = "pre-send";
+        (err as DOMException & { phase?: string }).phase = "pre-send";
         reject(err);
         return;
       }
 
       const onAbort = () => {
-        this.worker?.postMessage({ type: "cancel", id });
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
         this.pendingRequests.delete(id);
         reject(new DOMException("Aborted", "AbortError"));
       };
@@ -173,17 +213,17 @@ class PDFWorkerService {
 
       try {
         this.pendingRequests.set(id, {
-          resolve: (val) => {
+          resolve: (msg: WorkerSuccessResponse<"load">) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            resolve(Boolean(val));
+            resolve(Boolean(msg.payload ?? true));
           },
-          reject: (err) => {
+          reject: (msg: WorkerErrorResponse) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            reject(err);
+            reject(new Error(msg.error));
           },
         });
 
-        const message: RenderRequest = {
+        const message: WorkerRequest = {
           type: "load",
           id,
           docId,
@@ -198,39 +238,52 @@ class PDFWorkerService {
     });
   }
 
+  @RequireWorkerVoid()
   public unloadDocument(docId: string) {
-    if (!this.worker) this.initWorker();
-    if (!this.worker) return;
+    this.clearLastRenderScaleForDoc(docId);
     const id = `unload_${docId}_${Date.now()}`;
-    const message: RenderRequest = { type: "unload", id, docId };
+    const message: WorkerRequest = { type: "unload", id, docId };
     this.worker.postMessage(message);
   }
 
+  @RequireWorkerVoid()
+  public cancelQueuedRenders(options: {
+    pageIndex: number;
+    scale: number;
+    docId?: string;
+  }) {
+    const { pageIndex, scale, docId: requestedDocId } = options;
+    const docId = requestedDocId ?? this.defaultDocId;
+    const id = `cancelQueuedRenders_${docId}_${pageIndex}_${scale}_${this.requestSeq++}_${Date.now()}`;
+    const message: WorkerRequest = {
+      type: "cancelQueuedRenders",
+      id,
+      docId,
+      pageIndex,
+      scale,
+    };
+    this.worker.postMessage(message);
+  }
+
+  @RequireWorkerPromise()
   public releaseCanvas(options: {
     canvasIds: string[];
     signal?: AbortSignal;
   }): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (!this.worker) {
-        this.initWorker();
-        if (!this.worker) {
-          reject(new Error("Worker not initialized"));
-          return;
-        }
-      }
-
       const { canvasIds, signal } = options;
       const id = `releaseCanvas_${Date.now()}`;
 
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");
-        (err as any).phase = "pre-send";
+        (err as DOMException & { phase?: string }).phase = "pre-send";
         reject(err);
         return;
       }
 
       const onAbort = () => {
-        this.worker?.postMessage({ type: "cancel", id });
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
         this.pendingRequests.delete(id);
         reject(new DOMException("Aborted", "AbortError"));
       };
@@ -241,17 +294,17 @@ class PDFWorkerService {
 
       try {
         this.pendingRequests.set(id, {
-          resolve: (val) => {
+          resolve: (msg: WorkerSuccessResponse<"releaseCanvas">) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            resolve(Boolean(val));
+            resolve(Boolean(msg.payload ?? true));
           },
-          reject: (err) => {
+          reject: (msg: WorkerErrorResponse) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            reject(err);
+            reject(new Error(msg.error));
           },
         });
 
-        const message: RenderRequest = {
+        const message: WorkerRequest = {
           type: "releaseCanvas",
           id,
           canvasIds,
@@ -265,6 +318,7 @@ class PDFWorkerService {
     });
   }
 
+  @RequireWorkerPromise()
   public renderPageImage(options: {
     pageIndex: number;
     scale?: number;
@@ -279,14 +333,6 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<{ bytes: Uint8Array; mimeType: string }> {
     return new Promise((resolve, reject) => {
-      if (!this.worker) {
-        this.initWorker();
-        if (!this.worker) {
-          reject(new Error("Worker not initialized"));
-          return;
-        }
-      }
-
       const {
         pageIndex,
         scale,
@@ -307,13 +353,14 @@ class PDFWorkerService {
 
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");
-        (err as any).phase = "pre-send";
+        (err as DOMException & { phase?: string }).phase = "pre-send";
         reject(err);
         return;
       }
 
       const onAbort = () => {
-        this.worker?.postMessage({ type: "cancel", id });
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
         this.pendingRequests.delete(id);
         reject(new DOMException("Aborted", "AbortError"));
       };
@@ -324,41 +371,68 @@ class PDFWorkerService {
 
       try {
         this.pendingRequests.set(id, {
-          resolve: (payload) => {
+          resolve: (msg: WorkerSuccessResponse<"renderImage">) => {
             if (signal) signal.removeEventListener("abort", onAbort);
+            const fallbackMime = mimeType || "image/jpeg";
+            const payload = msg.payload;
+            if (payload === undefined || payload === false) {
+              resolve({ bytes: new Uint8Array(), mimeType: fallbackMime });
+              return;
+            }
+            const p = payload as { mimeType?: unknown; imageBytes?: unknown };
             const outMime =
-              (payload as any)?.mimeType || mimeType || "image/jpeg";
-            const bytesBuf = (payload as any)?.imageBytes as
-              | ArrayBuffer
-              | undefined;
+              typeof p.mimeType === "string" && p.mimeType
+                ? p.mimeType
+                : fallbackMime;
+            const bytesBuf =
+              p.imageBytes instanceof ArrayBuffer ? p.imageBytes : undefined;
+
             if (!bytesBuf) {
               resolve({ bytes: new Uint8Array(), mimeType: outMime });
               return;
             }
             resolve({ bytes: new Uint8Array(bytesBuf), mimeType: outMime });
           },
-          reject: (err) => {
+          reject: (msg: WorkerErrorResponse) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            reject(err);
+            reject(new Error(msg.error));
           },
         });
 
-        const message: RenderRequest = {
-          type: "renderImage",
-          id,
-          docId,
-          data: data ?? null,
-          isNewDoc,
-          pageIndex,
-          scale,
-          targetWidth,
-          renderAnnotations,
-          mimeType,
-          quality,
-          priority: priority || 0,
-        };
-
-        this.worker.postMessage(message);
+        if (isNewDoc) {
+          if (!data) {
+            throw new Error("Missing data for isNewDoc renderImage");
+          }
+          const message: WorkerRequest = {
+            type: "renderImage",
+            id,
+            docId,
+            isNewDoc: true,
+            data,
+            pageIndex,
+            scale,
+            targetWidth,
+            renderAnnotations,
+            mimeType,
+            quality,
+            priority: priority || 0,
+          };
+          this.worker.postMessage(message);
+        } else {
+          const message: WorkerRequest = {
+            type: "renderImage",
+            id,
+            docId,
+            pageIndex,
+            scale,
+            targetWidth,
+            renderAnnotations,
+            mimeType,
+            quality,
+            priority: priority || 0,
+          };
+          this.worker.postMessage(message);
+        }
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);
@@ -366,6 +440,7 @@ class PDFWorkerService {
     });
   }
 
+  @RequireWorkerPromise()
   public renderPage(options: {
     pageIndex: number;
     scale: number;
@@ -378,14 +453,6 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (!this.worker) {
-        this.initWorker();
-        if (!this.worker) {
-          reject(new Error("Worker not initialized"));
-          return;
-        }
-      }
-
       const {
         pageIndex,
         scale,
@@ -400,15 +467,26 @@ class PDFWorkerService {
       const docId = requestedDocId ?? this.defaultDocId;
       const id = `render_${docId}_${pageIndex}_${scale}_${canvasId}_${this.requestSeq++}_${Date.now()}`;
 
+      const scaleKey = `${docId}|${pageIndex}`;
+      const lastScale = this.lastRenderScaleByDocPage.get(scaleKey);
+      if (
+        typeof lastScale === "number" &&
+        Math.abs(lastScale - scale) > 0.001
+      ) {
+        this.cancelQueuedRenders({ docId, pageIndex, scale });
+      }
+      this.lastRenderScaleByDocPage.set(scaleKey, scale);
+
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");
-        (err as any).phase = "pre-send";
+        (err as DOMException & { phase?: string }).phase = "pre-send";
         reject(err);
         return;
       }
 
       const onAbort = () => {
-        this.worker?.postMessage({ type: "cancel", id });
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
         this.pendingRequests.delete(id);
         reject(new DOMException("Aborted", "AbortError"));
       };
@@ -419,17 +497,17 @@ class PDFWorkerService {
 
       try {
         this.pendingRequests.set(id, {
-          resolve: (val) => {
+          resolve: (msg: WorkerSuccessResponse<"render">) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            resolve(val);
+            resolve(Boolean(msg.payload ?? true));
           },
-          reject: (err) => {
+          reject: (msg: WorkerErrorResponse) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            reject(err);
+            reject(new Error(msg.error));
           },
         });
 
-        const message: RenderRequest = {
+        const message: WorkerRequest = {
           type: "render",
           id,
           docId,

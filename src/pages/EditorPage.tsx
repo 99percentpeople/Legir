@@ -88,6 +88,55 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const initialTitleRef = useRef<string | null>(null);
   const workspaceScrollContainerRef = useRef<HTMLElement | null>(null);
 
+  const toggleFullscreen = useCallback(() => {
+    const next = !state.isFullscreen;
+    setState({ isFullscreen: next });
+
+    if (tauri) {
+      void (async () => {
+        try {
+          const win = getCurrentWindow();
+          await win.setFullscreen(next);
+        } catch (error) {
+          console.error("Failed to toggle fullscreen", error);
+          setState({ isFullscreen: !next });
+        }
+      })();
+      return;
+    }
+
+    void (async () => {
+      try {
+        if (next) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          }
+        }
+      } catch (error) {
+        console.error("Failed to toggle fullscreen", error);
+        setState({ isFullscreen: !next });
+      }
+    })();
+  }, [setState, state.isFullscreen, tauri]);
+
+  useEventListener(
+    tauri ? undefined : window,
+    "keydown",
+    (e: KeyboardEvent) => {
+      if (e.key === "F11") {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    },
+  );
+
+  useEventListener(tauri ? undefined : document, "fullscreenchange", () => {
+    console.log("fullscreenchange");
+    setState({ isFullscreen: !!document.fullscreenElement });
+  });
+
   useAppEvent(
     "workspace:scrollContainerReady",
     ({ element }) => {
@@ -379,7 +428,11 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
       const { width } = getWorkspaceViewport();
       const availableWidth = width - FIT_WIDTH_PADDING_X;
-      if (state.pageLayout === "double") {
+      if (state.pageLayout !== "single") {
+        if (state.pageFlow === "horizontal") {
+          const scale = availableWidth / page.width;
+          return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
+        }
         const denom = page.width * 2 + WORKSPACE_BASE_PAGE_GAP_PX;
         const scale = denom > 0 ? availableWidth / denom : 1.0;
         return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
@@ -406,13 +459,19 @@ const EditorPage: React.FC<EditorPageProps> = ({
       const availableHeight = height - FIT_SCREEN_PADDING_Y;
 
       const widthScale =
-        state.pageLayout === "double"
+        state.pageLayout !== "single"
           ? (() => {
+              if (state.pageFlow === "horizontal") {
+                return availableWidth / page.width;
+              }
               const denom = page.width * 2 + WORKSPACE_BASE_PAGE_GAP_PX;
               return denom > 0 ? availableWidth / denom : 1.0;
             })()
           : availableWidth / page.width;
-      const heightScale = availableHeight / page.height;
+      const heightScale =
+        state.pageLayout !== "single" && state.pageFlow === "horizontal"
+          ? availableHeight / (page.height * 2 + WORKSPACE_BASE_PAGE_GAP_PX)
+          : availableHeight / page.height;
       const scale = Math.min(widthScale, heightScale);
       return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
     },
@@ -928,9 +987,15 @@ const EditorPage: React.FC<EditorPageProps> = ({
           <ZoomControls
             scale={state.scale}
             pageLayout={state.pageLayout}
+            pageFlow={state.pageFlow}
+            isFullscreen={state.isFullscreen}
             onPageLayoutChange={(layout) => {
               setState({ pageLayout: layout, fitTrigger: Date.now() });
             }}
+            onPageFlowChange={(flow) => {
+              setState({ pageFlow: flow, fitTrigger: Date.now() });
+            }}
+            onToggleFullscreen={toggleFullscreen}
             onZoomIn={() => updateScale(state.scale * 1.25)}
             onZoomOut={() => updateScale(state.scale / 1.25)}
             onFitWidth={() => {

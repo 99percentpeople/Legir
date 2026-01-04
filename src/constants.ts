@@ -30,6 +30,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   rightPanelTab: "document",
   sidebarTab: "thumbnails",
   pageLayout: "single",
+  pageFlow: "vertical",
   sidebarWidth: 256,
   rightPanelWidth: 320,
   translateOption: "cloud:cloudv2",

@@ -146,6 +146,7 @@ function pickEditorUiState(state: EditorState): EditorUiState {
     rightPanelTab: state.rightPanelTab,
     sidebarTab: state.sidebarTab,
     pageLayout: state.pageLayout,
+    pageFlow: state.pageFlow,
     sidebarWidth: state.sidebarWidth,
     rightPanelWidth: state.rightPanelWidth,
     translateOption: state.translateOption,
@@ -210,6 +211,8 @@ const initialState: EditorState = {
   isSaving: false,
   ...DEFAULT_EDITOR_UI_STATE,
   pageLayout: "single",
+  pageFlow: "vertical",
+  isFullscreen: false,
   hasSavedSession: false,
   isDirty: false,
   currentPageIndex: 0,
@@ -745,29 +748,10 @@ export const useEditorStore = create<EditorState & EditorActions>()(
       },
     }),
     {
-      name: "ff-editor-ui",
-      version: 2,
+      name: "ff-editor-ui-dev",
+      version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => pickEditorUiState(state),
-      migrate: (persisted: any, version) => {
-        if (!persisted || typeof persisted !== "object") return persisted;
-        if (version !== 1) return persisted;
-
-        const engine = persisted.translateEngine;
-        const model = persisted.translateGeminiModel;
-        const nextTranslateOption =
-          engine === "cloud"
-            ? "cloud"
-            : typeof model === "string" && model
-              ? `gemini:${model}`
-              : "gemini:gemini-2.5-flash";
-
-        const { translateEngine, translateGeminiModel, ...rest } = persisted;
-        return {
-          ...rest,
-          translateOption: nextTranslateOption,
-        };
-      },
     },
   ),
 );

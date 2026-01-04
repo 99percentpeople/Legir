@@ -1520,17 +1520,39 @@ const Workspace: React.FC<WorkspaceProps> = ({
       <div
         ref={contentRef}
         className={cn(
-          "mx-auto flex min-h-full w-fit flex-col items-center p-8 pb-20",
+          "mx-auto flex min-h-full w-fit p-8 pb-20",
+          editorState.pageFlow === "horizontal"
+            ? "flex-row items-center"
+            : "flex-col items-center",
         )}
         style={{ gap: `${WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale}px` }}
       >
-        {editorState.pageLayout === "double"
+        {editorState.pageLayout !== "single"
           ? pageRows.map((row, rowIdx) => (
               <div
                 key={rowIdx}
-                className="flex w-fit items-start"
+                className={cn(
+                  "flex",
+                  editorState.pageFlow === "horizontal"
+                    ? "flex-col"
+                    : "flex-row",
+                  editorState.pageFlow === "horizontal"
+                    ? "items-center"
+                    : "items-start",
+                  row.length === 1 ? "justify-center" : "w-fit",
+                )}
                 style={{
                   gap: `${WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale}px`,
+                  width:
+                    row.length === 1 && editorState.pageFlow !== "horizontal"
+                      ? row[0].width * editorState.scale * 2 +
+                        WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale
+                      : undefined,
+                  height:
+                    row.length === 1 && editorState.pageFlow === "horizontal"
+                      ? row[0].height * editorState.scale * 2 +
+                        WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale
+                      : undefined,
                 }}
               >
                 {row.map(renderPage)}

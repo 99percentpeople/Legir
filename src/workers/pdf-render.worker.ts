@@ -1,6 +1,10 @@
 import * as pdfjsLib from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
-import type { Tile } from "@/services/pdfService/types";
+import type {
+  WorkerErrorResponse,
+  WorkerRequest,
+  WorkerSuccessResponse,
+} from "@/services/pdfService/workerProtocol";
 
 const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
 const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
@@ -22,33 +26,6 @@ if (typeof self.document === "undefined") {
     fonts: (self as any).fonts,
   };
   (self as any).document = fakeOwnerDocument;
-}
-
-interface RenderRequest {
-  type?:
-    | "render"
-    | "cancel"
-    | "load"
-    | "unload"
-    | "renderImage"
-    | "releaseCanvas"
-    | "reprioritize";
-  id: string;
-  docId?: string;
-  data?: Uint8Array | null;
-  pageIndex?: number;
-  scale?: number;
-  targetWidth?: number;
-  renderAnnotations?: boolean;
-  mimeType?: string;
-  quality?: number;
-  tile?: Tile;
-  viewportCenter?: [number, number];
-  isNewDoc?: boolean;
-  canvas?: OffscreenCanvas;
-  canvasId?: string;
-  canvasIds?: string[];
-  priority?: number; // Lower number = higher priority
 }
 
 type MaybePromise<T> = T | Promise<T>;
@@ -78,16 +55,84 @@ const getDocState = (docId?: string): DocState => {
 const canvasMap = new Map<string, OffscreenCanvas>();
 
 // Store active render tasks to allow cancellation
-const activeRenderTasks = new Map<string, { cancel: () => void }>();
+const activeRenderTasks = new Map<
+  string,
+  { cancel: () => void; docId: string }
+>();
 
 // Priority Queue Implementation
 interface QueueItem {
   id: string;
   priority: number;
-  data: RenderRequest;
+  data: Extract<WorkerRequest, { type: "render" | "renderImage" }>;
 }
 const taskQueue: QueueItem[] = [];
 let isProcessing = false;
+
+const buildQueueTaskKey = (
+  req: Extract<WorkerRequest, { type: "render" | "renderImage" }>,
+): string => {
+  const type = req.type;
+  const docId = getDocId(req.docId);
+  const pageIndex = req.pageIndex ?? -1;
+  const scale = typeof req.scale === "number" ? req.scale : -1;
+  const canvasId = req.type === "render" ? req.canvasId : "";
+  const tile = req.type === "render" && req.tile ? req.tile.join(",") : "";
+  const targetWidth =
+    req.type === "renderImage" && typeof req.targetWidth === "number"
+      ? req.targetWidth
+      : -1;
+  const mimeType = req.type === "renderImage" ? req.mimeType || "" : "";
+  const quality =
+    req.type === "renderImage" && typeof req.quality === "number"
+      ? req.quality
+      : -1;
+  return `${type}|${docId}|${pageIndex}|${scale}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}`;
+};
+
+const cancelQueuedTasksForDoc = (docId: string) => {
+  for (let i = taskQueue.length - 1; i >= 0; i--) {
+    const queuedDocId = getDocId(taskQueue[i].data.docId);
+    if (queuedDocId !== docId) continue;
+    const removed = taskQueue.splice(i, 1)[0];
+    if (removed) {
+      postSuccess(removed.id, false);
+    }
+  }
+};
+
+const cancelActiveTasksForDoc = (docId: string) => {
+  for (const [taskId, task] of Array.from(activeRenderTasks.entries())) {
+    if (task.docId !== docId) continue;
+    try {
+      task.cancel();
+    } catch {
+      // ignore
+    }
+    activeRenderTasks.delete(taskId);
+  }
+};
+
+const postSuccess = <TPayload = unknown>(
+  id: string,
+  payload?: TPayload,
+  transfer?: Transferable[],
+) => {
+  const msg =
+    payload === undefined
+      ? ({ id, success: true } as WorkerSuccessResponse)
+      : ({ id, success: true, payload } as unknown as WorkerSuccessResponse);
+  if (transfer && transfer.length > 0) {
+    self.postMessage(msg, { transfer });
+  } else {
+    self.postMessage(msg);
+  }
+};
+
+const postError = (id: string, error: string) => {
+  const msg: WorkerErrorResponse = { id, success: false, error };
+  self.postMessage(msg);
+};
 
 // Process the next task in the queue
 const processQueue = async () => {
@@ -194,14 +239,14 @@ const getPageForDoc = async (docId: string, pageIndex: number) => {
   return await pagePromise;
 };
 
-const renderToCanvas = async (params: RenderRequest) => {
+const renderToCanvas = async (
+  params: Extract<WorkerRequest, { type: "render" }>,
+) => {
   const {
     id,
-    data,
     pageIndex,
     scale,
     tile,
-    isNewDoc,
     canvas: transferredCanvas,
     canvasId,
     docId,
@@ -215,6 +260,7 @@ const renderToCanvas = async (params: RenderRequest) => {
 
   // Register cancellation handler immediately to catch early cancels
   activeRenderTasks.set(id, {
+    docId: resolvedDocId,
     cancel: () => {
       isCancelled = true;
       if (renderTask) {
@@ -226,7 +272,7 @@ const renderToCanvas = async (params: RenderRequest) => {
   try {
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
-    await ensureDocumentLoaded(resolvedDocId, { isNewDoc, data });
+    await ensureDocumentLoaded(resolvedDocId);
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
     // Resolve Canvas
@@ -300,35 +346,31 @@ const renderToCanvas = async (params: RenderRequest) => {
     ctx.restore();
 
     // No need to transfer bitmap back, canvas is already updated
-    self.postMessage({ id, success: true });
+    postSuccess(id, true);
   } catch (error: any) {
     if (error?.name === "RenderingCancelledException") {
-      self.postMessage({ id, success: true, payload: false });
+      postSuccess(id, false);
       return;
     }
 
-    self.postMessage({
-      id,
-      success: false,
-      error: error.message || "Unknown error",
-    });
+    postError(id, error.message || "Unknown error");
   } finally {
     // Clean up task from map
     activeRenderTasks.delete(id);
   }
 };
 
-const renderToImage = async (params: RenderRequest) => {
+const renderToImage = async (
+  params: Extract<WorkerRequest, { type: "renderImage" }>,
+) => {
   const {
     id,
-    data,
     pageIndex,
     scale,
     targetWidth,
     renderAnnotations,
     mimeType,
     quality,
-    isNewDoc,
     docId,
   } = params;
 
@@ -338,6 +380,7 @@ const renderToImage = async (params: RenderRequest) => {
   let isCancelled = false;
 
   activeRenderTasks.set(id, {
+    docId: resolvedDocId,
     cancel: () => {
       isCancelled = true;
       if (renderTask) {
@@ -350,7 +393,14 @@ const renderToImage = async (params: RenderRequest) => {
     if (isCancelled) throw { name: "RenderingCancelledException" };
     if (pageIndex === undefined) throw new Error("Missing render parameters");
 
-    await ensureDocumentLoaded(resolvedDocId, { isNewDoc, data });
+    if (params.isNewDoc) {
+      await ensureDocumentLoaded(resolvedDocId, {
+        isNewDoc: true,
+        data: params.data,
+      });
+    } else {
+      await ensureDocumentLoaded(resolvedDocId);
+    }
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
     const page = await getPageForDoc(resolvedDocId, pageIndex);
@@ -402,48 +452,38 @@ const renderToImage = async (params: RenderRequest) => {
     const buf = await blob.arrayBuffer();
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
-    (self as any).postMessage(
+    postSuccess(
+      id,
       {
-        id,
-        success: true,
-        payload: {
-          mimeType: outMimeType,
-          imageBytes: buf,
-        },
+        mimeType: outMimeType,
+        imageBytes: buf,
       },
       [buf],
     );
   } catch (error: any) {
     if (error?.name === "RenderingCancelledException") {
-      self.postMessage({ id, success: true, payload: false });
+      postSuccess(id, false);
       return;
     }
 
-    self.postMessage({
-      id,
-      success: false,
-      error: error.message || "Unknown error",
-    });
+    postError(id, error.message || "Unknown error");
   } finally {
     activeRenderTasks.delete(id);
   }
 };
 
-const handleQueuedTask = async (data: RenderRequest) => {
-  const type = data.type || "render";
-  if (type === "renderImage") {
+const handleQueuedTask = async (
+  data: Extract<WorkerRequest, { type: "render" | "renderImage" }>,
+) => {
+  if (data.type === "renderImage") {
     await renderToImage(data);
     return;
   }
   await renderToCanvas(data);
 };
 
-self.onmessage = async (e: MessageEvent<RenderRequest>) => {
-  const {
-    type = "render",
-    id,
-    priority = 0, // Default priority
-  } = e.data;
+self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
+  const { type, id } = e.data;
 
   if (type === "cancel") {
     // 1. Check if it's in the queue and remove it
@@ -465,18 +505,12 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
   if (type === "load") {
     try {
       const resolvedDocId = getDocId(e.data.docId);
-      if (e.data.data) {
-        await loadDocument(resolvedDocId, e.data.data);
-        self.postMessage({ id, success: true });
-      } else {
-        throw new Error("No data provided for load");
-      }
+      cancelQueuedTasksForDoc(resolvedDocId);
+      cancelActiveTasksForDoc(resolvedDocId);
+      await loadDocument(resolvedDocId, e.data.data);
+      postSuccess(id, true);
     } catch (error: any) {
-      self.postMessage({
-        id,
-        success: false,
-        error: error.message || "Load error",
-      });
+      postError(id, error.message || "Load error");
     }
     return;
   }
@@ -484,33 +518,28 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
   if (type === "unload") {
     try {
       const resolvedDocId = getDocId(e.data.docId);
+      cancelQueuedTasksForDoc(resolvedDocId);
+      cancelActiveTasksForDoc(resolvedDocId);
       await disposeDocument(resolvedDocId);
-      self.postMessage({ id, success: true });
+      postSuccess(id, true);
     } catch (error: any) {
-      self.postMessage({
-        id,
-        success: false,
-        error: error.message || "Unload error",
-      });
+      postError(id, error.message || "Unload error");
     }
     return;
   }
 
   if (type === "releaseCanvas") {
-    const idsToRelease = new Set<string>();
-    if (e.data.canvasId) idsToRelease.add(e.data.canvasId);
-    if (Array.isArray(e.data.canvasIds)) {
-      for (const cid of e.data.canvasIds) idsToRelease.add(cid);
-    }
+    const idsToRelease = new Set<string>(e.data.canvasIds);
 
     if (idsToRelease.size > 0) {
       for (let i = taskQueue.length - 1; i >= 0; i--) {
-        const cid = taskQueue[i].data.canvasId;
-        if (cid && idsToRelease.has(cid)) {
-          const removed = taskQueue.splice(i, 1)[0];
-          if (removed) {
-            self.postMessage({ id: removed.id, success: true, payload: false });
-          }
+        const queued = taskQueue[i].data;
+        if (queued.type !== "render") continue;
+        const cid = queued.canvasId;
+        if (!idsToRelease.has(cid)) continue;
+        const removed = taskQueue.splice(i, 1)[0];
+        if (removed) {
+          postSuccess(removed.id, false);
         }
       }
       for (const cid of idsToRelease) {
@@ -518,7 +547,45 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
       }
     }
 
-    self.postMessage({ id, success: true });
+    postSuccess(id, true);
+    return;
+  }
+
+  if (type === "cancelQueuedRenders") {
+    // Optimization: When scale changes, discard all pending tasks with different scale
+    // This ensures we don't waste time on tiles that are no longer needed
+    const incomingScale = e.data.scale;
+    const incomingDocId = getDocId(e.data.docId);
+    const incomingPageIndex = e.data.pageIndex;
+
+    if (
+      incomingScale !== undefined &&
+      incomingPageIndex !== undefined &&
+      taskQueue.length > 0
+    ) {
+      for (let i = taskQueue.length - 1; i >= 0; i--) {
+        const queued = taskQueue[i];
+        const queuedType = queued.data.type || "render";
+        if (queuedType !== "render") continue;
+
+        const taskDocId = getDocId(queued.data.docId);
+        if (taskDocId !== incomingDocId) continue;
+        if (queued.data.pageIndex !== incomingPageIndex) continue;
+
+        const taskScale = queued.data.scale;
+        if (
+          taskScale !== undefined &&
+          Math.abs(taskScale - incomingScale) > 0.001
+        ) {
+          const removed = taskQueue.splice(i, 1)[0];
+          if (removed) {
+            postSuccess(removed.id, false);
+          }
+        }
+      }
+    }
+
+    postSuccess(id, true);
     return;
   }
 
@@ -538,8 +605,7 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
       const vcy = vc[1];
 
       for (const item of taskQueue) {
-        const queuedType = item.data.type || "render";
-        if (queuedType !== "render") continue;
+        if (item.data.type !== "render") continue;
         if (getDocId(item.data.docId) !== incomingDocId) continue;
         if (item.data.pageIndex !== incomingPageIndex) continue;
 
@@ -563,46 +629,27 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
       scheduleNext();
     }
 
-    self.postMessage({ id, success: true });
+    postSuccess(id, true);
     return;
   }
 
   if (type === "render" || type === "renderImage") {
     // Early registration of canvas to prevent loss during cancellation or optimization
-    if (e.data.canvas && e.data.canvasId) {
+    if (type === "render" && e.data.canvas) {
       canvasMap.set(e.data.canvasId, e.data.canvas);
     }
 
-    // Optimization: When scale changes, discard all pending tasks with different scale
-    // This ensures we don't waste time on tiles that are no longer needed
-    const incomingScale = e.data.scale;
-    const incomingDocId = getDocId(e.data.docId);
-    const incomingPageIndex = e.data.pageIndex;
+    const priority = e.data.priority ?? 0;
 
-    if (
-      type === "render" &&
-      incomingScale !== undefined &&
-      incomingPageIndex !== undefined
-    ) {
-      for (let i = taskQueue.length - 1; i >= 0; i--) {
-        const queued = taskQueue[i];
-        const queuedType = queued.data.type || "render";
-        if (queuedType !== "render") continue;
-
-        const taskDocId = getDocId(queued.data.docId);
-        if (taskDocId !== incomingDocId) continue;
-        if (queued.data.pageIndex !== incomingPageIndex) continue;
-
-        const taskScale = queued.data.scale;
-        if (
-          taskScale !== undefined &&
-          Math.abs(taskScale - incomingScale) > 0.001
-        ) {
-          const removed = taskQueue.splice(i, 1)[0];
-          if (removed) {
-            self.postMessage({ id: removed.id, success: true, payload: false });
-          }
-        }
+    const queuedData = e.data;
+    const incomingKey = buildQueueTaskKey(queuedData);
+    const existingIndex = taskQueue.findIndex(
+      (item) => buildQueueTaskKey(item.data) === incomingKey,
+    );
+    if (existingIndex > -1) {
+      const removed = taskQueue.splice(existingIndex, 1)[0];
+      if (removed) {
+        postSuccess(removed.id, false);
       }
     }
 
@@ -610,7 +657,7 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     taskQueue.push({
       id,
       priority,
-      data: e.data,
+      data: queuedData,
     });
 
     // Sort queue: Lower priority value = Higher priority (closer to center)

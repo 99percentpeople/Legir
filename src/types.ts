@@ -10,7 +10,9 @@ export enum FieldType {
 
 export type EditorMode = "form" | "annotation";
 
-export type PageLayoutMode = "single" | "double";
+export type PageLayoutMode = "single" | "double_even" | "double_odd";
+
+export type PageFlowDirection = "vertical" | "horizontal";
 
 export type Tool =
   // Common
@@ -224,6 +226,8 @@ export interface EditorState {
   isPanelFloating: boolean;
   isSaving: boolean;
   pageLayout: PageLayoutMode;
+  pageFlow: PageFlowDirection;
+  isFullscreen: boolean;
   isSidebarOpen: boolean;
   isRightPanelOpen: boolean;
   rightPanelTab: string;
@@ -280,6 +284,7 @@ export type EditorUiState = Pick<
   | "rightPanelTab"
   | "sidebarTab"
   | "pageLayout"
+  | "pageFlow"
   | "sidebarWidth"
   | "rightPanelWidth"
   | "translateOption"
