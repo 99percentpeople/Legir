@@ -1,4 +1,10 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { EditorState, FormField, FieldType, Annotation, Tool } from "@/types";
 import {
   DEFAULT_FIELD_STYLE,
@@ -246,6 +252,65 @@ const Workspace: React.FC<WorkspaceProps> = ({
     annotations: editorState.annotations,
     pageLayout: editorState.pageLayout,
   });
+
+  const pagePlacementByIndex = useMemo(() => {
+    const map = new Map<
+      number,
+      {
+        spreadIndex: number;
+        posInSpread: number;
+        isSingleInSpread: boolean;
+      }
+    >();
+
+    if (editorState.pageLayout === "single") {
+      pagesWithControls.forEach((p, idx) => {
+        map.set(p.pageIndex, {
+          spreadIndex: idx,
+          posInSpread: 0,
+          isSingleInSpread: true,
+        });
+      });
+      return map;
+    }
+
+    pageRows.forEach((row, spreadIndex) => {
+      row.forEach((p, posInSpread) => {
+        map.set(p.pageIndex, {
+          spreadIndex,
+          posInSpread,
+          isSingleInSpread: row.length === 1,
+        });
+      });
+    });
+
+    return map;
+  }, [editorState.pageLayout, pageRows, pagesWithControls]);
+
+  const contentLayoutStyle = useMemo(() => {
+    const gapPx = `${WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale}px`;
+    const isDoubleLayout = editorState.pageLayout !== "single";
+
+    if (editorState.pageFlow === "horizontal") {
+      return {
+        columnGap: gapPx,
+        rowGap: gapPx,
+        gridAutoFlow: "column" as const,
+        gridTemplateRows: isDoubleLayout
+          ? ("repeat(2, max-content)" as const)
+          : ("max-content" as const),
+      };
+    }
+
+    return {
+      columnGap: gapPx,
+      rowGap: gapPx,
+      gridAutoFlow: "row" as const,
+      gridTemplateColumns: isDoubleLayout
+        ? ("repeat(2, max-content)" as const)
+        : ("max-content" as const),
+    };
+  }, [editorState.pageFlow, editorState.pageLayout, editorState.scale]);
 
   const { handleViewportScroll } = useWorkspaceViewport({
     containerRef,
@@ -1294,8 +1359,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const renderPage = (page: (typeof pagesWithControls)[number]) => (
     <div
       id={`page-${page.pageIndex}`}
-      key={page.pageIndex}
-      className="relative flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
+      className="relative w-fit flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
       data-ff-text-selecting={
         textSelectingPages[page.pageIndex] ? "1" : undefined
       }
@@ -1520,45 +1584,92 @@ const Workspace: React.FC<WorkspaceProps> = ({
       <div
         ref={contentRef}
         className={cn(
-          "mx-auto flex min-h-full w-fit p-8 pb-20",
+          "mx-auto grid min-h-full w-fit p-8 pb-20",
           editorState.pageFlow === "horizontal"
-            ? "flex-row items-center"
-            : "flex-col items-center",
+            ? "content-center items-center justify-items-center"
+            : "items-start justify-items-center",
         )}
-        style={{ gap: `${WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale}px` }}
+        style={contentLayoutStyle}
       >
-        {editorState.pageLayout !== "single"
-          ? pageRows.map((row, rowIdx) => (
+        {pagesWithControls.map((page) => {
+          const placement = pagePlacementByIndex.get(page.pageIndex);
+          const isDoubleLayout = editorState.pageLayout !== "single";
+
+          if (!placement || !isDoubleLayout) {
+            const fallbackIdx = pagesWithControls.findIndex(
+              (p) => p.pageIndex === page.pageIndex,
+            );
+            const spreadIndex = Math.max(0, fallbackIdx);
+            return (
               <div
-                key={rowIdx}
-                className={cn(
-                  "flex",
+                key={page.pageIndex}
+                style={
                   editorState.pageFlow === "horizontal"
-                    ? "flex-col"
-                    : "flex-row",
-                  editorState.pageFlow === "horizontal"
-                    ? "items-center"
-                    : "items-start",
-                  row.length === 1 ? "justify-center" : "w-fit",
-                )}
-                style={{
-                  gap: `${WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale}px`,
-                  width:
-                    row.length === 1 && editorState.pageFlow !== "horizontal"
-                      ? row[0].width * editorState.scale * 2 +
-                        WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale
-                      : undefined,
-                  height:
-                    row.length === 1 && editorState.pageFlow === "horizontal"
-                      ? row[0].height * editorState.scale * 2 +
-                        WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale
-                      : undefined,
-                }}
+                    ? {
+                        gridColumnStart: spreadIndex + 1,
+                        gridRowStart: 1,
+                      }
+                    : {
+                        gridRowStart: spreadIndex + 1,
+                        gridColumnStart: 1,
+                      }
+                }
               >
-                {row.map(renderPage)}
+                {renderPage(page)}
               </div>
-            ))
-          : pagesWithControls.map(renderPage)}
+            );
+          }
+
+          if (editorState.pageFlow === "horizontal") {
+            return (
+              <div
+                key={page.pageIndex}
+                style={
+                  placement.isSingleInSpread
+                    ? {
+                        gridColumnStart: placement.spreadIndex + 1,
+                        gridRow: "1 / span 2",
+                        alignSelf: "center",
+                        justifySelf: "center",
+                      }
+                    : {
+                        gridColumnStart: placement.spreadIndex + 1,
+                        gridRowStart: placement.posInSpread + 1,
+                        justifySelf: "start",
+                        alignSelf:
+                          placement.posInSpread === 0 ? "end" : "start",
+                      }
+                }
+              >
+                {renderPage(page)}
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={page.pageIndex}
+              style={
+                placement.isSingleInSpread
+                  ? {
+                      gridRowStart: placement.spreadIndex + 1,
+                      gridColumn: "1 / span 2",
+                      justifySelf: "center",
+                      alignSelf: "start",
+                    }
+                  : {
+                      gridRowStart: placement.spreadIndex + 1,
+                      gridColumnStart: placement.posInSpread + 1,
+                      justifySelf:
+                        placement.posInSpread === 0 ? "end" : "start",
+                      alignSelf: "start",
+                    }
+              }
+            >
+              {renderPage(page)}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

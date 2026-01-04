@@ -660,6 +660,8 @@ export const useWorkspaceViewport = (opts: {
       const container = opts.containerRef.current;
       const content = opts.contentRef.current;
 
+      if (opts.editorState.pageFlow === "horizontal") return;
+
       // Wait for layout to settle (especially for different page widths)
       // We use requestAnimationFrame to ensure we calculate after render
       // Adding a small timeout to ensure all child components have updated their dimensions
@@ -674,6 +676,7 @@ export const useWorkspaceViewport = (opts: {
     opts.editorState.pdfDocument,
     opts.editorState.pages.length,
     opts.editorState.pendingViewStateRestore,
+    opts.editorState.pageFlow,
     opts.fitTrigger,
   ]);
 
