@@ -1,5 +1,6 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
 import type { Tile } from "./types";
+import type { TextContent } from "pdfjs-dist/types/src/display/api";
 import type {
   WorkerCommandType,
   WorkerErrorResponse,
@@ -81,10 +82,7 @@ class PDFWorkerService {
   private readonly defaultDocId: string = "default";
 
   private lastRenderScaleByDocPage = new Map<string, number>();
-  private textContentCacheByDocPage = new Map<
-    string,
-    { items: unknown[]; styles: Record<string, unknown>; lang?: string }
-  >();
+  private textContentCacheByDocPage = new Map<string, TextContent>();
 
   private clearLastRenderScaleForDoc(docId: string) {
     const prefix = `${docId}|`;
@@ -264,11 +262,7 @@ class PDFWorkerService {
     pageIndex: number;
     docId?: string;
     signal?: AbortSignal;
-  }): Promise<{
-    items: unknown[];
-    styles: Record<string, unknown>;
-    lang?: string;
-  } | null> {
+  }): Promise<TextContent | null> {
     return new Promise((resolve, reject) => {
       const { pageIndex, docId: requestedDocId, signal } = options;
       const docId = requestedDocId ?? this.defaultDocId;

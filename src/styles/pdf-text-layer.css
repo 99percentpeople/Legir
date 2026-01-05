@@ -1,13 +1,3 @@
-[data-main-rotation="90"] {
-  transform: rotate(90deg) translateY(-100%);
-}
-[data-main-rotation="180"] {
-  transform: rotate(180deg) translate(-100%, -100%);
-}
-[data-main-rotation="270"] {
-  transform: rotate(270deg) translateX(-100%);
-}
-
 .textLayer {
   position: absolute;
   text-align: initial;
@@ -17,15 +7,22 @@
   text-size-adjust: none;
   forced-color-adjust: none;
   transform-origin: 0 0;
+  transform: scale(var(--ff-smooth-scale, 1));
   --scale-round-x: 2px;
   --scale-round-y: 2px;
   --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
   mix-blend-mode: multiply;
 }
 
-.textLayer--rendering {
-  visibility: hidden;
-  pointer-events: none;
+.textLayer[data-main-rotation="90"] {
+  transform: scale(var(--ff-smooth-scale, 1)) rotate(90deg) translateY(-100%);
+}
+.textLayer[data-main-rotation="180"] {
+  transform: scale(var(--ff-smooth-scale, 1)) rotate(180deg)
+    translate(-100%, -100%);
+}
+.textLayer[data-main-rotation="270"] {
+  transform: scale(var(--ff-smooth-scale, 1)) rotate(270deg) translateX(-100%);
 }
 
 .textLayer :is(span, br) {

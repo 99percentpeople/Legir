@@ -1,4 +1,4 @@
-import { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { TextContent } from "pdfjs-dist/types/src/display/api";
 import type { Tile } from "./types";
 
 type CommandSpec<TRequest extends Record<string, unknown>, TResponse = never> =

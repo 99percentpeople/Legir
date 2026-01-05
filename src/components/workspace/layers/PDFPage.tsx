@@ -33,6 +33,15 @@ const PDFPage: React.FC<PDFPageProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
 
+  const rotatedViewport = pageProxy
+    ? pageProxy.getViewport({
+        scale: 1,
+        rotation: pageProxy.rotate,
+      })
+    : null;
+  const containerWidth = rotatedViewport?.width ?? width;
+  const containerHeight = rotatedViewport?.height ?? height;
+
   // Intersection Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -60,8 +69,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
       ref={containerRef}
       className="relative isolate origin-top overflow-hidden bg-white shadow-lg transition-shadow hover:shadow-xl"
       style={{
-        width: width * scale,
-        height: height * scale,
+        width: containerWidth * scale,
+        height: containerHeight * scale,
       }}
     >
       <PDFCanvasLayer

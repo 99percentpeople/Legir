@@ -125,7 +125,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
           const viewport = pageProxy.getViewport({
             scale: targetScale,
-            rotation: pageProxy.rotate,
+            rotation: 0,
           });
 
           // Apply CSS variables for correct scaling
@@ -339,9 +339,9 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   }, [isSelecting, isSelectMode]);
 
   // Temporary CSS transform for smooth zooming before re-render
-  const textLayerTransform = useMemo(() => {
+  const textLayerSmoothScale = useMemo(() => {
     if (renderedScale && scale !== renderedScale) {
-      return `scale(${scale / renderedScale})`;
+      return String(scale / renderedScale);
     }
     return undefined;
   }, [scale, renderedScale]);
@@ -360,8 +360,9 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       data-main-rotation={pageRotation}
       data-selectable={isSelectMode}
       style={{
-        transform: textLayerTransform,
         cursor,
+        ...(textLayerSmoothScale &&
+          ({ "--ff-smooth-scale": textLayerSmoothScale } as any)),
         ...(isHighlighting && {
           "--highlight-color": highlightColor,
           "--highlight-opacity": highlightOpacity,
