@@ -1,3 +1,4 @@
+import { TextContent } from "pdfjs-dist/types/src/display/api";
 import type { Tile } from "./types";
 
 type CommandSpec<TRequest extends Record<string, unknown>, TResponse = never> =
@@ -86,6 +87,14 @@ export type WorkerCommandPayloadMap = {
       viewportCenter: [number, number];
     },
     boolean
+  >;
+
+  getTextContent: CommandSpec<
+    {
+      docId?: string;
+      pageIndex: number;
+    },
+    TextContent | false
   >;
 };
 

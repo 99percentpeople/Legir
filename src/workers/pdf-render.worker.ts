@@ -25,6 +25,7 @@ if (typeof self.document === "undefined") {
     // 模拟 fonts 对象
     fonts: (self as any).fonts,
   };
+
   (self as any).document = fakeOwnerDocument;
 }
 
@@ -155,6 +156,46 @@ const processQueue = async () => {
     isProcessing = false;
     // Schedule next processing
     scheduleNext();
+  }
+};
+
+const getTextContentForPage = async (
+  params: Extract<WorkerRequest, { type: "getTextContent" }>,
+) => {
+  const { id, pageIndex, docId } = params;
+  const resolvedDocId = getDocId(docId);
+
+  let isCancelled = false;
+  activeRenderTasks.set(id, {
+    docId: resolvedDocId,
+    cancel: () => {
+      isCancelled = true;
+    },
+  });
+
+  try {
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+    if (pageIndex === undefined) throw new Error("Missing text parameters");
+
+    await ensureDocumentLoaded(resolvedDocId);
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
+    const page = await getPageForDoc(resolvedDocId, pageIndex);
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
+    const textContent = await page.getTextContent({});
+    if (isCancelled) throw { name: "RenderingCancelledException" };
+
+    postSuccess(id, textContent);
+  } catch (error: any) {
+    if (error?.name === "RenderingCancelledException") {
+      postSuccess(id, false);
+      return;
+    }
+
+    postError(id, error.message || "Unknown error");
+  } finally {
+    activeRenderTasks.delete(id);
   }
 };
 
@@ -498,6 +539,15 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     if (task) {
       task.cancel();
       activeRenderTasks.delete(id);
+    }
+    return;
+  }
+
+  if (type === "getTextContent") {
+    try {
+      await getTextContentForPage(e.data);
+    } catch (error: any) {
+      postError(id, error.message || "Text error");
     }
     return;
   }

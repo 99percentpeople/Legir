@@ -81,11 +81,22 @@ class PDFWorkerService {
   private readonly defaultDocId: string = "default";
 
   private lastRenderScaleByDocPage = new Map<string, number>();
+  private textContentCacheByDocPage = new Map<
+    string,
+    { items: unknown[]; styles: Record<string, unknown>; lang?: string }
+  >();
 
   private clearLastRenderScaleForDoc(docId: string) {
     const prefix = `${docId}|`;
     for (const key of Array.from(this.lastRenderScaleByDocPage.keys())) {
       if (key.startsWith(prefix)) this.lastRenderScaleByDocPage.delete(key);
+    }
+  }
+
+  private clearTextContentCacheForDoc(docId: string) {
+    const prefix = `${docId}|`;
+    for (const key of Array.from(this.textContentCacheByDocPage.keys())) {
+      if (key.startsWith(prefix)) this.textContentCacheByDocPage.delete(key);
     }
   }
 
@@ -189,6 +200,7 @@ class PDFWorkerService {
     return new Promise((resolve, reject) => {
       const docId = options?.docId ?? this.defaultDocId;
       this.clearLastRenderScaleForDoc(docId);
+      this.clearTextContentCacheForDoc(docId);
 
       const id = `load_${docId}_${Date.now()}`;
       const signal = options?.signal;
@@ -241,9 +253,85 @@ class PDFWorkerService {
   @RequireWorkerVoid()
   public unloadDocument(docId: string) {
     this.clearLastRenderScaleForDoc(docId);
+    this.clearTextContentCacheForDoc(docId);
     const id = `unload_${docId}_${Date.now()}`;
     const message: WorkerRequest = { type: "unload", id, docId };
     this.worker.postMessage(message);
+  }
+
+  @RequireWorkerPromise()
+  public getTextContent(options: {
+    pageIndex: number;
+    docId?: string;
+    signal?: AbortSignal;
+  }): Promise<{
+    items: unknown[];
+    styles: Record<string, unknown>;
+    lang?: string;
+  } | null> {
+    return new Promise((resolve, reject) => {
+      const { pageIndex, docId: requestedDocId, signal } = options;
+      const docId = requestedDocId ?? this.defaultDocId;
+
+      const cacheKey = `${docId}|${pageIndex}`;
+      const cached = this.textContentCacheByDocPage.get(cacheKey);
+      if (cached) {
+        resolve(cached);
+        return;
+      }
+
+      const id = `getTextContent_${docId}_${pageIndex}_${this.requestSeq++}_${Date.now()}`;
+
+      if (signal?.aborted) {
+        const err = new DOMException("Aborted", "AbortError");
+        (err as DOMException & { phase?: string }).phase = "pre-send";
+        reject(err);
+        return;
+      }
+
+      const onAbort = () => {
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
+        this.pendingRequests.delete(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        this.pendingRequests.set(id, {
+          resolve: (msg: WorkerSuccessResponse<"getTextContent">) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            const payload = msg.payload;
+            if (!payload) {
+              resolve(null);
+              return;
+            }
+
+            this.textContentCacheByDocPage.set(cacheKey, payload);
+            resolve(payload);
+          },
+          reject: (msg: WorkerErrorResponse) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            reject(new Error(msg.error));
+          },
+        });
+
+        const message: WorkerRequest = {
+          type: "getTextContent",
+          id,
+          docId,
+          pageIndex,
+        };
+
+        this.worker.postMessage(message);
+      } catch (e) {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    });
   }
 
   @RequireWorkerVoid()

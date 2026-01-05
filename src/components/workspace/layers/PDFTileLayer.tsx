@@ -763,13 +763,19 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   const frontTileIdSet = new Set(frontTiles.map((t) => t.canvasId));
   const midTileIdSet = new Set(midTiles.map((t) => t.canvasId));
   const backTileIdSet = new Set(backTiles.map((t) => t.canvasId));
-  const allTiles: TileInfo[] = [];
-  const seenTileIds = new Set<string>();
-  for (const t of [...frontTiles, ...midTiles, ...backTiles]) {
-    if (seenTileIds.has(t.canvasId)) continue;
-    seenTileIds.add(t.canvasId);
-    allTiles.push(t);
-  }
+  const tileByIdInPaintOrder = new Map<string, TileInfo>();
+  const pushTiles = (tiles: TileInfo[]) => {
+    for (const t of tiles) {
+      if (tileByIdInPaintOrder.has(t.canvasId)) {
+        tileByIdInPaintOrder.delete(t.canvasId);
+      }
+      tileByIdInPaintOrder.set(t.canvasId, t);
+    }
+  };
+  pushTiles(frontTiles);
+  pushTiles(midTiles);
+  pushTiles(backTiles);
+  const allTiles = Array.from(tileByIdInPaintOrder.values());
 
   if (!showTileCanvases) {
     return null;
@@ -784,7 +790,6 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         const isBack = backTileIdSet.has(t.canvasId);
         const isMid = midTileIdSet.has(t.canvasId);
         const isFront = frontTileIdSet.has(t.canvasId);
-        const zIndex = isBack ? 30 : isMid ? 20 : 10;
 
         const baseW = isBack
           ? backTilesPageW
@@ -838,7 +843,6 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
             }}
             className="absolute"
             style={{
-              zIndex,
               display: tileDisplay,
               left: baseW ? `${(t.x / baseW) * 100}%` : t.x / dprRef.current,
               top: baseH ? `${(t.y / baseH) * 100}%` : t.y / dprRef.current,

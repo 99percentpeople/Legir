@@ -58,7 +58,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative z-0 origin-top overflow-hidden bg-white shadow-lg transition-shadow hover:shadow-xl"
+      className="relative isolate origin-top overflow-hidden bg-white shadow-lg transition-shadow hover:shadow-xl"
       style={{
         width: width * scale,
         height: height * scale,

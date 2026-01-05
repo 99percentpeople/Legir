@@ -222,16 +222,12 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
   const hasUsableTileBuffer = tileState.hasUsableTileBuffer;
   const shouldHidePageCanvasForTiles =
-    tileState.tileMode &&
-    hasUsableTileBuffer &&
-    tileState.hasAnyTileRendered &&
-    tileState.hasAllTilesRendered;
+    tileState.tileMode && tileState.hasAllTilesRendered;
   const showPlaceholderImage =
     !!placeholderImage &&
     !hasUsableTileBuffer &&
     (tileState.tileMode || (!tileState.tileMode && !isRendered));
   const showSpinner = !hasUsableTileBuffer && !isRendered && !placeholderImage;
-  const placeholderZIndex = tileState.tileMode ? 0 : 10;
   const canvasADisplay =
     activeCanvas === "B" || !isInView || shouldHidePageCanvasForTiles
       ? "none"
@@ -248,14 +244,13 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         <img
           src={placeholderImage}
           className="pointer-events-none absolute inset-0 h-full w-full object-contain blur-sm"
-          style={{ zIndex: placeholderZIndex }}
           alt="Loading..."
         />
       )}
 
       {/* Loading Spinner */}
       {showSpinner && (
-        <div className="text-muted-foreground pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-gray-50">
+        <div className="text-muted-foreground pointer-events-none absolute inset-0 flex items-center justify-center bg-gray-50">
           <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"></div>
         </div>
       )}
