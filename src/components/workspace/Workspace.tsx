@@ -17,7 +17,6 @@ import { usePointerCapture } from "@/hooks/usePointerCapture";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useCanvasPanning } from "@/hooks/useCanvasPanning";
 import { useInkSession } from "./hooks/useInkSession";
-import { useLanguage } from "../language-provider";
 import { getCursor, shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
 import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionPopover";
 import { TranslationFloatingWindow } from "./widgets/TranslationFloatingWindow";
@@ -1584,7 +1583,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       <div
         ref={contentRef}
         className={cn(
-          "mx-auto grid min-h-full w-fit p-8 pb-20",
+          "mx-auto grid min-h-full w-fit place-content-center p-8 pb-20",
           editorState.pageFlow === "horizontal"
             ? "content-center items-center justify-items-center"
             : "items-start justify-items-center",
