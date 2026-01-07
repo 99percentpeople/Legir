@@ -1,4 +1,4 @@
-import { rgb } from "pdf-lib";
+import { rgb } from "@cantoo/pdf-lib";
 import { pdfDebug } from "./debug";
 
 export const hexToPdfColor = (hex: string | undefined) => {

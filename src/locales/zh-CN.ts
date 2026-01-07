@@ -2,6 +2,7 @@ const zhCN = {
   common: {
     select: "选择...",
     cancel: "取消",
+    continue: "继续",
     save: "保存",
     delete: "删除",
     close: "关闭",
@@ -100,6 +101,13 @@ const zhCN = {
       confirm: "关闭且不保存",
       cancel: "取消",
     },
+    pdf_password: {
+      title: "需要密码",
+      title_incorrect: "密码错误",
+      desc: "该 PDF 受密码保护。",
+      desc_incorrect: "请重试。",
+      password_label: "密码",
+    },
     file_drop: {
       title: "打开拖拽的文件？",
       desc: "当前已经打开了一个文档。请选择如何处理新拖入的 PDF。",
@@ -109,6 +117,24 @@ const zhCN = {
     },
   },
   properties: {
+    ai_detection: {
+      title: "AI 字段识别",
+      desc: "使用 Gemini 分析页面并自动检测创建表单字段。",
+      api_key_missing:
+        "缺少 Gemini API Key。请在 .env.local 中设置 GEMINI_API_KEY 并重启应用。",
+      page_range: "页面范围",
+      page_range_hint: "例如：1-5, 8, 10-12（默认：全部）",
+      valid_all: "已选择所有页面（共 {total} 页）",
+      err_format: "格式无效。请使用数字和范围（如 1-3, 5）。",
+      err_bounds: "页码超出范围（1-{total}）。",
+      valid_selected: "已选择 {count} 页：{pages}",
+      types: "检测字段类型",
+      style_override: "覆盖默认样式",
+      prompt: "额外指令（可选）",
+      prompt_ph: "例如：“仅查找顶部区域的字段”或“忽略日期字段”",
+      prompt_hint: "为 AI 模型提供上下文或特定规则。",
+      start: "开始分析",
+    },
     document: {
       title: "文档信息",
       hint: "编辑全局 PDF 信息。在画布上选择一个字段以编辑其属性。",
@@ -116,6 +142,12 @@ const zhCN = {
     filename: {
       label: "文件名",
       desc: "导出文件时使用的名称。",
+    },
+    export_password: {
+      label: "导出密码",
+      desc: "导出时使用密码",
+      placeholder: "密码",
+      placeholder_use_open: "留空则导出时不设置密码",
     },
     doc_title: "文档标题",
     author: "作者",
@@ -226,10 +258,6 @@ const zhCN = {
       properties: "属性编辑",
     },
   },
-  ai_panel: {
-    api_key_missing:
-      "缺少 Gemini API Key。请在 .env.local 中设置 GEMINI_API_KEY 并重启应用。",
-  },
   annotation: {
     font_missing_warning:
       "该 PDF 使用了精简/嵌入字体，可能缺少字形。编辑此自由文本后将使用默认字体重新排版。",
@@ -326,22 +354,6 @@ const zhCN = {
     centers: "对齐中心",
     equal: "等间距对齐",
     done: "完成",
-  },
-  ai_dialog: {
-    title: "AI 字段识别",
-    desc: "使用 Gemini 分析页面并自动检测创建表单字段。",
-    page_range: "页面范围",
-    page_range_hint: "例如：1-5, 8, 10-12（默认：全部）",
-    valid_all: "已选择所有页面（共 {total} 页）",
-    err_format: "格式无效。请使用数字和范围（如 1-3, 5）。",
-    err_bounds: "页码超出范围（1-{total}）。",
-    valid_selected: "已选择 {count} 页：{pages}",
-    types: "检测字段类型",
-    style_override: "覆盖默认样式",
-    prompt: "额外指令（可选）",
-    prompt_ph: "例如：“仅查找顶部区域的字段”或“忽略日期字段”",
-    prompt_hint: "为 AI 模型提供上下文或特定规则。",
-    start: "开始分析",
   },
   landing: {
     title: "AI 驱动的 PDF 表单编辑器",

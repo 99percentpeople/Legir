@@ -1,5 +1,5 @@
 import type { FormField } from "@/types";
-import type { PDFPage } from "pdf-lib";
+import type { PDFPage } from "@cantoo/pdf-lib";
 import type * as pdfjsLib from "pdfjs-dist";
 import { hexToPdfColor } from "./colors";
 import { uiRectToPdfBounds } from "./coords";

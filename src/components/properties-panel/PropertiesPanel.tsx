@@ -2,6 +2,7 @@ import React from "react";
 import { FormField, Annotation, PDFMetadata } from "@/types";
 import { DocumentPropertiesPanel } from "./DocumentPropertiesPanel";
 import { ControlPropertiesPanel } from "./ControlPropertiesPanel";
+import { useEditorStore } from "@/store/useEditorStore";
 
 // --- Main Container Component ---
 interface PropertiesPanelProps {
@@ -42,6 +43,10 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
     width,
     onResize,
   }) => {
+    const exportPassword = useEditorStore((s) => s.exportPassword);
+    const pdfOpenPassword = useEditorStore((s) => s.pdfOpenPassword);
+    const setEditorState = useEditorStore((s) => s.setState);
+
     if (activeTab === "properties" && selectedControl) {
       return (
         <ControlPropertiesPanel
@@ -66,6 +71,11 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         onMetadataChange={onMetadataChange}
         filename={filename}
         onFilenameChange={onFilenameChange}
+        exportPassword={exportPassword}
+        pdfOpenPassword={pdfOpenPassword}
+        onExportPasswordChange={(password) => {
+          setEditorState({ exportPassword: password, isDirty: true });
+        }}
         isOpen={isOpen}
         onOpen={onOpen}
         onCollapse={onCollapse}

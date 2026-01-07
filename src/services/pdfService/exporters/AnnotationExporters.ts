@@ -9,7 +9,7 @@ import {
   PDFDict,
   type PDFFont,
   PDFRef,
-} from "pdf-lib";
+} from "@cantoo/pdf-lib";
 import type * as pdfjsLib from "pdfjs-dist";
 import { Annotation } from "@/types";
 import { IAnnotationExporter } from "../types";

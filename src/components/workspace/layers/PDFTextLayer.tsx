@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { cn } from "../../../lib/cn"; // Adjust path as needed
+import { cn } from "@/lib/cn"; // Adjust path as needed
 import * as pdfjsLib from "pdfjs-dist";
 import { useEditorStore } from "@/store/useEditorStore";
 import { appEventBus } from "@/lib/eventBus";
@@ -100,7 +100,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           signal: args.signal,
         });
       } catch (error) {
-        if (error?.name !== "AbortException") {
+        if (error?.name !== "AbortError") {
           console.error(`Page ${pageIndex} Text Layer Error:`, error);
         }
       } finally {
@@ -346,6 +346,9 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     return undefined;
   }, [scale, renderedScale]);
 
+  const shouldDisplay = isInView || isSelecting;
+  const shouldHideByVisibility = !isInView && isSelecting;
+
   return (
     <div
       ref={textLayerRef}
@@ -360,9 +363,13 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       data-main-rotation={pageRotation}
       data-selectable={isSelectMode}
       style={{
+        display: shouldDisplay ? "block" : "none",
+        visibility: shouldHideByVisibility ? "hidden" : "visible",
+        pointerEvents: shouldHideByVisibility ? "none" : undefined,
         cursor,
-        ...(textLayerSmoothScale &&
-          ({ "--ff-smooth-scale": textLayerSmoothScale } as any)),
+        ...(textLayerSmoothScale && {
+          "--ff-smooth-scale": textLayerSmoothScale,
+        }),
         ...(isHighlighting && {
           "--highlight-color": highlightColor,
           "--highlight-opacity": highlightOpacity,

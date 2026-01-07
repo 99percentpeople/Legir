@@ -7,7 +7,7 @@ import {
   PDFStream,
   PDFString,
   PDFHexString,
-} from "pdf-lib";
+} from "@cantoo/pdf-lib";
 import { Annotation } from "@/types";
 import { parsePDFDate } from "@/utils/pdfUtils";
 import { IAnnotationParser, ParserContext } from "../types";

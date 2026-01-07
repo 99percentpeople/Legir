@@ -29,6 +29,7 @@ export type WorkerCommandPayloadMap = {
     {
       docId?: string;
       data: Uint8Array;
+      password?: string;
     },
     boolean
   >;
@@ -54,6 +55,7 @@ export type WorkerCommandPayloadMap = {
       | {
           isNewDoc: true;
           data: Uint8Array;
+          password?: string;
         }
       | {
           isNewDoc?: false | undefined;

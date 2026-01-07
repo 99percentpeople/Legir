@@ -2,6 +2,7 @@ const zhTW = {
   common: {
     select: "選擇...",
     cancel: "取消",
+    continue: "繼續",
     save: "儲存",
     delete: "刪除",
     close: "關閉",
@@ -97,6 +98,13 @@ const zhTW = {
       confirm: "關閉且不儲存",
       cancel: "取消",
     },
+    pdf_password: {
+      title: "需要密碼",
+      title_incorrect: "密碼錯誤",
+      desc: "此 PDF 受密碼保護。",
+      desc_incorrect: "請再試一次。",
+      password_label: "密碼",
+    },
     file_drop: {
       title: "開啟拖放的檔案？",
       desc: "目前已開啟一個文件。請選擇如何處理新拖入的 PDF。",
@@ -106,6 +114,24 @@ const zhTW = {
     },
   },
   properties: {
+    ai_detection: {
+      title: "AI 欄位識別",
+      desc: "使用 Gemini 分析頁面並自動檢測建立表單欄位。",
+      api_key_missing:
+        "缺少 Gemini API Key。請在 .env.local 中設定 GEMINI_API_KEY 並重啟應用。",
+      page_range: "頁面範圍",
+      page_range_hint: "例如：1-5, 8, 10-12（預設：全部）",
+      valid_all: "已選擇所有頁面（共 {total} 頁）",
+      err_format: "格式無效。請使用數字和範圍（如 1-3, 5）。",
+      err_bounds: "頁碼超出範圍（1-{total}）。",
+      valid_selected: "已選擇 {count} 頁：{pages}",
+      types: "檢測欄位類型",
+      style_override: "覆蓋預設樣式",
+      prompt: "額外指令（可選）",
+      prompt_ph: "例如：「僅尋找頂部區域的欄位」或「忽略日期欄位」",
+      prompt_hint: "為 AI 模型提供上下文或特定規則。",
+      start: "開始分析",
+    },
     document: {
       title: "文件資訊",
       hint: "編輯全域 PDF 資訊。在畫布上選擇一個欄位以編輯其屬性。",
@@ -113,6 +139,12 @@ const zhTW = {
     filename: {
       label: "檔名",
       desc: "匯出檔案時使用的名稱。",
+    },
+    export_password: {
+      label: "匯出密碼",
+      desc: "匯出時使用密碼",
+      placeholder: "密碼",
+      placeholder_use_open: "留空則匯出時不設定密碼",
     },
     doc_title: "文件標題",
     author: "作者",
@@ -123,12 +155,11 @@ const zhTW = {
     },
     creator: "建立者",
     producer: "製作工具",
-    producer_tooltip: "导出时默认为 'Formforge'，除非手动锁定。",
-    creation_date: "创建日期",
+    producer_tooltip: "匯出時預設為 'Formforge'，除非手動鎖定。",
+    creation_date: "建立日期",
     modification_date: "修改日期",
-    mod_date_auto: "自动更新",
-    mod_date_tooltip:
-      "导入时默认为当前日期。导出时更新为当前时间，除非手动锁定。",
+    mod_date_auto: "自動更新",
+    mod_date_tooltip: "預設為匯入日期。匯出時更新為目前時間，除非手動鎖定。",
     annotation: {
       title: "註釋屬性",
     },
@@ -223,10 +254,6 @@ const zhTW = {
       properties: "屬性編輯",
     },
   },
-  ai_panel: {
-    api_key_missing:
-      "缺少 Gemini API Key。請在 .env.local 中設定 GEMINI_API_KEY 並重啟應用。",
-  },
   workspace: {
     no_pdf: "未載入 PDF。請使用上傳按鈕開始。",
   },
@@ -319,22 +346,6 @@ const zhTW = {
     centers: "對齊中心",
     equal: "等間距對齊",
     done: "完成",
-  },
-  ai_dialog: {
-    title: "AI 欄位識別",
-    desc: "使用 Gemini 分析頁面並自動檢測建立表單欄位。",
-    page_range: "頁面範圍",
-    page_range_hint: "例如：1-5, 8, 10-12（預設：全部）",
-    valid_all: "已選擇所有頁面（共 {total} 頁）",
-    err_format: "格式無效。請使用數字和範圍（如 1-3, 5）。",
-    err_bounds: "頁碼超出範圍（1-{total}）。",
-    valid_selected: "已選擇 {count} 頁：{pages}",
-    types: "檢測欄位類型",
-    style_override: "覆蓋預設樣式",
-    prompt: "額外指令（可選）",
-    prompt_ph: "例如：「僅尋找頂部區域的欄位」或「忽略日期欄位」",
-    prompt_hint: "為 AI 模型提供上下文或特定規則。",
-    start: "開始分析",
   },
   landing: {
     title: "AI 驅動的 PDF 表單編輯器",

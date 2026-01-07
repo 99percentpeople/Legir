@@ -1,5 +1,6 @@
-import type { PDFFont, PDFDocument } from "pdf-lib";
-import type { Fontkit } from "pdf-lib/cjs/types/fontkit";
+import type { PDFFont, PDFDocument } from "@cantoo/pdf-lib";
+
+type Fontkit = Parameters<PDFDocument["registerFontkit"]>[0];
 
 export type ExportFontConfig = {
   id: "cjk_sans" | "cjk_serif";

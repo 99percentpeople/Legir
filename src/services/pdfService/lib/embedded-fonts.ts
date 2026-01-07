@@ -1,4 +1,4 @@
-import { PDFArray, PDFDict, PDFName, PDFStream } from "pdf-lib";
+import { PDFArray, PDFDict, PDFName, PDFStream } from "@cantoo/pdf-lib";
 import { normalizePdfFontName } from "./pdf-font-names";
 
 export type EmbeddedFontLoadCache = Map<string, Promise<string | undefined>>;

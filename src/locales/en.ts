@@ -2,6 +2,7 @@ const en = {
   common: {
     select: "Select...",
     cancel: "Cancel",
+    continue: "Continue",
     save: "Save",
     delete: "Delete",
     close: "Close",
@@ -100,6 +101,13 @@ const en = {
       confirm: "Close without saving",
       cancel: "Cancel",
     },
+    pdf_password: {
+      title: "Password required",
+      title_incorrect: "Incorrect password",
+      desc: "This PDF is password-protected.",
+      desc_incorrect: "Please try again.",
+      password_label: "Password",
+    },
     file_drop: {
       title: "Open dropped file?",
       desc: "A document is already open. Choose what to do with the dropped PDF.",
@@ -109,6 +117,25 @@ const en = {
     },
   },
   properties: {
+    ai_detection: {
+      title: "AI Field Detection",
+      desc: "Analyze pages to automatically detect and create form fields using Gemini.",
+      api_key_missing:
+        "Missing Gemini API key. Set GEMINI_API_KEY in .env.local and restart the app.",
+      page_range: "Page Range",
+      page_range_hint: "e.g., 1-5, 8, 10-12 (Default: All)",
+      valid_all: "All pages selected ({total} pages)",
+      err_format: "Invalid format. Use numbers and ranges (e.g. 1-3, 5).",
+      err_bounds: "Page number out of bounds (1-{total}).",
+      valid_selected: "Selected {count} pages: {pages}",
+      types: "Field Types to Detect",
+      style_override: "Override Default Style",
+      prompt: "Additional Instructions (Optional)",
+      prompt_ph:
+        "e.g., 'Only find fields in the top section' or 'Ignore date fields'",
+      prompt_hint: "Provide context or specific rules for the AI model.",
+      start: "Start Analysis",
+    },
     document: {
       title: "Document Info",
       hint: "Edit global PDF information. Select a field on the canvas to edit its properties.",
@@ -116,6 +143,12 @@ const en = {
     filename: {
       label: "Filename",
       desc: "The name used when exporting the file.",
+    },
+    export_password: {
+      label: "Export password",
+      desc: "Use a password during export",
+      placeholder: "Password",
+      placeholder_use_open: "Leave blank to export without a password",
     },
     doc_title: "Document Title",
     author: "Author",
@@ -222,10 +255,6 @@ const en = {
       properties: "Property Editing",
     },
   },
-  ai_panel: {
-    api_key_missing:
-      "Missing Gemini API key. Set GEMINI_API_KEY in .env.local and restart the app.",
-  },
   annotation: {
     font_missing_warning:
       "This PDF uses a subset/embedded font that may be missing glyphs. When you edit this text, it will be re-rendered using the default font.",
@@ -323,23 +352,6 @@ const en = {
     centers: "Snap to Centers",
     equal: "Equidistant Snapping",
     done: "Done",
-  },
-  ai_dialog: {
-    title: "AI Field Detection",
-    desc: "Analyze pages to automatically detect and create form fields using Gemini.",
-    page_range: "Page Range",
-    page_range_hint: "e.g., 1-5, 8, 10-12 (Default: All)",
-    valid_all: "All pages selected ({total} pages)",
-    err_format: "Invalid format. Use numbers and ranges (e.g. 1-3, 5).",
-    err_bounds: "Page number out of bounds (1-{total}).",
-    valid_selected: "Selected {count} pages: {pages}",
-    types: "Field Types to Detect",
-    style_override: "Override Default Style",
-    prompt: "Additional Instructions (Optional)",
-    prompt_ph:
-      "e.g., 'Only find fields in the top section' or 'Ignore date fields'",
-    prompt_hint: "Provide context or specific rules for the AI model.",
-    start: "Start Analysis",
   },
   landing: {
     title: "AI-Powered PDF Form Editor",

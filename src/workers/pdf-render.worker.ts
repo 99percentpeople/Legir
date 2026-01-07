@@ -70,6 +70,33 @@ interface QueueItem {
 const taskQueue: QueueItem[] = [];
 let isProcessing = false;
 
+type TaskResult = {
+  payload?: unknown;
+  transfer?: Transferable[];
+};
+
+const pendingSuccessResponses: Array<{
+  id: string;
+  payload?: unknown;
+  transfer?: Transferable[];
+}> = [];
+
+const queueSuccessResponse = (
+  id: string,
+  payload?: unknown,
+  transfer?: Transferable[],
+) => {
+  pendingSuccessResponses.push({ id, payload, transfer });
+};
+
+const flushPendingSuccessResponses = () => {
+  while (pendingSuccessResponses.length > 0) {
+    const next = pendingSuccessResponses.shift();
+    if (!next) continue;
+    postSuccess(next.id, next.payload, next.transfer);
+  }
+};
+
 const buildQueueTaskKey = (
   req: Extract<WorkerRequest, { type: "render" | "renderImage" }>,
 ): string => {
@@ -92,14 +119,17 @@ const buildQueueTaskKey = (
 };
 
 const cancelQueuedTasksForDoc = (docId: string) => {
+  const removedIds: string[] = [];
   for (let i = taskQueue.length - 1; i >= 0; i--) {
-    const queuedDocId = getDocId(taskQueue[i].data.docId);
+    const queued = taskQueue[i].data;
+    const queuedDocId = getDocId(queued.docId);
     if (queuedDocId !== docId) continue;
     const removed = taskQueue.splice(i, 1)[0];
     if (removed) {
-      postSuccess(removed.id, false);
+      removedIds.push(removed.id);
     }
   }
+  return removedIds;
 };
 
 const cancelActiveTasksForDoc = (docId: string) => {
@@ -138,25 +168,9 @@ const postError = (id: string, error: string) => {
 // Process the next task in the queue
 const processQueue = async () => {
   if (isProcessing || taskQueue.length === 0) return;
-
-  isProcessing = true;
-  // Get the highest priority task (lowest distance value)
   const item = taskQueue.shift();
-
-  if (!item) {
-    isProcessing = false;
-    return;
-  }
-
-  try {
-    await handleQueuedTask(item.data);
-  } catch (err) {
-    console.error("Error processing task:", err);
-  } finally {
-    isProcessing = false;
-    // Schedule next processing
-    scheduleNext();
-  }
+  if (!item) return;
+  await handleQueuedTask(item.data);
 };
 
 const getTextContentForPage = async (
@@ -183,17 +197,18 @@ const getTextContentForPage = async (
     const page = await getPageForDoc(resolvedDocId, pageIndex);
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
-    const textContent = await page.getTextContent({});
+    const textContent = await page.getTextContent({}).catch((e) => {
+      throw new Error("[worker] Failed to getTextContent: " + e.message);
+    });
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
-    postSuccess(id, textContent);
+    return { payload: textContent } satisfies TaskResult;
   } catch (error: any) {
     if (error?.name === "RenderingCancelledException") {
-      postSuccess(id, false);
-      return;
+      return { payload: false } satisfies TaskResult;
     }
 
-    postError(id, error.message || "Unknown error");
+    throw error;
   } finally {
     activeRenderTasks.delete(id);
   }
@@ -213,7 +228,11 @@ const scheduleNext = () => {
   port.postMessage(null);
 };
 
-const loadDocument = async (docId: string, data: Uint8Array) => {
+const loadDocument = async (
+  docId: string,
+  data: Uint8Array,
+  password?: string,
+) => {
   const state = getDocState(docId);
   try {
     await state.pdfDoc?.destroy();
@@ -221,16 +240,32 @@ const loadDocument = async (docId: string, data: Uint8Array) => {
   state.pageCache.clear();
   const loadingTask = pdfjsLib.getDocument({
     data: data,
-    password: "",
+    password: password || "",
     cMapUrl: PDFJS_CMAP_URL,
     cMapPacked: true,
     standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
     useSystemFonts: false,
     disableFontFace: false,
+    stopAtErrors: false,
   });
+
+  if (typeof password === "string") {
+    let didTry = false;
+    loadingTask.onPassword = (cb: (password: string) => void) => {
+      if (didTry) {
+        void loadingTask.destroy().catch(() => {});
+        cb("");
+        return;
+      }
+      didTry = true;
+      cb(password);
+    };
+  }
   state.docLoadingPromise = loadingTask.promise;
   state.pdfDoc = null;
-  state.pdfDoc = await state.docLoadingPromise;
+  state.pdfDoc = await state.docLoadingPromise.catch((e) => {
+    throw new Error("[worker] Failed to load document: " + e.message);
+  });
 };
 
 const disposeDocument = async (docId: string) => {
@@ -247,11 +282,12 @@ const ensureDocumentLoaded = async (
   options?: {
     isNewDoc?: boolean;
     data?: Uint8Array | null;
+    password?: string;
   },
 ) => {
   const state = getDocState(docId);
   if (options?.isNewDoc && options.data) {
-    await loadDocument(docId, options.data);
+    await loadDocument(docId, options.data, options.password);
     return;
   }
 
@@ -272,12 +308,17 @@ const getPageForDoc = async (docId: string, pageIndex: number) => {
   }
 
   const pageNumber = pageIndex + 1;
-  let pagePromise = state.pageCache.get(pageNumber);
-  if (!pagePromise) {
-    pagePromise = state.pdfDoc.getPage(pageNumber);
-    state.pageCache.set(pageNumber, pagePromise);
+  try {
+    let pagePromise = state.pageCache.get(pageNumber);
+    if (!pagePromise) {
+      pagePromise = state.pdfDoc.getPage(pageNumber);
+      state.pageCache.set(pageNumber, pagePromise);
+    }
+
+    return await pagePromise;
+  } catch (e) {
+    throw new Error("[worker] failed to getPage: " + e.message);
   }
-  return await pagePromise;
 };
 
 const renderToCanvas = async (
@@ -382,19 +423,20 @@ const renderToCanvas = async (
 
     renderTask = page.render(renderContext);
 
-    await renderTask.promise;
+    await renderTask.promise.catch((e) => {
+      throw new Error("[worker] failed to renderToCanvas: " + e.message);
+    });
 
     ctx.restore();
 
     // No need to transfer bitmap back, canvas is already updated
-    postSuccess(id, true);
+    return { payload: true } satisfies TaskResult;
   } catch (error: any) {
     if (error?.name === "RenderingCancelledException") {
-      postSuccess(id, false);
-      return;
+      return { payload: false } satisfies TaskResult;
     }
 
-    postError(id, error.message || "Unknown error");
+    throw error;
   } finally {
     // Clean up task from map
     activeRenderTasks.delete(id);
@@ -438,6 +480,7 @@ const renderToImage = async (
       await ensureDocumentLoaded(resolvedDocId, {
         isNewDoc: true,
         data: params.data,
+        password: params.password,
       });
     } else {
       await ensureDocumentLoaded(resolvedDocId);
@@ -480,7 +523,9 @@ const renderToImage = async (
       annotationMode,
     });
 
-    await renderTask.promise;
+    await renderTask.promise.catch((error) => {
+      throw new Error("[worker] failed to renderToImage: " + error.message);
+    });
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
     const outMimeType = mimeType || "image/jpeg";
@@ -493,227 +538,260 @@ const renderToImage = async (
     const buf = await blob.arrayBuffer();
     if (isCancelled) throw { name: "RenderingCancelledException" };
 
-    postSuccess(
-      id,
-      {
+    return {
+      payload: {
         mimeType: outMimeType,
         imageBytes: buf,
       },
-      [buf],
-    );
+      transfer: [buf],
+    } satisfies TaskResult;
   } catch (error: any) {
     if (error?.name === "RenderingCancelledException") {
-      postSuccess(id, false);
-      return;
+      return { payload: false } satisfies TaskResult;
     }
 
-    postError(id, error.message || "Unknown error");
+    throw error;
   } finally {
     activeRenderTasks.delete(id);
   }
 };
 
-const handleQueuedTask = async (
-  data: Extract<WorkerRequest, { type: "render" | "renderImage" }>,
-) => {
-  if (data.type === "renderImage") {
-    await renderToImage(data);
-    return;
+const handleQueuedTask = async (data: WorkerRequest | null) => {
+  flushPendingSuccessResponses();
+  let isQueuedRender = false;
+  let id = "";
+
+  try {
+    if (!data) return;
+    const type = data.type;
+    id = data.id;
+    isQueuedRender = type === "render" || type === "renderImage";
+
+    if (isQueuedRender) {
+      isProcessing = true;
+    }
+
+    let result: TaskResult | undefined;
+
+    switch (type) {
+      case "render":
+        result = await renderToCanvas(data);
+        break;
+      case "renderImage":
+        result = await renderToImage(data);
+        break;
+      case "getTextContent":
+        result = await getTextContentForPage(data);
+        break;
+      case "load": {
+        const resolvedDocId = getDocId(data.docId);
+        for (const rid of cancelQueuedTasksForDoc(resolvedDocId)) {
+          postSuccess(rid, false);
+        }
+        cancelActiveTasksForDoc(resolvedDocId);
+        await loadDocument(resolvedDocId, data.data, data.password);
+        result = { payload: true };
+        break;
+      }
+      case "unload": {
+        const resolvedDocId = getDocId(data.docId);
+        for (const rid of cancelQueuedTasksForDoc(resolvedDocId)) {
+          postSuccess(rid, false);
+        }
+        cancelActiveTasksForDoc(resolvedDocId);
+        await disposeDocument(resolvedDocId);
+        result = { payload: true };
+        break;
+      }
+      case "releaseCanvas": {
+        const idsToRelease = new Set<string>(data.canvasIds);
+
+        if (idsToRelease.size > 0) {
+          for (let i = taskQueue.length - 1; i >= 0; i--) {
+            const queued = taskQueue[i].data;
+            if (queued.type !== "render") continue;
+            const cid = queued.canvasId;
+            if (!idsToRelease.has(cid)) continue;
+            const removed = taskQueue.splice(i, 1)[0];
+            if (removed) {
+              postSuccess(removed.id, false);
+            }
+          }
+          for (const cid of idsToRelease) {
+            canvasMap.delete(cid);
+          }
+        }
+
+        result = { payload: true };
+        break;
+      }
+      case "cancelQueuedRenders": {
+        const incomingScale = data.scale;
+        const incomingDocId = getDocId(data.docId);
+        const incomingPageIndex = data.pageIndex;
+
+        if (
+          incomingScale !== undefined &&
+          incomingPageIndex !== undefined &&
+          taskQueue.length > 0
+        ) {
+          for (let i = taskQueue.length - 1; i >= 0; i--) {
+            const queued = taskQueue[i];
+            if (queued.data.type !== "render") continue;
+
+            const taskDocId = getDocId(queued.data.docId);
+            if (taskDocId !== incomingDocId) continue;
+            if (queued.data.pageIndex !== incomingPageIndex) continue;
+
+            const taskScale = queued.data.scale;
+            if (
+              taskScale !== undefined &&
+              Math.abs(taskScale - incomingScale) > 0.001
+            ) {
+              const removed = taskQueue.splice(i, 1)[0];
+              if (removed) {
+                postSuccess(removed.id, false);
+              }
+            }
+          }
+        }
+
+        result = { payload: true };
+        break;
+      }
+      case "reprioritize": {
+        const incomingDocId = getDocId(data.docId);
+        const incomingPageIndex = data.pageIndex;
+        const incomingScale = data.scale;
+        const vc = data.viewportCenter;
+
+        if (
+          vc &&
+          incomingPageIndex !== undefined &&
+          incomingScale !== undefined &&
+          taskQueue.length > 0
+        ) {
+          const vcx = vc[0];
+          const vcy = vc[1];
+
+          for (const item of taskQueue) {
+            if (item.data.type !== "render") continue;
+            if (getDocId(item.data.docId) !== incomingDocId) continue;
+            if (item.data.pageIndex !== incomingPageIndex) continue;
+
+            const taskScale = item.data.scale;
+            if (
+              taskScale === undefined ||
+              Math.abs(taskScale - incomingScale) > 0.001
+            ) {
+              continue;
+            }
+
+            const t = item.data.tile;
+            const cx = t ? t[0] + t[2] / 2 : vcx;
+            const cy = t ? t[1] + t[3] / 2 : vcy;
+            const newPriority = Math.hypot(cx - vcx, cy - vcy);
+            item.priority = newPriority;
+            item.data.priority = newPriority;
+          }
+
+          taskQueue.sort((a, b) => a.priority - b.priority);
+        }
+
+        result = { payload: true };
+        break;
+      }
+      default:
+        throw new Error("Unknown message type");
+    }
+
+    postSuccess(id, result?.payload, result?.transfer);
+  } catch (err: any) {
+    if (id) {
+      postError(id, err?.message || "Unknown error");
+    }
+  } finally {
+    if (isQueuedRender) {
+      isProcessing = false;
+    }
+    flushPendingSuccessResponses();
+    scheduleNext();
   }
-  await renderToCanvas(data);
 };
 
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
-  const { type, id } = e.data;
+  const data = e.data;
+  const { type, id } = data;
 
-  if (type === "cancel") {
-    // 1. Check if it's in the queue and remove it
-    const queueIndex = taskQueue.findIndex((item) => item.id === id);
-    if (queueIndex > -1) {
-      taskQueue.splice(queueIndex, 1);
-      // console.log(`Task ${id} removed from queue (cancelled)`);
-    }
-
-    // 2. Check if it's currently running and cancel it
-    const task = activeRenderTasks.get(id);
-    if (task) {
-      task.cancel();
-      activeRenderTasks.delete(id);
-    }
-    return;
-  }
-
-  if (type === "getTextContent") {
-    try {
-      await getTextContentForPage(e.data);
-    } catch (error: any) {
-      postError(id, error.message || "Text error");
-    }
-    return;
-  }
-
-  if (type === "load") {
-    try {
-      const resolvedDocId = getDocId(e.data.docId);
-      cancelQueuedTasksForDoc(resolvedDocId);
-      cancelActiveTasksForDoc(resolvedDocId);
-      await loadDocument(resolvedDocId, e.data.data);
-      postSuccess(id, true);
-    } catch (error: any) {
-      postError(id, error.message || "Load error");
-    }
-    return;
-  }
-
-  if (type === "unload") {
-    try {
-      const resolvedDocId = getDocId(e.data.docId);
-      cancelQueuedTasksForDoc(resolvedDocId);
-      cancelActiveTasksForDoc(resolvedDocId);
-      await disposeDocument(resolvedDocId);
-      postSuccess(id, true);
-    } catch (error: any) {
-      postError(id, error.message || "Unload error");
-    }
-    return;
-  }
-
-  if (type === "releaseCanvas") {
-    const idsToRelease = new Set<string>(e.data.canvasIds);
-
-    if (idsToRelease.size > 0) {
-      for (let i = taskQueue.length - 1; i >= 0; i--) {
-        const queued = taskQueue[i].data;
-        if (queued.type !== "render") continue;
-        const cid = queued.canvasId;
-        if (!idsToRelease.has(cid)) continue;
-        const removed = taskQueue.splice(i, 1)[0];
-        if (removed) {
-          postSuccess(removed.id, false);
-        }
+  switch (type) {
+    case "cancel": {
+      // 1. Check if it's in the queue and remove it
+      const queueIndex = taskQueue.findIndex((item) => item.id === id);
+      if (queueIndex > -1) {
+        taskQueue.splice(queueIndex, 1);
+        // console.log(`Task ${id} removed from queue (cancelled)`);
       }
-      for (const cid of idsToRelease) {
-        canvasMap.delete(cid);
+
+      // 2. Check if it's currently running and cancel it
+      const task = activeRenderTasks.get(id);
+      if (task) {
+        task.cancel();
+        activeRenderTasks.delete(id);
       }
+      return;
     }
 
-    postSuccess(id, true);
-    return;
-  }
-
-  if (type === "cancelQueuedRenders") {
+    case "cancelQueuedRenders":
     // Optimization: When scale changes, discard all pending tasks with different scale
     // This ensures we don't waste time on tiles that are no longer needed
-    const incomingScale = e.data.scale;
-    const incomingDocId = getDocId(e.data.docId);
-    const incomingPageIndex = e.data.pageIndex;
+    case "getTextContent":
+    case "load":
+    case "unload":
+    case "releaseCanvas":
+    case "reprioritize":
+      void handleQueuedTask(data);
+      return;
 
-    if (
-      incomingScale !== undefined &&
-      incomingPageIndex !== undefined &&
-      taskQueue.length > 0
-    ) {
-      for (let i = taskQueue.length - 1; i >= 0; i--) {
-        const queued = taskQueue[i];
-        const queuedType = queued.data.type || "render";
-        if (queuedType !== "render") continue;
-
-        const taskDocId = getDocId(queued.data.docId);
-        if (taskDocId !== incomingDocId) continue;
-        if (queued.data.pageIndex !== incomingPageIndex) continue;
-
-        const taskScale = queued.data.scale;
-        if (
-          taskScale !== undefined &&
-          Math.abs(taskScale - incomingScale) > 0.001
-        ) {
-          const removed = taskQueue.splice(i, 1)[0];
-          if (removed) {
-            postSuccess(removed.id, false);
-          }
-        }
-      }
-    }
-
-    postSuccess(id, true);
-    return;
-  }
-
-  if (type === "reprioritize") {
-    const incomingDocId = getDocId(e.data.docId);
-    const incomingPageIndex = e.data.pageIndex;
-    const incomingScale = e.data.scale;
-    const vc = e.data.viewportCenter;
-
-    if (
-      vc &&
-      incomingPageIndex !== undefined &&
-      incomingScale !== undefined &&
-      taskQueue.length > 0
-    ) {
-      const vcx = vc[0];
-      const vcy = vc[1];
-
-      for (const item of taskQueue) {
-        if (item.data.type !== "render") continue;
-        if (getDocId(item.data.docId) !== incomingDocId) continue;
-        if (item.data.pageIndex !== incomingPageIndex) continue;
-
-        const taskScale = item.data.scale;
-        if (
-          taskScale === undefined ||
-          Math.abs(taskScale - incomingScale) > 0.001
-        ) {
-          continue;
-        }
-
-        const t = item.data.tile;
-        const cx = t ? t[0] + t[2] / 2 : vcx;
-        const cy = t ? t[1] + t[3] / 2 : vcy;
-        const newPriority = Math.hypot(cx - vcx, cy - vcy);
-        item.priority = newPriority;
-        item.data.priority = newPriority;
+    case "render":
+    case "renderImage": {
+      // Early registration of canvas to prevent loss during cancellation or optimization
+      if (type === "render" && data.canvas) {
+        canvasMap.set(data.canvasId, data.canvas);
       }
 
+      const priority = data.priority ?? 0;
+
+      const queuedData = data;
+      const incomingKey = buildQueueTaskKey(queuedData);
+      const existingIndex = taskQueue.findIndex((item) => {
+        const t = item.data.type;
+        if (t !== "render" && t !== "renderImage") return false;
+        return buildQueueTaskKey(item.data as any) === incomingKey;
+      });
+      if (existingIndex > -1) {
+        const removed = taskQueue.splice(existingIndex, 1)[0];
+        if (removed) {
+          queueSuccessResponse(removed.id, false);
+          void handleQueuedTask(null);
+        }
+      }
+
+      // Add to queue
+      taskQueue.push({
+        id,
+        priority,
+        data: queuedData,
+      });
+
+      // Sort queue: Lower priority value = Higher priority (closer to center)
       taskQueue.sort((a, b) => a.priority - b.priority);
+
+      // Trigger processing
       scheduleNext();
+      return;
     }
 
-    postSuccess(id, true);
-    return;
-  }
-
-  if (type === "render" || type === "renderImage") {
-    // Early registration of canvas to prevent loss during cancellation or optimization
-    if (type === "render" && e.data.canvas) {
-      canvasMap.set(e.data.canvasId, e.data.canvas);
-    }
-
-    const priority = e.data.priority ?? 0;
-
-    const queuedData = e.data;
-    const incomingKey = buildQueueTaskKey(queuedData);
-    const existingIndex = taskQueue.findIndex(
-      (item) => buildQueueTaskKey(item.data) === incomingKey,
-    );
-    if (existingIndex > -1) {
-      const removed = taskQueue.splice(existingIndex, 1)[0];
-      if (removed) {
-        postSuccess(removed.id, false);
-      }
-    }
-
-    // Add to queue
-    taskQueue.push({
-      id,
-      priority,
-      data: queuedData,
-    });
-
-    // Sort queue: Lower priority value = Higher priority (closer to center)
-    taskQueue.sort((a, b) => a.priority - b.priority);
-
-    // Trigger processing
-    scheduleNext();
+    default:
+      return;
   }
 };

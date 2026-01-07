@@ -2,6 +2,7 @@ const es = {
   common: {
     select: "Seleccionar...",
     cancel: "Cancelar",
+    continue: "Continuar",
     save: "Guardar",
     delete: "Eliminar",
     close: "Cerrar",
@@ -97,6 +98,13 @@ const es = {
       confirm: "Cerrar sin guardar",
       cancel: "Cancelar",
     },
+    pdf_password: {
+      title: "Se requiere contraseña",
+      title_incorrect: "Contraseña incorrecta",
+      desc: "Este PDF está protegido con contraseña.",
+      desc_incorrect: "Inténtelo de nuevo.",
+      password_label: "Contraseña",
+    },
     file_drop: {
       title: "¿Abrir archivo soltado?",
       desc: "Ya hay un documento abierto. Elija qué hacer con el PDF soltado.",
@@ -106,6 +114,26 @@ const es = {
     },
   },
   properties: {
+    ai_detection: {
+      title: "Detección de campos IA",
+      desc: "Analizar páginas para detectar y crear automáticamente campos de formulario usando Gemini.",
+      api_key_missing:
+        "Falta la clave de API de Gemini. Configure GEMINI_API_KEY en .env.local y reinicie la aplicación.",
+      page_range: "Rango de páginas",
+      page_range_hint: "ej., 1-5, 8, 10-12 (Predeterminado: Todo)",
+      valid_all: "Todas las páginas seleccionadas ({total} páginas)",
+      err_format: "Formato inválido. Use números y rangos (ej. 1-3, 5).",
+      err_bounds: "Número de página fuera de límites (1-{total}).",
+      valid_selected: "Seleccionadas {count} páginas: {pages}",
+      types: "Tipos de campos a detectar",
+      style_override: "Anular estilo predeterminado",
+      prompt: "Instrucciones adicionales (Opcional)",
+      prompt_ph:
+        "ej., 'Solo encontrar campos en la sección superior' o 'Ignorar campos de fecha'",
+      prompt_hint:
+        "Proporcionar contexto o reglas específicas para el modelo IA.",
+      start: "Iniciar análisis",
+    },
     document: {
       title: "Información del documento",
       hint: "Editar información global del PDF. Seleccione un campo en el lienzo para editar sus propiedades.",
@@ -113,6 +141,12 @@ const es = {
     filename: {
       label: "Nombre de archivo",
       desc: "El nombre utilizado al exportar el archivo.",
+    },
+    export_password: {
+      label: "Contraseña de exportación",
+      desc: "Usar una contraseña al exportar",
+      placeholder: "Contraseña",
+      placeholder_use_open: "Deja en blanco para exportar sin contraseña",
     },
     doc_title: "Título del documento",
     author: "Autor",
@@ -224,10 +258,6 @@ const es = {
       properties: "Edición de propiedades",
     },
   },
-  ai_panel: {
-    api_key_missing:
-      "Falta la clave de API de Gemini. Configure GEMINI_API_KEY en .env.local y reinicie la aplicación.",
-  },
   workspace: {
     no_pdf: "No hay PDF cargado. Use el botón de carga para comenzar.",
   },
@@ -322,24 +352,6 @@ const es = {
     centers: "Ajustar a centros",
     equal: "Ajuste equidistante",
     done: "Hecho",
-  },
-  ai_dialog: {
-    title: "Detección de campos IA",
-    desc: "Analizar páginas para detectar y crear automáticamente campos de formulario usando Gemini.",
-    page_range: "Rango de páginas",
-    page_range_hint: "ej., 1-5, 8, 10-12 (Predeterminado: Todo)",
-    valid_all: "Todas las páginas seleccionadas ({total} páginas)",
-    err_format: "Formato inválido. Use números y rangos (ej. 1-3, 5).",
-    err_bounds: "Número de página fuera de límites (1-{total}).",
-    valid_selected: "Seleccionadas {count} páginas: {pages}",
-    types: "Tipos de campos a detectar",
-    style_override: "Anular estilo predeterminado",
-    prompt: "Instrucciones adicionales (Opcional)",
-    prompt_ph:
-      "ej., 'Solo encontrar campos en la sección superior' o 'Ignorar campos de fecha'",
-    prompt_hint:
-      "Proporcionar contexto o reglas específicas para el modelo IA.",
-    start: "Iniciar análisis",
   },
   landing: {
     title: "Editor de formularios PDF impulsado por IA",

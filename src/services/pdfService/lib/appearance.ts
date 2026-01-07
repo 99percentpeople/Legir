@@ -1,4 +1,4 @@
-import { PDFDocument, PDFDict, PDFName, PDFNumber } from "pdf-lib";
+import { PDFDocument, PDFDict, PDFName, PDFNumber } from "@cantoo/pdf-lib";
 import { rgbArrayToHex } from "./colors";
 import { pdfDebug } from "./debug";
 import { normalizePdfFontName } from "./pdf-font-names";

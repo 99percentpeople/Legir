@@ -141,6 +141,7 @@ export interface HistorySnapshot {
   fields: FormField[];
   annotations: Annotation[];
   metadata: PDFMetadata;
+  exportPassword: string | null;
 }
 
 export type EditorSaveTarget =
@@ -175,10 +176,13 @@ export type DialogName = "shortcuts" | "settings" | "close_confirm" | null;
 export type TranslateOptionId = `${string}:${string}`;
 
 export interface EditorState {
+  // Document State
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
   pdfDocument: PDFDocumentProxy | null; // PDF.js Document Proxy
   pageCache: Map<number, Promise<PDFPageProxy>>;
+  pdfOpenPassword: string | null;
+  exportPassword: string | null;
   metadata: PDFMetadata;
   filename: string;
   saveTarget: EditorSaveTarget | null;

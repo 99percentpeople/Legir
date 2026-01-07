@@ -1,5 +1,5 @@
 import { isSerifFamily } from "./text";
-import type { PDFFont } from "pdf-lib";
+import type { PDFFont } from "@cantoo/pdf-lib";
 
 export const pickCjkFontFromMap = (
   fontMap: Map<string, PDFFont> | undefined,

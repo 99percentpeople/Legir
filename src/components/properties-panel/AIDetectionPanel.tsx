@@ -41,7 +41,7 @@ export function AIDetectionPanel({
     <PanelLayout
       title={
         <>
-          <Sparkles size={16} /> {t("ai_dialog.title")}
+          <Sparkles size={16} /> {t("properties.ai_detection.title")}
         </>
       }
       isFloating={isFloating}
@@ -55,7 +55,7 @@ export function AIDetectionPanel({
         <div className="space-y-2">
           {!GEMINI_API_AVAILABLE && (
             <div className="text-muted-foreground text-xs">
-              {t("ai_panel.api_key_missing")}
+              {t("properties.ai_detection.api_key_missing")}
             </div>
           )}
 
@@ -67,7 +67,7 @@ export function AIDetectionPanel({
               type="submit"
             >
               <Sparkles size={16} className="mr-2" />
-              {t("ai_dialog.start")}
+              {t("properties.ai_detection.start")}
             </Button>
           </DialogFooter>
         </div>

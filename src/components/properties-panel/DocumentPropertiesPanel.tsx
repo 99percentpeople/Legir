@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { DateField, DateInput } from "@/components/ui/datafield-rac";
 import { parseDateTime } from "@internationalized/date";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +24,9 @@ export interface DocumentPropertiesPanelProps {
   onMetadataChange: (updates: Partial<PDFMetadata>) => void;
   filename: string;
   onFilenameChange: (name: string) => void;
+  exportPassword: string | null;
+  pdfOpenPassword: string | null;
+  onExportPasswordChange: (password: string | null) => void;
   onClose?: () => void;
   onCollapse?: () => void;
   isOpen: boolean;
@@ -39,6 +43,9 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
     onMetadataChange,
     filename,
     onFilenameChange,
+    exportPassword,
+    pdfOpenPassword,
+    onExportPasswordChange,
     onClose,
     onCollapse,
     isOpen,
@@ -50,6 +57,8 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
   }) => {
     const { t } = useLanguage();
     const [creationEditable, setCreationEditable] = useState(false);
+
+    const exportPasswordEnabled = exportPassword !== null;
 
     const toCalendarDateTime = (dateStr?: string) => {
       if (!dateStr) return null;
@@ -85,7 +94,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
           </div>
 
           <div className="space-y-2">
-            <Label>{t("properties.filename")}</Label>
+            <Label>{t("properties.filename.label")}</Label>
             <Input
               type="text"
               value={filename}
@@ -99,6 +108,54 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
           </div>
 
           <Separator />
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Lock size={14} /> {t("properties.export_password.label")}
+            </Label>
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-muted-foreground text-xs">
+                {t("properties.export_password.desc")}
+              </div>
+              <Switch
+                checked={exportPasswordEnabled}
+                onMouseDown={onTriggerHistorySave}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    onTriggerHistorySave();
+                  }
+                }}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    onExportPasswordChange(
+                      typeof pdfOpenPassword === "string"
+                        ? pdfOpenPassword
+                        : "",
+                    );
+                    return;
+                  }
+                  onExportPasswordChange(null);
+                }}
+              />
+            </div>
+
+            {exportPasswordEnabled && (
+              <Input
+                type="password"
+                value={exportPassword || ""}
+                onFocus={onTriggerHistorySave}
+                onChange={(e) => {
+                  onExportPasswordChange(e.target.value);
+                }}
+                placeholder={
+                  typeof pdfOpenPassword === "string" && pdfOpenPassword
+                    ? t("properties.export_password.placeholder_use_open")
+                    : t("properties.export_password.placeholder")
+                }
+              />
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label>{t("properties.doc_title")}</Label>

@@ -5,7 +5,7 @@ import {
   PDFString,
   TextAlignment,
   type PDFFont,
-} from "pdf-lib";
+} from "@cantoo/pdf-lib";
 import { FormField, FieldType } from "@/types";
 import { IControlExporter } from "../types";
 import { containsNonAscii, isExplicitCjkFontSelection } from "../lib/text";

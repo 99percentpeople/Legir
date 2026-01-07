@@ -81,7 +81,7 @@ export function AIDetectionOptionsForm({
     if (!input || input.toLowerCase() === "all") {
       setValidation({
         isValid: true,
-        message: t("ai_dialog.valid_all", { total: totalPages }),
+        message: t("properties.ai_detection.valid_all", { total: totalPages }),
         isError: false,
       });
       return;
@@ -101,7 +101,7 @@ export function AIDetectionOptionsForm({
         const rangeParts = p.split("-");
         if (rangeParts.length !== 2) {
           hasError = true;
-          errorMsg = t("ai_dialog.err_format");
+          errorMsg = t("properties.ai_detection.err_format");
           break;
         }
         const start = parseInt(rangeParts[0]);
@@ -109,17 +109,19 @@ export function AIDetectionOptionsForm({
 
         if (isNaN(start) || isNaN(end)) {
           hasError = true;
-          errorMsg = t("ai_dialog.err_format");
+          errorMsg = t("properties.ai_detection.err_format");
           break;
         }
         if (start < 1 || end > totalPages) {
           hasError = true;
-          errorMsg = t("ai_dialog.err_bounds", { total: totalPages });
+          errorMsg = t("properties.ai_detection.err_bounds", {
+            total: totalPages,
+          });
           break;
         }
         if (start > end) {
           hasError = true;
-          errorMsg = t("ai_dialog.err_format"); // Invalid range
+          errorMsg = t("properties.ai_detection.err_format"); // Invalid range
           break;
         }
         for (let i = start; i <= end; i++) pages.add(i);
@@ -128,12 +130,14 @@ export function AIDetectionOptionsForm({
         const num = parseInt(p);
         if (isNaN(num)) {
           hasError = true;
-          errorMsg = t("ai_dialog.err_format");
+          errorMsg = t("properties.ai_detection.err_format");
           break;
         }
         if (num < 1 || num > totalPages) {
           hasError = true;
-          errorMsg = t("ai_dialog.err_bounds", { total: totalPages });
+          errorMsg = t("properties.ai_detection.err_bounds", {
+            total: totalPages,
+          });
           break;
         }
         pages.add(num);
@@ -148,7 +152,7 @@ export function AIDetectionOptionsForm({
         // Handle case where input might be just "," or empty parts
         setValidation({
           isValid: false,
-          message: t("ai_dialog.err_format"),
+          message: t("properties.ai_detection.err_format"),
           isError: true,
         });
       } else {
@@ -158,7 +162,7 @@ export function AIDetectionOptionsForm({
             : sorted.join(", ");
         setValidation({
           isValid: true,
-          message: t("ai_dialog.valid_selected", {
+          message: t("properties.ai_detection.valid_selected", {
             count: sorted.length,
             pages: display,
           }),
@@ -191,7 +195,7 @@ export function AIDetectionOptionsForm({
         {/* Page Range */}
         <div className="space-y-2">
           <div className="flex items-baseline justify-between">
-            <Label>{t("ai_dialog.page_range")}</Label>
+            <Label>{t("properties.ai_detection.page_range")}</Label>
             <span className="text-muted-foreground text-xs">
               Total: {totalPages}
             </span>
@@ -221,7 +225,8 @@ export function AIDetectionOptionsForm({
               />
             )}
             <span className="leading-tight">
-              {validation.message || t("ai_dialog.page_range_hint")}
+              {validation.message ||
+                t("properties.ai_detection.page_range_hint")}
             </span>
           </div>
         </div>
@@ -230,7 +235,7 @@ export function AIDetectionOptionsForm({
 
         {/* Field Types */}
         <div className="space-y-3">
-          <Label>{t("ai_dialog.types")}</Label>
+          <Label>{t("properties.ai_detection.types")}</Label>
           <ToggleGroup
             type="multiple"
             value={allowedTypes}
@@ -285,7 +290,7 @@ export function AIDetectionOptionsForm({
         {/* Style Adjustments */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label>{t("ai_dialog.style_override")}</Label>
+            <Label>{t("properties.ai_detection.style_override")}</Label>
             <Switch
               checked={useCustomStyle}
               onCheckedChange={setUseCustomStyle}
@@ -351,16 +356,16 @@ export function AIDetectionOptionsForm({
 
         {/* Extra Prompt */}
         <div className="space-y-2">
-          <Label>{t("ai_dialog.prompt")}</Label>
+          <Label>{t("properties.ai_detection.prompt")}</Label>
           <Textarea
             value={extraPrompt}
             onChange={(e) => setExtraPrompt(e.target.value)}
-            placeholder={t("ai_dialog.prompt_ph")}
+            placeholder={t("properties.ai_detection.prompt_ph")}
             className="resize-none"
             rows={3}
           />
           <p className="text-muted-foreground text-xs">
-            {t("ai_dialog.prompt_hint")}
+            {t("properties.ai_detection.prompt_hint")}
           </p>
         </div>
       </div>
@@ -391,9 +396,11 @@ const AIDetectionDialog: React.FC<AIDetectionDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-500" />
-            {t("ai_dialog.title")}
+            {t("properties.ai_detection.title")}
           </DialogTitle>
-          <DialogDescription>{t("ai_dialog.desc")}</DialogDescription>
+          <DialogDescription>
+            {t("properties.ai_detection.desc")}
+          </DialogDescription>
         </DialogHeader>
 
         <AIDetectionOptionsForm
@@ -413,7 +420,7 @@ const AIDetectionDialog: React.FC<AIDetectionDialogProps> = ({
                 className="bg-purple-600 text-white hover:bg-purple-700"
               >
                 <Sparkles size={16} className="mr-2" />
-                {t("ai_dialog.start")}
+                {t("properties.ai_detection.start")}
               </Button>
             </DialogFooter>
           )}

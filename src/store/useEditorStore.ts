@@ -159,6 +159,8 @@ const initialState: EditorState = {
   pdfBytes: null,
   pdfDocument: null,
   pageCache: new Map(),
+  pdfOpenPassword: null,
+  exportPassword: null,
   metadata: {},
   filename: "document.pdf",
   saveTarget: null,
@@ -278,7 +280,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
       },
 
       warmupThumbnails: () => {
-        const { pdfBytes } = get();
+        const { pdfBytes, pdfOpenPassword } = get();
         if (!pdfBytes || pdfBytes.byteLength === 0) return;
 
         thumbnailWarmupEpoch += 1;
@@ -288,11 +290,18 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         const { signal } = thumbnailWarmupAbort;
 
         void (async () => {
-          try {
-            await pdfWorkerService.loadDocument(pdfBytes, { signal });
-          } catch {
-            return;
-          }
+          let workerLoaded = false;
+          const ensureWorkerLoaded = async () => {
+            if (workerLoaded) return;
+            await pdfWorkerService.loadDocument(pdfBytes, {
+              signal,
+              password:
+                typeof pdfOpenPassword === "string"
+                  ? pdfOpenPassword
+                  : undefined,
+            });
+            workerLoaded = true;
+          };
 
           for (let pageIndex = 0; ; pageIndex++) {
             if (signal.aborted) return;
@@ -304,15 +313,36 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             if (!page || page.imageData) continue;
 
             try {
-              const { bytes, mimeType } =
-                await pdfWorkerService.renderPageImage({
+              let bytes: Uint8Array;
+              let mimeType: string;
+              try {
+                ({ bytes, mimeType } = await pdfWorkerService.renderPageImage({
                   pageIndex,
                   targetWidth: THUMBNAIL_TARGET_WIDTH,
                   mimeType: THUMBNAIL_MIME_TYPE,
                   quality: THUMBNAIL_JPEG_QUALITY,
                   priority: THUMBNAIL_WARMUP_PRIORITY,
                   signal,
-                });
+                }));
+              } catch (e: any) {
+                const msg =
+                  typeof e?.message === "string" ? e.message : String(e);
+                if (msg.includes("PDF Document not loaded")) {
+                  await ensureWorkerLoaded();
+                  ({ bytes, mimeType } = await pdfWorkerService.renderPageImage(
+                    {
+                      pageIndex,
+                      targetWidth: THUMBNAIL_TARGET_WIDTH,
+                      mimeType: THUMBNAIL_MIME_TYPE,
+                      quality: THUMBNAIL_JPEG_QUALITY,
+                      priority: THUMBNAIL_WARMUP_PRIORITY,
+                      signal,
+                    },
+                  ));
+                } else {
+                  throw e;
+                }
+              }
 
               if (signal.aborted) return;
               if (!bytes || bytes.byteLength === 0) continue;
@@ -417,6 +447,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             fields: state.fields,
             annotations: state.annotations,
             metadata: state.metadata,
+            exportPassword: state.exportPassword,
           };
           const newPast = [...state.past, snapshot].slice(-50);
           return { ...state, past: newPast, future: [] };
@@ -432,12 +463,14 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             fields: state.fields,
             annotations: state.annotations,
             metadata: state.metadata,
+            exportPassword: state.exportPassword,
           };
           return {
             ...state,
             fields: previous.fields,
             annotations: previous.annotations,
             metadata: previous.metadata,
+            exportPassword: previous.exportPassword,
             past: newPast,
             future: [currentSnapshot, ...state.future],
             selectedId: null,
@@ -455,12 +488,14 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             fields: state.fields,
             annotations: state.annotations,
             metadata: state.metadata,
+            exportPassword: state.exportPassword,
           };
           return {
             ...state,
             fields: next.fields,
             annotations: next.annotations,
             metadata: next.metadata,
+            exportPassword: next.exportPassword,
             past: [...state.past, currentSnapshot],
             future: newFuture,
             selectedId: null,
@@ -694,6 +729,8 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           pdfBytes: initialState.pdfBytes,
           pdfDocument: initialState.pdfDocument,
           pageCache: new Map(),
+          pdfOpenPassword: initialState.pdfOpenPassword,
+          exportPassword: initialState.exportPassword,
           metadata: initialState.metadata,
           filename: initialState.filename,
           saveTarget: initialState.saveTarget,

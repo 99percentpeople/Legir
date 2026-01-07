@@ -10,6 +10,8 @@ import {
   DialogDescription,
 } from "./components/ui/dialog";
 import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
+import { Label } from "./components/ui/label";
 import { EditorState, FormField } from "./types";
 import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
 import { analyzePageForFields } from "./services/LLMService";
@@ -89,6 +91,44 @@ const App: React.FC = () => {
     null,
   );
 
+  const [pdfLoadProgress, setPdfLoadProgress] = useState<{
+    id: string;
+    label?: string;
+    loaded: number;
+    total?: number;
+  } | null>(null);
+
+  const [pdfPasswordPrompt, setPdfPasswordPrompt] = useState<{
+    id: string;
+    reason: "need_password" | "incorrect_password";
+    submit: (password: string) => void;
+    cancel: () => void;
+  } | null>(null);
+  const [pdfPasswordValue, setPdfPasswordValue] = useState("");
+
+  useAppEvent("pdf:loadStart", ({ id, label }) => {
+    setPdfLoadProgress({ id, label, loaded: 0, total: undefined });
+  });
+
+  useAppEvent("pdf:loadProgress", ({ id, loaded, total }) => {
+    setPdfLoadProgress((prev) => {
+      if (!prev || prev.id !== id) return prev;
+      return { ...prev, loaded, total };
+    });
+  });
+
+  useAppEvent("pdf:loadEnd", ({ id }) => {
+    setPdfLoadProgress((prev) => {
+      if (!prev || prev.id !== id) return prev;
+      return null;
+    });
+  });
+
+  useAppEvent("pdf:passwordRequired", (payload) => {
+    setPdfPasswordValue("");
+    setPdfPasswordPrompt(payload);
+  });
+
   const loadIntoEditor = useCallback(
     async (options: {
       input: File | Uint8Array;
@@ -167,6 +207,7 @@ const App: React.FC = () => {
             annotations,
             metadata,
             outline,
+            openPassword,
             dispose,
           } = await loadPDF(options.input);
           pdfDisposeRef.current = dispose;
@@ -183,6 +224,11 @@ const App: React.FC = () => {
             annotations,
             outline,
             scale: 1.0,
+          });
+
+          setState({
+            pdfOpenPassword: openPassword ?? null,
+            exportPassword: openPassword ?? null,
           });
 
           // Web: overwrite any previous draft immediately so the latest opened file
@@ -465,6 +511,11 @@ const App: React.FC = () => {
       state.fields,
       state.metadata,
       state.annotations,
+      undefined,
+      {
+        openPassword: state.pdfOpenPassword,
+        exportPassword: state.exportPassword,
+      },
     );
   };
 
@@ -718,6 +769,44 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-full w-full flex-col">
+      {pdfLoadProgress && !state.isProcessing && (
+        <div className="bg-muted/70 sticky top-0 z-50 w-full border-b px-4 py-2 backdrop-blur">
+          <div className="text-muted-foreground mb-1 text-xs">
+            {(() => {
+              const total = pdfLoadProgress.total;
+              const loaded = pdfLoadProgress.loaded;
+              if (typeof total === "number" && total > 0) {
+                const pct = Math.max(
+                  0,
+                  Math.min(100, Math.round((loaded / total) * 100)),
+                );
+                return `${t("common.loading")} ${pct}%`;
+              }
+              return `${t("common.loading")} ${Math.max(0, loaded)} bytes`;
+            })()}
+          </div>
+          <div className="bg-muted h-2 w-full rounded">
+            <div
+              className="bg-primary h-2 rounded"
+              style={{
+                width:
+                  typeof pdfLoadProgress.total === "number" &&
+                  pdfLoadProgress.total > 0
+                    ? `${Math.max(
+                        0,
+                        Math.min(
+                          100,
+                          (pdfLoadProgress.loaded / pdfLoadProgress.total) *
+                            100,
+                        ),
+                      )}%`
+                    : "25%",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <AppRoutes
         canAccessEditor={state.pages.length > 0}
         isLoading={state.isProcessing}
@@ -826,6 +915,108 @@ const App: React.FC = () => {
           <p className="text-foreground text-lg font-medium">
             {state.processingStatus || t("common.processing")}
           </p>
+
+          {pdfLoadProgress && (
+            <div className="mt-4 w-full">
+              <div className="text-muted-foreground mb-2 text-xs">
+                {(() => {
+                  const total = pdfLoadProgress.total;
+                  const loaded = pdfLoadProgress.loaded;
+                  if (typeof total === "number" && total > 0) {
+                    const pct = Math.max(
+                      0,
+                      Math.min(100, Math.round((loaded / total) * 100)),
+                    );
+                    return `${pct}%`;
+                  }
+                  return `${Math.max(0, loaded)} bytes`;
+                })()}
+              </div>
+              <div className="bg-muted h-2 w-full rounded">
+                <div
+                  className="bg-primary h-2 rounded"
+                  style={{
+                    width:
+                      typeof pdfLoadProgress.total === "number" &&
+                      pdfLoadProgress.total > 0
+                        ? `${Math.max(
+                            0,
+                            Math.min(
+                              100,
+                              (pdfLoadProgress.loaded / pdfLoadProgress.total) *
+                                100,
+                            ),
+                          )}%`
+                        : "25%",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!pdfPasswordPrompt}
+        onOpenChange={(open) => {
+          if (open) return;
+          const cur = pdfPasswordPrompt;
+          setPdfPasswordPrompt(null);
+          if (cur) cur.cancel();
+        }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogTitle>
+            {pdfPasswordPrompt?.reason === "incorrect_password"
+              ? t("dialog.pdf_password.title_incorrect")
+              : t("dialog.pdf_password.title")}
+          </DialogTitle>
+          <DialogDescription>
+            {pdfPasswordPrompt?.reason === "incorrect_password"
+              ? t("dialog.pdf_password.desc_incorrect")
+              : t("dialog.pdf_password.desc")}
+          </DialogDescription>
+
+          <div className="space-y-2">
+            <Label htmlFor="pdf-password">
+              {t("dialog.pdf_password.password_label")}
+            </Label>
+            <Input
+              id="pdf-password"
+              type="password"
+              value={pdfPasswordValue}
+              onChange={(e) => setPdfPasswordValue(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                const cur = pdfPasswordPrompt;
+                setPdfPasswordPrompt(null);
+                if (cur) cur.submit(pdfPasswordValue);
+              }}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const cur = pdfPasswordPrompt;
+                setPdfPasswordPrompt(null);
+                if (cur) cur.cancel();
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={() => {
+                const cur = pdfPasswordPrompt;
+                setPdfPasswordPrompt(null);
+                if (cur) cur.submit(pdfPasswordValue);
+              }}
+            >
+              {t("common.continue")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

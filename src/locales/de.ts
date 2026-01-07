@@ -2,6 +2,7 @@ const de = {
   common: {
     select: "Auswählen...",
     cancel: "Abbrechen",
+    continue: "Fortfahren",
     save: "Speichern",
     delete: "Löschen",
     close: "Schließen",
@@ -97,6 +98,13 @@ const de = {
       confirm: "Schließen ohne Speichern",
       cancel: "Abbrechen",
     },
+    pdf_password: {
+      title: "Passwort erforderlich",
+      title_incorrect: "Falsches Passwort",
+      desc: "Diese PDF ist passwortgeschützt.",
+      desc_incorrect: "Bitte versuchen Sie es erneut.",
+      password_label: "Passwort",
+    },
     file_drop: {
       title: "Abgelegte Datei öffnen?",
       desc: "Ein Dokument ist bereits geöffnet. Wählen Sie aus, was mit der abgelegten PDF geschehen soll.",
@@ -106,13 +114,40 @@ const de = {
     },
   },
   properties: {
+    ai_detection: {
+      title: "KI-Felderkennung",
+      desc: "Seiten analysieren, um Formularfelder mit Gemini automatisch zu erkennen und zu erstellen.",
+      api_key_missing:
+        "Fehlender Gemini API-Schlüssel. Setzen Sie GEMINI_API_KEY in .env.local und starten Sie die App neu.",
+      page_range: "Seitenbereich",
+      page_range_hint: "z.B. 1-5, 8, 10-12 (Standard: Alle)",
+      valid_all: "Alle Seiten ausgewählt ({total} Seiten)",
+      err_format:
+        "Ungültiges Format. Verwenden Sie Zahlen und Bereiche (z.B. 1-3, 5).",
+      err_bounds: "Seitennummer außerhalb des Bereichs (1-{total}).",
+      valid_selected: "{count} Seiten ausgewählt: {pages}",
+      types: "Zu erkennende Feldtypen",
+      style_override: "Standardstil überschreiben",
+      prompt: "Zusätzliche Anweisungen (Optional)",
+      prompt_ph:
+        "z.B. 'Nur Felder im oberen Bereich finden' oder 'Datumsfelder ignorieren'",
+      prompt_hint:
+        "Kontext oder spezifische Regeln für das KI-Modell bereitstellen.",
+      start: "Analyse starten",
+    },
     document: {
-      title: "Dokumentinfo",
-      hint: "Globale PDF-Informationen bearbeiten. Wählen Sie ein Feld auf der Leinwand aus, um dessen Eigenschaften zu bearbeiten.",
+      title: "Dokumentinfos",
+      hint: "Bearbeite globale PDF-Informationen. Wähle ein Feld auf der Leinwand aus, um dessen Eigenschaften zu bearbeiten.",
     },
     filename: {
       label: "Dateiname",
-      desc: "Der Name, der beim Exportieren der Datei verwendet wird.",
+      desc: "Name, der beim Export verwendet wird.",
+    },
+    export_password: {
+      label: "Export-Passwort",
+      desc: "Beim Export ein Passwort verwenden",
+      placeholder: "Passwort",
+      placeholder_use_open: "Leer lassen, um ohne Passwort zu exportieren",
     },
     doc_title: "Dokumenttitel",
     author: "Autor",
@@ -224,10 +259,6 @@ const de = {
       properties: "Eigenschaften bearbeiten",
     },
   },
-  ai_panel: {
-    api_key_missing:
-      "Fehlender Gemini API-Schlüssel. Setzen Sie GEMINI_API_KEY in .env.local und starten Sie die App neu.",
-  },
   workspace: {
     no_pdf:
       "Kein PDF geladen. Verwenden Sie die Upload-Schaltfläche, um zu beginnen.",
@@ -322,25 +353,6 @@ const de = {
     centers: "An Mitten einrasten",
     equal: "Äquidistantes Einrasten",
     done: "Fertig",
-  },
-  ai_dialog: {
-    title: "KI-Felderkennung",
-    desc: "Seiten analysieren, um Formularfelder mit Gemini automatisch zu erkennen und zu erstellen.",
-    page_range: "Seitenbereich",
-    page_range_hint: "z.B. 1-5, 8, 10-12 (Standard: Alle)",
-    valid_all: "Alle Seiten ausgewählt ({total} Seiten)",
-    err_format:
-      "Ungültiges Format. Verwenden Sie Zahlen und Bereiche (z.B. 1-3, 5).",
-    err_bounds: "Seitennummer außerhalb des Bereichs (1-{total}).",
-    valid_selected: "{count} Seiten ausgewählt: {pages}",
-    types: "Zu erkennende Feldtypen",
-    style_override: "Standardstil überschreiben",
-    prompt: "Zusätzliche Anweisungen (Optional)",
-    prompt_ph:
-      "z.B. 'Nur Felder im oberen Bereich finden' oder 'Datumsfelder ignorieren'",
-    prompt_hint:
-      "Kontext oder spezifische Regeln für das KI-Modell bereitstellen.",
-    start: "Analyse starten",
   },
   landing: {
     title: "KI-gestützter PDF-Formular-Editor",

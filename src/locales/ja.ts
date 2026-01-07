@@ -2,6 +2,7 @@ const ja = {
   common: {
     select: "選択...",
     cancel: "キャンセル",
+    continue: "続ける",
     save: "保存",
     delete: "削除",
     close: "閉じる",
@@ -97,6 +98,13 @@ const ja = {
       confirm: "保存せずに閉じる",
       cancel: "キャンセル",
     },
+    pdf_password: {
+      title: "パスワードが必要です",
+      title_incorrect: "パスワードが正しくありません",
+      desc: "この PDF はパスワードで保護されています。",
+      desc_incorrect: "もう一度お試しください。",
+      password_label: "パスワード",
+    },
     file_drop: {
       title: "ドロップしたファイルを開きますか？",
       desc: "すでにドキュメントが開かれています。ドロップした PDF をどう処理するか選択してください。",
@@ -106,6 +114,26 @@ const ja = {
     },
   },
   properties: {
+    ai_detection: {
+      title: "AI フィールド検出",
+      desc: "Gemini を使用してページを分析し、フォームフィールドを自動的に検出して作成します。",
+      api_key_missing:
+        "Gemini API キーがありません。.env.local に GEMINI_API_KEY を設定してアプリを再起動してください。",
+      page_range: "ページ範囲",
+      page_range_hint: "例：1-5, 8, 10-12（デフォルト：すべて）",
+      valid_all: "すべてのページを選択しました（計 {total} ページ）",
+      err_format:
+        "無効な形式です。数字と範囲を使用してください（例：1-3, 5）。",
+      err_bounds: "ページ番号が範囲外です（1-{total}）。",
+      valid_selected: "{count} ページを選択しました：{pages}",
+      types: "検出するフィールドタイプ",
+      style_override: "デフォルトスタイルを上書き",
+      prompt: "追加の指示（オプション）",
+      prompt_ph:
+        "例：「上部のセクションのフィールドのみを検索」または「日付フィールドを無視」",
+      prompt_hint: "AI モデルにコンテキストまたは特定のルールを提供します。",
+      start: "分析を開始",
+    },
     document: {
       title: "ドキュメント情報",
       hint: "PDF 全体の情報を編集します。キャンバス上のフィールドを選択して設定を変更します。",
@@ -113,6 +141,12 @@ const ja = {
     filename: {
       label: "ファイル名",
       desc: "ファイルのエクスポート時に使用される名前。",
+    },
+    export_password: {
+      label: "エクスポートパスワード",
+      desc: "エクスポート時にパスワードを使用します",
+      placeholder: "パスワード",
+      placeholder_use_open: "空欄の場合はパスワードなしでエクスポート",
     },
     doc_title: "ドキュメントタイトル",
     author: "作成者",
@@ -224,10 +258,6 @@ const ja = {
       properties: "設定編集",
     },
   },
-  ai_panel: {
-    api_key_missing:
-      "Gemini API キーがありません。.env.local に GEMINI_API_KEY を設定してアプリを再起動してください。",
-  },
   workspace: {
     no_pdf:
       "PDF が読み込まれていません。アップロードボタンを使用してください。",
@@ -322,23 +352,6 @@ const ja = {
     centers: "中心にスナップ",
     equal: "等間隔スナップ",
     done: "完了",
-  },
-  ai_dialog: {
-    title: "AI フィールド検出",
-    desc: "Gemini を使用してページを分析し、フォームフィールドを自動的に検出して作成します。",
-    page_range: "ページ範囲",
-    page_range_hint: "例：1-5, 8, 10-12（デフォルト：すべて）",
-    valid_all: "すべてのページを選択しました（計 {total} ページ）",
-    err_format: "無効な形式です。数字と範囲を使用してください（例：1-3, 5）。",
-    err_bounds: "ページ番号が範囲外です（1-{total}）。",
-    valid_selected: "{count} ページを選択しました：{pages}",
-    types: "検出するフィールドタイプ",
-    style_override: "デフォルトスタイルを上書き",
-    prompt: "追加の指示（オプション）",
-    prompt_ph:
-      "例：「上部のセクションのフィールドのみを検索」または「日付フィールドを無視」",
-    prompt_hint: "AI モデルにコンテキストまたは特定のルールを提供します。",
-    start: "分析を開始",
   },
   landing: {
     title: "AI 搭載 PDF フォームエディター",

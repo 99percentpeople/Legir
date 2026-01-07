@@ -1,7 +1,7 @@
 import { DEFAULT_FIELD_STYLE } from "@/constants";
 import type { FieldStyle } from "@/types";
 import type { ParserContext, PdfJsAnnotation } from "../types";
-import type { PDFDocument } from "pdf-lib";
+import type { PDFDocument } from "@cantoo/pdf-lib";
 import { normalizePdfColorToRgb255, rgbArrayToHex } from "./colors";
 import {
   getFieldPropertiesFromPdfLib,

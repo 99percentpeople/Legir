@@ -1,5 +1,5 @@
 import * as pdfjsLib from "pdfjs-dist";
-import { PDFDocument, PDFForm, PDFPage, type PDFFont } from "pdf-lib";
+import { PDFDocument, PDFForm, PDFPage, type PDFFont } from "@cantoo/pdf-lib";
 import { Annotation, FormField } from "@/types";
 
 // [x, y, width, height]

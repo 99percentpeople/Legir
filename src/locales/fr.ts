@@ -2,6 +2,7 @@ const fr = {
   common: {
     select: "Sélectionner...",
     cancel: "Annuler",
+    continue: "Continuer",
     save: "Enregistrer",
     delete: "Supprimer",
     close: "Fermer",
@@ -97,6 +98,13 @@ const fr = {
       confirm: "Fermer sans enregistrer",
       cancel: "Annuler",
     },
+    pdf_password: {
+      title: "Mot de passe requis",
+      title_incorrect: "Mot de passe incorrect",
+      desc: "Ce PDF est protégé par mot de passe.",
+      desc_incorrect: "Veuillez réessayer.",
+      password_label: "Mot de passe",
+    },
     file_drop: {
       title: "Ouvrir le fichier déposé ?",
       desc: "Un document est déjà ouvert. Choisissez quoi faire avec le PDF déposé.",
@@ -106,13 +114,40 @@ const fr = {
     },
   },
   properties: {
+    ai_detection: {
+      title: "Détection de champ IA",
+      desc: "Analyser les pages pour détecter et créer automatiquement des champs de formulaire à l'aide de Gemini.",
+      api_key_missing:
+        "Clé API Gemini manquante. Définissez GEMINI_API_KEY dans .env.local et redémarrez l'application.",
+      page_range: "Plage de pages",
+      page_range_hint: "ex : 1-5, 8, 10-12 (Défaut : Tout)",
+      valid_all: "Toutes les pages sélectionnées ({total} pages)",
+      err_format:
+        "Format invalide. Utilisez des nombres et des plages (ex : 1-3, 5).",
+      err_bounds: "Numéro de page hors limites (1-{total}).",
+      valid_selected: "{count} pages sélectionnées : {pages}",
+      types: "Types de champs à détecter",
+      style_override: "Remplacer le style par défaut",
+      prompt: "Instructions supplémentaires (Facultatif)",
+      prompt_ph:
+        "ex : 'Trouver uniquement les champs dans la section supérieure' ou 'Ignorer les champs de date'",
+      prompt_hint:
+        "Fournir un contexte ou des règles spécifiques pour le modèle IA.",
+      start: "Démarrer l'analyse",
+    },
     document: {
-      title: "Infos Document",
-      hint: "Modifier les informations globales du PDF. Sélectionnez un champ sur le canevas pour modifier ses propriétés.",
+      title: "Infos du document",
+      hint: "Modifiez les informations globales du PDF. Sélectionnez un champ sur le canevas pour modifier ses propriétés.",
     },
     filename: {
-      label: "Nom de fichier",
-      desc: "Le nom utilisé lors de l'exportation du fichier.",
+      label: "Nom du fichier",
+      desc: "Nom utilisé lors de l'export du fichier.",
+    },
+    export_password: {
+      label: "Mot de passe d’export",
+      desc: "Utiliser un mot de passe lors de l’export",
+      placeholder: "Mot de passe",
+      placeholder_use_open: "Laissez vide pour exporter sans mot de passe",
     },
     doc_title: "Titre du document",
     author: "Auteur",
@@ -224,10 +259,6 @@ const fr = {
       properties: "Édition des propriétés",
     },
   },
-  ai_panel: {
-    api_key_missing:
-      "Clé API Gemini manquante. Définissez GEMINI_API_KEY dans .env.local et redémarrez l'application.",
-  },
   workspace: {
     no_pdf:
       "Aucun PDF chargé. Utilisez le bouton de téléchargement pour commencer.",
@@ -323,25 +354,6 @@ const fr = {
     centers: "Ancrer aux centres",
     equal: "Ancrage équidistant",
     done: "Terminé",
-  },
-  ai_dialog: {
-    title: "Détection de champ IA",
-    desc: "Analyser les pages pour détecter et créer automatiquement des champs de formulaire à l'aide de Gemini.",
-    page_range: "Plage de pages",
-    page_range_hint: "ex : 1-5, 8, 10-12 (Défaut : Tout)",
-    valid_all: "Toutes les pages sélectionnées ({total} pages)",
-    err_format:
-      "Format invalide. Utilisez des nombres et des plages (ex : 1-3, 5).",
-    err_bounds: "Numéro de page hors limites (1-{total}).",
-    valid_selected: "{count} pages sélectionnées : {pages}",
-    types: "Types de champs à détecter",
-    style_override: "Remplacer le style par défaut",
-    prompt: "Instructions supplémentaires (Facultatif)",
-    prompt_ph:
-      "ex : 'Trouver uniquement les champs dans la section supérieure' ou 'Ignorer les champs de date'",
-    prompt_hint:
-      "Fournir un contexte ou des règles spécifiques pour le modèle IA.",
-    start: "Démarrer l'analyse",
   },
   landing: {
     title: "Éditeur de formulaire PDF alimenté par l'IA",

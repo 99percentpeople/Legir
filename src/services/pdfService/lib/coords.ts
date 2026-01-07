@@ -1,4 +1,4 @@
-import { PDFPage } from "pdf-lib";
+import { PDFPage } from "@cantoo/pdf-lib";
 import type * as pdfjsLib from "pdfjs-dist";
 import { pdfDebug } from "./debug";
 

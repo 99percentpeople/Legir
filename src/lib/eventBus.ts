@@ -66,6 +66,25 @@ export type AppEventMap = {
   "sidebar:focusAnnotation": {
     id: string;
   };
+  "pdf:loadStart": {
+    id: string;
+    label?: string;
+  };
+  "pdf:loadProgress": {
+    id: string;
+    loaded: number;
+    total?: number;
+  };
+  "pdf:loadEnd": {
+    id: string;
+    ok: boolean;
+  };
+  "pdf:passwordRequired": {
+    id: string;
+    reason: "need_password" | "incorrect_password";
+    submit: (password: string) => void;
+    cancel: () => void;
+  };
 };
 
 export const appEventBus = new EventBus<AppEventMap>();

@@ -79,6 +79,8 @@ class PDFWorkerService {
   >();
   private requestSeq = 0;
 
+  private passwordByDocId = new Map<string, string>();
+
   private readonly defaultDocId: string = "default";
 
   private lastRenderScaleByDocPage = new Map<string, number>();
@@ -119,6 +121,7 @@ class PDFWorkerService {
         signal,
       } = options;
       const docId = requestedDocId ?? this.defaultDocId;
+
       const id = `reprioritize_${docId}_${pageIndex}_${scale}_${this.requestSeq++}_${Date.now()}`;
 
       if (signal?.aborted) {
@@ -193,11 +196,19 @@ class PDFWorkerService {
   @RequireWorkerPromise()
   public loadDocument(
     data: Uint8Array,
-    options?: { docId?: string; signal?: AbortSignal },
+    options?: { docId?: string; signal?: AbortSignal; password?: string },
   ): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const docId = options?.docId ?? this.defaultDocId;
       this.clearLastRenderScaleForDoc(docId);
+
+      const password =
+        typeof options?.password === "string"
+          ? options.password
+          : this.passwordByDocId.get(docId);
+      if (typeof password === "string" && password) {
+        this.passwordByDocId.set(docId, password);
+      }
       this.clearTextContentCacheForDoc(docId);
 
       const id = `load_${docId}_${Date.now()}`;
@@ -238,6 +249,7 @@ class PDFWorkerService {
           id,
           docId,
           data,
+          password,
         };
 
         this.worker.postMessage(message);
@@ -251,6 +263,7 @@ class PDFWorkerService {
   @RequireWorkerVoid()
   public unloadDocument(docId: string) {
     this.clearLastRenderScaleForDoc(docId);
+    this.passwordByDocId.delete(docId);
     this.clearTextContentCacheForDoc(docId);
     const id = `unload_${docId}_${Date.now()}`;
     const message: WorkerRequest = { type: "unload", id, docId };
@@ -412,6 +425,7 @@ class PDFWorkerService {
     docId?: string;
     data?: Uint8Array;
     isNewDoc?: boolean;
+    password?: string;
     signal?: AbortSignal;
   }): Promise<{ bytes: Uint8Array; mimeType: string }> {
     return new Promise((resolve, reject) => {
@@ -426,10 +440,19 @@ class PDFWorkerService {
         docId: requestedDocId,
         data,
         isNewDoc,
+        password: requestedPassword,
         signal,
       } = options;
 
       const docId = requestedDocId ?? this.defaultDocId;
+
+      const password =
+        typeof requestedPassword === "string"
+          ? requestedPassword
+          : this.passwordByDocId.get(docId);
+      if (typeof password === "string" && password) {
+        this.passwordByDocId.set(docId, password);
+      }
 
       const id = `renderImage_${docId}_${pageIndex}_${this.requestSeq++}_${Date.now()}`;
 
@@ -491,6 +514,7 @@ class PDFWorkerService {
             docId,
             isNewDoc: true,
             data,
+            password,
             pageIndex,
             scale,
             targetWidth,
