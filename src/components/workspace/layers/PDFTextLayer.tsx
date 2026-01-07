@@ -42,9 +42,33 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   );
 
   const [renderedScale, setRenderedScale] = useState<number | null>(null);
-  const [pageRotation, setPageRotation] = useState(0);
   const [isSelecting, setIsSelecting] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+
+  const userUnit = useMemo(() => {
+    if (!pageProxy) return 1;
+    return pageProxy.getViewport({ scale: 1, rotation: 0 }).userUnit ?? 1;
+  }, [pageProxy]);
+
+  const setLayerVars = useCallback(
+    (el: HTMLElement, scaleFactor: number) => {
+      el.style.setProperty("--scale-factor", String(scaleFactor));
+      el.style.setProperty("--user-unit", String(userUnit));
+    },
+    [userUnit],
+  );
+
+  const syncPdfJsContainerStyles = useCallback(
+    (from: HTMLElement, to: HTMLElement) => {
+      const minFontSize = from.style.getPropertyValue("--min-font-size");
+      if (minFontSize) {
+        to.style.setProperty("--min-font-size", minFontSize);
+      }
+      if (from.style.width) to.style.width = from.style.width;
+      if (from.style.height) to.style.height = from.style.height;
+    },
+    [],
+  );
 
   // Used to manage render sequence and cancellation
   const renderSeqRef = useRef(0);
@@ -120,21 +144,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           signal,
         }: RenderTextInnerArgs) => {
           if (!pageProxy) return;
-          setPageRotation(pageProxy.rotate);
           if (isCancelled()) return;
 
           const viewport = pageProxy.getViewport({
             scale: targetScale,
-            rotation: 0,
+            rotation: pageProxy.rotate,
           });
-
-          // Apply CSS variables for correct scaling
-          const applyLayerStyles = (el: HTMLDivElement) => {
-            el.style.width = `${viewport.width}px`;
-            el.style.height = `${viewport.height}px`;
-            el.style.setProperty("--scale-factor", `${targetScale}`);
-            el.style.setProperty("--user-unit", `${viewport.userUnit}`);
-          };
 
           const textContent = await pdfWorkerService.getTextContent({
             pageIndex,
@@ -144,15 +159,9 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           if (!textContent) return;
 
           const staging = document.createElement("div");
-          applyLayerStyles(staging);
-
-          const textContentSource = {
-            items: textContent.items,
-            styles: textContent.styles,
-            lang: textContent.lang,
-          } as any;
+          setLayerVars(staging, targetScale);
           const textLayer = new pdfjsLib.TextLayer({
-            textContentSource,
+            textContentSource: textContent,
             container: staging,
             viewport,
           });
@@ -162,20 +171,27 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
           if (isCancelled()) return;
 
-          applyLayerStyles(container);
+          syncPdfJsContainerStyles(staging, container);
+
           container.replaceChildren(...Array.from(staging.childNodes));
 
           ensureEndOfContent(container);
           setRenderedScale(targetScale);
         },
       ),
-    [decorateRenderText, ensureEndOfContent, pageIndex, pageProxy],
+    [
+      decorateRenderText,
+      ensureEndOfContent,
+      pageIndex,
+      pageProxy,
+      setLayerVars,
+      syncPdfJsContainerStyles,
+    ],
   );
 
   // 1. Reset state when the PDF page object changes
   useEffect(() => {
     setRenderedScale(null);
-    setPageRotation(0);
     setIsSelecting(false);
     setIsRendering(false);
 
@@ -270,11 +286,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
     // If we already rendered for the current scale + rotation, avoid triggering an extra
     // render after `setRenderedScale` / `setPageRotation` updates state.
-    if (
-      renderedScale !== null &&
-      renderedScale === scale &&
-      pageRotation === pageProxy.rotate
-    ) {
+    if (renderedScale !== null && renderedScale === scale) {
       return;
     }
 
@@ -321,7 +333,6 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     isInView,
     isSelectMode,
     pageProxy,
-    pageRotation,
     renderedScale,
     scale,
     renderText,
@@ -360,13 +371,15 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
         pdfTextLayerDebug && "textLayer-debug",
       )}
       tabIndex={0}
-      data-main-rotation={pageRotation}
+      data-main-rotation={pageProxy?.rotate ?? 0}
       data-selectable={isSelectMode}
       style={{
         display: shouldDisplay ? "block" : "none",
         visibility: shouldHideByVisibility ? "hidden" : "visible",
         pointerEvents: shouldHideByVisibility ? "none" : undefined,
         cursor,
+        "--scale-factor": String(renderedScale ?? scale),
+        "--user-unit": String(userUnit),
         ...(textLayerSmoothScale && {
           "--ff-smooth-scale": textLayerSmoothScale,
         }),
