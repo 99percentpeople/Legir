@@ -370,6 +370,7 @@ const App: React.FC = () => {
         pages,
         annotations: fileAnnotations,
         outline,
+        openPassword,
         dispose,
       } = await loadPDF(draft.pdfBytes);
       pdfDisposeRef.current = dispose;
@@ -386,6 +387,11 @@ const App: React.FC = () => {
         filename: draft.filename,
         saveTarget: null,
         scale: viewState?.scale ?? 1.0,
+      });
+
+      setState({
+        pdfOpenPassword: openPassword ?? null,
+        exportPassword: openPassword ?? null,
       });
 
       if (viewState) {

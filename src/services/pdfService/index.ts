@@ -213,7 +213,11 @@ const createPdfJsLoadTask = (options: {
       appEventBus.emit("pdf:loadEnd", { id, ok });
     });
 
-  return { task, id, getLastPassword: () => lastPassword };
+  return {
+    task,
+    id,
+    getLastPassword: () => lastPassword,
+  };
 };
 
 const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
@@ -532,6 +536,9 @@ const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
 
 export const loadPDF = async (
   input: File | Uint8Array,
+  options?: {
+    password?: string | null;
+  },
 ): Promise<{
   pdfBytes: Uint8Array;
   pdfDocument: pdfjsLib.PDFDocumentProxy;
@@ -560,13 +567,12 @@ export const loadPDF = async (
   const { task: pdfJsLoadTask, getLastPassword } = createPdfJsLoadTask({
     data: pdfJsData,
     label: "loadPDF",
+    password: options?.password,
   });
 
   const pdf = await pdfJsLoadTask.promise;
 
-  const pw = getLastPassword();
-  const openPassword = typeof pw === "string" && pw ? pw : undefined;
-
+  const openPassword = getLastPassword() ?? options?.password;
   try {
     pdfDoc = await PDFDocument.load(
       pdfBytes,
