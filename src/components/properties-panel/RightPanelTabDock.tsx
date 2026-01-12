@@ -1,14 +1,16 @@
 import React from "react";
-import { FileText, SlidersHorizontal, Sparkles } from "lucide-react";
+import { FileText, Languages, SlidersHorizontal, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useScrollbarWidthOffset } from "@/hooks/useScrollbarWidthOffset";
 import { useLanguage } from "@/components/language-provider";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { appEventBus } from "@/lib/eventBus";
 
 export type RightPanelTabId =
   | "document"
   | "properties"
   | "ai_detect"
+  | "translate"
   | (string & {});
 
 export interface RightPanelDockTab {
@@ -20,7 +22,7 @@ export interface RightPanelDockTab {
 
 export interface RightPanelTabDockProps {
   tabs?: RightPanelDockTab[];
-  activeTab: RightPanelTabId;
+  activeTabs: RightPanelTabId[];
   isRightPanelOpen: boolean;
   isFloating: boolean;
   rightOffsetPx: number;
@@ -30,7 +32,7 @@ export interface RightPanelTabDockProps {
 
 export function RightPanelTabDock({
   tabs,
-  activeTab,
+  activeTabs,
   isRightPanelOpen,
   isFloating,
   rightOffsetPx,
@@ -68,6 +70,14 @@ export function RightPanelTabDock({
 
   const handleSelectTab = React.useCallback(
     (tab: RightPanelTabId) => {
+      if (tab === "translate") {
+        appEventBus.emit("workspace:openTranslate", {
+          sourceText: "",
+          autoTranslate: false,
+        });
+        return;
+      }
+
       onSelectTab(tab);
 
       setIsSwitching(true);
@@ -80,12 +90,13 @@ export function RightPanelTabDock({
         switchingTimerRef.current = null;
       }, 150);
     },
-    [activeTab, onSelectTab],
+    [onSelectTab],
   );
 
   const defaultTabs: RightPanelDockTab[] = [
     { id: "document", title: t("properties.document.title"), Icon: FileText },
     { id: "ai_detect", title: t("right_panel.tabs.ai_detect"), Icon: Sparkles },
+    { id: "translate", title: t("translate.title"), Icon: Languages },
     {
       id: "properties",
       title: t("right_panel.tabs.properties"),
@@ -106,12 +117,12 @@ export function RightPanelTabDock({
   return (
     <div
       className={cn(
-        "bg-background/95 absolute top-3 z-50 flex flex-col gap-0.5 rounded-l-lg rounded-r-none border border-r-0 p-0.5 pr-0 shadow-lg backdrop-blur",
+        "bg-background/95 absolute top-3 z-30 flex flex-col gap-0.5 rounded-l-lg rounded-r-none border border-r-0 p-0.5 pr-0 shadow-lg backdrop-blur",
       )}
       style={{ right: rightOffsetPx + (isFloating ? 0 : scrollbarWidthPx) }}
     >
       {visibleTabs.map(({ id, title, disabled, Icon }) => {
-        const isActive = isRightPanelOpen && activeTab === id;
+        const isActive = activeTabs.includes(id);
         return (
           <button
             key={id}
@@ -156,10 +167,7 @@ export function RightPanelTabDock({
             </div>
             <Icon
               size={18}
-              className={cn(
-                "shrink-0 transition-transform duration-300",
-                isCjk ? null : "-rotate-90",
-              )}
+              className={cn("shrink-0 transition-transform duration-300")}
             />
           </button>
         );

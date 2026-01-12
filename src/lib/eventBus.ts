@@ -59,6 +59,10 @@ export type AppEventMap = {
   "workspace:scrollContainerReady": {
     element: HTMLElement;
   };
+  "workspace:openTranslate": {
+    sourceText?: string;
+    autoTranslate?: boolean;
+  };
   "workspace:focusControl": {
     id: string;
     focusInput?: boolean;

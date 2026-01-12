@@ -14,6 +14,8 @@ export type PageLayoutMode = "single" | "double_even" | "double_odd";
 
 export type PageFlowDirection = "vertical" | "horizontal";
 
+export type ThumbnailsLayoutMode = "single" | "double";
+
 export type Tool =
   // Common
   | "select"
@@ -163,6 +165,8 @@ export interface DebugOptions {
 export interface EditorOptions {
   snappingOptions: SnappingOptions;
   debugOptions: DebugOptions;
+  userName: string;
+  thumbnailsLayout: ThumbnailsLayoutMode;
 }
 
 export interface PenStyle {
@@ -217,6 +221,7 @@ export interface EditorState {
 
   // Translate (UI preference)
   translateOption: TranslateOptionId;
+  translateTargetLanguage: string | null;
 
   // Dialog State
   activeDialog: "shortcuts" | "settings" | "close_confirm" | null;
@@ -235,6 +240,7 @@ export interface EditorState {
   isSidebarOpen: boolean;
   isRightPanelOpen: boolean;
   rightPanelTab: string;
+  rightPanelDockTab: string[];
   sidebarTab: string;
   hasSavedSession: boolean;
   isDirty: boolean;
@@ -292,4 +298,7 @@ export type EditorUiState = Pick<
   | "sidebarWidth"
   | "rightPanelWidth"
   | "translateOption"
+  | "translateTargetLanguage"
+  | "options"
+  | "rightPanelDockTab"
 >;

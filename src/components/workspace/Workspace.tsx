@@ -36,6 +36,8 @@ import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
 import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { appEventBus } from "@/lib/eventBus";
+import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useEditorStore } from "@/store/useEditorStore";
 
 // Workspace = the editor canvas.
 //
@@ -170,6 +172,40 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const [isTranslateOpen, setIsTranslateOpen] = useState(false);
   const [translateSourceText, setTranslateSourceText] = useState("");
   const [translateAutoToken, setTranslateAutoToken] = useState(0);
+
+  const setUiState = useEditorStore((s) => s.setUiState);
+
+  useAppEvent("workspace:openTranslate", ({ sourceText, autoTranslate }) => {
+    const trimmed = typeof sourceText === "string" ? sourceText.trim() : "";
+
+    // handle if translate is already open
+    if (isTranslateOpen) {
+      if (trimmed !== "") setTranslateSourceText(trimmed);
+    } else {
+      setTranslateSourceText(trimmed);
+      setIsTranslateOpen(true);
+    }
+
+    if (autoTranslate) setTranslateAutoToken((x) => x + 1);
+  });
+
+  useEffect(() => {
+    if (isTranslateOpen) {
+      setUiState((prev) => {
+        if (prev.rightPanelDockTab?.includes("translate")) return {};
+        const next = [...(prev.rightPanelDockTab ?? []), "translate"];
+        return { rightPanelDockTab: next };
+      });
+      return;
+    }
+    setUiState((prev) => {
+      if (!prev.rightPanelDockTab?.includes("translate")) return {};
+      const next = (prev.rightPanelDockTab ?? []).filter(
+        (t) => t !== "translate",
+      );
+      return { rightPanelDockTab: next };
+    });
+  }, [isTranslateOpen, setUiState]);
 
   const [movingFieldId, setMovingFieldId] = useState<string | null>(null);
   const [movingAnnotationId, setMovingAnnotationId] = useState<string | null>(

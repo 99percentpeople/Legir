@@ -26,14 +26,30 @@ export const WORKSPACE_BASE_PAGE_GAP_PX = 32;
 
 export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   isSidebarOpen: !(typeof window !== "undefined" && window.innerWidth < 768),
-  isRightPanelOpen: !(typeof window !== "undefined" && window.innerWidth < 768),
+  isRightPanelOpen: false,
   rightPanelTab: "document",
+  rightPanelDockTab: [],
   sidebarTab: "thumbnails",
   pageLayout: "single",
   pageFlow: "vertical",
   sidebarWidth: 256,
   rightPanelWidth: 320,
   translateOption: "cloud:cloudv2",
+  translateTargetLanguage: null,
+  options: {
+    snappingOptions: {
+      enabled: true,
+      snapToBorders: true,
+      snapToCenter: true,
+      snapToEqualDistances: false,
+      threshold: 8,
+    },
+    debugOptions: {
+      pdfTextLayer: false,
+    },
+    userName: "",
+    thumbnailsLayout: "single",
+  },
 };
 
 // prettier-ignore

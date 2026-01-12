@@ -1,7 +1,7 @@
 import React, { Suspense, useCallback, useEffect, useRef } from "react";
 import Toolbar from "../components/toolbar/Toolbar";
 import Sidebar from "../components/sidebar/Sidebar";
-import ZoomControls from "../components/toolbar/ZoomControls";
+import FloatingBar from "../components/toolbar/FloatingBar";
 import { Skeleton } from "../components/ui/skeleton";
 import { useEditorStore, type EditorStore } from "../store/useEditorStore";
 import { Button } from "../components/ui/button";
@@ -25,6 +25,7 @@ import { useLanguage } from "../components/language-provider";
 import type {
   Annotation,
   EditorState,
+  EditorUiState,
   FormField,
   PDFMetadata,
   Tool,
@@ -932,7 +933,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
           annotations={state.annotations}
           outline={state.outline}
           selectedId={state.selectedId}
-          pageLayout={state.pageLayout}
+          thumbnailsLayout={state.options.thumbnailsLayout}
           onSelectControl={(id) => {
             selectControl(id);
             if (id) {
@@ -984,7 +985,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
               fitTrigger={state.fitTrigger}
             />
           </Suspense>
-          <ZoomControls
+          <FloatingBar
             scale={state.scale}
             pageLayout={state.pageLayout}
             pageFlow={state.pageFlow}
@@ -1010,7 +1011,11 @@ const EditorPage: React.FC<EditorPageProps> = ({
         </div>
 
         <RightPanelTabDock
-          activeTab={state.rightPanelTab}
+          activeTabs={
+            state.isRightPanelOpen
+              ? [state.rightPanelTab, ...state.rightPanelDockTab]
+              : [...state.rightPanelDockTab]
+          }
           isRightPanelOpen={state.isRightPanelOpen}
           isFloating={state.isPanelFloating}
           rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
@@ -1018,7 +1023,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
           onSelectTab={(tab) => {
             if (tab === "properties" && !selectedControl) return;
             setUiState((prev) => {
-              const updates: any = {
+              const updates: Partial<EditorUiState> = {
                 rightPanelTab: tab,
                 isRightPanelOpen: true,
               };

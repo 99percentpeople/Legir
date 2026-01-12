@@ -5,7 +5,7 @@ import {
   PageData,
   PDFOutlineItem,
   Annotation,
-  PageLayoutMode,
+  ThumbnailsLayoutMode,
 } from "@/types";
 import { cn } from "@/lib/cn";
 import {
@@ -40,7 +40,7 @@ interface SidebarProps {
   onResize: (width: number) => void;
   pdfDocument?: PDFDocumentProxy;
   currentPageIndex?: number;
-  pageLayout?: PageLayoutMode;
+  thumbnailsLayout?: ThumbnailsLayoutMode;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
 }
@@ -63,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onResize,
   pdfDocument,
   currentPageIndex,
-  pageLayout,
+  thumbnailsLayout,
   activeTab,
   onTabChange,
 }) => {
@@ -177,7 +177,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               pdfDocument={pdfDocument}
               onNavigate={onNavigatePage}
               currentPageIndex={currentPageIndex}
-              pageLayout={pageLayout}
+              thumbnailsLayout={thumbnailsLayout}
             />
           </TabsContent>
           <TabsContent

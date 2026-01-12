@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import type { PageData, PageLayoutMode } from "@/types";
+import type { PageData, ThumbnailsLayoutMode } from "@/types";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useLanguage } from "../language-provider";
@@ -73,7 +73,7 @@ interface ThumbnailsPanelProps {
   pdfDocument?: PDFDocumentProxy;
   onNavigate: (pageIndex: number) => void;
   currentPageIndex?: number;
-  pageLayout?: PageLayoutMode;
+  thumbnailsLayout?: ThumbnailsLayoutMode;
 }
 
 const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
@@ -81,7 +81,7 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
   pdfDocument,
   onNavigate,
   currentPageIndex,
-  pageLayout,
+  thumbnailsLayout,
 }) => {
   const { t } = useLanguage();
 
@@ -91,9 +91,7 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
         <div
           className={cn(
             "grid gap-4",
-            pageLayout && pageLayout !== "single"
-              ? "grid-cols-2"
-              : "grid-cols-1",
+            thumbnailsLayout === "double" ? "grid-cols-2" : "grid-cols-1",
           )}
         >
           {pages?.map((page, idx) => (

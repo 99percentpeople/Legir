@@ -1,5 +1,15 @@
 import React from "react";
-import { Settings2, Magnet, Globe, Moon, Sun, Laptop, Bug } from "lucide-react";
+import {
+  Settings2,
+  Magnet,
+  Globe,
+  Moon,
+  Sun,
+  Laptop,
+  Bug,
+  LayoutGrid,
+  User,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,10 +17,11 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "./ui/dialog";
-import { Label } from "./ui/label";
-import { Switch } from "./ui/switch";
-import { Button } from "./ui/button";
+} from "../ui/dialog";
+import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import {
   Select,
   SelectContent,
@@ -18,11 +29,16 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { DebugOptions, EditorOptions, SnappingOptions } from "../types";
-import { useLanguage, Language, LANGUAGES } from "./language-provider";
-import { useTheme } from "./theme-provider";
-import { Separator } from "./ui/separator";
+} from "../ui/select";
+import {
+  DebugOptions,
+  EditorOptions,
+  SnappingOptions,
+  ThumbnailsLayoutMode,
+} from "@/types";
+import { useLanguage, Language, LANGUAGES } from "../language-provider";
+import { useTheme } from "../theme-provider";
+import { Separator } from "../ui/separator";
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -65,7 +81,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="flex max-h-full flex-col sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5" />
@@ -74,7 +90,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
           <DialogDescription>{t("settings.description")}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 overflow-y-auto py-4 pr-1">
           {/* Language Selection */}
           <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
             <div className="flex items-center justify-between">
@@ -214,6 +230,57 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </div>
             <p className="text-muted-foreground px-1 text-xs">
               {t("settings.debug.pdf_text_layer_debug_desc")}
+            </p>
+          </div>
+
+          <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <LayoutGrid className="text-primary h-4 w-4" />
+                <Label className="mb-0 font-semibold">
+                  {t("settings.thumbnails_layout")}
+                </Label>
+              </div>
+              <Select
+                value={options.thumbnailsLayout || "single"}
+                onValueChange={(val) =>
+                  onChange({
+                    ...options,
+                    thumbnailsLayout: val as ThumbnailsLayoutMode,
+                  })
+                }
+              >
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder={t("common.select")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">{t("settings.single")}</SelectItem>
+                  <SelectItem value="double">{t("settings.double")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <User className="text-primary h-4 w-4" />
+                <Label htmlFor="ff-user-name" className="mb-0 font-semibold">
+                  {t("settings.user_name")}
+                </Label>
+              </div>
+              <Input
+                id="ff-user-name"
+                value={options.userName || ""}
+                onChange={(e) =>
+                  onChange({ ...options, userName: e.target.value })
+                }
+                placeholder={t("settings.user_name_placeholder")}
+                className="h-8 w-[180px]"
+              />
+            </div>
+            <p className="text-muted-foreground px-1 text-xs">
+              {t("settings.user_name_desc")}
             </p>
           </div>
         </div>

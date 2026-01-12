@@ -1,5 +1,10 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[tauri::command]
+    fn get_system_username() -> Option<String> {
+        whoami::username().map(|name| name.trim().to_string()).ok()
+    }
+
     // Tauri app builder (desktop entry).
     //
     // Responsibilities:
@@ -20,6 +25,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_cli::init());
 
     builder
+        .invoke_handler(tauri::generate_handler![get_system_username])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 // Dev-only: enable Tauri log plugin for easier debugging.

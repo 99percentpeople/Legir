@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { PDFMetadata } from "@/types";
-import { FileText, Lock, Unlock } from "lucide-react";
+import { Eye, EyeOff, FileText, Lock, Unlock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DateField, DateInput } from "@/components/ui/datafield-rac";
 import { parseDateTime } from "@internationalized/date";
@@ -73,6 +73,12 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
       }
     };
 
+    const [exportPasswordVisible, setExportPasswordVisible] = useState(false);
+
+    const toggleExportPasswordVisibility = () => {
+      setExportPasswordVisible(!exportPasswordVisible);
+    };
+
     return (
       <PanelLayout
         title={
@@ -115,7 +121,10 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             </Label>
 
             <div className="flex items-center justify-between gap-3">
-              <div className="text-muted-foreground text-xs">
+              <div
+                className="text-muted-foreground text-xs"
+                id="export-password-description"
+              >
                 {t("properties.export_password.desc")}
               </div>
               <Switch
@@ -141,19 +150,37 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             </div>
 
             {exportPasswordEnabled && (
-              <Input
-                type="password"
-                value={exportPassword || ""}
-                onFocus={onTriggerHistorySave}
-                onChange={(e) => {
-                  onExportPasswordChange(e.target.value);
-                }}
-                placeholder={
-                  typeof pdfOpenPassword === "string" && pdfOpenPassword
-                    ? t("properties.export_password.placeholder_use_open")
-                    : t("properties.export_password.placeholder")
-                }
-              />
+              <div className="relative">
+                <Input
+                  aria-describedby="export-password-description"
+                  className="pe-9"
+                  id="export-password"
+                  onChange={(e) => onExportPasswordChange(e.target.value)}
+                  placeholder={
+                    typeof pdfOpenPassword === "string" && pdfOpenPassword
+                      ? t("properties.export_password.placeholder_use_open")
+                      : t("properties.export_password.placeholder")
+                  }
+                  type={exportPasswordVisible ? "text" : "password"}
+                  value={exportPassword || ""}
+                />
+                <button
+                  aria-controls="password"
+                  aria-label={
+                    exportPasswordVisible ? "Hide password" : "Show password"
+                  }
+                  aria-pressed={exportPasswordVisible}
+                  className="text-muted-foreground/80 hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 absolute inset-y-0 end-0 flex h-full w-9 items-center justify-center rounded-e-md transition-[color,box-shadow] outline-none focus:z-10 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={toggleExportPasswordVisibility}
+                  type="button"
+                >
+                  {exportPasswordVisible ? (
+                    <EyeOff aria-hidden="true" size={16} />
+                  ) : (
+                    <Eye aria-hidden="true" size={16} />
+                  )}
+                </button>
+              </div>
             )}
           </div>
 

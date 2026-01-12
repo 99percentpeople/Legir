@@ -78,7 +78,6 @@ const fr = {
     title: "Traduire",
     provider: "Fournisseur",
     provider_gemini: "Gemini (IA)",
-    provider_cloud: "Cloud Translation API",
     cloud_api_key_missing:
       "Clé Cloud Translation API manquante. Définissez GOOGLE_TRANSLATE_API_KEY dans .env.local et redémarrez l’application.",
     model: "Modèle",
@@ -336,6 +335,13 @@ const fr = {
       "Configurer le comportement de l'espace de travail et les règles d'ancrage.",
     language: "Langue",
     theme: "Thème",
+    thumbnails_layout: "Disposition des vignettes",
+    single: "Simple",
+    double: "Double",
+    user_name: "Nom d'utilisateur",
+    user_name_placeholder: "Votre nom",
+    user_name_desc:
+      "Utilisé comme auteur lors de la création de nouveaux commentaires.",
     theme_options: {
       light: "Clair",
       dark: "Sombre",
@@ -402,8 +408,7 @@ const fr = {
     saving_closing: "Enregistrement et fermeture...",
     processing: "Traitement...",
     wait: "Cela peut prendre un moment",
-    load_error:
-      "Échec du chargement du PDF. Veuillez essayer un autre fichier.",
+    load_error: "Échec du chargement du PDF.",
     save_success: "Enregistré avec succès",
     save_fail: "Échec de l'enregistrement",
     no_new_fields: "Aucun nouveau champ de formulaire n'a été détecté.",

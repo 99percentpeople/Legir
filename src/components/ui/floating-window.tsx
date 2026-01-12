@@ -439,7 +439,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     <div
       ref={setWindowEl}
       className={cn(
-        "bg-background fixed z-9999 flex flex-col overflow-visible rounded-lg border shadow-xl",
+        "bg-background fixed z-40 flex flex-col overflow-visible rounded-lg border shadow-xl",
         className,
       )}
       style={{

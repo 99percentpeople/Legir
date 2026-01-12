@@ -61,6 +61,37 @@ const activeRenderTasks = new Map<
   { cancel: () => void; docId: string }
 >();
 
+const RENDER_CANCELLED_ERROR = { name: "RenderingCancelledException" } as const;
+
+const registerCancellableTask = (
+  id: string,
+  docId: string,
+  onCancel?: () => void,
+) => {
+  let isCancelled = false;
+  activeRenderTasks.set(id, {
+    docId,
+    cancel: () => {
+      isCancelled = true;
+      try {
+        onCancel?.();
+      } catch {
+        // ignore
+      }
+    },
+  });
+
+  const throwIfCancelled = () => {
+    if (isCancelled) throw RENDER_CANCELLED_ERROR;
+  };
+
+  const cleanup = () => {
+    activeRenderTasks.delete(id);
+  };
+
+  return { throwIfCancelled, cleanup };
+};
+
 // Priority Queue Implementation
 interface QueueItem {
   id: string;
@@ -179,28 +210,25 @@ const getTextContentForPage = async (
   const { id, pageIndex, docId } = params;
   const resolvedDocId = getDocId(docId);
 
-  let isCancelled = false;
-  activeRenderTasks.set(id, {
-    docId: resolvedDocId,
-    cancel: () => {
-      isCancelled = true;
-    },
-  });
+  const { throwIfCancelled, cleanup } = registerCancellableTask(
+    id,
+    resolvedDocId,
+  );
 
   try {
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
     if (pageIndex === undefined) throw new Error("Missing text parameters");
 
     await ensureDocumentLoaded(resolvedDocId);
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     const page = await getPageForDoc(resolvedDocId, pageIndex);
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     const textContent = await page.getTextContent({}).catch((e) => {
       throw new Error("[worker] Failed to getTextContent: " + e.message);
     });
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     return { payload: textContent } satisfies TaskResult;
   } catch (error: any) {
@@ -210,7 +238,7 @@ const getTextContentForPage = async (
 
     throw error;
   } finally {
-    activeRenderTasks.delete(id);
+    cleanup();
   }
 };
 
@@ -338,24 +366,20 @@ const renderToCanvas = async (
   const resolvedDocId = getDocId(docId);
 
   let renderTask: pdfjsLib.RenderTask | null = null;
-  let isCancelled = false;
 
-  // Register cancellation handler immediately to catch early cancels
-  activeRenderTasks.set(id, {
-    docId: resolvedDocId,
-    cancel: () => {
-      isCancelled = true;
-      if (renderTask) {
-        renderTask.cancel();
-      }
+  const { throwIfCancelled, cleanup } = registerCancellableTask(
+    id,
+    resolvedDocId,
+    () => {
+      renderTask?.cancel();
     },
-  });
+  );
 
   try {
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     await ensureDocumentLoaded(resolvedDocId);
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     // Resolve Canvas
     let targetCanvas: OffscreenCanvas | undefined = transferredCanvas;
@@ -375,7 +399,7 @@ const renderToCanvas = async (
     }
 
     const page = await getPageForDoc(resolvedDocId, pageIndex);
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     // Calculate viewport
     const viewport = page.getViewport({ scale: scale, rotation: page.rotate });
@@ -419,7 +443,7 @@ const renderToCanvas = async (
         : pdfjsLib.AnnotationMode.DISABLE,
     };
 
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     renderTask = page.render(renderContext);
 
@@ -438,8 +462,7 @@ const renderToCanvas = async (
 
     throw error;
   } finally {
-    // Clean up task from map
-    activeRenderTasks.delete(id);
+    cleanup();
   }
 };
 
@@ -460,20 +483,17 @@ const renderToImage = async (
   const resolvedDocId = getDocId(docId);
 
   let renderTask: pdfjsLib.RenderTask | null = null;
-  let isCancelled = false;
 
-  activeRenderTasks.set(id, {
-    docId: resolvedDocId,
-    cancel: () => {
-      isCancelled = true;
-      if (renderTask) {
-        renderTask.cancel();
-      }
+  const { throwIfCancelled, cleanup } = registerCancellableTask(
+    id,
+    resolvedDocId,
+    () => {
+      renderTask?.cancel();
     },
-  });
+  );
 
   try {
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
     if (pageIndex === undefined) throw new Error("Missing render parameters");
 
     if (params.isNewDoc) {
@@ -485,10 +505,10 @@ const renderToImage = async (
     } else {
       await ensureDocumentLoaded(resolvedDocId);
     }
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     const page = await getPageForDoc(resolvedDocId, pageIndex);
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     const baseViewport = page.getViewport({
       scale: 1.0,
@@ -526,17 +546,17 @@ const renderToImage = async (
     await renderTask.promise.catch((error) => {
       throw new Error("[worker] failed to renderToImage: " + error.message);
     });
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     const outMimeType = mimeType || "image/jpeg";
     const blob = await canvas.convertToBlob({
       type: outMimeType,
       quality: typeof quality === "number" ? quality : 0.8,
     });
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     const buf = await blob.arrayBuffer();
-    if (isCancelled) throw { name: "RenderingCancelledException" };
+    throwIfCancelled();
 
     return {
       payload: {

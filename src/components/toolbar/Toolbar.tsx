@@ -12,7 +12,6 @@ import {
   CircleDot,
   Settings,
   PenLine,
-  Save,
   Highlighter,
   PenTool,
   Edit3,
@@ -28,7 +27,6 @@ import { cn } from "../../lib/cn";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
@@ -36,13 +34,6 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { useLanguage } from "../language-provider";
 import { canSaveAs } from "../../services/fileOps";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { ANNOTATION_STYLES } from "@/constants";
@@ -111,7 +102,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const tauri = isTauri();
 
   return (
-    <div className="bg-background border-border text-foreground relative z-50 flex h-12 items-center gap-2 border-b px-2 sm:px-4 lg:justify-between">
+    <div className="bg-background border-border text-foreground relative z-30 flex h-12 items-center gap-2 border-b px-2 sm:px-4 lg:justify-between">
       {/* Left Section: Mode Selection & History */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         <div className="flex items-center gap-1">

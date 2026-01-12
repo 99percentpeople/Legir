@@ -139,7 +139,9 @@ export interface EditorActions {
 
 export type EditorStore = EditorState & EditorActions;
 
-function pickEditorUiState(state: EditorState): EditorUiState {
+function pickEditorUiState(
+  state: Partial<EditorState>,
+): Partial<EditorUiState> {
   return {
     isSidebarOpen: state.isSidebarOpen,
     isRightPanelOpen: state.isRightPanelOpen,
@@ -150,6 +152,8 @@ function pickEditorUiState(state: EditorState): EditorUiState {
     sidebarWidth: state.sidebarWidth,
     rightPanelWidth: state.rightPanelWidth,
     translateOption: state.translateOption,
+    translateTargetLanguage: state.translateTargetLanguage,
+    options: state.options,
   };
 }
 
@@ -194,26 +198,11 @@ const initialState: EditorState = {
   past: [],
   future: [],
   clipboard: null,
-  options: {
-    snappingOptions: {
-      enabled: true,
-      snapToBorders: true,
-      snapToCenter: true,
-      snapToEqualDistances: false,
-      threshold: 8,
-    },
-    debugOptions: {
-      pdfTextLayer: false,
-    },
-  },
-  translateOption: "gemini:gemini-2.5-flash",
   lastSavedAt: null,
   processingStatus: null,
   isPanelFloating: false,
   isSaving: false,
   ...DEFAULT_EDITOR_UI_STATE,
-  pageLayout: "single",
-  pageFlow: "vertical",
   isFullscreen: false,
   hasSavedSession: false,
   isDirty: false,
@@ -416,7 +405,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
                       ...patch.snappingOptions,
                     },
                   }
-                : null),
+                : {}),
               ...(patch.debugOptions
                 ? {
                     debugOptions: {
@@ -424,7 +413,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
                       ...patch.debugOptions,
                     },
                   }
-                : null),
+                : {}),
             },
           };
         }),
@@ -524,12 +513,12 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         saveCheckpoint();
         const now = new Date().toISOString();
         set((state) => {
-          const author = annotation.author || state.metadata?.author || "User";
+          const author = annotation.author || state.options.userName;
           const annotationWithDetails = {
             ...annotation,
             updatedAt: now,
             author: author,
-          };
+          } satisfies Annotation;
           const shouldSwitch = shouldSwitchToSelectAfterUse(state.tool);
           const isForcedContinuous = state.keys.ctrl || state.keys.meta;
           return {

@@ -131,13 +131,11 @@ export class TranslateService {
   constructor() {
     this.registerOptionGroup({
       id: "cloud",
-      label: "Cloud Translation API",
-      labelKey: "translate.provider_cloud",
+      label: "Cloud Translation",
       options: [
         {
           id: "cloudv2",
-          label: "Cloud Translation API",
-          labelKey: "translate.provider_cloud",
+          label: "Cloud Translation v2",
         },
       ],
       isAvailable: () => this.cloudV2.isAvailable(),

@@ -25,7 +25,7 @@ import {
 import { useLanguage } from "../language-provider";
 import type { PageFlowDirection, PageLayoutMode } from "../../types";
 
-interface ZoomControlsProps {
+interface FloatingBarProps {
   scale: number;
   pageLayout: PageLayoutMode;
   pageFlow: PageFlowDirection;
@@ -39,7 +39,7 @@ interface ZoomControlsProps {
   onFitScreen: () => void;
 }
 
-const ZoomControls: React.FC<ZoomControlsProps> = ({
+const FloatingBar: React.FC<FloatingBarProps> = ({
   scale,
   pageLayout,
   pageFlow,
@@ -61,7 +61,7 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
         variant="ghost"
         size="icon"
         onClick={onZoomOut}
-        title="Zoom Out (Ctrl + -)"
+        title={t("toolbar.zoom_out")}
         className="h-8 w-8"
       >
         <ZoomOut size={16} />
@@ -93,7 +93,7 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
         variant="ghost"
         size="icon"
         onClick={onZoomIn}
-        title="Zoom In (Ctrl + +)"
+        title={t("toolbar.zoom_in")}
         className="h-8 w-8"
       >
         <ZoomIn size={16} />
@@ -182,4 +182,4 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
   );
 };
 
-export default ZoomControls;
+export default FloatingBar;

@@ -1,17 +1,10 @@
 import React, { useEffect, useCallback, useState } from "react";
 import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
-import SettingsDialog from "./components/SettingsDialog";
+import SettingsDialog from "./components/dialogs/SettingsDialog";
 import type { AIDetectionOptions } from "./components/AIDetectionOptionsForm";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "./components/ui/dialog";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { Label } from "./components/ui/label";
+import FileDropDialog from "./components/dialogs/FileDropDialog";
+import ProcessingDialog from "./components/dialogs/ProcessingDialog";
+import PdfPasswordDialog from "./components/dialogs/PdfPasswordDialog";
 import { EditorState, FormField } from "./types";
 import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
 import { analyzePageForFields } from "./services/LLMService";
@@ -31,7 +24,6 @@ import { useEditorStore, type EditorActions } from "./store/useEditorStore";
 import { useLocation } from "wouter";
 import AppRoutes from "./AppRoutes";
 import { useAppInitialization } from "./app/useAppInitialization";
-import { Spinner } from "./components/ui/spinner";
 import { recentFilesService } from "./services/recentFilesService";
 import { isTauri } from "@tauri-apps/api/core";
 import { useAppEvent } from "@/hooks/useAppEventBus";
@@ -104,7 +96,6 @@ const App: React.FC = () => {
     submit: (password: string) => void;
     cancel: () => void;
   } | null>(null);
-  const [pdfPasswordValue, setPdfPasswordValue] = useState("");
 
   useAppEvent("pdf:loadStart", ({ id, label }) => {
     setPdfLoadProgress({ id, label, loaded: 0, total: undefined });
@@ -125,7 +116,6 @@ const App: React.FC = () => {
   });
 
   useAppEvent("pdf:passwordRequired", (payload) => {
-    setPdfPasswordValue("");
     setPdfPasswordPrompt(payload);
   });
 
@@ -845,186 +835,59 @@ const App: React.FC = () => {
         onChange={(o) => setOptions(o)}
       />
 
-      <Dialog
-        open={fileDropDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setFileDropDialogOpen(false);
-            setPendingFileDropPath(null);
-          }
+      <FileDropDialog
+        isOpen={fileDropDialogOpen}
+        pendingPath={pendingFileDropPath}
+        isDirty={state.isDirty}
+        onClose={() => {
+          setFileDropDialogOpen(false);
+          setPendingFileDropPath(null);
         }}
-      >
-        <DialogContent>
-          <DialogTitle>{t("dialog.file_drop.title")}</DialogTitle>
-          <DialogDescription>{t("dialog.file_drop.desc")}</DialogDescription>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setFileDropDialogOpen(false);
-                setPendingFileDropPath(null);
-              }}
-            >
-              {t("common.cancel")}
-            </Button>
-            {state.isDirty && (
-              <Button
-                variant="secondary"
-                onClick={async () => {
-                  const path = pendingFileDropPath;
-                  setFileDropDialogOpen(false);
-                  setPendingFileDropPath(null);
-                  if (!path) return;
-                  if (isTauri()) {
-                    const ok = await handleExport();
-                    if (!ok) return;
-                  } else {
-                    await handleSaveDraft(true);
-                  }
-                  await openDroppedPdfPath(path);
-                }}
-                disabled={!pendingFileDropPath}
-              >
-                {isTauri()
-                  ? t("dialog.file_drop.save_open")
-                  : t("dialog.file_drop.save_draft_open")}
-              </Button>
-            )}
-            <Button
-              onClick={async () => {
-                const path = pendingFileDropPath;
-                setFileDropDialogOpen(false);
-                setPendingFileDropPath(null);
-                if (!path) return;
-                await openDroppedPdfPath(path);
-              }}
-              disabled={!pendingFileDropPath}
-            >
-              {t("dialog.file_drop.open")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onSaveAndOpen={async () => {
+          const path = pendingFileDropPath;
+          setFileDropDialogOpen(false);
+          setPendingFileDropPath(null);
+          if (!path) return;
+          if (isTauri()) {
+            const ok = await handleExport();
+            if (!ok) return;
+          } else {
+            await handleSaveDraft(true);
+          }
+          await openDroppedPdfPath(path);
+        }}
+        onOpen={async () => {
+          const path = pendingFileDropPath;
+          setFileDropDialogOpen(false);
+          setPendingFileDropPath(null);
+          if (!path) return;
+          await openDroppedPdfPath(path);
+        }}
+      />
 
-      <Dialog open={state.isProcessing}>
-        <DialogContent
-          showCloseButton={false}
-          className="flex flex-col items-center justify-center text-center sm:max-w-[300px]"
-        >
-          <DialogTitle className="sr-only">
-            {t("common.processing")}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            {t("common.processing")}
-          </DialogDescription>
-          <Spinner size="lg" className="text-primary mb-4" />
-          <p className="text-foreground text-lg font-medium">
-            {state.processingStatus || t("common.processing")}
-          </p>
+      <ProcessingDialog
+        isOpen={state.isProcessing}
+        processingStatus={state.processingStatus}
+        pdfLoadProgress={pdfLoadProgress}
+      />
 
-          {pdfLoadProgress && (
-            <div className="mt-4 w-full">
-              <div className="text-muted-foreground mb-2 text-xs">
-                {(() => {
-                  const total = pdfLoadProgress.total;
-                  const loaded = pdfLoadProgress.loaded;
-                  if (typeof total === "number" && total > 0) {
-                    const pct = Math.max(
-                      0,
-                      Math.min(100, Math.round((loaded / total) * 100)),
-                    );
-                    return `${pct}%`;
-                  }
-                  return `${Math.max(0, loaded)} bytes`;
-                })()}
-              </div>
-              <div className="bg-muted h-2 w-full rounded">
-                <div
-                  className="bg-primary h-2 rounded"
-                  style={{
-                    width:
-                      typeof pdfLoadProgress.total === "number" &&
-                      pdfLoadProgress.total > 0
-                        ? `${Math.max(
-                            0,
-                            Math.min(
-                              100,
-                              (pdfLoadProgress.loaded / pdfLoadProgress.total) *
-                                100,
-                            ),
-                          )}%`
-                        : "25%",
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={!!pdfPasswordPrompt}
-        onOpenChange={(open) => {
-          if (open) return;
+      <PdfPasswordDialog
+        prompt={
+          pdfPasswordPrompt
+            ? { id: pdfPasswordPrompt.id, reason: pdfPasswordPrompt.reason }
+            : null
+        }
+        onCancel={() => {
           const cur = pdfPasswordPrompt;
           setPdfPasswordPrompt(null);
           if (cur) cur.cancel();
         }}
-      >
-        <DialogContent showCloseButton={false}>
-          <DialogTitle>
-            {pdfPasswordPrompt?.reason === "incorrect_password"
-              ? t("dialog.pdf_password.title_incorrect")
-              : t("dialog.pdf_password.title")}
-          </DialogTitle>
-          <DialogDescription>
-            {pdfPasswordPrompt?.reason === "incorrect_password"
-              ? t("dialog.pdf_password.desc_incorrect")
-              : t("dialog.pdf_password.desc")}
-          </DialogDescription>
-
-          <div className="space-y-2">
-            <Label htmlFor="pdf-password">
-              {t("dialog.pdf_password.password_label")}
-            </Label>
-            <Input
-              id="pdf-password"
-              type="password"
-              value={pdfPasswordValue}
-              onChange={(e) => setPdfPasswordValue(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                const cur = pdfPasswordPrompt;
-                setPdfPasswordPrompt(null);
-                if (cur) cur.submit(pdfPasswordValue);
-              }}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                const cur = pdfPasswordPrompt;
-                setPdfPasswordPrompt(null);
-                if (cur) cur.cancel();
-              }}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button
-              onClick={() => {
-                const cur = pdfPasswordPrompt;
-                setPdfPasswordPrompt(null);
-                if (cur) cur.submit(pdfPasswordValue);
-              }}
-            >
-              {t("common.continue")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onSubmit={(password) => {
+          const cur = pdfPasswordPrompt;
+          setPdfPasswordPrompt(null);
+          if (cur) cur.submit(password);
+        }}
+      />
     </div>
   );
 };

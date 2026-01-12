@@ -78,7 +78,6 @@ const de = {
     title: "Übersetzen",
     provider: "Anbieter",
     provider_gemini: "Gemini (KI)",
-    provider_cloud: "Cloud Translation API",
     cloud_api_key_missing:
       "Cloud Translation API-Key fehlt. Setze GOOGLE_TRANSLATE_API_KEY in .env.local und starte die App neu.",
     model: "Modell",
@@ -335,6 +334,12 @@ const de = {
     description: "Arbeitsbereichsverhalten und Einrastregeln konfigurieren.",
     language: "Sprache",
     theme: "Thema",
+    thumbnails_layout: "Thumbnail-Layout",
+    single: "Einspaltig",
+    double: "Zweispaltig",
+    user_name: "Benutzername",
+    user_name_placeholder: "Dein Name",
+    user_name_desc: "Wird als Autor beim Erstellen neuer Kommentare verwendet.",
     theme_options: {
       light: "Hell",
       dark: "Dunkel",
@@ -400,8 +405,7 @@ const de = {
     saving_closing: "Speichern und schließen...",
     processing: "Verarbeitung...",
     wait: "Dies kann einen Moment dauern",
-    load_error:
-      "Laden des PDF fehlgeschlagen. Bitte versuchen Sie eine andere Datei.",
+    load_error: "Laden des PDF fehlgeschlagen.",
     save_success: "Erfolgreich gespeichert",
     save_fail: "Speichern fehlgeschlagen",
     no_new_fields: "Keine neuen Formularfelder erkannt.",

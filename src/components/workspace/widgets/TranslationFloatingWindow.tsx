@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Copy, CopyCheck, Sparkles } from "lucide-react";
+import { Check, Copy, Languages } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -80,7 +80,7 @@ function ResultOutputBox({
         }
       }}
       className={cn(
-        "bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border text-sm whitespace-pre-wrap outline-none select-text",
+        "bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border text-sm wrap-break-word whitespace-pre-wrap outline-none select-text",
         className,
       )}
     >
@@ -100,6 +100,9 @@ export const TranslationFloatingWindow: React.FC<
 > = ({ isOpen, sourceText, autoTranslateToken, onClose }) => {
   const { t, effectiveLanguage } = useLanguage();
   const translateOptionRaw = useEditorStore((s) => s.translateOption);
+  const translateTargetLanguage = useEditorStore(
+    (s) => s.translateTargetLanguage,
+  );
   const setState = useEditorStore((s) => s.setState);
 
   const [registryVersion, setRegistryVersion] = useState(0);
@@ -136,7 +139,9 @@ export const TranslationFloatingWindow: React.FC<
         translateService.normalizeTranslateOption(firstAvailableOption),
     });
   }, [firstAvailableOption, setState, translateOption]);
-  const [targetLang, setTargetLang] = useState<string>(effectiveLanguage);
+  const [targetLang, setTargetLang] = useState<string>(
+    translateTargetLanguage || effectiveLanguage,
+  );
 
   const [input, setInput] = useState<string>(sourceText);
   const [output, setOutput] = useState<string>("");
@@ -158,7 +163,16 @@ export const TranslationFloatingWindow: React.FC<
     setInput(sourceText);
     setError(null);
     setActiveTab("source");
+
+    // Keep target language in sync with persisted preference.
+    // If user hasn't set one yet, default to effectiveLanguage.
+    setTargetLang(translateTargetLanguage || effectiveLanguage);
   }, [isOpen, sourceText]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setTargetLang(translateTargetLanguage || effectiveLanguage);
+  }, [effectiveLanguage, isOpen, translateTargetLanguage]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -277,7 +291,7 @@ export const TranslationFloatingWindow: React.FC<
       isOpen={isOpen}
       title={
         <>
-          <Sparkles size={16} /> {t("translate.title")}
+          <Languages size={16} /> {t("translate.title")}
         </>
       }
       closeLabel={t("common.close")}
@@ -359,103 +373,104 @@ export const TranslationFloatingWindow: React.FC<
 
         if (isHorizontal) {
           return (
-            <div className="grid h-full min-h-0 grid-cols-2 gap-2 p-2">
-              <div className="flex min-h-0 flex-col gap-1.5">
-                {unavailableMessageKey && (
-                  <div className="text-muted-foreground text-[11px] leading-4">
-                    {t(unavailableMessageKey)}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-muted-foreground text-[11px] leading-4">
-                    {t("translate.source_text")}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select value={targetLang} onValueChange={setTargetLang}>
-                      <SelectTrigger
-                        className="h-7! text-xs"
-                        size="sm"
-                        title={t("translate.target")}
+            <div className="flex h-full min-h-0 flex-col gap-2 p-2">
+              <div className="grid min-h-0 min-w-0 flex-1 grid-cols-2 gap-2">
+                <div className="flex min-h-0 flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-muted-foreground text-[11px] leading-4">
+                      {t("translate.source_text")}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={targetLang}
+                        onValueChange={(v) => {
+                          setTargetLang(v);
+                          setState({ translateTargetLanguage: v });
+                        }}
                       >
-                        <SelectValue placeholder={t("translate.target")} />
-                      </SelectTrigger>
-                      <SelectContent portalContainer={portalContainer}>
-                        {TARGET_LANG_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        <SelectTrigger
+                          className="h-7! text-xs"
+                          size="sm"
+                          title={t("translate.target")}
+                        >
+                          <SelectValue placeholder={t("translate.target")} />
+                        </SelectTrigger>
+                        <SelectContent portalContainer={portalContainer}>
+                          {TARGET_LANG_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-                    <Button
-                      disabled={!canTranslate && !isLoading}
-                      className="h-7 bg-purple-600 px-2 text-xs text-white hover:bg-purple-700"
-                      onClick={
-                        isLoading
-                          ? handleCancel
-                          : () => {
-                              void handleTranslate();
-                            }
-                      }
-                    >
-                      {isLoading ? t("common.cancel") : t("translate.action")}
-                    </Button>
+                      <Button
+                        disabled={!canTranslate && !isLoading}
+                        className="h-7 bg-purple-600 px-2 text-xs text-white hover:bg-purple-700"
+                        onClick={
+                          isLoading
+                            ? handleCancel
+                            : () => {
+                                void handleTranslate();
+                              }
+                        }
+                      >
+                        {isLoading ? t("common.cancel") : t("translate.action")}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="min-h-0 flex-1">
+                    <Textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      className="field-sizing-fixed h-full min-h-0 resize-none overflow-auto text-sm"
+                    />
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1">
-                  <Textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    className="field-sizing-fixed h-full min-h-0 resize-none overflow-auto text-sm"
+                <div className="flex min-h-0 flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-muted-foreground text-[11px] leading-4">
+                      {t("translate.result")}
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
+                      disabled={!output.trim()}
+                      onClick={handleCopy}
+                    >
+                      {copied ? <Check size={16} /> : <Copy size={16} />}
+                      {t("translate.copy")}
+                    </Button>
+                  </div>
+
+                  <ResultOutputBox
+                    output={output}
+                    isLoading={isLoading}
+                    error={error}
+                    className="p-1"
                   />
                 </div>
               </div>
-
-              <div className="flex min-h-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-muted-foreground text-[11px] leading-4">
-                    {t("translate.result")}
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    disabled={!output.trim()}
-                    onClick={handleCopy}
-                  >
-                    {copied ? <CopyCheck size={16} /> : <Copy size={16} />}
-                    {t("translate.copy")}
-                  </Button>
+              {unavailableMessageKey && (
+                <div className="text-muted-foreground text-[11px] leading-4">
+                  {t(unavailableMessageKey)}
                 </div>
-
-                <ResultOutputBox
-                  output={output}
-                  isLoading={isLoading}
-                  error={error}
-                  className="p-1"
-                />
-              </div>
+              )}
             </div>
           );
         }
 
         // Vertical: tabs switch between source and result
         return (
-          <div className="flex h-full min-h-0 flex-col p-2">
-            {unavailableMessageKey && (
-              <div className="text-muted-foreground mb-1.5 text-[11px] leading-4">
-                {t(unavailableMessageKey)}
-              </div>
-            )}
-
+          <div className="flex h-full min-h-0 flex-col gap-2 p-2">
             <Tabs
               value={activeTab}
               onValueChange={(v) => setActiveTab(v as "source" | "result")}
               className="min-h-0 flex-1"
             >
-              <div className="flex items-center gap-2 border-b">
+              <div className="flex items-end gap-2 border-b">
                 <TabsList className="text-foreground h-auto gap-2 rounded-none bg-transparent px-0 py-0">
                   <TabsTrigger
                     value="source"
@@ -471,10 +486,16 @@ export const TranslationFloatingWindow: React.FC<
                   </TabsTrigger>
                 </TabsList>
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="mb-1 ml-auto flex items-center gap-2">
                   {activeTab === "source" ? (
                     <>
-                      <Select value={targetLang} onValueChange={setTargetLang}>
+                      <Select
+                        value={targetLang}
+                        onValueChange={(v) => {
+                          setTargetLang(v);
+                          setState({ translateTargetLanguage: v });
+                        }}
+                      >
                         <SelectTrigger
                           className="h-7! w-32 text-xs"
                           size="sm"
@@ -512,7 +533,7 @@ export const TranslationFloatingWindow: React.FC<
                       disabled={!output.trim()}
                       onClick={handleCopy}
                     >
-                      {copied ? <CopyCheck size={16} /> : <Copy size={16} />}
+                      {copied ? <Check size={16} /> : <Copy size={16} />}
                       {t("translate.copy")}
                     </Button>
                   )}
@@ -542,6 +563,11 @@ export const TranslationFloatingWindow: React.FC<
                 </div>
               </TabsContent>
             </Tabs>
+            {unavailableMessageKey && (
+              <div className="text-muted-foreground mb-1.5 text-[11px] leading-4">
+                {t(unavailableMessageKey)}
+              </div>
+            )}
           </div>
         );
       }}

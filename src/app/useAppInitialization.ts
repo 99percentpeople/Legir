@@ -6,7 +6,7 @@ import {
 } from "react";
 import { getStartupOpenPdfArg, openFileFromPath } from "../services/fileOps";
 import { recentFilesService } from "../services/recentFilesService";
-import { isTauri } from "@tauri-apps/api/core";
+import { isTauri, invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEditorStore, type EditorActions } from "../store/useEditorStore";
 import type { EditorState } from "../types";
@@ -36,31 +36,50 @@ export function useAppInitialization({
     let unlisten: null | (() => void) = null;
 
     void (async () => {
+      const CANCELLED = Symbol("cancelled");
+      const throwIfCancelled = () => {
+        if (cancelled) throw CANCELLED;
+      };
+
       try {
         const startupPath = await getStartupOpenPdfArg();
-        if (!cancelled && startupPath) {
+        throwIfCancelled();
+
+        if (startupPath) {
           const picked = await openFileFromPath(startupPath);
-          if (cancelled) return;
+          throwIfCancelled();
           await loadIntoEditor({
             input: picked.bytes,
             pdfFile: null,
             filename: picked.filename,
             saveTarget: { kind: "tauri", path: startupPath },
           });
+          throwIfCancelled();
         }
       } catch (e) {
-        console.error("Failed to fetch pending argv PDF:", e);
+        if (e !== CANCELLED) {
+          console.error("Failed to fetch pending argv PDF:", e);
+        }
       }
 
-      if (!cancelled) {
-        setState({
-          hasSavedSession: recentFilesService.hasWebSession(),
-        });
-      }
+      setState({
+        hasSavedSession: recentFilesService.hasWebSession(),
+      });
 
-      if (!isTauri() || cancelled) return;
+      if (!isTauri()) return;
+
       try {
-        if (cancelled) return;
+        const snapshot = useEditorStore.getState();
+        const existing = snapshot.options?.userName;
+        if (!existing) {
+          const name = await invoke<string | null>("get_system_username");
+          throwIfCancelled();
+          const current = useEditorStore.getState().options?.userName;
+          if (!current && typeof name === "string" && name.trim().length > 0) {
+            useEditorStore.getState().setOptions({ userName: name.trim() });
+          }
+        }
+
         const webview = getCurrentWebview();
         unlisten = await webview.onDragDropEvent((event: any) => {
           const payload: any = event?.payload;
@@ -84,17 +103,15 @@ export function useAppInitialization({
           setPendingFileDropPath(firstPdf);
           setFileDropDialogOpen(true);
         });
-
+      } catch (e) {
+        if (e !== CANCELLED) {
+          // ignore
+        }
+      } finally {
         if (cancelled) {
-          try {
-            unlisten?.();
-          } catch {
-            // ignore
-          }
+          unlisten?.();
           unlisten = null;
         }
-      } catch {
-        // ignore
       }
     })();
 
