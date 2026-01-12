@@ -49,9 +49,9 @@ export interface AIAnalysisOptions {
   model?: GeminiModelId;
 }
 
-export interface TranslateTextOptions extends LLMTranslateTextOptions<GeminiModelId> {}
+export type TranslateTextOptions = LLMTranslateTextOptions<GeminiModelId>;
 
-export interface TranslateTextStreamOptions extends TranslateTextOptions {}
+export type TranslateTextStreamOptions = TranslateTextOptions;
 
 const extractGeminiText = (value: any): string => {
   if (!value) return "";
@@ -425,7 +425,7 @@ export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
       const h = ((yMaxVal - yMinVal) / 1000) * pageHeight;
 
       // Sanitize label for ID generation and clean display
-      let rawLabel = item.label || `Field_${index}`;
+      const rawLabel = item.label || `Field_${index}`;
       // Remove leading/trailing non-alphanumerics
       let cleanLabel = rawLabel.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "");
       // Replace remaining non-alphanumerics with single underscore to keep it readable but valid

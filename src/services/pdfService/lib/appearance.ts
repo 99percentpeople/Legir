@@ -96,7 +96,7 @@ export const parseDefaultAppearance = (
 
     if (token === "Tf" && i >= 2) {
       const size = parseFloat(tokens[i - 1]);
-      let fontName = normalizePdfFontName(tokens[i - 2]);
+      const fontName = normalizePdfFontName(tokens[i - 2]);
 
       if (!isNaN(size)) {
         style.fontSize = size > 0 ? size : 12;

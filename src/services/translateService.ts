@@ -101,9 +101,7 @@ class CloudTranslateV2 {
     }
 
     const json = (await res.json()) as any;
-    const translated =
-      json?.data?.translations?.[0]?.translatedText ??
-      json?.data?.translations?.[0]?.translated_text;
+    const translated = json?.data?.translations?.[0]?.translatedText;
 
     if (typeof translated !== "string") {
       throw new Error("Cloud Translation API returned an unexpected response.");

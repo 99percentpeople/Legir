@@ -402,8 +402,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
         pageIndex,
       );
 
-      let newX = currentCoords.x - moveOffset.x;
-      let newY = currentCoords.y - moveOffset.y;
+      const newX = currentCoords.x - moveOffset.x;
+      const newY = currentCoords.y - moveOffset.y;
 
       onUpdateAnnotation(movingAnnotationId, {
         rect: { ...annot.rect, x: newX, y: newY },
@@ -1231,8 +1231,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
       setGlobalCursor("move");
 
       let targetFieldId = field.id;
-      let targetFieldRect = field.rect;
-      let targetPageIndex = field.pageIndex;
+      const targetFieldRect = field.rect;
+      const targetPageIndex = field.pageIndex;
 
       // Check for Duplicate shortcut (Ctrl/Meta + Drag)
       if (e.ctrlKey || e.metaKey) {

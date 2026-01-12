@@ -1,17 +1,25 @@
 import eslint from "@eslint/js";
+import tseslint from "typescript-eslint";
 
-export default [
+export default tseslint.config(
   eslint.configs.recommended,
+  ...tseslint.configs.recommended,
   {
-    // Custom configurations apply to default JS files
+    files: ["**/*.{js,jsx,ts,tsx}"],
     rules: {
       semi: "error",
       "prefer-const": "error",
-      "no-unused-vars": "warn",
+      "no-empty": ["error", { allowEmptyCatch: true }],
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
   {
     // Ignores specific files
-    ignores: ["dist/", "node_modules/"],
+    ignores: ["dist/", "node_modules/", "src-tauri/"],
   },
-];
+);

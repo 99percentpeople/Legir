@@ -16,7 +16,7 @@ export const renderPage = async (
   try {
     if (typeof window === "undefined") return null;
 
-    const pageIndex = Math.max(0, (page as any).pageNumber - 1);
+    const pageIndex = Math.max(0, page.pageNumber - 1);
     const { bytes, mimeType } = await pdfWorkerService.renderPageImage({
       pageIndex,
       scale,
@@ -37,7 +37,7 @@ export const renderPage = async (
 export const renderPageBytes = async (
   pdfBytes: Uint8Array,
   scale: number = 1.0,
-  range: Number | [Number, Number],
+  range: number | [number, number],
   options?: {
     renderAnnotations?: boolean;
     signal?: AbortSignal;
@@ -45,11 +45,8 @@ export const renderPageBytes = async (
 ): Promise<string[] | null> => {
   if (typeof window === "undefined") return null;
 
-  const isNumberObject = (x: unknown): x is Number => x instanceof Number;
-  const toNum = (x: Number) => (isNumberObject(x) ? x.valueOf() : (x as any));
-
-  const start = Array.isArray(range) ? toNum(range[0]) : toNum(range);
-  const end = Array.isArray(range) ? toNum(range[1]) : toNum(range);
+  const start = Array.isArray(range) ? range[0] : range;
+  const end = Array.isArray(range) ? range[1] : range;
 
   const from = Math.max(0, Math.min(Math.floor(start), Math.floor(end)));
   const to = Math.max(0, Math.max(Math.floor(start), Math.floor(end)));

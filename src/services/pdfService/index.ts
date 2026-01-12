@@ -174,9 +174,9 @@ const createPdfJsLoadTask = (options: {
   let lastPassword: string | undefined = undefined;
 
   task.onPassword = (callback: (password: string) => void, reason: unknown) => {
-    const pr = (pdfjsLib as any)?.PasswordResponses;
     const mappedReason =
-      typeof pr === "object" && reason === pr.INCORRECT_PASSWORD
+      pdfjsLib.PasswordResponses &&
+      reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD
         ? "incorrect_password"
         : "need_password";
 
@@ -706,7 +706,7 @@ export const loadPDF = async (
       const pageNumber = idx + 1;
       const page = await pdf.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 1.0 });
-      const pageAnnotations = (pdfLibAnnotsByPageIndex?.get(idx) || []) as any;
+      const pageAnnotations = pdfLibAnnotsByPageIndex?.get(idx) || [];
 
       const context: ParserContext = {
         pageAnnotations,

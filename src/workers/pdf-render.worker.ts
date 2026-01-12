@@ -264,7 +264,9 @@ const loadDocument = async (
   const state = getDocState(docId);
   try {
     await state.pdfDoc?.destroy();
-  } catch {}
+  } catch {
+    // ignore
+  }
   state.pageCache.clear();
   const loadingTask = pdfjsLib.getDocument({
     data: data,
@@ -761,9 +763,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       return;
     }
 
-    case "cancelQueuedRenders":
     // Optimization: When scale changes, discard all pending tasks with different scale
     // This ensures we don't waste time on tiles that are no longer needed
+    case "cancelQueuedRenders":
     case "getTextContent":
     case "load":
     case "unload":
@@ -784,9 +786,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       const queuedData = data;
       const incomingKey = buildQueueTaskKey(queuedData);
       const existingIndex = taskQueue.findIndex((item) => {
-        const t = item.data.type;
-        if (t !== "render" && t !== "renderImage") return false;
-        return buildQueueTaskKey(item.data as any) === incomingKey;
+        const d = item.data;
+        if (d.type !== "render" && d.type !== "renderImage") return false;
+        return buildQueueTaskKey(d) === incomingKey;
       });
       if (existingIndex > -1) {
         const removed = taskQueue.splice(existingIndex, 1)[0];

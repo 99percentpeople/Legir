@@ -1,7 +1,7 @@
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
 import type { Tile } from "./types";
 
-type CommandSpec<TRequest extends Record<string, unknown>, TResponse = never> =
+type CommandSpec<TRequest extends object, TResponse = never> =
   | TRequest
   | [TRequest, TResponse];
 
@@ -23,7 +23,7 @@ export type WorkerCommandPayloadMap = {
     boolean
   >;
 
-  cancel: CommandSpec<{}>;
+  cancel: CommandSpec<object, void>;
 
   load: CommandSpec<
     {

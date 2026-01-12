@@ -195,7 +195,7 @@ export const preloadControls = () => {
     c.propertiesComponent,
   ]);
 
-  for (const c of lazyList) void (c as any).preload?.();
+  for (const c of lazyList) void c.preload?.();
   void Promise.all(lazyList.map((c) => warmLazy(c)));
 };
 

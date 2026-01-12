@@ -30,7 +30,7 @@ export const parsePDFDate = (
         } else if (rest.startsWith("+") || rest.startsWith("-")) {
           // Handle format: +HH'mm' or +HHmm or +HH
           const sign = rest.charAt(0);
-          let tzPart = rest.substring(1).replace(/'/g, "");
+          const tzPart = rest.substring(1).replace(/'/g, "");
 
           let tzHour = "00";
           let tzMinute = "00";

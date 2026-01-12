@@ -406,6 +406,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       try {
         return f.encodeText(run);
       } catch {
+        /* eslint-disable no-control-regex */
         const sanitized = run.replace(/[^\x00-\x7F]/g, "?");
         return f.encodeText(sanitized);
       }

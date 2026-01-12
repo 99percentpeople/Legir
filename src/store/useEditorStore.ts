@@ -573,7 +573,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           propsToSync.forEach((key) => {
             const k = key as keyof FormField;
             if (updates[k] !== undefined) {
-              // @ts-ignore
+              // @ts-expect-error index signature mismatch for dynamic keyof assignment
               syncUpdates[k] = updates[k];
             }
           });

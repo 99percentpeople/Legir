@@ -189,15 +189,15 @@ export class HighlightParser implements IAnnotationParser {
           | { x: number; y: number; width: number; height: number }[]
           | undefined = undefined;
 
-        let author = annotation.title || undefined;
-        let contents = annotation.contents || undefined;
-        let updatedAt = parsePDFDate(annotation.modificationDate);
+        const author = annotation.title || undefined;
+        const contents = annotation.contents || undefined;
+        const updatedAt = parsePDFDate(annotation.modificationDate);
 
         let opacity =
           typeof annotation.opacity === "number" ? annotation.opacity : 0.4;
 
         // Try to get QuadPoints
-        let qp = annotation.quadPoints;
+        const qp = annotation.quadPoints;
 
         if (qp && Array.isArray(qp)) {
           rects = [];
@@ -274,8 +274,8 @@ export class CommentParser implements IAnnotationParser {
         if ((!contents || contents.trim() === "") && annotation.richText) {
           contents = stripRichTextToPlainText(annotation.richText);
         }
-        let author = annotation.title || undefined;
-        let updatedAt = parsePDFDate(annotation.modificationDate);
+        const author = annotation.title || undefined;
+        const updatedAt = parsePDFDate(annotation.modificationDate);
 
         let opacity =
           typeof annotation.opacity === "number" ? annotation.opacity : 1;
@@ -780,7 +780,7 @@ export class FreeTextParser implements IAnnotationParser {
         opacity = Math.min(1, Math.max(0, opacity));
         let fontSize = 12;
         let fontFamily: string | undefined = undefined;
-        let sourcePdfRef:
+        const sourcePdfRef:
           | { objectNumber: number; generationNumber: number }
           | undefined = annotation.sourcePdfRef;
         let sourcePdfFontName: string | undefined = undefined;

@@ -499,12 +499,12 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
       if (
         tileRenderedRef.current.has(tile.canvasId) ||
-        (targetCanvas as any).dataset?.rendered === "1"
+        targetCanvas.dataset.rendered === "1"
       ) {
         return true;
       }
 
-      const wasRendered = (targetCanvas as any).dataset?.rendered === "1";
+      const wasRendered = targetCanvas.dataset.rendered === "1";
       if (!wasRendered && !tileRenderedRef.current.has(tile.canvasId)) {
         targetCanvas.style.visibility = "hidden";
       }
@@ -554,7 +554,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           tileRenderedRef.current.add(tile.canvasId);
           const el = tileCanvasElsRef.current.get(tile.canvasId);
           if (el) {
-            (el as any).dataset.rendered = "1";
+            el.dataset.rendered = "1";
             el.style.visibility = "visible";
           }
 
@@ -833,7 +833,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
             ref={(el) => {
               if (el) {
                 tileCanvasElsRef.current.set(t.canvasId, el);
-                const wasRendered = (el as any).dataset?.rendered === "1";
+                const wasRendered = el.dataset.rendered === "1";
                 if (!wasRendered && !tileRenderedRef.current.has(t.canvasId)) {
                   el.style.visibility = "hidden";
                 }

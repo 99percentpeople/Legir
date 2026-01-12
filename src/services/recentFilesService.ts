@@ -477,10 +477,10 @@ export class RecentFilesService {
     try {
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return null;
-      const scale = Number((parsed as any).scale ?? 0);
-      const scrollLeft = Number((parsed as any).scrollLeft ?? 0);
-      const scrollTop = Number((parsed as any).scrollTop ?? 0);
-      const updatedAt = Number((parsed as any).updatedAt ?? 0);
+      const scale = Number(parsed.scale ?? 0);
+      const scrollLeft = Number(parsed.scrollLeft ?? 0);
+      const scrollTop = Number(parsed.scrollTop ?? 0);
+      const updatedAt = Number(parsed.updatedAt ?? 0);
       if (
         !Number.isFinite(scale) ||
         !Number.isFinite(scrollLeft) ||

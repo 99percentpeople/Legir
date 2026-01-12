@@ -61,7 +61,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
         "input, textarea, select, [contenteditable='true']",
       ) as HTMLElement | null;
       try {
-        (input as any)?.focus?.({ preventScroll: true });
+        input?.focus({ preventScroll: true });
       } catch {
         try {
           input?.focus();
