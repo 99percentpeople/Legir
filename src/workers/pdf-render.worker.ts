@@ -13,20 +13,24 @@ pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
   name: "pdfjs-worker-render",
 });
 
+type FakeNode = {
+  nodeName: string;
+  style: Record<string, string>;
+  parentNode: FakeNode | null;
+  childNodes: unknown[];
+  appendChild: (child: unknown) => void;
+  removeChild: (child: unknown) => void;
+  insertBefore: (child: unknown, before: unknown | null) => void;
+  append: (...children: unknown[]) => void;
+  remove(): void;
+
+  setAttribute: (name: string, value: string) => void;
+  setAttributeNS: (ns: string | null, name: string, value: string) => void;
+};
+
 type DocumentPolyfillUsage = {
   enabled: boolean;
-  calls: {
-    createElement: number;
-    createElementNS: number;
-    createDocumentFragment: number;
-    createTextNode: number;
-    append: number;
-    appendChild: number;
-    insertBefore: number;
-    removeChild: number;
-    setAttribute: number;
-    setAttributeNS: number;
-  };
+  calls: Record<string, number>;
 };
 
 const documentPolyfillUsage: DocumentPolyfillUsage = {
@@ -45,14 +49,11 @@ const documentPolyfillUsage: DocumentPolyfillUsage = {
   },
 };
 
-let didLogDocumentPolyfillUse = false;
-const shouldLogDocumentPolyfillUse =
-  (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
-const maybeLogDocumentPolyfillUse = (method: string) => {
+const shouldLogDocumentPolyfillUse = import.meta.env.DEV === true;
+const maybeLogDocumentPolyfillUse = (method: string, data?: unknown) => {
+  documentPolyfillUsage.calls[method] += 1;
   if (!shouldLogDocumentPolyfillUse) return;
-  if (didLogDocumentPolyfillUse) return;
-  didLogDocumentPolyfillUse = true;
-  console.debug("[worker] document polyfill used", { method });
+  console.debug("[worker] document polyfill used", { method, data });
 };
 
 const getDocumentPolyfillUsageSnapshot = () => ({
@@ -64,53 +65,66 @@ const getDocumentPolyfillUsageSnapshot = () => ({
 if (typeof self.document === "undefined") {
   documentPolyfillUsage.enabled = true;
 
-  type FakeNode = {
-    nodeName: string;
-    style: Record<string, string>;
-    appendChild: (child: unknown) => void;
-    removeChild: (child: unknown) => void;
-    insertBefore: (child: unknown, before: unknown | null) => void;
-    append: (...children: unknown[]) => void;
-    setAttribute: (name: string, value: string) => void;
-    setAttributeNS: (ns: string | null, name: string, value: string) => void;
-  };
-
   const createFakeNode = (nodeName: string): FakeNode => {
     const node: FakeNode = {
       nodeName,
       style: {},
+      parentNode: null,
+      childNodes: [],
       appendChild: (child) => {
-        void child;
-        documentPolyfillUsage.calls.appendChild += 1;
-        maybeLogDocumentPolyfillUse("appendChild");
+        maybeLogDocumentPolyfillUse("appendChild", child);
+
+        if (child && typeof child === "object") {
+          (child as FakeNode).parentNode = node;
+        }
+        (node as FakeNode).childNodes.push(child);
+        return child;
       },
       removeChild: (child) => {
-        void child;
-        documentPolyfillUsage.calls.removeChild += 1;
-        maybeLogDocumentPolyfillUse("removeChild");
+        maybeLogDocumentPolyfillUse("removeChild", child);
+
+        const idx = node.childNodes.indexOf(child);
+        if (idx >= 0) node.childNodes.splice(idx, 1);
+        if (child && typeof child === "object") {
+          (child as FakeNode).parentNode = null;
+        }
       },
       insertBefore: (child, before) => {
-        void child;
-        void before;
-        documentPolyfillUsage.calls.insertBefore += 1;
-        maybeLogDocumentPolyfillUse("insertBefore");
+        maybeLogDocumentPolyfillUse("insertBefore", { child, before });
+
+        if (child && typeof child === "object") {
+          (child as FakeNode).parentNode = node;
+        }
+        if (!before) {
+          node.childNodes.push(child);
+          return child;
+        }
+        const idx = node.childNodes.indexOf(before);
+        if (idx >= 0) node.childNodes.splice(idx, 0, child);
+        else node.childNodes.push(child);
+        return child;
       },
       append: (...children) => {
-        void children;
-        documentPolyfillUsage.calls.append += 1;
-        maybeLogDocumentPolyfillUse("append");
+        maybeLogDocumentPolyfillUse("append", { children });
+
+        for (const c of children) node.appendChild(c);
+      },
+      remove: () => {
+        maybeLogDocumentPolyfillUse("remove");
+        node.parentNode?.removeChild(node);
       },
       setAttribute: (name, value) => {
-        void name;
-        void value;
-        documentPolyfillUsage.calls.setAttribute += 1;
-        maybeLogDocumentPolyfillUse("setAttribute");
+        maybeLogDocumentPolyfillUse("setAttribute", {
+          name,
+          value,
+        });
       },
-      setAttributeNS: (_ns, name, value) => {
-        void name;
-        void value;
-        documentPolyfillUsage.calls.setAttributeNS += 1;
-        maybeLogDocumentPolyfillUse("setAttributeNS");
+      setAttributeNS: (ns, name, value) => {
+        maybeLogDocumentPolyfillUse("setAttributeNS", {
+          ns,
+          name,
+          value,
+        });
       },
     };
     return node;
@@ -120,44 +134,43 @@ if (typeof self.document === "undefined") {
   const head = createFakeNode("head");
   const body = createFakeNode("body");
 
+  documentElement.appendChild(head);
+  documentElement.appendChild(body);
+
   const fakeOwnerDocument = {
     documentElement,
     head,
     body,
     createElement: (name: string) => {
-      documentPolyfillUsage.calls.createElement += 1;
-      maybeLogDocumentPolyfillUse("createElement");
+      maybeLogDocumentPolyfillUse("createElement", { name });
       if (name === "canvas") {
         return new OffscreenCanvas(1, 1);
       }
       return createFakeNode(name);
     },
-    createElementNS: (_ns: string, name: string) => {
-      documentPolyfillUsage.calls.createElementNS += 1;
-      maybeLogDocumentPolyfillUse("createElementNS");
+    createElementNS: (ns: string, name: string) => {
+      maybeLogDocumentPolyfillUse("createElementNS", { ns, name });
       return fakeOwnerDocument.createElement(name);
     },
     createDocumentFragment: () => {
-      documentPolyfillUsage.calls.createDocumentFragment += 1;
       maybeLogDocumentPolyfillUse("createDocumentFragment");
       return createFakeNode("#document-fragment");
     },
     createTextNode: (text: string) => {
-      documentPolyfillUsage.calls.createTextNode += 1;
-      maybeLogDocumentPolyfillUse("createTextNode");
+      maybeLogDocumentPolyfillUse("createTextNode", { text });
       return { nodeName: "#text", textContent: text };
     },
     fonts: (self as unknown as { fonts?: unknown }).fonts,
   };
 
-  (self as unknown as { document: unknown }).document = fakeOwnerDocument;
+  (self as any).document = fakeOwnerDocument;
 }
 
 type MaybePromise<T> = T | Promise<T>;
 
 type DocState = {
+  loadingTask: pdfjsLib.PDFDocumentLoadingTask | null;
   pdfDoc: pdfjsLib.PDFDocumentProxy | null;
-  docLoadingPromise: Promise<pdfjsLib.PDFDocumentProxy> | null;
   pageCache: Map<number, MaybePromise<pdfjsLib.PDFPageProxy>>;
 };
 
@@ -171,7 +184,7 @@ const getDocState = (docId?: string): DocState => {
   if (existing) return existing;
   const created: DocState = {
     pdfDoc: null,
-    docLoadingPromise: null,
+    loadingTask: null,
     pageCache: new Map<number, MaybePromise<pdfjsLib.PDFPageProxy>>(),
   };
   docs.set(id, created);
@@ -389,7 +402,20 @@ const loadDocument = async (
   password?: string,
 ) => {
   const state = getDocState(docId);
-  await state.pdfDoc?.destroy().catch(() => {});
+
+  if (state.loadingTask) {
+    try {
+      await state.loadingTask?.destroy();
+    } finally {
+      state.loadingTask = null;
+    }
+  }
+
+  try {
+    await state.pdfDoc?.destroy();
+  } finally {
+    state.pdfDoc = null;
+  }
   state.pageCache.clear();
   const loadingTask = pdfjsLib.getDocument({
     data: data,
@@ -398,7 +424,7 @@ const loadDocument = async (
     cMapPacked: true,
     standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
     useSystemFonts: false,
-    disableFontFace: true,
+    disableFontFace: false,
     stopAtErrors: false,
   });
 
@@ -414,11 +440,14 @@ const loadDocument = async (
       cb(password);
     };
   }
-  state.docLoadingPromise = loadingTask.promise;
-  state.pdfDoc = null;
-  state.pdfDoc = await state.docLoadingPromise.catch((e) => {
+  state.loadingTask = loadingTask;
+
+  try {
+    state.pdfDoc = await state.loadingTask.promise;
+  } catch (e) {
+    await loadingTask.destroy().catch(() => {});
     throw new Error("[worker] Failed to load document: " + e.message);
-  });
+  }
 };
 
 const disposeDocument = async (docId: string) => {
@@ -426,8 +455,19 @@ const disposeDocument = async (docId: string) => {
   if (!state) return;
   docs.delete(docId);
 
-  await state.pdfDoc?.destroy().catch(() => {});
-  state.pdfDoc = null;
+  try {
+    state.loadingTask?.destroy();
+  } finally {
+    state.loadingTask = null;
+  }
+
+  try {
+    await state.pdfDoc?.destroy();
+  } finally {
+    state.pdfDoc = null;
+  }
+
+  state.pageCache.clear();
 };
 
 const ensureDocumentLoaded = async (
@@ -443,15 +483,14 @@ const ensureDocumentLoaded = async (
     await loadDocument(docId, options.data, options.password);
     return;
   }
+  if (state.pdfDoc) return;
 
-  if (!state.pdfDoc && state.docLoadingPromise) {
-    state.pdfDoc = await state.docLoadingPromise;
+  if (state.loadingTask) {
+    state.pdfDoc = await state.loadingTask.promise;
     return;
   }
 
-  if (!state.pdfDoc) {
-    throw new Error("PDF Document not loaded");
-  }
+  throw new Error("PDF Document not loaded");
 };
 
 const getPageForDoc = async (docId: string, pageIndex: number) => {
