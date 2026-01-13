@@ -3,7 +3,6 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
   type RefObject,
 } from "react";
 import {
@@ -52,6 +51,26 @@ export const useWorkspaceViewport = (opts: {
   } | null>(null);
 
   const scrollRafRef = useRef<number | null>(null);
+  const wheelRafRef = useRef<number | null>(null);
+  const pendingWheelZoomRef = useRef<{
+    scale: number;
+    anchor:
+      | {
+          kind: "content";
+          targetX: number;
+          targetY: number;
+          mouseX: number;
+          mouseY: number;
+        }
+      | {
+          kind: "page";
+          pageIndex: number;
+          pageX: number;
+          pageY: number;
+          mouseX: number;
+          mouseY: number;
+        };
+  } | null>(null);
   const prevScaleRef = useRef(opts.editorState.scale);
   const scrollPosRef = useRef({ x: 0, y: 0 });
 
@@ -61,6 +80,10 @@ export const useWorkspaceViewport = (opts: {
       if (scrollRafRef.current !== null) {
         window.cancelAnimationFrame(scrollRafRef.current);
         scrollRafRef.current = null;
+      }
+      if (wheelRafRef.current !== null) {
+        window.cancelAnimationFrame(wheelRafRef.current);
+        wheelRafRef.current = null;
       }
     };
   }, []);
@@ -207,51 +230,6 @@ export const useWorkspaceViewport = (opts: {
           return best;
         };
 
-        const findPageAtPoint = (clientX: number, clientY: number) => {
-          const els =
-            typeof document.elementsFromPoint === "function"
-              ? document.elementsFromPoint(clientX, clientY)
-              : [];
-          for (const el of els) {
-            const pageEl = (el as HTMLElement | null)?.closest?.(
-              '[id^="page-"]',
-            );
-            if (
-              pageEl instanceof HTMLElement &&
-              pageEl.id.startsWith("page-")
-            ) {
-              const pageIndex = Number(pageEl.id.slice("page-".length));
-              if (!Number.isNaN(pageIndex)) {
-                return {
-                  pageIndex,
-                  rect: pageEl.getBoundingClientRect(),
-                  dist: 0,
-                };
-              }
-            }
-          }
-
-          let best: { pageIndex: number; rect: DOMRect; dist: number } | null =
-            null;
-
-          for (let i = 0; i < opts.editorState.pages.length; i++) {
-            const pageIndex = opts.editorState.pages[i]?.pageIndex;
-            if (typeof pageIndex !== "number") continue;
-            const el = document.getElementById(`page-${pageIndex}`);
-            if (!el) continue;
-            const r = el.getBoundingClientRect();
-
-            const dist = distToRectSquared(clientX, clientY, r);
-
-            if (!best || dist < best.dist) {
-              best = { pageIndex, rect: r, dist };
-              if (dist === 0) break;
-            }
-          }
-
-          return best;
-        };
-
         const findPageNearPointByDom = (
           clientX: number,
           clientY: number,
@@ -298,13 +276,16 @@ export const useWorkspaceViewport = (opts: {
 
         const currentScale = opts.editorState.scale;
         const steps = -e.deltaY / 100;
-        let newScale = currentScale * Math.pow(ZOOM_BASE, steps);
+        const baseScale = pendingWheelZoomRef.current?.scale ?? currentScale;
+        let newScale = baseScale * Math.pow(ZOOM_BASE, steps);
         newScale = Math.max(0.25, Math.min(5.0, newScale));
         newScale = Number(newScale.toFixed(3));
 
-        if (Math.abs(newScale - currentScale) < 0.001) return;
+        if (Math.abs(newScale - baseScale) < 0.001) return;
 
-        const containerRect = container.getBoundingClientRect();
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
         const contentRect = content.getBoundingClientRect();
 
         // Relative mouse position to the content box
@@ -315,38 +296,49 @@ export const useWorkspaceViewport = (opts: {
         let targetY = 0;
 
         if (opts.editorState.pageLayout !== "single") {
-          const rect = container.getBoundingClientRect();
-          const mouseX = e.clientX - rect.left;
-          const mouseY = e.clientY - rect.top;
+          const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * currentScale;
+          const probe = Math.max(8, Math.min(256, gapPx / 2));
+          const domHit = findPageNearPointByDom(
+            e.clientX,
+            e.clientY,
+            probe,
+            probe,
+          );
 
-          const hit = findPageAtPoint(e.clientX, e.clientY);
-          if (hit) {
-            const { pageIndex, rect: pageRect } = hit;
+          if (domHit) {
+            const { pageIndex, rect: pageRect } = domHit;
             const pageX = (e.clientX - pageRect.left) / currentScale;
             const pageY = (e.clientY - pageRect.top) / currentScale;
             const pageW = pageRect.width / currentScale;
             const pageH = pageRect.height / currentScale;
 
-            zoomAnchorRef.current = {
-              kind: "page",
-              pageIndex,
-              pageX: Math.max(0, Math.min(pageW, pageX)),
-              pageY: Math.max(0, Math.min(pageH, pageY)),
-              mouseX,
-              mouseY,
+            pendingWheelZoomRef.current = {
+              scale: newScale,
+              anchor: {
+                kind: "page",
+                pageIndex,
+                pageX: Math.max(0, Math.min(pageW, pageX)),
+                pageY: Math.max(0, Math.min(pageH, pageY)),
+                mouseX,
+                mouseY,
+              },
             };
-            opts.onScaleChange(newScale);
-            return;
+          } else {
+            const scaleRatio = newScale / currentScale;
+            targetX = relX * scaleRatio;
+            targetY = relY * scaleRatio;
+            pendingWheelZoomRef.current = {
+              scale: newScale,
+              anchor: {
+                kind: "content",
+                targetX,
+                targetY,
+                mouseX,
+                mouseY,
+              },
+            };
           }
-
-          const scaleRatio = newScale / currentScale;
-          targetX = relX * scaleRatio;
-          targetY = relY * scaleRatio;
         } else {
-          const rect = container.getBoundingClientRect();
-          const mouseX = e.clientX - rect.left;
-          const mouseY = e.clientY - rect.top;
-
           // Prefer page anchoring in single-page mode as well.
           // When the cursor is in the inter-page gap, we probe ±gap/2 to snap to the nearest page.
           const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * currentScale;
@@ -363,95 +355,106 @@ export const useWorkspaceViewport = (opts: {
             const pageW = pageRect.width / currentScale;
             const pageH = pageRect.height / currentScale;
 
-            zoomAnchorRef.current = {
-              kind: "page",
-              pageIndex,
-              pageX: Math.max(0, Math.min(pageW, pageX)),
-              pageY: Math.max(0, Math.min(pageH, pageY)),
-              mouseX,
-              mouseY,
+            pendingWheelZoomRef.current = {
+              scale: newScale,
+              anchor: {
+                kind: "page",
+                pageIndex,
+                pageX: Math.max(0, Math.min(pageW, pageX)),
+                pageY: Math.max(0, Math.min(pageH, pageY)),
+                mouseX,
+                mouseY,
+              },
             };
-            opts.onScaleChange(newScale);
-            return;
-          }
-
-          if (opts.editorState.pageFlow === "horizontal") {
-            const scaleRatio = newScale / currentScale;
-            targetX = relX * scaleRatio;
-            targetY = relY * scaleRatio;
           } else {
-            // Decompose Y coordinate into Fixed (padding/gap) and Scaled (pages) parts
-            const paddingPx = WORKSPACE_BASE_PADDING_PX;
-            const gapPx2 = gapPx;
-            let accumulatedH = paddingPx;
-            let fixedY = paddingPx;
-            let scaledY = 0;
-
-            if (relY < paddingPx) {
-              // Mouse in top padding
-              fixedY = relY;
-              scaledY = 0;
+            if (opts.editorState.pageFlow === "horizontal") {
+              const scaleRatio = newScale / currentScale;
+              targetX = relX * scaleRatio;
+              targetY = relY * scaleRatio;
             } else {
-              let found = false;
-              for (let i = 0; i < opts.editorState.pages.length; i++) {
-                const page = opts.editorState.pages[i];
-                const pageH = page.height * currentScale;
+              // Decompose Y coordinate into Fixed (padding/gap) and Scaled (pages) parts
+              const paddingPx = WORKSPACE_BASE_PADDING_PX;
+              const gapPx2 = gapPx;
+              let accumulatedH = paddingPx;
+              let fixedY = paddingPx;
+              let scaledY = 0;
 
-                // Check if mouse is on this page
-                if (relY < accumulatedH + pageH) {
-                  scaledY += relY - accumulatedH;
-                  found = true;
-                  break;
-                }
-                accumulatedH += pageH;
-                scaledY += pageH;
+              if (relY < paddingPx) {
+                // Mouse in top padding
+                fixedY = relY;
+                scaledY = 0;
+              } else {
+                let found = false;
+                for (let i = 0; i < opts.editorState.pages.length; i++) {
+                  const page = opts.editorState.pages[i];
+                  const pageH = page.height * currentScale;
 
-                // Check if mouse is in gap (only if not last page)
-                if (i < opts.editorState.pages.length - 1) {
-                  if (relY < accumulatedH + gapPx2) {
+                  // Check if mouse is on this page
+                  if (relY < accumulatedH + pageH) {
                     scaledY += relY - accumulatedH;
                     found = true;
                     break;
                   }
-                  accumulatedH += gapPx2;
-                  scaledY += gapPx2;
+                  accumulatedH += pageH;
+                  scaledY += pageH;
+
+                  // Check if mouse is in gap (only if not last page)
+                  if (i < opts.editorState.pages.length - 1) {
+                    if (relY < accumulatedH + gapPx2) {
+                      scaledY += relY - accumulatedH;
+                      found = true;
+                      break;
+                    }
+                    accumulatedH += gapPx2;
+                    scaledY += gapPx2;
+                  }
+                }
+                if (!found) {
+                  // Mouse is below last page (bottom padding)
+                  fixedY += relY - accumulatedH;
                 }
               }
-              if (!found) {
-                // Mouse is below last page (bottom padding)
-                fixedY += relY - accumulatedH;
+
+              // Decompose X coordinate (Simple assumption of fixed side padding)
+              const fixedXPadding = WORKSPACE_BASE_PADDING_PX;
+              let fixedX = fixedXPadding;
+              let scaledX = 0;
+              if (relX < fixedXPadding) {
+                fixedX = relX;
+                scaledX = 0;
+              } else {
+                fixedX = fixedXPadding;
+                scaledX = relX - fixedXPadding;
               }
+
+              // Calculate predicted position at new scale
+              targetX = scaledX * (newScale / currentScale) + fixedX;
+              targetY = scaledY * (newScale / currentScale) + fixedY;
             }
 
-            // Decompose X coordinate (Simple assumption of fixed side padding)
-            const fixedXPadding = WORKSPACE_BASE_PADDING_PX;
-            let fixedX = fixedXPadding;
-            let scaledX = 0;
-            if (relX < fixedXPadding) {
-              fixedX = relX;
-              scaledX = 0;
-            } else {
-              fixedX = fixedXPadding;
-              scaledX = relX - fixedXPadding;
-            }
-
-            // Calculate predicted position at new scale
-            targetX = scaledX * (newScale / currentScale) + fixedX;
-            targetY = scaledY * (newScale / currentScale) + fixedY;
+            pendingWheelZoomRef.current = {
+              scale: newScale,
+              anchor: {
+                kind: "content",
+                targetX,
+                targetY,
+                mouseX,
+                mouseY,
+              },
+            };
           }
         }
 
-        const mouseX = e.clientX - containerRect.left;
-        const mouseY = e.clientY - containerRect.top;
-
-        zoomAnchorRef.current = {
-          kind: "content",
-          targetX,
-          targetY,
-          mouseX,
-          mouseY,
-        };
-        opts.onScaleChange(newScale);
+        if (typeof window !== "undefined" && wheelRafRef.current === null) {
+          wheelRafRef.current = window.requestAnimationFrame(() => {
+            wheelRafRef.current = null;
+            const pending = pendingWheelZoomRef.current;
+            if (!pending) return;
+            zoomAnchorRef.current = pending.anchor;
+            pendingWheelZoomRef.current = null;
+            opts.onScaleChange(pending.scale);
+          });
+        }
       }
     },
     [

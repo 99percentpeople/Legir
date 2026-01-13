@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import SettingsDialog from "./components/dialogs/SettingsDialog";
 import type { AIDetectionOptions } from "./components/AIDetectionOptionsForm";
@@ -12,7 +12,6 @@ import { saveDraft, getDraft } from "./services/storageService";
 import {
   exportPdfBytes,
   openFileFromPath,
-  getStartupOpenPdfArg,
   openFile,
   pickSaveTarget,
   writeToSaveTarget,
@@ -20,7 +19,7 @@ import {
 } from "./services/fileOps";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
-import { useEditorStore, type EditorActions } from "./store/useEditorStore";
+import { useEditorStore } from "./store/useEditorStore";
 import { useLocation } from "wouter";
 import AppRoutes from "./AppRoutes";
 import { useAppInitialization } from "./app/useAppInitialization";

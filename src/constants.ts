@@ -23,6 +23,9 @@ export const FIT_SCREEN_PADDING_Y = 120;
 
 export const WORKSPACE_BASE_PADDING_PX = 32;
 export const WORKSPACE_BASE_PAGE_GAP_PX = 32;
+export const WORKSPACE_BOTTOM_PADDING_PX = 80;
+export const WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES = 30;
+export const WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES = 5;
 
 export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   isSidebarOpen: !(typeof window !== "undefined" && window.innerWidth < 768),

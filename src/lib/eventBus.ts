@@ -1,7 +1,10 @@
 export type Unsubscribe = () => void;
 
 export class EventBus<Events extends Record<string, unknown>> {
-  private listeners = new Map<keyof Events, Set<(payload: any) => void>>();
+  private listeners = new Map<
+    keyof Events,
+    Set<(payload: Events[keyof Events]) => void>
+  >();
   private lastPayload = new Map<keyof Events, unknown>();
 
   on<K extends keyof Events>(
@@ -55,6 +58,10 @@ export type AppEventMap = {
   "workspace:textSelectingChange": {
     pageIndex: number;
     isSelecting: boolean;
+  };
+  "workspace:navigatePage": {
+    pageIndex: number;
+    behavior?: "auto" | "smooth";
   };
   "workspace:scrollContainerReady": {
     element: HTMLElement;

@@ -1,4 +1,10 @@
-import React, { Suspense, useCallback, useEffect, useRef } from "react";
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Toolbar from "../components/toolbar/Toolbar";
 import Sidebar from "../components/sidebar/Sidebar";
 import FloatingBar from "../components/toolbar/FloatingBar";
@@ -12,6 +18,7 @@ import { AIDetectionPanel } from "../components/properties-panel/AIDetectionPane
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
+import { TranslationFloatingWindow } from "../components/workspace/widgets/TranslationFloatingWindow";
 
 const Workspace = React.lazy(() => import("../components/workspace/Workspace"));
 import {
@@ -39,7 +46,10 @@ import {
   WORKSPACE_BASE_PAGE_GAP_PX,
 } from "../constants";
 import { isTauri } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  type CloseRequestedEvent,
+  getCurrentWindow,
+} from "@tauri-apps/api/window";
 import { recentFilesService } from "../services/recentFilesService";
 
 export interface EditorPageProps {
@@ -88,6 +98,10 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const skipNextWindowCloseRef = useRef(false);
   const initialTitleRef = useRef<string | null>(null);
   const workspaceScrollContainerRef = useRef<HTMLElement | null>(null);
+
+  const [isTranslateOpen, setIsTranslateOpen] = useState(false);
+  const [translateSourceText, setTranslateSourceText] = useState("");
+  const [translateAutoToken, setTranslateAutoToken] = useState(0);
 
   const toggleFullscreen = useCallback(() => {
     const next = !state.isFullscreen;
@@ -145,6 +159,41 @@ const EditorPage: React.FC<EditorPageProps> = ({
     },
     { replayLast: true },
   );
+
+  useAppEvent("workspace:openTranslate", ({ sourceText, autoTranslate }) => {
+    const trimmed = typeof sourceText === "string" ? sourceText.trim() : "";
+
+    // handle if translate is already open
+    if (isTranslateOpen) {
+      if (trimmed !== "") setTranslateSourceText(trimmed);
+    } else {
+      setTranslateSourceText(trimmed);
+      setIsTranslateOpen(true);
+    }
+
+    if (autoTranslate) setTranslateAutoToken((x) => x + 1);
+  });
+
+  useEffect(() => {
+    if (isTranslateOpen) {
+      setUiState((prev) => {
+        if (prev.rightPanelDockTab?.includes("translate")) return {};
+        return {
+          rightPanelDockTab: [...(prev.rightPanelDockTab ?? []), "translate"],
+        };
+      });
+      return;
+    }
+
+    setUiState((prev) => {
+      if (!prev.rightPanelDockTab?.includes("translate")) return {};
+      return {
+        rightPanelDockTab: (prev.rightPanelDockTab ?? []).filter(
+          (t) => t !== "translate",
+        ),
+      };
+    });
+  }, [isTranslateOpen, setUiState]);
 
   const selectedField =
     state.selectedId && state.fields.find((f) => f.id === state.selectedId)
@@ -254,7 +303,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
       let cancelled = false;
       (async () => {
         const win = getCurrentWindow();
-        unlisten = await win.onCloseRequested((event: any) => {
+        unlisten = await win.onCloseRequested((event: CloseRequestedEvent) => {
           if (skipNextWindowCloseRef.current) {
             skipNextWindowCloseRef.current = false;
             return;
@@ -284,7 +333,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
           if (!isDirty) return;
           try {
-            event?.preventDefault?.();
+            event.preventDefault();
           } catch {
             // ignore
           }
@@ -947,7 +996,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
           onDeleteAnnotation={deleteAnnotation}
           onUpdateAnnotation={updateAnnotation}
           onNavigatePage={(idx) => {
-            document.getElementById(`page-${idx}`)?.scrollIntoView({
+            appEventBus.emit("workspace:navigatePage", {
+              pageIndex: idx,
               behavior: "smooth",
             });
           }}
@@ -1089,6 +1139,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
               onResize={(w) => setUiState({ rightPanelWidth: w })}
             />
           ))}
+
+        <TranslationFloatingWindow
+          isOpen={isTranslateOpen}
+          sourceText={translateSourceText}
+          autoTranslateToken={translateAutoToken}
+          onClose={() => setIsTranslateOpen(false)}
+        />
       </div>
     </>
   );

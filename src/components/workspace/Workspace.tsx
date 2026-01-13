@@ -10,6 +10,9 @@ import {
   DEFAULT_FIELD_STYLE,
   ANNOTATION_STYLES,
   WORKSPACE_BASE_PAGE_GAP_PX,
+  WORKSPACE_BOTTOM_PADDING_PX,
+  WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES,
+  WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES,
 } from "@/constants";
 import { cn } from "@/lib/cn";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
@@ -19,7 +22,6 @@ import { useCanvasPanning } from "@/hooks/useCanvasPanning";
 import { useInkSession } from "./hooks/useInkSession";
 import { getCursor, shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
 import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionPopover";
-import { TranslationFloatingWindow } from "./widgets/TranslationFloatingWindow";
 import PDFPageWithProxy from "./layers/PDFPageWithProxy";
 import { ControlRenderer, preloadControls, registerControls } from "./controls";
 import { useWorkspaceDerivedPages } from "./hooks/useWorkspaceDerivedPages";
@@ -33,11 +35,12 @@ import {
 } from "./hooks/useWorkspaceSnapping";
 import { getPageIndexFromPoint as getPageIndexFromPointLib } from "./lib/getPageIndexFromPoint";
 import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
+import { VirtualizedPages } from "./VirtualizedPages";
+import { computeWorkspacePageRects } from "./lib/computeWorkspacePageRects";
 import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
-import { useEditorStore } from "@/store/useEditorStore";
 
 // Workspace = the editor canvas.
 //
@@ -169,43 +172,26 @@ const Workspace: React.FC<WorkspaceProps> = ({
     onSelectControl,
   });
 
-  const [isTranslateOpen, setIsTranslateOpen] = useState(false);
-  const [translateSourceText, setTranslateSourceText] = useState("");
-  const [translateAutoToken, setTranslateAutoToken] = useState(0);
+  useAppEvent("workspace:navigatePage", ({ pageIndex, behavior }) => {
+    const container = containerRef.current;
+    if (!container) return;
 
-  const setUiState = useEditorStore((s) => s.setUiState);
-
-  useAppEvent("workspace:openTranslate", ({ sourceText, autoTranslate }) => {
-    const trimmed = typeof sourceText === "string" ? sourceText.trim() : "";
-
-    // handle if translate is already open
-    if (isTranslateOpen) {
-      if (trimmed !== "") setTranslateSourceText(trimmed);
-    } else {
-      setTranslateSourceText(trimmed);
-      setIsTranslateOpen(true);
-    }
-
-    if (autoTranslate) setTranslateAutoToken((x) => x + 1);
-  });
-
-  useEffect(() => {
-    if (isTranslateOpen) {
-      setUiState((prev) => {
-        if (prev.rightPanelDockTab?.includes("translate")) return {};
-        const next = [...(prev.rightPanelDockTab ?? []), "translate"];
-        return { rightPanelDockTab: next };
-      });
+    if (shouldVirtualizePages) {
+      const rect = getPageRectByPageIndex(pageIndex);
+      if (!rect) return;
+      if (editorState.pageFlow === "vertical") {
+        container.scrollTo({ top: rect.top, behavior: behavior ?? "auto" });
+      } else {
+        container.scrollTo({ left: rect.left, behavior: behavior ?? "auto" });
+      }
       return;
     }
-    setUiState((prev) => {
-      if (!prev.rightPanelDockTab?.includes("translate")) return {};
-      const next = (prev.rightPanelDockTab ?? []).filter(
-        (t) => t !== "translate",
-      );
-      return { rightPanelDockTab: next };
+
+    document.getElementById(`page-${pageIndex}`)?.scrollIntoView({
+      behavior: behavior ?? "auto",
+      block: "start",
     });
-  }, [isTranslateOpen, setUiState]);
+  });
 
   const [movingFieldId, setMovingFieldId] = useState<string | null>(null);
   const [movingAnnotationId, setMovingAnnotationId] = useState<string | null>(
@@ -281,12 +267,37 @@ const Workspace: React.FC<WorkspaceProps> = ({
   // But we keep this comment for reference.
 
   // --- Optimization: Pre-calculate grouped controls ---
-  const { pagesWithControls, pageRows } = useWorkspaceDerivedPages({
+  const { pagesWithControls } = useWorkspaceDerivedPages({
     pages: editorState.pages,
     fields: editorState.fields,
     annotations: editorState.annotations,
     pageLayout: editorState.pageLayout,
   });
+
+  const pageRowsForLayout = useMemo(() => {
+    if (editorState.pageLayout === "single") {
+      return [] as Array<Array<(typeof editorState.pages)[number]>>;
+    }
+
+    const pages = editorState.pages;
+    const rows: Array<Array<(typeof editorState.pages)[number]>> = [];
+    if (pages.length === 0) return rows;
+
+    const startIndex = editorState.pageLayout === "double_even" ? 1 : 0;
+    if (editorState.pageLayout === "double_even") {
+      if (pages[0]) rows.push([pages[0]]);
+    }
+
+    for (let i = startIndex; i < pages.length; i += 2) {
+      const left = pages[i];
+      if (!left) continue;
+      const right = pages[i + 1];
+      if (right) rows.push([left, right]);
+      else rows.push([left]);
+    }
+
+    return rows;
+  }, [editorState.pageLayout, editorState.pages]);
 
   const pagePlacementByIndex = useMemo(() => {
     const map = new Map<
@@ -299,7 +310,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     >();
 
     if (editorState.pageLayout === "single") {
-      pagesWithControls.forEach((p, idx) => {
+      editorState.pages.forEach((p, idx) => {
         map.set(p.pageIndex, {
           spreadIndex: idx,
           posInSpread: 0,
@@ -309,7 +320,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return map;
     }
 
-    pageRows.forEach((row, spreadIndex) => {
+    pageRowsForLayout.forEach((row, spreadIndex) => {
       row.forEach((p, posInSpread) => {
         map.set(p.pageIndex, {
           spreadIndex,
@@ -320,7 +331,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     });
 
     return map;
-  }, [editorState.pageLayout, pageRows, pagesWithControls]);
+  }, [editorState.pageLayout, editorState.pages, pageRowsForLayout]);
 
   const contentLayoutStyle = useMemo(() => {
     const gapPx = `${WORKSPACE_BASE_PAGE_GAP_PX * editorState.scale}px`;
@@ -347,6 +358,47 @@ const Workspace: React.FC<WorkspaceProps> = ({
     };
   }, [editorState.pageFlow, editorState.pageLayout, editorState.scale]);
 
+  // Large PDFs can overwhelm layout/paint when rendering all pages at once.
+  // Virtualization keeps the DOM small by only mounting pages near the viewport.
+  const shouldVirtualizePages =
+    pagesWithControls.length > WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES;
+
+  const virtualAxis =
+    editorState.pageFlow === "vertical" ? "vertical" : "horizontal";
+
+  const pageLayoutRects = useMemo(() => {
+    return computeWorkspacePageRects({
+      pages: editorState.pages,
+      pageRows: pageRowsForLayout,
+      pageLayout: editorState.pageLayout,
+      pageFlow: editorState.pageFlow,
+      scale: editorState.scale,
+    });
+  }, [
+    editorState.pageFlow,
+    editorState.pageLayout,
+    editorState.pages,
+    editorState.scale,
+    pageRowsForLayout,
+  ]);
+
+  const pageIndexToItemIndex = useMemo(() => {
+    const map = new Map<number, number>();
+    pagesWithControls.forEach((p, i) => {
+      map.set(p.pageIndex, i);
+    });
+    return map;
+  }, [pagesWithControls]);
+
+  const getPageRectByPageIndex = useCallback(
+    (pageIndex: number) => {
+      const idx = pageIndexToItemIndex.get(pageIndex);
+      if (typeof idx !== "number") return null;
+      return pageLayoutRects.virtualRects[idx] ?? null;
+    },
+    [pageIndexToItemIndex, pageLayoutRects.virtualRects],
+  );
+
   const { handleViewportScroll } = useWorkspaceViewport({
     containerRef,
     contentRef,
@@ -360,7 +412,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
   });
 
   const { getRelativeCoordsFromPoint, getRelativeCoords } =
-    useWorkspacePointerCoords({ editorStateRef });
+    useWorkspacePointerCoords({
+      editorStateRef,
+      contentRef,
+      getPageRectByPageIndex,
+    });
 
   const { checkEraserCollision } = useWorkspaceEraser({
     editorState,
@@ -376,6 +432,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
       y,
       activePageIndex,
       editorState.pages.length,
+      {
+        contentEl: contentRef.current,
+        axis: editorState.pageFlow === "vertical" ? "vertical" : "horizontal",
+        getPageRectByPageIndex,
+      },
     );
   };
 
@@ -1584,9 +1645,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
         onTranslate={() => {
           const text = textSelectionToolbar.text.trim();
           if (!text) return;
-          setTranslateSourceText(text);
-          setIsTranslateOpen(true);
-          setTranslateAutoToken((x) => x + 1);
+          appEventBus.emit("workspace:openTranslate", {
+            sourceText: text,
+            autoTranslate: true,
+          });
           window.getSelection?.()?.removeAllRanges?.();
           setTextSelectionToolbar((prev) =>
             prev.isVisible ? { ...prev, isVisible: false } : prev,
@@ -1609,103 +1671,132 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }}
       />
 
-      <TranslationFloatingWindow
-        isOpen={isTranslateOpen}
-        sourceText={translateSourceText}
-        autoTranslateToken={translateAutoToken}
-        onClose={() => setIsTranslateOpen(false)}
-      />
+      {shouldVirtualizePages ? (
+        <div className="flex min-h-full min-w-full">
+          <div
+            ref={contentRef}
+            // IMPORTANT: `shrink-0` ensures scrollWidth/scrollHeight reflect the
+            // computed content size (otherwise flex can shrink the content and the
+            // scrollbar cannot reach the end).
+            className="relative m-auto shrink-0"
+            style={{
+              width: `${pageLayoutRects.contentWidthPx}px`,
+              height: `${pageLayoutRects.contentHeightPx}px`,
+            }}
+          >
+            <VirtualizedPages
+              enabled={shouldVirtualizePages}
+              containerRef={containerRef}
+              axis={virtualAxis}
+              overscan={WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES}
+              pinIndex={
+                typeof activePageIndex === "number"
+                  ? (pageIndexToItemIndex.get(activePageIndex) ?? null)
+                  : null
+              }
+              items={pagesWithControls}
+              rects={pageLayoutRects.virtualRects}
+              getKey={(p) => p.pageIndex}
+              renderItem={(page) => renderPage(page)}
+              layoutEpoch={Math.round(editorState.scale * 1000)}
+            />
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={contentRef}
+          className={cn(
+            "mx-auto grid min-h-full w-fit place-content-center p-8",
+            editorState.pageFlow === "horizontal"
+              ? "content-center items-center justify-items-center"
+              : "items-start justify-items-center",
+          )}
+          style={{
+            ...contentLayoutStyle,
+            paddingBottom: WORKSPACE_BOTTOM_PADDING_PX,
+          }}
+        >
+          {pagesWithControls.map((page) => {
+            const placement = pagePlacementByIndex.get(page.pageIndex);
+            const isDoubleLayout = editorState.pageLayout !== "single";
 
-      <div
-        ref={contentRef}
-        className={cn(
-          "mx-auto grid min-h-full w-fit place-content-center p-8 pb-20",
-          editorState.pageFlow === "horizontal"
-            ? "content-center items-center justify-items-center"
-            : "items-start justify-items-center",
-        )}
-        style={contentLayoutStyle}
-      >
-        {pagesWithControls.map((page) => {
-          const placement = pagePlacementByIndex.get(page.pageIndex);
-          const isDoubleLayout = editorState.pageLayout !== "single";
+            if (!placement || !isDoubleLayout) {
+              const fallbackIdx = pagesWithControls.findIndex(
+                (p) => p.pageIndex === page.pageIndex,
+              );
+              const spreadIndex = Math.max(0, fallbackIdx);
+              return (
+                <div
+                  key={page.pageIndex}
+                  style={
+                    editorState.pageFlow === "horizontal"
+                      ? {
+                          gridColumnStart: spreadIndex + 1,
+                          gridRowStart: 1,
+                        }
+                      : {
+                          gridRowStart: spreadIndex + 1,
+                          gridColumnStart: 1,
+                        }
+                  }
+                >
+                  {renderPage(page)}
+                </div>
+              );
+            }
 
-          if (!placement || !isDoubleLayout) {
-            const fallbackIdx = pagesWithControls.findIndex(
-              (p) => p.pageIndex === page.pageIndex,
-            );
-            const spreadIndex = Math.max(0, fallbackIdx);
-            return (
-              <div
-                key={page.pageIndex}
-                style={
-                  editorState.pageFlow === "horizontal"
-                    ? {
-                        gridColumnStart: spreadIndex + 1,
-                        gridRowStart: 1,
-                      }
-                    : {
-                        gridRowStart: spreadIndex + 1,
-                        gridColumnStart: 1,
-                      }
-                }
-              >
-                {renderPage(page)}
-              </div>
-            );
-          }
+            if (editorState.pageFlow === "horizontal") {
+              return (
+                <div
+                  key={page.pageIndex}
+                  style={
+                    placement.isSingleInSpread
+                      ? {
+                          gridColumnStart: placement.spreadIndex + 1,
+                          gridRow: "1 / span 2",
+                          alignSelf: "center",
+                          justifySelf: "center",
+                        }
+                      : {
+                          gridColumnStart: placement.spreadIndex + 1,
+                          gridRowStart: placement.posInSpread + 1,
+                          justifySelf: "start",
+                          alignSelf:
+                            placement.posInSpread === 0 ? "end" : "start",
+                        }
+                  }
+                >
+                  {renderPage(page)}
+                </div>
+              );
+            }
 
-          if (editorState.pageFlow === "horizontal") {
             return (
               <div
                 key={page.pageIndex}
                 style={
                   placement.isSingleInSpread
                     ? {
-                        gridColumnStart: placement.spreadIndex + 1,
-                        gridRow: "1 / span 2",
-                        alignSelf: "center",
+                        gridRowStart: placement.spreadIndex + 1,
+                        gridColumn: "1 / span 2",
                         justifySelf: "center",
+                        alignSelf: "start",
                       }
                     : {
-                        gridColumnStart: placement.spreadIndex + 1,
-                        gridRowStart: placement.posInSpread + 1,
-                        justifySelf: "start",
-                        alignSelf:
+                        gridRowStart: placement.spreadIndex + 1,
+                        gridColumnStart: placement.posInSpread + 1,
+                        justifySelf:
                           placement.posInSpread === 0 ? "end" : "start",
+                        alignSelf: "start",
                       }
                 }
               >
                 {renderPage(page)}
               </div>
             );
-          }
-
-          return (
-            <div
-              key={page.pageIndex}
-              style={
-                placement.isSingleInSpread
-                  ? {
-                      gridRowStart: placement.spreadIndex + 1,
-                      gridColumn: "1 / span 2",
-                      justifySelf: "center",
-                      alignSelf: "start",
-                    }
-                  : {
-                      gridRowStart: placement.spreadIndex + 1,
-                      gridColumnStart: placement.posInSpread + 1,
-                      justifySelf:
-                        placement.posInSpread === 0 ? "end" : "start",
-                      alignSelf: "start",
-                    }
-              }
-            >
-              {renderPage(page)}
-            </div>
-          );
-        })}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 };

@@ -11,7 +11,6 @@ const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "");
-  const isProd = mode === "production";
   return {
     // prevent vite from obscuring rust errors
     clearScreen: false,
@@ -47,11 +46,6 @@ export default defineConfig(({ mode }) => {
         ],
       }),
     ],
-    esbuild: isProd
-      ? {
-          drop: ["debugger"],
-        }
-      : undefined,
     define: {
       "process.env.API_KEY": JSON.stringify(env.GEMINI_API_KEY),
       "process.env.GEMINI_API_KEY": JSON.stringify(env.GEMINI_API_KEY),

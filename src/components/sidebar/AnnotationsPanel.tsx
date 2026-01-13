@@ -249,8 +249,19 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
       .sort((a, b) => a - b);
   }, [groupedAnnotations]);
 
-  const handleSelect = (id: string) => {
+  const handleSelect = (annot: Annotation) => {
+    const id = annot.id;
     onSelectControl(id);
+
+    // Virtualization note:
+    // Pages/controls may be unmounted until they enter the viewport. Navigate to the
+    // target page first so its controls can mount, then use sticky focus to scroll to
+    // the exact annotation element.
+    appEventBus.emit("workspace:navigatePage", {
+      pageIndex: annot.pageIndex,
+      behavior: "smooth",
+    });
+
     appEventBus.emit(
       "workspace:focusControl",
       { id, focusInput: false },
@@ -362,7 +373,7 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
                       key={annot.id}
                       annotation={annot}
                       isSelected={selectedId === annot.id}
-                      onSelect={() => handleSelect(annot.id)}
+                      onSelect={() => handleSelect(annot)}
                       onDelete={() => onDeleteAnnotation(annot.id)}
                       onUpdate={(updates) =>
                         onUpdateAnnotation(annot.id, updates)

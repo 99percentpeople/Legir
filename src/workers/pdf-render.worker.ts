@@ -13,20 +13,144 @@ pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
   name: "pdfjs-worker-render",
 });
 
+type DocumentPolyfillUsage = {
+  enabled: boolean;
+  calls: {
+    createElement: number;
+    createElementNS: number;
+    createDocumentFragment: number;
+    createTextNode: number;
+    append: number;
+    appendChild: number;
+    insertBefore: number;
+    removeChild: number;
+    setAttribute: number;
+    setAttributeNS: number;
+  };
+};
+
+const documentPolyfillUsage: DocumentPolyfillUsage = {
+  enabled: false,
+  calls: {
+    createElement: 0,
+    createElementNS: 0,
+    createDocumentFragment: 0,
+    createTextNode: 0,
+    append: 0,
+    appendChild: 0,
+    insertBefore: 0,
+    removeChild: 0,
+    setAttribute: 0,
+    setAttributeNS: 0,
+  },
+};
+
+let didLogDocumentPolyfillUse = false;
+const shouldLogDocumentPolyfillUse =
+  (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
+const maybeLogDocumentPolyfillUse = (method: string) => {
+  if (!shouldLogDocumentPolyfillUse) return;
+  if (didLogDocumentPolyfillUse) return;
+  didLogDocumentPolyfillUse = true;
+  console.debug("[worker] document polyfill used", { method });
+};
+
+const getDocumentPolyfillUsageSnapshot = () => ({
+  enabled: documentPolyfillUsage.enabled,
+  calls: { ...documentPolyfillUsage.calls },
+});
+
 // Polyfill document for pdf.js font rendering in worker
 if (typeof self.document === "undefined") {
+  documentPolyfillUsage.enabled = true;
+
+  type FakeNode = {
+    nodeName: string;
+    style: Record<string, string>;
+    appendChild: (child: unknown) => void;
+    removeChild: (child: unknown) => void;
+    insertBefore: (child: unknown, before: unknown | null) => void;
+    append: (...children: unknown[]) => void;
+    setAttribute: (name: string, value: string) => void;
+    setAttributeNS: (ns: string | null, name: string, value: string) => void;
+  };
+
+  const createFakeNode = (nodeName: string): FakeNode => {
+    const node: FakeNode = {
+      nodeName,
+      style: {},
+      appendChild: (child) => {
+        void child;
+        documentPolyfillUsage.calls.appendChild += 1;
+        maybeLogDocumentPolyfillUse("appendChild");
+      },
+      removeChild: (child) => {
+        void child;
+        documentPolyfillUsage.calls.removeChild += 1;
+        maybeLogDocumentPolyfillUse("removeChild");
+      },
+      insertBefore: (child, before) => {
+        void child;
+        void before;
+        documentPolyfillUsage.calls.insertBefore += 1;
+        maybeLogDocumentPolyfillUse("insertBefore");
+      },
+      append: (...children) => {
+        void children;
+        documentPolyfillUsage.calls.append += 1;
+        maybeLogDocumentPolyfillUse("append");
+      },
+      setAttribute: (name, value) => {
+        void name;
+        void value;
+        documentPolyfillUsage.calls.setAttribute += 1;
+        maybeLogDocumentPolyfillUse("setAttribute");
+      },
+      setAttributeNS: (_ns, name, value) => {
+        void name;
+        void value;
+        documentPolyfillUsage.calls.setAttributeNS += 1;
+        maybeLogDocumentPolyfillUse("setAttributeNS");
+      },
+    };
+    return node;
+  };
+
+  const documentElement = createFakeNode("documentElement");
+  const head = createFakeNode("head");
+  const body = createFakeNode("body");
+
   const fakeOwnerDocument = {
+    documentElement,
+    head,
+    body,
     createElement: (name: string) => {
+      documentPolyfillUsage.calls.createElement += 1;
+      maybeLogDocumentPolyfillUse("createElement");
       if (name === "canvas") {
         return new OffscreenCanvas(1, 1);
       }
-      return null;
+      return createFakeNode(name);
     },
-    // 模拟 fonts 对象
-    fonts: (self as any).fonts,
+    createElementNS: (_ns: string, name: string) => {
+      documentPolyfillUsage.calls.createElementNS += 1;
+      maybeLogDocumentPolyfillUse("createElementNS");
+      return fakeOwnerDocument.createElement(name);
+    },
+    createDocumentFragment: () => {
+      documentPolyfillUsage.calls.createDocumentFragment += 1;
+      maybeLogDocumentPolyfillUse("createDocumentFragment");
+      return createFakeNode("#document-fragment");
+    },
+    createTextNode: (text: string) => {
+      documentPolyfillUsage.calls.createTextNode += 1;
+      maybeLogDocumentPolyfillUse("createTextNode");
+      return { nodeName: "#text", textContent: text };
+    },
+    fonts: (self as unknown as { fonts?: unknown }).fonts,
   };
 
-  (self as any).document = fakeOwnerDocument;
+  (self as unknown as { document: unknown }).document = fakeOwnerDocument;
 }
 
 type MaybePromise<T> = T | Promise<T>;
@@ -61,8 +185,6 @@ const activeRenderTasks = new Map<
   { cancel: () => void; docId: string }
 >();
 
-const RENDER_CANCELLED_ERROR = { name: "RenderingCancelledException" } as const;
-
 const registerCancellableTask = (
   id: string,
   docId: string,
@@ -82,7 +204,8 @@ const registerCancellableTask = (
   });
 
   const throwIfCancelled = () => {
-    if (isCancelled) throw RENDER_CANCELLED_ERROR;
+    if (isCancelled)
+      throw new pdfjsLib.RenderingCancelledException("Rendering cancelled");
   };
 
   const cleanup = () => {
@@ -135,6 +258,7 @@ const buildQueueTaskKey = (
   const docId = getDocId(req.docId);
   const pageIndex = req.pageIndex ?? -1;
   const scale = typeof req.scale === "number" ? req.scale : -1;
+  const renderAnnotations = req.renderAnnotations === true ? "1" : "0";
   const canvasId = req.type === "render" ? req.canvasId : "";
   const tile = req.type === "render" && req.tile ? req.tile.join(",") : "";
   const targetWidth =
@@ -146,7 +270,7 @@ const buildQueueTaskKey = (
     req.type === "renderImage" && typeof req.quality === "number"
       ? req.quality
       : -1;
-  return `${type}|${docId}|${pageIndex}|${scale}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}`;
+  return `${type}|${docId}|${pageIndex}|${scale}|${renderAnnotations}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}`;
 };
 
 const cancelQueuedTasksForDoc = (docId: string) => {
@@ -231,8 +355,11 @@ const getTextContentForPage = async (
     throwIfCancelled();
 
     return { payload: textContent } satisfies TaskResult;
-  } catch (error: any) {
-    if (error?.name === "RenderingCancelledException") {
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "RenderingCancelledException"
+    ) {
       return { payload: false } satisfies TaskResult;
     }
 
@@ -262,11 +389,7 @@ const loadDocument = async (
   password?: string,
 ) => {
   const state = getDocState(docId);
-  try {
-    await state.pdfDoc?.destroy();
-  } catch {
-    // ignore
-  }
+  await state.pdfDoc?.destroy().catch(() => {});
   state.pageCache.clear();
   const loadingTask = pdfjsLib.getDocument({
     data: data,
@@ -275,7 +398,7 @@ const loadDocument = async (
     cMapPacked: true,
     standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
     useSystemFonts: false,
-    disableFontFace: false,
+    disableFontFace: true,
     stopAtErrors: false,
   });
 
@@ -301,10 +424,10 @@ const loadDocument = async (
 const disposeDocument = async (docId: string) => {
   const state = docs.get(docId);
   if (!state) return;
-  try {
-    await state.pdfDoc?.destroy();
-  } catch {}
   docs.delete(docId);
+
+  await state.pdfDoc?.destroy().catch(() => {});
+  state.pdfDoc = null;
 };
 
 const ensureDocumentLoaded = async (
@@ -449,16 +572,17 @@ const renderToCanvas = async (
 
     renderTask = page.render(renderContext);
 
-    await renderTask.promise.catch((e) => {
-      throw new Error("[worker] failed to renderToCanvas: " + e.message);
-    });
+    await renderTask.promise;
 
     ctx.restore();
 
     // No need to transfer bitmap back, canvas is already updated
     return { payload: true } satisfies TaskResult;
-  } catch (error: any) {
-    if (error?.name === "RenderingCancelledException") {
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "RenderingCancelledException"
+    ) {
       return { payload: false } satisfies TaskResult;
     }
 
@@ -508,7 +632,6 @@ const renderToImage = async (
       await ensureDocumentLoaded(resolvedDocId);
     }
     throwIfCancelled();
-
     const page = await getPageForDoc(resolvedDocId, pageIndex);
     throwIfCancelled();
 
@@ -545,9 +668,7 @@ const renderToImage = async (
       annotationMode,
     });
 
-    await renderTask.promise.catch((error) => {
-      throw new Error("[worker] failed to renderToImage: " + error.message);
-    });
+    await renderTask.promise;
     throwIfCancelled();
 
     const outMimeType = mimeType || "image/jpeg";
@@ -567,14 +688,26 @@ const renderToImage = async (
       },
       transfer: [buf],
     } satisfies TaskResult;
-  } catch (error: any) {
-    if (error?.name === "RenderingCancelledException") {
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "RenderingCancelledException"
+    ) {
       return { payload: false } satisfies TaskResult;
     }
 
+    console.error("[worker] renderImage error", {
+      id,
+      docId: resolvedDocId,
+      pageIndex,
+      message: error?.message,
+      name: error?.name,
+      documentPolyfillUsage: getDocumentPolyfillUsageSnapshot(),
+    });
+
     throw error;
   } finally {
-    activeRenderTasks.delete(id);
+    cleanup();
   }
 };
 
@@ -728,7 +861,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
     }
 
     postSuccess(id, result?.payload, result?.transfer);
-  } catch (err: any) {
+  } catch (err) {
     if (id) {
       postError(id, err?.message || "Unknown error");
     }
