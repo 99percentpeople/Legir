@@ -424,7 +424,7 @@ const loadDocument = async (
     cMapPacked: true,
     standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
     useSystemFonts: false,
-    disableFontFace: true,
+    disableFontFace: false,
     stopAtErrors: false,
   });
 
