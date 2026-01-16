@@ -256,7 +256,7 @@ const zhCN = {
       destination: "目标",
       page: "第{page}页",
       go_to_page: "跳转到第{page}页",
-      not_available: "暂无",
+      not_available: "无",
     },
   },
   right_panel: {

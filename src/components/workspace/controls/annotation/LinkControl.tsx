@@ -6,10 +6,14 @@ import { appEventBus } from "@/lib/eventBus";
 import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useLanguage } from "@/components/language-provider";
+import { useEditorStore } from "@/store/useEditorStore";
 
 export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
-  const { data } = props;
+  const { data, id, isSelected, onSelect } = props;
   const { t } = useLanguage();
+  const isModifierPressed = useEditorStore(
+    (state) => state.keys.ctrl || state.keys.meta,
+  );
 
   const safeUrl = useMemo(() => {
     if (!data.linkUrl) return null;
@@ -32,6 +36,13 @@ export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
 
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (isModifierPressed) {
+        event.preventDefault();
+        event.stopPropagation();
+        onSelect(id);
+        return;
+      }
+
       if (destPageIndex !== null) {
         event.preventDefault();
         appEventBus.emit("workspace:navigatePage", {
@@ -48,20 +59,22 @@ export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
         void openUrl(safeUrl);
       }
     },
-    [destPageIndex, safeUrl, appEventBus, isTauri, openUrl],
-  );
-
-  const handlePointerDown = useCallback(
-    (event: React.PointerEvent<HTMLAnchorElement>) => {
-      event.stopPropagation();
-    },
-    [],
+    [
+      destPageIndex,
+      safeUrl,
+      id,
+      onSelect,
+      isModifierPressed,
+      appEventBus,
+      isTauri,
+      openUrl,
+    ],
   );
 
   if (!safeUrl && destPageIndex === null) return null;
 
   return (
-    <ControlWrapper {...props} showBorder={false}>
+    <ControlWrapper {...props} showBorder={isSelected}>
       <a
         className="absolute inset-0"
         href={safeUrl || "#"}
@@ -70,7 +83,6 @@ export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
         title={title}
         aria-label={title}
         onClick={handleClick}
-        onPointerDown={handlePointerDown}
         style={{ cursor: "pointer" }}
       />
     </ControlWrapper>

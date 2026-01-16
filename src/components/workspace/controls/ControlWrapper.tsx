@@ -108,6 +108,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       id={elementId || undefined}
       onPointerDown={(e) => {
         if (!isSelectable) return;
+        if (e.button === 1) return;
         onPointerDown?.(e);
       }}
       className={cn(

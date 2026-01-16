@@ -186,6 +186,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
                 }}
                 onPointerDown={(e) => {
                   if (!isSelectable) return;
+                  if (e.button === 1) return;
                   e.stopPropagation();
                   onSelect(data.id);
                   props.onPointerDown?.(e);
