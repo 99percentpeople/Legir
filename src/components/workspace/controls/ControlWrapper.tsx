@@ -30,17 +30,23 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
 }) => {
   const wrapperRef = React.useRef<HTMLDivElement>(null);
   const pendingFocusRef = React.useRef(false);
-  const focusInputRef = React.useRef(true);
 
   useAppEvent(
     "workspace:focusControl",
     (payload) => {
       if (payload.id !== id) return;
       pendingFocusRef.current = true;
-      focusInputRef.current = payload.focusInput !== false;
     },
     { replayLast: true },
   );
+
+  const isAnnotation = [
+    "comment",
+    "highlight",
+    "ink",
+    "freetext",
+    "link",
+  ].includes(data.type);
 
   React.useEffect(() => {
     if (!isSelected) return;
@@ -50,13 +56,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     const el = wrapperRef.current;
     if (!el) return;
 
-    el.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-      inline: "center",
-    });
-
-    if (focusInputRef.current) {
+    if (!isAnnotation) {
       const input = el.querySelector(
         "input, textarea, select, [contenteditable='true']",
       ) as HTMLElement | null;
@@ -72,7 +72,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     }
 
     appEventBus.clearSticky("workspace:focusControl");
-  }, [isSelected]);
+  }, [isSelected, isAnnotation]);
 
   // Extract rect safely
   const rect = customRect || ("rect" in data ? data.rect : undefined);
@@ -91,9 +91,6 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const label = "name" in data ? (data as { name: string }).name : data.type;
 
   // Determine ID based on type for sidebar navigation
-  const isAnnotation = ["comment", "highlight", "ink", "freetext"].includes(
-    data.type,
-  );
   const defaultElementId = isAnnotation
     ? `annotation-${id}`
     : `field-element-${id}`;

@@ -87,7 +87,7 @@ export interface FormField {
 export interface Annotation {
   id: string;
   pageIndex: number;
-  type: "highlight" | "ink" | "comment" | "freetext";
+  type: "highlight" | "ink" | "comment" | "freetext" | "link";
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
@@ -105,6 +105,8 @@ export interface Annotation {
   updatedAt?: string; // ISO Date string for modification date
   svgPath?: string; // Imported appearance path data
   appearanceStreamContent?: string; // Raw PDF appearance stream operators
+  linkUrl?: string;
+  linkDestPageIndex?: number;
 
   sourcePdfRef?: { objectNumber: number; generationNumber: number };
   sourcePdfFontName?: string;

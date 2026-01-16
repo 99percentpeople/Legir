@@ -247,6 +247,14 @@ const en = {
     y: "Y",
     width: "Width",
     height: "Height",
+    link: {
+      title: "Link",
+      url: "URL",
+      destination: "Destination",
+      page: "Page {page}",
+      go_to_page: "Go to page {page}",
+      not_available: "N/A",
+    },
   },
   right_panel: {
     tabs: {

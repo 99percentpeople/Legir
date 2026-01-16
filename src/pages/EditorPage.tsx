@@ -160,6 +160,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
     { replayLast: true },
   );
 
+  useAppEvent("sidebar:focusAnnotation", () => {
+    setUiState((prev) => ({
+      isSidebarOpen: true,
+      sidebarTab: "annotations",
+      ...(prev.isPanelFloating ? { isRightPanelOpen: false } : {}),
+    }));
+  });
+
   useAppEvent("workspace:openTranslate", ({ sourceText, autoTranslate }) => {
     const trimmed = typeof sourceText === "string" ? sourceText.trim() : "";
 
@@ -768,12 +776,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const handleEditAnnotation = useCallback(
     (id: string) => {
-      setUiState((prev) => ({
-        isSidebarOpen: true,
-        sidebarTab: "annotations",
-        ...(prev.isPanelFloating ? { isRightPanelOpen: false } : {}),
-      }));
-
       selectControl(id);
 
       appEventBus.emit(
@@ -784,7 +786,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         },
       );
     },
-    [selectControl, setUiState],
+    [selectControl],
   );
 
   const handlePropertiesChange = useCallback(
@@ -983,12 +985,16 @@ const EditorPage: React.FC<EditorPageProps> = ({
           outline={state.outline}
           selectedId={state.selectedId}
           thumbnailsLayout={state.options.thumbnailsLayout}
-          onSelectControl={(id) => {
+          onSelectControl={(id, options) => {
             selectControl(id);
             if (id) {
               appEventBus.emit(
                 "workspace:focusControl",
-                { id, focusInput: true },
+                {
+                  id,
+                  behavior: options?.behavior,
+                  skipScroll: options?.skipScroll,
+                },
                 { sticky: true },
               );
             }

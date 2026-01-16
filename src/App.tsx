@@ -371,7 +371,12 @@ const App: React.FC = () => {
         pages,
         outline,
         fields: draft.fields,
-        annotations: draft.annotations || fileAnnotations,
+        annotations: draft.annotations
+          ? [
+              ...draft.annotations.filter((a) => a.type !== "link"),
+              ...fileAnnotations.filter((a) => a.type === "link"),
+            ]
+          : fileAnnotations,
         metadata: draft.metadata,
         filename: draft.filename,
         saveTarget: null,

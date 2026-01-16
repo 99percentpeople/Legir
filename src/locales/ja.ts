@@ -250,6 +250,14 @@ const ja = {
     y: "Y",
     width: "幅",
     height: "高さ",
+    link: {
+      title: "リンク",
+      url: "URL",
+      destination: "移動先",
+      page: "ページ {page}",
+      go_to_page: "ページ {page} に移動",
+      not_available: "なし",
+    },
   },
   right_panel: {
     tabs: {

@@ -16,12 +16,16 @@ import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { cn } from "../../lib/cn";
 import { useLanguage } from "../language-provider";
+import type { AppEventMap } from "@/lib/eventBus";
 
 interface FieldTreePanelProps {
   pages: PageData[];
   fields: FormField[];
   selectedId: string | null;
-  onSelectControl: (id: string) => void;
+  onSelectControl: (
+    id: string,
+    options?: Omit<AppEventMap["workspace:focusControl"], "id">,
+  ) => void;
 }
 
 const FieldTreePanel: React.FC<FieldTreePanelProps> = ({

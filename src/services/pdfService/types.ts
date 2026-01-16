@@ -45,6 +45,10 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   modificationDate?: string;
   quadPoints?: number[];
   opacity?: number;
+  url?: string;
+  unsafeUrl?: string;
+  dest?: unknown;
+  destPageIndex?: number | null;
 };
 
 export interface ParserContext {

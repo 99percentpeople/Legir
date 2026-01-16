@@ -135,6 +135,20 @@ const CONTROL_CONFIGS: ControlConfig[] = [
     label: "Comment",
   },
   {
+    type: "link",
+    component: lazyWithPreload(() =>
+      import("./annotation/LinkControl").then((module) => ({
+        default: module.LinkControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/LinkProperties").then((module) => ({
+        default: module.LinkProperties,
+      })),
+    ),
+    label: "Link",
+  },
+  {
     type: "freetext",
     component: lazyWithPreload(() =>
       import("./annotation/FreetextControl").then((module) => ({

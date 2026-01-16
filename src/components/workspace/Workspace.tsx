@@ -35,6 +35,7 @@ import {
 } from "./hooks/useWorkspaceSnapping";
 import { getPageIndexFromPoint as getPageIndexFromPointLib } from "./lib/getPageIndexFromPoint";
 import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
+import { getFocusRect } from "./lib/getFocusRect";
 import { VirtualizedPages } from "./VirtualizedPages";
 import { computeWorkspacePageRects } from "./lib/computeWorkspacePageRects";
 import { isTauri } from "@tauri-apps/api/core";
@@ -172,24 +173,71 @@ const Workspace: React.FC<WorkspaceProps> = ({
     onSelectControl,
   });
 
-  useAppEvent("workspace:navigatePage", ({ pageIndex, behavior }) => {
+  useAppEvent(
+    "workspace:navigatePage",
+    ({ pageIndex, behavior, skipScroll }) => {
+      if (skipScroll) return;
+      const container = containerRef.current;
+      if (!container) return;
+
+      if (shouldVirtualizePages) {
+        const rect = getPageRectByPageIndex(pageIndex);
+        if (!rect) return;
+        if (editorState.pageFlow === "vertical") {
+          container.scrollTo({ top: rect.top, behavior: behavior ?? "auto" });
+        } else {
+          container.scrollTo({ left: rect.left, behavior: behavior ?? "auto" });
+        }
+        return;
+      }
+
+      document.getElementById(`page-${pageIndex}`)?.scrollIntoView({
+        behavior: behavior ?? "auto",
+        block: "start",
+      });
+    },
+  );
+
+  useAppEvent("workspace:focusControl", ({ id, behavior, skipScroll }) => {
+    if (skipScroll) return;
     const container = containerRef.current;
     if (!container) return;
 
-    if (shouldVirtualizePages) {
-      const rect = getPageRectByPageIndex(pageIndex);
-      if (!rect) return;
-      if (editorState.pageFlow === "vertical") {
-        container.scrollTo({ top: rect.top, behavior: behavior ?? "auto" });
-      } else {
-        container.scrollTo({ left: rect.left, behavior: behavior ?? "auto" });
-      }
-      return;
+    const state = editorStateRef.current;
+    const field = state.fields.find((item) => item.id === id);
+    const annotation = field
+      ? null
+      : state.annotations.find((item) => item.id === id);
+
+    const pageIndex = field?.pageIndex ?? annotation?.pageIndex;
+    if (typeof pageIndex !== "number") return;
+
+    const rect =
+      field?.rect ?? (annotation ? getFocusRect(annotation) : undefined);
+    const pageRect = getPageRectByPageIndex(pageIndex);
+    if (!pageRect) return;
+
+    const containerRect = container.getBoundingClientRect();
+    let targetLeft = pageRect.left;
+    let targetTop = pageRect.top;
+
+    if (rect) {
+      const rectCenterX = rect.x + rect.width / 2;
+      const rectCenterY = rect.y + rect.height / 2;
+      targetLeft =
+        pageRect.left +
+        rectCenterX * editorState.scale -
+        containerRect.width / 2;
+      targetTop =
+        pageRect.top +
+        rectCenterY * editorState.scale -
+        containerRect.height / 2;
     }
 
-    document.getElementById(`page-${pageIndex}`)?.scrollIntoView({
-      behavior: behavior ?? "auto",
-      block: "start",
+    container.scrollTo({
+      left: Math.max(0, targetLeft),
+      top: Math.max(0, targetTop),
+      behavior: behavior ?? "smooth",
     });
   });
 
@@ -1418,7 +1466,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
       setActivePageIndex(data.pageIndex);
       const coords = getRelativeCoords(e, data.pageIndex);
 
-      if (["freetext", "ink", "highlight", "comment"].includes(data.type)) {
+      if (
+        ["freetext", "ink", "highlight", "comment", "link"].includes(data.type)
+      ) {
         setResizingAnnotationId(data.id);
       } else {
         setResizingFieldId(data.id);
@@ -1515,24 +1565,30 @@ const Workspace: React.FC<WorkspaceProps> = ({
             onControlResizeStart={handleResizePointerDown}
           />
         ))}
-        {page.pageAnnotations.map((annot) => (
-          <ControlRenderer
-            key={annot.id}
-            data={annot}
-            id={annot.id}
-            isSelected={editorState.selectedId === annot.id}
-            scale={editorState.scale}
-            isAnnotationMode={editorState.mode === "annotation"}
-            isFormMode={editorState.mode === "form"}
-            isSelectable={isSelectable}
-            onControlPointerDown={handleAnnotationPointerDown}
-            onSelect={onSelectControl}
-            onUpdate={onUpdateAnnotation}
-            onDelete={onDeleteAnnotation}
-            onEdit={onEditAnnotation}
-            onControlResizeStart={handleResizePointerDown}
-          />
-        ))}
+        {page.pageAnnotations.map((annot) => {
+          const allowSelect = annot.type !== "link";
+
+          return (
+            <ControlRenderer
+              key={annot.id}
+              data={annot}
+              id={annot.id}
+              isSelected={editorState.selectedId === annot.id}
+              scale={editorState.scale}
+              isAnnotationMode={editorState.mode === "annotation"}
+              isFormMode={editorState.mode === "form"}
+              isSelectable={isSelectable}
+              onControlPointerDown={
+                allowSelect ? handleAnnotationPointerDown : undefined
+              }
+              onSelect={onSelectControl}
+              onUpdate={onUpdateAnnotation}
+              onDelete={onDeleteAnnotation}
+              onEdit={onEditAnnotation}
+              onControlResizeStart={handleResizePointerDown}
+            />
+          );
+        })}
 
         {dragStart && dragCurrent && activePageIndex === page.pageIndex && (
           <div

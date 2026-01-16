@@ -40,7 +40,6 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   const pdfTextLayerDebug = useEditorStore(
     (s) => s.options.debugOptions.pdfTextLayer,
   );
-
   const [renderedScale, setRenderedScale] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
@@ -151,10 +150,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
             rotation: pageProxy.rotate,
           });
 
-          const textContent = await pdfWorkerService.getTextContent({
+          const textContentPromise = pdfWorkerService.getTextContent({
             pageIndex,
             signal,
           });
+
+          const textContent = await textContentPromise;
           if (isCancelled()) return;
           if (!textContent) return;
 

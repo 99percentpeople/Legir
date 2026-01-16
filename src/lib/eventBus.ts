@@ -62,6 +62,7 @@ export type AppEventMap = {
   "workspace:navigatePage": {
     pageIndex: number;
     behavior?: "auto" | "smooth";
+    skipScroll?: boolean;
   };
   "workspace:scrollContainerReady": {
     element: HTMLElement;
@@ -72,7 +73,8 @@ export type AppEventMap = {
   };
   "workspace:focusControl": {
     id: string;
-    focusInput?: boolean;
+    behavior?: "auto" | "smooth";
+    skipScroll?: boolean;
   };
   "sidebar:focusAnnotation": {
     id: string;

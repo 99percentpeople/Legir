@@ -49,7 +49,7 @@ const documentPolyfillUsage: DocumentPolyfillUsage = {
   },
 };
 
-const shouldLogDocumentPolyfillUse = import.meta.env.DEV === true;
+const shouldLogDocumentPolyfillUse = false;
 const maybeLogDocumentPolyfillUse = (method: string, data?: unknown) => {
   documentPolyfillUsage.calls[method] += 1;
   if (!shouldLogDocumentPolyfillUse) return;

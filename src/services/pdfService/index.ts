@@ -1,6 +1,6 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { pdfWorkerService } from "./pdfWorkerService";
-import { mapOutline } from "./lib/outline";
+import { mapOutline, resolveDest } from "./lib/outline";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
 import { loadAndEmbedExportFonts } from "./lib/built-in-fonts";
 import {
@@ -44,6 +44,7 @@ import {
   PDFOptionList,
   PDFRadioGroup,
   PDFSignature,
+  PDFNull,
 } from "@cantoo/pdf-lib";
 import fontkit from "pdf-fontkit";
 import { pdfDebug, pdfDebugEnabled } from "./lib/debug";
@@ -68,6 +69,7 @@ import {
   HighlightParser,
   CommentParser,
   FreeTextParser,
+  LinkParser,
 } from "./parsers/AnnotationParsers";
 import {
   TextControlParser,
@@ -119,6 +121,7 @@ const annotationParsers: IAnnotationParser[] = [
   new HighlightParser(),
   new CommentParser(),
   new FreeTextParser(),
+  new LinkParser(),
 ];
 
 const controlParsers: IControlParser[] = [
@@ -220,9 +223,236 @@ const createPdfJsLoadTask = (options: {
   };
 };
 
-const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
+const buildPdfLibAnnotsByPageIndex = async (
+  pdfDoc: PDFDocument,
+  pdfJsDoc: pdfjsLib.PDFDocumentProxy,
+) => {
   const out = new Map<number, PdfJsAnnotation[]>();
   const pages = pdfDoc.getPages();
+  const pageIndexByRefKey = new Map<string, number>();
+  const pageIndexByNode = new Map<PDFDict, number>();
+
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const page = pages[pageIndex];
+    const pageNode = page.node;
+    if (pageNode instanceof PDFDict) {
+      pageIndexByNode.set(pageNode, pageIndex);
+      const ref = pdfDoc.context.getObjectRef(pageNode);
+      if (ref) {
+        pageIndexByRefKey.set(
+          `${ref.objectNumber}:${ref.generationNumber}`,
+          pageIndex,
+        );
+      }
+    }
+  }
+
+  const normalizeDestForResolve = (
+    value: unknown,
+    depth = 0,
+    seenRefs: Set<string> = new Set(),
+  ): unknown => {
+    if (value === undefined || value === null) return undefined;
+    if (depth > 6) return undefined;
+
+    const refToProxy = (ref: PDFRef) => ({
+      num: ref.objectNumber,
+      gen: ref.generationNumber,
+    });
+
+    if (value instanceof PDFRef) {
+      const key = `${value.objectNumber}:${value.generationNumber}`;
+      if (seenRefs.has(key)) return undefined;
+      seenRefs.add(key);
+
+      let resolved: unknown = undefined;
+      try {
+        resolved = pdfDoc.context.lookup(value);
+      } catch {
+        resolved = undefined;
+      }
+
+      if (resolved && resolved !== value) {
+        const normalized = normalizeDestForResolve(
+          resolved,
+          depth + 1,
+          seenRefs,
+        );
+        if (normalized !== undefined) return normalized;
+      }
+
+      return [refToProxy(value)];
+    }
+
+    if (typeof value === "string" || Array.isArray(value)) return value;
+    if (value instanceof PDFString || value instanceof PDFName) {
+      return pdfObjToString(value);
+    }
+    if (value instanceof PDFDict) {
+      const ref = pdfDoc.context.getObjectRef(value);
+      return ref ? [refToProxy(ref)] : undefined;
+    }
+    if (value instanceof PDFNumber) {
+      return [value.asNumber()];
+    }
+    if (value instanceof PDFArray) {
+      let rawFirst: unknown = undefined;
+      try {
+        rawFirst = value.get(0);
+      } catch {
+        rawFirst = undefined;
+      }
+
+      if (rawFirst instanceof PDFRef) {
+        return [refToProxy(rawFirst)];
+      }
+      if (rawFirst instanceof PDFDict) {
+        const ref = pdfDoc.context.getObjectRef(rawFirst);
+        return ref ? [refToProxy(ref)] : undefined;
+      }
+      if (rawFirst instanceof PDFNumber) {
+        return [rawFirst.asNumber()];
+      }
+      if (rawFirst instanceof PDFString || rawFirst instanceof PDFName) {
+        const named = pdfObjToString(rawFirst);
+        return named || undefined;
+      }
+
+      let first: unknown = undefined;
+      try {
+        first = value.lookup(0);
+      } catch {
+        first = undefined;
+      }
+      if (first instanceof PDFRef) {
+        return [refToProxy(first)];
+      }
+      if (first instanceof PDFNumber) {
+        return [first.asNumber()];
+      }
+      if (first instanceof PDFString || first instanceof PDFName) {
+        const named = pdfObjToString(first);
+        return named || undefined;
+      }
+      if (first instanceof PDFDict) {
+        const ref = pdfDoc.context.getObjectRef(first);
+        return ref ? [refToProxy(ref)] : undefined;
+      }
+
+      return undefined;
+    }
+    return value;
+  };
+
+  const readDictValue = (dict: PDFDict, key: string): unknown => {
+    const pdfKey = PDFName.of(key);
+    let value: unknown = undefined;
+    try {
+      value = dict.lookup(pdfKey);
+    } catch {
+      value = undefined;
+    }
+
+    if (value === undefined || value === PDFNull) {
+      try {
+        value = dict.get(pdfKey, true);
+      } catch {
+        value = undefined;
+      }
+      if (value instanceof PDFRef) {
+        try {
+          value = dict.context.lookup(value);
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (value === PDFNull) return undefined;
+    return value;
+  };
+
+  const extractActionDest = (action: PDFDict, depth = 0): unknown => {
+    if (depth > 4) return undefined;
+
+    const direct = readDictValue(action, "D") ?? readDictValue(action, "Dest");
+    if (direct !== undefined) return direct;
+
+    const next = readDictValue(action, "Next");
+    if (next instanceof PDFDict) {
+      return extractActionDest(next, depth + 1);
+    }
+    if (next instanceof PDFArray) {
+      for (let i = 0; i < next.size(); i++) {
+        let item: unknown = undefined;
+        try {
+          item = next.lookup(i);
+        } catch {
+          item = undefined;
+        }
+        if (item instanceof PDFDict) {
+          const found = extractActionDest(item, depth + 1);
+          if (found !== undefined) return found;
+        }
+      }
+    }
+
+    return undefined;
+  };
+
+  const resolveDestPageIndexFromPdfLib = (
+    value: unknown,
+  ): number | undefined => {
+    const resolveFromNumber = (num: number): number | undefined => {
+      if (!Number.isFinite(num)) return undefined;
+      if (num >= 0 && num < pages.length) return num;
+      if (num >= 1 && num <= pages.length) return num - 1;
+      return undefined;
+    };
+
+    const resolveFromRef = (ref: PDFRef): number | undefined => {
+      const key = `${ref.objectNumber}:${ref.generationNumber}`;
+      return pageIndexByRefKey.get(key);
+    };
+
+    const resolveFromDict = (dict: PDFDict): number | undefined => {
+      const direct = pageIndexByNode.get(dict);
+      if (typeof direct === "number") return direct;
+      const ref = pdfDoc.context.getObjectRef(dict);
+      if (!ref) return undefined;
+      return resolveFromRef(ref);
+    };
+
+    const resolveFromValue = (val: unknown): number | undefined => {
+      if (!val) return undefined;
+      if (val instanceof PDFRef) return resolveFromRef(val);
+      if (val instanceof PDFDict) return resolveFromDict(val);
+      if (val instanceof PDFNumber) return resolveFromNumber(val.asNumber());
+      if (typeof val === "number") return resolveFromNumber(val);
+      return undefined;
+    };
+
+    if (value instanceof PDFArray) {
+      let rawFirst: unknown = undefined;
+      try {
+        rawFirst = value.get(0);
+      } catch {
+        rawFirst = undefined;
+      }
+      const rawResolved = resolveFromValue(rawFirst);
+      if (typeof rawResolved === "number") return rawResolved;
+
+      let lookedUp: unknown = undefined;
+      try {
+        lookedUp = value.lookup(0);
+      } catch {
+        lookedUp = undefined;
+      }
+      return resolveFromValue(lookedUp);
+    }
+
+    return resolveFromValue(value);
+  };
 
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
     const page = pages[pageIndex];
@@ -232,7 +462,17 @@ const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
     } catch {
       annots = undefined;
     }
-    if (!(annots instanceof PDFArray)) continue;
+    if (!(annots instanceof PDFArray)) {
+      pdfDebug("import:annotations", "page_annots_missing", () => ({
+        pageIndex,
+        annots: summarizePdfObjForDebug(annots),
+      }));
+      continue;
+    }
+    pdfDebug("import:annotations", "page_annots", () => ({
+      pageIndex,
+      count: annots.size(),
+    }));
 
     for (let i = 0; i < annots.size(); i++) {
       let sourcePdfRef:
@@ -255,13 +495,35 @@ const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
       const annot = annots.lookup(i);
       if (!(annot instanceof PDFDict)) continue;
 
-      const subtype = annot.lookup(PDFName.of("Subtype"));
-
+      let subtype: unknown;
+      try {
+        subtype = annot.lookup(PDFName.of("Subtype"));
+      } catch {
+        subtype = undefined;
+      }
       const subtypeName =
         subtype instanceof PDFName ? subtype.decodeText() : undefined;
+
+      let rectObj: unknown;
+      try {
+        rectObj = annot.lookup(PDFName.of("Rect"));
+      } catch {
+        rectObj = undefined;
+      }
+      const rect = pdfRectFromObj(rectObj);
+
+      pdfDebug("import:annotations", "annot_raw", () => ({
+        pageIndex,
+        annotIndex: i,
+        subtypeName,
+        rect,
+        rectObj: summarizePdfObjForDebug(rectObj),
+        sourcePdfRef,
+        annot: summarizePdfObjForDebug(annot),
+      }));
+
       if (!subtypeName) continue;
 
-      const rect = pdfRectFromObj(annot.lookup(PDFName.of("Rect")));
       if (!rect) continue;
 
       const pushForPage = (a: PdfJsAnnotation) => {
@@ -465,6 +727,72 @@ const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
         continue;
       }
 
+      if (subtypeName === "Link") {
+        let url: string | undefined = undefined;
+        let dest: unknown = undefined;
+        let action: PDFDict | undefined = undefined;
+        let actionType: string | undefined = undefined;
+
+        try {
+          const actionValue = readDictValue(annot, "A");
+          if (actionValue instanceof PDFDict) {
+            action = actionValue;
+            actionType = pdfObjToString(readDictValue(action, "S"));
+            if (actionType === "URI") {
+              url = pdfObjToString(readDictValue(action, "URI"));
+            }
+            const actionDest = extractActionDest(action);
+            if (actionDest !== undefined) dest = actionDest;
+          }
+        } catch {
+          // ignore
+        }
+
+        if (dest === undefined) {
+          try {
+            dest = readDictValue(annot, "Dest");
+          } catch {
+            // ignore
+          }
+        }
+
+        let destPageIndex: number | null | undefined = undefined;
+        const normalizedDest = normalizeDestForResolve(dest);
+        if (normalizedDest !== undefined) {
+          destPageIndex = await resolveDest(pdfJsDoc, normalizedDest);
+        }
+        if (typeof destPageIndex !== "number") {
+          const fallbackIndex = resolveDestPageIndexFromPdfLib(dest);
+          if (typeof fallbackIndex === "number") destPageIndex = fallbackIndex;
+        }
+
+        pdfDebug("import:annotations", "link_extracted", () => ({
+          pageIndex,
+          annotIndex: i,
+          url,
+          actionType,
+          actionKeys: action ? action.keys().map((k) => k.decodeText()) : [],
+          action: summarizePdfObjForDebug(action),
+          dest: summarizePdfObjForDebug(dest),
+          normalizedDest,
+          destPageIndex,
+        }));
+
+        if (!url && typeof destPageIndex !== "number") {
+          continue;
+        }
+
+        pushForPage({
+          subtype: "Link",
+          rect,
+          sourcePdfRef,
+          url,
+          dest,
+          destPageIndex,
+        });
+        continue;
+      }
+
       if (
         subtypeName !== "Highlight" &&
         subtypeName !== "Text" &&
@@ -605,7 +933,7 @@ export const loadPDF = async (
     undefined;
   if (pdfDoc) {
     try {
-      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc);
+      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, pdf);
     } catch (e) {
       console.warn("Failed to extract annotations with pdf-lib", e);
     }
@@ -760,6 +1088,22 @@ export const loadPDF = async (
     fields.push(...r.fields);
     annotations.push(...r.annotations);
   }
+
+  pdfDebug("import:annotations", "annotations_final", () => {
+    const counts: Record<string, number> = {};
+    for (const a of annotations) {
+      const key = a.type || "unknown";
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    const linkWithDest = annotations.filter(
+      (a) => a.type === "link" && typeof a.linkDestPageIndex === "number",
+    ).length;
+    return {
+      total: annotations.length,
+      counts,
+      linkWithDest,
+    };
+  });
 
   const [metadata, outline] = await Promise.all([
     metadataPromise,
