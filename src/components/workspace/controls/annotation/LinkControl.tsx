@@ -34,17 +34,17 @@ export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
       ? t("properties.link.go_to_page", { page: destPageIndex + 1 })
       : t("properties.link.title");
 
-  const handleClick = useCallback(
-    (event: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleActivate = useCallback(
+    (event?: React.SyntheticEvent) => {
       if (isModifierPressed) {
-        event.preventDefault();
-        event.stopPropagation();
+        event?.preventDefault();
+        event?.stopPropagation();
         onSelect(id);
         return;
       }
 
       if (destPageIndex !== null) {
-        event.preventDefault();
+        event?.preventDefault();
         appEventBus.emit("workspace:navigatePage", {
           pageIndex: destPageIndex,
           behavior: "smooth",
@@ -55,8 +55,13 @@ export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
       if (!safeUrl) return;
 
       if (isTauri()) {
-        event.preventDefault();
+        event?.preventDefault();
         void openUrl(safeUrl);
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        window.open(safeUrl, "_blank", "noopener,noreferrer");
       }
     },
     [
@@ -71,17 +76,26 @@ export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
     ],
   );
 
+  const handleClick = useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>) => {
+      handleActivate(event);
+    },
+    [handleActivate],
+  );
+
   if (!safeUrl && destPageIndex === null) return null;
 
   return (
     <ControlWrapper {...props} showBorder={isSelected}>
       <a
         className="absolute inset-0"
-        href={safeUrl || "#"}
-        target={safeUrl ? "_blank" : undefined}
-        rel={safeUrl ? "noopener noreferrer" : undefined}
+        role="link"
+        tabIndex={0}
         title={title}
         aria-label={title}
+        href={safeUrl || undefined}
+        target={safeUrl ? "_blank" : undefined}
+        rel={safeUrl ? "noopener noreferrer" : undefined}
         onClick={handleClick}
         style={{ cursor: "pointer" }}
       />

@@ -2,7 +2,6 @@ import React from "react";
 import { registry } from "./registry/ControlRegistry";
 import { BaseControlProps } from "./types";
 import { FormField, Annotation } from "@/types";
-import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
 
 // Dynamic control dispatcher.
 //
