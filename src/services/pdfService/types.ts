@@ -1,4 +1,3 @@
-import * as pdfjsLib from "pdfjs-dist";
 import { PDFDocument, PDFForm, PDFPage, type PDFFont } from "@cantoo/pdf-lib";
 import { Annotation, FormField } from "@/types";
 
@@ -51,10 +50,24 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   destPageIndex?: number | null;
 };
 
+export type ViewportLike = {
+  viewBox?: [number, number, number, number];
+  userUnit?: number;
+  width: number;
+  height: number;
+  scale: number;
+  rotation: number;
+  transform: [number, number, number, number, number, number];
+  offsetX: number;
+  offsetY: number;
+  convertToViewportPoint: (x: number, y: number) => [number, number];
+  convertToPdfPoint: (x: number, y: number) => [number, number];
+};
+
 export interface ParserContext {
   pageAnnotations: PdfJsAnnotation[];
   pageIndex: number;
-  viewport: pdfjsLib.PageViewport;
+  viewport: ViewportLike;
   pdfDoc?: PDFDocument;
   fontMap?: Map<string, string>;
   globalDA?: string;
@@ -77,7 +90,7 @@ export interface IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
-    viewport?: pdfjsLib.PageViewport,
+    viewport?: ViewportLike,
   ): Promise<void> | void;
 }
 
@@ -87,6 +100,6 @@ export interface IControlExporter {
     form: PDFForm,
     field: FormField,
     fontMap?: Map<string, PDFFont>,
-    viewport?: pdfjsLib.PageViewport,
+    viewport?: ViewportLike,
   ): Promise<void> | void;
 }

@@ -1,5 +1,3 @@
-import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
-
 export enum FieldType {
   TEXT = "Text",
   CHECKBOX = "Checkbox",
@@ -138,6 +136,9 @@ export interface PageData {
   pageIndex: number;
   width: number;
   height: number;
+  viewBox: [number, number, number, number];
+  userUnit: number;
+  rotation: number;
   imageData?: string; // Base64 string (Optional now, used for lazy loading fallback)
 }
 
@@ -185,8 +186,6 @@ export interface EditorState {
   // Document State
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
-  pdfDocument: PDFDocumentProxy | null; // PDF.js Document Proxy
-  pageCache: Map<number, Promise<PDFPageProxy>>;
   pdfOpenPassword: string | null;
   exportPassword: string | null;
   metadata: PDFMetadata;

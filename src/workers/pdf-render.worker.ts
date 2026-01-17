@@ -701,6 +701,10 @@ const renderToCanvas = async (
 
     ctx.restore();
 
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+
     // No need to transfer bitmap back, canvas is already updated
     return { payload: true } satisfies TaskResult;
   } catch (error) {

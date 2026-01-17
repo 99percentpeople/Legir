@@ -22,7 +22,7 @@ import { useCanvasPanning } from "@/hooks/useCanvasPanning";
 import { useInkSession } from "./hooks/useInkSession";
 import { getCursor, shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
 import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionPopover";
-import PDFPageWithProxy from "./layers/PDFPageWithProxy";
+import PDFPage from "./layers/PDFPage";
 import { ControlRenderer, preloadControls, registerControls } from "./controls";
 import { useWorkspaceDerivedPages } from "./hooks/useWorkspaceDerivedPages";
 import { useWorkspaceTextSelection } from "./hooks/useWorkspaceTextSelection";
@@ -46,7 +46,7 @@ import { useAppEvent } from "@/hooks/useAppEventBus";
 // Workspace = the editor canvas.
 //
 // Responsibilities:
-// - Render PDF pages (via `PDFPageWithProxy` which uses worker rendering)
+// - Render PDF pages (via `PDFPage` which uses worker rendering)
 // - Overlay controls/annotations on top of pages (via `ControlRenderer`)
 // - Handle pointer/keyboard driven interactions: selection, draw-to-create, drag/resize, panning
 //
@@ -1514,11 +1514,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }}
       onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
     >
-      <PDFPageWithProxy
-        pageIndex={page.pageIndex}
+      <PDFPage
+        page={page}
         scale={editorState.scale}
-        width={page.width}
-        height={page.height}
         placeholderImage={page.imageData}
         isSelectMode={
           editorState.tool === "select" || editorState.tool === "draw_highlight"

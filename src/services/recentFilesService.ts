@@ -1,6 +1,4 @@
-import { renderPage } from "./pdfService";
 import { pdfWorkerService } from "./pdfService/pdfWorkerService";
-import type { PDFDocumentProxy } from "pdfjs-dist";
 
 export type RecentFileEntry = {
   path: string;
@@ -388,60 +386,6 @@ export class RecentFilesService {
         } finally {
           pdfWorkerService.unloadDocument(docId);
         }
-      },
-    });
-
-    return next;
-  }
-
-  /**
-   * Upsert a recent file and schedule preview generation from an existing pdfjs
-   * `PDFDocumentProxy` (no second `getDocument()` call).
-   */
-  upsertWithDocPreview(options: {
-    path: string;
-    filename: string;
-    pdfDocument: PDFDocumentProxy;
-    lastOpenedAt?: number;
-    targetWidth?: number;
-    previewUpdatedAt?: number;
-    forcePreviewRender?: boolean;
-  }) {
-    const next = this.upsert({
-      path: options.path,
-      filename: options.filename,
-      lastOpenedAt: options.lastOpenedAt,
-    });
-
-    if (!options.forcePreviewRender) {
-      const existing = this.getAll().find((e) => e.path === options.path);
-      if (existing?.previewDataUrl) {
-        return next;
-      }
-    }
-
-    this.scheduleRecentFilePreviewUpdate({
-      path: options.path,
-      previewUpdatedAt: options.previewUpdatedAt,
-      targetWidth: options.targetWidth,
-      renderAnnotations: true,
-      createPreview: async (signal) => {
-        if (signal.aborted) return null;
-        const page = await options.pdfDocument.getPage(1);
-        if (signal.aborted) return null;
-        const baseViewport = page.getViewport({
-          scale: 1.0,
-          rotation: page.rotate,
-        });
-        const targetWidth = options.targetWidth ?? 240;
-        const scale = Math.min(
-          1.0,
-          Math.max(0.05, targetWidth / baseViewport.width),
-        );
-        return await renderPage(page, scale, {
-          renderAnnotations: true,
-          signal,
-        });
       },
     });
 

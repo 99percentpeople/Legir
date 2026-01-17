@@ -1,4 +1,3 @@
-import * as pdfjsLib from "pdfjs-dist";
 import { pdfWorkerService } from "./pdfWorkerService";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
 import { loadAndEmbedExportFonts } from "./lib/built-in-fonts";
@@ -26,6 +25,7 @@ import {
 } from "./lib/pdf-import-utils";
 import {
   PDFDocument,
+  EncryptedPDFError,
   StandardFonts,
   type PDFFont,
   PDFRef,
@@ -60,6 +60,7 @@ import {
   IAnnotationExporter,
   IControlExporter,
   ParserContext,
+  ViewportLike,
 } from "./types";
 import type { PdfJsAnnotation } from "./types";
 import {
@@ -89,29 +90,23 @@ import {
   DropdownControlExporter,
   SignatureControlExporter,
 } from "./exporters/ControlExporters";
-import PdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
-import { PDFJS_CMAP_URL, PDFJS_STANDARD_FONT_URL } from "./pdfRenderer";
+import { createPdfLibViewport } from "./lib/coords";
 
 // PDF pipeline service.
 //
 // This module is the authoritative boundary for:
-// - Loading a PDF (bytes -> pdfjs document/pages/outline + pdf-lib document resources)
+// - Loading a PDF (bytes -> pdf-lib document/pages + worker outline/render)
 // - Rendering pages/thumbnails (mostly via worker for responsiveness)
 // - Importing existing PDF form fields / annotations into our internal models
 // - Exporting internal models back into a new PDF
 //
 // Key design: we use BOTH libraries for different responsibilities.
-// - `pdfjs-dist`: viewing/metadata/outline + render surfaces
-// - `pdf-lib`: writing/export + certain resource introspection (fonts/DA)
+// - `pdfjs-dist`: render/text/outline in the worker
+// - `pdf-lib`: page/metadata parsing + writing/export + resource introspection
 //
 // Extension points:
 // - Add a new control/annotation type by implementing a Parser + Exporter and registering it
 //   in the arrays below. The rest of the app treats `FormField` / `Annotation` as plain data.
-
-// pdfjs worker for parsing/render internals.
-pdfjsLib.GlobalWorkerOptions.workerPort = new PdfjsWorker({
-  name: "pdfjs-worker",
-});
 
 // Register parsers and exporters
 const annotationParsers: IAnnotationParser[] = [
@@ -145,84 +140,106 @@ const controlExporters: IControlExporter[] = [
   new SignatureControlExporter(),
 ];
 
-const createPdfJsLoadTask = (options: {
-  data: Uint8Array;
-  label?: string;
-  password?: string;
-}): {
-  task: pdfjsLib.PDFDocumentLoadingTask;
+type PdfLoadSession = {
   id: string;
+  requestPassword: (
+    reason: "need_password" | "incorrect_password",
+  ) => Promise<string>;
   getLastPassword: () => string | undefined;
-} => {
+  markProgress: (loaded: number, total?: number) => void;
+  finish: (ok: boolean) => void;
+};
+
+const createPdfLoadSession = (label?: string): PdfLoadSession => {
   const id = `pdf_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  appEventBus.emit("pdf:loadStart", { id, label: options.label });
-
-  const task = pdfjsLib.getDocument({
-    data: options.data,
-    password: options.password || "",
-    cMapUrl: PDFJS_CMAP_URL,
-    cMapPacked: true,
-    standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
-    useSystemFonts: false,
-    disableFontFace: false,
-    stopAtErrors: false,
-  });
-
-  task.onProgress = (progress) => {
-    appEventBus.emit("pdf:loadProgress", {
-      id,
-      loaded: progress?.loaded ?? 0,
-      total: progress?.total,
-    });
-  };
-
   let lastPassword: string | undefined = undefined;
 
-  task.onPassword = (callback: (password: string) => void, reason: unknown) => {
-    const mappedReason =
-      pdfjsLib.PasswordResponses &&
-      reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD
-        ? "incorrect_password"
-        : "need_password";
-
-    let settled = false;
-    const submit = (password: string) => {
-      if (settled) return;
-      settled = true;
-      lastPassword = password;
-      callback(password);
-    };
-    const cancel = () => {
-      if (settled) return;
-      settled = true;
-      void task.destroy().catch(() => {
-        // ignore
-      });
-      callback("");
-    };
-
-    appEventBus.emit("pdf:passwordRequired", {
+  const markProgress = (loaded: number, total?: number) => {
+    appEventBus.emit("pdf:loadProgress", {
       id,
-      reason: mappedReason,
-      submit,
-      cancel,
+      loaded,
+      total,
     });
   };
 
-  let ok = false;
+  appEventBus.emit("pdf:loadStart", { id, label });
+  markProgress(0, 1);
 
-  task.promise
-    .then(() => (ok = true))
-    .catch(() => (ok = false))
-    .finally(() => {
-      appEventBus.emit("pdf:loadEnd", { id, ok });
+  const requestPassword = (reason: "need_password" | "incorrect_password") =>
+    new Promise<string>((resolve, reject) => {
+      let settled = false;
+      const submit = (password: string) => {
+        if (settled) return;
+        settled = true;
+        lastPassword = password;
+        resolve(password);
+      };
+      const cancel = () => {
+        if (settled) return;
+        settled = true;
+        reject(new Error("Password prompt cancelled"));
+      };
+
+      appEventBus.emit("pdf:passwordRequired", {
+        id,
+        reason,
+        submit,
+        cancel,
+      });
     });
+
+  const finish = (ok: boolean) => {
+    appEventBus.emit("pdf:loadEnd", { id, ok });
+  };
 
   return {
-    task,
     id,
+    requestPassword,
     getLastPassword: () => lastPassword,
+    markProgress,
+    finish,
   };
+};
+
+const getPdfLibPasswordReason = (
+  error: unknown,
+  hadPassword: boolean,
+): "need_password" | "incorrect_password" | null => {
+  if (error instanceof EncryptedPDFError) {
+    return hadPassword ? "incorrect_password" : "need_password";
+  }
+
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("password")) {
+      return hadPassword ? "incorrect_password" : "need_password";
+    }
+  }
+
+  return null;
+};
+
+const loadPdfLibDocumentWithPassword = async (
+  pdfBytes: Uint8Array,
+  session: PdfLoadSession,
+  initialPassword?: string | null,
+): Promise<{ pdfDoc: PDFDocument; openPassword?: string }> => {
+  let password: string | undefined =
+    typeof initialPassword === "string" ? initialPassword : undefined;
+
+  while (true) {
+    try {
+      const pdfDoc = await PDFDocument.load(pdfBytes, {
+        password,
+        updateMetadata: false,
+      });
+      return { pdfDoc, openPassword: password };
+    } catch (error) {
+      const reason = getPdfLibPasswordReason(error, password !== undefined);
+      if (!reason) throw error;
+      password = await session.requestPassword(reason);
+    }
+  }
 };
 
 const buildPdfLibAnnotsByPageIndex = async (
@@ -874,7 +891,6 @@ export const loadPDF = async (
   },
 ): Promise<{
   pdfBytes: Uint8Array;
-  pdfDocument: pdfjsLib.PDFDocumentProxy;
   pages: PageData[];
   fields: FormField[];
   annotations: Annotation[];
@@ -893,33 +909,33 @@ export const loadPDF = async (
 
   let fontMap = new Map<string, string>();
   let globalDA: string | undefined = undefined;
-  let pdfDoc: PDFDocument | null = null;
 
-  const renderBuffer = pdfBytes;
-  const pdfJsData = new Uint8Array(pdfBytes);
-  const { task: pdfJsLoadTask, getLastPassword } = createPdfJsLoadTask({
-    data: pdfJsData,
-    label: "loadPDF",
-    password: options?.password,
-  });
-
-  const pdf = await pdfJsLoadTask.promise;
-
-  const openPassword = getLastPassword() ?? options?.password;
+  const loadSession = createPdfLoadSession("loadPDF");
+  let openPassword: string | undefined = undefined;
+  let pdfDoc: PDFDocument;
   try {
-    pdfDoc = await PDFDocument.load(pdfBytes, {
-      password: openPassword ? openPassword : undefined,
-      updateMetadata: false,
-    });
-    try {
-      fontMap = getFontMap(pdfDoc);
-      globalDA = getGlobalDA(pdfDoc);
-    } catch (e) {
-      console.warn("Failed to parse PDF resources with pdf-lib", e);
-    }
+    const loaded = await loadPdfLibDocumentWithPassword(
+      pdfBytes,
+      loadSession,
+      options?.password,
+    );
+    pdfDoc = loaded.pdfDoc;
+    openPassword = loaded.openPassword;
+    loadSession.markProgress(1, 1);
+    loadSession.finish(true);
+  } catch (error) {
+    loadSession.finish(false);
+    throw error;
+  }
+
+  try {
+    fontMap = getFontMap(pdfDoc);
+    globalDA = getGlobalDA(pdfDoc);
   } catch (e) {
     console.warn("Failed to parse PDF resources with pdf-lib", e);
   }
+
+  const renderBuffer = pdfBytes;
 
   let workerReady = false;
   try {
@@ -930,37 +946,36 @@ export const loadPDF = async (
     console.warn("Failed to load PDF into render worker", e);
   }
 
-  const numPages = pdf.numPages;
+  const pdfLibPages = pdfDoc.getPages();
+  const numPages = pdfLibPages.length;
   const pages: PageData[] = [];
   const fields: FormField[] = [];
   const annotations: Annotation[] = [];
 
   let pdfLibAnnotsByPageIndex: Map<number, PdfJsAnnotation[]> | undefined =
     undefined;
-  if (pdfDoc) {
-    try {
-      const resolveDestWithWorker = async (
-        normalizedDest: unknown,
-      ): Promise<number | null> => {
-        if (!workerReady) return null;
-        try {
-          return await pdfWorkerService.resolveDest({ dest: normalizedDest });
-        } catch {
-          return null;
-        }
-      };
-      const resolveDestPageIndex = async (
-        normalizedDest: unknown,
-      ): Promise<number | null> => {
-        return await resolveDestWithWorker(normalizedDest);
-      };
+  try {
+    const resolveDestWithWorker = async (
+      normalizedDest: unknown,
+    ): Promise<number | null> => {
+      if (!workerReady) return null;
+      try {
+        return await pdfWorkerService.resolveDest({ dest: normalizedDest });
+      } catch {
+        return null;
+      }
+    };
+    const resolveDestPageIndex = async (
+      normalizedDest: unknown,
+    ): Promise<number | null> => {
+      return await resolveDestWithWorker(normalizedDest);
+    };
 
-      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, {
-        resolveDest: resolveDestPageIndex,
-      });
-    } catch (e) {
-      console.warn("Failed to extract annotations with pdf-lib", e);
-    }
+    pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, {
+      resolveDest: resolveDestPageIndex,
+    });
+  } catch (e) {
+    console.warn("Failed to extract annotations with pdf-lib", e);
   }
 
   const embeddedFontCache = new Map<string, Promise<string | undefined>>();
@@ -979,39 +994,6 @@ export const loadPDF = async (
       });
     }
     embeddedFontFaces.clear();
-  };
-
-  const pdfLibPages = pdfDoc ? pdfDoc.getPages() : [];
-
-  const getPdfLibPageSize = (pageIndex: number) => {
-    if (!pdfDoc) return null;
-    const page = pdfLibPages[pageIndex];
-    if (!page) return null;
-
-    const crop = page.getCropBox();
-    let width = crop.width;
-    let height = crop.height;
-
-    let userUnit = 1;
-    try {
-      const userUnitObj = page.node.lookup(PDFName.of("UserUnit"));
-      if (userUnitObj instanceof PDFNumber) {
-        const v = userUnitObj.asNumber();
-        if (Number.isFinite(v) && v > 0) userUnit = v;
-      }
-    } catch {
-      // ignore
-    }
-
-    width *= userUnit;
-    height *= userUnit;
-
-    const rotation = (((page.getRotation().angle || 0) % 360) + 360) % 360;
-    if (rotation % 180 !== 0) {
-      [width, height] = [height, width];
-    }
-
-    return { width, height };
   };
 
   const toLocalISO = (d: Date) => {
@@ -1087,19 +1069,31 @@ export const loadPDF = async (
       nextPageIndex += 1;
       if (idx >= numPages) return;
 
+      const pdfLibPage = pdfLibPages[idx];
+      if (!pdfLibPage) continue;
       const pageNumber = idx + 1;
-      const page = await pdf.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 1.0 });
-      const pdfLibSize = getPdfLibPageSize(idx);
-      const pageWidth = pdfLibSize?.width ?? viewport.width;
-      const pageHeight = pdfLibSize?.height ?? viewport.height;
+
+      const viewport: ViewportLike = createPdfLibViewport(pdfLibPage, {
+        scale: 1.0,
+      });
+      const pageWidth = viewport.width;
+      const pageHeight = viewport.height;
+      const userUnit = viewport.userUnit ?? 1;
+      const viewBox =
+        viewport.viewBox ??
+        ([0, 0, pageWidth / userUnit, pageHeight / userUnit] as [
+          number,
+          number,
+          number,
+          number,
+        ]);
       const pageAnnotations = pdfLibAnnotsByPageIndex?.get(idx) || [];
 
       const context: ParserContext = {
         pageAnnotations,
         pageIndex: idx,
         viewport,
-        pdfDoc: pdfDoc || undefined,
+        pdfDoc,
         fontMap,
         globalDA,
         embeddedFontCache,
@@ -1131,6 +1125,9 @@ export const loadPDF = async (
           pageIndex: idx,
           width: pageWidth,
           height: pageHeight,
+          viewBox,
+          userUnit,
+          rotation: viewport.rotation,
         },
         fields: fieldsForPage,
         annotations: annotsForPage,
@@ -1171,7 +1168,6 @@ export const loadPDF = async (
 
   return {
     pdfBytes,
-    pdfDocument: pdf,
     pages,
     fields,
     annotations,
@@ -1260,46 +1256,24 @@ export const exportPDF = async (
     return { includeFontIds, needsCustomFont };
   };
 
-  let pdfJsDoc: pdfjsLib.PDFDocumentProxy | undefined;
-  let resolvedOpenPassword: string | undefined = openPassword;
-  try {
-    const renderBuffer = new Uint8Array(originalBytes.slice(0));
-    const { task, getLastPassword } = createPdfJsLoadTask({
-      data: renderBuffer,
-      label: "exportPDF",
-      password: openPassword,
-    });
-    pdfJsDoc = await task.promise;
-
-    const pw = getLastPassword();
-    if (typeof pw === "string" && pw) {
-      resolvedOpenPassword = pw;
-    }
-  } catch (e) {
-    console.warn(
-      "[PDF Export] Failed to load PDF with pdf.js; rotation-aware export disabled",
-      e,
-    );
-  }
-
-  const viewportCache = new Map<number, pdfjsLib.PageViewport>();
-  const getViewportForPage = async (pageIndex: number) => {
-    if (!pdfJsDoc) return undefined;
-    if (viewportCache.has(pageIndex)) return viewportCache.get(pageIndex);
-    try {
-      const p = await pdfJsDoc.getPage(pageIndex + 1);
-      const vp = p.getViewport({ scale: 1.0 });
-      viewportCache.set(pageIndex, vp);
-      return vp;
-    } catch {
-      return undefined;
-    }
-  };
+  const resolvedOpenPassword = openPassword ?? undefined;
 
   const pdfDoc = await PDFDocument.load(
     originalBytes,
     resolvedOpenPassword ? { password: resolvedOpenPassword } : undefined,
   );
+
+  const pdfLibPages = pdfDoc.getPages();
+  const viewportCache = new Map<number, ViewportLike>();
+  const getViewportForPage = async (pageIndex: number) => {
+    const cached = viewportCache.get(pageIndex);
+    if (cached) return cached;
+    const page = pdfLibPages[pageIndex];
+    if (!page) return undefined;
+    const vp = createPdfLibViewport(page, { scale: 1.0 });
+    viewportCache.set(pageIndex, vp);
+    return vp;
+  };
 
   // Metadata update
   if (metadata) {

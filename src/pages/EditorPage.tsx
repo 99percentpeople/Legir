@@ -1010,7 +1010,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
           currentPageIndex={state.currentPageIndex}
           width={state.sidebarWidth}
           onResize={(w) => setUiState({ sidebarWidth: w })}
-          pdfDocument={state.pdfDocument}
           activeTab={state.sidebarTab}
           onTabChange={(tab) => setUiState({ sidebarTab: tab })}
         />

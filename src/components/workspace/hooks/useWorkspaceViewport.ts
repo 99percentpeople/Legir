@@ -676,7 +676,6 @@ export const useWorkspaceViewport = (opts: {
       });
     }
   }, [
-    opts.editorState.pdfDocument,
     opts.editorState.pages.length,
     opts.editorState.pendingViewStateRestore,
     opts.editorState.pageFlow,

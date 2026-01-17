@@ -3,13 +3,11 @@ import type { PageData, ThumbnailsLayoutMode } from "@/types";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useLanguage } from "../language-provider";
-import type { PDFDocumentProxy } from "pdfjs-dist";
 
 // --- Thumbnail Item ---
 interface ThumbnailItemProps {
   page: PageData;
   pageIndex: number;
-  pdfDocument: PDFDocumentProxy;
   onNavigate: (pageIndex: number) => void;
   isActive?: boolean;
 }
@@ -70,7 +68,6 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
 
 interface ThumbnailsPanelProps {
   pages?: PageData[];
-  pdfDocument?: PDFDocumentProxy;
   onNavigate: (pageIndex: number) => void;
   currentPageIndex?: number;
   thumbnailsLayout?: ThumbnailsLayoutMode;
@@ -78,7 +75,6 @@ interface ThumbnailsPanelProps {
 
 const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
   pages,
-  pdfDocument,
   onNavigate,
   currentPageIndex,
   thumbnailsLayout,
@@ -99,7 +95,6 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
               key={idx}
               page={page}
               pageIndex={idx}
-              pdfDocument={pdfDocument}
               onNavigate={onNavigate}
               isActive={idx === currentPageIndex}
             />

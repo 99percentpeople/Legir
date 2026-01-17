@@ -1,34 +1,60 @@
-import * as pdfjsLib from "pdfjs-dist";
 import { pdfWorkerService } from "./pdfWorkerService";
 
-const BASE_URL = import.meta.env.BASE_URL || "/";
-export const PDFJS_CMAP_URL = `${BASE_URL}pdfjs/cmaps/`;
-export const PDFJS_STANDARD_FONT_URL = `${BASE_URL}pdfjs/standard_fonts/`;
-
-export const renderPage = async (
-  page: pdfjsLib.PDFPageProxy,
-  scale: number = 1.0,
-  options?: {
-    renderAnnotations?: boolean;
-    signal?: AbortSignal;
-  },
-): Promise<string | null> => {
+export const renderPage = async (options: {
+  pageIndex: number;
+  scale?: number;
+  renderAnnotations?: boolean;
+  signal?: AbortSignal;
+  pdfBytes?: Uint8Array;
+  password?: string | null;
+}): Promise<string | null> => {
   try {
     if (typeof window === "undefined") return null;
 
-    const pageIndex = Math.max(0, page.pageNumber - 1);
+    const {
+      pageIndex,
+      scale = 1.0,
+      renderAnnotations = false,
+      signal,
+      pdfBytes,
+      password,
+    } = options;
+
     const { bytes, mimeType } = await pdfWorkerService.renderPageImage({
       pageIndex,
       scale,
-      renderAnnotations: options?.renderAnnotations ?? false,
+      renderAnnotations,
       mimeType: "image/jpeg",
       quality: 0.8,
-      signal: options?.signal,
+      signal,
     });
 
     if (!bytes || bytes.length === 0) return null;
     return await bytesToDataUrl(bytes, mimeType || "image/jpeg");
   } catch (e) {
+    const msg = typeof e?.message === "string" ? e.message : String(e);
+    if (msg.includes("PDF Document not loaded") && options.pdfBytes) {
+      try {
+        const { bytes, mimeType } = await pdfWorkerService.renderPageImage({
+          pageIndex: options.pageIndex,
+          scale: options.scale ?? 1.0,
+          renderAnnotations: options.renderAnnotations ?? false,
+          mimeType: "image/jpeg",
+          quality: 0.8,
+          signal: options.signal,
+          isNewDoc: true,
+          data: options.pdfBytes,
+          password:
+            typeof options.password === "string" ? options.password : undefined,
+        });
+        if (!bytes || bytes.length === 0) return null;
+        return await bytesToDataUrl(bytes, mimeType || "image/jpeg");
+      } catch (err) {
+        console.error("Failed to render page to DataURL", err);
+        return null;
+      }
+    }
+
     console.error("Failed to render page to DataURL", e);
     return null;
   }

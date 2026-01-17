@@ -1,24 +1,37 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import * as pdfjsLib from "pdfjs-dist";
-import { MAX_PIXELS_PER_PAGE } from "@/constants";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { PageData } from "@/types";
+import {
+  MAX_PIXELS_PER_PAGE,
+  THUMBNAIL_JPEG_QUALITY,
+  THUMBNAIL_MIME_TYPE,
+  THUMBNAIL_TARGET_WIDTH,
+} from "@/constants";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
+import { useEditorStore } from "@/store/useEditorStore";
 import PDFTileLayer from "./PDFTileLayer";
 
 interface PDFCanvasLayerProps {
-  pageIndex: number;
-  pageProxy: pdfjsLib.PDFPageProxy | null;
+  page: PageData;
   scale: number;
   isInView: boolean;
   placeholderImage?: string;
 }
 
 const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
-  pageIndex,
-  pageProxy,
+  page,
   scale,
   isInView,
   placeholderImage,
 }) => {
+  const pageIndex = page.pageIndex;
   // Double buffering: Two canvases to prevent flickering during resize/re-render
   const canvasARef = useRef<HTMLCanvasElement>(null);
   const canvasBRef = useRef<HTMLCanvasElement>(null);
@@ -40,15 +53,113 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   const renderedScaleRef = useRef<number | null>(null);
   const renderEpochRef = useRef(0);
   const dprRef = useRef<number>(1);
+  const setState = useEditorStore.setState;
+  const pageInfo = useMemo(
+    () => ({
+      viewBox: page.viewBox,
+      userUnit: page.userUnit,
+      rotation: page.rotation,
+    }),
+    [page.viewBox, page.userUnit, page.rotation],
+  );
+
+  const updateImageData = useCallback(
+    async (canvas: HTMLCanvasElement, renderEpoch?: number) => {
+      if (
+        typeof renderEpoch === "number" &&
+        renderEpoch !== renderEpochRef.current
+      ) {
+        return;
+      }
+      if (typeof document === "undefined") return;
+
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+
+      if (
+        typeof renderEpoch === "number" &&
+        renderEpoch !== renderEpochRef.current
+      ) {
+        return;
+      }
+
+      const current = useEditorStore.getState();
+      const currentPage = current.pages[pageIndex];
+      if (!currentPage || currentPage.imageData) return;
+
+      const sourceWidth = canvas.width;
+      const sourceHeight = canvas.height;
+      if (!sourceWidth || !sourceHeight) return;
+
+      const scale = Math.min(1, THUMBNAIL_TARGET_WIDTH / sourceWidth);
+      const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+      const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+      const thumbCanvas = document.createElement("canvas");
+      thumbCanvas.width = targetWidth;
+      thumbCanvas.height = targetHeight;
+      const ctx = thumbCanvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.drawImage(canvas, 0, 0, targetWidth, targetHeight);
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        thumbCanvas.toBlob(
+          (result) => resolve(result),
+          THUMBNAIL_MIME_TYPE,
+          THUMBNAIL_JPEG_QUALITY,
+        );
+      });
+
+      let imageData: string | null = null;
+      if (blob) {
+        imageData = URL.createObjectURL(blob);
+      } else {
+        try {
+          imageData = thumbCanvas.toDataURL(
+            THUMBNAIL_MIME_TYPE,
+            THUMBNAIL_JPEG_QUALITY,
+          );
+        } catch {
+          imageData = null;
+        }
+      }
+
+      if (!imageData) return;
+
+      const latest = useEditorStore.getState();
+      const latestPage = latest.pages[pageIndex];
+      if (!latestPage || latestPage.imageData) {
+        if (imageData.startsWith("blob:")) {
+          try {
+            URL.revokeObjectURL(imageData);
+          } catch {
+            // ignore
+          }
+        }
+        return;
+      }
+
+      setState((s) => {
+        const page = s.pages[pageIndex];
+        if (!page || page.imageData) return {};
+        const nextPages = s.pages.slice();
+        nextPages[pageIndex] = { ...page, imageData };
+        return { pages: nextPages };
+      });
+    },
+    [pageIndex, setState],
+  );
 
   useLayoutEffect(() => {
     renderedScaleRef.current = null;
     setIsRendered(false);
-  }, [pageProxy]);
+  }, [pageIndex, pageInfo]);
 
   useLayoutEffect(() => {
     renderEpochRef.current += 1;
-  }, [pageProxy, pageIndex, scale]);
+  }, [pageIndex, pageInfo, scale]);
 
   // Stable IDs for canvas elements to allow reuse in Worker
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
@@ -70,8 +181,6 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
   // Rendering Logic with Double Buffering and Debounce
   useEffect(() => {
-    if (!pageProxy) return;
-
     if (tileState.tileMode) {
       return;
     }
@@ -88,7 +197,10 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     dprRef.current = dpr;
-    const viewportCheck = pageProxy.getViewport({ scale: scale * dpr });
+    const viewportCheck = createViewportFromPageInfo(pageInfo, {
+      scale: scale * dpr,
+      rotation: pageInfo.rotation,
+    });
     const pixelsCheck =
       Math.ceil(viewportCheck.width) * Math.ceil(viewportCheck.height);
     if (pixelsCheck > MAX_PIXELS_PER_PAGE) {
@@ -98,6 +210,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     const epoch = renderEpochRef.current;
     let abortController: AbortController | null = null;
     let rafId: number | null = null;
+    let swapRafId: number | null = null;
 
     const render = async (signal: AbortSignal): Promise<boolean> => {
       // activeCanvas === "A", target is B.
@@ -105,7 +218,6 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       const targetCanvas = targetCanvasRef.current;
 
       if (!targetCanvas) return false;
-      if (!pageProxy) return false;
 
       const targetId =
         activeCanvas === "A" ? canvasBId.current : canvasAId.current;
@@ -126,8 +238,9 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         // but we set it on the placeholder to ensure layout is correct.
         // The worker handles the actual bitmap size.
 
-        const viewport = pageProxy.getViewport({
+        const viewport = createViewportFromPageInfo(pageInfo, {
           scale: scale * dpr,
+          rotation: pageInfo.rotation,
         });
 
         if (!isTransferredRef.current) {
@@ -205,20 +318,37 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         if (!ok) return;
         if (renderEpochRef.current !== epoch) return;
         const targetId = activeCanvas === "A" ? "B" : "A";
-        setActiveCanvas(targetId);
-        setIsRendered(true);
-        renderedScaleRef.current = scale;
+        swapRafId = requestAnimationFrame(() => {
+          if (renderEpochRef.current !== epoch) return;
+          setActiveCanvas(targetId);
+          setIsRendered(true);
+          renderedScaleRef.current = scale;
+          const targetCanvas =
+            targetId === "A" ? canvasARef.current : canvasBRef.current;
+          if (targetCanvas) {
+            void updateImageData(targetCanvas, epoch);
+          }
+        });
       });
     });
 
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
+      if (swapRafId) cancelAnimationFrame(swapRafId);
       if (abortController) {
         abortController.abort();
       }
     };
     // Re-run if visibility changes or scale/doc changes
-  }, [activeCanvas, isInView, pageProxy, pageIndex, scale, tileState.tileMode]);
+  }, [
+    activeCanvas,
+    isInView,
+    pageIndex,
+    pageInfo,
+    scale,
+    tileState.tileMode,
+    updateImageData,
+  ]);
 
   const hasUsableTileBuffer = tileState.hasUsableTileBuffer;
   const shouldHidePageCanvasForTiles =
@@ -270,8 +400,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       />
 
       <PDFTileLayer
-        pageIndex={pageIndex}
-        pageProxy={pageProxy}
+        page={page}
         scale={scale}
         isInView={isInView}
         isRendered={isRendered}

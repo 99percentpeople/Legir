@@ -1,5 +1,4 @@
 import React, { useCallback, useMemo } from "react";
-import * as pdfjsLib from "pdfjs-dist";
 import { AnnotationControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { appEventBus } from "@/lib/eventBus";
@@ -7,6 +6,26 @@ import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useLanguage } from "@/components/language-provider";
 import { useEditorStore } from "@/store/useEditorStore";
+
+const getSafeUrl = (raw: string) => {
+  try {
+    const base =
+      typeof window !== "undefined" ? window.location.href : "about:blank";
+    const url = new URL(raw, base);
+    const protocol = url.protocol.toLowerCase();
+    if (
+      protocol === "http:" ||
+      protocol === "https:" ||
+      protocol === "mailto:" ||
+      protocol === "tel:"
+    ) {
+      return url.href;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
 
 export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
   const { data, id, isSelected, onSelect } = props;
@@ -17,12 +36,7 @@ export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
 
   const safeUrl = useMemo(() => {
     if (!data.linkUrl) return null;
-    try {
-      const url = pdfjsLib.createValidAbsoluteUrl(data.linkUrl);
-      return url ? url.href : null;
-    } catch {
-      return null;
-    }
+    return getSafeUrl(data.linkUrl);
   }, [data.linkUrl]);
 
   const destPageIndex =

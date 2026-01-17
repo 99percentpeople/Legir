@@ -1,14 +1,12 @@
 import { FormField, FieldType } from "@/types";
-import { IControlParser, ParserContext } from "../types";
+import { IControlParser, ParserContext, ViewportLike } from "../types";
 import {
   getStyleParsingResources,
   parseFieldStyle,
 } from "../lib/control-parsing";
 import { pdfJsWidgetRectToUiRect } from "../lib/coords";
 import { pdfDebug } from "../lib/debug";
-import type * as pdfjsLib from "pdfjs-dist";
-
-const getViewportSummary = (viewport: pdfjsLib.PageViewport) => {
+const getViewportSummary = (viewport: ViewportLike) => {
   try {
     return {
       width: viewport?.width,

@@ -39,7 +39,7 @@ import { useAppEvent } from "@/hooks/useAppEventBus";
 // Rule of thumb:
 // - Rendering/interaction logic lives in `pages/EditorPage.tsx` and `components/workspace/Workspace.tsx`.
 // - Authoritative editor state lives in `store/useEditorStore.ts`.
-// - PDF import/export pipeline lives in `services/pdfService.ts`.
+// - PDF import/export pipeline lives in `services/pdfService/index.ts`.
 
 const App: React.FC = () => {
   const { t } = useLanguage();
@@ -67,7 +67,6 @@ const App: React.FC = () => {
   const {
     setState,
     setOptions,
-    getPageCached,
     saveCheckpoint,
     resetDocument,
     setProcessingStatus,
@@ -128,12 +127,11 @@ const App: React.FC = () => {
       // Main import pipeline entry.
       //
       // Important invariants:
-      // - Must cleanup previous pdfjs document + embedded font faces (see `pdfDisposeRef`).
+      // - Must cleanup previous embedded font faces (see `pdfDisposeRef`).
       // - Must reset store before loading, but preserve cross-document UI bits (e.g. `hasSavedSession`).
       // - All heavy work should be wrapped by `withProcessing()` so UI can display status/spinners.
       const run = async () => {
         recentFilesService.cancelPreviewTasks();
-        const prevPdfDocument = useEditorStore.getState().pdfDocument;
 
         if (isTauri() && typeof document !== "undefined") {
           const snapshot = useEditorStore.getState();
@@ -170,15 +168,6 @@ const App: React.FC = () => {
             new Promise<void>((resolve) => setTimeout(resolve, 80)),
           ]);
 
-          if (prevPdfDocument) {
-            try {
-              prevPdfDocument.cleanup();
-              await prevPdfDocument.destroy();
-            } catch {
-              // ignore
-            }
-          }
-
           pdfDisposeRef.current?.();
           pdfDisposeRef.current = null;
 
@@ -190,7 +179,6 @@ const App: React.FC = () => {
 
           const {
             pdfBytes,
-            pdfDocument,
             pages,
             fields,
             annotations,
@@ -204,7 +192,6 @@ const App: React.FC = () => {
           loadDocument({
             pdfFile: options.pdfFile,
             pdfBytes,
-            pdfDocument,
             metadata,
             filename: options.filename,
             saveTarget: options.saveTarget,
@@ -244,10 +231,10 @@ const App: React.FC = () => {
 
           if (options.saveTarget?.kind === "tauri") {
             const tauriPath = options.saveTarget.path;
-            recentFilesService.upsertWithDocPreview({
+            recentFilesService.upsertWithBytesPreview({
               path: tauriPath,
               filename: options.filename,
-              pdfDocument,
+              pdfBytes,
               targetWidth: 240,
             });
 
@@ -355,7 +342,6 @@ const App: React.FC = () => {
 
       // Re-load the PDF document from bytes as it is not serializable in DB
       const {
-        pdfDocument,
         pages,
         annotations: fileAnnotations,
         outline,
@@ -367,7 +353,6 @@ const App: React.FC = () => {
       loadDocument({
         pdfFile: null,
         pdfBytes: draft.pdfBytes,
-        pdfDocument,
         pages,
         outline,
         fields: draft.fields,
@@ -406,7 +391,7 @@ const App: React.FC = () => {
   };
 
   const handleAdvancedDetect = async (options: AIDetectionOptions) => {
-    if (state.pages.length === 0 || !state.pdfDocument) return;
+    if (state.pages.length === 0 || !state.pdfBytes) return;
 
     // Parse the page range from options
     const targetPageIndices = (() => {
@@ -458,8 +443,11 @@ const App: React.FC = () => {
           }),
         );
 
-        const pageProxy = await getPageCached(pageIndex);
-        const base64Image = await renderPage(pageProxy);
+        const base64Image = await renderPage({
+          pageIndex,
+          pdfBytes: state.pdfBytes,
+          password: state.pdfOpenPassword,
+        });
 
         if (base64Image) {
           const fields = await analyzePageForFields(
