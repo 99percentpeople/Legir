@@ -1,4 +1,5 @@
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { PDFOutlineItem } from "@/types";
 import type { Tile } from "./types";
 
 type CommandSpec<TRequest extends object, TResponse = never> =
@@ -97,6 +98,21 @@ export type WorkerCommandPayloadMap = {
       pageIndex: number;
     },
     TextContent | false
+  >;
+
+  getOutline: CommandSpec<
+    {
+      docId?: string;
+    },
+    PDFOutlineItem[] | false
+  >;
+
+  resolveDest: CommandSpec<
+    {
+      docId?: string;
+      dest: unknown;
+    },
+    number | null | false
   >;
 };
 

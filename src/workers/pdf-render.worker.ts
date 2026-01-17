@@ -5,6 +5,7 @@ import type {
   WorkerRequest,
   WorkerSuccessResponse,
 } from "@/services/pdfService/workerProtocol";
+import { mapOutline, resolveDest } from "@/services/pdfService/lib/outline";
 
 const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
 const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
@@ -368,6 +369,91 @@ const getTextContentForPage = async (
     throwIfCancelled();
 
     return { payload: textContent } satisfies TaskResult;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "RenderingCancelledException"
+    ) {
+      return { payload: false } satisfies TaskResult;
+    }
+
+    throw error;
+  } finally {
+    cleanup();
+  }
+};
+
+const getOutlineForDoc = async (
+  params: Extract<WorkerRequest, { type: "getOutline" }>,
+) => {
+  const { id, docId } = params;
+  const resolvedDocId = getDocId(docId);
+
+  const { throwIfCancelled, cleanup } = registerCancellableTask(
+    id,
+    resolvedDocId,
+  );
+
+  try {
+    throwIfCancelled();
+    await ensureDocumentLoaded(resolvedDocId);
+    throwIfCancelled();
+
+    const state = getDocState(resolvedDocId);
+    const pdf = state.pdfDoc;
+    if (!pdf) throw new Error("PDF Document not loaded");
+
+    const rawOutline = await pdf.getOutline();
+    throwIfCancelled();
+
+    if (!rawOutline || rawOutline.length === 0) {
+      return { payload: [] } satisfies TaskResult;
+    }
+
+    const outline = await mapOutline(pdf, rawOutline);
+    throwIfCancelled();
+
+    return { payload: outline } satisfies TaskResult;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "RenderingCancelledException"
+    ) {
+      return { payload: false } satisfies TaskResult;
+    }
+
+    throw error;
+  } finally {
+    cleanup();
+  }
+};
+
+const resolveDestForDoc = async (
+  params: Extract<WorkerRequest, { type: "resolveDest" }>,
+) => {
+  const { id, docId, dest } = params;
+  const resolvedDocId = getDocId(docId);
+
+  const { throwIfCancelled, cleanup } = registerCancellableTask(
+    id,
+    resolvedDocId,
+  );
+
+  try {
+    throwIfCancelled();
+    await ensureDocumentLoaded(resolvedDocId);
+    throwIfCancelled();
+
+    const state = getDocState(resolvedDocId);
+    const pdf = state.pdfDoc;
+    if (!pdf) throw new Error("PDF Document not loaded");
+
+    const pageIndex = await resolveDest(pdf, dest);
+    throwIfCancelled();
+
+    return {
+      payload: typeof pageIndex === "number" ? pageIndex : null,
+    } satisfies TaskResult;
   } catch (error) {
     if (
       error instanceof Error &&
@@ -777,6 +863,12 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
       case "getTextContent":
         result = await getTextContentForPage(data);
         break;
+      case "getOutline":
+        result = await getOutlineForDoc(data);
+        break;
+      case "resolveDest":
+        result = await resolveDestForDoc(data);
+        break;
       case "load": {
         const resolvedDocId = getDocId(data.docId);
         for (const rid of cancelQueuedTasksForDoc(resolvedDocId)) {
@@ -939,6 +1031,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     // This ensures we don't waste time on tiles that are no longer needed
     case "cancelQueuedRenders":
     case "getTextContent":
+    case "getOutline":
+    case "resolveDest":
     case "load":
     case "unload":
     case "releaseCanvas":

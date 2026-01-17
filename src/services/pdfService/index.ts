@@ -1,6 +1,5 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { pdfWorkerService } from "./pdfWorkerService";
-import { mapOutline, resolveDest } from "./lib/outline";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
 import { loadAndEmbedExportFonts } from "./lib/built-in-fonts";
 import {
@@ -8,7 +7,6 @@ import {
   isSerifFamily,
   isExplicitCjkFontSelection,
 } from "./lib/text";
-import { parsePDFDate } from "@/utils/pdfUtils";
 import {
   buildFullFieldNameFromChain,
   decodePdfStreamToText,
@@ -151,7 +149,11 @@ const createPdfJsLoadTask = (options: {
   data: Uint8Array;
   label?: string;
   password?: string;
-}) => {
+}): {
+  task: pdfjsLib.PDFDocumentLoadingTask;
+  id: string;
+  getLastPassword: () => string | undefined;
+} => {
   const id = `pdf_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   appEventBus.emit("pdf:loadStart", { id, label: options.label });
 
@@ -225,7 +227,9 @@ const createPdfJsLoadTask = (options: {
 
 const buildPdfLibAnnotsByPageIndex = async (
   pdfDoc: PDFDocument,
-  pdfJsDoc: pdfjsLib.PDFDocumentProxy,
+  options?: {
+    resolveDest?: (dest: unknown) => Promise<number | null>;
+  },
 ) => {
   const out = new Map<number, PdfJsAnnotation[]>();
   const pages = pdfDoc.getPages();
@@ -758,8 +762,9 @@ const buildPdfLibAnnotsByPageIndex = async (
 
         let destPageIndex: number | null | undefined = undefined;
         const normalizedDest = normalizeDestForResolve(dest);
-        if (normalizedDest !== undefined) {
-          destPageIndex = await resolveDest(pdfJsDoc, normalizedDest);
+        const resolveDestPageIndex = options?.resolveDest;
+        if (normalizedDest !== undefined && resolveDestPageIndex) {
+          destPageIndex = await resolveDestPageIndex(normalizedDest);
         }
         if (typeof destPageIndex !== "number") {
           const fallbackIndex = resolveDestPageIndexFromPdfLib(dest);
@@ -902,10 +907,10 @@ export const loadPDF = async (
 
   const openPassword = getLastPassword() ?? options?.password;
   try {
-    pdfDoc = await PDFDocument.load(
-      pdfBytes,
-      openPassword ? { password: openPassword } : undefined,
-    );
+    pdfDoc = await PDFDocument.load(pdfBytes, {
+      password: openPassword ? openPassword : undefined,
+      updateMetadata: false,
+    });
     try {
       fontMap = getFontMap(pdfDoc);
       globalDA = getGlobalDA(pdfDoc);
@@ -916,8 +921,9 @@ export const loadPDF = async (
     console.warn("Failed to parse PDF resources with pdf-lib", e);
   }
 
+  let workerReady = false;
   try {
-    await pdfWorkerService.loadDocument(renderBuffer, {
+    workerReady = await pdfWorkerService.loadDocument(renderBuffer, {
       password: openPassword,
     });
   } catch (e) {
@@ -933,7 +939,25 @@ export const loadPDF = async (
     undefined;
   if (pdfDoc) {
     try {
-      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, pdf);
+      const resolveDestWithWorker = async (
+        normalizedDest: unknown,
+      ): Promise<number | null> => {
+        if (!workerReady) return null;
+        try {
+          return await pdfWorkerService.resolveDest({ dest: normalizedDest });
+        } catch {
+          return null;
+        }
+      };
+      const resolveDestPageIndex = async (
+        normalizedDest: unknown,
+      ): Promise<number | null> => {
+        return await resolveDestWithWorker(normalizedDest);
+      };
+
+      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, {
+        resolveDest: resolveDestPageIndex,
+      });
     } catch (e) {
       console.warn("Failed to extract annotations with pdf-lib", e);
     }
@@ -957,63 +981,95 @@ export const loadPDF = async (
     embeddedFontFaces.clear();
   };
 
-  const metadataPromise = (async (): Promise<PDFMetadata> => {
+  const pdfLibPages = pdfDoc ? pdfDoc.getPages() : [];
+
+  const getPdfLibPageSize = (pageIndex: number) => {
+    if (!pdfDoc) return null;
+    const page = pdfLibPages[pageIndex];
+    if (!page) return null;
+
+    const crop = page.getCropBox();
+    let width = crop.width;
+    let height = crop.height;
+
+    let userUnit = 1;
     try {
-      const { info } = await pdf.getMetadata();
-      if (!info) return {};
-
-      const toLocalISO = (d: Date) => {
-        const pad = (n: number) => n.toString().padStart(2, "0");
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      };
-
-      const cDateStr = parsePDFDate(info["CreationDate"]);
-      const mDateStr = parsePDFDate(info["ModDate"]);
-
-      const cDate = cDateStr ? new Date(cDateStr) : undefined;
-      const mDate = mDateStr ? new Date(mDateStr) : undefined;
-
-      let keywords = info["Keywords"];
-      if (typeof keywords === "string") {
-        keywords = [keywords];
-      } else if (!Array.isArray(keywords)) {
-        keywords = undefined;
+      const userUnitObj = page.node.lookup(PDFName.of("UserUnit"));
+      if (userUnitObj instanceof PDFNumber) {
+        const v = userUnitObj.asNumber();
+        if (Number.isFinite(v) && v > 0) userUnit = v;
       }
-
-      if (keywords) {
-        keywords = keywords.filter(
-          (k: unknown) => typeof k === "string" && k.trim().length > 0,
-        );
-        if (keywords.length === 0) keywords = undefined;
-      }
-
-      return {
-        title: info["Title"],
-        author: info["Author"],
-        subject: info["Subject"],
-        keywords: keywords,
-        creator: info["Creator"],
-        producer: info["Producer"],
-        creationDate: cDate ? toLocalISO(cDate) : undefined,
-        modificationDate: mDate ? toLocalISO(mDate) : undefined,
-        isModDateManual: false,
-        isProducerManual: false,
-      };
-    } catch (e) {
-      console.warn("Failed to extract metadata", e);
-      return {};
+    } catch {
+      // ignore
     }
+
+    width *= userUnit;
+    height *= userUnit;
+
+    const rotation = (((page.getRotation().angle || 0) % 360) + 360) % 360;
+    if (rotation % 180 !== 0) {
+      [width, height] = [height, width];
+    }
+
+    return { width, height };
+  };
+
+  const toLocalISO = (d: Date) => {
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const readMetadataFromPdfLib = (doc: PDFDocument): PDFMetadata => {
+    const keywords = doc.getKeywords();
+    let keywordsOut: string[] | undefined = undefined;
+    if (typeof keywords === "string") {
+      keywordsOut = [keywords];
+    }
+    if (keywordsOut) {
+      keywordsOut = keywordsOut.filter(
+        (k) => typeof k === "string" && k.trim().length > 0,
+      );
+      if (keywordsOut.length === 0) keywordsOut = undefined;
+    }
+
+    const created = doc.getCreationDate();
+    const modified = doc.getModificationDate();
+
+    return {
+      title: doc.getTitle(),
+      author: doc.getAuthor(),
+      subject: doc.getSubject(),
+      keywords: keywordsOut,
+      creator: doc.getCreator(),
+      producer: doc.getProducer(),
+      creationDate: created ? toLocalISO(created) : undefined,
+      modificationDate: modified ? toLocalISO(modified) : undefined,
+      isModDateManual: false,
+      isProducerManual: false,
+    };
+  };
+
+  const metadataPromise = (async (): Promise<PDFMetadata> => {
+    if (pdfDoc) {
+      try {
+        return readMetadataFromPdfLib(pdfDoc);
+      } catch (e) {
+        console.warn("Failed to extract metadata with pdf-lib", e);
+      }
+    }
+    return {};
   })();
 
   const outlinePromise = (async (): Promise<PDFOutlineItem[]> => {
-    try {
-      const rawOutline = await pdf.getOutline();
-      if (!rawOutline) return [];
-      return await mapOutline(pdf, rawOutline);
-    } catch (e) {
-      console.warn("Failed to extract outline", e);
-      return [];
+    if (workerReady) {
+      try {
+        const outline = await pdfWorkerService.getOutline();
+        if (outline) return outline;
+      } catch (e) {
+        console.warn("Failed to extract outline via worker", e);
+      }
     }
+    return [];
   })();
 
   const pageResults: {
@@ -1034,6 +1090,9 @@ export const loadPDF = async (
       const pageNumber = idx + 1;
       const page = await pdf.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 1.0 });
+      const pdfLibSize = getPdfLibPageSize(idx);
+      const pageWidth = pdfLibSize?.width ?? viewport.width;
+      const pageHeight = pdfLibSize?.height ?? viewport.height;
       const pageAnnotations = pdfLibAnnotsByPageIndex?.get(idx) || [];
 
       const context: ParserContext = {
@@ -1070,8 +1129,8 @@ export const loadPDF = async (
       pageResults[idx] = {
         page: {
           pageIndex: idx,
-          width: viewport.width,
-          height: viewport.height,
+          width: pageWidth,
+          height: pageHeight,
         },
         fields: fieldsForPage,
         annotations: annotsForPage,

@@ -79,7 +79,6 @@ src-tauri/                   # Tauri 桌面端（Rust）
   tauri.conf.json            # 桌面端配置（窗口/dragDrop/CLI args/build）
   capabilities/              # 权限声明（fs/dialog/cli/window 等）
   src/
-    main.rs                  # 极薄入口：转发到 lib.rs
     lib.rs                   # 插件初始化（dialog/fs/cli/log）
 
 public/
@@ -146,6 +145,18 @@ public/
 
 - `services/geminiService.analyzePageForFields(...)`
 - 无 API Key 会抛错；UI 侧应提示用户设置 `.env.local`。
+
+---
+
+## PDF 加载/渲染性能建议
+
+- **一次加载，多处复用**：`loadPDF()` 会同时初始化 pdf.js 与 pdf-lib；渲染/缩略图/最近文件预览尽量复用同一份 `PDFDocumentProxy` 和 `pdfBytes`，避免重复 `getDocument()` 或二次读取。
+- **首屏优先、懒渲染**：`PDFPage` 只在进入视口时触发渲染（IntersectionObserver + `isInView`），配合 `pdfWorkerService.reprioritize()` 优先渲染视口中心，缩放时用 `cancelQueuedRenders()` 及时丢弃过期任务。
+- **大页切片渲染**：像素超过 `MAX_PIXELS_PER_PAGE` 时启用 `PDFTileLayer`，通过 `TILE_MAX_DIM` 控制单块尺寸，避免整页渲染阻塞和内存峰值。
+- **低清占位 + 预热缩略图**：`warmupThumbnails()` 用 `renderPageImage` 先生成低分辨率缩略图，在 `PDFCanvasLayer` 作为 `placeholderImage` 显示，提升“可见速度”。
+- **限制 DPR 与分辨率**：`PDFCanvasLayer`/`PDFTileLayer` 将 DPR 夹在 2 以内；缩放时可按需降低渲染分辨率，减少像素量。
+- **缓存与清理**：`useEditorStore.getPageCached()` 复用 page proxy，`pdfWorkerService.getTextContent()` 复用文本内容；切换文档时调用 `unloadDocument()` 与 `releaseCanvas()` 释放旧文档资源。
+- **可选：延后重解析**：若首屏优先，考虑把 `pdf-lib` 的字段/注释解析放到后台或按需触发，先保证页面渲染与交互就绪。
 
 ---
 
