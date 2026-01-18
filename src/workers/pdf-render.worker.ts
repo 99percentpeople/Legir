@@ -2,6 +2,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 import type {
   WorkerErrorResponse,
+  WorkerProgressResponse,
   WorkerRequest,
   WorkerSuccessResponse,
 } from "@/services/pdfService/workerProtocol";
@@ -334,6 +335,20 @@ const postError = (id: string, error: string) => {
   self.postMessage(msg);
 };
 
+const postProgress = (
+  id: string,
+  payload: { docId?: string; loaded: number; total?: number },
+) => {
+  const msg: WorkerProgressResponse = {
+    type: "loadProgress",
+    id,
+    docId: payload.docId,
+    loaded: payload.loaded,
+    total: payload.total,
+  };
+  self.postMessage(msg);
+};
+
 // Process the next task in the queue
 const processQueue = async () => {
   if (isProcessing || taskQueue.length === 0) return;
@@ -486,6 +501,7 @@ const loadDocument = async (
   docId: string,
   data: Uint8Array,
   password?: string,
+  progressId?: string,
 ) => {
   const state = getDocState(docId);
 
@@ -512,6 +528,7 @@ const loadDocument = async (
     useSystemFonts: false,
     disableFontFace: false,
     stopAtErrors: false,
+    length: data.length,
   });
 
   if (typeof password === "string") {
@@ -524,6 +541,19 @@ const loadDocument = async (
       }
       didTry = true;
       cb(password);
+    };
+  }
+  if (progressId) {
+    let lastLoaded = -1;
+    let lastTotal = -1;
+    loadingTask.onProgress = ({
+      loaded,
+      total,
+    }: pdfjsLib.OnProgressParameters) => {
+      if (loaded === lastLoaded && (total ?? -1) === lastTotal) return;
+      lastLoaded = loaded;
+      lastTotal = total ?? -1;
+      postProgress(progressId, { docId, loaded, total });
     };
   }
   state.loadingTask = loadingTask;
@@ -879,7 +909,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           postSuccess(rid, false);
         }
         cancelActiveTasksForDoc(resolvedDocId);
-        await loadDocument(resolvedDocId, data.data, data.password);
+        await loadDocument(resolvedDocId, data.data, data.password, data.id);
         result = { payload: true };
         break;
       }

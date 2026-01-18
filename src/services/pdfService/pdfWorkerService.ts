@@ -5,8 +5,8 @@ import type { PDFOutlineItem } from "@/types";
 import type {
   WorkerCommandType,
   WorkerErrorResponse,
+  WorkerMessage,
   WorkerRequest,
-  WorkerResponse,
   WorkerSuccessResponse,
 } from "./workerProtocol";
 
@@ -70,6 +70,7 @@ const RequireWorkerVoid = () => {
 type PendingRequestHandlers<TType extends WorkerCommandType> = {
   resolve: (msg: WorkerSuccessResponse<TType>) => void;
   reject: (msg: WorkerErrorResponse) => void;
+  onProgress?: (payload: { loaded: number; total?: number }) => void;
 };
 
 class PDFWorkerService {
@@ -181,8 +182,19 @@ class PDFWorkerService {
     try {
       this.worker = new PDFRenderWorker();
       if (this.worker) {
-        this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        this.worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
           const msg = e.data;
+          if ("type" in msg && msg.type === "loadProgress") {
+            const request = this.pendingRequests.get(msg.id);
+            if (request?.onProgress) {
+              request.onProgress({
+                loaded: msg.loaded,
+                total: msg.total,
+              });
+            }
+            return;
+          }
+          if (!("success" in msg)) return;
           const request = this.pendingRequests.get(msg.id);
           if (request) {
             if (msg.success === true) {
@@ -202,7 +214,12 @@ class PDFWorkerService {
   @RequireWorkerPromise()
   public loadDocument(
     data: Uint8Array,
-    options?: { docId?: string; signal?: AbortSignal; password?: string },
+    options?: {
+      docId?: string;
+      signal?: AbortSignal;
+      password?: string;
+      onProgress?: (payload: { loaded: number; total?: number }) => void;
+    },
   ): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const docId = options?.docId ?? this.defaultDocId;
@@ -249,6 +266,7 @@ class PDFWorkerService {
             if (signal) signal.removeEventListener("abort", onAbort);
             reject(new Error(msg.error));
           },
+          onProgress: options?.onProgress,
         });
 
         const message: WorkerRequest = {

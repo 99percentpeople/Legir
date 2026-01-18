@@ -150,3 +150,13 @@ export type WorkerErrorResponse = {
 export type WorkerResponse<
   TType extends WorkerCommandType = WorkerCommandType,
 > = WorkerSuccessResponse<TType> | WorkerErrorResponse;
+
+export type WorkerProgressResponse = {
+  type: "loadProgress";
+  id: string;
+  docId?: string;
+  loaded: number;
+  total?: number;
+};
+
+export type WorkerMessage = WorkerResponse | WorkerProgressResponse;

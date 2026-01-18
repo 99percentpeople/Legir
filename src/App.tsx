@@ -568,7 +568,7 @@ const App: React.FC = () => {
 
       toast.success(t("app.save_success"));
       return true;
-    }).catch((err: any) => {
+    }).catch((err) => {
       if (err?.name === "AbortError") return false;
       console.error("Save As failed:", err);
       toast.error(t("app.save_fail"));
@@ -757,7 +757,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-full w-full flex-col">
-      {pdfLoadProgress && !state.isProcessing && (
+      {pdfLoadProgress && (
         <div className="bg-muted/70 sticky top-0 z-50 w-full border-b px-4 py-2 backdrop-blur">
           <div className="text-muted-foreground mb-1 text-xs">
             {(() => {
