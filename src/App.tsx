@@ -146,7 +146,8 @@ const App: React.FC = () => {
                 path: tauriPath,
                 scale: snapshot.scale,
                 pageIndex: snapshot.currentPageIndex,
-                element: el,
+                scrollLeft: el.scrollLeft,
+                scrollTop: el.scrollTop,
               });
             }
           }
@@ -560,7 +561,8 @@ const App: React.FC = () => {
               path: tauriTarget.path,
               scale: snapshot.scale,
               pageIndex: snapshot.currentPageIndex,
-              element: el,
+              scrollLeft: 0,
+              scrollTop: 0,
             });
           }
         }
@@ -709,7 +711,8 @@ const App: React.FC = () => {
             path: tauriPath,
             scale: snapshot.scale,
             pageIndex: snapshot.currentPageIndex,
-            element: el,
+            scrollLeft: el.scrollLeft,
+            scrollTop: el.scrollTop,
           });
         }
       }
@@ -720,9 +723,10 @@ const App: React.FC = () => {
       if (snapshot.pages.length > 0) {
         const el = workspaceScrollContainerRef.current;
         if (el) {
-          recentFilesService.saveWebDraftView({
+          recentFilesService.saveWebDraftViewState({
             scale: snapshot.scale,
-            element: el,
+            scrollLeft: el.scrollLeft,
+            scrollTop: el.scrollTop,
           });
         }
       }

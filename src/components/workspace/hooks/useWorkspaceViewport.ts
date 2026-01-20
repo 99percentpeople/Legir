@@ -73,6 +73,7 @@ export const useWorkspaceViewport = (opts: {
   } | null>(null);
   const prevScaleRef = useRef(opts.editorState.scale);
   const scrollPosRef = useRef({ x: 0, y: 0 });
+  const skipNextAutoCenterRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -654,11 +655,20 @@ export const useWorkspaceViewport = (opts: {
 
   // --- Scroll to Center on Document Load, Page Count Change, or Fit Trigger ---
   useEffect(() => {
+    if (opts.editorState.pendingViewStateRestore) {
+      skipNextAutoCenterRef.current = true;
+      return;
+    }
+
+    if (skipNextAutoCenterRef.current) {
+      skipNextAutoCenterRef.current = false;
+      return;
+    }
+
     if (
       opts.containerRef.current &&
       opts.contentRef.current &&
-      opts.editorState.pages.length > 0 &&
-      !opts.editorState.pendingViewStateRestore
+      opts.editorState.pages.length > 0
     ) {
       const container = opts.containerRef.current;
       const content = opts.contentRef.current;

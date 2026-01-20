@@ -98,6 +98,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const skipNextWindowCloseRef = useRef(false);
   const initialTitleRef = useRef<string | null>(null);
   const workspaceScrollContainerRef = useRef<HTMLElement | null>(null);
+  const webViewStateRef = useRef({
+    lastScroll: null as { left: number; top: number } | null,
+    cleanup: null as null | (() => void),
+    rafId: null as number | null,
+    lastSaveAt: 0,
+  });
 
   const [isTranslateOpen, setIsTranslateOpen] = useState(false);
   const [translateSourceText, setTranslateSourceText] = useState("");
@@ -156,9 +162,73 @@ const EditorPage: React.FC<EditorPageProps> = ({
     "workspace:scrollContainerReady",
     ({ element }) => {
       workspaceScrollContainerRef.current = element;
+
+      if (tauri) return;
+
+      try {
+        webViewStateRef.current.cleanup?.();
+      } catch {
+        // ignore
+      }
+      webViewStateRef.current.cleanup = null;
+
+      const update = () => {
+        webViewStateRef.current.lastScroll = {
+          left: element.scrollLeft,
+          top: element.scrollTop,
+        };
+
+        if (webViewStateRef.current.rafId !== null) return;
+        if (typeof window === "undefined") return;
+        webViewStateRef.current.rafId = window.requestAnimationFrame(() => {
+          webViewStateRef.current.rafId = null;
+          const now = Date.now();
+          if (now - webViewStateRef.current.lastSaveAt < 200) return;
+          webViewStateRef.current.lastSaveAt = now;
+          const snapshot = useEditorStore.getState();
+          if (!snapshot.pages || snapshot.pages.length === 0) return;
+          const last = webViewStateRef.current.lastScroll ?? {
+            left: element.scrollLeft,
+            top: element.scrollTop,
+          };
+          recentFilesService.saveWebDraftViewState({
+            scale: snapshot.scale,
+            scrollLeft: last.left,
+            scrollTop: last.top,
+          });
+        });
+      };
+
+      update();
+      element.addEventListener("scroll", update, { passive: true });
+      webViewStateRef.current.cleanup = () => {
+        element.removeEventListener("scroll", update);
+      };
     },
     { replayLast: true },
   );
+
+  useEffect(() => {
+    return () => {
+      try {
+        webViewStateRef.current.cleanup?.();
+      } catch {
+        // ignore
+      }
+      webViewStateRef.current.cleanup = null;
+
+      if (webViewStateRef.current.rafId !== null) {
+        try {
+          if (typeof window !== "undefined") {
+            window.cancelAnimationFrame(webViewStateRef.current.rafId);
+          }
+        } catch {
+          // ignore
+        }
+      }
+      webViewStateRef.current.rafId = null;
+    };
+  }, []);
 
   useAppEvent("sidebar:focusAnnotation", () => {
     setUiState((prev) => ({
@@ -334,7 +404,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
                 path: tauriPath,
                 scale: snapshot.scale,
                 pageIndex: snapshot.currentPageIndex,
-                element: el,
+                scrollLeft: el.scrollLeft,
+                scrollTop: el.scrollTop,
               });
             }
           }
@@ -391,7 +462,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
           path: tauriPath,
           scale: snapshot.scale,
           pageIndex: snapshot.currentPageIndex,
-          element: el,
+          scrollLeft: el.scrollLeft,
+          scrollTop: el.scrollTop,
         });
       }
     }
@@ -405,13 +477,20 @@ const EditorPage: React.FC<EditorPageProps> = ({
     if (!snapshot.pages || snapshot.pages.length === 0) return;
     const el = workspaceScrollContainerRef.current;
     if (!el) return;
-    recentFilesService.saveWebDraftView({ scale: snapshot.scale, element: el });
+
+    const last = webViewStateRef.current.lastScroll;
+    recentFilesService.saveWebDraftViewState({
+      scale: snapshot.scale,
+      scrollLeft: last?.left ?? el.scrollLeft,
+      scrollTop: last?.top ?? el.scrollTop,
+    });
   }, []);
 
   useEventListener<BeforeUnloadEvent>(
     !tauri && typeof window !== "undefined" ? window : null,
     "beforeunload",
     (e) => {
+      persistWebViewState();
       if (state.pages.length > 0 && state.isDirty) {
         e.preventDefault();
         e.returnValue = "";

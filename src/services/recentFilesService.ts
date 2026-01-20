@@ -318,19 +318,20 @@ export class RecentFilesService {
     return next;
   }
 
-  /** Persist Tauri view state from a caller-provided scroll container. */
+  /** Persist Tauri view state from explicit scroll coordinates. */
   saveTauriViewState(options: {
     path: string;
     scale: number;
+    scrollLeft: number;
+    scrollTop: number;
     pageIndex?: number;
-    element: HTMLElement;
     updatedAt?: number;
   }) {
     this.setRecentFileViewState({
       path: options.path,
       scale: options.scale,
-      scrollLeft: options.element.scrollLeft,
-      scrollTop: options.element.scrollTop,
+      scrollLeft: options.scrollLeft,
+      scrollTop: options.scrollTop,
       pageIndex: options.pageIndex,
       updatedAt: options.updatedAt,
     });
@@ -458,16 +459,16 @@ export class RecentFilesService {
     );
   }
 
-  /** Persist Web draft view state from a caller-provided scroll container. */
-  saveWebDraftView(options: {
+  saveWebDraftViewState(options: {
     scale: number;
-    element: HTMLElement;
+    scrollLeft: number;
+    scrollTop: number;
     updatedAt?: number;
   }) {
     this.setWebDraftViewState({
       scale: options.scale,
-      scrollLeft: options.element.scrollLeft,
-      scrollTop: options.element.scrollTop,
+      scrollLeft: options.scrollLeft,
+      scrollTop: options.scrollTop,
       updatedAt: options.updatedAt,
     });
   }

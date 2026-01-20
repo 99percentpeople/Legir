@@ -282,7 +282,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
           return success;
         }
         return false;
-      } catch (error: any) {
+      } catch (error) {
         // Handle pre-send aborts: Restore state so we can retry with the cached canvas
         if (error?.phase === "pre-send") {
           // If we were trying to send a canvas, rollback the transferred state
