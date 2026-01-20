@@ -23,7 +23,6 @@ import {
   THUMBNAIL_WARMUP_PRIORITY,
 } from "../constants";
 import { shouldSwitchToSelectAfterUse } from "../lib/tool-behavior";
-import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
 
 let thumbnailWarmupEpoch = 0;
@@ -90,15 +89,12 @@ export interface EditorActions {
       | ((prev: EditorOptions) => Partial<EditorOptions>),
   ) => void;
 
-  getPageCached: (pageIndex: number) => Promise<PDFPageProxy>;
-
   warmupThumbnails: () => void;
 
   // Complex Actions
   loadDocument: (data: {
     pdfFile: File | null;
     pdfBytes: Uint8Array;
-    pdfDocument: PDFDocumentProxy;
     pages: PageData[];
     fields: FormField[];
     annotations: Annotation[];
@@ -161,8 +157,6 @@ function pickEditorUiState(
 const initialState: EditorState = {
   pdfFile: null,
   pdfBytes: null,
-  pdfDocument: null,
-  pageCache: new Map(),
   pdfOpenPassword: null,
   exportPassword: null,
   metadata: {},
@@ -253,20 +247,6 @@ export const useEditorStore = create<EditorState & EditorActions>()(
       },
 
       setProcessingStatus: (status) => set({ processingStatus: status }),
-
-      getPageCached: async (pageIndex) => {
-        const { pdfDocument, pageCache } = get();
-        if (!pdfDocument) {
-          throw new Error("PDF document not loaded");
-        }
-
-        let pagePromise = pageCache.get(pageIndex);
-        if (!pagePromise) {
-          pagePromise = pdfDocument.getPage(pageIndex + 1);
-          pageCache.set(pageIndex, pagePromise);
-        }
-        return await pagePromise;
-      },
 
       warmupThumbnails: () => {
         const { pdfBytes, pdfOpenPassword } = get();
@@ -421,7 +401,6 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         revokeThumbnailObjectUrls(get().pages);
         set({
           ...data,
-          pageCache: new Map(),
           past: [],
           future: [],
           selectedId: null,
@@ -716,8 +695,6 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         set(() => ({
           pdfFile: initialState.pdfFile,
           pdfBytes: initialState.pdfBytes,
-          pdfDocument: initialState.pdfDocument,
-          pageCache: new Map(),
           pdfOpenPassword: initialState.pdfOpenPassword,
           exportPassword: initialState.exportPassword,
           metadata: initialState.metadata,

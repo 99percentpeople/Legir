@@ -1,6 +1,4 @@
-import * as pdfjsLib from "pdfjs-dist";
 import { pdfWorkerService } from "./pdfWorkerService";
-import { mapOutline } from "./lib/outline";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
 import { loadAndEmbedExportFonts } from "./lib/built-in-fonts";
 import {
@@ -8,7 +6,6 @@ import {
   isSerifFamily,
   isExplicitCjkFontSelection,
 } from "./lib/text";
-import { parsePDFDate } from "@/utils/pdfUtils";
 import {
   buildFullFieldNameFromChain,
   decodePdfStreamToText,
@@ -28,6 +25,7 @@ import {
 } from "./lib/pdf-import-utils";
 import {
   PDFDocument,
+  EncryptedPDFError,
   StandardFonts,
   type PDFFont,
   PDFRef,
@@ -44,6 +42,8 @@ import {
   PDFOptionList,
   PDFRadioGroup,
   PDFSignature,
+  PDFNull,
+  ParseSpeeds,
 } from "@cantoo/pdf-lib";
 import fontkit from "pdf-fontkit";
 import { pdfDebug, pdfDebugEnabled } from "./lib/debug";
@@ -61,6 +61,7 @@ import {
   IAnnotationExporter,
   IControlExporter,
   ParserContext,
+  ViewportLike,
 } from "./types";
 import type { PdfJsAnnotation } from "./types";
 import {
@@ -68,6 +69,7 @@ import {
   HighlightParser,
   CommentParser,
   FreeTextParser,
+  LinkParser,
 } from "./parsers/AnnotationParsers";
 import {
   TextControlParser,
@@ -89,29 +91,23 @@ import {
   DropdownControlExporter,
   SignatureControlExporter,
 } from "./exporters/ControlExporters";
-import PdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
-import { PDFJS_CMAP_URL, PDFJS_STANDARD_FONT_URL } from "./pdfRenderer";
+import { createPdfLibViewport } from "./lib/coords";
 
 // PDF pipeline service.
 //
 // This module is the authoritative boundary for:
-// - Loading a PDF (bytes -> pdfjs document/pages/outline + pdf-lib document resources)
+// - Loading a PDF (bytes -> pdf-lib document/pages + worker outline/render)
 // - Rendering pages/thumbnails (mostly via worker for responsiveness)
 // - Importing existing PDF form fields / annotations into our internal models
 // - Exporting internal models back into a new PDF
 //
 // Key design: we use BOTH libraries for different responsibilities.
-// - `pdfjs-dist`: viewing/metadata/outline + render surfaces
-// - `pdf-lib`: writing/export + certain resource introspection (fonts/DA)
+// - `pdfjs-dist`: render/text/outline in the worker
+// - `pdf-lib`: page/metadata parsing + writing/export + resource introspection
 //
 // Extension points:
 // - Add a new control/annotation type by implementing a Parser + Exporter and registering it
 //   in the arrays below. The rest of the app treats `FormField` / `Annotation` as plain data.
-
-// pdfjs worker for parsing/render internals.
-pdfjsLib.GlobalWorkerOptions.workerPort = new PdfjsWorker({
-  name: "pdfjs-worker",
-});
 
 // Register parsers and exporters
 const annotationParsers: IAnnotationParser[] = [
@@ -119,6 +115,7 @@ const annotationParsers: IAnnotationParser[] = [
   new HighlightParser(),
   new CommentParser(),
   new FreeTextParser(),
+  new LinkParser(),
 ];
 
 const controlParsers: IControlParser[] = [
@@ -144,85 +141,341 @@ const controlExporters: IControlExporter[] = [
   new SignatureControlExporter(),
 ];
 
-const createPdfJsLoadTask = (options: {
-  data: Uint8Array;
-  label?: string;
-  password?: string;
-}) => {
+type PdfLoadSession = {
+  id: string;
+  requestPassword: (
+    reason: "need_password" | "incorrect_password",
+  ) => Promise<string>;
+  getLastPassword: () => string | undefined;
+  markProgress: (loaded: number, total?: number) => void;
+  finish: (ok: boolean) => void;
+};
+
+const createPdfLoadSession = (label?: string): PdfLoadSession => {
   const id = `pdf_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  appEventBus.emit("pdf:loadStart", { id, label: options.label });
-
-  const task = pdfjsLib.getDocument({
-    data: options.data,
-    password: options.password || "",
-    cMapUrl: PDFJS_CMAP_URL,
-    cMapPacked: true,
-    standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
-    useSystemFonts: false,
-    disableFontFace: false,
-    stopAtErrors: false,
-  });
-
-  task.onProgress = (progress) => {
-    appEventBus.emit("pdf:loadProgress", {
-      id,
-      loaded: progress?.loaded ?? 0,
-      total: progress?.total,
-    });
-  };
-
   let lastPassword: string | undefined = undefined;
 
-  task.onPassword = (callback: (password: string) => void, reason: unknown) => {
-    const mappedReason =
-      pdfjsLib.PasswordResponses &&
-      reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD
-        ? "incorrect_password"
-        : "need_password";
-
-    let settled = false;
-    const submit = (password: string) => {
-      if (settled) return;
-      settled = true;
-      lastPassword = password;
-      callback(password);
-    };
-    const cancel = () => {
-      if (settled) return;
-      settled = true;
-      void task.destroy().catch(() => {
-        // ignore
-      });
-      callback("");
-    };
-
-    appEventBus.emit("pdf:passwordRequired", {
+  const markProgress = (loaded: number, total?: number) => {
+    appEventBus.emit("pdf:loadProgress", {
       id,
-      reason: mappedReason,
-      submit,
-      cancel,
+      loaded,
+      total,
     });
   };
 
-  let ok = false;
+  appEventBus.emit("pdf:loadStart", { id, label });
+  markProgress(0, 1);
 
-  task.promise
-    .then(() => (ok = true))
-    .catch(() => (ok = false))
-    .finally(() => {
-      appEventBus.emit("pdf:loadEnd", { id, ok });
+  const requestPassword = (reason: "need_password" | "incorrect_password") =>
+    new Promise<string>((resolve, reject) => {
+      let settled = false;
+      const submit = (password: string) => {
+        if (settled) return;
+        settled = true;
+        lastPassword = password;
+        resolve(password);
+      };
+      const cancel = () => {
+        if (settled) return;
+        settled = true;
+        reject(new Error("Password prompt cancelled"));
+      };
+
+      appEventBus.emit("pdf:passwordRequired", {
+        id,
+        reason,
+        submit,
+        cancel,
+      });
     });
 
+  const finish = (ok: boolean) => {
+    appEventBus.emit("pdf:loadEnd", { id, ok });
+  };
+
   return {
-    task,
     id,
+    requestPassword,
     getLastPassword: () => lastPassword,
+    markProgress,
+    finish,
   };
 };
 
-const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
+const getPdfLibPasswordReason = (
+  error: unknown,
+  hadPassword: boolean,
+): "need_password" | "incorrect_password" | null => {
+  if (error instanceof EncryptedPDFError) {
+    return hadPassword ? "incorrect_password" : "need_password";
+  }
+
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("password")) {
+      return hadPassword ? "incorrect_password" : "need_password";
+    }
+  }
+
+  return null;
+};
+
+const loadPdfLibDocumentWithPassword = async (
+  pdfBytes: Uint8Array,
+  session: PdfLoadSession,
+  initialPassword?: string | null,
+): Promise<{ pdfDoc: PDFDocument; openPassword?: string }> => {
+  let password: string | undefined =
+    typeof initialPassword === "string" ? initialPassword : undefined;
+
+  while (true) {
+    try {
+      const pdfDoc = await PDFDocument.load(pdfBytes, {
+        password,
+        updateMetadata: false,
+        parseSpeed: ParseSpeeds.Fastest,
+      });
+      return { pdfDoc, openPassword: password };
+    } catch (error) {
+      const reason = getPdfLibPasswordReason(error, password !== undefined);
+      if (!reason) throw error;
+      password = await session.requestPassword(reason);
+    }
+  }
+};
+
+const buildPdfLibAnnotsByPageIndex = async (
+  pdfDoc: PDFDocument,
+  options?: {
+    resolveDest?: (dest: unknown) => Promise<number | null>;
+  },
+) => {
   const out = new Map<number, PdfJsAnnotation[]>();
   const pages = pdfDoc.getPages();
+  const pageIndexByRefKey = new Map<string, number>();
+  const pageIndexByNode = new Map<PDFDict, number>();
+
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const page = pages[pageIndex];
+    const pageNode = page.node;
+    if (pageNode instanceof PDFDict) {
+      pageIndexByNode.set(pageNode, pageIndex);
+      const ref = pdfDoc.context.getObjectRef(pageNode);
+      if (ref) {
+        pageIndexByRefKey.set(
+          `${ref.objectNumber}:${ref.generationNumber}`,
+          pageIndex,
+        );
+      }
+    }
+  }
+
+  const normalizeDestForResolve = (
+    value: unknown,
+    depth = 0,
+    seenRefs: Set<string> = new Set(),
+  ): unknown => {
+    if (value === undefined || value === null) return undefined;
+    if (depth > 6) return undefined;
+
+    const refToProxy = (ref: PDFRef) => ({
+      num: ref.objectNumber,
+      gen: ref.generationNumber,
+    });
+
+    if (value instanceof PDFRef) {
+      const key = `${value.objectNumber}:${value.generationNumber}`;
+      if (seenRefs.has(key)) return undefined;
+      seenRefs.add(key);
+
+      let resolved: unknown = undefined;
+      try {
+        resolved = pdfDoc.context.lookup(value);
+      } catch {
+        resolved = undefined;
+      }
+
+      if (resolved && resolved !== value) {
+        const normalized = normalizeDestForResolve(
+          resolved,
+          depth + 1,
+          seenRefs,
+        );
+        if (normalized !== undefined) return normalized;
+      }
+
+      return [refToProxy(value)];
+    }
+
+    if (typeof value === "string" || Array.isArray(value)) return value;
+    if (value instanceof PDFString || value instanceof PDFName) {
+      return pdfObjToString(value);
+    }
+    if (value instanceof PDFDict) {
+      const ref = pdfDoc.context.getObjectRef(value);
+      return ref ? [refToProxy(ref)] : undefined;
+    }
+    if (value instanceof PDFNumber) {
+      return [value.asNumber()];
+    }
+    if (value instanceof PDFArray) {
+      let rawFirst: unknown = undefined;
+      try {
+        rawFirst = value.get(0);
+      } catch {
+        rawFirst = undefined;
+      }
+
+      if (rawFirst instanceof PDFRef) {
+        return [refToProxy(rawFirst)];
+      }
+      if (rawFirst instanceof PDFDict) {
+        const ref = pdfDoc.context.getObjectRef(rawFirst);
+        return ref ? [refToProxy(ref)] : undefined;
+      }
+      if (rawFirst instanceof PDFNumber) {
+        return [rawFirst.asNumber()];
+      }
+      if (rawFirst instanceof PDFString || rawFirst instanceof PDFName) {
+        const named = pdfObjToString(rawFirst);
+        return named || undefined;
+      }
+
+      let first: unknown = undefined;
+      try {
+        first = value.lookup(0);
+      } catch {
+        first = undefined;
+      }
+      if (first instanceof PDFRef) {
+        return [refToProxy(first)];
+      }
+      if (first instanceof PDFNumber) {
+        return [first.asNumber()];
+      }
+      if (first instanceof PDFString || first instanceof PDFName) {
+        const named = pdfObjToString(first);
+        return named || undefined;
+      }
+      if (first instanceof PDFDict) {
+        const ref = pdfDoc.context.getObjectRef(first);
+        return ref ? [refToProxy(ref)] : undefined;
+      }
+
+      return undefined;
+    }
+    return value;
+  };
+
+  const readDictValue = (dict: PDFDict, key: string): unknown => {
+    const pdfKey = PDFName.of(key);
+    let value: unknown = undefined;
+    try {
+      value = dict.lookup(pdfKey);
+    } catch {
+      value = undefined;
+    }
+
+    if (value === undefined || value === PDFNull) {
+      try {
+        value = dict.get(pdfKey, true);
+      } catch {
+        value = undefined;
+      }
+      if (value instanceof PDFRef) {
+        try {
+          value = dict.context.lookup(value);
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (value === PDFNull) return undefined;
+    return value;
+  };
+
+  const extractActionDest = (action: PDFDict, depth = 0): unknown => {
+    if (depth > 4) return undefined;
+
+    const direct = readDictValue(action, "D") ?? readDictValue(action, "Dest");
+    if (direct !== undefined) return direct;
+
+    const next = readDictValue(action, "Next");
+    if (next instanceof PDFDict) {
+      return extractActionDest(next, depth + 1);
+    }
+    if (next instanceof PDFArray) {
+      for (let i = 0; i < next.size(); i++) {
+        let item: unknown = undefined;
+        try {
+          item = next.lookup(i);
+        } catch {
+          item = undefined;
+        }
+        if (item instanceof PDFDict) {
+          const found = extractActionDest(item, depth + 1);
+          if (found !== undefined) return found;
+        }
+      }
+    }
+
+    return undefined;
+  };
+
+  const resolveDestPageIndexFromPdfLib = (
+    value: unknown,
+  ): number | undefined => {
+    const resolveFromNumber = (num: number): number | undefined => {
+      if (!Number.isFinite(num)) return undefined;
+      if (num >= 0 && num < pages.length) return num;
+      if (num >= 1 && num <= pages.length) return num - 1;
+      return undefined;
+    };
+
+    const resolveFromRef = (ref: PDFRef): number | undefined => {
+      const key = `${ref.objectNumber}:${ref.generationNumber}`;
+      return pageIndexByRefKey.get(key);
+    };
+
+    const resolveFromDict = (dict: PDFDict): number | undefined => {
+      const direct = pageIndexByNode.get(dict);
+      if (typeof direct === "number") return direct;
+      const ref = pdfDoc.context.getObjectRef(dict);
+      if (!ref) return undefined;
+      return resolveFromRef(ref);
+    };
+
+    const resolveFromValue = (val: unknown): number | undefined => {
+      if (!val) return undefined;
+      if (val instanceof PDFRef) return resolveFromRef(val);
+      if (val instanceof PDFDict) return resolveFromDict(val);
+      if (val instanceof PDFNumber) return resolveFromNumber(val.asNumber());
+      if (typeof val === "number") return resolveFromNumber(val);
+      return undefined;
+    };
+
+    if (value instanceof PDFArray) {
+      let rawFirst: unknown = undefined;
+      try {
+        rawFirst = value.get(0);
+      } catch {
+        rawFirst = undefined;
+      }
+      const rawResolved = resolveFromValue(rawFirst);
+      if (typeof rawResolved === "number") return rawResolved;
+
+      let lookedUp: unknown = undefined;
+      try {
+        lookedUp = value.lookup(0);
+      } catch {
+        lookedUp = undefined;
+      }
+      return resolveFromValue(lookedUp);
+    }
+
+    return resolveFromValue(value);
+  };
 
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
     const page = pages[pageIndex];
@@ -232,7 +485,17 @@ const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
     } catch {
       annots = undefined;
     }
-    if (!(annots instanceof PDFArray)) continue;
+    if (!(annots instanceof PDFArray)) {
+      pdfDebug("import:annotations", "page_annots_missing", () => ({
+        pageIndex,
+        annots: summarizePdfObjForDebug(annots),
+      }));
+      continue;
+    }
+    pdfDebug("import:annotations", "page_annots", () => ({
+      pageIndex,
+      count: annots.size(),
+    }));
 
     for (let i = 0; i < annots.size(); i++) {
       let sourcePdfRef:
@@ -255,13 +518,35 @@ const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
       const annot = annots.lookup(i);
       if (!(annot instanceof PDFDict)) continue;
 
-      const subtype = annot.lookup(PDFName.of("Subtype"));
-
+      let subtype: unknown;
+      try {
+        subtype = annot.lookup(PDFName.of("Subtype"));
+      } catch {
+        subtype = undefined;
+      }
       const subtypeName =
         subtype instanceof PDFName ? subtype.decodeText() : undefined;
+
+      let rectObj: unknown;
+      try {
+        rectObj = annot.lookup(PDFName.of("Rect"));
+      } catch {
+        rectObj = undefined;
+      }
+      const rect = pdfRectFromObj(rectObj);
+
+      pdfDebug("import:annotations", "annot_raw", () => ({
+        pageIndex,
+        annotIndex: i,
+        subtypeName,
+        rect,
+        rectObj: summarizePdfObjForDebug(rectObj),
+        sourcePdfRef,
+        annot: summarizePdfObjForDebug(annot),
+      }));
+
       if (!subtypeName) continue;
 
-      const rect = pdfRectFromObj(annot.lookup(PDFName.of("Rect")));
       if (!rect) continue;
 
       const pushForPage = (a: PdfJsAnnotation) => {
@@ -465,6 +750,73 @@ const buildPdfLibAnnotsByPageIndex = async (pdfDoc: PDFDocument) => {
         continue;
       }
 
+      if (subtypeName === "Link") {
+        let url: string | undefined = undefined;
+        let dest: unknown = undefined;
+        let action: PDFDict | undefined = undefined;
+        let actionType: string | undefined = undefined;
+
+        try {
+          const actionValue = readDictValue(annot, "A");
+          if (actionValue instanceof PDFDict) {
+            action = actionValue;
+            actionType = pdfObjToString(readDictValue(action, "S"));
+            if (actionType === "URI") {
+              url = pdfObjToString(readDictValue(action, "URI"));
+            }
+            const actionDest = extractActionDest(action);
+            if (actionDest !== undefined) dest = actionDest;
+          }
+        } catch {
+          // ignore
+        }
+
+        if (dest === undefined) {
+          try {
+            dest = readDictValue(annot, "Dest");
+          } catch {
+            // ignore
+          }
+        }
+
+        let destPageIndex: number | null | undefined = undefined;
+        const normalizedDest = normalizeDestForResolve(dest);
+        const resolveDestPageIndex = options?.resolveDest;
+        if (normalizedDest !== undefined && resolveDestPageIndex) {
+          destPageIndex = await resolveDestPageIndex(normalizedDest);
+        }
+        if (typeof destPageIndex !== "number") {
+          const fallbackIndex = resolveDestPageIndexFromPdfLib(dest);
+          if (typeof fallbackIndex === "number") destPageIndex = fallbackIndex;
+        }
+
+        pdfDebug("import:annotations", "link_extracted", () => ({
+          pageIndex,
+          annotIndex: i,
+          url,
+          actionType,
+          actionKeys: action ? action.keys().map((k) => k.decodeText()) : [],
+          action: summarizePdfObjForDebug(action),
+          dest: summarizePdfObjForDebug(dest),
+          normalizedDest,
+          destPageIndex,
+        }));
+
+        if (!url && typeof destPageIndex !== "number") {
+          continue;
+        }
+
+        pushForPage({
+          subtype: "Link",
+          rect,
+          sourcePdfRef,
+          url,
+          dest,
+          destPageIndex,
+        });
+        continue;
+      }
+
       if (
         subtypeName !== "Highlight" &&
         subtypeName !== "Text" &&
@@ -541,7 +893,6 @@ export const loadPDF = async (
   },
 ): Promise<{
   pdfBytes: Uint8Array;
-  pdfDocument: pdfjsLib.PDFDocumentProxy;
   pages: PageData[];
   fields: FormField[];
   annotations: Annotation[];
@@ -560,223 +911,302 @@ export const loadPDF = async (
 
   let fontMap = new Map<string, string>();
   let globalDA: string | undefined = undefined;
-  let pdfDoc: PDFDocument | null = null;
 
-  const renderBuffer = pdfBytes;
-  const pdfJsData = new Uint8Array(pdfBytes);
-  const { task: pdfJsLoadTask, getLastPassword } = createPdfJsLoadTask({
-    data: pdfJsData,
-    label: "loadPDF",
-    password: options?.password,
-  });
-
-  const pdf = await pdfJsLoadTask.promise;
-
-  const openPassword = getLastPassword() ?? options?.password;
+  const loadSession = createPdfLoadSession("loadPDF");
+  let loadOk = false;
+  let openPassword: string | undefined = undefined;
+  let pdfDoc: PDFDocument;
+  const initialPassword =
+    typeof options?.password === "string" ? options.password : undefined;
   try {
-    pdfDoc = await PDFDocument.load(
+    const renderBuffer = pdfBytes;
+
+    loadSession.markProgress(0, pdfBytes.length);
+
+    const loadWorker = async (password?: string) => {
+      try {
+        return await pdfWorkerService.loadDocument(renderBuffer, {
+          password,
+          onProgress: (payload) => {
+            const total =
+              typeof payload.total === "number" && payload.total > 0
+                ? payload.total
+                : pdfBytes.length;
+            loadSession.markProgress(payload.loaded, total);
+          },
+        });
+      } catch (e) {
+        console.warn("Failed to load PDF into render worker", e);
+        return false;
+      }
+    };
+
+    const pdfLibPromise = loadPdfLibDocumentWithPassword(
       pdfBytes,
-      openPassword ? { password: openPassword } : undefined,
+      loadSession,
+      initialPassword,
     );
+    const workerLoadPromise = loadWorker(initialPassword);
+
+    const [loaded, workerReadyInitial] = await Promise.all([
+      pdfLibPromise,
+      workerLoadPromise,
+    ]);
+    pdfDoc = loaded.pdfDoc;
+    openPassword = loaded.openPassword;
+
     try {
       fontMap = getFontMap(pdfDoc);
       globalDA = getGlobalDA(pdfDoc);
     } catch (e) {
       console.warn("Failed to parse PDF resources with pdf-lib", e);
     }
-  } catch (e) {
-    console.warn("Failed to parse PDF resources with pdf-lib", e);
-  }
 
-  try {
-    await pdfWorkerService.loadDocument(renderBuffer, {
-      password: openPassword,
-    });
-  } catch (e) {
-    console.warn("Failed to load PDF into render worker", e);
-  }
+    let workerReady = workerReadyInitial;
+    if (
+      !workerReady &&
+      typeof openPassword === "string" &&
+      openPassword !== initialPassword
+    ) {
+      loadSession.markProgress(0, pdfBytes.length);
+      workerReady = await loadWorker(openPassword);
+    }
 
-  const numPages = pdf.numPages;
-  const pages: PageData[] = [];
-  const fields: FormField[] = [];
-  const annotations: Annotation[] = [];
+    const pdfLibPages = pdfDoc.getPages();
+    const numPages = pdfLibPages.length;
+    const pages: PageData[] = [];
+    const fields: FormField[] = [];
+    const annotations: Annotation[] = [];
 
-  let pdfLibAnnotsByPageIndex: Map<number, PdfJsAnnotation[]> | undefined =
-    undefined;
-  if (pdfDoc) {
+    let pdfLibAnnotsByPageIndex: Map<number, PdfJsAnnotation[]> | undefined =
+      undefined;
     try {
-      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc);
+      const resolveDestWithWorker = async (
+        normalizedDest: unknown,
+      ): Promise<number | null> => {
+        if (!workerReady) return null;
+        try {
+          return await pdfWorkerService.resolveDest({ dest: normalizedDest });
+        } catch {
+          return null;
+        }
+      };
+      const resolveDestPageIndex = async (
+        normalizedDest: unknown,
+      ): Promise<number | null> => {
+        return await resolveDestWithWorker(normalizedDest);
+      };
+
+      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, {
+        resolveDest: resolveDestPageIndex,
+      });
     } catch (e) {
       console.warn("Failed to extract annotations with pdf-lib", e);
     }
-  }
 
-  const embeddedFontCache = new Map<string, Promise<string | undefined>>();
-  const embeddedFontFaces = new Set<FontFace>();
+    const embeddedFontCache = new Map<string, Promise<string | undefined>>();
+    const embeddedFontFaces = new Set<FontFace>();
 
-  const dispose = () => {
-    embeddedFontCache.clear();
+    const dispose = () => {
+      embeddedFontCache.clear();
 
-    if (typeof document !== "undefined" && document.fonts) {
-      embeddedFontFaces.forEach((face) => {
-        try {
-          document.fonts.delete(face);
-        } catch {
-          // Ignore removal errors
-        }
-      });
-    }
-    embeddedFontFaces.clear();
-  };
+      if (typeof document !== "undefined" && document.fonts) {
+        embeddedFontFaces.forEach((face) => {
+          try {
+            document.fonts.delete(face);
+          } catch {
+            // Ignore removal errors
+          }
+        });
+      }
+      embeddedFontFaces.clear();
+    };
 
-  const metadataPromise = (async (): Promise<PDFMetadata> => {
-    try {
-      const { info } = await pdf.getMetadata();
-      if (!info) return {};
+    const toLocalISO = (d: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
-      const toLocalISO = (d: Date) => {
-        const pad = (n: number) => n.toString().padStart(2, "0");
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      };
-
-      const cDateStr = parsePDFDate(info["CreationDate"]);
-      const mDateStr = parsePDFDate(info["ModDate"]);
-
-      const cDate = cDateStr ? new Date(cDateStr) : undefined;
-      const mDate = mDateStr ? new Date(mDateStr) : undefined;
-
-      let keywords = info["Keywords"];
+    const readMetadataFromPdfLib = (doc: PDFDocument): PDFMetadata => {
+      const keywords = doc.getKeywords();
+      let keywordsOut: string[] | undefined = undefined;
       if (typeof keywords === "string") {
-        keywords = [keywords];
-      } else if (!Array.isArray(keywords)) {
-        keywords = undefined;
+        keywordsOut = [keywords];
+      }
+      if (keywordsOut) {
+        keywordsOut = keywordsOut.filter(
+          (k) => typeof k === "string" && k.trim().length > 0,
+        );
+        if (keywordsOut.length === 0) keywordsOut = undefined;
       }
 
-      if (keywords) {
-        keywords = keywords.filter(
-          (k: unknown) => typeof k === "string" && k.trim().length > 0,
-        );
-        if (keywords.length === 0) keywords = undefined;
-      }
+      const created = doc.getCreationDate();
+      const modified = doc.getModificationDate();
 
       return {
-        title: info["Title"],
-        author: info["Author"],
-        subject: info["Subject"],
-        keywords: keywords,
-        creator: info["Creator"],
-        producer: info["Producer"],
-        creationDate: cDate ? toLocalISO(cDate) : undefined,
-        modificationDate: mDate ? toLocalISO(mDate) : undefined,
+        title: doc.getTitle(),
+        author: doc.getAuthor(),
+        subject: doc.getSubject(),
+        keywords: keywordsOut,
+        creator: doc.getCreator(),
+        producer: doc.getProducer(),
+        creationDate: created ? toLocalISO(created) : undefined,
+        modificationDate: modified ? toLocalISO(modified) : undefined,
         isModDateManual: false,
         isProducerManual: false,
       };
-    } catch (e) {
-      console.warn("Failed to extract metadata", e);
+    };
+
+    const metadataPromise = (async (): Promise<PDFMetadata> => {
+      if (pdfDoc) {
+        try {
+          return readMetadataFromPdfLib(pdfDoc);
+        } catch (e) {
+          console.warn("Failed to extract metadata with pdf-lib", e);
+        }
+      }
       return {};
-    }
-  })();
+    })();
 
-  const outlinePromise = (async (): Promise<PDFOutlineItem[]> => {
-    try {
-      const rawOutline = await pdf.getOutline();
-      if (!rawOutline) return [];
-      return await mapOutline(pdf, rawOutline);
-    } catch (e) {
-      console.warn("Failed to extract outline", e);
+    const outlinePromise = (async (): Promise<PDFOutlineItem[]> => {
+      if (workerReady) {
+        try {
+          const outline = await pdfWorkerService.getOutline();
+          if (outline) return outline;
+        } catch (e) {
+          console.warn("Failed to extract outline via worker", e);
+        }
+      }
       return [];
-    }
-  })();
+    })();
 
-  const pageResults: {
-    page: PageData;
-    fields: FormField[];
-    annotations: Annotation[];
-  }[] = new Array(numPages);
+    const pageResults: {
+      page: PageData;
+      fields: FormField[];
+      annotations: Annotation[];
+    }[] = new Array(numPages);
 
-  const maxConcurrency = Math.min(4, numPages);
-  let nextPageIndex = 0;
+    const maxConcurrency = Math.min(4, numPages);
+    let nextPageIndex = 0;
 
-  const worker = async () => {
-    while (true) {
-      const idx = nextPageIndex;
-      nextPageIndex += 1;
-      if (idx >= numPages) return;
+    const worker = async () => {
+      while (true) {
+        const idx = nextPageIndex;
+        nextPageIndex += 1;
+        if (idx >= numPages) return;
 
-      const pageNumber = idx + 1;
-      const page = await pdf.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 1.0 });
-      const pageAnnotations = pdfLibAnnotsByPageIndex?.get(idx) || [];
+        const pdfLibPage = pdfLibPages[idx];
+        if (!pdfLibPage) continue;
+        const pageNumber = idx + 1;
 
-      const context: ParserContext = {
-        pageAnnotations,
-        pageIndex: idx,
-        viewport,
-        pdfDoc: pdfDoc || undefined,
-        fontMap,
-        globalDA,
-        embeddedFontCache,
-        embeddedFontFaces,
-      };
+        const viewport: ViewportLike = createPdfLibViewport(pdfLibPage, {
+          scale: 1.0,
+        });
+        const pageWidth = viewport.width;
+        const pageHeight = viewport.height;
+        const userUnit = viewport.userUnit ?? 1;
+        const viewBox =
+          viewport.viewBox ??
+          ([0, 0, pageWidth / userUnit, pageHeight / userUnit] as [
+            number,
+            number,
+            number,
+            number,
+          ]);
+        const pageAnnotations = pdfLibAnnotsByPageIndex?.get(idx) || [];
 
-      const annotsForPage: Annotation[] = [];
-      for (const parser of annotationParsers) {
-        try {
-          const parsedAnnots = await parser.parse(context);
-          annotsForPage.push(...parsedAnnots);
-        } catch (e) {
-          console.warn(`Annotation parser failed for page ${pageNumber}`, e);
-        }
-      }
-
-      const fieldsForPage: FormField[] = [];
-      for (const parser of controlParsers) {
-        try {
-          const parsedFields = await parser.parse(context);
-          fieldsForPage.push(...parsedFields);
-        } catch (e) {
-          console.warn(`Control parser failed for page ${pageNumber}`, e);
-        }
-      }
-
-      pageResults[idx] = {
-        page: {
+        const context: ParserContext = {
+          pageAnnotations,
           pageIndex: idx,
-          width: viewport.width,
-          height: viewport.height,
-        },
-        fields: fieldsForPage,
-        annotations: annotsForPage,
-      };
+          viewport,
+          pdfDoc,
+          fontMap,
+          globalDA,
+          embeddedFontCache,
+          embeddedFontFaces,
+        };
+
+        const annotsForPage: Annotation[] = [];
+        for (const parser of annotationParsers) {
+          try {
+            const parsedAnnots = await parser.parse(context);
+            annotsForPage.push(...parsedAnnots);
+          } catch (e) {
+            console.warn(`Annotation parser failed for page ${pageNumber}`, e);
+          }
+        }
+
+        const fieldsForPage: FormField[] = [];
+        for (const parser of controlParsers) {
+          try {
+            const parsedFields = await parser.parse(context);
+            fieldsForPage.push(...parsedFields);
+          } catch (e) {
+            console.warn(`Control parser failed for page ${pageNumber}`, e);
+          }
+        }
+
+        pageResults[idx] = {
+          page: {
+            pageIndex: idx,
+            width: pageWidth,
+            height: pageHeight,
+            viewBox,
+            userUnit,
+            rotation: viewport.rotation,
+          },
+          fields: fieldsForPage,
+          annotations: annotsForPage,
+        };
+      }
+    };
+
+    await Promise.all(new Array(maxConcurrency).fill(null).map(() => worker()));
+
+    for (let i = 0; i < pageResults.length; i++) {
+      const r = pageResults[i];
+      if (!r) continue;
+      pages.push(r.page);
+      fields.push(...r.fields);
+      annotations.push(...r.annotations);
     }
-  };
 
-  await Promise.all(new Array(maxConcurrency).fill(null).map(() => worker()));
+    pdfDebug("import:annotations", "annotations_final", () => {
+      const counts: Record<string, number> = {};
+      for (const a of annotations) {
+        const key = a.type || "unknown";
+        counts[key] = (counts[key] || 0) + 1;
+      }
+      const linkWithDest = annotations.filter(
+        (a) => a.type === "link" && typeof a.linkDestPageIndex === "number",
+      ).length;
+      return {
+        total: annotations.length,
+        counts,
+        linkWithDest,
+      };
+    });
 
-  for (let i = 0; i < pageResults.length; i++) {
-    const r = pageResults[i];
-    if (!r) continue;
-    pages.push(r.page);
-    fields.push(...r.fields);
-    annotations.push(...r.annotations);
+    const [metadata, outline] = await Promise.all([
+      metadataPromise,
+      outlinePromise,
+    ]);
+
+    const result = {
+      pdfBytes,
+      pages,
+      fields,
+      annotations,
+      metadata,
+      outline,
+      openPassword,
+      dispose,
+    };
+    loadOk = true;
+    return result;
+  } finally {
+    loadSession.finish(loadOk);
   }
-
-  const [metadata, outline] = await Promise.all([
-    metadataPromise,
-    outlinePromise,
-  ]);
-
-  return {
-    pdfBytes,
-    pdfDocument: pdf,
-    pages,
-    fields,
-    annotations,
-    metadata,
-    outline,
-    openPassword,
-    dispose,
-  };
 };
 
 export const exportPDF = async (
@@ -857,46 +1287,24 @@ export const exportPDF = async (
     return { includeFontIds, needsCustomFont };
   };
 
-  let pdfJsDoc: pdfjsLib.PDFDocumentProxy | undefined;
-  let resolvedOpenPassword: string | undefined = openPassword;
-  try {
-    const renderBuffer = new Uint8Array(originalBytes.slice(0));
-    const { task, getLastPassword } = createPdfJsLoadTask({
-      data: renderBuffer,
-      label: "exportPDF",
-      password: openPassword,
-    });
-    pdfJsDoc = await task.promise;
-
-    const pw = getLastPassword();
-    if (typeof pw === "string" && pw) {
-      resolvedOpenPassword = pw;
-    }
-  } catch (e) {
-    console.warn(
-      "[PDF Export] Failed to load PDF with pdf.js; rotation-aware export disabled",
-      e,
-    );
-  }
-
-  const viewportCache = new Map<number, pdfjsLib.PageViewport>();
-  const getViewportForPage = async (pageIndex: number) => {
-    if (!pdfJsDoc) return undefined;
-    if (viewportCache.has(pageIndex)) return viewportCache.get(pageIndex);
-    try {
-      const p = await pdfJsDoc.getPage(pageIndex + 1);
-      const vp = p.getViewport({ scale: 1.0 });
-      viewportCache.set(pageIndex, vp);
-      return vp;
-    } catch {
-      return undefined;
-    }
-  };
+  const resolvedOpenPassword = openPassword ?? undefined;
 
   const pdfDoc = await PDFDocument.load(
     originalBytes,
     resolvedOpenPassword ? { password: resolvedOpenPassword } : undefined,
   );
+
+  const pdfLibPages = pdfDoc.getPages();
+  const viewportCache = new Map<number, ViewportLike>();
+  const getViewportForPage = async (pageIndex: number) => {
+    const cached = viewportCache.get(pageIndex);
+    if (cached) return cached;
+    const page = pdfLibPages[pageIndex];
+    if (!page) return undefined;
+    const vp = createPdfLibViewport(page, { scale: 1.0 });
+    viewportCache.set(pageIndex, vp);
+    return vp;
+  };
 
   // Metadata update
   if (metadata) {

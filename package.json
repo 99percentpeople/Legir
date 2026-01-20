@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "vite",
     "dev:app": "tauri dev",
-    "build": "tsc --noEmit && vite build --sourcemap",
+    "build": "tsc --noEmit && vite build",
     "build:turbo": "turbo run build",
     "build:app": "tauri build",
     "preview": "bun run build:turbo && vite preview",

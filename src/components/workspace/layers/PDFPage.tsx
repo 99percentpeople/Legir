@@ -1,14 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import * as pdfjsLib from "pdfjs-dist";
+import type { PageData } from "@/types";
 import PDFCanvasLayer from "./PDFCanvasLayer";
 import PDFTextLayer from "./PDFTextLayer";
 
 interface PDFPageProps {
-  pageIndex: number;
-  pageProxy: pdfjsLib.PDFPageProxy | null;
+  page: PageData;
   scale: number;
-  width: number;
-  height: number;
   placeholderImage?: string; // Optional low-res image if we have one
   isSelectMode?: boolean;
   textLayerCursor?: React.CSSProperties["cursor"];
@@ -18,11 +15,8 @@ interface PDFPageProps {
 }
 
 const PDFPage: React.FC<PDFPageProps> = ({
-  pageIndex,
-  pageProxy,
+  page,
   scale,
-  width,
-  height,
   placeholderImage,
   isSelectMode = true,
   textLayerCursor,
@@ -33,14 +27,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
 
-  const rotatedViewport = pageProxy
-    ? pageProxy.getViewport({
-        scale: 1,
-        rotation: pageProxy.rotate,
-      })
-    : null;
-  const containerWidth = rotatedViewport?.width ?? width;
-  const containerHeight = rotatedViewport?.height ?? height;
+  const containerWidth = page.width;
+  const containerHeight = page.height;
 
   // Intersection Observer
   useEffect(() => {
@@ -74,8 +62,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
       }}
     >
       <PDFCanvasLayer
-        pageIndex={pageIndex}
-        pageProxy={pageProxy}
+        page={page}
         scale={scale}
         isInView={isInView}
         placeholderImage={placeholderImage}
@@ -83,8 +70,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
 
       {/* Text Layer */}
       <PDFTextLayer
-        pageIndex={pageIndex}
-        pageProxy={pageProxy}
+        page={page}
         scale={scale}
         isInView={isInView}
         isSelectMode={isSelectMode}

@@ -10,7 +10,7 @@
 - **画布/交互核心**：`src/components/workspace/Workspace.tsx`
 - **控件系统**：`src/components/workspace/controls/*`
 - **编辑器状态（SSOT）**：`src/store/useEditorStore.ts`
-- **PDF 管线**：`src/services/pdfService.ts` + `src/services/pdf/*`
+- **PDF 管线**：`src/services/pdfService/index.ts` + `src/services/pdfService/*`
 - **文件打开/保存（Web vs Tauri）**：`src/services/fileOps.ts`
 
 ---
@@ -52,7 +52,7 @@ src/
     recentFilesService.ts    # 桌面最近文件 + 预览缩略图队列（localStorage，单例服务）
     geminiService.ts         # AI 识别：从页面截图推断字段位置/类型
     pdfService/
-      index.ts               # PDF 解析/渲染/导出中心（pdfjs-dist + pdf-lib）
+      index.ts               # PDF 解析/渲染/导出中心（pdf-lib + pdfjs-dist（worker））
       pdfWorkerService.ts    # 渲染 worker 编排层（给 workspace 使用）
       parsers/               # 将 PDF 原生对象 -> FormField/Annotation
       exporters/             # 将 FormField/Annotation -> 写回 PDF
@@ -61,7 +61,7 @@ src/
   components/
     workspace/               # 编辑器画布：PDF 页渲染 + 控件叠加 + 交互
       Workspace.tsx          # 交互中心：选中/拖拽/缩放/绘制批注
-      PDFPageWithProxy.tsx   # 单页渲染入口（会走 worker 渲染）
+      layers/PDFPage.tsx     # 单页渲染入口（会走 worker 渲染）
       controls/              # 控件系统：registry + renderer + wrapper + properties
     properties-panel/        # 右侧属性面板（文档属性 + 控件属性）
     sidebar/                 # 左侧面板：页面缩略图、字段/批注列表、outline
@@ -79,7 +79,6 @@ src-tauri/                   # Tauri 桌面端（Rust）
   tauri.conf.json            # 桌面端配置（窗口/dragDrop/CLI args/build）
   capabilities/              # 权限声明（fs/dialog/cli/window 等）
   src/
-    main.rs                  # 极薄入口：转发到 lib.rs
     lib.rs                   # 插件初始化（dialog/fs/cli/log）
 
 public/
@@ -95,8 +94,8 @@ public/
 
 - **入口**：`src/App.tsx`
 - **解析**：`src/services/pdfService.loadPDF(input)`
-  - `pdfjs-dist`：页面信息/outline/渲染侧资源
-  - `pdf-lib`：资源解析（字体映射、DA 等）与导出写回
+  - `pdf-lib`：页面尺寸/旋转/metadata/字段解析与导出写回
+  - `pdfjs-dist`（worker）：渲染、文本层、outline/目的地解析
 - **落地状态**：`src/store/useEditorStore.ts` 的 `loadDocument(...)`
 - **路由**：`src/AppRoutes.tsx` 控制是否可进入编辑器
 
@@ -117,14 +116,14 @@ public/
 
 推荐用法：
 
-- 打开 PDF 后：优先调用 `recentFilesService.upsertRecentFileWithPreviewFromPdfDocument(...)`
-  - 复用主加载流程已创建的 `PDFDocumentProxy`，避免二次 `getDocument()`
-- 保存/导出后：调用 `recentFilesService.upsertRecentFileWithPreviewFromPdfBytes(..., { forcePreviewRender: true })`
-- 路由切换/退出：调用 `recentFilesService.cancelAllRecentFilePreviewTasks()`
+- 打开 PDF 后：优先调用 `recentFilesService.upsertWithBytesPreview(...)`
+  - 复用 `loadPDF()` 已得到的 `pdfBytes`，由 worker 统一生成预览缩略图
+- 保存/导出后：调用 `recentFilesService.upsertWithBytesPreview(..., { forcePreviewRender: true })`
+- 路由切换/退出：调用 `recentFilesService.cancelPreviewTasks()`
 
 ### 2) Workspace 渲染：PDF 页 + 控件叠加
 
-- **PDF 页渲染**：`components/workspace/PDFPageWithProxy`（通过 `pdfWorkerService` 走 worker 渲染）
+- **PDF 页渲染**：`components/workspace/layers/PDFPage.tsx`（通过 `pdfWorkerService` 走 worker 渲染）
 - **控件渲染**：`components/workspace/controls/ControlRenderer.tsx`
   - 根据 `data.type` 从 `ControlRegistry` 取对应组件
 
@@ -149,6 +148,18 @@ public/
 
 ---
 
+## PDF 加载/渲染性能建议
+
+- **一次加载，多处复用**：`loadPDF()` 用 pdf-lib 解析页面/metadata，并把 `pdfBytes` 交给 worker；渲染/缩略图/outline/文本层复用 worker 内的文档实例，避免重复 `loadDocument()` 或二次读取。
+- **首屏优先、懒渲染**：`PDFPage` 只在进入视口时触发渲染（IntersectionObserver + `isInView`），配合 `pdfWorkerService.reprioritize()` 优先渲染视口中心，缩放时用 `cancelQueuedRenders()` 及时丢弃过期任务。
+- **大页切片渲染**：像素超过 `MAX_PIXELS_PER_PAGE` 时启用 `PDFTileLayer`，通过 `TILE_MAX_DIM` 控制单块尺寸，避免整页渲染阻塞和内存峰值。
+- **低清占位 + 预热缩略图**：`warmupThumbnails()` 用 `renderPageImage` 先生成低分辨率缩略图，在 `PDFCanvasLayer` 作为 `placeholderImage` 显示，提升“可见速度”。
+- **限制 DPR 与分辨率**：`PDFCanvasLayer`/`PDFTileLayer` 将 DPR 夹在 2 以内；缩放时可按需降低渲染分辨率，减少像素量。
+- **缓存与清理**：worker 内部复用 page/text 内容，`pdfWorkerService.getTextContent()` 复用文本内容；切换文档时调用 `pdfWorkerService.unloadDocument()` 与 `pdfWorkerService.releaseCanvas()` 释放旧资源。
+- **可选：延后重解析**：若首屏优先，考虑把 `pdf-lib` 的字段/注释解析放到后台或按需触发，先保证页面渲染与交互就绪。
+
+---
+
 ## 扩展点（避免重复实现）
 
 ### 添加新的“表单控件类型”
@@ -161,9 +172,9 @@ public/
 
 **如果需要导入/导出到 PDF 原生对象**：
 
-- 增加 parser：`src/services/pdf/parsers/*`
-- 增加 exporter：`src/services/pdf/exporters/*`
-- 由 `src/services/pdfService.ts` 将其装配进 parser/exporter 数组
+- 增加 parser：`src/services/pdfService/parsers/*`
+- 增加 exporter：`src/services/pdfService/exporters/*`
+- 由 `src/services/pdfService/index.ts` 将其装配进 parser/exporter 数组
 
 ### 添加新的“批注类型”
 

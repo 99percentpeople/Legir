@@ -1,11 +1,12 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
 import type { Tile } from "./types";
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { PDFOutlineItem } from "@/types";
 import type {
   WorkerCommandType,
   WorkerErrorResponse,
+  WorkerMessage,
   WorkerRequest,
-  WorkerResponse,
   WorkerSuccessResponse,
 } from "./workerProtocol";
 
@@ -69,6 +70,7 @@ const RequireWorkerVoid = () => {
 type PendingRequestHandlers<TType extends WorkerCommandType> = {
   resolve: (msg: WorkerSuccessResponse<TType>) => void;
   reject: (msg: WorkerErrorResponse) => void;
+  onProgress?: (payload: { loaded: number; total?: number }) => void;
 };
 
 class PDFWorkerService {
@@ -85,6 +87,7 @@ class PDFWorkerService {
 
   private lastRenderScaleByDocPage = new Map<string, number>();
   private textContentCacheByDocPage = new Map<string, TextContent>();
+  private outlineCacheByDocId = new Map<string, PDFOutlineItem[]>();
 
   private clearLastRenderScaleForDoc(docId: string) {
     const prefix = `${docId}|`;
@@ -98,6 +101,10 @@ class PDFWorkerService {
     for (const key of Array.from(this.textContentCacheByDocPage.keys())) {
       if (key.startsWith(prefix)) this.textContentCacheByDocPage.delete(key);
     }
+  }
+
+  private clearOutlineCacheForDoc(docId: string) {
+    this.outlineCacheByDocId.delete(docId);
   }
 
   constructor() {
@@ -175,8 +182,19 @@ class PDFWorkerService {
     try {
       this.worker = new PDFRenderWorker();
       if (this.worker) {
-        this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        this.worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
           const msg = e.data;
+          if ("type" in msg && msg.type === "loadProgress") {
+            const request = this.pendingRequests.get(msg.id);
+            if (request?.onProgress) {
+              request.onProgress({
+                loaded: msg.loaded,
+                total: msg.total,
+              });
+            }
+            return;
+          }
+          if (!("success" in msg)) return;
           const request = this.pendingRequests.get(msg.id);
           if (request) {
             if (msg.success === true) {
@@ -196,7 +214,12 @@ class PDFWorkerService {
   @RequireWorkerPromise()
   public loadDocument(
     data: Uint8Array,
-    options?: { docId?: string; signal?: AbortSignal; password?: string },
+    options?: {
+      docId?: string;
+      signal?: AbortSignal;
+      password?: string;
+      onProgress?: (payload: { loaded: number; total?: number }) => void;
+    },
   ): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const docId = options?.docId ?? this.defaultDocId;
@@ -210,6 +233,7 @@ class PDFWorkerService {
         this.passwordByDocId.set(docId, password);
       }
       this.clearTextContentCacheForDoc(docId);
+      this.clearOutlineCacheForDoc(docId);
 
       const id = `load_${docId}_${Date.now()}`;
       const signal = options?.signal;
@@ -242,6 +266,7 @@ class PDFWorkerService {
             if (signal) signal.removeEventListener("abort", onAbort);
             reject(new Error(msg.error));
           },
+          onProgress: options?.onProgress,
         });
 
         const message: WorkerRequest = {
@@ -265,6 +290,7 @@ class PDFWorkerService {
     this.clearLastRenderScaleForDoc(docId);
     this.passwordByDocId.delete(docId);
     this.clearTextContentCacheForDoc(docId);
+    this.clearOutlineCacheForDoc(docId);
     const id = `unload_${docId}_${Date.now()}`;
     const message: WorkerRequest = { type: "unload", id, docId };
     this.worker.postMessage(message);
@@ -331,6 +357,134 @@ class PDFWorkerService {
           id,
           docId,
           pageIndex,
+        };
+
+        this.worker.postMessage(message);
+      } catch (e) {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    });
+  }
+
+  @RequireWorkerPromise()
+  public getOutline(options?: {
+    docId?: string;
+    signal?: AbortSignal;
+  }): Promise<PDFOutlineItem[] | null> {
+    return new Promise((resolve, reject) => {
+      const docId = options?.docId ?? this.defaultDocId;
+      const cached = this.outlineCacheByDocId.get(docId);
+      if (cached) {
+        resolve(cached);
+        return;
+      }
+
+      const id = `getOutline_${docId}_${this.requestSeq++}_${Date.now()}`;
+      const signal = options?.signal;
+
+      if (signal?.aborted) {
+        const err = new DOMException("Aborted", "AbortError");
+        (err as DOMException & { phase?: string }).phase = "pre-send";
+        reject(err);
+        return;
+      }
+
+      const onAbort = () => {
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
+        this.pendingRequests.delete(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        this.pendingRequests.set(id, {
+          resolve: (msg: WorkerSuccessResponse<"getOutline">) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            const payload = msg.payload;
+            if (!Array.isArray(payload)) {
+              resolve(null);
+              return;
+            }
+            this.outlineCacheByDocId.set(docId, payload);
+            resolve(payload);
+          },
+          reject: (msg: WorkerErrorResponse) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            reject(new Error(msg.error));
+          },
+        });
+
+        const message: WorkerRequest = {
+          type: "getOutline",
+          id,
+          docId,
+        };
+
+        this.worker.postMessage(message);
+      } catch (e) {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    });
+  }
+
+  @RequireWorkerPromise()
+  public resolveDest(options: {
+    dest: unknown;
+    docId?: string;
+    signal?: AbortSignal;
+  }): Promise<number | null> {
+    return new Promise((resolve, reject) => {
+      const { dest, docId: requestedDocId, signal } = options;
+      const docId = requestedDocId ?? this.defaultDocId;
+
+      const id = `resolveDest_${docId}_${this.requestSeq++}_${Date.now()}`;
+
+      if (signal?.aborted) {
+        const err = new DOMException("Aborted", "AbortError");
+        (err as DOMException & { phase?: string }).phase = "pre-send";
+        reject(err);
+        return;
+      }
+
+      const onAbort = () => {
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
+        this.pendingRequests.delete(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        this.pendingRequests.set(id, {
+          resolve: (msg: WorkerSuccessResponse<"resolveDest">) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            const payload = msg.payload;
+            if (typeof payload !== "number") {
+              resolve(null);
+              return;
+            }
+            resolve(payload);
+          },
+          reject: (msg: WorkerErrorResponse) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            reject(new Error(msg.error));
+          },
+        });
+
+        const message: WorkerRequest = {
+          type: "resolveDest",
+          id,
+          docId,
+          dest,
         };
 
         this.worker.postMessage(message);

@@ -251,6 +251,14 @@ const de = {
     y: "Y",
     width: "Breite",
     height: "Höhe",
+    link: {
+      title: "Link",
+      url: "URL",
+      destination: "Ziel",
+      page: "Seite {page}",
+      go_to_page: "Gehe zu Seite {page}",
+      not_available: "k. A.",
+    },
   },
   right_panel: {
     tabs: {

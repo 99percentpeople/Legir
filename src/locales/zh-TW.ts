@@ -246,6 +246,14 @@ const zhTW = {
     y: "Y",
     width: "寬度",
     height: "高度",
+    link: {
+      title: "連結",
+      url: "URL",
+      destination: "目的地",
+      page: "第{page}頁",
+      go_to_page: "跳轉到第{page}頁",
+      not_available: "無",
+    },
   },
   right_panel: {
     tabs: {

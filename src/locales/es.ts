@@ -250,6 +250,14 @@ const es = {
     y: "Y",
     width: "Ancho",
     height: "Alto",
+    link: {
+      title: "Enlace",
+      url: "URL",
+      destination: "Destino",
+      page: "Página {page}",
+      go_to_page: "Ir a la página {page}",
+      not_available: "N/D",
+    },
   },
   right_panel: {
     tabs: {

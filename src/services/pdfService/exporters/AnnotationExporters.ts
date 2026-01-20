@@ -10,9 +10,8 @@ import {
   type PDFFont,
   PDFRef,
 } from "@cantoo/pdf-lib";
-import type * as pdfjsLib from "pdfjs-dist";
 import { Annotation } from "@/types";
-import { IAnnotationExporter } from "../types";
+import { IAnnotationExporter, ViewportLike } from "../types";
 import { hexToPdfColor } from "../lib/colors";
 import { generateInkAppearanceOps } from "../lib/ink";
 import { containsNonAscii, isSerifFamily } from "../lib/text";
@@ -28,7 +27,7 @@ export class HighlightExporter implements IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
-    viewport?: pdfjsLib.PageViewport,
+    viewport?: ViewportLike,
   ): void {
     if (!annotation.rect) return;
 
@@ -108,7 +107,7 @@ export class CommentExporter implements IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
-    viewport?: pdfjsLib.PageViewport,
+    viewport?: ViewportLike,
   ): void {
     if (!annotation.rect) return;
 
@@ -161,7 +160,7 @@ export class FreeTextExporter implements IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
-    viewport?: pdfjsLib.PageViewport,
+    viewport?: ViewportLike,
   ): Promise<void> {
     if (!annotation.rect) return;
 
@@ -536,7 +535,7 @@ export class InkExporter implements IAnnotationExporter {
     page: PDFPage,
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
-    viewport?: pdfjsLib.PageViewport,
+    viewport?: ViewportLike,
   ): void {
     const { height: pageHeight } = page.getSize();
 

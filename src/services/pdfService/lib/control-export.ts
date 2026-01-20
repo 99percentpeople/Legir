@@ -1,13 +1,13 @@
 import type { FormField } from "@/types";
 import type { PDFPage } from "@cantoo/pdf-lib";
-import type * as pdfjsLib from "pdfjs-dist";
+import type { ViewportLike } from "../types";
 import { hexToPdfColor } from "./colors";
 import { uiRectToPdfBounds } from "./coords";
 
 export const getCommonControlExportOpts = (
   field: FormField,
   page: PDFPage,
-  viewport?: pdfjsLib.PageViewport,
+  viewport?: ViewportLike,
 ) => {
   const b = uiRectToPdfBounds(page, field.rect, viewport);
   const bw = field.style?.borderWidth ?? 1;

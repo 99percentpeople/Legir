@@ -1,5 +1,3 @@
-import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
-
 export enum FieldType {
   TEXT = "Text",
   CHECKBOX = "Checkbox",
@@ -87,7 +85,7 @@ export interface FormField {
 export interface Annotation {
   id: string;
   pageIndex: number;
-  type: "highlight" | "ink" | "comment" | "freetext";
+  type: "highlight" | "ink" | "comment" | "freetext" | "link";
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
@@ -105,6 +103,8 @@ export interface Annotation {
   updatedAt?: string; // ISO Date string for modification date
   svgPath?: string; // Imported appearance path data
   appearanceStreamContent?: string; // Raw PDF appearance stream operators
+  linkUrl?: string;
+  linkDestPageIndex?: number;
 
   sourcePdfRef?: { objectNumber: number; generationNumber: number };
   sourcePdfFontName?: string;
@@ -136,6 +136,9 @@ export interface PageData {
   pageIndex: number;
   width: number;
   height: number;
+  viewBox: [number, number, number, number];
+  userUnit: number;
+  rotation: number;
   imageData?: string; // Base64 string (Optional now, used for lazy loading fallback)
 }
 
@@ -183,8 +186,6 @@ export interface EditorState {
   // Document State
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
-  pdfDocument: PDFDocumentProxy | null; // PDF.js Document Proxy
-  pageCache: Map<number, Promise<PDFPageProxy>>;
   pdfOpenPassword: string | null;
   exportPassword: string | null;
   metadata: PDFMetadata;

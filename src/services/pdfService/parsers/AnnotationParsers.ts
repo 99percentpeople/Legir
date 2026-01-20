@@ -1270,3 +1270,60 @@ export class FreeTextParser implements IAnnotationParser {
     return annotations;
   }
 }
+
+export class LinkParser implements IAnnotationParser {
+  async parse(context: ParserContext): Promise<Annotation[]> {
+    const { pageAnnotations, pageIndex, viewport } = context;
+    const annotations: Annotation[] = [];
+    let seenLinks = 0;
+    let addedLinks = 0;
+
+    pageAnnotations.forEach((annotation, index) => {
+      if (annotation.subtype !== "Link") return;
+      seenLinks += 1;
+
+      const linkUrl =
+        typeof annotation.url === "string" ? annotation.url : undefined;
+      const linkDestPageIndex =
+        typeof annotation.destPageIndex === "number"
+          ? annotation.destPageIndex
+          : undefined;
+
+      if (!linkUrl && typeof linkDestPageIndex !== "number") {
+        pdfDebug("import:annotations", "link_skipped", () => ({
+          pageIndex,
+          annotIndex: index,
+          url: linkUrl,
+          destPageIndex: annotation.destPageIndex,
+          sourcePdfRef: annotation.sourcePdfRef,
+        }));
+        return;
+      }
+
+      const { x, y, width, height } = pdfJsRectToUiRect(
+        annotation.rect,
+        viewport,
+      );
+
+      annotations.push({
+        id: `imported_link_${pageIndex + 1}_${index}`,
+        pageIndex,
+        type: "link",
+        rect: { x, y, width, height },
+        linkUrl,
+        linkDestPageIndex,
+      });
+      addedLinks += 1;
+    });
+
+    if (seenLinks > 0) {
+      pdfDebug("import:annotations", "link_parsed_page", () => ({
+        pageIndex,
+        seenLinks,
+        addedLinks,
+      }));
+    }
+
+    return annotations;
+  }
+}

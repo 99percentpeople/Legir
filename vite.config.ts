@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       strictPort: true,
-      host: host || false, // 关键：允许局域网访问（用于手机调试）
+      host: host || false,
       hmr: host
         ? {
             protocol: "ws",

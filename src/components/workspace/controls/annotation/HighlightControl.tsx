@@ -166,6 +166,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
             }}
             onPointerDown={(e) => {
               if (!isSelectable) return;
+              if (e.button === 1) return;
               e.stopPropagation();
               e.preventDefault();
               onSelect(data.id);
@@ -297,6 +298,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
                 style={{ mixBlendMode: "multiply" }}
                 onPointerDown={(e) => {
                   if (!isSelectable) return;
+                  if (e.button === 1) return;
                   e.stopPropagation();
                   e.preventDefault();
                   onSelect(data.id);

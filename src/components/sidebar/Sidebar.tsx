@@ -20,7 +20,7 @@ import ThumbnailsPanel from "./ThumbnailsPanel";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useLanguage } from "../language-provider";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { AppEventMap } from "@/lib/eventBus";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -32,13 +32,15 @@ interface SidebarProps {
   annotations?: Annotation[];
   outline: PDFOutlineItem[];
   selectedId: string | null;
-  onSelectControl: (id: string) => void;
+  onSelectControl: (
+    id: string,
+    options?: Omit<AppEventMap["workspace:focusControl"], "id">,
+  ) => void;
   onDeleteAnnotation?: (id: string) => void;
   onUpdateAnnotation?: (id: string, updates: Partial<Annotation>) => void;
   onNavigatePage: (pageIndex: number) => void;
   width: number;
   onResize: (width: number) => void;
-  pdfDocument?: PDFDocumentProxy;
   currentPageIndex?: number;
   thumbnailsLayout?: ThumbnailsLayoutMode;
   activeTab?: string;
@@ -61,7 +63,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNavigatePage,
   width,
   onResize,
-  pdfDocument,
   currentPageIndex,
   thumbnailsLayout,
   activeTab,
@@ -174,7 +175,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <ThumbnailsPanel
               pages={pages}
-              pdfDocument={pdfDocument}
               onNavigate={onNavigatePage}
               currentPageIndex={currentPageIndex}
               thumbnailsLayout={thumbnailsLayout}

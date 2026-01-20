@@ -251,6 +251,14 @@ const fr = {
     y: "Y",
     width: "Largeur",
     height: "Hauteur",
+    link: {
+      title: "Lien",
+      url: "URL",
+      destination: "Destination",
+      page: "Page {page}",
+      go_to_page: "Aller à la page {page}",
+      not_available: "N/D",
+    },
   },
   right_panel: {
     tabs: {

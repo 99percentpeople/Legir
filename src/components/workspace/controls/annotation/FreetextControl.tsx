@@ -211,7 +211,10 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
             value={data.text || ""}
             onChange={(e) => onUpdate?.(data.id, { text: e.target.value })}
             onBlur={handleBlur}
-            onPointerDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              if (e.button === 1) return;
+              e.stopPropagation();
+            }}
             style={{
               fontFamily: editFontFamily,
               fontSize: "inherit",

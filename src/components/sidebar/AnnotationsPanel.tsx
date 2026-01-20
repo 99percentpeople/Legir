@@ -22,6 +22,7 @@ import {
 import { TimeText } from "../timeText";
 import { Textarea } from "../ui/textarea";
 import { cn } from "@/lib/cn";
+import type { AppEventMap } from "@/lib/eventBus";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 
@@ -163,7 +164,10 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
 // --- Annotations Panel ---
 interface AnnotationsProps {
   annotations: Annotation[];
-  onSelectControl: (id: string) => void;
+  onSelectControl: (
+    id: string,
+    options?: Omit<AppEventMap["workspace:focusControl"], "id">,
+  ) => void;
   onDeleteAnnotation: (id: string) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   selectedId: string | null;
@@ -184,7 +188,6 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
     "ink",
     "freetext",
   ]);
-
   // Include all annotation types that we want to display
   const allAnnotations = useMemo(
     () =>
@@ -251,22 +254,9 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
 
   const handleSelect = (annot: Annotation) => {
     const id = annot.id;
-    onSelectControl(id);
-
-    // Virtualization note:
-    // Pages/controls may be unmounted until they enter the viewport. Navigate to the
-    // target page first so its controls can mount, then use sticky focus to scroll to
-    // the exact annotation element.
-    appEventBus.emit("workspace:navigatePage", {
-      pageIndex: annot.pageIndex,
+    onSelectControl(id, {
       behavior: "smooth",
     });
-
-    appEventBus.emit(
-      "workspace:focusControl",
-      { id, focusInput: false },
-      { sticky: true },
-    );
   };
 
   return (

@@ -250,6 +250,14 @@ const zhCN = {
     y: "Y",
     width: "宽度",
     height: "高度",
+    link: {
+      title: "链接",
+      url: "URL",
+      destination: "目标",
+      page: "第{page}页",
+      go_to_page: "跳转到第{page}页",
+      not_available: "无",
+    },
   },
   right_panel: {
     tabs: {

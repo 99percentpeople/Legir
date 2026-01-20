@@ -1,4 +1,5 @@
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { PDFOutlineItem } from "@/types";
 import type { Tile } from "./types";
 
 type CommandSpec<TRequest extends object, TResponse = never> =
@@ -98,6 +99,21 @@ export type WorkerCommandPayloadMap = {
     },
     TextContent | false
   >;
+
+  getOutline: CommandSpec<
+    {
+      docId?: string;
+    },
+    PDFOutlineItem[] | false
+  >;
+
+  resolveDest: CommandSpec<
+    {
+      docId?: string;
+      dest: unknown;
+    },
+    number | null | false
+  >;
 };
 
 export type WorkerCommandType = keyof WorkerCommandPayloadMap;
@@ -134,3 +150,13 @@ export type WorkerErrorResponse = {
 export type WorkerResponse<
   TType extends WorkerCommandType = WorkerCommandType,
 > = WorkerSuccessResponse<TType> | WorkerErrorResponse;
+
+export type WorkerProgressResponse = {
+  type: "loadProgress";
+  id: string;
+  docId?: string;
+  loaded: number;
+  total?: number;
+};
+
+export type WorkerMessage = WorkerResponse | WorkerProgressResponse;

@@ -1,7 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import * as pdfjsLib from "pdfjs-dist";
+import type { PageData } from "@/types";
 import { MAX_PIXELS_PER_PAGE, TILE_MAX_DIM } from "@/constants";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 
 type TileInfo = {
@@ -15,8 +16,7 @@ type TileInfo = {
 };
 
 interface PDFTileLayerProps {
-  pageIndex: number;
-  pageProxy: pdfjsLib.PDFPageProxy | null;
+  page: PageData;
   scale: number;
   isInView: boolean;
   isRendered: boolean;
@@ -29,13 +29,13 @@ interface PDFTileLayerProps {
 }
 
 const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
-  pageIndex,
-  pageProxy,
+  page,
   scale,
   isInView,
   isRendered,
   onStateChange,
 }) => {
+  const pageIndex = page.pageIndex;
   const [hasAnyTileRendered, setHasAnyTileRendered] = useState(false);
   const [tileProgressVersion, setTileProgressVersion] = useState(0);
   const [viewportVersion, setViewportVersion] = useState(0);
@@ -240,34 +240,21 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
   useLayoutEffect(() => {
     renderEpochRef.current += 1;
-  }, [pageProxy, pageIndex, scale, tileMode, backTilesKey]);
+  }, [page, pageIndex, scale, tileMode, backTilesKey]);
 
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
 
   useEffect(() => {
-    if (!pageProxy) {
-      setTileMode(false);
-      setFrontTiles([]);
-      setFrontTilesKey("");
-      setMidTiles([]);
-      setMidTilesKey("");
-      setBackTiles([]);
-      setBackTilesKey("");
-      setFrontTilesPageW(0);
-      setFrontTilesPageH(0);
-      setMidTilesPageW(0);
-      setMidTilesPageH(0);
-      setBackTilesPageW(0);
-      setBackTilesPageH(0);
-      setHasAnyTileRendered(false);
-      setFrontHasAnyRendered(false);
-      didInitFrontFromBackKeyRef.current = "";
-      return;
-    }
-
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     dprRef.current = dpr;
-    const viewport = pageProxy.getViewport({ scale: scale * dpr });
+    const viewport = createViewportFromPageInfo(
+      {
+        viewBox: page.viewBox,
+        userUnit: page.userUnit,
+        rotation: page.rotation,
+      },
+      { scale: scale * dpr, rotation: page.rotation },
+    );
     const pageW = Math.ceil(viewport.width);
     const pageH = Math.ceil(viewport.height);
     const pixels = pageW * pageH;
@@ -355,7 +342,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
     setBackTiles(nextTiles);
     setBackTilesKey(epoch);
-  }, [backTilesKey, frontTilesKey, pageIndex, pageProxy, scale]);
+  }, [backTilesKey, frontTilesKey, page, pageIndex, scale]);
 
   useEffect(() => {
     if (!tileMode) return;
@@ -478,7 +465,6 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   ]);
 
   useEffect(() => {
-    if (!pageProxy) return;
     if (!isInView) return;
     if (!tileMode) return;
     if (!backTilesKey) return;
@@ -706,15 +692,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         abortController.abort();
       }
     };
-  }, [
-    backTiles,
-    backTilesKey,
-    isInView,
-    pageProxy,
-    pageIndex,
-    scale,
-    tileMode,
-  ]);
+  }, [backTiles, backTilesKey, isInView, page, pageIndex, scale, tileMode]);
 
   const hasUsableFrontTileBuffer =
     frontHasAnyRendered &&
