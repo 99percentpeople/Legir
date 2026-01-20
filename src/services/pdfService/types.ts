@@ -26,6 +26,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
 
   color?: number[] | Uint8ClampedArray;
   backgroundColor?: number[] | Uint8ClampedArray;
+  fillColor?: number[] | Uint8ClampedArray;
   borderStyle?: {
     width?: number;
     style?: "solid" | "dashed" | "underline";
@@ -71,6 +72,8 @@ export interface ParserContext {
   pdfDoc?: PDFDocument;
   fontMap?: Map<string, string>;
   globalDA?: string;
+  systemFontFamilies?: string[];
+  systemFontAliasToFamilyCompact?: Record<string, string>;
   embeddedFontCache?: Map<string, Promise<string | undefined>>;
   embeddedFontFaces?: Set<FontFace>;
 }

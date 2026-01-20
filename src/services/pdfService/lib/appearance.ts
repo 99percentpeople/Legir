@@ -1,7 +1,11 @@
 import { PDFDocument, PDFDict, PDFName, PDFNumber } from "@cantoo/pdf-lib";
 import { rgbArrayToHex } from "./colors";
 import { pdfDebug } from "./debug";
-import { normalizePdfFontName } from "./pdf-font-names";
+import {
+  matchSystemFontFamily,
+  normalizePdfFontName,
+  pdfFontToAppFontKey,
+} from "./pdf-font-names";
 import { decodePdfString } from "./pdf-objects";
 
 export const getFontMap = (pdfDoc: PDFDocument): Map<string, string> => {
@@ -48,12 +52,12 @@ export const getFontMap = (pdfDoc: PDFDocument): Map<string, string> => {
           if (fontDict instanceof PDFDict)
             processFontDict(fontDict, `Page ${i + 1}`);
         }
-      } catch (e) {
+      } catch {
         /* Ignore page resource errors */
       }
     }
-  } catch (e) {
-    console.warn("Failed to extract font map", e);
+  } catch {
+    console.warn("Failed to extract font map");
   }
 
   pdfDebug("import:fonts", "font_map_extracted", () => ({
@@ -71,7 +75,7 @@ export const getGlobalDA = (pdfDoc: PDFDocument): string | undefined => {
       const da = acroForm.lookup(PDFName.of("DA"));
       return decodePdfString(da);
     }
-  } catch (e) {
+  } catch {
     return undefined;
   }
   return undefined;
@@ -80,6 +84,7 @@ export const getGlobalDA = (pdfDoc: PDFDocument): string | undefined => {
 export const parseDefaultAppearance = (
   da: string,
   fontMap: Map<string, string>,
+  systemFontFamilies?: string[],
 ) => {
   const style = {
     fontFamily: "Helvetica",
@@ -104,25 +109,21 @@ export const parseDefaultAppearance = (
 
       const resolvedFontName =
         fontMap.get(fontName) || fontMap.get("/" + fontName) || fontName;
-      const lowerName = resolvedFontName.toLowerCase();
 
-      if (
-        lowerName.includes("tiro") ||
-        lowerName.includes("times") ||
-        lowerName.includes("serif") ||
-        lowerName.includes("roman") ||
-        lowerName.includes("minion") ||
-        lowerName.includes("garamond")
-      ) {
-        style.fontFamily = "Times Roman";
-      } else if (
-        lowerName.includes("cour") ||
-        lowerName.includes("mono") ||
-        lowerName.includes("code")
-      ) {
-        style.fontFamily = "Courier";
+      const fontKey =
+        pdfFontToAppFontKey(resolvedFontName) || pdfFontToAppFontKey(fontName);
+      if (fontKey) {
+        style.fontFamily = fontKey;
       } else {
-        style.fontFamily = "Helvetica";
+        const systemFamily = matchSystemFontFamily(
+          resolvedFontName,
+          systemFontFamilies,
+        );
+        if (systemFamily) {
+          style.fontFamily = systemFamily;
+        } else {
+          style.fontFamily = normalizePdfFontName(resolvedFontName);
+        }
       }
     } else if ((token === "rg" || token === "RG") && i >= 3) {
       const r = parseFloat(tokens[i - 3]);
@@ -179,7 +180,7 @@ export const getFieldPropertiesFromPdfLib = (
     }
 
     return { da, q };
-  } catch (e) {
+  } catch {
     return null;
   }
 };

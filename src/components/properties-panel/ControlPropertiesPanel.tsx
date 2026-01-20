@@ -9,6 +9,7 @@ import { CommonProperties } from "@/components/workspace/controls/properties/Com
 import { AppearanceProperties } from "@/components/workspace/controls/properties/AppearanceProperties";
 import { GeometryProperties } from "@/components/workspace/controls/properties/GeometryProperties";
 import { PanelLayout } from "./PanelLayout";
+import { getSystemFontFamilies } from "@/lib/system-fonts";
 
 export interface ControlPropertiesPanelProps {
   data: FormField | Annotation;
@@ -46,14 +47,20 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
     );
     const SpecificProperties = controlConfig?.propertiesComponent;
 
-    const isFormField = (item: any): item is FormField => {
+    const isFormField = (item: unknown): item is FormField => {
       // FormFields typically have a 'name' property and 'style' object
+      if (!item || typeof item !== "object") return false;
       return "name" in item && "style" in item;
     };
 
     const isField = isFormField(data);
     const isHighlightAnnotation =
       !isField && (data as Annotation).type === "highlight";
+
+    React.useEffect(() => {
+      if (!isOpen) return;
+      void getSystemFontFamilies();
+    }, [isOpen]);
 
     return (
       <PanelLayout

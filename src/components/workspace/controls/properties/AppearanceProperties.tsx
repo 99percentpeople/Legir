@@ -11,16 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Palette,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Type,
-} from "lucide-react";
+import { Palette, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { FONT_FAMILY_MAP } from "@/constants";
 import { cn } from "@/lib/cn";
+import { getSystemFontFamilies } from "@/lib/system-fonts";
+import { resolveFontStackForDisplay } from "@/lib/fonts";
 
 export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
   data,
@@ -30,7 +26,28 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
   const { t } = useLanguage();
   const style = data.style || {};
 
-  const handleStyleChange = (key: string, value: any) => {
+  const [systemFamilies, setSystemFamilies] = React.useState<string[]>([]);
+
+  const availableFontKeys = [
+    ...Object.keys(FONT_FAMILY_MAP),
+    ...systemFamilies,
+  ];
+  const currentFontValue = style.fontFamily || "Helvetica";
+  const isCustomFontValue =
+    !!style.fontFamily && !availableFontKeys.includes(style.fontFamily);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void getSystemFontFamilies().then((families) => {
+      if (cancelled) return;
+      setSystemFamilies(families);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleStyleChange = (key: string, value: unknown) => {
     onChange({
       style: {
         ...style,
@@ -134,7 +151,7 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
             <div className="space-y-2">
               <Label>{t("properties.font_family")}</Label>
               <Select
-                value={style.fontFamily || "Helvetica"}
+                value={currentFontValue}
                 onValueChange={(val) => {
                   onTriggerHistorySave();
                   handleStyleChange("fontFamily", val);
@@ -149,6 +166,30 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
                       <span style={{ fontFamily: font }}>{name}</span>
                     </SelectItem>
                   ))}
+                  {systemFamilies
+                    .filter(
+                      (name) =>
+                        !Object.prototype.hasOwnProperty.call(
+                          FONT_FAMILY_MAP,
+                          name,
+                        ),
+                    )
+                    .map((name) => (
+                      <SelectItem key={name} value={name}>
+                        <span
+                          style={{
+                            fontFamily: resolveFontStackForDisplay(name),
+                          }}
+                        >
+                          {name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  {isCustomFontValue && (
+                    <SelectItem value={style.fontFamily as string}>
+                      {style.fontFamily as string}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

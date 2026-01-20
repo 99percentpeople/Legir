@@ -91,7 +91,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
     toast.warning(t("annotation.font_missing_warning"));
   }, [isEditing, data.sourcePdfFontMissing, t]);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (_e: React.PointerEvent) => {
     const now = Date.now();
     if (now - lastClickTimeRef.current < 300) {
       // Double click detected
@@ -190,16 +190,16 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
 
       <div
         className={cn(
-          "flex h-full w-full items-start overflow-hidden",
-          "rounded-sm transition-colors",
-          isSelected && !isEditing && "ring-primary ring-1",
+          "flex h-full w-full items-start overflow-hidden transition-colors",
+          isSelected && !isEditing && "ring-primary ring-1 ring-inset",
         )}
         style={{
           "--scale": scale,
           color: data.color || "#000000",
+          backgroundColor: data.backgroundColor || undefined,
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
-          lineHeight: 1,
+          lineHeight: 1.4,
           opacity: baseOpacity * (data.text ? 1 : 0.5),
         }}
         onPointerDown={handlePointerDown}

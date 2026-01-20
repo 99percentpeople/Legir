@@ -1,6 +1,13 @@
 import { pdfWorkerService } from "./pdfWorkerService";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
-import { loadAndEmbedExportFonts } from "./lib/built-in-fonts";
+import {
+  getSystemFontFamilies,
+  getSystemFontAliasToFamilyCompact,
+} from "@/lib/system-fonts";
+import {
+  loadAndEmbedExportFonts,
+  loadAndEmbedSelectedSystemFonts,
+} from "./lib/built-in-fonts";
 import {
   containsNonAscii,
   isSerifFamily,
@@ -911,6 +918,9 @@ export const loadPDF = async (
 
   let fontMap = new Map<string, string>();
   let globalDA: string | undefined = undefined;
+  let systemFontFamilies: string[] | undefined = undefined;
+  let systemFontAliasToFamilyCompact: Record<string, string> | undefined =
+    undefined;
 
   const loadSession = createPdfLoadSession("loadPDF");
   let loadOk = false;
@@ -954,6 +964,22 @@ export const loadPDF = async (
     ]);
     pdfDoc = loaded.pdfDoc;
     openPassword = loaded.openPassword;
+
+    try {
+      const families = await getSystemFontFamilies();
+      if (families.length > 0) systemFontFamilies = families;
+    } catch {
+      systemFontFamilies = undefined;
+    }
+
+    try {
+      const aliases = await getSystemFontAliasToFamilyCompact();
+      if (aliases && Object.keys(aliases).length > 0) {
+        systemFontAliasToFamilyCompact = aliases;
+      }
+    } catch {
+      systemFontAliasToFamilyCompact = undefined;
+    }
 
     try {
       fontMap = getFontMap(pdfDoc);
@@ -1122,6 +1148,8 @@ export const loadPDF = async (
           pdfDoc,
           fontMap,
           globalDA,
+          systemFontFamilies,
+          systemFontAliasToFamilyCompact,
           embeddedFontCache,
           embeddedFontFaces,
         };
@@ -1235,11 +1263,16 @@ export const exportPDF = async (
   const resolveExportFontNeeds = () => {
     const includeFontIds = new Set<"cjk_sans" | "cjk_serif">();
     let needsCustomFont = false;
+    const usedFontFamilies = new Set<string>();
 
     const consider = (
       text: string | undefined,
       fontFamily: string | undefined,
     ) => {
+      if (typeof fontFamily === "string") {
+        const trimmed = fontFamily.trim();
+        if (trimmed) usedFontFamilies.add(trimmed);
+      }
       const hasText = typeof text === "string" && text.length > 0;
       const hasNonAscii = hasText ? containsNonAscii(text) : false;
       const explicitCjk = isExplicitCjkFontSelection(fontFamily);
@@ -1284,7 +1317,7 @@ export const exportPDF = async (
       needsCustomFont = false;
     }
 
-    return { includeFontIds, needsCustomFont };
+    return { includeFontIds, needsCustomFont, usedFontFamilies };
   };
 
   const resolvedOpenPassword = openPassword ?? undefined;
@@ -1359,7 +1392,8 @@ export const exportPDF = async (
   fontMap.set("Times Roman", timesRoman);
   fontMap.set("Courier", courier);
 
-  const { includeFontIds, needsCustomFont } = resolveExportFontNeeds();
+  const { includeFontIds, needsCustomFont, usedFontFamilies } =
+    resolveExportFontNeeds();
 
   await loadAndEmbedExportFonts({
     pdfDoc,
@@ -1370,6 +1404,14 @@ export const exportPDF = async (
         ? { bytes: customFont.bytes, name: customFont.name }
         : undefined,
     includeFontIds,
+    subset: true,
+  });
+
+  await loadAndEmbedSelectedSystemFonts({
+    pdfDoc,
+    fontMap,
+    fontkit,
+    families: Array.from(usedFontFamilies),
     subset: true,
   });
 
@@ -1428,7 +1470,7 @@ export const exportPDF = async (
       if (shouldRemove) {
         form.removeField(field);
       }
-    } catch (e) {
+    } catch {
       console.warn(
         `Attempting manual removal for corrupt field: ${field.getName()}`,
       );

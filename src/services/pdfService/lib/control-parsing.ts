@@ -20,6 +20,7 @@ export const parseFieldStyle = (
   pdfDoc: PDFDocument | undefined,
   fontMap: Map<string, string>,
   globalDA: string | undefined,
+  systemFontFamilies?: string[],
 ): { style: FieldStyle; alignment: "left" | "center" | "right" } => {
   let alignment: "left" | "center" | "right" = "left";
   const importedStyle: FieldStyle = { ...DEFAULT_FIELD_STYLE };
@@ -82,7 +83,7 @@ export const parseFieldStyle = (
   const finalDa = da || globalDA;
 
   if (finalDa) {
-    const parsed = parseDefaultAppearance(finalDa, fontMap);
+    const parsed = parseDefaultAppearance(finalDa, fontMap, systemFontFamilies);
     importedStyle.fontFamily = parsed.fontFamily;
     importedStyle.fontSize = parsed.fontSize;
     importedStyle.textColor = parsed.textColor;

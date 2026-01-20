@@ -55,6 +55,7 @@ export class TextControlParser implements IControlParser {
           pdfDoc,
           fontMap,
           globalDA,
+          context.systemFontFamilies,
         );
 
         fields.push({
@@ -114,6 +115,7 @@ export class CheckboxControlParser implements IControlParser {
           pdfDoc,
           fontMap,
           globalDA,
+          context.systemFontFamilies,
         );
         const isChecked =
           annotation.fieldValue && annotation.fieldValue !== "Off";
@@ -175,6 +177,7 @@ export class RadioControlParser implements IControlParser {
           pdfDoc,
           fontMap,
           globalDA,
+          context.systemFontFamilies,
         );
         const radioValue = annotation.buttonValue;
         const isChecked = annotation.fieldValue === radioValue;
@@ -231,6 +234,7 @@ export class DropdownControlParser implements IControlParser {
           pdfDoc,
           fontMap,
           globalDA,
+          context.systemFontFamilies,
         );
 
         let options: string[] | undefined = undefined;
@@ -312,6 +316,7 @@ export class SignatureControlParser implements IControlParser {
           pdfDoc,
           fontMap,
           globalDA,
+          context.systemFontFamilies,
         );
 
         fields.push({

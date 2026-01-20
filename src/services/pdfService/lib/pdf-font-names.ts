@@ -11,6 +11,58 @@ const normalizePdfFontNameForLookup = (name: string) => {
 export const normalizePdfFontName = (name: string) =>
   normalizePdfFontNameForLookup(name);
 
+const toCompactFontName = (name: string) => {
+  const normalized = normalizePdfFontNameForLookup(name);
+  return normalized.toUpperCase().replace(/[^A-Z0-9]+/g, "");
+};
+
+export const matchSystemFontFamily = (
+  pdfFontName: string | undefined,
+  systemFamilies: string[] | undefined,
+) => {
+  if (!pdfFontName) return undefined;
+  if (!systemFamilies || systemFamilies.length === 0) return undefined;
+
+  const needle = toCompactFontName(pdfFontName);
+  if (!needle) return undefined;
+
+  for (const fam of systemFamilies) {
+    if (typeof fam !== "string") continue;
+    const c = toCompactFontName(fam);
+    if (!c) continue;
+    if (c === needle) return fam;
+    if (c.includes(needle)) return fam;
+    if (needle.includes(c)) return fam;
+  }
+
+  return undefined;
+};
+
+export const matchSystemFontFamilyByAlias = (
+  pdfFontName: string | undefined,
+  aliasToFamilyCompact: Record<string, string> | undefined,
+) => {
+  if (!pdfFontName) return undefined;
+  if (!aliasToFamilyCompact) return undefined;
+
+  const needle = toCompactFontName(pdfFontName);
+  if (!needle) return undefined;
+
+  const direct = aliasToFamilyCompact[needle];
+  if (typeof direct === "string" && direct.trim()) return direct;
+
+  // Fuzzy match for cases where the PDF name contains extra suffixes.
+  // Keys are already compacted (A-Z0-9 only).
+  for (const [k, fam] of Object.entries(aliasToFamilyCompact)) {
+    if (!k) continue;
+    if (k === needle || k.includes(needle) || needle.includes(k)) {
+      if (typeof fam === "string" && fam.trim()) return fam;
+    }
+  }
+
+  return undefined;
+};
+
 export const pdfFontToAppFontKey = (pdfFontName: string | undefined) => {
   if (!pdfFontName) return undefined;
   const normalized = normalizePdfFontNameForLookup(pdfFontName);

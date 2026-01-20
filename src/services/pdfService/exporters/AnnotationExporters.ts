@@ -175,6 +175,11 @@ export class FreeTextExporter implements IAnnotationExporter {
     const g = colorObj.green;
     const bb = colorObj.blue;
 
+    const bgColorObj = hexToPdfColor(annotation.backgroundColor);
+    const bgR = bgColorObj?.red;
+    const bgG = bgColorObj?.green;
+    const bgB = bgColorObj?.blue;
+
     const opacity =
       typeof annotation.opacity === "number"
         ? Math.min(1, Math.max(0, annotation.opacity))
@@ -203,18 +208,28 @@ export class FreeTextExporter implements IAnnotationExporter {
       annotation.fontFamily && fontMap?.has(annotation.fontFamily)
         ? fontMap.get(annotation.fontFamily)
         : undefined;
+    const isUserSelectedNonStandardEmbedded =
+      !!annotation.fontFamily &&
+      !!userSelectedFont &&
+      annotation.fontFamily !== "Helvetica" &&
+      annotation.fontFamily !== "Times Roman" &&
+      annotation.fontFamily !== "Courier";
     const userExplicitCustom =
       annotation.fontFamily === "Custom" ||
       annotation.fontFamily === "CustomSans" ||
       annotation.fontFamily === "CustomSerif" ||
       annotation.fontFamily === "Noto Sans SC" ||
       annotation.fontFamily === "Source Han Serif SC" ||
+      isUserSelectedNonStandardEmbedded ||
       (customFont && userSelectedFont && userSelectedFont === customFont);
 
     // Base (ASCII) font selection
     let baseFont: PDFFont | undefined;
     let baseResourceName: string;
-    if (userExplicitCustom && customFont) {
+    if (isUserSelectedNonStandardEmbedded && userSelectedFont) {
+      baseFont = userSelectedFont;
+      baseResourceName = "Base";
+    } else if (userExplicitCustom && customFont) {
       // If user explicitly chose a CJK/custom font, render the entire annotation with it.
       baseFont = customFont;
       baseResourceName = "Cust";
@@ -240,7 +255,25 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     // If the user explicitly chose the custom font, apply it to all text.
     // Otherwise, only apply custom to non-ASCII runs.
-    const useMixedFonts = !!customFont && hasNonAscii && !userExplicitCustom;
+    const baseCanEncodeAll = (() => {
+      if (!hasNonAscii) return true;
+      if (!baseFont) return false;
+      try {
+        let sanitized = "";
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          sanitized += ch.charCodeAt(0) <= 0x7f ? ch : "?";
+        }
+
+        const rawEncoded = baseFont.encodeText(text).toString();
+        const sanitizedEncoded = baseFont.encodeText(sanitized).toString();
+        return rawEncoded !== sanitizedEncoded;
+      } catch {
+        return false;
+      }
+    })();
+
+    const useMixedFonts = !!customFont && hasNonAscii && !baseCanEncodeAll;
     const cjkFont = useMixedFonts ? customFont : undefined;
     const cjkResourceName = cjkFont ? "Cust" : undefined;
 
@@ -250,7 +283,7 @@ export class FreeTextExporter implements IAnnotationExporter {
     // 2. Prepare text wrapping
     const paragraphs = text.split(/\r\n|\r|\n/);
     const lines: string[] = [];
-    const availableWidth = Math.max(0, w - 4);
+    const availableWidth = Math.max(0, w);
 
     const measureWidth = (s: string) => {
       if (!useMixedFonts || !cjkFont) {
@@ -391,13 +424,21 @@ export class FreeTextExporter implements IAnnotationExporter {
       });
     }
 
-    const lineHeight = fontSize * 1.2;
+    const lineHeight = fontSize;
     const startY = h - fontSize; // Start from top
 
-    let appearanceOps = `q${typeof opacity === "number" && opacity < 1 ? " /GS0 gs" : ""} ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${lineHeight} TL`;
+    let appearanceOps = `q${typeof opacity === "number" && opacity < 1 ? " /GS0 gs" : ""}`;
+    if (
+      typeof bgR === "number" &&
+      typeof bgG === "number" &&
+      typeof bgB === "number"
+    ) {
+      appearanceOps += ` ${bgR} ${bgG} ${bgB} rg 0 0 ${w} ${h} re f`;
+    }
+    appearanceOps += ` ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${lineHeight} TL`;
 
     // Initial position
-    appearanceOps += ` 2 ${startY} Td`;
+    appearanceOps += ` 0 ${startY} Td`;
 
     let currentResource = baseResourceName;
 
@@ -413,10 +454,11 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     for (const line of lines) {
       if (!useMixedFonts || !cjkFont || !cjkResourceName) {
-        const encoded = encodeRun(
-          userExplicitCustom && customFont ? customFont : baseFont,
-          line,
-        );
+        const runFont =
+          userExplicitCustom && customFont && !isUserSelectedNonStandardEmbedded
+            ? customFont
+            : baseFont;
+        const encoded = encodeRun(runFont, line);
         appearanceOps += ` ${encoded} Tj T*`;
         continue;
       }
@@ -503,6 +545,12 @@ export class FreeTextExporter implements IAnnotationExporter {
       AP: { N: appearanceRef },
       Q: q,
       BS: { W: 0 },
+      IC:
+        typeof bgR === "number" &&
+        typeof bgG === "number" &&
+        typeof bgB === "number"
+          ? [bgR, bgG, bgB]
+          : undefined,
       CA: typeof opacity === "number" ? opacity : undefined,
       P: page.ref,
       T: annotation.author
@@ -537,7 +585,7 @@ export class InkExporter implements IAnnotationExporter {
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
   ): void {
-    const { height: pageHeight } = page.getSize();
+    const { height: _pageHeight } = page.getSize();
 
     const strokes =
       annotation.strokes && annotation.strokes.length > 0

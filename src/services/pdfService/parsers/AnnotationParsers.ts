@@ -14,10 +14,12 @@ import { IAnnotationParser, ParserContext } from "../types";
 import { normalizePdfColorToRgb255, rgbArrayToHex } from "../lib/colors";
 import { pdfDebug } from "../lib/debug";
 import { extractInkAppearance } from "../lib/ink";
-import { ensurePdfEmbeddedFontLoaded } from "../lib/embedded-fonts";
 import { pdfJsRectToUiRect } from "../lib/coords";
 import { decodePdfString } from "../lib/pdf-objects";
+import { ensurePdfEmbeddedFontLoaded } from "../lib/embedded-fonts";
 import {
+  matchSystemFontFamily,
+  matchSystemFontFamilyByAlias,
   normalizePdfFontName,
   pdfFontToAppFontKey,
   pdfFontToCssFontFamily,
@@ -326,6 +328,106 @@ export class FreeTextParser implements IAnnotationParser {
       if (baseFont instanceof PDFString || baseFont instanceof PDFHexString)
         return baseFont.decodeText();
       return undefined;
+    };
+
+    const parseFillColorFromContentStream = (content: string) => {
+      const tokens = content.trim().split(/\s+/);
+
+      const to01 = (n: number) => {
+        if (!Number.isFinite(n)) return 0;
+        if (n <= 1.01) return Math.max(0, Math.min(1, n));
+        return Math.max(0, Math.min(1, n / 255));
+      };
+
+      const rgbHexFrom3 = (r: number, g: number, b: number) =>
+        rgbArrayToHex([to01(r) * 255, to01(g) * 255, to01(b) * 255]);
+
+      const cmykHexFrom4 = (c: number, m: number, y: number, k: number) => {
+        const c01 = to01(c);
+        const m01 = to01(m);
+        const y01 = to01(y);
+        const k01 = to01(k);
+        const rr = 255 * (1 - c01) * (1 - k01);
+        const gg = 255 * (1 - m01) * (1 - k01);
+        const bb = 255 * (1 - y01) * (1 - k01);
+        return rgbArrayToHex([rr, gg, bb]);
+      };
+
+      let inText = false;
+      let currentFillHex: string | undefined = undefined;
+      let lastRect: { x: number; y: number; w: number; h: number } | undefined =
+        undefined;
+
+      let best:
+        | {
+            hex: string;
+            area: number;
+          }
+        | undefined = undefined;
+
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+
+        if (token === "BT") {
+          inText = true;
+          continue;
+        }
+        if (token === "ET") {
+          inText = false;
+          continue;
+        }
+
+        if (token === "rg" && i >= 3) {
+          const r = parseFloat(tokens[i - 3]);
+          const g = parseFloat(tokens[i - 2]);
+          const b = parseFloat(tokens[i - 1]);
+          const hex = rgbHexFrom3(r, g, b);
+          if (hex) currentFillHex = hex;
+          continue;
+        }
+
+        if (token === "g" && i >= 1) {
+          const gray = parseFloat(tokens[i - 1]);
+          const hex = rgbHexFrom3(gray, gray, gray);
+          if (hex) currentFillHex = hex;
+          continue;
+        }
+
+        if (token === "k" && i >= 4) {
+          const c = parseFloat(tokens[i - 4]);
+          const m = parseFloat(tokens[i - 3]);
+          const y = parseFloat(tokens[i - 2]);
+          const k = parseFloat(tokens[i - 1]);
+          const hex = cmykHexFrom4(c, m, y, k);
+          if (hex) currentFillHex = hex;
+          continue;
+        }
+
+        if (token === "re" && i >= 4) {
+          const x = parseFloat(tokens[i - 4]);
+          const y = parseFloat(tokens[i - 3]);
+          const w = parseFloat(tokens[i - 2]);
+          const h = parseFloat(tokens[i - 1]);
+          if (!isNaN(x) && !isNaN(y) && !isNaN(w) && !isNaN(h)) {
+            lastRect = { x, y, w, h };
+          }
+          continue;
+        }
+
+        if (token === "f" || token === "f*" || token === "F") {
+          if (!inText && lastRect && currentFillHex) {
+            const area = Math.abs(lastRect.w * lastRect.h);
+            if (Number.isFinite(area) && area > 0) {
+              if (!best || area > best.area) {
+                best = { hex: currentFillHex, area };
+              }
+            }
+          }
+          lastRect = undefined;
+        }
+      }
+
+      return best?.hex;
     };
 
     const parseTextColorFromContentStream = (content: string) => {
@@ -757,16 +859,20 @@ export class FreeTextParser implements IAnnotationParser {
         const initialColorArray = annotation.color;
         const normalizedRgb = normalizePdfColorToRgb255(initialColorArray);
         let color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#000000";
-        pdfDebug("import:freetext", "initial", () => ({
-          pageIndex,
-          index,
-          pdfJsColor: initialColorArray,
-          normalizedRgb,
-          initialHex: color,
-          defaultAppearance: annotation.defaultAppearance,
-          DA: annotation.DA,
-        }));
-        const [x1, y1] = annotation.rect;
+
+        let backgroundColor: string | undefined = undefined;
+        if (annotation.backgroundColor) {
+          const bgRgb = normalizePdfColorToRgb255(annotation.backgroundColor);
+          const bgHex = bgRgb ? rgbArrayToHex(bgRgb) : undefined;
+          if (bgHex) backgroundColor = bgHex;
+        }
+
+        if (!backgroundColor && annotation.fillColor) {
+          const fillRgb = normalizePdfColorToRgb255(annotation.fillColor);
+          const fillHex = fillRgb ? rgbArrayToHex(fillRgb) : undefined;
+          if (fillHex) backgroundColor = fillHex;
+        }
+        const [_x1, _y1] = annotation.rect;
         const { x, y, width, height } = pdfJsRectToUiRect(
           annotation.rect,
           viewport,
@@ -994,9 +1100,26 @@ export class FreeTextParser implements IAnnotationParser {
                         !!context.embeddedFontCache,
                     }));
 
-                    // Try to load the embedded font program (FontFile2/OpenType) into the browser.
-                    // If this succeeds, we use the injected family name as the primary font.
+                    const fontKey =
+                      pdfFontToAppFontKey(baseFontName) ||
+                      pdfFontToAppFontKey(resourceName);
+
+                    const sysNeedle = baseFontName || resourceName;
+                    const systemFamily =
+                      matchSystemFontFamily(
+                        sysNeedle,
+                        context.systemFontFamilies,
+                      ) ||
+                      matchSystemFontFamilyByAlias(
+                        sysNeedle,
+                        context.systemFontAliasToFamilyCompact,
+                      );
+
+                    // Chromium can reject embedded PDF fonts (OTS parsing error). Only attempt
+                    // injection if we cannot resolve a standard key or an installed system family.
                     const injectedFamily =
+                      !fontKey &&
+                      !systemFamily &&
                       fontDictResolved &&
                       (baseFontName || resourceName) &&
                       context.embeddedFontCache
@@ -1018,14 +1141,13 @@ export class FreeTextParser implements IAnnotationParser {
                       injectedFamily,
                     }));
 
-                    const fontKey =
-                      pdfFontToAppFontKey(baseFontName) ||
-                      pdfFontToAppFontKey(resourceName);
-
-                    sourcePdfFontMissing = !fontKey && !injectedFamily;
+                    sourcePdfFontMissing =
+                      !fontKey && !injectedFamily && !systemFamily;
 
                     if (fontKey) {
                       fontFamily = fontKey;
+                    } else if (systemFamily) {
+                      fontFamily = systemFamily;
                     } else if (injectedFamily) {
                       const fallback =
                         pdfFontToCssFontFamily(baseFontName) ||
@@ -1101,6 +1223,11 @@ export class FreeTextParser implements IAnnotationParser {
                       const apHex = parseTextColorFromContentStream(apContent);
                       if (apHex) color = apHex;
 
+                      const apFillHex =
+                        parseFillColorFromContentStream(apContent);
+                      if (apFillHex && !backgroundColor)
+                        backgroundColor = apFillHex;
+
                       const apFont = parseFontFromContentStream(apContent);
                       if (apFont?.fontSize) fontSize = apFont.fontSize;
 
@@ -1126,6 +1253,20 @@ export class FreeTextParser implements IAnnotationParser {
                         const resolvedBase =
                           resolveBaseFontName(apFontDictResolved);
 
+                        const fontKey =
+                          pdfFontToAppFontKey(resolvedBase) ||
+                          pdfFontToAppFontKey(apFont.resourceName);
+
+                        const systemFamily =
+                          matchSystemFontFamily(
+                            resolvedBase || apFont.resourceName,
+                            context.systemFontFamilies,
+                          ) ||
+                          matchSystemFontFamilyByAlias(
+                            resolvedBase || apFont.resourceName,
+                            context.systemFontAliasToFamilyCompact,
+                          );
+
                         pdfDebug("import:freetext", "font_inject_gate", () => ({
                           stage: "AP",
                           pageIndex,
@@ -1138,10 +1279,14 @@ export class FreeTextParser implements IAnnotationParser {
                           willAttempt:
                             !!apFontDictResolved &&
                             !!(resolvedBase || apFont.resourceName) &&
-                            !!context.embeddedFontCache,
+                            !!context.embeddedFontCache &&
+                            !fontKey &&
+                            !systemFamily,
                         }));
 
                         const injectedFamily =
+                          !fontKey &&
+                          !systemFamily &&
                           apFontDictResolved &&
                           (resolvedBase || apFont.resourceName) &&
                           context.embeddedFontCache
@@ -1166,17 +1311,16 @@ export class FreeTextParser implements IAnnotationParser {
                           }),
                         );
 
-                        const fontKey =
-                          pdfFontToAppFontKey(resolvedBase) ||
-                          pdfFontToAppFontKey(apFont.resourceName);
-
                         sourcePdfFontName = resolvedBase || apFont.resourceName;
                         sourcePdfFontIsSubset =
                           !!sourcePdfFontName?.includes("+");
-                        sourcePdfFontMissing = !fontKey && !injectedFamily;
+                        sourcePdfFontMissing =
+                          !fontKey && !injectedFamily && !systemFamily;
 
                         if (fontKey) {
                           fontFamily = fontKey;
+                        } else if (systemFamily) {
+                          fontFamily = systemFamily;
                         } else if (injectedFamily) {
                           const fallback =
                             pdfFontToCssFontFamily(resolvedBase) ||
@@ -1253,6 +1397,7 @@ export class FreeTextParser implements IAnnotationParser {
           type: "freetext",
           rect: { x, y, width, height },
           color: color,
+          backgroundColor,
           opacity: opacity,
           text: contents,
           size: fontSize,

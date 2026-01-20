@@ -1,4 +1,5 @@
 import type { PDFFont, PDFDocument } from "@cantoo/pdf-lib";
+import { isTauri, invoke } from "@tauri-apps/api/core";
 
 type Fontkit = Parameters<PDFDocument["registerFontkit"]>[0];
 
@@ -6,6 +7,8 @@ export type ExportFontConfig = {
   id: "cjk_sans" | "cjk_serif";
   name: string;
   path: string;
+  systemFamilies: string[];
+  generic: "serif" | "sans-serif";
   exportKeys: string[];
   importAliases: string[];
 };
@@ -15,6 +18,17 @@ export const BUILT_IN_EXPORT_FONTS: ExportFontConfig[] = [
     id: "cjk_sans",
     name: "Noto Sans SC",
     path: "fonts/NotoSansSC-Regular.ttf",
+    systemFamilies: [
+      "Noto Sans SC",
+      "Noto Sans CJK SC",
+      "Noto Sans CJK",
+      "Microsoft YaHei",
+      "Microsoft YaHei UI",
+      "PingFang SC",
+      "Hiragino Sans GB",
+      "WenQuanYi Micro Hei",
+    ],
+    generic: "sans-serif",
     exportKeys: ["Noto Sans SC", "CustomSans", "Custom"],
     importAliases: [
       "NotoSansSC",
@@ -31,6 +45,17 @@ export const BUILT_IN_EXPORT_FONTS: ExportFontConfig[] = [
     id: "cjk_serif",
     name: "Source Han Serif SC",
     path: "fonts/SourceHanSerifSC-VF.ttf",
+    systemFamilies: [
+      "Source Han Serif SC",
+      "Source Han Serif",
+      "Songti SC",
+      "STSong",
+      "SimSun",
+      "NSimSun",
+      "PMingLiU",
+      "Noto Serif CJK SC",
+    ],
+    generic: "serif",
     exportKeys: ["Source Han Serif SC", "CustomSerif"],
     importAliases: [
       "SourceHanSerifSC",
@@ -44,12 +69,19 @@ export const BUILT_IN_EXPORT_FONTS: ExportFontConfig[] = [
   },
 ];
 
+const toPublicUrl = (path: string) => {
+  const base = import.meta.env.BASE_URL || "/";
+  const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+  return `${normalizedBase}${normalizedPath}`;
+};
+
 const fetchFontBytes = async (
   path: string,
 ): Promise<Uint8Array | undefined> => {
   if (typeof fetch === "undefined") return undefined;
   try {
-    const res = await fetch(path);
+    const res = await fetch(toPublicUrl(path));
     if (!res.ok) return undefined;
     const buf = await res.arrayBuffer();
     if (buf.byteLength === 0) return undefined;
@@ -102,6 +134,28 @@ export const loadAndEmbedExportFonts = async (args: {
     }
   };
 
+  const loadSystemFontBytes = async (args: {
+    families: string[];
+    generic: "serif" | "sans-serif";
+  }): Promise<Uint8Array | undefined> => {
+    if (!isTauri()) return undefined;
+    try {
+      const result = await invoke<Uint8Array | number[] | null>(
+        "get_system_font_bytes",
+        {
+          families: args.families,
+          generic: args.generic,
+        },
+      );
+      if (!result) return undefined;
+      if (result instanceof Uint8Array) return result;
+      if (Array.isArray(result)) return new Uint8Array(result);
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
   // Optional user-provided font -> treat as default CJK sans fallback
   if (customFont?.bytes && customFont.bytes.byteLength > 0) {
     const embedded = await embedFont(customFont.bytes, subset);
@@ -116,7 +170,12 @@ export const loadAndEmbedExportFonts = async (args: {
   for (const def of BUILT_IN_EXPORT_FONTS) {
     if (includeFontIds && !includeFontIds.has(def.id)) continue;
 
-    const bytes = await fetchFontBytes(def.path);
+    const bytes = isTauri()
+      ? await loadSystemFontBytes({
+          families: def.systemFamilies,
+          generic: def.generic,
+        })
+      : await fetchFontBytes(def.path);
     if (!bytes) {
       console.warn("[PDF Export] Built-in font not found", def.path);
       continue;
@@ -130,6 +189,83 @@ export const loadAndEmbedExportFonts = async (args: {
       console.info("[PDF Export] Loaded built-in font", def.path);
     } else {
       console.warn("[PDF Export] Failed to embed built-in font", def.name);
+    }
+  }
+};
+
+export const loadAndEmbedSelectedSystemFonts = async (args: {
+  pdfDoc: PDFDocument;
+  fontMap: Map<string, PDFFont>;
+  fontkit: Fontkit;
+  families: string[];
+  subset?: boolean;
+}) => {
+  if (!isTauri()) return;
+
+  const { pdfDoc, fontMap, fontkit } = args;
+  const subset = args.subset ?? true;
+
+  let fontkitRegistered = false;
+  const ensureFontkit = () => {
+    if (!fontkitRegistered) {
+      pdfDoc.registerFontkit(fontkit);
+      fontkitRegistered = true;
+    }
+  };
+
+  const embedFont = async (bytes: Uint8Array): Promise<PDFFont | undefined> => {
+    ensureFontkit();
+    try {
+      return await pdfDoc.embedFont(bytes, { subset });
+    } catch (e) {
+      console.warn("[PDF Export] System font embed failed", e);
+      return undefined;
+    }
+  };
+
+  const normalized = args.families
+    .map((f) => (typeof f === "string" ? f.trim() : ""))
+    .filter((f) => f.length > 0);
+
+  const uniqueFamilies = Array.from(new Set(normalized)).filter(
+    (f) => !fontMap.has(f),
+  );
+
+  // Don't attempt to resolve standard/built-in keys via system font lookup.
+  const skipKeys = new Set([
+    "Helvetica",
+    "Times Roman",
+    "Courier",
+    "Noto Sans SC",
+    "Source Han Serif SC",
+    "Custom",
+    "CustomSans",
+    "CustomSerif",
+  ]);
+
+  for (const family of uniqueFamilies) {
+    if (skipKeys.has(family)) continue;
+
+    try {
+      const result = await invoke<Uint8Array | number[] | null>(
+        "get_system_font_bytes",
+        {
+          families: [family],
+          generic: null,
+        },
+      );
+      if (!result) continue;
+
+      const bytes =
+        result instanceof Uint8Array ? result : new Uint8Array(result);
+      if (bytes.byteLength === 0) continue;
+
+      const embedded = await embedFont(bytes);
+      if (embedded) {
+        fontMap.set(family, embedded);
+      }
+    } catch {
+      // ignore
     }
   }
 };

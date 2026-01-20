@@ -30,10 +30,40 @@ export class TextControlExporter implements IControlExporter {
     if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
       fieldFont = fontMap.get(field.style.fontFamily);
     }
+
+    const selectedFamily = field.style?.fontFamily;
+    const isSelectedNonStandardEmbedded =
+      !!selectedFamily &&
+      !!fontMap?.has(selectedFamily) &&
+      selectedFamily !== "Helvetica" &&
+      selectedFamily !== "Times Roman" &&
+      selectedFamily !== "Courier";
+
+    const selectedCanEncodeValue = (() => {
+      if (!isSelectedNonStandardEmbedded) return false;
+      if (!fieldFont) return false;
+      try {
+        if (typeof field.value !== "string") return false;
+        const original = field.value;
+        let sanitized = "";
+        for (let i = 0; i < original.length; i++) {
+          const ch = original[i];
+          sanitized += ch.charCodeAt(0) <= 0x7f ? ch : "?";
+        }
+
+        const rawEncoded = fieldFont.encodeText(original).toString();
+        const sanitizedEncoded = fieldFont.encodeText(sanitized).toString();
+        return rawEncoded !== sanitizedEncoded;
+      } catch {
+        return false;
+      }
+    })();
+
     if (
       field.value &&
       containsNonAscii(field.value) &&
-      !isExplicitCjkFontSelection(field.style?.fontFamily)
+      !isExplicitCjkFontSelection(field.style?.fontFamily) &&
+      !(isSelectedNonStandardEmbedded && selectedCanEncodeValue)
     ) {
       const cjk = pickCjkFontFromMap(fontMap, field.style?.fontFamily);
       if (cjk) fieldFont = cjk;
@@ -42,7 +72,7 @@ export class TextControlExporter implements IControlExporter {
     let tf;
     try {
       tf = form.getTextField(field.name);
-    } catch (e) {
+    } catch {
       tf = form.createTextField(field.name);
     }
 
@@ -89,7 +119,7 @@ export class CheckboxControlExporter implements IControlExporter {
     let cb;
     try {
       cb = form.getCheckBox(field.name);
-    } catch (e) {
+    } catch {
       cb = form.createCheckBox(field.name);
     }
 
@@ -122,10 +152,39 @@ export class DropdownControlExporter implements IControlExporter {
     if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
       fieldFont = fontMap.get(field.style.fontFamily);
     }
+
+    const selectedFamily = field.style?.fontFamily;
+    const isSelectedNonStandardEmbedded =
+      !!selectedFamily &&
+      !!fontMap?.has(selectedFamily) &&
+      selectedFamily !== "Helvetica" &&
+      selectedFamily !== "Times Roman" &&
+      selectedFamily !== "Courier";
+
+    const selectedCanEncodeValue = (() => {
+      if (!isSelectedNonStandardEmbedded) return false;
+      if (!fieldFont) return false;
+      try {
+        if (typeof field.value !== "string") return false;
+        const original = field.value;
+        let sanitized = "";
+        for (let i = 0; i < original.length; i++) {
+          const ch = original[i];
+          sanitized += ch.charCodeAt(0) <= 0x7f ? ch : "?";
+        }
+
+        const rawEncoded = fieldFont.encodeText(original).toString();
+        const sanitizedEncoded = fieldFont.encodeText(sanitized).toString();
+        return rawEncoded !== sanitizedEncoded;
+      } catch {
+        return false;
+      }
+    })();
     if (
       field.value &&
       containsNonAscii(field.value) &&
-      !isExplicitCjkFontSelection(field.style?.fontFamily)
+      !isExplicitCjkFontSelection(field.style?.fontFamily) &&
+      !selectedCanEncodeValue
     ) {
       const cjk = pickCjkFontFromMap(fontMap, field.style?.fontFamily);
       if (cjk) fieldFont = cjk;
@@ -135,7 +194,7 @@ export class DropdownControlExporter implements IControlExporter {
       let ol;
       try {
         ol = form.getOptionList(field.name);
-      } catch (e) {
+      } catch {
         ol = form.createOptionList(field.name);
       }
 
@@ -169,7 +228,7 @@ export class DropdownControlExporter implements IControlExporter {
       let dd;
       try {
         dd = form.getDropdown(field.name);
-      } catch (e) {
+      } catch {
         dd = form.createDropdown(field.name);
       }
 
@@ -217,7 +276,7 @@ export class RadioControlExporter implements IControlExporter {
     let rg;
     try {
       rg = form.getRadioGroup(field.name);
-    } catch (e) {
+    } catch {
       rg = form.createRadioGroup(field.name);
       if (field.toolTip) {
         rg.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
@@ -307,7 +366,7 @@ export class SignatureControlExporter implements IControlExporter {
     let tf;
     try {
       tf = form.getTextField(field.name);
-    } catch (e) {
+    } catch {
       tf = form.createTextField(field.name);
     }
 

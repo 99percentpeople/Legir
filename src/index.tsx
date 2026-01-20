@@ -2,6 +2,7 @@ import "./globals.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { isTauri } from "@tauri-apps/api/core";
 import { ThemeProvider } from "./components/theme-provider";
 import { LanguageProvider } from "./components/language-provider";
 import { Toaster } from "./components/ui/sonner";
@@ -17,6 +18,10 @@ import { useHashLocation } from "wouter/use-hash-location";
 const rootElement = document.getElementById("root");
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
+}
+
+if (!isTauri()) {
+  void import("./styles/font-faces.css");
 }
 
 const root = ReactDOM.createRoot(rootElement);

@@ -11,9 +11,22 @@ export const containsNonAscii = (s: string) => {
   return false;
 };
 
+const toSafeFontFamilyCss = (font: string) => {
+  const trimmed = font.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.includes(",")) return trimmed;
+  if (trimmed.includes('"') || trimmed.includes("'")) return trimmed;
+  if (trimmed.includes("var(")) return trimmed;
+  if (/\s/.test(trimmed)) return `"${trimmed}"`;
+  return trimmed;
+};
+
 export const resolveFontStack = (fontKey?: string) => {
   const key = (fontKey || "Helvetica").trim();
-  return FONT_FAMILY_MAP[key] || fontKey || "Helvetica";
+  const mapped = FONT_FAMILY_MAP[key];
+  if (mapped) return mapped;
+  if (!fontKey) return "Helvetica";
+  return toSafeFontFamilyCss(fontKey);
 };
 
 export const isKnownFontKey = (fontKey?: string) => {
@@ -84,7 +97,7 @@ export const resolveFontStackWithCjkFallback = (fontKey?: string) => {
 export const resolveFontStackForDisplay = (fontKey?: string) => {
   // For imported/custom font-family strings, preserve the original look and do not
   // force-inject our CJK fallback (which can override the PDF's intended font).
-  if (fontKey && !isKnownFontKey(fontKey)) return fontKey;
+  if (fontKey && !isKnownFontKey(fontKey)) return resolveFontStack(fontKey);
   return resolveFontStackWithCjkFallback(fontKey);
 };
 
@@ -93,7 +106,7 @@ export const resolveCjkFallbackFontStack = (baseFontKey?: string) =>
 
 export const resolveFormControlFontFamilyCss = (
   fontKey: string | undefined,
-  displayedValue: string | undefined,
+  _displayedValue: string | undefined,
 ) => {
   return resolveFontStackWithCjkFallback(fontKey);
 };

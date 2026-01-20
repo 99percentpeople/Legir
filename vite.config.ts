@@ -11,9 +11,11 @@ const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "");
+  const isTauriEnv = mode === "tauri" || !!process.env.TAURI_ENV_PLATFORM;
   return {
     // prevent vite from obscuring rust errors
     clearScreen: false,
+    publicDir: isTauriEnv ? false : "public",
     server: {
       port: 3000,
       strictPort: true,

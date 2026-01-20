@@ -76,6 +76,8 @@ const maybeDecodeFontStreamBytes = async (args: {
     return false;
   };
 
+  if (looksLikeFont(bytes)) return bytes;
+
   // Common case: FlateDecode. (PDF flate is compatible with DecompressionStream('deflate')
   // in modern browsers; if it fails we just fall back to raw bytes.)
   const g = globalThis as unknown as { DecompressionStream?: unknown };

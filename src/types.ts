@@ -93,6 +93,7 @@ export interface Annotation {
   text?: string; // For comment
   author?: string; // Creator/Author of the annotation
   color?: string;
+  backgroundColor?: string;
   opacity?: number; // For highlight
   thickness?: number; // For ink
   size?: number; // For text
