@@ -44,6 +44,22 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   const [renderedScale, setRenderedScale] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const endOfContentRef = useRef<HTMLDivElement | null>(null);
+  const prevRangeRef = useRef<Range | null>(null);
+  const manualSelectionRef = useRef<{
+    anchorNode: Node;
+    anchorOffset: number;
+    activeLayer: HTMLDivElement;
+    startX: number;
+    startY: number;
+    didDrag: boolean;
+    anchorRect: DOMRect | null;
+    lastFocusRect: DOMRect | null;
+    lineSpans: HTMLSpanElement[];
+    lineBandTop: number;
+    lineBandBottom: number;
+    lineLayer: HTMLDivElement | null;
+  } | null>(null);
 
   const userUnit = useMemo(() => page.userUnit ?? 1, [page.userUnit]);
   const pageInfo = useMemo(
@@ -84,10 +100,15 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
   // Helper: Adds an element to mark the end of content for accessibility/layout
   const ensureEndOfContent = useCallback((container: HTMLDivElement) => {
-    if (container.querySelector(":scope > .endOfContent")) return;
+    const existing = container.querySelector(":scope > .endOfContent");
+    if (existing instanceof HTMLDivElement) {
+      endOfContentRef.current = existing;
+      return;
+    }
     const end = document.createElement("div");
     end.className = "endOfContent";
     container.appendChild(end);
+    endOfContentRef.current = end;
   }, []);
 
   type RenderTextInnerArgs = {
@@ -192,8 +213,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     setRenderedScale(null);
     setIsSelecting(false);
     setIsRendering(false);
+    endOfContentRef.current = null;
+    prevRangeRef.current = null;
 
-    textLayerRef.current.innerHTML = "";
+    if (textLayerRef.current) {
+      textLayerRef.current.innerHTML = "";
+    }
   }, [pageIndex, pageInfo]);
 
   // 2. Handle Selection Logic (Web Select API)
@@ -201,22 +226,101 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   useEffect(() => {
     if (!isSelectMode) {
       setIsSelecting(false);
+      prevRangeRef.current = null;
+      const container = textLayerRef.current;
+      const endDiv = endOfContentRef.current;
+      if (container && endDiv) {
+        container.append(endDiv);
+        endDiv.style.width = "";
+        endDiv.style.height = "";
+        endDiv.style.userSelect = "";
+      }
       return;
     }
 
     const handleSelectionChange = () => {
       const el = textLayerRef.current;
       const sel = window.getSelection();
+      if (!el) return;
+
+      if (!endOfContentRef.current) {
+        ensureEndOfContent(el);
+      }
+      const endDiv = endOfContentRef.current;
+
+      const resetEndOfContent = () => {
+        if (!endDiv) return;
+        el.append(endDiv);
+        endDiv.style.width = "";
+        endDiv.style.height = "";
+        endDiv.style.userSelect = "";
+      };
 
       // Check if selection exists and is actually selecting text (not collapsed)
-      if (!el || !sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
         setIsSelecting(false);
+        prevRangeRef.current = null;
+        resetEndOfContent();
         return;
       }
 
       // Check if the current selection intersects with this specific text layer
       const range = sel.getRangeAt(0);
-      setIsSelecting(range.intersectsNode(el));
+      const intersects = range.intersectsNode(el);
+      setIsSelecting(intersects);
+      if (!intersects) {
+        prevRangeRef.current = null;
+        resetEndOfContent();
+        return;
+      }
+
+      if (!endDiv) {
+        prevRangeRef.current = range.cloneRange();
+        return;
+      }
+
+      const prevRange = prevRangeRef.current;
+      const modifyStart =
+        !!prevRange &&
+        (range.compareBoundaryPoints(Range.END_TO_END, prevRange) === 0 ||
+          range.compareBoundaryPoints(Range.START_TO_END, prevRange) === 0);
+
+      let anchor: Node | null = modifyStart
+        ? range.startContainer
+        : range.endContainer;
+
+      if (anchor.nodeType === Node.TEXT_NODE) {
+        anchor = anchor.parentNode;
+      }
+
+      if (!modifyStart && range.endOffset === 0) {
+        let current: Node | null = anchor;
+        do {
+          while (current && !current.previousSibling) {
+            current = current.parentNode;
+          }
+          current = current?.previousSibling ?? null;
+        } while (current && !current.childNodes.length);
+        if (current) anchor = current;
+      }
+
+      const anchorEl =
+        anchor instanceof Element ? anchor : anchor?.parentElement;
+      const parentTextLayer = anchorEl?.closest(".textLayer");
+      if (!anchorEl || parentTextLayer !== el) {
+        resetEndOfContent();
+        prevRangeRef.current = range.cloneRange();
+        return;
+      }
+
+      endDiv.style.width = el.style.width;
+      endDiv.style.height = el.style.height;
+      endDiv.style.userSelect = "text";
+      anchorEl.parentElement?.insertBefore(
+        endDiv,
+        modifyStart ? anchorEl : anchorEl.nextSibling,
+      );
+      prevRangeRef.current = range.cloneRange();
     };
 
     document.addEventListener("selectionchange", handleSelectionChange);
@@ -227,36 +331,397 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [isSelectMode]);
+  }, [ensureEndOfContent, isSelectMode]);
 
   // 3. Handle Click Outside (Background Click)
   // Manually clear selection when user clicks on the canvas/background OR empty space in text layer
   useEffect(() => {
     if (!isSelectMode) return;
 
+    const doc = document as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      caretPositionFromPoint?: (
+        x: number,
+        y: number,
+      ) => { offsetNode: Node; offset: number } | null;
+    };
+
+    const getCaretRangeFromPoint = (x: number, y: number) => {
+      if (typeof doc.caretRangeFromPoint === "function") {
+        return doc.caretRangeFromPoint(x, y);
+      }
+      if (typeof doc.caretPositionFromPoint === "function") {
+        const position = doc.caretPositionFromPoint(x, y);
+        if (!position) return null;
+        const range = document.createRange();
+        range.setStart(position.offsetNode, position.offset);
+        range.collapse(true);
+        return range;
+      }
+      return null;
+    };
+
+    const findNearestTextSpan = (
+      layer: HTMLDivElement,
+      x: number,
+      y: number,
+      candidates?: HTMLSpanElement[],
+    ) => {
+      const spans =
+        candidates ??
+        Array.from(
+          layer.querySelectorAll<HTMLSpanElement>("span[role='presentation']"),
+        );
+      let bestSpan: HTMLSpanElement | null = null;
+      let bestRect: DOMRect | null = null;
+      let bestScore = Number.POSITIVE_INFINITY;
+      spans.forEach((span) => {
+        if (!span.textContent) return;
+        const rect = span.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        const dx =
+          x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0;
+        const dy =
+          y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
+        const score = dy * dy * 4 + dx * dx;
+        if (score < bestScore) {
+          bestScore = score;
+          bestSpan = span;
+          bestRect = rect;
+        }
+      });
+      if (!bestSpan || !bestRect) return null;
+      return { span: bestSpan, rect: bestRect };
+    };
+
+    const getLineInfoForRect = (
+      layer: HTMLDivElement,
+      anchorRect: DOMRect,
+      anchorSpan?: HTMLSpanElement,
+    ) => {
+      const spans = Array.from(
+        layer.querySelectorAll<HTMLSpanElement>("span[role='presentation']"),
+      );
+      const lineSpans: HTMLSpanElement[] = [];
+      let bandTop = anchorRect.top;
+      let bandBottom = anchorRect.bottom;
+      const anchorCenter = anchorRect.top + anchorRect.height / 2;
+      const maxCenterDiff = Math.max(2, anchorRect.height * 0.6);
+
+      spans.forEach((span) => {
+        if (!span.textContent) return;
+        const rect = span.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        const overlap =
+          Math.min(rect.bottom, anchorRect.bottom) -
+          Math.max(rect.top, anchorRect.top);
+        const minHeight = Math.min(rect.height, anchorRect.height);
+        const centerDiff =
+          Math.abs(rect.top + rect.height / 2 - anchorCenter) ??
+          Number.POSITIVE_INFINITY;
+        const isSameLine =
+          overlap >= Math.max(1, minHeight * 0.3) ||
+          centerDiff <= maxCenterDiff;
+        if (!isSameLine) return;
+        lineSpans.push(span);
+        bandTop = Math.min(bandTop, rect.top);
+        bandBottom = Math.max(bandBottom, rect.bottom);
+      });
+
+      if (lineSpans.length === 0 && anchorSpan) {
+        lineSpans.push(anchorSpan);
+      }
+
+      return {
+        lineSpans,
+        lineBandTop: bandTop,
+        lineBandBottom: bandBottom,
+      };
+    };
+
+    const getNearestTextTarget = (
+      layer: HTMLDivElement,
+      x: number,
+      y: number,
+      candidates?: HTMLSpanElement[],
+    ) => {
+      const nearest = findNearestTextSpan(layer, x, y, candidates);
+      if (!nearest) return null;
+      const { span, rect } = nearest;
+      const clampedX = Math.min(Math.max(x, rect.left + 1), rect.right - 1);
+      const clampedY = Math.min(Math.max(y, rect.top + 1), rect.bottom - 1);
+      const rangeFromPoint = getCaretRangeFromPoint(clampedX, clampedY);
+      if (rangeFromPoint && span.contains(rangeFromPoint.startContainer)) {
+        rangeFromPoint.collapse(true);
+        return { range: rangeFromPoint, rect, span };
+      }
+      const range = document.createRange();
+      const textNode = span.firstChild;
+      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+        const textLength = textNode.textContent?.length ?? 0;
+        const useEnd = clampedX > rect.left + rect.width / 2;
+        range.setStart(textNode, useEnd ? textLength : 0);
+      } else {
+        range.setStart(span, 0);
+      }
+      range.collapse(true);
+      return { range, rect, span };
+    };
+
+    const getTargetFromRange = (
+      range: Range | null,
+      element: Element | null,
+    ) => {
+      if (!range || !element) return null;
+      const span = element.closest("span[role='presentation']");
+      if (!(span instanceof HTMLSpanElement)) return null;
+      const rect = span.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return null;
+      const collapsed = range.cloneRange();
+      collapsed.collapse(true);
+      return { range: collapsed, rect, span };
+    };
+
+    const clearManualSelection = () => {
+      manualSelectionRef.current = null;
+    };
+
+    const getTextLayerFromPoint = (x: number, y: number) => {
+      const elements = document.elementsFromPoint(x, y);
+      for (const element of elements) {
+        if (!(element instanceof HTMLElement)) continue;
+        const layer = element.closest(".textLayer");
+        if (layer instanceof HTMLDivElement) return layer;
+      }
+      return null;
+    };
+
+    const handleManualPointerMove = (e: PointerEvent) => {
+      const state = manualSelectionRef.current;
+      if (!state) return;
+      const sel = window.getSelection();
+      if (!sel) return;
+      const dx = Math.abs(e.clientX - state.startX);
+      const dy = Math.abs(e.clientY - state.startY);
+      if (dx > 2 || dy > 2) {
+        state.didDrag = true;
+      }
+
+      const focusLayer =
+        getTextLayerFromPoint(e.clientX, e.clientY) ??
+        state.lineLayer ??
+        state.activeLayer;
+      const useLineBand = state.lineLayer === focusLayer;
+      const lineRect = useLineBand
+        ? (state.lastFocusRect ?? state.anchorRect)
+        : null;
+      const linePad = lineRect ? Math.max(8, lineRect.height * 0.8) : 10;
+      const bandTop = state.lineBandTop;
+      const bandBottom = state.lineBandBottom;
+      const isInLineBand =
+        useLineBand &&
+        e.clientY >= bandTop - linePad &&
+        e.clientY <= bandBottom + linePad;
+      const distanceToBand =
+        e.clientY < bandTop
+          ? bandTop - e.clientY
+          : e.clientY > bandBottom
+            ? e.clientY - bandBottom
+            : 0;
+      const lineTarget =
+        useLineBand && state.lineSpans.length
+          ? getNearestTextTarget(
+              focusLayer,
+              e.clientX,
+              e.clientY,
+              state.lineSpans,
+            )
+          : null;
+      const globalTarget = getNearestTextTarget(
+        focusLayer,
+        e.clientX,
+        e.clientY,
+      );
+      let focusTarget = globalTarget ?? lineTarget;
+
+      if (isInLineBand && lineTarget) {
+        focusTarget = lineTarget;
+      } else if (!isInLineBand && lineTarget && globalTarget) {
+        const distanceToTarget =
+          e.clientY < globalTarget.rect.top
+            ? globalTarget.rect.top - e.clientY
+            : e.clientY > globalTarget.rect.bottom
+              ? e.clientY - globalTarget.rect.bottom
+              : 0;
+        if (distanceToBand <= distanceToTarget) {
+          focusTarget = lineTarget;
+        }
+      }
+
+      if (!focusTarget) return;
+      if (focusTarget === globalTarget && !isInLineBand) {
+        const lineInfo = getLineInfoForRect(
+          focusLayer,
+          focusTarget.rect,
+          focusTarget.span,
+        );
+        if (lineInfo.lineSpans.length > 0) {
+          state.lineSpans = lineInfo.lineSpans;
+          state.lineBandTop = lineInfo.lineBandTop;
+          state.lineBandBottom = lineInfo.lineBandBottom;
+          state.lineLayer = focusLayer;
+        }
+      }
+      state.lastFocusRect = focusTarget.rect;
+      const focusRange = focusTarget.range;
+
+      if (typeof sel.setBaseAndExtent === "function") {
+        sel.setBaseAndExtent(
+          state.anchorNode,
+          state.anchorOffset,
+          focusRange.startContainer,
+          focusRange.startOffset,
+        );
+      } else {
+        const range = document.createRange();
+        range.setStart(state.anchorNode, state.anchorOffset);
+        range.setEnd(focusRange.startContainer, focusRange.startOffset);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    };
+
+    const handleManualPointerEnd = () => {
+      const state = manualSelectionRef.current;
+      const sel = window.getSelection();
+      if (state && !state.didDrag && sel) {
+        sel.removeAllRanges();
+      }
+      clearManualSelection();
+      document.removeEventListener(
+        "pointermove",
+        handleManualPointerMove,
+        true,
+      );
+      document.removeEventListener("pointerup", handleManualPointerEnd, true);
+      document.removeEventListener(
+        "pointercancel",
+        handleManualPointerEnd,
+        true,
+      );
+    };
+
     const handlePointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
       const target = e.target as HTMLElement;
+      const activeLayer = textLayerRef.current;
+      if (!activeLayer) return;
 
       // Determine if we clicked on text.
       // We look for 'span' or 'br' which are the text containers in PDF.js text layer.
-      const textNode = target.closest("span, br");
       const textLayer = target.closest(".textLayer");
+      const directTextTarget = target.closest("span, br");
 
-      // If we clicked on text inside a text layer, we do nothing (allow default selection start).
-      // We verify both presence to ensure we are interacting with the PDF text layer.
-      const isTextClick = textLayer && textNode && textLayer.contains(textNode);
-
-      if (!isTextClick) {
+      if (!textLayer) {
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed) {
-          sel.removeAllRanges(); // This triggers 'selectionchange', setting isSelecting to false
+          sel.removeAllRanges();
         }
+        return;
+      }
+
+      if (textLayer !== activeLayer) return;
+
+      const directRange = getCaretRangeFromPoint(e.clientX, e.clientY);
+      const directContainer = directRange?.startContainer;
+      const directElement =
+        directContainer instanceof Element
+          ? directContainer
+          : directContainer?.parentElement;
+      const directInLayer =
+        !!directRange && !!directElement && activeLayer.contains(directElement);
+      const directRect = directRange?.getClientRects()[0];
+      const caretRect =
+        directRect && directRect.width + directRect.height > 0
+          ? directRect
+          : directRange?.getBoundingClientRect();
+      const caretDx = caretRect
+        ? e.clientX < caretRect.left
+          ? caretRect.left - e.clientX
+          : e.clientX > caretRect.right
+            ? e.clientX - caretRect.right
+            : 0
+        : Number.POSITIVE_INFINITY;
+      const caretDy = caretRect
+        ? e.clientY < caretRect.top
+          ? caretRect.top - e.clientY
+          : e.clientY > caretRect.bottom
+            ? e.clientY - caretRect.bottom
+            : 0
+        : Number.POSITIVE_INFINITY;
+      const isNearCaret = caretDx <= 6 && caretDy <= 6;
+      const isTextTarget =
+        !!directTextTarget && activeLayer.contains(directTextTarget);
+      const sel = window.getSelection();
+      if (!sel) return;
+      const directTarget =
+        directInLayer && isNearCaret && isTextTarget
+          ? getTargetFromRange(directRange ?? null, directElement ?? null)
+          : null;
+      const anchorTarget =
+        directTarget ?? getNearestTextTarget(activeLayer, e.clientX, e.clientY);
+      if (anchorTarget) {
+        sel.removeAllRanges();
+        sel.addRange(anchorTarget.range);
+        const lineInfo = getLineInfoForRect(
+          activeLayer,
+          anchorTarget.rect,
+          anchorTarget.span,
+        );
+        manualSelectionRef.current = {
+          anchorNode: anchorTarget.range.startContainer,
+          anchorOffset: anchorTarget.range.startOffset,
+          activeLayer,
+          startX: e.clientX,
+          startY: e.clientY,
+          didDrag: false,
+          anchorRect: anchorTarget.rect,
+          lastFocusRect: anchorTarget.rect,
+          lineSpans: lineInfo.lineSpans,
+          lineBandTop: lineInfo.lineBandTop,
+          lineBandBottom: lineInfo.lineBandBottom,
+          lineLayer: activeLayer,
+        };
+        document.addEventListener("pointermove", handleManualPointerMove, true);
+        document.addEventListener("pointerup", handleManualPointerEnd, true);
+        document.addEventListener(
+          "pointercancel",
+          handleManualPointerEnd,
+          true,
+        );
+        e.preventDefault();
+        return;
+      }
+      if (sel && !sel.isCollapsed) {
+        sel.removeAllRanges(); // This triggers 'selectionchange', setting isSelecting to false
       }
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener(
+        "pointermove",
+        handleManualPointerMove,
+        true,
+      );
+      document.removeEventListener("pointerup", handleManualPointerEnd, true);
+      document.removeEventListener(
+        "pointercancel",
+        handleManualPointerEnd,
+        true,
+      );
+      clearManualSelection();
     };
   }, [isSelectMode]);
 

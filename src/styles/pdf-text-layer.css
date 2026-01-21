@@ -50,11 +50,6 @@
     scale(var(--min-font-size-inv));
 }
 
-.textLayer.selecting :is(span, br) {
-  /* Solve text selection flickering issue https://github.com/mozilla/pdf.js/issues/9168#issuecomment-1952529240 */
-  min-height: calc(80px * var(--total-scale-factor));
-}
-
 .textLayer br::selection {
   background: transparent;
 }
