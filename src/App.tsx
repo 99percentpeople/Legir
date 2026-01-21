@@ -241,12 +241,25 @@ const App: React.FC = () => {
 
             const lastViewState = recentFilesService.getViewState(tauriPath);
             if (lastViewState) {
+              const restoredPageIndex =
+                typeof lastViewState.pageIndex === "number"
+                  ? Math.max(
+                      0,
+                      Math.min(
+                        pages.length - 1,
+                        Math.floor(lastViewState.pageIndex),
+                      ),
+                    )
+                  : null;
               setState({
                 pendingViewStateRestore: {
                   scale: lastViewState.scale,
                   scrollLeft: lastViewState.scrollLeft,
                   scrollTop: lastViewState.scrollTop,
                 },
+                ...(restoredPageIndex !== null
+                  ? { currentPageIndex: restoredPageIndex }
+                  : {}),
               });
             }
           }

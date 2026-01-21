@@ -7,6 +7,7 @@ import type {
   WorkerSuccessResponse,
 } from "@/services/pdfService/workerProtocol";
 import { mapOutline, resolveDest } from "@/services/pdfService/lib/outline";
+import type { RenderParameters } from "pdfjs-dist/types/src/display/api";
 
 const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
 const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
@@ -164,7 +165,7 @@ if (typeof self.document === "undefined") {
     },
     fonts: (self as unknown as { fonts?: unknown }).fonts,
   };
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (self as any).document = fakeOwnerDocument;
 }
 
@@ -716,12 +717,13 @@ const renderToCanvas = async (
 
     const renderContext = {
       canvas: undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       canvasContext: ctx as any, // Type cast for OffscreenCanvasRenderingContext2D compatibility
       viewport: viewport,
       annotationMode: renderAnnotations
         ? pdfjsLib.AnnotationMode.ENABLE
         : pdfjsLib.AnnotationMode.DISABLE,
-    };
+    } satisfies RenderParameters;
 
     throwIfCancelled();
 
@@ -819,9 +821,9 @@ const renderToImage = async (
     const annotationMode = renderAnnotations
       ? pdfjsLib.AnnotationMode.ENABLE
       : pdfjsLib.AnnotationMode.DISABLE;
-
     renderTask = page.render({
       canvas: undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       canvasContext: ctx as any,
       viewport,
       annotationMode,

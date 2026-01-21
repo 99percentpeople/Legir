@@ -109,6 +109,10 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const [translateSourceText, setTranslateSourceText] = useState("");
   const [translateAutoToken, setTranslateAutoToken] = useState(0);
 
+  const handleInitialScrollApplied = useCallback(() => {
+    setState({ pendingViewStateRestore: null });
+  }, [setState]);
+
   const toggleFullscreen = useCallback(() => {
     const next = !state.isFullscreen;
     setState({ isFullscreen: next });
@@ -636,14 +640,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
     if (state.pendingViewStateRestore) {
       const restore = state.pendingViewStateRestore;
       updateScale(restore.scale);
-
-      requestAnimationFrame(() => {
-        const el = workspaceScrollContainerRef.current;
-        if (!el) return;
-        el.scrollLeft = restore.scrollLeft;
-        el.scrollTop = restore.scrollTop;
-        setState({ pendingViewStateRestore: null });
-      });
       return;
     }
 
@@ -1117,6 +1113,15 @@ const EditorPage: React.FC<EditorPageProps> = ({
               onPageIndexChange={(idx) => setState({ currentPageIndex: idx })}
               onToolChange={(tool) => setTool(tool)}
               fitTrigger={state.fitTrigger}
+              initialScrollPosition={
+                state.pendingViewStateRestore
+                  ? {
+                      left: state.pendingViewStateRestore.scrollLeft,
+                      top: state.pendingViewStateRestore.scrollTop,
+                    }
+                  : null
+              }
+              onInitialScrollApplied={handleInitialScrollApplied}
             />
           </Suspense>
           <FloatingBar

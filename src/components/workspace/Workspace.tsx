@@ -29,6 +29,7 @@ import { useWorkspaceTextSelection } from "./hooks/useWorkspaceTextSelection";
 import { useWorkspaceViewport } from "./hooks/useWorkspaceViewport";
 import { useWorkspacePointerCoords } from "./hooks/useWorkspacePointerCoords";
 import { useWorkspaceEraser } from "./hooks/useWorkspaceEraser";
+import { useWorkspaceInitialScroll } from "./hooks/useWorkspaceInitialScroll";
 import {
   useWorkspaceSnapping,
   type SnapLine,
@@ -72,6 +73,8 @@ interface WorkspaceProps {
   onPageIndexChange?: (index: number) => void;
   onToolChange: (tool: Tool) => void;
   fitTrigger?: number;
+  initialScrollPosition?: { left: number; top: number } | null;
+  onInitialScrollApplied?: () => void;
 }
 
 type Rect = {
@@ -95,6 +98,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onPageIndexChange,
   onToolChange,
   fitTrigger,
+  initialScrollPosition,
+  onInitialScrollApplied,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -107,6 +112,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
       { sticky: true },
     );
   }, []);
+
+  useWorkspaceInitialScroll({
+    containerRef,
+    initialScrollPosition,
+    scale: editorState.scale,
+    pagesLength: editorState.pages.length,
+    onInitialScrollApplied,
+  });
 
   const { capture: capturePointer, release: releasePointer } =
     usePointerCapture(containerRef);
@@ -447,6 +460,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     [pageIndexToItemIndex, pageLayoutRects.virtualRects],
   );
 
+  const allowPageIndexChange = !editorState.pendingViewStateRestore;
   const { handleViewportScroll } = useWorkspaceViewport({
     containerRef,
     contentRef,
@@ -454,10 +468,19 @@ const Workspace: React.FC<WorkspaceProps> = ({
     onScaleChange,
     isPanning,
     fitTrigger,
-    onPageIndexChange,
+    onPageIndexChange: allowPageIndexChange ? onPageIndexChange : undefined,
     textSelectionToolbarVisible: textSelectionToolbar.isVisible,
     updateTextSelectionToolbar,
   });
+
+  const wasRestoringRef = useRef(false);
+  useEffect(() => {
+    const isRestoring = !!editorState.pendingViewStateRestore;
+    if (wasRestoringRef.current && !isRestoring) {
+      handleViewportScroll();
+    }
+    wasRestoringRef.current = isRestoring;
+  }, [editorState.pendingViewStateRestore, handleViewportScroll]);
 
   const { getRelativeCoordsFromPoint, getRelativeCoords } =
     useWorkspacePointerCoords({

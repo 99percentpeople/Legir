@@ -3,13 +3,15 @@ import type { PageData, ThumbnailsLayoutMode } from "@/types";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useLanguage } from "../language-provider";
+import { useEditorStore } from "@/store/useEditorStore";
 
-// --- Thumbnail Item ---
 interface ThumbnailItemProps {
   page: PageData;
   pageIndex: number;
   onNavigate: (pageIndex: number) => void;
   isActive?: boolean;
+  scrollBehaviorRef: React.RefObject<ScrollBehavior>;
+  isRestoringViewState: boolean;
 }
 
 const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
@@ -17,15 +19,20 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
   pageIndex,
   onNavigate,
   isActive,
+  scrollBehaviorRef,
+  isRestoringViewState,
 }) => {
   const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isActive && ref.current) {
-      ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!isActive || !ref.current) return;
+    const behavior = scrollBehaviorRef.current;
+    ref.current.scrollIntoView({ behavior, block: "center" });
+    if (behavior === "auto" && !isRestoringViewState) {
+      scrollBehaviorRef.current = "smooth";
     }
-  }, [isActive]);
+  }, [isActive, isRestoringViewState, scrollBehaviorRef]);
 
   const aspectRatio =
     page.width && page.height ? page.width / page.height : 0.75;
@@ -80,6 +87,29 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
   thumbnailsLayout,
 }) => {
   const { t } = useLanguage();
+  const isRestoringViewState = useEditorStore(
+    (state) => !!state.pendingViewStateRestore,
+  );
+  const scrollBehaviorRef = useRef<ScrollBehavior>("auto");
+  const lastDocKeyRef = useRef<string | null>(null);
+
+  const docKey = (() => {
+    if (!pages || pages.length === 0) return "empty";
+    const first = pages[0];
+    const last = pages[pages.length - 1] ?? first;
+    return `${pages.length}:${first.width}:${first.height}:${first.rotation}:${last.width}:${last.height}:${last.rotation}`;
+  })();
+
+  if (docKey !== lastDocKeyRef.current) {
+    lastDocKeyRef.current = docKey;
+    scrollBehaviorRef.current = "auto";
+  }
+
+  useEffect(() => {
+    if (isRestoringViewState) {
+      scrollBehaviorRef.current = "auto";
+    }
+  }, [isRestoringViewState]);
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden">
@@ -97,6 +127,8 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
               pageIndex={idx}
               onNavigate={onNavigate}
               isActive={idx === currentPageIndex}
+              scrollBehaviorRef={scrollBehaviorRef}
+              isRestoringViewState={isRestoringViewState}
             />
           ))}
           {(!pages || pages.length === 0) && (
