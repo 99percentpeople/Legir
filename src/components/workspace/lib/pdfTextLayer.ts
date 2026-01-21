@@ -142,14 +142,9 @@ const setLayerDimensions = (div: HTMLElement, viewport: ViewportLike) => {
   const { pageWidth, pageHeight } = getRawDims(viewport);
   const w = `calc(var(--total-scale-factor) * ${pageWidth}px)`;
   const h = `calc(var(--total-scale-factor) * ${pageHeight}px)`;
-  if (viewport.rotation % 180 === 0) {
-    div.style.width = w;
-    div.style.height = h;
-  } else {
-    div.style.width = h;
-    div.style.height = w;
-  }
-  div.setAttribute("data-main-rotation", String(viewport.rotation));
+  div.style.width = w;
+  div.style.height = h;
+  div.setAttribute("data-main-rotation", String(viewport.rotation ?? 0));
 };
 
 const isMarkedContent = (
