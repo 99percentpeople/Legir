@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import type { PageData } from "@/types";
 import { cn } from "@/lib/cn";
 import { useEditorStore } from "@/store/useEditorStore";
@@ -12,6 +13,7 @@ import { appEventBus } from "@/lib/eventBus";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { buildTextLayer } from "../lib/pdfTextLayer";
+import { useTextLayerSelection } from "../hooks/useTextLayerSelection";
 
 interface PDFTextLayerProps {
   page: PageData;
@@ -70,6 +72,21 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     }),
     [page.viewBox, page.userUnit, page.rotation],
   );
+
+  const {
+    pagePortalEl,
+    isDraggingSelectionHandle,
+    isPointerSelectingText,
+    selectionHandles,
+    startSelectionHandleDrag,
+  } = useTextLayerSelection({
+    pageIndex,
+    textLayerRef,
+    isSelectMode,
+    scale,
+    renderedScale,
+    isInView,
+  });
 
   const setLayerVars = useCallback(
     (el: HTMLElement, scaleFactor: number) => {
@@ -347,9 +364,9 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     };
 
     const getCaretRangeFromPoint = (x: number, y: number) => {
-      if (typeof doc.caretRangeFromPoint === "function") {
+      if (typeof doc.caretRangeFromPoint === "function")
         return doc.caretRangeFromPoint(x, y);
-      }
+
       if (typeof doc.caretPositionFromPoint === "function") {
         const position = doc.caretPositionFromPoint(x, y);
         if (!position) return null;
@@ -611,11 +628,150 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       );
     };
 
-    const handlePointerDown = (e: PointerEvent) => {
+    const selectWordFromRange = (anchorRange: Range, sel: Selection) => {
+      const baseRange = anchorRange.cloneRange();
+      baseRange.collapse(true);
+      const baseNode = baseRange.startContainer;
+      const baseOffset = baseRange.startOffset;
+      const textNode =
+        baseNode.nodeType === Node.TEXT_NODE
+          ? (baseNode as Text)
+          : (baseNode.firstChild as Text | null);
+
+      const text = textNode?.data ?? "";
+      const textLen = text.length;
+      if (!textNode || textLen === 0) return false;
+
+      const idx = Math.max(0, Math.min(textLen - 1, baseOffset));
+      const findWord = () => {
+        if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+          const Seg = Intl.Segmenter;
+          if (typeof Seg === "function") {
+            const seg = new Seg(undefined, { granularity: "word" });
+            for (const part of seg.segment(text)) {
+              const start = part.index;
+              const end = start + part.segment.length;
+              if (idx >= start && idx < end && part.isWordLike) {
+                return { start, end };
+              }
+            }
+          }
+        }
+
+        const isWordChar = (c: string) => /[A-Za-z0-9_]/.test(c);
+        const cur = text[idx] ?? "";
+        if (!cur || !cur.trim()) return null;
+        const isWord = isWordChar(cur);
+        let start = idx;
+        let end = idx + 1;
+        while (start > 0) {
+          const c = text[start - 1] ?? "";
+          if (!c || !c.trim()) break;
+          if (isWord) {
+            if (!isWordChar(c)) break;
+          } else {
+            if (isWordChar(c)) break;
+          }
+          start -= 1;
+        }
+        while (end < textLen) {
+          const c = text[end] ?? "";
+          if (!c || !c.trim()) break;
+          if (isWord) {
+            if (!isWordChar(c)) break;
+          } else {
+            if (isWordChar(c)) break;
+          }
+          end += 1;
+        }
+        return { start, end };
+      };
+
+      const word = findWord();
+      if (!word) return false;
+
+      const wordRange = document.createRange();
+      wordRange.setStart(textNode, word.start);
+      wordRange.setEnd(textNode, word.end);
+      sel.removeAllRanges();
+      sel.addRange(wordRange);
+      return true;
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
       const target = e.target as HTMLElement;
+      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
       const activeLayer = textLayerRef.current;
       if (!activeLayer) return;
+
+      const textLayer = target.closest(".textLayer");
+      const directTextTarget = target.closest("span, br");
+
+      if (!textLayer) {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) {
+          sel.removeAllRanges();
+        }
+        return;
+      }
+
+      if (textLayer !== activeLayer) return;
+
+      const directRange = getCaretRangeFromPoint(e.clientX, e.clientY);
+      const directContainer = directRange?.startContainer;
+      const directElement =
+        directContainer instanceof Element
+          ? directContainer
+          : directContainer?.parentElement;
+      const directInLayer =
+        !!directRange && !!directElement && activeLayer.contains(directElement);
+      const directRect = directRange?.getClientRects()[0];
+      const caretRect =
+        directRect && directRect.width + directRect.height > 0
+          ? directRect
+          : directRange?.getBoundingClientRect();
+      const caretDx = caretRect
+        ? e.clientX < caretRect.left
+          ? caretRect.left - e.clientX
+          : e.clientX > caretRect.right
+            ? e.clientX - caretRect.right
+            : 0
+        : Number.POSITIVE_INFINITY;
+      const caretDy = caretRect
+        ? e.clientY < caretRect.top
+          ? caretRect.top - e.clientY
+          : e.clientY > caretRect.bottom
+            ? e.clientY - caretRect.bottom
+            : 0
+        : Number.POSITIVE_INFINITY;
+      const isNearCaret = caretDx <= 6 && caretDy <= 6;
+      const isTextTarget =
+        !!directTextTarget && activeLayer.contains(directTextTarget);
+      const sel = window.getSelection();
+      if (!sel) return;
+      const directTarget =
+        directInLayer && isNearCaret && isTextTarget
+          ? getTargetFromRange(directRange ?? null, directElement ?? null)
+          : null;
+      const anchorTarget =
+        directTarget ?? getNearestTextTarget(activeLayer, e.clientX, e.clientY);
+      if (anchorTarget && e.detail === 2) {
+        if (selectWordFromRange(anchorTarget.range, sel)) {
+          e.preventDefault();
+          return;
+        }
+      }
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      if (e.pointerType === "mouse") return;
+      const target = e.target as HTMLElement;
+      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
+      const activeLayer = textLayerRef.current;
+      if (!activeLayer) return;
+      const isTouchPointer = e.pointerType === "touch";
 
       // Determine if we clicked on text.
       // We look for 'span' or 'br' which are the text containers in PDF.js text layer.
@@ -631,6 +787,8 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       }
 
       if (textLayer !== activeLayer) return;
+
+      if (isTouchPointer) return;
 
       const directRange = getCaretRangeFromPoint(e.clientX, e.clientY);
       const directContainer = directRange?.startContainer;
@@ -707,8 +865,10 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       }
     };
 
+    document.addEventListener("mousedown", handleMouseDown);
     document.addEventListener("pointerdown", handlePointerDown);
     return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener(
         "pointermove",
@@ -811,34 +971,88 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   const shouldHideByVisibility = !isInView && isSelecting;
 
   return (
-    <div
-      ref={textLayerRef}
-      className={cn(
-        "textLayer",
-        isHighlighting && "highlighting",
-        isSelecting && "selecting", // Helps CSS hide native selection background if needed
-        isRendering && "textLayer-rendering",
-        pdfTextLayerDebug && "textLayer-debug",
-      )}
-      tabIndex={0}
-      data-main-rotation={page.rotation ?? 0}
-      data-selectable={isSelectMode}
-      style={{
-        display: shouldDisplay ? "block" : "none",
-        visibility: shouldHideByVisibility ? "hidden" : "visible",
-        pointerEvents: shouldHideByVisibility ? "none" : undefined,
-        cursor,
-        "--scale-factor": String(renderedScale ?? scale),
-        "--user-unit": String(userUnit),
-        ...(textLayerSmoothScale && {
-          "--ff-smooth-scale": textLayerSmoothScale,
-        }),
-        ...(isHighlighting && {
-          "--highlight-color": highlightColor,
-          "--highlight-opacity": highlightOpacity,
-        }),
-      }}
-    />
+    <>
+      <div
+        ref={textLayerRef}
+        className={cn(
+          "textLayer",
+          isHighlighting && "highlighting",
+          isSelecting && "selecting", // Helps CSS hide native selection background if needed
+          isRendering && "textLayer-rendering",
+          pdfTextLayerDebug && "textLayer-debug",
+        )}
+        tabIndex={0}
+        data-main-rotation={page.rotation ?? 0}
+        data-selectable={isSelectMode}
+        style={{
+          display: shouldDisplay ? "block" : "none",
+          visibility: shouldHideByVisibility ? "hidden" : "visible",
+          pointerEvents: shouldHideByVisibility ? "none" : undefined,
+          cursor,
+          "--scale-factor": String(renderedScale ?? scale),
+          "--user-unit": String(userUnit),
+          ...(textLayerSmoothScale && {
+            "--ff-smooth-scale": textLayerSmoothScale,
+          }),
+          ...(isHighlighting && {
+            "--highlight-color": highlightColor,
+            "--highlight-opacity": highlightOpacity,
+          }),
+        }}
+      />
+      {pagePortalEl &&
+        isSelectMode &&
+        (isDraggingSelectionHandle ||
+          selectionHandles.start ||
+          selectionHandles.end) &&
+        createPortal(
+          <div
+            className="ff-text-selection-handles-layer"
+            data-ff-handle-dragging={
+              isDraggingSelectionHandle ? "1" : undefined
+            }
+            data-ff-pointer-selecting={isPointerSelectingText ? "1" : undefined}
+          >
+            {selectionHandles.start && (
+              <div
+                data-handle-kind="start"
+                className="ff-text-selection-handle"
+                style={{
+                  left: selectionHandles.start.left,
+                  top: selectionHandles.start.top,
+                  height: selectionHandles.start.height,
+                }}
+              >
+                <div className="ff-text-selection-handle__stem" />
+                <div
+                  data-ff-selection-handle="1"
+                  className="ff-text-selection-handle__dot"
+                  onPointerDown={(e) => startSelectionHandleDrag("start", e)}
+                />
+              </div>
+            )}
+            {selectionHandles.end && (
+              <div
+                data-handle-kind="end"
+                className="ff-text-selection-handle"
+                style={{
+                  left: selectionHandles.end.left,
+                  top: selectionHandles.end.top,
+                  height: selectionHandles.end.height,
+                }}
+              >
+                <div className="ff-text-selection-handle__stem" />
+                <div
+                  data-ff-selection-handle="1"
+                  className="ff-text-selection-handle__dot"
+                  onPointerDown={(e) => startSelectionHandleDrag("end", e)}
+                />
+              </div>
+            )}
+          </div>,
+          pagePortalEl,
+        )}
+    </>
   );
 };
 

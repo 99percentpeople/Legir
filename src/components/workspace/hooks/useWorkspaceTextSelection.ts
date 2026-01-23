@@ -194,15 +194,45 @@ export const useWorkspaceTextSelection = (opts: {
     });
   });
 
-  const textSelectionVirtualRef = useRef<any>({
+  const textSelectionVirtualRef = useRef<{
+    getBoundingClientRect: () => DOMRect;
+    contextElement: Element | null;
+  }>({
     getBoundingClientRect: () => new DOMRect(),
     contextElement: document.body,
   });
 
   const isTextSelectingRef = useRef(false);
+  const isHandleDraggingRef = useRef(false);
+  const preferredHandleKindRef = useRef<"start" | "end" | null>(null);
+
+  useAppEvent(
+    "workspace:textSelectionHandleDraggingChange",
+    ({ dragging, handleKind }) => {
+      isHandleDraggingRef.current = dragging;
+      if (handleKind) preferredHandleKindRef.current = handleKind;
+      if (dragging) {
+        setTextSelectionToolbar((prev) =>
+          prev.isVisible ? { ...prev, isVisible: false } : prev,
+        );
+      } else {
+        requestAnimationFrame(() => {
+          updateTextSelectionToolbar();
+        });
+      }
+    },
+    { replayLast: true },
+  );
 
   const updateTextSelectionToolbar = useCallback(() => {
     if (editorState.tool !== "select" || editorState.mode !== "annotation") {
+      setTextSelectionToolbar((prev) =>
+        prev.isVisible ? { ...prev, isVisible: false } : prev,
+      );
+      return;
+    }
+
+    if (isHandleDraggingRef.current) {
       setTextSelectionToolbar((prev) =>
         prev.isVisible ? { ...prev, isVisible: false } : prev,
       );
@@ -251,8 +281,59 @@ export const useWorkspaceTextSelection = (opts: {
     }
 
     const clientRects = Array.from(range.getClientRects()).filter(
-      (r) => r.width >= 2 && r.height >= 2,
+      (r) => r.width >= 1 && r.height >= 2,
     );
+
+    const lineRects = (() => {
+      if (clientRects.length === 0) return [] as DOMRect[];
+      const sorted = [...clientRects].sort((a, b) =>
+        Math.abs(a.top - b.top) < 2 ? a.left - b.left : a.top - b.top,
+      );
+
+      const lines: Array<{
+        left: number;
+        right: number;
+        top: number;
+        bottom: number;
+        height: number;
+      }> = [];
+
+      for (const r of sorted) {
+        const last = lines[lines.length - 1];
+        const midY = r.top + r.height / 2;
+        const isSameLine =
+          !!last &&
+          midY >= last.top - last.height * 0.6 &&
+          midY <= last.bottom + last.height * 0.6;
+
+        if (!last || !isSameLine) {
+          lines.push({
+            left: r.left,
+            right: r.right,
+            top: r.top,
+            bottom: r.bottom,
+            height: r.height,
+          });
+          continue;
+        }
+
+        last.left = Math.min(last.left, r.left);
+        last.right = Math.max(last.right, r.right);
+        last.top = Math.min(last.top, r.top);
+        last.bottom = Math.max(last.bottom, r.bottom);
+        last.height = Math.max(last.height, r.height, last.bottom - last.top);
+      }
+
+      return lines.map(
+        (l) =>
+          new DOMRect(
+            l.left,
+            l.top,
+            Math.max(1, l.right - l.left),
+            l.bottom - l.top,
+          ),
+      );
+    })();
     const isBackward = (() => {
       const anchorNode = sel.anchorNode;
       const focusNode = sel.focusNode;
@@ -266,13 +347,19 @@ export const useWorkspaceTextSelection = (opts: {
       return a.compareBoundaryPoints(Range.START_TO_START, f) === 1;
     })();
 
-    const rect =
-      (clientRects.length > 0
-        ? isBackward
-          ? clientRects[0]
-          : clientRects[clientRects.length - 1]
-        : null) ?? range.getBoundingClientRect();
-    if (!rect || rect.width < 2 || rect.height < 2) {
+    const preferred = preferredHandleKindRef.current;
+    const lineIndex =
+      preferred === "start"
+        ? 0
+        : preferred === "end"
+          ? lineRects.length - 1
+          : isBackward
+            ? 0
+            : lineRects.length - 1;
+
+    const rect = lineRects[lineIndex] ?? range.getBoundingClientRect();
+
+    if (!rect || rect.height < 2) {
       setTextSelectionToolbar((prev) =>
         prev.isVisible ? { ...prev, isVisible: false } : prev,
       );
@@ -332,6 +419,7 @@ export const useWorkspaceTextSelection = (opts: {
       const target = e.target as HTMLElement | null;
       if (target?.closest?.(".textLayer")) {
         isTextSelectingRef.current = true;
+        preferredHandleKindRef.current = null;
         setTextSelectionToolbar((prev) =>
           prev.isVisible ? { ...prev, isVisible: false } : prev,
         );

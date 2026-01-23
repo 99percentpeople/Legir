@@ -59,6 +59,10 @@ export type AppEventMap = {
     pageIndex: number;
     isSelecting: boolean;
   };
+  "workspace:textSelectionHandleDraggingChange": {
+    dragging: boolean;
+    handleKind?: "start" | "end";
+  };
   "workspace:navigatePage": {
     pageIndex: number;
     behavior?: "auto" | "smooth";
