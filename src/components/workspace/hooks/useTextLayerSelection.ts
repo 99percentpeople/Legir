@@ -20,6 +20,21 @@ export type TextSelectionHandlesState = {
   end: TextSelectionHandleRect | null;
 };
 
+type ManualSelectionState = {
+  anchorNode: Node;
+  anchorOffset: number;
+  activeLayer: HTMLDivElement;
+  startX: number;
+  startY: number;
+  didDrag: boolean;
+  anchorRect: DOMRect | null;
+  lastFocusRect: DOMRect | null;
+  lineSpans: HTMLSpanElement[];
+  lineBandTop: number;
+  lineBandBottom: number;
+  lineLayer: HTMLDivElement | null;
+};
+
 export const useTextLayerSelection = (opts: {
   pageIndex: number;
   textLayerRef: RefObject<HTMLDivElement>;
@@ -44,6 +59,7 @@ export const useTextLayerSelection = (opts: {
     fixedOffset: number;
     activeHandleKind: "start" | "end";
   } | null>(null);
+  const manualSelectionRef = useRef<ManualSelectionState | null>(null);
   const [isDraggingSelectionHandle, setIsDraggingSelectionHandle] =
     useState(false);
   const isPointerSelectingTextRef = useRef(false);
@@ -134,8 +150,13 @@ export const useTextLayerSelection = (opts: {
   );
 
   const getNearestTextTarget = useCallback(
-    (layer: HTMLDivElement, x: number, y: number) => {
-      const nearest = findNearestTextSpan(layer, x, y);
+    (
+      layer: HTMLDivElement,
+      x: number,
+      y: number,
+      candidates?: HTMLSpanElement[],
+    ) => {
+      const nearest = findNearestTextSpan(layer, x, y, candidates);
       if (!nearest) return null;
       const { span, rect } = nearest;
       const clampedX = Math.min(Math.max(x, rect.left + 1), rect.right - 1);
@@ -315,6 +336,485 @@ export const useTextLayerSelection = (opts: {
       document.removeEventListener("pointercancel", onPointerEnd, true);
     };
   }, [isSelectMode, textLayerRef]);
+
+  useEffect(() => {
+    if (!isSelectMode) {
+      manualSelectionRef.current = null;
+      return;
+    }
+    if (typeof document === "undefined") return;
+
+    const getLineInfoForRect = (
+      layer: HTMLDivElement,
+      anchorRect: DOMRect,
+      anchorSpan?: HTMLSpanElement,
+    ) => {
+      const spans = Array.from(
+        layer.querySelectorAll<HTMLSpanElement>("span[role='presentation']"),
+      );
+      const lineSpans: HTMLSpanElement[] = [];
+      let bandTop = anchorRect.top;
+      let bandBottom = anchorRect.bottom;
+      const anchorCenter = anchorRect.top + anchorRect.height / 2;
+      const maxCenterDiff = Math.max(2, anchorRect.height * 0.6);
+
+      spans.forEach((span) => {
+        if (!span.textContent) return;
+        const rect = span.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        const overlap =
+          Math.min(rect.bottom, anchorRect.bottom) -
+          Math.max(rect.top, anchorRect.top);
+        const minHeight = Math.min(rect.height, anchorRect.height);
+        const centerDiff =
+          Math.abs(rect.top + rect.height / 2 - anchorCenter) ??
+          Number.POSITIVE_INFINITY;
+        const isSameLine =
+          overlap >= Math.max(1, minHeight * 0.3) ||
+          centerDiff <= maxCenterDiff;
+        if (!isSameLine) return;
+        lineSpans.push(span);
+        bandTop = Math.min(bandTop, rect.top);
+        bandBottom = Math.max(bandBottom, rect.bottom);
+      });
+
+      if (lineSpans.length === 0 && anchorSpan) {
+        lineSpans.push(anchorSpan);
+      }
+
+      return {
+        lineSpans,
+        lineBandTop: bandTop,
+        lineBandBottom: bandBottom,
+      };
+    };
+
+    const getTargetFromRange = (
+      range: Range | null,
+      element: Element | null,
+    ) => {
+      if (!range || !element) return null;
+      const span = element.closest("span[role='presentation']");
+      if (!(span instanceof HTMLSpanElement)) return null;
+      const rect = span.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return null;
+      const collapsed = range.cloneRange();
+      collapsed.collapse(true);
+      return { range: collapsed, rect, span };
+    };
+
+    const clearManualSelection = () => {
+      manualSelectionRef.current = null;
+    };
+
+    const handleManualPointerMove = (e: PointerEvent) => {
+      const state = manualSelectionRef.current;
+      if (!state) return;
+      const sel = window.getSelection();
+      if (!sel) return;
+      const dx = Math.abs(e.clientX - state.startX);
+      const dy = Math.abs(e.clientY - state.startY);
+      if (dx > 2 || dy > 2) {
+        state.didDrag = true;
+      }
+
+      const focusLayer =
+        getTextLayerFromPoint(e.clientX, e.clientY) ??
+        state.lineLayer ??
+        state.activeLayer;
+      const useLineBand = state.lineLayer === focusLayer;
+      const lineRect = useLineBand
+        ? (state.lastFocusRect ?? state.anchorRect)
+        : null;
+      const linePad = lineRect ? Math.max(8, lineRect.height * 0.8) : 10;
+      const bandTop = state.lineBandTop;
+      const bandBottom = state.lineBandBottom;
+      const isInLineBand =
+        useLineBand &&
+        e.clientY >= bandTop - linePad &&
+        e.clientY <= bandBottom + linePad;
+      const distanceToBand =
+        e.clientY < bandTop
+          ? bandTop - e.clientY
+          : e.clientY > bandBottom
+            ? e.clientY - bandBottom
+            : 0;
+      const lineTarget =
+        useLineBand && state.lineSpans.length
+          ? getNearestTextTarget(
+              focusLayer,
+              e.clientX,
+              e.clientY,
+              state.lineSpans,
+            )
+          : null;
+      const globalTarget = getNearestTextTarget(
+        focusLayer,
+        e.clientX,
+        e.clientY,
+      );
+      let focusTarget = globalTarget ?? lineTarget;
+
+      if (isInLineBand && lineTarget) {
+        focusTarget = lineTarget;
+      } else if (!isInLineBand && lineTarget && globalTarget) {
+        const distanceToTarget =
+          e.clientY < globalTarget.rect.top
+            ? globalTarget.rect.top - e.clientY
+            : e.clientY > globalTarget.rect.bottom
+              ? e.clientY - globalTarget.rect.bottom
+              : 0;
+        if (distanceToBand <= distanceToTarget) {
+          focusTarget = lineTarget;
+        }
+      }
+
+      if (!focusTarget) return;
+      if (focusTarget === globalTarget && !isInLineBand) {
+        const lineInfo = getLineInfoForRect(
+          focusLayer,
+          focusTarget.rect,
+          focusTarget.span,
+        );
+        if (lineInfo.lineSpans.length > 0) {
+          state.lineSpans = lineInfo.lineSpans;
+          state.lineBandTop = lineInfo.lineBandTop;
+          state.lineBandBottom = lineInfo.lineBandBottom;
+          state.lineLayer = focusLayer;
+        }
+      }
+      state.lastFocusRect = focusTarget.rect;
+      const focusRange = focusTarget.range;
+
+      if (typeof sel.setBaseAndExtent === "function") {
+        sel.setBaseAndExtent(
+          state.anchorNode,
+          state.anchorOffset,
+          focusRange.startContainer,
+          focusRange.startOffset,
+        );
+      } else {
+        const range = document.createRange();
+        range.setStart(state.anchorNode, state.anchorOffset);
+        range.setEnd(focusRange.startContainer, focusRange.startOffset);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    };
+
+    const handleManualPointerEnd = () => {
+      const state = manualSelectionRef.current;
+      const sel = window.getSelection();
+      if (state && !state.didDrag && sel?.isCollapsed) {
+        // Only clear a collapsed anchor selection (no drag). Avoid wiping
+        // word/phrase selections created by double-click or programmatic ranges.
+        sel.removeAllRanges();
+      }
+      clearManualSelection();
+      document.removeEventListener(
+        "pointermove",
+        handleManualPointerMove,
+        true,
+      );
+      document.removeEventListener("pointerup", handleManualPointerEnd, true);
+      document.removeEventListener(
+        "pointercancel",
+        handleManualPointerEnd,
+        true,
+      );
+    };
+
+    const startManualSelection = (
+      anchorTarget: { range: Range; rect: DOMRect; span: HTMLSpanElement },
+      activeLayer: HTMLDivElement,
+      startX: number,
+      startY: number,
+      sel: Selection,
+    ) => {
+      // Manual anchor keeps whitespace drags locked to the intended line, instead
+      // of letting the browser jump the selection to a later text run.
+      sel.removeAllRanges();
+      sel.addRange(anchorTarget.range);
+      const lineInfo = getLineInfoForRect(
+        activeLayer,
+        anchorTarget.rect,
+        anchorTarget.span,
+      );
+      manualSelectionRef.current = {
+        anchorNode: anchorTarget.range.startContainer,
+        anchorOffset: anchorTarget.range.startOffset,
+        activeLayer,
+        startX,
+        startY,
+        didDrag: false,
+        anchorRect: anchorTarget.rect,
+        lastFocusRect: anchorTarget.rect,
+        lineSpans: lineInfo.lineSpans,
+        lineBandTop: lineInfo.lineBandTop,
+        lineBandBottom: lineInfo.lineBandBottom,
+        lineLayer: activeLayer,
+      };
+      document.addEventListener("pointermove", handleManualPointerMove, true);
+      document.addEventListener("pointerup", handleManualPointerEnd, true);
+      document.addEventListener("pointercancel", handleManualPointerEnd, true);
+    };
+
+    const selectWordFromRange = (anchorRange: Range, sel: Selection) => {
+      const baseRange = anchorRange.cloneRange();
+      baseRange.collapse(true);
+      const baseNode = baseRange.startContainer;
+      const baseOffset = baseRange.startOffset;
+      const textNode =
+        baseNode.nodeType === Node.TEXT_NODE
+          ? (baseNode as Text)
+          : (baseNode.firstChild as Text | null);
+
+      const text = textNode?.data ?? "";
+      const textLen = text.length;
+      if (!textNode || textLen === 0) return false;
+
+      const idx = Math.max(0, Math.min(textLen - 1, baseOffset));
+      const findWord = () => {
+        if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+          const Seg = Intl.Segmenter;
+          if (typeof Seg === "function") {
+            const seg = new Seg(undefined, { granularity: "word" });
+            for (const part of seg.segment(text)) {
+              const start = part.index;
+              const end = start + part.segment.length;
+              if (idx >= start && idx < end && part.isWordLike) {
+                return { start, end };
+              }
+            }
+          }
+        }
+
+        const isWordChar = (c: string) => /[A-Za-z0-9_]/.test(c);
+        const cur = text[idx] ?? "";
+        if (!cur || !cur.trim()) return null;
+        const isWord = isWordChar(cur);
+        let start = idx;
+        let end = idx + 1;
+        while (start > 0) {
+          const c = text[start - 1] ?? "";
+          if (!c || !c.trim()) break;
+          if (isWord) {
+            if (!isWordChar(c)) break;
+          } else {
+            if (isWordChar(c)) break;
+          }
+          start -= 1;
+        }
+        while (end < textLen) {
+          const c = text[end] ?? "";
+          if (!c || !c.trim()) break;
+          if (isWord) {
+            if (!isWordChar(c)) break;
+          } else {
+            if (isWordChar(c)) break;
+          }
+          end += 1;
+        }
+        return { start, end };
+      };
+
+      const word = findWord();
+      if (!word) return false;
+
+      const wordRange = document.createRange();
+      wordRange.setStart(textNode, word.start);
+      wordRange.setEnd(textNode, word.end);
+      sel.removeAllRanges();
+      sel.addRange(wordRange);
+      return true;
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
+      const activeLayer = textLayerRef.current;
+      if (!activeLayer) return;
+
+      const textLayer = target.closest(".textLayer");
+      const directTextTarget = target.closest("span, br");
+
+      if (!textLayer) {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) {
+          sel.removeAllRanges();
+        }
+        return;
+      }
+
+      if (textLayer !== activeLayer) return;
+
+      const directRange = getCaretRangeFromPoint(e.clientX, e.clientY);
+      const directContainer = directRange?.startContainer;
+      const directElement =
+        directContainer instanceof Element
+          ? directContainer
+          : directContainer?.parentElement;
+      const directInLayer =
+        !!directRange && !!directElement && activeLayer.contains(directElement);
+      const directRect = directRange?.getClientRects()[0];
+      const caretRect =
+        directRect && directRect.width + directRect.height > 0
+          ? directRect
+          : directRange?.getBoundingClientRect();
+      const caretDx = caretRect
+        ? e.clientX < caretRect.left
+          ? caretRect.left - e.clientX
+          : e.clientX > caretRect.right
+            ? e.clientX - caretRect.right
+            : 0
+        : Number.POSITIVE_INFINITY;
+      const caretDy = caretRect
+        ? e.clientY < caretRect.top
+          ? caretRect.top - e.clientY
+          : e.clientY > caretRect.bottom
+            ? e.clientY - caretRect.bottom
+            : 0
+        : Number.POSITIVE_INFINITY;
+      const isNearCaret = caretDx <= 6 && caretDy <= 6;
+      const isTextTarget =
+        !!directTextTarget && activeLayer.contains(directTextTarget);
+      const sel = window.getSelection();
+      if (!sel) return;
+      const directTarget =
+        directInLayer && isNearCaret && isTextTarget
+          ? getTargetFromRange(directRange ?? null, directElement ?? null)
+          : null;
+      const anchorTarget =
+        directTarget ?? getNearestTextTarget(activeLayer, e.clientX, e.clientY);
+      if (anchorTarget && e.detail === 2) {
+        if (selectWordFromRange(anchorTarget.range, sel)) {
+          e.preventDefault();
+          return;
+        }
+      }
+      if (e.detail > 1) return;
+      if (anchorTarget) {
+        startManualSelection(
+          anchorTarget,
+          activeLayer,
+          e.clientX,
+          e.clientY,
+          sel,
+        );
+        e.preventDefault();
+      }
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      if (e.pointerType === "mouse") {
+        // Mouse click counts are only reliable on mousedown (e.detail).
+        // Keep pointerdown for pen/other pointers to avoid breaking double-click.
+        return;
+      }
+      const target = e.target as HTMLElement;
+      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
+      const activeLayer = textLayerRef.current;
+      if (!activeLayer) return;
+      const isTouchPointer = e.pointerType === "touch";
+
+      const textLayer = target.closest(".textLayer");
+      const directTextTarget = target.closest("span, br");
+
+      if (!textLayer) {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) {
+          sel.removeAllRanges();
+        }
+        return;
+      }
+
+      if (textLayer !== activeLayer) return;
+
+      if (isTouchPointer) return;
+
+      const directRange = getCaretRangeFromPoint(e.clientX, e.clientY);
+      const directContainer = directRange?.startContainer;
+      const directElement =
+        directContainer instanceof Element
+          ? directContainer
+          : directContainer?.parentElement;
+      const directInLayer =
+        !!directRange && !!directElement && activeLayer.contains(directElement);
+      const directRect = directRange?.getClientRects()[0];
+      const caretRect =
+        directRect && directRect.width + directRect.height > 0
+          ? directRect
+          : directRange?.getBoundingClientRect();
+      const caretDx = caretRect
+        ? e.clientX < caretRect.left
+          ? caretRect.left - e.clientX
+          : e.clientX > caretRect.right
+            ? e.clientX - caretRect.right
+            : 0
+        : Number.POSITIVE_INFINITY;
+      const caretDy = caretRect
+        ? e.clientY < caretRect.top
+          ? caretRect.top - e.clientY
+          : e.clientY > caretRect.bottom
+            ? e.clientY - caretRect.bottom
+            : 0
+        : Number.POSITIVE_INFINITY;
+      const isNearCaret = caretDx <= 6 && caretDy <= 6;
+      const isTextTarget =
+        !!directTextTarget && activeLayer.contains(directTextTarget);
+      const sel = window.getSelection();
+      if (!sel) return;
+      const directTarget =
+        directInLayer && isNearCaret && isTextTarget
+          ? getTargetFromRange(directRange ?? null, directElement ?? null)
+          : null;
+      // Always establish a deterministic anchor, even from whitespace, so the
+      // drag selection doesn't jump to a later text run chosen by the browser.
+      const anchorTarget =
+        directTarget ?? getNearestTextTarget(activeLayer, e.clientX, e.clientY);
+      if (anchorTarget) {
+        startManualSelection(
+          anchorTarget,
+          activeLayer,
+          e.clientX,
+          e.clientY,
+          sel,
+        );
+        e.preventDefault();
+        return;
+      }
+      if (sel && !sel.isCollapsed) {
+        sel.removeAllRanges();
+      }
+    };
+
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener(
+        "pointermove",
+        handleManualPointerMove,
+        true,
+      );
+      document.removeEventListener("pointerup", handleManualPointerEnd, true);
+      document.removeEventListener(
+        "pointercancel",
+        handleManualPointerEnd,
+        true,
+      );
+      clearManualSelection();
+    };
+  }, [
+    getCaretRangeFromPoint,
+    getNearestTextTarget,
+    getTextLayerFromPoint,
+    isSelectMode,
+    textLayerRef,
+  ]);
 
   const startSelectionHandleDrag = useCallback(
     (kind: "start" | "end", e: ReactPointerEvent) => {

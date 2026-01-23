@@ -280,9 +280,19 @@ export const useWorkspaceTextSelection = (opts: {
       return;
     }
 
-    const clientRects = Array.from(range.getClientRects()).filter(
+    const rawClientRects = Array.from(range.getClientRects()).filter(
       (r) => r.width >= 1 && r.height >= 2,
     );
+    const clientRects = (() => {
+      if (rawClientRects.length <= 1) return rawClientRects;
+      const heights = [...rawClientRects]
+        .map((r) => r.height)
+        .sort((a, b) => a - b);
+      const median = heights[Math.floor(heights.length / 2)] ?? 0;
+      const maxHeight = Math.max(8, median * 3);
+      const filtered = rawClientRects.filter((r) => r.height <= maxHeight);
+      return filtered.length ? filtered : rawClientRects;
+    })();
 
     const lineRects = (() => {
       if (clientRects.length === 0) return [] as DOMRect[];
@@ -357,7 +367,56 @@ export const useWorkspaceTextSelection = (opts: {
             ? 0
             : lineRects.length - 1;
 
-    const rect = lineRects[lineIndex] ?? range.getBoundingClientRect();
+    const getCaretRect = (node: Node, offset: number) => {
+      try {
+        const r = document.createRange();
+        r.setStart(node, offset);
+        r.collapse(true);
+        const caretRect = r.getClientRects()[0] ?? r.getBoundingClientRect();
+        if (caretRect && caretRect.height > 0) return caretRect;
+      } catch {}
+
+      const el = node instanceof Element ? node : node.parentElement;
+      const span = el?.closest?.("span[role='presentation']") as
+        | HTMLSpanElement
+        | null
+        | undefined;
+      if (!span) return null;
+      const rect = span.getBoundingClientRect();
+      if (rect.width + rect.height === 0) return null;
+      return rect;
+    };
+
+    const preferStart = preferred === "start" || (!preferred && isBackward);
+    const caretNode = preferStart ? range.startContainer : range.endContainer;
+    const caretOffset = preferStart ? range.startOffset : range.endOffset;
+    const isEndOfContentNode = (node: Node) => {
+      const el = node instanceof Element ? node : node.parentElement;
+      return !!el?.closest?.(".endOfContent");
+    };
+    const caretRect = isEndOfContentNode(caretNode)
+      ? null
+      : getCaretRect(caretNode, caretOffset);
+
+    const lineRectForCaret = caretRect
+      ? lineRects.reduce<DOMRect | null>((closest, candidate) => {
+          if (!candidate || candidate.height <= 0) return closest;
+          const caretCenter = caretRect.top + caretRect.height / 2;
+          const candidateCenter = candidate.top + candidate.height / 2;
+          const distance = Math.abs(candidateCenter - caretCenter);
+          if (!closest) return candidate;
+          const closestCenter = closest.top + closest.height / 2;
+          return distance < Math.abs(closestCenter - caretCenter)
+            ? candidate
+            : closest;
+        }, null)
+      : null;
+
+    const rect =
+      lineRectForCaret ??
+      lineRects[lineIndex] ??
+      caretRect ??
+      range.getBoundingClientRect();
 
     if (!rect || rect.height < 2) {
       setTextSelectionToolbar((prev) =>
