@@ -197,6 +197,11 @@
   pointer-events: none;
 }
 
+.ff-text-selection-handles-layer[data-ff-pointer-dragging="1"]
+  .ff-text-selection-handle__dot {
+  pointer-events: none;
+}
+
 .hiddenCanvasElement {
   position: absolute;
   top: 0;

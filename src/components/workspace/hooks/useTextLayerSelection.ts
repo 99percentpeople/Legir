@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { appEventBus } from "@/lib/eventBus";
+import { resetGlobalCursor, setGlobalCursor } from "@/lib/cursor";
 
 export type TextSelectionHandleRect = {
   left: number;
@@ -49,6 +50,14 @@ export const useTextLayerSelection = (opts: {
   const [isPointerSelectingText, setIsPointerSelectingText] = useState(false);
   const [selectionHandles, setSelectionHandles] =
     useState<TextSelectionHandlesState>({ start: null, end: null });
+
+  useEffect(() => {
+    if (!isDraggingSelectionHandle) return;
+    setGlobalCursor("grabbing", "text-selection-handle-drag");
+    return () => {
+      resetGlobalCursor("text-selection-handle-drag");
+    };
+  }, [isDraggingSelectionHandle]);
 
   useEffect(() => {
     setPagePortalEl(
