@@ -53,14 +53,55 @@ export type TranslateTextOptions = LLMTranslateTextOptions<GeminiModelId>;
 
 export type TranslateTextStreamOptions = TranslateTextOptions;
 
-const extractGeminiText = (value: any): string => {
-  if (!value) return "";
-  if (typeof value.text === "string") return value.text;
+export type GeminiPageTranslateBlock = {
+  id: string;
+  order: number;
+  text: string;
+  rect: { x: number; y: number; width: number; height: number };
+  fontSize: number;
+  fontFamily: string;
+};
 
-  const parts = value?.candidates?.[0]?.content?.parts;
+export type GeminiPageTranslateResponse = {
+  translations: Array<{
+    id: string;
+    action: "translate" | "skip";
+    translatedText?: string | null;
+  }>;
+};
+
+const extractGeminiText = (value: unknown): string => {
+  if (!value) return "";
+
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "text" in value &&
+    typeof (value as { text?: unknown }).text === "string"
+  ) {
+    return (value as { text: string }).text;
+  }
+
+  const parts = (() => {
+    if (typeof value !== "object" || value === null) return undefined;
+
+    const candidates = (value as { candidates?: unknown }).candidates;
+    if (!Array.isArray(candidates)) return undefined;
+    const first = candidates[0];
+    if (typeof first !== "object" || first === null) return undefined;
+    const content = (first as { content?: unknown }).content;
+    if (typeof content !== "object" || content === null) return undefined;
+    return (content as { parts?: unknown }).parts;
+  })();
   if (Array.isArray(parts)) {
     return parts
-      .map((p: any) => (typeof p?.text === "string" ? p.text : ""))
+      .map((p: unknown) => {
+        if (typeof p === "object" && p !== null && "text" in p) {
+          const t = (p as { text?: unknown }).text;
+          return typeof t === "string" ? t : "";
+        }
+        return "";
+      })
       .join("");
   }
 
@@ -110,9 +151,118 @@ Task:
 - Keep formatting (line breaks) where appropriate.
 - Output ONLY the translated text. No explanations.
 
+${opts.prompt ? `Additional instructions:\n${opts.prompt}\n` : ""}
+
 Text:
 ${text}
 `.trim();
+};
+
+export const translatePageBlocksStructured = async (options: {
+  blocks: GeminiPageTranslateBlock[];
+  context?: Array<{ pageIndex: number; text: string }>;
+  targetLanguage: string;
+  sourceLanguage?: string;
+  model?: GeminiModelId;
+  prompt?: string;
+  usePositionAwarePrompt?: boolean;
+  signal?: AbortSignal;
+}): Promise<GeminiPageTranslateResponse> => {
+  const model = getGeminiModelId(options.model);
+
+  const extra = (options.prompt || "").trim();
+  const positionAware = options.usePositionAwarePrompt
+    ? "\n- Consider each block's rect and fontSize. Prefer shorter translations that fit the region. Avoid adding extra line breaks."
+    : "";
+
+  const prompt = `
+You are a professional translator.
+
+Task:
+- Translate the target page blocks to ${options.targetLanguage}.
+- You may SKIP blocks that are not meaningful to translate (e.g. pure symbols, page numbers).
+- Preserve meaning.
+- Preserve existing line breaks within each block. Do NOT add extra line breaks.
+- Output MUST be valid JSON that matches the schema. No markdown.
+${positionAware}
+
+${extra ? `Additional instructions:\n${extra}\n` : ""}
+
+Input JSON:
+${JSON.stringify(
+  {
+    target: {
+      blocks: options.blocks,
+    },
+    context: options.context ?? [],
+  },
+  null,
+  2,
+)}
+`.trim();
+
+  const response = await client.generateContent({
+    model,
+    contents: {
+      parts: [{ text: prompt }],
+    },
+    config: {
+      ...buildGeminiConfig(model, { signal: options.signal }),
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          translations: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                action: { type: Type.STRING, enum: ["translate", "skip"] },
+                translatedText: { type: Type.STRING, nullable: true },
+              },
+              required: ["id", "action"],
+            },
+          },
+        },
+        required: ["translations"],
+      },
+    },
+  });
+
+  const jsonText = response.text;
+  if (!jsonText) {
+    return { translations: [] };
+  }
+
+  const parsed = JSON.parse(jsonText) as unknown;
+  if (!parsed || typeof parsed !== "object") {
+    return { translations: [] };
+  }
+
+  const translations = (parsed as { translations?: unknown }).translations;
+  if (!Array.isArray(translations)) {
+    return { translations: [] };
+  }
+
+  const safe = translations
+    .map((t) => {
+      if (!t || typeof t !== "object") return null;
+      const id = (t as { id?: unknown }).id;
+      const action = (t as { action?: unknown }).action;
+      const translatedText = (t as { translatedText?: unknown }).translatedText;
+      if (typeof id !== "string") return null;
+      if (action !== "translate" && action !== "skip") return null;
+      return {
+        id,
+        action,
+        translatedText:
+          typeof translatedText === "string" ? translatedText : null,
+      } as const;
+    })
+    .filter(Boolean) as GeminiPageTranslateResponse["translations"];
+
+  return { translations: safe };
 };
 
 class GeminiClient {
@@ -410,8 +560,18 @@ export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
 
     if (!result.fields || !Array.isArray(result.fields)) return [];
 
-    return result.fields.map((item: any, index: number) => {
-      const [ymin, xmin, ymax, xmax] = item.box_2d;
+    return result.fields.map((item: unknown, index: number) => {
+      const safe = item as {
+        box_2d?: unknown;
+        label?: unknown;
+        type?: unknown;
+        visual_characteristics?: unknown;
+        text_preferences?: unknown;
+        options?: unknown;
+      };
+
+      const box = Array.isArray(safe.box_2d) ? safe.box_2d : [];
+      const [ymin, xmin, ymax, xmax] = box;
 
       // Convert 0-1000 scale to pixel scale
       const yMinVal = Math.max(0, Math.min(1000, Number(ymin)));
@@ -425,7 +585,10 @@ export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
       const h = ((yMaxVal - yMinVal) / 1000) * pageHeight;
 
       // Sanitize label for ID generation and clean display
-      const rawLabel = item.label || `Field_${index}`;
+      const rawLabel =
+        typeof safe.label === "string" && safe.label.trim()
+          ? safe.label
+          : `Field_${index}`;
       // Remove leading/trailing non-alphanumerics
       let cleanLabel = rawLabel.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "");
       // Replace remaining non-alphanumerics with single underscore to keep it readable but valid
@@ -435,38 +598,43 @@ export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
 
       // Map string type to Enum
       let fieldType = FieldType.TEXT;
-      if (item.type === "checkbox") fieldType = FieldType.CHECKBOX;
-      else if (item.type === "radio") fieldType = FieldType.RADIO;
-      else if (item.type === "dropdown") fieldType = FieldType.DROPDOWN;
-      else if (item.type === "signature") fieldType = FieldType.SIGNATURE;
+      if (safe.type === "checkbox") fieldType = FieldType.CHECKBOX;
+      else if (safe.type === "radio") fieldType = FieldType.RADIO;
+      else if (safe.type === "dropdown") fieldType = FieldType.DROPDOWN;
+      else if (safe.type === "signature") fieldType = FieldType.SIGNATURE;
 
       // Parse Style (start with defaults)
       const style: FieldStyle = { ...DEFAULT_FIELD_STYLE };
 
-      if (item.visual_characteristics) {
-        const vc = item.visual_characteristics;
+      if (safe.visual_characteristics) {
+        const vc = safe.visual_characteristics as Record<string, unknown>;
 
-        if (vc.background_color) {
-          const bg = vc.background_color.toLowerCase();
+        const backgroundColor = vc["background_color"];
+        if (typeof backgroundColor === "string" && backgroundColor) {
+          const bg = backgroundColor.toLowerCase();
           // Normalize white/off-white to transparent to avoid obscuring PDF content
           if (bg === "transparent" || bg === "#ffffff" || bg === "#fff") {
             style.isTransparent = true;
           } else {
-            style.backgroundColor = vc.background_color;
+            style.backgroundColor = backgroundColor;
             style.isTransparent = false;
           }
         }
 
-        if (vc.border_color) {
-          style.borderColor = vc.border_color;
+        const borderColor = vc["border_color"];
+        if (typeof borderColor === "string" && borderColor) {
+          style.borderColor = borderColor;
         }
 
-        if (typeof vc.border_width === "number") {
-          style.borderWidth = vc.border_width;
+        const borderWidth = vc["border_width"];
+        if (typeof borderWidth === "number") {
+          style.borderWidth = borderWidth;
         }
 
-        if (vc.font_size) {
-          style.fontSize = Number(vc.font_size);
+        const fontSize = vc["font_size"];
+        if (typeof fontSize === "number" || typeof fontSize === "string") {
+          const parsed = Number(fontSize);
+          if (Number.isFinite(parsed) && parsed > 0) style.fontSize = parsed;
         }
       }
 
@@ -477,13 +645,14 @@ export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
       let multiline = undefined;
       let alignment: "left" | "center" | "right" | undefined = undefined;
 
-      if (fieldType === FieldType.TEXT && item.text_preferences) {
-        multiline = item.text_preferences.multiline;
-        if (item.text_preferences.alignment) {
-          alignment = item.text_preferences.alignment as
-            | "left"
-            | "center"
-            | "right";
+      if (fieldType === FieldType.TEXT && safe.text_preferences) {
+        const tp = safe.text_preferences as Record<string, unknown>;
+        const ml = tp["multiline"];
+        if (typeof ml === "boolean") multiline = ml;
+
+        const align = tp["alignment"];
+        if (align === "left" || align === "center" || align === "right") {
+          alignment = align;
         }
       }
 
@@ -498,10 +667,8 @@ export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
         // Default options for dropdowns if detected, otherwise fall back to defaults
         options:
           fieldType === FieldType.DROPDOWN
-            ? item.options &&
-              Array.isArray(item.options) &&
-              item.options.length > 0
-              ? item.options
+            ? Array.isArray(safe.options) && safe.options.length > 0
+              ? (safe.options as string[])
               : ["Option 1", "Option 2"]
             : undefined,
         radioValue: fieldType === FieldType.RADIO ? "Choice1" : undefined,
@@ -516,18 +683,20 @@ translateService.registerOptionGroup({
   id: "gemini",
   label: "Gemini (AI)",
   labelKey: "translate.provider_gemini",
+  isLLM: true,
   options: GEMINI_MODEL_OPTIONS.map((opt) => ({
     id: opt.value,
     label: opt.label,
   })),
   isAvailable: () => client.isAvailable(),
-  unavailableMessageKey: "ai_panel.api_key_missing",
+  unavailableMessageKey: "properties.ai_detection.api_key_missing",
   translate: async (text, optionId, opts) => {
     const model = getGeminiModelId(optionId);
     return await geminiProvider.translateText(text, {
       model,
       targetLanguage: opts.targetLanguage,
       sourceLanguage: opts.sourceLanguage,
+      prompt: opts.prompt,
       signal: opts.signal,
     });
   },
@@ -537,6 +706,7 @@ translateService.registerOptionGroup({
       model,
       targetLanguage: opts.targetLanguage,
       sourceLanguage: opts.sourceLanguage,
+      prompt: opts.prompt,
       signal: opts.signal,
     });
   },

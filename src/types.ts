@@ -106,6 +106,20 @@ export interface Annotation {
   appearanceStreamContent?: string; // Raw PDF appearance stream operators
   linkUrl?: string;
   linkDestPageIndex?: number;
+  flatten?: boolean;
+
+  meta?:
+    | {
+        kind: "page_translate";
+        source: "text_layer" | "ocr";
+        granularity?: "line" | "paragraph";
+        targetLanguage: string;
+        sourceLanguage?: string;
+        translateOption?: TranslateOptionId;
+        prompt?: string;
+        createdAt: string;
+      }
+    | { kind: string; [key: string]: unknown };
 
   sourcePdfRef?: { objectNumber: number; generationNumber: number };
   sourcePdfFontName?: string;
@@ -183,7 +197,36 @@ export type DialogName = "shortcuts" | "settings" | "close_confirm" | null;
 
 export type TranslateOptionId = `${string}:${string}`;
 
-export interface EditorState {
+export type PageTranslateContextWindow =
+  | "none"
+  | "prev"
+  | "next"
+  | "prev_next"
+  | "all_prev"
+  | "all_next"
+  | "all";
+
+export interface PageTranslateUiPreferences {
+  pageTranslateFontFamily: string;
+  pageTranslateUsePositionAwarePrompt: boolean;
+  pageTranslateUseParagraphs: boolean;
+  pageTranslateFlattenFreetext: boolean;
+  pageTranslateContextWindow: PageTranslateContextWindow;
+  pageTranslateParagraphXGap: number;
+  pageTranslateParagraphYGap: number;
+}
+
+export type PageTranslateParagraphCandidate = {
+  id: string;
+  pageIndex: number;
+  rect: { x: number; y: number; width: number; height: number };
+  sourceText: string;
+  fontSize: number;
+  fontFamily: string;
+  isExcluded: boolean;
+};
+
+export interface EditorState extends PageTranslateUiPreferences {
   // Document State
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
@@ -224,6 +267,9 @@ export interface EditorState {
   // Translate (UI preference)
   translateOption: TranslateOptionId;
   translateTargetLanguage: string | null;
+
+  pageTranslateParagraphCandidates: PageTranslateParagraphCandidate[];
+  pageTranslateSelectedParagraphIds: string[];
 
   // Dialog State
   activeDialog: "shortcuts" | "settings" | "close_confirm" | null;
@@ -301,6 +347,13 @@ export type EditorUiState = Pick<
   | "rightPanelWidth"
   | "translateOption"
   | "translateTargetLanguage"
+  | "pageTranslateFontFamily"
+  | "pageTranslateUsePositionAwarePrompt"
+  | "pageTranslateUseParagraphs"
+  | "pageTranslateFlattenFreetext"
+  | "pageTranslateContextWindow"
+  | "pageTranslateParagraphXGap"
+  | "pageTranslateParagraphYGap"
   | "options"
   | "rightPanelDockTab"
 >;

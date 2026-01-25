@@ -131,6 +131,36 @@ const zhTW = {
       prompt_hint: "為 AI 模型提供上下文或特定規則。",
       start: "開始分析",
     },
+    page_translate: {
+      position_aware: "版面感知翻譯",
+      position_aware_hint:
+        "將文字框位置與尺寸提供給 AI，優先產生更適合當前區域的譯文（更精簡、盡量不換行）。",
+      context_window: "上下文視窗",
+      context_window_hint:
+        "翻譯目前頁面時附帶其它頁面文字作為上下文，以提高譯文準確性。",
+      context_window_none: "不包含",
+      context_window_prev: "前一頁",
+      context_window_next: "後一頁",
+      context_window_prev_next: "前一頁 + 後一頁",
+      context_window_all_prev: "前面所有頁",
+      context_window_all_next: "後面所有頁",
+      context_window_all: "除目前頁外全部頁",
+      flatten_all_freetext: "扁平化所有自由文字",
+      flatten_all_freetext_hint:
+        "匯出時將所有自由文字寫入頁面內容，而不是保留為 PDF 註解。",
+      use_paragraphs: "以段落翻譯",
+      use_paragraphs_hint: "先預覽段落候選，再只翻譯未排除的段落。",
+      paragraph_x_gap: "X-gap",
+      paragraph_y_gap: "Y-gap",
+      preview_paragraphs: "預覽段落",
+      clear_paragraphs: "清空",
+      merge_selected: "合併選取",
+      unmerge_selected: "取消合併",
+      toggle_exclude_selected: "排除/包含選取",
+      paragraph_candidates_count: "段落：{count}，已選：{selected}",
+      paragraph_preview_required:
+        "已開啟段落模式，請先點擊「預覽段落」以擷取候選。",
+    },
     document: {
       title: "文件資訊",
       hint: "編輯全域 PDF 資訊。在畫布上選擇一個欄位以編輯其屬性。",
@@ -241,6 +271,7 @@ const zhTW = {
     font_size: "字體大小",
     font_family: "字體",
     opacity: "不透明度",
+    flatten: "匯出時扁平化",
     geometry: "幾何",
     x: "X",
     y: "Y",
@@ -258,6 +289,7 @@ const zhTW = {
   right_panel: {
     tabs: {
       ai_detect: "AI 識別",
+      page_translate: "全頁翻譯",
       properties: "屬性編輯",
     },
   },

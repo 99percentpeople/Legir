@@ -1,5 +1,11 @@
 import React from "react";
-import { FileText, Languages, SlidersHorizontal, Sparkles } from "lucide-react";
+import {
+  BookA,
+  FileText,
+  Languages,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useScrollbarWidthOffset } from "@/hooks/useScrollbarWidthOffset";
 import { useLanguage } from "@/components/language-provider";
@@ -11,6 +17,7 @@ export type RightPanelTabId =
   | "properties"
   | "ai_detect"
   | "translate"
+  | "page_translate"
   | (string & {});
 
 export interface RightPanelDockTab {
@@ -33,7 +40,7 @@ export interface RightPanelTabDockProps {
 export function RightPanelTabDock({
   tabs,
   activeTabs,
-  isRightPanelOpen,
+  isRightPanelOpen: _isRightPanelOpen,
   isFloating,
   rightOffsetPx,
   canOpenProperties,
@@ -97,6 +104,11 @@ export function RightPanelTabDock({
     { id: "document", title: t("properties.document.title"), Icon: FileText },
     { id: "ai_detect", title: t("right_panel.tabs.ai_detect"), Icon: Sparkles },
     { id: "translate", title: t("translate.title"), Icon: Languages },
+    {
+      id: "page_translate",
+      title: t("right_panel.tabs.page_translate"),
+      Icon: BookA,
+    },
     {
       id: "properties",
       title: t("right_panel.tabs.properties"),

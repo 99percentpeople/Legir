@@ -3,7 +3,6 @@ import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import SettingsDialog from "./components/dialogs/SettingsDialog";
 import type { AIDetectionOptions } from "./components/AIDetectionOptionsForm";
 import FileDropDialog from "./components/dialogs/FileDropDialog";
-import ProcessingDialog from "./components/dialogs/ProcessingDialog";
 import PdfPasswordDialog from "./components/dialogs/PdfPasswordDialog";
 import { EditorState, FormField } from "./types";
 import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
@@ -73,6 +72,27 @@ const App: React.FC = () => {
     withProcessing,
     loadDocument,
   } = state;
+
+  // Global "processing" UI.
+  //
+  // Any long-running operation should wrap itself with `withProcessing()` and update
+  // `processingStatus` via `setProcessingStatus()`.
+  //
+  // We render this as a Sonner loading toast (instead of a blocking dialog) so:
+  // - long tasks (load/export/AI) share one consistent UX
+  // - UI remains usable while background work runs
+  const processingToastId = "global-processing";
+
+  React.useEffect(() => {
+    if (!state.isProcessing) {
+      toast.dismiss(processingToastId);
+      return;
+    }
+
+    const msg = state.processingStatus || t("common.processing");
+
+    toast.loading(msg, { id: processingToastId, duration: Infinity });
+  }, [state.isProcessing, state.processingStatus, t]);
   const pdfDisposeRef = React.useRef<null | (() => void)>(null);
   const loadQueueRef = React.useRef<Promise<void>>(Promise.resolve());
 
@@ -586,7 +606,8 @@ const App: React.FC = () => {
     }).catch((err) => {
       if (err?.name === "AbortError") return false;
       console.error("Save As failed:", err);
-      toast.error(t("app.save_fail"));
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`${t("app.save_fail")}${msg ? `: ${msg}` : ""}`);
       return false;
     });
   };
@@ -630,7 +651,8 @@ const App: React.FC = () => {
       return true;
     }).catch((error) => {
       console.error("Export failed:", error);
-      toast.error(t("app.export_fail"));
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`${t("app.export_fail")}${msg ? `: ${msg}` : ""}`);
       return false;
     });
   };
@@ -678,7 +700,8 @@ const App: React.FC = () => {
       }
     }).catch((error) => {
       console.error("Print failed:", error);
-      toast.error(t("app.export_fail"));
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`${t("app.export_fail")}${msg ? `: ${msg}` : ""}`);
     });
   };
 
@@ -872,12 +895,6 @@ const App: React.FC = () => {
           if (!path) return;
           await openDroppedPdfPath(path);
         }}
-      />
-
-      <ProcessingDialog
-        isOpen={state.isProcessing}
-        processingStatus={state.processingStatus}
-        pdfLoadProgress={pdfLoadProgress}
       />
 
       <PdfPasswordDialog

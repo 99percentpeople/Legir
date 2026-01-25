@@ -135,6 +135,37 @@ const en = {
       prompt_hint: "Provide context or specific rules for the AI model.",
       start: "Start Analysis",
     },
+    page_translate: {
+      position_aware: "Layout-aware translation",
+      position_aware_hint:
+        "Provide text box position & size to the AI so it prefers translations that fit the area (shorter, avoid line breaks).",
+      context_window: "Context window",
+      context_window_hint:
+        "Include surrounding pages as context to improve translation quality.",
+      context_window_none: "None",
+      context_window_prev: "Previous page",
+      context_window_next: "Next page",
+      context_window_prev_next: "Previous + next",
+      context_window_all_prev: "All previous pages",
+      context_window_all_next: "All next pages",
+      context_window_all: "All other pages",
+      flatten_all_freetext: "Flatten all Free Text",
+      flatten_all_freetext_hint:
+        "When exporting, write all Free Text into the page content instead of keeping them as PDF annotations.",
+      use_paragraphs: "Translate by paragraphs",
+      use_paragraphs_hint:
+        "Preview paragraph candidates first, then translate only the included paragraphs.",
+      paragraph_x_gap: "X-gap",
+      paragraph_y_gap: "Y-gap",
+      preview_paragraphs: "Preview paragraphs",
+      clear_paragraphs: "Clear",
+      merge_selected: "Merge selected",
+      unmerge_selected: "Unmerge selected",
+      toggle_exclude_selected: "Exclude/Include selected",
+      paragraph_candidates_count: "Paragraphs: {count}, selected: {selected}",
+      paragraph_preview_required:
+        "Paragraph mode is enabled. Click “Preview paragraphs” to extract candidates.",
+    },
     document: {
       title: "Document Info",
       hint: "Edit global PDF information. Select a field on the canvas to edit its properties.",
@@ -242,6 +273,7 @@ const en = {
     font_size: "Font Size",
     font_family: "Font Family",
     opacity: "Opacity",
+    flatten: "Flatten on export",
     geometry: "Geometry",
     x: "X",
     y: "Y",
@@ -259,6 +291,7 @@ const en = {
   right_panel: {
     tabs: {
       ai_detect: "AI Detect",
+      page_translate: "Page Translate",
       properties: "Property Editing",
     },
   },

@@ -133,6 +133,37 @@ const ja = {
       prompt_hint: "AI モデルにコンテキストまたは特定のルールを提供します。",
       start: "分析を開始",
     },
+    page_translate: {
+      position_aware: "レイアウト考慮翻訳",
+      position_aware_hint:
+        "テキスト枠の位置とサイズを AI に渡し、領域に収まる訳（短め・改行を避ける）を優先します。",
+      context_window: "コンテキスト範囲",
+      context_window_hint:
+        "翻訳時に周辺ページのテキストをコンテキストとして添付し、精度を向上させます。",
+      context_window_none: "なし",
+      context_window_prev: "前のページ",
+      context_window_next: "次のページ",
+      context_window_prev_next: "前後のページ",
+      context_window_all_prev: "前のすべてのページ",
+      context_window_all_next: "後のすべてのページ",
+      context_window_all: "現在ページ以外すべて",
+      flatten_all_freetext: "すべての自由テキストをフラット化",
+      flatten_all_freetext_hint:
+        "エクスポート時に、すべての自由テキストを PDF 注釈として残さずページ内容に書き込みます。",
+      use_paragraphs: "段落ごとに翻訳",
+      use_paragraphs_hint:
+        "最初に段落候補をプレビューし、含めた段落のみを翻訳します。",
+      paragraph_x_gap: "X-gap",
+      paragraph_y_gap: "Y-gap",
+      preview_paragraphs: "段落をプレビュー",
+      clear_paragraphs: "クリア",
+      merge_selected: "選択を結合",
+      unmerge_selected: "結合を解除",
+      toggle_exclude_selected: "選択を除外/含める",
+      paragraph_candidates_count: "段落: {count}, 選択: {selected}",
+      paragraph_preview_required:
+        "段落モードが有効です。候補を抽出するには「段落をプレビュー」をクリックしてください。",
+    },
     document: {
       title: "ドキュメント情報",
       hint: "PDF 全体の情報を編集します。キャンバス上のフィールドを選択して設定を変更します。",
@@ -245,6 +276,7 @@ const ja = {
     font_size: "フォントサイズ",
     font_family: "フォントファミリ",
     opacity: "不透明度",
+    flatten: "エクスポート時にフラット化",
     geometry: "位置とサイズ",
     x: "X",
     y: "Y",
@@ -262,6 +294,7 @@ const ja = {
   right_panel: {
     tabs: {
       ai_detect: "AI 検出",
+      page_translate: "ページ翻訳",
       properties: "設定編集",
     },
   },

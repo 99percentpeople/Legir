@@ -205,6 +205,34 @@ class PDFWorkerService {
             this.pendingRequests.delete(msg.id);
           }
         };
+
+        this.worker.onmessageerror = () => {
+          const error = "Worker message error";
+          for (const [id, handlers] of Array.from(
+            this.pendingRequests.entries(),
+          )) {
+            try {
+              handlers.reject({ id, success: false, error });
+            } catch {}
+          }
+          this.pendingRequests.clear();
+        };
+
+        this.worker.onerror = (evt) => {
+          const msg =
+            typeof (evt as unknown as { message?: unknown })?.message ===
+            "string"
+              ? String((evt as unknown as { message: string }).message)
+              : "Worker error";
+          for (const [id, handlers] of Array.from(
+            this.pendingRequests.entries(),
+          )) {
+            try {
+              handlers.reject({ id, success: false, error: msg });
+            } catch {}
+          }
+          this.pendingRequests.clear();
+        };
       }
     } catch (e) {
       console.error("Failed to initialize PDF Worker", e);

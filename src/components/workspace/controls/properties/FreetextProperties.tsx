@@ -49,6 +49,7 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
     !!data.fontFamily && !availableFontKeys.includes(data.fontFamily);
 
   const isTransparent = !data.backgroundColor;
+  const isFlatten = Boolean(data.flatten);
 
   return (
     <div>
@@ -57,6 +58,20 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
         {t("properties.appearance")}
       </h4>
       <div className="space-y-4">
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <Label>{t("properties.flatten")}</Label>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="freetextFlatten"
+                checked={isFlatten}
+                onMouseDown={onTriggerHistorySave}
+                onCheckedChange={(checked) => onChange({ flatten: checked })}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Color */}
         <div className="space-y-2">
           <Label>{t("properties.color")}</Label>

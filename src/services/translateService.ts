@@ -25,6 +25,8 @@ export interface TranslateOptionGroupRegistration {
   labelKey?: string;
   options: TranslateOptionRegistration[];
 
+  isLLM?: boolean;
+
   isAvailable: (optionId: string) => boolean;
   unavailableMessageKey?: string;
 
@@ -44,6 +46,7 @@ export interface TranslateTextOptions {
   targetLanguage: string;
   sourceLanguage?: string;
   translateOption?: TranslateOptionId;
+  prompt?: string;
 
   // Back-compat (prefer translateOption)
   model?: string;
@@ -130,6 +133,7 @@ export class TranslateService {
     this.registerOptionGroup({
       id: "cloud",
       label: "Cloud Translation",
+      isLLM: false,
       options: [
         {
           id: "cloudv2",
@@ -250,6 +254,13 @@ export class TranslateService {
     const entry = this.optionToGroup.get(normalized);
     if (!entry) return false;
     return entry.group.isAvailable(entry.localOptionId);
+  }
+
+  isOptionLLM(option: TranslateOptionId) {
+    const normalized = this.normalizeTranslateOption(option);
+    const entry = this.optionToGroup.get(normalized);
+    if (!entry) return false;
+    return Boolean(entry.group.isLLM);
   }
 
   getOptionUnavailableMessageKey(

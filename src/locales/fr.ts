@@ -134,6 +134,38 @@ const fr = {
         "Fournir un contexte ou des règles spécifiques pour le modèle IA.",
       start: "Démarrer l'analyse",
     },
+    page_translate: {
+      position_aware: "Traduction sensible à la mise en page",
+      position_aware_hint:
+        "Fournir à l’IA la position et la taille de la zone de texte afin de privilégier une traduction qui s’y adapte (plus courte, éviter les retours à la ligne).",
+      context_window: "Fenêtre de contexte",
+      context_window_hint:
+        "Inclure les pages voisines comme contexte pour améliorer la qualité de la traduction.",
+      context_window_none: "Aucun",
+      context_window_prev: "Page précédente",
+      context_window_next: "Page suivante",
+      context_window_prev_next: "Précédente + suivante",
+      context_window_all_prev: "Toutes les pages précédentes",
+      context_window_all_next: "Toutes les pages suivantes",
+      context_window_all: "Toutes les autres pages",
+      flatten_all_freetext: "Aplatir tous les textes libres",
+      flatten_all_freetext_hint:
+        "Lors de l’export, écrire tous les textes libres dans le contenu de la page au lieu de les conserver comme annotations PDF.",
+      use_paragraphs: "Traduire par paragraphes",
+      use_paragraphs_hint:
+        "Prévisualisez d’abord les candidats de paragraphe, puis traduisez uniquement les paragraphes inclus.",
+      paragraph_x_gap: "X-gap",
+      paragraph_y_gap: "Y-gap",
+      preview_paragraphs: "Prévisualiser les paragraphes",
+      clear_paragraphs: "Effacer",
+      merge_selected: "Fusionner la sélection",
+      unmerge_selected: "Annuler la fusion",
+      toggle_exclude_selected: "Exclure/Inclure la sélection",
+      paragraph_candidates_count:
+        "Paragraphes : {count}, sélectionnés : {selected}",
+      paragraph_preview_required:
+        "Le mode paragraphes est activé. Cliquez sur « Prévisualiser les paragraphes » pour extraire des candidats.",
+    },
     document: {
       title: "Infos du document",
       hint: "Modifiez les informations globales du PDF. Sélectionnez un champ sur le canevas pour modifier ses propriétés.",
@@ -244,8 +276,9 @@ const fr = {
     color: "Couleur",
     thickness: "Épaisseur",
     font_size: "Taille de police",
-    font_family: "Famille de polices",
+    font_family: "Police",
     opacity: "Opacité",
+    flatten: "Aplatir à l’export",
     geometry: "Géométrie",
     x: "X",
     y: "Y",
@@ -263,6 +296,7 @@ const fr = {
   right_panel: {
     tabs: {
       ai_detect: "Détection IA",
+      page_translate: "Traduire la page",
       properties: "Édition des propriétés",
     },
   },

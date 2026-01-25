@@ -134,6 +134,37 @@ const de = {
         "Kontext oder spezifische Regeln für das KI-Modell bereitstellen.",
       start: "Analyse starten",
     },
+    page_translate: {
+      position_aware: "Layoutbewusste Übersetzung",
+      position_aware_hint:
+        "Gibt der KI Position und Größe des Textfelds, damit sie Übersetzungen bevorzugt, die in den Bereich passen (kürzer, Zeilenumbrüche vermeiden).",
+      context_window: "Kontextfenster",
+      context_window_hint:
+        "Umliegende Seiten als Kontext einbeziehen, um die Übersetzungsqualität zu verbessern.",
+      context_window_none: "Keins",
+      context_window_prev: "Vorherige Seite",
+      context_window_next: "Nächste Seite",
+      context_window_prev_next: "Vorherige + nächste",
+      context_window_all_prev: "Alle vorherigen Seiten",
+      context_window_all_next: "Alle nächsten Seiten",
+      context_window_all: "Alle anderen Seiten",
+      flatten_all_freetext: "Alle Freitexte abflachen",
+      flatten_all_freetext_hint:
+        "Beim Export alle Freitexte in den Seiteninhalt schreiben, statt sie als PDF-Anmerkungen zu behalten.",
+      use_paragraphs: "Nach Absätzen übersetzen",
+      use_paragraphs_hint:
+        "Zuerst Absatz-Kandidaten vorschauen, dann nur die eingeschlossenen Absätze übersetzen.",
+      paragraph_x_gap: "X-gap",
+      paragraph_y_gap: "Y-gap",
+      preview_paragraphs: "Absätze vorschauen",
+      clear_paragraphs: "Leeren",
+      merge_selected: "Ausgewählte zusammenführen",
+      unmerge_selected: "Auswahl trennen",
+      toggle_exclude_selected: "Ausgewählte ein-/ausschließen",
+      paragraph_candidates_count: "Absätze: {count}, ausgewählt: {selected}",
+      paragraph_preview_required:
+        "Absatzmodus ist aktiviert. Klicke auf „Absätze vorschauen“, um Kandidaten zu extrahieren.",
+    },
     document: {
       title: "Dokumentinfos",
       hint: "Bearbeite globale PDF-Informationen. Wähle ein Feld auf der Leinwand aus, um dessen Eigenschaften zu bearbeiten.",
@@ -246,6 +277,7 @@ const de = {
     font_size: "Schriftgröße",
     font_family: "Schriftart",
     opacity: "Deckkraft",
+    flatten: "Beim Export abflachen",
     geometry: "Geometrie",
     x: "X",
     y: "Y",
@@ -263,6 +295,7 @@ const de = {
   right_panel: {
     tabs: {
       ai_detect: "KI-Erkennung",
+      page_translate: "Seite übersetzen",
       properties: "Eigenschaften bearbeiten",
     },
   },

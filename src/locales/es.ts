@@ -133,6 +133,38 @@ const es = {
         "Proporcionar contexto o reglas específicas para el modelo IA.",
       start: "Iniciar análisis",
     },
+    page_translate: {
+      position_aware: "Traducción consciente del diseño",
+      position_aware_hint:
+        "Proporciona a la IA la posición y el tamaño del cuadro de texto para que prefiera traducciones que se ajusten al área (más cortas, evitar saltos de línea).",
+      context_window: "Ventana de contexto",
+      context_window_hint:
+        "Incluye páginas cercanas como contexto para mejorar la calidad de la traducción.",
+      context_window_none: "Ninguno",
+      context_window_prev: "Página anterior",
+      context_window_next: "Página siguiente",
+      context_window_prev_next: "Anterior + siguiente",
+      context_window_all_prev: "Todas las páginas anteriores",
+      context_window_all_next: "Todas las páginas siguientes",
+      context_window_all: "Todas las demás páginas",
+      flatten_all_freetext: "Aplanar todo el texto libre",
+      flatten_all_freetext_hint:
+        "Al exportar, escribir todo el texto libre en el contenido de la página en lugar de conservarlo como anotaciones PDF.",
+      use_paragraphs: "Traducir por párrafos",
+      use_paragraphs_hint:
+        "Primero previsualiza candidatos de párrafo, luego traduce solo los párrafos incluidos.",
+      paragraph_x_gap: "X-gap",
+      paragraph_y_gap: "Y-gap",
+      preview_paragraphs: "Previsualizar párrafos",
+      clear_paragraphs: "Limpiar",
+      merge_selected: "Combinar seleccionados",
+      unmerge_selected: "Separar seleccionados",
+      toggle_exclude_selected: "Excluir/Incluir seleccionados",
+      paragraph_candidates_count:
+        "Párrafos: {count}, seleccionados: {selected}",
+      paragraph_preview_required:
+        "El modo de párrafos está habilitado. Haz clic en “Previsualizar párrafos” para extraer candidatos.",
+    },
     document: {
       title: "Información del documento",
       hint: "Editar información global del PDF. Seleccione un campo en el lienzo para editar sus propiedades.",
@@ -245,6 +277,7 @@ const es = {
     font_size: "Tamaño de fuente",
     font_family: "Familia de fuentes",
     opacity: "Opacidad",
+    flatten: "Aplanar al exportar",
     geometry: "Geometría",
     x: "X",
     y: "Y",
@@ -262,6 +295,7 @@ const es = {
   right_panel: {
     tabs: {
       ai_detect: "Detección IA",
+      page_translate: "Traducir página",
       properties: "Edición de propiedades",
     },
   },

@@ -5,7 +5,14 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { EditorState, FormField, FieldType, Annotation, Tool } from "@/types";
+import {
+  EditorState,
+  FormField,
+  FieldType,
+  Annotation,
+  Tool,
+  PageTranslateParagraphCandidate,
+} from "@/types";
 import {
   DEFAULT_FIELD_STYLE,
   ANNOTATION_STYLES,
@@ -72,6 +79,11 @@ interface WorkspaceProps {
   onTriggerHistorySave: () => void;
   onPageIndexChange?: (index: number) => void;
   onToolChange: (tool: Tool) => void;
+  onSelectPageTranslateParagraphId?: (
+    id: string,
+    opts?: { additive?: boolean },
+  ) => void;
+  onClearPageTranslateParagraphSelection?: () => void;
   fitTrigger?: number;
   initialScrollPosition?: { left: number; top: number } | null;
   onInitialScrollApplied?: () => void;
@@ -97,6 +109,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onTriggerHistorySave,
   onPageIndexChange,
   onToolChange,
+  onSelectPageTranslateParagraphId,
+  onClearPageTranslateParagraphSelection,
   fitTrigger,
   initialScrollPosition,
   onInitialScrollApplied,
@@ -134,6 +148,20 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   // Only allow selection when tool is "select"
   const isSelectable = editorState.tool === "select" && !isPanModeActive;
+
+  const paragraphCandidatesByPage = useMemo(() => {
+    const map = new Map<number, PageTranslateParagraphCandidate[]>();
+    for (const c of editorState.pageTranslateParagraphCandidates) {
+      const arr = map.get(c.pageIndex);
+      if (arr) arr.push(c);
+      else map.set(c.pageIndex, [c]);
+    }
+    return map;
+  }, [editorState.pageTranslateParagraphCandidates]);
+
+  const selectedParagraphIds = useMemo(() => {
+    return new Set(editorState.pageTranslateSelectedParagraphIds);
+  }, [editorState.pageTranslateSelectedParagraphIds]);
 
   // Keep a ref to editorState for stable event handlers
   const editorStateRef = useRef(editorState);
@@ -1556,6 +1584,57 @@ const Workspace: React.FC<WorkspaceProps> = ({
           editorState.tool === "draw_highlight" ? "crosshair" : undefined
         }
       />
+
+      {editorState.pageTranslateUseParagraphs &&
+        (paragraphCandidatesByPage.get(page.pageIndex)?.length ?? 0) > 0 && (
+          <svg
+            className="absolute inset-0 z-10"
+            viewBox={`0 0 ${page.width} ${page.height}`}
+            preserveAspectRatio="none"
+            style={{ pointerEvents: isSelectable ? "auto" : "none" }}
+            onPointerDown={(e) => {
+              if (!isSelectable) return;
+              if (e.target !== e.currentTarget) return;
+              e.stopPropagation();
+              onSelectControl(null);
+              onClearPageTranslateParagraphSelection?.();
+            }}
+          >
+            {(paragraphCandidatesByPage.get(page.pageIndex) ?? []).map((c) => {
+              const isSelected = selectedParagraphIds.has(c.id);
+              const stroke = c.isExcluded ? "#9ca3af" : "#a855f7";
+              const fill = isSelected
+                ? c.isExcluded
+                  ? "rgba(156, 163, 175, 0.18)"
+                  : "rgba(168, 85, 247, 0.18)"
+                : "transparent";
+
+              return (
+                <rect
+                  key={c.id}
+                  x={c.rect.x}
+                  y={c.rect.y}
+                  width={c.rect.width}
+                  height={c.rect.height}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={isSelected ? 2 : 1}
+                  strokeDasharray={c.isExcluded ? "4 2" : undefined}
+                  vectorEffect="non-scaling-stroke"
+                  onPointerDown={(e) => {
+                    if (!isSelectable) return;
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onSelectControl(null);
+                    onSelectPageTranslateParagraphId?.(c.id, {
+                      additive: e.ctrlKey || e.metaKey || e.shiftKey,
+                    });
+                  }}
+                />
+              );
+            })}
+          </svg>
+        )}
 
       <div
         className={cn("absolute inset-0 scheme-light")}

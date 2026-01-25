@@ -134,6 +134,36 @@ const zhCN = {
       prompt_hint: "为 AI 模型提供上下文或特定规则。",
       start: "开始分析",
     },
+    page_translate: {
+      position_aware: "布局感知翻译",
+      position_aware_hint:
+        "把文本框位置与尺寸提供给 AI，优先生成更适合当前区域的译文（更简短、尽量不换行）。",
+      context_window: "上下文窗口",
+      context_window_hint:
+        "翻译当前页时附带其它页面文本作为上下文，以提高译文准确性。",
+      context_window_none: "不包含",
+      context_window_prev: "前一页",
+      context_window_next: "后一页",
+      context_window_prev_next: "前一页 + 后一页",
+      context_window_all_prev: "前面所有页",
+      context_window_all_next: "后面所有页",
+      context_window_all: "除当前页外全部页",
+      flatten_all_freetext: "扁平化所有自由文本",
+      flatten_all_freetext_hint:
+        "导出时将所有自由文本写入页面内容，而不是保留为 PDF 注释。",
+      use_paragraphs: "按段落翻译",
+      use_paragraphs_hint: "先预览段落候选，再只翻译未排除的段落。",
+      paragraph_x_gap: "X-gap",
+      paragraph_y_gap: "Y-gap",
+      preview_paragraphs: "预览段落",
+      clear_paragraphs: "清空",
+      merge_selected: "合并选中",
+      unmerge_selected: "取消合并",
+      toggle_exclude_selected: "排除/包含选中",
+      paragraph_candidates_count: "段落：{count}，已选：{selected}",
+      paragraph_preview_required:
+        "已开启段落模式，请先点击“预览段落”提取候选。",
+    },
     document: {
       title: "文档信息",
       hint: "编辑全局 PDF 信息。在画布上选择一个字段以编辑其属性。",
@@ -245,6 +275,7 @@ const zhCN = {
     font_size: "字体大小",
     font_family: "字体",
     opacity: "不透明度",
+    flatten: "导出时扁平化",
     geometry: "几何",
     x: "X",
     y: "Y",
@@ -262,6 +293,7 @@ const zhCN = {
   right_panel: {
     tabs: {
       ai_detect: "AI 识别",
+      page_translate: "全页翻译",
       properties: "属性编辑",
     },
   },

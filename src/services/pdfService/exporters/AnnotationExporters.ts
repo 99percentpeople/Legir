@@ -401,6 +401,159 @@ export class FreeTextExporter implements IAnnotationExporter {
       wrapParagraph(paragraph);
     }
 
+    if (annotation.flatten) {
+      const bg =
+        typeof bgR === "number" &&
+        typeof bgG === "number" &&
+        typeof bgB === "number"
+          ? rgb(bgR, bgG, bgB)
+          : undefined;
+
+      if (bg) {
+        page.drawRectangle({
+          x,
+          y,
+          width: w,
+          height: h,
+          color: bg,
+          opacity,
+          borderWidth: 0,
+        });
+      }
+
+      const textColor = rgb(r, g, bb);
+      const lineHeight = fontSize;
+
+      const measureLineWidth = (s: string) => {
+        if (!useMixedFonts || !cjkFont || !cjkResourceName) {
+          const runFont =
+            userExplicitCustom &&
+            customFont &&
+            !isUserSelectedNonStandardEmbedded
+              ? customFont
+              : baseFont;
+          try {
+            return runFont.widthOfTextAtSize(s, fontSize);
+          } catch {
+            return 0;
+          }
+        }
+
+        let total = 0;
+        let buf = "";
+        let bufIsAscii: boolean | null = null;
+        const flushWidth = () => {
+          if (!buf) return;
+          const runFont = bufIsAscii ? baseFont : cjkFont;
+          try {
+            total += runFont.widthOfTextAtSize(buf, fontSize);
+          } catch {
+            // ignore
+          }
+          buf = "";
+          bufIsAscii = null;
+        };
+
+        for (let i = 0; i < s.length; i++) {
+          const ch = s[i];
+          const isAscii = ch.charCodeAt(0) <= 0x7f;
+          if (bufIsAscii === null) {
+            bufIsAscii = isAscii;
+            buf = ch;
+            continue;
+          }
+          if (isAscii === bufIsAscii) {
+            buf += ch;
+          } else {
+            flushWidth();
+            bufIsAscii = isAscii;
+            buf = ch;
+          }
+        }
+        flushWidth();
+        return total;
+      };
+
+      const getAlignedX = (lineText: string) => {
+        const lw = measureLineWidth(lineText);
+        const q =
+          annotation.alignment === "center"
+            ? 1
+            : annotation.alignment === "right"
+              ? 2
+              : 0;
+        if (q === 1) return x + (w - lw) / 2;
+        if (q === 2) return x + (w - lw);
+        return x;
+      };
+
+      for (let li = 0; li < lines.length; li++) {
+        const lineText = lines[li]!;
+        const drawY = y + h - fontSize - li * lineHeight;
+
+        if (!useMixedFonts || !cjkFont || !cjkResourceName) {
+          const runFont =
+            userExplicitCustom &&
+            customFont &&
+            !isUserSelectedNonStandardEmbedded
+              ? customFont
+              : baseFont;
+          page.drawText(lineText, {
+            x: getAlignedX(lineText),
+            y: drawY,
+            size: fontSize,
+            font: runFont,
+            color: textColor,
+            opacity,
+          });
+          continue;
+        }
+
+        let cursorX = getAlignedX(lineText);
+        let buf = "";
+        let bufIsAscii: boolean | null = null;
+        const flush = () => {
+          if (!buf) return;
+          const runFont = bufIsAscii ? baseFont : cjkFont;
+          page.drawText(buf, {
+            x: cursorX,
+            y: drawY,
+            size: fontSize,
+            font: runFont,
+            color: textColor,
+            opacity,
+          });
+          try {
+            cursorX += runFont.widthOfTextAtSize(buf, fontSize);
+          } catch {
+            // ignore
+          }
+          buf = "";
+          bufIsAscii = null;
+        };
+
+        for (let i = 0; i < lineText.length; i++) {
+          const ch = lineText[i];
+          const isAscii = ch.charCodeAt(0) <= 0x7f;
+          if (bufIsAscii === null) {
+            bufIsAscii = isAscii;
+            buf = ch;
+            continue;
+          }
+          if (isAscii === bufIsAscii) {
+            buf += ch;
+          } else {
+            flush();
+            bufIsAscii = isAscii;
+            buf = ch;
+          }
+        }
+        flush();
+      }
+
+      return;
+    }
+
     // 3. Generate Appearance Stream (AP)
     const apFontResources: Record<string, PDFRef> = {
       [baseResourceName]: baseFontRef,

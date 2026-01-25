@@ -199,7 +199,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           backgroundColor: data.backgroundColor || undefined,
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
-          lineHeight: 1.4,
+          lineHeight: 1,
           opacity: baseOpacity * (data.text ? 1 : 0.5),
         }}
         onPointerDown={handlePointerDown}

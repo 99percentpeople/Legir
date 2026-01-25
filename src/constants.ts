@@ -1,4 +1,4 @@
-import type { EditorUiState } from "./types";
+import type { EditorUiState, PageTranslateUiPreferences } from "./types";
 
 export const DEFAULT_SCALE = 1.0;
 export const ZOOM_BASE = 1.25;
@@ -27,6 +27,17 @@ export const WORKSPACE_BOTTOM_PADDING_PX = 80;
 export const WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES = 30;
 export const WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES = 5;
 
+export const DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES: PageTranslateUiPreferences =
+  {
+    pageTranslateFontFamily: "Helvetica",
+    pageTranslateUsePositionAwarePrompt: false,
+    pageTranslateUseParagraphs: false,
+    pageTranslateFlattenFreetext: false,
+    pageTranslateContextWindow: "none",
+    pageTranslateParagraphXGap: 2.5,
+    pageTranslateParagraphYGap: 1.2,
+  };
+
 export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   isSidebarOpen: !(typeof window !== "undefined" && window.innerWidth < 768),
   isRightPanelOpen: false,
@@ -39,6 +50,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   rightPanelWidth: 320,
   translateOption: "cloud:cloudv2",
   translateTargetLanguage: null,
+  ...DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES,
   options: {
     snappingOptions: {
       enabled: true,

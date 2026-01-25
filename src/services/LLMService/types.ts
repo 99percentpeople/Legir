@@ -11,6 +11,7 @@ export interface LLMTranslateTextOptions<TModel extends string = string> {
   model?: TModel;
   targetLanguage: string;
   sourceLanguage?: string;
+  prompt?: string;
   signal?: AbortSignal;
 }
 

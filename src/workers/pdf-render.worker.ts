@@ -1052,6 +1052,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       if (queueIndex > -1) {
         taskQueue.splice(queueIndex, 1);
         // console.log(`Task ${id} removed from queue (cancelled)`);
+        postSuccess(id, false);
       }
 
       // 2. Check if it's currently running and cancel it
@@ -1059,6 +1060,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       if (task) {
         task.cancel();
         activeRenderTasks.delete(id);
+        postSuccess(id, false);
       }
       return;
     }

@@ -13,6 +13,7 @@ import {
   DialogName,
   FieldType,
   EditorOptions,
+  PageTranslateUiPreferences,
 } from "../types";
 import {
   ANNOTATION_STYLES,
@@ -113,6 +114,10 @@ export interface EditorActions {
   ) => void;
 
   addAnnotation: (annotation: Annotation) => void;
+  addAnnotations: (
+    annotations: Annotation[],
+    opts?: { select?: boolean },
+  ) => void;
   updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   deleteAnnotation: (id: string) => void;
 
@@ -131,9 +136,42 @@ export interface EditorActions {
   setKeys: (keys: Partial<EditorState["keys"]>) => void;
 
   resetDocument: () => void;
+
+  setPageTranslateParagraphCandidates: (
+    candidates: EditorState["pageTranslateParagraphCandidates"],
+  ) => void;
+  clearPageTranslateParagraphCandidates: () => void;
+  removePageTranslateParagraphCandidatesByPageIndex: (
+    pageIndex: number,
+  ) => void;
+  setSelectedPageTranslateParagraphIds: (ids: string[]) => void;
+  selectPageTranslateParagraphId: (
+    id: string,
+    opts?: { additive?: boolean },
+  ) => void;
+  toggleExcludeSelectedPageTranslateParagraphs: () => void;
+  mergeSelectedPageTranslateParagraphs: () => void;
+  deleteSelectedPageTranslateParagraphs: () => void;
+
+  setAllFreetextFlatten: (flatten: boolean) => void;
 }
 
 export type EditorStore = EditorState & EditorActions;
+
+const pickPageTranslateUiPreferences = (
+  state: Partial<PageTranslateUiPreferences>,
+): Partial<PageTranslateUiPreferences> => {
+  return {
+    pageTranslateFontFamily: state.pageTranslateFontFamily,
+    pageTranslateUsePositionAwarePrompt:
+      state.pageTranslateUsePositionAwarePrompt,
+    pageTranslateUseParagraphs: state.pageTranslateUseParagraphs,
+    pageTranslateFlattenFreetext: state.pageTranslateFlattenFreetext,
+    pageTranslateContextWindow: state.pageTranslateContextWindow,
+    pageTranslateParagraphXGap: state.pageTranslateParagraphXGap,
+    pageTranslateParagraphYGap: state.pageTranslateParagraphYGap,
+  };
+};
 
 function pickEditorUiState(
   state: Partial<EditorState>,
@@ -149,7 +187,9 @@ function pickEditorUiState(
     rightPanelWidth: state.rightPanelWidth,
     translateOption: state.translateOption,
     translateTargetLanguage: state.translateTargetLanguage,
+    ...pickPageTranslateUiPreferences(state),
     options: state.options,
+    rightPanelDockTab: state.rightPanelDockTab,
   };
 }
 
@@ -196,6 +236,8 @@ const initialState: EditorState = {
   processingStatus: null,
   isPanelFloating: false,
   isSaving: false,
+  pageTranslateParagraphCandidates: [],
+  pageTranslateSelectedParagraphIds: [],
   ...DEFAULT_EDITOR_UI_STATE,
   isFullscreen: false,
   hasSavedSession: false,
@@ -213,6 +255,48 @@ const initialState: EditorState = {
   activeDialog: null,
   closeConfirmSource: null,
   actionSignal: null, // Deprecated, but kept for interface compatibility
+};
+
+const medianNumber = (values: number[]) => {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1]! + sorted[mid]!) / 2;
+  }
+  return sorted[mid]!;
+};
+
+const pickMostCommonString = (values: string[]) => {
+  const counts = new Map<string, number>();
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  let best: { v: string; n: number } | null = null;
+  for (const [v, n] of counts) {
+    if (!best || n > best.n) best = { v, n };
+  }
+  return best?.v;
+};
+
+const unionRect = (
+  rects: Array<{ x: number; y: number; width: number; height: number }>,
+) => {
+  if (rects.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const r of rects) {
+    minX = Math.min(minX, r.x);
+    minY = Math.min(minY, r.y);
+    maxX = Math.max(maxX, r.x + r.width);
+    maxY = Math.max(maxY, r.y + r.height);
+  }
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+  };
 };
 
 let processingDepth = 0;
@@ -293,9 +377,11 @@ export const useEditorStore = create<EditorState & EditorActions>()(
                   priority: THUMBNAIL_WARMUP_PRIORITY,
                   signal,
                 }));
-              } catch (e: any) {
+              } catch (e: unknown) {
                 const msg =
-                  typeof e?.message === "string" ? e.message : String(e);
+                  typeof (e as { message?: unknown })?.message === "string"
+                    ? String((e as { message: string }).message)
+                    : String(e);
                 if (msg.includes("PDF Document not loaded")) {
                   await ensureWorkerLoaded();
                   ({ bytes, mimeType } = await pdfWorkerService.renderPageImage(
@@ -405,6 +491,8 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           future: [],
           selectedId: null,
           isDirty: false,
+          pageTranslateParagraphCandidates: [],
+          pageTranslateSelectedParagraphIds: [],
         });
         get().warmupThumbnails();
       },
@@ -504,6 +592,34 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             annotations: [...state.annotations, annotationWithDetails],
             selectedId: annotationWithDetails.id,
             tool: shouldSwitch && !isForcedContinuous ? "select" : state.tool,
+            isDirty: true,
+          };
+        });
+      },
+
+      addAnnotations: (annotations, opts) => {
+        if (!Array.isArray(annotations) || annotations.length === 0) return;
+        const { saveCheckpoint } = get();
+        saveCheckpoint();
+        const now = new Date().toISOString();
+        set((state) => {
+          const authorFallback = state.options.userName;
+          const batch = annotations.map(
+            (a) =>
+              ({
+                ...a,
+                updatedAt: now,
+                author: a.author || authorFallback,
+              }) satisfies Annotation,
+          );
+
+          const shouldSelect = opts?.select !== false;
+          const last = batch[batch.length - 1];
+          return {
+            annotations: [...state.annotations, ...batch],
+            selectedId: shouldSelect
+              ? (last?.id ?? state.selectedId)
+              : state.selectedId,
             isDirty: true,
           };
         });
@@ -723,6 +839,10 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           keys: { ...initialState.keys },
           activeDialog: initialState.activeDialog,
           closeConfirmSource: initialState.closeConfirmSource,
+          pageTranslateParagraphCandidates:
+            initialState.pageTranslateParagraphCandidates,
+          pageTranslateSelectedParagraphIds:
+            initialState.pageTranslateSelectedParagraphIds,
         }));
       },
 
@@ -747,6 +867,166 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           newFields[fieldIndex] = { ...field, rect: { ...field.rect, x, y } };
 
           return { ...state, fields: newFields, isDirty: true };
+        });
+      },
+
+      setPageTranslateParagraphCandidates: (candidates) =>
+        set({
+          pageTranslateParagraphCandidates: candidates,
+          pageTranslateSelectedParagraphIds: [],
+        }),
+
+      clearPageTranslateParagraphCandidates: () =>
+        set({
+          pageTranslateParagraphCandidates: [],
+          pageTranslateSelectedParagraphIds: [],
+        }),
+
+      removePageTranslateParagraphCandidatesByPageIndex: (pageIndex) =>
+        set((state) => {
+          const removedIds = new Set(
+            state.pageTranslateParagraphCandidates
+              .filter((c) => c.pageIndex === pageIndex)
+              .map((c) => c.id),
+          );
+          if (removedIds.size === 0) return state;
+          return {
+            ...state,
+            pageTranslateParagraphCandidates:
+              state.pageTranslateParagraphCandidates.filter(
+                (c) => c.pageIndex !== pageIndex,
+              ),
+            pageTranslateSelectedParagraphIds:
+              state.pageTranslateSelectedParagraphIds.filter(
+                (id) => !removedIds.has(id),
+              ),
+          };
+        }),
+
+      setSelectedPageTranslateParagraphIds: (ids) =>
+        set({ pageTranslateSelectedParagraphIds: ids }),
+
+      selectPageTranslateParagraphId: (id, opts) =>
+        set((state) => {
+          const additive = Boolean(opts?.additive);
+          if (!additive) {
+            return { pageTranslateSelectedParagraphIds: [id] };
+          }
+          const existing = new Set(state.pageTranslateSelectedParagraphIds);
+          if (existing.has(id)) existing.delete(id);
+          else existing.add(id);
+          return { pageTranslateSelectedParagraphIds: Array.from(existing) };
+        }),
+
+      toggleExcludeSelectedPageTranslateParagraphs: () =>
+        set((state) => {
+          const selected = new Set(state.pageTranslateSelectedParagraphIds);
+          if (selected.size === 0) return state;
+          const next = state.pageTranslateParagraphCandidates.map((c) => {
+            if (!selected.has(c.id)) return c;
+            return { ...c, isExcluded: !c.isExcluded };
+          });
+          return { ...state, pageTranslateParagraphCandidates: next };
+        }),
+
+      deleteSelectedPageTranslateParagraphs: () =>
+        set((state) => {
+          const selected = new Set(state.pageTranslateSelectedParagraphIds);
+          if (selected.size === 0) return state;
+          const next = state.pageTranslateParagraphCandidates.filter(
+            (c) => !selected.has(c.id),
+          );
+          return {
+            ...state,
+            pageTranslateParagraphCandidates: next,
+            pageTranslateSelectedParagraphIds: [],
+          };
+        }),
+
+      mergeSelectedPageTranslateParagraphs: () =>
+        set((state) => {
+          const selectedIds = state.pageTranslateSelectedParagraphIds;
+          if (selectedIds.length < 2) return state;
+          const selected = state.pageTranslateParagraphCandidates.filter((c) =>
+            selectedIds.includes(c.id),
+          );
+          if (selected.length < 2) return state;
+          const pageIndex = selected[0]!.pageIndex;
+          if (selected.some((c) => c.pageIndex !== pageIndex)) return state;
+
+          const mergedId = `page_translate_para_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+          const rect = unionRect(selected.map((c) => c.rect));
+          const fontSize =
+            medianNumber(
+              selected.map((c) => c.fontSize).filter((n) => n > 0),
+            ) ||
+            selected[0]!.fontSize ||
+            12;
+          const fontFamily =
+            pickMostCommonString(selected.map((c) => c.fontFamily)) ||
+            selected[0]!.fontFamily ||
+            "sans-serif";
+          const sourceText = selected
+            .slice()
+            .sort((a, b) => {
+              const dy = a.rect.y - b.rect.y;
+              if (Math.abs(dy) > 0.001) return dy;
+              return a.rect.x - b.rect.x;
+            })
+            .map((c) => c.sourceText)
+            .join("\n")
+            .trim();
+
+          const merged = {
+            id: mergedId,
+            pageIndex,
+            rect,
+            sourceText,
+            fontSize,
+            fontFamily,
+            isExcluded: false,
+          };
+
+          const selectedSet = new Set(selectedIds);
+          const remaining = state.pageTranslateParagraphCandidates.filter(
+            (c) => !selectedSet.has(c.id),
+          );
+
+          return {
+            ...state,
+            pageTranslateParagraphCandidates: [...remaining, merged].sort(
+              (a, b) => {
+                if (a.pageIndex !== b.pageIndex)
+                  return a.pageIndex - b.pageIndex;
+                const dy = a.rect.y - b.rect.y;
+                if (Math.abs(dy) > 0.001) return dy;
+                return a.rect.x - b.rect.x;
+              },
+            ),
+            pageTranslateSelectedParagraphIds: [mergedId],
+          };
+        }),
+
+      setAllFreetextFlatten: (flatten) => {
+        const { saveCheckpoint } = get();
+        saveCheckpoint();
+        const now = new Date().toISOString();
+        set((state) => {
+          let changed = false;
+          const next = state.annotations.map((a) => {
+            if (a.type !== "freetext") return a;
+            if ((a.flatten ?? false) === flatten) return a;
+            changed = true;
+            const shouldMarkEdited = !!a.sourcePdfRef && a.isEdited !== true;
+            return {
+              ...a,
+              flatten,
+              updatedAt: now,
+              ...(shouldMarkEdited ? { isEdited: true } : null),
+            } satisfies Annotation;
+          });
+          if (!changed) return state;
+          return { ...state, annotations: next, isDirty: true };
         });
       },
     }),
