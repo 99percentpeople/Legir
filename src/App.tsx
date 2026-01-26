@@ -25,6 +25,7 @@ import { useAppInitialization } from "./app/useAppInitialization";
 import { recentFilesService } from "./services/recentFilesService";
 import { isTauri } from "@tauri-apps/api/core";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";
 
 // App orchestrator (not just UI).
 //
@@ -81,18 +82,11 @@ const App: React.FC = () => {
   // We render this as a Sonner loading toast (instead of a blocking dialog) so:
   // - long tasks (load/export/AI) share one consistent UX
   // - UI remains usable while background work runs
-  const processingToastId = "global-processing";
-
-  React.useEffect(() => {
-    if (!state.isProcessing) {
-      toast.dismiss(processingToastId);
-      return;
-    }
-
-    const msg = state.processingStatus || t("common.processing");
-
-    toast.loading(msg, { id: processingToastId, duration: Infinity });
-  }, [state.isProcessing, state.processingStatus, t]);
+  useGlobalProcessingToast({
+    isProcessing: state.isProcessing,
+    processingStatus: state.processingStatus,
+    defaultMessage: t("common.processing"),
+  });
   const pdfDisposeRef = React.useRef<null | (() => void)>(null);
   const loadQueueRef = React.useRef<Promise<void>>(Promise.resolve());
 
