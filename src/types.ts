@@ -214,6 +214,7 @@ export interface PageTranslateUiPreferences {
   pageTranslateContextWindow: PageTranslateContextWindow;
   pageTranslateParagraphXGap: number;
   pageTranslateParagraphYGap: number;
+  pageTranslateParagraphSplitByFontSize: boolean;
 }
 
 export type PageTranslateParagraphCandidate = {
@@ -354,6 +355,7 @@ export type EditorUiState = Pick<
   | "pageTranslateContextWindow"
   | "pageTranslateParagraphXGap"
   | "pageTranslateParagraphYGap"
+  | "pageTranslateParagraphSplitByFontSize"
   | "options"
   | "rightPanelDockTab"
 >;

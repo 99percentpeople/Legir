@@ -156,6 +156,10 @@ const de = {
         "Zuerst Absatz-Kandidaten vorschauen, dann nur die eingeschlossenen Absätze übersetzen.",
       paragraph_x_gap: "X-gap",
       paragraph_y_gap: "Y-gap",
+      paragraph_split_by_font_size:
+        "Unterschiedliche Schriftgrößen nicht zusammenführen",
+      paragraph_split_by_font_size_hint:
+        "Beim Vorschauen der Absatz-Kandidaten werden Zeilen mit deutlich unterschiedlicher Schriftgröße nicht automatisch zu einem Absatz zusammengeführt.",
       preview_paragraphs: "Absätze vorschauen",
       clear_paragraphs: "Leeren",
       merge_selected: "Ausgewählte zusammenführen",

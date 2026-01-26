@@ -155,6 +155,9 @@ const zhCN = {
       use_paragraphs_hint: "先预览段落候选，再只翻译未排除的段落。",
       paragraph_x_gap: "X-gap",
       paragraph_y_gap: "Y-gap",
+      paragraph_split_by_font_size: "不同字号不合并",
+      paragraph_split_by_font_size_hint:
+        "预览段落候选时，避免把字号差异明显的行自动合并到同一段落。",
       preview_paragraphs: "预览段落",
       clear_paragraphs: "清空",
       merge_selected: "合并选中",

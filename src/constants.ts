@@ -36,6 +36,7 @@ export const DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES: PageTranslateUiPreferences =
     pageTranslateContextWindow: "none",
     pageTranslateParagraphXGap: 2.5,
     pageTranslateParagraphYGap: 1.2,
+    pageTranslateParagraphSplitByFontSize: false,
   };
 
 export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {

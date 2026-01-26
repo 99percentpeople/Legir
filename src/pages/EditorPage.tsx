@@ -1285,6 +1285,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
               onParagraphYGapChange={(val) =>
                 setUiState({ pageTranslateParagraphYGap: val })
               }
+              paragraphSplitByFontSize={
+                state.pageTranslateParagraphSplitByFontSize
+              }
+              onParagraphSplitByFontSizeChange={(val) =>
+                setUiState({ pageTranslateParagraphSplitByFontSize: val })
+              }
               paragraphCandidatesCount={
                 state.pageTranslateParagraphCandidates.length
               }

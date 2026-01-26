@@ -69,6 +69,8 @@ export interface PageTranslatePanelProps {
   onParagraphXGapChange: (value: number) => void;
   paragraphYGap: number;
   onParagraphYGapChange: (value: number) => void;
+  paragraphSplitByFontSize: boolean;
+  onParagraphSplitByFontSizeChange: (value: boolean) => void;
   paragraphCandidatesCount: number;
   selectedParagraphCount: number;
   onPreviewParagraphs: (options: {
@@ -191,6 +193,8 @@ export function PageTranslatePanel({
   onParagraphXGapChange,
   paragraphYGap,
   onParagraphYGapChange,
+  paragraphSplitByFontSize,
+  onParagraphSplitByFontSizeChange,
   paragraphCandidatesCount,
   selectedParagraphCount,
   onPreviewParagraphs,
@@ -413,21 +417,35 @@ export function PageTranslatePanel({
               <SelectValue placeholder={t("common.select")} />
             </SelectTrigger>
             <SelectContent>
-              {optionGroups.map((g, gi) => (
-                <React.Fragment key={g.id}>
-                  <SelectGroup>
-                    <SelectLabel>
-                      {g.labelKey ? t(g.labelKey) : g.label}
-                    </SelectLabel>
-                    {g.options.map((opt) => (
-                      <SelectItem key={opt.id} value={opt.id}>
-                        {opt.labelKey ? t(opt.labelKey) : opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  {gi < optionGroups.length - 1 && <SelectSeparator />}
-                </React.Fragment>
-              ))}
+              {optionGroups.map((group, idx) => {
+                const groupLabel = group.labelKey
+                  ? t(group.labelKey)
+                  : group.label;
+                return (
+                  <React.Fragment key={group.id}>
+                    <SelectGroup>
+                      <SelectLabel>{groupLabel}</SelectLabel>
+                      {group.options.map((opt) => {
+                        const optLabel = opt.labelKey
+                          ? t(opt.labelKey)
+                          : opt.label;
+                        return (
+                          <SelectItem
+                            key={opt.id}
+                            value={opt.id}
+                            disabled={
+                              !translateService.isOptionAvailable(opt.id)
+                            }
+                          >
+                            {optLabel}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectGroup>
+                    {idx < optionGroups.length - 1 && <SelectSeparator />}
+                  </React.Fragment>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -581,6 +599,26 @@ export function PageTranslatePanel({
                 }}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label
+                htmlFor="page-translate-paragraph-split-font-size"
+                className="cursor-pointer"
+              >
+                {t("properties.page_translate.paragraph_split_by_font_size")}
+              </Label>
+              <Switch
+                id="page-translate-paragraph-split-font-size"
+                checked={paragraphSplitByFontSize}
+                onCheckedChange={onParagraphSplitByFontSizeChange}
+                disabled={!useParagraphs || isProcessing}
+              />
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {t("properties.page_translate.paragraph_split_by_font_size_hint")}
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">

@@ -156,6 +156,10 @@ const fr = {
         "Prévisualisez d’abord les candidats de paragraphe, puis traduisez uniquement les paragraphes inclus.",
       paragraph_x_gap: "X-gap",
       paragraph_y_gap: "Y-gap",
+      paragraph_split_by_font_size:
+        "Ne pas fusionner les tailles de police différentes",
+      paragraph_split_by_font_size_hint:
+        "Lors de la prévisualisation des paragraphes, éviter de fusionner automatiquement les lignes dont la taille de police est sensiblement différente.",
       preview_paragraphs: "Prévisualiser les paragraphes",
       clear_paragraphs: "Effacer",
       merge_selected: "Fusionner la sélection",

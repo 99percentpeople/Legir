@@ -668,6 +668,7 @@ export const usePageTranslation = (deps: {
                   page,
                   xGap: options.xGap,
                   yGap: options.yGap,
+                  splitByFontSize: state.pageTranslateParagraphSplitByFontSize,
                   signal: controller.signal,
                 },
               );
@@ -698,6 +699,7 @@ export const usePageTranslation = (deps: {
       setPageTranslateParagraphCandidates,
       setProcessingStatus,
       state.pages,
+      state.pageTranslateParagraphSplitByFontSize,
       t,
       withProcessing,
     ],

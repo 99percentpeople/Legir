@@ -152,6 +152,9 @@ const zhTW = {
       use_paragraphs_hint: "先預覽段落候選，再只翻譯未排除的段落。",
       paragraph_x_gap: "X-gap",
       paragraph_y_gap: "Y-gap",
+      paragraph_split_by_font_size: "不同字號不合併",
+      paragraph_split_by_font_size_hint:
+        "預覽段落候選時，避免把字號差異明顯的行自動合併到同一段落。",
       preview_paragraphs: "預覽段落",
       clear_paragraphs: "清空",
       merge_selected: "合併選取",

@@ -170,6 +170,8 @@ const pickPageTranslateUiPreferences = (
     pageTranslateContextWindow: state.pageTranslateContextWindow,
     pageTranslateParagraphXGap: state.pageTranslateParagraphXGap,
     pageTranslateParagraphYGap: state.pageTranslateParagraphYGap,
+    pageTranslateParagraphSplitByFontSize:
+      state.pageTranslateParagraphSplitByFontSize,
   };
 };
 
@@ -238,6 +240,7 @@ const initialState: EditorState = {
   isSaving: false,
   pageTranslateParagraphCandidates: [],
   pageTranslateSelectedParagraphIds: [],
+  pageTranslateParagraphSplitByFontSize: false,
   ...DEFAULT_EDITOR_UI_STATE,
   isFullscreen: false,
   hasSavedSession: false,

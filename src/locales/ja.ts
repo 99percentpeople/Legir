@@ -155,6 +155,9 @@ const ja = {
         "最初に段落候補をプレビューし、含めた段落のみを翻訳します。",
       paragraph_x_gap: "X-gap",
       paragraph_y_gap: "Y-gap",
+      paragraph_split_by_font_size: "異なるフォントサイズを結合しない",
+      paragraph_split_by_font_size_hint:
+        "段落候補のプレビュー時に、フォントサイズが大きく異なる行を同じ段落に自動結合しないようにします。",
       preview_paragraphs: "段落をプレビュー",
       clear_paragraphs: "クリア",
       merge_selected: "選択を結合",

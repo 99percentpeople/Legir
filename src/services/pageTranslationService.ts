@@ -30,13 +30,22 @@ const buildParagraphCandidatesFromLines = (options: {
   lines: PageTranslationLine[];
   xGap: number;
   yGap: number;
+  splitByFontSize?: boolean;
 }): PageTranslateParagraphCandidate[] => {
-  const { pageIndex, lines, xGap, yGap } = options;
+  const { pageIndex, lines, xGap, yGap, splitByFontSize } = options;
   const sorted = [...lines].sort((a, b) => {
     const dy = a.rect.y - b.rect.y;
     if (Math.abs(dy) > 0.001) return dy;
     return a.rect.x - b.rect.x;
   });
+
+  const isFontSizeCompatible = (a: number, b: number) => {
+    const fa = Math.max(1, a || 12);
+    const fb = Math.max(1, b || 12);
+    const diff = Math.abs(fa - fb);
+    const tolerance = Math.max(0.75, Math.min(fa, fb) * 0.15);
+    return diff <= tolerance;
+  };
 
   const parent = Array.from({ length: sorted.length }, (_, i) => i);
   const find = (i: number): number => {
@@ -72,6 +81,12 @@ const buildParagraphCandidatesFromLines = (options: {
       const bPadY = Math.max(0, (b.fontSize || 12) * yGap);
       const bTop = b.rect.y - bPadY;
       if (bTop > aBottom) break;
+      if (
+        splitByFontSize &&
+        !isFontSizeCompatible(a.fontSize || 12, b.fontSize || 12)
+      ) {
+        continue;
+      }
       if (rectOverlaps(expanded[i]!, expanded[j]!)) {
         union(i, j);
       }
@@ -737,10 +752,12 @@ export const pageTranslationService = {
     page: PageData;
     xGap: number;
     yGap: number;
+    splitByFontSize?: boolean;
     docId?: string;
     signal?: AbortSignal;
   }): Promise<PageTranslateParagraphCandidate[]> => {
-    const { pageIndex, page, xGap, yGap, docId, signal } = options;
+    const { pageIndex, page, xGap, yGap, splitByFontSize, docId, signal } =
+      options;
     const lines = await pageTranslationService.extractLinesFromTextLayer({
       pageIndex,
       page,
@@ -752,6 +769,7 @@ export const pageTranslationService = {
       lines,
       xGap,
       yGap,
+      splitByFontSize,
     });
   },
 

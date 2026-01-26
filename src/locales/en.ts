@@ -157,6 +157,9 @@ const en = {
         "Preview paragraph candidates first, then translate only the included paragraphs.",
       paragraph_x_gap: "X-gap",
       paragraph_y_gap: "Y-gap",
+      paragraph_split_by_font_size: "Don't merge different font sizes",
+      paragraph_split_by_font_size_hint:
+        "When previewing paragraph candidates, avoid merging lines with noticeably different font sizes.",
       preview_paragraphs: "Preview paragraphs",
       clear_paragraphs: "Clear",
       merge_selected: "Merge selected",

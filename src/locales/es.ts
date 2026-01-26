@@ -155,6 +155,9 @@ const es = {
         "Primero previsualiza candidatos de párrafo, luego traduce solo los párrafos incluidos.",
       paragraph_x_gap: "X-gap",
       paragraph_y_gap: "Y-gap",
+      paragraph_split_by_font_size: "No combinar tamaños de fuente diferentes",
+      paragraph_split_by_font_size_hint:
+        "Al previsualizar párrafos, evita combinar automáticamente líneas con tamaños de fuente notablemente diferentes.",
       preview_paragraphs: "Previsualizar párrafos",
       clear_paragraphs: "Limpiar",
       merge_selected: "Combinar seleccionados",

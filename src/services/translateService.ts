@@ -103,14 +103,23 @@ class CloudTranslateV2 {
       );
     }
 
-    const json = (await res.json()) as any;
-    const translated = json?.data?.translations?.[0]?.translatedText;
+    type CloudTranslateV2Response = {
+      data?: {
+        translations?: Array<{
+          translatedText?: string;
+        }>;
+      };
+    };
+
+    const json = (await res.json()) as CloudTranslateV2Response;
+    const translated = json.data?.translations?.[0]?.translatedText;
 
     if (typeof translated !== "string") {
       throw new Error("Cloud Translation API returned an unexpected response.");
     }
 
-    return decodeHtmlEntities(translated).trim();
+    const decoded = decodeHtmlEntities(translated);
+    return decoded.trim();
   }
 
   async *translateStream(text: string, opts: TranslateTextOptions) {
