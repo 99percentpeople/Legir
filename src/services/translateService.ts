@@ -181,6 +181,12 @@ export class TranslateService {
   registerOptionGroup(group: TranslateOptionGroupRegistration) {
     this.groups = [...this.groups.filter((g) => g.id !== group.id), group];
 
+    for (const fullId of this.optionToGroup.keys()) {
+      if (fullId.startsWith(`${group.id}:`)) {
+        this.optionToGroup.delete(fullId);
+      }
+    }
+
     for (const opt of group.options) {
       const fullId = this.buildFullOptionId(group.id, opt.id);
       this.optionToGroup.set(fullId, { group, localOptionId: opt.id });

@@ -76,8 +76,9 @@ const de = {
   },
   translate: {
     title: "Übersetzen",
-    provider: "Anbieter",
+    provider: "Modell Anbieter",
     provider_gemini: "Gemini (KI)",
+    provider_openai: "OpenAI (KI)",
     cloud_api_key_missing:
       "Cloud Translation API-Key fehlt. Setze GOOGLE_TRANSLATE_API_KEY in .env.local und starte die App neu.",
     model: "Modell",
@@ -114,10 +115,10 @@ const de = {
   },
   properties: {
     ai_detection: {
-      title: "KI-Felderkennung",
-      desc: "Seiten analysieren, um Formularfelder mit Gemini automatisch zu erkennen und zu erstellen.",
+      title: "Formularerkennung",
+      desc: "Seiten analysieren, um Formularfelder mit dem konfigurierten LLM automatisch zu erkennen und zu erstellen.",
       api_key_missing:
-        "Fehlender Gemini API-Schlüssel. Setzen Sie GEMINI_API_KEY in .env.local und starten Sie die App neu.",
+        "Fehlender API-Schlüssel. Konfigurieren Sie einen LLM-Anbieter unter Einstellungen → LLM.",
       page_range: "Seitenbereich",
       page_range_hint: "z.B. 1-5, 8, 10-12 (Standard: Alle)",
       valid_all: "Alle Seiten ausgewählt ({total} Seiten)",
@@ -137,7 +138,10 @@ const de = {
     page_translate: {
       position_aware: "Layoutbewusste Übersetzung",
       position_aware_hint:
-        "Gibt der KI Position und Größe des Textfelds, damit sie Übersetzungen bevorzugt, die in den Bereich passen (kürzer, Zeilenumbrüche vermeiden).",
+        "Gibt der KI einen Hinweis zur maximalen Länge (basierend auf der Textfeldgröße), damit sie Übersetzungen bevorzugt, die in den Bereich passen (kürzer, Zeilenumbrüche vermeiden).",
+      ai_reflow_paragraphs: "Absatz-Neuformatierung (KI)",
+      ai_reflow_paragraphs_hint:
+        "Erlaubt der KI, layoutbedingte Zeilenumbrüche aus der PDF-Text-Ebene zu entfernen und bei Bedarf in natürliche Absätze umzuschreiben.",
       context_window: "Kontextfenster",
       context_window_hint:
         "Umliegende Seiten als Kontext einbeziehen, um die Übersetzungsqualität zu verbessern.",
@@ -148,6 +152,9 @@ const de = {
       context_window_all_prev: "Alle vorherigen Seiten",
       context_window_all_next: "Alle nächsten Seiten",
       context_window_all: "Alle anderen Seiten",
+      freetext_padding: "Rahmen-Padding",
+      freetext_padding_hint:
+        "Textfeld des Originals um diesen Wert nach außen erweitern (gilt für Zeilen- und Absatzmodus).",
       flatten_all_freetext: "Alle Freitexte abflachen",
       flatten_all_freetext_hint:
         "Beim Export alle Freitexte in den Seiteninhalt schreiben, statt sie als PDF-Anmerkungen zu behalten.",
@@ -377,6 +384,12 @@ const de = {
   settings: {
     title: "Editor-Einstellungen",
     description: "Arbeitsbereichsverhalten und Einrastregeln konfigurieren.",
+    tabs: {
+      general: "Allgemein",
+      snapping: "Einrasten",
+      llm: "LLM",
+      debug: "Debug",
+    },
     language: "Sprache",
     theme: "Thema",
     thumbnails_layout: "Thumbnail-Layout",
@@ -402,6 +415,25 @@ const de = {
     borders: "An Rändern einrasten",
     centers: "An Mitten einrasten",
     equal: "Äquidistantes Einrasten",
+    llm: {
+      title: "LLM",
+      gemini: "Gemini",
+      openai: "OpenAI",
+      api_key_placeholder: "API-Schlüssel",
+      api_url_placeholder: "API-URL (optional)",
+      check: "Prüfen",
+      check_success: "Konfiguration OK.",
+      check_failed: "Prüfung fehlgeschlagen.",
+      api_key_required: "API-Schlüssel ist erforderlich.",
+      fetch_models: "Modelle abrufen",
+      fetch_success: "Modelle abgerufen.",
+      fetch_failed: "Abrufen fehlgeschlagen.",
+      models: "Modelle",
+      models_loaded_count: "Geladen: {count} Modell(e)",
+      custom_models_translate: "Benutzerdefinierte Modelle (Übersetzung)",
+      custom_models_vision: "Benutzerdefinierte Modelle (Vision)",
+      custom_models_placeholder: "Modell-ID eingeben und Enter drücken",
+    },
     done: "Fertig",
   },
   landing: {

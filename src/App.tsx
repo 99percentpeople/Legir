@@ -490,6 +490,8 @@ const App: React.FC = () => {
                   ? options.allowedTypes
                   : undefined,
               extraPrompt: options.extraPrompt,
+              providerId: options.providerId,
+              modelId: options.modelId,
             },
           );
 

@@ -79,8 +79,9 @@ const zhCN = {
   },
   translate: {
     title: "翻译",
-    provider: "翻译引擎",
+    provider: "模型提供商",
     provider_gemini: "Gemini（AI）",
+    provider_openai: "OpenAI（AI）",
     cloud_api_key_missing:
       "缺少 Cloud Translation API Key。请在 .env.local 中设置 GOOGLE_TRANSLATE_API_KEY 并重启应用。",
     model: "模型",
@@ -117,10 +118,9 @@ const zhCN = {
   },
   properties: {
     ai_detection: {
-      title: "AI 字段识别",
-      desc: "使用 Gemini 分析页面并自动检测创建表单字段。",
-      api_key_missing:
-        "缺少 Gemini API Key。请在 .env.local 中设置 GEMINI_API_KEY 并重启应用。",
+      title: "表单识别",
+      desc: "使用已配置的大模型分析页面，并自动检测和创建表单字段。",
+      api_key_missing: "缺少 API Key。请在 设置 → 大模型 中配置并重试。",
       page_range: "页面范围",
       page_range_hint: "例如：1-5, 8, 10-12（默认：全部）",
       valid_all: "已选择所有页面（共 {total} 页）",
@@ -137,7 +137,10 @@ const zhCN = {
     page_translate: {
       position_aware: "布局感知翻译",
       position_aware_hint:
-        "把文本框位置与尺寸提供给 AI，优先生成更适合当前区域的译文（更简短、尽量不换行）。",
+        "给 AI 提供基于文本框大小计算的最大长度提示，优先生成能放入当前区域的译文（更精简、尽量不换行）。",
+      ai_reflow_paragraphs: "AI 段落重排/去断行",
+      ai_reflow_paragraphs_hint:
+        "允许 AI 根据上下文把 PDF text layer 的布局换行合并为自然段落（在必要时才保留/添加换行）。",
       context_window: "上下文窗口",
       context_window_hint:
         "翻译当前页时附带其它页面文本作为上下文，以提高译文准确性。",
@@ -148,6 +151,9 @@ const zhCN = {
       context_window_all_prev: "前面所有页",
       context_window_all_next: "后面所有页",
       context_window_all: "除当前页外全部页",
+      freetext_padding: "识别框向外扩展",
+      freetext_padding_hint:
+        "对源文本框向外扩展一定距离（行/段落模式都生效），用于更好覆盖原文区域。",
       flatten_all_freetext: "扁平化所有自由文本",
       flatten_all_freetext_hint:
         "导出时将所有自由文本写入页面内容，而不是保留为 PDF 注释。",
@@ -377,6 +383,12 @@ const zhCN = {
   settings: {
     title: "编辑器设置",
     description: "配置工作区行为和对齐规则。",
+    tabs: {
+      general: "通用",
+      snapping: "对齐",
+      llm: "大模型",
+      debug: "调试",
+    },
     language: "语言",
     theme: "主题",
     thumbnails_layout: "缩略图布局",
@@ -401,6 +413,25 @@ const zhCN = {
     borders: "对齐边框",
     centers: "对齐中心",
     equal: "等间距对齐",
+    llm: {
+      title: "大模型",
+      gemini: "Gemini",
+      openai: "OpenAI",
+      api_key_placeholder: "API Key",
+      api_url_placeholder: "API URL（可选）",
+      check: "检查",
+      check_success: "配置正常。",
+      check_failed: "检查失败。",
+      api_key_required: "需要填写 API Key。",
+      fetch_models: "获取模型",
+      fetch_success: "已获取模型列表。",
+      fetch_failed: "获取模型失败。",
+      models: "模型列表",
+      models_loaded_count: "已加载：{count} 个模型",
+      custom_models_translate: "自定义模型（翻译）",
+      custom_models_vision: "自定义模型（视觉）",
+      custom_models_placeholder: "输入模型 ID 后按回车添加",
+    },
     done: "完成",
   },
   landing: {

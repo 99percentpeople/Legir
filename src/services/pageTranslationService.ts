@@ -10,12 +10,24 @@ import type {
   Annotation,
   PageData,
   PageTranslateParagraphCandidate,
+  PageTranslateContextWindow,
+  TranslateOptionId,
 } from "@/types";
 import {
   translateService,
   type TranslateTextOptions,
 } from "@/services/translateService";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
+
+import {
+  translatePageBlocksStructured,
+  type GeminiPageTranslateBlock,
+} from "@/services/LLMService/providers/geminiProvider";
+
+import {
+  translateOpenAiPageBlocksStructured,
+  type OpenAiPageTranslateBlock,
+} from "@/services/LLMService/providers/openaiProvider";
 
 export type PageTranslationTextBlock = {
   text: string;
@@ -158,6 +170,12 @@ export type PageTranslationResult = {
   >;
 };
 
+export type ParsePageRangeResult =
+  | { ok: true; pageIndices: number[] }
+  | { ok: false };
+
+type StructuredTranslateProviderId = "gemini" | "openai";
+
 const rectOverlaps = (
   a: { x: number; y: number; width: number; height: number },
   b: { x: number; y: number; width: number; height: number },
@@ -168,6 +186,497 @@ const rectOverlaps = (
     a.y < b.y + b.height &&
     a.y + a.height > b.y
   );
+};
+
+const parseTranslateOption = (id: TranslateOptionId) => {
+  const idx = id.indexOf(":");
+  if (idx <= 0) return { providerId: "", modelId: "" };
+  return {
+    providerId: id.slice(0, idx),
+    modelId: id.slice(idx + 1),
+  };
+};
+
+const getStructuredTranslateProviderId = (
+  translateOption?: TranslateOptionId,
+): StructuredTranslateProviderId | null => {
+  if (!translateOption) return null;
+  if (!translateService.isOptionLLM(translateOption)) return null;
+  const { providerId } = parseTranslateOption(translateOption);
+  if (providerId === "gemini" || providerId === "openai") return providerId;
+  return null;
+};
+
+const canUseStructuredTranslate = (translateOption?: TranslateOptionId) => {
+  return getStructuredTranslateProviderId(translateOption) !== null;
+};
+
+const parsePageRange = (
+  input: string,
+  totalPages: number,
+): ParsePageRangeResult => {
+  const raw = input.trim();
+  if (!raw || raw.toLowerCase() === "all") {
+    return {
+      ok: true,
+      pageIndices: [...Array(totalPages)].map((_, i) => i),
+    };
+  }
+
+  const parts = raw.split(",");
+  const pages = new Set<number>();
+
+  for (const part of parts) {
+    const p = part.trim();
+    if (!p) continue;
+
+    if (p.includes("-")) {
+      const rangeParts = p.split("-");
+      if (rangeParts.length !== 2) {
+        return { ok: false };
+      }
+      const start = parseInt(rangeParts[0]!, 10);
+      const end = parseInt(rangeParts[1]!, 10);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
+        return { ok: false };
+      }
+      if (start < 1 || end > totalPages) {
+        return { ok: false };
+      }
+      for (let i = start; i <= end; i++) pages.add(i - 1);
+      continue;
+    }
+
+    const num = parseInt(p, 10);
+    if (!Number.isFinite(num)) {
+      return { ok: false };
+    }
+    if (num < 1 || num > totalPages) {
+      return { ok: false };
+    }
+    pages.add(num - 1);
+  }
+
+  const pageIndices = Array.from(pages).sort((a, b) => a - b);
+  if (pageIndices.length === 0) {
+    return { ok: false };
+  }
+
+  return { ok: true, pageIndices };
+};
+
+const getContextPageIndices = (
+  pageIndex: number,
+  mode: PageTranslateContextWindow,
+  totalPages: number,
+): number[] => {
+  const clamp = (i: number) => i >= 0 && i < totalPages;
+  if (mode === "none") return [];
+  if (mode === "prev") return clamp(pageIndex - 1) ? [pageIndex - 1] : [];
+  if (mode === "next") return clamp(pageIndex + 1) ? [pageIndex + 1] : [];
+  if (mode === "prev_next") {
+    const out: number[] = [];
+    if (clamp(pageIndex - 1)) out.push(pageIndex - 1);
+    if (clamp(pageIndex + 1)) out.push(pageIndex + 1);
+    return out;
+  }
+  if (mode === "all_prev") {
+    const out: number[] = [];
+    for (let i = pageIndex - 1; i >= 0; i--) out.push(i);
+    return out;
+  }
+  if (mode === "all_next") {
+    const out: number[] = [];
+    for (let i = pageIndex + 1; i < totalPages; i++) out.push(i);
+    return out;
+  }
+  if (mode === "all") {
+    const out: number[] = [];
+    for (let i = 0; i < totalPages; i++) {
+      if (i === pageIndex) continue;
+      out.push(i);
+    }
+    return out;
+  }
+  return [];
+};
+
+const buildContextForPageFromTextLayer = async (args: {
+  pages: PageData[];
+  pageIndex: number;
+  contextWindow: PageTranslateContextWindow;
+  signal?: AbortSignal;
+}): Promise<Array<{ pageIndex: number; text: string }>> => {
+  const { pages, pageIndex, contextWindow, signal } = args;
+
+  const indices = getContextPageIndices(pageIndex, contextWindow, pages.length);
+
+  const maxCharsTotal = 20_000;
+  const maxCharsPerPage = 8_000;
+  let used = 0;
+
+  const takePrevClosestFirst =
+    contextWindow === "all_prev" || contextWindow === "all";
+  const ordered = takePrevClosestFirst ? [...indices].reverse() : indices;
+
+  const out: Array<{ pageIndex: number; text: string }> = [];
+  for (const idx of ordered) {
+    if (signal?.aborted) return [];
+    if (used >= maxCharsTotal) break;
+    const page = pages[idx];
+    if (!page) continue;
+
+    const lines = await extractLinesFromTextLayerInternal({
+      pageIndex: idx,
+      page,
+      signal,
+    });
+    const raw = lines
+      .map((l) => l.sourceText)
+      .join("\n")
+      .trim();
+    if (!raw) continue;
+
+    const clipped = raw.slice(
+      0,
+      Math.min(maxCharsPerPage, maxCharsTotal - used),
+    );
+    used += clipped.length;
+    out.push({ pageIndex: idx, text: clipped });
+  }
+  return out;
+};
+
+const buildParagraphPrompt = (args: {
+  basePrompt?: string;
+  page: PageData;
+  rect: { x: number; y: number; width: number; height: number };
+  fontSize: number;
+  sourceText: string;
+  usePositionAwarePrompt: boolean;
+  aiReflowParagraphs: boolean;
+}) => {
+  const base = (args.basePrompt || "").trim();
+  const allowLineBreaks = args.sourceText.includes("\n");
+
+  const lineBreakRule = args.aiReflowParagraphs
+    ? "You MAY reflow paragraphs: treat PDF/text-layer line breaks as layout artifacts unless they are clearly intentional paragraph breaks. Prefer natural sentences and remove unnecessary mid-sentence line breaks. Do NOT add extra line breaks; only keep or add line breaks when truly necessary."
+    : allowLineBreaks
+      ? "Preserve existing line breaks. Do NOT add extra line breaks."
+      : "";
+
+  if (!args.usePositionAwarePrompt) {
+    if (!allowLineBreaks) return base || undefined;
+    if (!lineBreakRule) return base || undefined;
+    if (!base) return lineBreakRule;
+    return `${base}\n\n${lineBreakRule}`;
+  }
+
+  const extra = buildPositionAwarePrompt({
+    page: args.page,
+    rect: args.rect,
+    fontSize: args.fontSize,
+    allowLineBreaks: !args.aiReflowParagraphs && allowLineBreaks,
+  });
+
+  const combined = lineBreakRule ? `${extra}\n\n${lineBreakRule}` : extra;
+  if (!base) return combined;
+  return `${base}\n\n${combined}`;
+};
+
+const estimateMaxCharsForRect = (args: {
+  rect: { x: number; y: number; width: number; height: number };
+  fontSize: number;
+}) => {
+  const fs = Math.max(1, args.fontSize || 12);
+  const w = Math.max(0, args.rect.width);
+  const h = Math.max(0, args.rect.height);
+  const approxCharsPerLine = Math.max(1, Math.floor(w / (fs * 0.6)));
+  const approxLines = Math.max(1, Math.floor(h / (fs * 1.25)));
+  return Math.max(1, approxCharsPerLine * approxLines);
+};
+
+const translatePageLinesStructured = async (args: {
+  pageIndex: number;
+  page: PageData;
+  lines: PageTranslationLine[];
+  translate: {
+    targetLanguage: string;
+    sourceLanguage?: string;
+    translateOption: TranslateOptionId;
+    prompt?: string;
+  };
+  contextWindow: PageTranslateContextWindow;
+  usePositionAwarePrompt: boolean;
+  aiReflowParagraphs: boolean;
+  pages: PageData[];
+  signal?: AbortSignal;
+}) => {
+  const usable = args.lines.filter((l) => l.sourceText.trim().length > 0);
+  if (usable.length === 0) {
+    return [] as Array<PageTranslationLine & { translatedText: string }>;
+  }
+
+  const translateOpt = parseTranslateOption(args.translate.translateOption);
+  const providerId = getStructuredTranslateProviderId(
+    args.translate.translateOption,
+  );
+  if (!providerId) {
+    throw new Error(
+      `Unsupported LLM translate option: ${args.translate.translateOption}`,
+    );
+  }
+
+  const blocks = usable.map((l, i) => ({
+    id: String(i + 1),
+    order: i + 1,
+    text: l.sourceText,
+    ...(args.usePositionAwarePrompt
+      ? {
+          maxChars: estimateMaxCharsForRect({
+            rect: l.rect,
+            fontSize: l.fontSize || 12,
+          }),
+        }
+      : null),
+  }));
+
+  const context = await buildContextForPageFromTextLayer({
+    pages: args.pages,
+    pageIndex: args.pageIndex,
+    contextWindow: args.contextWindow,
+    signal: args.signal,
+  });
+
+  const res =
+    providerId === "gemini"
+      ? await translatePageBlocksStructured({
+          blocks: blocks as GeminiPageTranslateBlock[],
+          context,
+          targetLanguage: args.translate.targetLanguage,
+          sourceLanguage: args.translate.sourceLanguage,
+          model: translateOpt.modelId,
+          prompt: args.translate.prompt,
+          usePositionAwarePrompt: args.usePositionAwarePrompt,
+          aiReflowParagraphs: args.aiReflowParagraphs,
+          signal: args.signal,
+        })
+      : await translateOpenAiPageBlocksStructured({
+          blocks: blocks as OpenAiPageTranslateBlock[],
+          context,
+          targetLanguage: args.translate.targetLanguage,
+          sourceLanguage: args.translate.sourceLanguage,
+          model: translateOpt.modelId,
+          prompt: args.translate.prompt,
+          usePositionAwarePrompt: args.usePositionAwarePrompt,
+          aiReflowParagraphs: args.aiReflowParagraphs,
+          signal: args.signal,
+        });
+
+  const byId = new Map(res.translations.map((tr) => [tr.id, tr] as const));
+
+  return usable
+    .map((l, i) => {
+      const tr = byId.get(String(i + 1));
+      if (!tr || tr.action !== "translate") return null;
+      const tt = (tr.translatedText || "").trim();
+      if (!tt) return null;
+      return {
+        ...l,
+        translatedText: tt,
+      };
+    })
+    .filter(Boolean) as Array<PageTranslationLine & { translatedText: string }>;
+};
+
+const translateParagraphCandidatesStructured = async (args: {
+  pageIndex: number;
+  page: PageData;
+  candidates: PageTranslateParagraphCandidate[];
+  translate: {
+    targetLanguage: string;
+    sourceLanguage?: string;
+    translateOption: TranslateOptionId;
+    prompt?: string;
+  };
+  contextWindow: PageTranslateContextWindow;
+  usePositionAwarePrompt: boolean;
+  aiReflowParagraphs: boolean;
+  pages: PageData[];
+  signal?: AbortSignal;
+}) => {
+  const ordered = args.candidates.slice().sort((a, b) => {
+    const dy = a.rect.y - b.rect.y;
+    if (Math.abs(dy) > 0.001) return dy;
+    return a.rect.x - b.rect.x;
+  });
+
+  const translateOpt = parseTranslateOption(args.translate.translateOption);
+  const providerId = getStructuredTranslateProviderId(
+    args.translate.translateOption,
+  );
+  if (!providerId) {
+    throw new Error(
+      `Unsupported LLM translate option: ${args.translate.translateOption}`,
+    );
+  }
+
+  const blocks = ordered.map((c, i) => ({
+    id: String(i + 1),
+    order: i + 1,
+    text: c.sourceText,
+    ...(args.usePositionAwarePrompt
+      ? {
+          maxChars: estimateMaxCharsForRect({
+            rect: c.rect,
+            fontSize: c.fontSize || 12,
+          }),
+        }
+      : null),
+  }));
+
+  const context = await buildContextForPageFromTextLayer({
+    pages: args.pages,
+    pageIndex: args.pageIndex,
+    contextWindow: args.contextWindow,
+    signal: args.signal,
+  });
+
+  const res =
+    providerId === "gemini"
+      ? await translatePageBlocksStructured({
+          blocks: blocks as GeminiPageTranslateBlock[],
+          context,
+          targetLanguage: args.translate.targetLanguage,
+          sourceLanguage: args.translate.sourceLanguage,
+          model: translateOpt.modelId,
+          prompt: args.translate.prompt,
+          usePositionAwarePrompt: args.usePositionAwarePrompt,
+          aiReflowParagraphs: args.aiReflowParagraphs,
+          signal: args.signal,
+        })
+      : await translateOpenAiPageBlocksStructured({
+          blocks: blocks as OpenAiPageTranslateBlock[],
+          context,
+          targetLanguage: args.translate.targetLanguage,
+          sourceLanguage: args.translate.sourceLanguage,
+          model: translateOpt.modelId,
+          prompt: args.translate.prompt,
+          usePositionAwarePrompt: args.usePositionAwarePrompt,
+          aiReflowParagraphs: args.aiReflowParagraphs,
+          signal: args.signal,
+        });
+
+  const byId = new Map(res.translations.map((tr) => [tr.id, tr] as const));
+  return ordered
+    .map((c, i) => {
+      const tr = byId.get(String(i + 1));
+      if (!tr || tr.action !== "translate") return null;
+      const tt = (tr.translatedText || "").trim();
+      if (!tt) return null;
+      return {
+        pageIndex: args.pageIndex,
+        sourceText: c.sourceText,
+        rect: c.rect,
+        fontSize: c.fontSize,
+        fontFamily: c.fontFamily,
+        translatedText: tt,
+      };
+    })
+    .filter(Boolean) as Array<PageTranslationLine & { translatedText: string }>;
+};
+
+const unmergeSelectedParagraphCandidatesFromTextLayer = async (options: {
+  pages: PageData[];
+  candidates: PageTranslateParagraphCandidate[];
+  selectedIds: string[];
+  signal?: AbortSignal;
+  onProgress?: (info: {
+    pageIndex: number;
+    pageNumber: number;
+    totalPages: number;
+  }) => void;
+}) => {
+  const selectedSet = new Set(options.selectedIds);
+  const selected = options.candidates.filter((c) => selectedSet.has(c.id));
+  if (selected.length === 0) {
+    return {
+      candidates: options.candidates,
+      selectedIds: options.selectedIds,
+    };
+  }
+
+  const remaining = options.candidates.filter((c) => !selectedSet.has(c.id));
+  const created: PageTranslateParagraphCandidate[] = [];
+  const createdIds: string[] = [];
+
+  const selectedByPage = new Map<number, typeof selected>();
+  for (const c of selected) {
+    const arr = selectedByPage.get(c.pageIndex);
+    if (arr) arr.push(c);
+    else selectedByPage.set(c.pageIndex, [c]);
+  }
+
+  const dedupe = new Set<string>();
+  const pagesToProcess = Array.from(selectedByPage.keys()).sort(
+    (a, b) => a - b,
+  );
+
+  for (let i = 0; i < pagesToProcess.length; i++) {
+    const pageIndex = pagesToProcess[i]!;
+    const group = selectedByPage.get(pageIndex) ?? [];
+    const page = options.pages[pageIndex];
+    if (!page) continue;
+    if (options.signal?.aborted) break;
+
+    options.onProgress?.({
+      pageIndex,
+      pageNumber: i + 1,
+      totalPages: pagesToProcess.length,
+    });
+
+    const lines = await extractLinesFromTextLayerInternal({
+      pageIndex,
+      page,
+      signal: options.signal,
+    });
+
+    for (const parent of group) {
+      const matched = lines.filter((l) => rectOverlaps(l.rect, parent.rect));
+      if (matched.length === 0) {
+        created.push(parent);
+        createdIds.push(parent.id);
+        continue;
+      }
+
+      for (const l of matched) {
+        const key = `${pageIndex}|${l.rect.x.toFixed(2)}|${l.rect.y.toFixed(2)}|${l.rect.width.toFixed(2)}|${l.rect.height.toFixed(2)}|${l.sourceText}`;
+        if (dedupe.has(key)) continue;
+        dedupe.add(key);
+
+        const id = createId(`page_translate_line_${pageIndex}`);
+        created.push({
+          id,
+          pageIndex,
+          rect: l.rect,
+          sourceText: l.sourceText,
+          fontSize: l.fontSize || parent.fontSize || 12,
+          fontFamily: l.fontFamily || parent.fontFamily || "sans-serif",
+          isExcluded: parent.isExcluded,
+        });
+        createdIds.push(id);
+      }
+    }
+  }
+
+  const next = [...remaining, ...created].sort((a, b) => {
+    if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex;
+    const dy = a.rect.y - b.rect.y;
+    if (Math.abs(dy) > 0.001) return dy;
+    return a.rect.x - b.rect.x;
+  });
+
+  return { candidates: next, selectedIds: createdIds };
 };
 
 const expandRect = (
@@ -319,6 +828,16 @@ const wrapTextToLines = (
   return lines;
 };
 
+const computeFreetextRequiredHeight = (args: {
+  linesCount: number;
+  fontSize: number;
+}) => {
+  const size = Math.max(1, args.fontSize || 12);
+  const basePadding = 2;
+  const extraBottomPadding = args.linesCount > 1 ? Math.ceil(size * 0.25) : 0;
+  return Math.ceil(args.linesCount * size + basePadding + extraBottomPadding);
+};
+
 const fitPageTranslateFreetext = (options: {
   text: string;
   rect: { x: number; y: number; width: number; height: number };
@@ -341,7 +860,10 @@ const fitPageTranslateFreetext = (options: {
   const computeWrapHeight = (size: number) => {
     const measure = createMeasureWidth(options.fontFamily, size);
     const lines = wrapTextToLines(text, availableWidth, measure);
-    const requiredHeight = lines.length * size + 2;
+    const requiredHeight = computeFreetextRequiredHeight({
+      linesCount: lines.length,
+      fontSize: size,
+    });
     return { requiredHeight, linesCount: lines.length };
   };
 
@@ -681,6 +1203,26 @@ const buildLinesFromBlocks = (
     .filter((l) => l.sourceText.length > 0);
 };
 
+const extractLinesFromTextLayerInternal = async (options: {
+  pageIndex: number;
+  page: PageData;
+  docId?: string;
+  signal?: AbortSignal;
+}): Promise<PageTranslationLine[]> => {
+  const { pageIndex, page, docId, signal } = options;
+
+  const textContent = await pdfWorkerService.getTextContent({
+    pageIndex,
+    docId,
+    signal,
+  });
+
+  if (!textContent) return [];
+
+  const blocks = extractTextBlocks(textContent, page);
+  return buildLinesFromBlocks(pageIndex, blocks);
+};
+
 const translateTextCollectingStream = async (
   text: string,
   opts: TranslateTextOptions,
@@ -698,25 +1240,14 @@ const buildPositionAwarePrompt = (args: {
   fontSize: number;
   allowLineBreaks?: boolean;
 }) => {
-  const { page, rect, fontSize, allowLineBreaks } = args;
-  const w = Math.max(0, rect.width);
-  const h = Math.max(0, rect.height);
-  const relW = page.width > 0 ? w / page.width : 0;
-  const relH = page.height > 0 ? h / page.height : 0;
-  const approxCharsPerLine =
-    fontSize > 0 ? Math.max(1, Math.floor(w / (fontSize * 0.6))) : 0;
+  const { rect, fontSize, allowLineBreaks } = args;
+  const maxChars = estimateMaxCharsForRect({ rect, fontSize });
 
   return (
-    "Layout constraints (for this one line):\n" +
-    `- Page size: ${page.width.toFixed(2)} x ${page.height.toFixed(2)}\n` +
-    `- Target bbox (x,y,w,h): ${rect.x.toFixed(2)}, ${rect.y.toFixed(2)}, ${w.toFixed(2)}, ${h.toFixed(2)}\n` +
-    `- Font size (pt-ish): ${Math.round(fontSize)}\n` +
-    `- Relative bbox (w%, h%): ${(relW * 100).toFixed(1)}%, ${(relH * 100).toFixed(1)}%\n` +
-    (approxCharsPerLine > 0
-      ? `- Approx max chars per line: ${approxCharsPerLine}\n`
-      : "") +
+    "Length constraints:\n" +
+    `- Approx max chars: ${maxChars}\n` +
     "Rules:\n" +
-    "- Prefer a concise translation that fits the bbox width.\n" +
+    "- Prefer a concise translation that fits within the character budget.\n" +
     (allowLineBreaks
       ? "- Preserve existing line breaks. Do NOT add extra line breaks.\n"
       : "- Do NOT add line breaks. Output a single line only.\n") +
@@ -727,24 +1258,16 @@ const buildPositionAwarePrompt = (args: {
 export const pageTranslationService = {
   buildPositionAwarePrompt,
 
+  parsePageRange,
+  isStructuredTranslateOption: canUseStructuredTranslate,
+
   extractLinesFromTextLayer: async (options: {
     pageIndex: number;
     page: PageData;
     docId?: string;
     signal?: AbortSignal;
   }): Promise<PageTranslationLine[]> => {
-    const { pageIndex, page, docId, signal } = options;
-
-    const textContent = await pdfWorkerService.getTextContent({
-      pageIndex,
-      docId,
-      signal,
-    });
-
-    if (!textContent) return [];
-
-    const blocks = extractTextBlocks(textContent, page);
-    return buildLinesFromBlocks(pageIndex, blocks);
+    return await extractLinesFromTextLayerInternal(options);
   },
 
   extractParagraphCandidatesFromTextLayer: async (options: {
@@ -773,6 +1296,354 @@ export const pageTranslationService = {
     });
   },
 
+  extractParagraphCandidatesFromTextLayerForPages: async (options: {
+    pages: PageData[];
+    pageIndices: number[];
+    xGap: number;
+    yGap: number;
+    splitByFontSize?: boolean;
+    docId?: string;
+    signal?: AbortSignal;
+    onProgress?: (info: {
+      pageIndex: number;
+      pageNumber: number;
+      totalPages: number;
+    }) => void;
+  }): Promise<PageTranslateParagraphCandidate[]> => {
+    const out: PageTranslateParagraphCandidate[] = [];
+    for (let i = 0; i < options.pageIndices.length; i++) {
+      const pageIndex = options.pageIndices[i]!;
+      const page = options.pages[pageIndex];
+      if (!page) continue;
+      if (options.signal?.aborted) return out;
+
+      options.onProgress?.({
+        pageIndex,
+        pageNumber: i + 1,
+        totalPages: options.pageIndices.length,
+      });
+
+      const candidates =
+        await pageTranslationService.extractParagraphCandidatesFromTextLayer({
+          pageIndex,
+          page,
+          xGap: options.xGap,
+          yGap: options.yGap,
+          splitByFontSize: options.splitByFontSize,
+          docId: options.docId,
+          signal: options.signal,
+        });
+      out.push(...candidates);
+    }
+    return out;
+  },
+
+  translateTextLayerPagesToFreetextAnnotationsByPage:
+    async function* (options: {
+      pages: PageData[];
+      pageIndices: number[];
+      translate: {
+        targetLanguage: string;
+        sourceLanguage?: string;
+        translateOption: TranslateOptionId;
+        prompt?: string;
+      };
+      contextWindow: PageTranslateContextWindow;
+      fontFamily?: string;
+      usePositionAwarePrompt: boolean;
+      aiReflowParagraphs: boolean;
+      padding?: number;
+      flattenFreetext?: boolean;
+      docId?: string;
+      signal?: AbortSignal;
+      onProgress?: (info: {
+        pageIndex: number;
+        pageNumber: number;
+        totalPages: number;
+        lineIndex: number;
+        totalLines: number;
+      }) => void;
+      onError?: (
+        info: { pageIndex: number; pageNumber: number; totalPages: number },
+        e: unknown,
+      ) => void;
+    }): AsyncGenerator<{ pageIndex: number; annotations: Annotation[] }> {
+      for (let p = 0; p < options.pageIndices.length; p++) {
+        const pageIndex = options.pageIndices[p]!;
+        const page = options.pages[pageIndex];
+        if (!page) continue;
+        if (options.signal?.aborted) return;
+
+        try {
+          if (
+            pageTranslationService.isStructuredTranslateOption(
+              options.translate.translateOption,
+            )
+          ) {
+            const lines = await extractLinesFromTextLayerInternal({
+              pageIndex,
+              page,
+              docId: options.docId,
+              signal: options.signal,
+            });
+
+            const usable = lines.filter((l) => l.sourceText.trim().length > 0);
+            if (usable.length === 0) {
+              yield { pageIndex, annotations: [] };
+              continue;
+            }
+
+            options.onProgress?.({
+              pageIndex,
+              pageNumber: p + 1,
+              totalPages: options.pageIndices.length,
+              lineIndex: 1,
+              totalLines: usable.length,
+            });
+
+            const translated = await translatePageLinesStructured({
+              pageIndex,
+              page,
+              lines: usable,
+              pages: options.pages,
+              translate: options.translate,
+              contextWindow: options.contextWindow,
+              usePositionAwarePrompt: options.usePositionAwarePrompt,
+              aiReflowParagraphs: options.aiReflowParagraphs,
+              signal: options.signal,
+            });
+
+            const annots =
+              pageTranslationService.buildFreetextAnnotationsFromTranslation({
+                results: [{ pageIndex, lines: translated }],
+                pages: options.pages,
+                translate: {
+                  targetLanguage: options.translate.targetLanguage,
+                  sourceLanguage: options.translate.sourceLanguage,
+                  translateOption: options.translate.translateOption,
+                  prompt: options.translate.prompt,
+                },
+                source: "text_layer",
+                granularity: "line",
+                fontFamily: options.fontFamily,
+                padding: options.padding,
+                flattenFreetext: options.flattenFreetext,
+              });
+
+            yield { pageIndex, annotations: annots };
+            continue;
+          }
+
+          const annots =
+            await pageTranslationService.translatePagesToFreetextAnnotationsFromTextLayer(
+              {
+                pages: options.pages,
+                pageIndices: [pageIndex],
+                translate: {
+                  targetLanguage: options.translate.targetLanguage,
+                  sourceLanguage: options.translate.sourceLanguage,
+                  translateOption: options.translate.translateOption,
+                  prompt: options.translate.prompt,
+                },
+                fontFamily: options.fontFamily,
+                usePositionAwarePrompt: options.usePositionAwarePrompt,
+                flattenFreetext: options.flattenFreetext,
+                padding: options.padding,
+                docId: options.docId,
+                signal: options.signal,
+                onProgress: (info) => options.onProgress?.(info),
+              },
+            );
+
+          yield { pageIndex, annotations: annots };
+        } catch (e: unknown) {
+          if (typeof (e as { name?: unknown })?.name === "string") {
+            if ((e as { name: string }).name === "AbortError") return;
+          }
+          options.onError?.(
+            {
+              pageIndex,
+              pageNumber: p + 1,
+              totalPages: options.pageIndices.length,
+            },
+            e,
+          );
+          yield { pageIndex, annotations: [] };
+        }
+      }
+    },
+
+  translateParagraphCandidatesToFreetextAnnotationsByPage:
+    async function* (options: {
+      pages: PageData[];
+      pageIndices: number[];
+      paragraphCandidates: PageTranslateParagraphCandidate[];
+      translate: {
+        targetLanguage: string;
+        sourceLanguage?: string;
+        translateOption: TranslateOptionId;
+        prompt?: string;
+      };
+      contextWindow: PageTranslateContextWindow;
+      fontFamily?: string;
+      usePositionAwarePrompt: boolean;
+      aiReflowParagraphs: boolean;
+      padding?: number;
+      flattenFreetext?: boolean;
+      signal?: AbortSignal;
+      onProgress?: (info: {
+        processed: number;
+        total: number;
+        pageIndex: number;
+      }) => void;
+      onError?: (
+        info: { pageIndex: number; processed: number; total: number },
+        e: unknown,
+      ) => void;
+    }): AsyncGenerator<{ pageIndex: number; annotations: Annotation[] }> {
+      const allowedPages = new Set(options.pageIndices);
+      const usableAll = options.paragraphCandidates.filter(
+        (c) =>
+          allowedPages.has(c.pageIndex) &&
+          !c.isExcluded &&
+          c.sourceText.trim().length > 0,
+      );
+      const total = usableAll.length;
+      let processed = 0;
+
+      const byPage = new Map<number, PageTranslateParagraphCandidate[]>();
+      for (const c of usableAll) {
+        const arr = byPage.get(c.pageIndex);
+        if (arr) arr.push(c);
+        else byPage.set(c.pageIndex, [c]);
+      }
+      const pageIndicesSorted = Array.from(byPage.keys()).sort((a, b) => a - b);
+
+      for (const pageIndex of pageIndicesSorted) {
+        if (options.signal?.aborted) return;
+        const page = options.pages[pageIndex];
+        if (!page) continue;
+
+        const candidates = (byPage.get(pageIndex) ?? []).slice();
+        if (candidates.length === 0) continue;
+
+        const translatedLines: Array<
+          PageTranslationLine & { translatedText: string }
+        > = [];
+
+        if (
+          pageTranslationService.isStructuredTranslateOption(
+            options.translate.translateOption,
+          )
+        ) {
+          processed += candidates.length;
+          options.onProgress?.({
+            processed: Math.min(processed, total),
+            total,
+            pageIndex,
+          });
+
+          const structured = await translateParagraphCandidatesStructured({
+            pageIndex,
+            page,
+            candidates,
+            pages: options.pages,
+            translate: options.translate,
+            contextWindow: options.contextWindow,
+            usePositionAwarePrompt: options.usePositionAwarePrompt,
+            aiReflowParagraphs: options.aiReflowParagraphs,
+            signal: options.signal,
+          });
+          translatedLines.push(...structured);
+        } else {
+          for (const c of candidates) {
+            processed += 1;
+            options.onProgress?.({ processed, total, pageIndex });
+            if (options.signal?.aborted) return;
+
+            try {
+              const perParagraphPrompt = buildParagraphPrompt({
+                basePrompt: options.translate.prompt,
+                page,
+                rect: c.rect,
+                fontSize: c.fontSize || 12,
+                sourceText: c.sourceText,
+                usePositionAwarePrompt: options.usePositionAwarePrompt,
+                aiReflowParagraphs: options.aiReflowParagraphs,
+              });
+
+              const translatedText = await translateTextCollectingStream(
+                c.sourceText,
+                {
+                  targetLanguage: options.translate.targetLanguage,
+                  sourceLanguage: options.translate.sourceLanguage,
+                  translateOption: options.translate.translateOption,
+                  prompt: perParagraphPrompt,
+                  signal: options.signal,
+                },
+              );
+              if (!translatedText) continue;
+
+              translatedLines.push({
+                pageIndex,
+                sourceText: c.sourceText,
+                rect: c.rect,
+                fontSize: c.fontSize,
+                fontFamily: c.fontFamily,
+                translatedText,
+              });
+            } catch (e: unknown) {
+              if (typeof (e as { name?: unknown })?.name === "string") {
+                if ((e as { name: string }).name === "AbortError") return;
+              }
+              options.onError?.({ pageIndex, processed, total }, e);
+            }
+          }
+        }
+
+        const annots =
+          translatedLines.length > 0
+            ? pageTranslationService.buildFreetextAnnotationsFromTranslation({
+                results: [{ pageIndex, lines: translatedLines }],
+                pages: options.pages,
+                translate: {
+                  targetLanguage: options.translate.targetLanguage,
+                  sourceLanguage: options.translate.sourceLanguage,
+                  translateOption: options.translate.translateOption,
+                  prompt: options.translate.prompt,
+                },
+                source: "text_layer",
+                granularity: "paragraph",
+                fontFamily: options.fontFamily,
+                padding: options.padding,
+                flattenFreetext: options.flattenFreetext,
+              })
+            : [];
+
+        yield { pageIndex, annotations: annots };
+      }
+    },
+
+  unmergeSelectedParagraphCandidatesFromTextLayer: async (options: {
+    pages: PageData[];
+    candidates: PageTranslateParagraphCandidate[];
+    selectedIds: string[];
+    signal?: AbortSignal;
+    onProgress?: (info: {
+      pageIndex: number;
+      pageNumber: number;
+      totalPages: number;
+    }) => void;
+  }) => {
+    return await unmergeSelectedParagraphCandidatesFromTextLayer({
+      pages: options.pages,
+      candidates: options.candidates,
+      selectedIds: options.selectedIds,
+      signal: options.signal,
+      onProgress: options.onProgress,
+    });
+  },
+
   translatePagesFromTextLayer: async (options: {
     pages: PageData[];
     pageIndices: number[];
@@ -798,6 +1669,10 @@ export const pageTranslationService = {
 
     const results: PageTranslationResult[] = [];
 
+    const structuredProviderId = getStructuredTranslateProviderId(
+      translate.translateOption as TranslateOptionId | undefined,
+    );
+
     for (let p = 0; p < pageIndices.length; p++) {
       const pageIndex = pageIndices[p]!;
       const page = pages[pageIndex];
@@ -809,6 +1684,36 @@ export const pageTranslationService = {
         docId,
         signal,
       });
+
+      if (structuredProviderId && translate.translateOption) {
+        onProgress?.({
+          pageIndex,
+          pageNumber: p + 1,
+          totalPages: pageIndices.length,
+          lineIndex: 1,
+          totalLines: 1,
+        });
+
+        const translated = await translatePageLinesStructured({
+          pageIndex,
+          page,
+          lines,
+          pages,
+          translate: {
+            targetLanguage: translate.targetLanguage,
+            sourceLanguage: translate.sourceLanguage,
+            translateOption: translate.translateOption as TranslateOptionId,
+            prompt: translate.prompt,
+          },
+          contextWindow: "none",
+          usePositionAwarePrompt: options.usePositionAwarePrompt ?? false,
+          aiReflowParagraphs: false,
+          signal,
+        });
+
+        results.push({ pageIndex, lines: translated });
+        continue;
+      }
 
       const translatedLines: PageTranslationResult["lines"] = [];
 
@@ -1010,7 +1915,10 @@ export const pageTranslationService = {
             Math.max(1, args.width),
             measureAtBase,
           );
-          return lines.length * baseSize + 2;
+          return computeFreetextRequiredHeight({
+            linesCount: lines.length,
+            fontSize: baseSize,
+          });
         };
 
         const canFitWrappedAtBaseWithinMaxHeight = (() => {
@@ -1021,7 +1929,10 @@ export const pageTranslationService = {
             Math.max(1, horizExpandedRect.width),
             measure,
           );
-          const requiredHeight = lines.length * baseSize + 2;
+          const requiredHeight = computeFreetextRequiredHeight({
+            linesCount: lines.length,
+            fontSize: baseSize,
+          });
           return requiredHeight <= maxHeight;
         })();
 

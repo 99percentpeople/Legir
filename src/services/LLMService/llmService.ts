@@ -38,6 +38,10 @@ export class LLMService {
   isProviderAvailable(id: LLMProviderId) {
     return this.providers.get(id)?.isAvailable() ?? false;
   }
+
+  getProviders(): LLMProvider[] {
+    return Array.from(this.providers.values());
+  }
 }
 
 export const llmService = new LLMService();

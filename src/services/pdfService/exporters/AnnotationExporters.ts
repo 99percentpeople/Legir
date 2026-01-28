@@ -223,6 +223,32 @@ export class FreeTextExporter implements IAnnotationExporter {
       isUserSelectedNonStandardEmbedded ||
       (customFont && userSelectedFont && userSelectedFont === customFont);
 
+    const createCanEncodeChar = (font: PDFFont) => {
+      const questionEncoded = (() => {
+        try {
+          return font.encodeText("?").toString();
+        } catch {
+          return null;
+        }
+      })();
+
+      const cache = new Map<string, boolean>();
+      return (ch: string) => {
+        const cached = cache.get(ch);
+        if (typeof cached === "boolean") return cached;
+        try {
+          const encoded = font.encodeText(ch).toString();
+          const ok =
+            ch === "?" || !questionEncoded || encoded !== questionEncoded;
+          cache.set(ch, ok);
+          return ok;
+        } catch {
+          cache.set(ch, false);
+          return false;
+        }
+      };
+    };
+
     // Base (ASCII) font selection
     let baseFont: PDFFont | undefined;
     let baseResourceName: string;
@@ -253,24 +279,19 @@ export class FreeTextExporter implements IAnnotationExporter {
       }
     }
 
+    const canBaseEncodeChar = createCanEncodeChar(baseFont);
+
     // If the user explicitly chose the custom font, apply it to all text.
     // Otherwise, only apply custom to non-ASCII runs.
     const baseCanEncodeAll = (() => {
       if (!hasNonAscii) return true;
-      if (!baseFont) return false;
-      try {
-        let sanitized = "";
-        for (let i = 0; i < text.length; i++) {
-          const ch = text[i];
-          sanitized += ch.charCodeAt(0) <= 0x7f ? ch : "?";
-        }
-
-        const rawEncoded = baseFont.encodeText(text).toString();
-        const sanitizedEncoded = baseFont.encodeText(sanitized).toString();
-        return rawEncoded !== sanitizedEncoded;
-      } catch {
-        return false;
+      for (const ch of text) {
+        if (ch === "\n" || ch === "\r") continue;
+        const code = ch.codePointAt(0) ?? 0;
+        if (code <= 0x7f) continue;
+        if (!canBaseEncodeChar(ch)) return false;
       }
+      return true;
     })();
 
     const useMixedFonts = !!customFont && hasNonAscii && !baseCanEncodeAll;
@@ -599,8 +620,12 @@ export class FreeTextExporter implements IAnnotationExporter {
       try {
         return f.encodeText(run);
       } catch {
-        /* eslint-disable no-control-regex */
-        const sanitized = run.replace(/[^\x00-\x7F]/g, "?");
+        const canEncodeChar = createCanEncodeChar(f);
+        let sanitized = "";
+        for (const ch of run) {
+          const code = ch.codePointAt(0) ?? 0;
+          sanitized += code <= 0x7f || canEncodeChar(ch) ? ch : "?";
+        }
         return f.encodeText(sanitized);
       }
     };

@@ -13,7 +13,6 @@ import {
   SelectGroup,
   SelectItem,
   SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -26,6 +25,7 @@ import {
   type TranslateOptionGroup,
 } from "@/services/translateService";
 import type { PageTranslateContextWindow, TranslateOptionId } from "@/types";
+import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 
 export type PageTranslateOptions = {
   pageRange: string;
@@ -34,6 +34,7 @@ export type PageTranslateOptions = {
   prompt: string;
   fontFamily: string;
   usePositionAwarePrompt: boolean;
+  aiReflowParagraphs: boolean;
   useParagraphs: boolean;
   contextWindow: PageTranslateContextWindow;
 };
@@ -54,8 +55,13 @@ export interface PageTranslatePanelProps {
   initialTargetLanguage: string;
   fontFamily: string;
   onFontFamilyChange: (fontFamily: string) => void;
+  freetextPadding: number;
+  onFreetextPaddingChange: (value: number) => void;
   usePositionAwarePrompt: boolean;
   onUsePositionAwarePromptChange: (value: boolean) => void;
+
+  aiReflowParagraphs: boolean;
+  onAiReflowParagraphsChange: (value: boolean) => void;
 
   contextWindow: PageTranslateContextWindow;
   onContextWindowChange: (value: PageTranslateContextWindow) => void;
@@ -181,8 +187,12 @@ export function PageTranslatePanel({
   initialTargetLanguage,
   fontFamily,
   onFontFamilyChange,
+  freetextPadding,
+  onFreetextPaddingChange,
   usePositionAwarePrompt,
   onUsePositionAwarePromptChange,
+  aiReflowParagraphs,
+  onAiReflowParagraphsChange,
   contextWindow,
   onContextWindowChange,
   flattenAllFreetext,
@@ -218,6 +228,41 @@ export function PageTranslatePanel({
     void registryVersion;
     return translateService.getOptionGroups();
   }, [registryVersion]);
+
+  const modelSelectGroups = useMemo<ModelSelectGroup[]>(() => {
+    const weight = (groupId: string) => {
+      if (groupId === "cloud") return 0;
+      if (groupId === "openai") return 1;
+      if (groupId === "gemini") return 2;
+      return 3;
+    };
+
+    const sorted = optionGroups
+      .map((g, idx) => ({ g, idx }))
+      .sort((a, b) => {
+        const wa = weight(a.g.id);
+        const wb = weight(b.g.id);
+        if (wa !== wb) return wa - wb;
+        return a.idx - b.idx;
+      })
+      .map((x) => x.g);
+
+    return sorted.map((group) => {
+      const groupLabel = group.labelKey ? t(group.labelKey) : group.label;
+      return {
+        id: group.id,
+        label: groupLabel,
+        options: group.options.map((opt) => {
+          const optLabel = opt.labelKey ? t(opt.labelKey) : opt.label;
+          return {
+            value: opt.id,
+            label: optLabel,
+            disabled: !translateService.isOptionAvailable(opt.id),
+          };
+        }),
+      };
+    });
+  }, [optionGroups, t]);
 
   const firstAvailableOption = useMemo<TranslateOptionId | undefined>(() => {
     for (const group of optionGroups) {
@@ -275,6 +320,8 @@ export function PageTranslatePanel({
     return translateService.isOptionLLM(translateOption);
   }, [translateOption]);
 
+  const isAiReflowAvailable = isPositionAwareAvailable;
+
   const isContextWindowAvailable = isPositionAwareAvailable;
 
   const parsed = useMemo(() => {
@@ -299,6 +346,9 @@ export function PageTranslatePanel({
   const currentUsePositionAwarePrompt =
     isPositionAwareAvailable && Boolean(usePositionAwarePrompt);
 
+  const currentAiReflowParagraphs =
+    isAiReflowAvailable && Boolean(aiReflowParagraphs);
+
   useEffect(() => {
     if (isPositionAwareAvailable) return;
     if (!usePositionAwarePrompt) return;
@@ -308,6 +358,12 @@ export function PageTranslatePanel({
     onUsePositionAwarePromptChange,
     usePositionAwarePrompt,
   ]);
+
+  useEffect(() => {
+    if (isAiReflowAvailable) return;
+    if (!aiReflowParagraphs) return;
+    onAiReflowParagraphsChange(false);
+  }, [aiReflowParagraphs, isAiReflowAvailable, onAiReflowParagraphsChange]);
 
   return (
     <PanelLayout
@@ -354,6 +410,7 @@ export function PageTranslatePanel({
                     prompt,
                     fontFamily: currentFontValue,
                     usePositionAwarePrompt: currentUsePositionAwarePrompt,
+                    aiReflowParagraphs: currentAiReflowParagraphs,
                     useParagraphs,
                     contextWindow,
                   });
@@ -409,45 +466,15 @@ export function PageTranslatePanel({
 
         <div className="space-y-2">
           <Label>{t("translate.model")}</Label>
-          <Select
+          <ModelSelect
             value={translateOption}
-            onValueChange={(v) => setTranslateOption(v as TranslateOptionId)}
-          >
-            <SelectTrigger disabled={isProcessing}>
-              <SelectValue placeholder={t("common.select")} />
-            </SelectTrigger>
-            <SelectContent>
-              {optionGroups.map((group, idx) => {
-                const groupLabel = group.labelKey
-                  ? t(group.labelKey)
-                  : group.label;
-                return (
-                  <React.Fragment key={group.id}>
-                    <SelectGroup>
-                      <SelectLabel>{groupLabel}</SelectLabel>
-                      {group.options.map((opt) => {
-                        const optLabel = opt.labelKey
-                          ? t(opt.labelKey)
-                          : opt.label;
-                        return (
-                          <SelectItem
-                            key={opt.id}
-                            value={opt.id}
-                            disabled={
-                              !translateService.isOptionAvailable(opt.id)
-                            }
-                          >
-                            {optLabel}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectGroup>
-                    {idx < optionGroups.length - 1 && <SelectSeparator />}
-                  </React.Fragment>
-                );
-              })}
-            </SelectContent>
-          </Select>
+            onValueChange={(v) =>
+              setTranslateOption(translateService.normalizeTranslateOption(v))
+            }
+            placeholder={t("common.select")}
+            groups={modelSelectGroups}
+            disabled={isProcessing}
+          />
         </div>
 
         <div className="space-y-2">
@@ -462,6 +489,24 @@ export function PageTranslatePanel({
           />
           <p className="text-muted-foreground text-xs">
             {t("properties.ai_detection.prompt_hint")}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>{t("properties.page_translate.freetext_padding")}</Label>
+          <Input
+            type="number"
+            step="0.5"
+            value={String(freetextPadding)}
+            disabled={isProcessing}
+            onChange={(e) => {
+              const next = parseFloat(e.target.value);
+              if (!Number.isFinite(next)) return;
+              onFreetextPaddingChange(Math.max(0, Math.min(50, next)));
+            }}
+          />
+          <p className="text-muted-foreground text-xs">
+            {t("properties.page_translate.freetext_padding_hint")}
           </p>
         </div>
 
@@ -502,6 +547,26 @@ export function PageTranslatePanel({
           </div>
           <p className="text-muted-foreground text-xs">
             {t("properties.page_translate.position_aware_hint")}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label
+              htmlFor="page-translate-ai-reflow"
+              className="cursor-pointer"
+            >
+              {t("properties.page_translate.ai_reflow_paragraphs")}
+            </Label>
+            <Switch
+              id="page-translate-ai-reflow"
+              checked={currentAiReflowParagraphs}
+              onCheckedChange={onAiReflowParagraphsChange}
+              disabled={isProcessing || !isAiReflowAvailable}
+            />
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {t("properties.page_translate.ai_reflow_paragraphs_hint")}
           </p>
         </div>
 

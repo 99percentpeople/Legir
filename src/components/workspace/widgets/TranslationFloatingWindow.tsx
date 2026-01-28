@@ -13,14 +13,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { useLanguage } from "@/components/language-provider";
+import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 import {
   translateService,
   type TranslateOptionGroup,
@@ -121,6 +119,41 @@ export const TranslationFloatingWindow: React.FC<
     void registryVersion;
     return translateService.getOptionGroups();
   }, [registryVersion]);
+
+  const modelSelectGroups = useMemo<ModelSelectGroup[]>(() => {
+    const weight = (groupId: string) => {
+      if (groupId === "cloud") return 0;
+      if (groupId === "openai") return 1;
+      if (groupId === "gemini") return 2;
+      return 3;
+    };
+
+    const sorted = optionGroups
+      .map((g, idx) => ({ g, idx }))
+      .sort((a, b) => {
+        const wa = weight(a.g.id);
+        const wb = weight(b.g.id);
+        if (wa !== wb) return wa - wb;
+        return a.idx - b.idx;
+      })
+      .map((x) => x.g);
+
+    return sorted.map((group) => {
+      const groupLabel = group.labelKey ? t(group.labelKey) : group.label;
+      return {
+        id: group.id,
+        label: groupLabel,
+        options: group.options.map((opt) => {
+          const optLabel = opt.labelKey ? t(opt.labelKey) : opt.label;
+          return {
+            value: opt.id,
+            label: optLabel,
+            disabled: !translateService.isOptionAvailable(opt.id),
+          };
+        }),
+      };
+    });
+  }, [optionGroups, t]);
 
   const firstAvailableOption = useMemo<TranslateOptionId | undefined>(() => {
     for (const group of optionGroups) {
@@ -236,12 +269,17 @@ export const TranslationFloatingWindow: React.FC<
           });
           setOutput(res);
         }
-      } catch (e: any) {
-        if (e?.name === "AbortError") {
+      } catch (e: unknown) {
+        const err =
+          typeof e === "object" && e !== null
+            ? (e as { name?: string; message?: string })
+            : null;
+
+        if (err?.name === "AbortError") {
           // user cancelled
           return;
         }
-        setError(e?.message);
+        setError(err?.message || String(e));
       } finally {
         setIsLoading(false);
         abortRef.current = null;
@@ -317,53 +355,20 @@ export const TranslationFloatingWindow: React.FC<
                 {t("translate.provider")}
               </div>
             )}
-            <Select
+            <ModelSelect
               value={translateOption}
               onValueChange={(v) => {
                 setState({
                   translateOption: translateService.normalizeTranslateOption(v),
                 });
               }}
-            >
-              <SelectTrigger
-                className="h-7! border-none text-xs"
-                size="sm"
-                title={t("translate.provider")}
-              >
-                <SelectValue placeholder={t("translate.provider")} />
-              </SelectTrigger>
-              <SelectContent portalContainer={portalContainer}>
-                {optionGroups.map((group, idx) => {
-                  const groupLabel = group.labelKey
-                    ? t(group.labelKey)
-                    : group.label;
-                  return (
-                    <React.Fragment key={group.id}>
-                      <SelectGroup>
-                        <SelectLabel>{groupLabel}</SelectLabel>
-                        {group.options.map((opt) => {
-                          const optLabel = opt.labelKey
-                            ? t(opt.labelKey)
-                            : opt.label;
-                          return (
-                            <SelectItem
-                              key={opt.id}
-                              value={opt.id}
-                              disabled={
-                                !translateService.isOptionAvailable(opt.id)
-                              }
-                            >
-                              {optLabel}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectGroup>
-                      {idx < optionGroups.length - 1 && <SelectSeparator />}
-                    </React.Fragment>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+              placeholder={t("translate.provider")}
+              groups={modelSelectGroups}
+              triggerClassName="h-7! border-none text-xs"
+              triggerSize="sm"
+              triggerTitle={t("translate.provider")}
+              portalContainer={portalContainer}
+            />
           </div>
         </div>
       )}

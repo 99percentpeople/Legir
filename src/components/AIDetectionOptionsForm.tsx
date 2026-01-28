@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Sparkles,
-  Settings2,
   Type,
   CheckSquare,
   CircleDot,
@@ -29,9 +28,16 @@ import { FieldType, FieldStyle } from "../types";
 import { useLanguage } from "./language-provider";
 import { DEFAULT_FIELD_STYLE } from "../constants";
 import { cn } from "../lib/cn";
+import {
+  getAIDetectModelGroups,
+  subscribeLLMModelRegistry,
+} from "@/services/LLMService";
+import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 
 export interface AIDetectionOptions {
   pageRange: string;
+  providerId?: string;
+  modelId?: string;
   allowedTypes: FieldType[];
   extraPrompt: string;
   defaultStyle: FieldStyle;
@@ -55,7 +61,54 @@ export function AIDetectionOptionsForm({
   totalPages,
 }: AIDetectionOptionsFormProps) {
   const { t } = useLanguage();
+
+  const [llmRegistryVersion, setLlmRegistryVersion] = useState(0);
+
+  useEffect(() => {
+    return subscribeLLMModelRegistry(() => {
+      setLlmRegistryVersion((v) => v + 1);
+    });
+  }, []);
+
+  const modelGroups = React.useMemo(
+    () => getAIDetectModelGroups(),
+    [llmRegistryVersion],
+  );
+
+  const modelSelectGroups = React.useMemo<ModelSelectGroup[]>(() => {
+    return modelGroups.map((g) => ({
+      id: g.providerId,
+      label: g.labelKey ? t(g.labelKey) : g.label,
+      options: g.models.map((m) => ({
+        value: `${g.providerId}:${m.id}`,
+        label: m.labelKey ? t(m.labelKey) : m.label,
+        disabled: !g.isAvailable,
+      })),
+    }));
+  }, [modelGroups, t]);
+  const flatModels = React.useMemo(
+    () =>
+      modelGroups.flatMap((g) =>
+        g.models.map((m) => ({ providerId: g.providerId, model: m })),
+      ),
+    [modelGroups],
+  );
+
+  const getDefaultModelKey = React.useCallback(() => {
+    const firstAvailable = modelGroups.find(
+      (g) => g.isAvailable && g.models.length > 0,
+    );
+    if (firstAvailable) {
+      return `${firstAvailable.providerId}:${firstAvailable.models[0].id}`;
+    }
+    const firstAny = flatModels[0];
+    return firstAny ? `${firstAny.providerId}:${firstAny.model.id}` : undefined;
+  }, [flatModels, modelGroups]);
+
   const [pageRange, setPageRange] = useState<string>("All");
+  const [selectedModelKey, setSelectedModelKey] = useState<string | undefined>(
+    getDefaultModelKey(),
+  );
   const [allowedTypes, setAllowedTypes] = useState<FieldType[]>([
     FieldType.TEXT,
     FieldType.CHECKBOX,
@@ -172,6 +225,25 @@ export function AIDetectionOptionsForm({
     }
   }, [pageRange, totalPages, t]);
 
+  useEffect(() => {
+    const nextDefault = getDefaultModelKey();
+
+    if (!selectedModelKey) {
+      if (nextDefault) setSelectedModelKey(nextDefault);
+      return;
+    }
+
+    const [providerId, modelId] = selectedModelKey.split(":");
+    const group = modelGroups.find((g) => g.providerId === providerId);
+    const exists = flatModels.some(
+      (x) => x.providerId === providerId && x.model.id === modelId,
+    );
+
+    if (!exists || (group && !group.isAvailable)) {
+      setSelectedModelKey(nextDefault);
+    }
+  }, [flatModels, getDefaultModelKey, modelGroups, selectedModelKey]);
+
   const handleTypeToggle = (value: string[]) => {
     if (value.length > 0) {
       setAllowedTypes(value as FieldType[]);
@@ -180,8 +252,15 @@ export function AIDetectionOptionsForm({
 
   const handleConfirm = () => {
     if (!validation.isValid) return;
+
+    const selected = flatModels.find(
+      (x) => `${x.providerId}:${x.model.id}` === selectedModelKey,
+    );
+
     onSubmit({
       pageRange,
+      providerId: selected?.providerId,
+      modelId: selected?.model.id,
       allowedTypes,
       extraPrompt,
       defaultStyle: customStyle,
@@ -230,6 +309,23 @@ export function AIDetectionOptionsForm({
             </span>
           </div>
         </div>
+
+        {/* Model */}
+        {flatModels.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <Label>{t("translate.model")}</Label>
+              <ModelSelect
+                value={selectedModelKey}
+                onValueChange={(v) => setSelectedModelKey(v)}
+                placeholder={t("common.select")}
+                groups={modelSelectGroups}
+                showSeparators={false}
+              />
+            </div>
+          </>
+        )}
 
         <Separator />
 

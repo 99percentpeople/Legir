@@ -76,8 +76,9 @@ const zhTW = {
   },
   translate: {
     title: "翻譯",
-    provider: "翻譯服務",
+    provider: "模型提供商",
     provider_gemini: "Gemini（AI）",
+    provider_openai: "OpenAI（AI）",
     cloud_api_key_missing:
       "缺少 Cloud Translation API Key。請在 .env.local 中設定 GOOGLE_TRANSLATE_API_KEY 並重啟應用。",
     model: "模型",
@@ -114,10 +115,9 @@ const zhTW = {
   },
   properties: {
     ai_detection: {
-      title: "AI 欄位識別",
-      desc: "使用 Gemini 分析頁面並自動檢測建立表單欄位。",
-      api_key_missing:
-        "缺少 Gemini API Key。請在 .env.local 中設定 GEMINI_API_KEY 並重啟應用。",
+      title: "表單識別",
+      desc: "使用已設定的大模型分析頁面，並自動檢測與建立表單欄位。",
+      api_key_missing: "缺少 API Key。請在 設定 → 大模型 中設定並重試。",
       page_range: "頁面範圍",
       page_range_hint: "例如：1-5, 8, 10-12（預設：全部）",
       valid_all: "已選擇所有頁面（共 {total} 頁）",
@@ -134,10 +134,13 @@ const zhTW = {
     page_translate: {
       position_aware: "版面感知翻譯",
       position_aware_hint:
-        "將文字框位置與尺寸提供給 AI，優先產生更適合當前區域的譯文（更精簡、盡量不換行）。",
+        "提供基於文字框大小計算的最大長度提示，讓 AI 優先生成能放入目前區域的譯文（更精簡、盡量不換行）。",
+      ai_reflow_paragraphs: "AI 段落重排/去斷行",
+      ai_reflow_paragraphs_hint:
+        "允許 AI 依上下文把 PDF text layer 的版面換行合併為自然段落（必要時才保留/新增換行）。",
       context_window: "上下文視窗",
       context_window_hint:
-        "翻譯目前頁面時附帶其它頁面文字作為上下文，以提高譯文準確性。",
+        "翻譯目前頁面時附帶其他頁面文字作為上下文，以提升譯文準確性。",
       context_window_none: "不包含",
       context_window_prev: "前一頁",
       context_window_next: "後一頁",
@@ -145,6 +148,9 @@ const zhTW = {
       context_window_all_prev: "前面所有頁",
       context_window_all_next: "後面所有頁",
       context_window_all: "除目前頁外全部頁",
+      freetext_padding: "識別框向外擴展",
+      freetext_padding_hint:
+        "對源文字框向外擴展一定距離（行/段落模式都生效），用於更好覆蓋原文區域。",
       flatten_all_freetext: "扁平化所有自由文字",
       flatten_all_freetext_hint:
         "匯出時將所有自由文字寫入頁面內容，而不是保留為 PDF 註解。",
@@ -369,6 +375,12 @@ const zhTW = {
   settings: {
     title: "編輯器設定",
     description: "配置工作區行為和對齊規則。",
+    tabs: {
+      general: "通用",
+      snapping: "對齊",
+      llm: "大模型",
+      debug: "除錯",
+    },
     language: "語言",
     theme: "主題",
     thumbnails_layout: "縮圖佈局",
@@ -393,6 +405,25 @@ const zhTW = {
     borders: "對齊邊框",
     centers: "對齊中心",
     equal: "等間距對齊",
+    llm: {
+      title: "大模型",
+      gemini: "Gemini",
+      openai: "OpenAI",
+      api_key_placeholder: "API Key",
+      api_url_placeholder: "API URL（可選）",
+      check: "檢查",
+      check_success: "設定正常。",
+      check_failed: "檢查失敗。",
+      api_key_required: "需要填寫 API Key。",
+      fetch_models: "取得模型",
+      fetch_success: "已取得模型清單。",
+      fetch_failed: "取得模型失敗。",
+      models: "模型清單",
+      models_loaded_count: "已載入：{count} 個模型",
+      custom_models_translate: "自訂模型（翻譯）",
+      custom_models_vision: "自訂模型（視覺）",
+      custom_models_placeholder: "輸入模型 ID 後按 Enter 新增",
+    },
     done: "完成",
   },
   landing: {

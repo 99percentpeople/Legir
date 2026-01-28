@@ -76,8 +76,9 @@ const es = {
   },
   translate: {
     title: "Traducir",
-    provider: "Proveedor",
+    provider: "Modelo Proveedor",
     provider_gemini: "Gemini (IA)",
+    provider_openai: "OpenAI (IA)",
     cloud_api_key_missing:
       "Falta la clave de Cloud Translation API. Establece GOOGLE_TRANSLATE_API_KEY en .env.local y reinicia la aplicación.",
     model: "Modelo",
@@ -114,10 +115,10 @@ const es = {
   },
   properties: {
     ai_detection: {
-      title: "Detección de campos IA",
-      desc: "Analizar páginas para detectar y crear automáticamente campos de formulario usando Gemini.",
+      title: "Detección de formularios",
+      desc: "Analizar páginas para detectar y crear automáticamente campos de formulario usando el LLM configurado.",
       api_key_missing:
-        "Falta la clave de API de Gemini. Configure GEMINI_API_KEY en .env.local y reinicie la aplicación.",
+        "Falta la clave de API. Configure un proveedor LLM en Ajustes → LLM.",
       page_range: "Rango de páginas",
       page_range_hint: "ej., 1-5, 8, 10-12 (Predeterminado: Todo)",
       valid_all: "Todas las páginas seleccionadas ({total} páginas)",
@@ -136,7 +137,10 @@ const es = {
     page_translate: {
       position_aware: "Traducción consciente del diseño",
       position_aware_hint:
-        "Proporciona a la IA la posición y el tamaño del cuadro de texto para que prefiera traducciones que se ajusten al área (más cortas, evitar saltos de línea).",
+        "Proporciona una pista de longitud máxima (según el tamaño del cuadro de texto) para que la IA prefiera traducciones que quepan en el área (más cortas, evitar saltos de línea).",
+      ai_reflow_paragraphs: "Reflujo de párrafos (IA)",
+      ai_reflow_paragraphs_hint:
+        "Permite a la IA eliminar los saltos de línea causados por el diseño del text layer del PDF y reescribir en párrafos naturales cuando corresponda.",
       context_window: "Ventana de contexto",
       context_window_hint:
         "Incluye páginas cercanas como contexto para mejorar la calidad de la traducción.",
@@ -147,6 +151,9 @@ const es = {
       context_window_all_prev: "Todas las páginas anteriores",
       context_window_all_next: "Todas las páginas siguientes",
       context_window_all: "Todas las demás páginas",
+      freetext_padding: "Relleno del recuadro",
+      freetext_padding_hint:
+        "Amplía hacia afuera el recuadro del texto original con este valor (aplica a modo línea y párrafo).",
       flatten_all_freetext: "Aplanar todo el texto libre",
       flatten_all_freetext_hint:
         "Al exportar, escribir todo el texto libre en el contenido de la página en lugar de conservarlo como anotaciones PDF.",
@@ -376,6 +383,12 @@ const es = {
     title: "Configuración del editor",
     description:
       "Configurar comportamiento del espacio de trabajo y reglas de ajuste.",
+    tabs: {
+      general: "General",
+      snapping: "Ajuste",
+      llm: "LLM",
+      debug: "Depuración",
+    },
     language: "Idioma",
     theme: "Tema",
     thumbnails_layout: "Diseño de miniaturas",
@@ -401,6 +414,25 @@ const es = {
     borders: "Ajustar a bordes",
     centers: "Ajustar a centros",
     equal: "Ajuste equidistante",
+    llm: {
+      title: "LLM",
+      gemini: "Gemini",
+      openai: "OpenAI",
+      api_key_placeholder: "Clave API",
+      api_url_placeholder: "URL de API (opcional)",
+      check: "Comprobar",
+      check_success: "Configuración correcta.",
+      check_failed: "Fallo en la comprobación.",
+      api_key_required: "Se requiere clave API.",
+      fetch_models: "Obtener modelos",
+      fetch_success: "Modelos obtenidos.",
+      fetch_failed: "Error al obtener modelos.",
+      models: "Modelos",
+      models_loaded_count: "Cargados: {count} modelo(s)",
+      custom_models_translate: "Modelos personalizados (Traducción)",
+      custom_models_vision: "Modelos personalizados (Visión)",
+      custom_models_placeholder: "Escriba un ID de modelo y presione Enter",
+    },
     done: "Hecho",
   },
   landing: {

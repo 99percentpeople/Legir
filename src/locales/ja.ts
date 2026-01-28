@@ -76,8 +76,9 @@ const ja = {
   },
   translate: {
     title: "翻訳",
-    provider: "翻訳サービス",
+    provider: "モデル提供者",
     provider_gemini: "Gemini（AI）",
+    provider_openai: "OpenAI（AI）",
     cloud_api_key_missing:
       "Cloud Translation API のキーがありません。.env.local に GOOGLE_TRANSLATE_API_KEY を設定して再起動してください。",
     model: "モデル",
@@ -114,10 +115,10 @@ const ja = {
   },
   properties: {
     ai_detection: {
-      title: "AI フィールド検出",
-      desc: "Gemini を使用してページを分析し、フォームフィールドを自動的に検出して作成します。",
+      title: "フォーム検出",
+      desc: "設定済みの LLM を使用してページを分析し、フォームフィールドを自動的に検出して作成します。",
       api_key_missing:
-        "Gemini API キーがありません。.env.local に GEMINI_API_KEY を設定してアプリを再起動してください。",
+        "API キーがありません。設定 → LLM でプロバイダーを設定してください。",
       page_range: "ページ範囲",
       page_range_hint: "例：1-5, 8, 10-12（デフォルト：すべて）",
       valid_all: "すべてのページを選択しました（計 {total} ページ）",
@@ -134,12 +135,15 @@ const ja = {
       start: "分析を開始",
     },
     page_translate: {
-      position_aware: "レイアウト考慮翻訳",
+      position_aware: "レイアウト考慮の翻訳",
       position_aware_hint:
-        "テキスト枠の位置とサイズを AI に渡し、領域に収まる訳（短め・改行を避ける）を優先します。",
+        "テキストボックスのサイズから最大長のヒントを渡し、領域に収まりやすい翻訳（短め・改行を避ける）を優先させます。",
+      ai_reflow_paragraphs: "AI 段落整形（改行の整理）",
+      ai_reflow_paragraphs_hint:
+        "PDF の text layer 由来の不自然な改行を、文脈に応じて自然な段落に整形します（必要な場合のみ改行を保持/追加）。",
       context_window: "コンテキスト範囲",
       context_window_hint:
-        "翻訳時に周辺ページのテキストをコンテキストとして添付し、精度を向上させます。",
+        "周辺ページをコンテキストとして含め、翻訳品質を向上させます。",
       context_window_none: "なし",
       context_window_prev: "前のページ",
       context_window_next: "次のページ",
@@ -147,6 +151,9 @@ const ja = {
       context_window_all_prev: "前のすべてのページ",
       context_window_all_next: "後のすべてのページ",
       context_window_all: "現在ページ以外すべて",
+      freetext_padding: "枠の外側パディング",
+      freetext_padding_hint:
+        "元のテキスト枠をこの値だけ外側に広げます（行/段落モード両方に適用）。",
       flatten_all_freetext: "すべての自由テキストをフラット化",
       flatten_all_freetext_hint:
         "エクスポート時に、すべての自由テキストを PDF 注釈として残さずページ内容に書き込みます。",
@@ -375,6 +382,12 @@ const ja = {
   settings: {
     title: "エディター設定",
     description: "ワークスペースの動作とスナップルールを構成します。",
+    tabs: {
+      general: "一般",
+      snapping: "スナップ",
+      llm: "LLM",
+      debug: "デバッグ",
+    },
     language: "言語",
     theme: "テーマ",
     thumbnails_layout: "縮小版のレイアウト",
@@ -400,6 +413,25 @@ const ja = {
     borders: "境界線にスナップ",
     centers: "中心にスナップ",
     equal: "等間隔スナップ",
+    llm: {
+      title: "LLM",
+      gemini: "Gemini",
+      openai: "OpenAI",
+      api_key_placeholder: "API キー",
+      api_url_placeholder: "API URL（任意）",
+      check: "確認",
+      check_success: "設定OK。",
+      check_failed: "確認に失敗しました。",
+      api_key_required: "API キーが必要です。",
+      fetch_models: "モデルを取得",
+      fetch_success: "モデルを取得しました。",
+      fetch_failed: "モデルの取得に失敗しました。",
+      models: "モデル",
+      models_loaded_count: "読み込み済み: {count} 件",
+      custom_models_translate: "カスタムモデル（翻訳）",
+      custom_models_vision: "カスタムモデル（ビジョン）",
+      custom_models_placeholder: "モデルIDを入力して Enter で追加",
+    },
     done: "完了",
   },
   landing: {

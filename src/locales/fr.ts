@@ -76,8 +76,9 @@ const fr = {
   },
   translate: {
     title: "Traduire",
-    provider: "Fournisseur",
+    provider: "Modèle fournisseur",
     provider_gemini: "Gemini (IA)",
+    provider_openai: "OpenAI (IA)",
     cloud_api_key_missing:
       "Clé Cloud Translation API manquante. Définissez GOOGLE_TRANSLATE_API_KEY dans .env.local et redémarrez l’application.",
     model: "Modèle",
@@ -114,10 +115,10 @@ const fr = {
   },
   properties: {
     ai_detection: {
-      title: "Détection de champ IA",
-      desc: "Analyser les pages pour détecter et créer automatiquement des champs de formulaire à l'aide de Gemini.",
+      title: "Détection de formulaires",
+      desc: "Analyser les pages pour détecter et créer automatiquement des champs de formulaire avec le LLM configuré.",
       api_key_missing:
-        "Clé API Gemini manquante. Définissez GEMINI_API_KEY dans .env.local et redémarrez l'application.",
+        "Clé API manquante. Configurez un fournisseur LLM dans Paramètres → LLM.",
       page_range: "Plage de pages",
       page_range_hint: "ex : 1-5, 8, 10-12 (Défaut : Tout)",
       valid_all: "Toutes les pages sélectionnées ({total} pages)",
@@ -135,19 +136,25 @@ const fr = {
       start: "Démarrer l'analyse",
     },
     page_translate: {
-      position_aware: "Traduction sensible à la mise en page",
+      position_aware: "Traduction adaptée à la mise en page",
       position_aware_hint:
-        "Fournir à l’IA la position et la taille de la zone de texte afin de privilégier une traduction qui s’y adapte (plus courte, éviter les retours à la ligne).",
+        "Fournit un indice de longueur maximale (selon la taille de la zone de texte) afin que l’IA privilégie des traductions qui tiennent dans la zone (plus courtes, éviter les retours à la ligne).",
+      ai_reflow_paragraphs: "Recomposition des paragraphes (IA)",
+      ai_reflow_paragraphs_hint:
+        "Autorise l’IA à supprimer les retours à la ligne dus à la mise en page du PDF et à reformuler en paragraphes naturels lorsque c’est approprié.",
       context_window: "Fenêtre de contexte",
       context_window_hint:
-        "Inclure les pages voisines comme contexte pour améliorer la qualité de la traduction.",
-      context_window_none: "Aucun",
+        "Inclure les pages environnantes comme contexte pour améliorer la qualité de traduction.",
+      context_window_none: "Aucune",
       context_window_prev: "Page précédente",
       context_window_next: "Page suivante",
       context_window_prev_next: "Précédente + suivante",
       context_window_all_prev: "Toutes les pages précédentes",
       context_window_all_next: "Toutes les pages suivantes",
       context_window_all: "Toutes les autres pages",
+      freetext_padding: "Marge du cadre",
+      freetext_padding_hint:
+        "Étendre le cadre du texte source vers l’extérieur de cette valeur (valable pour les modes ligne et paragraphe).",
       flatten_all_freetext: "Aplatir tous les textes libres",
       flatten_all_freetext_hint:
         "Lors de l’export, écrire tous les textes libres dans le contenu de la page au lieu de les conserver comme annotations PDF.",
@@ -379,6 +386,12 @@ const fr = {
     title: "Paramètres de l'éditeur",
     description:
       "Configurer le comportement de l'espace de travail et les règles d'ancrage.",
+    tabs: {
+      general: "Général",
+      snapping: "Ancrage",
+      llm: "LLM",
+      debug: "Débogage",
+    },
     language: "Langue",
     theme: "Thème",
     thumbnails_layout: "Disposition des vignettes",
@@ -405,6 +418,26 @@ const fr = {
     borders: "Ancrer aux bordures",
     centers: "Ancrer aux centres",
     equal: "Ancrage équidistant",
+    llm: {
+      title: "LLM",
+      gemini: "Gemini",
+      openai: "OpenAI",
+      api_key_placeholder: "Clé API",
+      api_url_placeholder: "URL de l'API (optionnel)",
+      check: "Vérifier",
+      check_success: "Configuration OK.",
+      check_failed: "Échec de la vérification.",
+      api_key_required: "La clé API est requise.",
+      fetch_models: "Récupérer les modèles",
+      fetch_success: "Modèles récupérés.",
+      fetch_failed: "Échec de la récupération.",
+      models: "Modèles",
+      models_loaded_count: "Chargés : {count} modèle(s)",
+      custom_models_translate: "Modèles personnalisés (Traduction)",
+      custom_models_vision: "Modèles personnalisés (Vision)",
+      custom_models_placeholder:
+        "Saisissez un ID de modèle puis appuyez sur Entrée",
+    },
     done: "Terminé",
   },
   landing: {

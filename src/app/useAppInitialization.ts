@@ -10,6 +10,7 @@ import { isTauri, invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEditorStore, type EditorActions } from "../store/useEditorStore";
 import type { EditorState } from "../types";
+import { loadModels } from "@/services/LLMService";
 
 export function useAppInitialization({
   loadIntoEditor,
@@ -40,6 +41,8 @@ export function useAppInitialization({
       const throwIfCancelled = () => {
         if (cancelled) throw CANCELLED;
       };
+
+      void loadModels();
 
       try {
         const startupPath = await getStartupOpenPdfArg();
@@ -81,12 +84,22 @@ export function useAppInitialization({
         }
 
         const webview = getCurrentWebview();
-        unlisten = await webview.onDragDropEvent((event: any) => {
-          const payload: any = event?.payload;
-          if (payload?.type !== "drop") return;
+        unlisten = await webview.onDragDropEvent((event: unknown) => {
+          const payload =
+            typeof event === "object" && event !== null && "payload" in event
+              ? (event as { payload?: unknown }).payload
+              : null;
 
-          const paths: string[] = Array.isArray(payload?.paths)
-            ? payload.paths
+          if (typeof payload !== "object" || payload === null) return;
+          if (
+            !("type" in payload) ||
+            (payload as { type?: unknown }).type !== "drop"
+          )
+            return;
+
+          const rawPaths = (payload as { paths?: unknown }).paths;
+          const paths: string[] = Array.isArray(rawPaths)
+            ? rawPaths.filter((p): p is string => typeof p === "string")
             : [];
           const firstPdf = paths.find((p) => typeof p === "string") || null;
           if (!firstPdf) return;

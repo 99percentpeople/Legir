@@ -79,8 +79,9 @@ const en = {
   },
   translate: {
     title: "Translate",
-    provider: "Provider",
+    provider: "Models Provider",
     provider_gemini: "Gemini (AI)",
+    provider_openai: "OpenAI (AI)",
     cloud_api_key_missing:
       "Missing Cloud Translation API key. Set GOOGLE_TRANSLATE_API_KEY in .env.local and restart the app.",
     model: "Model",
@@ -117,10 +118,10 @@ const en = {
   },
   properties: {
     ai_detection: {
-      title: "AI Field Detection",
-      desc: "Analyze pages to automatically detect and create form fields using Gemini.",
+      title: "Form Detection",
+      desc: "Analyze pages to automatically detect and create form fields using your configured LLM.",
       api_key_missing:
-        "Missing Gemini API key. Set GEMINI_API_KEY in .env.local and restart the app.",
+        "Missing API key. Configure an LLM provider in Settings → LLM.",
       page_range: "Page Range",
       page_range_hint: "e.g., 1-5, 8, 10-12 (Default: All)",
       valid_all: "All pages selected ({total} pages)",
@@ -138,7 +139,10 @@ const en = {
     page_translate: {
       position_aware: "Layout-aware translation",
       position_aware_hint:
-        "Provide text box position & size to the AI so it prefers translations that fit the area (shorter, avoid line breaks).",
+        "Provide a max-length hint (based on the text box size) so the AI prefers translations that fit the area (shorter, avoid line breaks).",
+      ai_reflow_paragraphs: "AI paragraph reflow",
+      ai_reflow_paragraphs_hint:
+        "Let AI remove layout-induced line breaks from the PDF text layer and rewrite into natural paragraphs when appropriate.",
       context_window: "Context window",
       context_window_hint:
         "Include surrounding pages as context to improve translation quality.",
@@ -149,6 +153,9 @@ const en = {
       context_window_all_prev: "All previous pages",
       context_window_all_next: "All next pages",
       context_window_all: "All other pages",
+      freetext_padding: "Bounding box padding",
+      freetext_padding_hint:
+        "Expand the source text box outward by this amount (applies to both line and paragraph modes).",
       flatten_all_freetext: "Flatten all Free Text",
       flatten_all_freetext_hint:
         "When exporting, write all Free Text into the page content instead of keeping them as PDF annotations.",
@@ -375,6 +382,12 @@ const en = {
   settings: {
     title: "Editor Settings",
     description: "Configure the workspace behavior and snapping rules.",
+    tabs: {
+      general: "General",
+      snapping: "Snapping",
+      llm: "LLM",
+      debug: "Debug",
+    },
     language: "Language",
     theme: "Theme",
     thumbnails_layout: "Thumbnails Layout",
@@ -400,6 +413,25 @@ const en = {
     borders: "Snap to Borders",
     centers: "Snap to Centers",
     equal: "Equidistant Snapping",
+    llm: {
+      title: "LLM",
+      gemini: "Gemini",
+      openai: "OpenAI",
+      api_key_placeholder: "API Key",
+      api_url_placeholder: "API URL (optional)",
+      check: "Check",
+      check_success: "Configuration looks good.",
+      check_failed: "Check failed.",
+      api_key_required: "API key is required.",
+      fetch_models: "Fetch Models",
+      fetch_success: "Models fetched.",
+      fetch_failed: "Fetch failed.",
+      models: "Models",
+      models_loaded_count: "Loaded: {count} model(s)",
+      custom_models_translate: "Custom models (Translate)",
+      custom_models_vision: "Custom models (Vision)",
+      custom_models_placeholder: "Type a model ID and press Enter",
+    },
     done: "Done",
   },
   landing: {

@@ -10,7 +10,6 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Label } from "../ui/label";
 import { useLanguage } from "../language-provider";
 
 export type PdfPasswordPrompt = {

@@ -1,65 +1,40 @@
 import {
   GoogleGenAI,
-  ThinkingLevel,
   Type,
   type GenerateContentParameters,
+  type ListModelsParameters,
+  type Model,
 } from "@google/genai";
 
 import { DEFAULT_FIELD_STYLE } from "@/constants";
 import type { FieldStyle, FormField } from "@/types";
 import { FieldType } from "@/types";
-import { translateService } from "@/services/translateService";
+import { useEditorStore } from "@/store/useEditorStore";
 
 import type {
-  LLMAnalyzePageForFieldsProvider,
-  LLMTranslateProvider,
   LLMTranslateTextOptions,
+  LLMModelOption,
+  LLMProvider,
+  LLMAnalyzePageForFieldsOptions,
 } from "../types";
 
-export type GeminiModelId = "gemini-3-flash-preview" | "gemini-2.5-flash";
-
-export type GeminiModelOption = {
-  value: GeminiModelId;
-  label: string;
-  config?: {
-    thinkingLevel?: ThinkingLevel;
-  };
-};
-
-export const GEMINI_MODEL_OPTIONS: GeminiModelOption[] = [
-  {
-    value: "gemini-3-flash-preview",
-    label: "Gemini 3 Flash Preview",
-    config: {
-      thinkingLevel: ThinkingLevel.MINIMAL,
-    },
-  },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-];
-
 const getGeminiApiKey = () => {
-  return process.env.GEMINI_API_KEY || process.env.API_KEY;
+  return (useEditorStore.getState().options?.llm?.gemini?.apiKey || "").trim();
 };
-
-export const GEMINI_API_AVAILABLE = !!getGeminiApiKey();
 
 export interface AIAnalysisOptions {
   allowedTypes?: FieldType[];
   extraPrompt?: string;
-  model?: GeminiModelId;
+  model?: string;
 }
 
-export type TranslateTextOptions = LLMTranslateTextOptions<GeminiModelId>;
-
-export type TranslateTextStreamOptions = TranslateTextOptions;
+export type TranslateTextOptions = LLMTranslateTextOptions;
 
 export type GeminiPageTranslateBlock = {
   id: string;
   order: number;
   text: string;
-  rect: { x: number; y: number; width: number; height: number };
-  fontSize: number;
-  fontFamily: string;
+  maxChars?: number;
 };
 
 export type GeminiPageTranslateResponse = {
@@ -108,37 +83,153 @@ const extractGeminiText = (value: unknown): string => {
   return "";
 };
 
-const getGeminiModelId = (raw: string | undefined): GeminiModelId => {
-  const fallback = GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash";
-  if (!raw) return fallback;
-  const known = GEMINI_MODEL_OPTIONS.some((m) => m.value === raw);
-  return known ? (raw as GeminiModelId) : fallback;
+const normalizeGeminiModelId = (raw: string) => {
+  if (raw.startsWith("models/")) return raw.slice("models/".length);
+  return raw;
 };
 
-const getGeminiModelOption = (model: GeminiModelId): GeminiModelOption => {
-  return (
-    GEMINI_MODEL_OPTIONS.find((m) => m.value === model) ?? {
-      value: model,
-      label: model,
-    }
-  );
+let cachedTranslateModels: LLMModelOption[] = [];
+let cachedVisionModels: LLMModelOption[] = [];
+let refreshPromise: Promise<void> | null = null;
+let refreshEpoch = 0;
+
+export const resetGeminiModelCache = () => {
+  refreshEpoch += 1;
+  cachedTranslateModels = [];
+  cachedVisionModels = [];
+  refreshPromise = null;
 };
 
-const buildGeminiConfig = (
-  model: GeminiModelId,
-  opts?: { signal?: AbortSignal },
-) => {
-  const modelOpt = getGeminiModelOption(model);
+const mergeModels = (a: LLMModelOption[], b: LLMModelOption[]) => {
+  const out: LLMModelOption[] = [];
+  const seen = new Set<string>();
+
+  for (const m of [...a, ...b]) {
+    if (!m?.id) continue;
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+
+  return out;
+};
+
+const getCustomTranslateModels = (): LLMModelOption[] => {
+  const ids =
+    useEditorStore.getState().options?.llm?.gemini?.customTranslateModels;
+  if (!Array.isArray(ids)) return [];
+  return ids
+    .map((x) => (typeof x === "string" ? x.trim() : ""))
+    .filter(Boolean)
+    .map((id) => ({ id, label: id }));
+};
+
+const getCustomVisionModels = (): LLMModelOption[] => {
+  const ids =
+    useEditorStore.getState().options?.llm?.gemini?.customVisionModels;
+  if (!Array.isArray(ids)) return [];
+  return ids
+    .map((x) => (typeof x === "string" ? x.trim() : ""))
+    .filter(Boolean)
+    .map((id) => ({ id, label: id }));
+};
+
+const buildGeminiConfig = (opts?: { signal?: AbortSignal }) => {
   return {
-    ...(modelOpt.config?.thinkingLevel
-      ? {
-          thinkingConfig: {
-            thinkingLevel: modelOpt.config.thinkingLevel,
-          },
-        }
-      : {}),
     abortSignal: opts?.signal,
   };
+};
+
+export const getGeminiCachedModels = () => {
+  return {
+    translate: cachedTranslateModels,
+    vision: cachedVisionModels,
+  };
+};
+
+const refreshModels = async () => {
+  if (!client.isAvailable()) {
+    refreshEpoch += 1;
+    cachedTranslateModels = [];
+    cachedVisionModels = [];
+    return;
+  }
+  if (cachedTranslateModels.length > 0) return;
+  if (refreshPromise) return await refreshPromise;
+
+  const epoch = refreshEpoch;
+
+  refreshPromise = (async () => {
+    if (!client.isAvailable()) {
+      if (refreshEpoch === epoch) {
+        cachedTranslateModels = [];
+        cachedVisionModels = [];
+      }
+      return;
+    }
+
+    const pager = await client.listModels({
+      config: {
+        queryBase: true,
+        pageSize: 100,
+      },
+    } satisfies ListModelsParameters);
+
+    const all: Model[] = [];
+    for await (const m of pager) {
+      if (m.supportedActions?.includes("generateContent")) {
+        all.push(m);
+      }
+    }
+
+    const translate: LLMModelOption[] = [];
+    const vision: LLMModelOption[] = [];
+
+    for (const m of all) {
+      const name = typeof m.name === "string" ? m.name : "";
+      if (!name) continue;
+
+      const id = normalizeGeminiModelId(name);
+      const label =
+        typeof m.displayName === "string" && m.displayName ? m.displayName : id;
+
+      translate.push({ id, label });
+      vision.push({ id, label });
+    }
+
+    if (refreshEpoch === epoch) {
+      cachedTranslateModels = translate.sort((a, b) =>
+        a.id.localeCompare(b.id),
+      );
+      cachedVisionModels =
+        vision.length > 0
+          ? vision.sort((a, b) => a.id.localeCompare(b.id))
+          : cachedTranslateModels;
+    }
+  })().finally(() => {
+    refreshPromise = null;
+  });
+
+  return await refreshPromise;
+};
+
+const resolveTranslateModelId = async (requested: string | undefined) => {
+  await refreshModels();
+  const candidate = typeof requested === "string" ? requested.trim() : "";
+  if (candidate) return candidate;
+  const fallback = cachedTranslateModels[0]?.id || "gemini-2.5-flash";
+  return fallback;
+};
+
+const resolveVisionModelId = async (requested: string | undefined) => {
+  await refreshModels();
+  const candidate = typeof requested === "string" ? requested.trim() : "";
+  if (candidate) return candidate;
+  const fallback =
+    cachedVisionModels[0]?.id ||
+    cachedTranslateModels[0]?.id ||
+    "gemini-2.5-flash";
+  return fallback;
 };
 
 const buildTranslationPrompt = (text: string, opts: TranslateTextOptions) => {
@@ -163,17 +254,22 @@ export const translatePageBlocksStructured = async (options: {
   context?: Array<{ pageIndex: number; text: string }>;
   targetLanguage: string;
   sourceLanguage?: string;
-  model?: GeminiModelId;
+  model?: string;
   prompt?: string;
   usePositionAwarePrompt?: boolean;
+  aiReflowParagraphs?: boolean;
   signal?: AbortSignal;
 }): Promise<GeminiPageTranslateResponse> => {
-  const model = getGeminiModelId(options.model);
+  const model = await resolveTranslateModelId(options.model);
 
   const extra = (options.prompt || "").trim();
   const positionAware = options.usePositionAwarePrompt
-    ? "\n- Consider each block's rect and fontSize. Prefer shorter translations that fit the region. Avoid adding extra line breaks."
+    ? "\n- Each block may include a maxChars hint. Prefer translations that fit within maxChars."
     : "";
+
+  const lineBreakRule = options.aiReflowParagraphs
+    ? "- You MAY reflow paragraphs within each block: treat PDF/text-layer line breaks as layout artifacts unless they are clearly intentional paragraph breaks. Prefer natural sentences and remove unnecessary mid-sentence line breaks. Do NOT add extra line breaks; only keep or add line breaks when truly necessary."
+    : "- Preserve existing line breaks within each block. Do NOT add extra line breaks.";
 
   const prompt = `
 You are a professional translator.
@@ -182,9 +278,20 @@ Task:
 - Translate the target page blocks to ${options.targetLanguage}.
 - You may SKIP blocks that are not meaningful to translate (e.g. pure symbols, page numbers).
 - Preserve meaning.
-- Preserve existing line breaks within each block. Do NOT add extra line breaks.
-- Output MUST be valid JSON that matches the schema. No markdown.
+${lineBreakRule}
+- Output MUST be valid JSON. No markdown.
 ${positionAware}
+
+Output JSON schema:
+{
+  "translations": [
+    {
+      "id": string,
+      "action": "translate" | "skip",
+      "translatedText"?: string | null
+    }
+  ]
+}
 
 ${extra ? `Additional instructions:\n${extra}\n` : ""}
 
@@ -207,7 +314,7 @@ ${JSON.stringify(
       parts: [{ text: prompt }],
     },
     config: {
-      ...buildGeminiConfig(model, { signal: options.signal }),
+      ...buildGeminiConfig({ signal: options.signal }),
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -293,125 +400,166 @@ class GeminiClient {
     const ai = this.createClient();
     return await ai.models.generateContentStream(req);
   }
+
+  async listModels(params?: ListModelsParameters) {
+    if (!this.isAvailable()) {
+      throw new Error("No API Key provided for Gemini.");
+    }
+    const ai = this.createClient();
+    return await ai.models.list(params);
+  }
 }
 
 const client = new GeminiClient();
 
-export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
-  LLMAnalyzePageForFieldsProvider = {
+export const checkGeminiConfig = async () => {
+  if (!client.isAvailable()) {
+    throw new Error("No API Key provided for Gemini.");
+  }
+
+  const pager = await client.listModels({
+    config: {
+      queryBase: true,
+      pageSize: 1,
+    },
+  } satisfies ListModelsParameters);
+
+  for await (const _m of pager) {
+    break;
+  }
+};
+
+export const geminiProvider: LLMProvider = {
   id: "gemini",
+  label: "Gemini (AI)",
+  labelKey: "translate.provider_gemini",
+  unavailableMessageKey: "properties.ai_detection.api_key_missing",
   isAvailable: () => client.isAvailable(),
+  getFunctions: () => {
+    return {
+      translate: {
+        kind: "translate",
+        getModels: () =>
+          mergeModels(cachedTranslateModels, getCustomTranslateModels()),
+        refreshModels,
+        translateText: async (text, opts) => {
+          const model = await resolveTranslateModelId(opts.modelId);
+          const prompt = buildTranslationPrompt(text, opts);
 
-  translateText: async (text, opts) => {
-    const model = getGeminiModelId(opts.model);
-    const prompt = buildTranslationPrompt(text, opts);
+          const response = await client.generateContent({
+            model,
+            contents: {
+              parts: [{ text: prompt }],
+            },
+            config: buildGeminiConfig({ signal: opts.signal }),
+          });
 
-    const response = await client.generateContent({
-      model,
-      contents: {
-        parts: [{ text: prompt }],
+          return (response.text || "").trim();
+        },
+        translateTextStream: async function* (text, opts) {
+          const model = await resolveTranslateModelId(opts.modelId);
+          const prompt = buildTranslationPrompt(text, opts);
+
+          const req: GenerateContentParameters = {
+            model,
+            contents: {
+              parts: [{ text: prompt }],
+            },
+            config: buildGeminiConfig({ signal: opts.signal }),
+          };
+
+          const stream = await client.generateContentStream(req);
+          for await (const chunk of stream) {
+            const delta = extractGeminiText(chunk);
+            if (delta) yield delta;
+          }
+        },
       },
-      config: buildGeminiConfig(model, { signal: opts.signal }),
-    });
+      aiDetect: {
+        kind: "aiDetect",
+        getModels: () =>
+          mergeModels(cachedVisionModels, getCustomVisionModels()),
+        refreshModels,
+        analyzePageForFields: async (
+          base64Image,
+          pageIndex,
+          pageWidth,
+          pageHeight,
+          existingFields = [],
+          options,
+        ) => {
+          const typedExistingFields = existingFields as FormField[];
+          const typedOptions = options as
+            | LLMAnalyzePageForFieldsOptions
+            | undefined;
 
-    return (response.text || "").trim();
-  },
+          const model = await resolveVisionModelId(typedOptions?.modelId);
 
-  translateTextStream: async function* (text, opts) {
-    const model = getGeminiModelId(opts.model);
-    const prompt = buildTranslationPrompt(text, opts);
+          // Clean base64 string
+          const cleanBase64 = base64Image.replace(
+            /^data:image\/(png|jpeg|jpg);base64,/,
+            "",
+          );
 
-    const req: GenerateContentParameters = {
-      model,
-      contents: {
-        parts: [{ text: prompt }],
-      },
-      config: buildGeminiConfig(model, { signal: opts.signal }),
-    };
+          // Create a summary of existing fields to provide context to the AI
+          // Convert to 0-1000 scale for the model
+          const existingFieldsSummary = typedExistingFields.map((f) => ({
+            id: f.id,
+            type: f.type,
+            // Provide coordinates in 0-1000 scale [ymin, xmin, ymax, xmax]
+            box_2d: [
+              Math.round((f.rect.y / pageHeight) * 1000),
+              Math.round((f.rect.x / pageWidth) * 1000),
+              Math.round(((f.rect.y + f.rect.height) / pageHeight) * 1000),
+              Math.round(((f.rect.x + f.rect.width) / pageWidth) * 1000),
+            ],
+          }));
 
-    const stream = await client.generateContentStream(req);
-    for await (const chunk of stream) {
-      const delta = extractGeminiText(chunk);
-      if (delta) yield delta;
-    }
-  },
+          const allowedTypes = typedOptions?.allowedTypes || [
+            FieldType.TEXT,
+            FieldType.CHECKBOX,
+            FieldType.RADIO,
+            FieldType.DROPDOWN,
+            FieldType.SIGNATURE,
+          ];
 
-  analyzePageForFields: async (
-    base64Image,
-    pageIndex,
-    pageWidth,
-    pageHeight,
-    existingFields = [],
-    options,
-  ) => {
-    const typedExistingFields = existingFields as FormField[];
-    const typedOptions = options as AIAnalysisOptions | undefined;
+          const typeDescriptions = [];
+          if (allowedTypes.includes(FieldType.TEXT)) {
+            typeDescriptions.push(
+              "Text Input Areas: Blank rectangles, underlines, or comb boxes.",
+            );
+          }
+          if (allowedTypes.includes(FieldType.CHECKBOX)) {
+            typeDescriptions.push(
+              "Checkboxes: Small squares intended for ticking.",
+            );
+          }
+          if (allowedTypes.includes(FieldType.RADIO)) {
+            typeDescriptions.push(
+              "Radio Buttons: Small circles intended for selection.",
+            );
+          }
+          if (allowedTypes.includes(FieldType.DROPDOWN)) {
+            typeDescriptions.push("Dropdowns: Boxes with a down arrow.");
+          }
+          if (allowedTypes.includes(FieldType.SIGNATURE)) {
+            typeDescriptions.push(
+              "Signature Fields: Lines marked with 'Sign here', 'Signature', or 'X'.",
+            );
+          }
 
-    const model = getGeminiModelId(typedOptions?.model);
+          const schemaEnumMap: Record<string, string> = {
+            [FieldType.TEXT]: "text",
+            [FieldType.CHECKBOX]: "checkbox",
+            [FieldType.RADIO]: "radio",
+            [FieldType.DROPDOWN]: "dropdown",
+            [FieldType.SIGNATURE]: "signature",
+          };
+          const currentSchemaEnum = allowedTypes
+            .map((t) => schemaEnumMap[t])
+            .filter(Boolean);
 
-    // Clean base64 string
-    const cleanBase64 = base64Image.replace(
-      /^data:image\/(png|jpeg|jpg);base64,/,
-      "",
-    );
-
-    // Create a summary of existing fields to provide context to the AI
-    // Convert to 0-1000 scale for the model
-    const existingFieldsSummary = typedExistingFields.map((f) => ({
-      id: f.id,
-      type: f.type,
-      // Provide coordinates in 0-1000 scale [ymin, xmin, ymax, xmax]
-      box_2d: [
-        Math.round((f.rect.y / pageHeight) * 1000),
-        Math.round((f.rect.x / pageWidth) * 1000),
-        Math.round(((f.rect.y + f.rect.height) / pageHeight) * 1000),
-        Math.round(((f.rect.x + f.rect.width) / pageWidth) * 1000),
-      ],
-    }));
-
-    const allowedTypes = typedOptions?.allowedTypes || [
-      FieldType.TEXT,
-      FieldType.CHECKBOX,
-      FieldType.RADIO,
-      FieldType.DROPDOWN,
-      FieldType.SIGNATURE,
-    ];
-
-    const typeDescriptions = [];
-    if (allowedTypes.includes(FieldType.TEXT)) {
-      typeDescriptions.push(
-        "Text Input Areas: Blank rectangles, underlines, or comb boxes.",
-      );
-    }
-    if (allowedTypes.includes(FieldType.CHECKBOX)) {
-      typeDescriptions.push("Checkboxes: Small squares intended for ticking.");
-    }
-    if (allowedTypes.includes(FieldType.RADIO)) {
-      typeDescriptions.push(
-        "Radio Buttons: Small circles intended for selection.",
-      );
-    }
-    if (allowedTypes.includes(FieldType.DROPDOWN)) {
-      typeDescriptions.push("Dropdowns: Boxes with a down arrow.");
-    }
-    if (allowedTypes.includes(FieldType.SIGNATURE)) {
-      typeDescriptions.push(
-        "Signature Fields: Lines marked with 'Sign here', 'Signature', or 'X'.",
-      );
-    }
-
-    const schemaEnumMap: Record<string, string> = {
-      [FieldType.TEXT]: "text",
-      [FieldType.CHECKBOX]: "checkbox",
-      [FieldType.RADIO]: "radio",
-      [FieldType.DROPDOWN]: "dropdown",
-      [FieldType.SIGNATURE]: "signature",
-    };
-    const currentSchemaEnum = allowedTypes
-      .map((t) => schemaEnumMap[t])
-      .filter(Boolean);
-
-    const prompt = `
+          const prompt = `
       You are an expert PDF form digitizer. 
       Analyze the image and identify the precise bounding boxes for user-fillable form fields.
       
@@ -462,256 +610,231 @@ export const geminiProvider: LLMTranslateProvider<GeminiModelId> &
       Return a JSON object with a "fields" array.
     `;
 
-    const response = await client.generateContent({
-      model,
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: cleanBase64,
-            },
-          },
-          { text: prompt },
-        ],
-      },
-      config: {
-        ...buildGeminiConfig(model),
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            fields: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  label: {
-                    type: Type.STRING,
-                    description:
-                      "The inferred label for this field (clean text only, no underscores)",
-                  },
-                  type: { type: Type.STRING, enum: currentSchemaEnum },
-                  box_2d: {
-                    type: Type.ARRAY,
-                    items: { type: Type.INTEGER },
-                    description: "[ymin, xmin, ymax, xmax] on 0-1000 scale",
-                  },
-                  options: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING },
-                    description:
-                      "For dropdowns, a list of inferred options. Null/Empty for other types.",
-                    nullable: true,
-                  },
-                  text_preferences: {
-                    type: Type.OBJECT,
-                    description: "Specific properties for text fields",
-                    properties: {
-                      alignment: {
-                        type: Type.STRING,
-                        enum: ["left", "center", "right"],
-                        description: "Text alignment",
-                      },
-                      multiline: {
-                        type: Type.BOOLEAN,
-                        description:
-                          "True if the field appears to be a multi-line text area",
-                      },
-                    },
-                    nullable: true,
-                  },
-                  visual_characteristics: {
-                    type: Type.OBJECT,
-                    properties: {
-                      background_color: {
-                        type: Type.STRING,
-                        description: "Hex code (e.g. #F0F0F0) or 'transparent'",
-                      },
-                      border_color: {
-                        type: Type.STRING,
-                        description: "Hex code (e.g. #000000)",
-                      },
-                      border_width: {
-                        type: Type.INTEGER,
-                        description:
-                          "Set to 0 if border exists in image, 1 otherwise.",
-                      },
-                      font_size: {
-                        type: Type.INTEGER,
-                        description: "Estimated font size in pt",
-                      },
-                    },
-                    nullable: true,
+          const response = await client.generateContent({
+            model,
+            contents: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: "image/jpeg",
+                    data: cleanBase64,
                   },
                 },
-                required: ["label", "type", "box_2d"],
+                { text: prompt },
+              ],
+            },
+            config: {
+              ...buildGeminiConfig(),
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  fields: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        label: {
+                          type: Type.STRING,
+                          description:
+                            "The inferred label for this field (clean text only, no underscores)",
+                        },
+                        type: { type: Type.STRING, enum: currentSchemaEnum },
+                        box_2d: {
+                          type: Type.ARRAY,
+                          items: { type: Type.INTEGER },
+                          description:
+                            "[ymin, xmin, ymax, xmax] on 0-1000 scale",
+                        },
+                        options: {
+                          type: Type.ARRAY,
+                          items: { type: Type.STRING },
+                          description:
+                            "For dropdowns, a list of inferred options. Null/Empty for other types.",
+                          nullable: true,
+                        },
+                        text_preferences: {
+                          type: Type.OBJECT,
+                          description: "Specific properties for text fields",
+                          properties: {
+                            alignment: {
+                              type: Type.STRING,
+                              enum: ["left", "center", "right"],
+                              description: "Text alignment",
+                            },
+                            multiline: {
+                              type: Type.BOOLEAN,
+                              description:
+                                "True if the field appears to be a multi-line text area",
+                            },
+                          },
+                          nullable: true,
+                        },
+                        visual_characteristics: {
+                          type: Type.OBJECT,
+                          properties: {
+                            background_color: {
+                              type: Type.STRING,
+                              description:
+                                "Hex code (e.g. #F0F0F0) or 'transparent'",
+                            },
+                            border_color: {
+                              type: Type.STRING,
+                              description: "Hex code (e.g. #000000)",
+                            },
+                            border_width: {
+                              type: Type.INTEGER,
+                              description:
+                                "Set to 0 if border exists in image, 1 otherwise.",
+                            },
+                            font_size: {
+                              type: Type.INTEGER,
+                              description: "Estimated font size in pt",
+                            },
+                          },
+                          nullable: true,
+                        },
+                      },
+                      required: ["label", "type", "box_2d"],
+                    },
+                  },
+                },
               },
             },
-          },
+          });
+
+          const jsonText = response.text;
+          if (!jsonText) return [];
+
+          const result = JSON.parse(jsonText);
+
+          if (!result.fields || !Array.isArray(result.fields)) return [];
+
+          return result.fields.map((item: unknown, index: number) => {
+            const safe = item as {
+              box_2d?: unknown;
+              label?: unknown;
+              type?: unknown;
+              visual_characteristics?: unknown;
+              text_preferences?: unknown;
+              options?: unknown;
+            };
+
+            const box = Array.isArray(safe.box_2d) ? safe.box_2d : [];
+            const [ymin, xmin, ymax, xmax] = box;
+
+            // Convert 0-1000 scale to pixel scale
+            const yMinVal = Math.max(0, Math.min(1000, Number(ymin)));
+            const xMinVal = Math.max(0, Math.min(1000, Number(xmin)));
+            const yMaxVal = Math.max(0, Math.min(1000, Number(ymax)));
+            const xMaxVal = Math.max(0, Math.min(1000, Number(xmax)));
+
+            const x = (xMinVal / 1000) * pageWidth;
+            const y = (yMinVal / 1000) * pageHeight;
+            const w = ((xMaxVal - xMinVal) / 1000) * pageWidth;
+            const h = ((yMaxVal - yMinVal) / 1000) * pageHeight;
+
+            // Sanitize label for ID generation and clean display
+            const rawLabel =
+              typeof safe.label === "string" && safe.label.trim()
+                ? safe.label
+                : `Field_${index}`;
+            // Remove leading/trailing non-alphanumerics
+            let cleanLabel = rawLabel.replace(
+              /^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g,
+              "",
+            );
+            // Replace remaining non-alphanumerics with single underscore to keep it readable but valid
+            cleanLabel = cleanLabel.replace(/[^a-zA-Z0-9]+/g, "_");
+
+            if (!cleanLabel) cleanLabel = `Field_${index}`;
+
+            // Map string type to Enum
+            let fieldType = FieldType.TEXT;
+            if (safe.type === "checkbox") fieldType = FieldType.CHECKBOX;
+            else if (safe.type === "radio") fieldType = FieldType.RADIO;
+            else if (safe.type === "dropdown") fieldType = FieldType.DROPDOWN;
+            else if (safe.type === "signature") fieldType = FieldType.SIGNATURE;
+
+            // Parse Style (start with defaults)
+            const style: FieldStyle = { ...DEFAULT_FIELD_STYLE };
+
+            if (safe.visual_characteristics) {
+              const vc = safe.visual_characteristics as Record<string, unknown>;
+
+              const backgroundColor = vc["background_color"];
+              if (typeof backgroundColor === "string" && backgroundColor) {
+                const bg = backgroundColor.toLowerCase();
+                // Normalize white/off-white to transparent to avoid obscuring PDF content
+                if (bg === "transparent" || bg === "#ffffff" || bg === "#fff") {
+                  style.isTransparent = true;
+                } else {
+                  style.backgroundColor = backgroundColor;
+                  style.isTransparent = false;
+                }
+              }
+
+              const borderColor = vc["border_color"];
+              if (typeof borderColor === "string" && borderColor) {
+                style.borderColor = borderColor;
+              }
+
+              const borderWidth = vc["border_width"];
+              if (typeof borderWidth === "number") {
+                style.borderWidth = borderWidth;
+              }
+
+              const fontSize = vc["font_size"];
+              if (
+                typeof fontSize === "number" ||
+                typeof fontSize === "string"
+              ) {
+                const parsed = Number(fontSize);
+                if (Number.isFinite(parsed) && parsed > 0)
+                  style.fontSize = parsed;
+              }
+            }
+
+            // Enforce black text color for detected fields to prevent visibility issues
+            style.textColor = "#000000";
+
+            // Parse Text Preferences
+            let multiline = undefined;
+            let alignment: "left" | "center" | "right" | undefined = undefined;
+
+            if (fieldType === FieldType.TEXT && safe.text_preferences) {
+              const tp = safe.text_preferences as Record<string, unknown>;
+              const ml = tp["multiline"];
+              if (typeof ml === "boolean") multiline = ml;
+
+              const align = tp["alignment"];
+              if (align === "left" || align === "center" || align === "right") {
+                alignment = align;
+              }
+            }
+
+            return {
+              id: `auto_${pageIndex}_${index}_${Date.now()}`,
+              pageIndex,
+              type: fieldType,
+              name: cleanLabel,
+              rect: { x, y, width: w, height: h },
+              required: false,
+              style: style,
+              // Default options for dropdowns if detected, otherwise fall back to defaults
+              options:
+                fieldType === FieldType.DROPDOWN
+                  ? Array.isArray(safe.options) && safe.options.length > 0
+                    ? (safe.options as string[])
+                    : ["Option 1", "Option 2"]
+                  : undefined,
+              radioValue: fieldType === FieldType.RADIO ? "Choice1" : undefined,
+              multiline: multiline,
+              alignment: alignment,
+            } satisfies FormField;
+          });
         },
       },
-    });
-
-    const jsonText = response.text;
-    if (!jsonText) return [];
-
-    const result = JSON.parse(jsonText);
-
-    if (!result.fields || !Array.isArray(result.fields)) return [];
-
-    return result.fields.map((item: unknown, index: number) => {
-      const safe = item as {
-        box_2d?: unknown;
-        label?: unknown;
-        type?: unknown;
-        visual_characteristics?: unknown;
-        text_preferences?: unknown;
-        options?: unknown;
-      };
-
-      const box = Array.isArray(safe.box_2d) ? safe.box_2d : [];
-      const [ymin, xmin, ymax, xmax] = box;
-
-      // Convert 0-1000 scale to pixel scale
-      const yMinVal = Math.max(0, Math.min(1000, Number(ymin)));
-      const xMinVal = Math.max(0, Math.min(1000, Number(xmin)));
-      const yMaxVal = Math.max(0, Math.min(1000, Number(ymax)));
-      const xMaxVal = Math.max(0, Math.min(1000, Number(xmax)));
-
-      const x = (xMinVal / 1000) * pageWidth;
-      const y = (yMinVal / 1000) * pageHeight;
-      const w = ((xMaxVal - xMinVal) / 1000) * pageWidth;
-      const h = ((yMaxVal - yMinVal) / 1000) * pageHeight;
-
-      // Sanitize label for ID generation and clean display
-      const rawLabel =
-        typeof safe.label === "string" && safe.label.trim()
-          ? safe.label
-          : `Field_${index}`;
-      // Remove leading/trailing non-alphanumerics
-      let cleanLabel = rawLabel.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "");
-      // Replace remaining non-alphanumerics with single underscore to keep it readable but valid
-      cleanLabel = cleanLabel.replace(/[^a-zA-Z0-9]+/g, "_");
-
-      if (!cleanLabel) cleanLabel = `Field_${index}`;
-
-      // Map string type to Enum
-      let fieldType = FieldType.TEXT;
-      if (safe.type === "checkbox") fieldType = FieldType.CHECKBOX;
-      else if (safe.type === "radio") fieldType = FieldType.RADIO;
-      else if (safe.type === "dropdown") fieldType = FieldType.DROPDOWN;
-      else if (safe.type === "signature") fieldType = FieldType.SIGNATURE;
-
-      // Parse Style (start with defaults)
-      const style: FieldStyle = { ...DEFAULT_FIELD_STYLE };
-
-      if (safe.visual_characteristics) {
-        const vc = safe.visual_characteristics as Record<string, unknown>;
-
-        const backgroundColor = vc["background_color"];
-        if (typeof backgroundColor === "string" && backgroundColor) {
-          const bg = backgroundColor.toLowerCase();
-          // Normalize white/off-white to transparent to avoid obscuring PDF content
-          if (bg === "transparent" || bg === "#ffffff" || bg === "#fff") {
-            style.isTransparent = true;
-          } else {
-            style.backgroundColor = backgroundColor;
-            style.isTransparent = false;
-          }
-        }
-
-        const borderColor = vc["border_color"];
-        if (typeof borderColor === "string" && borderColor) {
-          style.borderColor = borderColor;
-        }
-
-        const borderWidth = vc["border_width"];
-        if (typeof borderWidth === "number") {
-          style.borderWidth = borderWidth;
-        }
-
-        const fontSize = vc["font_size"];
-        if (typeof fontSize === "number" || typeof fontSize === "string") {
-          const parsed = Number(fontSize);
-          if (Number.isFinite(parsed) && parsed > 0) style.fontSize = parsed;
-        }
-      }
-
-      // Enforce black text color for detected fields to prevent visibility issues
-      style.textColor = "#000000";
-
-      // Parse Text Preferences
-      let multiline = undefined;
-      let alignment: "left" | "center" | "right" | undefined = undefined;
-
-      if (fieldType === FieldType.TEXT && safe.text_preferences) {
-        const tp = safe.text_preferences as Record<string, unknown>;
-        const ml = tp["multiline"];
-        if (typeof ml === "boolean") multiline = ml;
-
-        const align = tp["alignment"];
-        if (align === "left" || align === "center" || align === "right") {
-          alignment = align;
-        }
-      }
-
-      return {
-        id: `auto_${pageIndex}_${index}_${Date.now()}`,
-        pageIndex,
-        type: fieldType,
-        name: cleanLabel,
-        rect: { x, y, width: w, height: h },
-        required: false,
-        style: style,
-        // Default options for dropdowns if detected, otherwise fall back to defaults
-        options:
-          fieldType === FieldType.DROPDOWN
-            ? Array.isArray(safe.options) && safe.options.length > 0
-              ? (safe.options as string[])
-              : ["Option 1", "Option 2"]
-            : undefined,
-        radioValue: fieldType === FieldType.RADIO ? "Choice1" : undefined,
-        multiline: multiline,
-        alignment: alignment,
-      } satisfies FormField;
-    });
+    };
   },
 };
-
-translateService.registerOptionGroup({
-  id: "gemini",
-  label: "Gemini (AI)",
-  labelKey: "translate.provider_gemini",
-  isLLM: true,
-  options: GEMINI_MODEL_OPTIONS.map((opt) => ({
-    id: opt.value,
-    label: opt.label,
-  })),
-  isAvailable: () => client.isAvailable(),
-  unavailableMessageKey: "properties.ai_detection.api_key_missing",
-  translate: async (text, optionId, opts) => {
-    const model = getGeminiModelId(optionId);
-    return await geminiProvider.translateText(text, {
-      model,
-      targetLanguage: opts.targetLanguage,
-      sourceLanguage: opts.sourceLanguage,
-      prompt: opts.prompt,
-      signal: opts.signal,
-    });
-  },
-  translateStream: (text, optionId, opts) => {
-    const model = getGeminiModelId(optionId);
-    return geminiProvider.translateTextStream!(text, {
-      model,
-      targetLanguage: opts.targetLanguage,
-      sourceLanguage: opts.sourceLanguage,
-      prompt: opts.prompt,
-      signal: opts.signal,
-    });
-  },
-});
-
-translateService.setDefaultOptionId(
-  `gemini:${GEMINI_MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash"}`,
-);

@@ -8,7 +8,7 @@ import {
   AIDetectionOptions,
   AIDetectionOptionsForm,
 } from "@/components/AIDetectionOptionsForm";
-import { GEMINI_API_AVAILABLE } from "@/services/LLMService";
+import { isAIDetectAvailable } from "@/services/LLMService";
 
 export interface AIDetectionPanelProps {
   isFloating: boolean;
@@ -36,6 +36,7 @@ export function AIDetectionPanel({
   onDetect,
 }: AIDetectionPanelProps) {
   const { t } = useLanguage();
+  const isAvailable = isAIDetectAvailable();
 
   return (
     <PanelLayout
@@ -53,7 +54,7 @@ export function AIDetectionPanel({
       onResize={onResize}
       footer={
         <div className="space-y-2">
-          {!GEMINI_API_AVAILABLE && (
+          {!isAvailable && (
             <div className="text-muted-foreground text-xs">
               {t("properties.ai_detection.api_key_missing")}
             </div>
@@ -61,7 +62,7 @@ export function AIDetectionPanel({
 
           <DialogFooter className="p-0">
             <Button
-              disabled={!GEMINI_API_AVAILABLE || isProcessing}
+              disabled={!isAvailable || isProcessing}
               className="bg-purple-600 text-white hover:bg-purple-700"
               form="ai-detection-panel-form"
               type="submit"

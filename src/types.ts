@@ -180,11 +180,37 @@ export interface DebugOptions {
   pdfTextLayer: boolean;
 }
 
-export interface EditorOptions {
+export type AppLLMModelOption = {
+  id: string;
+  label: string;
+  labelKey?: string;
+};
+
+export interface GeminiLLMProviderOptions {
+  apiKey?: string;
+  customTranslateModels: string[];
+  customVisionModels: string[];
+}
+
+export interface OpenAiLLMProviderOptions {
+  apiKey?: string;
+  apiUrl?: string;
+  customTranslateModels: string[];
+  customVisionModels: string[];
+}
+
+export interface LLMOptions {
+  gemini: GeminiLLMProviderOptions;
+  openai: OpenAiLLMProviderOptions;
+}
+
+export interface AppOptions {
   snappingOptions: SnappingOptions;
   debugOptions: DebugOptions;
   userName: string;
   thumbnailsLayout: ThumbnailsLayoutMode;
+
+  llm: LLMOptions;
 }
 
 export interface PenStyle {
@@ -206,15 +232,17 @@ export type PageTranslateContextWindow =
   | "all_next"
   | "all";
 
-export interface PageTranslateUiPreferences {
-  pageTranslateFontFamily: string;
-  pageTranslateUsePositionAwarePrompt: boolean;
-  pageTranslateUseParagraphs: boolean;
-  pageTranslateFlattenFreetext: boolean;
-  pageTranslateContextWindow: PageTranslateContextWindow;
-  pageTranslateParagraphXGap: number;
-  pageTranslateParagraphYGap: number;
-  pageTranslateParagraphSplitByFontSize: boolean;
+export interface PageTranslateOptions {
+  fontFamily: string;
+  usePositionAwarePrompt: boolean;
+  aiReflowParagraphs: boolean;
+  useParagraphs: boolean;
+  flattenFreetext: boolean;
+  contextWindow: PageTranslateContextWindow;
+  paragraphXGap: number;
+  paragraphYGap: number;
+  paragraphSplitByFontSize: boolean;
+  freetextPadding: number;
 }
 
 export type PageTranslateParagraphCandidate = {
@@ -227,7 +255,7 @@ export type PageTranslateParagraphCandidate = {
   isExcluded: boolean;
 };
 
-export interface EditorState extends PageTranslateUiPreferences {
+export interface EditorState {
   // Document State
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
@@ -263,11 +291,20 @@ export interface EditorState extends PageTranslateUiPreferences {
     data: FormField | Annotation;
   } | null;
   // Settings
-  options: EditorOptions;
+  options: AppOptions;
+
+  llmModelCache: {
+    geminiTranslateModels: AppLLMModelOption[];
+    geminiVisionModels: AppLLMModelOption[];
+    openaiTranslateModels: AppLLMModelOption[];
+    openaiVisionModels: AppLLMModelOption[];
+  };
 
   // Translate (UI preference)
   translateOption: TranslateOptionId;
   translateTargetLanguage: string | null;
+
+  pageTranslateOptions: PageTranslateOptions;
 
   pageTranslateParagraphCandidates: PageTranslateParagraphCandidate[];
   pageTranslateSelectedParagraphIds: string[];
@@ -348,14 +385,7 @@ export type EditorUiState = Pick<
   | "rightPanelWidth"
   | "translateOption"
   | "translateTargetLanguage"
-  | "pageTranslateFontFamily"
-  | "pageTranslateUsePositionAwarePrompt"
-  | "pageTranslateUseParagraphs"
-  | "pageTranslateFlattenFreetext"
-  | "pageTranslateContextWindow"
-  | "pageTranslateParagraphXGap"
-  | "pageTranslateParagraphYGap"
-  | "pageTranslateParagraphSplitByFontSize"
+  | "pageTranslateOptions"
   | "options"
   | "rightPanelDockTab"
 >;

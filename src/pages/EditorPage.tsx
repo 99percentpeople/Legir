@@ -1256,40 +1256,100 @@ const EditorPage: React.FC<EditorPageProps> = ({
               initialTargetLanguage={
                 state.translateTargetLanguage || effectiveLanguage
               }
-              fontFamily={state.pageTranslateFontFamily}
+              fontFamily={state.pageTranslateOptions.fontFamily}
               onFontFamilyChange={(val) =>
-                setUiState({ pageTranslateFontFamily: val })
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    fontFamily: val,
+                  },
+                }))
               }
-              usePositionAwarePrompt={state.pageTranslateUsePositionAwarePrompt}
+              freetextPadding={state.pageTranslateOptions.freetextPadding}
+              onFreetextPaddingChange={(val) =>
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    freetextPadding: val,
+                  },
+                }))
+              }
+              usePositionAwarePrompt={
+                state.pageTranslateOptions.usePositionAwarePrompt
+              }
               onUsePositionAwarePromptChange={(val) =>
-                setUiState({ pageTranslateUsePositionAwarePrompt: val })
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    usePositionAwarePrompt: val,
+                  },
+                }))
               }
-              contextWindow={state.pageTranslateContextWindow}
+              aiReflowParagraphs={state.pageTranslateOptions.aiReflowParagraphs}
+              onAiReflowParagraphsChange={(val) =>
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    aiReflowParagraphs: val,
+                  },
+                }))
+              }
+              contextWindow={state.pageTranslateOptions.contextWindow}
               onContextWindowChange={(val) =>
-                setUiState({ pageTranslateContextWindow: val })
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    contextWindow: val,
+                  },
+                }))
               }
-              flattenAllFreetext={state.pageTranslateFlattenFreetext}
+              flattenAllFreetext={state.pageTranslateOptions.flattenFreetext}
               onFlattenAllFreetextChange={(val) => {
-                setUiState({ pageTranslateFlattenFreetext: val });
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    flattenFreetext: val,
+                  },
+                }));
                 setAllFreetextFlatten(val);
               }}
-              useParagraphs={state.pageTranslateUseParagraphs}
+              useParagraphs={state.pageTranslateOptions.useParagraphs}
               onUseParagraphsChange={(val) =>
-                setUiState({ pageTranslateUseParagraphs: val })
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    useParagraphs: val,
+                  },
+                }))
               }
-              paragraphXGap={state.pageTranslateParagraphXGap}
+              paragraphXGap={state.pageTranslateOptions.paragraphXGap}
               onParagraphXGapChange={(val) =>
-                setUiState({ pageTranslateParagraphXGap: val })
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    paragraphXGap: val,
+                  },
+                }))
               }
-              paragraphYGap={state.pageTranslateParagraphYGap}
+              paragraphYGap={state.pageTranslateOptions.paragraphYGap}
               onParagraphYGapChange={(val) =>
-                setUiState({ pageTranslateParagraphYGap: val })
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    paragraphYGap: val,
+                  },
+                }))
               }
               paragraphSplitByFontSize={
-                state.pageTranslateParagraphSplitByFontSize
+                state.pageTranslateOptions.paragraphSplitByFontSize
               }
               onParagraphSplitByFontSizeChange={(val) =>
-                setUiState({ pageTranslateParagraphSplitByFontSize: val })
+                setUiState((prev) => ({
+                  pageTranslateOptions: {
+                    ...prev.pageTranslateOptions,
+                    paragraphSplitByFontSize: val,
+                  },
+                }))
               }
               paragraphCandidatesCount={
                 state.pageTranslateParagraphCandidates.length

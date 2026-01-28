@@ -1585,7 +1585,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }
       />
 
-      {editorState.pageTranslateUseParagraphs &&
+      {editorState.pageTranslateOptions.useParagraphs &&
         (paragraphCandidatesByPage.get(page.pageIndex)?.length ?? 0) > 0 && (
           <svg
             className="absolute inset-0 z-10"

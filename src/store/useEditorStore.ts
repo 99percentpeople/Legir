@@ -12,8 +12,7 @@ import {
   HistorySnapshot,
   DialogName,
   FieldType,
-  EditorOptions,
-  PageTranslateUiPreferences,
+  AppOptions,
 } from "../types";
 import {
   ANNOTATION_STYLES,
@@ -25,6 +24,13 @@ import {
 } from "../constants";
 import { shouldSwitchToSelectAfterUse } from "../lib/tool-behavior";
 import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
+
+const envGeminiApiKey = (
+  process.env.GEMINI_API_KEY ||
+  process.env.API_KEY ||
+  ""
+).trim();
+const envOpenAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
 
 let thumbnailWarmupEpoch = 0;
 let thumbnailWarmupAbort: AbortController | null = null;
@@ -85,9 +91,7 @@ export interface EditorActions {
   resetUiState: () => void;
 
   setOptions: (
-    updates:
-      | Partial<EditorOptions>
-      | ((prev: EditorOptions) => Partial<EditorOptions>),
+    updates: Partial<AppOptions> | ((prev: AppOptions) => Partial<AppOptions>),
   ) => void;
 
   warmupThumbnails: () => void;
@@ -158,23 +162,6 @@ export interface EditorActions {
 
 export type EditorStore = EditorState & EditorActions;
 
-const pickPageTranslateUiPreferences = (
-  state: Partial<PageTranslateUiPreferences>,
-): Partial<PageTranslateUiPreferences> => {
-  return {
-    pageTranslateFontFamily: state.pageTranslateFontFamily,
-    pageTranslateUsePositionAwarePrompt:
-      state.pageTranslateUsePositionAwarePrompt,
-    pageTranslateUseParagraphs: state.pageTranslateUseParagraphs,
-    pageTranslateFlattenFreetext: state.pageTranslateFlattenFreetext,
-    pageTranslateContextWindow: state.pageTranslateContextWindow,
-    pageTranslateParagraphXGap: state.pageTranslateParagraphXGap,
-    pageTranslateParagraphYGap: state.pageTranslateParagraphYGap,
-    pageTranslateParagraphSplitByFontSize:
-      state.pageTranslateParagraphSplitByFontSize,
-  };
-};
-
 function pickEditorUiState(
   state: Partial<EditorState>,
 ): Partial<EditorUiState> {
@@ -189,7 +176,7 @@ function pickEditorUiState(
     rightPanelWidth: state.rightPanelWidth,
     translateOption: state.translateOption,
     translateTargetLanguage: state.translateTargetLanguage,
-    ...pickPageTranslateUiPreferences(state),
+    pageTranslateOptions: state.pageTranslateOptions,
     options: state.options,
     rightPanelDockTab: state.rightPanelDockTab,
   };
@@ -240,7 +227,6 @@ const initialState: EditorState = {
   isSaving: false,
   pageTranslateParagraphCandidates: [],
   pageTranslateSelectedParagraphIds: [],
-  pageTranslateParagraphSplitByFontSize: false,
   ...DEFAULT_EDITOR_UI_STATE,
   isFullscreen: false,
   hasSavedSession: false,
@@ -258,7 +244,20 @@ const initialState: EditorState = {
   activeDialog: null,
   closeConfirmSource: null,
   actionSignal: null, // Deprecated, but kept for interface compatibility
+  llmModelCache: {
+    geminiTranslateModels: [],
+    geminiVisionModels: [],
+    openaiTranslateModels: [],
+    openaiVisionModels: [],
+  },
 };
+
+initialState.options.llm.gemini.apiKey = (
+  initialState.options.llm.gemini.apiKey || envGeminiApiKey
+).trim();
+initialState.options.llm.openai.apiKey = (
+  initialState.options.llm.openai.apiKey || envOpenAiApiKey
+).trim();
 
 const medianNumber = (values: number[]) => {
   if (values.length === 0) return 0;
@@ -446,7 +445,37 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         set((state) => {
           const newValues =
             typeof updates === "function" ? updates(state) : updates;
-          return { ...state, ...newValues };
+          const patch = { ...state, ...newValues };
+
+          const nextOptions = patch.options;
+          if (!nextOptions) return patch;
+
+          const geminiApiKey = (nextOptions.llm.gemini.apiKey || "").trim();
+          const openaiApiKey = (nextOptions.llm.openai.apiKey || "").trim();
+
+          const shouldPatchKeys =
+            (!geminiApiKey && envGeminiApiKey) ||
+            (!openaiApiKey && envOpenAiApiKey);
+
+          if (!shouldPatchKeys) return patch;
+
+          return {
+            ...patch,
+            options: {
+              ...nextOptions,
+              llm: {
+                ...nextOptions.llm,
+                gemini: {
+                  ...nextOptions.llm.gemini,
+                  ...(geminiApiKey ? {} : { apiKey: envGeminiApiKey }),
+                },
+                openai: {
+                  ...nextOptions.llm.openai,
+                  ...(openaiApiKey ? {} : { apiKey: envOpenAiApiKey }),
+                },
+              },
+            },
+          };
         }),
 
       setUiState: (updates) =>
@@ -467,6 +496,22 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             options: {
               ...state.options,
               ...patch,
+              ...(patch.llm
+                ? {
+                    llm: {
+                      ...state.options.llm,
+                      ...patch.llm,
+                      gemini: {
+                        ...state.options.llm.gemini,
+                        ...patch.llm.gemini,
+                      },
+                      openai: {
+                        ...state.options.llm.openai,
+                        ...patch.llm.openai,
+                      },
+                    },
+                  }
+                : {}),
               ...(patch.snappingOptions
                 ? {
                     snappingOptions: {

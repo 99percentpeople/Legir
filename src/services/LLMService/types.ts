@@ -1,40 +1,50 @@
-export type LLMProviderId = string;
-
 import type { FieldType, FormField } from "@/types";
 
-export interface LLMProvider {
-  id: LLMProviderId;
-  isAvailable: () => boolean;
-}
+export type LLMProviderId = string;
 
-export interface LLMTranslateTextOptions<TModel extends string = string> {
-  model?: TModel;
+export type LLMFunctionKind = "translate" | "aiDetect";
+
+export type LLMModelOption = {
+  id: string;
+  label: string;
+  labelKey?: string;
+};
+
+export interface LLMTranslateTextOptions {
+  modelId?: string;
   targetLanguage: string;
   sourceLanguage?: string;
   prompt?: string;
   signal?: AbortSignal;
 }
 
-export interface LLMTranslateProvider<
-  TModel extends string = string,
-> extends LLMProvider {
+export interface LLMTranslateFunction {
+  kind: "translate";
+  getModels: () => LLMModelOption[];
+  refreshModels?: () => Promise<void>;
+
   translateText: (
     text: string,
-    opts: LLMTranslateTextOptions<TModel>,
+    opts: LLMTranslateTextOptions,
   ) => Promise<string>;
   translateTextStream?: (
     text: string,
-    opts: LLMTranslateTextOptions<TModel>,
+    opts: LLMTranslateTextOptions,
   ) => AsyncGenerator<string>;
 }
 
 export type LLMAnalyzePageForFieldsOptions = {
   allowedTypes?: FieldType[];
   extraPrompt?: string;
-  model?: string;
+  providerId?: LLMProviderId;
+  modelId?: string;
 };
 
-export interface LLMAnalyzePageForFieldsProvider extends LLMProvider {
+export interface LLMAIDetectFunction {
+  kind: "aiDetect";
+  getModels: () => LLMModelOption[];
+  refreshModels?: () => Promise<void>;
+
   analyzePageForFields: (
     base64Image: string,
     pageIndex: number,
@@ -45,7 +55,16 @@ export interface LLMAnalyzePageForFieldsProvider extends LLMProvider {
   ) => Promise<FormField[]>;
 }
 
-export type LLMFeatureProvider =
-  | LLMProvider
-  | LLMTranslateProvider
-  | LLMAnalyzePageForFieldsProvider;
+export type LLMProviderFunctions = {
+  translate?: LLMTranslateFunction;
+  aiDetect?: LLMAIDetectFunction;
+};
+
+export interface LLMProvider {
+  id: LLMProviderId;
+  label: string;
+  labelKey?: string;
+  unavailableMessageKey?: string;
+  isAvailable: () => boolean;
+  getFunctions: () => LLMProviderFunctions;
+}

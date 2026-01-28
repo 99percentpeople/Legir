@@ -77,7 +77,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
     if (!onOpenRecent) return;
     try {
       await onOpenRecent(entry.path);
-    } catch (e: any) {
+    } catch (e) {
       toast.error(e?.message || t("landing.desktop.open_fail"));
     }
   };
