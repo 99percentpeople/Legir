@@ -472,6 +472,10 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
                   left: selectionHandles.start.left,
                   top: selectionHandles.start.top,
                   height: selectionHandles.start.height,
+                  ...(typeof selectionHandles.start.rotateDeg === "number" && {
+                    transform: `rotate(${selectionHandles.start.rotateDeg}deg)`,
+                    transformOrigin: "50% 0%",
+                  }),
                 }}
               >
                 <div className="ff-text-selection-handle__stem" />
@@ -490,6 +494,10 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
                   left: selectionHandles.end.left,
                   top: selectionHandles.end.top,
                   height: selectionHandles.end.height,
+                  ...(typeof selectionHandles.end.rotateDeg === "number" && {
+                    transform: `rotate(${selectionHandles.end.rotateDeg}deg)`,
+                    transformOrigin: "50% 100%",
+                  }),
                 }}
               >
                 <div className="ff-text-selection-handle__stem" />

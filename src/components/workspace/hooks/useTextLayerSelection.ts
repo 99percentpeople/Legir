@@ -13,6 +13,7 @@ export type TextSelectionHandleRect = {
   left: number;
   top: number;
   height: number;
+  rotateDeg?: number;
 };
 
 export type TextSelectionHandlesState = {
@@ -30,8 +31,9 @@ type ManualSelectionState = {
   anchorRect: DOMRect | null;
   lastFocusRect: DOMRect | null;
   lineSpans: HTMLSpanElement[];
-  lineBandTop: number;
-  lineBandBottom: number;
+  lineBandAxis: "x" | "y";
+  lineBandStart: number;
+  lineBandEnd: number;
   lineLayer: HTMLDivElement | null;
 };
 
@@ -113,6 +115,61 @@ export const useTextLayerSelection = (opts: {
     [doc],
   );
 
+  const getSpanRotationDeg = useCallback((span: HTMLSpanElement) => {
+    if (typeof window === "undefined") return null;
+
+    try {
+      const anySpan = span as unknown as {
+        getBoxQuads?: (options?: unknown) => DOMQuad[];
+      };
+      if (typeof anySpan.getBoxQuads === "function") {
+        const quad = anySpan.getBoxQuads({ box: "border" })?.[0];
+        const p1 = quad?.p1;
+        const p2 = quad?.p2;
+        if (p1 && p2) {
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          if (dx || dy) return (Math.atan2(dy, dx) * 180) / Math.PI;
+        }
+      }
+    } catch {}
+
+    try {
+      const style = window.getComputedStyle(span);
+      const transform = style.transform;
+      if (transform && transform !== "none") {
+        const match = transform.match(/^matrix\((.+)\)$/);
+        if (match) {
+          const parts = match[1]
+            .split(",")
+            .map((s) => Number.parseFloat(s.trim()));
+          const a = parts[0] ?? 1;
+          const b = parts[1] ?? 0;
+          const angle = (Math.atan2(b, a) * 180) / Math.PI;
+          const layer = span.closest(".textLayer") as HTMLDivElement | null;
+          const mainRotation = layer
+            ? Number.parseFloat(layer.getAttribute("data-main-rotation") || "0")
+            : 0;
+          return angle + (Number.isFinite(mainRotation) ? mainRotation : 0);
+        }
+      }
+    } catch {}
+
+    return null;
+  }, []);
+
+  const getLineBandAxisForSpan = useCallback(
+    (span: HTMLSpanElement | null) => {
+      const deg = span ? getSpanRotationDeg(span) : null;
+      if (deg === null) return "y";
+      const rad = (deg * Math.PI) / 180;
+      const absCos = Math.abs(Math.cos(rad));
+      const absSin = Math.abs(Math.sin(rad));
+      return absCos >= absSin ? "y" : "x";
+    },
+    [getSpanRotationDeg],
+  );
+
   const findNearestTextSpan = useCallback(
     (
       layer: HTMLDivElement,
@@ -170,7 +227,17 @@ export const useTextLayerSelection = (opts: {
       const textNode = span.firstChild;
       if (textNode && textNode.nodeType === Node.TEXT_NODE) {
         const textLength = textNode.textContent?.length ?? 0;
-        const useEnd = clampedX > rect.left + rect.width / 2;
+        const useEnd = (() => {
+          const deg = getSpanRotationDeg(span);
+          if (deg === null) return clampedX > rect.left + rect.width / 2;
+          const rad = (deg * Math.PI) / 180;
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const dx = clampedX - cx;
+          const dy = clampedY - cy;
+          const proj = dx * Math.cos(rad) + dy * Math.sin(rad);
+          return proj > 0;
+        })();
         range.setStart(textNode, useEnd ? textLength : 0);
       } else {
         range.setStart(span, 0);
@@ -178,7 +245,7 @@ export const useTextLayerSelection = (opts: {
       range.collapse(true);
       return { range, rect, span };
     },
-    [findNearestTextSpan, getCaretRangeFromPoint],
+    [findNearestTextSpan, getCaretRangeFromPoint, getSpanRotationDeg],
   );
 
   const getTextLayerFromPoint = useCallback((x: number, y: number) => {
@@ -198,7 +265,23 @@ export const useTextLayerSelection = (opts: {
       r.setStart(node, offset);
       r.collapse(true);
       const rect = r.getClientRects()[0] ?? r.getBoundingClientRect();
-      if (rect && rect.height > 0) return rect;
+      if (rect && (rect.width > 0.5 || rect.height > 0.5)) return rect;
+
+      const textNode =
+        node.nodeType === Node.TEXT_NODE
+          ? (node as Text)
+          : ((node.firstChild as Text | null) ?? null);
+      if (textNode && textNode.data) {
+        const len = textNode.data.length;
+        if (len > 0) {
+          const clamped = Math.max(0, Math.min(len - 1, offset));
+          const rr = document.createRange();
+          rr.setStart(textNode, clamped);
+          rr.setEnd(textNode, Math.min(len, clamped + 1));
+          const rect2 = rr.getClientRects()[0] ?? rr.getBoundingClientRect();
+          if (rect2 && (rect2.width > 0.5 || rect2.height > 0.5)) return rect2;
+        }
+      }
     } catch {}
 
     const el = node instanceof Element ? node : node.parentElement;
@@ -210,6 +293,15 @@ export const useTextLayerSelection = (opts: {
     const rect = span.getBoundingClientRect();
     if (rect.width + rect.height === 0) return null;
     return rect;
+  }, []);
+
+  const getCaretSpan = useCallback((node: Node) => {
+    const el = node instanceof Element ? node : node.parentElement;
+    const span = el?.closest?.("span[role='presentation']") as
+      | HTMLSpanElement
+      | null
+      | undefined;
+    return span ?? null;
   }, []);
 
   const updateSelectionHandles = useCallback(() => {
@@ -242,7 +334,70 @@ export const useTextLayerSelection = (opts: {
 
     const pageRect = pageEl.getBoundingClientRect();
     const handleWidth = 14;
-    const dotRadius = 5;
+    const dotRadius = 6;
+
+    const getHandleVisualLength = (
+      rect: DOMRect | null,
+      span: HTMLSpanElement | null,
+      baselineDeg: number | null,
+    ) => {
+      if (!rect) return 0;
+      const w = rect.width;
+      const h = rect.height;
+      const hasW = w > 0.5;
+      const hasH = h > 0.5;
+
+      const fontSize =
+        span && typeof window !== "undefined"
+          ? Number.parseFloat(window.getComputedStyle(span).fontSize || "0")
+          : 0;
+
+      if (span && typeof window !== "undefined") {
+        try {
+          const anySpan = span as unknown as {
+            getBoxQuads?: (options?: unknown) => DOMQuad[];
+          };
+          if (typeof anySpan.getBoxQuads === "function") {
+            const quad = anySpan.getBoxQuads({ box: "border" })?.[0];
+            const p2 = quad?.p2;
+            const p3 = quad?.p3;
+            if (p2 && p3) {
+              const qdx = p3.x - p2.x;
+              const qdy = p3.y - p2.y;
+              const quadHeight = Math.hypot(qdx, qdy);
+              if (Number.isFinite(quadHeight) && quadHeight > 0) {
+                if (Number.isFinite(fontSize) && fontSize > 0) {
+                  return Math.min(quadHeight, fontSize * 4);
+                }
+                return quadHeight;
+              }
+            }
+          }
+        } catch {}
+      }
+
+      if (typeof baselineDeg === "number" && hasW && hasH) {
+        const caretRad = ((baselineDeg + 90) * Math.PI) / 180;
+        const absCos = Math.abs(Math.cos(caretRad));
+        const absSin = Math.abs(Math.sin(caretRad));
+        const lenFromW = absCos > 0.1 ? w / absCos : 0;
+        const lenFromH = absSin > 0.1 ? h / absSin : 0;
+        const rawLen = Math.max(lenFromW, lenFromH);
+        if (Number.isFinite(rawLen) && rawLen > 0) {
+          if (Number.isFinite(fontSize) && fontSize > 0) {
+            return Math.min(rawLen, fontSize * 4);
+          }
+          return rawLen;
+        }
+      }
+
+      if (hasH) return h;
+      if (hasW) return w;
+
+      if (Number.isFinite(fontSize) && fontSize > 0) return fontSize;
+
+      return 0;
+    };
 
     const startRect =
       startLayer === layerEl
@@ -253,25 +408,159 @@ export const useTextLayerSelection = (opts: {
         ? getCaretClientRect(range.endContainer, range.endOffset)
         : null;
 
+    const startSpan =
+      startLayer === layerEl ? getCaretSpan(range.startContainer) : null;
+    const endSpan =
+      endLayer === layerEl ? getCaretSpan(range.endContainer) : null;
+    const startRotateDeg = startSpan ? getSpanRotationDeg(startSpan) : null;
+    const endRotateDeg = endSpan ? getSpanRotationDeg(endSpan) : null;
+
+    const startLen = getHandleVisualLength(
+      startRect,
+      startSpan,
+      startRotateDeg,
+    );
+    const endLen = getHandleVisualLength(endRect, endSpan, endRotateDeg);
+
+    const getHandleAnchorPoint = (
+      rect: DOMRect | null,
+      span: HTMLSpanElement | null,
+      baselineDeg: number | null,
+      kind: "start" | "end",
+      visualLen: number,
+    ) => {
+      if (!rect) return null;
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+
+      if (span && typeof window !== "undefined") {
+        try {
+          const anySpan = span as unknown as {
+            getBoxQuads?: (options?: unknown) => DOMQuad[];
+          };
+          if (typeof anySpan.getBoxQuads === "function") {
+            const quad = anySpan.getBoxQuads({ box: "border" })?.[0];
+            const p1 = quad?.p1;
+            const p2 = quad?.p2;
+            const p4 = quad?.p4;
+            if (p1 && p2 && p4) {
+              const bx = p2.x - p1.x;
+              const by = p2.y - p1.y;
+              const hx = p4.x - p1.x;
+              const hy = p4.y - p1.y;
+              const bLen = Math.hypot(bx, by);
+              const hLen = Math.hypot(hx, hy);
+              if (bLen > 0.5 && hLen > 0.5) {
+                const bUx = bx / bLen;
+                const bUy = by / bLen;
+                const hUx = hx / hLen;
+                const hUy = hy / hLen;
+
+                const vx = cx - p1.x;
+                const vy = cy - p1.y;
+                const s = Math.min(Math.max(vx * bUx + vy * bUy, 0), bLen);
+
+                const topPt = { x: p1.x + bUx * s, y: p1.y + bUy * s };
+                const bottomPt = {
+                  x: topPt.x + hUx * hLen,
+                  y: topPt.y + hUy * hLen,
+                };
+
+                const tTop = topPt.x * hUx + topPt.y * hUy;
+                const tBottom = bottomPt.x * hUx + bottomPt.y * hUy;
+                const topIsMin = tTop <= tBottom;
+                const startPt = topIsMin ? topPt : bottomPt;
+                const endPt = topIsMin ? bottomPt : topPt;
+
+                const out = kind === "start" ? -dotRadius : dotRadius;
+                const base = kind === "start" ? startPt : endPt;
+                return { x: base.x + hUx * out, y: base.y + hUy * out };
+              }
+            }
+          }
+        } catch {}
+      }
+
+      if (typeof baselineDeg === "number") {
+        const caretRad = ((baselineDeg + 90) * Math.PI) / 180;
+        const dx = Math.cos(caretRad);
+        const dy = Math.sin(caretRad);
+        const extentFromRect =
+          (Math.abs(dx) * rect.width + Math.abs(dy) * rect.height) / 2;
+        const extentFromLen = Math.max(1, visualLen / 2);
+        const extent = Math.max(extentFromRect, extentFromLen);
+
+        const ax0 = cx - dx * extent;
+        const ay0 = cy - dy * extent;
+        const ax1 = cx + dx * extent;
+        const ay1 = cy + dy * extent;
+
+        const t0 = ax0 * dx + ay0 * dy;
+        const t1 = ax1 * dx + ay1 * dy;
+        const firstIsMin = t0 <= t1;
+        const startPt = firstIsMin ? { x: ax0, y: ay0 } : { x: ax1, y: ay1 };
+        const endPt = firstIsMin ? { x: ax1, y: ay1 } : { x: ax0, y: ay0 };
+
+        const out = kind === "start" ? -dotRadius : dotRadius;
+        const base = kind === "start" ? startPt : endPt;
+        return { x: base.x + dx * out, y: base.y + dy * out };
+      }
+
+      return {
+        x: cx,
+        y: kind === "start" ? rect.top : rect.top + rect.height,
+      };
+    };
+
+    const startAnchor = getHandleAnchorPoint(
+      startRect,
+      startSpan,
+      startRotateDeg,
+      "start",
+      startLen,
+    );
+    const endAnchor = getHandleAnchorPoint(
+      endRect,
+      endSpan,
+      endRotateDeg,
+      "end",
+      endLen,
+    );
+
     const start = startRect
       ? {
-          left: startRect.left - pageRect.left - handleWidth / 2,
-          top: startRect.top - pageRect.top - dotRadius,
-          height: Math.max(8, startRect.height + dotRadius),
+          left:
+            (startAnchor?.x ?? startRect.left) -
+            pageRect.left -
+            handleWidth / 2,
+          top: (startAnchor?.y ?? startRect.top) - pageRect.top,
+          height: Math.max(8, startLen + dotRadius),
+          ...(typeof startRotateDeg === "number"
+            ? { rotateDeg: startRotateDeg }
+            : {}),
         }
       : null;
 
     const end = endRect
       ? {
-          left: endRect.left - pageRect.left - handleWidth / 2,
-          top: endRect.top - pageRect.top,
-          height: Math.max(8, endRect.height + dotRadius),
+          left:
+            (endAnchor?.x ?? endRect.left) - pageRect.left - handleWidth / 2,
+          top:
+            (endAnchor?.y ?? endRect.top + endRect.height) -
+            pageRect.top -
+            Math.max(8, endLen + dotRadius),
+          height: Math.max(8, endLen + dotRadius),
+          ...(typeof endRotateDeg === "number"
+            ? { rotateDeg: endRotateDeg }
+            : {}),
         }
       : null;
 
     setSelectionHandles({ start, end });
   }, [
+    getCaretSpan,
     getCaretClientRect,
+    getSpanRotationDeg,
     isDraggingSelectionHandle,
     isSelectMode,
     pagePortalEl,
@@ -348,34 +637,68 @@ export const useTextLayerSelection = (opts: {
       layer: HTMLDivElement,
       anchorRect: DOMRect,
       anchorSpan?: HTMLSpanElement,
+      axis: "x" | "y" = "y",
     ) => {
       const spans = Array.from(
         layer.querySelectorAll<HTMLSpanElement>("span[role='presentation']"),
       );
       const lineSpans: HTMLSpanElement[] = [];
-      let bandTop = anchorRect.top;
-      let bandBottom = anchorRect.bottom;
-      const anchorCenter = anchorRect.top + anchorRect.height / 2;
-      const maxCenterDiff = Math.max(2, anchorRect.height * 0.6);
+      let bandStart = axis === "x" ? anchorRect.left : anchorRect.top;
+      let bandEnd = axis === "x" ? anchorRect.right : anchorRect.bottom;
+      const anchorCenter =
+        axis === "x"
+          ? anchorRect.left + anchorRect.width / 2
+          : anchorRect.top + anchorRect.height / 2;
+      const maxCenterDiff = Math.max(
+        2,
+        (axis === "x" ? anchorRect.width : anchorRect.height) * 0.6,
+      );
+
+      const anchorDeg = anchorSpan ? getSpanRotationDeg(anchorSpan) : null;
+      const angleThreshold = 40;
+      const getAngleDelta = (a: number, b: number) => {
+        const diff = (((a - b) % 360) + 360) % 360;
+        return diff > 180 ? 360 - diff : diff;
+      };
 
       spans.forEach((span) => {
         if (!span.textContent) return;
+
+        if (anchorDeg !== null) {
+          const spanDeg = getSpanRotationDeg(span);
+          if (spanDeg !== null) {
+            if (getAngleDelta(spanDeg, anchorDeg) > angleThreshold) return;
+          } else if (getLineBandAxisForSpan(span) !== axis) {
+            return;
+          }
+        } else if (getLineBandAxisForSpan(span) !== axis) {
+          return;
+        }
+
         const rect = span.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
         const overlap =
-          Math.min(rect.bottom, anchorRect.bottom) -
-          Math.max(rect.top, anchorRect.top);
-        const minHeight = Math.min(rect.height, anchorRect.height);
+          axis === "x"
+            ? Math.min(rect.right, anchorRect.right) -
+              Math.max(rect.left, anchorRect.left)
+            : Math.min(rect.bottom, anchorRect.bottom) -
+              Math.max(rect.top, anchorRect.top);
+        const minSize =
+          axis === "x"
+            ? Math.min(rect.width, anchorRect.width)
+            : Math.min(rect.height, anchorRect.height);
         const centerDiff =
-          Math.abs(rect.top + rect.height / 2 - anchorCenter) ??
-          Number.POSITIVE_INFINITY;
+          Math.abs(
+            (axis === "x"
+              ? rect.left + rect.width / 2
+              : rect.top + rect.height / 2) - anchorCenter,
+          ) ?? Number.POSITIVE_INFINITY;
         const isSameLine =
-          overlap >= Math.max(1, minHeight * 0.3) ||
-          centerDiff <= maxCenterDiff;
+          overlap >= Math.max(1, minSize * 0.3) || centerDiff <= maxCenterDiff;
         if (!isSameLine) return;
         lineSpans.push(span);
-        bandTop = Math.min(bandTop, rect.top);
-        bandBottom = Math.max(bandBottom, rect.bottom);
+        bandStart = Math.min(bandStart, axis === "x" ? rect.left : rect.top);
+        bandEnd = Math.max(bandEnd, axis === "x" ? rect.right : rect.bottom);
       });
 
       if (lineSpans.length === 0 && anchorSpan) {
@@ -384,8 +707,8 @@ export const useTextLayerSelection = (opts: {
 
       return {
         lineSpans,
-        lineBandTop: bandTop,
-        lineBandBottom: bandBottom,
+        lineBandStart: bandStart,
+        lineBandEnd: bandEnd,
       };
     };
 
@@ -426,18 +749,22 @@ export const useTextLayerSelection = (opts: {
       const lineRect = useLineBand
         ? (state.lastFocusRect ?? state.anchorRect)
         : null;
-      const linePad = lineRect ? Math.max(8, lineRect.height * 0.8) : 10;
-      const bandTop = state.lineBandTop;
-      const bandBottom = state.lineBandBottom;
+      const axis = state.lineBandAxis;
+      const linePad = lineRect
+        ? Math.max(8, (axis === "x" ? lineRect.width : lineRect.height) * 0.8)
+        : 10;
+      const bandStart = state.lineBandStart;
+      const bandEnd = state.lineBandEnd;
+      const pointerCoord = axis === "x" ? e.clientX : e.clientY;
       const isInLineBand =
         useLineBand &&
-        e.clientY >= bandTop - linePad &&
-        e.clientY <= bandBottom + linePad;
+        pointerCoord >= bandStart - linePad &&
+        pointerCoord <= bandEnd + linePad;
       const distanceToBand =
-        e.clientY < bandTop
-          ? bandTop - e.clientY
-          : e.clientY > bandBottom
-            ? e.clientY - bandBottom
+        pointerCoord < bandStart
+          ? bandStart - pointerCoord
+          : pointerCoord > bandEnd
+            ? pointerCoord - bandEnd
             : 0;
       const lineTarget =
         useLineBand && state.lineSpans.length
@@ -459,11 +786,17 @@ export const useTextLayerSelection = (opts: {
         focusTarget = lineTarget;
       } else if (!isInLineBand && lineTarget && globalTarget) {
         const distanceToTarget =
-          e.clientY < globalTarget.rect.top
-            ? globalTarget.rect.top - e.clientY
-            : e.clientY > globalTarget.rect.bottom
-              ? e.clientY - globalTarget.rect.bottom
-              : 0;
+          axis === "x"
+            ? e.clientX < globalTarget.rect.left
+              ? globalTarget.rect.left - e.clientX
+              : e.clientX > globalTarget.rect.right
+                ? e.clientX - globalTarget.rect.right
+                : 0
+            : e.clientY < globalTarget.rect.top
+              ? globalTarget.rect.top - e.clientY
+              : e.clientY > globalTarget.rect.bottom
+                ? e.clientY - globalTarget.rect.bottom
+                : 0;
         if (distanceToBand <= distanceToTarget) {
           focusTarget = lineTarget;
         }
@@ -471,15 +804,18 @@ export const useTextLayerSelection = (opts: {
 
       if (!focusTarget) return;
       if (focusTarget === globalTarget && !isInLineBand) {
+        const nextAxis = getLineBandAxisForSpan(focusTarget.span);
         const lineInfo = getLineInfoForRect(
           focusLayer,
           focusTarget.rect,
           focusTarget.span,
+          nextAxis,
         );
         if (lineInfo.lineSpans.length > 0) {
           state.lineSpans = lineInfo.lineSpans;
-          state.lineBandTop = lineInfo.lineBandTop;
-          state.lineBandBottom = lineInfo.lineBandBottom;
+          state.lineBandAxis = nextAxis;
+          state.lineBandStart = lineInfo.lineBandStart;
+          state.lineBandEnd = lineInfo.lineBandEnd;
           state.lineLayer = focusLayer;
         }
       }
@@ -539,6 +875,7 @@ export const useTextLayerSelection = (opts: {
         activeLayer,
         anchorTarget.rect,
         anchorTarget.span,
+        getLineBandAxisForSpan(anchorTarget.span),
       );
       manualSelectionRef.current = {
         anchorNode: anchorTarget.range.startContainer,
@@ -550,8 +887,9 @@ export const useTextLayerSelection = (opts: {
         anchorRect: anchorTarget.rect,
         lastFocusRect: anchorTarget.rect,
         lineSpans: lineInfo.lineSpans,
-        lineBandTop: lineInfo.lineBandTop,
-        lineBandBottom: lineInfo.lineBandBottom,
+        lineBandAxis: getLineBandAxisForSpan(anchorTarget.span),
+        lineBandStart: lineInfo.lineBandStart,
+        lineBandEnd: lineInfo.lineBandEnd,
         lineLayer: activeLayer,
       };
       document.addEventListener("pointermove", handleManualPointerMove, true);
@@ -810,7 +1148,9 @@ export const useTextLayerSelection = (opts: {
     };
   }, [
     getCaretRangeFromPoint,
+    getLineBandAxisForSpan,
     getNearestTextTarget,
+    getSpanRotationDeg,
     getTextLayerFromPoint,
     isSelectMode,
     textLayerRef,
