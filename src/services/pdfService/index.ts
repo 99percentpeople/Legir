@@ -872,11 +872,37 @@ const buildPdfLibAnnotsByPageIndex = async (
         const da = pdfObjToString(annot.lookup(PDFName.of("DA")));
         const q = annot.lookup(PDFName.of("Q"));
         const textAlignment = q instanceof PDFNumber ? q.asNumber() : undefined;
+
+        const rotation = (() => {
+          let r: number | undefined = undefined;
+          try {
+            const rotateObj = annot.lookup(PDFName.of("Rotate"));
+            if (rotateObj instanceof PDFNumber) r = rotateObj.asNumber();
+          } catch {
+            // ignore
+          }
+
+          if (typeof r !== "number") {
+            try {
+              const mk = annot.lookup(PDFName.of("MK"));
+              if (mk instanceof PDFDict) {
+                const mkR = mk.lookup(PDFName.of("R"));
+                if (mkR instanceof PDFNumber) r = mkR.asNumber();
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          if (typeof r !== "number" || !Number.isFinite(r)) return undefined;
+          return r;
+        })();
         pushForPage({
           ...base,
           defaultAppearance: da,
           DA: da,
           textAlignment,
+          rotation,
         });
         continue;
       }

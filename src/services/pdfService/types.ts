@@ -34,6 +34,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   defaultAppearance?: string;
   DA?: string;
   textAlignment?: number;
+  rotation?: number;
 
   checkBox?: boolean;
   radioButton?: boolean;

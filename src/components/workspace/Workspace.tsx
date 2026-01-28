@@ -96,6 +96,14 @@ type Rect = {
   height: number;
 };
 
+const normalizeRotationDeg = (deg: number) => {
+  if (!Number.isFinite(deg)) return 0;
+  let d = deg % 360;
+  if (d <= -180) d += 360;
+  if (d > 180) d -= 360;
+  return d;
+};
+
 const Workspace: React.FC<WorkspaceProps> = ({
   editorState,
   onAddField,
@@ -303,6 +311,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
     originalRect: Rect;
     mouseX: number;
     mouseY: number;
+    originalRotationDeg?: number;
+    rotateStartAngleRad?: number;
+    rotatePivot?: { x: number; y: number };
   } | null>(null);
 
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
@@ -539,6 +550,59 @@ const Workspace: React.FC<WorkspaceProps> = ({
     );
   };
 
+  const getRotatedFreetextOuterRect = React.useCallback(
+    (rect: Rect, rotationDeg: number) => {
+      const theta = (rotationDeg * Math.PI) / 180;
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+      const absCos = Math.abs(cos);
+      const absSin = Math.abs(sin);
+
+      const outerW = absCos * rect.width + absSin * rect.height;
+      const outerH = absSin * rect.width + absCos * rect.height;
+      const cx = rect.x + rect.width / 2;
+      const cy = rect.y + rect.height / 2;
+
+      return {
+        x: cx - outerW / 2,
+        y: cy - outerH / 2,
+        width: outerW,
+        height: outerH,
+      };
+    },
+    [],
+  );
+
+  const getInnerSizeFromOuterAabb = React.useCallback(
+    (outer: Rect, rotationDeg: number) => {
+      if (!Number.isFinite(rotationDeg) || rotationDeg === 0) {
+        return { width: outer.width, height: outer.height };
+      }
+
+      const theta = (rotationDeg * Math.PI) / 180;
+      const absCos = Math.abs(Math.cos(theta));
+      const absSin = Math.abs(Math.sin(theta));
+      const det = absCos * absCos - absSin * absSin;
+      if (!Number.isFinite(det) || Math.abs(det) < 1e-6) {
+        return { width: outer.width, height: outer.height };
+      }
+
+      const width = (outer.width * absCos - outer.height * absSin) / det;
+      const height = (outer.height * absCos - outer.width * absSin) / det;
+      if (
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width <= 0 ||
+        height <= 0
+      ) {
+        return { width: outer.width, height: outer.height };
+      }
+
+      return { width, height };
+    },
+    [],
+  );
+
   const updateMovingAnnotation = (clientX: number, clientY: number) => {
     if (!movingAnnotationId || !moveOffset) return;
 
@@ -562,11 +626,30 @@ const Workspace: React.FC<WorkspaceProps> = ({
         pageIndex,
       );
 
-      const newX = currentCoords.x - moveOffset.x;
-      const newY = currentCoords.y - moveOffset.y;
+      const newOuterX = currentCoords.x - moveOffset.x;
+      const newOuterY = currentCoords.y - moveOffset.y;
+
+      if (
+        annot.type === "freetext" &&
+        typeof annot.rotationDeg === "number" &&
+        Number.isFinite(annot.rotationDeg) &&
+        annot.rotationDeg !== 0
+      ) {
+        const outer = getRotatedFreetextOuterRect(
+          annot.rect,
+          annot.rotationDeg,
+        );
+        const dx = (outer.width - annot.rect.width) / 2;
+        const dy = (outer.height - annot.rect.height) / 2;
+        onUpdateAnnotation(movingAnnotationId, {
+          rect: { ...annot.rect, x: newOuterX + dx, y: newOuterY + dy },
+          pageIndex: pageIndex,
+        });
+        return;
+      }
 
       onUpdateAnnotation(movingAnnotationId, {
-        rect: { ...annot.rect, x: newX, y: newY },
+        rect: { ...annot.rect, x: newOuterX, y: newOuterY },
         pageIndex: pageIndex,
       });
     }
@@ -585,6 +668,36 @@ const Workspace: React.FC<WorkspaceProps> = ({
         clientY,
         pageIndex,
       );
+
+      if (resizeHandle === "rotate" && annot.type === "freetext") {
+        const pivot =
+          resizeStart.rotatePivot ??
+          ({
+            x: resizeStart.originalRect.x + resizeStart.originalRect.width / 2,
+            y: resizeStart.originalRect.y + resizeStart.originalRect.height / 2,
+          } satisfies { x: number; y: number });
+
+        const startAngle = resizeStart.rotateStartAngleRad ?? 0;
+        const currentAngle = Math.atan2(
+          currentCoords.y - pivot.y,
+          currentCoords.x - pivot.x,
+        );
+        const deltaDeg = ((currentAngle - startAngle) * 180) / Math.PI;
+        const baseDeg =
+          typeof resizeStart.originalRotationDeg === "number"
+            ? resizeStart.originalRotationDeg
+            : typeof annot.rotationDeg === "number"
+              ? annot.rotationDeg
+              : 0;
+
+        let next = normalizeRotationDeg(baseDeg + deltaDeg);
+        if (editorState.keys.shift) {
+          next = Math.round(next / 15) * 15;
+        }
+
+        onUpdateAnnotation(resizingAnnotationId, { rotationDeg: next });
+        return;
+      }
 
       let newX = resizeStart.originalRect.x;
       let newY = resizeStart.originalRect.y;
@@ -1483,10 +1596,17 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (annotation.rect && annotation.type !== "highlight") {
         setGlobalCursor("move");
         setMovingAnnotationId(annotation.id);
-        setMoveOffset({
-          x: coords.x - annotation.rect.x,
-          y: coords.y - annotation.rect.y,
-        });
+        const rotationDeg =
+          annotation.type === "freetext" &&
+          typeof annotation.rotationDeg === "number" &&
+          Number.isFinite(annotation.rotationDeg)
+            ? annotation.rotationDeg
+            : 0;
+        const outerRect =
+          annotation.type === "freetext" && rotationDeg !== 0
+            ? getRotatedFreetextOuterRect(annotation.rect, rotationDeg)
+            : annotation.rect;
+        setMoveOffset({ x: coords.x - outerRect.x, y: coords.y - outerRect.y });
       }
     },
     [
@@ -1495,6 +1615,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       onSelectControl,
       getRelativeCoords,
       isPanModeActive,
+      getRotatedFreetextOuterRect,
     ],
   );
 
@@ -1527,11 +1648,31 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       setResizeHandle(handle);
       if (data.rect) {
-        setResizeStart({
+        const base = {
           originalRect: { ...data.rect },
           mouseX: coords.x,
           mouseY: coords.y,
-        });
+        };
+
+        if (handle === "rotate" && data.type === "freetext") {
+          const pivot = {
+            x: data.rect.x + data.rect.width / 2,
+            y: data.rect.y + data.rect.height / 2,
+          };
+          const startAngleRad = Math.atan2(
+            coords.y - pivot.y,
+            coords.x - pivot.x,
+          );
+          setResizeStart({
+            ...base,
+            originalRotationDeg:
+              typeof data.rotationDeg === "number" ? data.rotationDeg : 0,
+            rotateStartAngleRad: startAngleRad,
+            rotatePivot: pivot,
+          });
+        } else {
+          setResizeStart(base);
+        }
       }
 
       // Set Global Cursor based on handle
@@ -1540,6 +1681,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       else if (["ne", "sw"].includes(handle)) cursor = "nesw-resize";
       else if (["n", "s"].includes(handle)) cursor = "ns-resize";
       else if (["e", "w"].includes(handle)) cursor = "ew-resize";
+      else if (handle === "rotate") cursor = "grab";
 
       setGlobalCursor(cursor);
     },
@@ -1608,6 +1750,64 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   ? "rgba(156, 163, 175, 0.18)"
                   : "rgba(168, 85, 247, 0.18)"
                 : "transparent";
+
+              const rotationDeg =
+                typeof c.rotationDeg === "number" &&
+                Number.isFinite(c.rotationDeg)
+                  ? c.rotationDeg
+                  : 0;
+
+              if (rotationDeg !== 0) {
+                const ir = c.innerRect;
+                const inner =
+                  ir && Number.isFinite(ir.width) && Number.isFinite(ir.height)
+                    ? { width: ir.width, height: ir.height }
+                    : getInnerSizeFromOuterAabb(c.rect, rotationDeg);
+                const cx =
+                  ir && Number.isFinite(ir.x) && Number.isFinite(ir.width)
+                    ? ir.x + ir.width / 2
+                    : c.rect.x + c.rect.width / 2;
+                const cy =
+                  ir && Number.isFinite(ir.y) && Number.isFinite(ir.height)
+                    ? ir.y + ir.height / 2
+                    : c.rect.y + c.rect.height / 2;
+
+                return (
+                  <g key={c.id}>
+                    <rect
+                      x={c.rect.x}
+                      y={c.rect.y}
+                      width={c.rect.width}
+                      height={c.rect.height}
+                      fill="transparent"
+                      stroke="transparent"
+                      vectorEffect="non-scaling-stroke"
+                      onPointerDown={(e) => {
+                        if (!isSelectable) return;
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onSelectControl(null);
+                        onSelectPageTranslateParagraphId?.(c.id, {
+                          additive: e.ctrlKey || e.metaKey || e.shiftKey,
+                        });
+                      }}
+                    />
+                    <rect
+                      x={cx - inner.width / 2}
+                      y={cy - inner.height / 2}
+                      width={inner.width}
+                      height={inner.height}
+                      fill={fill}
+                      stroke={stroke}
+                      strokeWidth={isSelected ? 2 : 1}
+                      strokeDasharray={c.isExcluded ? "4 2" : undefined}
+                      vectorEffect="non-scaling-stroke"
+                      transform={`rotate(${rotationDeg}, ${cx}, ${cy})`}
+                      style={{ pointerEvents: "none" }}
+                    />
+                  </g>
+                );
+              }
 
               return (
                 <rect

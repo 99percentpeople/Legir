@@ -39,6 +39,9 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
 
   const displaySize = Math.round((data.size || 12) as number);
   const displayOpacity = Math.round(((data.opacity ?? 1) as number) * 100);
+  const rotationDeg =
+    typeof data.rotationDeg === "number" ? data.rotationDeg : 0;
+  const displayRotationDeg = Math.round(rotationDeg);
 
   const availableFontKeys = [
     ...Object.keys(FONT_FAMILY_MAP),
@@ -191,6 +194,23 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             step={1}
             onValueCommit={onTriggerHistorySave}
             onValueChange={(vals) => onChange({ size: vals[0] })}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>{t("properties.rotation") || "Rotation"}</Label>
+            <span className="text-muted-foreground text-xs">
+              {displayRotationDeg}°
+            </span>
+          </div>
+          <Slider
+            value={[rotationDeg]}
+            min={-180}
+            max={180}
+            step={1}
+            onValueCommit={onTriggerHistorySave}
+            onValueChange={(vals) => onChange({ rotationDeg: vals[0] })}
           />
         </div>
       </div>

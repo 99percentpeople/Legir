@@ -25,6 +25,14 @@ import {
   pdfFontToCssFontFamily,
 } from "../lib/pdf-font-names";
 
+const normalizeRotationDeg = (deg: number) => {
+  if (!Number.isFinite(deg)) return 0;
+  let d = deg % 360;
+  if (d <= -180) d += 360;
+  if (d > 180) d -= 360;
+  return d;
+};
+
 export class InkParser implements IAnnotationParser {
   async parse(context: ParserContext): Promise<Annotation[]> {
     const { pageIndex, pdfDoc, viewport } = context;
@@ -856,6 +864,11 @@ export class FreeTextParser implements IAnnotationParser {
     for (let index = 0; index < pageAnnotations.length; index++) {
       const annotation = pageAnnotations[index];
       if (annotation.subtype === "FreeText") {
+        const rotationDeg = (() => {
+          const r = (annotation as { rotation?: unknown }).rotation;
+          if (typeof r !== "number" || !Number.isFinite(r)) return undefined;
+          return normalizeRotationDeg(-r);
+        })();
         const initialColorArray = annotation.color;
         const normalizedRgb = normalizePdfColorToRgb255(initialColorArray);
         let color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#000000";
@@ -872,12 +885,76 @@ export class FreeTextParser implements IAnnotationParser {
           const fillHex = fillRgb ? rgbArrayToHex(fillRgb) : undefined;
           if (fillHex) backgroundColor = fillHex;
         }
-        const [_x1, _y1] = annotation.rect;
-        const { x, y, width, height } = pdfJsRectToUiRect(
-          annotation.rect,
-          viewport,
-        );
+        const [rectX1, rectY1, rectX2, rectY2] = annotation.rect;
+        const outerPdfWidth = Math.abs(rectX2 - rectX1);
+        const outerPdfHeight = Math.abs(rectY2 - rectY1);
 
+        const {
+          x: outerX,
+          y: outerY,
+          width: outerW,
+          height: outerH,
+        } = pdfJsRectToUiRect(annotation.rect, viewport);
+
+        let apInnerPdfSize: { width: number; height: number } | undefined =
+          undefined;
+
+        const computeInnerUiSize = (): { width: number; height: number } => {
+          if (
+            typeof rotationDeg !== "number" ||
+            !Number.isFinite(rotationDeg)
+          ) {
+            return { width: outerW, height: outerH };
+          }
+          if (rotationDeg === 0) return { width: outerW, height: outerH };
+
+          if (apInnerPdfSize && outerPdfWidth > 0 && outerPdfHeight > 0) {
+            const sfX = outerW / outerPdfWidth;
+            const sfY = outerH / outerPdfHeight;
+            const sf =
+              Number.isFinite(sfX) && Number.isFinite(sfY) && sfX > 0 && sfY > 0
+                ? (sfX + sfY) / 2
+                : Number.isFinite(sfX) && sfX > 0
+                  ? sfX
+                  : Number.isFinite(sfY) && sfY > 0
+                    ? sfY
+                    : 1;
+
+            const w = apInnerPdfSize.width * sf;
+            const h = apInnerPdfSize.height * sf;
+            if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+              return { width: w, height: h };
+            }
+          }
+
+          const theta = (rotationDeg * Math.PI) / 180;
+          const absCos = Math.abs(Math.cos(theta));
+          const absSin = Math.abs(Math.sin(theta));
+          const det = absCos * absCos - absSin * absSin;
+          if (!Number.isFinite(det) || Math.abs(det) < 1e-6) {
+            return { width: outerW, height: outerH };
+          }
+
+          const w = (outerW * absCos - outerH * absSin) / det;
+          const h = (outerH * absCos - outerW * absSin) / det;
+          if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+            return { width: w, height: h };
+          }
+
+          return { width: outerW, height: outerH };
+        };
+
+        const computeInnerUiRect = () => {
+          const { width, height } = computeInnerUiSize();
+          const cx = outerX + outerW / 2;
+          const cy = outerY + outerH / 2;
+          return {
+            x: cx - width / 2,
+            y: cy - height / 2,
+            width,
+            height,
+          };
+        };
         let contents = annotation.contents || "";
         let author = annotation.title || undefined;
         let updatedAt = parsePDFDate(annotation.modificationDate);
@@ -1231,6 +1308,45 @@ export class FreeTextParser implements IAnnotationParser {
                       const apFont = parseFontFromContentStream(apContent);
                       if (apFont?.fontSize) fontSize = apFont.fontSize;
 
+                      if (
+                        typeof rotationDeg === "number" &&
+                        Number.isFinite(rotationDeg) &&
+                        rotationDeg !== 0
+                      ) {
+                        try {
+                          const cms = Array.from(
+                            apContent.matchAll(
+                              /1\s+0\s+0\s+1\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s+cm/g,
+                            ),
+                          );
+                          const last =
+                            cms.length > 0 ? cms[cms.length - 1] : undefined;
+                          if (last) {
+                            const tx = parseFloat(last[1]);
+                            const ty = parseFloat(last[2]);
+                            if (
+                              Number.isFinite(tx) &&
+                              Number.isFinite(ty) &&
+                              tx < 0 &&
+                              ty < 0
+                            ) {
+                              const w = -2 * tx;
+                              const h = -2 * ty;
+                              if (
+                                Number.isFinite(w) &&
+                                Number.isFinite(h) &&
+                                w > 0 &&
+                                h > 0
+                              ) {
+                                apInnerPdfSize = { width: w, height: h };
+                              }
+                            }
+                          }
+                        } catch {
+                          // ignore
+                        }
+                      }
+
                       if (apFont?.resourceName) {
                         let apFontDictResolved: PDFDict | undefined = undefined;
                         try {
@@ -1391,14 +1507,16 @@ export class FreeTextParser implements IAnnotationParser {
           }
         }
 
+        const innerRect = computeInnerUiRect();
         annotations.push({
           id: `imported_freetext_${pageIndex + 1}_${index}`,
           pageIndex: pageIndex,
           type: "freetext",
-          rect: { x, y, width, height },
+          rect: innerRect,
           color: color,
           backgroundColor,
           opacity: opacity,
+          rotationDeg,
           text: contents,
           size: fontSize,
           fontFamily: fontFamily,

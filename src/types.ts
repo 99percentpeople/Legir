@@ -98,6 +98,7 @@ export interface Annotation {
   thickness?: number; // For ink
   size?: number; // For text
   fontFamily?: string; // For text
+  rotationDeg?: number;
   alignment?: "left" | "center" | "right"; // For comment text alignment
   subtype?: "ink" | "polyline" | "line"; // To preserve original PDF subtype
   intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
@@ -249,9 +250,11 @@ export type PageTranslateParagraphCandidate = {
   id: string;
   pageIndex: number;
   rect: { x: number; y: number; width: number; height: number };
+  innerRect?: { x: number; y: number; width: number; height: number };
   sourceText: string;
   fontSize: number;
   fontFamily: string;
+  rotationDeg?: number;
   isExcluded: boolean;
 };
 

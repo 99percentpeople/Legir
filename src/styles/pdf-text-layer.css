@@ -113,26 +113,23 @@
   inset: 0;
   z-index: 60;
   pointer-events: none;
+  --ff-text-selection-handle-stem-overhang: calc(
+    var(--ff-text-selection-handle-dot-size) * 0.5
+  );
 }
 
 .ff-text-selection-handle {
   position: absolute;
-  width: 14px;
+  width: var(--ff-text-selection-handle-width);
   pointer-events: none;
   user-select: none;
-}
-
-.ff-text-selection-handle {
-  --ff-handle-dot-size: 12px;
-  --ff-handle-stem-width: 2px;
-  --ff-handle-stem-overhang: calc(var(--ff-handle-dot-size) * 0.5);
 }
 
 .ff-text-selection-handle__stem {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  width: var(--ff-handle-stem-width);
+  width: var(--ff-text-selection-handle-stem-width);
   background: var(--color-blue-500);
   border-radius: 999px;
   pointer-events: none;
@@ -141,14 +138,14 @@
 
 .ff-text-selection-handle[data-handle-kind="start"]
   .ff-text-selection-handle__stem {
-  top: calc(var(--ff-handle-stem-overhang) * -1);
+  top: calc(var(--ff-text-selection-handle-stem-overhang) * -1);
   bottom: 0;
 }
 
 .ff-text-selection-handle[data-handle-kind="end"]
   .ff-text-selection-handle__stem {
   top: 0;
-  bottom: calc(var(--ff-handle-stem-overhang) * -1);
+  bottom: calc(var(--ff-text-selection-handle-stem-overhang) * -1);
 }
 
 .ff-text-selection-handle__dot {
@@ -156,8 +153,8 @@
   --ty: 0;
   position: absolute;
   left: 50%;
-  width: var(--ff-handle-dot-size);
-  height: var(--ff-handle-dot-size);
+  width: var(--ff-text-selection-handle-dot-size);
+  height: var(--ff-text-selection-handle-dot-size);
   border-radius: 999px;
   background: var(--color-blue-500);
   transform: translateX(var(--tx)) translateY(var(--ty));

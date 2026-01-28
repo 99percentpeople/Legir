@@ -31,6 +31,32 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   const warnedMissingFontRef = useRef(false);
 
   const displaySize = Math.round((data.size || 12) as number);
+  const rotationDeg =
+    typeof data.rotationDeg === "number" ? data.rotationDeg : 0;
+
+  const rotatedOuterRect = (() => {
+    const rect = data.rect;
+    if (!rect) return undefined;
+    if (!Number.isFinite(rotationDeg) || rotationDeg === 0) return undefined;
+
+    const theta = (rotationDeg * Math.PI) / 180;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const absCos = Math.abs(cos);
+    const absSin = Math.abs(sin);
+
+    const outerW = absCos * rect.width + absSin * rect.height;
+    const outerH = absSin * rect.width + absCos * rect.height;
+    const cx = rect.x + rect.width / 2;
+    const cy = rect.y + rect.height / 2;
+
+    return {
+      x: cx - outerW / 2,
+      y: cy - outerH / 2,
+      width: outerW,
+      height: outerH,
+    };
+  })();
 
   const resolvedFontFamily = resolveFontStackForDisplay(data.fontFamily);
   const cjkFontFamily = resolveCjkFallbackFontStack(data.fontFamily);
@@ -106,8 +132,13 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   };
 
   return (
-    <ControlWrapper {...props} showBorder={isSelected} resizable={true}>
-      <FloatingToolbar isVisible={isSelected && !isEditing}>
+    <ControlWrapper
+      {...props}
+      customRect={rotatedOuterRect}
+      showBorder={isSelected}
+      resizable={true}
+    >
+      <FloatingToolbar isVisible={isSelected && !isEditing} sideOffset={32}>
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -190,13 +221,13 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
 
       <div
         className={cn(
-          "flex h-full w-full items-start overflow-hidden transition-colors",
+          "relative flex h-full w-full items-start transition-colors",
+          rotationDeg === 0 ? "overflow-hidden" : "overflow-visible",
           isSelected && !isEditing && "ring-primary ring-1 ring-inset",
         )}
         style={{
           "--scale": scale,
           color: data.color || "#000000",
-          backgroundColor: data.backgroundColor || undefined,
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
           lineHeight: 1,
@@ -204,45 +235,115 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
         }}
         onPointerDown={handlePointerDown}
       >
-        {isEditing ? (
-          <textarea
-            ref={textareaRef}
-            className="h-full w-full resize-none bg-transparent outline-none"
-            value={data.text || ""}
-            onChange={(e) => onUpdate?.(data.id, { text: e.target.value })}
-            onBlur={handleBlur}
-            onPointerDown={(e) => {
-              if (e.button === 1) return;
-              e.stopPropagation();
-            }}
+        {rotationDeg !== 0 && data.rect ? (
+          <div
+            className="absolute top-1/2 left-1/2"
             style={{
-              fontFamily: editFontFamily,
-              fontSize: "inherit",
-              color: "inherit",
-              lineHeight: "inherit",
+              width: data.rect.width * scale,
+              height: data.rect.height * scale,
+              transform: `translate(-50%, -50%) rotate(${rotationDeg}deg)`,
+              transformOrigin: "50% 50%",
             }}
-          />
+          >
+            <div
+              className="h-full w-full"
+              style={{
+                backgroundColor: data.backgroundColor || undefined,
+              }}
+            >
+              {isEditing ? (
+                <textarea
+                  ref={textareaRef}
+                  className="h-full w-full resize-none bg-transparent outline-none"
+                  value={data.text || ""}
+                  onChange={(e) =>
+                    onUpdate?.(data.id, { text: e.target.value })
+                  }
+                  onBlur={handleBlur}
+                  onPointerDown={(e) => {
+                    if (e.button === 1) return;
+                    e.stopPropagation();
+                  }}
+                  style={{
+                    fontFamily: editFontFamily,
+                    fontSize: "inherit",
+                    color: "inherit",
+                    lineHeight: "inherit",
+                  }}
+                />
+              ) : (
+                <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
+                  {data.text
+                    ? data.text.split(/\r\n|\r|\n/).map((line, idx, arr) => (
+                        <React.Fragment key={idx}>
+                          {splitTextRuns(line).map((run, rIdx) => (
+                            <span
+                              key={rIdx}
+                              style={{
+                                fontFamily: run.isAscii
+                                  ? resolvedFontFamily
+                                  : nonAsciiFontFamily,
+                              }}
+                            >
+                              {run.text}
+                            </span>
+                          ))}
+                          {idx < arr.length - 1 ? "\n" : null}
+                        </React.Fragment>
+                      ))
+                    : "Double click to edit"}
+                </div>
+              )}
+            </div>
+          </div>
         ) : (
-          <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
-            {data.text
-              ? data.text.split(/\r\n|\r|\n/).map((line, idx, arr) => (
-                  <React.Fragment key={idx}>
-                    {splitTextRuns(line).map((run, rIdx) => (
-                      <span
-                        key={rIdx}
-                        style={{
-                          fontFamily: run.isAscii
-                            ? resolvedFontFamily
-                            : nonAsciiFontFamily,
-                        }}
-                      >
-                        {run.text}
-                      </span>
-                    ))}
-                    {idx < arr.length - 1 ? "\n" : null}
-                  </React.Fragment>
-                ))
-              : "Double click to edit"}
+          <div
+            className="h-full w-full"
+            style={{
+              backgroundColor: data.backgroundColor || undefined,
+            }}
+          >
+            {isEditing ? (
+              <textarea
+                ref={textareaRef}
+                className="h-full w-full resize-none bg-transparent outline-none"
+                value={data.text || ""}
+                onChange={(e) => onUpdate?.(data.id, { text: e.target.value })}
+                onBlur={handleBlur}
+                onPointerDown={(e) => {
+                  if (e.button === 1) return;
+                  e.stopPropagation();
+                }}
+                style={{
+                  fontFamily: editFontFamily,
+                  fontSize: "inherit",
+                  color: "inherit",
+                  lineHeight: "inherit",
+                }}
+              />
+            ) : (
+              <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
+                {data.text
+                  ? data.text.split(/\r\n|\r|\n/).map((line, idx, arr) => (
+                      <React.Fragment key={idx}>
+                        {splitTextRuns(line).map((run, rIdx) => (
+                          <span
+                            key={rIdx}
+                            style={{
+                              fontFamily: run.isAscii
+                                ? resolvedFontFamily
+                                : nonAsciiFontFamily,
+                            }}
+                          >
+                            {run.text}
+                          </span>
+                        ))}
+                        {idx < arr.length - 1 ? "\n" : null}
+                      </React.Fragment>
+                    ))
+                  : "Double click to edit"}
+              </div>
+            )}
           </div>
         )}
       </div>

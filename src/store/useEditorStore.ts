@@ -1002,6 +1002,32 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           const pageIndex = selected[0]!.pageIndex;
           if (selected.some((c) => c.pageIndex !== pageIndex)) return state;
 
+          const normalizeRotationDeg = (deg: number) => {
+            if (!Number.isFinite(deg)) return 0;
+            let d = deg % 360;
+            if (d <= -180) d += 360;
+            if (d > 180) d -= 360;
+            return d;
+          };
+
+          const deltaRotationDeg = (a: number, b: number) => {
+            return normalizeRotationDeg(a - b);
+          };
+
+          const rotations = selected
+            .map((c) => c.rotationDeg)
+            .filter(
+              (r): r is number => typeof r === "number" && Number.isFinite(r),
+            );
+
+          if (rotations.length === selected.length) {
+            const base = rotations[0] ?? 0;
+            const incompatible = rotations.some(
+              (r) => Math.abs(deltaRotationDeg(r, base)) > 1,
+            );
+            if (incompatible) return state;
+          }
+
           const mergedId = `page_translate_para_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
           const rect = unionRect(selected.map((c) => c.rect));
           const fontSize =
@@ -1025,6 +1051,11 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             .join("\n")
             .trim();
 
+          const rotationDeg =
+            rotations.length > 0
+              ? normalizeRotationDeg(medianNumber(rotations))
+              : undefined;
+
           const merged = {
             id: mergedId,
             pageIndex,
@@ -1032,6 +1063,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             sourceText,
             fontSize,
             fontFamily,
+            rotationDeg,
             isExcluded: false,
           };
 

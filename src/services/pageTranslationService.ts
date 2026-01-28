@@ -32,9 +32,28 @@ import {
 export type PageTranslationTextBlock = {
   text: string;
   rect: { x: number; y: number; width: number; height: number };
+  quad?: [
+    [number, number],
+    [number, number],
+    [number, number],
+    [number, number],
+  ];
 
   fontSize: number;
   fontFamily: string;
+  rotationDeg: number;
+};
+
+const normalizeRotationDeg = (deg: number) => {
+  if (!Number.isFinite(deg)) return 0;
+  let d = deg % 360;
+  if (d <= -180) d += 360;
+  if (d > 180) d -= 360;
+  return d;
+};
+
+const deltaRotationDeg = (a: number, b: number) => {
+  return normalizeRotationDeg(a - b);
 };
 
 const buildParagraphCandidatesFromLines = (options: {
@@ -51,12 +70,122 @@ const buildParagraphCandidatesFromLines = (options: {
     return a.rect.x - b.rect.x;
   });
 
+  const getAxes = (rotationDeg: number) => {
+    const theta = (rotationDeg * Math.PI) / 180;
+    let dirX = Math.cos(theta);
+    let dirY = Math.sin(theta);
+
+    if (Math.abs(dirX) >= Math.abs(dirY)) {
+      if (dirX < 0) {
+        dirX = -dirX;
+        dirY = -dirY;
+      }
+    } else {
+      if (dirY < 0) {
+        dirX = -dirX;
+        dirY = -dirY;
+      }
+    }
+    const normX = -dirY;
+    const normY = dirX;
+    return { dirX, dirY, normX, normY };
+  };
+
+  const projectPointsInterval = (
+    points: Array<[number, number]>,
+    axisX: number,
+    axisY: number,
+  ) => {
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const [x, y] of points) {
+      const v = x * axisX + y * axisY;
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+    return { min, max };
+  };
+
+  const getLinePoints = (l: PageTranslationLine) => {
+    if (l.points && l.points.length > 0) return l.points;
+    const r = l.rect;
+    return [
+      [r.x, r.y],
+      [r.x + r.width, r.y],
+      [r.x, r.y + r.height],
+      [r.x + r.width, r.y + r.height],
+    ] as Array<[number, number]>;
+  };
+
+  const intervalDistance = (
+    a: { min: number; max: number },
+    b: { min: number; max: number },
+  ) => {
+    if (a.max < b.min) return b.min - a.max;
+    if (b.max < a.min) return a.min - b.max;
+    return 0;
+  };
+
+  const overlapsInRotationFrame = (
+    a: PageTranslationLine,
+    b: PageTranslationLine,
+  ) => {
+    const ra =
+      typeof a.rotationDeg === "number" && Number.isFinite(a.rotationDeg)
+        ? a.rotationDeg
+        : 0;
+    const rb =
+      typeof b.rotationDeg === "number" && Number.isFinite(b.rotationDeg)
+        ? b.rotationDeg
+        : 0;
+    const rRef = normalizeRotationDeg((ra + rb) / 2);
+    const { dirX, dirY, normX, normY } = getAxes(rRef);
+
+    const aPts = getLinePoints(a);
+    const bPts = getLinePoints(b);
+
+    const aU = projectPointsInterval(aPts, dirX, dirY);
+    const aV = projectPointsInterval(aPts, normX, normY);
+    const bU = projectPointsInterval(bPts, dirX, dirY);
+    const bV = projectPointsInterval(bPts, normX, normY);
+
+    const aFs = Math.max(1, a.fontSize || 12);
+    const bFs = Math.max(1, b.fontSize || 12);
+
+    const minFs = Math.min(aFs, bFs);
+    const vDist = intervalDistance(aV, bV);
+    const vLimit = Math.max(1, minFs * Math.max(0.8, yGap * 1.25));
+    if (vDist > vLimit) return false;
+
+    const uOverlap = Math.min(aU.max, bU.max) - Math.max(aU.min, bU.min);
+    const uOverlapLen = Math.max(0, uOverlap);
+    const aULen = Math.max(0, aU.max - aU.min);
+    const bULen = Math.max(0, bU.max - bU.min);
+    const minULen = Math.max(1, Math.min(aULen, bULen));
+
+    const overlapScale = Math.max(0.4, 1 - Math.max(0, xGap) * 0.25);
+    const requiredOverlap =
+      Math.max(minFs * 1.2, minULen * 0.15) * overlapScale;
+    return uOverlapLen >= requiredOverlap;
+  };
+
   const isFontSizeCompatible = (a: number, b: number) => {
     const fa = Math.max(1, a || 12);
     const fb = Math.max(1, b || 12);
     const diff = Math.abs(fa - fb);
     const tolerance = Math.max(0.75, Math.min(fa, fb) * 0.15);
     return diff <= tolerance;
+  };
+
+  const isRotationCompatible = (
+    a: PageTranslationLine,
+    b: PageTranslationLine,
+  ) => {
+    const ra = a.rotationDeg;
+    const rb = b.rotationDeg;
+    if (typeof ra !== "number" || !Number.isFinite(ra)) return true;
+    if (typeof rb !== "number" || !Number.isFinite(rb)) return true;
+    return Math.abs(deltaRotationDeg(ra, rb)) <= 1;
   };
 
   const parent = Array.from({ length: sorted.length }, (_, i) => i);
@@ -77,29 +206,20 @@ const buildParagraphCandidatesFromLines = (options: {
     if (ra !== rb) parent[rb] = ra;
   };
 
-  const expanded = sorted.map((l) => {
-    const fs = Math.max(1, l.fontSize || 12);
-    const padX = Math.max(0, fs * xGap);
-    const padY = Math.max(0, fs * yGap);
-    return expandRect(l.rect, padX, padY);
-  });
-
   for (let i = 0; i < sorted.length; i++) {
     const a = sorted[i]!;
-    const aPadY = Math.max(0, (a.fontSize || 12) * yGap);
-    const aBottom = a.rect.y + a.rect.height + aPadY;
     for (let j = i + 1; j < sorted.length; j++) {
       const b = sorted[j]!;
-      const bPadY = Math.max(0, (b.fontSize || 12) * yGap);
-      const bTop = b.rect.y - bPadY;
-      if (bTop > aBottom) break;
       if (
         splitByFontSize &&
         !isFontSizeCompatible(a.fontSize || 12, b.fontSize || 12)
       ) {
         continue;
       }
-      if (rectOverlaps(expanded[i]!, expanded[j]!)) {
+      if (!isRotationCompatible(a, b)) {
+        continue;
+      }
+      if (overlapsInRotationFrame(a, b)) {
         union(i, j);
       }
     }
@@ -116,16 +236,66 @@ const buildParagraphCandidatesFromLines = (options: {
   const out: PageTranslateParagraphCandidate[] = [];
   let idx = 0;
   for (const segLines of groups.values()) {
+    const rotations = segLines
+      .map((l) => l.rotationDeg)
+      .filter((r): r is number => typeof r === "number" && Number.isFinite(r));
+    const groupRotationDeg =
+      rotations.length > 0 ? normalizeRotationDeg(median(rotations)) : 0;
+    const { dirX, dirY, normX, normY } = getAxes(groupRotationDeg);
+
     const ordered = segLines.slice().sort((a, b) => {
-      const dy = a.rect.y - b.rect.y;
-      if (Math.abs(dy) > 0.001) return dy;
-      return a.rect.x - b.rect.x;
+      const ar = a.innerRect ?? a.rect;
+      const br = b.innerRect ?? b.rect;
+      const acx = ar.x + ar.width / 2;
+      const acy = ar.y + ar.height / 2;
+      const bcx = br.x + br.width / 2;
+      const bcy = br.y + br.height / 2;
+      const av = acx * normX + acy * normY;
+      const bv = bcx * normX + bcy * normY;
+      const dv = av - bv;
+      if (Math.abs(dv) > 0.001) return dv;
+      const au = acx * dirX + acy * dirY;
+      const bu = bcx * dirX + bcy * dirY;
+      return au - bu;
     });
 
-    const rect = unionRect(ordered.map((l) => l.rect));
+    const orderedPoints = ordered.flatMap((l) => getLinePoints(l));
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (const [x, y] of orderedPoints) {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+    const rect = {
+      x: minX,
+      y: minY,
+      width: Math.max(0, maxX - minX),
+      height: Math.max(0, maxY - minY),
+    };
+
+    const u = projectPointsInterval(orderedPoints, dirX, dirY);
+    const v = projectPointsInterval(orderedPoints, normX, normY);
+    const uMid = (u.min + u.max) / 2;
+    const vMid = (v.min + v.max) / 2;
+    const cx = dirX * uMid + normX * vMid;
+    const cy = dirY * uMid + normY * vMid;
+    const innerRect = {
+      x: cx - (u.max - u.min) / 2,
+      y: cy - (v.max - v.min) / 2,
+      width: Math.max(0, u.max - u.min),
+      height: Math.max(0, v.max - v.min),
+    };
     const fontFamily =
       pickMostCommon(ordered.map((l) => l.fontFamily)) || "sans-serif";
     const fontSize = median(ordered.map((l) => l.fontSize)) || 12;
+    const rotationDeg =
+      rotations.length > 0
+        ? normalizeRotationDeg(median(rotations))
+        : undefined;
     const sourceText = ordered
       .map((l) => l.sourceText)
       .join("\n")
@@ -138,9 +308,11 @@ const buildParagraphCandidatesFromLines = (options: {
       id: `page_translate_paragraph_${pageIndex}_${idx++}`,
       pageIndex,
       rect,
+      innerRect: rotationDeg ? innerRect : undefined,
       sourceText,
       fontSize,
       fontFamily,
+      rotationDeg,
       isExcluded: false,
     });
   }
@@ -157,8 +329,11 @@ export type PageTranslationLine = {
   pageIndex: number;
   sourceText: string;
   rect: { x: number; y: number; width: number; height: number };
+  innerRect?: { x: number; y: number; width: number; height: number };
+  points?: Array<[number, number]>;
   fontSize: number;
   fontFamily: string;
+  rotationDeg?: number;
 };
 
 export type PageTranslationResult = {
@@ -578,8 +753,10 @@ const translateParagraphCandidatesStructured = async (args: {
         pageIndex: args.pageIndex,
         sourceText: c.sourceText,
         rect: c.rect,
+        innerRect: c.innerRect,
         fontSize: c.fontSize,
         fontFamily: c.fontFamily,
+        rotationDeg: c.rotationDeg,
         translatedText: tt,
       };
     })
@@ -642,7 +819,14 @@ const unmergeSelectedParagraphCandidatesFromTextLayer = async (options: {
     });
 
     for (const parent of group) {
-      const matched = lines.filter((l) => rectOverlaps(l.rect, parent.rect));
+      const matched = lines.filter((l) => {
+        if (!rectOverlaps(l.rect, parent.rect)) return false;
+        const pr = parent.rotationDeg;
+        const lr = l.rotationDeg;
+        if (typeof pr !== "number" || !Number.isFinite(pr)) return true;
+        if (typeof lr !== "number" || !Number.isFinite(lr)) return true;
+        return Math.abs(deltaRotationDeg(lr, pr)) <= 1;
+      });
       if (matched.length === 0) {
         created.push(parent);
         createdIds.push(parent.id);
@@ -650,7 +834,7 @@ const unmergeSelectedParagraphCandidatesFromTextLayer = async (options: {
       }
 
       for (const l of matched) {
-        const key = `${pageIndex}|${l.rect.x.toFixed(2)}|${l.rect.y.toFixed(2)}|${l.rect.width.toFixed(2)}|${l.rect.height.toFixed(2)}|${l.sourceText}`;
+        const key = `${pageIndex}|${l.rect.x.toFixed(2)}|${l.rect.y.toFixed(2)}|${l.rect.width.toFixed(2)}|${l.rect.height.toFixed(2)}|${l.sourceText}|${l.rotationDeg}`;
         if (dedupe.has(key)) continue;
         dedupe.add(key);
 
@@ -659,9 +843,11 @@ const unmergeSelectedParagraphCandidatesFromTextLayer = async (options: {
           id,
           pageIndex,
           rect: l.rect,
+          innerRect: l.innerRect,
           sourceText: l.sourceText,
           fontSize: l.fontSize || parent.fontSize || 12,
           fontFamily: l.fontFamily || parent.fontFamily || "sans-serif",
+          rotationDeg: l.rotationDeg,
           isExcluded: parent.isExcluded,
         });
         createdIds.push(id);
@@ -677,19 +863,6 @@ const unmergeSelectedParagraphCandidatesFromTextLayer = async (options: {
   });
 
   return { candidates: next, selectedIds: createdIds };
-};
-
-const expandRect = (
-  rect: { x: number; y: number; width: number; height: number },
-  padX: number,
-  padY: number,
-) => {
-  return {
-    x: rect.x - padX,
-    y: rect.y - padY,
-    width: rect.width + padX * 2,
-    height: rect.height + padY * 2,
-  };
 };
 
 const createId = (prefix: string) => {
@@ -980,28 +1153,6 @@ const pickMostCommon = (values: string[]) => {
   return best?.v;
 };
 
-const unionRect = (
-  rects: Array<{ x: number; y: number; width: number; height: number }>,
-) => {
-  if (rects.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const r of rects) {
-    minX = Math.min(minX, r.x);
-    minY = Math.min(minY, r.y);
-    maxX = Math.max(maxX, r.x + r.width);
-    maxY = Math.max(maxY, r.y + r.height);
-  }
-  return {
-    x: minX,
-    y: minY,
-    width: Math.max(0, maxX - minX),
-    height: Math.max(0, maxY - minY),
-  };
-};
-
 const extractTextBlocks = (textContent: TextContent, page: PageData) => {
   const viewport = createViewportFromPageInfo(
     {
@@ -1044,6 +1195,7 @@ const extractTextBlocks = (textContent: TextContent, page: PageData) => {
     if (style.vertical) {
       angle += Math.PI / 2;
     }
+    const rotationDeg = normalizeRotationDeg((angle * 180) / Math.PI);
     const fontFamily =
       getFontSubstitution(style) || style.fontFamily || "sans-serif";
 
@@ -1072,13 +1224,26 @@ const extractTextBlocks = (textContent: TextContent, page: PageData) => {
 
     const pdfX = left + pageX;
     const pdfYTop = pageY + pageHeight - top;
-    const pdfYBottom = pdfYTop - fontHeight;
+
+    const theta = -angle;
+
+    const dxX = width * Math.cos(theta);
+    const dxY = width * Math.sin(theta);
+    const dyX = fontHeight * Math.sin(theta);
+    const dyY = -fontHeight * Math.cos(theta);
 
     const cornerPoints = [
       viewport.convertToViewportPoint(pdfX, pdfYTop),
-      viewport.convertToViewportPoint(pdfX + width, pdfYTop),
-      viewport.convertToViewportPoint(pdfX, pdfYBottom),
-      viewport.convertToViewportPoint(pdfX + width, pdfYBottom),
+      viewport.convertToViewportPoint(pdfX + dxX, pdfYTop + dxY),
+      viewport.convertToViewportPoint(pdfX + dyX, pdfYTop + dyY),
+      viewport.convertToViewportPoint(pdfX + dxX + dyX, pdfYTop + dxY + dyY),
+    ];
+
+    const quad = cornerPoints as unknown as [
+      [number, number],
+      [number, number],
+      [number, number],
+      [number, number],
     ];
 
     let minX = Number.POSITIVE_INFINITY;
@@ -1102,8 +1267,10 @@ const extractTextBlocks = (textContent: TextContent, page: PageData) => {
     blocks.push({
       text: str,
       rect,
+      quad,
       fontSize: fontHeight * (page.userUnit ?? 1),
       fontFamily,
+      rotationDeg,
     });
   }
 
@@ -1114,50 +1281,191 @@ const buildLinesFromBlocks = (
   pageIndex: number,
   blocks: PageTranslationTextBlock[],
 ) => {
-  const sorted = [...blocks].sort((a, b) => {
-    const dy = a.rect.y - b.rect.y;
-    if (Math.abs(dy) > 0.001) return dy;
-    return a.rect.x - b.rect.x;
-  });
+  const getAxes = (rotationDeg: number) => {
+    const theta = (rotationDeg * Math.PI) / 180;
+    let dirX = Math.cos(theta);
+    let dirY = Math.sin(theta);
+
+    if (Math.abs(dirX) >= Math.abs(dirY)) {
+      if (dirX < 0) {
+        dirX = -dirX;
+        dirY = -dirY;
+      }
+    } else {
+      if (dirY < 0) {
+        dirX = -dirX;
+        dirY = -dirY;
+      }
+    }
+    const normX = -dirY;
+    const normY = dirX;
+    return { dirX, dirY, normX, normY };
+  };
+
+  const projectRectInterval = (
+    rect: { x: number; y: number; width: number; height: number },
+    axisX: number,
+    axisY: number,
+  ) => {
+    const corners = [
+      [rect.x, rect.y],
+      [rect.x + rect.width, rect.y],
+      [rect.x, rect.y + rect.height],
+      [rect.x + rect.width, rect.y + rect.height],
+    ] as const;
+
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const [x, y] of corners) {
+      const v = x * axisX + y * axisY;
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+    return { min, max };
+  };
+
+  const projectBlockInterval = (
+    block: PageTranslationTextBlock,
+    axisX: number,
+    axisY: number,
+  ) => {
+    if (block.quad && block.quad.length === 4) {
+      let min = Number.POSITIVE_INFINITY;
+      let max = Number.NEGATIVE_INFINITY;
+      for (const [x, y] of block.quad) {
+        const v = x * axisX + y * axisY;
+        min = Math.min(min, v);
+        max = Math.max(max, v);
+      }
+      return { min, max };
+    }
+    return projectRectInterval(block.rect, axisX, axisY);
+  };
+
+  const intervalDistance = (
+    a: { min: number; max: number },
+    b: { min: number; max: number },
+  ) => {
+    if (a.max < b.min) return b.min - a.max;
+    if (b.max < a.min) return a.min - b.max;
+    return 0;
+  };
+
+  const sorted = [...blocks]
+    .map((b) => {
+      const rot = normalizeRotationDeg(b.rotationDeg);
+      const { dirX, dirY, normX, normY } = getAxes(rot);
+      const cx = b.rect.x + b.rect.width / 2;
+      const cy = b.rect.y + b.rect.height / 2;
+      const u = cx * dirX + cy * dirY;
+      const v = cx * normX + cy * normY;
+      return { b, cx, cy, u, v, rot };
+    })
+    .sort((a, b) => {
+      const dv = a.v - b.v;
+      if (Math.abs(dv) > 0.001) return dv;
+      return a.u - b.u;
+    });
 
   const lines: Array<{
     blocks: PageTranslationTextBlock[];
-    y: number;
+    v: number;
+    uMin: number;
+    uMax: number;
     fontSize: number;
+    rotationDeg: number;
   }> = [];
 
-  for (const b of sorted) {
+  for (const item of sorted) {
+    const b = item.b;
+    const centerX = item.cx;
+    const centerY = item.cy;
     const size = b.fontSize || 1;
-    const threshold = Math.max(2, size * 0.6);
 
-    const target = lines.find((l) => Math.abs(b.rect.y - l.y) <= threshold);
+    let target: (typeof lines)[number] | undefined;
+    let bestDv = Number.POSITIVE_INFINITY;
+    for (const l of lines) {
+      if (Math.abs(deltaRotationDeg(b.rotationDeg, l.rotationDeg)) > 15)
+        continue;
+      const { dirX, dirY, normX, normY } = getAxes(l.rotationDeg);
+      const v = centerX * normX + centerY * normY;
+      const dv = Math.abs(v - l.v);
+      const u = projectBlockInterval(b, dirX, dirY);
+      const du = intervalDistance(u, { min: l.uMin, max: l.uMax });
+
+      const vThreshold = Math.max(1, Math.min(size, l.fontSize) * 0.35);
+      const uThreshold = Math.max(6, Math.max(size, l.fontSize) * 1.6);
+      if (dv <= vThreshold && du <= uThreshold && dv < bestDv) {
+        bestDv = dv;
+        target = l;
+      }
+    }
     if (!target) {
-      lines.push({ blocks: [b], y: b.rect.y, fontSize: size });
+      const { dirX, dirY, normX, normY } = getAxes(b.rotationDeg);
+      const v = centerX * normX + centerY * normY;
+      const u = projectBlockInterval(b, dirX, dirY);
+      lines.push({
+        blocks: [b],
+        v,
+        uMin: u.min,
+        uMax: u.max,
+        fontSize: size,
+        rotationDeg: b.rotationDeg,
+      });
       continue;
     }
 
     target.blocks.push(b);
-    target.y = median(target.blocks.map((x) => x.rect.y));
     target.fontSize = median(target.blocks.map((x) => x.fontSize));
+    target.rotationDeg = normalizeRotationDeg(
+      median(target.blocks.map((x) => x.rotationDeg)),
+    );
+    const { normX, normY } = getAxes(target.rotationDeg);
+    target.v = median(
+      target.blocks.map((x) => {
+        const cx = x.rect.x + x.rect.width / 2;
+        const cy = x.rect.y + x.rect.height / 2;
+        return cx * normX + cy * normY;
+      }),
+    );
+
+    const { dirX, dirY } = getAxes(target.rotationDeg);
+    let uMin = Number.POSITIVE_INFINITY;
+    let uMax = Number.NEGATIVE_INFINITY;
+    for (const x of target.blocks) {
+      const u = projectBlockInterval(x, dirX, dirY);
+      uMin = Math.min(uMin, u.min);
+      uMax = Math.max(uMax, u.max);
+    }
+    target.uMin = uMin;
+    target.uMax = uMax;
   }
 
   return lines
     .flatMap((l) => {
-      const blocksSorted = [...l.blocks].sort((a, b) => a.rect.x - b.rect.x);
+      const { dirX, dirY } = getAxes(l.rotationDeg);
+      const blocksSorted = [...l.blocks]
+        .map((b) => {
+          const u = projectBlockInterval(b, dirX, dirY);
+          return { b, uMin: u.min, uMax: u.max };
+        })
+        .sort((a, b) => a.uMin - b.uMin);
 
       const segments: PageTranslationTextBlock[][] = [];
       let current: PageTranslationTextBlock[] = [];
 
       for (let i = 0; i < blocksSorted.length; i++) {
-        const b = blocksSorted[i]!;
+        const b = blocksSorted[i]!.b;
         if (current.length === 0) {
           current = [b];
           continue;
         }
 
         const prev = current[current.length - 1]!;
-        const gap = b.rect.x - (prev.rect.x + prev.rect.width);
-        const splitThreshold = Math.max(10, l.fontSize * 2.5);
+        const prevU = projectBlockInterval(prev, dirX, dirY);
+        const currU = projectBlockInterval(b, dirX, dirY);
+        const gap = currU.min - prevU.max;
+        const splitThreshold = Math.max(8, l.fontSize * 1.6);
         if (gap > splitThreshold) {
           segments.push(current);
           current = [b];
@@ -1170,11 +1478,69 @@ const buildLinesFromBlocks = (
 
       return segments
         .map((seg) => {
-          const rect = unionRect(seg.map((b) => b.rect));
           const fontFamily =
             pickMostCommon(seg.map((b) => b.fontFamily)) || "sans-serif";
           const fontSize =
             median(seg.map((b) => b.fontSize)) || l.fontSize || 12;
+          const rotationDeg = normalizeRotationDeg(
+            median(seg.map((b) => b.rotationDeg)),
+          );
+
+          const points: Array<[number, number]> = [];
+          for (const b of seg) {
+            if (b.quad && b.quad.length === 4) {
+              points.push(...b.quad);
+            } else {
+              const r = b.rect;
+              points.push(
+                [r.x, r.y],
+                [r.x + r.width, r.y],
+                [r.x, r.y + r.height],
+                [r.x + r.width, r.y + r.height],
+              );
+            }
+          }
+
+          let minX = Number.POSITIVE_INFINITY;
+          let minY = Number.POSITIVE_INFINITY;
+          let maxX = Number.NEGATIVE_INFINITY;
+          let maxY = Number.NEGATIVE_INFINITY;
+          for (const [x, y] of points) {
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+          }
+          const rect = {
+            x: minX,
+            y: minY,
+            width: Math.max(0, maxX - minX),
+            height: Math.max(0, maxY - minY),
+          };
+
+          const { dirX, dirY, normX, normY } = getAxes(rotationDeg);
+          let uMin = Number.POSITIVE_INFINITY;
+          let uMax = Number.NEGATIVE_INFINITY;
+          let vMin = Number.POSITIVE_INFINITY;
+          let vMax = Number.NEGATIVE_INFINITY;
+          for (const [x, y] of points) {
+            const u = x * dirX + y * dirY;
+            const v = x * normX + y * normY;
+            uMin = Math.min(uMin, u);
+            uMax = Math.max(uMax, u);
+            vMin = Math.min(vMin, v);
+            vMax = Math.max(vMax, v);
+          }
+          const uMid = (uMin + uMax) / 2;
+          const vMid = (vMin + vMax) / 2;
+          const cx = dirX * uMid + normX * vMid;
+          const cy = dirY * uMid + normY * vMid;
+          const innerRect = {
+            x: cx - (uMax - uMin) / 2,
+            y: cy - (vMax - vMin) / 2,
+            width: Math.max(0, uMax - uMin),
+            height: Math.max(0, vMax - vMin),
+          };
 
           let text = "";
           for (let i = 0; i < seg.length; i++) {
@@ -1185,7 +1551,9 @@ const buildLinesFromBlocks = (
             }
 
             const prev = seg[i - 1]!;
-            const gap = curr.rect.x - (prev.rect.x + prev.rect.width);
+            const prevU = projectBlockInterval(prev, dirX, dirY);
+            const currU = projectBlockInterval(curr, dirX, dirY);
+            const gap = currU.min - prevU.max;
             const shouldSpace = gap > Math.max(1, fontSize * 0.25);
             text += (shouldSpace ? " " : "") + curr.text;
           }
@@ -1194,8 +1562,11 @@ const buildLinesFromBlocks = (
             pageIndex,
             sourceText: text.trim(),
             rect,
+            innerRect: rotationDeg !== 0 ? innerRect : undefined,
+            points,
             fontSize,
             fontFamily,
+            rotationDeg,
           } satisfies PageTranslationLine;
         })
         .filter((l) => l.sourceText.length > 0);
@@ -1588,8 +1959,10 @@ export const pageTranslationService = {
                 pageIndex,
                 sourceText: c.sourceText,
                 rect: c.rect,
+                innerRect: c.innerRect,
                 fontSize: c.fontSize,
                 fontFamily: c.fontFamily,
+                rotationDeg: c.rotationDeg,
                 translatedText,
               });
             } catch (e: unknown) {
@@ -1782,6 +2155,35 @@ export const pageTranslationService = {
 
     const forcedFontFamily = (options.fontFamily || "").trim() || "Helvetica";
 
+    const deriveInnerRectFromOuterAabb = (args: {
+      outer: { x: number; y: number; width: number; height: number };
+      rotationDeg: number;
+    }) => {
+      const { outer, rotationDeg } = args;
+      if (!Number.isFinite(rotationDeg) || rotationDeg === 0) return outer;
+
+      const theta = (rotationDeg * Math.PI) / 180;
+      const absCos = Math.abs(Math.cos(theta));
+      const absSin = Math.abs(Math.sin(theta));
+      const det = absCos * absCos - absSin * absSin;
+      if (!Number.isFinite(det) || Math.abs(det) < 1e-6) return outer;
+
+      const w = (outer.width * absCos - outer.height * absSin) / det;
+      const h = (outer.height * absCos - outer.width * absSin) / det;
+      if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+        return outer;
+      }
+
+      const cx = outer.x + outer.width / 2;
+      const cy = outer.y + outer.height / 2;
+      return {
+        x: cx - w / 2,
+        y: cy - h / 2,
+        width: w,
+        height: h,
+      };
+    };
+
     const createdAt = new Date().toISOString();
 
     const annots: Annotation[] = [];
@@ -1790,10 +2192,28 @@ export const pageTranslationService = {
       const pageWidth = pageSize?.width;
       const pageHeight = pageSize?.height;
 
-      const occupiedRects = page.lines.map((l) => padRect(l.rect, padding));
+      const normalizedLines = page.lines.map((l) => {
+        const r = l.rotationDeg;
+        if (typeof r !== "number" || !Number.isFinite(r) || r === 0) return l;
 
-      for (let i = 0; i < page.lines.length; i++) {
-        const line = page.lines[i]!;
+        if (l.innerRect) {
+          return {
+            ...l,
+            rect: l.innerRect,
+          };
+        }
+        return {
+          ...l,
+          rect: deriveInnerRectFromOuterAabb({ outer: l.rect, rotationDeg: r }),
+        };
+      });
+
+      const occupiedRects = normalizedLines.map((l) =>
+        padRect(l.rect, padding),
+      );
+
+      for (let i = 0; i < normalizedLines.length; i++) {
+        const line = normalizedLines[i]!;
 
         const isParagraphGranularity = options.granularity === "paragraph";
 
@@ -2052,6 +2472,7 @@ export const pageTranslationService = {
           color: "#000000",
           backgroundColor: "#ffffff",
           opacity: 1,
+          rotationDeg: line.rotationDeg,
           flatten: options.flattenFreetext,
           meta: {
             kind: "page_translate",

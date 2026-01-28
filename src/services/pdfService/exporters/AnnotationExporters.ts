@@ -601,7 +601,31 @@ export class FreeTextExporter implements IAnnotationExporter {
     const lineHeight = fontSize;
     const startY = h - fontSize; // Start from top
 
+    const rotationDeg =
+      typeof annotation.rotationDeg === "number" &&
+      Number.isFinite(annotation.rotationDeg)
+        ? annotation.rotationDeg
+        : 0;
+    const theta = (-rotationDeg * Math.PI) / 180;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const absCos = Math.abs(cos);
+    const absSin = Math.abs(sin);
+
+    const aabbW = absCos * w + absSin * h;
+    const aabbH = absSin * w + absCos * h;
+    const pageCx = x + w / 2;
+    const pageCy = y + h / 2;
+    const rectX = pageCx - aabbW / 2;
+    const rectY = pageCy - aabbH / 2;
+
     let appearanceOps = `q${typeof opacity === "number" && opacity < 1 ? " /GS0 gs" : ""}`;
+
+    if (rotationDeg !== 0) {
+      const cx = aabbW / 2;
+      const cy = aabbH / 2;
+      appearanceOps += ` 1 0 0 1 ${cx} ${cy} cm ${cos} ${sin} ${-sin} ${cos} 0 0 cm 1 0 0 1 ${-w / 2} ${-h / 2} cm`;
+    }
     if (
       typeof bgR === "number" &&
       typeof bgG === "number" &&
@@ -684,7 +708,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       Type: "XObject",
       Subtype: "Form",
       FormType: 1,
-      BBox: [0, 0, w, h],
+      BBox: [0, 0, aabbW, aabbH],
       Resources: apResources,
     });
     const appearanceRef = pdfDoc.context.register(appearanceStream);
@@ -713,16 +737,26 @@ export class FreeTextExporter implements IAnnotationExporter {
         : annotation.alignment === "right"
           ? 2
           : 0;
+
+    const pdfRotation = (() => {
+      const r = -rotationDeg;
+      if (!Number.isFinite(r)) return undefined;
+      const d = ((r % 360) + 360) % 360;
+      return d === 0 ? undefined : d;
+    })();
+
     const freeTextAnnot = pdfDoc.context.obj({
       Type: "Annot",
       Subtype: "FreeText",
       F: 4, // Print flag
-      Rect: [x, y, x + w, y + h],
+      Rect: [rectX, rectY, rectX + aabbW, rectY + aabbH],
       Contents: PDFHexString.fromText(text),
       DA: PDFString.of(da),
       AP: { N: appearanceRef },
       Q: q,
       BS: { W: 0 },
+      Rotate: pdfRotation,
+      MK: pdfRotation !== undefined ? { R: pdfRotation } : undefined,
       IC:
         typeof bgR === "number" &&
         typeof bgG === "number" &&

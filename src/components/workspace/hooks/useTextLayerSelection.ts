@@ -8,6 +8,10 @@ import {
 } from "react";
 import { appEventBus } from "@/lib/eventBus";
 import { resetGlobalCursor, setGlobalCursor } from "@/lib/cursor";
+import {
+  PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX,
+  PDF_TEXT_SELECTION_HANDLE_WIDTH_PX,
+} from "@/constants";
 
 export type TextSelectionHandleRect = {
   left: number;
@@ -333,8 +337,8 @@ export const useTextLayerSelection = (opts: {
     const endLayer = getClosestLayer(range.endContainer);
 
     const pageRect = pageEl.getBoundingClientRect();
-    const handleWidth = 14;
-    const dotRadius = 6;
+    const handleWidth = PDF_TEXT_SELECTION_HANDLE_WIDTH_PX;
+    const dotRadius = PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX / 2;
 
     const getHandleVisualLength = (
       rect: DOMRect | null,

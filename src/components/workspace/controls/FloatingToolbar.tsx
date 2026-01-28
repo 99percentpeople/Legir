@@ -11,6 +11,7 @@ export interface FloatingToolbarProps {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  sideOffset?: number;
 }
 
 export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
@@ -18,6 +19,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   children,
   className,
   style,
+  sideOffset,
 }) => {
   if (!isVisible) return null;
 
@@ -55,7 +57,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       <PopoverContent
         side="top"
         align="center"
-        sideOffset={8}
+        sideOffset={sideOffset ?? 8}
         className={cn(
           "bg-background z-50 flex w-auto items-center gap-1 rounded-md border p-1 shadow-md",
           className,

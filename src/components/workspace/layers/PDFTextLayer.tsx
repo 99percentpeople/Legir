@@ -10,6 +10,11 @@ import type { PageData } from "@/types";
 import { cn } from "@/lib/cn";
 import { useEditorStore } from "@/store/useEditorStore";
 import { appEventBus } from "@/lib/eventBus";
+import {
+  PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX,
+  PDF_TEXT_SELECTION_HANDLE_STEM_WIDTH_PX,
+  PDF_TEXT_SELECTION_HANDLE_WIDTH_PX,
+} from "@/constants";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { buildTextLayer } from "../lib/pdfTextLayer";
@@ -459,6 +464,11 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
         createPortal(
           <div
             className="ff-text-selection-handles-layer"
+            style={{
+              "--ff-text-selection-handle-width": `${PDF_TEXT_SELECTION_HANDLE_WIDTH_PX}px`,
+              "--ff-text-selection-handle-dot-size": `${PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX}px`,
+              "--ff-text-selection-handle-stem-width": `${PDF_TEXT_SELECTION_HANDLE_STEM_WIDTH_PX}px`,
+            }}
             data-ff-handle-dragging={
               isDraggingSelectionHandle ? "1" : undefined
             }
