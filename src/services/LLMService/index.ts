@@ -35,14 +35,14 @@ const resolveDefaultProviderId = () => {
 llmService.setDefaultProviderId(resolveDefaultProviderId());
 
 const getAnyAvailableProviderWithFunction = (
-  kind: "translate" | "aiDetect",
+  kind: "translate" | "formDetect",
 ): LLMProvider | null => {
   for (const p of llmService.getProviders()) {
     if (!p.isAvailable()) continue;
     const fn =
       kind === "translate"
         ? p.getFunctions().translate
-        : p.getFunctions().aiDetect;
+        : p.getFunctions().formDetect;
     if (fn) return p;
   }
   return null;
@@ -187,7 +187,7 @@ export const loadModels = async (opts?: LoadModelsOptions) => {
 
     const fns = p.getFunctions();
     const translate = fns.translate;
-    const aiDetect = fns.aiDetect;
+    const formDetect = fns.formDetect;
 
     try {
       await translate?.refreshModels?.();
@@ -196,7 +196,7 @@ export const loadModels = async (opts?: LoadModelsOptions) => {
     }
 
     try {
-      await aiDetect?.refreshModels?.();
+      await formDetect?.refreshModels?.();
     } catch (err) {
       if (throwOnError) throw err;
     }
@@ -222,7 +222,7 @@ export const loadModels = async (opts?: LoadModelsOptions) => {
     ? hasGeminiKey
       ? geminiProvider
           .getFunctions()
-          .aiDetect?.getModels()
+          .formDetect?.getModels()
           .map((m) => ({ id: m.id, label: m.label, labelKey: m.labelKey }))
       : []
     : prevCache.geminiVisionModels;
@@ -238,7 +238,7 @@ export const loadModels = async (opts?: LoadModelsOptions) => {
     ? hasOpenAiKey
       ? openaiProvider
           .getFunctions()
-          .aiDetect?.getModels()
+          .formDetect?.getModels()
           .map((m) => ({ id: m.id, label: m.label, labelKey: m.labelKey }))
       : []
     : prevCache.openaiVisionModels;
@@ -271,10 +271,10 @@ const getTranslateFunction = () => {
   return fn;
 };
 
-const getAnalyzeFunction = (providerId?: string) => {
+const getFormDetectFunction = (providerId?: string) => {
   if (providerId) {
     const p = llmService.getProvider(providerId);
-    const fn = p?.getFunctions().aiDetect;
+    const fn = p?.getFunctions().formDetect;
     if (!p || !fn) {
       throw new Error(`LLM provider does not support analysis: ${providerId}`);
     }
@@ -282,10 +282,10 @@ const getAnalyzeFunction = (providerId?: string) => {
   }
 
   const p = llmService.getDefaultProvider();
-  const fn = p.isAvailable() ? p.getFunctions().aiDetect : undefined;
+  const fn = p.isAvailable() ? p.getFunctions().formDetect : undefined;
   if (!fn) {
-    const fallback = getAnyAvailableProviderWithFunction("aiDetect");
-    const fallbackFn = fallback?.getFunctions().aiDetect;
+    const fallback = getAnyAvailableProviderWithFunction("formDetect");
+    const fallbackFn = fallback?.getFunctions().formDetect;
     if (!fallbackFn) {
       throw new Error("No available LLM provider supports analysis.");
     }
@@ -294,25 +294,25 @@ const getAnalyzeFunction = (providerId?: string) => {
   return fn;
 };
 
-export const isAIDetectAvailable = () => {
+export const isFormDetectAvailable = () => {
   try {
     return llmService
       .getProviders()
-      .some((p) => Boolean(p.getFunctions().aiDetect) && p.isAvailable());
+      .some((p) => Boolean(p.getFunctions().formDetect) && p.isAvailable());
   } catch {
     return false;
   }
 };
 
-export const getAIDetectModels = (): LLMModelOption[] => {
+export const getFormDetectModels = (): LLMModelOption[] => {
   try {
-    return getAnalyzeFunction().getModels();
+    return getFormDetectFunction().getModels();
   } catch {
     return [];
   }
 };
 
-export type AIDetectModelGroup = {
+export type FormDetectModelGroup = {
   providerId: string;
   label: string;
   labelKey?: string;
@@ -321,10 +321,10 @@ export type AIDetectModelGroup = {
   models: LLMModelOption[];
 };
 
-export const getAIDetectModelGroups = (): AIDetectModelGroup[] => {
-  const groups: AIDetectModelGroup[] = [];
+export const getFormDetectModelGroups = (): FormDetectModelGroup[] => {
+  const groups: FormDetectModelGroup[] = [];
   for (const p of llmService.getProviders()) {
-    const fn = p.getFunctions().aiDetect;
+    const fn = p.getFunctions().formDetect;
     if (!fn) continue;
     groups.push({
       providerId: p.id,
@@ -369,7 +369,7 @@ export const analyzePageForFields = async (
   existingFields: FormField[] = [],
   options?: AIAnalysisOptions,
 ) => {
-  return await getAnalyzeFunction(options?.providerId).analyzePageForFields(
+  return await getFormDetectFunction(options?.providerId).analyzePageForFields(
     base64Image,
     pageIndex,
     pageWidth,

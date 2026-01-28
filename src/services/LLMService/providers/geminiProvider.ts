@@ -433,7 +433,7 @@ export const geminiProvider: LLMProvider = {
   id: "gemini",
   label: "Gemini (AI)",
   labelKey: "translate.provider_gemini",
-  unavailableMessageKey: "properties.ai_detection.api_key_missing",
+  unavailableMessageKey: "properties.form_detection.api_key_missing",
   isAvailable: () => client.isAvailable(),
   getFunctions: () => {
     return {
@@ -475,8 +475,8 @@ export const geminiProvider: LLMProvider = {
           }
         },
       },
-      aiDetect: {
-        kind: "aiDetect",
+      formDetect: {
+        kind: "formDetect",
         getModels: () =>
           mergeModels(cachedVisionModels, getCustomVisionModels()),
         refreshModels,

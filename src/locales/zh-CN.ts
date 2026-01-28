@@ -42,8 +42,8 @@ const zhCN = {
     freetext_properties: "自由文本属性",
     settings: "设置",
     shortcuts: "快捷键 (?)",
-    ai_detect: "AI 识别",
-    ai_custom: "自定义识别...",
+    form_detect: "表单识别",
+    form_custom: "自定义识别...",
     export: "导出",
     save_as: "另存为...",
     save_draft: "保存草稿",
@@ -117,7 +117,7 @@ const zhCN = {
     },
   },
   properties: {
-    ai_detection: {
+    form_detection: {
       title: "表单识别",
       desc: "使用已配置的大模型分析页面，并自动检测和创建表单字段。",
       api_key_missing: "缺少 API Key。请在 设置 → 大模型 中配置并重试。",
@@ -301,7 +301,7 @@ const zhCN = {
   },
   right_panel: {
     tabs: {
-      ai_detect: "AI 识别",
+      form_detect: "表单识别",
       page_translate: "全页翻译",
       properties: "属性编辑",
     },

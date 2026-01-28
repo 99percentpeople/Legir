@@ -14,7 +14,7 @@ import { Button } from "../components/ui/button";
 import { appEventBus } from "@/lib/eventBus";
 import { RightPanelTabDock } from "../components/properties-panel/RightPanelTabDock";
 import { PropertiesPanel } from "../components/properties-panel/PropertiesPanel";
-import { AIDetectionPanel } from "../components/properties-panel/AIDetectionPanel";
+import { FormDetectionPanel } from "../components/properties-panel/FormDetectionPanel";
 import { PageTranslatePanel } from "../components/properties-panel/PageTranslatePanel";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { usePageTranslation } from "../hooks/usePageTranslation";
@@ -39,7 +39,7 @@ import type {
   PDFMetadata,
   Tool,
 } from "../types";
-import type { AIDetectionOptions } from "../components/AIDetectionOptionsForm";
+import type { FormDetectionOptions } from "../components/FormDetectionOptionsForm";
 import {
   ANNOTATION_STYLES,
   FIT_SCREEN_PADDING_X,
@@ -62,7 +62,7 @@ export interface EditorPageProps {
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
-  onAdvancedDetect: (options: AIDetectionOptions) => void;
+  onAdvancedDetect: (options: FormDetectionOptions) => void;
 }
 
 const EditorPage: React.FC<EditorPageProps> = ({
@@ -1213,8 +1213,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
         />
 
         {canRenderRightPanel &&
-          (state.rightPanelTab === "ai_detect" ? (
-            <AIDetectionPanel
+          (state.rightPanelTab === "form_detect" ? (
+            <FormDetectionPanel
               isFloating={state.isPanelFloating}
               isOpen={state.isRightPanelOpen}
               onOpen={() => {

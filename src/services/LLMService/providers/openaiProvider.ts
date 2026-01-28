@@ -317,7 +317,7 @@ export const openaiProvider: LLMProvider = {
   id: "openai",
   label: "OpenAI (AI)",
   labelKey: "translate.provider_openai",
-  unavailableMessageKey: "properties.ai_detection.api_key_missing",
+  unavailableMessageKey: "properties.form_detection.api_key_missing",
   isAvailable: () => isOpenAiAvailable(),
   getFunctions: () => ({
     translate: {
@@ -392,8 +392,8 @@ export const openaiProvider: LLMProvider = {
         }
       },
     },
-    aiDetect: {
-      kind: "aiDetect",
+    formDetect: {
+      kind: "formDetect",
       getModels: () => mergeModels(cachedVisionModels, getCustomVisionModels()),
       refreshModels,
       analyzePageForFields: async (

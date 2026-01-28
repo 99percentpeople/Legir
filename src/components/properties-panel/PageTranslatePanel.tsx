@@ -125,7 +125,7 @@ const parsePageRange = (input: string, totalPages: number) => {
       if (rangeParts.length !== 2) {
         return {
           ok: false as const,
-          errorKey: "properties.ai_detection.err_format",
+          errorKey: "properties.form_detection.err_format",
         };
       }
       const start = parseInt(rangeParts[0]!, 10);
@@ -133,13 +133,13 @@ const parsePageRange = (input: string, totalPages: number) => {
       if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
         return {
           ok: false as const,
-          errorKey: "properties.ai_detection.err_format",
+          errorKey: "properties.form_detection.err_format",
         };
       }
       if (start < 1 || end > totalPages) {
         return {
           ok: false as const,
-          errorKey: "properties.ai_detection.err_bounds",
+          errorKey: "properties.form_detection.err_bounds",
         };
       }
       for (let i = start; i <= end; i++) pages.add(i - 1);
@@ -150,13 +150,13 @@ const parsePageRange = (input: string, totalPages: number) => {
     if (!Number.isFinite(num)) {
       return {
         ok: false as const,
-        errorKey: "properties.ai_detection.err_format",
+        errorKey: "properties.form_detection.err_format",
       };
     }
     if (num < 1 || num > totalPages) {
       return {
         ok: false as const,
-        errorKey: "properties.ai_detection.err_bounds",
+        errorKey: "properties.form_detection.err_bounds",
       };
     }
     pages.add(num - 1);
@@ -166,7 +166,7 @@ const parsePageRange = (input: string, totalPages: number) => {
   if (pageIndices.length === 0) {
     return {
       ok: false as const,
-      errorKey: "properties.ai_detection.err_format",
+      errorKey: "properties.form_detection.err_format",
     };
   }
 
@@ -427,7 +427,7 @@ export function PageTranslatePanel({
       <div className="space-y-6">
         <div className="space-y-2">
           <div className="flex items-baseline justify-between">
-            <Label>{t("properties.ai_detection.page_range")}</Label>
+            <Label>{t("properties.form_detection.page_range")}</Label>
             <span className="text-muted-foreground text-xs">
               Total: {totalPages}
             </span>
@@ -436,7 +436,7 @@ export function PageTranslatePanel({
             value={pageRange}
             disabled={isProcessing}
             onChange={(e) => setPageRange(e.target.value)}
-            placeholder={t("properties.ai_detection.page_range_hint")}
+            placeholder={t("properties.form_detection.page_range_hint")}
           />
           {!parsed.ok && (
             <div className="text-destructive text-xs">
@@ -478,17 +478,17 @@ export function PageTranslatePanel({
         </div>
 
         <div className="space-y-2">
-          <Label>{t("properties.ai_detection.prompt")}</Label>
+          <Label>{t("properties.form_detection.prompt")}</Label>
           <Textarea
             value={prompt}
             disabled={isProcessing}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={t("properties.ai_detection.prompt_ph")}
+            placeholder={t("properties.form_detection.prompt_ph")}
             className="resize-none"
             rows={3}
           />
           <p className="text-muted-foreground text-xs">
-            {t("properties.ai_detection.prompt_hint")}
+            {t("properties.form_detection.prompt_hint")}
           </p>
         </div>
 

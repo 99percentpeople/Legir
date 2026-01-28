@@ -1,16 +1,16 @@
 import React from "react";
-import { Sparkles } from "lucide-react";
+import { Form, Sparkles } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { PanelLayout } from "./PanelLayout";
 import {
-  AIDetectionOptions,
-  AIDetectionOptionsForm,
-} from "@/components/AIDetectionOptionsForm";
-import { isAIDetectAvailable } from "@/services/LLMService";
+  FormDetectionOptions,
+  FormDetectionOptionsForm,
+} from "@/components/FormDetectionOptionsForm";
+import { isFormDetectAvailable } from "@/services/LLMService";
 
-export interface AIDetectionPanelProps {
+export interface FormDetectionPanelProps {
   isFloating: boolean;
   isOpen: boolean;
   onOpen: () => void;
@@ -21,10 +21,10 @@ export interface AIDetectionPanelProps {
   totalPages: number;
   isProcessing: boolean;
 
-  onDetect: (options: AIDetectionOptions) => void;
+  onDetect: (options: FormDetectionOptions) => void;
 }
 
-export function AIDetectionPanel({
+export function FormDetectionPanel({
   isFloating,
   isOpen,
   onOpen,
@@ -34,15 +34,15 @@ export function AIDetectionPanel({
   totalPages,
   isProcessing,
   onDetect,
-}: AIDetectionPanelProps) {
+}: FormDetectionPanelProps) {
   const { t } = useLanguage();
-  const isAvailable = isAIDetectAvailable();
+  const isAvailable = isFormDetectAvailable();
 
   return (
     <PanelLayout
       title={
         <>
-          <Sparkles size={16} /> {t("properties.ai_detection.title")}
+          <Form size={16} /> {t("properties.form_detection.title")}
         </>
       }
       isFloating={isFloating}
@@ -56,7 +56,7 @@ export function AIDetectionPanel({
         <div className="space-y-2">
           {!isAvailable && (
             <div className="text-muted-foreground text-xs">
-              {t("properties.ai_detection.api_key_missing")}
+              {t("properties.form_detection.api_key_missing")}
             </div>
           )}
 
@@ -64,22 +64,22 @@ export function AIDetectionPanel({
             <Button
               disabled={!isAvailable || isProcessing}
               className="bg-purple-600 text-white hover:bg-purple-700"
-              form="ai-detection-panel-form"
+              form="form-detection-panel-form"
               type="submit"
             >
               <Sparkles size={16} className="mr-2" />
-              {t("properties.ai_detection.start")}
+              {t("properties.form_detection.start")}
             </Button>
           </DialogFooter>
         </div>
       }
     >
-      <AIDetectionOptionsForm
+      <FormDetectionOptionsForm
         totalPages={totalPages}
         onSubmit={onDetect}
         renderFooter={({ isValid, onConfirm }) => (
           <form
-            id="ai-detection-panel-form"
+            id="form-detection-panel-form"
             onSubmit={(e) => {
               e.preventDefault();
               if (!isValid) return;

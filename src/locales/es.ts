@@ -39,8 +39,8 @@ const es = {
     freetext_properties: "Propiedades de texto libre",
     settings: "Configuración",
     shortcuts: "Atajos de teclado (?)",
-    ai_detect: "Detección IA",
-    ai_custom: "Detección personalizada...",
+    form_detect: "Detección de formularios",
+    form_custom: "Detección personalizada...",
     export: "Exportar",
     save_as: "Guardar como...",
     save_draft: "Guardar borrador",
@@ -114,7 +114,7 @@ const es = {
     },
   },
   properties: {
-    ai_detection: {
+    form_detection: {
       title: "Detección de formularios",
       desc: "Analizar páginas para detectar y crear automáticamente campos de formulario usando el LLM configurado.",
       api_key_missing:
@@ -304,7 +304,7 @@ const es = {
   },
   right_panel: {
     tabs: {
-      ai_detect: "Detección IA",
+      form_detect: "Detección de formularios",
       page_translate: "Traducir página",
       properties: "Edición de propiedades",
     },

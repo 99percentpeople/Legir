@@ -39,8 +39,8 @@ const ja = {
     freetext_properties: "自由入力の設定",
     settings: "設定",
     shortcuts: "ショートカット一覧 (?)",
-    ai_detect: "AI 検出",
-    ai_custom: "独自検出...",
+    form_detect: "フォーム検出",
+    form_custom: "独自検出...",
     export: "書き出し",
     save_as: "名前を付けて保存...",
     save_draft: "下書きを保存",
@@ -114,7 +114,7 @@ const ja = {
     },
   },
   properties: {
-    ai_detection: {
+    form_detection: {
       title: "フォーム検出",
       desc: "設定済みの LLM を使用してページを分析し、フォームフィールドを自動的に検出して作成します。",
       api_key_missing:
@@ -303,7 +303,7 @@ const ja = {
   },
   right_panel: {
     tabs: {
-      ai_detect: "AI 検出",
+      form_detect: "フォーム検出",
       page_translate: "ページ翻訳",
       properties: "設定編集",
     },

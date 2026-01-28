@@ -29,12 +29,12 @@ import { useLanguage } from "./language-provider";
 import { DEFAULT_FIELD_STYLE } from "../constants";
 import { cn } from "../lib/cn";
 import {
-  getAIDetectModelGroups,
+  getFormDetectModelGroups,
   subscribeLLMModelRegistry,
 } from "@/services/LLMService";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 
-export interface AIDetectionOptions {
+export interface FormDetectionOptions {
   pageRange: string;
   providerId?: string;
   modelId?: string;
@@ -44,22 +44,22 @@ export interface AIDetectionOptions {
   useCustomStyle: boolean;
 }
 
-export interface AIDetectionOptionsFormRenderProps {
+export interface FormDetectionOptionsFormRenderProps {
   isValid: boolean;
   onConfirm: () => void;
 }
 
-export interface AIDetectionOptionsFormProps {
-  onSubmit: (options: AIDetectionOptions) => void;
-  renderFooter: (props: AIDetectionOptionsFormRenderProps) => React.ReactNode;
+export interface FormDetectionOptionsFormProps {
+  onSubmit: (options: FormDetectionOptions) => void;
+  renderFooter: (props: FormDetectionOptionsFormRenderProps) => React.ReactNode;
   totalPages: number;
 }
 
-export function AIDetectionOptionsForm({
+export function FormDetectionOptionsForm({
   onSubmit,
   renderFooter,
   totalPages,
-}: AIDetectionOptionsFormProps) {
+}: FormDetectionOptionsFormProps) {
   const { t } = useLanguage();
 
   const [llmRegistryVersion, setLlmRegistryVersion] = useState(0);
@@ -71,7 +71,7 @@ export function AIDetectionOptionsForm({
   }, []);
 
   const modelGroups = React.useMemo(
-    () => getAIDetectModelGroups(),
+    () => getFormDetectModelGroups(),
     [llmRegistryVersion],
   );
 
@@ -134,7 +134,9 @@ export function AIDetectionOptionsForm({
     if (!input || input.toLowerCase() === "all") {
       setValidation({
         isValid: true,
-        message: t("properties.ai_detection.valid_all", { total: totalPages }),
+        message: t("properties.form_detection.valid_all", {
+          total: totalPages,
+        }),
         isError: false,
       });
       return;
@@ -154,7 +156,7 @@ export function AIDetectionOptionsForm({
         const rangeParts = p.split("-");
         if (rangeParts.length !== 2) {
           hasError = true;
-          errorMsg = t("properties.ai_detection.err_format");
+          errorMsg = t("properties.form_detection.err_format");
           break;
         }
         const start = parseInt(rangeParts[0]);
@@ -162,19 +164,19 @@ export function AIDetectionOptionsForm({
 
         if (isNaN(start) || isNaN(end)) {
           hasError = true;
-          errorMsg = t("properties.ai_detection.err_format");
+          errorMsg = t("properties.form_detection.err_format");
           break;
         }
         if (start < 1 || end > totalPages) {
           hasError = true;
-          errorMsg = t("properties.ai_detection.err_bounds", {
+          errorMsg = t("properties.form_detection.err_bounds", {
             total: totalPages,
           });
           break;
         }
         if (start > end) {
           hasError = true;
-          errorMsg = t("properties.ai_detection.err_format"); // Invalid range
+          errorMsg = t("properties.form_detection.err_format"); // Invalid range
           break;
         }
         for (let i = start; i <= end; i++) pages.add(i);
@@ -183,12 +185,12 @@ export function AIDetectionOptionsForm({
         const num = parseInt(p);
         if (isNaN(num)) {
           hasError = true;
-          errorMsg = t("properties.ai_detection.err_format");
+          errorMsg = t("properties.form_detection.err_format");
           break;
         }
         if (num < 1 || num > totalPages) {
           hasError = true;
-          errorMsg = t("properties.ai_detection.err_bounds", {
+          errorMsg = t("properties.form_detection.err_bounds", {
             total: totalPages,
           });
           break;
@@ -205,7 +207,7 @@ export function AIDetectionOptionsForm({
         // Handle case where input might be just "," or empty parts
         setValidation({
           isValid: false,
-          message: t("properties.ai_detection.err_format"),
+          message: t("properties.form_detection.err_format"),
           isError: true,
         });
       } else {
@@ -215,7 +217,7 @@ export function AIDetectionOptionsForm({
             : sorted.join(", ");
         setValidation({
           isValid: true,
-          message: t("properties.ai_detection.valid_selected", {
+          message: t("properties.form_detection.valid_selected", {
             count: sorted.length,
             pages: display,
           }),
@@ -274,7 +276,7 @@ export function AIDetectionOptionsForm({
         {/* Page Range */}
         <div className="space-y-2">
           <div className="flex items-baseline justify-between">
-            <Label>{t("properties.ai_detection.page_range")}</Label>
+            <Label>{t("properties.form_detection.page_range")}</Label>
             <span className="text-muted-foreground text-xs">
               Total: {totalPages}
             </span>
@@ -305,7 +307,7 @@ export function AIDetectionOptionsForm({
             )}
             <span className="leading-tight">
               {validation.message ||
-                t("properties.ai_detection.page_range_hint")}
+                t("properties.form_detection.page_range_hint")}
             </span>
           </div>
         </div>
@@ -331,7 +333,7 @@ export function AIDetectionOptionsForm({
 
         {/* Field Types */}
         <div className="space-y-3">
-          <Label>{t("properties.ai_detection.types")}</Label>
+          <Label>{t("properties.form_detection.types")}</Label>
           <ToggleGroup
             type="multiple"
             value={allowedTypes}
@@ -386,7 +388,7 @@ export function AIDetectionOptionsForm({
         {/* Style Adjustments */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label>{t("properties.ai_detection.style_override")}</Label>
+            <Label>{t("properties.form_detection.style_override")}</Label>
             <Switch
               checked={useCustomStyle}
               onCheckedChange={setUseCustomStyle}
@@ -452,16 +454,16 @@ export function AIDetectionOptionsForm({
 
         {/* Extra Prompt */}
         <div className="space-y-2">
-          <Label>{t("properties.ai_detection.prompt")}</Label>
+          <Label>{t("properties.form_detection.prompt")}</Label>
           <Textarea
             value={extraPrompt}
             onChange={(e) => setExtraPrompt(e.target.value)}
-            placeholder={t("properties.ai_detection.prompt_ph")}
+            placeholder={t("properties.form_detection.prompt_ph")}
             className="resize-none"
             rows={3}
           />
           <p className="text-muted-foreground text-xs">
-            {t("properties.ai_detection.prompt_hint")}
+            {t("properties.form_detection.prompt_hint")}
           </p>
         </div>
       </div>
@@ -471,14 +473,14 @@ export function AIDetectionOptionsForm({
   );
 }
 
-interface AIDetectionDialogProps {
+interface FormDetectionDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (options: AIDetectionOptions) => void;
+  onConfirm: (options: FormDetectionOptions) => void;
   totalPages: number;
 }
 
-const AIDetectionDialog: React.FC<AIDetectionDialogProps> = ({
+const FormDetectionDialog: React.FC<FormDetectionDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
@@ -492,14 +494,14 @@ const AIDetectionDialog: React.FC<AIDetectionDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-500" />
-            {t("properties.ai_detection.title")}
+            {t("properties.form_detection.title")}
           </DialogTitle>
           <DialogDescription>
-            {t("properties.ai_detection.desc")}
+            {t("properties.form_detection.desc")}
           </DialogDescription>
         </DialogHeader>
 
-        <AIDetectionOptionsForm
+        <FormDetectionOptionsForm
           totalPages={totalPages}
           onSubmit={onConfirm}
           renderFooter={({ isValid, onConfirm }) => (
@@ -516,7 +518,7 @@ const AIDetectionDialog: React.FC<AIDetectionDialogProps> = ({
                 className="bg-purple-600 text-white hover:bg-purple-700"
               >
                 <Sparkles size={16} className="mr-2" />
-                {t("properties.ai_detection.start")}
+                {t("properties.form_detection.start")}
               </Button>
             </DialogFooter>
           )}
@@ -526,4 +528,4 @@ const AIDetectionDialog: React.FC<AIDetectionDialogProps> = ({
   );
 };
 
-export default AIDetectionDialog;
+export default FormDetectionDialog;

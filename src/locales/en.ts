@@ -42,8 +42,8 @@ const en = {
     freetext_properties: "Free Text Properties",
     settings: "Settings",
     shortcuts: "Keyboard Shortcuts (?)",
-    ai_detect: "AI Detect",
-    ai_custom: "Custom Detect...",
+    form_detect: "Form Detect",
+    form_custom: "Custom Detect...",
     export: "Export",
     save_as: "Save As...",
     save_draft: "Save Draft",
@@ -117,7 +117,7 @@ const en = {
     },
   },
   properties: {
-    ai_detection: {
+    form_detection: {
       title: "Form Detection",
       desc: "Analyze pages to automatically detect and create form fields using your configured LLM.",
       api_key_missing:
@@ -300,7 +300,7 @@ const en = {
   },
   right_panel: {
     tabs: {
-      ai_detect: "AI Detect",
+      form_detect: "Form Detect",
       page_translate: "Page Translate",
       properties: "Property Editing",
     },

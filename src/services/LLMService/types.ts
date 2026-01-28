@@ -2,7 +2,7 @@ import type { FieldType, FormField } from "@/types";
 
 export type LLMProviderId = string;
 
-export type LLMFunctionKind = "translate" | "aiDetect";
+export type LLMFunctionKind = "translate" | "formDetect";
 
 export type LLMModelOption = {
   id: string;
@@ -40,8 +40,8 @@ export type LLMAnalyzePageForFieldsOptions = {
   modelId?: string;
 };
 
-export interface LLMAIDetectFunction {
-  kind: "aiDetect";
+export interface LLMFormDetectFunction {
+  kind: "formDetect";
   getModels: () => LLMModelOption[];
   refreshModels?: () => Promise<void>;
 
@@ -57,7 +57,7 @@ export interface LLMAIDetectFunction {
 
 export type LLMProviderFunctions = {
   translate?: LLMTranslateFunction;
-  aiDetect?: LLMAIDetectFunction;
+  formDetect?: LLMFormDetectFunction;
 };
 
 export interface LLMProvider {

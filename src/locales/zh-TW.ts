@@ -39,8 +39,8 @@ const zhTW = {
     freetext_properties: "自由文本屬性",
     settings: "設定",
     shortcuts: "快捷鍵 (?)",
-    ai_detect: "AI 識別",
-    ai_custom: "自訂識別...",
+    form_detect: "表單識別",
+    form_custom: "自訂識別...",
     export: "匯出",
     save_as: "另存為...",
     save_draft: "儲存草稿",
@@ -114,7 +114,7 @@ const zhTW = {
     },
   },
   properties: {
-    ai_detection: {
+    form_detection: {
       title: "表單識別",
       desc: "使用已設定的大模型分析頁面，並自動檢測與建立表單欄位。",
       api_key_missing: "缺少 API Key。請在 設定 → 大模型 中設定並重試。",
@@ -297,7 +297,7 @@ const zhTW = {
   },
   right_panel: {
     tabs: {
-      ai_detect: "AI 識別",
+      form_detect: "表單識別",
       page_translate: "全頁翻譯",
       properties: "屬性編輯",
     },

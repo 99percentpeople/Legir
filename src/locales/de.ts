@@ -39,8 +39,8 @@ const de = {
     freetext_properties: "Frei text eigenschaften",
     settings: "Einstellungen",
     shortcuts: "Tastenkürzel (?)",
-    ai_detect: "KI-Erkennung",
-    ai_custom: "Benutzerdefinierte Erkennung...",
+    form_detect: "Formularerkennung",
+    form_custom: "Benutzerdefinierte Erkennung...",
     export: "Exportieren",
     save_as: "Speichern unter...",
     save_draft: "Entwurf speichern",
@@ -114,7 +114,7 @@ const de = {
     },
   },
   properties: {
-    ai_detection: {
+    form_detection: {
       title: "Formularerkennung",
       desc: "Seiten analysieren, um Formularfelder mit dem konfigurierten LLM automatisch zu erkennen und zu erstellen.",
       api_key_missing:
@@ -305,7 +305,7 @@ const de = {
   },
   right_panel: {
     tabs: {
-      ai_detect: "KI-Erkennung",
+      form_detect: "Formularerkennung",
       page_translate: "Seite übersetzen",
       properties: "Eigenschaften bearbeiten",
     },

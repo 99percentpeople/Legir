@@ -2,9 +2,9 @@ import React from "react";
 import {
   BookA,
   FileText,
+  Form,
   Languages,
   SlidersHorizontal,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useScrollbarWidthOffset } from "@/hooks/useScrollbarWidthOffset";
@@ -15,7 +15,7 @@ import { appEventBus } from "@/lib/eventBus";
 export type RightPanelTabId =
   | "document"
   | "properties"
-  | "ai_detect"
+  | "form_detect"
   | "translate"
   | "page_translate"
   | (string & {});
@@ -102,7 +102,11 @@ export function RightPanelTabDock({
 
   const defaultTabs: RightPanelDockTab[] = [
     { id: "document", title: t("properties.document.title"), Icon: FileText },
-    { id: "ai_detect", title: t("right_panel.tabs.ai_detect"), Icon: Sparkles },
+    {
+      id: "form_detect",
+      title: t("right_panel.tabs.form_detect"),
+      Icon: Form,
+    },
     { id: "translate", title: t("translate.title"), Icon: Languages },
     {
       id: "page_translate",
