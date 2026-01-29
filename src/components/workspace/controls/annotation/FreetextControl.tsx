@@ -95,6 +95,10 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   const lastClickTimeRef = useRef<number>(0);
 
   const baseOpacity = Math.min(1, Math.max(0, data.opacity ?? 1));
+  const hasText = (data.text || "").length > 0;
+  const hasBackgroundColor = (data.backgroundColor || "").trim().length > 0;
+  const effectiveOpacity =
+    baseOpacity * (!hasText && !hasBackgroundColor ? 0.5 : 1);
 
   useEffect(() => {
     if (!isSelected) {
@@ -231,7 +235,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
           lineHeight: 1,
-          opacity: baseOpacity * (data.text ? 1 : 0.5),
+          opacity: effectiveOpacity,
         }}
         onPointerDown={handlePointerDown}
       >
@@ -273,8 +277,8 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                 />
               ) : (
                 <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
-                  {data.text
-                    ? data.text.split(/\r\n|\r|\n/).map((line, idx, arr) => (
+                  {hasText
+                    ? data.text!.split(/\r\n|\r|\n/).map((line, idx, arr) => (
                         <React.Fragment key={idx}>
                           {splitTextRuns(line).map((run, rIdx) => (
                             <span
@@ -291,7 +295,9 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                           {idx < arr.length - 1 ? "\n" : null}
                         </React.Fragment>
                       ))
-                    : "Double click to edit"}
+                    : hasBackgroundColor
+                      ? null
+                      : "Double click to edit"}
                 </div>
               )}
             </div>
@@ -323,8 +329,8 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
               />
             ) : (
               <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
-                {data.text
-                  ? data.text.split(/\r\n|\r|\n/).map((line, idx, arr) => (
+                {hasText
+                  ? data.text!.split(/\r\n|\r|\n/).map((line, idx, arr) => (
                       <React.Fragment key={idx}>
                         {splitTextRuns(line).map((run, rIdx) => (
                           <span
@@ -341,7 +347,9 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                         {idx < arr.length - 1 ? "\n" : null}
                       </React.Fragment>
                     ))
-                  : "Double click to edit"}
+                  : hasBackgroundColor
+                    ? null
+                    : "Double click to edit"}
               </div>
             )}
           </div>

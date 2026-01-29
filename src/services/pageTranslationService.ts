@@ -658,12 +658,18 @@ const translatePageLinesStructured = async (args: {
   return usable
     .map((l, i) => {
       const tr = byId.get(String(i + 1));
-      if (!tr) return null;
+      if (!tr) return args.aiReflowParagraphs ? buildResult(l, "") : null;
       if (tr.action === "skip") return buildResult(l, "");
       if (tr.action !== "translate") return null;
 
-      const tt = (tr.translatedText || "").trim();
-      if (!tt) return args.aiReflowParagraphs ? buildResult(l, "") : null;
+      const raw = tr.translatedText;
+      const tt = (raw || "").trim();
+      if (!tt) {
+        const isExplicitEmpty = typeof raw === "string";
+        return args.aiReflowParagraphs || isExplicitEmpty
+          ? buildResult(l, "")
+          : null;
+      }
       return buildResult(l, tt);
     })
     .filter(Boolean) as Array<PageTranslationLine & { translatedText: string }>;
@@ -766,12 +772,18 @@ const translateParagraphCandidatesStructured = async (args: {
   return ordered
     .map((c, i) => {
       const tr = byId.get(String(i + 1));
-      if (!tr) return null;
-      if (tr.action === "skip") return buildResult(c, " ");
+      if (!tr) return args.aiReflowParagraphs ? buildResult(c, "") : null;
+      if (tr.action === "skip") return buildResult(c, "");
       if (tr.action !== "translate") return null;
 
-      const tt = (tr.translatedText || "").trim();
-      if (!tt) return args.aiReflowParagraphs ? buildResult(c, " ") : null;
+      const raw = tr.translatedText;
+      const tt = (raw || "").trim();
+      if (!tt) {
+        const isExplicitEmpty = typeof raw === "string";
+        return args.aiReflowParagraphs || isExplicitEmpty
+          ? buildResult(c, "")
+          : null;
+      }
       return buildResult(c, tt);
     })
     .filter(Boolean) as Array<PageTranslationLine & { translatedText: string }>;
@@ -1967,7 +1979,9 @@ export const pageTranslationService = {
                   signal: options.signal,
                 },
               );
-              if (!translatedText && !options.aiReflowParagraphs) continue;
+              const safeTranslatedText =
+                typeof translatedText === "string" ? translatedText : "";
+              if (!safeTranslatedText && !options.aiReflowParagraphs) continue;
 
               translatedLines.push({
                 pageIndex,
@@ -1977,7 +1991,7 @@ export const pageTranslationService = {
                 fontSize: c.fontSize,
                 fontFamily: c.fontFamily,
                 rotationDeg: c.rotationDeg,
-                translatedText,
+                translatedText: safeTranslatedText,
               });
             } catch (e: unknown) {
               if (typeof (e as { name?: unknown })?.name === "string") {
