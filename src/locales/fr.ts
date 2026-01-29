@@ -288,6 +288,7 @@ const fr = {
     thickness: "Épaisseur",
     font_size: "Taille de police",
     font_family: "Police",
+    rotation: "Rotation",
     opacity: "Opacité",
     flatten: "Aplatir à l’export",
     geometry: "Géométrie",

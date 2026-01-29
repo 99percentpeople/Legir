@@ -659,7 +659,7 @@ const translatePageLinesStructured = async (args: {
     .map((l, i) => {
       const tr = byId.get(String(i + 1));
       if (!tr) return args.aiReflowParagraphs ? buildResult(l, "") : null;
-      if (tr.action === "skip") return buildResult(l, "");
+      if (tr.action === "skip") return null;
       if (tr.action !== "translate") return null;
 
       const raw = tr.translatedText;
@@ -773,7 +773,7 @@ const translateParagraphCandidatesStructured = async (args: {
     .map((c, i) => {
       const tr = byId.get(String(i + 1));
       if (!tr) return args.aiReflowParagraphs ? buildResult(c, "") : null;
-      if (tr.action === "skip") return buildResult(c, "");
+      if (tr.action === "skip") return null;
       if (tr.action !== "translate") return null;
 
       const raw = tr.translatedText;

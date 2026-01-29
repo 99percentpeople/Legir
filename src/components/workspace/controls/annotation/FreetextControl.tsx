@@ -24,7 +24,7 @@ import {
 } from "@/lib/fonts";
 
 export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
-  const { data, scale, isSelected, onUpdate, onDelete, onEdit } = props;
+  const { data, isSelected, onUpdate, onDelete, onEdit } = props;
   const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -230,7 +230,6 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           isSelected && !isEditing && "ring-primary ring-1 ring-inset",
         )}
         style={{
-          "--scale": scale,
           color: data.color || "#000000",
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
@@ -243,8 +242,8 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           <div
             className="absolute top-1/2 left-1/2"
             style={{
-              width: data.rect.width * scale,
-              height: data.rect.height * scale,
+              width: `calc(${data.rect.width}px * var(--scale, 1))`,
+              height: `calc(${data.rect.height}px * var(--scale, 1))`,
               transform: `translate(-50%, -50%) rotate(${rotationDeg}deg)`,
               transformOrigin: "50% 50%",
             }}

@@ -283,6 +283,7 @@ const zhCN = {
     thickness: "粗细",
     font_size: "字体大小",
     font_family: "字体",
+    rotation: "旋转",
     opacity: "不透明度",
     flatten: "导出时扁平化",
     geometry: "几何",

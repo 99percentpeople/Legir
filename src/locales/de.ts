@@ -287,6 +287,7 @@ const de = {
     thickness: "Dicke",
     font_size: "Schriftgröße",
     font_family: "Schriftart",
+    rotation: "Drehung",
     opacity: "Deckkraft",
     flatten: "Beim Export abflachen",
     geometry: "Geometrie",

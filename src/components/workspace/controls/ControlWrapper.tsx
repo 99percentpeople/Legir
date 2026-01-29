@@ -17,7 +17,6 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   children,
   id,
   isSelected,
-  scale,
   isSelectable,
   onResizeStart,
   data,
@@ -105,14 +104,15 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     if (!shouldRenderRotatedOverlay) return null;
     if (!baseRect) return null;
 
-    const outerW = rect.width * scale;
-    const outerH = rect.height * scale;
-    const innerW = baseRect.width * scale;
-    const innerH = baseRect.height * scale;
-    const innerLeft = (outerW - innerW) / 2;
-    const innerTop = (outerH - innerH) / 2;
+    const innerLeft = (rect.width - baseRect.width) / 2;
+    const innerTop = (rect.height - baseRect.height) / 2;
 
-    return { innerW, innerH, innerLeft, innerTop };
+    return {
+      innerW: baseRect.width,
+      innerH: baseRect.height,
+      innerLeft,
+      innerTop,
+    };
   })();
 
   // Determine ID based on type for sidebar navigation
@@ -146,10 +146,10 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
         className,
       )}
       style={{
-        left: rect.x * scale,
-        top: rect.y * scale,
-        width: rect.width * scale,
-        height: rect.height * scale,
+        left: `calc(${rect.x}px * var(--scale, 1))`,
+        top: `calc(${rect.y}px * var(--scale, 1))`,
+        width: `calc(${rect.width}px * var(--scale, 1))`,
+        height: `calc(${rect.height}px * var(--scale, 1))`,
         cursor: isSelectable ? "pointer" : "inherit",
       }}
     >
@@ -162,17 +162,25 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
           <div className="pointer-events-none absolute inset-0">
             {shouldRenderRotatedOverlay ? (
               <>
-                <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
+                <div className="absolute inset-px border border-dashed border-blue-500" />
                 <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap shadow-sm">
                   {label}
                 </span>
                 <div
                   className="absolute"
                   style={{
-                    left: rotatedInnerOverlayGeometry?.innerLeft,
-                    top: rotatedInnerOverlayGeometry?.innerTop,
-                    width: rotatedInnerOverlayGeometry?.innerW,
-                    height: rotatedInnerOverlayGeometry?.innerH,
+                    left: rotatedInnerOverlayGeometry
+                      ? `calc(${rotatedInnerOverlayGeometry.innerLeft}px * var(--scale, 1))`
+                      : undefined,
+                    top: rotatedInnerOverlayGeometry
+                      ? `calc(${rotatedInnerOverlayGeometry.innerTop}px * var(--scale, 1))`
+                      : undefined,
+                    width: rotatedInnerOverlayGeometry
+                      ? `calc(${rotatedInnerOverlayGeometry.innerW}px * var(--scale, 1))`
+                      : undefined,
+                    height: rotatedInnerOverlayGeometry
+                      ? `calc(${rotatedInnerOverlayGeometry.innerH}px * var(--scale, 1))`
+                      : undefined,
                     transform: `rotate(${rotationDeg}deg)`,
                     transformOrigin: "50% 50%",
                   }}
@@ -194,6 +202,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                     />
                   ))}
 
+                  <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-dashed border-blue-500" />
                   <div
                     className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
                     onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
@@ -221,10 +230,15 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                 ))}
 
                 {data.type === "freetext" && (
-                  <div
-                    className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
-                    onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
-                  />
+                  <>
+                    <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-dashed border-blue-500" />
+                    <div
+                      className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
+                      onPointerDown={(e) =>
+                        handleResizePointerDown(e, "rotate")
+                      }
+                    />
+                  </>
                 )}
               </>
             )}

@@ -2,6 +2,7 @@ import {
   PDFDocument,
   PDFPage,
   rgb,
+  degrees,
   PDFName,
   PDFString,
   PDFHexString,
@@ -422,6 +423,15 @@ export class FreeTextExporter implements IAnnotationExporter {
       wrapParagraph(paragraph);
     }
 
+    const rotationDeg =
+      typeof annotation.rotationDeg === "number" &&
+      Number.isFinite(annotation.rotationDeg)
+        ? annotation.rotationDeg
+        : 0;
+    const theta = (-rotationDeg * Math.PI) / 180;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+
     if (annotation.flatten) {
       const bg =
         typeof bgR === "number" &&
@@ -430,15 +440,30 @@ export class FreeTextExporter implements IAnnotationExporter {
           ? rgb(bgR, bgG, bgB)
           : undefined;
 
+      const hasRotation = rotationDeg !== 0;
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      const rotatePoint = (px: number, py: number) => {
+        if (!hasRotation) return { x: px, y: py };
+        const dx = px - cx;
+        const dy = py - cy;
+        return {
+          x: cx + cos * dx - sin * dy,
+          y: cy + sin * dx + cos * dy,
+        };
+      };
+
       if (bg) {
+        const rp = rotatePoint(x, y);
         page.drawRectangle({
-          x,
-          y,
+          x: rp.x,
+          y: rp.y,
           width: w,
           height: h,
           color: bg,
           opacity,
           borderWidth: 0,
+          rotate: hasRotation ? degrees(-rotationDeg) : undefined,
         });
       }
 
@@ -519,13 +544,15 @@ export class FreeTextExporter implements IAnnotationExporter {
             !isUserSelectedNonStandardEmbedded
               ? customFont
               : baseFont;
+          const rp = rotatePoint(getAlignedX(lineText), drawY);
           page.drawText(lineText, {
-            x: getAlignedX(lineText),
-            y: drawY,
+            x: rp.x,
+            y: rp.y,
             size: fontSize,
             font: runFont,
             color: textColor,
             opacity,
+            rotate: hasRotation ? degrees(-rotationDeg) : undefined,
           });
           continue;
         }
@@ -536,13 +563,15 @@ export class FreeTextExporter implements IAnnotationExporter {
         const flush = () => {
           if (!buf) return;
           const runFont = bufIsAscii ? baseFont : cjkFont;
+          const rp = rotatePoint(cursorX, drawY);
           page.drawText(buf, {
-            x: cursorX,
-            y: drawY,
+            x: rp.x,
+            y: rp.y,
             size: fontSize,
             font: runFont,
             color: textColor,
             opacity,
+            rotate: hasRotation ? degrees(-rotationDeg) : undefined,
           });
           try {
             cursorX += runFont.widthOfTextAtSize(buf, fontSize);
@@ -601,14 +630,13 @@ export class FreeTextExporter implements IAnnotationExporter {
     const lineHeight = fontSize;
     const startY = h - fontSize; // Start from top
 
-    const rotationDeg =
-      typeof annotation.rotationDeg === "number" &&
-      Number.isFinite(annotation.rotationDeg)
-        ? annotation.rotationDeg
-        : 0;
-    const theta = (-rotationDeg * Math.PI) / 180;
-    const cos = Math.cos(theta);
-    const sin = Math.sin(theta);
+    const pdfNum = (n: number) => {
+      if (!Number.isFinite(n)) return "0";
+      const v = Math.abs(n) < 1e-8 ? 0 : n;
+      const s = v.toFixed(6);
+      return s.replace(/\.0+$|(?<=\.[0-9]*?)0+$/g, "").replace(/\.$/, "");
+    };
+
     const absCos = Math.abs(cos);
     const absSin = Math.abs(sin);
 
@@ -624,7 +652,7 @@ export class FreeTextExporter implements IAnnotationExporter {
     if (rotationDeg !== 0) {
       const cx = aabbW / 2;
       const cy = aabbH / 2;
-      appearanceOps += ` 1 0 0 1 ${cx} ${cy} cm ${cos} ${sin} ${-sin} ${cos} 0 0 cm 1 0 0 1 ${-w / 2} ${-h / 2} cm`;
+      appearanceOps += ` 1 0 0 1 ${pdfNum(cx)} ${pdfNum(cy)} cm ${pdfNum(cos)} ${pdfNum(sin)} ${pdfNum(-sin)} ${pdfNum(cos)} 0 0 cm 1 0 0 1 ${pdfNum(-w / 2)} ${pdfNum(-h / 2)} cm`;
     }
     if (
       typeof bgR === "number" &&

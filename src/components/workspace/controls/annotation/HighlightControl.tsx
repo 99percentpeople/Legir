@@ -15,7 +15,6 @@ import { getContrastColor } from "@/utils/colors";
 interface HighlightRectProps {
   r: { x: number; y: number; width: number; height: number };
   data: AnnotationControlProps["data"];
-  scale: number;
   isSelectable: boolean;
   onSelect: (id: string) => void;
   elementId?: string;
@@ -31,7 +30,6 @@ interface HighlightRectProps {
 interface HighlightPolygonProps {
   rects: { x: number; y: number; width: number; height: number }[];
   data: AnnotationControlProps["data"];
-  scale: number;
   isSelectable: boolean;
   onSelect: (id: string) => void;
   elementId?: string;
@@ -84,7 +82,6 @@ const rectsToPath = (
 const HighlightRect: React.FC<HighlightRectProps> = ({
   r,
   data,
-  scale,
   isSelectable,
   onSelect,
   elementId,
@@ -95,13 +92,12 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
   onEdit,
   isAnnotationMode = true,
 }) => {
-  const { ref, x, y } = useMouse<HTMLDivElement>();
+  const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
 
   return (
     <ControlWrapper
       id={data.id}
       isSelected={!!isSelected}
-      scale={scale}
       isAnnotationMode={isAnnotationMode}
       isFormMode={false}
       isSelectable={isSelectable}
@@ -182,14 +178,12 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
               hideWhenDetached
               className="group z-50"
               style={{
-                transform: `translate(${x - (r.width * scale) / 2}px, ${
-                  y - r.height * scale
-                }px)`,
+                transform: `translate(${x - width / 2}px, ${y - height}px)`,
               }}
             >
               <div
                 className={cn(
-                  "dark bg-background text-foreground pointer-events-none max-w-xs rounded-md px-2 py-1 text-xs break-words whitespace-pre-wrap opacity-80 shadow-sm",
+                  "dark bg-background text-foreground pointer-events-none max-w-xs rounded-md px-2 py-1 text-xs wrap-break-word whitespace-pre-wrap opacity-80 shadow-sm",
                   "animate-in fade-in-0 zoom-in-95 group-data-[side=bottom]:slide-in-from-top-2 group-data-[side=left]:slide-in-from-right-2 group-data-[side=right]:slide-in-from-left-2 group-data-[side=top]:slide-in-from-bottom-2",
                   "group-data-[state=closed]:animate-out group-data-[state=closed]:fade-out-0 group-data-[state=closed]:zoom-out-95",
                 )}
@@ -207,7 +201,6 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
 const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
   rects,
   data,
-  scale,
   isSelectable,
   onSelect,
   elementId,
@@ -220,13 +213,12 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
 }) => {
   const bounds = getRectBounds(rects);
   const d = rectsToPath(rects, { x: bounds.x, y: bounds.y });
-  const { ref, x, y } = useMouse<SVGPathElement>();
+  const { ref, x, y, width, height } = useMouse<SVGPathElement>();
 
   return (
     <ControlWrapper
       id={data.id}
       isSelected={!!isSelected}
-      scale={scale}
       isAnnotationMode={isAnnotationMode}
       isFormMode={false}
       isSelectable={isSelectable}
@@ -316,14 +308,12 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
               hideWhenDetached
               className="group z-50"
               style={{
-                transform: `translate(${x - (bounds.width * scale) / 2}px, ${
-                  y - bounds.height * scale
-                }px)`,
+                transform: `translate(${x - width / 2}px, ${y - height}px)`,
               }}
             >
               <div
                 className={cn(
-                  "dark bg-background text-foreground pointer-events-none max-w-xs rounded-md px-2 py-1 text-xs break-words whitespace-pre-wrap opacity-80 shadow-sm",
+                  "dark bg-background text-foreground pointer-events-none max-w-xs rounded-md px-2 py-1 text-xs wrap-break-word whitespace-pre-wrap opacity-80 shadow-sm",
                   "animate-in fade-in-0 zoom-in-95 group-data-[side=bottom]:slide-in-from-top-2 group-data-[side=left]:slide-in-from-right-2 group-data-[side=right]:slide-in-from-left-2 group-data-[side=top]:slide-in-from-bottom-2",
                   "group-data-[state=closed]:animate-out group-data-[state=closed]:fade-out-0 group-data-[state=closed]:zoom-out-95",
                 )}
@@ -340,7 +330,6 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
 
 export const HighlightControl: React.FC<AnnotationControlProps> = ({
   data,
-  scale,
   onSelect,
   isSelectable,
   isSelected,
@@ -348,14 +337,12 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
   onDelete,
   onEdit,
   isAnnotationMode,
-  isFormMode,
 }) => {
   if (data.rects && data.rects.length > 0) {
     return (
       <HighlightPolygon
         rects={data.rects}
         data={data}
-        scale={scale}
         isSelectable={isSelectable}
         onSelect={onSelect}
         elementId={`annotation-${data.id}`}
@@ -372,7 +359,6 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
       <HighlightRect
         r={data.rect}
         data={data}
-        scale={scale}
         isSelectable={isSelectable}
         onSelect={onSelect}
         elementId={`annotation-${data.id}`}

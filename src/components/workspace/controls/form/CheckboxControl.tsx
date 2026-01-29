@@ -6,8 +6,7 @@ import { cn } from "@/lib/cn";
 import { resolveFontStackWithCjkFallback } from "@/lib/fonts";
 
 export const CheckboxControl: React.FC<FormControlProps> = (props) => {
-  const { data, isFormMode, isAnnotationMode, isSelectable, onUpdate, scale } =
-    props;
+  const { data, isFormMode, isAnnotationMode, isSelectable, onUpdate } = props;
   const style = data.style || {};
 
   const effectiveBorderStyle =
@@ -18,7 +17,6 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
         : "solid";
 
   const containerStyle: React.CSSProperties = {
-    "--scale": scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: `calc(${style.borderWidth}px * var(--scale, 1))`,
     borderColor: style.borderColor,

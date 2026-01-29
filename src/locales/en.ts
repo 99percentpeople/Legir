@@ -282,6 +282,7 @@ const en = {
     thickness: "Thickness",
     font_size: "Font Size",
     font_family: "Font Family",
+    rotation: "Rotation",
     opacity: "Opacity",
     flatten: "Flatten on export",
     geometry: "Geometry",

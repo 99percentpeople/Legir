@@ -14,7 +14,6 @@ import { getContrastColor } from "@/utils/colors";
 export const InkControl: React.FC<AnnotationControlProps> = (props) => {
   const {
     data,
-    scale,
     onSelect,
     isSelected,
     isSelectable,
@@ -22,7 +21,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
     onDelete,
     onEdit,
   } = props;
-  const { ref, x, y } = useMouse<HTMLDivElement>();
+  const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
 
   const strokes = useMemo(() => {
     if (data.strokes && data.strokes.length > 0) return data.strokes;
@@ -204,9 +203,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
               hideWhenDetached
               className="group z-50"
               style={{
-                transform: `translate(${x - (bounds.width * scale) / 2}px, ${
-                  y - bounds.height * scale
-                }px)`,
+                transform: `translate(${x - width / 2}px, ${y - height}px)`,
               }}
             >
               <div

@@ -27,7 +27,7 @@ if (!isTauri()) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <LanguageProvider defaultLanguage="en" storageKey="ff-ui-language">
+    <LanguageProvider defaultLanguage="system" storageKey="ff-ui-language">
       <ThemeProvider defaultTheme="system" storageKey="ff-ui-theme">
         <Toaster position="top-center" />
         <Router hook={useHashLocation}>

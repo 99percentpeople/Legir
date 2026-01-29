@@ -1855,7 +1855,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
             data={field}
             id={field.id}
             isSelected={editorState.selectedId === field.id}
-            scale={editorState.scale}
             isAnnotationMode={editorState.mode === "annotation"}
             isFormMode={editorState.mode === "form"}
             isSelectable={isSelectable}
@@ -1874,7 +1873,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
               data={annot}
               id={annot.id}
               isSelected={editorState.selectedId === annot.id}
-              scale={editorState.scale}
               isAnnotationMode={editorState.mode === "annotation"}
               isFormMode={editorState.mode === "form"}
               isSelectable={isSelectable}
@@ -1975,6 +1973,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       className="relative flex-1 overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
       style={{
         cursor: isPanModeActive ? "grab" : undefined,
+        "--scale": editorState.scale,
       }}
       onPointerDown={handleContainerPointerDown}
       onPointerMove={handlePointerMove}

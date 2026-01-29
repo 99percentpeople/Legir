@@ -93,6 +93,8 @@ You are a professional translator.
 Task:
 - Translate the target page blocks to ${options.targetLanguage}.
 - You may SKIP blocks that are not meaningful to translate (e.g. pure symbols, page numbers).
+- IMPORTANT: If you choose "skip", do NOT include translatedText.
+- IMPORTANT: If you want an intentional blank placeholder translation, use action "translate" with "translatedText": "" (empty string).
 - Preserve meaning.
 ${lineBreakRule}
 - Output MUST be valid JSON. No markdown.

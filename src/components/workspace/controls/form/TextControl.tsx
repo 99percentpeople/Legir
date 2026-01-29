@@ -12,7 +12,6 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
     isSelectable,
     onUpdate,
     onSelect,
-    scale,
   } = props;
   const style = data.style || {};
 
@@ -28,7 +27,6 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
         : "solid";
 
   const containerStyle: React.CSSProperties = {
-    "--scale": scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: `calc(${style.borderWidth}px * var(--scale, 1))`,
     borderColor: style.borderColor,
@@ -62,7 +60,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
           isAnnotationMode && !isSelectable && "pointer-events-none",
         )}
         style={containerStyle}
-        onPointerDown={(e) => {
+        onPointerDown={(_e) => {
           // Forward event to parent handler (which we need to wire up in Workspace)
           // For now, just stop propagation if we are selecting
           // Note: We need to call the passed in onPointerDown from props if we add it

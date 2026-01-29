@@ -286,6 +286,7 @@ const es = {
     thickness: "Grosor",
     font_size: "Tamaño de fuente",
     font_family: "Familia de fuentes",
+    rotation: "Rotación",
     opacity: "Opacidad",
     flatten: "Aplanar al exportar",
     geometry: "Geometría",

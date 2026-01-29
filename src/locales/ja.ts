@@ -285,6 +285,7 @@ const ja = {
     thickness: "太さ",
     font_size: "フォントサイズ",
     font_family: "フォントファミリ",
+    rotation: "回転",
     opacity: "不透明度",
     flatten: "エクスポート時にフラット化",
     geometry: "位置とサイズ",

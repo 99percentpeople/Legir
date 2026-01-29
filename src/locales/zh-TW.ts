@@ -279,6 +279,7 @@ const zhTW = {
     thickness: "粗細",
     font_size: "字體大小",
     font_family: "字體",
+    rotation: "旋轉",
     opacity: "不透明度",
     flatten: "匯出時扁平化",
     geometry: "幾何",

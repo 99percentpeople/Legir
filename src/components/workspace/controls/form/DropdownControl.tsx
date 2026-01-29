@@ -14,7 +14,6 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
     isSelectable,
     onUpdate,
     onSelect,
-    scale,
   } = props;
   const style = data.style || {};
 
@@ -32,7 +31,6 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
         : "solid";
 
   const containerStyle: React.CSSProperties = {
-    "--scale": scale,
     backgroundColor: !style.isTransparent ? style.backgroundColor : undefined,
     borderWidth: `calc(${style.borderWidth}px * var(--scale, 1))`,
     borderColor: style.borderColor,

@@ -38,8 +38,8 @@ export const DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES: PageTranslateOptions = {
   useParagraphs: false,
   flattenFreetext: false,
   contextWindow: "none",
-  paragraphXGap: 2.5,
-  paragraphYGap: 1.2,
+  paragraphXGap: 1,
+  paragraphYGap: 1,
   paragraphSplitByFontSize: false,
   freetextPadding: 1,
 };

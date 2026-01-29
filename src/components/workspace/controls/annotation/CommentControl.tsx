@@ -12,11 +12,12 @@ import { useMouse } from "@/hooks/useMouse";
 import { getContrastColor } from "@/utils/colors";
 
 export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
-  const { data, scale, isSelected, onUpdate, onDelete, onEdit } = props;
-  const { ref, x, y } = useMouse<HTMLDivElement>();
+  const { data, isSelected, onUpdate, onDelete, onEdit } = props;
+  const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
 
   // Ensure rect exists, otherwise default
   const rect = data.rect || { x: 0, y: 0, width: 30, height: 30 };
+  const iconBaseSize = Math.min(rect.width, rect.height) * 0.6;
 
   return (
     <ControlWrapper {...props} showBorder={false}>
@@ -75,10 +76,14 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
             }}
           >
             <MessageCircleMore
-              size={Math.min(rect.width, rect.height) * scale * 0.6}
+              size={24}
               className="text-foreground opacity-80"
               fill={data.color ? data.color : "none"}
               color={data.color ? getContrastColor(data.color) : "currentColor"}
+              style={{
+                width: `calc(${iconBaseSize}px * var(--scale, 1))`,
+                height: `calc(${iconBaseSize}px * var(--scale, 1))`,
+              }}
             />
           </div>
         </TooltipTrigger>
@@ -91,9 +96,7 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
               hideWhenDetached
               className="group z-50"
               style={{
-                transform: `translate(${x - (rect.width * scale) / 2}px, ${
-                  y - rect.height * scale
-                }px)`,
+                transform: `translate(${x - width / 2}px, ${y - height}px)`,
               }}
             >
               <div
