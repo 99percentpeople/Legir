@@ -650,16 +650,21 @@ const translatePageLinesStructured = async (args: {
 
   const byId = new Map(res.translations.map((tr) => [tr.id, tr] as const));
 
+  const buildResult = (l: PageTranslationLine, translatedText: string) => ({
+    ...l,
+    translatedText,
+  });
+
   return usable
     .map((l, i) => {
       const tr = byId.get(String(i + 1));
-      if (!tr || tr.action !== "translate") return null;
+      if (!tr) return null;
+      if (tr.action === "skip") return buildResult(l, "");
+      if (tr.action !== "translate") return null;
+
       const tt = (tr.translatedText || "").trim();
-      if (!tt) return null;
-      return {
-        ...l,
-        translatedText: tt,
-      };
+      if (!tt) return args.aiReflowParagraphs ? buildResult(l, "") : null;
+      return buildResult(l, tt);
     })
     .filter(Boolean) as Array<PageTranslationLine & { translatedText: string }>;
 };
@@ -743,22 +748,31 @@ const translateParagraphCandidatesStructured = async (args: {
         });
 
   const byId = new Map(res.translations.map((tr) => [tr.id, tr] as const));
+
+  const buildResult = (
+    c: PageTranslateParagraphCandidate,
+    translatedText: string,
+  ) => ({
+    pageIndex: args.pageIndex,
+    sourceText: c.sourceText,
+    rect: c.rect,
+    innerRect: c.innerRect,
+    fontSize: c.fontSize,
+    fontFamily: c.fontFamily,
+    rotationDeg: c.rotationDeg,
+    translatedText,
+  });
+
   return ordered
     .map((c, i) => {
       const tr = byId.get(String(i + 1));
-      if (!tr || tr.action !== "translate") return null;
+      if (!tr) return null;
+      if (tr.action === "skip") return buildResult(c, " ");
+      if (tr.action !== "translate") return null;
+
       const tt = (tr.translatedText || "").trim();
-      if (!tt) return null;
-      return {
-        pageIndex: args.pageIndex,
-        sourceText: c.sourceText,
-        rect: c.rect,
-        innerRect: c.innerRect,
-        fontSize: c.fontSize,
-        fontFamily: c.fontFamily,
-        rotationDeg: c.rotationDeg,
-        translatedText: tt,
-      };
+      if (!tt) return args.aiReflowParagraphs ? buildResult(c, " ") : null;
+      return buildResult(c, tt);
     })
     .filter(Boolean) as Array<PageTranslationLine & { translatedText: string }>;
 };
@@ -1953,7 +1967,7 @@ export const pageTranslationService = {
                   signal: options.signal,
                 },
               );
-              if (!translatedText) continue;
+              if (!translatedText && !options.aiReflowParagraphs) continue;
 
               translatedLines.push({
                 pageIndex,
@@ -2224,6 +2238,34 @@ export const pageTranslationService = {
         const paddedRect = padRect(line.rect, padding);
 
         const baseSize = Math.max(4, Math.min(200, line.fontSize || 12));
+        if (normalizedText.length === 0) {
+          annots.push({
+            id: createId(`page_translate_${page.pageIndex}_${i}`),
+            pageIndex: page.pageIndex,
+            type: "freetext",
+            rect: paddedRect,
+            text: "",
+            size: baseSize,
+            fontFamily: forcedFontFamily,
+            color: "#000000",
+            backgroundColor: "#ffffff",
+            opacity: 1,
+            rotationDeg: line.rotationDeg,
+            flatten: options.flattenFreetext,
+            meta: {
+              kind: "page_translate",
+              source,
+              granularity: options.granularity,
+              targetLanguage: translate.targetLanguage,
+              sourceLanguage: translate.sourceLanguage,
+              translateOption: translate.translateOption,
+              prompt: translate.prompt,
+              createdAt,
+            },
+          });
+          occupiedRects[i] = padRect(paddedRect, padding);
+          continue;
+        }
         const measureAtBase = createMeasureWidth(forcedFontFamily, baseSize);
         const hasExplicitLineBreaks = normalizedText.includes("\n");
         const isMultiLineByRect =
