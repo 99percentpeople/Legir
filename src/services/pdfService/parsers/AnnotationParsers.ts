@@ -962,6 +962,7 @@ export class FreeTextParser implements IAnnotationParser {
           typeof annotation.opacity === "number" ? annotation.opacity : 1;
         opacity = Math.min(1, Math.max(0, opacity));
         let fontSize = 12;
+        let lineHeight: number | undefined = undefined;
         let fontFamily: string | undefined = undefined;
         const sourcePdfRef:
           | { objectNumber: number; generationNumber: number }
@@ -987,6 +988,15 @@ export class FreeTextParser implements IAnnotationParser {
           } else {
             const sizeMatch = daStr.match(/(\d+(\.\d+)?)\s+Tf/);
             if (sizeMatch) fontSize = parseFloat(sizeMatch[1]);
+          }
+
+          const tlMatch = daStr.match(/(\d+(?:\.\d+)?)\s+TL\b/);
+          if (tlMatch && Number.isFinite(fontSize) && fontSize > 0) {
+            const leading = parseFloat(tlMatch[1]);
+            const m = leading / fontSize;
+            if (Number.isFinite(m) && m > 0) {
+              lineHeight = Math.abs(m - 1) < 1e-3 ? undefined : m;
+            }
           }
 
           const tokens = daStr.trim().split(/\s+/);
@@ -1519,6 +1529,7 @@ export class FreeTextParser implements IAnnotationParser {
           rotationDeg,
           text: contents,
           size: fontSize,
+          lineHeight,
           fontFamily: fontFamily,
           author: author,
           updatedAt: updatedAt,

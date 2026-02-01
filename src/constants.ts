@@ -70,6 +70,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
     },
     userName: "",
     thumbnailsLayout: "single",
+    removeTextUnderFlattenedFreetext: true,
     llm: {
       openai: {
         customTranslateModels: [],

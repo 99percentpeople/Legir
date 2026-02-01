@@ -184,6 +184,10 @@ const zhTW = {
       placeholder: "密碼",
       placeholder_use_open: "留空則匯出時不設定密碼",
     },
+    remove_text_under_freetext: {
+      label: "移除自由文字下方原文",
+      desc: "匯出並扁平化自由文字時，移除其覆蓋區域下方的頁面文字，使其不可選取/不可複製。",
+    },
     doc_title: "文件標題",
     author: "作者",
     subject: "主旨",
@@ -278,6 +282,7 @@ const zhTW = {
     color: "顏色",
     thickness: "粗細",
     font_size: "字體大小",
+    line_height: "行高",
     font_family: "字體",
     rotation: "旋轉",
     opacity: "不透明度",
@@ -378,6 +383,7 @@ const zhTW = {
     description: "配置工作區行為和對齊規則。",
     tabs: {
       general: "通用",
+      export: "匯出",
       snapping: "對齊",
       llm: "大模型",
       debug: "除錯",

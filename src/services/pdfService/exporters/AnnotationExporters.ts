@@ -432,6 +432,14 @@ export class FreeTextExporter implements IAnnotationExporter {
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
 
+    const lineHeightMultiplier =
+      typeof annotation.lineHeight === "number" &&
+      Number.isFinite(annotation.lineHeight) &&
+      annotation.lineHeight > 0
+        ? annotation.lineHeight
+        : 1;
+    const lineHeight = fontSize * lineHeightMultiplier;
+
     if (annotation.flatten) {
       const bg =
         typeof bgR === "number" &&
@@ -466,9 +474,7 @@ export class FreeTextExporter implements IAnnotationExporter {
           rotate: hasRotation ? degrees(-rotationDeg) : undefined,
         });
       }
-
       const textColor = rgb(r, g, bb);
-      const lineHeight = fontSize;
 
       const measureLineWidth = (s: string) => {
         if (!useMixedFonts || !cjkFont || !cjkResourceName) {
@@ -535,7 +541,7 @@ export class FreeTextExporter implements IAnnotationExporter {
 
       for (let li = 0; li < lines.length; li++) {
         const lineText = lines[li]!;
-        const drawY = y + h - fontSize - li * lineHeight;
+        const drawY = y + h - lineHeight - li * lineHeight;
 
         if (!useMixedFonts || !cjkFont || !cjkResourceName) {
           const runFont =
@@ -627,8 +633,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       });
     }
 
-    const lineHeight = fontSize;
-    const startY = h - fontSize; // Start from top
+    const startY = h - lineHeight;
 
     const pdfNum = (n: number) => {
       if (!Number.isFinite(n)) return "0";
@@ -661,7 +666,7 @@ export class FreeTextExporter implements IAnnotationExporter {
     ) {
       appearanceOps += ` ${bgR} ${bgG} ${bgB} rg 0 0 ${w} ${h} re f`;
     }
-    appearanceOps += ` ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${lineHeight} TL`;
+    appearanceOps += ` ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${pdfNum(lineHeight)} TL`;
 
     // Initial position
     appearanceOps += ` 0 ${startY} Td`;
@@ -758,7 +763,7 @@ export class FreeTextExporter implements IAnnotationExporter {
     }
 
     // 5. Create Annotation
-    const da = `/${baseResourceName} ${fontSize} Tf ${r} ${g} ${bb} rg`;
+    const da = `/${baseResourceName} ${fontSize} Tf ${r} ${g} ${bb} rg ${pdfNum(lineHeight)} TL`;
     const q =
       annotation.alignment === "center"
         ? 1
@@ -778,6 +783,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       Subtype: "FreeText",
       F: 4, // Print flag
       Rect: [rectX, rectY, rectX + aabbW, rectY + aabbH],
+      RD: [0, 0, 0, 0],
       Contents: PDFHexString.fromText(text),
       DA: PDFString.of(da),
       AP: { N: appearanceRef },

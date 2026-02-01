@@ -187,6 +187,10 @@ const zhCN = {
       placeholder: "密码",
       placeholder_use_open: "留空则导出时不设置密码",
     },
+    remove_text_under_freetext: {
+      label: "去除自由文本下方原文",
+      desc: "导出并扁平化自由文本时，去除其覆盖区域下方的页面文字，使其不可选/不可复制。",
+    },
     doc_title: "文档标题",
     author: "作者",
     subject: "主题",
@@ -282,6 +286,7 @@ const zhCN = {
     color: "颜色",
     thickness: "粗细",
     font_size: "字体大小",
+    line_height: "行高",
     font_family: "字体",
     rotation: "旋转",
     opacity: "不透明度",
@@ -386,6 +391,7 @@ const zhCN = {
     description: "配置工作区行为和对齐规则。",
     tabs: {
       general: "通用",
+      export: "导出",
       snapping: "对齐",
       llm: "大模型",
       debug: "调试",

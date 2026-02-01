@@ -189,6 +189,10 @@ const es = {
       placeholder: "Contraseña",
       placeholder_use_open: "Deja en blanco para exportar sin contraseña",
     },
+    remove_text_under_freetext: {
+      label: "Eliminar texto debajo de Texto libre",
+      desc: "Al exportar Texto libre aplanado, elimina el texto subyacente para que no se pueda seleccionar/copiar.",
+    },
     doc_title: "Título del documento",
     author: "Autor",
     subject: "Asunto",
@@ -285,6 +289,7 @@ const es = {
     color: "Color",
     thickness: "Grosor",
     font_size: "Tamaño de fuente",
+    line_height: "Altura de línea",
     font_family: "Familia de fuentes",
     rotation: "Rotación",
     opacity: "Opacidad",
@@ -386,6 +391,7 @@ const es = {
       "Configurar comportamiento del espacio de trabajo y reglas de ajuste.",
     tabs: {
       general: "General",
+      export: "Exportación",
       snapping: "Ajuste",
       llm: "LLM",
       debug: "Depuración",

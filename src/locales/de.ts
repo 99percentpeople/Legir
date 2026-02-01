@@ -190,6 +190,10 @@ const de = {
       placeholder: "Passwort",
       placeholder_use_open: "Leer lassen, um ohne Passwort zu exportieren",
     },
+    remove_text_under_freetext: {
+      label: "Text unter Freitext entfernen",
+      desc: "Beim Export von abgeflachtem Freitext den darunterliegenden Seiten-Text entfernen, damit er nicht ausgewählt/kopiert werden kann.",
+    },
     doc_title: "Dokumenttitel",
     author: "Autor",
     subject: "Betreff",
@@ -286,6 +290,7 @@ const de = {
     color: "Farbe",
     thickness: "Dicke",
     font_size: "Schriftgröße",
+    line_height: "Zeilenhöhe",
     font_family: "Schriftart",
     rotation: "Drehung",
     opacity: "Deckkraft",
@@ -387,6 +392,7 @@ const de = {
     description: "Arbeitsbereichsverhalten und Einrastregeln konfigurieren.",
     tabs: {
       general: "Allgemein",
+      export: "Export",
       snapping: "Einrasten",
       llm: "LLM",
       debug: "Debug",

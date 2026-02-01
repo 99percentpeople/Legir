@@ -190,6 +190,10 @@ const en = {
       placeholder: "Password",
       placeholder_use_open: "Leave blank to export without a password",
     },
+    remove_text_under_freetext: {
+      label: "Remove text under Free Text",
+      desc: "When exporting flattened Free Text, remove underlying page text so it can't be selected/copied.",
+    },
     doc_title: "Document Title",
     author: "Author",
     subject: "Subject",
@@ -281,6 +285,7 @@ const en = {
     color: "Color",
     thickness: "Thickness",
     font_size: "Font Size",
+    line_height: "Line Height",
     font_family: "Font Family",
     rotation: "Rotation",
     opacity: "Opacity",
@@ -385,6 +390,7 @@ const en = {
     description: "Configure the workspace behavior and snapping rules.",
     tabs: {
       general: "General",
+      export: "Export",
       snapping: "Snapping",
       llm: "LLM",
       debug: "Debug",

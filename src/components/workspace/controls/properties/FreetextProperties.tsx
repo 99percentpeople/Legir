@@ -43,6 +43,14 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
     typeof data.rotationDeg === "number" ? data.rotationDeg : 0;
   const displayRotationDeg = Math.round(rotationDeg);
 
+  const lineHeightMultiplier =
+    typeof data.lineHeight === "number" &&
+    Number.isFinite(data.lineHeight) &&
+    data.lineHeight > 0
+      ? data.lineHeight
+      : 1;
+  const displayLineHeight = Math.round(lineHeightMultiplier * 100);
+
   const availableFontKeys = [
     ...Object.keys(FONT_FAMILY_MAP),
     ...systemFamilies,
@@ -194,6 +202,23 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             step={1}
             onValueCommit={onTriggerHistorySave}
             onValueChange={(vals) => onChange({ size: vals[0] })}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>{t("properties.line_height") || "Line Height"}</Label>
+            <span className="text-muted-foreground text-xs">
+              {displayLineHeight}%
+            </span>
+          </div>
+          <Slider
+            value={[lineHeightMultiplier]}
+            min={0.8}
+            max={2}
+            step={0.05}
+            onValueCommit={onTriggerHistorySave}
+            onValueChange={(vals) => onChange({ lineHeight: vals[0] })}
           />
         </div>
 

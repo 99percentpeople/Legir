@@ -508,6 +508,8 @@ const App: React.FC = () => {
       {
         openPassword: state.pdfOpenPassword,
         exportPassword: state.exportPassword,
+        removeTextUnderFlattenedFreetext:
+          state.options.removeTextUnderFlattenedFreetext,
       },
     );
   };

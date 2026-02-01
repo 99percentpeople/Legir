@@ -191,6 +191,10 @@ const fr = {
       placeholder: "Mot de passe",
       placeholder_use_open: "Laissez vide pour exporter sans mot de passe",
     },
+    remove_text_under_freetext: {
+      label: "Supprimer le texte sous le texte libre",
+      desc: "Lors de l’export du texte libre aplati, supprimer le texte sous-jacent afin qu’il ne puisse pas être sélectionné/copié.",
+    },
     doc_title: "Titre du document",
     author: "Auteur",
     subject: "Sujet",
@@ -287,6 +291,7 @@ const fr = {
     color: "Couleur",
     thickness: "Épaisseur",
     font_size: "Taille de police",
+    line_height: "Interligne",
     font_family: "Police",
     rotation: "Rotation",
     opacity: "Opacité",
@@ -389,6 +394,7 @@ const fr = {
       "Configurer le comportement de l'espace de travail et les règles d'ancrage.",
     tabs: {
       general: "Général",
+      export: "Export",
       snapping: "Ancrage",
       llm: "LLM",
       debug: "Débogage",

@@ -9,6 +9,7 @@ import {
   Bug,
   LayoutGrid,
   User,
+  FileText,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -328,6 +329,13 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
               {t("settings.tabs.general")}
             </TabsTrigger>
             <TabsTrigger
+              value="export"
+              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <FileText className="h-4 w-4" />
+              {t("settings.tabs.export")}
+            </TabsTrigger>
+            <TabsTrigger
               value="snapping"
               className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
@@ -475,6 +483,37 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </div>
                   <p className="text-muted-foreground px-1 text-xs">
                     {t("settings.user_name_desc")}
+                  </p>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="export">
+              <div className="space-y-6">
+                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <FileText className="text-primary h-4 w-4" />
+                      <Label
+                        htmlFor="remove-text-under-freetext"
+                        className="mb-0 font-semibold"
+                      >
+                        {t("properties.remove_text_under_freetext.label")}
+                      </Label>
+                    </div>
+                    <Switch
+                      id="remove-text-under-freetext"
+                      checked={!!options.removeTextUnderFlattenedFreetext}
+                      onCheckedChange={(checked) =>
+                        onChange({
+                          ...options,
+                          removeTextUnderFlattenedFreetext: checked,
+                        })
+                      }
+                    />
+                  </div>
+                  <p className="text-muted-foreground px-1 text-xs">
+                    {t("properties.remove_text_under_freetext.desc")}
                   </p>
                 </div>
               </div>

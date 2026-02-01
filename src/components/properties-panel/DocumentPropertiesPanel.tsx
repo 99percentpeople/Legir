@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { PDFMetadata } from "@/types";
+import { AppOptions, PDFMetadata } from "@/types";
 import { Eye, EyeOff, FileText, Lock, Unlock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DateField, DateInput } from "@/components/ui/datafield-rac";
@@ -27,6 +27,8 @@ export interface DocumentPropertiesPanelProps {
   exportPassword: string | null;
   pdfOpenPassword: string | null;
   onExportPasswordChange: (password: string | null) => void;
+  options: AppOptions;
+  onOptionsChange: (updates: Partial<AppOptions>) => void;
   onClose?: () => void;
   onCollapse?: () => void;
   isOpen: boolean;
@@ -46,6 +48,8 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
     exportPassword,
     pdfOpenPassword,
     onExportPasswordChange,
+    options: _options,
+    onOptionsChange: _onOptionsChange,
     onClose,
     onCollapse,
     isOpen,
@@ -68,7 +72,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
         const pad = (n: number) => n.toString().padStart(2, "0");
         const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         return parseDateTime(iso);
-      } catch (e) {
+      } catch {
         return null;
       }
     };
@@ -399,11 +403,8 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
 );
 
 interface KeywordsInputProps {
-  metadata: {
-    keywords?: string | string[];
-    [key: string]: any;
-  };
-  onMetadataChange: (data: any) => void;
+  metadata: PDFMetadata;
+  onMetadataChange: (data: Partial<PDFMetadata>) => void;
   onTriggerHistorySave?: () => void;
 }
 

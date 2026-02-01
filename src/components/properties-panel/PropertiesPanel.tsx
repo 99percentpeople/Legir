@@ -7,15 +7,15 @@ import { useEditorStore } from "@/store/useEditorStore";
 // --- Main Container Component ---
 interface PropertiesPanelProps {
   selectedControl: FormField | Annotation | null;
-  activeTab: string;
+  activeTab: "properties" | "document";
   metadata: PDFMetadata;
   filename: string;
-  onChange: (updates: Partial<FormField | Annotation>) => void;
+  onChange: (data: FormField | Annotation) => void;
   onMetadataChange: (updates: Partial<PDFMetadata>) => void;
   onFilenameChange: (name: string) => void;
-  onDelete: () => void;
-  onClose: () => void;
-  onCollapse: () => void;
+  onDelete: (id: string) => void;
+  onClose?: () => void;
+  onCollapse?: () => void;
   isOpen: boolean;
   onOpen: () => void;
   isFloating: boolean;
@@ -45,6 +45,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
   }) => {
     const exportPassword = useEditorStore((s) => s.exportPassword);
     const pdfOpenPassword = useEditorStore((s) => s.pdfOpenPassword);
+    const options = useEditorStore((s) => s.options);
     const setEditorState = useEditorStore((s) => s.setState);
 
     if (activeTab === "properties" && selectedControl) {
@@ -52,8 +53,8 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         <ControlPropertiesPanel
           data={selectedControl}
           onChange={onChange}
-          onDelete={onDelete}
-          onClose={onClose}
+          onDelete={() => onDelete(selectedControl.id)}
+          onClose={onClose ?? (() => {})}
           isOpen={isOpen}
           onOpen={onOpen}
           onCollapse={onCollapse}
@@ -76,10 +77,20 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         onExportPasswordChange={(password) => {
           setEditorState({ exportPassword: password, isDirty: true });
         }}
+        options={options}
+        onOptionsChange={(updates) => {
+          setEditorState((prev) => ({
+            options: {
+              ...prev.options,
+              ...updates,
+            },
+            isDirty: true,
+          }));
+        }}
         isOpen={isOpen}
         onOpen={onOpen}
         onCollapse={onCollapse}
-        onClose={onCollapse}
+        onClose={onClose}
         isFloating={isFloating}
         onTriggerHistorySave={onTriggerHistorySave}
         width={width}

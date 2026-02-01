@@ -97,6 +97,7 @@ export interface Annotation {
   opacity?: number; // For highlight
   thickness?: number; // For ink
   size?: number; // For text
+  lineHeight?: number;
   fontFamily?: string; // For text
   rotationDeg?: number;
   alignment?: "left" | "center" | "right"; // For comment text alignment
@@ -210,6 +211,7 @@ export interface AppOptions {
   debugOptions: DebugOptions;
   userName: string;
   thumbnailsLayout: ThumbnailsLayoutMode;
+  removeTextUnderFlattenedFreetext: boolean;
 
   llm: LLMOptions;
 }

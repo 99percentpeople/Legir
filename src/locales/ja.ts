@@ -188,6 +188,10 @@ const ja = {
       placeholder: "パスワード",
       placeholder_use_open: "空欄の場合はパスワードなしでエクスポート",
     },
+    remove_text_under_freetext: {
+      label: "自由テキスト下の文字を削除",
+      desc: "自由テキストをフラット化してエクスポートする際、下のページ文字を削除して選択/コピーできないようにします。",
+    },
     doc_title: "ドキュメントタイトル",
     author: "作成者",
     subject: "件名",
@@ -284,6 +288,7 @@ const ja = {
     color: "色",
     thickness: "太さ",
     font_size: "フォントサイズ",
+    line_height: "行間",
     font_family: "フォントファミリ",
     rotation: "回転",
     opacity: "不透明度",
@@ -385,6 +390,7 @@ const ja = {
     description: "ワークスペースの動作とスナップルールを構成します。",
     tabs: {
       general: "一般",
+      export: "エクスポート",
       snapping: "スナップ",
       llm: "LLM",
       debug: "デバッグ",

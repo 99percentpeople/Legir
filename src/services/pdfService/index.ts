@@ -30,6 +30,7 @@ import {
   pdfRectFromObj,
   summarizePdfObjForDebug,
 } from "./lib/pdf-import-utils";
+import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
 import {
   PDFDocument,
   EncryptedPDFError,
@@ -1272,6 +1273,7 @@ export const exportPDF = async (
   options?: {
     openPassword?: string | null;
     exportPassword?: string | null;
+    removeTextUnderFlattenedFreetext?: boolean;
   },
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
@@ -1285,6 +1287,11 @@ export const exportPDF = async (
     typeof options?.exportPassword === "string" && options.exportPassword
       ? options.exportPassword
       : undefined;
+
+  const removeTextUnderFlattenedFreetext =
+    typeof options?.removeTextUnderFlattenedFreetext === "boolean"
+      ? options.removeTextUnderFlattenedFreetext
+      : true;
 
   const resolveExportFontNeeds = () => {
     const includeFontIds = new Set<"cjk_sans" | "cjk_serif">();
@@ -1454,19 +1461,31 @@ export const exportPDF = async (
     keepAnnotRefKeysByPage.set(a.pageIndex, setForPage);
   }
 
-  // Force NeedAppearances
-  try {
-    let acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
-    if (!acroForm) {
-      acroForm = pdfDoc.context.obj({});
-      pdfDoc.catalog.set(PDFName.of("AcroForm"), acroForm);
-    }
+  const hasNonFlattenFreeText = annotations.some(
+    (a) => a?.type === "freetext" && !a.flatten,
+  );
 
-    if (acroForm instanceof PDFDict) {
-      acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
+  if (fields.length > 0 && !hasNonFlattenFreeText) {
+    try {
+      let acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
+      if (!acroForm) {
+        acroForm = pdfDoc.context.obj({});
+        pdfDoc.catalog.set(PDFName.of("AcroForm"), acroForm);
+      }
+
+      if (acroForm instanceof PDFDict) {
+        acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
+      }
+    } catch (e) {
+      console.warn("Failed to set NeedAppearances", e);
     }
-  } catch (e) {
-    console.warn("Failed to set NeedAppearances", e);
+  } else {
+    try {
+      const acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
+      if (acroForm instanceof PDFDict) {
+        acroForm.set(PDFName.of("NeedAppearances"), PDFBool.False);
+      }
+    } catch {}
   }
 
   // 1. Cleanup Existing Fields
@@ -1591,6 +1610,19 @@ export const exportPDF = async (
       }
     } catch (e) {
       console.warn("Failed to cleanup annotations on page", e);
+    }
+  }
+
+  if (removeTextUnderFlattenedFreetext) {
+    try {
+      await applyTextRedactionsUnderFlattenedFreetext({
+        pdfDoc,
+        pages,
+        annotations,
+        getViewportForPage,
+      });
+    } catch (e) {
+      console.warn("Failed to apply text redactions", e);
     }
   }
 

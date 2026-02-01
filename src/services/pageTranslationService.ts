@@ -1030,11 +1030,22 @@ const wrapTextToLines = (
 const computeFreetextRequiredHeight = (args: {
   linesCount: number;
   fontSize: number;
+  lineHeightMultiplier?: number;
 }) => {
   const size = Math.max(1, args.fontSize || 12);
   const basePadding = 2;
   const extraBottomPadding = args.linesCount > 1 ? Math.ceil(size * 0.25) : 0;
-  return Math.ceil(args.linesCount * size + basePadding + extraBottomPadding);
+  const lineHeightMultiplier =
+    typeof args.lineHeightMultiplier === "number" &&
+    Number.isFinite(args.lineHeightMultiplier) &&
+    args.lineHeightMultiplier > 0
+      ? args.lineHeightMultiplier
+      : 1;
+  return Math.ceil(
+    args.linesCount * size * lineHeightMultiplier +
+      basePadding +
+      extraBottomPadding,
+  );
 };
 
 const fitPageTranslateFreetext = (options: {
@@ -1043,6 +1054,8 @@ const fitPageTranslateFreetext = (options: {
   fontSize: number;
   fontFamily: string;
   maxHeight?: number;
+  preferredLineHeightMultiplier?: number;
+  minLineHeightMultiplier?: number;
 }) => {
   const maxSize = 200;
 
@@ -1051,24 +1064,89 @@ const fitPageTranslateFreetext = (options: {
   const rect = options.rect;
   const text = options.text;
   const availableWidth = Math.max(1, rect.width);
+  const preferredLineHeightMultiplier =
+    typeof options.preferredLineHeightMultiplier === "number" &&
+    Number.isFinite(options.preferredLineHeightMultiplier) &&
+    options.preferredLineHeightMultiplier > 0
+      ? options.preferredLineHeightMultiplier
+      : 1;
+  const minLineHeightMultiplier = (() => {
+    const raw =
+      typeof options.minLineHeightMultiplier === "number" &&
+      Number.isFinite(options.minLineHeightMultiplier) &&
+      options.minLineHeightMultiplier > 0
+        ? options.minLineHeightMultiplier
+        : preferredLineHeightMultiplier;
+    return Math.max(0.1, Math.min(preferredLineHeightMultiplier, raw));
+  })();
   const hardMaxHeight =
     typeof options.maxHeight === "number"
       ? Math.max(1, options.maxHeight)
       : Number.POSITIVE_INFINITY;
 
-  const computeWrapHeight = (size: number) => {
+  const computeWrapHeight = (size: number, lineHeightMultiplier: number) => {
     const measure = createMeasureWidth(options.fontFamily, size);
     const lines = wrapTextToLines(text, availableWidth, measure);
     const requiredHeight = computeFreetextRequiredHeight({
       linesCount: lines.length,
       fontSize: size,
+      lineHeightMultiplier,
     });
     return { requiredHeight, linesCount: lines.length };
   };
 
-  const base = computeWrapHeight(baseSize);
-  if (base.requiredHeight <= rect.height) {
-    return { rect, size: baseSize, text };
+  const findBestLineHeightForSize = (args: {
+    size: number;
+    maxHeight: number;
+  }): { lineHeightMultiplier: number; requiredHeight: number } | null => {
+    const preferred = computeWrapHeight(
+      args.size,
+      preferredLineHeightMultiplier,
+    );
+    if (preferred.requiredHeight <= args.maxHeight) {
+      return {
+        lineHeightMultiplier: preferredLineHeightMultiplier,
+        requiredHeight: preferred.requiredHeight,
+      };
+    }
+
+    const min = computeWrapHeight(args.size, minLineHeightMultiplier);
+    if (min.requiredHeight > args.maxHeight) return null;
+
+    let lo = minLineHeightMultiplier;
+    let hi = preferredLineHeightMultiplier;
+    let best = minLineHeightMultiplier;
+
+    for (let step = 0; step < 10; step++) {
+      const mid = (lo + hi) / 2;
+      const { requiredHeight } = computeWrapHeight(args.size, mid);
+      if (requiredHeight <= args.maxHeight) {
+        best = mid;
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+
+    const rounded = Math.round(best * 100) / 100;
+    const final = computeWrapHeight(args.size, rounded);
+    return {
+      lineHeightMultiplier: rounded,
+      requiredHeight: final.requiredHeight,
+    };
+  };
+
+  const baseInRect = findBestLineHeightForSize({
+    size: baseSize,
+    maxHeight: rect.height,
+  });
+  if (baseInRect) {
+    return {
+      rect,
+      size: baseSize,
+      text,
+      lineHeightMultiplier: baseInRect.lineHeightMultiplier,
+    };
   }
 
   const maxExpandHeight = Math.min(
@@ -1078,11 +1156,16 @@ const fitPageTranslateFreetext = (options: {
 
   const allowedExpandHeight = Math.min(maxExpandHeight, hardMaxHeight);
 
-  if (base.requiredHeight <= allowedExpandHeight) {
+  const baseWithExpand = findBestLineHeightForSize({
+    size: baseSize,
+    maxHeight: allowedExpandHeight,
+  });
+  if (baseWithExpand) {
     return {
-      rect: { ...rect, height: base.requiredHeight },
+      rect: { ...rect, height: baseWithExpand.requiredHeight },
       size: baseSize,
       text,
+      lineHeightMultiplier: baseWithExpand.lineHeightMultiplier,
     };
   }
 
@@ -1094,19 +1177,31 @@ const fitPageTranslateFreetext = (options: {
   let lo = Math.floor(minSize);
   let hi = Math.floor(baseSize);
   let best = lo;
+  let bestLineHeightMultiplier = minLineHeightMultiplier;
 
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
-    const { requiredHeight } = computeWrapHeight(mid);
-    if (requiredHeight <= targetHeight) {
+    const midBest = findBestLineHeightForSize({
+      size: mid,
+      maxHeight: targetHeight,
+    });
+    if (midBest) {
       best = mid;
+      bestLineHeightMultiplier = midBest.lineHeightMultiplier;
       lo = mid + 1;
     } else {
       hi = mid - 1;
     }
   }
 
-  const chosen = computeWrapHeight(best);
+  const chosen = findBestLineHeightForSize({
+    size: best,
+    maxHeight: targetHeight,
+  }) ?? {
+    lineHeightMultiplier: bestLineHeightMultiplier,
+    requiredHeight: computeWrapHeight(best, bestLineHeightMultiplier)
+      .requiredHeight,
+  };
   return {
     rect:
       chosen.requiredHeight > rect.height
@@ -1114,6 +1209,7 @@ const fitPageTranslateFreetext = (options: {
         : rect,
     size: best,
     text,
+    lineHeightMultiplier: chosen.lineHeightMultiplier,
   };
 };
 
@@ -2244,6 +2340,8 @@ export const pageTranslationService = {
         const line = normalizedLines[i]!;
 
         const isParagraphGranularity = options.granularity === "paragraph";
+        const preferredLineHeightMultiplier = isParagraphGranularity ? 1.5 : 1;
+        const minLineHeightMultiplier = isParagraphGranularity ? 0.8 : 1;
 
         const normalizedText =
           options.granularity === "paragraph"
@@ -2385,18 +2483,6 @@ export const pageTranslationService = {
           maxBottomYWithMaxHoriz - paddedRect.y,
         );
 
-        const computeWrapRequiredHeight = (args: { width: number }) => {
-          const lines = wrapTextToLines(
-            normalizedText,
-            Math.max(1, args.width),
-            measureAtBase,
-          );
-          return computeFreetextRequiredHeight({
-            linesCount: lines.length,
-            fontSize: baseSize,
-          });
-        };
-
         const canFitWrappedAtBaseWithinMaxHeight = (() => {
           if (!Number.isFinite(maxHeight) || maxHeight <= 0) return false;
           const measure = createMeasureWidth(forcedFontFamily, baseSize);
@@ -2447,6 +2533,7 @@ export const pageTranslationService = {
             },
             size,
             text: normalizedText,
+            lineHeightMultiplier: 1,
           };
         };
 
@@ -2457,6 +2544,7 @@ export const pageTranslationService = {
                   rect: horizExpandedRect,
                   size: baseSize,
                   text: normalizedText,
+                  lineHeightMultiplier: 1,
                 }
               : canFitWrappedAtBaseWithinMaxHeight
                 ? fitPageTranslateFreetext({
@@ -2476,45 +2564,42 @@ export const pageTranslationService = {
                   }));
           }
 
-          const requiredHeightNoHoriz = computeWrapRequiredHeight({
-            width: paddedRect.width,
+          const noHoriz = fitPageTranslateFreetext({
+            text: normalizedText,
+            rect: paddedRect,
+            fontSize: baseSize,
+            fontFamily: forcedFontFamily,
+            maxHeight,
+            preferredLineHeightMultiplier,
+            minLineHeightMultiplier,
           });
 
-          if (requiredHeightNoHoriz <= paddedRect.height) {
-            return { rect: paddedRect, size: baseSize, text: normalizedText };
-          }
-
-          if (requiredHeightNoHoriz <= maxHeight) {
-            return fitPageTranslateFreetext({
-              text: normalizedText,
-              rect: paddedRect,
-              fontSize: baseSize,
-              fontFamily: forcedFontFamily,
-              maxHeight,
-            });
-          }
-
-          const requiredHeightWithMaxHoriz = computeWrapRequiredHeight({
-            width: maxHorizRect.width,
-          });
-
-          if (requiredHeightWithMaxHoriz <= maxHeightWithMaxHoriz) {
-            return fitPageTranslateFreetext({
-              text: normalizedText,
-              rect: maxHorizRect,
-              fontSize: baseSize,
-              fontFamily: forcedFontFamily,
-              maxHeight: maxHeightWithMaxHoriz,
-            });
-          }
-
-          return fitPageTranslateFreetext({
+          const withMaxHoriz = fitPageTranslateFreetext({
             text: normalizedText,
             rect: maxHorizRect,
             fontSize: baseSize,
             fontFamily: forcedFontFamily,
             maxHeight: maxHeightWithMaxHoriz,
+            preferredLineHeightMultiplier,
+            minLineHeightMultiplier,
           });
+
+          if (noHoriz.size !== withMaxHoriz.size) {
+            return noHoriz.size > withMaxHoriz.size ? noHoriz : withMaxHoriz;
+          }
+
+          if (
+            noHoriz.lineHeightMultiplier !== withMaxHoriz.lineHeightMultiplier
+          ) {
+            return noHoriz.lineHeightMultiplier >
+              withMaxHoriz.lineHeightMultiplier
+              ? noHoriz
+              : withMaxHoriz;
+          }
+
+          const noArea = noHoriz.rect.width * noHoriz.rect.height;
+          const withArea = withMaxHoriz.rect.width * withMaxHoriz.rect.height;
+          return noArea <= withArea ? noHoriz : withMaxHoriz;
         })();
 
         annots.push({
@@ -2524,6 +2609,9 @@ export const pageTranslationService = {
           rect: fitted.rect,
           text: fitted.text,
           size: fitted.size,
+          lineHeight: isParagraphGranularity
+            ? fitted.lineHeightMultiplier
+            : undefined,
           fontFamily: forcedFontFamily,
           color: "#000000",
           backgroundColor: "#ffffff",

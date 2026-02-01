@@ -226,14 +226,19 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
       <div
         className={cn(
           "relative flex h-full w-full items-start transition-colors",
-          rotationDeg === 0 ? "overflow-hidden" : "overflow-visible",
+          "overflow-hidden",
           isSelected && !isEditing && "ring-primary ring-1 ring-inset",
         )}
         style={{
           color: data.color || "#000000",
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
-          lineHeight: 1,
+          lineHeight:
+            typeof data.lineHeight === "number" &&
+            Number.isFinite(data.lineHeight) &&
+            data.lineHeight > 0
+              ? data.lineHeight
+              : 1,
           opacity: effectiveOpacity,
         }}
         onPointerDown={handlePointerDown}

@@ -1377,7 +1377,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
           ) : (
             <PropertiesPanel
               selectedControl={selectedControl}
-              activeTab={state.rightPanelTab}
+              activeTab={
+                state.rightPanelTab === "properties" ? "properties" : "document"
+              }
               metadata={state.metadata}
               filename={state.filename}
               onChange={handlePropertiesChange}
