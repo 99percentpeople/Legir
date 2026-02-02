@@ -31,6 +31,13 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   const warnedMissingFontRef = useRef(false);
 
   const displaySize = Math.round((data.size || 12) as number);
+  const lineHeightMultiplier =
+    typeof data.lineHeight === "number" &&
+    Number.isFinite(data.lineHeight) &&
+    data.lineHeight > 0
+      ? data.lineHeight
+      : 1;
+  const baseLineHeightPx = (data.size || 12) * lineHeightMultiplier;
   const rotationDeg =
     typeof data.rotationDeg === "number" ? data.rotationDeg : 0;
 
@@ -233,12 +240,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
           color: data.color || "#000000",
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
           fontFamily: resolvedFontFamily,
-          lineHeight:
-            typeof data.lineHeight === "number" &&
-            Number.isFinite(data.lineHeight) &&
-            data.lineHeight > 0
-              ? data.lineHeight
-              : 1,
+          lineHeight: `calc(${baseLineHeightPx}px * var(--scale, 1))`,
           opacity: effectiveOpacity,
         }}
         onPointerDown={handlePointerDown}
@@ -332,28 +334,49 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                 }}
               />
             ) : (
-              <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
-                {hasText
-                  ? data.text!.split(/\r\n|\r|\n/).map((line, idx, arr) => (
-                      <React.Fragment key={idx}>
-                        {splitTextRuns(line).map((run, rIdx) => (
-                          <span
-                            key={rIdx}
-                            style={{
-                              fontFamily: run.isAscii
-                                ? resolvedFontFamily
-                                : nonAsciiFontFamily,
-                            }}
-                          >
-                            {run.text}
-                          </span>
-                        ))}
-                        {idx < arr.length - 1 ? "\n" : null}
-                      </React.Fragment>
-                    ))
-                  : hasBackgroundColor
-                    ? null
-                    : "Double click to edit"}
+              <div
+                className="relative h-full w-full"
+                style={{
+                  color: "inherit",
+                }}
+              >
+                <div
+                  className="absolute top-0 left-0"
+                  style={{
+                    width: `${Math.max(1, data.rect?.width ?? 1)}px`,
+                    height: `${Math.max(1, data.rect?.height ?? 1)}px`,
+                    transform: "scale(var(--scale, 1))",
+                    transformOrigin: "0 0",
+                    fontFamily: resolvedFontFamily,
+                    fontSize: `${data.size || 12}px`,
+                    lineHeight: `${baseLineHeightPx}px`,
+                    color: "inherit",
+                  }}
+                >
+                  <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
+                    {hasText
+                      ? data.text!.split(/\r\n|\r|\n/).map((line, idx, arr) => (
+                          <React.Fragment key={idx}>
+                            {splitTextRuns(line).map((run, rIdx) => (
+                              <span
+                                key={rIdx}
+                                style={{
+                                  fontFamily: run.isAscii
+                                    ? resolvedFontFamily
+                                    : nonAsciiFontFamily,
+                                }}
+                              >
+                                {run.text}
+                              </span>
+                            ))}
+                            {idx < arr.length - 1 ? "\n" : null}
+                          </React.Fragment>
+                        ))
+                      : hasBackgroundColor
+                        ? null
+                        : "Double click to edit"}
+                  </div>
+                </div>
               </div>
             )}
           </div>

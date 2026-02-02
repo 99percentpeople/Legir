@@ -29,6 +29,8 @@ import {
   type OpenAiPageTranslateBlock,
 } from "@/services/LLMService/providers/openaiProvider";
 
+import { resolveCjkFallbackFontStack, splitTextRuns } from "@/lib/fonts";
+
 export type PageTranslationTextBlock = {
   text: string;
   rect: { x: number; y: number; width: number; height: number };
@@ -941,12 +943,25 @@ const createMeasureWidth = (fontFamily: string, fontSize: number) => {
     return (_s: string) => Number.POSITIVE_INFINITY;
   }
 
-  const family = resolveFontStackForDisplay(fontFamily);
-  ctx.font = `${fontSize}px ${family}`;
+  const asciiFamily = resolveFontStackForDisplay(fontFamily);
+  const nonAsciiFamily = resolveCjkFallbackFontStack(fontFamily);
+  ctx.font = `${fontSize}px ${asciiFamily}`;
 
   return (s: string) => {
     try {
-      return ctx.measureText(s).width;
+      if (!s) return 0;
+      if (!nonAsciiFamily || nonAsciiFamily === asciiFamily) {
+        ctx.font = `${fontSize}px ${asciiFamily}`;
+        return ctx.measureText(s).width;
+      }
+
+      let total = 0;
+      const runs = splitTextRuns(s);
+      for (const run of runs) {
+        ctx.font = `${fontSize}px ${run.isAscii ? asciiFamily : nonAsciiFamily}`;
+        total += ctx.measureText(run.text).width;
+      }
+      return total;
     } catch {
       return Number.POSITIVE_INFINITY;
     }
@@ -1056,14 +1071,22 @@ const fitPageTranslateFreetext = (options: {
   maxHeight?: number;
   preferredLineHeightMultiplier?: number;
   minLineHeightMultiplier?: number;
+  allowShrinkFontSize?: boolean;
+  rotationDeg?: number;
 }) => {
   const maxSize = 200;
 
+  const allowShrinkFontSize = options.allowShrinkFontSize !== false;
   const baseSize = Math.max(4, Math.min(maxSize, options.fontSize || 12));
-  const minSize = Math.min(6, baseSize);
+  const minSize = 4;
   const rect = options.rect;
   const text = options.text;
   const availableWidth = Math.max(1, rect.width);
+  const rotationDeg =
+    typeof options.rotationDeg === "number" &&
+    Number.isFinite(options.rotationDeg)
+      ? options.rotationDeg
+      : 0;
   const preferredLineHeightMultiplier =
     typeof options.preferredLineHeightMultiplier === "number" &&
     Number.isFinite(options.preferredLineHeightMultiplier) &&
@@ -1079,20 +1102,117 @@ const fitPageTranslateFreetext = (options: {
         : preferredLineHeightMultiplier;
     return Math.max(0.1, Math.min(preferredLineHeightMultiplier, raw));
   })();
+  const shouldUseConservativeMetrics =
+    preferredLineHeightMultiplier !== 1 ||
+    minLineHeightMultiplier !== 1 ||
+    text.includes("\n");
+
   const hardMaxHeight =
     typeof options.maxHeight === "number"
       ? Math.max(1, options.maxHeight)
       : Number.POSITIVE_INFINITY;
 
+  const canPreferVerticalExpand =
+    shouldUseConservativeMetrics &&
+    Number.isFinite(hardMaxHeight) &&
+    hardMaxHeight > rect.height + 1;
+
+  const resizeRectPreserveRotatedOuterTopLeft = (next: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) => {
+    if (!Number.isFinite(rotationDeg) || rotationDeg === 0) return next;
+
+    const theta = (rotationDeg * Math.PI) / 180;
+    const absCos = Math.abs(Math.cos(theta));
+    const absSin = Math.abs(Math.sin(theta));
+
+    const outerX =
+      rect.x + ((1 - absCos) * rect.width) / 2 - (absSin * rect.height) / 2;
+    const outerY =
+      rect.y + ((1 - absCos) * rect.height) / 2 - (absSin * rect.width) / 2;
+
+    return {
+      ...next,
+      x: outerX - ((1 - absCos) * next.width) / 2 + (absSin * next.height) / 2,
+      y: outerY - ((1 - absCos) * next.height) / 2 + (absSin * next.width) / 2,
+    };
+  };
+
   const computeWrapHeight = (size: number, lineHeightMultiplier: number) => {
     const measure = createMeasureWidth(options.fontFamily, size);
-    const lines = wrapTextToLines(text, availableWidth, measure);
-    const requiredHeight = computeFreetextRequiredHeight({
-      linesCount: lines.length,
+    const isVeryLongText = shouldUseConservativeMetrics && text.length > 600;
+    const isExtremelyLongText =
+      shouldUseConservativeMetrics && text.length > 1200;
+    const widthSlack = shouldUseConservativeMetrics
+      ? Math.min(6, Math.max(1, Math.round(size * 0.12)))
+      : 0;
+    const effectiveWidth = Math.max(1, availableWidth - widthSlack);
+
+    const lines = wrapTextToLines(text, effectiveWidth, measure);
+    const normalLinesCount = lines.length;
+    const linesCount = (() => {
+      if (!shouldUseConservativeMetrics) return lines.length;
+      if (!isVeryLongText && lines.length <= 10) return lines.length;
+
+      const percentSlack = Math.min(
+        32,
+        Math.max(0, Math.round(availableWidth * 0.04)),
+      );
+      const extraSlack = Math.min(16, Math.max(4, Math.round(size * 0.28)));
+      const tighterWidth = Math.max(
+        1,
+        availableWidth - widthSlack - percentSlack - extraSlack,
+      );
+      const tighterLines = wrapTextToLines(text, tighterWidth, measure);
+      return Math.max(lines.length, tighterLines.length);
+    })();
+    const normalBaseHeight = computeFreetextRequiredHeight({
+      linesCount: normalLinesCount,
       fontSize: size,
       lineHeightMultiplier,
     });
-    return { requiredHeight, linesCount: lines.length };
+    const baseHeight = computeFreetextRequiredHeight({
+      linesCount,
+      fontSize: size,
+      lineHeightMultiplier,
+    });
+
+    const safetyPadding =
+      shouldUseConservativeMetrics && linesCount > 1
+        ? Math.max(3, Math.ceil(size * 0.25))
+        : 0;
+
+    const perLineSafetyPadding =
+      shouldUseConservativeMetrics && (linesCount > 12 || isVeryLongText)
+        ? Math.ceil(linesCount * Math.max(0.2, size * 0.02))
+        : 0;
+
+    const tailSafetyPadding =
+      shouldUseConservativeMetrics && linesCount > 2
+        ? Math.ceil(
+            size *
+              lineHeightMultiplier *
+              (linesCount > 80 || isExtremelyLongText
+                ? 3.2
+                : linesCount > 40
+                  ? 2.6
+                  : linesCount > 20 || isVeryLongText
+                    ? 2.2
+                    : 0.25),
+          )
+        : 0;
+
+    return {
+      normalLinesCount,
+      normalBaseHeight,
+      baseHeight,
+      requiredHeight:
+        baseHeight + safetyPadding + perLineSafetyPadding + tailSafetyPadding,
+      linesCount,
+    };
   };
 
   const findBestLineHeightForSize = (args: {
@@ -1103,15 +1223,50 @@ const fitPageTranslateFreetext = (options: {
       args.size,
       preferredLineHeightMultiplier,
     );
-    if (preferred.requiredHeight <= args.maxHeight) {
+
+    const effectiveMaxHeight = (() => {
+      if (!shouldUseConservativeMetrics) return args.maxHeight;
+      if (canPreferVerticalExpand && args.maxHeight > rect.height + 1) {
+        return args.maxHeight;
+      }
+      if (preferred.linesCount <= 20 && text.length <= 600)
+        return args.maxHeight;
+
+      const reserveLines =
+        preferred.linesCount > 60 || text.length > 1200 ? 3 : 2;
+      const reserve = Math.ceil(
+        args.size * preferredLineHeightMultiplier * reserveLines,
+      );
+      if (preferred.normalBaseHeight <= args.maxHeight - reserve) {
+        return args.maxHeight;
+      }
+      return Math.max(1, args.maxHeight - reserve);
+    })();
+
+    if (preferred.requiredHeight <= effectiveMaxHeight) {
       return {
         lineHeightMultiplier: preferredLineHeightMultiplier,
         requiredHeight: preferred.requiredHeight,
       };
     }
 
+    const minimalSafety = shouldUseConservativeMetrics
+      ? Math.max(2, Math.ceil(args.size * 0.25))
+      : 0;
+    if (preferred.normalBaseHeight + minimalSafety <= effectiveMaxHeight) {
+      return {
+        lineHeightMultiplier: preferredLineHeightMultiplier,
+        requiredHeight: preferred.normalBaseHeight + minimalSafety,
+      };
+    }
+
     const min = computeWrapHeight(args.size, minLineHeightMultiplier);
-    if (min.requiredHeight > args.maxHeight) return null;
+    if (
+      min.requiredHeight > effectiveMaxHeight &&
+      min.normalBaseHeight + minimalSafety > effectiveMaxHeight
+    ) {
+      return null;
+    }
 
     let lo = minLineHeightMultiplier;
     let hi = preferredLineHeightMultiplier;
@@ -1120,7 +1275,7 @@ const fitPageTranslateFreetext = (options: {
     for (let step = 0; step < 10; step++) {
       const mid = (lo + hi) / 2;
       const { requiredHeight } = computeWrapHeight(args.size, mid);
-      if (requiredHeight <= args.maxHeight) {
+      if (requiredHeight <= effectiveMaxHeight) {
         best = mid;
         lo = mid;
       } else {
@@ -1140,19 +1295,29 @@ const fitPageTranslateFreetext = (options: {
     size: baseSize,
     maxHeight: rect.height,
   });
-  if (baseInRect) {
+  if (
+    baseInRect &&
+    (!canPreferVerticalExpand ||
+      baseInRect.lineHeightMultiplier >= preferredLineHeightMultiplier - 1e-6)
+  ) {
     return {
       rect,
       size: baseSize,
       text,
       lineHeightMultiplier: baseInRect.lineHeightMultiplier,
+      requiredHeight: baseInRect.requiredHeight,
+      didFit: true,
     };
   }
 
-  const maxExpandHeight = Math.min(
-    rect.height + 400,
-    Math.max(rect.height * 8, baseSize * 12 + 2),
-  );
+  const maxExpandHeight = shouldUseConservativeMetrics
+    ? Number.isFinite(hardMaxHeight)
+      ? hardMaxHeight
+      : Math.min(
+          rect.height + 2000,
+          Math.max(rect.height * 20, baseSize * 60 + 2),
+        )
+    : Math.min(rect.height + 400, Math.max(rect.height * 8, baseSize * 12 + 2));
 
   const allowedExpandHeight = Math.min(maxExpandHeight, hardMaxHeight);
 
@@ -1162,10 +1327,15 @@ const fitPageTranslateFreetext = (options: {
   });
   if (baseWithExpand) {
     return {
-      rect: { ...rect, height: baseWithExpand.requiredHeight },
+      rect: resizeRectPreserveRotatedOuterTopLeft({
+        ...rect,
+        height: baseWithExpand.requiredHeight,
+      }),
       size: baseSize,
       text,
       lineHeightMultiplier: baseWithExpand.lineHeightMultiplier,
+      requiredHeight: baseWithExpand.requiredHeight,
+      didFit: baseWithExpand.requiredHeight <= allowedExpandHeight,
     };
   }
 
@@ -1173,6 +1343,24 @@ const fitPageTranslateFreetext = (options: {
     hardMaxHeight,
     Math.max(rect.height, allowedExpandHeight),
   );
+
+  if (!allowShrinkFontSize) {
+    const requiredHeight = computeWrapHeight(
+      baseSize,
+      minLineHeightMultiplier,
+    ).requiredHeight;
+    return {
+      rect: resizeRectPreserveRotatedOuterTopLeft({
+        ...rect,
+        height: Math.min(targetHeight, Math.max(rect.height, requiredHeight)),
+      }),
+      size: baseSize,
+      text,
+      lineHeightMultiplier: minLineHeightMultiplier,
+      requiredHeight,
+      didFit: requiredHeight <= targetHeight,
+    };
+  }
 
   let lo = Math.floor(minSize);
   let hi = Math.floor(baseSize);
@@ -1194,22 +1382,45 @@ const fitPageTranslateFreetext = (options: {
     }
   }
 
-  const chosen = findBestLineHeightForSize({
-    size: best,
+  let chosenSize = best;
+  let chosen = findBestLineHeightForSize({
+    size: chosenSize,
     maxHeight: targetHeight,
-  }) ?? {
+  });
+
+  if (!chosen) {
+    for (let s = chosenSize - 1; s >= 2; s--) {
+      const candidate = findBestLineHeightForSize({
+        size: s,
+        maxHeight: targetHeight,
+      });
+      if (candidate) {
+        chosenSize = s;
+        chosen = candidate;
+        break;
+      }
+    }
+  }
+
+  const resolved = chosen ?? {
     lineHeightMultiplier: bestLineHeightMultiplier,
-    requiredHeight: computeWrapHeight(best, bestLineHeightMultiplier)
+    requiredHeight: computeWrapHeight(chosenSize, bestLineHeightMultiplier)
       .requiredHeight,
   };
+  const didFit = resolved.requiredHeight <= targetHeight;
   return {
     rect:
-      chosen.requiredHeight > rect.height
-        ? { ...rect, height: Math.min(targetHeight, chosen.requiredHeight) }
+      resolved.requiredHeight > rect.height
+        ? resizeRectPreserveRotatedOuterTopLeft({
+            ...rect,
+            height: Math.min(targetHeight, resolved.requiredHeight),
+          })
         : rect,
-    size: best,
+    size: chosenSize,
     text,
-    lineHeightMultiplier: chosen.lineHeightMultiplier,
+    lineHeightMultiplier: resolved.lineHeightMultiplier,
+    requiredHeight: resolved.requiredHeight,
+    didFit,
   };
 };
 
@@ -2380,15 +2591,57 @@ export const pageTranslationService = {
         }
         const measureAtBase = createMeasureWidth(forcedFontFamily, baseSize);
         const hasExplicitLineBreaks = normalizedText.includes("\n");
-        const isMultiLineByRect =
-          isParagraphGranularity && line.rect.height >= baseSize * 1.6;
+        const isMultiLineByRect = line.rect.height >= baseSize * 1.6;
+        const widthSlack = Math.min(
+          6,
+          Math.max(1, Math.round(baseSize * 0.12)),
+        );
+        const singleLineWidthAtBase = measureAtBase(normalizedText);
+        const isMultiLineByWrapAtBase = (() => {
+          if (hasExplicitLineBreaks) return true;
+          const effectiveWidth = Math.max(1, paddedRect.width - widthSlack);
+          const lines = wrapTextToLines(
+            normalizedText,
+            effectiveWidth,
+            measureAtBase,
+          );
+          if (lines.length > 1) return true;
+
+          const percentSlack = Math.min(
+            32,
+            Math.max(0, Math.round(paddedRect.width * 0.04)),
+          );
+          const extraSlack = Math.min(
+            16,
+            Math.max(4, Math.round(baseSize * 0.28)),
+          );
+          const tighterWidth = Math.max(
+            1,
+            paddedRect.width - widthSlack - percentSlack - extraSlack,
+          );
+          const tighterLines = wrapTextToLines(
+            normalizedText,
+            tighterWidth,
+            measureAtBase,
+          );
+          if (tighterLines.length > 1) return true;
+
+          const margin = Math.max(2, Math.round(baseSize * 0.25));
+          return (
+            Number.isFinite(singleLineWidthAtBase) &&
+            singleLineWidthAtBase > effectiveWidth - margin
+          );
+        })();
+
         const preferVerticalExpansion =
-          isParagraphGranularity &&
-          (hasExplicitLineBreaks || isMultiLineByRect);
+          isParagraphGranularity ||
+          hasExplicitLineBreaks ||
+          isMultiLineByRect ||
+          isMultiLineByWrapAtBase;
 
         const singleLineWidth = preferVerticalExpansion
           ? Number.POSITIVE_INFINITY
-          : measureAtBase(normalizedText);
+          : singleLineWidthAtBase;
 
         const maxRightX = (() => {
           let limit =
@@ -2432,6 +2685,7 @@ export const pageTranslationService = {
 
         const canFitSingleLineAtBase =
           !preferVerticalExpansion &&
+          !isParagraphGranularity &&
           Number.isFinite(singleLineWidth) &&
           singleLineWidth > 0 &&
           singleLineWidth <= maxWidth;
@@ -2553,6 +2807,9 @@ export const pageTranslationService = {
                     fontSize: baseSize,
                     fontFamily: forcedFontFamily,
                     maxHeight,
+                    preferredLineHeightMultiplier,
+                    minLineHeightMultiplier,
+                    rotationDeg: line.rotationDeg,
                   })
                 : (shrinkToSingleLine() ??
                   fitPageTranslateFreetext({
@@ -2561,6 +2818,9 @@ export const pageTranslationService = {
                     fontSize: baseSize,
                     fontFamily: forcedFontFamily,
                     maxHeight,
+                    preferredLineHeightMultiplier,
+                    minLineHeightMultiplier,
+                    rotationDeg: line.rotationDeg,
                   }));
           }
 
@@ -2572,6 +2832,8 @@ export const pageTranslationService = {
             maxHeight,
             preferredLineHeightMultiplier,
             minLineHeightMultiplier,
+            allowShrinkFontSize: false,
+            rotationDeg: line.rotationDeg,
           });
 
           const withMaxHoriz = fitPageTranslateFreetext({
@@ -2582,7 +2844,38 @@ export const pageTranslationService = {
             maxHeight: maxHeightWithMaxHoriz,
             preferredLineHeightMultiplier,
             minLineHeightMultiplier,
+            allowShrinkFontSize: false,
+            rotationDeg: line.rotationDeg,
           });
+
+          if (noHoriz.didFit) return noHoriz;
+          if (withMaxHoriz.didFit) return withMaxHoriz;
+
+          const noHorizWithShrink = fitPageTranslateFreetext({
+            text: normalizedText,
+            rect: paddedRect,
+            fontSize: baseSize,
+            fontFamily: forcedFontFamily,
+            maxHeight,
+            preferredLineHeightMultiplier,
+            minLineHeightMultiplier,
+            allowShrinkFontSize: true,
+            rotationDeg: line.rotationDeg,
+          });
+          if (noHorizWithShrink.didFit) return noHorizWithShrink;
+
+          const withMaxHorizWithShrink = fitPageTranslateFreetext({
+            text: normalizedText,
+            rect: maxHorizRect,
+            fontSize: baseSize,
+            fontFamily: forcedFontFamily,
+            maxHeight: maxHeightWithMaxHoriz,
+            preferredLineHeightMultiplier,
+            minLineHeightMultiplier,
+            allowShrinkFontSize: true,
+            rotationDeg: line.rotationDeg,
+          });
+          if (withMaxHorizWithShrink.didFit) return withMaxHorizWithShrink;
 
           if (noHoriz.size !== withMaxHoriz.size) {
             return noHoriz.size > withMaxHoriz.size ? noHoriz : withMaxHoriz;
@@ -2593,6 +2886,12 @@ export const pageTranslationService = {
           ) {
             return noHoriz.lineHeightMultiplier >
               withMaxHoriz.lineHeightMultiplier
+              ? noHoriz
+              : withMaxHoriz;
+          }
+
+          if (Math.abs(noHoriz.rect.width - withMaxHoriz.rect.width) > 0.5) {
+            return noHoriz.rect.width <= withMaxHoriz.rect.width
               ? noHoriz
               : withMaxHoriz;
           }

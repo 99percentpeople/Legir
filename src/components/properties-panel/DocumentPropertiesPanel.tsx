@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { AppOptions, PDFMetadata } from "@/types";
+import { PDFMetadata } from "@/types";
 import { Eye, EyeOff, FileText, Lock, Unlock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DateField, DateInput } from "@/components/ui/datafield-rac";
@@ -27,8 +27,6 @@ export interface DocumentPropertiesPanelProps {
   exportPassword: string | null;
   pdfOpenPassword: string | null;
   onExportPasswordChange: (password: string | null) => void;
-  options: AppOptions;
-  onOptionsChange: (updates: Partial<AppOptions>) => void;
   onClose?: () => void;
   onCollapse?: () => void;
   isOpen: boolean;
@@ -48,8 +46,6 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
     exportPassword,
     pdfOpenPassword,
     onExportPasswordChange,
-    options: _options,
-    onOptionsChange: _onOptionsChange,
     onClose,
     onCollapse,
     isOpen,
