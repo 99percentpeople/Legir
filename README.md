@@ -18,12 +18,14 @@ FormForge 是一个基于 React + Vite 的 PDF 表单/批注编辑器，使用 [
 1. 安装依赖
    - `bun install`
 
-2. （可选）配置 Gemini API Key（用于 AI 自动识别表单区域）
+2. （可选）配置 AI / 翻译相关环境变量
 
    在 `.env.local` 中设置：
    - `GEMINI_API_KEY=...`
+   - `OPENAI_API_KEY=...`
+   - `OPENAI_API_URL=...`（可选，用于自定义 OpenAI 兼容接口地址）
 
-   说明：构建时会在 `vite.config.ts` 中将 `GEMINI_API_KEY` 注入为 `process.env.API_KEY` / `process.env.GEMINI_API_KEY`。
+   说明：构建时会在 `vite.config.ts` 中将这些变量注入为 `process.env.*`，其中 `GEMINI_API_KEY` 同时会映射到 `process.env.API_KEY` / `process.env.GEMINI_API_KEY`。
 
 3. 启动 Web 开发服务器
    - `bun run dev`

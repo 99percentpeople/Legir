@@ -12,6 +12,7 @@ import {
   Annotation,
   Tool,
   PageTranslateParagraphCandidate,
+  PDFSearchResult,
 } from "@/types";
 import {
   DEFAULT_FIELD_STYLE,
@@ -21,7 +22,7 @@ import {
   WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES,
   WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES,
 } from "@/constants";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import { usePointerCapture } from "@/hooks/usePointerCapture";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
@@ -87,6 +88,8 @@ interface WorkspaceProps {
   fitTrigger?: number;
   initialScrollPosition?: { left: number; top: number } | null;
   onInitialScrollApplied?: () => void;
+  pdfSearchResultsByPage?: Map<number, PDFSearchResult[]>;
+  activePdfSearchResultId?: string | null;
 }
 
 type Rect = {
@@ -122,6 +125,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   fitTrigger,
   initialScrollPosition,
   onInitialScrollApplied,
+  pdfSearchResultsByPage,
+  activePdfSearchResultId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -289,6 +294,36 @@ const Workspace: React.FC<WorkspaceProps> = ({
       behavior: behavior ?? "smooth",
     });
   });
+
+  useAppEvent(
+    "workspace:focusSearchResult",
+    ({ pageIndex, rect, behavior, skipScroll }) => {
+      if (skipScroll) return;
+      const container = containerRef.current;
+      if (!container) return;
+
+      const pageRect = getPageRectByPageIndex(pageIndex);
+      if (!pageRect) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const rectCenterX = rect.x + rect.width / 2;
+      const rectCenterY = rect.y + rect.height / 2;
+      const targetLeft =
+        pageRect.left +
+        rectCenterX * editorState.scale -
+        containerRect.width / 2;
+      const targetTop =
+        pageRect.top +
+        rectCenterY * editorState.scale -
+        containerRect.height / 2;
+
+      container.scrollTo({
+        left: Math.max(0, targetLeft),
+        top: Math.max(0, targetTop),
+        behavior: behavior ?? "smooth",
+      });
+    },
+  );
 
   const [movingFieldId, setMovingFieldId] = useState<string | null>(null);
   const [movingAnnotationId, setMovingAnnotationId] = useState<string | null>(
@@ -1725,6 +1760,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
         textLayerCursor={
           editorState.tool === "draw_highlight" ? "crosshair" : undefined
         }
+        searchResults={pdfSearchResultsByPage?.get(page.pageIndex) ?? []}
+        activeSearchResultId={activePdfSearchResultId}
       />
 
       {editorState.pageTranslateOptions.useParagraphs &&

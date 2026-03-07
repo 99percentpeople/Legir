@@ -25,12 +25,9 @@ import {
 import { shouldSwitchToSelectAfterUse } from "../lib/tool-behavior";
 import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
 
-const envGeminiApiKey = (
-  process.env.GEMINI_API_KEY ||
-  process.env.API_KEY ||
-  ""
-).trim();
+const envGeminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
 const envOpenAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
+const envOpenAiApiUrl = (process.env.OPENAI_API_URL || "").trim();
 
 let thumbnailWarmupEpoch = 0;
 let thumbnailWarmupAbort: AbortController | null = null;
@@ -258,6 +255,9 @@ initialState.options.llm.gemini.apiKey = (
 initialState.options.llm.openai.apiKey = (
   initialState.options.llm.openai.apiKey || envOpenAiApiKey
 ).trim();
+initialState.options.llm.openai.apiUrl = (
+  initialState.options.llm.openai.apiUrl || envOpenAiApiUrl
+).trim();
 
 const medianNumber = (values: number[]) => {
   if (values.length === 0) return 0;
@@ -452,10 +452,12 @@ export const useEditorStore = create<EditorState & EditorActions>()(
 
           const geminiApiKey = (nextOptions.llm.gemini.apiKey || "").trim();
           const openaiApiKey = (nextOptions.llm.openai.apiKey || "").trim();
+          const openaiApiUrl = (nextOptions.llm.openai.apiUrl || "").trim();
 
           const shouldPatchKeys =
             (!geminiApiKey && envGeminiApiKey) ||
-            (!openaiApiKey && envOpenAiApiKey);
+            (!openaiApiKey && envOpenAiApiKey) ||
+            (!openaiApiUrl && envOpenAiApiUrl);
 
           if (!shouldPatchKeys) return patch;
 
@@ -472,6 +474,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
                 openai: {
                   ...nextOptions.llm.openai,
                   ...(openaiApiKey ? {} : { apiKey: envOpenAiApiKey }),
+                  ...(openaiApiUrl ? {} : { apiUrl: envOpenAiApiUrl }),
                 },
               },
             },

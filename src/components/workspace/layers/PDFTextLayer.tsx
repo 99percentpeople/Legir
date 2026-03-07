@@ -6,10 +6,11 @@ import React, {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import type { PageData } from "@/types";
-import { cn } from "@/lib/cn";
+import type { PageData, PDFSearchResult } from "@/types";
+import { cn } from "@/utils/cn";
 import { useEditorStore } from "@/store/useEditorStore";
 import { appEventBus } from "@/lib/eventBus";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX,
   PDF_TEXT_SELECTION_HANDLE_STEM_WIDTH_PX,
@@ -19,6 +20,10 @@ import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { buildTextLayer } from "../lib/pdfTextLayer";
 import { useTextLayerSelection } from "../hooks/useTextLayerSelection";
+import {
+  getPdfSearchHighlightRects,
+  selectPdfSearchTextRange,
+} from "../lib/pdfSearchHighlights";
 
 interface PDFTextLayerProps {
   page: PageData;
@@ -29,6 +34,8 @@ interface PDFTextLayerProps {
   isHighlighting?: boolean;
   highlightColor?: string;
   highlightOpacity?: number;
+  searchResults?: PDFSearchResult[];
+  activeSearchResultId?: string | null;
 }
 
 const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
@@ -40,6 +47,8 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   isHighlighting = false,
   highlightColor,
   highlightOpacity,
+  searchResults = [],
+  activeSearchResultId = null,
 }) => {
   const pageIndex = page.pageIndex;
   const textLayerRef = useRef<HTMLDivElement>(null);
@@ -51,6 +60,21 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   const [renderedScale, setRenderedScale] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const [searchHighlightRects, setSearchHighlightRects] = useState<
+    Array<{
+      key: string;
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+      isActive: boolean;
+    }>
+  >([]);
+  const pendingSearchSelectionRef = useRef<{
+    pageIndex: number;
+    startOffset: number;
+    endOffset: number;
+  } | null>(null);
   const endOfContentRef = useRef<HTMLDivElement | null>(null);
   const prevRangeRef = useRef<Range | null>(null);
 
@@ -100,6 +124,24 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     },
     [],
   );
+
+  const applyPendingSearchSelection = useCallback(() => {
+    const pending = pendingSearchSelectionRef.current;
+    const root = textLayerRef.current;
+    if (!pending || pending.pageIndex !== pageIndex || !root) return false;
+    if (!isInView || renderedScale === null) return false;
+
+    const didSelect = selectPdfSearchTextRange(
+      root,
+      pending.startOffset,
+      pending.endOffset,
+    );
+    if (!didSelect) return false;
+
+    pendingSearchSelectionRef.current = null;
+    appEventBus.clearSticky("workspace:selectSearchText");
+    return true;
+  }, [isInView, pageIndex, renderedScale]);
 
   // Used to manage render sequence and cancellation
   const renderSeqRef = useRef(0);
@@ -221,6 +263,8 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     setRenderedScale(null);
     setIsSelecting(false);
     setIsRendering(false);
+    setSearchHighlightRects([]);
+    pendingSearchSelectionRef.current = null;
     endOfContentRef.current = null;
     prevRangeRef.current = null;
 
@@ -415,6 +459,20 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     // Since 'isSelecting' changed to false, Effect #6 will naturally re-run.
   }, [isSelecting, isSelectMode]);
 
+  useAppEvent(
+    "workspace:selectSearchText",
+    (payload) => {
+      if (payload.pageIndex !== pageIndex) return;
+      pendingSearchSelectionRef.current = payload;
+      applyPendingSearchSelection();
+    },
+    { replayLast: true },
+  );
+
+  useEffect(() => {
+    applyPendingSearchSelection();
+  }, [applyPendingSearchSelection]);
+
   // Temporary CSS transform for smooth zooming before re-render
   const textLayerSmoothScale = useMemo(() => {
     if (renderedScale && scale !== renderedScale) {
@@ -425,6 +483,33 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
   const shouldDisplay = isInView || isSelecting;
   const shouldHideByVisibility = !isInView && isSelecting;
+
+  useEffect(() => {
+    if (!textLayerRef.current || !isInView || renderedScale === null) {
+      setSearchHighlightRects([]);
+      return;
+    }
+
+    if (searchResults.length === 0) {
+      setSearchHighlightRects([]);
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      if (!textLayerRef.current) return;
+      setSearchHighlightRects(
+        getPdfSearchHighlightRects(
+          textLayerRef.current,
+          searchResults,
+          activeSearchResultId,
+        ),
+      );
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [activeSearchResultId, isInView, renderedScale, scale, searchResults]);
 
   return (
     <>
@@ -456,6 +541,25 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           }),
         }}
       />
+      {searchHighlightRects.length > 0 && (
+        <div className="ff-pdf-search-hit-rect-layer">
+          {searchHighlightRects.map((rect) => (
+            <div
+              key={rect.key}
+              className={cn(
+                "ff-pdf-search-hit-rect",
+                rect.isActive && "ff-pdf-search-hit-rect--active",
+              )}
+              style={{
+                left: `${rect.left * 100}%`,
+                top: `${rect.top * 100}%`,
+                width: `${rect.width * 100}%`,
+                height: `${rect.height * 100}%`,
+              }}
+            />
+          ))}
+        </div>
+      )}
       {pagePortalEl &&
         isSelectMode &&
         (isDraggingSelectionHandle ||

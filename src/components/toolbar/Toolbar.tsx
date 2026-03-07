@@ -18,12 +18,12 @@ import {
   Eraser,
   MessageCirclePlus,
   Hand,
-  Pen,
+  Search,
 } from "lucide-react";
-import { EditorState, Tool, PenStyle } from "../../types";
+import { EditorState, Tool, PenStyle } from "@/types";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
-import { cn } from "../../lib/cn";
+import { cn } from "@/utils/cn";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,11 +62,13 @@ interface ToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   onOpenShortcuts: () => void;
+  onOpenSearch: () => void;
   isFieldListOpen: boolean;
   onToggleFieldList: () => void;
   isPropertiesPanelOpen: boolean;
   onTogglePropertiesPanel: () => void;
   onOpenSettings: () => void;
+  isSearchOpen?: boolean;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -90,11 +92,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
   canUndo,
   canRedo,
   onOpenShortcuts,
+  onOpenSearch,
   isFieldListOpen,
   onToggleFieldList,
   isPropertiesPanelOpen,
   onTogglePropertiesPanel,
   onOpenSettings,
+  isSearchOpen = false,
 }) => {
   const { t } = useLanguage();
   const { mode, tool } = editorState;
@@ -104,7 +108,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <div className="bg-background border-border text-foreground relative z-30 flex h-12 items-center gap-2 border-b px-2 sm:px-4 lg:justify-between">
       {/* Left Section: Mode Selection & History */}
-      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-2">
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -152,9 +156,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Separator orientation="vertical" />
         </div>
-
-        <Separator orientation="vertical" className="h-6" />
 
         <div className="flex items-center gap-1">
           <Button
@@ -176,6 +179,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
             title={t("toolbar.redo")}
           >
             <Redo2 size={20} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSearch}
+            disabled={editorState.pages.length === 0}
+            className={cn(
+              "h-8 w-8 sm:h-9 sm:w-9",
+              isSearchOpen && "bg-accent text-accent-foreground",
+            )}
+            title={t("toolbar.search_pdf")}
+          >
+            <Search size={20} />
           </Button>
         </div>
       </div>

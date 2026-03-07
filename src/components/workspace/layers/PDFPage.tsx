@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import type { PageData } from "@/types";
+import type { PageData, PDFSearchResult } from "@/types";
 import PDFCanvasLayer from "./PDFCanvasLayer";
 import PDFTextLayer from "./PDFTextLayer";
 
@@ -12,6 +12,8 @@ interface PDFPageProps {
   isHighlighting?: boolean;
   highlightColor?: string;
   highlightOpacity?: number;
+  searchResults?: PDFSearchResult[];
+  activeSearchResultId?: string | null;
 }
 
 const PDFPage: React.FC<PDFPageProps> = ({
@@ -23,6 +25,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
   isHighlighting = false,
   highlightColor,
   highlightOpacity,
+  searchResults = [],
+  activeSearchResultId = null,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
@@ -78,6 +82,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
         isHighlighting={isHighlighting}
         highlightColor={highlightColor}
         highlightOpacity={highlightOpacity}
+        searchResults={searchResults}
+        activeSearchResultId={activeSearchResultId}
       />
     </div>
   );

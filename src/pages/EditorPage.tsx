@@ -7,6 +7,8 @@ import React, {
 } from "react";
 import Toolbar from "../components/toolbar/Toolbar";
 import Sidebar from "../components/sidebar/Sidebar";
+import PDFSearchHeader from "../components/sidebar/PDFSearchHeader";
+import PDFSearchPanel from "../components/sidebar/PDFSearchPanel";
 import FloatingBar from "../components/toolbar/FloatingBar";
 import { Skeleton } from "../components/ui/skeleton";
 import { useEditorStore, type EditorStore } from "../store/useEditorStore";
@@ -37,6 +39,7 @@ import type {
   EditorUiState,
   FormField,
   PDFMetadata,
+  PDFSearchResult,
   Tool,
 } from "../types";
 import type { FormDetectionOptions } from "../components/FormDetectionOptionsForm";
@@ -53,6 +56,9 @@ import {
   getCurrentWindow,
 } from "@tauri-apps/api/window";
 import { recentFilesService } from "../services/recentFilesService";
+import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
+import { findPdfSearchResults } from "../lib/pdfSearch";
+import { getPdfSearchSelectionOffsets } from "../components/workspace/lib/pdfSearchHighlights";
 
 export interface EditorPageProps {
   editorStore: EditorStore;
@@ -122,6 +128,25 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const [isTranslateOpen, setIsTranslateOpen] = useState(false);
   const [translateSourceText, setTranslateSourceText] = useState("");
   const [translateAutoToken, setTranslateAutoToken] = useState(0);
+  const [isPdfSearchOpen, setIsPdfSearchOpen] = useState(false);
+  const [pdfSearchQuery, setPdfSearchQuery] = useState("");
+  const [pdfSearchResults, setPdfSearchResults] = useState<PDFSearchResult[]>(
+    [],
+  );
+  const [activePdfSearchResultId, setActivePdfSearchResultId] = useState<
+    string | null
+  >(null);
+  const [isPdfSearchLoading, setIsPdfSearchLoading] = useState(false);
+  const [pdfSearchFocusToken, setPdfSearchFocusToken] = useState(0);
+  const [isPdfSearchCaseSensitive, setIsPdfSearchCaseSensitive] =
+    useState(false);
+  const pdfSearchSeqRef = useRef(0);
+  const pendingPdfSearchPreferredSelectionRef = useRef<{
+    query: string;
+    pageIndex: number;
+    startOffset: number;
+    endOffset: number;
+  } | null>(null);
 
   const {
     isPageTranslating,
@@ -269,6 +294,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   }, []);
 
   useAppEvent("sidebar:focusAnnotation", () => {
+    setIsPdfSearchOpen(false);
     setUiState((prev) => ({
       isSidebarOpen: true,
       sidebarTab: "annotations",
@@ -360,6 +386,300 @@ const EditorPage: React.FC<EditorPageProps> = ({
       setUiState({ rightPanelTab: "document" });
     }
   }, [state.selectedId, state.rightPanelTab, setUiState]);
+
+  useEffect(() => {
+    if (!state.isSidebarOpen && isPdfSearchOpen) {
+      setIsPdfSearchOpen(false);
+    }
+  }, [isPdfSearchOpen, state.isSidebarOpen]);
+
+  useEffect(() => {
+    appEventBus.clearSticky("workspace:selectSearchText");
+  }, [state.filename, state.pages.length, state.pdfBytes]);
+
+  const getWorkspaceSelectedSearchText = useCallback(() => {
+    const selection = window.getSelection?.();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      return null;
+    }
+
+    const selectedText = selection.toString();
+    if (!selectedText.trim()) return null;
+
+    const range = selection.getRangeAt(0);
+    const getClosestTextLayer = (node: Node | null) => {
+      if (!node) return null;
+      const element = node instanceof Element ? node : node.parentElement;
+      return element?.closest?.(".textLayer") ?? null;
+    };
+
+    const startTextLayer = getClosestTextLayer(range.startContainer);
+    const endTextLayer = getClosestTextLayer(range.endContainer);
+    const textLayer =
+      startTextLayer && endTextLayer && startTextLayer === endTextLayer
+        ? (startTextLayer as HTMLElement)
+        : null;
+    if (!textLayer) return null;
+
+    const pageElement = textLayer.closest?.(
+      "[id^='page-']",
+    ) as HTMLElement | null;
+    const pageIndex = Number.parseInt(
+      pageElement?.id.replace(/^page-/, "") ?? "",
+      10,
+    );
+    const offsets = getPdfSearchSelectionOffsets(textLayer, selection);
+    if (!Number.isFinite(pageIndex) || !offsets) return null;
+
+    return {
+      query: selectedText.replace(/\s+/g, " ").trim(),
+      pageIndex,
+      startOffset: offsets.startOffset,
+      endOffset: offsets.endOffset,
+    };
+  }, []);
+
+  const getPreferredPdfSearchResultId = useCallback(
+    (
+      results: PDFSearchResult[],
+      preferredSelection: {
+        pageIndex: number;
+        startOffset: number;
+        endOffset: number;
+      },
+    ) => {
+      const pageResults = results.filter(
+        (result) => result.pageIndex === preferredSelection.pageIndex,
+      );
+      if (pageResults.length === 0) return null;
+
+      let bestResult: PDFSearchResult | null = null;
+      let bestOverlap = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+
+      for (const result of pageResults) {
+        const overlap = Math.max(
+          0,
+          Math.min(result.endOffset, preferredSelection.endOffset) -
+            Math.max(result.startOffset, preferredSelection.startOffset),
+        );
+        const distance =
+          Math.abs(result.startOffset - preferredSelection.startOffset) +
+          Math.abs(result.endOffset - preferredSelection.endOffset);
+
+        if (overlap > bestOverlap) {
+          bestResult = result;
+          bestOverlap = overlap;
+          bestDistance = distance;
+          continue;
+        }
+
+        if (overlap === bestOverlap && distance < bestDistance) {
+          bestResult = result;
+          bestDistance = distance;
+        }
+      }
+
+      return bestResult?.id ?? null;
+    },
+    [],
+  );
+
+  const openPdfSearch = useCallback(() => {
+    const selectedSearch = getWorkspaceSelectedSearchText();
+    pendingPdfSearchPreferredSelectionRef.current = selectedSearch
+      ? {
+          query: selectedSearch.query,
+          pageIndex: selectedSearch.pageIndex,
+          startOffset: selectedSearch.startOffset,
+          endOffset: selectedSearch.endOffset,
+        }
+      : null;
+    if (selectedSearch) {
+      window.getSelection?.()?.removeAllRanges?.();
+    }
+    if (selectedSearch?.query) setPdfSearchQuery(selectedSearch.query);
+    if (!isPdfSearchOpen) {
+      setPdfSearchResults([]);
+      setActivePdfSearchResultId(null);
+    }
+    setIsPdfSearchOpen(true);
+    setPdfSearchFocusToken((value) => value + 1);
+    setUiState((prev) => {
+      if (prev.isPanelFloating) {
+        return { isSidebarOpen: true, isRightPanelOpen: false };
+      }
+      return { isSidebarOpen: true };
+    });
+  }, [getWorkspaceSelectedSearchText, isPdfSearchOpen, setUiState]);
+
+  const closePdfSearch = useCallback(() => {
+    const activeResult =
+      pdfSearchResults.find(
+        (result) => result.id === activePdfSearchResultId,
+      ) ?? null;
+
+    setIsPdfSearchOpen(false);
+
+    if (!activeResult) return;
+
+    window.requestAnimationFrame(() => {
+      appEventBus.emit("workspace:focusSearchResult", {
+        pageIndex: activeResult.pageIndex,
+        rect: activeResult.rect,
+        behavior: "auto",
+      });
+      appEventBus.emit(
+        "workspace:selectSearchText",
+        {
+          pageIndex: activeResult.pageIndex,
+          startOffset: activeResult.startOffset,
+          endOffset: activeResult.endOffset,
+        },
+        { sticky: true },
+      );
+    });
+  }, [activePdfSearchResultId, pdfSearchResults]);
+
+  useEffect(() => {
+    const trimmedQuery = pdfSearchQuery.trim();
+    const currentSeq = ++pdfSearchSeqRef.current;
+
+    if (!isPdfSearchOpen) {
+      pendingPdfSearchPreferredSelectionRef.current = null;
+      setIsPdfSearchLoading(false);
+      return;
+    }
+
+    if (!trimmedQuery || state.pages.length === 0) {
+      pendingPdfSearchPreferredSelectionRef.current = null;
+      setIsPdfSearchLoading(false);
+      setPdfSearchResults([]);
+      setActivePdfSearchResultId(null);
+      return;
+    }
+
+    const abortController = new AbortController();
+    setIsPdfSearchLoading(true);
+    setPdfSearchResults([]);
+    setActivePdfSearchResultId(null);
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const pageMatches = await Promise.all(
+            state.pages.map(async (page) => {
+              const textContent = await pdfWorkerService.getTextContent({
+                pageIndex: page.pageIndex,
+                signal: abortController.signal,
+              });
+              if (!textContent) return [];
+              return findPdfSearchResults(textContent, trimmedQuery, page, {
+                caseSensitive: isPdfSearchCaseSensitive,
+              });
+            }),
+          );
+
+          if (abortController.signal.aborted) return;
+          if (pdfSearchSeqRef.current !== currentSeq) return;
+
+          const nextResults = pageMatches.flat();
+          const preferredResultId = (() => {
+            const preferredSelection =
+              pendingPdfSearchPreferredSelectionRef.current;
+            if (!preferredSelection) return null;
+            if (preferredSelection.query !== trimmedQuery) {
+              pendingPdfSearchPreferredSelectionRef.current = null;
+              return null;
+            }
+            pendingPdfSearchPreferredSelectionRef.current = null;
+            return getPreferredPdfSearchResultId(
+              nextResults,
+              preferredSelection,
+            );
+          })();
+          setPdfSearchResults(nextResults);
+          setActivePdfSearchResultId(
+            (currentId) =>
+              preferredResultId ??
+              (nextResults.some((result) => result.id === currentId)
+                ? currentId
+                : (nextResults[0]?.id ?? null)),
+          );
+        } catch (error) {
+          if ((error as Error)?.name !== "AbortError") {
+            console.error("Failed to search PDF text", error);
+          }
+        } finally {
+          if (
+            !abortController.signal.aborted &&
+            pdfSearchSeqRef.current === currentSeq
+          ) {
+            setIsPdfSearchLoading(false);
+          }
+        }
+      })();
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timer);
+      abortController.abort();
+    };
+  }, [isPdfSearchCaseSensitive, isPdfSearchOpen, pdfSearchQuery, state.pages]);
+
+  const pdfSearchResultsByPage = React.useMemo(() => {
+    const grouped = new Map<number, PDFSearchResult[]>();
+    for (const result of pdfSearchResults) {
+      const pageResults = grouped.get(result.pageIndex);
+      if (pageResults) pageResults.push(result);
+      else grouped.set(result.pageIndex, [result]);
+    }
+    return grouped;
+  }, [pdfSearchResults]);
+
+  const activePdfSearchResultIndex = React.useMemo(
+    () =>
+      pdfSearchResults.findIndex(
+        (result) => result.id === activePdfSearchResultId,
+      ),
+    [activePdfSearchResultId, pdfSearchResults],
+  );
+
+  const handleSelectPdfSearchResult = useCallback((result: PDFSearchResult) => {
+    setActivePdfSearchResultId(result.id);
+    appEventBus.emit("workspace:focusSearchResult", {
+      pageIndex: result.pageIndex,
+      rect: result.rect,
+      behavior: "smooth",
+    });
+  }, []);
+
+  const handleSelectPreviousPdfSearchResult = useCallback(() => {
+    if (pdfSearchResults.length === 0) return;
+    const targetIndex =
+      activePdfSearchResultIndex >= 0
+        ? (activePdfSearchResultIndex - 1 + pdfSearchResults.length) %
+          pdfSearchResults.length
+        : pdfSearchResults.length - 1;
+    handleSelectPdfSearchResult(pdfSearchResults[targetIndex]!);
+  }, [
+    activePdfSearchResultIndex,
+    handleSelectPdfSearchResult,
+    pdfSearchResults,
+  ]);
+
+  const handleSelectNextPdfSearchResult = useCallback(() => {
+    if (pdfSearchResults.length === 0) return;
+    const targetIndex =
+      activePdfSearchResultIndex >= 0
+        ? (activePdfSearchResultIndex + 1) % pdfSearchResults.length
+        : 0;
+    handleSelectPdfSearchResult(pdfSearchResults[targetIndex]!);
+  }, [
+    activePdfSearchResultIndex,
+    handleSelectPdfSearchResult,
+    pdfSearchResults,
+  ]);
 
   useEffect(() => {
     const appName = process.env.APP_NAME;
@@ -729,6 +1049,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
       if (e.key === "Escape") {
         if (currentState.activeDialog) return;
+        if (isPdfSearchOpen) {
+          e.preventDefault();
+          if (isInput) target.blur();
+          closePdfSearch();
+          return;
+        }
         if (isInput) target.blur();
         if (currentState.selectedId) {
           currentState.selectControl(null);
@@ -752,6 +1078,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
         e.preventDefault();
         onPrint();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        openPdfSearch();
         return;
       }
 
@@ -947,6 +1279,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const canRenderRightPanel =
     state.mode === "form" || state.mode === "annotation" || selectedControl;
+  const normalizedSidebarTab =
+    state.sidebarTab === "search" ? "thumbnails" : state.sidebarTab;
+  const activeSidebarTab = isPdfSearchOpen ? "search" : normalizedSidebarTab;
 
   return (
     <>
@@ -980,6 +1315,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         canUndo={state.past.length > 0}
         canRedo={state.future.length > 0}
         onOpenShortcuts={() => openDialog("shortcuts")}
+        onOpenSearch={openPdfSearch}
         isFieldListOpen={state.isSidebarOpen}
         onToggleFieldList={() =>
           setUiState((prev) => {
@@ -999,6 +1335,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
           })
         }
         onOpenSettings={() => openDialog("settings")}
+        isSearchOpen={isPdfSearchOpen}
       />
 
       <Dialog
@@ -1087,6 +1424,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
             });
           }}
           onClose={() => setUiState({ isSidebarOpen: false })}
+          onExitSearch={closePdfSearch}
           isFloating={state.isPanelFloating}
           pages={state.pages}
           fields={state.fields}
@@ -1119,8 +1457,37 @@ const EditorPage: React.FC<EditorPageProps> = ({
           currentPageIndex={state.currentPageIndex}
           width={state.sidebarWidth}
           onResize={(w) => setUiState({ sidebarWidth: w })}
-          activeTab={state.sidebarTab}
-          onTabChange={(tab) => setUiState({ sidebarTab: tab })}
+          activeTab={activeSidebarTab}
+          isSearchActive={isPdfSearchOpen}
+          onTabChange={(tab) => {
+            setIsPdfSearchOpen(false);
+            setUiState({ sidebarTab: tab });
+          }}
+          searchHeaderContent={
+            <PDFSearchHeader
+              query={pdfSearchQuery}
+              focusToken={pdfSearchFocusToken}
+              caseSensitive={isPdfSearchCaseSensitive}
+              canGoPrevious={pdfSearchResults.length > 0}
+              canGoNext={pdfSearchResults.length > 0}
+              onQueryChange={setPdfSearchQuery}
+              onToggleCaseSensitive={() =>
+                setIsPdfSearchCaseSensitive((value) => !value)
+              }
+              onPrevious={handleSelectPreviousPdfSearchResult}
+              onNext={handleSelectNextPdfSearchResult}
+            />
+          }
+          searchContent={
+            <PDFSearchPanel
+              query={pdfSearchQuery}
+              results={pdfSearchResults}
+              activeResultId={activePdfSearchResultId}
+              activeResultIndex={activePdfSearchResultIndex}
+              isSearching={isPdfSearchLoading}
+              onSelectResult={handleSelectPdfSearchResult}
+            />
+          }
         />
 
         <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -1160,6 +1527,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
                   : null
               }
               onInitialScrollApplied={handleInitialScrollApplied}
+              pdfSearchResultsByPage={
+                isPdfSearchOpen ? pdfSearchResultsByPage : undefined
+              }
+              activePdfSearchResultId={
+                isPdfSearchOpen ? activePdfSearchResultId : null
+              }
             />
           </Suspense>
           <FloatingBar

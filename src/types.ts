@@ -248,6 +248,26 @@ export interface PageTranslateOptions {
   freetextPadding: number;
 }
 
+export interface PDFSearchDisplaySegment {
+  text: string;
+  highlighted: boolean;
+}
+
+export interface PDFSearchResult {
+  id: string;
+  pageIndex: number;
+  matchIndexOnPage: number;
+  startOffset: number;
+  endOffset: number;
+  sortTop: number;
+  sortLeft: number;
+  rect: { x: number; y: number; width: number; height: number };
+  matchText: string;
+  contextBefore: string;
+  contextAfter: string;
+  displaySegments: PDFSearchDisplaySegment[];
+}
+
 export type PageTranslateParagraphCandidate = {
   id: string;
   pageIndex: number;

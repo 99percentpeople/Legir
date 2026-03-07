@@ -24,13 +24,15 @@
 - Web build：`bun run build`
 - Tauri build：`bun run build:app`
 
-### Gemini API Key（可选）
+### AI 环境变量（可选）
 
 用于 AI 自动识别字段（见 `src/services/geminiService.ts`）。在 `.env.local` 中设置：
 
 - `GEMINI_API_KEY=...`
+- `OPENAI_API_KEY=...`
+- `OPENAI_API_URL=...`（可选，自定义 OpenAI 兼容接口地址）
 
-构建时会在 `vite.config.ts` 中注入为 `process.env.API_KEY` / `process.env.GEMINI_API_KEY`。
+构建时会在 `vite.config.ts` 中注入为 `process.env.*`；其中 `GEMINI_API_KEY` 会额外映射到 `process.env.API_KEY` / `process.env.GEMINI_API_KEY`。
 
 ---
 

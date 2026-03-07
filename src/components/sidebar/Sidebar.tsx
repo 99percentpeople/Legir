@@ -7,7 +7,7 @@ import {
   Annotation,
   ThumbnailsLayoutMode,
 } from "@/types";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import {
   LEFT_SIDEBAR_MAX_WIDTH_PX,
   LEFT_SIDEBAR_MIN_WIDTH_PX,
@@ -26,6 +26,7 @@ interface SidebarProps {
   isOpen: boolean;
   onOpen: () => void;
   onClose: () => void;
+  onExitSearch?: () => void;
   isFloating?: boolean;
   pages: PageData[];
   fields: FormField[];
@@ -45,12 +46,16 @@ interface SidebarProps {
   thumbnailsLayout?: ThumbnailsLayoutMode;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
+  searchContent?: React.ReactNode;
+  searchHeaderContent?: React.ReactNode;
+  isSearchActive?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onOpen,
   onClose,
+  onExitSearch,
   isFloating = false,
   pages,
   fields,
@@ -67,6 +72,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   thumbnailsLayout,
   activeTab,
   onTabChange,
+  searchContent,
+  searchHeaderContent,
+  isSearchActive = false,
 }) => {
   const { t } = useLanguage();
 
@@ -126,42 +134,48 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Header */}
         <div className="bg-muted/30 border-border flex shrink-0 items-center justify-between gap-2 border-b p-2">
-          <TabsList className="flex h-8 flex-1 justify-end">
-            <TabsTrigger
-              value="thumbnails"
-              className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
-              title={t("sidebar.thumbnails")}
-            >
-              <LayoutGrid size={16} />
-            </TabsTrigger>
-            <TabsTrigger
-              value="outline"
-              className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
-              title={t("sidebar.outline")}
-            >
-              <List size={16} />
-            </TabsTrigger>
-            <TabsTrigger
-              value="fields"
-              className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
-              title={t("sidebar.fields")}
-            >
-              <Layers size={16} />
-            </TabsTrigger>
-            <TabsTrigger
-              value="annotations"
-              className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
-              title={t("sidebar.annotations")}
-            >
-              <StickyNote size={16} />
-            </TabsTrigger>
-          </TabsList>
+          {isSearchActive && searchHeaderContent ? (
+            searchHeaderContent
+          ) : (
+            <TabsList className="flex h-8 flex-1 justify-end">
+              <TabsTrigger
+                value="thumbnails"
+                className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
+                title={t("sidebar.thumbnails")}
+              >
+                <LayoutGrid size={16} />
+              </TabsTrigger>
+              <TabsTrigger
+                value="outline"
+                className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
+                title={t("sidebar.outline")}
+              >
+                <List size={16} />
+              </TabsTrigger>
+              <TabsTrigger
+                value="fields"
+                className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
+                title={t("sidebar.fields")}
+              >
+                <Layers size={16} />
+              </TabsTrigger>
+              <TabsTrigger
+                value="annotations"
+                className="data-[state=active]:bg-muted h-full w-9 p-0 text-xs"
+                title={t("sidebar.annotations")}
+              >
+                <StickyNote size={16} />
+              </TabsTrigger>
+            </TabsList>
+          )}
           <Button
             variant="ghost"
             size="icon"
-            onClick={onClose}
+            onClick={isSearchActive ? (onExitSearch ?? onClose) : onClose}
             className="h-8 w-8 shrink-0"
-            title={t("common.close")}
+            title={
+              isSearchActive ? t("sidebar.exit_search") : t("common.close")
+            }
           >
             <X size={16} />
           </Button>
@@ -213,6 +227,14 @@ const Sidebar: React.FC<SidebarProps> = ({
               selectedId={selectedId}
             />
           </TabsContent>
+          {searchContent ? (
+            <TabsContent
+              value="search"
+              className="mt-0 flex h-full flex-1 flex-col data-[state=inactive]:hidden"
+            >
+              {searchContent}
+            </TabsContent>
+          ) : null}
         </div>
       </Tabs>
 
