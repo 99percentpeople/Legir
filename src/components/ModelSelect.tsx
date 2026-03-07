@@ -58,7 +58,7 @@ export function ModelSelect(props: {
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent portalContainer={portalContainer}>
+      <SelectContent>
         {groups.map((group, idx) => (
           <React.Fragment key={group.id}>
             <SelectGroup>

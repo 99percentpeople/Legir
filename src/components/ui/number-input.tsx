@@ -8,7 +8,7 @@ import {
   NumberField,
   NumberFieldProps,
 } from "react-aria-components";
-import { cn } from "../../lib/cn";
+import { cn } from "../../utils/cn";
 
 export interface NumberInputProps extends Omit<NumberFieldProps, "onChange"> {
   className?: string;

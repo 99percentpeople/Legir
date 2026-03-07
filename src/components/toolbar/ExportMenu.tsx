@@ -20,6 +20,8 @@ import {
 } from "../ui/dropdown-menu";
 import { Separator } from "../ui/separator";
 import { useLanguage } from "../language-provider";
+import { ButtonGroup } from "../ui/button-group";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export interface ExportMenuProps {
   disabled: boolean;
@@ -52,28 +54,29 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
   const primaryLabel = t(tauri ? "common.save" : "toolbar.export");
   const PrimaryIcon = tauri ? Save : Download;
 
+  const isMobile = useIsMobile();
+
   return (
-    <div className="isolate flex rounded-md shadow-sm">
-      <Button
-        onClick={onPrimary}
-        disabled={saveDisabled}
-        className="hidden rounded-r-none sm:flex"
-      >
-        <PrimaryIcon size={16} />
-        <span className="hidden sm:inline">{primaryLabel}</span>
-      </Button>
+    <ButtonGroup>
+      {!isMobile && (
+        <Button
+          onClick={onPrimary}
+          disabled={saveDisabled}
+          className="hidden rounded-r-none sm:flex"
+        >
+          <PrimaryIcon size={16} />
+          <span className="hidden sm:inline">{primaryLabel}</span>
+        </Button>
+      )}
 
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button
-            disabled={disabled}
-            className="border-l-border -ml-px h-8 w-8 rounded-l-md border-l-0 p-0 sm:h-9 sm:w-auto sm:rounded-l-none sm:border-l sm:px-2"
-          >
+          <Button size="icon" disabled={disabled}>
             <PrimaryIcon size={16} className="sm:hidden" />
             <ChevronDown size={16} className="hidden sm:block" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="min-w-56">
           <DropdownMenuItem
             onClick={onPrimary}
             className="sm:hidden"
@@ -148,7 +151,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </ButtonGroup>
   );
 };
 

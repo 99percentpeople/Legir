@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/components/language-provider";
 import { PanelLayout } from "./PanelLayout";
 import { type Tag, TagInput } from "emblor";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 
 export interface DocumentPropertiesPanelProps {
   metadata: PDFMetadata;

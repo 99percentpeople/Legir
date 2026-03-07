@@ -3,7 +3,7 @@ import { PDFOutlineItem, PageData } from "../../types";
 import { ChevronRight, ChevronDown, Book, File, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { cn } from "../../lib/cn";
+import { cn } from "../../utils/cn";
 import { useLanguage } from "../language-provider";
 
 // --- Outline Item ---

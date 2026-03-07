@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Database, MousePointer2, Trash2, Upload } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 
 export const SignatureProperties: React.FC<PropertyPanelProps<FormField>> = ({
   data,

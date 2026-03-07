@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { AnnotationControlProps } from "../types";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { useMouse } from "@/hooks/useMouse";

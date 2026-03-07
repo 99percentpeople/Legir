@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import type { PageData, ThumbnailsLayoutMode } from "@/types";
 import { ImageIcon } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { useLanguage } from "../language-provider";
 import { useEditorStore } from "@/store/useEditorStore";
 

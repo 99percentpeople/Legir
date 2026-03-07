@@ -24,7 +24,7 @@ import {
   type TranslateOptionGroup,
 } from "@/services/translateService";
 import { FloatingWindow } from "@/components/ui/floating-window";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { TranslateOptionId } from "@/types";
 
@@ -78,7 +78,7 @@ function ResultOutputBox({
         }
       }}
       className={cn(
-        "bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border text-sm wrap-break-word whitespace-pre-wrap outline-none select-text",
+        "bg-muted/20 min-h-0 flex-1 overflow-auto rounded-md border px-3 py-2 text-sm wrap-break-word whitespace-pre-wrap outline-none select-text",
         className,
       )}
     >
@@ -373,7 +373,7 @@ export const TranslationFloatingWindow: React.FC<
         </div>
       )}
     >
-      {({ width, portalContainer }) => {
+      {({ width }) => {
         const isHorizontal = width >= 720;
 
         if (isHorizontal) {
@@ -400,7 +400,7 @@ export const TranslationFloatingWindow: React.FC<
                         >
                           <SelectValue placeholder={t("translate.target")} />
                         </SelectTrigger>
-                        <SelectContent portalContainer={portalContainer}>
+                        <SelectContent>
                           {TARGET_LANG_OPTIONS.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
                               {opt.label}
@@ -454,7 +454,6 @@ export const TranslationFloatingWindow: React.FC<
                     output={output}
                     isLoading={isLoading}
                     error={error}
-                    className="p-1"
                   />
                 </div>
               </div>
@@ -508,7 +507,7 @@ export const TranslationFloatingWindow: React.FC<
                         >
                           <SelectValue placeholder={t("translate.target")} />
                         </SelectTrigger>
-                        <SelectContent portalContainer={portalContainer}>
+                        <SelectContent>
                           {TARGET_LANG_OPTIONS.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
                               {opt.label}
@@ -563,7 +562,6 @@ export const TranslationFloatingWindow: React.FC<
                     output={output}
                     isLoading={isLoading}
                     error={error}
-                    className="p-1.5"
                   />
                 </div>
               </TabsContent>

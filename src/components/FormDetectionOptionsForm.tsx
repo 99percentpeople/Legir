@@ -27,7 +27,7 @@ import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import { FieldType, FieldStyle } from "../types";
 import { useLanguage } from "./language-provider";
 import { DEFAULT_FIELD_STYLE } from "../constants";
-import { cn } from "../lib/cn";
+import { cn } from "../utils/cn";
 import {
   getFormDetectModelGroups,
   subscribeLLMModelRegistry,

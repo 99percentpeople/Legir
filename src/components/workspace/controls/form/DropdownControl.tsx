@@ -3,7 +3,7 @@ import { ChevronDown, Check } from "lucide-react";
 import { ListBox, ListBoxItem } from "react-aria-components";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { resolveFormControlFontFamilyCss } from "@/lib/fonts";
 
 export const DropdownControl: React.FC<FormControlProps> = (props) => {

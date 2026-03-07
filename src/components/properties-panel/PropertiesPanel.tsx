@@ -53,7 +53,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
           data={selectedControl}
           onChange={onChange}
           onDelete={() => onDelete(selectedControl.id)}
-          onClose={onClose ?? (() => {})}
+          onClose={onClose}
           isOpen={isOpen}
           onOpen={onOpen}
           onCollapse={onCollapse}
@@ -79,7 +79,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         isOpen={isOpen}
         onOpen={onOpen}
         onCollapse={onCollapse}
-        onClose={onClose}
+        onClose={onCollapse}
         isFloating={isFloating}
         onTriggerHistorySave={onTriggerHistorySave}
         width={width}

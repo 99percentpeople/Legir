@@ -1,5 +1,5 @@
 import React from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { ControlProps } from "./types";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";

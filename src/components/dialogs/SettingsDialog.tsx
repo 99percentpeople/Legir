@@ -935,10 +935,6 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </TabsContent>
           </div>
         </Tabs>
-
-        <DialogFooter>
-          <Button onClick={onClose}>{t("settings.done")}</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

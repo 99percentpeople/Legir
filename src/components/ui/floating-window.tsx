@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { resetGlobalCursor, setGlobalCursor } from "@/lib/cursor";
 
 export interface FloatingWindowRenderContext {

@@ -1,50 +1,7 @@
 import * as React from "react";
-import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { Popover as PopoverPrimitive } from "radix-ui";
 
-import { cn } from "@/lib/cn";
-
-const ensureGlobalPopoverCtrlWheelInterceptor = () => {
-  if (typeof window === "undefined") return;
-
-  const key = "__ff_popover_ctrl_wheel_interceptor_installed__";
-  if (window[key]) return;
-  window[key] = true;
-
-  const handler = (e: WheelEvent) => {
-    if (e.defaultPrevented) return;
-    if (!(e.ctrlKey || e.metaKey)) return;
-
-    const target = e.target;
-    if (!(target instanceof Element)) return;
-
-    const contentEl = target.closest(
-      '[data-slot="popover-content"]',
-    ) as HTMLElement | null;
-    if (!contentEl) return;
-
-    // Critical: prevent browser zoom when ctrl/meta+wheel happens over popovers.
-    e.preventDefault();
-    e.stopPropagation();
-
-    window.dispatchEvent(
-      new CustomEvent("ff-ctrl-wheel", {
-        detail: {
-          deltaY: e.deltaY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          ctrlKey: e.ctrlKey,
-          metaKey: e.metaKey,
-          contentId: contentEl.id,
-        },
-      }),
-    );
-  };
-
-  window.addEventListener("wheel", handler, {
-    passive: false,
-    capture: true,
-  });
-};
+import { cn } from "@/utils/cn";
 
 function Popover({
   ...props
@@ -58,37 +15,27 @@ function PopoverTrigger({
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
-const PopoverContent = React.forwardRef<
-  React.ComponentRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(
-  (
-    { className, align = "center", sideOffset = 4, onWheelCapture, ...props },
-    ref,
-  ) => {
-    React.useEffect(() => {
-      ensureGlobalPopoverCtrlWheelInterceptor();
-    }, []);
-
-    return (
-      <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Content
-          ref={ref}
-          data-slot="popover-content"
-          align={align}
-          sideOffset={sideOffset}
-          onWheelCapture={onWheelCapture}
-          className={cn(
-            "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden",
-            className,
-          )}
-          {...props}
-        />
-      </PopoverPrimitive.Portal>
-    );
-  },
-);
-PopoverContent.displayName = "PopoverContent";
+function PopoverContent({
+  className,
+  align = "center",
+  sideOffset = 4,
+  ...props
+}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  return (
+    <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Content
+        data-slot="popover-content"
+        align={align}
+        sideOffset={sideOffset}
+        className={cn(
+          "bg-popover text-popover-foreground ring-foreground/10 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 z-50 flex w-72 origin-(--radix-popover-content-transform-origin) flex-col gap-2.5 rounded-lg p-2.5 text-sm shadow-md ring-1 outline-hidden duration-100",
+          className,
+        )}
+        {...props}
+      />
+    </PopoverPrimitive.Portal>
+  );
+}
 
 function PopoverAnchor({
   ...props
@@ -96,4 +43,45 @@ function PopoverAnchor({
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />;
 }
 
-export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor };
+function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="popover-header"
+      className={cn("flex flex-col gap-0.5 text-sm", className)}
+      {...props}
+    />
+  );
+}
+
+function PopoverTitle({ className, ...props }: React.ComponentProps<"h2">) {
+  return (
+    <div
+      data-slot="popover-title"
+      className={cn("font-medium", className)}
+      {...props}
+    />
+  );
+}
+
+function PopoverDescription({
+  className,
+  ...props
+}: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="popover-description"
+      className={cn("text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}
+
+export {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+};

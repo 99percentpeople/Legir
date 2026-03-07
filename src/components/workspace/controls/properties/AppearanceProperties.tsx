@@ -14,7 +14,7 @@ import {
 import { Palette, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { FONT_FAMILY_MAP } from "@/constants";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
 

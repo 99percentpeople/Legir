@@ -1,7 +1,7 @@
 import React from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import {
   RIGHT_PANEL_MAX_WIDTH_PX,
   RIGHT_PANEL_MIN_WIDTH_PX,

@@ -15,7 +15,7 @@ import {
   AlignRight,
 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 
 export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
   data,

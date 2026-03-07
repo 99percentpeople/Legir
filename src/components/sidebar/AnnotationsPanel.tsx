@@ -21,7 +21,7 @@ import {
 } from "../ui/dropdown-menu";
 import { TimeText } from "../timeText";
 import { Textarea } from "../ui/textarea";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import type { AppEventMap } from "@/lib/eventBus";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";

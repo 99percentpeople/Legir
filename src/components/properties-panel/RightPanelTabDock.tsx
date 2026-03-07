@@ -6,7 +6,7 @@ import {
   Languages,
   SlidersHorizontal,
 } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/utils/cn";
 import { useScrollbarWidthOffset } from "@/hooks/useScrollbarWidthOffset";
 import { useLanguage } from "@/components/language-provider";
 import { useAppEvent } from "@/hooks/useAppEventBus";
