@@ -344,7 +344,7 @@ export const TranslationFloatingWindow: React.FC<
       className="rounded-xl"
       headerClassName="px-2 py-1.5"
       closeButtonClassName="h-7 w-7"
-      header={({ width, portalContainer }) => (
+      header={({ width }) => (
         <div className={cn("flex flex-1", width >= 720 && "justify-center")}>
           <div
             className="flex cursor-auto items-center gap-2 **:cursor-auto"
@@ -367,7 +367,6 @@ export const TranslationFloatingWindow: React.FC<
               triggerClassName="h-7! border-none text-xs"
               triggerSize="sm"
               triggerTitle={t("translate.provider")}
-              portalContainer={portalContainer}
             />
           </div>
         </div>

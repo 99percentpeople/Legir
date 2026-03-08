@@ -12,6 +12,7 @@ import {
 } from "@/constants";
 import type { EditorState } from "@/types";
 import { useEventListener } from "@/hooks/useEventListener";
+import { pickClosestRectCandidate } from "@/lib/viewportMath";
 
 export const useWorkspaceViewport = (opts: {
   containerRef: RefObject<HTMLDivElement>;
@@ -193,44 +194,6 @@ export const useWorkspaceViewport = (opts: {
         const content = opts.contentRef.current;
         if (!content) return;
 
-        const distToRectSquared = (x: number, y: number, r: DOMRect) => {
-          const inside =
-            x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-          const dx = inside
-            ? 0
-            : x < r.left
-              ? r.left - x
-              : x > r.right
-                ? x - r.right
-                : 0;
-          const dy = inside
-            ? 0
-            : y < r.top
-              ? r.top - y
-              : y > r.bottom
-                ? y - r.bottom
-                : 0;
-          return dx * dx + dy * dy;
-        };
-
-        const pickClosestHit = <T extends { pageIndex: number; rect: DOMRect }>(
-          x: number,
-          y: number,
-          candidates: T[],
-        ) => {
-          let best: T | null = null;
-          let bestDist = Infinity;
-          for (const c of candidates) {
-            const dist = distToRectSquared(x, y, c.rect);
-            if (dist < bestDist) {
-              bestDist = dist;
-              best = c;
-              if (dist === 0) break;
-            }
-          }
-          return best;
-        };
-
         const findPageNearPointByDom = (
           clientX: number,
           clientY: number,
@@ -272,7 +235,11 @@ export const useWorkspaceViewport = (opts: {
 
           if (candidates.length === 0) return null;
           // Pick the closest page rect to the pointer (works even when pointer is in the gap).
-          return pickClosestHit(clientX, clientY, candidates);
+          return pickClosestRectCandidate(
+            { x: clientX, y: clientY },
+            candidates,
+            (candidate) => candidate.rect,
+          );
         };
 
         const currentScale = opts.editorState.scale;

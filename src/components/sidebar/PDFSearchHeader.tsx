@@ -38,7 +38,7 @@ const PDFSearchHeader: React.FC<PDFSearchHeaderProps> = ({
 
   return (
     <div className="flex min-w-0 flex-1 items-center">
-      <div className="border-border bg-background focus-within:border-ring/60 focus-within:ring-ring/20 flex h-9 min-w-0 flex-1 items-center rounded-md border pr-1 shadow-sm transition-[border-color,box-shadow] focus-within:ring-4">
+      <div className="border-border bg-background focus-within:border-ring/60 focus-within:ring-ring/20 flex h-8 min-w-0 flex-1 items-center rounded-md border pr-1 shadow-sm transition-[border-color,box-shadow] focus-within:ring-4">
         <Search className="text-muted-foreground ml-2 h-3.5 w-3.5 shrink-0" />
         <input
           ref={inputRef}

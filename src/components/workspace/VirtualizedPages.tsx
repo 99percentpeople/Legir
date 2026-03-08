@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { findVisibleRange } from "@/lib/visibleRange";
 
 type Rect = {
   top: number;
@@ -74,63 +75,20 @@ export function VirtualizedPages<T>(props: {
         ? container.clientHeight
         : container.clientWidth);
 
-    const ends = axisEnds;
-    const starts = axisStarts;
-
-    // Find first item whose end crosses viewStart.
-    let start = 0;
-    {
-      let lo = 0;
-      let hi = count - 1;
-      let ans = count - 1;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        if (ends[mid] >= viewStart) {
-          ans = mid;
-          hi = mid - 1;
-        } else {
-          lo = mid + 1;
-        }
-      }
-      start = ans;
-    }
-
-    // Find last item whose start is before viewEnd.
-    let end = count - 1;
-    {
-      let lo = 0;
-      let hi = count - 1;
-      let ans = 0;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        if (starts[mid] <= viewEnd) {
-          ans = mid;
-          lo = mid + 1;
-        } else {
-          hi = mid - 1;
-        }
-      }
-      end = ans;
-    }
-
-    start = Math.max(0, start - overscan);
-    end = Math.min(count - 1, end + overscan);
-
-    // Ensure the active/"pinned" item is always mounted (useful for ongoing
-    // interactions even when the viewport range jumps).
-    if (typeof props.pinIndex === "number") {
-      const pin = Math.max(0, Math.min(props.pinIndex, count - 1));
-      if (pin < start) start = pin;
-      if (pin > end) end = pin;
-    }
-
-    if (end < start) {
-      start = 0;
-      end = Math.min(count - 1, overscan * 2);
-    }
+    const nextRange = findVisibleRange({
+      starts: axisStarts,
+      ends: axisEnds,
+      viewStart,
+      viewEnd,
+      overscan,
+      pinIndex: props.pinIndex,
+    });
+    if (!nextRange) return;
 
     setRange((prev) =>
-      prev.start === start && prev.end === end ? prev : { start, end },
+      prev.start === nextRange.start && prev.end === nextRange.end
+        ? prev
+        : nextRange,
     );
   }, [
     axisEnds,

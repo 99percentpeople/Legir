@@ -416,7 +416,7 @@ export function PageTranslatePanel({
                   });
                 }}
               >
-                <Languages size={16} className="mr-2" />
+                <Languages size={16} />
                 {t("translate.action")}
               </Button>
             )}

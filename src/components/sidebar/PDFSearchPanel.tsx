@@ -22,6 +22,8 @@ const PDFSearchPanel: React.FC<PDFSearchPanelProps> = ({
 }) => {
   const { t } = useLanguage();
   const listRef = useRef<HTMLDivElement>(null);
+  const lastResultsKeyRef = useRef("");
+  const hasScrolledForCurrentResultsRef = useRef(false);
 
   const groupedResults = useMemo(() => {
     const groups = new Map<number, PDFSearchResult[]>();
@@ -36,12 +38,35 @@ const PDFSearchPanel: React.FC<PDFSearchPanelProps> = ({
     }));
   }, [results]);
 
+  const resultsKey = useMemo(() => {
+    const firstId = results[0]?.id ?? "";
+    const lastId = results[results.length - 1]?.id ?? "";
+    return `${query}::${results.length}::${firstId}::${lastId}`;
+  }, [query, results]);
+
+  useEffect(() => {
+    if (lastResultsKeyRef.current === resultsKey) return;
+    lastResultsKeyRef.current = resultsKey;
+    hasScrolledForCurrentResultsRef.current = false;
+  }, [resultsKey]);
+
   useEffect(() => {
     if (!activeResultId || !listRef.current) return;
     const activeEl = listRef.current.querySelector<HTMLElement>(
       `[data-search-result-id="${activeResultId}"]`,
     );
-    activeEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    activeEl?.scrollIntoView(
+      hasScrolledForCurrentResultsRef.current
+        ? {
+            behavior: "smooth",
+            block: "nearest",
+          }
+        : {
+            behavior: "instant",
+            block: "center",
+          },
+    );
+    hasScrolledForCurrentResultsRef.current = true;
   }, [activeResultId]);
 
   return (

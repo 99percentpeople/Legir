@@ -32,7 +32,6 @@ export function ModelSelect(props: {
   triggerClassName?: string;
   triggerSize?: "sm" | "default";
   triggerTitle?: string;
-  portalContainer?: HTMLElement | null;
   showSeparators?: boolean;
 }) {
   const {
@@ -44,7 +43,6 @@ export function ModelSelect(props: {
     triggerClassName,
     triggerSize,
     triggerTitle,
-    portalContainer,
     showSeparators = true,
   } = props;
 

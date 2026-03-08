@@ -67,7 +67,7 @@ export function FormDetectionPanel({
               form="form-detection-panel-form"
               type="submit"
             >
-              <Sparkles size={16} className="mr-2" />
+              <Sparkles size={16} />
               {t("properties.form_detection.start")}
             </Button>
           </DialogFooter>

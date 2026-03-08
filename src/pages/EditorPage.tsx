@@ -59,6 +59,11 @@ import { recentFilesService } from "../services/recentFilesService";
 import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
 import { findPdfSearchResults } from "../lib/pdfSearch";
 import { getPdfSearchSelectionOffsets } from "../components/workspace/lib/pdfSearchHighlights";
+import {
+  getDistanceSquaredBetweenPoints,
+  getPointToRectDistanceSquared,
+  getRectCenter,
+} from "@/lib/viewportMath";
 
 export interface EditorPageProps {
   editorStore: EditorStore;
@@ -141,12 +146,20 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const [isPdfSearchCaseSensitive, setIsPdfSearchCaseSensitive] =
     useState(false);
   const pdfSearchSeqRef = useRef(0);
+  const pdfSearchViewportStateRef = useRef({
+    scale: state.scale,
+    currentPageIndex: state.currentPageIndex,
+  });
   const pendingPdfSearchPreferredSelectionRef = useRef<{
     query: string;
     pageIndex: number;
     startOffset: number;
     endOffset: number;
   } | null>(null);
+  pdfSearchViewportStateRef.current = {
+    scale: state.scale,
+    currentPageIndex: state.currentPageIndex,
+  };
 
   const {
     isPageTranslating,
@@ -485,6 +498,69 @@ const EditorPage: React.FC<EditorPageProps> = ({
     [],
   );
 
+  const getViewportClosestPdfSearchResultId = useCallback(
+    (results: PDFSearchResult[]) => {
+      const container = workspaceScrollContainerRef.current;
+      if (!container || results.length === 0) return null;
+      const viewportState = pdfSearchViewportStateRef.current;
+
+      const containerRect = container.getBoundingClientRect();
+      const viewportCenter = getRectCenter(containerRect);
+
+      let bestResult: PDFSearchResult | null = null;
+      let bestViewportDistance = Number.POSITIVE_INFINITY;
+      let bestCenterDistance = Number.POSITIVE_INFINITY;
+
+      for (const result of results) {
+        const pageElement = document.getElementById(
+          `page-${result.pageIndex}`,
+        ) as HTMLElement | null;
+        if (!pageElement) continue;
+
+        const pageRect = pageElement.getBoundingClientRect();
+        const resultCenter = {
+          x:
+            pageRect.left +
+            (result.rect.x + result.rect.width / 2) * viewportState.scale,
+          y:
+            pageRect.top +
+            (result.rect.y + result.rect.height / 2) * viewportState.scale,
+        };
+        const viewportDistance = getPointToRectDistanceSquared(
+          resultCenter,
+          containerRect,
+        );
+        const centerDistance = getDistanceSquaredBetweenPoints(
+          resultCenter,
+          viewportCenter,
+        );
+
+        if (viewportDistance < bestViewportDistance) {
+          bestResult = result;
+          bestViewportDistance = viewportDistance;
+          bestCenterDistance = centerDistance;
+          continue;
+        }
+
+        if (
+          viewportDistance === bestViewportDistance &&
+          centerDistance < bestCenterDistance
+        ) {
+          bestResult = result;
+          bestCenterDistance = centerDistance;
+        }
+      }
+
+      if (bestResult) return bestResult.id;
+
+      const currentPageResults = results.filter(
+        (result) => result.pageIndex === viewportState.currentPageIndex,
+      );
+      return currentPageResults[0]?.id ?? results[0]?.id ?? null;
+    },
+    [],
+  );
+
   const openPdfSearch = useCallback(() => {
     const selectedSearch = getWorkspaceSelectedSearchText();
     pendingPdfSearchPreferredSelectionRef.current = selectedSearch
@@ -598,10 +674,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
               preferredSelection,
             );
           })();
+          const viewportClosestResultId = preferredResultId
+            ? null
+            : getViewportClosestPdfSearchResultId(nextResults);
           setPdfSearchResults(nextResults);
           setActivePdfSearchResultId(
             (currentId) =>
               preferredResultId ??
+              viewportClosestResultId ??
               (nextResults.some((result) => result.id === currentId)
                 ? currentId
                 : (nextResults[0]?.id ?? null)),
@@ -625,7 +705,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
       window.clearTimeout(timer);
       abortController.abort();
     };
-  }, [isPdfSearchCaseSensitive, isPdfSearchOpen, pdfSearchQuery, state.pages]);
+  }, [
+    getPreferredPdfSearchResultId,
+    getViewportClosestPdfSearchResultId,
+    isPdfSearchCaseSensitive,
+    isPdfSearchOpen,
+    pdfSearchQuery,
+    state.pages,
+  ]);
 
   const pdfSearchResultsByPage = React.useMemo(() => {
     const grouped = new Map<number, PDFSearchResult[]>();

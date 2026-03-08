@@ -4,6 +4,10 @@ import { MAX_PIXELS_PER_PAGE, TILE_MAX_DIM } from "@/constants";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import {
+  getDistanceBetweenPoints,
+  getDistanceSquaredBetweenPoints,
+} from "@/lib/viewportMath";
 
 type TileInfo = {
   key: string;
@@ -185,10 +189,17 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         viewportCenterRef.current = [centerX, centerY];
 
         const last = lastReprioritizeCenterRef.current;
-        const dx = last ? centerX - last[0] : Infinity;
-        const dy = last ? centerY - last[1] : Infinity;
         const MIN_MOVE = 64 * dpr;
-        if (last && dx * dx + dy * dy < MIN_MOVE * MIN_MOVE) return;
+        if (
+          last &&
+          getDistanceSquaredBetweenPoints(
+            { x: centerX, y: centerY },
+            { x: last[0], y: last[1] },
+          ) <
+            MIN_MOVE * MIN_MOVE
+        ) {
+          return;
+        }
         lastReprioritizeCenterRef.current = [centerX, centerY];
 
         const send = (c: [number, number]) => {
@@ -318,9 +329,10 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         const w = Math.min(TILE_MAX_DIM, pageW - x);
         const h = Math.min(TILE_MAX_DIM, pageH - y);
         const key = `${x}_${y}_${w}_${h}`;
-        const dx = x + w / 2 - centerX;
-        const dy = y + h / 2 - centerY;
-        const priority = Math.hypot(dx, dy);
+        const priority = getDistanceBetweenPoints(
+          { x: x + w / 2, y: y + h / 2 },
+          { x: centerX, y: centerY },
+        );
         nextTiles.push({
           key,
           canvasId: `${componentId.current}-T-${epoch}-${key}`,
@@ -525,9 +537,10 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           priority: (() => {
             const vc = viewportCenterRef.current;
             if (!vc) return tile.priority;
-            const cx = tile.x + tile.w / 2;
-            const cy = tile.y + tile.h / 2;
-            return Math.hypot(cx - vc[0], cy - vc[1]);
+            return getDistanceBetweenPoints(
+              { x: tile.x + tile.w / 2, y: tile.y + tile.h / 2 },
+              { x: vc[0], y: vc[1] },
+            );
           })(),
           signal,
         });
@@ -630,9 +643,10 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           let bestP = Infinity;
           for (let i = 0; i < pendingTiles.length; i++) {
             const t = pendingTiles[i];
-            const cx = t.x + t.w / 2;
-            const cy = t.y + t.h / 2;
-            const p = Math.hypot(cx - vc[0], cy - vc[1]);
+            const p = getDistanceBetweenPoints(
+              { x: t.x + t.w / 2, y: t.y + t.h / 2 },
+              { x: vc[0], y: vc[1] },
+            );
             if (p < bestP) {
               bestP = p;
               bestIdx = i;
