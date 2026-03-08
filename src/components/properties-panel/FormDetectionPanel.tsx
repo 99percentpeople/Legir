@@ -63,7 +63,7 @@ export function FormDetectionPanel({
           <DialogFooter className="p-0">
             <Button
               disabled={!isAvailable || isProcessing}
-              className="bg-purple-600 text-white hover:bg-purple-700"
+              className="w-full bg-purple-600 text-white hover:bg-purple-700"
               form="form-detection-panel-form"
               type="submit"
             >

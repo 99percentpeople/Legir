@@ -59,7 +59,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
         align="center"
         sideOffset={sideOffset ?? 8}
         className={cn(
-          "bg-background z-50 flex w-auto items-center gap-1 rounded-md border p-1 shadow-md",
+          "bg-background z-50 flex w-auto flex-row items-center gap-1 rounded-md border p-1 shadow-md",
           className,
         )}
         style={style}

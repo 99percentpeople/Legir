@@ -129,7 +129,7 @@ const PDFSearchPanel: React.FC<PDFSearchPanelProps> = ({
                           "bg-accent/40 ring-primary/30 ring-1 ring-inset",
                       )}
                     >
-                      <div className="text-foreground text-sm leading-6 break-words">
+                      <div className="text-foreground text-sm leading-6 wrap-break-word">
                         {result.displaySegments.map((segment, index) => (
                           <span
                             key={`${result.id}:${index}`}

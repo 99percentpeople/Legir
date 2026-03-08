@@ -393,14 +393,19 @@ export function PageTranslatePanel({
           )}
           <DialogFooter className="p-0">
             {isProcessing ? (
-              <Button type="button" variant="secondary" onClick={onCancel}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onCancel}
+                className="w-full"
+              >
                 {t("common.cancel")}
               </Button>
             ) : (
               <Button
                 type="button"
                 disabled={!canStart}
-                className="bg-purple-600 text-white hover:bg-purple-700"
+                className="w-full bg-purple-600 text-white hover:bg-purple-700"
                 onClick={() => {
                   if (!parsed.ok) return;
                   onStart({

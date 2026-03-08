@@ -27,6 +27,7 @@ import { FloatingWindow } from "@/components/ui/floating-window";
 import { cn } from "@/utils/cn";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { TranslateOptionId } from "@/types";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface TranslationFloatingWindowProps {
   isOpen: boolean;
@@ -345,9 +346,14 @@ export const TranslationFloatingWindow: React.FC<
       headerClassName="px-2 py-1.5"
       closeButtonClassName="h-7 w-7"
       header={({ width }) => (
-        <div className={cn("flex flex-1", width >= 720 && "justify-center")}>
+        <div
+          className={cn(
+            "flex min-w-0 flex-1",
+            width >= 720 && "justify-center",
+          )}
+        >
           <div
-            className="flex cursor-auto items-center gap-2 **:cursor-auto"
+            className="flex min-w-0 shrink cursor-auto items-center gap-2 **:cursor-auto"
             data-floating-window-no-drag
           >
             {width >= 720 && (
@@ -355,6 +361,7 @@ export const TranslationFloatingWindow: React.FC<
                 {t("translate.provider")}
               </div>
             )}
+
             <ModelSelect
               value={translateOption}
               onValueChange={(v) => {
@@ -410,7 +417,12 @@ export const TranslationFloatingWindow: React.FC<
 
                       <Button
                         disabled={!canTranslate && !isLoading}
-                        className="h-7 bg-purple-600 px-2 text-xs text-white hover:bg-purple-700"
+                        variant={isLoading ? "destructive" : undefined}
+                        className={cn(
+                          "h-7 px-2 text-xs",
+                          !isLoading &&
+                            "bg-purple-600 text-white hover:bg-purple-700",
+                        )}
                         onClick={
                           isLoading
                             ? handleCancel
@@ -419,7 +431,17 @@ export const TranslationFloatingWindow: React.FC<
                               }
                         }
                       >
-                        {isLoading ? t("common.cancel") : t("translate.action")}
+                        {isLoading ? (
+                          <>
+                            <Spinner />
+                            {t("common.cancel")}
+                          </>
+                        ) : (
+                          <>
+                            <Languages />
+                            {t("translate.action")}
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -517,7 +539,12 @@ export const TranslationFloatingWindow: React.FC<
 
                       <Button
                         disabled={!canTranslate && !isLoading}
-                        className="h-7 bg-purple-600 px-2 text-xs text-white hover:bg-purple-700"
+                        variant={isLoading ? "destructive" : undefined}
+                        className={cn(
+                          "h-7 px-2 text-xs",
+                          !isLoading &&
+                            "bg-purple-600 text-white hover:bg-purple-700",
+                        )}
                         onClick={
                           isLoading
                             ? handleCancel
@@ -526,7 +553,17 @@ export const TranslationFloatingWindow: React.FC<
                               }
                         }
                       >
-                        {isLoading ? t("common.cancel") : t("translate.action")}
+                        {isLoading ? (
+                          <>
+                            <Spinner />
+                            {t("common.cancel")}
+                          </>
+                        ) : (
+                          <>
+                            <Languages />
+                            {t("translate.action")}
+                          </>
+                        )}
                       </Button>
                     </>
                   ) : (

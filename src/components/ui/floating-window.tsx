@@ -472,7 +472,9 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           document.body.style.userSelect = "none";
         }}
       >
-        <div className="flex min-w-0 gap-2 text-sm font-semibold">{title}</div>
+        <div className="flex min-w-0 gap-2 text-sm font-semibold text-nowrap">
+          {title}
+        </div>
         {headerEl}
         <div>
           <Button

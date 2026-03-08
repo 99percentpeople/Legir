@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/utils/cn";
 
 export type ModelSelectOption = {
   value: string;
@@ -50,7 +51,7 @@ export function ModelSelect(props: {
     <Select value={value} onValueChange={(v) => onValueChange(v)}>
       <SelectTrigger
         disabled={disabled}
-        className={triggerClassName}
+        className={cn("max-w-full min-w-0", triggerClassName)}
         size={triggerSize}
         title={triggerTitle}
       >
