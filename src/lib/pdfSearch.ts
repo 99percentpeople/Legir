@@ -67,9 +67,14 @@ const getPageSearchText = (textContent: TextContent) =>
 type SearchTokenBoundary = {
   start: number;
   end: number;
-  sortTop: number;
-  sortLeft: number;
-  rect: { x: number; y: number; width: number; height: number };
+  textWidth: number;
+  fontHeight: number;
+  topLeftX: number;
+  topLeftY: number;
+  advanceX: number;
+  advanceY: number;
+  downX: number;
+  downY: number;
 };
 
 const transform = (m1: number[], m2: number[]) => {
@@ -137,44 +142,85 @@ const getSearchTokenBoundaries = (
       top = (tx[5] ?? 0) - fontAscent * Math.cos(angle);
     }
 
-    const absCos = Math.abs(Math.cos(angle));
-    const absSin = Math.abs(Math.sin(angle));
-    const rectWidth = Math.max(
-      1,
-      Math.abs(textWidth * absCos) + Math.abs(fontHeight * absSin),
-    );
-    const rectHeight = Math.max(
-      1,
-      Math.abs(textWidth * absSin) + Math.abs(fontHeight * absCos),
-    );
-    const sortLeft = Number.isFinite(left) ? left : 0;
-    const sortTop = Number.isFinite(top) ? top : 0;
+    const advanceX = Math.cos(angle);
+    const advanceY = Math.sin(angle);
+    const downX = -advanceY;
+    const downY = advanceX;
 
     boundaries.push({
       start,
       end: currentOffset,
-      sortTop,
-      sortLeft,
-      rect: {
-        x: sortLeft,
-        y: sortTop,
-        width: rectWidth,
-        height: rectHeight,
-      },
+      textWidth: Math.max(0, textWidth),
+      fontHeight: Math.max(1, fontHeight),
+      topLeftX: Number.isFinite(left) ? left : 0,
+      topLeftY: Number.isFinite(top) ? top : 0,
+      advanceX: Number.isFinite(advanceX) ? advanceX : 1,
+      advanceY: Number.isFinite(advanceY) ? advanceY : 0,
+      downX: Number.isFinite(downX) ? downX : 0,
+      downY: Number.isFinite(downY) ? downY : 1,
     });
   }
 
   return boundaries;
 };
 
+const getMatchRectForBoundary = (
+  boundary: SearchTokenBoundary,
+  startOffset: number,
+  endOffset: number,
+) => {
+  const overlapStart = Math.max(boundary.start, startOffset);
+  const overlapEnd = Math.min(boundary.end, endOffset);
+  if (overlapEnd <= overlapStart) return null;
+
+  const textLength = Math.max(1, boundary.end - boundary.start);
+  const startRatio = (overlapStart - boundary.start) / textLength;
+  const endRatio = (overlapEnd - boundary.start) / textLength;
+  const segmentStart = boundary.textWidth * startRatio;
+  const segmentWidth = Math.max(
+    boundary.textWidth * (endRatio - startRatio),
+    boundary.textWidth > 0 ? boundary.textWidth / textLength : 1,
+  );
+
+  const topLeftX = boundary.topLeftX + boundary.advanceX * segmentStart;
+  const topLeftY = boundary.topLeftY + boundary.advanceY * segmentStart;
+  const topRightX = topLeftX + boundary.advanceX * segmentWidth;
+  const topRightY = topLeftY + boundary.advanceY * segmentWidth;
+  const bottomLeftX = topLeftX + boundary.downX * boundary.fontHeight;
+  const bottomLeftY = topLeftY + boundary.downY * boundary.fontHeight;
+  const bottomRightX = topRightX + boundary.downX * boundary.fontHeight;
+  const bottomRightY = topRightY + boundary.downY * boundary.fontHeight;
+
+  const minX = Math.min(topLeftX, topRightX, bottomLeftX, bottomRightX);
+  const minY = Math.min(topLeftY, topRightY, bottomLeftY, bottomRightY);
+  const maxX = Math.max(topLeftX, topRightX, bottomLeftX, bottomRightX);
+  const maxY = Math.max(topLeftY, topRightY, bottomLeftY, bottomRightY);
+
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
+};
+
+const getMatchRects = (
+  boundaries: SearchTokenBoundary[],
+  startOffset: number,
+  endOffset: number,
+) =>
+  boundaries
+    .map((boundary) =>
+      getMatchRectForBoundary(boundary, startOffset, endOffset),
+    )
+    .filter((rect): rect is NonNullable<typeof rect> => !!rect);
+
 const getMatchSortPosition = (
   boundaries: SearchTokenBoundary[],
   startOffset: number,
   endOffset: number,
 ) => {
-  const overlapping = boundaries.filter(
-    (boundary) => boundary.end > startOffset && boundary.start < endOffset,
-  );
+  const overlapping = getMatchRects(boundaries, startOffset, endOffset);
 
   if (overlapping.length === 0) {
     return {
@@ -185,23 +231,23 @@ const getMatchSortPosition = (
 
   return overlapping.reduce(
     (best, boundary) => {
-      if (boundary.sortTop < best.sortTop - 0.5) {
+      if (boundary.y < best.sortTop - 0.5) {
         return {
-          sortTop: boundary.sortTop,
-          sortLeft: boundary.sortLeft,
+          sortTop: boundary.y,
+          sortLeft: boundary.x,
         };
       }
-      if (Math.abs(boundary.sortTop - best.sortTop) <= 0.5) {
+      if (Math.abs(boundary.y - best.sortTop) <= 0.5) {
         return {
           sortTop: best.sortTop,
-          sortLeft: Math.min(best.sortLeft, boundary.sortLeft),
+          sortLeft: Math.min(best.sortLeft, boundary.x),
         };
       }
       return best;
     },
     {
-      sortTop: overlapping[0]!.sortTop,
-      sortLeft: overlapping[0]!.sortLeft,
+      sortTop: overlapping[0]!.y,
+      sortLeft: overlapping[0]!.x,
     },
   );
 };
@@ -211,9 +257,7 @@ const getMatchRect = (
   startOffset: number,
   endOffset: number,
 ) => {
-  const overlapping = boundaries.filter(
-    (boundary) => boundary.end > startOffset && boundary.start < endOffset,
-  );
+  const overlapping = getMatchRects(boundaries, startOffset, endOffset);
 
   if (overlapping.length === 0) {
     return { x: 0, y: 0, width: 1, height: 1 };
@@ -225,10 +269,10 @@ const getMatchRect = (
   let maxY = -Infinity;
 
   for (const boundary of overlapping) {
-    minX = Math.min(minX, boundary.rect.x);
-    minY = Math.min(minY, boundary.rect.y);
-    maxX = Math.max(maxX, boundary.rect.x + boundary.rect.width);
-    maxY = Math.max(maxY, boundary.rect.y + boundary.rect.height);
+    minX = Math.min(minX, boundary.x);
+    minY = Math.min(minY, boundary.y);
+    maxX = Math.max(maxX, boundary.x + boundary.width);
+    maxY = Math.max(maxY, boundary.y + boundary.height);
   }
 
   return {
