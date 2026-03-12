@@ -66,12 +66,25 @@ const decodeHtmlEntities = (text: string) => {
   return el.value;
 };
 
+const createAbortError = () => {
+  const error = new Error("The operation was aborted.");
+  error.name = "AbortError";
+  return error;
+};
+
+const throwIfAborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
+};
+
 class CloudTranslateV2 {
   isAvailable() {
     return !!getCloudTranslationApiKey();
   }
 
   async translate(text: string, opts: TranslateTextOptions) {
+    throwIfAborted(opts.signal);
     const apiKey = getCloudTranslationApiKey();
     if (!apiKey) {
       throw new Error("No API Key provided for Cloud Translation API.");
@@ -119,6 +132,7 @@ class CloudTranslateV2 {
     }
 
     const decoded = decodeHtmlEntities(translated);
+    throwIfAborted(opts.signal);
     return decoded.trim();
   }
 
@@ -288,19 +302,23 @@ export class TranslateService {
   }
 
   async translate(text: string, opts: TranslateTextOptions): Promise<string> {
+    throwIfAborted(opts.signal);
     const option = this.resolveTranslateOption(opts);
     const entry = this.optionToGroup.get(option);
     if (!entry) {
       throw new Error(`Unknown translate option: ${option}`);
     }
 
-    return await entry.group.translate(text, entry.localOptionId, opts);
+    const result = await entry.group.translate(text, entry.localOptionId, opts);
+    throwIfAborted(opts.signal);
+    return result;
   }
 
   async *translateStream(
     text: string,
     opts: TranslateTextOptions,
   ): AsyncGenerator<string> {
+    throwIfAborted(opts.signal);
     const option = this.resolveTranslateOption(opts);
     const entry = this.optionToGroup.get(option);
     if (!entry) {
@@ -308,11 +326,40 @@ export class TranslateService {
     }
 
     if (entry.group.translateStream) {
-      yield* entry.group.translateStream(text, entry.localOptionId, opts);
+      const stream = entry.group.translateStream(
+        text,
+        entry.localOptionId,
+        opts,
+      );
+      let completed = false;
+      const abortListener = () => {
+        void stream.return?.(undefined);
+      };
+
+      opts.signal?.addEventListener("abort", abortListener, { once: true });
+
+      try {
+        for await (const chunk of stream) {
+          throwIfAborted(opts.signal);
+          if (!chunk) continue;
+          yield chunk;
+        }
+        completed = true;
+        throwIfAborted(opts.signal);
+      } finally {
+        opts.signal?.removeEventListener("abort", abortListener);
+        if (!completed) {
+          await stream.return?.(undefined);
+        }
+      }
       return;
     }
 
-    yield await entry.group.translate(text, entry.localOptionId, opts);
+    const result = await entry.group.translate(text, entry.localOptionId, opts);
+    throwIfAborted(opts.signal);
+    if (result) {
+      yield result;
+    }
   }
 }
 

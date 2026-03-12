@@ -37,6 +37,12 @@ const getClient = () => {
   });
 };
 
+const createAbortError = () => {
+  const error = new Error("The operation was aborted.");
+  error.name = "AbortError";
+  return error;
+};
+
 const normalizeOpenAiModelLabel = (id: string) => {
   return id;
 };
@@ -345,13 +351,16 @@ export const openaiProvider: LLMProvider = {
         userPromptParts.push("Text to translate:");
         userPromptParts.push(text);
 
-        const completion = await client.chat.completions.create({
-          model,
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: userPromptParts.join("\n") },
-          ],
-        });
+        const completion = await client.chat.completions.create(
+          {
+            model,
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: userPromptParts.join("\n") },
+            ],
+          },
+          opts.signal ? { signal: opts.signal } : undefined,
+        );
 
         const out = completion.choices?.[0]?.message?.content;
         return (out ?? "").trim();
@@ -377,16 +386,22 @@ export const openaiProvider: LLMProvider = {
         userPromptParts.push("Text to translate:");
         userPromptParts.push(text);
 
-        const stream = await client.chat.completions.create({
-          model,
-          stream: true,
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: userPromptParts.join("\n") },
-          ],
-        });
+        const stream = await client.chat.completions.create(
+          {
+            model,
+            stream: true,
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: userPromptParts.join("\n") },
+            ],
+          },
+          opts.signal ? { signal: opts.signal } : undefined,
+        );
 
         for await (const chunk of stream) {
+          if (opts.signal?.aborted) {
+            throw createAbortError();
+          }
           const delta = chunk?.choices?.[0]?.delta?.content;
           if (typeof delta === "string" && delta) {
             yield delta;

@@ -184,6 +184,7 @@ export const TranslationFloatingWindow: React.FC<
   const [activeTab, setActiveTab] = useState<"source" | "result">("source");
 
   const lastAutoTranslateTokenRef = useRef<number | undefined>(undefined);
+  const windowBodyRef = useRef<HTMLDivElement | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -194,14 +195,31 @@ export const TranslationFloatingWindow: React.FC<
 
   useEffect(() => {
     if (!isOpen) return;
-    setInput(sourceText);
+    if (sourceText.trim()) {
+      setInput(sourceText);
+    }
     setError(null);
     setActiveTab("source");
 
     // Keep target language in sync with persisted preference.
     // If user hasn't set one yet, default to effectiveLanguage.
     setTargetLang(translateTargetLanguage || effectiveLanguage);
-  }, [isOpen, sourceText]);
+  }, [effectiveLanguage, isOpen, sourceText, translateTargetLanguage]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      const textarea = windowBodyRef.current?.querySelector("textarea");
+      if (!(textarea instanceof HTMLTextAreaElement)) return;
+      textarea.focus();
+      textarea.select();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -384,7 +402,10 @@ export const TranslationFloatingWindow: React.FC<
 
         if (isHorizontal) {
           return (
-            <div className="flex h-full min-h-0 flex-col gap-2 p-2">
+            <div
+              ref={windowBodyRef}
+              className="flex h-full min-h-0 flex-col gap-2 p-2"
+            >
               <div className="grid min-h-0 min-w-0 flex-1 grid-cols-2 gap-2">
                 <div className="flex min-h-0 flex-col gap-1.5">
                   <div className="flex items-center justify-between gap-2">
@@ -417,18 +438,14 @@ export const TranslationFloatingWindow: React.FC<
 
                       <Button
                         disabled={!canTranslate && !isLoading}
-                        variant={isLoading ? "destructive" : undefined}
+                        variant={isLoading ? "secondary" : undefined}
                         className={cn(
                           "h-7 px-2 text-xs",
                           !isLoading &&
                             "bg-purple-600 text-white hover:bg-purple-700",
                         )}
-                        onClick={
-                          isLoading
-                            ? handleCancel
-                            : () => {
-                                void handleTranslate();
-                              }
+                        onClick={() =>
+                          isLoading ? handleCancel() : handleTranslate()
                         }
                       >
                         {isLoading ? (
@@ -489,7 +506,10 @@ export const TranslationFloatingWindow: React.FC<
 
         // Vertical: tabs switch between source and result
         return (
-          <div className="flex h-full min-h-0 flex-col gap-2 p-2">
+          <div
+            ref={windowBodyRef}
+            className="flex h-full min-h-0 flex-col gap-2 p-2"
+          >
             <Tabs
               value={activeTab}
               onValueChange={(v) => setActiveTab(v as "source" | "result")}
@@ -539,18 +559,14 @@ export const TranslationFloatingWindow: React.FC<
 
                       <Button
                         disabled={!canTranslate && !isLoading}
-                        variant={isLoading ? "destructive" : undefined}
+                        variant={isLoading ? "secondary" : undefined}
                         className={cn(
                           "h-7 px-2 text-xs",
                           !isLoading &&
                             "bg-purple-600 text-white hover:bg-purple-700",
                         )}
-                        onClick={
-                          isLoading
-                            ? handleCancel
-                            : () => {
-                                void handleTranslate();
-                              }
+                        onClick={() =>
+                          isLoading ? handleCancel() : handleTranslate()
                         }
                       >
                         {isLoading ? (
