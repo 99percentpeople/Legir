@@ -258,6 +258,9 @@ export class DropdownControlParser implements IControlParser {
         const isMultiSelect = !!(
           annotation.fieldFlags && annotation.fieldFlags & 2097152
         );
+        const allowCustomValue = !!(
+          annotation.fieldFlags && annotation.fieldFlags & 262144
+        );
 
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
@@ -274,6 +277,7 @@ export class DropdownControlParser implements IControlParser {
               : undefined,
           options: options,
           isMultiSelect: isMultiSelect,
+          allowCustomValue: allowCustomValue,
           alignment: alignment,
           toolTip: annotation.alternativeText || undefined,
         });

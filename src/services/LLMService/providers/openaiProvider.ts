@@ -4,11 +4,20 @@ import { DEFAULT_FIELD_STYLE } from "@/constants";
 import type { FieldStyle, FormField } from "@/types";
 import { FieldType } from "@/types";
 import { useEditorStore } from "@/store/useEditorStore";
+import {
+  buildAiChatTurnPrompt,
+  getAiChatSystemInstruction,
+} from "@/services/aiChat/prompts";
+import { JsonStringFieldStreamExtractor } from "@/services/LLMService/streamingJson";
 
 import type {
   LLMAnalyzePageForFieldsOptions,
+  LLMChatTurnResult,
+  LLMChatTurnStreamEvent,
   LLMModelOption,
   LLMProvider,
+  LLMRunChatTurnOptions,
+  LLMSummarizeTextOptions,
   LLMTranslateTextOptions,
 } from "../types";
 
@@ -18,6 +27,18 @@ const getOpenAiApiKey = () => {
 
 const getOpenAiApiUrl = () => {
   return (useEditorStore.getState().options?.llm?.openai?.apiUrl || "").trim();
+};
+
+const supportsConfiguredResponsesApi = () => {
+  const baseURL = getOpenAiApiUrl();
+  if (!baseURL) return true;
+
+  try {
+    const host = new URL(baseURL).host.toLowerCase();
+    return host === "api.openai.com";
+  } catch {
+    return false;
+  }
 };
 
 const isOpenAiAvailable = () => {
@@ -309,6 +330,37 @@ const resolveVisionModelId = async (requested: string | undefined) => {
   return fallback;
 };
 
+const summarizeWithOpenAi = async (
+  text: string,
+  opts: LLMSummarizeTextOptions,
+) => {
+  const client = getClient();
+  const model = await resolveTranslateModelId(opts.modelId);
+
+  const response = await client.chat.completions.create(
+    {
+      model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You summarize document excerpts faithfully. Return plain text only. Do not use markdown.",
+        },
+        {
+          role: "user",
+          content: [opts.prompt?.trim(), "", "Source text:", text]
+            .filter(Boolean)
+            .join("\n\n"),
+        },
+      ],
+    },
+    opts.signal ? { signal: opts.signal } : undefined,
+  );
+
+  const content = response.choices?.[0]?.message?.content;
+  return typeof content === "string" ? content.trim() : "";
+};
+
 const extractJsonObject = (text: string): unknown => {
   const trimmed = text.trim();
   try {
@@ -319,6 +371,129 @@ const extractJsonObject = (text: string): unknown => {
     if (!match) throw new Error("Failed to parse JSON response.");
     return JSON.parse(match[0]);
   }
+};
+
+const normalizeChatTurnResult = (value: unknown): LLMChatTurnResult => {
+  if (!value || typeof value !== "object") {
+    throw new Error("OpenAI chat agent returned an invalid JSON object.");
+  }
+
+  const assistantMessageRaw = (value as { message?: unknown }).message;
+  const finishReasonRaw = (value as { finish_reason?: unknown }).finish_reason;
+  const toolCallsRaw = (value as { tool_calls?: unknown }).tool_calls;
+
+  const assistantMessage =
+    typeof assistantMessageRaw === "string" ? assistantMessageRaw.trim() : "";
+  const finishReason = finishReasonRaw === "tool_calls" ? "tool_calls" : "stop";
+
+  const toolCalls = Array.isArray(toolCallsRaw)
+    ? toolCallsRaw
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const id = (item as { id?: unknown }).id;
+          const name = (item as { name?: unknown }).name;
+          const args = (item as { args?: unknown }).args;
+
+          if (typeof id !== "string" || typeof name !== "string") return null;
+          return {
+            id,
+            name,
+            args:
+              args && typeof args === "object" && !Array.isArray(args)
+                ? (args as Record<string, unknown>)
+                : {},
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  return {
+    reasoningText: "",
+    assistantMessage,
+    toolCalls,
+    finishReason: toolCalls.length > 0 ? "tool_calls" : finishReason,
+  };
+};
+
+const extractOpenAiCompatibleReasoningText = (value: unknown): string => {
+  if (!value || typeof value !== "object") return "";
+
+  const snakeCase = (value as { reasoning_content?: unknown })
+    .reasoning_content;
+  if (typeof snakeCase === "string") return snakeCase;
+
+  const camelCase = (value as { reasoningContent?: unknown }).reasoningContent;
+  if (typeof camelCase === "string") return camelCase;
+
+  return "";
+};
+
+const OPENAI_CHAT_TURN_TEXT_FORMAT = {
+  type: "json_schema" as const,
+  name: "ai_chat_turn",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["message", "tool_calls", "finish_reason"],
+    properties: {
+      message: { type: "string" },
+      tool_calls: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "name", "args"],
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            args: {
+              type: "object",
+              additionalProperties: true,
+            },
+          },
+        },
+      },
+      finish_reason: {
+        type: "string",
+        enum: ["stop", "tool_calls"],
+      },
+    },
+  },
+};
+
+const supportsOpenAiReasoningSummary = (model: string) => {
+  const normalized = model.trim().toLowerCase();
+  return (
+    normalized.startsWith("gpt-5") ||
+    normalized.startsWith("o1") ||
+    normalized.startsWith("o3") ||
+    normalized.startsWith("o4")
+  );
+};
+
+const buildOpenAiChatTurnResponsesRequest = (
+  model: string,
+  options: LLMRunChatTurnOptions,
+) => {
+  return {
+    model,
+    instructions: getAiChatSystemInstruction(),
+    input: buildAiChatTurnPrompt({
+      messages: options.messages,
+      tools: options.tools,
+    }),
+    text: {
+      format: OPENAI_CHAT_TURN_TEXT_FORMAT,
+    },
+    ...(supportsOpenAiReasoningSummary(model)
+      ? {
+          reasoning: {
+            summary: "auto" as const,
+          },
+        }
+      : {}),
+  };
 };
 
 export const openaiProvider: LLMProvider = {
@@ -405,6 +580,289 @@ export const openaiProvider: LLMProvider = {
           const delta = chunk?.choices?.[0]?.delta?.content;
           if (typeof delta === "string" && delta) {
             yield delta;
+          }
+        }
+      },
+    },
+    summarize: {
+      kind: "summarize",
+      getModels: () =>
+        mergeModels(cachedTranslateModels, getCustomTranslateModels()),
+      refreshModels,
+      summarizeText: summarizeWithOpenAi,
+    },
+    chatAgent: {
+      kind: "chatAgent",
+      getModels: () =>
+        mergeModels(cachedTranslateModels, getCustomTranslateModels()),
+      refreshModels,
+      runTurn: async (options: LLMRunChatTurnOptions) => {
+        const client = getClient();
+        const model = await resolveTranslateModelId(options.modelId);
+
+        const completion = await client.chat.completions.create(
+          {
+            model,
+            messages: [
+              {
+                role: "system",
+                content: getAiChatSystemInstruction(),
+              },
+              {
+                role: "user",
+                content: buildAiChatTurnPrompt({
+                  messages: options.messages,
+                  tools: options.tools,
+                }),
+              },
+            ],
+            response_format: { type: "json_object" },
+          },
+          options.signal ? { signal: options.signal } : undefined,
+        );
+
+        const content = completion.choices?.[0]?.message?.content;
+        if (!content) {
+          return {
+            reasoningText: "",
+            assistantMessage: "",
+            toolCalls: [],
+            finishReason: "stop",
+          };
+        }
+
+        const result = normalizeChatTurnResult(extractJsonObject(content));
+        const reasoningText = extractOpenAiCompatibleReasoningText(
+          completion.choices?.[0]?.message,
+        ).trim();
+
+        return !result.reasoningText && reasoningText
+          ? {
+              ...result,
+              reasoningText,
+            }
+          : result;
+      },
+      runTurnStream: async function* (
+        options: LLMRunChatTurnOptions,
+      ): AsyncGenerator<LLMChatTurnStreamEvent> {
+        const client = getClient();
+        const model = await resolveTranslateModelId(options.modelId);
+        const canUseResponsesApi = supportsConfiguredResponsesApi();
+
+        const request = {
+          model,
+          messages: [
+            {
+              role: "system" as const,
+              content: getAiChatSystemInstruction(),
+            },
+            {
+              role: "user" as const,
+              content: buildAiChatTurnPrompt({
+                messages: options.messages,
+                tools: options.tools,
+              }),
+            },
+          ],
+          response_format: { type: "json_object" as const },
+        };
+        const responsesRequest = buildOpenAiChatTurnResponsesRequest(
+          model,
+          options,
+        );
+        let responsesStreamedAny = false;
+
+        try {
+          if (!canUseResponsesApi) {
+            throw new Error(
+              "Responses API is not supported by the configured base URL.",
+            );
+          }
+
+          const stream = await client.responses.create(
+            {
+              ...responsesRequest,
+              stream: true,
+            },
+            options.signal ? { signal: options.signal } : undefined,
+          );
+
+          const extractor = new JsonStringFieldStreamExtractor("message");
+          let raw = "";
+          let streamedReasoning = "";
+
+          for await (const event of stream) {
+            if (options.signal?.aborted) {
+              throw createAbortError();
+            }
+
+            if (event.type === "response.reasoning_summary_text.delta") {
+              if (!event.delta) continue;
+              responsesStreamedAny = true;
+              streamedReasoning += event.delta;
+              yield {
+                type: "reasoning_delta",
+                delta: event.delta,
+              };
+              continue;
+            }
+
+            if (event.type !== "response.output_text.delta") {
+              continue;
+            }
+
+            const deltaRaw = event.delta;
+            if (typeof deltaRaw === "string" && deltaRaw) {
+              responsesStreamedAny = true;
+              raw += deltaRaw;
+              const delta = extractor.push(deltaRaw);
+              if (delta) yield { type: "assistant_delta", delta };
+            }
+          }
+
+          if (!raw.trim()) {
+            yield {
+              type: "result",
+              result: {
+                reasoningText: streamedReasoning.trim(),
+                assistantMessage: "",
+                toolCalls: [],
+                finishReason: "stop",
+              },
+            };
+            return;
+          }
+
+          const result = normalizeChatTurnResult(extractJsonObject(raw));
+          yield {
+            type: "result",
+            result:
+              !result.reasoningText && streamedReasoning.trim()
+                ? {
+                    ...result,
+                    reasoningText: streamedReasoning.trim(),
+                  }
+                : result,
+          };
+          return;
+        } catch {
+          if (options.signal?.aborted) {
+            throw createAbortError();
+          }
+          if (responsesStreamedAny) {
+            throw new Error(
+              "OpenAI responses stream ended unexpectedly after partial output.",
+            );
+          }
+
+          let legacyStreamedAny = false;
+          try {
+            const stream = await client.chat.completions.create(
+              {
+                ...request,
+                stream: true,
+              },
+              options.signal ? { signal: options.signal } : undefined,
+            );
+
+            const extractor = new JsonStringFieldStreamExtractor("message");
+            let raw = "";
+            let streamedReasoning = "";
+
+            for await (const chunk of stream) {
+              if (options.signal?.aborted) {
+                throw createAbortError();
+              }
+              const reasoningDelta = extractOpenAiCompatibleReasoningText(
+                chunk?.choices?.[0]?.delta,
+              );
+              if (reasoningDelta) {
+                legacyStreamedAny = true;
+                streamedReasoning += reasoningDelta;
+                yield {
+                  type: "reasoning_delta",
+                  delta: reasoningDelta,
+                };
+              }
+              const deltaRaw = chunk?.choices?.[0]?.delta?.content;
+              if (typeof deltaRaw === "string" && deltaRaw) {
+                legacyStreamedAny = true;
+                raw += deltaRaw;
+                const delta = extractor.push(deltaRaw);
+                if (delta) yield { type: "assistant_delta", delta };
+              }
+            }
+
+            if (!raw.trim()) {
+              yield {
+                type: "result",
+                result: {
+                  reasoningText: streamedReasoning.trim(),
+                  assistantMessage: "",
+                  toolCalls: [],
+                  finishReason: "stop",
+                },
+              };
+              return;
+            }
+
+            const result = normalizeChatTurnResult(extractJsonObject(raw));
+            yield {
+              type: "result",
+              result:
+                !result.reasoningText && streamedReasoning.trim()
+                  ? {
+                      ...result,
+                      reasoningText: streamedReasoning.trim(),
+                    }
+                  : result,
+            };
+            return;
+          } catch {
+            if (options.signal?.aborted) {
+              throw createAbortError();
+            }
+            if (legacyStreamedAny) {
+              throw new Error(
+                "OpenAI legacy chat stream ended unexpectedly after partial output.",
+              );
+            }
+
+            const completion = await client.chat.completions.create(
+              request,
+              options.signal ? { signal: options.signal } : undefined,
+            );
+
+            const content = completion.choices?.[0]?.message?.content;
+            if (!content) {
+              yield {
+                type: "result",
+                result: {
+                  reasoningText: "",
+                  assistantMessage: "",
+                  toolCalls: [],
+                  finishReason: "stop",
+                },
+              };
+              return;
+            }
+
+            const result = normalizeChatTurnResult(extractJsonObject(content));
+            const reasoningText = extractOpenAiCompatibleReasoningText(
+              completion.choices?.[0]?.message,
+            ).trim();
+            yield {
+              type: "result",
+              result:
+                !result.reasoningText && reasoningText
+                  ? {
+                      ...result,
+                      reasoningText,
+                    }
+                  : result,
+            };
+            return;
           }
         }
       },

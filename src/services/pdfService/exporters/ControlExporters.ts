@@ -234,6 +234,7 @@ export class DropdownControlExporter implements IControlExporter {
 
       dd.addToPage(page, { ...commonOpts, font: fieldFont });
       if (field.options) dd.setOptions(field.options);
+      if (field.allowCustomValue) dd.enableEditing();
 
       if (field.value) {
         try {

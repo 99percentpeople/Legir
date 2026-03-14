@@ -81,6 +81,13 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
         customVisionModels: [],
       },
     },
+    aiChat: {
+      digestMode: "excerpt",
+      digestCharsPerChunk: 360,
+      digestSourceCharsPerChunk: 3600,
+      digestSummaryProviderId: "",
+      digestSummaryModelId: "",
+    },
   },
 };
 

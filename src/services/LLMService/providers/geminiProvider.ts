@@ -10,8 +10,17 @@ import { DEFAULT_FIELD_STYLE } from "@/constants";
 import type { FieldStyle, FormField } from "@/types";
 import { FieldType } from "@/types";
 import { useEditorStore } from "@/store/useEditorStore";
+import {
+  buildAiChatTurnPrompt,
+  getAiChatSystemInstruction,
+} from "@/services/aiChat/prompts";
+import { JsonStringFieldStreamExtractor } from "@/services/LLMService/streamingJson";
 
 import type {
+  LLMChatTurnResult,
+  LLMChatTurnStreamEvent,
+  LLMRunChatTurnOptions,
+  LLMSummarizeTextOptions,
   LLMTranslateTextOptions,
   LLMModelOption,
   LLMProvider,
@@ -83,6 +92,59 @@ const extractGeminiText = (value: unknown): string => {
   return "";
 };
 
+const extractJsonObject = (text: string): unknown => {
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("Failed to parse Gemini JSON response.");
+    return JSON.parse(match[0]);
+  }
+};
+
+const normalizeChatTurnResult = (value: unknown): LLMChatTurnResult => {
+  if (!value || typeof value !== "object") {
+    throw new Error("Gemini chat agent returned an invalid JSON object.");
+  }
+
+  const assistantMessageRaw = (value as { message?: unknown }).message;
+  const finishReasonRaw = (value as { finish_reason?: unknown }).finish_reason;
+  const toolCallsRaw = (value as { tool_calls?: unknown }).tool_calls;
+
+  const assistantMessage =
+    typeof assistantMessageRaw === "string" ? assistantMessageRaw.trim() : "";
+  const finishReason = finishReasonRaw === "tool_calls" ? "tool_calls" : "stop";
+
+  const toolCalls = Array.isArray(toolCallsRaw)
+    ? toolCallsRaw
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const id = (item as { id?: unknown }).id;
+          const name = (item as { name?: unknown }).name;
+          const args = (item as { args?: unknown }).args;
+
+          if (typeof id !== "string" || typeof name !== "string") return null;
+          return {
+            id,
+            name,
+            args:
+              args && typeof args === "object" && !Array.isArray(args)
+                ? (args as Record<string, unknown>)
+                : {},
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  return {
+    reasoningText: "",
+    assistantMessage,
+    toolCalls,
+    finishReason: toolCalls.length > 0 ? "tool_calls" : finishReason,
+  };
+};
+
 const normalizeGeminiModelId = (raw: string) => {
   if (raw.startsWith("models/")) return raw.slice("models/".length);
   return raw;
@@ -138,6 +200,28 @@ const buildGeminiConfig = (opts?: { signal?: AbortSignal }) => {
   return {
     abortSignal: opts?.signal,
   };
+};
+
+const summarizeWithGemini = async (
+  text: string,
+  opts: LLMSummarizeTextOptions,
+) => {
+  const model = await resolveTranslateModelId(opts.modelId);
+  const response = await client.generateContent({
+    model,
+    contents: {
+      parts: [
+        {
+          text: [opts.prompt?.trim(), "", "Source text:", text]
+            .filter(Boolean)
+            .join("\n\n"),
+        },
+      ],
+    },
+    config: buildGeminiConfig({ signal: opts.signal }),
+  });
+
+  return extractGeminiText(response).trim();
 };
 
 export const getGeminiCachedModels = () => {
@@ -474,6 +558,185 @@ export const geminiProvider: LLMProvider = {
           for await (const chunk of stream) {
             const delta = extractGeminiText(chunk);
             if (delta) yield delta;
+          }
+        },
+      },
+      summarize: {
+        kind: "summarize",
+        getModels: () =>
+          mergeModels(cachedTranslateModels, getCustomTranslateModels()),
+        refreshModels,
+        summarizeText: summarizeWithGemini,
+      },
+      chatAgent: {
+        kind: "chatAgent",
+        getModels: () =>
+          mergeModels(cachedTranslateModels, getCustomTranslateModels()),
+        refreshModels,
+        runTurn: async (options: LLMRunChatTurnOptions) => {
+          const model = await resolveTranslateModelId(options.modelId);
+
+          const response = await client.generateContent({
+            model,
+            contents: {
+              parts: [
+                {
+                  text: [
+                    getAiChatSystemInstruction(),
+                    "",
+                    buildAiChatTurnPrompt({
+                      messages: options.messages,
+                      tools: options.tools,
+                    }),
+                  ].join("\n"),
+                },
+              ],
+            },
+            config: {
+              ...buildGeminiConfig({ signal: options.signal }),
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  message: { type: Type.STRING },
+                  tool_calls: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        id: { type: Type.STRING },
+                        name: { type: Type.STRING },
+                        args: { type: Type.OBJECT },
+                      },
+                      required: ["id", "name", "args"],
+                    },
+                  },
+                  finish_reason: {
+                    type: Type.STRING,
+                    enum: ["stop", "tool_calls"],
+                  },
+                },
+                required: ["message", "tool_calls", "finish_reason"],
+              },
+            },
+          });
+
+          const jsonText = response.text;
+          if (!jsonText) {
+            return {
+              reasoningText: "",
+              assistantMessage: "",
+              toolCalls: [],
+              finishReason: "stop",
+            };
+          }
+
+          return normalizeChatTurnResult(extractJsonObject(jsonText));
+        },
+        runTurnStream: async function* (
+          options: LLMRunChatTurnOptions,
+        ): AsyncGenerator<LLMChatTurnStreamEvent> {
+          const model = await resolveTranslateModelId(options.modelId);
+
+          const req: GenerateContentParameters = {
+            model,
+            contents: {
+              parts: [
+                {
+                  text: [
+                    getAiChatSystemInstruction(),
+                    "",
+                    buildAiChatTurnPrompt({
+                      messages: options.messages,
+                      tools: options.tools,
+                    }),
+                  ].join("\n"),
+                },
+              ],
+            },
+            config: {
+              ...buildGeminiConfig({ signal: options.signal }),
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  message: { type: Type.STRING },
+                  tool_calls: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        id: { type: Type.STRING },
+                        name: { type: Type.STRING },
+                        args: { type: Type.OBJECT },
+                      },
+                      required: ["id", "name", "args"],
+                    },
+                  },
+                  finish_reason: {
+                    type: Type.STRING,
+                    enum: ["stop", "tool_calls"],
+                  },
+                },
+                required: ["message", "tool_calls", "finish_reason"],
+              },
+            },
+          };
+
+          try {
+            const stream = await client.generateContentStream(req);
+            const extractor = new JsonStringFieldStreamExtractor("message");
+            let raw = "";
+
+            for await (const chunk of stream) {
+              const deltaRaw = extractGeminiText(chunk);
+              if (!deltaRaw) continue;
+              raw += deltaRaw;
+              const delta = extractor.push(deltaRaw);
+              if (delta) yield { type: "assistant_delta", delta };
+            }
+
+            if (!raw.trim()) {
+              yield {
+                type: "result",
+                result: {
+                  reasoningText: "",
+                  assistantMessage: "",
+                  toolCalls: [],
+                  finishReason: "stop",
+                },
+              };
+              return;
+            }
+
+            yield {
+              type: "result",
+              result: normalizeChatTurnResult(extractJsonObject(raw)),
+            };
+            return;
+          } catch (error) {
+            if (options.signal?.aborted) throw error;
+
+            const response = await client.generateContent(req);
+            const jsonText = response.text;
+            if (!jsonText) {
+              yield {
+                type: "result",
+                result: {
+                  reasoningText: "",
+                  assistantMessage: "",
+                  toolCalls: [],
+                  finishReason: "stop",
+                },
+              };
+              return;
+            }
+
+            yield {
+              type: "result",
+              result: normalizeChatTurnResult(extractJsonObject(jsonText)),
+            };
+            return;
           }
         },
       },

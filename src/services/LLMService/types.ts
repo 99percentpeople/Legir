@@ -1,8 +1,13 @@
 import type { FieldType, FormField } from "@/types";
+import type { ZodTypeAny } from "zod";
 
 export type LLMProviderId = string;
 
-export type LLMFunctionKind = "translate" | "formDetect";
+export type LLMFunctionKind =
+  | "translate"
+  | "formDetect"
+  | "chatAgent"
+  | "summarize";
 
 export type LLMModelOption = {
   id: string;
@@ -10,10 +15,55 @@ export type LLMModelOption = {
   labelKey?: string;
 };
 
+export interface LLMChatToolDefinition {
+  name: string;
+  description: string;
+  accessType: "read" | "write";
+  inputSchema: ZodTypeAny;
+}
+
+export interface LLMChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  toolCallId?: string;
+  toolName?: string;
+}
+
+export interface LLMChatToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface LLMChatTurnResult {
+  reasoningText: string;
+  assistantMessage: string;
+  toolCalls: LLMChatToolCall[];
+  finishReason: "stop" | "tool_calls";
+}
+
+export type LLMChatTurnStreamEvent =
+  | { type: "reasoning_delta"; delta: string }
+  | { type: "assistant_delta"; delta: string }
+  | { type: "result"; result: LLMChatTurnResult };
+
+export interface LLMRunChatTurnOptions {
+  modelId?: string;
+  messages: LLMChatMessage[];
+  tools: LLMChatToolDefinition[];
+  signal?: AbortSignal;
+}
+
 export interface LLMTranslateTextOptions {
   modelId?: string;
   targetLanguage: string;
   sourceLanguage?: string;
+  prompt?: string;
+  signal?: AbortSignal;
+}
+
+export interface LLMSummarizeTextOptions {
+  modelId?: string;
   prompt?: string;
   signal?: AbortSignal;
 }
@@ -55,9 +105,31 @@ export interface LLMFormDetectFunction {
   ) => Promise<FormField[]>;
 }
 
+export interface LLMChatAgentFunction {
+  kind: "chatAgent";
+  getModels: () => LLMModelOption[];
+  refreshModels?: () => Promise<void>;
+  runTurn: (options: LLMRunChatTurnOptions) => Promise<LLMChatTurnResult>;
+  runTurnStream?: (
+    options: LLMRunChatTurnOptions,
+  ) => AsyncGenerator<LLMChatTurnStreamEvent>;
+}
+
+export interface LLMSummarizeFunction {
+  kind: "summarize";
+  getModels: () => LLMModelOption[];
+  refreshModels?: () => Promise<void>;
+  summarizeText: (
+    text: string,
+    opts: LLMSummarizeTextOptions,
+  ) => Promise<string>;
+}
+
 export type LLMProviderFunctions = {
   translate?: LLMTranslateFunction;
   formDetect?: LLMFormDetectFunction;
+  chatAgent?: LLMChatAgentFunction;
+  summarize?: LLMSummarizeFunction;
 };
 
 export interface LLMProvider {

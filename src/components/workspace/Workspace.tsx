@@ -33,7 +33,10 @@ import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionP
 import PDFPage from "./layers/PDFPage";
 import { ControlRenderer, preloadControls, registerControls } from "./controls";
 import { useWorkspaceDerivedPages } from "./hooks/useWorkspaceDerivedPages";
-import { useWorkspaceTextSelection } from "./hooks/useWorkspaceTextSelection";
+import {
+  useWorkspaceTextSelection,
+  type TextSelectionToolbarState,
+} from "./hooks/useWorkspaceTextSelection";
 import { useWorkspaceViewport } from "./hooks/useWorkspaceViewport";
 import { useWorkspacePointerCoords } from "./hooks/useWorkspacePointerCoords";
 import { useWorkspaceEraser } from "./hooks/useWorkspaceEraser";
@@ -51,6 +54,8 @@ import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
+import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 
 // Workspace = the editor canvas.
 //
@@ -98,6 +103,8 @@ type Rect = {
   width: number;
   height: number;
 };
+
+type TextSelectionPayload = NonNullable<TextSelectionToolbarState["selection"]>;
 
 const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
@@ -227,6 +234,64 @@ const Workspace: React.FC<WorkspaceProps> = ({
     onSelectControl,
   });
 
+  const closeTextSelectionPopover = useCallback(() => {
+    window.getSelection?.()?.removeAllRanges?.();
+    setTextSelectionToolbar((prev) =>
+      prev.isVisible ? { ...prev, isVisible: false } : prev,
+    );
+  }, [setTextSelectionToolbar]);
+
+  const resolveSelectionAttachmentRect = useCallback(
+    async (selection: TextSelectionPayload) => {
+      const page = editorState.pages[selection.pageIndex];
+      if (!page) return null;
+
+      const textContent = await pdfWorkerService.getTextContent({
+        pageIndex: selection.pageIndex,
+      });
+      const geometry = getPdfSearchRangeGeometry(
+        textContent,
+        page,
+        selection.startOffset,
+        selection.endOffset,
+      );
+      return geometry?.rect ?? null;
+    },
+    [editorState.pages],
+  );
+
+  const handleAskAiFromSelection = useCallback(() => {
+    const text = textSelectionToolbar.text.trim();
+    const selection = textSelectionToolbar.selection;
+    if (!text || !selection) return;
+
+    closeTextSelectionPopover();
+
+    void (async () => {
+      const rect = await resolveSelectionAttachmentRect(selection).catch(
+        () => null,
+      );
+      if (!rect) return;
+      appEventBus.emit(
+        "workspace:askAi",
+        {
+          kind: "workspace_selection",
+          text: selection.exactText,
+          pageIndex: selection.pageIndex,
+          startOffset: selection.startOffset,
+          endOffset: selection.endOffset,
+          rect,
+        },
+        { sticky: true },
+      );
+    })();
+  }, [
+    closeTextSelectionPopover,
+    resolveSelectionAttachmentRect,
+    textSelectionToolbar.selection,
+    textSelectionToolbar.text,
+  ]);
+
   useAppEvent(
     "workspace:navigatePage",
     ({ pageIndex, behavior, skipScroll }) => {
@@ -297,32 +362,24 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   useAppEvent(
     "workspace:focusSearchResult",
-    ({ pageIndex, rect, behavior, skipScroll }) => {
-      if (skipScroll) return;
-      const container = containerRef.current;
-      if (!container) return;
-
-      const pageRect = getPageRectByPageIndex(pageIndex);
-      if (!pageRect) return;
-
-      const containerRect = container.getBoundingClientRect();
-      const rectCenterX = rect.x + rect.width / 2;
-      const rectCenterY = rect.y + rect.height / 2;
-      const targetLeft =
-        pageRect.left +
-        rectCenterX * editorState.scale -
-        containerRect.width / 2;
-      const targetTop =
-        pageRect.top +
-        rectCenterY * editorState.scale -
-        containerRect.height / 2;
-
-      container.scrollTo({
-        left: Math.max(0, targetLeft),
-        top: Math.max(0, targetTop),
+    ({ pageIndex, rect, behavior, skipScroll }) =>
+      scrollWorkspaceToPageRect({
+        pageIndex,
+        rect,
         behavior: behavior ?? "smooth",
-      });
-    },
+        skipScroll,
+      }),
+  );
+
+  useAppEvent(
+    "workspace:focusTextRange",
+    ({ pageIndex, rect, behavior, skipScroll }) =>
+      scrollWorkspaceToPageRect({
+        pageIndex,
+        rect,
+        behavior: behavior ?? "auto",
+        skipScroll,
+      }),
   );
 
   const [movingFieldId, setMovingFieldId] = useState<string | null>(null);
@@ -532,6 +589,46 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return pageLayoutRects.virtualRects[idx] ?? null;
     },
     [pageIndexToItemIndex, pageLayoutRects.virtualRects],
+  );
+
+  const scrollWorkspaceToPageRect = useCallback(
+    ({
+      pageIndex,
+      rect,
+      behavior,
+      skipScroll,
+    }: {
+      pageIndex: number;
+      rect: Rect;
+      behavior?: "auto" | "smooth";
+      skipScroll?: boolean;
+    }) => {
+      if (skipScroll) return;
+      const container = containerRef.current;
+      if (!container) return;
+
+      const pageRect = getPageRectByPageIndex(pageIndex);
+      if (!pageRect) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const rectCenterX = rect.x + rect.width / 2;
+      const rectCenterY = rect.y + rect.height / 2;
+      const targetLeft =
+        pageRect.left +
+        rectCenterX * editorState.scale -
+        containerRect.width / 2;
+      const targetTop =
+        pageRect.top +
+        rectCenterY * editorState.scale -
+        containerRect.height / 2;
+
+      container.scrollTo({
+        left: Math.max(0, targetLeft),
+        top: Math.max(0, targetTop),
+        behavior: behavior ?? "auto",
+      });
+    },
+    [editorState.scale, getPageRectByPageIndex],
   );
 
   const allowPageIndexChange = !editorState.pendingViewStateRestore;
@@ -2021,18 +2118,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
       <WorkspaceTextSelectionPopover
         toolbar={textSelectionToolbar}
         virtualRef={textSelectionVirtualRef}
-        onClose={() => {
-          window.getSelection?.()?.removeAllRanges?.();
-          setTextSelectionToolbar((prev) =>
-            prev.isVisible ? { ...prev, isVisible: false } : prev,
-          );
-        }}
+        onClose={closeTextSelectionPopover}
         onHighlight={() => {
           createTextHighlightFromSelection({ force: true });
-          window.getSelection?.()?.removeAllRanges?.();
-          setTextSelectionToolbar((prev) =>
-            prev.isVisible ? { ...prev, isVisible: false } : prev,
-          );
+          closeTextSelectionPopover();
         }}
         onTranslate={() => {
           const text = textSelectionToolbar.text.trim();
@@ -2041,11 +2130,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
             sourceText: text,
             autoTranslate: true,
           });
-          window.getSelection?.()?.removeAllRanges?.();
-          setTextSelectionToolbar((prev) =>
-            prev.isVisible ? { ...prev, isVisible: false } : prev,
-          );
+          closeTextSelectionPopover();
         }}
+        onAskAi={handleAskAiFromSelection}
         onSearchWeb={() => {
           const q = textSelectionToolbar.text.trim();
           if (q) {
@@ -2056,10 +2143,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
               window.open(url, "_blank", "noopener,noreferrer");
             }
           }
-          window.getSelection?.()?.removeAllRanges?.();
-          setTextSelectionToolbar((prev) =>
-            prev.isVisible ? { ...prev, isVisible: false } : prev,
-          );
+          closeTextSelectionPopover();
         }}
       />
 

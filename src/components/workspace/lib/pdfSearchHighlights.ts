@@ -27,6 +27,10 @@ type TextNodePosition = {
   offset: number;
 };
 
+type ScrollRestoreTarget = {
+  element: HTMLElement;
+};
+
 const LINE_TOLERANCE_PX = 2;
 const MIN_GAP_TOLERANCE_PX = 3;
 const GAP_TOLERANCE_HEIGHT_RATIO = 0.45;
@@ -76,8 +80,23 @@ const locateTextNodePosition = (
   };
 };
 
+const createTextRange = (
+  boundaries: TextNodeBoundary[],
+  startOffset: number,
+  endOffset: number,
+) => {
+  const start = locateTextNodePosition(boundaries, startOffset);
+  const end = locateTextNodePosition(boundaries, endOffset);
+  if (!start || !end) return null;
+
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset);
+  return range;
+};
+
 const toLocalHighlightRect = (
-  rect: DOMRect,
+  rect: Pick<DOMRect, "left" | "top" | "width" | "height">,
   rootRect: DOMRect,
 ): LocalHighlightRect => ({
   left: rect.left - rootRect.left,
@@ -140,6 +159,57 @@ const mergeLocalRects = (rects: LocalHighlightRect[]) => {
   return merged;
 };
 
+const getMergedRangeClientRects = (range: Range) =>
+  mergeLocalRects(
+    Array.from(range.getClientRects())
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect) => ({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      })),
+  );
+
+export const getPdfSearchRangeClientRects = (
+  root: HTMLElement,
+  startOffset: number,
+  endOffset: number,
+) => {
+  const boundaries = collectTextNodeBoundaries(root);
+  if (boundaries.length === 0) return [];
+
+  const range = createTextRange(boundaries, startOffset, endOffset);
+  if (!range) return [];
+
+  return getMergedRangeClientRects(range);
+};
+
+export const getPdfSearchTextSlice = (
+  root: HTMLElement,
+  startOffset: number,
+  endOffset: number,
+) => {
+  const boundaries = collectTextNodeBoundaries(root);
+  if (boundaries.length === 0) return "";
+
+  const parts: string[] = [];
+  for (const boundary of boundaries) {
+    const overlapStart = Math.max(boundary.start, startOffset);
+    const overlapEnd = Math.min(boundary.end, endOffset);
+    if (overlapEnd <= overlapStart) continue;
+
+    parts.push(
+      boundary.node.data.slice(
+        overlapStart - boundary.start,
+        overlapEnd - boundary.start,
+      ),
+    );
+  }
+
+  return parts.join("");
+};
+
 export const getPdfSearchHighlightRects = (
   root: HTMLElement,
   matches: PDFSearchResult[],
@@ -155,18 +225,15 @@ export const getPdfSearchHighlightRects = (
   const rects: SearchHighlightRect[] = [];
 
   for (const match of matches) {
-    const start = locateTextNodePosition(boundaries, match.startOffset);
-    const end = locateTextNodePosition(boundaries, match.endOffset);
-    if (!start || !end) continue;
+    const range = createTextRange(
+      boundaries,
+      match.startOffset,
+      match.endOffset,
+    );
+    if (!range) continue;
 
-    const range = document.createRange();
-    range.setStart(start.node, start.offset);
-    range.setEnd(end.node, end.offset);
-
-    const localRects = mergeLocalRects(
-      Array.from(range.getClientRects())
-        .filter((rect) => rect.width > 0 && rect.height > 0)
-        .map((rect) => toLocalHighlightRect(rect, rootRect)),
+    const localRects = getMergedRangeClientRects(range).map((rect) =>
+      toLocalHighlightRect(rect, rootRect),
     );
 
     for (let index = 0; index < localRects.length; index += 1) {
@@ -189,23 +256,40 @@ export const selectPdfSearchTextRange = (
   root: HTMLElement,
   startOffset: number,
   endOffset: number,
+  options?: {
+    restoreScrollTarget?: ScrollRestoreTarget;
+  },
 ) => {
   const boundaries = collectTextNodeBoundaries(root);
   if (boundaries.length === 0) return false;
 
-  const start = locateTextNodePosition(boundaries, startOffset);
-  const end = locateTextNodePosition(boundaries, endOffset);
-  if (!start || !end) return false;
-
   const selection = window.getSelection?.();
   if (!selection) return false;
 
-  const range = document.createRange();
-  range.setStart(start.node, start.offset);
-  range.setEnd(end.node, end.offset);
+  const range = createTextRange(boundaries, startOffset, endOffset);
+  if (!range) return false;
+
+  const restoreTarget = options?.restoreScrollTarget;
+  const prevScrollLeft = restoreTarget?.element.scrollLeft ?? 0;
+  const prevScrollTop = restoreTarget?.element.scrollTop ?? 0;
 
   selection.removeAllRanges();
   selection.addRange(range);
+
+  if (restoreTarget) {
+    const { element } = restoreTarget;
+    if (
+      element.scrollLeft !== prevScrollLeft ||
+      element.scrollTop !== prevScrollTop
+    ) {
+      element.scrollTo({
+        left: prevScrollLeft,
+        top: prevScrollTop,
+        behavior: "auto",
+      });
+    }
+  }
+
   return !selection.isCollapsed;
 };
 

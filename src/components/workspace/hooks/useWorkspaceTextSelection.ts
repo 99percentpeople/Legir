@@ -9,12 +9,111 @@ import type { Annotation, EditorState } from "@/types";
 import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
+import {
+  getPdfSearchSelectionOffsets,
+  getPdfSearchTextSlice,
+} from "../lib/pdfSearchHighlights";
 
 export type TextSelectionToolbarState = {
   isVisible: boolean;
   left: number;
   top: number;
   text: string;
+  selection: {
+    pageIndex: number;
+    startOffset: number;
+    endOffset: number;
+    exactText: string;
+    rect: { x: number; y: number; width: number; height: number };
+  } | null;
+};
+
+type PdfSpaceRect = { x: number; y: number; width: number; height: number };
+
+const dedupeAndMergePdfRects = (rects: PdfSpaceRect[]) => {
+  const sorted = [...rects].sort((a, b) =>
+    Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y,
+  );
+
+  const deduped: PdfSpaceRect[] = [];
+  const isNearSame = (a: PdfSpaceRect, b: PdfSpaceRect) =>
+    Math.abs(a.x - b.x) < 1 &&
+    Math.abs(a.y - b.y) < 1 &&
+    Math.abs(a.width - b.width) < 1 &&
+    Math.abs(a.height - b.height) < 1;
+
+  for (const rect of sorted) {
+    const exists = deduped.some((item) => isNearSame(item, rect));
+    if (!exists) deduped.push(rect);
+  }
+
+  const merged: PdfSpaceRect[] = [];
+  for (const rect of deduped) {
+    const last = merged[merged.length - 1];
+    if (
+      last &&
+      Math.abs(last.y - rect.y) < 2 &&
+      Math.abs(last.height - rect.height) < 2 &&
+      rect.x <= last.x + last.width + 2
+    ) {
+      const newX = Math.min(last.x, rect.x);
+      const newRight = Math.max(last.x + last.width, rect.x + rect.width);
+      last.x = newX;
+      last.width = newRight - newX;
+      last.y = Math.min(last.y, rect.y);
+      last.height = Math.max(last.height, rect.height);
+    } else {
+      merged.push({ ...rect });
+    }
+  }
+
+  return merged;
+};
+
+const getPdfSelectionRects = (
+  range: Range,
+  pageEl: HTMLElement,
+  scale: number,
+) => {
+  const pageRect = pageEl.getBoundingClientRect();
+  const uiRects = Array.from(range.getClientRects())
+    .filter((rect) => rect.width > 1 && rect.height > 1)
+    .map((rect) => ({
+      x: (rect.left - pageRect.left) / scale,
+      y: (rect.top - pageRect.top) / scale,
+      width: rect.width / scale,
+      height: rect.height / scale,
+    }))
+    .filter((rect) => rect.width > 0.5 && rect.height > 0.5);
+
+  if (uiRects.length === 0) return null;
+
+  const rects = dedupeAndMergePdfRects(uiRects);
+  if (rects.length === 0) return null;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const rect of rects) {
+    minX = Math.min(minX, rect.x);
+    minY = Math.min(minY, rect.y);
+    maxX = Math.max(maxX, rect.x + rect.width);
+    maxY = Math.max(maxY, rect.y + rect.height);
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+
+  return {
+    rects,
+    rect: {
+      x: minX,
+      y: minY,
+      width: Math.max(1, maxX - minX),
+      height: Math.max(1, maxY - minY),
+    },
+  };
 };
 
 export const useWorkspaceTextSelection = (opts: {
@@ -72,77 +171,12 @@ export const useWorkspaceTextSelection = (opts: {
       const pageIndex = Number.parseInt(pageIndexStr, 10);
       if (!Number.isFinite(pageIndex)) return;
 
-      const scale = state.scale;
-      const pageRect = pageEl.getBoundingClientRect();
-
-      const uiRects = rects
-        .map((r) => ({
-          x: (r.left - pageRect.left) / scale,
-          y: (r.top - pageRect.top) / scale,
-          width: r.width / scale,
-          height: r.height / scale,
-        }))
-        .filter((r) => r.width > 0.5 && r.height > 0.5);
-
-      if (uiRects.length === 0) {
-        sel.removeAllRanges();
-        return;
-      }
-
-      const sorted = [...uiRects].sort((a, b) =>
-        Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y,
+      const selectionGeometry = getPdfSelectionRects(
+        range,
+        pageEl,
+        state.scale,
       );
-
-      const deduped: { x: number; y: number; width: number; height: number }[] =
-        [];
-      const isNearSame = (
-        a: { x: number; y: number; width: number; height: number },
-        b: { x: number; y: number; width: number; height: number },
-      ) =>
-        Math.abs(a.x - b.x) < 1 &&
-        Math.abs(a.y - b.y) < 1 &&
-        Math.abs(a.width - b.width) < 1 &&
-        Math.abs(a.height - b.height) < 1;
-
-      for (const r of sorted) {
-        const exists = deduped.some((d) => isNearSame(d, r));
-        if (!exists) deduped.push(r);
-      }
-
-      const merged: { x: number; y: number; width: number; height: number }[] =
-        [];
-      for (const r of deduped) {
-        const last = merged[merged.length - 1];
-        if (
-          last &&
-          Math.abs(last.y - r.y) < 2 &&
-          Math.abs(last.height - r.height) < 2 &&
-          r.x <= last.x + last.width + 2
-        ) {
-          const newX = Math.min(last.x, r.x);
-          const newRight = Math.max(last.x + last.width, r.x + r.width);
-          last.x = newX;
-          last.width = newRight - newX;
-          last.y = Math.min(last.y, r.y);
-          last.height = Math.max(last.height, r.height);
-        } else {
-          merged.push({ ...r });
-        }
-      }
-
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-
-      for (const r of merged) {
-        minX = Math.min(minX, r.x);
-        minY = Math.min(minY, r.y);
-        maxX = Math.max(maxX, r.x + r.width);
-        maxY = Math.max(maxY, r.y + r.height);
-      }
-
-      if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+      if (!selectionGeometry) {
         sel.removeAllRanges();
         return;
       }
@@ -151,13 +185,8 @@ export const useWorkspaceTextSelection = (opts: {
         id: `highlight_${Date.now()}`,
         pageIndex,
         type: "highlight",
-        rect: {
-          x: minX,
-          y: minY,
-          width: Math.max(1, maxX - minX),
-          height: Math.max(1, maxY - minY),
-        },
-        rects: merged,
+        rect: selectionGeometry.rect,
+        rects: selectionGeometry.rects,
         color: state.highlightStyle?.color || ANNOTATION_STYLES.highlight.color,
         opacity:
           state.highlightStyle?.opacity ?? ANNOTATION_STYLES.highlight.opacity,
@@ -177,6 +206,7 @@ export const useWorkspaceTextSelection = (opts: {
       left: 0,
       top: 0,
       text: "",
+      selection: null,
     });
 
   const [textSelectingPages, setTextSelectingPages] = useState<
@@ -279,6 +309,42 @@ export const useWorkspaceTextSelection = (opts: {
       );
       return;
     }
+
+    const sharedTextLayer =
+      startTextLayer && endTextLayer && startTextLayer === endTextLayer
+        ? (startTextLayer as HTMLElement)
+        : null;
+    const pageElement = sharedTextLayer?.closest?.(
+      "[id^='page-']",
+    ) as HTMLElement | null;
+    const pageIndex = Number.parseInt(
+      pageElement?.id.replace(/^page-/, "") ?? "",
+      10,
+    );
+    const offsets = sharedTextLayer
+      ? getPdfSearchSelectionOffsets(sharedTextLayer, sel)
+      : null;
+    const selectionGeometry =
+      pageElement && Number.isFinite(pageIndex)
+        ? getPdfSelectionRects(range, pageElement, editorState.scale)
+        : null;
+    const selection =
+      Number.isFinite(pageIndex) &&
+      offsets &&
+      selectionGeometry &&
+      sharedTextLayer
+        ? {
+            pageIndex,
+            startOffset: offsets.startOffset,
+            endOffset: offsets.endOffset,
+            exactText: getPdfSearchTextSlice(
+              sharedTextLayer,
+              offsets.startOffset,
+              offsets.endOffset,
+            ),
+            rect: selectionGeometry.rect,
+          }
+        : null;
 
     const rawClientRects = Array.from(range.getClientRects()).filter(
       (r) => r.width >= 1 && r.height >= 2,
@@ -438,7 +504,13 @@ export const useWorkspaceTextSelection = (opts: {
       contextElement: document.body,
     };
 
-    setTextSelectionToolbar({ isVisible: true, left, top, text: selectedText });
+    setTextSelectionToolbar({
+      isVisible: true,
+      left,
+      top,
+      text: selectedText,
+      selection,
+    });
   }, [editorState.mode, editorState.tool]);
 
   useEffect(() => {

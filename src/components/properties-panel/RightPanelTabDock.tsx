@@ -4,6 +4,7 @@ import {
   FileText,
   Form,
   Languages,
+  MessageSquare,
   SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -16,6 +17,7 @@ export type RightPanelTabId =
   | "document"
   | "properties"
   | "form_detect"
+  | "ai_chat"
   | "translate"
   | "page_translate"
   | (string & {});
@@ -102,6 +104,11 @@ export function RightPanelTabDock({
 
   const defaultTabs: RightPanelDockTab[] = [
     { id: "document", title: t("properties.document.title"), Icon: FileText },
+    {
+      id: "ai_chat",
+      title: t("right_panel.tabs.ai_chat"),
+      Icon: MessageSquare,
+    },
     {
       id: "form_detect",
       title: t("right_panel.tabs.form_detect"),

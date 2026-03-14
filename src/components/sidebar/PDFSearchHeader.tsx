@@ -2,16 +2,13 @@ import React, { useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Search } from "lucide-react";
 import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";
-import { cn } from "@/utils/cn";
 
 interface PDFSearchHeaderProps {
   query: string;
   focusToken: number;
-  caseSensitive: boolean;
   canGoPrevious: boolean;
   canGoNext: boolean;
   onQueryChange: (value: string) => void;
-  onToggleCaseSensitive: () => void;
   onPrevious: () => void;
   onNext: () => void;
 }
@@ -19,11 +16,9 @@ interface PDFSearchHeaderProps {
 const PDFSearchHeader: React.FC<PDFSearchHeaderProps> = ({
   query,
   focusToken,
-  caseSensitive,
   canGoPrevious,
   canGoNext,
   onQueryChange,
-  onToggleCaseSensitive,
   onPrevious,
   onNext,
 }) => {
@@ -54,22 +49,6 @@ const PDFSearchHeader: React.FC<PDFSearchHeaderProps> = ({
           placeholder={t("sidebar.search_pdf_placeholder")}
           className="placeholder:text-muted-foreground h-full min-w-0 flex-1 border-0 bg-transparent px-2 text-xs outline-none"
         />
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onToggleCaseSensitive}
-          className={cn(
-            "size-7 shrink-0 rounded-sm px-2 font-mono text-[11px]",
-            caseSensitive && "bg-accent text-accent-foreground",
-          )}
-          title={t("sidebar.search_case_sensitive")}
-        >
-          Aa
-        </Button>
-
-        <div className="bg-border mx-1 h-4 w-px shrink-0" />
 
         <Button
           type="button"

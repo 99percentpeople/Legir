@@ -25,6 +25,12 @@ import { cn } from "@/utils/cn";
 import type { AppEventMap } from "@/lib/eventBus";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import {
+  ANNOTATION_LIST_TYPES,
+  filterAnnotationsForList,
+  sortAnnotationsForList,
+  type AnnotationListType,
+} from "@/lib/annotationList";
 
 // --- Annotation Card ---
 interface AnnotationCardProps {
@@ -182,57 +188,31 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
 }) => {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([
-    "comment",
-    "highlight",
-    "ink",
-    "freetext",
+  const [selectedTypes, setSelectedTypes] = useState<AnnotationListType[]>([
+    ...ANNOTATION_LIST_TYPES,
   ]);
-  // Include all annotation types that we want to display
+
+  const annotationTypeLabelKey: Record<AnnotationListType, string> = {
+    comment: "toolbar.comment",
+    highlight: "toolbar.highlight",
+    ink: "toolbar.ink",
+    freetext: "toolbar.freetext",
+  };
+
   const allAnnotations = useMemo(
-    () =>
-      annotations.filter((a) =>
-        ["comment", "highlight", "ink", "freetext"].includes(a.type),
-      ),
+    () => filterAnnotationsForList(annotations),
     [annotations],
   );
 
-  // Filter based on type and search term
   const filteredAnnotations = useMemo(() => {
-    return allAnnotations.filter((annot) => {
-      const effectiveType =
-        annot.type === "ink" && annot.intent === "InkHighlight"
-          ? "highlight"
-          : annot.type;
-
-      // Type filter
-      if (!selectedTypes.includes(effectiveType)) return false;
-
-      // Search filter
-      if (!searchTerm) return true;
-      const textContent = annot.text || "";
-      const authorContent = annot.author || "";
-      const searchLower = searchTerm.toLowerCase();
-
-      return (
-        textContent.toLowerCase().includes(searchLower) ||
-        authorContent.toLowerCase().includes(searchLower)
-      );
+    return filterAnnotationsForList(allAnnotations, {
+      query: searchTerm,
+      selectedTypes,
     });
   }, [allAnnotations, searchTerm, selectedTypes]);
 
   const sortedAnnotations = useMemo(() => {
-    return filteredAnnotations.slice().sort((a, b) => {
-      if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex;
-
-      const ay = a.rect?.y ?? 0;
-      const by = b.rect?.y ?? 0;
-      const ax = a.rect?.x ?? 0;
-      const bx = b.rect?.x ?? 0;
-
-      if (Math.abs(ay - by) > 10) return ay - by;
-      return ax - bx;
-    });
+    return sortAnnotationsForList(filteredAnnotations);
   }, [filteredAnnotations]);
 
   // Group by page
@@ -275,7 +255,11 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant={selectedTypes.length !== 3 ? "secondary" : "ghost"}
+              variant={
+                selectedTypes.length !== ANNOTATION_LIST_TYPES.length
+                  ? "secondary"
+                  : "ghost"
+              }
               size="icon"
               className="h-8 w-8"
               title={t("sidebar.filter")}
@@ -284,51 +268,23 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[200px]">
-            <DropdownMenuCheckboxItem
-              checked={selectedTypes.includes("comment")}
-              onCheckedChange={(checked) => {
-                if (checked) setSelectedTypes([...selectedTypes, "comment"]);
-                else
-                  setSelectedTypes(
-                    selectedTypes.filter((t) => t !== "comment"),
+            {ANNOTATION_LIST_TYPES.map((type) => (
+              <DropdownMenuCheckboxItem
+                key={type}
+                checked={selectedTypes.includes(type)}
+                onCheckedChange={(checked) => {
+                  setSelectedTypes((prev) =>
+                    checked
+                      ? prev.includes(type)
+                        ? prev
+                        : [...prev, type]
+                      : prev.filter((item) => item !== type),
                   );
-              }}
-            >
-              {t("toolbar.comment")}
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={selectedTypes.includes("highlight")}
-              onCheckedChange={(checked) => {
-                if (checked) setSelectedTypes([...selectedTypes, "highlight"]);
-                else
-                  setSelectedTypes(
-                    selectedTypes.filter((t) => t !== "highlight"),
-                  );
-              }}
-            >
-              {t("toolbar.highlight")}
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={selectedTypes.includes("ink")}
-              onCheckedChange={(checked) => {
-                if (checked) setSelectedTypes([...selectedTypes, "ink"]);
-                else setSelectedTypes(selectedTypes.filter((t) => t !== "ink"));
-              }}
-            >
-              {t("toolbar.ink")}
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={selectedTypes.includes("freetext")}
-              onCheckedChange={(checked) => {
-                if (checked) setSelectedTypes([...selectedTypes, "freetext"]);
-                else
-                  setSelectedTypes(
-                    selectedTypes.filter((t) => t !== "freetext"),
-                  );
-              }}
-            >
-              {t("toolbar.freetext")}
-            </DropdownMenuCheckboxItem>
+                }}
+              >
+                {t(annotationTypeLabelKey[type])}
+              </DropdownMenuCheckboxItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -347,7 +303,7 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
         <div className="space-y-6 p-2">
           {filteredAnnotations.length === 0 ? (
             <div className="text-muted-foreground py-6 text-center text-sm italic">
-              {searchTerm || selectedTypes.length < 3
+              {searchTerm || selectedTypes.length < ANNOTATION_LIST_TYPES.length
                 ? t("sidebar.no_results")
                 : t("sidebar.no_annotations")}
             </div>

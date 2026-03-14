@@ -74,6 +74,7 @@ const ja = {
     search_pdf: "PDF 検索 (Ctrl/Cmd+F)",
     search_web: "Web で「{text}」を検索",
     translate: "翻訳",
+    ask_ai: "「{text}」について AI に質問",
   },
   translate: {
     title: "翻訳",
@@ -310,9 +311,90 @@ const ja = {
   },
   right_panel: {
     tabs: {
+      ai_chat: "AI チャット",
       form_detect: "フォーム検出",
       page_translate: "ページ翻訳",
       properties: "設定編集",
+    },
+  },
+  ai_chat: {
+    title: "AI チャット",
+    history: "履歴",
+    sessions: "会話",
+    session_default: "新しいチャット",
+    session_active: "現在",
+    new_chat: "新しいチャット",
+    delete: "削除",
+    tool_details: "詳細",
+    tool_args: "引数",
+    tool_result: "生の結果",
+    thinking: "思考中",
+    thought_complete: "考えました",
+    thought_for: "{duration}考えました",
+    duration_seconds: "{count}秒",
+    duration_minutes_seconds: "{minutes}分{seconds}秒",
+    duration_hours_minutes: "{hours}時間{minutes}分",
+    model: "モデル",
+    clear: "クリア",
+    clear_confirm: {
+      title: "この会話をクリアしますか？",
+      desc: "現在の会話メッセージ、ツール履歴、検索結果が削除されます。",
+      confirm: "会話をクリア",
+    },
+    send: "送信",
+    stop: "停止",
+    messages: "メッセージ",
+    tools: "ツール実行",
+    error_title: "リクエストに失敗しました",
+    input_placeholder:
+      "AI に PDF の内容を読ませたり、検索、移動、ハイライトさせたりできます...",
+    input_hint: "Enter で送信、Shift+Enter で改行します。",
+    attachment_selected_text: "選択テキスト",
+    attachment_page_short: "{page}ページ",
+    attachment_location: "{page}ページ · {start}-{end}",
+    attachment_remove: "添付を削除",
+    selection_only_message:
+      "現在の PDF に添付した選択テキストについて説明してください。",
+    selection_prompt:
+      "現在の PDF の文脈も踏まえて、次の選択テキストを説明してください。\n\n選択テキスト:\n{text}",
+    empty_title: "現在の PDF について質問する",
+    empty_desc:
+      "アシスタントはページテキストの読取り、文書検索、結果への移動、一時ハイライトを行えます。",
+    empty_no_document:
+      "PDF が開かれていません。先に文書を開くと、アシスタントが内容を読んで検索できます。",
+    empty_no_model:
+      "利用可能な AI モデルが設定されていません。設定で OpenAI または Gemini の API キーを追加してください。",
+    disabled: {
+      no_document: "文書なし",
+      no_model: "モデルなし",
+    },
+    status: {
+      idle: "待機中",
+      running: "実行中",
+      cancelling: "停止中",
+      error: "エラー",
+    },
+    examples: {
+      current_page: "現在のページを要約して",
+      search_focus: "免責条項を検索してその場所へ移動して",
+      highlight: "署名の出現箇所をすべてハイライトして",
+    },
+    starters: {
+      reading: {
+        title: "読む・要約する",
+        current_page: "現在のページを要約して",
+        whole_document: "文書全体の要約を作って",
+      },
+      search: {
+        title: "検索・移動",
+        keyword: "保証に関する記述をすべて検索して",
+        jump: "免責条項を検索してその場所へ移動して",
+      },
+      actions: {
+        title: "操作",
+        highlight: "署名の出現箇所をすべてハイライトして",
+        annotations: "この PDF の注釈とハイライトを一覧表示して",
+      },
     },
   },
   workspace: {
@@ -395,6 +477,9 @@ const ja = {
     search_previous: "前の結果",
     search_next: "次の結果",
     search_case_sensitive: "大文字と小文字を区別",
+    search_regex: "正規表現モード",
+    search_invalid_regex: "正規表現が無効です",
+    search_failed: "検索に失敗しました",
     exit_search: "検索を終了",
   },
   settings: {

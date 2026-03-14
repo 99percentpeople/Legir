@@ -531,6 +531,14 @@ export const useEditorStore = create<EditorState & EditorActions>()(
                     },
                   }
                 : {}),
+              ...(patch.aiChat
+                ? {
+                    aiChat: {
+                      ...state.options.aiChat,
+                      ...patch.aiChat,
+                    },
+                  }
+                : {}),
             },
           };
         }),
@@ -1118,6 +1126,41 @@ export const useEditorStore = create<EditorState & EditorActions>()(
       version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => pickEditorUiState(state),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<EditorState>;
+        return {
+          ...currentState,
+          ...persisted,
+          options: {
+            ...currentState.options,
+            ...persisted.options,
+            snappingOptions: {
+              ...currentState.options.snappingOptions,
+              ...persisted.options?.snappingOptions,
+            },
+            debugOptions: {
+              ...currentState.options.debugOptions,
+              ...persisted.options?.debugOptions,
+            },
+            llm: {
+              ...currentState.options.llm,
+              ...persisted.options?.llm,
+              gemini: {
+                ...currentState.options.llm.gemini,
+                ...persisted.options?.llm?.gemini,
+              },
+              openai: {
+                ...currentState.options.llm.openai,
+                ...persisted.options?.llm?.openai,
+              },
+            },
+            aiChat: {
+              ...currentState.options.aiChat,
+              ...persisted.options?.aiChat,
+            },
+          },
+        };
+      },
     },
   ),
 );

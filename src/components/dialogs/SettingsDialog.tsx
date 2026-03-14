@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Loader2,
   BrainCircuit,
+  MessageSquare,
 } from "lucide-react";
 import {
   Dialog,
@@ -21,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "../ui/dialog";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
@@ -46,8 +46,13 @@ import { useTheme } from "../theme-provider";
 import { Separator } from "../ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useEditorStore } from "@/store/useEditorStore";
-import { checkLlmProviderConfig, loadModels } from "@/services/LLMService";
+import {
+  checkLlmProviderConfig,
+  getChatModelGroups,
+  loadModels,
+} from "@/services/LLMService";
 import { type Tag, TagInput } from "emblor";
+import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -170,6 +175,16 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     updateLlmProviderOptions("openai", { apiUrl: value });
   };
 
+  const updateAiChatOptions = (patch: Partial<AppOptions["aiChat"]>) => {
+    onChange({
+      ...options,
+      aiChat: {
+        ...options.aiChat,
+        ...patch,
+      },
+    });
+  };
+
   const mergeModelIdLists = (a: string[], b: string[]) => {
     const out: string[] = [];
     const seen = new Set<string>();
@@ -182,6 +197,18 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     }
     return out;
   };
+
+  const aiToolModelGroups = useMemo<ModelSelectGroup[]>(() => {
+    return getChatModelGroups().map((group) => ({
+      id: group.providerId,
+      label: group.label,
+      options: group.models.map((model) => ({
+        value: `${group.providerId}:${model.id}`,
+        label: model.label,
+        disabled: !group.isAvailable,
+      })),
+    }));
+  }, [llmModelCache, options.llm]);
 
   const checkLlmProvider = async (provider: LlmProviderId) => {
     const apiKey = (options.llm[provider].apiKey || "").trim();
@@ -348,6 +375,13 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
             >
               <BrainCircuit className="h-4 w-4" />
               {t("settings.tabs.llm")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="ai_chat"
+              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <MessageSquare className="h-4 w-4" />
+              {t("settings.tabs.ai_chat")}
             </TabsTrigger>
             <TabsTrigger
               value="debug"
@@ -903,6 +937,140 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     </div>
                   </TabsContent>
                 </Tabs>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="ai_chat">
+              <div className="space-y-6">
+                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="text-primary h-4 w-4" />
+                    <Label className="mb-0 font-semibold">
+                      {t("settings.ai_chat.title")}
+                    </Label>
+                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    {t("settings.ai_chat.description")}
+                  </p>
+                </div>
+
+                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <Label className="mb-0 font-semibold">
+                        {t("settings.ai_chat.digest_mode")}
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings.ai_chat.digest_mode_desc")}
+                      </p>
+                    </div>
+                    <Select
+                      value={options.aiChat.digestMode}
+                      onValueChange={(value) =>
+                        updateAiChatOptions({
+                          digestMode:
+                            value === "ai_summary" ? "ai_summary" : "excerpt",
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-full sm:w-[220px]">
+                        <SelectValue placeholder={t("common.select")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="excerpt">
+                          {t("settings.ai_chat.digest_mode_excerpt")}
+                        </SelectItem>
+                        <SelectItem value="ai_summary">
+                          {t("settings.ai_chat.digest_mode_ai_summary")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold">
+                      {t("settings.ai_chat.summary_model")}
+                    </Label>
+                    <ModelSelect
+                      value={
+                        options.aiChat.digestSummaryProviderId &&
+                        options.aiChat.digestSummaryModelId
+                          ? `${options.aiChat.digestSummaryProviderId}:${options.aiChat.digestSummaryModelId}`
+                          : undefined
+                      }
+                      onValueChange={(value) => {
+                        const separatorIndex = value.indexOf(":");
+                        if (separatorIndex < 0) return;
+                        updateAiChatOptions({
+                          digestSummaryProviderId: value.slice(
+                            0,
+                            separatorIndex,
+                          ),
+                          digestSummaryModelId: value.slice(separatorIndex + 1),
+                        });
+                      }}
+                      placeholder={
+                        aiToolModelGroups.length > 0
+                          ? t("settings.ai_chat.summary_model_placeholder")
+                          : t("settings.ai_chat.no_models")
+                      }
+                      groups={aiToolModelGroups}
+                      disabled={aiToolModelGroups.length === 0}
+                      showSeparators
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      {t("settings.ai_chat.summary_model_desc")}
+                    </p>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="ai-chat-digest-chars">
+                        {t("settings.ai_chat.digest_chars_per_chunk")}
+                      </Label>
+                      <Input
+                        id="ai-chat-digest-chars"
+                        type="number"
+                        min={180}
+                        max={1200}
+                        value={String(options.aiChat.digestCharsPerChunk)}
+                        onChange={(event) => {
+                          const next = Number.parseInt(event.target.value, 10);
+                          if (!Number.isFinite(next)) return;
+                          updateAiChatOptions({ digestCharsPerChunk: next });
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="ai-chat-digest-source-chars">
+                        {t("settings.ai_chat.digest_source_chars_per_chunk")}
+                      </Label>
+                      <Input
+                        id="ai-chat-digest-source-chars"
+                        type="number"
+                        min={360}
+                        max={8000}
+                        value={String(options.aiChat.digestSourceCharsPerChunk)}
+                        onChange={(event) => {
+                          const next = Number.parseInt(event.target.value, 10);
+                          if (!Number.isFinite(next)) return;
+                          updateAiChatOptions({
+                            digestSourceCharsPerChunk: next,
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-muted-foreground text-xs">
+                    {t("settings.ai_chat.digest_sampling_desc")}
+                  </p>
+                </div>
               </div>
             </TabsContent>
 

@@ -74,6 +74,7 @@ const fr = {
     search_pdf: "Recherche PDF (Ctrl/Cmd+F)",
     search_web: "Rechercher “{text}” sur le Web",
     translate: "Traduire",
+    ask_ai: "Demander à l’IA à propos de « {text} »",
   },
   translate: {
     title: "Traduire",
@@ -313,9 +314,91 @@ const fr = {
   },
   right_panel: {
     tabs: {
+      ai_chat: "Chat IA",
       form_detect: "Détection de formulaires",
       page_translate: "Traduire la page",
       properties: "Édition des propriétés",
+    },
+  },
+  ai_chat: {
+    title: "Chat IA",
+    history: "Historique",
+    sessions: "Conversations",
+    session_default: "Nouveau chat",
+    session_active: "Actif",
+    new_chat: "Nouveau chat",
+    delete: "Supprimer",
+    tool_details: "Détails",
+    tool_args: "Arguments",
+    tool_result: "Résultat brut",
+    thinking: "Réflexion",
+    thought_complete: "A réfléchi",
+    thought_for: "Réflexion pendant {duration}",
+    duration_seconds: "{count}s",
+    duration_minutes_seconds: "{minutes}min {seconds}s",
+    duration_hours_minutes: "{hours}h {minutes}min",
+    model: "Modèle",
+    clear: "Effacer",
+    clear_confirm: {
+      title: "Effacer cette conversation ?",
+      desc: "Cela supprimera les messages actuels, l'historique des outils et les résultats de recherche.",
+      confirm: "Effacer la conversation",
+    },
+    send: "Envoyer",
+    stop: "Arrêter",
+    messages: "Messages",
+    tools: "Outils",
+    error_title: "Échec de la requête",
+    input_placeholder:
+      "Demandez à l'IA de lire, rechercher, naviguer ou surligner le contenu du PDF...",
+    input_hint:
+      "Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne.",
+    attachment_selected_text: "Texte sélectionné",
+    attachment_page_short: "P{page}",
+    attachment_location: "P{page} · {start}-{end}",
+    attachment_remove: "Retirer la pièce jointe",
+    selection_only_message:
+      "Veuillez expliquer le texte sélectionné joint depuis le PDF actuel.",
+    selection_prompt:
+      "Explique le texte sélectionné ci-dessous en tenant compte du contexte du PDF si utile.\n\nTexte sélectionné :\n{text}",
+    empty_title: "Posez une question sur le PDF actuel",
+    empty_desc:
+      "L'assistant peut lire le texte des pages, rechercher dans le document, naviguer vers des résultats et ajouter des surlignages temporaires.",
+    empty_no_document:
+      "Aucun PDF ouvert. Ouvrez d'abord un document pour que l'assistant puisse le lire et le rechercher.",
+    empty_no_model:
+      "Aucun modèle IA disponible n'est configuré. Ajoutez une clé API OpenAI ou Gemini dans les paramètres.",
+    disabled: {
+      no_document: "Aucun document",
+      no_model: "Aucun modèle",
+    },
+    status: {
+      idle: "Inactif",
+      running: "En cours",
+      cancelling: "Arrêt en cours",
+      error: "Erreur",
+    },
+    examples: {
+      current_page: "Résume la page actuelle",
+      search_focus: "Recherche la clause de responsabilité et va à cet endroit",
+      highlight: "Surligne toutes les occurrences de signature",
+    },
+    starters: {
+      reading: {
+        title: "Lire & Résumer",
+        current_page: "Résume la page actuelle",
+        whole_document: "Résume l'ensemble du document",
+      },
+      search: {
+        title: "Rechercher & Aller",
+        keyword: "Recherche tout ce qui concerne la garantie",
+        jump: "Recherche la clause de responsabilité et va à cet endroit",
+      },
+      actions: {
+        title: "Actions",
+        highlight: "Surligne toutes les occurrences de signature",
+        annotations: "Liste tous les commentaires et surlignages de ce PDF",
+      },
     },
   },
   workspace: {
@@ -398,6 +481,9 @@ const fr = {
     search_previous: "Résultat précédent",
     search_next: "Résultat suivant",
     search_case_sensitive: "Respecter la casse",
+    search_regex: "Mode regex",
+    search_invalid_regex: "Expression régulière invalide",
+    search_failed: "La recherche a échoué",
     exit_search: "Quitter la recherche",
   },
   settings: {

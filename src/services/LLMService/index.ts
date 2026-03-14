@@ -1,7 +1,11 @@
 import { llmService } from "./llmService";
 import type {
   LLMAnalyzePageForFieldsOptions,
+  LLMChatTurnResult,
+  LLMChatTurnStreamEvent,
+  LLMRunChatTurnOptions,
   LLMModelOption,
+  LLMSummarizeTextOptions,
   LLMTranslateTextOptions,
   LLMProvider,
 } from "./types";
@@ -35,14 +39,18 @@ const resolveDefaultProviderId = () => {
 llmService.setDefaultProviderId(resolveDefaultProviderId());
 
 const getAnyAvailableProviderWithFunction = (
-  kind: "translate" | "formDetect",
+  kind: "translate" | "formDetect" | "chatAgent" | "summarize",
 ): LLMProvider | null => {
   for (const p of llmService.getProviders()) {
     if (!p.isAvailable()) continue;
     const fn =
       kind === "translate"
         ? p.getFunctions().translate
-        : p.getFunctions().formDetect;
+        : kind === "formDetect"
+          ? p.getFunctions().formDetect
+          : kind === "chatAgent"
+            ? p.getFunctions().chatAgent
+            : p.getFunctions().summarize;
     if (fn) return p;
   }
   return null;
@@ -294,6 +302,60 @@ const getFormDetectFunction = (providerId?: string) => {
   return fn;
 };
 
+const getChatAgentFunction = (providerId?: string) => {
+  if (providerId) {
+    const provider = llmService.getProvider(providerId);
+    const fn = provider?.getFunctions().chatAgent;
+    if (!provider || !fn) {
+      throw new Error(
+        `LLM provider does not support chat agent: ${providerId}`,
+      );
+    }
+    return fn;
+  }
+
+  const provider = llmService.getDefaultProvider();
+  const fn = provider.isAvailable()
+    ? provider.getFunctions().chatAgent
+    : undefined;
+  if (!fn) {
+    const fallback = getAnyAvailableProviderWithFunction("chatAgent");
+    const fallbackFn = fallback?.getFunctions().chatAgent;
+    if (!fallbackFn) {
+      throw new Error("No available LLM provider supports AI chat.");
+    }
+    return fallbackFn;
+  }
+  return fn;
+};
+
+const getSummarizeFunction = (providerId?: string) => {
+  if (providerId) {
+    const provider = llmService.getProvider(providerId);
+    const fn = provider?.getFunctions().summarize;
+    if (!provider || !fn) {
+      throw new Error(
+        `LLM provider does not support summarization: ${providerId}`,
+      );
+    }
+    return fn;
+  }
+
+  const provider = llmService.getDefaultProvider();
+  const fn = provider.isAvailable()
+    ? provider.getFunctions().summarize
+    : undefined;
+  if (!fn) {
+    const fallback = getAnyAvailableProviderWithFunction("summarize");
+    const fallbackFn = fallback?.getFunctions().summarize;
+    if (!fallbackFn) {
+      throw new Error("No available LLM provider supports summarization.");
+    }
+    return fallbackFn;
+  }
+  return fn;
+};
+
 export const isFormDetectAvailable = () => {
   try {
     return llmService
@@ -332,6 +394,42 @@ export const getFormDetectModelGroups = (): FormDetectModelGroup[] => {
       labelKey: p.labelKey,
       isAvailable: p.isAvailable(),
       unavailableMessageKey: p.unavailableMessageKey,
+      models: fn.getModels(),
+    });
+  }
+  return groups;
+};
+
+export type ChatModelGroup = {
+  providerId: string;
+  label: string;
+  labelKey?: string;
+  isAvailable: boolean;
+  unavailableMessageKey?: string;
+  models: LLMModelOption[];
+};
+
+export const isChatAgentAvailable = () => {
+  try {
+    return llmService
+      .getProviders()
+      .some((p) => Boolean(p.getFunctions().chatAgent) && p.isAvailable());
+  } catch {
+    return false;
+  }
+};
+
+export const getChatModelGroups = (): ChatModelGroup[] => {
+  const groups: ChatModelGroup[] = [];
+  for (const provider of llmService.getProviders()) {
+    const fn = provider.getFunctions().chatAgent;
+    if (!fn) continue;
+    groups.push({
+      providerId: provider.id,
+      label: provider.label,
+      labelKey: provider.labelKey,
+      isAvailable: provider.isAvailable(),
+      unavailableMessageKey: provider.unavailableMessageKey,
       models: fn.getModels(),
     });
   }
@@ -377,4 +475,39 @@ export const analyzePageForFields = async (
     existingFields,
     options,
   );
+};
+
+export type RunChatAgentTurnOptions = LLMRunChatTurnOptions & {
+  providerId?: string;
+};
+
+export const runChatAgentTurn = async (
+  options: RunChatAgentTurnOptions,
+): Promise<LLMChatTurnResult> => {
+  const { providerId, ...rest } = options;
+  return await getChatAgentFunction(providerId).runTurn(rest);
+};
+
+export async function* runChatAgentTurnStream(
+  options: RunChatAgentTurnOptions,
+): AsyncGenerator<LLMChatTurnStreamEvent> {
+  const { providerId, ...rest } = options;
+  const fn = getChatAgentFunction(providerId);
+  if (fn.runTurnStream) {
+    yield* fn.runTurnStream(rest);
+    return;
+  }
+  yield { type: "result", result: await fn.runTurn(rest) };
+}
+
+export type SummarizeTextOptions = LLMSummarizeTextOptions & {
+  providerId?: string;
+};
+
+export const summarizeText = async (
+  text: string,
+  options: SummarizeTextOptions,
+) => {
+  const { providerId, ...rest } = options;
+  return await getSummarizeFunction(providerId).summarizeText(text, rest);
 };

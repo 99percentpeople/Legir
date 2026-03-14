@@ -70,11 +70,15 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       isActive: boolean;
     }>
   >([]);
-  const pendingSearchSelectionRef = useRef<{
+  const pendingTextRangeFocusRef = useRef<{
     pageIndex: number;
     startOffset: number;
     endOffset: number;
+    rect: { x: number; y: number; width: number; height: number };
+    behavior?: "auto" | "smooth";
+    skipScroll?: boolean;
   } | null>(null);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
   const endOfContentRef = useRef<HTMLDivElement | null>(null);
   const prevRangeRef = useRef<Range | null>(null);
 
@@ -125,8 +129,8 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     [],
   );
 
-  const applyPendingSearchSelection = useCallback(() => {
-    const pending = pendingSearchSelectionRef.current;
+  const applyPendingTextRangeFocus = useCallback(() => {
+    const pending = pendingTextRangeFocusRef.current;
     const root = textLayerRef.current;
     if (!pending || pending.pageIndex !== pageIndex || !root) return false;
     if (!isInView || renderedScale === null) return false;
@@ -135,11 +139,14 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       root,
       pending.startOffset,
       pending.endOffset,
+      scrollContainerRef.current
+        ? { restoreScrollTarget: { element: scrollContainerRef.current } }
+        : undefined,
     );
     if (!didSelect) return false;
 
-    pendingSearchSelectionRef.current = null;
-    appEventBus.clearSticky("workspace:selectSearchText");
+    pendingTextRangeFocusRef.current = null;
+    appEventBus.clearSticky("workspace:focusTextRange");
     return true;
   }, [isInView, pageIndex, renderedScale]);
 
@@ -264,7 +271,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     setIsSelecting(false);
     setIsRendering(false);
     setSearchHighlightRects([]);
-    pendingSearchSelectionRef.current = null;
+    pendingTextRangeFocusRef.current = null;
     endOfContentRef.current = null;
     prevRangeRef.current = null;
 
@@ -460,18 +467,26 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   }, [isSelecting, isSelectMode]);
 
   useAppEvent(
-    "workspace:selectSearchText",
+    "workspace:scrollContainerReady",
+    ({ element }) => {
+      scrollContainerRef.current = element;
+    },
+    { replayLast: true },
+  );
+
+  useAppEvent(
+    "workspace:focusTextRange",
     (payload) => {
       if (payload.pageIndex !== pageIndex) return;
-      pendingSearchSelectionRef.current = payload;
-      applyPendingSearchSelection();
+      pendingTextRangeFocusRef.current = payload;
+      applyPendingTextRangeFocus();
     },
     { replayLast: true },
   );
 
   useEffect(() => {
-    applyPendingSearchSelection();
-  }, [applyPendingSearchSelection]);
+    applyPendingTextRangeFocus();
+  }, [applyPendingTextRangeFocus]);
 
   // Temporary CSS transform for smooth zooming before re-render
   const textLayerSmoothScale = useMemo(() => {

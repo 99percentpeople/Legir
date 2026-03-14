@@ -46,6 +46,7 @@ export function ModelSelect(props: {
     triggerTitle,
     showSeparators = true,
   } = props;
+  const visibleGroups = groups.filter((group) => group.options.length > 0);
 
   return (
     <Select value={value} onValueChange={(v) => onValueChange(v)}>
@@ -58,7 +59,7 @@ export function ModelSelect(props: {
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {groups.map((group, idx) => (
+        {visibleGroups.map((group, idx) => (
           <React.Fragment key={group.id}>
             <SelectGroup>
               <SelectLabel>{group.label}</SelectLabel>
@@ -72,7 +73,7 @@ export function ModelSelect(props: {
                 </SelectItem>
               ))}
             </SelectGroup>
-            {showSeparators && idx < groups.length - 1 ? (
+            {showSeparators && idx < visibleGroups.length - 1 ? (
               <SelectSeparator />
             ) : null}
           </React.Fragment>

@@ -55,6 +55,7 @@ export interface FormField {
   };
   required?: boolean;
   isMultiSelect?: boolean;
+  allowCustomValue?: boolean;
   style?: FieldStyle;
 
   // Value & Defaults
@@ -206,6 +207,16 @@ export interface LLMOptions {
   openai: OpenAiLLMProviderOptions;
 }
 
+export type AiChatDigestMode = "excerpt" | "ai_summary";
+
+export interface AiChatOptions {
+  digestMode: AiChatDigestMode;
+  digestCharsPerChunk: number;
+  digestSourceCharsPerChunk: number;
+  digestSummaryProviderId?: string;
+  digestSummaryModelId?: string;
+}
+
 export interface AppOptions {
   snappingOptions: SnappingOptions;
   debugOptions: DebugOptions;
@@ -214,6 +225,7 @@ export interface AppOptions {
   removeTextUnderFlattenedFreetext: boolean;
 
   llm: LLMOptions;
+  aiChat: AiChatOptions;
 }
 
 export interface PenStyle {
@@ -262,6 +274,7 @@ export interface PDFSearchResult {
   sortTop: number;
   sortLeft: number;
   rect: { x: number; y: number; width: number; height: number };
+  rects: { x: number; y: number; width: number; height: number }[];
   matchText: string;
   contextBefore: string;
   contextAfter: string;

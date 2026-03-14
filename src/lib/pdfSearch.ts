@@ -10,6 +10,14 @@ import type {
   PDFSearchResult,
 } from "@/types";
 
+export type PDFSearchMode = "plain" | "regex";
+
+export interface PDFSearchOptions {
+  caseSensitive?: boolean;
+  mode?: PDFSearchMode;
+  regexFlags?: string;
+}
+
 const SEARCH_CONTEXT_CHARS = 36;
 const DEFAULT_TEXT_STYLE: TextStyle = {
   ascent: 0.8,
@@ -63,6 +71,14 @@ const getPageSearchText = (textContent: TextContent) =>
     .filter(isTextItem)
     .map((item) => item.str)
     .join("");
+
+const buildRegexFlags = (caseSensitive: boolean, regexFlags?: string) => {
+  return Array.from(
+    new Set(
+      `${(regexFlags || "").replace(/[^dgimsuvy]/g, "").replace(/[gi]/g, "")}g${caseSensitive ? "" : "i"}`,
+    ),
+  ).join("");
+};
 
 type SearchTokenBoundary = {
   start: number;
@@ -283,13 +299,59 @@ const getMatchRect = (
   };
 };
 
+export const getPdfSearchRangeGeometry = (
+  textContent: TextContent,
+  page: PageData,
+  startOffset: number,
+  endOffset: number,
+) => {
+  const pageText = getPageSearchText(textContent);
+  if (!pageText) return null;
+
+  const clampedStart = Math.max(
+    0,
+    Math.min(pageText.length, Math.trunc(startOffset)),
+  );
+  const clampedEnd = Math.max(
+    0,
+    Math.min(pageText.length, Math.trunc(endOffset)),
+  );
+  if (clampedEnd <= clampedStart) return null;
+
+  const tokenBoundaries = getSearchTokenBoundaries(textContent, page);
+  const rects = getMatchRects(tokenBoundaries, clampedStart, clampedEnd);
+  const { sortTop, sortLeft } = getMatchSortPosition(
+    tokenBoundaries,
+    clampedStart,
+    clampedEnd,
+  );
+  const rect = getMatchRect(tokenBoundaries, clampedStart, clampedEnd);
+
+  return {
+    startOffset: clampedStart,
+    endOffset: clampedEnd,
+    sortTop,
+    sortLeft,
+    rect,
+    rects,
+    matchText: pageText.slice(clampedStart, clampedEnd),
+    contextBefore: pageText.slice(
+      Math.max(0, clampedStart - SEARCH_CONTEXT_CHARS),
+      clampedStart,
+    ),
+    contextAfter: pageText.slice(
+      clampedEnd,
+      Math.min(pageText.length, clampedEnd + SEARCH_CONTEXT_CHARS),
+    ),
+    displaySegments: buildDisplaySegments(pageText, clampedStart, clampedEnd),
+  };
+};
+
 export const findPdfSearchResults = (
   textContent: TextContent,
   query: string,
   page: PageData,
-  options?: {
-    caseSensitive?: boolean;
-  },
+  options?: PDFSearchOptions,
 ): PDFSearchResult[] => {
   const trimmedQuery = query.trim();
   if (!trimmedQuery) return [];
@@ -297,55 +359,81 @@ export const findPdfSearchResults = (
   const pageText = getPageSearchText(textContent);
   if (!pageText) return [];
 
-  const tokenBoundaries = getSearchTokenBoundaries(textContent, page);
   const caseSensitive = options?.caseSensitive ?? false;
-  const normalizedPageText = caseSensitive
-    ? pageText
-    : pageText.toLocaleLowerCase();
-  const normalizedQuery = caseSensitive
-    ? trimmedQuery
-    : trimmedQuery.toLocaleLowerCase();
-  if (!normalizedQuery.trim()) return [];
+  const mode = options?.mode === "regex" ? "regex" : "plain";
 
   const results: PDFSearchResult[] = [];
-  let cursor = 0;
   let matchIndexOnPage = 0;
-
-  while (cursor < normalizedPageText.length) {
-    const matchOffset = normalizedPageText.indexOf(normalizedQuery, cursor);
-    if (matchOffset === -1) break;
-
-    const endOffset = matchOffset + trimmedQuery.length;
-    const { sortTop, sortLeft } = getMatchSortPosition(
-      tokenBoundaries,
+  const pushResult = (matchOffset: number, endOffset: number) => {
+    const geometry = getPdfSearchRangeGeometry(
+      textContent,
+      page,
       matchOffset,
       endOffset,
     );
-    const rect = getMatchRect(tokenBoundaries, matchOffset, endOffset);
+    if (!geometry) return;
 
     results.push({
       id: `${page.pageIndex}:${matchIndexOnPage}:${matchOffset}:${endOffset}`,
       pageIndex: page.pageIndex,
       matchIndexOnPage,
-      startOffset: matchOffset,
-      endOffset,
-      sortTop,
-      sortLeft,
-      rect,
-      matchText: pageText.slice(matchOffset, endOffset),
-      contextBefore: pageText.slice(
-        Math.max(0, matchOffset - SEARCH_CONTEXT_CHARS),
-        matchOffset,
-      ),
-      contextAfter: pageText.slice(
-        endOffset,
-        Math.min(pageText.length, endOffset + SEARCH_CONTEXT_CHARS),
-      ),
-      displaySegments: buildDisplaySegments(pageText, matchOffset, endOffset),
+      startOffset: geometry.startOffset,
+      endOffset: geometry.endOffset,
+      sortTop: geometry.sortTop,
+      sortLeft: geometry.sortLeft,
+      rect: geometry.rect,
+      rects: geometry.rects,
+      matchText: geometry.matchText,
+      contextBefore: geometry.contextBefore,
+      contextAfter: geometry.contextAfter,
+      displaySegments: geometry.displaySegments,
     });
-
     matchIndexOnPage += 1;
-    cursor = matchOffset + Math.max(1, normalizedQuery.length);
+  };
+
+  if (mode === "regex") {
+    let pattern: RegExp;
+    try {
+      pattern = new RegExp(
+        trimmedQuery,
+        buildRegexFlags(caseSensitive, options?.regexFlags),
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Invalid regular expression.";
+      throw new Error(`Invalid regex search pattern: ${message}`);
+    }
+
+    let match: RegExpExecArray | null = null;
+    while ((match = pattern.exec(pageText)) !== null) {
+      const matchText = match[0] ?? "";
+      if (!matchText.length) {
+        pattern.lastIndex += 1;
+        continue;
+      }
+
+      const matchOffset = match.index ?? 0;
+      const endOffset = matchOffset + matchText.length;
+      pushResult(matchOffset, endOffset);
+    }
+  } else {
+    const normalizedPageText = caseSensitive
+      ? pageText
+      : pageText.toLocaleLowerCase();
+    const normalizedQuery = caseSensitive
+      ? trimmedQuery
+      : trimmedQuery.toLocaleLowerCase();
+    if (!normalizedQuery.trim()) return [];
+
+    let cursor = 0;
+    while (cursor < normalizedPageText.length) {
+      const matchOffset = normalizedPageText.indexOf(normalizedQuery, cursor);
+      if (matchOffset === -1) break;
+
+      const endOffset = matchOffset + trimmedQuery.length;
+      pushResult(matchOffset, endOffset);
+      cursor = matchOffset + Math.max(1, normalizedQuery.length);
+    }
   }
 
   return results.sort((a, b) => {

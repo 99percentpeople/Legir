@@ -15,6 +15,7 @@ export interface PanelLayoutProps {
   onClose?: () => void;
   onCollapse?: () => void;
   title: React.ReactNode;
+  headerActions?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
   width: number;
@@ -28,6 +29,7 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
   onClose,
   onCollapse,
   title,
+  headerActions,
   children,
   footer,
   width,
@@ -90,11 +92,12 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
       )}
 
       {/* Header */}
-      <div className="border-border bg-muted/30 flex items-center justify-between border-b p-4">
-        <h3 className="text-foreground flex items-center gap-2 font-semibold">
+      <div className="border-border bg-muted/30 flex items-start justify-between border-b p-4">
+        <h3 className="text-foreground flex min-w-0 flex-1 items-center gap-2 font-semibold">
           {title}
         </h3>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1 self-start">
+          {headerActions}
           {onClose ? (
             <Button
               variant="ghost"
@@ -111,7 +114,10 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
       </div>
 
       {/* Body */}
-      <div className="scrollbar-thin scrollbar-thumb-border flex-1 space-y-6 overflow-y-auto p-4">
+      <div
+        data-slot="panel-body"
+        className="scrollbar-thin scrollbar-thumb-border flex-1 space-y-6 overflow-y-auto p-4"
+      >
         {children}
       </div>
 

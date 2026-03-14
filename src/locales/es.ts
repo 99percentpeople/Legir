@@ -74,6 +74,7 @@ const es = {
     search_pdf: "Búsqueda en PDF (Ctrl/Cmd+F)",
     search_web: "Buscar “{text}” en la web",
     translate: "Traducir",
+    ask_ai: "Preguntar a la IA sobre “{text}”",
   },
   translate: {
     title: "Traducir",
@@ -311,9 +312,90 @@ const es = {
   },
   right_panel: {
     tabs: {
+      ai_chat: "Chat IA",
       form_detect: "Detección de formularios",
       page_translate: "Traducir página",
       properties: "Edición de propiedades",
+    },
+  },
+  ai_chat: {
+    title: "Chat IA",
+    history: "Historial",
+    sessions: "Conversaciones",
+    session_default: "Nuevo chat",
+    session_active: "Activo",
+    new_chat: "Nuevo chat",
+    delete: "Eliminar",
+    tool_details: "Detalles",
+    tool_args: "Argumentos",
+    tool_result: "Resultado bruto",
+    thinking: "Pensando",
+    thought_complete: "Pensó",
+    thought_for: "Pensó durante {duration}",
+    duration_seconds: "{count}s",
+    duration_minutes_seconds: "{minutes}min {seconds}s",
+    duration_hours_minutes: "{hours}h {minutes}min",
+    model: "Modelo",
+    clear: "Limpiar",
+    clear_confirm: {
+      title: "¿Borrar este chat?",
+      desc: "Esto eliminará los mensajes actuales, el historial de herramientas y los resultados de búsqueda.",
+      confirm: "Borrar chat",
+    },
+    send: "Enviar",
+    stop: "Detener",
+    messages: "Mensajes",
+    tools: "Herramientas",
+    error_title: "La solicitud falló",
+    input_placeholder:
+      "Pide a la IA que lea, busque, navegue o resalte contenido del PDF...",
+    input_hint: "Pulsa Enter para enviar, Shift+Enter para una nueva línea.",
+    attachment_selected_text: "Texto seleccionado",
+    attachment_page_short: "P{page}",
+    attachment_location: "P{page} · {start}-{end}",
+    attachment_remove: "Quitar adjunto",
+    selection_only_message:
+      "Explica el texto seleccionado adjunto del PDF actual.",
+    selection_prompt:
+      "Explica el siguiente texto seleccionado del PDF actual y usa el contexto del documento cuando ayude.\n\nTexto seleccionado:\n{text}",
+    empty_title: "Pregunta sobre el PDF actual",
+    empty_desc:
+      "El asistente puede leer texto de páginas, buscar en el documento, saltar a resultados y añadir resaltados temporales.",
+    empty_no_document:
+      "No hay ningún PDF abierto. Abre primero un documento para que el asistente pueda leerlo y buscarlo.",
+    empty_no_model:
+      "No hay ningún modelo de IA disponible configurado. Añade una clave API de OpenAI o Gemini en ajustes.",
+    disabled: {
+      no_document: "Sin documento",
+      no_model: "Sin modelo",
+    },
+    status: {
+      idle: "Inactivo",
+      running: "En ejecución",
+      cancelling: "Deteniendo",
+      error: "Error",
+    },
+    examples: {
+      current_page: "Resume la página actual",
+      search_focus: "Busca la cláusula de responsabilidad y ve a ella",
+      highlight: "Resalta todas las apariciones de firma",
+    },
+    starters: {
+      reading: {
+        title: "Leer y resumir",
+        current_page: "Resume la página actual",
+        whole_document: "Resume todo el documento",
+      },
+      search: {
+        title: "Buscar e ir",
+        keyword: "Busca todo lo relacionado con la garantía",
+        jump: "Busca la cláusula de responsabilidad y ve a ella",
+      },
+      actions: {
+        title: "Acciones",
+        highlight: "Resalta todas las apariciones de firma",
+        annotations: "Lista todos los comentarios y resaltados de este PDF",
+      },
     },
   },
   workspace: {
@@ -395,6 +477,9 @@ const es = {
     search_previous: "Resultado anterior",
     search_next: "Siguiente resultado",
     search_case_sensitive: "Distinguir mayúsculas y minúsculas",
+    search_regex: "Modo regex",
+    search_invalid_regex: "Expresión regular no válida",
+    search_failed: "La búsqueda falló",
     exit_search: "Salir de la búsqueda",
   },
   settings: {

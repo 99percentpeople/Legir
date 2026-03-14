@@ -18,11 +18,13 @@ import { RightPanelTabDock } from "../components/properties-panel/RightPanelTabD
 import { PropertiesPanel } from "../components/properties-panel/PropertiesPanel";
 import { FormDetectionPanel } from "../components/properties-panel/FormDetectionPanel";
 import { PageTranslatePanel } from "../components/properties-panel/PageTranslatePanel";
+import { AiChatPanel } from "../components/properties-panel/AiChatPanel";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { usePageTranslation } from "../hooks/usePageTranslation";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
 import { TranslationFloatingWindow } from "../components/workspace/widgets/TranslationFloatingWindow";
+import { useAiChatController } from "@/hooks/useAiChatController";
 
 const Workspace = React.lazy(() => import("../components/workspace/Workspace"));
 import {
@@ -57,7 +59,7 @@ import {
 } from "@tauri-apps/api/window";
 import { recentFilesService } from "../services/recentFilesService";
 import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
-import { findPdfSearchResults } from "../lib/pdfSearch";
+import { findPdfSearchResults, type PDFSearchMode } from "../lib/pdfSearch";
 import { getPdfSearchSelectionOffsets } from "../components/workspace/lib/pdfSearchHighlights";
 import {
   getDistanceSquaredBetweenPoints,
@@ -145,6 +147,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const [pdfSearchFocusToken, setPdfSearchFocusToken] = useState(0);
   const [isPdfSearchCaseSensitive, setIsPdfSearchCaseSensitive] =
     useState(false);
+  const [pdfSearchMode, setPdfSearchMode] = useState<PDFSearchMode>("plain");
+  const [pdfSearchError, setPdfSearchError] = useState<string | null>(null);
   const pdfSearchSeqRef = useRef(0);
   const pdfSearchViewportStateRef = useRef({
     scale: state.scale,
@@ -180,6 +184,20 @@ const EditorPage: React.FC<EditorPageProps> = ({
     setSelectedPageTranslateParagraphIds,
     removePageTranslateParagraphCandidatesByPageIndex,
   });
+
+  const aiChat = useAiChatController(state);
+  const openAiChatPanel = useCallback(() => {
+    setUiState((prev) => {
+      const updates: Partial<EditorUiState> = {
+        rightPanelTab: "ai_chat",
+        isRightPanelOpen: true,
+      };
+      if (prev.isPanelFloating) {
+        updates.isSidebarOpen = false;
+      }
+      return updates;
+    });
+  }, [setUiState]);
 
   const handleInitialScrollApplied = useCallback(() => {
     setState({ pendingViewStateRestore: null });
@@ -329,6 +347,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
     if (autoTranslate) setTranslateAutoToken((x) => x + 1);
   });
 
+  useAppEvent("workspace:askAi", (attachment) => {
+    const trimmed = attachment.text.trim();
+    if (!trimmed) return;
+
+    openAiChatPanel();
+  });
+
   useEffect(() => {
     if (isTranslateOpen) {
       setUiState((prev) => {
@@ -407,7 +432,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   }, [isPdfSearchOpen, state.isSidebarOpen]);
 
   useEffect(() => {
-    appEventBus.clearSticky("workspace:selectSearchText");
+    appEventBus.clearSticky("workspace:focusTextRange");
   }, [state.filename, state.pages.length, state.pdfBytes]);
 
   const getWorkspaceSelectedSearchText = useCallback(() => {
@@ -600,17 +625,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
     if (!activeResult) return;
 
     window.requestAnimationFrame(() => {
-      appEventBus.emit("workspace:focusSearchResult", {
-        pageIndex: activeResult.pageIndex,
-        rect: activeResult.rect,
-        behavior: "auto",
-      });
       appEventBus.emit(
-        "workspace:selectSearchText",
+        "workspace:focusTextRange",
         {
           pageIndex: activeResult.pageIndex,
           startOffset: activeResult.startOffset,
           endOffset: activeResult.endOffset,
+          rect: activeResult.rect,
+          behavior: "auto",
         },
         { sticky: true },
       );
@@ -624,12 +646,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
     if (!isPdfSearchOpen) {
       pendingPdfSearchPreferredSelectionRef.current = null;
       setIsPdfSearchLoading(false);
+      setPdfSearchError(null);
       return;
     }
 
     if (!trimmedQuery || state.pages.length === 0) {
       pendingPdfSearchPreferredSelectionRef.current = null;
       setIsPdfSearchLoading(false);
+      setPdfSearchError(null);
       setPdfSearchResults([]);
       setActivePdfSearchResultId(null);
       return;
@@ -637,6 +661,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
     const abortController = new AbortController();
     setIsPdfSearchLoading(true);
+    setPdfSearchError(null);
     setPdfSearchResults([]);
     setActivePdfSearchResultId(null);
 
@@ -652,6 +677,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
               if (!textContent) return [];
               return findPdfSearchResults(textContent, trimmedQuery, page, {
                 caseSensitive: isPdfSearchCaseSensitive,
+                mode: pdfSearchMode,
               });
             }),
           );
@@ -689,6 +715,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
         } catch (error) {
           if ((error as Error)?.name !== "AbortError") {
             console.error("Failed to search PDF text", error);
+            const message = error instanceof Error ? error.message : "";
+            setPdfSearchResults([]);
+            setActivePdfSearchResultId(null);
+            setPdfSearchError(
+              message.includes("Invalid regex search pattern")
+                ? t("sidebar.search_invalid_regex")
+                : t("sidebar.search_failed"),
+            );
           }
         } finally {
           if (
@@ -710,8 +744,10 @@ const EditorPage: React.FC<EditorPageProps> = ({
     getViewportClosestPdfSearchResultId,
     isPdfSearchCaseSensitive,
     isPdfSearchOpen,
+    pdfSearchMode,
     pdfSearchQuery,
     state.pages,
+    t,
   ]);
 
   const pdfSearchResultsByPage = React.useMemo(() => {
@@ -723,6 +759,30 @@ const EditorPage: React.FC<EditorPageProps> = ({
     }
     return grouped;
   }, [pdfSearchResults]);
+
+  const workspaceTextHighlightsByPage = React.useMemo(() => {
+    const grouped = new Map<number, PDFSearchResult[]>();
+
+    const append = (source?: Map<number, PDFSearchResult[]>) => {
+      if (!source) return;
+      for (const [pageIndex, results] of source.entries()) {
+        const existing = grouped.get(pageIndex);
+        if (existing) existing.push(...results);
+        else grouped.set(pageIndex, [...results]);
+      }
+    };
+
+    if (isPdfSearchOpen) {
+      append(pdfSearchResultsByPage);
+    }
+    append(aiChat.highlightedSearchResultsByPage);
+
+    return grouped.size > 0 ? grouped : undefined;
+  }, [
+    aiChat.highlightedSearchResultsByPage,
+    isPdfSearchOpen,
+    pdfSearchResultsByPage,
+  ]);
 
   const activePdfSearchResultIndex = React.useMemo(
     () =>
@@ -1554,13 +1614,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
             <PDFSearchHeader
               query={pdfSearchQuery}
               focusToken={pdfSearchFocusToken}
-              caseSensitive={isPdfSearchCaseSensitive}
               canGoPrevious={pdfSearchResults.length > 0}
               canGoNext={pdfSearchResults.length > 0}
               onQueryChange={setPdfSearchQuery}
-              onToggleCaseSensitive={() =>
-                setIsPdfSearchCaseSensitive((value) => !value)
-              }
               onPrevious={handleSelectPreviousPdfSearchResult}
               onNext={handleSelectNextPdfSearchResult}
             />
@@ -1568,10 +1624,21 @@ const EditorPage: React.FC<EditorPageProps> = ({
           searchContent={
             <PDFSearchPanel
               query={pdfSearchQuery}
+              mode={pdfSearchMode}
+              caseSensitive={isPdfSearchCaseSensitive}
               results={pdfSearchResults}
               activeResultId={activePdfSearchResultId}
               activeResultIndex={activePdfSearchResultIndex}
               isSearching={isPdfSearchLoading}
+              errorMessage={pdfSearchError}
+              onToggleCaseSensitive={() =>
+                setIsPdfSearchCaseSensitive((value) => !value)
+              }
+              onToggleRegex={() =>
+                setPdfSearchMode((value) =>
+                  value === "regex" ? "plain" : "regex",
+                )
+              }
               onSelectResult={handleSelectPdfSearchResult}
             />
           }
@@ -1614,9 +1681,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
                   : null
               }
               onInitialScrollApplied={handleInitialScrollApplied}
-              pdfSearchResultsByPage={
-                isPdfSearchOpen ? pdfSearchResultsByPage : undefined
-              }
+              pdfSearchResultsByPage={workspaceTextHighlightsByPage}
               activePdfSearchResultId={
                 isPdfSearchOpen ? activePdfSearchResultId : null
               }
@@ -1673,7 +1738,40 @@ const EditorPage: React.FC<EditorPageProps> = ({
         />
 
         {canRenderRightPanel &&
-          (state.rightPanelTab === "form_detect" ? (
+          (state.rightPanelTab === "ai_chat" ? (
+            <AiChatPanel
+              isFloating={state.isPanelFloating}
+              isOpen={state.isRightPanelOpen}
+              onOpen={() => {
+                setUiState((prev) => {
+                  if (prev.isPanelFloating) {
+                    return { isRightPanelOpen: true, isSidebarOpen: false };
+                  }
+                  return { isRightPanelOpen: true };
+                });
+              }}
+              width={state.rightPanelWidth}
+              onResize={(w) => setUiState({ rightPanelWidth: w })}
+              onCollapse={() => setUiState({ isRightPanelOpen: false })}
+              sessions={aiChat.sessions}
+              activeSessionId={aiChat.activeSessionId}
+              onSelectSession={aiChat.selectSession}
+              onNewConversation={aiChat.newConversation}
+              onClearConversation={aiChat.clearConversation}
+              onDeleteConversation={aiChat.deleteConversation}
+              timeline={aiChat.timeline}
+              runStatus={aiChat.runStatus}
+              lastError={aiChat.lastError}
+              selectedModelKey={aiChat.selectedModelKey}
+              onSelectModel={aiChat.setSelectedModelKey}
+              modelGroups={aiChat.modelSelectGroups}
+              onSend={(input) => {
+                void aiChat.sendMessage(input);
+              }}
+              onStop={aiChat.stop}
+              disabledReason={aiChat.disabledReason}
+            />
+          ) : state.rightPanelTab === "form_detect" ? (
             <FormDetectionPanel
               isFloating={state.isPanelFloating}
               isOpen={state.isRightPanelOpen}

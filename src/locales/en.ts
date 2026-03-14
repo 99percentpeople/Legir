@@ -77,6 +77,7 @@ const en = {
     search_pdf: "PDF Search (Ctrl/Cmd+F)",
     search_web: "Search the web for “{text}”",
     translate: "Translate",
+    ask_ai: "Ask AI about “{text}”",
   },
   translate: {
     title: "Translate",
@@ -307,9 +308,91 @@ const en = {
   },
   right_panel: {
     tabs: {
+      ai_chat: "AI Chat",
       form_detect: "Form Detect",
       page_translate: "Page Translate",
       properties: "Property Editing",
+    },
+  },
+  ai_chat: {
+    title: "AI Chat",
+    history: "History",
+    sessions: "Conversations",
+    session_default: "New chat",
+    session_active: "Active",
+    new_chat: "New chat",
+    delete: "Delete",
+    tool_details: "Details",
+    tool_args: "Arguments",
+    tool_result: "Raw result",
+    responding: "Waiting for response",
+    thinking: "Thinking",
+    thought_complete: "Thought",
+    thought_for: "Thought for {duration}",
+    duration_seconds: "{count}s",
+    duration_minutes_seconds: "{minutes}m {seconds}s",
+    duration_hours_minutes: "{hours}h {minutes}m",
+    model: "Model",
+    clear: "Clear",
+    clear_confirm: {
+      title: "Clear this chat?",
+      desc: "This will remove the current chat messages, tool history, and search results.",
+      confirm: "Clear chat",
+    },
+    send: "Send",
+    stop: "Stop",
+    messages: "Messages",
+    tools: "Tool Actions",
+    error_title: "Request Failed",
+    input_placeholder:
+      "Ask the AI to read, search, jump, or highlight PDF content...",
+    input_hint: "Press Enter to send, Shift+Enter for a new line.",
+    attachment_selected_text: "Selected text",
+    attachment_page_short: "P{page}",
+    attachment_location: "P{page} · {start}-{end}",
+    attachment_remove: "Remove attachment",
+    selection_only_message:
+      "Please explain the attached selected text from the current PDF.",
+    selection_prompt:
+      "Please explain the following selected text from the current PDF. Use the surrounding document context when it helps.\n\nSelected text:\n{text}",
+    empty_title: "Ask About The Current PDF",
+    empty_desc:
+      "The assistant can read page text, search the document, jump to results, and add temporary highlights.",
+    empty_no_document:
+      "No PDF is open. Load a document first, then the assistant can read and search it.",
+    empty_no_model:
+      "No available AI model is configured. Add an OpenAI or Gemini API key in settings.",
+    disabled: {
+      no_document: "No document",
+      no_model: "No model",
+    },
+    status: {
+      idle: "Idle",
+      running: "Running",
+      cancelling: "Stopping",
+      error: "Error",
+    },
+    examples: {
+      current_page: "Summarize the current page",
+      search_focus: "Search for the liability clause and jump to it",
+      highlight: "Highlight all occurrences of signature",
+    },
+    starters: {
+      reading: {
+        title: "Read & Summarize",
+        current_page: "Summarize the current page",
+        whole_document: "Give me a summary of the whole document",
+      },
+      search: {
+        title: "Search & Jump",
+        keyword: "Find all mentions of warranty terms",
+        jump: "Search for the liability clause and jump to it",
+      },
+      actions: {
+        title: "Actions",
+        highlight: "Highlight all occurrences of signature",
+        annotations: "List all comments and highlights in this PDF",
+      },
     },
   },
   annotation: {
@@ -395,6 +478,9 @@ const en = {
     search_previous: "Previous result",
     search_next: "Next result",
     search_case_sensitive: "Match case",
+    search_regex: "Regex mode",
+    search_invalid_regex: "Invalid regular expression",
+    search_failed: "Search failed",
     exit_search: "Exit search",
   },
   settings: {
@@ -405,6 +491,7 @@ const en = {
       export: "Export",
       snapping: "Snapping",
       llm: "LLM",
+      ai_chat: "AI Chat",
       debug: "Debug",
     },
     language: "Language",
@@ -450,6 +537,25 @@ const en = {
       custom_models_translate: "Custom models (Translate)",
       custom_models_vision: "Custom models (Vision)",
       custom_models_placeholder: "Type a model ID and press Enter",
+    },
+    ai_chat: {
+      title: "AI Chat Tools",
+      description:
+        "Configure document digest behavior and pick a cheaper model for broad summaries.",
+      digest_mode: "Document digest mode",
+      digest_mode_desc:
+        "Controls how get_document_digest builds whole-document summaries.",
+      digest_mode_excerpt: "Local excerpt",
+      digest_mode_ai_summary: "AI summary",
+      summary_model: "Digest summary model",
+      summary_model_placeholder: "Select a model",
+      summary_model_desc:
+        "Used only by get_document_digest when AI summary mode is enabled. Pick a lower-cost chat model here.",
+      no_models: "No available models",
+      digest_chars_per_chunk: "Output chars per chunk",
+      digest_source_chars_per_chunk: "Input sample chars per chunk",
+      digest_sampling_desc:
+        "Input sample chars controls how much source text is sampled before summarization. Higher values improve coverage but increase cost.",
     },
     done: "Done",
   },

@@ -74,6 +74,7 @@ const de = {
     search_pdf: "PDF-Suche (Ctrl/Cmd+F)",
     search_web: "Im Web nach „{text}“ suchen",
     translate: "Übersetzen",
+    ask_ai: "KI zu „{text}“ fragen",
   },
   translate: {
     title: "Übersetzen",
@@ -312,9 +313,91 @@ const de = {
   },
   right_panel: {
     tabs: {
+      ai_chat: "AI Chat",
       form_detect: "Formularerkennung",
       page_translate: "Seite übersetzen",
       properties: "Eigenschaften bearbeiten",
+    },
+  },
+  ai_chat: {
+    title: "AI Chat",
+    history: "Verlauf",
+    sessions: "Unterhaltungen",
+    session_default: "Neuer Chat",
+    session_active: "Aktiv",
+    new_chat: "Neuer Chat",
+    delete: "Löschen",
+    tool_details: "Details",
+    tool_args: "Argumente",
+    tool_result: "Rohes Ergebnis",
+    thinking: "Denken",
+    thought_complete: "Nachgedacht",
+    thought_for: "Nachgedacht für {duration}",
+    duration_seconds: "{count}s",
+    duration_minutes_seconds: "{minutes}m {seconds}s",
+    duration_hours_minutes: "{hours}h {minutes}m",
+    model: "Modell",
+    clear: "Löschen",
+    clear_confirm: {
+      title: "Diesen Chat löschen?",
+      desc: "Dadurch werden die aktuellen Chat-Nachrichten, die Tool-Historie und die Suchergebnisse entfernt.",
+      confirm: "Chat löschen",
+    },
+    send: "Senden",
+    stop: "Stoppen",
+    messages: "Nachrichten",
+    tools: "Werkzeuge",
+    error_title: "Anfrage fehlgeschlagen",
+    input_placeholder:
+      "Bitten Sie die KI, PDF-Inhalte zu lesen, zu suchen, zu springen oder hervorzuheben...",
+    input_hint: "Enter zum Senden, Shift+Enter für eine neue Zeile.",
+    attachment_selected_text: "Ausgewählter Text",
+    attachment_page_short: "S.{page}",
+    attachment_location: "S.{page} · {start}-{end}",
+    attachment_remove: "Anhang entfernen",
+    selection_only_message:
+      "Bitte erkläre den angehängten ausgewählten Text aus dem aktuellen PDF.",
+    selection_prompt:
+      "Bitte erkläre den folgenden ausgewählten Text aus dem aktuellen PDF und nutze bei Bedarf den Dokumentkontext.\n\nAusgewählter Text:\n{text}",
+    empty_title: "Fragen Sie nach dem aktuellen PDF",
+    empty_desc:
+      "Der Assistent kann Seitentext lesen, das Dokument durchsuchen, zu Ergebnissen springen und temporäre Hervorhebungen setzen.",
+    empty_no_document:
+      "Kein PDF geöffnet. Öffnen Sie zuerst ein Dokument, damit der Assistent es lesen und durchsuchen kann.",
+    empty_no_model:
+      "Kein verfügbares KI-Modell konfiguriert. Fügen Sie in den Einstellungen einen OpenAI- oder Gemini-API-Schlüssel hinzu.",
+    disabled: {
+      no_document: "Kein Dokument",
+      no_model: "Kein Modell",
+    },
+    status: {
+      idle: "Bereit",
+      running: "Läuft",
+      cancelling: "Wird gestoppt",
+      error: "Fehler",
+    },
+    examples: {
+      current_page: "Aktuelle Seite zusammenfassen",
+      search_focus: "Nach der Haftungsklausel suchen und dorthin springen",
+      highlight: "Alle Vorkommen von Unterschrift hervorheben",
+    },
+    starters: {
+      reading: {
+        title: "Lesen & Zusammenfassen",
+        current_page: "Aktuelle Seite zusammenfassen",
+        whole_document: "Das gesamte Dokument zusammenfassen",
+      },
+      search: {
+        title: "Suchen & Springen",
+        keyword: "Alle Stellen zur Garantie suchen",
+        jump: "Nach der Haftungsklausel suchen und dorthin springen",
+      },
+      actions: {
+        title: "Aktionen",
+        highlight: "Alle Vorkommen von Unterschrift hervorheben",
+        annotations:
+          "Alle Kommentare und Hervorhebungen in diesem PDF auflisten",
+      },
     },
   },
   workspace: {
@@ -397,6 +480,9 @@ const de = {
     search_previous: "Vorheriger Treffer",
     search_next: "Nächster Treffer",
     search_case_sensitive: "Groß-/Kleinschreibung beachten",
+    search_regex: "Regex-Modus",
+    search_invalid_regex: "Ungültiger regulärer Ausdruck",
+    search_failed: "Suche fehlgeschlagen",
     exit_search: "Suche beenden",
   },
   settings: {

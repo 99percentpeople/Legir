@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Highlighter, Languages, Search } from "lucide-react";
+import { Highlighter, Languages, Search, Sparkles } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 
 export type WorkspaceTextSelectionPopoverState = {
@@ -23,6 +23,7 @@ export interface WorkspaceTextSelectionPopoverProps {
   onHighlight: () => void;
   onSearchWeb: () => void;
   onTranslate: () => void;
+  onAskAi: () => void;
 }
 
 export const WorkspaceTextSelectionPopover: React.FC<
@@ -34,6 +35,7 @@ export const WorkspaceTextSelectionPopover: React.FC<
   onHighlight,
   onSearchWeb,
   onTranslate,
+  onAskAi,
 }) => {
   const { t } = useLanguage();
 
@@ -95,6 +97,16 @@ export const WorkspaceTextSelectionPopover: React.FC<
             onClick={onTranslate}
           >
             <Languages size={16} />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title={t("toolbar.ask_ai", { text: toolbar.text.trim() })}
+            onClick={onAskAi}
+          >
+            <Sparkles size={16} />
           </Button>
 
           <Button

@@ -1,3 +1,5 @@
+import type { AiChatSelectionAttachment } from "@/services/aiChat/types";
+
 export type Unsubscribe = () => void;
 
 export class EventBus<Events extends Record<string, unknown>> {
@@ -75,6 +77,7 @@ export type AppEventMap = {
     sourceText?: string;
     autoTranslate?: boolean;
   };
+  "workspace:askAi": AiChatSelectionAttachment;
   "workspace:focusControl": {
     id: string;
     behavior?: "auto" | "smooth";
@@ -86,10 +89,13 @@ export type AppEventMap = {
     behavior?: "auto" | "smooth";
     skipScroll?: boolean;
   };
-  "workspace:selectSearchText": {
+  "workspace:focusTextRange": {
     pageIndex: number;
     startOffset: number;
     endOffset: number;
+    rect: { x: number; y: number; width: number; height: number };
+    behavior?: "auto" | "smooth";
+    skipScroll?: boolean;
   };
   "sidebar:focusAnnotation": {
     id: string;
