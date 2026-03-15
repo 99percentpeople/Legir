@@ -21,7 +21,9 @@ import {
 } from "@/types";
 import type {
   AiAnnotationKind,
+  AiAnnotationTextBatchUpdateResult,
   AiAnnotationListResult,
+  AiAnnotationTextUpdateResult,
   AiChatSelectionAttachment,
   AiFormFieldFillRequest,
   AiFormFieldFillResult,
@@ -583,6 +585,8 @@ export const createAiChatToolContext = (options: {
         pageNumber: result.pageIndex + 1,
         matchText: result.matchText,
         snippet: result.displaySegments.map((segment) => segment.text).join(""),
+        highlightBehavior: "exact_match_only",
+        snippetPurpose: "context_only",
       };
     });
   };
@@ -930,6 +934,8 @@ export const createAiChatToolContext = (options: {
           pageNumber: annotation.pageIndex + 1,
           type,
           text: (annotation.text || "").trim() || undefined,
+          highlightedText:
+            (annotation.highlightedText || "").trim() || undefined,
           author: (annotation.author || "").trim() || undefined,
           color: annotation.color,
           updatedAt: annotation.updatedAt,
@@ -947,6 +953,136 @@ export const createAiChatToolContext = (options: {
       returned: annotations.length,
       truncated: annotations.length < sorted.length,
       annotations,
+    };
+  };
+
+  const updateAnnotationText = (optionsInput: {
+    annotationId: string;
+    text: string;
+  }): AiAnnotationTextUpdateResult => {
+    const store = useEditorStore.getState();
+    const annotation = store.annotations.find(
+      (item) => item.id === optionsInput.annotationId,
+    );
+
+    if (!annotation) {
+      return {
+        ok: false,
+        annotationId: optionsInput.annotationId,
+        status: "rejected",
+        reason: "Annotation not found.",
+      };
+    }
+
+    const type = getAiAnnotationKind(annotation);
+    const nextText = optionsInput.text;
+    const previousText = annotation.text ?? "";
+    if (previousText === nextText) {
+      return {
+        ok: true,
+        annotationId: annotation.id,
+        pageNumber: annotation.pageIndex + 1,
+        type: type ?? undefined,
+        previousText,
+        text: nextText,
+        status: "unchanged",
+      };
+    }
+
+    store.saveCheckpoint();
+    store.updateAnnotation(annotation.id, { text: nextText });
+
+    return {
+      ok: true,
+      annotationId: annotation.id,
+      pageNumber: annotation.pageIndex + 1,
+      type: type ?? undefined,
+      previousText,
+      text: nextText,
+      status: "updated",
+    };
+  };
+
+  const updateAnnotationTexts = (optionsInput: {
+    updates: Array<{
+      annotationId: string;
+      text: string;
+    }>;
+  }): AiAnnotationTextBatchUpdateResult => {
+    const results: AiAnnotationTextUpdateResult[] = [];
+    let updatedCount = 0;
+    let unchangedCount = 0;
+    let rejectedCount = 0;
+
+    const pendingUpdates = optionsInput.updates.filter(
+      (item) => item.annotationId.trim().length > 0,
+    );
+    if (pendingUpdates.length === 0) {
+      return {
+        updatedCount: 0,
+        unchangedCount: 0,
+        rejectedCount: 0,
+        updates: [],
+      };
+    }
+
+    let savedCheckpoint = false;
+    for (const item of pendingUpdates) {
+      const currentStore = useEditorStore.getState();
+      const annotation = currentStore.annotations.find(
+        (candidate) => candidate.id === item.annotationId,
+      );
+
+      if (!annotation) {
+        rejectedCount += 1;
+        results.push({
+          ok: false,
+          annotationId: item.annotationId,
+          status: "rejected",
+          reason: "Annotation not found.",
+        });
+        continue;
+      }
+
+      const type = getAiAnnotationKind(annotation);
+      const previousText = annotation.text ?? "";
+      if (previousText === item.text) {
+        unchangedCount += 1;
+        results.push({
+          ok: true,
+          annotationId: annotation.id,
+          pageNumber: annotation.pageIndex + 1,
+          type: type ?? undefined,
+          previousText,
+          text: item.text,
+          status: "unchanged",
+        });
+        continue;
+      }
+
+      if (!savedCheckpoint) {
+        currentStore.saveCheckpoint();
+        savedCheckpoint = true;
+      }
+
+      currentStore.updateAnnotation(annotation.id, { text: item.text });
+      updatedCount += 1;
+      results.push({
+        ok: true,
+        annotationId: annotation.id,
+        pageNumber: annotation.pageIndex + 1,
+        type: type ?? undefined,
+        previousText,
+        text: item.text,
+        status: "updated",
+      });
+    }
+
+    return {
+      updatedCount,
+      unchangedCount,
+      rejectedCount,
+      updates: results,
     };
   };
 
@@ -1195,6 +1331,7 @@ export const createAiChatToolContext = (options: {
             ? stored.result.rects.map((item) => ({ ...item }))
             : [rect]),
         text: annotationText ?? stored.result.matchText,
+        highlightedText: stored.result.matchText,
         author: options.selectedChatModelAuthor,
         color: style.color,
         opacity: style.opacity,
@@ -1306,6 +1443,7 @@ export const createAiChatToolContext = (options: {
         rect: geometry.rect,
         rects: geometry.rects,
         text: effectiveAnnotationText ?? matchText,
+        highlightedText: matchText,
         author: options.selectedChatModelAuthor,
         color: style.color,
         opacity: style.opacity,
@@ -1476,6 +1614,7 @@ export const createAiChatToolContext = (options: {
         rect: geometry.rect,
         rects: geometry.rects,
         text: effectiveAnnotationText ?? matchText,
+        highlightedText: matchText,
         author: options.selectedChatModelAuthor,
         color: style.color,
         opacity: style.opacity,
@@ -1577,6 +1716,8 @@ export const createAiChatToolContext = (options: {
 
   return {
     rememberSearchResults,
+    updateAnnotationText,
+    updateAnnotationTexts,
     listFormFields,
     fillFormFields,
     focusField,

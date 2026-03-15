@@ -251,6 +251,28 @@ export const listAnnotationsArgsSchema = z
   })
   .strict();
 
+export const updateAnnotationTextArgsSchema = z
+  .object({
+    annotation_id: z.string().min(1),
+    text: z.string(),
+  })
+  .strict();
+
+export const updateAnnotationTextsArgsSchema = z
+  .object({
+    updates: z
+      .array(
+        z
+          .object({
+            annotation_id: z.string().min(1),
+            text: z.string(),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+
 export const listFormFieldsArgsSchema = z
   .object({
     page_numbers: pageNumbersSchema.optional().default([]),
@@ -358,6 +380,33 @@ export const highlightResultsArgsSchema = z
         code: z.ZodIssueCode.custom,
         message:
           "At least one result_id, selection_anchor, or document_anchor is required.",
+      });
+    }
+  });
+
+export const highlightResultArgsSchema = z
+  .object({
+    result_id: z.string().min(1).optional(),
+    annotation_text: z
+      .string()
+      .optional()
+      .describe(
+        "Optional note/comment text for the created highlight when it should differ from the highlighted source text.",
+      ),
+    selection_anchor: selectionAttachmentAnchorSchema.optional(),
+    document_anchor: documentAnchorSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const targetCount =
+      Number(Boolean(value.result_id)) +
+      Number(Boolean(value.selection_anchor)) +
+      Number(Boolean(value.document_anchor));
+    if (targetCount !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Exactly one of result_id, selection_anchor, or document_anchor is required.",
       });
     }
   });

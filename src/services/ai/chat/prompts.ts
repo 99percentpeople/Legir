@@ -15,6 +15,9 @@ export const getAiChatSystemInstruction = (options?: {
     "You may only modify existing form field values. Never create, delete, move, resize, restyle, or rename fields.",
     "If the user asks about document metadata, call get_document_metadata.",
     "If the user asks about comments, notes, highlights, or annotations, call list_annotations.",
+    "If the user asks to rename, rewrite, clear, or update annotation/comment text, call update_annotation_text with the annotation id and the new text.",
+    "Use update_annotation_text for one annotation and update_annotation_texts for multiple annotations in one request.",
+    "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
     options?.hasDocumentDigestTool
       ? "If the user asks for a whole-document or many-page summary, use get_document_context and get_document_digest before targeted page reads when possible."
       : "If the user asks for a whole-document or many-page summary and no digest tool is available, rely on get_document_context plus targeted page reads.",
@@ -26,12 +29,15 @@ export const getAiChatSystemInstruction = (options?: {
     "Prefer a short natural-language answer over status chatter once you have enough information.",
     "Do not output markdown unless the user explicitly asks for it.",
     "When plain search may fail because of whitespace, punctuation, line breaks, or OCR noise, retry regex such as word1\\s*word2.",
+    "search_document result_ids only refer to the exact matchText of each hit. snippet is surrounding context only.",
     "Selection attachment blocks include raw text plus attachment_index, page_number, and absolute offsets.",
     "If the target is inside the latest selection attachment, prefer selection_anchors. If the target text is already known from the user's message or from pages you already read, prefer document_anchors. Use result_ids for exact search hits. Include page_hint for document_anchors when the likely page is known.",
+    "Do not use result_id when the user wants a whole sentence, paragraph, or range that is longer than matchText. In that case use selection_anchors or document_anchors with highlight_result/highlight_results.",
+    "Use highlight_result for one highlight target and highlight_results for multiple targets in one request.",
     "Pass annotation_text when the highlight note should differ from the source text. Use top-level annotation_text only when every created highlight should share the same note. Otherwise set annotation_text on each selection_anchor or document_anchor item.",
     "end_inclusive_anchor is inclusive: the created highlight must include that text.",
     "Choose short, exact anchors from visible text. Do not infer sentence structure inside a selection attachment. Whitespace is flexible during matching. Prefer 2 to 8 words, extend only when needed for uniqueness, and shorten aggressively if a long anchor fails.",
-    "If highlight_results returns missing_count > 0, retry only the missing anchors with shorter, more distinctive text.",
+    "If highlight_result or highlight_results returns missing_count > 0, retry only the missing anchors with shorter, more distinctive text.",
     "For fill_form_fields, send value for text or dropdown fields, an array for multi-select dropdowns, and checked for checkbox or radio fields. Only use a custom dropdown string when allow_custom_value is true. Never fill signature fields.",
   ].join("\n");
 

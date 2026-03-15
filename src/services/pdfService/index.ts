@@ -31,6 +31,7 @@ import {
   summarizePdfObjForDebug,
 } from "./lib/pdf-import-utils";
 import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
+import { getFormForgeHighlightedText } from "./lib/annotationMetadata";
 import {
   PDFDocument,
   EncryptedPDFError,
@@ -848,6 +849,7 @@ const buildPdfLibAnnotsByPageIndex = async (
       const title = pdfObjToString(annot.lookup(PDFName.of("T")));
       const contents = pdfObjToString(annot.lookup(PDFName.of("Contents")));
       const modificationDate = pdfObjToString(annot.lookup(PDFName.of("M")));
+      const highlightedText = getFormForgeHighlightedText(annot);
 
       const base: PdfJsAnnotation = {
         subtype: subtypeName,
@@ -857,6 +859,7 @@ const buildPdfLibAnnotsByPageIndex = async (
         opacity,
         title,
         contents,
+        highlightedText,
         modificationDate,
       };
 

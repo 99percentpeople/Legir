@@ -42,6 +42,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
 
   title?: string;
   contents?: string;
+  highlightedText?: string;
   richText?: string;
   modificationDate?: string;
   quadPoints?: number[];

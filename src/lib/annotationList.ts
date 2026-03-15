@@ -53,9 +53,16 @@ export const filterAnnotationsForList = (
     if (!query) return true;
 
     const textContent = (annotation.text || "").toLowerCase();
+    const highlightedTextContent = (
+      annotation.highlightedText || ""
+    ).toLowerCase();
     const authorContent = (annotation.author || "").toLowerCase();
 
-    return textContent.includes(query) || authorContent.includes(query);
+    return (
+      textContent.includes(query) ||
+      highlightedTextContent.includes(query) ||
+      authorContent.includes(query)
+    );
   });
 };
 

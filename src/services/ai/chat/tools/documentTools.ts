@@ -129,7 +129,7 @@ export const createDocumentToolHandlers = (
     definition: defineTool("read", {
       name: "search_document",
       description:
-        "Search the current document and return result ids that can be focused or highlighted later. Supports plain substring search and regex search for flexible whitespace or token patterns.",
+        "Search the current document and return result ids that can be focused or highlighted later. result_id highlights only the exact matchText for that search hit; snippet is context only and cannot be highlighted directly. For longer phrases, sentences, or ranges, use selection_anchors or document_anchors with highlight_result/highlight_results. Supports plain substring search and regex search for flexible whitespace or token patterns.",
       inputSchema: searchDocumentArgsSchema,
     }),
     execute: async (rawArgs, _ctx, signal) => {

@@ -474,6 +474,8 @@ export const useAiChatController = (editorState: EditorState) => {
 
   const {
     rememberSearchResults,
+    updateAnnotationText,
+    updateAnnotationTexts,
     listFormFields,
     fillFormFields,
     focusField,
@@ -493,6 +495,8 @@ export const useAiChatController = (editorState: EditorState) => {
         documentContextService,
         rememberSearchResults,
         listAnnotations,
+        updateAnnotationText,
+        updateAnnotationTexts,
         listFormFields,
         fillFormFields,
         focusField,
@@ -518,6 +522,8 @@ export const useAiChatController = (editorState: EditorState) => {
       navigatePage,
       rememberSearchResults,
       setActiveHighlightedResultIds,
+      updateAnnotationText,
+      updateAnnotationTexts,
     ],
   );
 

@@ -94,6 +94,7 @@ export interface Annotation {
   points?: { x: number; y: number }[]; // For ink
   strokes?: { x: number; y: number }[][]; // For ink (multi-stroke)
   text?: string; // For comment
+  highlightedText?: string; // Source text covered by a text highlight
   author?: string; // Creator/Author of the annotation
   color?: string;
   backgroundColor?: string;

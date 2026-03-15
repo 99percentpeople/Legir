@@ -10,11 +10,14 @@ export type AiToolName =
   | "read_pages"
   | "search_document"
   | "list_annotations"
+  | "update_annotation_text"
+  | "update_annotation_texts"
   | "list_form_fields"
   | "fill_form_fields"
   | "focus_field"
   | "navigate_page"
   | "focus_result"
+  | "highlight_result"
   | "highlight_results"
   | "clear_highlights";
 
@@ -93,6 +96,8 @@ export interface AiSearchResultSummary {
   pageNumber: number;
   matchText: string;
   snippet: string;
+  highlightBehavior: "exact_match_only";
+  snippetPurpose: "context_only";
 }
 
 export type AiAnnotationKind = "comment" | "highlight" | "ink" | "freetext";
@@ -102,6 +107,7 @@ export interface AiAnnotationSummary {
   pageNumber: number;
   type: AiAnnotationKind;
   text?: string;
+  highlightedText?: string;
   author?: string;
   color?: string;
   updatedAt?: string;
@@ -114,6 +120,24 @@ export interface AiAnnotationListResult {
   returned: number;
   truncated: boolean;
   annotations: AiAnnotationSummary[];
+}
+
+export interface AiAnnotationTextUpdateResult {
+  ok: boolean;
+  annotationId: string;
+  pageNumber?: number;
+  type?: AiAnnotationKind;
+  previousText?: string;
+  text?: string;
+  status: "updated" | "unchanged" | "rejected";
+  reason?: string;
+}
+
+export interface AiAnnotationTextBatchUpdateResult {
+  updatedCount: number;
+  unchangedCount: number;
+  rejectedCount: number;
+  updates: AiAnnotationTextUpdateResult[];
 }
 
 export interface AiHighlightAnnotationSummary {
@@ -364,6 +388,16 @@ export interface AiToolExecutionContext {
     types?: AiAnnotationKind[];
     maxResults?: number;
   }) => AiAnnotationListResult;
+  updateAnnotationText: (options: {
+    annotationId: string;
+    text: string;
+  }) => AiAnnotationTextUpdateResult;
+  updateAnnotationTexts: (options: {
+    updates: Array<{
+      annotationId: string;
+      text: string;
+    }>;
+  }) => AiAnnotationTextBatchUpdateResult;
   listFormFields: (options: {
     pageNumbers?: number[];
     query?: string;

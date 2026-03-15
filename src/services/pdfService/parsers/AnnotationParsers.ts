@@ -248,6 +248,7 @@ export class HighlightParser implements IAnnotationParser {
           opacity: opacity,
           author: author,
           text: contents,
+          highlightedText: annotation.highlightedText,
           updatedAt: updatedAt,
         });
       }

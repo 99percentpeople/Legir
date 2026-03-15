@@ -187,6 +187,7 @@ export const useWorkspaceTextSelection = (opts: {
         type: "highlight",
         rect: selectionGeometry.rect,
         rects: selectionGeometry.rects,
+        highlightedText: selectedText.replace(/\s+/g, " ").trim(),
         color: state.highlightStyle?.color || ANNOTATION_STYLES.highlight.color,
         opacity:
           state.highlightStyle?.opacity ?? ANNOTATION_STYLES.highlight.opacity,
