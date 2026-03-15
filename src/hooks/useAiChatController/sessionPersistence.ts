@@ -216,9 +216,40 @@ export const restoreConversationFromTimeline = (
   items: AiChatTimelineItem[],
 ) => {
   const conversation: AiChatMessageRecord[] = [];
+  let pendingAssistant:
+    | {
+        turnId: string;
+        text: string;
+      }
+    | undefined;
+
+  const flushPendingAssistant = () => {
+    if (!pendingAssistant) return;
+    conversation.push({
+      role: "assistant",
+      content: pendingAssistant.text,
+    });
+    pendingAssistant = undefined;
+  };
+
   for (const item of items) {
     if (item.kind === "message") {
       if (item.role === "thinking") continue;
+      if (item.role === "assistant") {
+        const turnId = item.turnId ?? item.id;
+        if (!pendingAssistant || pendingAssistant.turnId !== turnId) {
+          flushPendingAssistant();
+          pendingAssistant = {
+            turnId,
+            text: item.text,
+          };
+        } else {
+          pendingAssistant.text += item.text;
+        }
+        continue;
+      }
+
+      flushPendingAssistant();
       conversation.push({
         role: item.role,
         content:
@@ -247,6 +278,7 @@ export const restoreConversationFromTimeline = (
       });
     }
   }
+  flushPendingAssistant();
   return conversation;
 };
 

@@ -175,6 +175,28 @@ const getMessageBranchKind = (item: MessageTimelineItem) => {
   return undefined;
 };
 
+const isLastAssistantSegmentForTurn = (
+  timeline: AiChatTimelineItem[],
+  item: MessageTimelineItem,
+) => {
+  if (item.role !== "assistant") return true;
+  const turnId = item.turnId ?? item.id;
+  const currentIndex = timeline.findIndex(
+    (timelineItem) =>
+      timelineItem.kind === "message" && timelineItem.id === item.id,
+  );
+  if (currentIndex < 0) return true;
+
+  return !timeline
+    .slice(currentIndex + 1)
+    .some(
+      (timelineItem) =>
+        timelineItem.kind === "message" &&
+        timelineItem.role === "assistant" &&
+        (timelineItem.turnId ?? timelineItem.id) === turnId,
+    );
+};
+
 const SelectionAttachmentChip = ({
   t,
   attachment,
@@ -1671,6 +1693,10 @@ export function AiChatPanel({
                   branchOptions.length > 0
                     ? getSelectedBranchOptionId(branchOptions)
                     : undefined;
+                const isLastAssistantSegment =
+                  item.role === "assistant"
+                    ? isLastAssistantSegmentForTurn(timeline, item)
+                    : true;
                 const isInlineEditingThisMessage =
                   inlineEditState?.messageId === item.id;
                 const selectionAttachments = userMessage
@@ -1819,14 +1845,21 @@ export function AiChatPanel({
                             <MessageActionBar
                               align={isUser ? "end" : "start"}
                               copied={copiedMessageId === item.id}
-                              branchOptions={branchOptions}
+                              branchOptions={
+                                !isUser && !isLastAssistantSegment
+                                  ? []
+                                  : branchOptions
+                              }
                               activeBranchSessionId={selectedBranchOptionId}
                               onSelectBranch={(sessionId) => {
                                 onSelectSession(sessionId);
                               }}
                               canEdit={isUser && !isBusy}
                               canRegenerate={
-                                !isUser && !item.isStreaming && !isBusy
+                                !isUser &&
+                                isLastAssistantSegment &&
+                                !item.isStreaming &&
+                                !isBusy
                               }
                               onCopy={() => {
                                 void handleCopyMessage(item);

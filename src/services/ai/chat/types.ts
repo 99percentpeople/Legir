@@ -279,6 +279,8 @@ export type AiChatTimelineItem =
       id: string;
       kind: "message";
       role: "user" | "assistant" | "thinking";
+      turnId?: string;
+      segmentIndex?: number;
       text: string;
       conversationText?: string;
       attachments?: AiChatMessageAttachment[];
@@ -291,6 +293,7 @@ export type AiChatTimelineItem =
       id: string;
       kind: "tool";
       toolCallId: string;
+      turnId?: string;
       batchId?: string;
       isParallelBatch?: boolean;
       toolName: AiToolName;
