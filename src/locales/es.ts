@@ -79,8 +79,6 @@ const es = {
   translate: {
     title: "Traducir",
     provider: "Modelo Proveedor",
-    provider_gemini: "Gemini (IA)",
-    provider_openai: "OpenAI (IA)",
     cloud_api_key_missing:
       "Falta la clave de Cloud Translation API. Establece GOOGLE_TRANSLATE_API_KEY en .env.local y reinicia la aplicación.",
     model: "Modelo",
@@ -344,9 +342,11 @@ const es = {
     },
     send: "Enviar",
     stop: "Detener",
+    cancel_edit: "Cancelar edición",
     messages: "Mensajes",
     tools: "Herramientas",
     error_title: "La solicitud falló",
+    retry: "Reintentar",
     input_placeholder:
       "Pide a la IA que lea, busque, navegue o resalte contenido del PDF...",
     input_hint: "Pulsa Enter para enviar, Shift+Enter para una nueva línea.",
@@ -532,6 +532,8 @@ const es = {
       fetch_success: "Modelos obtenidos.",
       fetch_failed: "Error al obtener modelos.",
       models: "Modelos",
+      fetched_models: "Modelos obtenidos",
+      fetched_models_empty: "Todavia no hay modelos obtenidos.",
       models_loaded_count: "Cargados: {count} modelo(s)",
       custom_models_translate: "Modelos personalizados (Traducción)",
       custom_models_vision: "Modelos personalizados (Visión)",

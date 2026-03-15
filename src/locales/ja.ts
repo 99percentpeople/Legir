@@ -79,8 +79,6 @@ const ja = {
   translate: {
     title: "翻訳",
     provider: "モデル提供者",
-    provider_gemini: "Gemini（AI）",
-    provider_openai: "OpenAI（AI）",
     cloud_api_key_missing:
       "Cloud Translation API のキーがありません。.env.local に GOOGLE_TRANSLATE_API_KEY を設定して再起動してください。",
     model: "モデル",
@@ -343,9 +341,11 @@ const ja = {
     },
     send: "送信",
     stop: "停止",
+    cancel_edit: "編集をキャンセル",
     messages: "メッセージ",
     tools: "ツール実行",
     error_title: "リクエストに失敗しました",
+    retry: "再試行",
     input_placeholder:
       "AI に PDF の内容を読ませたり、検索、移動、ハイライトさせたりできます...",
     input_hint: "Enter で送信、Shift+Enter で改行します。",
@@ -531,6 +531,8 @@ const ja = {
       fetch_success: "モデルを取得しました。",
       fetch_failed: "モデルの取得に失敗しました。",
       models: "モデル",
+      fetched_models: "取得済みモデル",
+      fetched_models_empty: "まだ取得済みモデルはありません。",
       models_loaded_count: "読み込み済み: {count} 件",
       custom_models_translate: "カスタムモデル（翻訳）",
       custom_models_vision: "カスタムモデル（ビジョン）",
