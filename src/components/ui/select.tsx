@@ -1,13 +1,23 @@
 import * as React from "react";
 import { Select as SelectPrimitive } from "radix-ui";
 
+import { useDialogPortalContainer } from "@/components/ui/dialog";
 import { cn } from "@/utils/cn";
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react";
 
 function Select({
+  value,
+  defaultValue,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />;
+  return (
+    <SelectPrimitive.Root
+      data-slot="select"
+      value={value}
+      defaultValue={defaultValue}
+      {...props}
+    />
+  );
 }
 
 function SelectGroup({
@@ -60,10 +70,16 @@ function SelectContent({
   children,
   position = "item-aligned",
   align = "center",
+  container,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: React.ComponentProps<typeof SelectPrimitive.Content> & {
+  container?: HTMLElement | null;
+}) {
+  const dialogPortalContainer = useDialogPortalContainer();
+  const portalContainer = container ?? dialogPortalContainer ?? undefined;
+
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={portalContainer}>
       <SelectPrimitive.Content
         data-slot="select-content"
         data-align-trigger={position === "item-aligned"}
