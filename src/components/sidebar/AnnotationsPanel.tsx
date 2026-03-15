@@ -142,9 +142,10 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
         </div>
 
         <Textarea
+          rows={1}
           id={`annotation-input-${annotation.id}`}
           ref={textareaRef}
-          className="text-foreground placeholder:text-muted-foreground/50 min-h-[60px] w-full resize-none border-none bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
+          className="text-foreground placeholder:text-muted-foreground/50 min-h-10 w-full resize-none border-none bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
           value={annotation.text || ""}
           placeholder={t("sidebar.add_remark")}
           onChange={(e) =>

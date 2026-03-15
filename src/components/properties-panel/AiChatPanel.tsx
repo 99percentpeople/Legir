@@ -1597,7 +1597,7 @@ export function AiChatPanel({
               </div>
               {!disabledReason ? (
                 <Tabs defaultValue={starterGroups[0]?.id} className="gap-3">
-                  <TabsList className="h-auto w-full justify-start rounded-xl p-1">
+                  <TabsList className="flex h-auto flex-wrap justify-start rounded-xl p-1">
                     {starterGroups.map((group) => (
                       <TabsTrigger
                         key={group.id}
