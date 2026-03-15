@@ -16,20 +16,22 @@ import {
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { useEditorStore } from "@/store/useEditorStore";
+import {
+  getWorkspaceRenderDpr,
+  isHeavyWorkspacePage,
+} from "../lib/renderPerformance";
 import PDFTileLayer from "./PDFTileLayer";
 
 interface PDFCanvasLayerProps {
   page: PageData;
   scale: number;
   isInView: boolean;
-  placeholderImage?: string;
 }
 
 const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   page,
   scale,
   isInView,
-  placeholderImage,
 }) => {
   const pageIndex = page.pageIndex;
   // Double buffering: Two canvases to prevent flickering during resize/re-render
@@ -54,6 +56,9 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   const renderEpochRef = useRef(0);
   const dprRef = useRef<number>(1);
   const setState = useEditorStore.setState;
+  const placeholderImage = useEditorStore(
+    (state) => state.thumbnailImages[pageIndex],
+  );
   const pageInfo = useMemo(
     () => ({
       viewBox: page.viewBox,
@@ -62,6 +67,14 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     }),
     [page.viewBox, page.userUnit, page.rotation],
   );
+  const isHeavyPage = useMemo(
+    () => isHeavyWorkspacePage(pageInfo, scale),
+    [pageInfo, scale],
+  );
+  // For oversized drawings, keep stretching the last good bitmap during zoom
+  // and coalesce render-scale updates onto the next paint instead of blocking input.
+  const [renderScale, setRenderScale] = useState(scale);
+  const renderScaleRafRef = useRef<number | null>(null);
 
   const updateImageData = useCallback(
     async (canvas: HTMLCanvasElement, renderEpoch?: number) => {
@@ -85,8 +98,9 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       }
 
       const current = useEditorStore.getState();
-      const currentPage = current.pages[pageIndex];
-      if (!currentPage || currentPage.imageData) return;
+      if (!current.pages[pageIndex] || current.thumbnailImages[pageIndex]) {
+        return;
+      }
 
       const sourceWidth = canvas.width;
       const sourceHeight = canvas.height;
@@ -129,8 +143,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       if (!imageData) return;
 
       const latest = useEditorStore.getState();
-      const latestPage = latest.pages[pageIndex];
-      if (!latestPage || latestPage.imageData) {
+      if (!latest.pages[pageIndex] || latest.thumbnailImages[pageIndex]) {
         if (imageData.startsWith("blob:")) {
           try {
             URL.revokeObjectURL(imageData);
@@ -142,11 +155,13 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       }
 
       setState((s) => {
-        const page = s.pages[pageIndex];
-        if (!page || page.imageData) return {};
-        const nextPages = s.pages.slice();
-        nextPages[pageIndex] = { ...page, imageData };
-        return { pages: nextPages };
+        if (!s.pages[pageIndex] || s.thumbnailImages[pageIndex]) return {};
+        return {
+          thumbnailImages: {
+            ...s.thumbnailImages,
+            [pageIndex]: imageData,
+          },
+        };
       });
     },
     [pageIndex, setState],
@@ -155,11 +170,45 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   useLayoutEffect(() => {
     renderedScaleRef.current = null;
     setIsRendered(false);
+    setRenderScale(scale);
   }, [pageIndex, pageInfo]);
+
+  useEffect(() => {
+    if (!isHeavyPage) {
+      setRenderScale((prev) => (prev === scale ? prev : scale));
+      return;
+    }
+
+    if (renderScale === scale) return;
+
+    if (renderScaleRafRef.current !== null) {
+      window.cancelAnimationFrame(renderScaleRafRef.current);
+    }
+
+    renderScaleRafRef.current = window.requestAnimationFrame(() => {
+      renderScaleRafRef.current = null;
+      setRenderScale(scale);
+    });
+
+    return () => {
+      if (renderScaleRafRef.current !== null) {
+        window.cancelAnimationFrame(renderScaleRafRef.current);
+        renderScaleRafRef.current = null;
+      }
+    };
+  }, [isHeavyPage, renderScale, scale]);
+
+  useEffect(() => {
+    return () => {
+      if (renderScaleRafRef.current !== null) {
+        window.cancelAnimationFrame(renderScaleRafRef.current);
+      }
+    };
+  }, []);
 
   useLayoutEffect(() => {
     renderEpochRef.current += 1;
-  }, [pageIndex, pageInfo, scale]);
+  }, [pageIndex, pageInfo, renderScale]);
 
   // Stable IDs for canvas elements to allow reuse in Worker
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
@@ -191,14 +240,18 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     }
 
     // Optimization: If already rendered at this scale, skip.
-    if (renderedScaleRef.current === scale) {
+    if (renderedScaleRef.current === renderScale) {
       return;
     }
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = getWorkspaceRenderDpr(
+      pageInfo,
+      renderScale,
+      Math.min(window.devicePixelRatio || 1, 2),
+    );
     dprRef.current = dpr;
     const viewportCheck = createViewportFromPageInfo(pageInfo, {
-      scale: scale * dpr,
+      scale: renderScale * dpr,
       rotation: pageInfo.rotation,
     });
     const pixelsCheck =
@@ -239,7 +292,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         // The worker handles the actual bitmap size.
 
         const viewport = createViewportFromPageInfo(pageInfo, {
-          scale: scale * dpr,
+          scale: renderScale * dpr,
           rotation: pageInfo.rotation,
         });
 
@@ -322,7 +375,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
           if (renderEpochRef.current !== epoch) return;
           setActiveCanvas(targetId);
           setIsRendered(true);
-          renderedScaleRef.current = scale;
+          renderedScaleRef.current = renderScale;
           const targetCanvas =
             targetId === "A" ? canvasARef.current : canvasBRef.current;
           if (targetCanvas) {
@@ -345,7 +398,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     isInView,
     pageIndex,
     pageInfo,
-    scale,
+    renderScale,
     tileState.tileMode,
     updateImageData,
   ]);
@@ -401,7 +454,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
       <PDFTileLayer
         page={page}
-        scale={scale}
+        scale={renderScale}
         isInView={isInView}
         isRendered={isRendered}
         onStateChange={setTileState}

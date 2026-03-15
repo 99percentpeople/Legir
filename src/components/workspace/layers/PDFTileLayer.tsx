@@ -8,6 +8,7 @@ import {
   getDistanceBetweenPoints,
   getDistanceSquaredBetweenPoints,
 } from "@/lib/viewportMath";
+import { getWorkspaceRenderDpr } from "../lib/renderPerformance";
 
 type TileInfo = {
   key: string;
@@ -47,6 +48,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
   const renderEpochRef = useRef(0);
   const dprRef = useRef<number>(1);
+  const tileProgressRafRef = useRef<number | null>(null);
 
   const [tileMode, setTileMode] = useState(false);
   const [frontTilesKey, setFrontTilesKey] = useState<string>("");
@@ -121,6 +123,14 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   const lastReprioritizeCenterRef = useRef<[number, number] | null>(null);
   const reprioritizeBusyRef = useRef(false);
   const reprioritizeQueuedCenterRef = useRef<[number, number] | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (tileProgressRafRef.current !== null) {
+        cancelAnimationFrame(tileProgressRafRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!scrollContainerEl) return;
@@ -256,7 +266,15 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
 
   useEffect(() => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = getWorkspaceRenderDpr(
+      {
+        viewBox: page.viewBox,
+        userUnit: page.userUnit,
+        rotation: page.rotation,
+      },
+      scale,
+      Math.min(window.devicePixelRatio || 1, 2),
+    );
     dprRef.current = dpr;
     const viewport = createViewportFromPageInfo(
       {
@@ -564,7 +582,12 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           // Used to trigger React re-renders while tiles are progressively completing.
           // This allows the parent to keep a full-page fallback visible until all tiles
           // for the current epoch are rendered.
-          setTileProgressVersion((v) => v + 1);
+          if (tileProgressRafRef.current === null) {
+            tileProgressRafRef.current = requestAnimationFrame(() => {
+              tileProgressRafRef.current = null;
+              setTileProgressVersion((v) => v + 1);
+            });
+          }
 
           if (
             !isRendered &&

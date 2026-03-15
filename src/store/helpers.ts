@@ -1,0 +1,333 @@
+import { filterSupportedGeminiToolCallingModelIds } from "@/services/ai/sdk/geminiModelSupport";
+import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
+import { ANNOTATION_STYLES, DEFAULT_EDITOR_UI_STATE } from "@/constants";
+import type {
+  AppOptions,
+  EditorState,
+  EditorUiState,
+  LLMOptions,
+  PageData,
+} from "@/types";
+
+const envGeminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
+const envOpenAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
+const envOpenAiApiUrl = (process.env.OPENAI_API_URL || "").trim();
+
+// Keep provider keys stable even when individual provider config is missing.
+export const createEmptyLlmOptions = (): LLMOptions =>
+  Object.fromEntries(
+    AI_PROVIDER_IDS.map((providerId) => [
+      providerId,
+      {
+        apiKey: "",
+        apiUrl: "",
+        customTranslateModels: [],
+        customVisionModels: [],
+      },
+    ]),
+  ) as LLMOptions;
+
+export const mergeLlmOptions = (
+  base: LLMOptions,
+  patch?: Partial<LLMOptions>,
+): LLMOptions =>
+  Object.fromEntries(
+    AI_PROVIDER_IDS.map((providerId) => [
+      providerId,
+      {
+        ...base[providerId],
+        ...patch?.[providerId],
+      },
+    ]),
+  ) as LLMOptions;
+
+export const trimLlmOptions = (options: LLMOptions): LLMOptions =>
+  Object.fromEntries(
+    AI_PROVIDER_IDS.map((providerId) => [
+      providerId,
+      {
+        ...options[providerId],
+        apiKey: (options[providerId].apiKey || "").trim(),
+        apiUrl: (options[providerId].apiUrl || "").trim(),
+        customTranslateModels:
+          providerId === "gemini"
+            ? filterSupportedGeminiToolCallingModelIds(
+                options[providerId].customTranslateModels || [],
+              )
+            : options[providerId].customTranslateModels || [],
+        customVisionModels:
+          providerId === "gemini"
+            ? filterSupportedGeminiToolCallingModelIds(
+                options[providerId].customVisionModels || [],
+              )
+            : options[providerId].customVisionModels || [],
+      },
+    ]),
+  ) as LLMOptions;
+
+export const applyEnvLlmDefaults = (options: LLMOptions): LLMOptions => ({
+  ...options,
+  gemini: {
+    ...options.gemini,
+    apiKey: (options.gemini.apiKey || envGeminiApiKey).trim(),
+  },
+  openai: {
+    ...options.openai,
+    apiKey: (options.openai.apiKey || envOpenAiApiKey).trim(),
+    apiUrl: (options.openai.apiUrl || envOpenAiApiUrl).trim(),
+  },
+});
+
+export const normalizeLlmOptions = (options: LLMOptions): LLMOptions =>
+  applyEnvLlmDefaults(trimLlmOptions(options));
+
+export const createEmptyLlmModelCache = (): EditorState["llmModelCache"] =>
+  Object.fromEntries(
+    AI_PROVIDER_IDS.map((providerId) => [
+      providerId,
+      {
+        translateModels: [],
+        visionModels: [],
+      },
+    ]),
+  ) as EditorState["llmModelCache"];
+
+export type PersistedLegacyAiChatOptions = Partial<AppOptions["aiChat"]> & {
+  digestSummaryProviderId?: string;
+  digestSummaryModelId?: string;
+};
+
+export const normalizeAiChatOptions = (
+  base: AppOptions["aiChat"],
+  patch?: PersistedLegacyAiChatOptions,
+): AppOptions["aiChat"] => {
+  const next = {
+    ...base,
+    ...patch,
+  };
+
+  const legacyProviderId = patch?.digestSummaryProviderId?.trim();
+  const legacyModelId = patch?.digestSummaryModelId?.trim();
+  if (
+    (!next.digestSummaryModelKey || !next.digestSummaryModelKey.trim()) &&
+    legacyProviderId &&
+    legacyModelId
+  ) {
+    next.digestSummaryModelKey = `${legacyProviderId}:${legacyModelId}`;
+  }
+
+  return {
+    digestCharsPerChunk: next.digestCharsPerChunk,
+    digestSourceCharsPerChunk: next.digestSourceCharsPerChunk,
+    digestSummaryModelKey: next.digestSummaryModelKey || "",
+  };
+};
+
+export const mergeEditorOptions = (
+  base: AppOptions,
+  patch?: Partial<AppOptions>,
+): AppOptions => {
+  if (!patch) {
+    return {
+      ...base,
+      llm: normalizeLlmOptions(base.llm),
+      aiChat: normalizeAiChatOptions(base.aiChat),
+    };
+  }
+
+  return {
+    ...base,
+    ...patch,
+    ...(patch.llm
+      ? {
+          llm: normalizeLlmOptions(mergeLlmOptions(base.llm, patch.llm)),
+        }
+      : {}),
+    ...(patch.snappingOptions
+      ? {
+          snappingOptions: {
+            ...base.snappingOptions,
+            ...patch.snappingOptions,
+          },
+        }
+      : {}),
+    ...(patch.debugOptions
+      ? {
+          debugOptions: {
+            ...base.debugOptions,
+            ...patch.debugOptions,
+          },
+        }
+      : {}),
+    ...(patch.aiChat
+      ? {
+          aiChat: normalizeAiChatOptions(base.aiChat, patch.aiChat),
+        }
+      : {}),
+  };
+};
+
+export const normalizeEditorOptions = (options: AppOptions): AppOptions =>
+  mergeEditorOptions(options);
+
+export const revokeObjectUrlIfNeeded = (url: string | undefined | null) => {
+  if (!url) return;
+  if (!url.startsWith("blob:")) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    // ignore
+  }
+};
+
+export const revokeThumbnailObjectUrls = (
+  thumbnailImages: Record<number, string>,
+) => {
+  for (const url of Object.values(thumbnailImages)) {
+    revokeObjectUrlIfNeeded(url);
+  }
+};
+
+export const revokeLegacyPageThumbnailObjectUrls = (pages: PageData[]) => {
+  for (const page of pages as Array<PageData & { imageData?: string }>) {
+    revokeObjectUrlIfNeeded(page.imageData);
+  }
+};
+
+export function pickEditorUiState(
+  state: Partial<EditorState>,
+): Partial<EditorUiState> {
+  return {
+    isSidebarOpen: state.isSidebarOpen,
+    isRightPanelOpen: state.isRightPanelOpen,
+    rightPanelTab: state.rightPanelTab,
+    sidebarTab: state.sidebarTab,
+    pageLayout: state.pageLayout,
+    pageFlow: state.pageFlow,
+    sidebarWidth: state.sidebarWidth,
+    rightPanelWidth: state.rightPanelWidth,
+    translateOption: state.translateOption,
+    translateTargetLanguage: state.translateTargetLanguage,
+    pageTranslateOptions: state.pageTranslateOptions,
+    options: state.options,
+    rightPanelDockTab: state.rightPanelDockTab,
+  };
+}
+
+export const initialState: EditorState = {
+  pdfFile: null,
+  pdfBytes: null,
+  pdfOpenPassword: null,
+  exportPassword: null,
+  metadata: {},
+  filename: "document.pdf",
+  saveTarget: null,
+  pages: [],
+  thumbnailImages: {},
+  fields: [],
+  annotations: [],
+  outline: [],
+  selectedId: null,
+  scale: 1.0,
+  mode: "annotation",
+  tool: "select",
+  penStyle: {
+    color: ANNOTATION_STYLES.ink.color,
+    thickness: ANNOTATION_STYLES.ink.thickness,
+    opacity: ANNOTATION_STYLES.ink.opacity,
+  },
+  highlightStyle: {
+    color: ANNOTATION_STYLES.highlight.color,
+    thickness: ANNOTATION_STYLES.highlight.thickness,
+    opacity: ANNOTATION_STYLES.highlight.opacity,
+  },
+  commentStyle: {
+    color: ANNOTATION_STYLES.comment.color,
+    opacity: ANNOTATION_STYLES.comment.opacity,
+  },
+  freetextStyle: {
+    color: ANNOTATION_STYLES.freetext.color,
+    size: ANNOTATION_STYLES.freetext.size,
+  },
+  isProcessing: false,
+  past: [],
+  future: [],
+  clipboard: null,
+  lastSavedAt: null,
+  processingStatus: null,
+  isPanelFloating: false,
+  isSaving: false,
+  pageTranslateParagraphCandidates: [],
+  pageTranslateSelectedParagraphIds: [],
+  ...DEFAULT_EDITOR_UI_STATE,
+  isFullscreen: false,
+  hasSavedSession: false,
+  isDirty: false,
+  currentPageIndex: 0,
+  pendingViewStateRestore: null,
+  fitTrigger: 0,
+  keys: {
+    ctrl: false,
+    shift: false,
+    alt: false,
+    meta: false,
+    space: false,
+  },
+  activeDialog: null,
+  closeConfirmSource: null,
+  actionSignal: null,
+  llmModelCache: createEmptyLlmModelCache(),
+};
+
+initialState.options = normalizeEditorOptions({
+  ...initialState.options,
+  llm: mergeLlmOptions(createEmptyLlmOptions(), initialState.options.llm),
+});
+
+// Page-translate candidate merging uses median/common-value heuristics so merged
+// blocks keep a visually plausible style.
+export const medianNumber = (values: number[]) => {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1]! + sorted[mid]!) / 2;
+  }
+  return sorted[mid]!;
+};
+
+export const pickMostCommonString = (values: string[]) => {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  let best: { value: string; count: number } | null = null;
+  for (const [value, count] of counts) {
+    if (!best || count > best.count) {
+      best = { value, count };
+    }
+  }
+  return best?.value;
+};
+
+export const unionRect = (
+  rects: Array<{ x: number; y: number; width: number; height: number }>,
+) => {
+  if (rects.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const rect of rects) {
+    minX = Math.min(minX, rect.x);
+    minY = Math.min(minY, rect.y);
+    maxX = Math.max(maxX, rect.x + rect.width);
+    maxY = Math.max(maxY, rect.y + rect.height);
+  }
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+  };
+};

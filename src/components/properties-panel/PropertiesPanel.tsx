@@ -3,6 +3,8 @@ import { FormField, Annotation, PDFMetadata } from "@/types";
 import { DocumentPropertiesPanel } from "./DocumentPropertiesPanel";
 import { ControlPropertiesPanel } from "./ControlPropertiesPanel";
 import { useEditorStore } from "@/store/useEditorStore";
+import { useShallow } from "zustand/react/shallow";
+import { selectPropertiesPanelState } from "@/store/selectors";
 
 // --- Main Container Component ---
 interface PropertiesPanelProps {
@@ -43,9 +45,9 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
     width,
     onResize,
   }) => {
-    const exportPassword = useEditorStore((s) => s.exportPassword);
-    const pdfOpenPassword = useEditorStore((s) => s.pdfOpenPassword);
-    const setEditorState = useEditorStore((s) => s.setState);
+    const { exportPassword, pdfOpenPassword, setEditorState } = useEditorStore(
+      useShallow(selectPropertiesPanelState),
+    );
 
     if (activeTab === "properties" && selectedControl) {
       return (

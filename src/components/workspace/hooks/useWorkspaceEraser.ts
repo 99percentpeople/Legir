@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { EditorState } from "@/types";
+import type { WorkspaceEditorState } from "@/types";
 
 type Point = { x: number; y: number };
 
@@ -16,7 +16,7 @@ const distToSegmentSquared = (p: Point, v: Point, w: Point) => {
 };
 
 export const useWorkspaceEraser = (opts: {
-  editorState: EditorState;
+  editorState: Pick<WorkspaceEditorState, "annotations" | "scale">;
   onDeleteAnnotation: (id: string) => void;
 }) => {
   const checkEraserCollision = useCallback(

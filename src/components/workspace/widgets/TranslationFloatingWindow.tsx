@@ -23,11 +23,14 @@ import {
   translateService,
   type TranslateOptionGroup,
 } from "@/services/translateService";
+import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
 import { FloatingWindow } from "@/components/ui/floating-window";
 import { cn } from "@/utils/cn";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { TranslateOptionId } from "@/types";
 import { Spinner } from "@/components/ui/spinner";
+import { useShallow } from "zustand/react/shallow";
+import { selectTranslationFloatingWindowState } from "@/store/selectors";
 
 export interface TranslationFloatingWindowProps {
   isOpen: boolean;
@@ -98,11 +101,8 @@ export const TranslationFloatingWindow: React.FC<
   TranslationFloatingWindowProps
 > = ({ isOpen, sourceText, autoTranslateToken, onClose }) => {
   const { t, effectiveLanguage } = useLanguage();
-  const translateOptionRaw = useEditorStore((s) => s.translateOption);
-  const translateTargetLanguage = useEditorStore(
-    (s) => s.translateTargetLanguage,
-  );
-  const setState = useEditorStore((s) => s.setState);
+  const { translateOptionRaw, translateTargetLanguage, setState } =
+    useEditorStore(useShallow(selectTranslationFloatingWindowState));
 
   const [registryVersion, setRegistryVersion] = useState(0);
 
@@ -124,9 +124,12 @@ export const TranslationFloatingWindow: React.FC<
   const modelSelectGroups = useMemo<ModelSelectGroup[]>(() => {
     const weight = (groupId: string) => {
       if (groupId === "cloud") return 0;
-      if (groupId === "openai") return 1;
-      if (groupId === "gemini") return 2;
-      return 3;
+      const providerIndex = AI_PROVIDER_IDS.indexOf(
+        groupId as (typeof AI_PROVIDER_IDS)[number],
+      );
+      return providerIndex >= 0
+        ? providerIndex + 1
+        : AI_PROVIDER_IDS.length + 1;
     };
 
     const sorted = optionGroups

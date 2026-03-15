@@ -3,7 +3,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type RefObject,
 } from "react";
-import type { EditorState } from "@/types";
+import type { WorkspaceEditorState } from "@/types";
 
 type PageRect = {
   top: number;
@@ -13,7 +13,7 @@ type PageRect = {
 };
 
 export const useWorkspacePointerCoords = (opts: {
-  editorStateRef: RefObject<EditorState>;
+  editorStateRef: RefObject<Pick<WorkspaceEditorState, "scale">>;
   contentRef?: RefObject<HTMLElement>;
   getPageRectByPageIndex?: (pageIndex: number) => PageRect | null;
 }) => {

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useCallback, type RefObject } from "react";
-import { Annotation, EditorState, Tool } from "@/types";
+import { Annotation, EditorState, Tool, WorkspaceEditorState } from "@/types";
 
 type Point = { x: number; y: number };
 
 interface UseInkSessionParams {
   editorState: Pick<EditorState, "tool" | "penStyle" | "highlightStyle">;
-  editorStateRef: RefObject<EditorState>;
+  editorStateRef: RefObject<WorkspaceEditorState>;
   onAddAnnotation: (annotation: Annotation) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   onSelectControl: (id: string | null) => void;

@@ -1,17 +1,9 @@
-import React, {
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Toolbar from "../components/toolbar/Toolbar";
 import Sidebar from "../components/sidebar/Sidebar";
 import PDFSearchHeader from "../components/sidebar/PDFSearchHeader";
 import PDFSearchPanel from "../components/sidebar/PDFSearchPanel";
-import FloatingBar from "../components/toolbar/FloatingBar";
-import { Skeleton } from "../components/ui/skeleton";
-import { useEditorStore, type EditorStore } from "../store/useEditorStore";
+import { useEditorStore } from "../store/useEditorStore";
 import { Button } from "../components/ui/button";
 import { appEventBus } from "@/lib/eventBus";
 import { RightPanelTabDock } from "../components/properties-panel/RightPanelTabDock";
@@ -25,8 +17,6 @@ import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
 import { TranslationFloatingWindow } from "../components/workspace/widgets/TranslationFloatingWindow";
 import { useAiChatController } from "@/hooks/useAiChatController";
-
-const Workspace = React.lazy(() => import("../components/workspace/Workspace"));
 import {
   Dialog,
   DialogContent,
@@ -45,13 +35,7 @@ import type {
   Tool,
 } from "../types";
 import type { FormDetectionOptions } from "../components/FormDetectionOptionsForm";
-import {
-  ANNOTATION_STYLES,
-  FIT_SCREEN_PADDING_X,
-  FIT_SCREEN_PADDING_Y,
-  FIT_WIDTH_PADDING_X,
-  WORKSPACE_BASE_PAGE_GAP_PX,
-} from "../constants";
+import { ANNOTATION_STYLES } from "../constants";
 import { isTauri } from "@tauri-apps/api/core";
 import {
   type CloseRequestedEvent,
@@ -66,10 +50,11 @@ import {
   getPointToRectDistanceSquared,
   getRectCenter,
 } from "@/lib/viewportMath";
+import { useShallow } from "zustand/react/shallow";
+import { selectEditorPageShellState } from "@/store/selectors";
+import { EditorCanvasPane } from "@/pages/editor/EditorCanvasPane";
 
 export interface EditorPageProps {
-  editorStore: EditorStore;
-
   onExport: () => Promise<boolean>;
   onSaveDraft: (silent?: boolean) => Promise<void>;
   onSaveAs: () => Promise<boolean>;
@@ -79,7 +64,6 @@ export interface EditorPageProps {
 }
 
 const EditorPage: React.FC<EditorPageProps> = ({
-  editorStore,
   onExport,
   onSaveDraft,
   onSaveAs,
@@ -87,16 +71,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
   onPrint,
   onAdvancedDetect,
 }) => {
+  const editorStore = useEditorStore(useShallow(selectEditorPageShellState));
   const state = editorStore;
   const tauri = isTauri();
   const { t, effectiveLanguage } = useLanguage();
   const {
     setState,
     setUiState,
-    addField,
-    addAnnotation,
     addAnnotations,
-    updateField,
     updateAnnotation,
     deleteSelection,
     selectControl,
@@ -110,7 +92,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
     openDialog,
     setPageTranslateParagraphCandidates,
     clearPageTranslateParagraphCandidates,
-    selectPageTranslateParagraphId,
     setSelectedPageTranslateParagraphIds,
     mergeSelectedPageTranslateParagraphs,
     toggleExcludeSelectedPageTranslateParagraphs,
@@ -121,7 +102,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const isMobile = useIsMobile();
   const prevSelectedIdRef = useRef<string | null>(null);
-  const lastFitKeyRef = useRef<string | null>(null);
   const skipNextWindowCloseRef = useRef(false);
   const initialTitleRef = useRef<string | null>(null);
   const workspaceScrollContainerRef = useRef<HTMLElement | null>(null);
@@ -151,8 +131,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const [pdfSearchError, setPdfSearchError] = useState<string | null>(null);
   const pdfSearchSeqRef = useRef(0);
   const pdfSearchViewportStateRef = useRef({
-    scale: state.scale,
-    currentPageIndex: state.currentPageIndex,
+    scale: useEditorStore.getState().scale,
+    currentPageIndex: useEditorStore.getState().currentPageIndex,
   });
   const pendingPdfSearchPreferredSelectionRef = useRef<{
     query: string;
@@ -160,10 +140,16 @@ const EditorPage: React.FC<EditorPageProps> = ({
     startOffset: number;
     endOffset: number;
   } | null>(null);
-  pdfSearchViewportStateRef.current = {
-    scale: state.scale,
-    currentPageIndex: state.currentPageIndex,
-  };
+  useEffect(
+    () =>
+      useEditorStore.subscribe((nextState) => {
+        pdfSearchViewportStateRef.current = {
+          scale: nextState.scale,
+          currentPageIndex: nextState.currentPageIndex,
+        };
+      }),
+    [],
+  );
 
   const {
     isPageTranslating,
@@ -199,12 +185,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
     });
   }, [setUiState]);
 
-  const handleInitialScrollApplied = useCallback(() => {
-    setState({ pendingViewStateRestore: null });
-  }, [setState]);
-
   const toggleFullscreen = useCallback(() => {
-    const next = !state.isFullscreen;
+    const next = !useEditorStore.getState().isFullscreen;
     setState({ isFullscreen: next });
 
     if (tauri) {
@@ -234,7 +216,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         setState({ isFullscreen: !next });
       }
     })();
-  }, [setState, state.isFullscreen, tauri]);
+  }, [setState, tauri]);
 
   useEventListener(
     tauri ? undefined : window,
@@ -1049,114 +1031,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
     onSaveDraft,
   ]);
 
-  const getWorkspaceViewport = useCallback(() => {
-    const el = workspaceScrollContainerRef.current;
-    if (el) return { width: el.clientWidth, height: el.clientHeight };
-    if (typeof window !== "undefined") {
-      return { width: window.innerWidth, height: window.innerHeight };
-    }
-    return { width: 0, height: 0 };
-  }, []);
-
-  const calculateFitWidthScale = useCallback(
-    (pageIndex: number = 0) => {
-      if (!state.pages || state.pages.length === 0) return 1.0;
-      const targetIndex = Math.max(
-        0,
-        Math.min(pageIndex, state.pages.length - 1),
-      );
-      const page = state.pages[targetIndex];
-      if (!page.width) return 1.0;
-
-      const { width } = getWorkspaceViewport();
-      const availableWidth = width - FIT_WIDTH_PADDING_X;
-      if (state.pageLayout !== "single") {
-        if (state.pageFlow === "horizontal") {
-          const scale = availableWidth / page.width;
-          return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
-        }
-        const denom = page.width * 2 + WORKSPACE_BASE_PAGE_GAP_PX;
-        const scale = denom > 0 ? availableWidth / denom : 1.0;
-        return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
-      }
-
-      const scale = availableWidth / page.width;
-      return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
-    },
-    [state.pages, state.pageLayout, getWorkspaceViewport],
-  );
-
-  const calculateFitScreenScale = useCallback(
-    (pageIndex: number = 0) => {
-      if (!state.pages || state.pages.length === 0) return 1.0;
-      const targetIndex = Math.max(
-        0,
-        Math.min(pageIndex, state.pages.length - 1),
-      );
-      const page = state.pages[targetIndex];
-      if (!page.width || !page.height) return 1.0;
-
-      const { width, height } = getWorkspaceViewport();
-      const availableWidth = width - FIT_SCREEN_PADDING_X;
-      const availableHeight = height - FIT_SCREEN_PADDING_Y;
-
-      const widthScale =
-        state.pageLayout !== "single"
-          ? (() => {
-              if (state.pageFlow === "horizontal") {
-                return availableWidth / page.width;
-              }
-              const denom = page.width * 2 + WORKSPACE_BASE_PAGE_GAP_PX;
-              return denom > 0 ? availableWidth / denom : 1.0;
-            })()
-          : availableWidth / page.width;
-      const heightScale =
-        state.pageLayout !== "single" && state.pageFlow === "horizontal"
-          ? availableHeight / (page.height * 2 + WORKSPACE_BASE_PAGE_GAP_PX)
-          : availableHeight / page.height;
-      const scale = Math.min(widthScale, heightScale);
-      return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
-    },
-    [state.pages, state.pageLayout, getWorkspaceViewport],
-  );
-
-  const updateScale = useCallback(
-    (newScale: number) => {
-      const clamped = Math.max(0.25, Math.min(5.0, newScale));
-      setState({ scale: clamped });
-    },
-    [setState],
-  );
-
-  useEffect(() => {
-    if (!state.pages || state.pages.length === 0) return;
-    const bytesLen =
-      typeof state.pdfBytes?.byteLength === "number"
-        ? state.pdfBytes.byteLength
-        : state.pdfBytes?.length;
-    const fitKey = `${state.filename || ""}:${state.pages.length}:${bytesLen || 0}`;
-    if (lastFitKeyRef.current === fitKey) return;
-    lastFitKeyRef.current = fitKey;
-
-    if (state.pendingViewStateRestore) {
-      const restore = state.pendingViewStateRestore;
-      updateScale(restore.scale);
-      return;
-    }
-
-    updateScale(calculateFitScreenScale(state.currentPageIndex));
-    setState({ fitTrigger: Date.now() });
-  }, [
-    state.pages,
-    state.pdfBytes,
-    state.filename,
-    state.currentPageIndex,
-    state.pendingViewStateRestore,
-    calculateFitScreenScale,
-    updateScale,
-    setState,
-  ]);
-
   useEventListener<KeyboardEvent>(
     typeof window !== "undefined" ? window : null,
     "keydown",
@@ -1419,7 +1293,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const handleFilenameChange = useCallback(
     (name: string) => {
-      setState((prev) => ({ ...prev, filename: name, isDirty: true }));
+      setState({ filename: name, isDirty: true });
     },
     [setState],
   );
@@ -1644,73 +1518,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
           }
         />
 
-        <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="flex flex-1 items-center justify-center p-4">
-                <div className="flex gap-6">
-                  <Skeleton className="h-[70vh] w-[48vh]" />
-                </div>
-              </div>
-            }
-          >
-            <Workspace
-              editorState={state}
-              onAddField={addField}
-              onAddAnnotation={addAnnotation}
-              onSelectControl={selectControl}
-              onUpdateField={updateField}
-              onUpdateAnnotation={updateAnnotation}
-              onDeleteAnnotation={deleteAnnotation}
-              onEditAnnotation={handleEditAnnotation}
-              onScaleChange={updateScale}
-              onTriggerHistorySave={saveCheckpoint}
-              onPageIndexChange={(idx) => setState({ currentPageIndex: idx })}
-              onToolChange={(tool) => setTool(tool)}
-              onSelectPageTranslateParagraphId={selectPageTranslateParagraphId}
-              onClearPageTranslateParagraphSelection={() =>
-                setSelectedPageTranslateParagraphIds([])
-              }
-              fitTrigger={state.fitTrigger}
-              initialScrollPosition={
-                state.pendingViewStateRestore
-                  ? {
-                      left: state.pendingViewStateRestore.scrollLeft,
-                      top: state.pendingViewStateRestore.scrollTop,
-                    }
-                  : null
-              }
-              onInitialScrollApplied={handleInitialScrollApplied}
-              pdfSearchResultsByPage={workspaceTextHighlightsByPage}
-              activePdfSearchResultId={
-                isPdfSearchOpen ? activePdfSearchResultId : null
-              }
-            />
-          </Suspense>
-          <FloatingBar
-            scale={state.scale}
-            pageLayout={state.pageLayout}
-            pageFlow={state.pageFlow}
-            isFullscreen={state.isFullscreen}
-            onPageLayoutChange={(layout) => {
-              setState({ pageLayout: layout, fitTrigger: Date.now() });
-            }}
-            onPageFlowChange={(flow) => {
-              setState({ pageFlow: flow, fitTrigger: Date.now() });
-            }}
-            onToggleFullscreen={toggleFullscreen}
-            onZoomIn={() => updateScale(state.scale * 1.25)}
-            onZoomOut={() => updateScale(state.scale / 1.25)}
-            onFitWidth={() => {
-              updateScale(calculateFitWidthScale(state.currentPageIndex));
-              setState({ fitTrigger: Date.now() });
-            }}
-            onFitScreen={() => {
-              updateScale(calculateFitScreenScale(state.currentPageIndex));
-              setState({ fitTrigger: Date.now() });
-            }}
-          />
-        </div>
+        <EditorCanvasPane
+          onEditAnnotation={handleEditAnnotation}
+          onToggleFullscreen={toggleFullscreen}
+          pdfSearchResultsByPage={workspaceTextHighlightsByPage}
+          activePdfSearchResultId={
+            isPdfSearchOpen ? activePdfSearchResultId : null
+          }
+        />
 
         <RightPanelTabDock
           activeTabs={
@@ -1768,6 +1583,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
               onSend={(input) => {
                 void aiChat.sendMessage(input);
               }}
+              onRegenerateMessage={(messageId) => {
+                void aiChat.regenerateAssistantMessage(messageId);
+              }}
+              onRetryLastError={() => {
+                void aiChat.retryLastFailedMessage();
+              }}
+              onEditUserMessage={aiChat.editUserMessage}
               onStop={aiChat.stop}
               disabledReason={aiChat.disabledReason}
             />
@@ -1978,4 +1800,4 @@ const EditorPage: React.FC<EditorPageProps> = ({
   );
 };
 
-export default EditorPage;
+export default React.memo(EditorPage);

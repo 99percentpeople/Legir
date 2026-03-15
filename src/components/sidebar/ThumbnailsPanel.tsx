@@ -24,6 +24,9 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
 }) => {
   const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
+  const thumbnailImage = useEditorStore(
+    (state) => state.thumbnailImages[pageIndex],
+  );
 
   useEffect(() => {
     if (!isActive || !ref.current) return;
@@ -53,9 +56,9 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
         )}
         style={{ aspectRatio: aspectRatio }}
       >
-        {page.imageData ? (
+        {thumbnailImage ? (
           <img
-            src={page.imageData}
+            src={thumbnailImage}
             alt={`Page ${pageIndex + 1}`}
             className="h-full w-full object-contain"
           />

@@ -6,7 +6,7 @@ import FileDropDialog from "./components/dialogs/FileDropDialog";
 import PdfPasswordDialog from "./components/dialogs/PdfPasswordDialog";
 import { EditorState, FormField } from "./types";
 import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
-import { analyzePageForFields } from "./services/LLMService";
+import { analyzePageForFields } from "./services/ai";
 import { saveDraft, getDraft } from "./services/storageService";
 import {
   exportPdfBytes,
@@ -26,6 +26,8 @@ import { recentFilesService } from "./services/recentFilesService";
 import { isTauri } from "@tauri-apps/api/core";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";
+import { useShallow } from "zustand/react/shallow";
+import { selectAppShellState } from "@/store/selectors";
 
 // App orchestrator (not just UI).
 //
@@ -34,7 +36,7 @@ import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";
 // - Render landing/editor routes
 // - Save/export (Web vs Tauri) via `fileOps`
 // - Web draft persistence via `storageService`
-// - AI field detection via `geminiService`
+// - AI field detection via `services/ai`
 //
 // Rule of thumb:
 // - Rendering/interaction logic lives in `pages/EditorPage.tsx` and `components/workspace/Workspace.tsx`.
@@ -63,7 +65,7 @@ const App: React.FC = () => {
   const [, navigate] = useLocation();
 
   // Use Zustand store
-  const state = useEditorStore();
+  const state = useEditorStore(useShallow(selectAppShellState));
   const {
     setState,
     setOptions,
@@ -72,6 +74,13 @@ const App: React.FC = () => {
     setProcessingStatus,
     withProcessing,
     loadDocument,
+    isProcessing,
+    processingStatus,
+    pagesLength,
+    hasSavedSession,
+    activeDialog,
+    options,
+    isDirty,
   } = state;
 
   // Global "processing" UI.
@@ -83,8 +92,8 @@ const App: React.FC = () => {
   // - long tasks (load/export/AI) share one consistent UX
   // - UI remains usable while background work runs
   useGlobalProcessingToast({
-    isProcessing: state.isProcessing,
-    processingStatus: state.processingStatus,
+    isProcessing,
+    processingStatus,
     defaultMessage: t("common.processing"),
   });
   const pdfDisposeRef = React.useRef<null | (() => void)>(null);
@@ -393,136 +402,142 @@ const App: React.FC = () => {
     });
   };
 
-  const handleAdvancedDetect = async (options: FormDetectionOptions) => {
-    if (state.pages.length === 0 || !state.pdfBytes) return;
+  const handleAdvancedDetect = useCallback(
+    async (options: FormDetectionOptions) => {
+      const snapshot = useEditorStore.getState();
+      if (snapshot.pages.length === 0 || !snapshot.pdfBytes) return;
 
-    // Parse the page range from options
-    const targetPageIndices = (() => {
-      const range = options.pageRange;
-      const totalPages = state.pages.length;
-      if (!range || range.toLowerCase() === "all") {
-        return Array.from({ length: totalPages }, (_, i) => i);
-      }
+      // Parse the page range from options
+      const targetPageIndices = (() => {
+        const range = options.pageRange;
+        const totalPages = snapshot.pages.length;
+        if (!range || range.toLowerCase() === "all") {
+          return Array.from({ length: totalPages }, (_, i) => i);
+        }
 
-      const pages = new Set<number>();
-      const parts = range.split(",");
-      for (const part of parts) {
-        const p = part.trim();
-        if (!p) continue;
+        const pages = new Set<number>();
+        const parts = range.split(",");
+        for (const part of parts) {
+          const p = part.trim();
+          if (!p) continue;
 
-        if (p.includes("-")) {
-          const [start, end] = p.split("-").map((n) => parseInt(n));
-          if (!isNaN(start) && !isNaN(end)) {
-            for (let i = start; i <= end; i++) {
-              if (i >= 1 && i <= totalPages) pages.add(i - 1);
+          if (p.includes("-")) {
+            const [start, end] = p.split("-").map((n) => parseInt(n));
+            if (!isNaN(start) && !isNaN(end)) {
+              for (let i = start; i <= end; i++) {
+                if (i >= 1 && i <= totalPages) pages.add(i - 1);
+              }
+            }
+          } else {
+            const num = parseInt(p);
+            if (!isNaN(num) && num >= 1 && num <= totalPages) {
+              pages.add(num - 1);
             }
           }
-        } else {
-          const num = parseInt(p);
-          if (!isNaN(num) && num >= 1 && num <= totalPages) {
-            pages.add(num - 1);
-          }
         }
+        return Array.from(pages).sort((a, b) => a - b);
+      })();
+
+      if (targetPageIndices.length === 0) {
+        toast.error("Invalid page range selected.");
+        return;
       }
-      return Array.from(pages).sort((a, b) => a - b);
-    })();
 
-    if (targetPageIndices.length === 0) {
-      toast.error("Invalid page range selected.");
-      return;
-    }
+      await withProcessing(null, async () => {
+        let allNewFields: FormField[] = [];
 
-    await withProcessing(null, async () => {
-      let allNewFields: FormField[] = [];
+        for (let i = 0; i < targetPageIndices.length; i++) {
+          const pageIndex = targetPageIndices[i];
+          const page = snapshot.pages[pageIndex];
 
-      for (let i = 0; i < targetPageIndices.length; i++) {
-        const pageIndex = targetPageIndices[i];
-        const page = state.pages[pageIndex];
-
-        setProcessingStatus(
-          t("app.analyzing", {
-            current: i + 1,
-            total: targetPageIndices.length,
-          }),
-        );
-
-        const base64Image = await renderPage({
-          pageIndex,
-          pdfBytes: state.pdfBytes,
-          password: state.pdfOpenPassword,
-        });
-
-        if (base64Image) {
-          const fields = await analyzePageForFields(
-            base64Image,
-            page.pageIndex,
-            page.width,
-            page.height,
-            [],
-            {
-              allowedTypes:
-                options.allowedTypes.length > 0
-                  ? options.allowedTypes
-                  : undefined,
-              extraPrompt: options.extraPrompt,
-              providerId: options.providerId,
-              modelId: options.modelId,
-            },
+          setProcessingStatus(
+            t("app.analyzing", {
+              current: i + 1,
+              total: targetPageIndices.length,
+            }),
           );
 
-          // Apply custom style if needed
-          if (options.useCustomStyle) {
-            fields.forEach((f) => {
-              f.style = { ...f.style, ...options.defaultStyle };
-            });
+          const base64Image = await renderPage({
+            pageIndex,
+            pdfBytes: snapshot.pdfBytes,
+            password: snapshot.pdfOpenPassword,
+          });
+
+          if (base64Image) {
+            const fields = await analyzePageForFields(
+              base64Image,
+              page.pageIndex,
+              page.width,
+              page.height,
+              [],
+              {
+                allowedTypes:
+                  options.allowedTypes.length > 0
+                    ? options.allowedTypes
+                    : undefined,
+                extraPrompt: options.extraPrompt,
+                providerId: options.providerId,
+                modelId: options.modelId,
+              },
+            );
+
+            // Apply custom style if needed
+            if (options.useCustomStyle) {
+              fields.forEach((f) => {
+                f.style = { ...f.style, ...options.defaultStyle };
+              });
+            }
+
+            allNewFields = [...allNewFields, ...fields];
           }
-
-          allNewFields = [...allNewFields, ...fields];
         }
-      }
 
-      if (allNewFields.length > 0) {
-        saveCheckpoint();
-        setState((prev) => ({
-          ...prev,
-          fields: [...prev.fields, ...allNewFields],
-          isDirty: true,
-        }));
-      } else {
-        toast.info(t("app.no_new_fields"));
-      }
-    }).catch((e) => {
-      console.error(e);
-      toast.error(t("app.auto_detect_fail", { error: e.message }));
-    });
-  };
+        if (allNewFields.length > 0) {
+          saveCheckpoint();
+          setState((prev) => ({
+            ...prev,
+            fields: [...prev.fields, ...allNewFields],
+            isDirty: true,
+          }));
+        } else {
+          toast.info(t("app.no_new_fields"));
+        }
+      }).catch((e) => {
+        console.error(e);
+        toast.error(t("app.auto_detect_fail", { error: e.message }));
+      });
+    },
+    [saveCheckpoint, setProcessingStatus, setState, t, withProcessing],
+  );
 
-  const generatePDF = async () => {
-    if (!state.pdfBytes) return null;
+  const generatePDF = useCallback(async () => {
+    const snapshot = useEditorStore.getState();
+    if (!snapshot.pdfBytes) return null;
     return await exportPDF(
-      state.pdfBytes,
-      state.fields,
-      state.metadata,
-      state.annotations,
+      snapshot.pdfBytes,
+      snapshot.fields,
+      snapshot.metadata,
+      snapshot.annotations,
       undefined,
       {
-        openPassword: state.pdfOpenPassword,
-        exportPassword: state.exportPassword,
+        openPassword: snapshot.pdfOpenPassword,
+        exportPassword: snapshot.exportPassword,
         removeTextUnderFlattenedFreetext:
-          state.options.removeTextUnderFlattenedFreetext,
+          snapshot.options.removeTextUnderFlattenedFreetext,
       },
     );
-  };
+  }, []);
 
-  const handleSaveAs = async (): Promise<boolean> => {
-    if (!state.pdfBytes) return false;
+  const handleSaveAs = useCallback(async (): Promise<boolean> => {
+    const snapshot = useEditorStore.getState();
+    if (!snapshot.pdfBytes) return false;
     return await withProcessing(t("app.generating"), async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       const modifiedBytes = await generatePDF();
       if (!modifiedBytes) return false;
 
       const target = await pickSaveTarget({
-        suggestedName: state.filename || "document.pdf",
+        suggestedName: snapshot.filename || "document.pdf",
         filters: [{ name: "PDF Document", extensions: ["pdf"] }],
       });
       if (!target) return false;
@@ -533,12 +548,12 @@ const App: React.FC = () => {
         if (isTauriSaveTarget(target)) {
           const normalized = target.path.replace(/\\/g, "/");
           const parts = normalized.split("/").filter(Boolean);
-          return parts.length > 0 ? parts[parts.length - 1] : state.filename;
+          return parts.length > 0 ? parts[parts.length - 1] : snapshot.filename;
         }
         if (target?.kind === "web") {
-          return target.handle?.name || state.filename;
+          return target.handle?.name || snapshot.filename;
         }
-        return state.filename;
+        return snapshot.filename;
       })();
 
       setState({
@@ -583,17 +598,18 @@ const App: React.FC = () => {
       toast.error(`${t("app.save_fail")}${msg ? `: ${msg}` : ""}`);
       return false;
     });
-  };
+  }, [generatePDF, setState, t, withProcessing]);
 
-  const handleExport = async (): Promise<boolean> => {
+  const handleExport = useCallback(async (): Promise<boolean> => {
     return await withProcessing(t("app.generating"), async () => {
+      const snapshot = useEditorStore.getState();
       const modifiedBytes = await generatePDF();
       if (!modifiedBytes) return false;
 
       const result = await exportPdfBytes({
         bytes: modifiedBytes,
-        filename: state.filename || "document.pdf",
-        existingTarget: state.saveTarget,
+        filename: snapshot.filename || "document.pdf",
+        existingTarget: snapshot.saveTarget,
         filters: [{ name: "PDF Document", extensions: ["pdf"] }],
       });
 
@@ -610,7 +626,7 @@ const App: React.FC = () => {
         if (isTauriSaveTarget(savedTarget)) {
           recentFilesService.upsertWithBytesPreview({
             path: savedTarget.path,
-            filename: state.filename || "document.pdf",
+            filename: snapshot.filename || "document.pdf",
             pdfBytes: modifiedBytes,
             targetWidth: 240,
             renderAnnotations: true,
@@ -628,9 +644,9 @@ const App: React.FC = () => {
       toast.error(`${t("app.export_fail")}${msg ? `: ${msg}` : ""}`);
       return false;
     });
-  };
+  }, [generatePDF, setState, t, withProcessing]);
 
-  const handlePrint = async () => {
+  const handlePrint = useCallback(async () => {
     await withProcessing(t("app.generating"), async () => {
       const modifiedBytes = await generatePDF();
       if (modifiedBytes) {
@@ -676,7 +692,7 @@ const App: React.FC = () => {
       const msg = error instanceof Error ? error.message : String(error);
       toast.error(`${t("app.export_fail")}${msg ? `: ${msg}` : ""}`);
     });
-  };
+  }, [generatePDF, t, withProcessing]);
 
   const handleSaveDraft = async (silent = false) => {
     const snapshot = useEditorStore.getState();
@@ -771,17 +787,16 @@ const App: React.FC = () => {
   return (
     <div className="flex h-full w-full flex-col">
       <AppRoutes
-        canAccessEditor={state.pages.length > 0}
-        isLoading={state.isProcessing}
+        canAccessEditor={pagesLength > 0}
+        isLoading={isProcessing}
         landingProps={{
           onUpload: handleUpload,
           onOpen: handleOpen,
           onOpenRecent: handleOpenRecent,
-          hasSavedSession: state.hasSavedSession,
+          hasSavedSession,
           onResume: handleResumeSession,
         }}
         editorProps={{
-          editorStore: state,
           onExport: handleExport,
           onSaveDraft: onEditorSaveDraft,
           onSaveAs: handleSaveAs,
@@ -792,20 +807,20 @@ const App: React.FC = () => {
       />
 
       <KeyboardShortcutsHelp
-        isOpen={state.activeDialog === "shortcuts"}
-        onClose={() => setState((prev) => ({ ...prev, activeDialog: null }))}
+        isOpen={activeDialog === "shortcuts"}
+        onClose={() => setState({ activeDialog: null })}
       />
       <SettingsDialog
-        isOpen={state.activeDialog === "settings"}
-        onClose={() => setState((prev) => ({ ...prev, activeDialog: null }))}
-        options={state.options}
+        isOpen={activeDialog === "settings"}
+        onClose={() => setState({ activeDialog: null })}
+        options={options}
         onChange={(o) => setOptions(o)}
       />
 
       <FileDropDialog
         isOpen={fileDropDialogOpen}
         pendingPath={pendingFileDropPath}
-        isDirty={state.isDirty}
+        isDirty={isDirty}
         onClose={() => {
           setFileDropDialogOpen(false);
           setPendingFileDropPath(null);

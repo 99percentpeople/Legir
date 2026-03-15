@@ -6,7 +6,6 @@ import PDFTextLayer from "./PDFTextLayer";
 interface PDFPageProps {
   page: PageData;
   scale: number;
-  placeholderImage?: string; // Optional low-res image if we have one
   isSelectMode?: boolean;
   textLayerCursor?: React.CSSProperties["cursor"];
   isHighlighting?: boolean;
@@ -19,7 +18,6 @@ interface PDFPageProps {
 const PDFPage: React.FC<PDFPageProps> = ({
   page,
   scale,
-  placeholderImage,
   isSelectMode = true,
   textLayerCursor,
   isHighlighting = false,
@@ -65,12 +63,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
         height: containerHeight * scale,
       }}
     >
-      <PDFCanvasLayer
-        page={page}
-        scale={scale}
-        isInView={isInView}
-        placeholderImage={placeholderImage}
-      />
+      <PDFCanvasLayer page={page} scale={scale} isInView={isInView} />
 
       {/* Text Layer */}
       <PDFTextLayer

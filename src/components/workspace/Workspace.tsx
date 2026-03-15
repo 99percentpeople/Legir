@@ -6,13 +6,13 @@ import React, {
   useMemo,
 } from "react";
 import {
-  EditorState,
   FormField,
   FieldType,
   Annotation,
   Tool,
   PageTranslateParagraphCandidate,
   PDFSearchResult,
+  WorkspaceEditorState,
 } from "@/types";
 import {
   DEFAULT_FIELD_STYLE,
@@ -73,7 +73,7 @@ registerControls();
 preloadControls();
 
 interface WorkspaceProps {
-  editorState: EditorState;
+  editorState: WorkspaceEditorState;
   onAddField: (field: FormField) => void;
   onAddAnnotation: (annotation: Annotation) => void;
   onSelectControl: (id: string | null) => void;
@@ -184,7 +184,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   }, [editorState.pageTranslateSelectedParagraphIds]);
 
   // Keep a ref to editorState for stable event handlers
-  const editorStateRef = useRef(editorState);
+  const editorStateRef = useRef<WorkspaceEditorState>(editorState);
   editorStateRef.current = editorState;
 
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(
@@ -1842,7 +1842,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
       <PDFPage
         page={page}
         scale={editorState.scale}
-        placeholderImage={page.imageData}
         isSelectMode={
           editorState.tool === "select" || editorState.tool === "draw_highlight"
         }
@@ -2277,4 +2276,4 @@ const Workspace: React.FC<WorkspaceProps> = ({
   );
 };
 
-export default Workspace;
+export default React.memo(Workspace);

@@ -5,7 +5,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import type { Annotation, EditorState } from "@/types";
+import type { Annotation, WorkspaceEditorState } from "@/types";
 import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
@@ -117,8 +117,8 @@ const getPdfSelectionRects = (
 };
 
 export const useWorkspaceTextSelection = (opts: {
-  editorState: EditorState;
-  editorStateRef: RefObject<EditorState>;
+  editorState: WorkspaceEditorState;
+  editorStateRef: RefObject<WorkspaceEditorState>;
   onAddAnnotation: (annotation: Annotation) => void;
   onSelectControl: (id: string | null) => void;
 }) => {

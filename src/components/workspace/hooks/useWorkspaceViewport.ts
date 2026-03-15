@@ -10,14 +10,14 @@ import {
   WORKSPACE_BASE_PADDING_PX,
   ZOOM_BASE,
 } from "@/constants";
-import type { EditorState } from "@/types";
+import type { WorkspaceEditorState } from "@/types";
 import { useEventListener } from "@/hooks/useEventListener";
 import { pickClosestRectCandidate } from "@/lib/viewportMath";
 
 export const useWorkspaceViewport = (opts: {
   containerRef: RefObject<HTMLDivElement>;
   contentRef: RefObject<HTMLDivElement>;
-  editorState: EditorState;
+  editorState: WorkspaceEditorState;
   onScaleChange: (newScale: number) => void;
   isPanning: boolean;
   fitTrigger?: number;

@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { EditorState } from "@/types";
+import type { WorkspaceEditorState } from "@/types";
 
 export type SnapLine = {
   type: "vertical" | "horizontal";
@@ -8,7 +8,9 @@ export type SnapLine = {
   end: number;
 };
 
-export const useWorkspaceSnapping = (opts: { editorState: EditorState }) => {
+export const useWorkspaceSnapping = (opts: {
+  editorState: Pick<WorkspaceEditorState, "fields" | "mode" | "options">;
+}) => {
   const applySnapping = useCallback(
     (
       rect: any,
