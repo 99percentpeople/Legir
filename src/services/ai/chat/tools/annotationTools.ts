@@ -5,12 +5,10 @@ import {
   createInvalidArgumentsResult,
   defineTool,
   emptyObjectSchema,
-  highlightResultArgsSchema,
   highlightResultsArgsSchema,
   listAnnotationsArgsSchema,
   parseToolArgs,
   summarizeListedAnnotations,
-  updateAnnotationTextArgsSchema,
   updateAnnotationTextsArgsSchema,
   type AiToolHandlerMap,
 } from "./shared";
@@ -19,9 +17,7 @@ export const createAnnotationToolHandlers = (
   ctx: AiToolExecutionContext,
 ): AiToolHandlerMap<
   | "list_annotations"
-  | "update_annotation_text"
   | "update_annotation_texts"
-  | "highlight_result"
   | "highlight_results"
   | "clear_highlights"
 > => ({
@@ -53,44 +49,11 @@ export const createAnnotationToolHandlers = (
     },
   },
 
-  update_annotation_text: {
-    definition: defineTool("write", {
-      name: "update_annotation_text",
-      description:
-        "Update the note/comment text of an existing annotation by id. Use list_annotations first when you need annotation ids or want to inspect the current note/highlight text before editing.",
-      inputSchema: updateAnnotationTextArgsSchema,
-    }),
-    execute: async (rawArgs) => {
-      const parsed = parseToolArgs(updateAnnotationTextArgsSchema, rawArgs);
-      if (parsed.success === false) {
-        return createInvalidArgumentsResult(
-          "update_annotation_text",
-          parsed.error,
-        );
-      }
-
-      const result = ctx.updateAnnotationText({
-        annotationId: parsed.data.annotation_id.trim(),
-        text: parsed.data.text,
-      });
-
-      return {
-        payload: result,
-        summary:
-          result.status === "updated"
-            ? "Updated annotation text"
-            : result.status === "unchanged"
-              ? "Annotation text unchanged"
-              : "update_annotation_text failed",
-      };
-    },
-  },
-
   update_annotation_texts: {
     definition: defineTool("write", {
       name: "update_annotation_texts",
       description:
-        "Batch update note/comment text on multiple annotations by id. Use list_annotations first when you need ids or want to inspect the current note/highlight text before editing.",
+        "Update note/comment text on one or more annotations by id. Accepts either a single annotation_id plus text or an updates array. Use list_annotations first when you need ids or want to inspect the current note/highlight text before editing.",
       inputSchema: updateAnnotationTextsArgsSchema,
     }),
     execute: async (rawArgs) => {
@@ -121,76 +84,11 @@ export const createAnnotationToolHandlers = (
     },
   },
 
-  highlight_result: {
-    definition: defineTool("write", {
-      name: "highlight_result",
-      description:
-        "Create one actual highlight annotation from exactly one result_id, selection_anchor, or document_anchor target. When using result_id, only the exact matchText is highlighted, never the surrounding snippet/context.",
-      inputSchema: highlightResultArgsSchema,
-    }),
-    execute: async (rawArgs) => {
-      const parsed = parseToolArgs(highlightResultArgsSchema, rawArgs);
-      if (parsed.success === false) {
-        return createInvalidArgumentsResult("highlight_result", parsed.error);
-      }
-
-      const resultId = parsed.data.result_id?.trim();
-      const annotationText = parsed.data.annotation_text?.trim() || undefined;
-      const selectionAnchor = parsed.data.selection_anchor
-        ? {
-            attachmentIndex: parsed.data.selection_anchor.attachment_index,
-            startAnchor: parsed.data.selection_anchor.start_anchor.trim(),
-            endInclusiveAnchor:
-              parsed.data.selection_anchor.end_inclusive_anchor.trim(),
-            annotationText:
-              parsed.data.selection_anchor.annotation_text?.trim() || undefined,
-          }
-        : undefined;
-      const documentAnchor = parsed.data.document_anchor
-        ? {
-            startAnchor: parsed.data.document_anchor.start_anchor.trim(),
-            endInclusiveAnchor:
-              parsed.data.document_anchor.end_inclusive_anchor.trim(),
-            pageHint: parsed.data.document_anchor.page_hint,
-            annotationText:
-              parsed.data.document_anchor.annotation_text?.trim() || undefined,
-          }
-        : undefined;
-
-      if (resultId && !ctx.getStoredSearchResult(resultId)) {
-        return {
-          payload: createErrorPayload(
-            "RESULT_NOT_FOUND",
-            "The provided result_id was not found in the current chat session.",
-          ),
-          summary: "highlight_result failed: result not found",
-        };
-      }
-
-      const result = await ctx.createSearchHighlightAnnotations({
-        ...(resultId ? { resultIds: [resultId] } : null),
-        ...(annotationText ? { annotationText } : null),
-        ...(selectionAnchor ? { selectionAnchors: [selectionAnchor] } : null),
-        ...(documentAnchor ? { documentAnchors: [documentAnchor] } : null),
-      });
-
-      return {
-        payload: result,
-        summary:
-          result.createdCount > 0
-            ? result.skippedExistingCount > 0 || result.missingCount > 0
-              ? `Created ${result.createdCount} highlight annotation${result.createdCount === 1 ? "" : "s"}, ${result.skippedExistingCount} skipped, ${result.missingCount} missing`
-              : `Created ${result.createdCount} highlight annotation${result.createdCount === 1 ? "" : "s"}`
-            : "highlight_result completed with no new highlights",
-      };
-    },
-  },
-
   highlight_results: {
     definition: defineTool("write", {
       name: "highlight_results",
       description:
-        "Create multiple highlight annotations from result_ids, selection_anchors, or document_anchors in a single batch. result_ids highlight only exact matchText values, never the surrounding snippets. Use highlight_result when you only need one highlight.",
+        "Create one or more highlight annotations from result_ids, selection_anchors, or document_anchors in a single batch. Accepts singular or plural target fields. result_ids highlight only exact matchText values, never the surrounding snippets.",
       inputSchema: highlightResultsArgsSchema,
     }),
     execute: async (rawArgs) => {

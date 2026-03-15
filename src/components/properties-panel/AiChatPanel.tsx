@@ -532,6 +532,39 @@ const ToolTimelineCall = ({
   t: TranslateFn;
   grouped?: boolean;
 }) => {
+  const hasProgressSnapshot =
+    item.status === "running" &&
+    (Boolean(item.progressCounts) ||
+      (Array.isArray(item.progressDetails) && item.progressDetails.length > 0));
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
+  const progressLogs = hasProgressSnapshot ? (item.progressDetails ?? []) : [];
+  const progressLogRef = React.useRef<HTMLDivElement | null>(null);
+  const progressLogScrollRafRef = React.useRef<number | null>(null);
+  const resultText = item.resultText?.trim();
+  const scheduleProgressLogScroll = React.useCallback(() => {
+    if (progressLogScrollRafRef.current !== null) {
+      cancelAnimationFrame(progressLogScrollRafRef.current);
+    }
+    progressLogScrollRafRef.current = requestAnimationFrame(() => {
+      progressLogScrollRafRef.current = requestAnimationFrame(() => {
+        const element = progressLogRef.current;
+        if (!element) return;
+        element.scrollTop = element.scrollHeight;
+      });
+    });
+  }, []);
+  React.useEffect(() => {
+    if (!detailsOpen || progressLogs.length === 0) return;
+    scheduleProgressLogScroll();
+  }, [detailsOpen, progressLogs, scheduleProgressLogScroll]);
+  React.useEffect(
+    () => () => {
+      if (progressLogScrollRafRef.current !== null) {
+        cancelAnimationFrame(progressLogScrollRafRef.current);
+      }
+    },
+    [],
+  );
   const content = (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-2">
@@ -578,18 +611,47 @@ const ToolTimelineCall = ({
           {item.argsText}
         </div>
 
-        <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-          {t("ai_chat.tool_result")}
-        </div>
-        <div className="text-muted-foreground bg-muted/40 max-h-64 overflow-auto rounded-md px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap">
-          {item.resultText ?? ""}
-        </div>
+        {progressLogs.length ? (
+          <div className="space-y-2">
+            <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+              {t("ai_chat.tool_schedule_log")}
+            </div>
+            <div
+              ref={progressLogRef}
+              className="bg-muted/35 border-border/50 max-h-48 space-y-1 overflow-y-auto rounded-md border px-2.5 py-2 font-mono text-[11px]"
+            >
+              {progressLogs.map((logLine, index) => (
+                <div
+                  key={`${item.id}:progress-log:${index}`}
+                  className="text-muted-foreground break-all whitespace-pre-wrap"
+                >
+                  {logLine}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {resultText ? (
+          <>
+            <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+              {t("ai_chat.tool_result")}
+            </div>
+            <div className="text-muted-foreground bg-muted/40 max-h-64 overflow-auto rounded-md px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap">
+              {resultText}
+            </div>
+          </>
+        ) : null}
       </CollapsibleContent>
     </div>
   );
 
   return (
-    <Collapsible defaultOpen={false}>
+    <Collapsible
+      defaultOpen={false}
+      open={detailsOpen}
+      onOpenChange={setDetailsOpen}
+    >
       {grouped ? (
         <div className="px-2 py-1.5">{content}</div>
       ) : (

@@ -201,8 +201,8 @@ export interface LLMProviderOptions {
 export type LLMOptions = Record<AiProviderId, LLMProviderOptions>;
 
 export interface AiChatOptions {
-  digestCharsPerChunk: number;
   digestSourceCharsPerChunk: number;
+  digestOutputRatioDenominator: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   digestSummaryModelKey?: string;
 }
 

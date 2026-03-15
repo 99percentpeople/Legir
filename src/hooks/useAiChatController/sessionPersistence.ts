@@ -200,6 +200,24 @@ export const normalizeTimelineForPersist = (items: AiChatTimelineItem[]) => {
         typeof item.resultSummary === "string"
           ? truncateText(item.resultSummary, MAX_PERSIST_TOOL_SUMMARY_CHARS)
           : undefined,
+      progressDetails: Array.isArray(item.progressDetails)
+        ? item.progressDetails
+            .slice(0, 16)
+            .map((detail) => truncateText(detail, 200))
+        : undefined,
+      progressItems: Array.isArray(item.progressItems)
+        ? item.progressItems.slice(0, 16).map((progressItem) => ({
+            ...progressItem,
+            label: truncateText(progressItem.label, 120),
+          }))
+        : undefined,
+      progressCounts: item.progressCounts
+        ? {
+            pending: item.progressCounts.pending,
+            running: item.progressCounts.running,
+            done: item.progressCounts.done,
+          }
+        : undefined,
       resultText:
         typeof item.resultText === "string"
           ? truncateText(item.resultText, MAX_PERSIST_TOOL_RESULT_CHARS)

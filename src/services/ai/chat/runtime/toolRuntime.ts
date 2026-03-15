@@ -140,6 +140,15 @@ export const createAiChatToolRuntime = (options: {
               definition.name,
               call.args,
               executeOptions.abortSignal ?? signal,
+              (progress) => {
+                onToolUpdate?.({
+                  phase: "progress",
+                  call,
+                  batchId,
+                  isParallelBatch: definition.accessType === "read",
+                  progress,
+                });
+              },
             );
 
             conversation.push(

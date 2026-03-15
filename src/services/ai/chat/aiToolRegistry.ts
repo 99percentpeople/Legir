@@ -1,6 +1,7 @@
 import type {
   AiChatToolDefinition,
   AiToolExecutionContext,
+  AiToolExecutionProgress,
   AiToolExecutionResult,
   AiToolName,
 } from "./types";
@@ -23,7 +24,12 @@ export const createAiToolRegistry = (ctx: AiToolExecutionContext) => {
       Object.values(handlers)
         .filter((handler): handler is AiToolHandler => Boolean(handler))
         .map((handler) => handler.definition),
-    execute: async (name: string, rawArgs: unknown, signal?: AbortSignal) => {
+    execute: async (
+      name: string,
+      rawArgs: unknown,
+      signal?: AbortSignal,
+      onProgress?: (progress: AiToolExecutionProgress) => void,
+    ) => {
       const handler = handlers[name as AiToolName];
       if (!handler) {
         return {
@@ -32,7 +38,7 @@ export const createAiToolRegistry = (ctx: AiToolExecutionContext) => {
         } satisfies AiToolExecutionResult;
       }
 
-      return await handler.execute(rawArgs, ctx, signal);
+      return await handler.execute(rawArgs, ctx, signal, onProgress);
     },
   };
 };

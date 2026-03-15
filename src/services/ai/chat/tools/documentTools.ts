@@ -65,10 +65,10 @@ export const createDocumentToolHandlers = (
           definition: defineTool("read", {
             name: "get_document_digest",
             description:
-              "Get an AI digest for exactly one contiguous page range. start_page and end_page are required, and each call summarizes only that range. For whole-document summaries, split the document into multiple ranges, call this tool in parallel when useful, then combine the results yourself. Optionally pass summary_instructions to tell the digest summarizer what to focus on.",
+              "Get an AI digest for exactly one contiguous page range. start_page and end_page are required. This tool can summarize very large ranges, including a whole document, because it automatically chunks and merges long ranges internally. The payload includes overall_excerpt for the full requested range plus per-chunk excerpts for supporting detail. Optionally pass summary_instructions to tell the digest summarizer what to focus on.",
             inputSchema: getDocumentDigestArgsSchema,
           }),
-          execute: async (rawArgs, _ctx, signal) => {
+          execute: async (rawArgs, _ctx, signal, onProgress) => {
             const parsed = parseToolArgs(getDocumentDigestArgsSchema, rawArgs);
             if (parsed.success === false) {
               return createInvalidArgumentsResult(
@@ -86,11 +86,12 @@ export const createDocumentToolHandlers = (
               summaryInstructions:
                 args.summary_instructions?.trim() || undefined,
               signal,
+              onProgress,
             });
 
             return {
               payload: digest,
-              summary: `AI digest covers ${digest.returnedPageCount} page${digest.returnedPageCount === 1 ? "" : "s"} in ${digest.chunkCount} chunk${digest.chunkCount === 1 ? "" : "s"}`,
+              summary: `AI digest covers ${digest.returnedPageCount} page${digest.returnedPageCount === 1 ? "" : "s"} with ${digest.chunkCount} leaf chunk${digest.chunkCount === 1 ? "" : "s"}`,
             };
           },
         },
@@ -129,7 +130,7 @@ export const createDocumentToolHandlers = (
     definition: defineTool("read", {
       name: "search_document",
       description:
-        "Search the current document and return result ids that can be focused or highlighted later. result_id highlights only the exact matchText for that search hit; snippet is context only and cannot be highlighted directly. For longer phrases, sentences, or ranges, use selection_anchors or document_anchors with highlight_result/highlight_results. Supports plain substring search and regex search for flexible whitespace or token patterns.",
+        "Search the current document and return result ids that can be focused or highlighted later. result_id highlights only the exact matchText for that search hit; snippet is context only and cannot be highlighted directly. For longer phrases, sentences, or ranges, use selection_anchors or document_anchors with highlight_results. Supports plain substring search and regex search for flexible whitespace or token patterns.",
       inputSchema: searchDocumentArgsSchema,
     }),
     execute: async (rawArgs, _ctx, signal) => {

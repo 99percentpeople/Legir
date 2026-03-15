@@ -27,6 +27,7 @@ import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Slider } from "../ui/slider";
 import {
   Select,
   SelectContent,
@@ -58,6 +59,12 @@ import {
 } from "@/services/ai";
 import { type Tag, TagInput } from "emblor";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
+import {
+  AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
+  AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
+  AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
+  AI_CHAT_DIGEST_SOURCE_CHARS_STEP,
+} from "@/constants";
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -202,6 +209,10 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
       })),
     }));
   }, [llmModelCache, options.llm]);
+
+  const digestOutputRatioDenominator =
+    options.aiChat.digestOutputRatioDenominator;
+  const digestSourceCharsPerChunk = options.aiChat.digestSourceCharsPerChunk;
 
   const checkLlmProvider = async (provider: LlmProviderId) => {
     const apiKey = (options.llm[provider].apiKey || "").trim();
@@ -906,41 +917,81 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="ai-chat-digest-chars">
-                        {t("settings.ai_chat.digest_chars_per_chunk")}
-                      </Label>
-                      <Input
-                        id="ai-chat-digest-chars"
-                        type="number"
-                        min={180}
-                        max={1200}
-                        value={String(options.aiChat.digestCharsPerChunk)}
-                        onChange={(event) => {
-                          const next = Number.parseInt(event.target.value, 10);
-                          if (!Number.isFinite(next)) return;
-                          updateAiChatOptions({ digestCharsPerChunk: next });
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ai-chat-digest-ratio">
+                          {t("settings.ai_chat.digest_chars_per_chunk")}
+                        </Label>
+                        <span className="text-muted-foreground text-xs">
+                          1/{digestOutputRatioDenominator}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[
+                          AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.indexOf(
+                            digestOutputRatioDenominator,
+                          ),
+                        ]}
+                        min={0}
+                        max={
+                          AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.length -
+                          1
+                        }
+                        step={1}
+                        onValueChange={(values) => {
+                          const nextIndex = values[0] ?? 0;
+                          const next =
+                            AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS[
+                              nextIndex
+                            ] ??
+                            AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS[1];
+                          updateAiChatOptions({
+                            digestOutputRatioDenominator: next,
+                          });
                         }}
                       />
+                      <div className="text-muted-foreground flex justify-between text-xs">
+                        <span>
+                          1/
+                          {AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS[0]}
+                        </span>
+                        <span>
+                          1/
+                          {
+                            AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS[
+                              AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.length -
+                                1
+                            ]
+                          }
+                        </span>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="ai-chat-digest-source-chars">
-                        {t("settings.ai_chat.digest_source_chars_per_chunk")}
-                      </Label>
-                      <Input
-                        id="ai-chat-digest-source-chars"
-                        type="number"
-                        min={360}
-                        max={8000}
-                        value={String(options.aiChat.digestSourceCharsPerChunk)}
-                        onChange={(event) => {
-                          const next = Number.parseInt(event.target.value, 10);
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ai-chat-digest-source-chars">
+                          {t("settings.ai_chat.digest_source_chars_per_chunk")}
+                        </Label>
+                        <span className="text-muted-foreground text-xs">
+                          {digestSourceCharsPerChunk}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[digestSourceCharsPerChunk]}
+                        min={AI_CHAT_DIGEST_SOURCE_CHARS_MIN}
+                        max={AI_CHAT_DIGEST_SOURCE_CHARS_MAX}
+                        step={AI_CHAT_DIGEST_SOURCE_CHARS_STEP}
+                        onValueChange={(values) => {
+                          const next = values[0];
                           if (!Number.isFinite(next)) return;
                           updateAiChatOptions({
                             digestSourceCharsPerChunk: next,
                           });
                         }}
                       />
+                      <div className="text-muted-foreground flex justify-between text-xs">
+                        <span>{AI_CHAT_DIGEST_SOURCE_CHARS_MIN}</span>
+                        <span>{AI_CHAT_DIGEST_SOURCE_CHARS_MAX}</span>
+                      </div>
                     </div>
                   </div>
 

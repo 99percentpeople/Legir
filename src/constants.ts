@@ -34,6 +34,17 @@ export const WORKSPACE_BOTTOM_PADDING_PX = 80;
 export const WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES = 30;
 export const WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES = 5;
 export const AI_CHAT_MAX_READ_PAGES_PER_CALL = 10;
+export const AI_CHAT_DIGEST_MAX_PAGES_PER_LEAF_CHUNK = 16;
+export const AI_CHAT_DIGEST_MERGE_BATCH_SIZE = 6;
+export const AI_CHAT_DIGEST_SUMMARY_CONCURRENCY = 3;
+export const AI_CHAT_DIGEST_SOURCE_CHARS_MIN = 1000;
+export const AI_CHAT_DIGEST_SOURCE_CHARS_MAX = 24000;
+export const AI_CHAT_DIGEST_SOURCE_CHARS_STEP = 1000;
+export const AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS = [
+  2, 3, 4, 5, 6, 7, 8, 9, 10,
+] as const;
+export const AI_CHAT_DIGEST_OUTPUT_CHARS_MIN = 180;
+export const AI_CHAT_DIGEST_OUTPUT_CHARS_MAX = 12000;
 
 export const DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES: PageTranslateOptions = {
   fontFamily: "Helvetica",
@@ -87,8 +98,8 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       ]),
     ) as LLMOptions,
     aiChat: {
-      digestCharsPerChunk: 360,
-      digestSourceCharsPerChunk: 3600,
+      digestSourceCharsPerChunk: 12000,
+      digestOutputRatioDenominator: 3,
       digestSummaryModelKey: "",
     },
   },

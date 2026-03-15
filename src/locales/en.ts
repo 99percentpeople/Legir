@@ -353,6 +353,11 @@ const en = {
     tools: "Tool Actions",
     error_title: "Request Failed",
     retry: "Retry",
+    tool_schedule_log: "Execution log",
+    tool_progress_layer: "Layer {count}",
+    tool_progress_pending: "{count} waiting",
+    tool_progress_running: "{count} running",
+    tool_progress_done: "{count} done",
     input_placeholder:
       "Ask the AI to read, search, jump, or highlight PDF content...",
     input_hint: "Press Enter to send, Shift+Enter for a new line.",
@@ -553,16 +558,16 @@ const en = {
     ai_chat: {
       title: "AI Chat Tools",
       description:
-        "Configure the AI document digest tool and pick a cheaper model for broad summaries.",
+        "Configure the AI document digest tool and choose a summary model for long-form summaries.",
       summary_model: "Digest summary model",
       summary_model_placeholder: "Select a model",
       summary_model_desc:
         "Used by get_document_digest. If no model is selected, the digest tool is disabled.",
       no_models: "No available models",
-      digest_chars_per_chunk: "Output chars per chunk",
-      digest_source_chars_per_chunk: "Input sample chars per chunk",
+      digest_chars_per_chunk: "Per-layer summary output length",
+      digest_source_chars_per_chunk: "Per-layer summary input budget",
       digest_sampling_desc:
-        "Input sample chars controls how much source text is sampled before summarization. Higher values improve coverage but increase cost.",
+        "The input budget controls how much material each summary layer can inspect, while the output length controls how much each layer keeps. Increasing input budget usually improves whole-document coverage more than increasing output length.",
     },
     done: "Done",
   },

@@ -10,7 +10,10 @@ import { type EditorState, type PDFSearchResult } from "@/types";
 import { aiChatService } from "@/services/ai/chat/aiChatService";
 import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
 import { createDocumentContextService } from "@/services/ai/chat/documentContextService";
-import { buildDocumentDigestSummaryPrompt } from "@/services/ai/chat/prompts";
+import {
+  buildDocumentDigestMergePrompt,
+  buildDocumentDigestSummaryPrompt,
+} from "@/services/ai/chat/prompts";
 import type {
   AiChatAssistantUpdate,
   AiChatSessionSummary,
@@ -18,6 +21,7 @@ import type {
   AiChatToolUpdate,
   AiChatUserMessageInput,
   AiChatMessageRecord,
+  AiDocumentDigestSourceKind,
   AiStoredSearchResult,
   AiTextSelectionContext,
 } from "@/services/ai/chat/types";
@@ -227,12 +231,29 @@ export const useAiChatController = (editorState: EditorState) => {
     [editorState.options.aiChat.digestSummaryModelKey, flatModels],
   );
 
+  const digestCharsPerChunk = useMemo(() => {
+    const sourceChars = Math.max(
+      1,
+      editorState.options.aiChat.digestSourceCharsPerChunk,
+    );
+    return Math.max(
+      180,
+      Math.floor(
+        sourceChars / editorState.options.aiChat.digestOutputRatioDenominator,
+      ),
+    );
+  }, [
+    editorState.options.aiChat.digestOutputRatioDenominator,
+    editorState.options.aiChat.digestSourceCharsPerChunk,
+  ]);
+
   const summarizeDigestChunk = useCallback(
     async (options: {
       startPage: number;
       endPage: number;
       sampledText: string;
       maxChars: number;
+      sourceKind?: AiDocumentDigestSourceKind;
       summaryInstructions?: string;
       signal?: AbortSignal;
     }) => {
@@ -248,12 +269,20 @@ export const useAiChatController = (editorState: EditorState) => {
       return await summarizeText(options.sampledText, {
         providerId,
         modelId,
-        prompt: buildDocumentDigestSummaryPrompt({
-          startPage: options.startPage,
-          endPage: options.endPage,
-          maxChars: options.maxChars,
-          summaryInstructions: options.summaryInstructions,
-        }),
+        prompt:
+          options.sourceKind === "chunk_summaries"
+            ? buildDocumentDigestMergePrompt({
+                startPage: options.startPage,
+                endPage: options.endPage,
+                maxChars: options.maxChars,
+                summaryInstructions: options.summaryInstructions,
+              })
+            : buildDocumentDigestSummaryPrompt({
+                startPage: options.startPage,
+                endPage: options.endPage,
+                maxChars: options.maxChars,
+                summaryInstructions: options.summaryInstructions,
+              }),
         signal: options.signal,
       });
     },
@@ -350,7 +379,7 @@ export const useAiChatController = (editorState: EditorState) => {
         }),
         getSelectedTextContext,
         getDigestConfig: () => ({
-          charsPerChunk: editorState.options.aiChat.digestCharsPerChunk,
+          charsPerChunk: digestCharsPerChunk,
           sourceCharsPerChunk:
             editorState.options.aiChat.digestSourceCharsPerChunk,
         }),
@@ -361,10 +390,10 @@ export const useAiChatController = (editorState: EditorState) => {
     [
       digestSummaryModel,
       documentIdentity,
+      digestCharsPerChunk,
       editorState.currentPageIndex,
       editorState.filename,
       editorState.metadata,
-      editorState.options.aiChat.digestCharsPerChunk,
       editorState.options.aiChat.digestSourceCharsPerChunk,
       editorState.outline,
       editorState.pages,

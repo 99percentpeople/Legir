@@ -5,6 +5,7 @@ import type {
   AiChatToolDefinition,
   AiSearchResultSummary,
   AiToolExecutionContext,
+  AiToolExecutionProgress,
   AiToolExecutionResult,
   AiToolName,
 } from "@/services/ai/chat/types";
@@ -16,6 +17,7 @@ export type AiToolHandler = {
     args: unknown,
     ctx: AiToolExecutionContext,
     signal?: AbortSignal,
+    onProgress?: (progress: AiToolExecutionProgress) => void,
   ) => Promise<AiToolExecutionResult>;
 };
 
@@ -185,7 +187,30 @@ export const summarizeListedAnnotations = (total: number, returned: number) => {
 };
 
 export const positiveIntSchema = z.number().int().positive();
-export const pageNumbersSchema = z.array(positiveIntSchema);
+const pageNumberInputSchema = z.preprocess((value) => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^\d+$/.test(trimmed)) {
+      return Number.parseInt(trimmed, 10);
+    }
+  }
+  return value;
+}, positiveIntSchema);
+
+const pageNumbersArraySchema = z.array(pageNumberInputSchema);
+
+export const pageNumbersSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+}, pageNumbersArraySchema);
+export const requiredPageNumbersSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+}, pageNumbersArraySchema.min(1));
 export const emptyObjectSchema = z.object({}).strict();
 export const annotationTypesSchema = z.array(
   z.enum(["comment", "highlight", "ink", "freetext"]),
@@ -226,7 +251,7 @@ export const getDocumentDigestArgsSchema = z
 
 export const readPagesArgsSchema = z
   .object({
-    page_numbers: pageNumbersSchema.min(1),
+    page_numbers: requiredPageNumbersSchema,
     include_layout: z.boolean().optional().default(false),
   })
   .strict();
@@ -251,27 +276,43 @@ export const listAnnotationsArgsSchema = z
   })
   .strict();
 
-export const updateAnnotationTextArgsSchema = z
-  .object({
-    annotation_id: z.string().min(1),
-    text: z.string(),
-  })
-  .strict();
-
-export const updateAnnotationTextsArgsSchema = z
-  .object({
-    updates: z
-      .array(
-        z
-          .object({
-            annotation_id: z.string().min(1),
-            text: z.string(),
-          })
-          .strict(),
-      )
-      .min(1),
-  })
-  .strict();
+export const updateAnnotationTextsArgsSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return value;
+    }
+    const record = value as Record<string, unknown>;
+    if ("updates" in record) return record;
+    if (
+      typeof record.annotation_id === "string" &&
+      typeof record.text === "string"
+    ) {
+      return {
+        updates: [
+          {
+            annotation_id: record.annotation_id,
+            text: record.text,
+          },
+        ],
+      };
+    }
+    return record;
+  },
+  z
+    .object({
+      updates: z
+        .array(
+          z
+            .object({
+              annotation_id: z.string().min(1),
+              text: z.string(),
+            })
+            .strict(),
+        )
+        .min(1),
+    })
+    .strict(),
+);
 
 export const listFormFieldsArgsSchema = z
   .object({
@@ -355,21 +396,40 @@ export const documentAnchorSchema = z
   .strict();
 
 export const highlightResultsArgsSchema = z
-  .object({
-    result_ids: z.array(z.string().min(1)).optional().default([]),
-    annotation_text: z
-      .string()
-      .optional()
-      .describe(
-        "Optional shared note/comment text applied to created highlights that do not provide their own item-level annotation_text.",
-      ),
-    selection_anchors: z
-      .array(selectionAttachmentAnchorSchema)
-      .optional()
-      .default([]),
-    document_anchors: z.array(documentAnchorSchema).optional().default([]),
-  })
-  .strict()
+  .preprocess(
+    (value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return value;
+      }
+      const record = value as Record<string, unknown>;
+      return {
+        ...record,
+        ...(record.result_id ? { result_ids: [record.result_id] } : null),
+        ...(record.selection_anchor
+          ? { selection_anchors: [record.selection_anchor] }
+          : null),
+        ...(record.document_anchor
+          ? { document_anchors: [record.document_anchor] }
+          : null),
+      };
+    },
+    z
+      .object({
+        result_ids: z.array(z.string().min(1)).optional().default([]),
+        annotation_text: z
+          .string()
+          .optional()
+          .describe(
+            "Optional shared note/comment text applied to created highlights that do not provide their own item-level annotation_text.",
+          ),
+        selection_anchors: z
+          .array(selectionAttachmentAnchorSchema)
+          .optional()
+          .default([]),
+        document_anchors: z.array(documentAnchorSchema).optional().default([]),
+      })
+      .strict(),
+  )
   .superRefine((value, ctx) => {
     if (
       value.result_ids.length === 0 &&
@@ -380,33 +440,6 @@ export const highlightResultsArgsSchema = z
         code: z.ZodIssueCode.custom,
         message:
           "At least one result_id, selection_anchor, or document_anchor is required.",
-      });
-    }
-  });
-
-export const highlightResultArgsSchema = z
-  .object({
-    result_id: z.string().min(1).optional(),
-    annotation_text: z
-      .string()
-      .optional()
-      .describe(
-        "Optional note/comment text for the created highlight when it should differ from the highlighted source text.",
-      ),
-    selection_anchor: selectionAttachmentAnchorSchema.optional(),
-    document_anchor: documentAnchorSchema.optional(),
-  })
-  .strict()
-  .superRefine((value, ctx) => {
-    const targetCount =
-      Number(Boolean(value.result_id)) +
-      Number(Boolean(value.selection_anchor)) +
-      Number(Boolean(value.document_anchor));
-    if (targetCount !== 1) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "Exactly one of result_id, selection_anchor, or document_anchor is required.",
       });
     }
   });

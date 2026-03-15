@@ -10,14 +10,12 @@ export type AiToolName =
   | "read_pages"
   | "search_document"
   | "list_annotations"
-  | "update_annotation_text"
   | "update_annotation_texts"
   | "list_form_fields"
   | "fill_form_fields"
   | "focus_field"
   | "navigate_page"
   | "focus_result"
-  | "highlight_result"
   | "highlight_results"
   | "clear_highlights";
 
@@ -84,6 +82,8 @@ export interface AiDocumentDigestChunk {
   charCount: number;
   excerpt: string;
 }
+
+export type AiDocumentDigestSourceKind = "page_text" | "chunk_summaries";
 
 export interface AiStoredSearchResult {
   id: string;
@@ -300,6 +300,9 @@ export type AiChatTimelineItem =
       status: "running" | "done" | "error";
       argsText: string;
       resultSummary?: string;
+      progressDetails?: string[];
+      progressItems?: AiToolExecutionProgressItem[];
+      progressCounts?: AiToolExecutionProgressCounts;
       resultText?: string;
       error?: string;
       createdAt: string;
@@ -349,12 +352,14 @@ export interface AiDocumentContextService {
     sourceCharsPerChunk?: number;
     summaryInstructions?: string;
     signal?: AbortSignal;
+    onProgress?: (progress: AiToolExecutionProgress) => void;
   }) => Promise<{
     pageCount: number;
     returnedPageCount: number;
     chunkCount: number;
     excerptCharsPerChunk: number;
     sourceCharsPerChunk: number;
+    overallExcerpt: string;
     chunks: AiDocumentDigestChunk[];
   }>;
   readPages: (options: {
@@ -441,12 +446,33 @@ export interface AiToolExecutionResult {
   summary: string;
 }
 
+export interface AiToolExecutionProgressItem {
+  id: string;
+  label: string;
+  status: "pending" | "running" | "done";
+  level?: number;
+}
+
+export interface AiToolExecutionProgressCounts {
+  pending: number;
+  running: number;
+  done: number;
+}
+
+export interface AiToolExecutionProgress {
+  summary: string;
+  details?: string[];
+  items?: AiToolExecutionProgressItem[];
+  counts?: AiToolExecutionProgressCounts;
+}
+
 export interface AiToolRegistry {
   getDefinitions: () => AiChatToolDefinition[];
   execute: (
     name: string,
     rawArgs: unknown,
     signal?: AbortSignal,
+    onProgress?: (progress: AiToolExecutionProgress) => void,
   ) => Promise<AiToolExecutionResult>;
 }
 
@@ -463,6 +489,13 @@ export type AiChatToolUpdate =
       batchId: string;
       isParallelBatch: boolean;
       result: AiToolExecutionResult;
+    }
+  | {
+      phase: "progress";
+      call: AiChatToolCallRecord;
+      batchId: string;
+      isParallelBatch: boolean;
+      progress: AiToolExecutionProgress;
     }
   | {
       phase: "error";

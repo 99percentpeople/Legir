@@ -347,7 +347,27 @@ export const applyToolUpdateToTimeline = (
               ...item,
               status: "done",
               resultSummary: update.result.summary,
+              progressDetails: undefined,
+              progressItems: undefined,
+              progressCounts: undefined,
               resultText: stringifyToolPayload(update.result.payload),
+            }
+          : item,
+      ),
+      touchedSession: false,
+    };
+  }
+
+  if (update.phase === "progress") {
+    return {
+      timeline: prev.map((item) =>
+        item.id === update.call.id && item.kind === "tool"
+          ? {
+              ...item,
+              resultSummary: update.progress.summary,
+              progressDetails: update.progress.details,
+              progressItems: update.progress.items,
+              progressCounts: update.progress.counts,
             }
           : item,
       ),
@@ -361,6 +381,9 @@ export const applyToolUpdateToTimeline = (
         ? {
             ...item,
             status: "error",
+            progressDetails: undefined,
+            progressItems: undefined,
+            progressCounts: undefined,
             error: update.error.message,
             resultText: stringifyToolPayload({
               ok: false,

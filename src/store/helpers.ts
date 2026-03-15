@@ -1,6 +1,12 @@
 import { filterSupportedGeminiToolCallingModelIds } from "@/services/ai/sdk/geminiModelSupport";
 import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
-import { ANNOTATION_STYLES, DEFAULT_EDITOR_UI_STATE } from "@/constants";
+import {
+  AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
+  AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
+  AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
+  ANNOTATION_STYLES,
+  DEFAULT_EDITOR_UI_STATE,
+} from "@/constants";
 import type {
   AppOptions,
   EditorState,
@@ -12,6 +18,17 @@ import type {
 const envGeminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
 const envOpenAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
 const envOpenAiApiUrl = (process.env.OPENAI_API_URL || "").trim();
+
+const clampDigestSourceChars = (value: unknown) => {
+  const next = Math.trunc(Number(value) || 0);
+  if (!Number.isFinite(next) || next <= 0) {
+    return DEFAULT_EDITOR_UI_STATE.options.aiChat.digestSourceCharsPerChunk;
+  }
+  return Math.max(
+    AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
+    Math.min(AI_CHAT_DIGEST_SOURCE_CHARS_MAX, next),
+  );
+};
 
 // Keep provider keys stable even when individual provider config is missing.
 export const createEmptyLlmOptions = (): LLMOptions =>
@@ -93,8 +110,43 @@ export const createEmptyLlmModelCache = (): EditorState["llmModelCache"] =>
   ) as EditorState["llmModelCache"];
 
 export type PersistedLegacyAiChatOptions = Partial<AppOptions["aiChat"]> & {
+  digestCharsPerChunk?: number;
   digestSummaryProviderId?: string;
   digestSummaryModelId?: string;
+};
+
+const normalizeDigestOutputRatioDenominator = (
+  value: unknown,
+): AppOptions["aiChat"]["digestOutputRatioDenominator"] => {
+  if (
+    typeof value === "number" &&
+    AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.includes(
+      value as (typeof AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS)[number],
+    )
+  ) {
+    return value as AppOptions["aiChat"]["digestOutputRatioDenominator"];
+  }
+  return 3;
+};
+
+const deriveLegacyDigestOutputRatioDenominator = (options: {
+  digestCharsPerChunk?: number;
+  digestSourceCharsPerChunk?: number;
+}) => {
+  const outputChars = Math.max(1, Math.trunc(options.digestCharsPerChunk || 0));
+  const sourceChars = Math.max(
+    outputChars,
+    Math.trunc(options.digestSourceCharsPerChunk || 0),
+  );
+  const rawRatio = sourceChars / outputChars;
+  const candidates: Array<
+    AppOptions["aiChat"]["digestOutputRatioDenominator"]
+  > = [...AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS];
+  return candidates.reduce((best, candidate) =>
+    Math.abs(candidate - rawRatio) < Math.abs(best - rawRatio)
+      ? candidate
+      : best,
+  );
 };
 
 export const normalizeAiChatOptions = (
@@ -117,8 +169,18 @@ export const normalizeAiChatOptions = (
   }
 
   return {
-    digestCharsPerChunk: next.digestCharsPerChunk,
-    digestSourceCharsPerChunk: next.digestSourceCharsPerChunk,
+    digestSourceCharsPerChunk: clampDigestSourceChars(
+      next.digestSourceCharsPerChunk,
+    ),
+    digestOutputRatioDenominator: normalizeDigestOutputRatioDenominator(
+      next.digestOutputRatioDenominator ??
+        deriveLegacyDigestOutputRatioDenominator({
+          digestCharsPerChunk: patch?.digestCharsPerChunk,
+          digestSourceCharsPerChunk: clampDigestSourceChars(
+            next.digestSourceCharsPerChunk,
+          ),
+        }),
+    ),
     digestSummaryModelKey: next.digestSummaryModelKey || "",
   };
 };
