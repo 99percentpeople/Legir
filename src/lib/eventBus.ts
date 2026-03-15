@@ -1,4 +1,4 @@
-import type { AiChatSelectionAttachment } from "@/services/aiChat/types";
+import type { AiChatSelectionAttachment } from "@/services/ai/chat/types";
 
 export type Unsubscribe = () => void;
 

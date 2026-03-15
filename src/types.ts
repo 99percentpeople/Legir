@@ -1,3 +1,5 @@
+import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
+
 export enum FieldType {
   TEXT = "Text",
   CHECKBOX = "Checkbox",
@@ -157,7 +159,6 @@ export interface PageData {
   viewBox: [number, number, number, number];
   userUnit: number;
   rotation: number;
-  imageData?: string; // Base64 string (Optional now, used for lazy loading fallback)
 }
 
 export interface HistorySnapshot {
@@ -189,32 +190,19 @@ export type AppLLMModelOption = {
   labelKey?: string;
 };
 
-export interface GeminiLLMProviderOptions {
-  apiKey?: string;
-  customTranslateModels: string[];
-  customVisionModels: string[];
-}
-
-export interface OpenAiLLMProviderOptions {
+export interface LLMProviderOptions {
   apiKey?: string;
   apiUrl?: string;
   customTranslateModels: string[];
   customVisionModels: string[];
 }
 
-export interface LLMOptions {
-  gemini: GeminiLLMProviderOptions;
-  openai: OpenAiLLMProviderOptions;
-}
-
-export type AiChatDigestMode = "excerpt" | "ai_summary";
+export type LLMOptions = Record<AiProviderId, LLMProviderOptions>;
 
 export interface AiChatOptions {
-  digestMode: AiChatDigestMode;
   digestCharsPerChunk: number;
   digestSourceCharsPerChunk: number;
-  digestSummaryProviderId?: string;
-  digestSummaryModelId?: string;
+  digestSummaryModelKey?: string;
 }
 
 export interface AppOptions {
@@ -303,6 +291,7 @@ export interface EditorState {
   filename: string;
   saveTarget: EditorSaveTarget | null;
   pages: PageData[];
+  thumbnailImages: Record<number, string>;
   fields: FormField[];
   annotations: Annotation[];
   outline: PDFOutlineItem[];
@@ -331,12 +320,13 @@ export interface EditorState {
   // Settings
   options: AppOptions;
 
-  llmModelCache: {
-    geminiTranslateModels: AppLLMModelOption[];
-    geminiVisionModels: AppLLMModelOption[];
-    openaiTranslateModels: AppLLMModelOption[];
-    openaiVisionModels: AppLLMModelOption[];
-  };
+  llmModelCache: Record<
+    AiProviderId,
+    {
+      translateModels: AppLLMModelOption[];
+      visionModels: AppLLMModelOption[];
+    }
+  >;
 
   // Translate (UI preference)
   translateOption: TranslateOptionId;
@@ -410,6 +400,40 @@ export interface EditorState {
     id: number;
   } | null;
 }
+
+// Workspace rendering only needs a focused subset of the editor state.
+// Keeping this hot-path contract explicit helps us avoid subscribing the
+// zoom/pan canvas to unrelated editor updates.
+export type WorkspaceEditorState = Pick<
+  EditorState,
+  | "annotations"
+  | "commentStyle"
+  | "fields"
+  | "freetextStyle"
+  | "highlightStyle"
+  | "keys"
+  | "mode"
+  | "options"
+  | "pageFlow"
+  | "pageLayout"
+  | "pages"
+  | "pageTranslateOptions"
+  | "pageTranslateParagraphCandidates"
+  | "pageTranslateSelectedParagraphIds"
+  | "penStyle"
+  | "pendingViewStateRestore"
+  | "scale"
+  | "selectedId"
+  | "tool"
+>;
+
+// The canvas shell needs a few extra viewport/layout fields around the
+// workspace state for fit-scale calculations and chrome controls.
+export type EditorCanvasState = WorkspaceEditorState &
+  Pick<
+    EditorState,
+    "currentPageIndex" | "filename" | "fitTrigger" | "isFullscreen" | "pdfBytes"
+  >;
 
 export type EditorUiState = Pick<
   EditorState,

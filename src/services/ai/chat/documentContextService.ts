@@ -3,6 +3,7 @@ import type {
   TextItem,
   TextMarkedContent,
 } from "pdfjs-dist/types/src/display/api";
+import { AI_CHAT_MAX_READ_PAGES_PER_CALL } from "@/constants";
 import { findPdfSearchResults } from "@/lib/pdfSearch";
 import { pageTranslationService } from "@/services/pageTranslationService";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
@@ -29,7 +30,6 @@ const clampNumber = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
 const normalizeExcerptText = (text: string) => text.replace(/\s+/g, " ").trim();
-const MAX_READ_PAGES_PER_CALL = 5;
 const DIGEST_LABEL_OVERHEAD_PER_PAGE = 12;
 
 const truncateText = (value: string, maxChars: number) => {
@@ -167,7 +167,6 @@ export const createDocumentContextService = (options: {
   getSnapshot: () => AiDocumentSnapshot;
   getSelectedTextContext: () => AiTextSelectionContext | null;
   getDigestConfig?: () => {
-    mode?: "excerpt" | "ai_summary";
     charsPerChunk?: number;
     sourceCharsPerChunk?: number;
   };
@@ -253,111 +252,99 @@ export const createDocumentContextService = (options: {
       return normalizeDocumentMetadata(snapshot);
     },
 
-    getDocumentDigest: async ({
-      startPage,
-      endPage,
-      charsPerChunk,
-      sourceCharsPerChunk,
-      summaryInstructions,
-      signal,
-    }) => {
-      const snapshot = getSnapshot();
-      const digestConfig = getDigestConfig?.();
-      const resolvedPageNumbers = buildPageRange(
-        startPage,
-        endPage,
-        snapshot.pages.length,
-      );
+    getDocumentDigest: summarizeDigestChunk
+      ? async ({
+          startPage,
+          endPage,
+          charsPerChunk,
+          sourceCharsPerChunk,
+          summaryInstructions,
+          signal,
+        }) => {
+          const snapshot = getSnapshot();
+          const digestConfig = getDigestConfig?.();
+          const resolvedPageNumbers = buildPageRange(
+            startPage,
+            endPage,
+            snapshot.pages.length,
+          );
 
-      const digestMode =
-        digestConfig?.mode === "ai_summary" && summarizeDigestChunk
-          ? "ai_summary"
-          : "excerpt";
-      const requestedCharsPerChunk = clampNumber(
-        Math.trunc(charsPerChunk ?? digestConfig?.charsPerChunk ?? 360) || 360,
-        180,
-        1200,
-      );
-      const requestedSourceCharsPerChunk = clampNumber(
-        Math.trunc(
-          sourceCharsPerChunk ??
-            digestConfig?.sourceCharsPerChunk ??
-            requestedCharsPerChunk * 10,
-        ) || requestedCharsPerChunk * 10,
-        requestedCharsPerChunk,
-        8_000,
-      );
-      const excerptCharsPerChunk = requestedCharsPerChunk;
-      const effectiveSourceCharsPerChunk = clampNumber(
-        Math.min(
-          requestedSourceCharsPerChunk,
-          Math.max(240, excerptCharsPerChunk * 12),
-        ),
-        excerptCharsPerChunk,
-        8_000,
-      );
-      const pages = await Promise.all(
-        resolvedPageNumbers.map(async (pageNumber) => {
-          const pageText = await readPageText(pageNumber - 1, signal);
-          return {
-            pageNumber,
-            text: normalizeExcerptText(pageText),
-            charCount: pageText.length,
-          };
-        }),
-      );
-      const totalCharCount = pages.reduce(
-        (sum, page) => sum + page.charCount,
-        0,
-      );
-      const localExcerpt = buildChunkSample(pages, excerptCharsPerChunk);
-      let excerpt = localExcerpt;
+          const requestedCharsPerChunk = clampNumber(
+            Math.trunc(charsPerChunk ?? digestConfig?.charsPerChunk ?? 360) ||
+              360,
+            180,
+            1200,
+          );
+          const requestedSourceCharsPerChunk = clampNumber(
+            Math.trunc(
+              sourceCharsPerChunk ??
+                digestConfig?.sourceCharsPerChunk ??
+                requestedCharsPerChunk * 10,
+            ) || requestedCharsPerChunk * 10,
+            requestedCharsPerChunk,
+            8_000,
+          );
+          const excerptCharsPerChunk = requestedCharsPerChunk;
+          const effectiveSourceCharsPerChunk = clampNumber(
+            Math.min(
+              requestedSourceCharsPerChunk,
+              Math.max(240, excerptCharsPerChunk * 12),
+            ),
+            excerptCharsPerChunk,
+            8_000,
+          );
+          const pages = await Promise.all(
+            resolvedPageNumbers.map(async (pageNumber) => {
+              const pageText = await readPageText(pageNumber - 1, signal);
+              return {
+                pageNumber,
+                text: normalizeExcerptText(pageText),
+                charCount: pageText.length,
+              };
+            }),
+          );
+          const totalCharCount = pages.reduce(
+            (sum, page) => sum + page.charCount,
+            0,
+          );
+          const sampledText = buildChunkSample(
+            pages,
+            effectiveSourceCharsPerChunk,
+          );
+          const summary = await summarizeDigestChunk({
+            startPage: resolvedPageNumbers[0]!,
+            endPage: resolvedPageNumbers[resolvedPageNumbers.length - 1]!,
+            sampledText,
+            maxChars: excerptCharsPerChunk,
+            summaryInstructions,
+            signal,
+          });
+          const normalizedSummary = normalizeExcerptText(summary);
+          const excerpt = truncateText(
+            normalizedSummary || buildChunkSample(pages, excerptCharsPerChunk),
+            excerptCharsPerChunk,
+          );
 
-      if (digestMode === "ai_summary") {
-        const sampledText = buildChunkSample(
-          pages,
-          effectiveSourceCharsPerChunk,
-        );
-        if (sampledText) {
-          try {
-            const summary = await summarizeDigestChunk({
+          const chunks: AiDocumentDigestChunk[] = [
+            {
               startPage: resolvedPageNumbers[0]!,
               endPage: resolvedPageNumbers[resolvedPageNumbers.length - 1]!,
-              sampledText,
-              maxChars: excerptCharsPerChunk,
-              summaryInstructions,
-              signal,
-            });
-            const normalizedSummary = normalizeExcerptText(summary);
-            if (normalizedSummary) {
-              excerpt = truncateText(normalizedSummary, excerptCharsPerChunk);
-            }
-          } catch {
-            excerpt = localExcerpt;
-          }
+              pageCount: resolvedPageNumbers.length,
+              charCount: totalCharCount,
+              excerpt,
+            },
+          ];
+
+          return {
+            pageCount: snapshot.pages.length,
+            returnedPageCount: resolvedPageNumbers.length,
+            chunkCount: 1,
+            excerptCharsPerChunk,
+            sourceCharsPerChunk: effectiveSourceCharsPerChunk,
+            chunks,
+          };
         }
-      }
-
-      const chunks: AiDocumentDigestChunk[] = [
-        {
-          startPage: resolvedPageNumbers[0]!,
-          endPage: resolvedPageNumbers[resolvedPageNumbers.length - 1]!,
-          pageCount: resolvedPageNumbers.length,
-          charCount: totalCharCount,
-          excerpt,
-        },
-      ];
-
-      return {
-        pageCount: snapshot.pages.length,
-        returnedPageCount: resolvedPageNumbers.length,
-        chunkCount: 1,
-        mode: digestMode,
-        excerptCharsPerChunk,
-        sourceCharsPerChunk: effectiveSourceCharsPerChunk,
-        chunks,
-      };
-    },
+      : undefined,
 
     readPages: async ({ pageNumbers, includeLayout = false, signal }) => {
       const snapshot = getSnapshot();
@@ -369,7 +356,7 @@ export const createDocumentContextService = (options: {
       const resolvedPageNumbers = clampPageNumbers(
         requestedPageNumbers,
         snapshot.pages.length,
-        MAX_READ_PAGES_PER_CALL,
+        AI_CHAT_MAX_READ_PAGES_PER_CALL,
       );
 
       const pages = await Promise.all(
@@ -399,7 +386,7 @@ export const createDocumentContextService = (options: {
         requestedPageCount: requestedPageNumbers.length,
         returnedPageCount: pages.length,
         truncated: requestedPageNumbers.length > pages.length,
-        maxPagesPerCall: MAX_READ_PAGES_PER_CALL,
+        maxPagesPerCall: AI_CHAT_MAX_READ_PAGES_PER_CALL,
         pages,
       };
     },

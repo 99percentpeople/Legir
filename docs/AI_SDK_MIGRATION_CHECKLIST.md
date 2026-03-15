@@ -169,7 +169,7 @@ src/services/aiSdk/
 
 验收标准：
 
-- `get_document_digest` 的 `ai_summary` 模式可用
+- `get_document_digest` 仅在已配置摘要模型时可用
 - 摘要输出质量不回退
 - 不再依赖 `openaiProvider.ts` / `geminiProvider.ts` 中的 summarize 实现
 

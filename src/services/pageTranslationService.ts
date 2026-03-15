@@ -17,18 +17,13 @@ import {
   translateService,
   type TranslateTextOptions,
 } from "@/services/translateService";
+import {
+  parseAiSdkModelSpecifier,
+  type AiSdkProviderId,
+} from "@/services/ai/sdk";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
-
-import {
-  translatePageBlocksStructured,
-  type GeminiPageTranslateBlock,
-} from "@/services/LLMService/providers/geminiProvider";
-
-import {
-  translateOpenAiPageBlocksStructured,
-  type OpenAiPageTranslateBlock,
-} from "@/services/LLMService/providers/openaiProvider";
-
+import { useEditorStore } from "@/store/useEditorStore";
+import { translatePageBlocksStructuredWithAiSdk } from "@/services/ai/sdk";
 import { resolveCjkFallbackFontStack, splitTextRuns } from "@/lib/fonts";
 
 export type PageTranslationTextBlock = {
@@ -351,8 +346,6 @@ export type ParsePageRangeResult =
   | { ok: true; pageIndices: number[] }
   | { ok: false };
 
-type StructuredTranslateProviderId = "gemini" | "openai";
-
 const rectOverlaps = (
   a: { x: number; y: number; width: number; height: number },
   b: { x: number; y: number; width: number; height: number },
@@ -376,12 +369,10 @@ const parseTranslateOption = (id: TranslateOptionId) => {
 
 const getStructuredTranslateProviderId = (
   translateOption?: TranslateOptionId,
-): StructuredTranslateProviderId | null => {
+): AiSdkProviderId | null => {
   if (!translateOption) return null;
   if (!translateService.isOptionLLM(translateOption)) return null;
-  const { providerId } = parseTranslateOption(translateOption);
-  if (providerId === "gemini" || providerId === "openai") return providerId;
-  return null;
+  return parseAiSdkModelSpecifier(translateOption)?.providerId || null;
 };
 
 const canUseStructuredTranslate = (translateOption?: TranslateOptionId) => {
@@ -625,30 +616,21 @@ const translatePageLinesStructured = async (args: {
     signal: args.signal,
   });
 
-  const res =
-    providerId === "gemini"
-      ? await translatePageBlocksStructured({
-          blocks: blocks as GeminiPageTranslateBlock[],
-          context,
-          targetLanguage: args.translate.targetLanguage,
-          sourceLanguage: args.translate.sourceLanguage,
-          model: translateOpt.modelId,
-          prompt: args.translate.prompt,
-          usePositionAwarePrompt: args.usePositionAwarePrompt,
-          aiReflowParagraphs: args.aiReflowParagraphs,
-          signal: args.signal,
-        })
-      : await translateOpenAiPageBlocksStructured({
-          blocks: blocks as OpenAiPageTranslateBlock[],
-          context,
-          targetLanguage: args.translate.targetLanguage,
-          sourceLanguage: args.translate.sourceLanguage,
-          model: translateOpt.modelId,
-          prompt: args.translate.prompt,
-          usePositionAwarePrompt: args.usePositionAwarePrompt,
-          aiReflowParagraphs: args.aiReflowParagraphs,
-          signal: args.signal,
-        });
+  const res = await translatePageBlocksStructuredWithAiSdk({
+    appOptions: useEditorStore.getState().options,
+    specifier: {
+      providerId,
+      modelId: translateOpt.modelId,
+    },
+    blocks,
+    context,
+    targetLanguage: args.translate.targetLanguage,
+    sourceLanguage: args.translate.sourceLanguage,
+    prompt: args.translate.prompt,
+    usePositionAwarePrompt: args.usePositionAwarePrompt,
+    aiReflowParagraphs: args.aiReflowParagraphs,
+    signal: args.signal,
+  });
 
   const byId = new Map(res.translations.map((tr) => [tr.id, tr] as const));
 
@@ -730,30 +712,21 @@ const translateParagraphCandidatesStructured = async (args: {
     signal: args.signal,
   });
 
-  const res =
-    providerId === "gemini"
-      ? await translatePageBlocksStructured({
-          blocks: blocks as GeminiPageTranslateBlock[],
-          context,
-          targetLanguage: args.translate.targetLanguage,
-          sourceLanguage: args.translate.sourceLanguage,
-          model: translateOpt.modelId,
-          prompt: args.translate.prompt,
-          usePositionAwarePrompt: args.usePositionAwarePrompt,
-          aiReflowParagraphs: args.aiReflowParagraphs,
-          signal: args.signal,
-        })
-      : await translateOpenAiPageBlocksStructured({
-          blocks: blocks as OpenAiPageTranslateBlock[],
-          context,
-          targetLanguage: args.translate.targetLanguage,
-          sourceLanguage: args.translate.sourceLanguage,
-          model: translateOpt.modelId,
-          prompt: args.translate.prompt,
-          usePositionAwarePrompt: args.usePositionAwarePrompt,
-          aiReflowParagraphs: args.aiReflowParagraphs,
-          signal: args.signal,
-        });
+  const res = await translatePageBlocksStructuredWithAiSdk({
+    appOptions: useEditorStore.getState().options,
+    specifier: {
+      providerId,
+      modelId: translateOpt.modelId,
+    },
+    blocks,
+    context,
+    targetLanguage: args.translate.targetLanguage,
+    sourceLanguage: args.translate.sourceLanguage,
+    prompt: args.translate.prompt,
+    usePositionAwarePrompt: args.usePositionAwarePrompt,
+    aiReflowParagraphs: args.aiReflowParagraphs,
+    signal: args.signal,
+  });
 
   const byId = new Map(res.translations.map((tr) => [tr.id, tr] as const));
 

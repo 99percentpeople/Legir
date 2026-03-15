@@ -10,7 +10,7 @@ import { isTauri, invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEditorStore, type EditorActions } from "../store/useEditorStore";
 import type { EditorState } from "../types";
-import { loadModels } from "@/services/LLMService";
+import { loadModels } from "@/services/ai";
 
 export function useAppInitialization({
   loadIntoEditor,

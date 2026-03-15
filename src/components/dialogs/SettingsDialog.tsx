@@ -41,6 +41,11 @@ import {
   SnappingOptions,
   ThumbnailsLayoutMode,
 } from "@/types";
+import {
+  AI_PROVIDER_IDS,
+  AI_PROVIDER_SPECS,
+  type AiProviderId,
+} from "@/services/ai/sdk/providerCatalog";
 import { useLanguage, Language, LANGUAGES } from "../language-provider";
 import { useTheme } from "../theme-provider";
 import { Separator } from "../ui/separator";
@@ -50,7 +55,7 @@ import {
   checkLlmProviderConfig,
   getChatModelGroups,
   loadModels,
-} from "@/services/LLMService";
+} from "@/services/ai";
 import { type Tag, TagInput } from "emblor";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 
@@ -71,34 +76,46 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const { theme, setTheme } = useTheme();
 
   const llmModelCache = useEditorStore((s) => s.llmModelCache);
+  type LlmProviderId = AiProviderId;
+  type ProviderStatus = {
+    state: "idle" | "checking" | "ok" | "error";
+    message: string;
+  };
+  type ProviderFetchStatus = {
+    state: "idle" | "fetching" | "ok" | "error";
+    message: string;
+  };
 
-  type LlmProviderId = "gemini" | "openai";
+  const buildProviderStatusRecord = <
+    T extends ProviderStatus | ProviderFetchStatus,
+  >(
+    initial: T,
+  ) =>
+    Object.fromEntries(
+      AI_PROVIDER_IDS.map((providerId) => [providerId, { ...initial }]),
+    ) as Record<LlmProviderId, T>;
 
-  const [llmProviderTab, setLlmProviderTab] = useState<LlmProviderId>("openai");
+  const [llmProviderTab, setLlmProviderTab] = useState<LlmProviderId>(
+    AI_PROVIDER_IDS[0],
+  );
 
   const [llmCheckStatus, setLlmCheckStatus] = useState<
-    Record<
-      LlmProviderId,
-      { state: "idle" | "checking" | "ok" | "error"; message: string }
-    >
-  >({
-    gemini: { state: "idle", message: "" },
-    openai: { state: "idle", message: "" },
-  });
+    Record<LlmProviderId, ProviderStatus>
+  >(buildProviderStatusRecord({ state: "idle", message: "" }));
 
   const [llmFetchStatus, setLlmFetchStatus] = useState<
-    Record<
-      LlmProviderId,
-      { state: "idle" | "fetching" | "ok" | "error"; message: string }
-    >
-  >({
-    gemini: { state: "idle", message: "" },
-    openai: { state: "idle", message: "" },
-  });
+    Record<LlmProviderId, ProviderFetchStatus>
+  >(buildProviderStatusRecord({ state: "idle", message: "" }));
 
   const modelUpdateTimersRef = useRef<Partial<Record<LlmProviderId, number>>>(
     {},
   );
+  const [
+    activeTranslateTagIndexByProvider,
+    setActiveTranslateTagIndexByProvider,
+  ] = useState<Partial<Record<LlmProviderId, number | null>>>({});
+  const [activeVisionTagIndexByProvider, setActiveVisionTagIndexByProvider] =
+    useState<Partial<Record<LlmProviderId, number | null>>>({});
 
   const tagStyles = useMemo(
     () => ({
@@ -132,17 +149,6 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     return ids.map((id) => ({ id, text: id }));
   };
 
-  const [activeGeminiTranslateTagIndex, setActiveGeminiTranslateTagIndex] =
-    useState<number | null>(null);
-  const [activeGeminiVisionTagIndex, setActiveGeminiVisionTagIndex] = useState<
-    number | null
-  >(null);
-  const [activeOpenAiTranslateTagIndex, setActiveOpenAiTranslateTagIndex] =
-    useState<number | null>(null);
-  const [activeOpenAiVisionTagIndex, setActiveOpenAiVisionTagIndex] = useState<
-    number | null
-  >(null);
-
   const scheduleModelRegistryUpdate = (provider: LlmProviderId) => {
     const prev = modelUpdateTimersRef.current[provider];
     if (typeof prev === "number") window.clearTimeout(prev);
@@ -171,8 +177,8 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     updateLlmProviderOptions(provider, { apiKey: value });
   };
 
-  const updateOpenAiApiUrl = (value: string) => {
-    updateLlmProviderOptions("openai", { apiUrl: value });
+  const updateLlmApiUrl = (provider: LlmProviderId, value: string) => {
+    updateLlmProviderOptions(provider, { apiUrl: value });
   };
 
   const updateAiChatOptions = (patch: Partial<AppOptions["aiChat"]>) => {
@@ -183,19 +189,6 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
         ...patch,
       },
     });
-  };
-
-  const mergeModelIdLists = (a: string[], b: string[]) => {
-    const out: string[] = [];
-    const seen = new Set<string>();
-    for (const raw of [...a, ...b]) {
-      const id = (raw || "").trim();
-      if (!id) continue;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      out.push(id);
-    }
-    return out;
   };
 
   const aiToolModelGroups = useMemo<ModelSelectGroup[]>(() => {
@@ -268,31 +261,6 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
         force: true,
         throwOnError: true,
       });
-
-      const cache = useEditorStore.getState().llmModelCache;
-      const translateModels =
-        provider === "openai"
-          ? cache.openaiTranslateModels
-          : cache.geminiTranslateModels;
-      const visionModels =
-        provider === "openai"
-          ? cache.openaiVisionModels
-          : cache.geminiVisionModels;
-
-      const prevTranslate = options.llm[provider].customTranslateModels || [];
-      const prevVision = options.llm[provider].customVisionModels || [];
-
-      updateLlmProviderOptions(provider, {
-        customTranslateModels: mergeModelIdLists(
-          prevTranslate,
-          translateModels.map((m) => m.id),
-        ),
-        customVisionModels: mergeModelIdLists(
-          prevVision,
-          visionModels.map((m) => m.id),
-        ),
-      });
-      scheduleModelRegistryUpdate(provider);
 
       setLlmFetchStatus((prev) => ({
         ...prev,
@@ -640,377 +608,286 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       <SelectValue placeholder={t("common.select")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="openai">
-                        {t("settings.llm.openai")}
-                      </SelectItem>
-                      <SelectItem value="gemini">
-                        {t("settings.llm.gemini")}
-                      </SelectItem>
+                      {AI_PROVIDER_SPECS.map((spec) => (
+                        <SelectItem key={spec.id} value={spec.id}>
+                          {spec.labelKey ? t(spec.labelKey) : spec.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <Tabs value={llmProviderTab}>
-                  <TabsContent value="gemini" className="space-y-4">
-                    <div className="bg-muted/30 border-border flex flex-col gap-2 rounded-lg border p-3">
-                      <Input
-                        value={options.llm.gemini.apiKey || ""}
-                        onChange={(e) =>
-                          updateLlmApiKey("gemini", e.target.value)
-                        }
-                        placeholder={t("settings.llm.api_key_placeholder")}
-                        className="h-8"
-                        type="password"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => void checkLlmProvider("gemini")}
-                          disabled={llmCheckStatus.gemini.state === "checking"}
-                        >
-                          {llmCheckStatus.gemini.state === "checking" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                  {AI_PROVIDER_SPECS.map((spec) => {
+                    const providerOptions = options.llm[spec.id];
+                    const checkStatus = llmCheckStatus[spec.id];
+                    const fetchStatus = llmFetchStatus[spec.id];
+                    const showApiUrl = spec.allowCustomBaseUrl;
+                    return (
+                      <TabsContent
+                        key={spec.id}
+                        value={spec.id}
+                        className="space-y-4"
+                      >
+                        <div className="bg-muted/30 border-border flex flex-col gap-2 rounded-lg border p-3">
+                          <Input
+                            value={providerOptions.apiKey || ""}
+                            onChange={(e) =>
+                              updateLlmApiKey(spec.id, e.target.value)
+                            }
+                            placeholder={t("settings.llm.api_key_placeholder")}
+                            className="h-8"
+                            type="password"
+                          />
+                          <div className="flex items-center gap-2">
+                            {showApiUrl ? (
+                              <Input
+                                value={providerOptions.apiUrl || ""}
+                                onChange={(e) =>
+                                  updateLlmApiUrl(spec.id, e.target.value)
+                                }
+                                placeholder={
+                                  spec.defaultBaseUrl ||
+                                  t("settings.llm.api_url_placeholder")
+                                }
+                                className="h-8"
+                              />
+                            ) : null}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => void checkLlmProvider(spec.id)}
+                              disabled={checkStatus.state === "checking"}
+                            >
+                              {checkStatus.state === "checking" ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : null}
+                              {t("settings.llm.check")}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() =>
+                                void fetchLlmProviderModels(spec.id)
+                              }
+                              disabled={fetchStatus.state === "fetching"}
+                            >
+                              {fetchStatus.state === "fetching" ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : null}
+                              {t("settings.llm.fetch_models")}
+                            </Button>
+                          </div>
+
+                          {checkStatus.state === "ok" ? (
+                            <div className="flex items-center gap-2 text-xs">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                              <span className="text-muted-foreground">
+                                {checkStatus.message}
+                              </span>
+                            </div>
                           ) : null}
-                          {t("settings.llm.check")}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => void fetchLlmProviderModels("gemini")}
-                          disabled={llmFetchStatus.gemini.state === "fetching"}
-                        >
-                          {llmFetchStatus.gemini.state === "fetching" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                          {checkStatus.state === "error" ? (
+                            <div className="flex items-center gap-2 text-xs">
+                              <AlertCircle className="text-destructive h-4 w-4" />
+                              <span className="text-destructive">
+                                {checkStatus.message}
+                              </span>
+                            </div>
                           ) : null}
-                          {t("settings.llm.fetch_models")}
-                        </Button>
-                      </div>
 
-                      {llmCheckStatus.gemini.state === "ok" ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span className="text-muted-foreground">
-                            {llmCheckStatus.gemini.message}
-                          </span>
-                        </div>
-                      ) : null}
-                      {llmCheckStatus.gemini.state === "error" ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <AlertCircle className="text-destructive h-4 w-4" />
-                          <span className="text-destructive">
-                            {llmCheckStatus.gemini.message}
-                          </span>
-                        </div>
-                      ) : null}
-
-                      {llmFetchStatus.gemini.state === "ok" ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span className="text-muted-foreground">
-                            {llmFetchStatus.gemini.message}
-                          </span>
-                        </div>
-                      ) : null}
-                      {llmFetchStatus.gemini.state === "error" ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <AlertCircle className="text-destructive h-4 w-4" />
-                          <span className="text-destructive">
-                            {llmFetchStatus.gemini.message}
-                          </span>
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="bg-muted/30 border-border flex flex-col gap-3 rounded-lg border p-3">
-                      <Label className="text-xs">
-                        {t("settings.llm.custom_models_translate")}
-                      </Label>
-                      <TagInput
-                        id="llm-gemini-translate-models"
-                        placeholder={t(
-                          "settings.llm.custom_models_placeholder",
-                        )}
-                        tags={toTags(
-                          options.llm.gemini.customTranslateModels || [],
-                        )}
-                        setTags={(newTags) => {
-                          const prevTags = toTags(
-                            options.llm.gemini.customTranslateModels || [],
-                          );
-                          const updated =
-                            typeof newTags === "function"
-                              ? newTags(prevTags)
-                              : newTags;
-                          updateLlmProviderOptions("gemini", {
-                            customTranslateModels: normalizeModelIds(updated),
-                          });
-                          scheduleModelRegistryUpdate("gemini");
-                        }}
-                        activeTagIndex={activeGeminiTranslateTagIndex}
-                        setActiveTagIndex={setActiveGeminiTranslateTagIndex}
-                        styleClasses={tagStyles}
-                      />
-
-                      <Label className="text-xs">
-                        {t("settings.llm.custom_models_vision")}
-                      </Label>
-                      <TagInput
-                        id="llm-gemini-vision-models"
-                        placeholder={t(
-                          "settings.llm.custom_models_placeholder",
-                        )}
-                        tags={toTags(
-                          options.llm.gemini.customVisionModels || [],
-                        )}
-                        setTags={(newTags) => {
-                          const prevTags = toTags(
-                            options.llm.gemini.customVisionModels || [],
-                          );
-                          const updated =
-                            typeof newTags === "function"
-                              ? newTags(prevTags)
-                              : newTags;
-                          updateLlmProviderOptions("gemini", {
-                            customVisionModels: normalizeModelIds(updated),
-                          });
-                          scheduleModelRegistryUpdate("gemini");
-                        }}
-                        activeTagIndex={activeGeminiVisionTagIndex}
-                        setActiveTagIndex={setActiveGeminiVisionTagIndex}
-                        styleClasses={tagStyles}
-                      />
-
-                      <p className="text-muted-foreground text-xs">
-                        {t("settings.llm.models_loaded_count", {
-                          count: llmModelCache.geminiTranslateModels.length,
-                        })}
-                      </p>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="openai" className="space-y-4">
-                    <div className="bg-muted/30 border-border flex flex-col gap-2 rounded-lg border p-3">
-                      <Input
-                        value={options.llm.openai.apiKey || ""}
-                        onChange={(e) =>
-                          updateLlmApiKey("openai", e.target.value)
-                        }
-                        placeholder={t("settings.llm.api_key_placeholder")}
-                        className="h-8"
-                        type="password"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={options.llm.openai.apiUrl || ""}
-                          onChange={(e) => updateOpenAiApiUrl(e.target.value)}
-                          placeholder={t("settings.llm.api_url_placeholder")}
-                          className="h-8"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => void checkLlmProvider("openai")}
-                          disabled={llmCheckStatus.openai.state === "checking"}
-                        >
-                          {llmCheckStatus.openai.state === "checking" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                          {fetchStatus.state === "ok" ? (
+                            <div className="flex items-center gap-2 text-xs">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                              <span className="text-muted-foreground">
+                                {fetchStatus.message}
+                              </span>
+                            </div>
                           ) : null}
-                          {t("settings.llm.check")}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => void fetchLlmProviderModels("openai")}
-                          disabled={llmFetchStatus.openai.state === "fetching"}
-                        >
-                          {llmFetchStatus.openai.state === "fetching" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                          {fetchStatus.state === "error" ? (
+                            <div className="flex items-center gap-2 text-xs">
+                              <AlertCircle className="text-destructive h-4 w-4" />
+                              <span className="text-destructive">
+                                {fetchStatus.message}
+                              </span>
+                            </div>
                           ) : null}
-                          {t("settings.llm.fetch_models")}
-                        </Button>
-                      </div>
-
-                      {llmCheckStatus.openai.state === "ok" ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span className="text-muted-foreground">
-                            {llmCheckStatus.openai.message}
-                          </span>
                         </div>
-                      ) : null}
-                      {llmCheckStatus.openai.state === "error" ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <AlertCircle className="text-destructive h-4 w-4" />
-                          <span className="text-destructive">
-                            {llmCheckStatus.openai.message}
-                          </span>
+
+                        <div className="bg-muted/30 border-border flex flex-col gap-3 rounded-lg border p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-xs">
+                              {t("settings.llm.fetched_models")}
+                            </Label>
+                            <span className="text-muted-foreground text-xs">
+                              {t("settings.llm.models_loaded_count", {
+                                count:
+                                  llmModelCache[spec.id].translateModels.length,
+                              })}
+                            </span>
+                          </div>
+                          {llmModelCache[spec.id].translateModels.length > 0 ? (
+                            <div className="bg-background/80 max-h-36 overflow-auto rounded-md border p-2">
+                              <div className="flex flex-wrap gap-1.5">
+                                {llmModelCache[spec.id].translateModels.map(
+                                  (model) => (
+                                    <span
+                                      key={`${spec.id}:fetched:${model.id}`}
+                                      className="bg-muted text-muted-foreground inline-flex max-w-full min-w-0 items-center rounded-md px-2 py-1 text-[11px]"
+                                      title={model.id}
+                                    >
+                                      <span className="truncate">
+                                        {model.id}
+                                      </span>
+                                    </span>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground text-xs">
+                              {t("settings.llm.fetched_models_empty")}
+                            </p>
+                          )}
                         </div>
-                      ) : null}
 
-                      {llmFetchStatus.openai.state === "ok" ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span className="text-muted-foreground">
-                            {llmFetchStatus.openai.message}
-                          </span>
+                        <div className="bg-muted/30 border-border flex flex-col gap-3 rounded-lg border p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-xs">
+                              {t("settings.llm.custom_models_translate")}
+                            </Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground h-6 px-2 text-xs"
+                              disabled={
+                                (providerOptions.customTranslateModels || [])
+                                  .length === 0
+                              }
+                              onClick={() => {
+                                updateLlmProviderOptions(spec.id, {
+                                  customTranslateModels: [],
+                                });
+                                scheduleModelRegistryUpdate(spec.id);
+                              }}
+                            >
+                              {t("settings.llm.clear_custom_models")}
+                            </Button>
+                          </div>
+                          <TagInput
+                            id={`llm-${spec.id}-translate-models`}
+                            placeholder={t(
+                              "settings.llm.custom_models_placeholder",
+                            )}
+                            tags={toTags(
+                              providerOptions.customTranslateModels || [],
+                            )}
+                            setTags={(newTags) => {
+                              const prevTags = toTags(
+                                providerOptions.customTranslateModels || [],
+                              );
+                              const updated =
+                                typeof newTags === "function"
+                                  ? newTags(prevTags)
+                                  : newTags;
+                              updateLlmProviderOptions(spec.id, {
+                                customTranslateModels:
+                                  normalizeModelIds(updated),
+                              });
+                              scheduleModelRegistryUpdate(spec.id);
+                            }}
+                            activeTagIndex={
+                              activeTranslateTagIndexByProvider[spec.id] ?? null
+                            }
+                            setActiveTagIndex={(index) =>
+                              setActiveTranslateTagIndexByProvider((prev) => ({
+                                ...prev,
+                                [spec.id]: index,
+                              }))
+                            }
+                            styleClasses={tagStyles}
+                          />
+
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-xs">
+                              {t("settings.llm.custom_models_vision")}
+                            </Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground h-6 px-2 text-xs"
+                              disabled={
+                                (providerOptions.customVisionModels || [])
+                                  .length === 0
+                              }
+                              onClick={() => {
+                                updateLlmProviderOptions(spec.id, {
+                                  customVisionModels: [],
+                                });
+                                scheduleModelRegistryUpdate(spec.id);
+                              }}
+                            >
+                              {t("settings.llm.clear_custom_models")}
+                            </Button>
+                          </div>
+                          <TagInput
+                            id={`llm-${spec.id}-vision-models`}
+                            placeholder={t(
+                              "settings.llm.custom_models_placeholder",
+                            )}
+                            tags={toTags(
+                              providerOptions.customVisionModels || [],
+                            )}
+                            setTags={(newTags) => {
+                              const prevTags = toTags(
+                                providerOptions.customVisionModels || [],
+                              );
+                              const updated =
+                                typeof newTags === "function"
+                                  ? newTags(prevTags)
+                                  : newTags;
+                              updateLlmProviderOptions(spec.id, {
+                                customVisionModels: normalizeModelIds(updated),
+                              });
+                              scheduleModelRegistryUpdate(spec.id);
+                            }}
+                            activeTagIndex={
+                              activeVisionTagIndexByProvider[spec.id] ?? null
+                            }
+                            setActiveTagIndex={(index) =>
+                              setActiveVisionTagIndexByProvider((prev) => ({
+                                ...prev,
+                                [spec.id]: index,
+                              }))
+                            }
+                            styleClasses={tagStyles}
+                          />
                         </div>
-                      ) : null}
-                      {llmFetchStatus.openai.state === "error" ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <AlertCircle className="text-destructive h-4 w-4" />
-                          <span className="text-destructive">
-                            {llmFetchStatus.openai.message}
-                          </span>
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="bg-muted/30 border-border flex flex-col gap-3 rounded-lg border p-3">
-                      <Label className="text-xs">
-                        {t("settings.llm.custom_models_translate")}
-                      </Label>
-                      <TagInput
-                        id="llm-openai-translate-models"
-                        placeholder={t(
-                          "settings.llm.custom_models_placeholder",
-                        )}
-                        tags={toTags(
-                          options.llm.openai.customTranslateModels || [],
-                        )}
-                        setTags={(newTags) => {
-                          const prevTags = toTags(
-                            options.llm.openai.customTranslateModels || [],
-                          );
-                          const updated =
-                            typeof newTags === "function"
-                              ? newTags(prevTags)
-                              : newTags;
-                          updateLlmProviderOptions("openai", {
-                            customTranslateModels: normalizeModelIds(updated),
-                          });
-                          scheduleModelRegistryUpdate("openai");
-                        }}
-                        activeTagIndex={activeOpenAiTranslateTagIndex}
-                        setActiveTagIndex={setActiveOpenAiTranslateTagIndex}
-                        styleClasses={tagStyles}
-                      />
-
-                      <Label className="text-xs">
-                        {t("settings.llm.custom_models_vision")}
-                      </Label>
-                      <TagInput
-                        id="llm-openai-vision-models"
-                        placeholder={t(
-                          "settings.llm.custom_models_placeholder",
-                        )}
-                        tags={toTags(
-                          options.llm.openai.customVisionModels || [],
-                        )}
-                        setTags={(newTags) => {
-                          const prevTags = toTags(
-                            options.llm.openai.customVisionModels || [],
-                          );
-                          const updated =
-                            typeof newTags === "function"
-                              ? newTags(prevTags)
-                              : newTags;
-                          updateLlmProviderOptions("openai", {
-                            customVisionModels: normalizeModelIds(updated),
-                          });
-                          scheduleModelRegistryUpdate("openai");
-                        }}
-                        activeTagIndex={activeOpenAiVisionTagIndex}
-                        setActiveTagIndex={setActiveOpenAiVisionTagIndex}
-                        styleClasses={tagStyles}
-                      />
-
-                      <p className="text-muted-foreground text-xs">
-                        {t("settings.llm.models_loaded_count", {
-                          count: llmModelCache.openaiTranslateModels.length,
-                        })}
-                      </p>
-                    </div>
-                  </TabsContent>
+                      </TabsContent>
+                    );
+                  })}
                 </Tabs>
               </div>
             </TabsContent>
 
             <TabsContent value="ai_chat">
               <div className="space-y-6">
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="text-primary h-4 w-4" />
-                    <Label className="mb-0 font-semibold">
-                      {t("settings.ai_chat.title")}
-                    </Label>
-                  </div>
-                  <p className="text-muted-foreground text-sm">
-                    {t("settings.ai_chat.description")}
-                  </p>
-                </div>
-
                 <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-1">
-                      <Label className="mb-0 font-semibold">
-                        {t("settings.ai_chat.digest_mode")}
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        {t("settings.ai_chat.digest_mode_desc")}
-                      </p>
-                    </div>
-                    <Select
-                      value={options.aiChat.digestMode}
-                      onValueChange={(value) =>
-                        updateAiChatOptions({
-                          digestMode:
-                            value === "ai_summary" ? "ai_summary" : "excerpt",
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-8 w-full sm:w-[220px]">
-                        <SelectValue placeholder={t("common.select")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="excerpt">
-                          {t("settings.ai_chat.digest_mode_excerpt")}
-                        </SelectItem>
-                        <SelectItem value="ai_summary">
-                          {t("settings.ai_chat.digest_mode_ai_summary")}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Separator />
-
                   <div className="space-y-2">
                     <Label className="font-semibold">
                       {t("settings.ai_chat.summary_model")}
                     </Label>
                     <ModelSelect
-                      value={
-                        options.aiChat.digestSummaryProviderId &&
-                        options.aiChat.digestSummaryModelId
-                          ? `${options.aiChat.digestSummaryProviderId}:${options.aiChat.digestSummaryModelId}`
-                          : undefined
-                      }
-                      onValueChange={(value) => {
-                        const separatorIndex = value.indexOf(":");
-                        if (separatorIndex < 0) return;
+                      value={options.aiChat.digestSummaryModelKey || undefined}
+                      onValueChange={(value) =>
                         updateAiChatOptions({
-                          digestSummaryProviderId: value.slice(
-                            0,
-                            separatorIndex,
-                          ),
-                          digestSummaryModelId: value.slice(separatorIndex + 1),
-                        });
-                      }}
+                          digestSummaryModelKey: value,
+                        })
+                      }
                       placeholder={
                         aiToolModelGroups.length > 0
                           ? t("settings.ai_chat.summary_model_placeholder")

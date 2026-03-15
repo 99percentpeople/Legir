@@ -8,7 +8,7 @@ import {
   FormDetectionOptions,
   FormDetectionOptionsForm,
 } from "@/components/FormDetectionOptionsForm";
-import { isFormDetectAvailable } from "@/services/LLMService";
+import { isFormDetectAvailable } from "@/services/ai";
 
 export interface FormDetectionPanelProps {
   isFloating: boolean;

@@ -1,4 +1,5 @@
-import type { EditorUiState, PageTranslateOptions } from "./types";
+import type { EditorUiState, LLMOptions, PageTranslateOptions } from "./types";
+import { AI_PROVIDER_IDS } from "./services/ai/sdk/providerCatalog";
 
 export const DEFAULT_SCALE = 1.0;
 export const ZOOM_BASE = 1.25;
@@ -11,11 +12,13 @@ export const PDF_TEXT_SELECTION_HANDLE_STEM_WIDTH_PX = 2;
 
 export const MAX_PIXELS_PER_PAGE = 16_000_000;
 export const TILE_MAX_DIM = 2048;
+export const WORKSPACE_HEAVY_PAGE_PIXEL_THRESHOLD = 8_000_000;
+export const WORKSPACE_HEAVY_PAGE_DPR_CAP = 1;
 
 // Thumbnail warmup (generate page preview images once per document).
 // Primary usage:
 // - `src/store/useEditorStore.ts` -> `warmupThumbnails()` (calls `pdfWorkerService.renderPageImage`)
-// - Cached value stored in `PageData.imageData` and displayed by `src/components/sidebar/ThumbnailsPanel.tsx`
+// - Cached value stored in `EditorState.thumbnailImages` and displayed by `src/components/sidebar/ThumbnailsPanel.tsx`
 export const THUMBNAIL_TARGET_WIDTH = 500;
 export const THUMBNAIL_MIME_TYPE = "image/jpeg";
 export const THUMBNAIL_JPEG_QUALITY = 0.7;
@@ -30,6 +33,7 @@ export const WORKSPACE_BASE_PAGE_GAP_PX = 32;
 export const WORKSPACE_BOTTOM_PADDING_PX = 80;
 export const WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES = 30;
 export const WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES = 5;
+export const AI_CHAT_MAX_READ_PAGES_PER_CALL = 10;
 
 export const DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES: PageTranslateOptions = {
   fontFamily: "Helvetica",
@@ -71,22 +75,21 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
     userName: "",
     thumbnailsLayout: "single",
     removeTextUnderFlattenedFreetext: true,
-    llm: {
-      openai: {
-        customTranslateModels: [],
-        customVisionModels: [],
-      },
-      gemini: {
-        customTranslateModels: [],
-        customVisionModels: [],
-      },
-    },
+    llm: Object.fromEntries(
+      AI_PROVIDER_IDS.map((providerId) => [
+        providerId,
+        {
+          apiKey: "",
+          apiUrl: "",
+          customTranslateModels: [],
+          customVisionModels: [],
+        },
+      ]),
+    ) as LLMOptions,
     aiChat: {
-      digestMode: "excerpt",
       digestCharsPerChunk: 360,
       digestSourceCharsPerChunk: 3600,
-      digestSummaryProviderId: "",
-      digestSummaryModelId: "",
+      digestSummaryModelKey: "",
     },
   },
 };

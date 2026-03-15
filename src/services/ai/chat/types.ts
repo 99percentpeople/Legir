@@ -1,3 +1,5 @@
+import type { ZodTypeAny } from "zod";
+import type { ToolSet } from "ai";
 import type { PDFSearchMode } from "@/lib/pdfSearch";
 import type { PDFMetadata, PDFOutlineItem, PDFSearchResult } from "@/types";
 
@@ -15,6 +17,26 @@ export type AiToolName =
   | "focus_result"
   | "highlight_results"
   | "clear_highlights";
+
+export interface AiChatToolDefinition {
+  name: string;
+  description: string;
+  accessType: "read" | "write";
+  inputSchema: ZodTypeAny;
+}
+
+export interface AiChatMessageRecord {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  toolCallId?: string;
+  toolName?: string;
+}
+
+export interface AiChatToolCallRecord {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
 
 export interface AiDocumentContext {
   filename: string;
@@ -191,6 +213,7 @@ export interface AiChatUiMessage {
   text: string;
   conversationText?: string;
   attachments?: AiChatMessageAttachment[];
+  branchAnchorId?: string;
   durationMs?: number;
   createdAt: string;
 }
@@ -212,6 +235,10 @@ export type AiChatUserMessageInput =
       text: string;
       displayText?: string;
       attachments?: AiChatMessageAttachment[];
+      editContext?: {
+        sourceSessionId: string;
+        targetMessageId: string;
+      };
     };
 
 export interface AiToolCallRecord {
@@ -231,6 +258,7 @@ export type AiChatTimelineItem =
       text: string;
       conversationText?: string;
       attachments?: AiChatMessageAttachment[];
+      branchAnchorId?: string;
       durationMs?: number;
       createdAt: string;
       isStreaming?: boolean;
@@ -254,6 +282,12 @@ export interface AiChatSessionSummary {
   id: string;
   title: string;
   updatedAt: string;
+  parentSessionId?: string;
+  branchDepth: number;
+  branchKind?: "edit" | "regenerate";
+  branchSourceMessageId?: string;
+  branchContextUserMessageId?: string;
+  branchContextUserAnchorId?: string;
 }
 
 export interface AiDocumentSnapshot {
@@ -281,7 +315,7 @@ export interface AiTextSelectionContext {
 export interface AiDocumentContextService {
   getDocumentContext: () => AiDocumentContext;
   getDocumentMetadata: () => AiDocumentMetadata;
-  getDocumentDigest: (options: {
+  getDocumentDigest?: (options: {
     startPage: number;
     endPage: number;
     charsPerChunk?: number;
@@ -292,7 +326,6 @@ export interface AiDocumentContextService {
     pageCount: number;
     returnedPageCount: number;
     chunkCount: number;
-    mode: "excerpt" | "ai_summary";
     excerptCharsPerChunk: number;
     sourceCharsPerChunk: number;
     chunks: AiDocumentDigestChunk[];
@@ -369,4 +402,61 @@ export interface AiToolExecutionContext {
 export interface AiToolExecutionResult {
   payload: unknown;
   summary: string;
+}
+
+export interface AiToolRegistry {
+  getDefinitions: () => AiChatToolDefinition[];
+  execute: (
+    name: string,
+    rawArgs: unknown,
+    signal?: AbortSignal,
+  ) => Promise<AiToolExecutionResult>;
+}
+
+export type AiChatToolUpdate =
+  | {
+      phase: "start";
+      call: AiChatToolCallRecord;
+      batchId: string;
+      isParallelBatch: boolean;
+    }
+  | {
+      phase: "success";
+      call: AiChatToolCallRecord;
+      batchId: string;
+      isParallelBatch: boolean;
+      result: AiToolExecutionResult;
+    }
+  | {
+      phase: "error";
+      call: AiChatToolCallRecord;
+      batchId: string;
+      isParallelBatch: boolean;
+      error: Error;
+    };
+
+export type AiChatAssistantUpdate =
+  | { phase: "reasoning_delta"; turnId: string; delta: string }
+  | { phase: "delta"; turnId: string; delta: string; branchAnchorId?: string }
+  | {
+      phase: "end";
+      turnId: string;
+      reasoningText: string;
+      assistantMessage: string;
+      branchAnchorId?: string;
+      toolCalls: AiChatToolCallRecord[];
+      finishReason: "stop" | "tool_calls";
+    };
+
+export interface AiChatToolRuntime {
+  aiTools: ToolSet;
+  toolCallsById: Map<string, AiChatToolCallRecord>;
+  sawToolActivity: () => boolean;
+  handleStreamToolError: (options: {
+    toolCallId: string;
+    toolName: string;
+    input: unknown;
+    batchId: string;
+    error: unknown;
+  }) => void;
 }

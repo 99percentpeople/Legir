@@ -31,7 +31,7 @@ import { cn } from "../utils/cn";
 import {
   getFormDetectModelGroups,
   subscribeLLMModelRegistry,
-} from "@/services/LLMService";
+} from "@/services/ai";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 
 export interface FormDetectionOptions {
