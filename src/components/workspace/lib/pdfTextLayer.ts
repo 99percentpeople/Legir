@@ -1,19 +1,14 @@
-import type {
-  TextContent,
-  TextItem,
-  TextMarkedContent,
-  TextStyle,
-} from "pdfjs-dist/types/src/display/api";
+import type { TextContent, TextStyle } from "pdfjs-dist/types/src/display/api";
+import {
+  DEFAULT_PDF_TEXT_STYLE,
+  getItemTransform,
+  isMarkedContent,
+  transform,
+} from "@/services/pdfService/lib/textGeometry";
 import type { ViewportLike } from "@/services/pdfService/types";
 
 const MAX_TEXT_DIVS_TO_RENDER = 100000;
 const DEFAULT_FONT_SIZE = 30;
-const DEFAULT_TEXT_STYLE: TextStyle = {
-  ascent: 0.8,
-  descent: -0.2,
-  vertical: false,
-  fontFamily: "sans-serif",
-};
 
 const ascentCache = new Map<string, number>();
 
@@ -104,19 +99,6 @@ const getAscent = (
   return ratio;
 };
 
-const transform = (m1: number[], m2: number[]) => {
-  const [a1, b1, c1, d1, e1, f1] = m1;
-  const [a2, b2, c2, d2, e2, f2] = m2;
-  return [
-    a1 * a2 + c1 * b2,
-    b1 * a2 + d1 * b2,
-    a1 * c2 + c1 * d2,
-    b1 * c2 + d1 * d2,
-    a1 * e2 + c1 * f2 + e1,
-    b1 * e2 + d1 * f2 + f1,
-  ];
-};
-
 const getRawDims = (viewport: ViewportLike) => {
   const viewBox = viewport.viewBox;
   if (viewBox) {
@@ -145,17 +127,6 @@ const setLayerDimensions = (div: HTMLElement, viewport: ViewportLike) => {
   div.style.width = w;
   div.style.height = h;
   div.setAttribute("data-main-rotation", String(viewport.rotation ?? 0));
-};
-
-const isMarkedContent = (
-  item: TextItem | TextMarkedContent,
-): item is TextMarkedContent => !("str" in item);
-
-const getItemTransform = (item: TextItem) => {
-  if (Array.isArray(item.transform) && item.transform.length >= 6) {
-    return item.transform as number[];
-  }
-  return [1, 0, 0, 1, 0, 0];
 };
 
 export const buildTextLayer = (
@@ -207,7 +178,7 @@ export const buildTextLayer = (
     const tx = transform(textLayerTransform, itemTransform);
     let angle = Math.atan2(tx[1], tx[0]);
 
-    const style = textContent.styles[item.fontName] ?? DEFAULT_TEXT_STYLE;
+    const style = textContent.styles[item.fontName] ?? DEFAULT_PDF_TEXT_STYLE;
     if (style.vertical) {
       angle += Math.PI / 2;
     }

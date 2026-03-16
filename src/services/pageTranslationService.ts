@@ -1,11 +1,17 @@
-import type {
-  TextContent,
-  TextItem,
-  TextMarkedContent,
-  TextStyle,
-} from "pdfjs-dist/types/src/display/api";
+import type { TextContent, TextStyle } from "pdfjs-dist/types/src/display/api";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
+import {
+  DEFAULT_PDF_TEXT_STYLE,
+  deltaRotationDeg,
+  getAxes,
+  getItemTransform,
+  intervalDistance,
+  isMarkedContent,
+  normalizeRotationDeg,
+  projectPointsInterval,
+  transform,
+} from "@/services/pdfService/lib/textGeometry";
 import type {
   Annotation,
   PageData,
@@ -41,18 +47,6 @@ export type PageTranslationTextBlock = {
   rotationDeg: number;
 };
 
-const normalizeRotationDeg = (deg: number) => {
-  if (!Number.isFinite(deg)) return 0;
-  let d = deg % 360;
-  if (d <= -180) d += 360;
-  if (d > 180) d -= 360;
-  return d;
-};
-
-const deltaRotationDeg = (a: number, b: number) => {
-  return normalizeRotationDeg(a - b);
-};
-
 const buildParagraphCandidatesFromLines = (options: {
   pageIndex: number;
   lines: PageTranslationLine[];
@@ -67,42 +61,6 @@ const buildParagraphCandidatesFromLines = (options: {
     return a.rect.x - b.rect.x;
   });
 
-  const getAxes = (rotationDeg: number) => {
-    const theta = (rotationDeg * Math.PI) / 180;
-    let dirX = Math.cos(theta);
-    let dirY = Math.sin(theta);
-
-    if (Math.abs(dirX) >= Math.abs(dirY)) {
-      if (dirX < 0) {
-        dirX = -dirX;
-        dirY = -dirY;
-      }
-    } else {
-      if (dirY < 0) {
-        dirX = -dirX;
-        dirY = -dirY;
-      }
-    }
-    const normX = -dirY;
-    const normY = dirX;
-    return { dirX, dirY, normX, normY };
-  };
-
-  const projectPointsInterval = (
-    points: Array<[number, number]>,
-    axisX: number,
-    axisY: number,
-  ) => {
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    for (const [x, y] of points) {
-      const v = x * axisX + y * axisY;
-      min = Math.min(min, v);
-      max = Math.max(max, v);
-    }
-    return { min, max };
-  };
-
   const getLinePoints = (l: PageTranslationLine) => {
     if (l.points && l.points.length > 0) return l.points;
     const r = l.rect;
@@ -112,15 +70,6 @@ const buildParagraphCandidatesFromLines = (options: {
       [r.x, r.y + r.height],
       [r.x + r.width, r.y + r.height],
     ] as Array<[number, number]>;
-  };
-
-  const intervalDistance = (
-    a: { min: number; max: number },
-    b: { min: number; max: number },
-  ) => {
-    if (a.max < b.min) return b.min - a.max;
-    if (b.max < a.min) return a.min - b.max;
-    return 0;
   };
 
   const overlapsInRotationFrame = (
@@ -1401,37 +1350,6 @@ export const isPageTranslateAnnotation = (a: Annotation) => {
   return a.meta?.kind === "page_translate";
 };
 
-const DEFAULT_TEXT_STYLE: TextStyle = {
-  ascent: 0.8,
-  descent: -0.2,
-  vertical: false,
-  fontFamily: "sans-serif",
-};
-
-const transform = (m1: number[], m2: number[]) => {
-  const [a1, b1, c1, d1, e1, f1] = m1;
-  const [a2, b2, c2, d2, e2, f2] = m2;
-  return [
-    a1 * a2 + c1 * b2,
-    b1 * a2 + d1 * b2,
-    a1 * c2 + c1 * d2,
-    b1 * c2 + d1 * d2,
-    a1 * e2 + c1 * f2 + e1,
-    b1 * e2 + d1 * f2 + f1,
-  ];
-};
-
-const isMarkedContent = (
-  item: TextItem | TextMarkedContent,
-): item is TextMarkedContent => !("str" in item);
-
-const getItemTransform = (item: TextItem) => {
-  if (Array.isArray(item.transform) && item.transform.length >= 6) {
-    return item.transform as number[];
-  }
-  return [1, 0, 0, 1, 0, 0];
-};
-
 const getFontSubstitution = (style: TextStyle) => {
   const maybe = style as TextStyle & { fontSubstitution?: string };
   if (typeof maybe.fontSubstitution !== "string") return undefined;
@@ -1497,7 +1415,7 @@ const extractTextBlocks = (textContent: TextContent, page: PageData) => {
 
     let angle = Math.atan2(tx[1], tx[0]);
 
-    const style = textContent.styles[item.fontName] ?? DEFAULT_TEXT_STYLE;
+    const style = textContent.styles[item.fontName] ?? DEFAULT_PDF_TEXT_STYLE;
     if (style.vertical) {
       angle += Math.PI / 2;
     }
@@ -1587,27 +1505,6 @@ const buildLinesFromBlocks = (
   pageIndex: number,
   blocks: PageTranslationTextBlock[],
 ) => {
-  const getAxes = (rotationDeg: number) => {
-    const theta = (rotationDeg * Math.PI) / 180;
-    let dirX = Math.cos(theta);
-    let dirY = Math.sin(theta);
-
-    if (Math.abs(dirX) >= Math.abs(dirY)) {
-      if (dirX < 0) {
-        dirX = -dirX;
-        dirY = -dirY;
-      }
-    } else {
-      if (dirY < 0) {
-        dirX = -dirX;
-        dirY = -dirY;
-      }
-    }
-    const normX = -dirY;
-    const normY = dirX;
-    return { dirX, dirY, normX, normY };
-  };
-
   const projectRectInterval = (
     rect: { x: number; y: number; width: number; height: number },
     axisX: number,
@@ -1646,15 +1543,6 @@ const buildLinesFromBlocks = (
       return { min, max };
     }
     return projectRectInterval(block.rect, axisX, axisY);
-  };
-
-  const intervalDistance = (
-    a: { min: number; max: number },
-    b: { min: number; max: number },
-  ) => {
-    if (a.max < b.min) return b.min - a.max;
-    if (b.max < a.min) return a.min - b.max;
-    return 0;
   };
 
   const sorted = [...blocks]

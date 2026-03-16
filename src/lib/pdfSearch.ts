@@ -1,9 +1,9 @@
-import type {
-  TextContent,
-  TextItem,
-  TextMarkedContent,
-  TextStyle,
-} from "pdfjs-dist/types/src/display/api";
+import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import {
+  DEFAULT_PDF_TEXT_STYLE,
+  isTextItem,
+  transform,
+} from "@/services/pdfService/lib/textGeometry";
 import type {
   PageData,
   PDFSearchDisplaySegment,
@@ -19,16 +19,6 @@ export interface PDFSearchOptions {
 }
 
 const SEARCH_CONTEXT_CHARS = 36;
-const DEFAULT_TEXT_STYLE: TextStyle = {
-  ascent: 0.8,
-  descent: -0.2,
-  vertical: false,
-  fontFamily: "sans-serif",
-};
-
-const isTextItem = (item: TextItem | TextMarkedContent): item is TextItem =>
-  "str" in item;
-
 const normalizePreviewText = (value: string) => value.replace(/\s+/g, " ");
 
 const buildDisplaySegments = (
@@ -93,19 +83,6 @@ type SearchTokenBoundary = {
   downY: number;
 };
 
-const transform = (m1: number[], m2: number[]) => {
-  const [a1, b1, c1, d1, e1, f1] = m1;
-  const [a2, b2, c2, d2, e2, f2] = m2;
-  return [
-    a1 * a2 + c1 * b2,
-    b1 * a2 + d1 * b2,
-    a1 * c2 + c1 * d2,
-    b1 * c2 + d1 * d2,
-    a1 * e2 + c1 * f2 + e1,
-    b1 * e2 + d1 * f2 + f1,
-  ];
-};
-
 const getSearchTokenBoundaries = (
   textContent: TextContent,
   page: PageData,
@@ -135,7 +112,7 @@ const getSearchTokenBoundaries = (
       : [1, 0, 0, 1, 0, 0];
     const tx = transform(textLayerTransform, itemTransform);
     let angle = Math.atan2(tx[1] ?? 0, tx[0] ?? 1);
-    const style = textContent.styles[item.fontName] ?? DEFAULT_TEXT_STYLE;
+    const style = textContent.styles[item.fontName] ?? DEFAULT_PDF_TEXT_STYLE;
     if (style.vertical) angle += Math.PI / 2;
 
     const fontHeight = Math.hypot(tx[2] ?? 0, tx[3] ?? 0) || item.height || 1;
