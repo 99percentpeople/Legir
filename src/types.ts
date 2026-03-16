@@ -1,3 +1,11 @@
+/**
+ * Core editor domain types shared across the app.
+ *
+ * This file is the main contract for document-facing models such as fields,
+ * annotations, editor tools, document snapshots, and workspace state.
+ * Keep service-local or feature-local types in a nearby `types.ts` instead of
+ * growing this file with implementation-specific details.
+ */
 import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
 
 export enum FieldType {

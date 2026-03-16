@@ -6,6 +6,8 @@
 - `src-tauri/` contains the desktop wrapper and Rust entry points.
 - `public/` stores static assets like pdfjs resources and bundled fonts.
 - `docs/ARCHITECTURE.md` is the canonical map of data flow and extension points.
+- If a directory contains `README.md`, read it before adding or moving code there.
+- Keep shared code in the narrowest valid home: `src/lib/` for cross-feature helpers, `src/utils/` for pure utilities, `src/services/pdfService/lib/` for PDF-domain helpers, `src/components/workspace/lib/` for workspace-only helpers. Keep data contracts in the nearest `types.ts`.
 
 ## Build, Test, and Development Commands
 
@@ -22,7 +24,7 @@
 
 - TypeScript + React with ES modules; keep components in PascalCase and hooks/stores in `use*` form (example `useEditorStore`).
 - Indentation, wrapping, and Tailwind class ordering are handled by Prettier; do not hand-align complex blocks.
-- Prefer small, focused components in `src/components/` and keep shared logic in `src/lib/` or `src/utils/`.
+- Prefer small, focused components in `src/components/`.
 
 ## Testing Guidelines
 

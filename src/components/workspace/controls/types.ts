@@ -1,3 +1,10 @@
+/**
+ * Workspace control component contracts.
+ *
+ * Keep shared props for control renderers and wrappers here. Do not move
+ * service, store, or editor domain types into this file; import those from
+ * their source modules instead.
+ */
 import React from "react";
 import { FormField, Annotation } from "@/types";
 

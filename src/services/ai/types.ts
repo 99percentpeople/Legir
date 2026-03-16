@@ -1,3 +1,10 @@
+/**
+ * Shared AI service contracts outside the chat runtime.
+ *
+ * This file holds provider-agnostic capability interfaces that can be reused by
+ * form detection, translation, summarization, or older AI integrations.
+ * Chat-specific tool/runtime/message contracts live under `src/services/ai/chat`.
+ */
 import type { FieldType, FormField } from "@/types";
 
 export type LLMProviderId = string;

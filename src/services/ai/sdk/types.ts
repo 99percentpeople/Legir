@@ -1,3 +1,10 @@
+/**
+ * AI SDK adapter contracts.
+ *
+ * Keep provider configuration, model specifiers, and resolved SDK model types
+ * here. Higher-level chat/task payloads should stay in their own feature
+ * folders.
+ */
 import type { LanguageModel } from "ai";
 import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
 

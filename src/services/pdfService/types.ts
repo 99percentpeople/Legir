@@ -1,3 +1,10 @@
+/**
+ * PDF pipeline contracts.
+ *
+ * Keep parser/exporter interfaces, viewport abstractions, and pdfjs/pdf-lib
+ * bridge types here. Do not put editor-wide models here; those belong in
+ * `src/types.ts`.
+ */
 import { PDFDocument, PDFForm, PDFPage, type PDFFont } from "@cantoo/pdf-lib";
 import { Annotation, FormField } from "@/types";
 
