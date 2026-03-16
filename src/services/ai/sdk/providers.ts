@@ -1,4 +1,5 @@
 import { createProviderRegistry, type ProviderRegistryProvider } from "ai";
+import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
@@ -99,6 +100,14 @@ export const createAiSdkProviders = (options: AppOptions) => {
       providers[config.providerId] = createGoogleGenerativeAI({
         name: config.providerId,
         apiKey: config.apiKey,
+      });
+      continue;
+    }
+
+    if (config.backendKind === "deepseek") {
+      providers[config.providerId] = createDeepSeek({
+        apiKey: config.apiKey,
+        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
       });
       continue;
     }

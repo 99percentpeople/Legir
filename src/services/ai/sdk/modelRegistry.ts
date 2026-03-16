@@ -5,7 +5,7 @@ import {
   AI_PROVIDER_SPECS,
   isAiProviderId,
 } from "@/services/ai/sdk/providerCatalog";
-import { filterSupportedGeminiToolCallingModelIds } from "@/services/ai/sdk/geminiModelSupport";
+import { filterSupportedGeminiToolCallingModelIds } from "@/services/ai/utils/geminiModelSupport";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { AppLLMModelOption, AppOptions, EditorState } from "@/types";
 import { createAiSdkProviderRegistry } from "@/services/ai/sdk/providers";

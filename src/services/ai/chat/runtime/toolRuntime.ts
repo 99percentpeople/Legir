@@ -3,7 +3,7 @@ import { tool, type ToolSet } from "ai";
 import {
   normalizeAiToolArgsDeep,
   toSnakeCaseKeysDeep,
-} from "@/services/ai/chat/toolCase";
+} from "@/services/ai/utils/toolCase";
 import type {
   AiChatMessageRecord,
   AiChatToolCallRecord,

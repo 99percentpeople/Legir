@@ -9,7 +9,11 @@ export const AI_PROVIDER_IDS = [
 
 export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
 
-export type AiProviderBackendKind = "openai" | "google" | "openai-compatible";
+export type AiProviderBackendKind =
+  | "openai"
+  | "google"
+  | "deepseek"
+  | "openai-compatible";
 
 export interface AiProviderSpec {
   id: AiProviderId;
@@ -56,7 +60,7 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
   {
     id: "deepseek",
     label: "DeepSeek",
-    backendKind: "openai-compatible",
+    backendKind: "deepseek",
     defaultBaseUrl: "https://api.deepseek.com/v1",
     allowCustomBaseUrl: true,
     fallbackModelId: "deepseek-chat",

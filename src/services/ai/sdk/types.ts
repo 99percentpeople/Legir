@@ -10,7 +10,11 @@ import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
 
 export type AiSdkProviderId = AiProviderId;
 
-export type AiSdkBackendKind = "openai" | "google" | "openai-compatible";
+export type AiSdkBackendKind =
+  | "openai"
+  | "google"
+  | "deepseek"
+  | "openai-compatible";
 
 export interface AiSdkProviderConfig {
   providerId: AiSdkProviderId;

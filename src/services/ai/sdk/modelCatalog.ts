@@ -7,7 +7,7 @@ import {
   getConfiguredAiSdkProvider,
   normalizeBaseUrl,
 } from "@/services/ai/sdk/providers";
-import { isSupportedGeminiToolCallingModelId } from "@/services/ai/sdk/geminiModelSupport";
+import { isSupportedGeminiToolCallingModelId } from "@/services/ai/utils/geminiModelSupport";
 import type { AppOptions } from "@/types";
 
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";

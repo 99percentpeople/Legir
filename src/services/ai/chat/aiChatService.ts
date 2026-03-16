@@ -9,6 +9,8 @@ import {
   resolveAiSdkLanguageModel,
   resolveAiSdkModelSpecifierForTask,
 } from "@/services/ai/sdk";
+import { getConfiguredAiSdkProvider } from "@/services/ai/sdk/providers";
+import type { AiSdkProviderId } from "@/services/ai/sdk/types";
 import type { AppOptions, EditorState } from "@/types";
 import type {
   AiChatAssistantUpdate,
@@ -26,6 +28,38 @@ const createFinalAnswerPrompt = (messages: AiChatMessageRecord[]) =>
     "Reply in the same language as the user's most recent message.",
     "Use plain natural language.",
   ].join("\n");
+
+const buildChatProviderOptions = (options: {
+  appOptions: AppOptions;
+  providerId: AiSdkProviderId;
+}) => {
+  const provider = getConfiguredAiSdkProvider(
+    options.appOptions,
+    options.providerId,
+  );
+
+  if (!provider) {
+    return undefined;
+  }
+
+  if (provider.backendKind === "openai") {
+    return {
+      openai: {
+        parallelToolCalls: true,
+      },
+    } as const;
+  }
+
+  if (provider.backendKind === "openai-compatible") {
+    return {
+      [provider.providerId]: {
+        parallel_tool_calls: true,
+      },
+    };
+  }
+
+  return undefined;
+};
 
 export const aiChatService = {
   async runConversation(options: {
@@ -61,6 +95,10 @@ export const aiChatService = {
       modelKey,
     });
     const model = resolveAiSdkLanguageModel(appOptions, modelSpecifier);
+    const providerOptions = buildChatProviderOptions({
+      appOptions,
+      providerId: modelSpecifier.providerId,
+    });
     const toolDefinitions = toolRegistry.getDefinitions();
     let currentBatchId = `${turnId}:step_0`;
     let stepIndex = 0;
@@ -83,6 +121,7 @@ export const aiChatService = {
         prompt: buildAiChatTurnPrompt({
           messages: conversation,
         }),
+        ...(providerOptions ? { providerOptions } : null),
         tools: toolRuntime.aiTools,
         stopWhen: stepCountIs(maxToolRounds + 1),
         abortSignal: signal,

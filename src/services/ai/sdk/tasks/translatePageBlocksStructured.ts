@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { z } from "zod";
 
-import { parseJsonTextWithSchema } from "@/services/ai/sdk/json";
+import { parseJsonTextWithSchema } from "@/services/ai/utils/json";
 import { resolveAiSdkLanguageModel } from "@/services/ai/sdk/modelRegistry";
 import type { AiSdkModelSpecifier } from "@/services/ai/sdk/types";
 import type { AppOptions } from "@/types";
