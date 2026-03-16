@@ -1,8 +1,3 @@
-import type {
-  TextContent,
-  TextItem,
-  TextMarkedContent,
-} from "pdfjs-dist/types/src/display/api";
 import {
   AI_CHAT_DIGEST_MAX_PAGES_PER_LEAF_CHUNK,
   AI_CHAT_DIGEST_MERGE_BATCH_SIZE,
@@ -13,13 +8,13 @@ import {
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
   AI_CHAT_MAX_READ_PAGES_PER_CALL,
 } from "@/constants";
-import { findPdfSearchResults } from "@/lib/pdfSearch";
+import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
 import { pageTranslationService } from "@/services/pageTranslationService";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import { serializePageTextContent } from "@/services/ai/chat/pageTextSerialization";
 import type {
   AiDocumentDigestChunk,
   AiDocumentDigestSourceKind,
-  AiDocumentContextService,
   AiDocumentMetadata,
   AiDocumentSnapshot,
   AiReadablePage,
@@ -27,15 +22,6 @@ import type {
   AiTextSelectionContext,
   AiToolExecutionProgressItem,
 } from "./types";
-
-const isTextItem = (item: TextItem | TextMarkedContent): item is TextItem =>
-  "str" in item;
-
-const joinPageText = (textContent: TextContent) =>
-  textContent.items
-    .filter(isTextItem)
-    .map((item) => item.str)
-    .join("");
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
@@ -333,7 +319,7 @@ export const createDocumentContextService = (options: {
     summaryInstructions?: string;
     signal?: AbortSignal;
   }) => Promise<string>;
-}): AiDocumentContextService => {
+}) => {
   const {
     getSnapshot,
     getSelectedTextContext,
@@ -354,7 +340,9 @@ export const createDocumentContextService = (options: {
     });
     if (!textContent) return "";
 
-    const text = joinPageText(textContent);
+    const snapshot = getSnapshot();
+    const page = snapshot.pages[pageIndex];
+    const text = serializePageTextContent(textContent, page).readableText;
     pageTextCache.set(pageIndex, text);
     return text;
   };
@@ -888,6 +876,14 @@ export const createDocumentContextService = (options: {
       regexFlags,
       maxResults = 20,
       signal,
+    }: {
+      query: string;
+      pageNumbers?: number[];
+      caseSensitive?: boolean;
+      mode?: PDFSearchMode;
+      regexFlags?: string;
+      maxResults?: number;
+      signal?: AbortSignal;
     }) => {
       const snapshot = getSnapshot();
       const pageNumberCandidates =
@@ -923,3 +919,7 @@ export const createDocumentContextService = (options: {
     },
   };
 };
+
+export type AiDocumentToolContext = ReturnType<
+  typeof createDocumentContextService
+>;

@@ -1,23 +1,21 @@
 import type {
   AiChatToolDefinition,
-  AiToolExecutionContext,
   AiToolExecutionProgress,
   AiToolExecutionResult,
   AiToolName,
 } from "./types";
-import { createAnnotationToolHandlers } from "./tools/annotationTools";
-import { createDocumentToolHandlers } from "./tools/documentTools";
-import { createFormToolHandlers } from "./tools/formTools";
-import { createNavigationToolHandlers } from "./tools/navigationTools";
-import { createErrorPayload, type AiToolHandler } from "./tools/shared";
+import type { AiToolContext } from "./aiToolContext";
+import { aiToolModules } from "./tools";
+import {
+  createErrorPayload,
+  createToolHandlerMap,
+  type AiToolHandler,
+} from "./tools/shared";
 
-export const createAiToolRegistry = (ctx: AiToolExecutionContext) => {
-  const handlers = {
-    ...createDocumentToolHandlers(ctx),
-    ...createAnnotationToolHandlers(ctx),
-    ...createFormToolHandlers(ctx),
-    ...createNavigationToolHandlers(ctx),
-  } satisfies Partial<Record<AiToolName, AiToolHandler>>;
+export const createAiToolRegistry = (ctx: AiToolContext) => {
+  const handlers = createToolHandlerMap(aiToolModules, ctx) satisfies Partial<
+    Record<AiToolName, AiToolHandler>
+  >;
 
   return {
     getDefinitions: (): AiChatToolDefinition[] =>

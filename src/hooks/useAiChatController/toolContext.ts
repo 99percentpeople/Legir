@@ -12,6 +12,10 @@ import {
 import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import { useEditorStore } from "@/store/useEditorStore";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import {
+  mapReadableRangeToFlatRange,
+  serializePageTextContent,
+} from "@/services/ai/chat/pageTextSerialization";
 import { getPdfSearchRangeClientRects } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
   FieldType,
@@ -1158,6 +1162,10 @@ export const createAiChatToolContext = (options: {
       number,
       Awaited<ReturnType<typeof pdfWorkerService.getTextContent>>
     >();
+    const serializedPageTextCache = new Map<
+      number,
+      ReturnType<typeof serializePageTextContent> | null
+    >();
     const latestSelectionAttachments = (
       options.sessionsRef.current.get(options.activeSessionIdRef.current)
         ?.timeline ?? []
@@ -1187,16 +1195,24 @@ export const createAiChatToolContext = (options: {
       return textContent;
     };
 
-    const getPageSearchText = (
-      textContent: NonNullable<
-        Awaited<ReturnType<typeof pdfWorkerService.getTextContent>>
-      >,
-    ) =>
-      textContent.items
-        .flatMap((item) =>
-          "str" in item && typeof item.str === "string" ? [item.str] : [],
-        )
-        .join("");
+    const loadSerializedPageText = async (pageIndex: number) => {
+      if (serializedPageTextCache.has(pageIndex)) {
+        return serializedPageTextCache.get(pageIndex) ?? null;
+      }
+
+      const textContent = await loadPageTextContent(pageIndex);
+      if (!textContent) {
+        serializedPageTextCache.set(pageIndex, null);
+        return null;
+      }
+
+      const serialized = serializePageTextContent(
+        textContent,
+        store.pages[pageIndex],
+      );
+      serializedPageTextCache.set(pageIndex, serialized);
+      return serialized;
+    };
 
     const getRenderedRangeRects = (
       pageIndex: number,
@@ -1494,55 +1510,96 @@ export const createAiChatToolContext = (options: {
         endInclusiveAnchor: string;
         specificity: number;
         variantRankSum: number;
+        matchSourceRank: number;
         pageDistance: number;
       } | null = null;
+      const isBetterCandidate = (
+        candidate: NonNullable<typeof bestCandidate>,
+        current: NonNullable<typeof bestCandidate> | null,
+      ) => {
+        if (!current) return true;
+        if (candidate.specificity !== current.specificity) {
+          return candidate.specificity > current.specificity;
+        }
+        if (candidate.variantRankSum !== current.variantRankSum) {
+          return candidate.variantRankSum < current.variantRankSum;
+        }
+        if (candidate.matchSourceRank !== current.matchSourceRank) {
+          return candidate.matchSourceRank < current.matchSourceRank;
+        }
+        if (candidate.pageDistance !== current.pageDistance) {
+          return candidate.pageDistance < current.pageDistance;
+        }
+
+        const candidateSpan = candidate.localEnd - candidate.localStart;
+        const currentSpan = current.localEnd - current.localStart;
+        if (candidateSpan !== currentSpan) {
+          return candidateSpan < currentSpan;
+        }
+
+        return candidate.pageIndex < current.pageIndex;
+      };
 
       for (const pageIndex of candidatePageIndexes) {
-        const textContent = await loadPageTextContent(pageIndex);
-        if (!textContent) continue;
+        const serializedPageText = await loadSerializedPageText(pageIndex);
+        if (!serializedPageText) continue;
 
-        const pageText = getPageSearchText(textContent);
-        if (!pageText) continue;
-
-        const resolvedAnchors = resolveTextAnchorOffsets(
-          pageText,
+        let resolvedAnchors = resolveTextAnchorOffsets(
+          serializedPageText.readableText,
           requestedDocumentAnchor.startAnchor,
           requestedDocumentAnchor.endInclusiveAnchor,
         );
-        if (!resolvedAnchors) continue;
+        let localStart = -1;
+        let localEnd = -1;
+        let matchSourceRank = 0;
+
+        if (resolvedAnchors) {
+          const mappedRange = mapReadableRangeToFlatRange(
+            serializedPageText.readableIndexToFlatIndex,
+            resolvedAnchors.localStart,
+            resolvedAnchors.localEnd,
+          );
+          if (mappedRange) {
+            localStart = mappedRange.flatStart;
+            localEnd = mappedRange.flatEnd;
+          } else {
+            resolvedAnchors = null;
+          }
+        }
+
+        if (!resolvedAnchors) {
+          resolvedAnchors = resolveTextAnchorOffsets(
+            serializedPageText.flatText,
+            requestedDocumentAnchor.startAnchor,
+            requestedDocumentAnchor.endInclusiveAnchor,
+          );
+          if (!resolvedAnchors) continue;
+          localStart = resolvedAnchors.localStart;
+          localEnd = resolvedAnchors.localEnd;
+          matchSourceRank = 1;
+        }
 
         const pageDistance =
           hintedPageIndex === null ? 0 : Math.abs(pageIndex - hintedPageIndex);
         const candidate = {
           pageIndex,
-          localStart: resolvedAnchors.localStart,
-          localEnd: resolvedAnchors.localEnd,
+          localStart,
+          localEnd,
           startAnchor: resolvedAnchors.startAnchor,
           endInclusiveAnchor: resolvedAnchors.endInclusiveAnchor,
           specificity: resolvedAnchors.specificity,
           variantRankSum: resolvedAnchors.variantRankSum,
+          matchSourceRank,
           pageDistance,
         };
 
-        if (
-          !bestCandidate ||
-          candidate.specificity > bestCandidate.specificity ||
-          (candidate.specificity === bestCandidate.specificity &&
-            (candidate.variantRankSum < bestCandidate.variantRankSum ||
-              (candidate.variantRankSum === bestCandidate.variantRankSum &&
-                (candidate.pageDistance < bestCandidate.pageDistance ||
-                  (candidate.pageDistance === bestCandidate.pageDistance &&
-                    (candidate.localEnd - candidate.localStart <
-                      bestCandidate.localEnd - bestCandidate.localStart ||
-                      (candidate.localEnd - candidate.localStart ===
-                        bestCandidate.localEnd - bestCandidate.localStart &&
-                        candidate.pageIndex < bestCandidate.pageIndex)))))))
-        ) {
+        if (isBetterCandidate(candidate, bestCandidate)) {
           bestCandidate = candidate;
         }
 
         if (
           candidate.variantRankSum === 0 &&
+          candidate.matchSourceRank === 0 &&
           (hintedPageIndex === null || candidate.pageIndex === hintedPageIndex)
         ) {
           break;
@@ -1598,8 +1655,10 @@ export const createAiChatToolContext = (options: {
         continue;
       }
 
-      const textContent = await loadPageTextContent(bestCandidate.pageIndex);
-      const pageText = textContent ? getPageSearchText(textContent) : "";
+      const serializedPageText = await loadSerializedPageText(
+        bestCandidate.pageIndex,
+      );
+      const pageText = serializedPageText?.flatText ?? "";
       const matchText = truncateAnnotationText(
         pageText.slice(bestCandidate.localStart, bestCandidate.localEnd),
       );
@@ -1731,3 +1790,7 @@ export const createAiChatToolContext = (options: {
     focusSearchResult,
   };
 };
+
+export type AiInteractionToolContext = ReturnType<
+  typeof createAiChatToolContext
+>;

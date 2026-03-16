@@ -62,9 +62,6 @@ export const aiChatService = {
     });
     const model = resolveAiSdkLanguageModel(appOptions, modelSpecifier);
     const toolDefinitions = toolRegistry.getDefinitions();
-    const hasDocumentDigestTool = toolDefinitions.some(
-      (definition) => definition.name === "get_document_digest",
-    );
     let currentBatchId = `${turnId}:step_0`;
     let stepIndex = 0;
     let toolRoundCount = 0;
@@ -82,9 +79,7 @@ export const aiChatService = {
     try {
       const result = streamText({
         model,
-        system: getAiChatSystemInstruction({
-          hasDocumentDigestTool,
-        }),
+        system: getAiChatSystemInstruction({ toolDefinitions }),
         prompt: buildAiChatTurnPrompt({
           messages: conversation,
         }),
@@ -148,9 +143,7 @@ export const aiChatService = {
       if (!assistantMessage && toolRuntime.sawToolActivity()) {
         const finalAnswer = await generateText({
           model,
-          system: getAiChatSystemInstruction({
-            hasDocumentDigestTool,
-          }),
+          system: getAiChatSystemInstruction({ toolDefinitions }),
           prompt: createFinalAnswerPrompt(conversation),
           abortSignal: signal,
         });

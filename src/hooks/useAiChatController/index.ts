@@ -9,6 +9,7 @@ import { useEditorStore } from "@/store/useEditorStore";
 import { type EditorState, type PDFSearchResult } from "@/types";
 import { aiChatService } from "@/services/ai/chat/aiChatService";
 import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
+import { composeAiToolContext } from "@/services/ai/chat/aiToolContext";
 import { createDocumentContextService } from "@/services/ai/chat/documentContextService";
 import {
   buildDocumentDigestMergePrompt,
@@ -367,7 +368,7 @@ export const useAiChatController = (editorState: EditorState) => {
 
   const isDocumentLoaded = editorState.pages.length > 0;
 
-  const documentContextService = useMemo(
+  const documentToolContext = useMemo(
     () =>
       createDocumentContextService({
         getSnapshot: () => ({
@@ -487,7 +488,7 @@ export const useAiChatController = (editorState: EditorState) => {
     };
   }, []);
 
-  const toolContext = useMemo(
+  const interactionToolContext = useMemo(
     () =>
       createAiChatToolContext({
         searchResultsRef,
@@ -501,59 +502,14 @@ export const useAiChatController = (editorState: EditorState) => {
     [selectedChatModel, selectedChatModelAuthor],
   );
 
-  const {
-    rememberSearchResults,
-    updateAnnotationText,
-    updateAnnotationTexts,
-    listFormFields,
-    fillFormFields,
-    focusField,
-    getStoredSearchResult,
-    setActiveHighlightedResultIds,
-    clearActiveHighlightedResultIds,
-    listAnnotations,
-    createSearchHighlightAnnotations,
-    clearSearchHighlights,
-    navigatePage,
-    focusSearchResult,
-  } = toolContext;
+  const toolContext = useMemo(
+    () => composeAiToolContext(documentToolContext, interactionToolContext),
+    [documentToolContext, interactionToolContext],
+  );
 
   const toolRegistry = useMemo(
-    () =>
-      createAiToolRegistry({
-        documentContextService,
-        rememberSearchResults,
-        listAnnotations,
-        updateAnnotationText,
-        updateAnnotationTexts,
-        listFormFields,
-        fillFormFields,
-        focusField,
-        getStoredSearchResult,
-        createSearchHighlightAnnotations,
-        clearSearchHighlights,
-        setHighlightedResultIds: setActiveHighlightedResultIds,
-        clearHighlightedResultIds: clearActiveHighlightedResultIds,
-        navigatePage,
-        focusSearchResult,
-      }),
-    [
-      clearSearchHighlights,
-      clearActiveHighlightedResultIds,
-      createSearchHighlightAnnotations,
-      documentContextService,
-      fillFormFields,
-      focusField,
-      focusSearchResult,
-      getStoredSearchResult,
-      listAnnotations,
-      listFormFields,
-      navigatePage,
-      rememberSearchResults,
-      setActiveHighlightedResultIds,
-      updateAnnotationText,
-      updateAnnotationTexts,
-    ],
+    () => createAiToolRegistry(toolContext),
+    [toolContext],
   );
 
   const appendTimelineItem = useCallback(

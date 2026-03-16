@@ -1,37 +1,31 @@
-import type { AiToolExecutionContext } from "@/services/ai/chat/types";
-
 import {
   createErrorPayload,
-  createInvalidArgumentsResult,
-  defineTool,
+  createToolBuilder,
+  defineToolModule,
   fillFormFieldsArgsSchema,
   focusFieldArgsSchema,
   listFormFieldsArgsSchema,
-  parseToolArgs,
   summarizeListedFormFields,
-  type AiToolHandlerMap,
 } from "./shared";
 
-export const createFormToolHandlers = (
-  ctx: AiToolExecutionContext,
-): AiToolHandlerMap<
-  "list_form_fields" | "fill_form_fields" | "focus_field"
-> => ({
-  list_form_fields: {
-    definition: defineTool("read", {
-      name: "list_form_fields",
-      description:
-        "List existing PDF form fields that the AI can inspect before filling. Returns field ids, types, page numbers, current values, and available options.",
-      inputSchema: listFormFieldsArgsSchema,
-    }),
-    execute: async (rawArgs) => {
-      const parsed = parseToolArgs(listFormFieldsArgsSchema, rawArgs);
-      if (parsed.success === false) {
-        return createInvalidArgumentsResult("list_form_fields", parsed.error);
-      }
+const LIST_FORM_FIELDS_TOOL_PROMPTS = [
+  "If the user asks to fill or update form fields and ids, options, or field mapping are unclear, call list_form_fields first.",
+];
 
-      const args = parsed.data;
-      const result = ctx.listFormFields({
+const FILL_FORM_FIELDS_TOOL_PROMPTS = [
+  "For fill_form_fields, send value for text or dropdown fields, an array for multi-select dropdowns, and checked for checkbox or radio fields. Only use a custom dropdown string when allow_custom_value is true. Never fill signature fields.",
+];
+
+export const formToolModule = defineToolModule((_ctx) => ({
+  list_form_fields: createToolBuilder("list_form_fields")
+    .read()
+    .description(
+      "List existing PDF form fields that the AI can inspect before filling. Returns field ids, types, page numbers, current values, and available options.",
+    )
+    .promptInstructions(LIST_FORM_FIELDS_TOOL_PROMPTS)
+    .inputSchema(listFormFieldsArgsSchema)
+    .build(async ({ args, ctx: toolCtx }) => {
+      const result = toolCtx.listFormFields({
         pageNumbers: args.page_numbers,
         query: args.query?.trim() || undefined,
         onlyEmpty: args.only_empty,
@@ -43,23 +37,17 @@ export const createFormToolHandlers = (
         payload: result,
         summary: summarizeListedFormFields(result.total, result.returned),
       };
-    },
-  },
-
-  fill_form_fields: {
-    definition: defineTool("write", {
-      name: "fill_form_fields",
-      description:
-        "Fill existing PDF form fields by id. Supports text, dropdown, checkbox, and radio fields. Use list_form_fields first when ids or options are unclear.",
-      inputSchema: fillFormFieldsArgsSchema,
     }),
-    execute: async (rawArgs) => {
-      const parsed = parseToolArgs(fillFormFieldsArgsSchema, rawArgs);
-      if (parsed.success === false) {
-        return createInvalidArgumentsResult("fill_form_fields", parsed.error);
-      }
 
-      const updates = parsed.data.updates.map((item) => ({
+  fill_form_fields: createToolBuilder("fill_form_fields")
+    .write()
+    .description(
+      "Fill existing PDF form fields by id. Supports text, dropdown, checkbox, and radio fields. Use list_form_fields first when ids or options are unclear.",
+    )
+    .promptInstructions(FILL_FORM_FIELDS_TOOL_PROMPTS)
+    .inputSchema(fillFormFieldsArgsSchema)
+    .build(async ({ args, ctx: toolCtx }) => {
+      const updates = args.updates.map((item) => ({
         fieldId: item.field_id.trim(),
         ...(item.value !== undefined ? { value: item.value } : null),
         ...(typeof item.checked === "boolean"
@@ -67,7 +55,7 @@ export const createFormToolHandlers = (
           : null),
       }));
 
-      const result = ctx.fillFormFields({ updates });
+      const result = toolCtx.fillFormFields({ updates });
       return {
         payload: result,
         summary:
@@ -75,24 +63,15 @@ export const createFormToolHandlers = (
             ? `Filled ${result.updatedCount} field${result.updatedCount === 1 ? "" : "s"}, ${result.rejectedCount} rejected`
             : `Filled ${result.updatedCount} field${result.updatedCount === 1 ? "" : "s"}`,
       };
-    },
-  },
-
-  focus_field: {
-    definition: defineTool("write", {
-      name: "focus_field",
-      description:
-        "Focus an existing form field by id and scroll it into view.",
-      inputSchema: focusFieldArgsSchema,
     }),
-    execute: async (rawArgs) => {
-      const parsed = parseToolArgs(focusFieldArgsSchema, rawArgs);
-      if (parsed.success === false) {
-        return createInvalidArgumentsResult("focus_field", parsed.error);
-      }
 
-      const fieldId = parsed.data.field_id.trim();
-      const field = fieldId ? ctx.focusField(fieldId) : null;
+  focus_field: createToolBuilder("focus_field")
+    .write()
+    .description("Focus an existing form field by id and scroll it into view.")
+    .inputSchema(focusFieldArgsSchema)
+    .build(async ({ args, ctx: toolCtx }) => {
+      const fieldId = args.field_id.trim();
+      const field = fieldId ? toolCtx.focusField(fieldId) : null;
       if (!field) {
         return {
           payload: createErrorPayload(
@@ -110,6 +89,5 @@ export const createFormToolHandlers = (
         },
         summary: `Focused field on page ${field.pageNumber}`,
       };
-    },
-  },
-});
+    }),
+}));

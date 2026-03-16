@@ -1,6 +1,13 @@
+/**
+ * Stable AI chat data contracts.
+ *
+ * This file defines the serialized or cross-module shapes used by the AI chat
+ * system: tool definitions, messages, tool results, readable page payloads, and
+ * related records. Runtime context composition and execution wiring should live
+ * alongside the runtime implementation instead of here.
+ */
 import type { ZodTypeAny } from "zod";
 import type { ToolSet } from "ai";
-import type { PDFSearchMode } from "@/lib/pdfSearch";
 import type { PDFMetadata, PDFOutlineItem, PDFSearchResult } from "@/types";
 
 export type AiToolName =
@@ -24,6 +31,7 @@ export interface AiChatToolDefinition {
   description: string;
   accessType: "read" | "write";
   inputSchema: ZodTypeAny;
+  promptInstructions?: string[];
 }
 
 export interface AiChatMessageRecord {
@@ -340,105 +348,6 @@ export interface AiTextSelectionContext {
   pageIndex: number;
   startOffset: number;
   endOffset: number;
-}
-
-export interface AiDocumentContextService {
-  getDocumentContext: () => AiDocumentContext;
-  getDocumentMetadata: () => AiDocumentMetadata;
-  getDocumentDigest?: (options: {
-    startPage: number;
-    endPage: number;
-    charsPerChunk?: number;
-    sourceCharsPerChunk?: number;
-    summaryInstructions?: string;
-    signal?: AbortSignal;
-    onProgress?: (progress: AiToolExecutionProgress) => void;
-  }) => Promise<{
-    pageCount: number;
-    returnedPageCount: number;
-    chunkCount: number;
-    excerptCharsPerChunk: number;
-    sourceCharsPerChunk: number;
-    overallExcerpt: string;
-    chunks: AiDocumentDigestChunk[];
-  }>;
-  readPages: (options: {
-    pageNumbers: number[];
-    includeLayout?: boolean;
-    signal?: AbortSignal;
-  }) => Promise<{
-    requestedPageCount: number;
-    returnedPageCount: number;
-    truncated: boolean;
-    maxPagesPerCall: number;
-    pages: AiReadablePage[];
-  }>;
-  searchDocument: (options: {
-    query: string;
-    pageNumbers?: number[];
-    caseSensitive?: boolean;
-    mode?: PDFSearchMode;
-    regexFlags?: string;
-    maxResults?: number;
-    signal?: AbortSignal;
-  }) => Promise<PDFSearchResult[]>;
-}
-
-export interface AiToolExecutionContext {
-  documentContextService: AiDocumentContextService;
-  rememberSearchResults: (
-    query: string,
-    results: PDFSearchResult[],
-  ) => AiSearchResultSummary[];
-  listAnnotations: (options: {
-    query?: string;
-    pageNumbers?: number[];
-    types?: AiAnnotationKind[];
-    maxResults?: number;
-  }) => AiAnnotationListResult;
-  updateAnnotationText: (options: {
-    annotationId: string;
-    text: string;
-  }) => AiAnnotationTextUpdateResult;
-  updateAnnotationTexts: (options: {
-    updates: Array<{
-      annotationId: string;
-      text: string;
-    }>;
-  }) => AiAnnotationTextBatchUpdateResult;
-  listFormFields: (options: {
-    pageNumbers?: number[];
-    query?: string;
-    onlyEmpty?: boolean;
-    includeReadOnly?: boolean;
-    maxResults?: number;
-  }) => AiFormFieldListResult;
-  fillFormFields: (options: {
-    updates: AiFormFieldFillRequest[];
-  }) => AiFormFieldFillResult;
-  focusField: (id: string) => AiFormFieldSummary | null;
-  getStoredSearchResult: (id: string) => AiStoredSearchResult | null;
-  createSearchHighlightAnnotations: (options: {
-    resultIds?: string[];
-    annotationText?: string;
-    selectionAnchors?: Array<{
-      attachmentIndex: number;
-      startAnchor: string;
-      endInclusiveAnchor: string;
-      annotationText?: string;
-    }>;
-    documentAnchors?: Array<{
-      startAnchor: string;
-      endInclusiveAnchor: string;
-      pageHint?: number;
-      annotationText?: string;
-    }>;
-  }) => Promise<AiHighlightAnnotationCreateResult>;
-  clearSearchHighlights: () => { clearedCount: number };
-  setHighlightedResultIds: (ids: string[]) => void;
-  clearHighlightedResultIds: () => void;
-  navigatePage: (pageIndex: number) => void;
-  focusSearchResult: (result: PDFSearchResult) => void;
 }
 
 export interface AiToolExecutionResult {

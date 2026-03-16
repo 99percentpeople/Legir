@@ -4,18 +4,18 @@ import type {
   AiAnnotationKind,
   AiChatToolDefinition,
   AiSearchResultSummary,
-  AiToolExecutionContext,
   AiToolExecutionProgress,
   AiToolExecutionResult,
   AiToolName,
 } from "@/services/ai/chat/types";
+import type { AiToolContext } from "@/services/ai/chat/aiToolContext";
 import { normalizeAiToolArgsDeep } from "@/services/ai/chat/toolCase";
 
 export type AiToolHandler = {
   definition: AiChatToolDefinition;
   execute: (
     args: unknown,
-    ctx: AiToolExecutionContext,
+    ctx: AiToolContext,
     signal?: AbortSignal,
     onProgress?: (progress: AiToolExecutionProgress) => void,
   ) => Promise<AiToolExecutionResult>;
@@ -24,6 +24,61 @@ export type AiToolHandler = {
 export type AiToolHandlerMap<T extends AiToolName = AiToolName> = Partial<
   Record<T, AiToolHandler>
 >;
+
+export type AiToolModule<
+  THandlers extends AiToolHandlerMap = AiToolHandlerMap,
+> = {
+  createHandlers: (ctx: AiToolContext) => THandlers;
+};
+
+export const defineToolModule = <THandlers extends AiToolHandlerMap>(
+  createHandlers: AiToolModule<THandlers>["createHandlers"],
+): AiToolModule<THandlers> => ({
+  createHandlers,
+});
+
+export const createToolHandlerMap = (
+  modules: readonly AiToolModule[],
+  ctx: AiToolContext,
+): AiToolHandlerMap => {
+  const handlers: AiToolHandlerMap = {};
+
+  for (const module of modules) {
+    const moduleHandlers = module.createHandlers(ctx);
+
+    for (const [name, handler] of Object.entries(moduleHandlers) as Array<
+      [AiToolName, AiToolHandler | undefined]
+    >) {
+      if (!handler) continue;
+      if (handlers[name]) {
+        throw new Error(`Duplicate AI tool handler registered: ${name}`);
+      }
+      handlers[name] = handler;
+    }
+  }
+
+  return handlers;
+};
+
+type AiToolBuilderState<
+  TName extends AiToolName,
+  TSchema extends ZodTypeAny,
+> = {
+  name: TName;
+  enabled: boolean;
+  accessType?: AiChatToolDefinition["accessType"];
+  description?: string;
+  inputSchema: TSchema;
+  promptInstructions: string[];
+};
+
+type AiToolBuilderExecuteOptions<TSchema extends ZodTypeAny> = {
+  args: z.output<TSchema>;
+  rawArgs: unknown;
+  ctx: AiToolContext;
+  signal?: AbortSignal;
+  onProgress?: (progress: AiToolExecutionProgress) => void;
+};
 
 export const defineTool = (
   accessType: AiChatToolDefinition["accessType"],
@@ -212,6 +267,91 @@ export const requiredPageNumbersSchema = z.preprocess((value) => {
   return Array.isArray(value) ? value : [value];
 }, pageNumbersArraySchema.min(1));
 export const emptyObjectSchema = z.object({}).strict();
+
+const createConfiguredToolBuilder = <
+  TName extends AiToolName,
+  TSchema extends ZodTypeAny,
+>(
+  state: AiToolBuilderState<TName, TSchema>,
+) => ({
+  enable: (enabled: boolean) =>
+    createConfiguredToolBuilder({
+      ...state,
+      enabled,
+    }),
+  read: () =>
+    createConfiguredToolBuilder({
+      ...state,
+      accessType: "read" as const,
+    }),
+  write: () =>
+    createConfiguredToolBuilder({
+      ...state,
+      accessType: "write" as const,
+    }),
+  description: (description: string) =>
+    createConfiguredToolBuilder({
+      ...state,
+      description,
+    }),
+  promptInstructions: (instructions: readonly string[]) =>
+    createConfiguredToolBuilder({
+      ...state,
+      promptInstructions: instructions.map((instruction) => instruction.trim()),
+    }),
+  inputSchema: <TNextSchema extends ZodTypeAny>(inputSchema: TNextSchema) =>
+    createConfiguredToolBuilder<TName, TNextSchema>({
+      ...state,
+      inputSchema,
+    }),
+  build: (
+    execute: (
+      options: AiToolBuilderExecuteOptions<TSchema>,
+    ) => Promise<AiToolExecutionResult> | AiToolExecutionResult,
+  ): AiToolHandler | undefined => {
+    if (!state.enabled) {
+      return undefined;
+    }
+    if (!state.accessType) {
+      throw new Error(`Tool ${state.name} is missing accessType.`);
+    }
+    if (!state.description?.trim()) {
+      throw new Error(`Tool ${state.name} is missing description.`);
+    }
+
+    return {
+      definition: defineTool(state.accessType, {
+        name: state.name,
+        description: state.description,
+        inputSchema: state.inputSchema,
+        promptInstructions: state.promptInstructions,
+      }),
+      execute: async (rawArgs, ctx, signal, onProgress) => {
+        const parsed = parseToolArgs(state.inputSchema, rawArgs);
+        if (parsed.success === false) {
+          return createInvalidArgumentsResult(state.name, parsed.error);
+        }
+
+        return await execute({
+          args: parsed.data,
+          rawArgs,
+          ctx,
+          signal,
+          onProgress,
+        });
+      },
+    };
+  },
+});
+
+export const createToolBuilder = <TName extends AiToolName>(name: TName) =>
+  createConfiguredToolBuilder<TName, typeof emptyObjectSchema>({
+    name,
+    enabled: true,
+    inputSchema: emptyObjectSchema,
+    promptInstructions: [],
+  });
+
 export const annotationTypesSchema = z.array(
   z.enum(["comment", "highlight", "ink", "freetext"]),
 );
@@ -252,7 +392,13 @@ export const getDocumentDigestArgsSchema = z
 export const readPagesArgsSchema = z
   .object({
     page_numbers: requiredPageNumbersSchema,
-    include_layout: z.boolean().optional().default(false),
+    include_layout: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        "When true, also return per-line text with layout rectangles. Prefer true for tables, multi-column pages, or when preparing precise highlight anchors.",
+      ),
   })
   .strict();
 
