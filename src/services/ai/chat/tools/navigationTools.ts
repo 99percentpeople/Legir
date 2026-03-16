@@ -2,6 +2,7 @@ import {
   createErrorPayload,
   createToolBuilder,
   defineToolModule,
+  focusControlArgsSchema,
   focusResultArgsSchema,
   navigatePageArgsSchema,
 } from "./shared";
@@ -20,6 +21,38 @@ export const navigationToolModule = defineToolModule((_ctx) => ({
           pageNumber: page_number,
         },
         summary: `Navigated to page ${page_number}`,
+      };
+    }),
+
+  focus_control: createToolBuilder("focus_control")
+    .write()
+    .description(
+      "Focus an existing field or annotation by id and scroll it into view. Use control_id from list_fields or list_annotations. Optionally set select true if the control should also become selected.",
+    )
+    .inputSchema(focusControlArgsSchema)
+    .build(async ({ args, ctx: toolCtx }) => {
+      const control = args.control_id.trim()
+        ? toolCtx.focusControl(args.control_id.trim(), {
+            select: args.select,
+          })
+        : null;
+      if (!control) {
+        return {
+          payload: createErrorPayload(
+            "CONTROL_NOT_FOUND",
+            "focus_control requires a valid control_id from list_fields or list_annotations.",
+          ),
+          summary: "focus_control failed: control not found",
+        };
+      }
+
+      return {
+        payload: {
+          ok: true,
+          selected: args.select,
+          ...control,
+        },
+        summary: `Focused ${control.controlType} on page ${control.pageNumber}`,
       };
     }),
 

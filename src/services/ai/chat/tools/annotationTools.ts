@@ -4,15 +4,8 @@ import {
   defineToolModule,
   emptyObjectSchema,
   highlightResultsArgsSchema,
-  listAnnotationsArgsSchema,
-  summarizeListedAnnotations,
   updateAnnotationTextsArgsSchema,
 } from "./shared";
-
-const LIST_ANNOTATIONS_TOOL_PROMPTS = [
-  "If the user asks about comments, notes, highlights, or annotations, call list_annotations.",
-  "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
-];
 
 const UPDATE_ANNOTATION_TEXTS_TOOL_PROMPTS = [
   "If the user asks to rename, rewrite, clear, or update annotation/comment text, call update_annotation_texts. It accepts either one annotation_id plus text or an updates array.",
@@ -30,27 +23,6 @@ const HIGHLIGHT_RESULTS_TOOL_PROMPTS = [
 ];
 
 export const annotationToolModule = defineToolModule((_ctx) => ({
-  list_annotations: createToolBuilder("list_annotations")
-    .read()
-    .description(
-      "List existing annotations in the current document, including comments and highlights. Highlight annotations include note/comment text plus highlightedText when the source text is known.",
-    )
-    .promptInstructions(LIST_ANNOTATIONS_TOOL_PROMPTS)
-    .inputSchema(listAnnotationsArgsSchema)
-    .build(async ({ args, ctx: toolCtx }) => {
-      const result = toolCtx.listAnnotations({
-        query: args.query?.trim() || undefined,
-        pageNumbers: args.page_numbers,
-        types: args.types,
-        maxResults: args.max_results,
-      });
-
-      return {
-        payload: result,
-        summary: summarizeListedAnnotations(result.total, result.returned),
-      };
-    }),
-
   update_annotation_texts: createToolBuilder("update_annotation_texts")
     .write()
     .description(

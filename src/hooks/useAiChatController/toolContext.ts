@@ -12,10 +12,11 @@ import {
 import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import { useEditorStore } from "@/store/useEditorStore";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import { roundAiRect } from "@/services/ai/utils/geometry";
 import {
   mapReadableRangeToFlatRange,
   serializePageTextContent,
-} from "@/services/ai/chat/pageTextSerialization";
+} from "@/services/ai/utils/pageTextSerialization";
 import { getPdfSearchRangeClientRects } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
   FieldType,
@@ -25,10 +26,12 @@ import {
 } from "@/types";
 import type {
   AiAnnotationKind,
+  AiAnnotationSummary,
   AiAnnotationTextBatchUpdateResult,
   AiAnnotationListResult,
   AiAnnotationTextUpdateResult,
   AiChatSelectionAttachment,
+  AiDocumentPageAssetSummary,
   AiFormFieldFillRequest,
   AiFormFieldFillResult,
   AiFormFieldFillResultItem,
@@ -38,6 +41,7 @@ import type {
   AiHighlightAnnotationCreateResult,
   AiSearchResultSummary,
   AiStoredSearchResult,
+  AiTypeCount,
 } from "@/services/ai/chat/types";
 import type { AiChatSessionData } from "@/hooks/useAiChatController/sessionPersistence";
 
@@ -144,7 +148,109 @@ const getAiAnnotationKind = (
   return type ? (type as AiAnnotationKind) : null;
 };
 
-export const summarizeFormField = (field: FormField): AiFormFieldSummary => {
+const summarizeAnnotation = (
+  annotation: Annotation,
+): AiAnnotationSummary | null => {
+  const type = getAiAnnotationKind(annotation);
+  if (!type) return null;
+
+  return {
+    id: annotation.id,
+    pageNumber: annotation.pageIndex + 1,
+    type,
+    text: (annotation.text || "").trim() || undefined,
+    highlightedText: (annotation.highlightedText || "").trim() || undefined,
+    author: (annotation.author || "").trim() || undefined,
+    color: annotation.color,
+    updatedAt: annotation.updatedAt,
+    rect: annotation.rect ? roundAiRect(annotation.rect) : undefined,
+    linkUrl: (annotation.linkUrl || "").trim() || undefined,
+    linkDestPageNumber:
+      typeof annotation.linkDestPageIndex === "number"
+        ? annotation.linkDestPageIndex + 1
+        : undefined,
+    metaKind:
+      typeof annotation.meta?.kind === "string"
+        ? annotation.meta.kind
+        : undefined,
+  };
+};
+
+const incrementTypeCount = <TType extends string>(
+  counts: Map<TType, number>,
+  type: TType,
+) => {
+  counts.set(type, (counts.get(type) ?? 0) + 1);
+};
+
+const serializeTypeCounts = <TType extends string>(
+  counts: Map<TType, number>,
+): AiTypeCount<TType>[] =>
+  Array.from(counts.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([type, count]) => ({ type, count }));
+
+const summarizeDocumentPageAssets = (): {
+  pageAssetSummary: AiDocumentPageAssetSummary[];
+} => {
+  const store = useEditorStore.getState();
+  const pageAssetSummary = Array.from(
+    { length: store.pages.length },
+    (_, index) => ({
+      pageNumber: index + 1,
+      formFieldTypes: [] as AiTypeCount<AiFormFieldKind>[],
+      annotationTypes: [] as AiTypeCount<AiAnnotationKind>[],
+    }),
+  );
+  const pageFormFieldTypeCounts = pageAssetSummary.map(
+    () => new Map<AiFormFieldKind, number>(),
+  );
+  const pageAnnotationTypeCounts = pageAssetSummary.map(
+    () => new Map<AiAnnotationKind, number>(),
+  );
+
+  for (const field of store.fields) {
+    const pageTypeCounts = pageFormFieldTypeCounts[field.pageIndex];
+    if (!pageTypeCounts) continue;
+
+    const type = getAiFormFieldKind(field.type);
+    incrementTypeCount(pageTypeCounts, type);
+  }
+
+  for (const annotation of store.annotations) {
+    const pageTypeCounts = pageAnnotationTypeCounts[annotation.pageIndex];
+    if (!pageTypeCounts) continue;
+
+    const type = getAiAnnotationKind(annotation);
+    if (!type) continue;
+
+    incrementTypeCount(pageTypeCounts, type);
+  }
+
+  for (const [index, pageSummary] of pageAssetSummary.entries()) {
+    pageSummary.formFieldTypes = serializeTypeCounts(
+      pageFormFieldTypeCounts[index]!,
+    );
+    pageSummary.annotationTypes = serializeTypeCounts(
+      pageAnnotationTypeCounts[index]!,
+    );
+  }
+
+  const nonEmptyPageAssetSummary = pageAssetSummary.filter(
+    (pageSummary) =>
+      pageSummary.formFieldTypes.length > 0 ||
+      pageSummary.annotationTypes.length > 0,
+  );
+
+  return {
+    pageAssetSummary: nonEmptyPageAssetSummary,
+  };
+};
+
+export const summarizeFormField = (
+  field: FormField,
+  options?: { includeLayout?: boolean },
+): AiFormFieldSummary => {
   const type = getAiFormFieldKind(field.type);
   const editable = !field.readOnly && field.type !== FieldType.SIGNATURE;
   const optionValue =
@@ -172,6 +278,11 @@ export const summarizeFormField = (field: FormField): AiFormFieldSummary => {
         ? allowsCustomDropdownValue(field)
         : undefined,
     optionValue,
+    ...(options?.includeLayout
+      ? {
+          rect: roundAiRect(field.rect),
+        }
+      : null),
     unsupportedReason:
       field.type === FieldType.SIGNATURE
         ? "AI signature filling is not supported."
@@ -572,6 +683,8 @@ export const createAiChatToolContext = (options: {
   selectedChatModel?: SelectedChatModelMeta;
   selectedChatModelAuthor: string;
 }) => {
+  const getDocumentPageAssetSummary = () => summarizeDocumentPageAssets();
+
   const rememberSearchResults = (
     query: string,
     results: PDFSearchResult[],
@@ -600,6 +713,7 @@ export const createAiChatToolContext = (options: {
     query?: string;
     onlyEmpty?: boolean;
     includeReadOnly?: boolean;
+    includeLayout?: boolean;
     maxResults?: number;
   }): AiFormFieldListResult => {
     const pageNumbers = (optionsInput.pageNumbers ?? [])
@@ -618,7 +732,11 @@ export const createAiChatToolContext = (options: {
         if (a.rect.x !== b.rect.x) return a.rect.x - b.rect.x;
         return a.id.localeCompare(b.id);
       })
-      .map(summarizeFormField)
+      .map((field) =>
+        summarizeFormField(field, {
+          includeLayout: optionsInput.includeLayout,
+        }),
+      )
       .filter((field) => {
         if (pageNumberSet && !pageNumberSet.has(field.pageNumber)) return false;
         if (!optionsInput.includeReadOnly && field.readOnly) return false;
@@ -876,18 +994,45 @@ export const createAiChatToolContext = (options: {
     };
   };
 
-  const focusField = (id: string) => {
+  const focusControl = (id: string, optionsInput?: { select?: boolean }) => {
     const field = useEditorStore
       .getState()
       .fields.find((item) => item.id === id);
-    if (!field) return null;
+    if (field) {
+      if (optionsInput?.select) {
+        useEditorStore.getState().selectControl(id);
+      }
+      appEventBus.emit("workspace:focusControl", {
+        id,
+        behavior: "smooth",
+      });
+      return {
+        controlType: "field" as const,
+        pageNumber: field.pageIndex + 1,
+        field: summarizeFormField(field),
+      };
+    }
 
-    useEditorStore.getState().selectControl(id);
+    const annotation = useEditorStore
+      .getState()
+      .annotations.find((item) => item.id === id);
+    if (!annotation) return null;
+
+    const summary = summarizeAnnotation(annotation);
+    if (!summary) return null;
+
+    if (optionsInput?.select) {
+      useEditorStore.getState().selectControl(id);
+    }
     appEventBus.emit("workspace:focusControl", {
       id,
       behavior: "smooth",
     });
-    return summarizeFormField(field);
+    return {
+      controlType: "annotation" as const,
+      pageNumber: annotation.pageIndex + 1,
+      annotation: summary,
+    };
   };
 
   const getStoredSearchResult = (id: string) =>
@@ -928,29 +1073,9 @@ export const createAiChatToolContext = (options: {
     });
     const sorted = sortAnnotationsForList(filtered);
     const limit = Math.max(1, Math.trunc(optionsInput.maxResults ?? 100));
-    const annotations = sorted.slice(0, limit).flatMap((annotation) => {
-      const type = getAiAnnotationKind(annotation);
-      if (!type) return [];
-
-      return [
-        {
-          id: annotation.id,
-          pageNumber: annotation.pageIndex + 1,
-          type,
-          text: (annotation.text || "").trim() || undefined,
-          highlightedText:
-            (annotation.highlightedText || "").trim() || undefined,
-          author: (annotation.author || "").trim() || undefined,
-          color: annotation.color,
-          updatedAt: annotation.updatedAt,
-          rect: annotation.rect,
-          metaKind:
-            typeof annotation.meta?.kind === "string"
-              ? annotation.meta.kind
-              : undefined,
-        },
-      ];
-    });
+    const annotations = sorted
+      .slice(0, limit)
+      .flatMap((annotation) => summarizeAnnotation(annotation) ?? []);
 
     return {
       total: sorted.length,
@@ -1774,12 +1899,13 @@ export const createAiChatToolContext = (options: {
   };
 
   return {
+    getDocumentPageAssetSummary,
     rememberSearchResults,
     updateAnnotationText,
     updateAnnotationTexts,
     listFormFields,
     fillFormFields,
-    focusField,
+    focusControl,
     getStoredSearchResult,
     setActiveHighlightedResultIds,
     clearActiveHighlightedResultIds,

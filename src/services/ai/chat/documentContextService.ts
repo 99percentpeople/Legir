@@ -11,7 +11,8 @@ import {
 import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
 import { pageTranslationService } from "@/services/pageTranslationService";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { serializePageTextContent } from "@/services/ai/chat/pageTextSerialization";
+import { roundAiRect } from "@/services/ai/utils/geometry";
+import { serializePageTextContent } from "@/services/ai/utils/pageTextSerialization";
 import type {
   AiDocumentDigestChunk,
   AiDocumentDigestSourceKind,
@@ -363,7 +364,7 @@ export const createDocumentContextService = (options: {
 
     const normalized = lines.map((line) => ({
       text: line.sourceText,
-      rect: line.rect,
+      rect: roundAiRect(line.rect),
     }));
     pageLinesCache.set(pageIndex, normalized);
     return normalized;

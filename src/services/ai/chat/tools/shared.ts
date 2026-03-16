@@ -9,7 +9,7 @@ import type {
   AiToolName,
 } from "@/services/ai/chat/types";
 import type { AiToolContext } from "@/services/ai/chat/aiToolContext";
-import { normalizeAiToolArgsDeep } from "@/services/ai/chat/toolCase";
+import { normalizeAiToolArgsDeep } from "@/services/ai/utils/toolCase";
 
 export type AiToolHandler = {
   definition: AiChatToolDefinition;
@@ -353,7 +353,7 @@ export const createToolBuilder = <TName extends AiToolName>(name: TName) =>
   });
 
 export const annotationTypesSchema = z.array(
-  z.enum(["comment", "highlight", "ink", "freetext"]),
+  z.enum(["comment", "highlight", "ink", "freetext", "link"]),
 );
 export const stringArraySchema = z.array(z.string());
 
@@ -466,6 +466,13 @@ export const listFormFieldsArgsSchema = z
     query: z.string().optional(),
     only_empty: z.boolean().optional().default(false),
     include_read_only: z.boolean().optional().default(false),
+    include_layout: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        "When true, also return each field's page-space rectangle. Prefer true when the user asks for field locations or when a later action needs visual targeting.",
+      ),
     max_results: positiveIntSchema.optional().default(100),
   })
   .strict();
@@ -486,9 +493,16 @@ export const fillFormFieldsArgsSchema = z
   })
   .strict();
 
-export const focusFieldArgsSchema = z
+export const focusControlArgsSchema = z
   .object({
-    field_id: z.string().min(1),
+    control_id: z.string().min(1),
+    select: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        "When true, also select the focused control in the workspace. Defaults to false to avoid switching the properties panel.",
+      ),
   })
   .strict();
 

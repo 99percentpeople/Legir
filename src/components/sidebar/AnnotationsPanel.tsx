@@ -32,6 +32,12 @@ import {
   type AnnotationListType,
 } from "@/lib/annotationList";
 
+type SidebarAnnotationListType = Exclude<AnnotationListType, "link">;
+
+const SIDEBAR_ANNOTATION_LIST_TYPES = ANNOTATION_LIST_TYPES.filter(
+  (type): type is SidebarAnnotationListType => type !== "link",
+);
+
 // --- Annotation Card ---
 interface AnnotationCardProps {
   annotation: Annotation;
@@ -189,11 +195,11 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
 }) => {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTypes, setSelectedTypes] = useState<AnnotationListType[]>([
-    ...ANNOTATION_LIST_TYPES,
-  ]);
+  const [selectedTypes, setSelectedTypes] = useState<
+    SidebarAnnotationListType[]
+  >([...SIDEBAR_ANNOTATION_LIST_TYPES]);
 
-  const annotationTypeLabelKey: Record<AnnotationListType, string> = {
+  const annotationTypeLabelKey: Record<SidebarAnnotationListType, string> = {
     comment: "toolbar.comment",
     highlight: "toolbar.highlight",
     ink: "toolbar.ink",
@@ -201,7 +207,10 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
   };
 
   const allAnnotations = useMemo(
-    () => filterAnnotationsForList(annotations),
+    () =>
+      filterAnnotationsForList(annotations, {
+        selectedTypes: SIDEBAR_ANNOTATION_LIST_TYPES,
+      }),
     [annotations],
   );
 
@@ -257,7 +266,7 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
           <DropdownMenuTrigger asChild>
             <Button
               variant={
-                selectedTypes.length !== ANNOTATION_LIST_TYPES.length
+                selectedTypes.length !== SIDEBAR_ANNOTATION_LIST_TYPES.length
                   ? "secondary"
                   : "ghost"
               }
@@ -269,7 +278,7 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[200px]">
-            {ANNOTATION_LIST_TYPES.map((type) => (
+            {SIDEBAR_ANNOTATION_LIST_TYPES.map((type) => (
               <DropdownMenuCheckboxItem
                 key={type}
                 checked={selectedTypes.includes(type)}
@@ -304,7 +313,8 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
         <div className="space-y-6 p-2">
           {filteredAnnotations.length === 0 ? (
             <div className="text-muted-foreground py-6 text-center text-sm italic">
-              {searchTerm || selectedTypes.length < ANNOTATION_LIST_TYPES.length
+              {searchTerm ||
+              selectedTypes.length < SIDEBAR_ANNOTATION_LIST_TYPES.length
                 ? t("sidebar.no_results")
                 : t("sidebar.no_annotations")}
             </div>

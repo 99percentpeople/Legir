@@ -6,8 +6,12 @@ import {
   defineToolModule,
   emptyObjectSchema,
   getDocumentDigestArgsSchema,
+  listAnnotationsArgsSchema,
+  listFormFieldsArgsSchema,
   readPagesArgsSchema,
   searchDocumentArgsSchema,
+  summarizeListedAnnotations,
+  summarizeListedFormFields,
   summarizeSearchResults,
 } from "./shared";
 
@@ -17,6 +21,10 @@ const METADATA_TOOL_PROMPTS = [
 
 const MULTI_PAGE_SUMMARY_FALLBACK_PROMPT =
   "If the user asks for a whole-document or many-page summary and no digest tool is available, rely on get_document_context plus targeted page reads.";
+
+const DOCUMENT_CONTEXT_TOOL_PROMPTS = [
+  "get_document_context includes per-page type breakdowns for form fields and supported annotations on pages that actually contain them, which is useful before form filling or annotation inspection.",
+];
 
 const READ_PAGES_TOOL_PROMPTS = [
   "read_pages text preserves inferred spaces and line breaks from the PDF while remaining compatible with anchor highlighting.",
@@ -29,6 +37,19 @@ const READ_PAGES_TOOL_PROMPTS = [
 const SEARCH_DOCUMENT_TOOL_PROMPTS = [
   "When plain search may fail because of whitespace, punctuation, line breaks, or OCR noise, retry regex such as word1\\s*word2.",
   "search_document result_ids only refer to the exact matchText of each hit. snippet is surrounding context only.",
+  "If you need multiple independent search_document calls for different keywords or ranges, issue them in the same step so they can run in parallel.",
+];
+
+const LIST_ANNOTATIONS_TOOL_PROMPTS = [
+  "If the user asks about comments, notes, highlights, links, or annotations, call list_annotations.",
+  "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
+  "When list_annotations returns link annotations, inspect linkUrl and linkDestPageNumber to understand the hyperlink target.",
+];
+
+const LIST_FIELDS_TOOL_PROMPTS = [
+  "If the user asks to fill or update form fields and ids, options, or field mapping are unclear, call list_fields first.",
+  "If the user asks where a field is, wants to inspect field geometry, or needs a visually targetable field list, call list_fields with include_layout: true.",
+  "If form-filling instructions may be encoded in comments, highlights, or notes, call list_annotations together with list_fields before filling.",
 ];
 
 export const documentToolModule = defineToolModule((ctx) => {
@@ -38,14 +59,18 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_document_context: createToolBuilder("get_document_context")
       .read()
       .description(
-        "Get lightweight runtime context for the currently opened PDF document.",
+        "Get lightweight runtime context for the currently opened PDF document, including per-page form-field and annotation type breakdowns only for pages that actually contain them.",
       )
-      .promptInstructions(
-        ctx.getDocumentDigest ? [] : [MULTI_PAGE_SUMMARY_FALLBACK_PROMPT],
-      )
+      .promptInstructions([
+        ...DOCUMENT_CONTEXT_TOOL_PROMPTS,
+        ...(ctx.getDocumentDigest ? [] : [MULTI_PAGE_SUMMARY_FALLBACK_PROMPT]),
+      ])
       .inputSchema(emptyObjectSchema)
       .build(async ({ ctx: toolCtx }) => {
-        const payload = toolCtx.getDocumentContext();
+        const payload = {
+          ...toolCtx.getDocumentContext(),
+          ...toolCtx.getDocumentPageAssetSummary(),
+        };
         return {
           payload,
           summary: `Context for ${payload.filename}, ${payload.pageCount} pages`,
@@ -157,6 +182,50 @@ export const documentToolModule = defineToolModule((ctx) => {
             results: remembered,
           },
           summary: summarizeSearchResults(remembered),
+        };
+      }),
+
+    list_annotations: createToolBuilder("list_annotations")
+      .read()
+      .description(
+        "List existing annotations in the current document, including comments, highlights, free text, ink, and hyperlink annotations. Highlight annotations include note/comment text plus highlightedText when the source text is known. Link annotations include linkUrl and linkDestPageNumber when available.",
+      )
+      .promptInstructions(LIST_ANNOTATIONS_TOOL_PROMPTS)
+      .inputSchema(listAnnotationsArgsSchema)
+      .build(async ({ args, ctx: toolCtx }) => {
+        const result = toolCtx.listAnnotations({
+          query: args.query?.trim() || undefined,
+          pageNumbers: args.page_numbers,
+          types: args.types,
+          maxResults: args.max_results,
+        });
+
+        return {
+          payload: result,
+          summary: summarizeListedAnnotations(result.total, result.returned),
+        };
+      }),
+
+    list_fields: createToolBuilder("list_fields")
+      .read()
+      .description(
+        "List existing PDF form fields that the AI can inspect before filling. Returns field ids, types, page numbers, current values, and available options. Optionally include field rectangles for visual targeting. Use together with list_annotations when comments or highlights describe how fields should be filled.",
+      )
+      .promptInstructions(LIST_FIELDS_TOOL_PROMPTS)
+      .inputSchema(listFormFieldsArgsSchema)
+      .build(async ({ args, ctx: toolCtx }) => {
+        const result = toolCtx.listFormFields({
+          pageNumbers: args.page_numbers,
+          query: args.query?.trim() || undefined,
+          onlyEmpty: args.only_empty,
+          includeReadOnly: args.include_read_only,
+          includeLayout: args.include_layout,
+          maxResults: args.max_results,
+        });
+
+        return {
+          payload: result,
+          summary: summarizeListedFormFields(result.total, result.returned),
         };
       }),
   };

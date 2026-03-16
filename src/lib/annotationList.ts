@@ -5,6 +5,7 @@ export const ANNOTATION_LIST_TYPES = [
   "highlight",
   "ink",
   "freetext",
+  "link",
 ] as const;
 
 export type AnnotationListType = (typeof ANNOTATION_LIST_TYPES)[number];
@@ -19,7 +20,8 @@ export const getAnnotationListType = (
     annotation.type === "comment" ||
     annotation.type === "highlight" ||
     annotation.type === "ink" ||
-    annotation.type === "freetext"
+    annotation.type === "freetext" ||
+    annotation.type === "link"
   ) {
     return annotation.type;
   }
@@ -57,11 +59,18 @@ export const filterAnnotationsForList = (
       annotation.highlightedText || ""
     ).toLowerCase();
     const authorContent = (annotation.author || "").toLowerCase();
+    const linkUrlContent = (annotation.linkUrl || "").toLowerCase();
+    const linkDestPageContent =
+      typeof annotation.linkDestPageIndex === "number"
+        ? String(annotation.linkDestPageIndex + 1)
+        : "";
 
     return (
       textContent.includes(query) ||
       highlightedTextContent.includes(query) ||
-      authorContent.includes(query)
+      authorContent.includes(query) ||
+      linkUrlContent.includes(query) ||
+      linkDestPageContent.includes(query)
     );
   });
 };
