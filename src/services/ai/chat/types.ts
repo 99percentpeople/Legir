@@ -8,6 +8,7 @@
  */
 import type { ZodTypeAny } from "zod";
 import type { ToolSet } from "ai";
+import type { AiDocumentLinkTarget } from "@/services/ai/utils/documentLinks";
 import type { PDFMetadata, PDFOutlineItem, PDFSearchResult } from "@/types";
 
 export type AiToolName =
@@ -18,9 +19,9 @@ export type AiToolName =
   | "search_document"
   | "list_annotations"
   | "update_annotation_texts"
-  | "list_form_fields"
+  | "list_fields"
   | "fill_form_fields"
-  | "focus_field"
+  | "focus_control"
   | "navigate_page"
   | "focus_result"
   | "highlight_results"
@@ -47,12 +48,26 @@ export interface AiChatToolCallRecord {
   args: Record<string, unknown>;
 }
 
+export type { AiDocumentLinkTarget };
+
+export interface AiTypeCount<TType extends string = string> {
+  type: TType;
+  count: number;
+}
+
+export interface AiDocumentPageAssetSummary {
+  pageNumber: number;
+  formFieldTypes: AiTypeCount<AiFormFieldKind>[];
+  annotationTypes: AiTypeCount<AiAnnotationKind>[];
+}
+
 export interface AiDocumentContext {
   filename: string;
   pageCount: number;
   currentPageNumber: number | null;
   visiblePageNumbers: number[];
   selectedText: string;
+  pageAssetSummary: AiDocumentPageAssetSummary[];
   outlinePreview: Array<{
     title: string;
     pageNumber?: number;
@@ -108,7 +123,12 @@ export interface AiSearchResultSummary {
   snippetPurpose: "context_only";
 }
 
-export type AiAnnotationKind = "comment" | "highlight" | "ink" | "freetext";
+export type AiAnnotationKind =
+  | "comment"
+  | "highlight"
+  | "ink"
+  | "freetext"
+  | "link";
 
 export interface AiAnnotationSummary {
   id: string;
@@ -120,6 +140,8 @@ export interface AiAnnotationSummary {
   color?: string;
   updatedAt?: string;
   rect?: { x: number; y: number; width: number; height: number };
+  linkUrl?: string;
+  linkDestPageNumber?: number;
   metaKind?: string;
 }
 
@@ -206,6 +228,7 @@ export interface AiFormFieldSummary {
   isMultiSelect?: boolean;
   allowCustomValue?: boolean;
   optionValue?: string;
+  rect?: { x: number; y: number; width: number; height: number };
   unsupportedReason?: string;
 }
 

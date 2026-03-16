@@ -559,10 +559,12 @@ const en = {
       title: "AI Chat Tools",
       description:
         "Configure the AI document digest tool and choose a summary model for long-form summaries.",
+      digest_enabled: "Enable digest tool",
+      digest_enabled_desc: "Turns get_document_digest on or off for AI chat.",
       summary_model: "Digest summary model",
       summary_model_placeholder: "Select a model",
       summary_model_desc:
-        "Used by get_document_digest. If no model is selected, the digest tool is disabled.",
+        "Used by get_document_digest. If the digest tool is disabled or no model is selected, the digest tool is unavailable.",
       no_models: "No available models",
       digest_chars_per_chunk: "Per-layer summary output length",
       digest_source_chars_per_chunk: "Per-layer summary input budget",

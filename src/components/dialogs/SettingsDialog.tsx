@@ -212,6 +212,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   const digestOutputRatioDenominator =
     options.aiChat.digestOutputRatioDenominator;
+  const digestEnabled = options.aiChat.digestEnabled;
   const digestSourceCharsPerChunk = options.aiChat.digestSourceCharsPerChunk;
 
   const checkLlmProvider = async (provider: LlmProviderId) => {
@@ -888,6 +889,31 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
             <TabsContent value="ai_chat">
               <div className="space-y-6">
                 <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="ai-chat-digest-enabled"
+                        className="font-semibold"
+                      >
+                        {t("settings.ai_chat.digest_enabled")}
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings.ai_chat.digest_enabled_desc")}
+                      </p>
+                    </div>
+                    <Switch
+                      id="ai-chat-digest-enabled"
+                      checked={digestEnabled}
+                      onCheckedChange={(checked) =>
+                        updateAiChatOptions({
+                          digestEnabled: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <Separator />
+
                   <div className="space-y-2">
                     <Label className="font-semibold">
                       {t("settings.ai_chat.summary_model")}
@@ -905,7 +931,9 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                           : t("settings.ai_chat.no_models")
                       }
                       groups={aiToolModelGroups}
-                      disabled={aiToolModelGroups.length === 0}
+                      disabled={
+                        !digestEnabled || aiToolModelGroups.length === 0
+                      }
                       showSeparators
                     />
                     <p className="text-muted-foreground text-xs">
@@ -931,6 +959,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                             digestOutputRatioDenominator,
                           ),
                         ]}
+                        disabled={!digestEnabled}
                         min={0}
                         max={
                           AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.length -
@@ -977,6 +1006,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       </div>
                       <Slider
                         value={[digestSourceCharsPerChunk]}
+                        disabled={!digestEnabled}
                         min={AI_CHAT_DIGEST_SOURCE_CHARS_MIN}
                         max={AI_CHAT_DIGEST_SOURCE_CHARS_MAX}
                         step={AI_CHAT_DIGEST_SOURCE_CHARS_STEP}

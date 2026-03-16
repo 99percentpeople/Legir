@@ -1591,6 +1591,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
               }}
               onEditUserMessage={aiChat.editUserMessage}
               onStop={aiChat.stop}
+              onOpenDocumentLink={aiChat.openDocumentLink}
               disabledReason={aiChat.disabledReason}
             />
           ) : state.rightPanelTab === "form_detect" ? (

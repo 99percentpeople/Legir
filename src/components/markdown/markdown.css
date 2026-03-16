@@ -1,0 +1,76 @@
+@reference "../../globals.css";
+
+@layer components {
+  .markdown {
+    @apply w-full max-w-full min-w-0 leading-6 break-words;
+
+    > :first-child {
+      margin-top: 0;
+    }
+
+    > :last-child {
+      margin-bottom: 0;
+    }
+
+    a {
+      @apply text-primary underline underline-offset-4;
+
+      &:hover {
+        @apply text-primary/80;
+      }
+    }
+
+    blockquote {
+      @apply border-border text-muted-foreground my-3 border-l-2 pl-4;
+    }
+
+    code {
+      @apply bg-background/80 rounded-[0.35rem] px-1.5 py-0.5 font-mono text-[0.92em];
+    }
+
+    hr {
+      @apply border-border my-4;
+    }
+
+    li {
+      @apply my-1;
+    }
+
+    ol {
+      @apply my-3 list-decimal pl-5;
+    }
+
+    p {
+      @apply my-3;
+    }
+
+    pre {
+      @apply bg-background/80 my-3 max-w-full overflow-x-auto rounded-md px-3 py-2.5 font-mono text-[13px];
+
+      code {
+        @apply block min-w-max bg-transparent p-0 whitespace-pre text-inherit;
+      }
+    }
+
+    .markdown-table-scroll {
+      @apply my-3 block w-full max-w-full overflow-x-auto overflow-y-hidden;
+    }
+
+    table {
+      @apply m-0 min-w-full border-collapse text-left text-sm;
+      width: max-content;
+    }
+
+    td {
+      @apply border-border border px-2 py-1.5;
+    }
+
+    th {
+      @apply border-border bg-muted/50 border px-2 py-1.5;
+    }
+
+    ul {
+      @apply my-3 list-disc pl-5;
+    }
+  }
+}

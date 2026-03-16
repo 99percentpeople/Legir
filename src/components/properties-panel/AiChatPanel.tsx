@@ -59,6 +59,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type {
+  AiDocumentLinkTarget,
   AiChatSessionSummary,
   AiChatTimelineItem,
   AiChatUserMessageInput,
@@ -67,6 +68,8 @@ import type {
 import { TimeAgoText } from "@/components/timeText";
 import { appEventBus } from "@/lib/eventBus";
 import { cn } from "@/utils/cn";
+import { StreamMarkdown } from "@/components/markdown/StreamMarkdown";
+import { useStickyBottomScroll } from "./useStickyBottomScroll";
 
 export interface AiChatPanelProps {
   isFloating: boolean;
@@ -101,6 +104,7 @@ export interface AiChatPanelProps {
     targetMessageId: string;
   } | null;
   onStop: () => void;
+  onOpenDocumentLink: (target: AiDocumentLinkTarget) => void;
   disabledReason: "no_document" | "no_model" | null;
 }
 
@@ -304,13 +308,19 @@ const ThinkingMessageBubble = ({
 }) => {
   const [open, setOpen] = React.useState(false);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const { scrollToBottom } = useStickyBottomScroll(contentRef, {
+    enabled: open,
+  });
 
   React.useLayoutEffect(() => {
     if (!open || !isStreaming) return;
-    const el = contentRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [open, isStreaming, text]);
+    scrollToBottom(false);
+  }, [open, isStreaming, scrollToBottom, text]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    scrollToBottom(true);
+  }, [open, scrollToBottom]);
 
   return (
     <Collapsible
@@ -539,32 +549,23 @@ const ToolTimelineCall = ({
   const [detailsOpen, setDetailsOpen] = React.useState(false);
   const progressLogs = hasProgressSnapshot ? (item.progressDetails ?? []) : [];
   const progressLogRef = React.useRef<HTMLDivElement | null>(null);
-  const progressLogScrollRafRef = React.useRef<number | null>(null);
+  const { scrollToBottom: scrollProgressLogToBottom } = useStickyBottomScroll(
+    progressLogRef,
+    {
+      enabled: detailsOpen && progressLogs.length > 0,
+      settleFrames: 2,
+      threshold: 32,
+    },
+  );
   const resultText = item.resultText?.trim();
-  const scheduleProgressLogScroll = React.useCallback(() => {
-    if (progressLogScrollRafRef.current !== null) {
-      cancelAnimationFrame(progressLogScrollRafRef.current);
-    }
-    progressLogScrollRafRef.current = requestAnimationFrame(() => {
-      progressLogScrollRafRef.current = requestAnimationFrame(() => {
-        const element = progressLogRef.current;
-        if (!element) return;
-        element.scrollTop = element.scrollHeight;
-      });
-    });
-  }, []);
   React.useEffect(() => {
     if (!detailsOpen || progressLogs.length === 0) return;
-    scheduleProgressLogScroll();
-  }, [detailsOpen, progressLogs, scheduleProgressLogScroll]);
-  React.useEffect(
-    () => () => {
-      if (progressLogScrollRafRef.current !== null) {
-        cancelAnimationFrame(progressLogScrollRafRef.current);
-      }
-    },
-    [],
-  );
+    scrollProgressLogToBottom(false);
+  }, [detailsOpen, progressLogs, scrollProgressLogToBottom]);
+  React.useEffect(() => {
+    if (!detailsOpen) return;
+    scrollProgressLogToBottom(true);
+  }, [detailsOpen, scrollProgressLogToBottom]);
   const content = (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-2">
@@ -694,6 +695,7 @@ export function AiChatPanel({
   onRetryLastError,
   onEditUserMessage,
   onStop,
+  onOpenDocumentLink,
   disabledReason,
 }: AiChatPanelProps) {
   const { t } = useLanguage();
@@ -1788,8 +1790,8 @@ export function AiChatPanel({
                     ) : (
                       <div
                         className={cn(
-                          "flex max-w-[88%] flex-col gap-2",
-                          isUser ? "items-end" : "items-start",
+                          "flex max-w-[90%] min-w-0 flex-col gap-2",
+                          isUser ? "items-end" : "w-full items-start",
                         )}
                       >
                         {isUser &&
@@ -1890,17 +1892,28 @@ export function AiChatPanel({
                             {hasVisibleText || (!isUser && item.isStreaming) ? (
                               <div
                                 className={cn(
-                                  "rounded-lg px-3 py-2 text-sm whitespace-pre-wrap",
+                                  "max-w-full min-w-0 rounded-lg px-3 py-2 text-sm",
                                   isUser
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted text-foreground",
+                                    ? "bg-primary text-primary-foreground whitespace-pre-wrap"
+                                    : "bg-muted text-foreground w-full",
                                 )}
                               >
-                                {hasVisibleText ? item.text : null}
+                                {hasVisibleText ? (
+                                  isUser ? (
+                                    item.text
+                                  ) : (
+                                    <StreamMarkdown
+                                      source={item.text}
+                                      streaming={item.isStreaming}
+                                      className="w-full"
+                                      onOpenDocumentLink={onOpenDocumentLink}
+                                    />
+                                  )
+                                ) : null}
                                 {!isUser && item.isStreaming ? (
-                                  <span className="ml-2 inline-flex align-middle">
+                                  <div className="mt-1.5 flex items-center">
                                     <Spinner size="sm" />
-                                  </span>
+                                  </div>
                                 ) : null}
                               </div>
                             ) : null}

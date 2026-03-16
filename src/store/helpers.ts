@@ -1,4 +1,4 @@
-import { filterSupportedGeminiToolCallingModelIds } from "@/services/ai/sdk/geminiModelSupport";
+import { filterSupportedGeminiToolCallingModelIds } from "@/services/ai/utils/geminiModelSupport";
 import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
 import {
   AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
@@ -169,6 +169,8 @@ export const normalizeAiChatOptions = (
   }
 
   return {
+    digestEnabled:
+      typeof next.digestEnabled === "boolean" ? next.digestEnabled : true,
     digestSourceCharsPerChunk: clampDigestSourceChars(
       next.digestSourceCharsPerChunk,
     ),

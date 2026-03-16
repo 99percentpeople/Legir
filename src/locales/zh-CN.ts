@@ -554,10 +554,12 @@ const zhCN = {
     ai_chat: {
       title: "AI 问答工具",
       description: "配置 AI 文档摘要工具，并为长篇总结单独指定摘要模型。",
+      digest_enabled: "启用摘要工具",
+      digest_enabled_desc: "控制 AI 问答里的 get_document_digest 是否可用。",
       summary_model: "摘要模型",
       summary_model_placeholder: "选择模型",
       summary_model_desc:
-        "用于 get_document_digest。未选择模型时，这个工具会被禁用。",
+        "用于 get_document_digest。关闭摘要工具或未选择模型时，这个工具不可用。",
       no_models: "无可用模型",
       digest_chars_per_chunk: "每层摘要输出长度",
       digest_source_chars_per_chunk: "每层摘要输入预算",

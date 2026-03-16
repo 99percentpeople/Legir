@@ -17,6 +17,7 @@ import {
 } from "@/services/ai/chat/prompts";
 import type {
   AiChatAssistantUpdate,
+  AiDocumentLinkTarget,
   AiChatSessionSummary,
   AiChatTimelineItem,
   AiChatToolUpdate,
@@ -61,6 +62,7 @@ import {
   applyToolUpdateToTimeline,
   finalizeStreamingTimeline,
 } from "@/hooks/useAiChatController/timelineUpdates";
+import { appEventBus } from "@/lib/eventBus";
 
 const isAbortError = (error: unknown) =>
   error instanceof Error && error.name === "AbortError";
@@ -231,6 +233,7 @@ export const useAiChatController = (editorState: EditorState) => {
       ),
     [editorState.options.aiChat.digestSummaryModelKey, flatModels],
   );
+  const digestEnabled = editorState.options.aiChat.digestEnabled;
 
   const digestCharsPerChunk = useMemo(() => {
     const sourceChars = Math.max(
@@ -384,11 +387,13 @@ export const useAiChatController = (editorState: EditorState) => {
           sourceCharsPerChunk:
             editorState.options.aiChat.digestSourceCharsPerChunk,
         }),
-        summarizeDigestChunk: digestSummaryModel
-          ? summarizeDigestChunk
-          : undefined,
+        summarizeDigestChunk:
+          digestEnabled && digestSummaryModel
+            ? summarizeDigestChunk
+            : undefined,
       }),
     [
+      digestEnabled,
       digestSummaryModel,
       documentIdentity,
       digestCharsPerChunk,
@@ -1075,6 +1080,59 @@ export const useAiChatController = (editorState: EditorState) => {
     abortRef.current = null;
   }, []);
 
+  const openDocumentLink = useCallback(
+    (target: AiDocumentLinkTarget) => {
+      switch (target.kind) {
+        case "page": {
+          const pageIndex = target.pageNumber - 1;
+          if (
+            !Number.isInteger(pageIndex) ||
+            pageIndex < 0 ||
+            pageIndex >= editorState.pages.length
+          ) {
+            return;
+          }
+          appEventBus.emit("workspace:navigatePage", {
+            pageIndex,
+            behavior: "smooth",
+          });
+          return;
+        }
+        case "control": {
+          const controlId = target.controlId.trim();
+          if (!controlId) return;
+
+          const store = useEditorStore.getState();
+          const exists =
+            store.fields.some((field) => field.id === controlId) ||
+            store.annotations.some((annotation) => annotation.id === controlId);
+          if (!exists) return;
+
+          appEventBus.emit("workspace:focusControl", {
+            id: controlId,
+            behavior: "smooth",
+          });
+          return;
+        }
+        case "result": {
+          const resultId = target.resultId.trim();
+          if (!resultId) return;
+
+          const stored = searchResultsRef.current.get(resultId);
+          if (!stored) return;
+
+          appEventBus.emit("workspace:focusSearchResult", {
+            pageIndex: stored.result.pageIndex,
+            rect: stored.result.rect,
+            behavior: "smooth",
+          });
+          return;
+        }
+      }
+    },
+    [editorState.pages.length],
+  );
+
   const clearConversation = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -1256,6 +1314,7 @@ export const useAiChatController = (editorState: EditorState) => {
     editUserMessage,
     switchMessageBranch,
     stop,
+    openDocumentLink,
 
     highlightedSearchResultsByPage,
     hasAvailableModel,

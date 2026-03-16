@@ -98,6 +98,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       ]),
     ) as LLMOptions,
     aiChat: {
+      digestEnabled: true,
       digestSourceCharsPerChunk: 12000,
       digestOutputRatioDenominator: 3,
       digestSummaryModelKey: "",

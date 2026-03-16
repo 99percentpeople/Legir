@@ -1,7 +1,7 @@
 import {
   normalizeAiToolArgsDeep,
   toSnakeCaseKeysDeep,
-} from "@/services/ai/chat/toolCase";
+} from "@/services/ai/utils/toolCase";
 import type {
   AiChatMessageAttachment,
   AiChatMessageRecord,
@@ -72,10 +72,68 @@ export type RestoredAiChatDocumentState = {
   sessionSummaries: AiChatSessionSummary[];
 };
 
+const INTERRUPTED_AI_CHAT_MESSAGE =
+  "The previous AI response was interrupted before it finished.";
+
 const truncateText = (value: string, maxChars: number) => {
   const text = String(value ?? "");
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(0, maxChars - 14))}…(truncated)`;
+};
+
+const calculateDurationMs = (createdAt: string, endedAtIso: string) => {
+  const started = Date.parse(createdAt);
+  const ended = Date.parse(endedAtIso);
+  if (!Number.isFinite(started) || !Number.isFinite(ended)) return undefined;
+  return Math.max(0, ended - started);
+};
+
+const settleInterruptedTimeline = (
+  items: AiChatTimelineItem[],
+  nowIso: string,
+) => {
+  let didInterrupt = false;
+
+  const timeline = items.map((item) => {
+    if (item.kind === "tool" && item.status === "running") {
+      didInterrupt = true;
+      return {
+        ...item,
+        status: "error" as const,
+        resultSummary: item.resultSummary ?? INTERRUPTED_AI_CHAT_MESSAGE,
+        progressDetails: undefined,
+        progressItems: undefined,
+        progressCounts: undefined,
+        error: item.error ?? INTERRUPTED_AI_CHAT_MESSAGE,
+      };
+    }
+
+    if (
+      item.kind === "message" &&
+      (item.role === "assistant" || item.role === "thinking") &&
+      item.isStreaming
+    ) {
+      didInterrupt = true;
+      return item.role === "thinking"
+        ? {
+            ...item,
+            isStreaming: false,
+            durationMs:
+              item.durationMs ?? calculateDurationMs(item.createdAt, nowIso),
+          }
+        : {
+            ...item,
+            isStreaming: false,
+          };
+    }
+
+    return item;
+  });
+
+  return {
+    timeline,
+    didInterrupt,
+  };
 };
 
 export const canUseLocalStorage = () => {
@@ -411,7 +469,11 @@ export const restorePersistedAiChatDocumentState = (
       const timelineRaw = Array.isArray(session.timeline)
         ? session.timeline
         : [];
-      const timeline = normalizeTimelineForPersist(timelineRaw);
+      const normalizedTimeline = normalizeTimelineForPersist(timelineRaw);
+      const { timeline } = settleInterruptedTimeline(
+        normalizedTimeline,
+        updatedAt,
+      );
 
       const searchResultsList = Array.isArray(session.searchResults)
         ? session.searchResults.slice(
