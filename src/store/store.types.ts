@@ -52,7 +52,7 @@ export interface EditorActions {
     direction: "UP" | "DOWN" | "LEFT" | "RIGHT",
     isFast?: boolean,
   ) => void;
-  addAnnotation: (annotation: Annotation) => void;
+  addAnnotation: (annotation: Annotation, opts?: { select?: boolean }) => void;
   addAnnotations: (
     annotations: Annotation[],
     opts?: { select?: boolean },

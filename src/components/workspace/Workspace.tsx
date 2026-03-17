@@ -75,7 +75,10 @@ preloadControls();
 interface WorkspaceProps {
   editorState: WorkspaceEditorState;
   onAddField: (field: FormField) => void;
-  onAddAnnotation: (annotation: Annotation) => void;
+  onAddAnnotation: (
+    annotation: Annotation,
+    opts?: { select?: boolean },
+  ) => void;
   onSelectControl: (id: string | null) => void;
   onUpdateField: (id: string, updates: Partial<FormField>) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
@@ -200,25 +203,55 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
   const currentPathRef = useRef<{ x: number; y: number }[]>([]);
-  const [currentPathState, setCurrentPathState] = useState<
-    { x: number; y: number }[]
-  >([]); // For forcing re-render of current line
+  const liveInkPathRef = useRef<SVGPathElement | null>(null);
+  const liveInkPathRafRef = useRef<number | null>(null);
+
+  const cancelLiveInkPathSync = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (liveInkPathRafRef.current === null) return;
+    window.cancelAnimationFrame(liveInkPathRafRef.current);
+    liveInkPathRafRef.current = null;
+  }, []);
+
+  const syncLiveInkPath = useCallback(() => {
+    liveInkPathRafRef.current = null;
+    const pathElement = liveInkPathRef.current;
+    if (!pathElement) return;
+    pathElement.setAttribute("d", pointsToPathLib(currentPathRef.current));
+  }, []);
+
+  const scheduleLiveInkPathSync = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (liveInkPathRafRef.current !== null) return;
+    liveInkPathRafRef.current = window.requestAnimationFrame(syncLiveInkPath);
+  }, [syncLiveInkPath]);
 
   const cancelInProgressInkStroke = useCallback(() => {
     setIsDrawing(false);
     currentPathRef.current = [];
-    setCurrentPathState([]);
-  }, []);
+    cancelLiveInkPathSync();
+    liveInkPathRef.current?.setAttribute("d", "");
+  }, [cancelLiveInkPathSync]);
 
   const { appendStroke, shouldAppendPoint } = useInkSession({
     editorState,
     editorStateRef,
     onAddAnnotation,
     onUpdateAnnotation,
-    onSelectControl,
     onCancelInProgressStroke: cancelInProgressInkStroke,
     onTriggerHistorySave,
   });
+
+  useEffect(() => {
+    return () => {
+      cancelLiveInkPathSync();
+    };
+  }, [cancelLiveInkPathSync]);
+
+  useEffect(() => {
+    if (!isDrawing) return;
+    scheduleLiveInkPathSync();
+  }, [activePageIndex, isDrawing, scheduleLiveInkPathSync]);
 
   const {
     createTextHighlightFromSelection,
@@ -1316,7 +1349,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const coords = getRelativeCoords(e, pageIndex);
       setIsDrawing(true);
       currentPathRef.current = [coords];
-      setCurrentPathState([coords]);
       return;
     }
 
@@ -1396,8 +1428,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
 
       currentPathRef.current.push(coords);
-      // Optimization: Throttle state updates? For now, raw update
-      setCurrentPathState([...currentPathRef.current]);
+      scheduleLiveInkPathSync();
       return;
     }
 
@@ -1471,11 +1502,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
 
       setIsDrawing(false);
+      cancelLiveInkPathSync();
       if (currentPathRef.current.length > 1) {
         appendStroke(activePageIndex, currentPathRef.current);
       }
       currentPathRef.current = [];
-      setCurrentPathState([]);
+      liveInkPathRef.current?.setAttribute("d", "");
     }
 
     if (shouldCreateTextHighlight) {
@@ -1822,11 +1854,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   // --- Render Helpers ---
 
-  // Convert points array to SVG path
-  const pointsToPath = (points: { x: number; y: number }[]) => {
-    return pointsToPathLib(points);
-  };
-
   const renderPage = (page: (typeof pagesWithControls)[number]) => (
     <div
       id={`page-${page.pageIndex}`}
@@ -2046,7 +2073,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
       >
         {isDrawing && activePageIndex === page.pageIndex && (
           <path
-            d={pointsToPath(currentPathState)}
+            ref={liveInkPathRef}
+            d={pointsToPathLib(currentPathRef.current)}
             stroke={
               editorState.tool === "draw_highlight"
                 ? editorState.highlightStyle?.color ||

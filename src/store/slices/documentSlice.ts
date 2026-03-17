@@ -3,6 +3,7 @@ import {
   revokeLegacyPageThumbnailObjectUrls,
   revokeThumbnailObjectUrls,
 } from "@/store/helpers";
+import { prepareAnnotationsForStore } from "@/lib/inkGeometry";
 import { cancelThumbnailWarmup } from "@/store/slices/runtimeSlice";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 
@@ -17,6 +18,7 @@ export const createDocumentSlice: EditorStoreSlice<
     revokeLegacyPageThumbnailObjectUrls(get().pages);
     set({
       ...data,
+      annotations: prepareAnnotationsForStore(data.annotations),
       thumbnailImages: {},
       past: [],
       future: [],

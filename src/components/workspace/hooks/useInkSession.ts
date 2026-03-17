@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, type RefObject } from "react";
+import { prepareInkAnnotationForStore } from "@/lib/inkGeometry";
 import { Annotation, EditorState, Tool, WorkspaceEditorState } from "@/types";
 
 type Point = { x: number; y: number };
@@ -6,9 +7,11 @@ type Point = { x: number; y: number };
 interface UseInkSessionParams {
   editorState: Pick<EditorState, "tool" | "penStyle" | "highlightStyle">;
   editorStateRef: RefObject<WorkspaceEditorState>;
-  onAddAnnotation: (annotation: Annotation) => void;
+  onAddAnnotation: (
+    annotation: Annotation,
+    opts?: { select?: boolean },
+  ) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
-  onSelectControl: (id: string | null) => void;
   onCancelInProgressStroke: () => void;
   onTriggerHistorySave: () => void;
   pointSpacingPx?: number;
@@ -19,7 +22,6 @@ export const useInkSession = ({
   editorStateRef,
   onAddAnnotation,
   onUpdateAnnotation,
-  onSelectControl,
   onCancelInProgressStroke,
   onTriggerHistorySave,
   pointSpacingPx = 4,
@@ -29,6 +31,15 @@ export const useInkSession = ({
   const inkSessionStrokesRef = useRef<Point[][]>([]);
   const inkSessionToolRef = useRef<Tool | null>(null);
   const prevToolRef = useRef<Tool>(editorState.tool);
+
+  const commitEditorStateRef = useCallback(
+    (updater: (state: WorkspaceEditorState) => WorkspaceEditorState) => {
+      const state = editorStateRef.current;
+      if (!state) return;
+      editorStateRef.current = updater(state);
+    },
+    [editorStateRef],
+  );
 
   const resetSession = useCallback(() => {
     inkSessionIdRef.current = null;
@@ -124,6 +135,22 @@ export const useInkSession = ({
           onTriggerHistorySave();
 
           inkSessionStrokesRef.current = [...existingStrokes, stroke];
+          const nextAnnotation = prepareInkAnnotationForStore(
+            {
+              ...currentAnnot,
+              strokes: inkSessionStrokesRef.current,
+            },
+            {
+              recomputeRect: true,
+              recomputeSvgPath: true,
+            },
+          );
+          commitEditorStateRef((currentState) => ({
+            ...currentState,
+            annotations: currentState.annotations.map((annotation) =>
+              annotation.id === sessionId ? nextAnnotation : annotation,
+            ),
+          }));
           onUpdateAnnotation(sessionId, {
             strokes: inkSessionStrokesRef.current,
           });
@@ -132,32 +159,41 @@ export const useInkSession = ({
       }
 
       const id = `ink_${Date.now()}`;
-      const prevSelectedId = state.selectedId;
 
       inkSessionIdRef.current = id;
       inkSessionPageIndexRef.current = pageIndex;
       inkSessionStrokesRef.current = [stroke];
       inkSessionToolRef.current = activeTool;
 
-      onAddAnnotation({
-        id,
-        pageIndex,
-        type: "ink",
-        strokes: [stroke],
-        color: style.color,
-        thickness: style.thickness,
-        opacity: style.opacity,
-        intent: isHighlight ? "InkHighlight" : undefined,
-      });
+      const nextAnnotation = prepareInkAnnotationForStore(
+        {
+          id,
+          pageIndex,
+          type: "ink",
+          strokes: [stroke],
+          color: style.color,
+          thickness: style.thickness,
+          opacity: style.opacity,
+          intent: isHighlight ? "InkHighlight" : undefined,
+        },
+        {
+          recomputeRect: true,
+          recomputeSvgPath: true,
+        },
+      );
 
-      onSelectControl(prevSelectedId);
+      commitEditorStateRef((currentState) => ({
+        ...currentState,
+        annotations: [...currentState.annotations, nextAnnotation],
+      }));
+      onAddAnnotation(nextAnnotation, { select: false });
     },
     [
+      commitEditorStateRef,
       editorState.highlightStyle,
       editorState.penStyle,
       editorStateRef,
       onAddAnnotation,
-      onSelectControl,
       onTriggerHistorySave,
       onUpdateAnnotation,
       resetSession,

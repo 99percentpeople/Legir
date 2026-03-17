@@ -1,5 +1,9 @@
 import { ANNOTATION_STYLES } from "@/constants";
 import { shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
+import {
+  prepareAnnotationsForStore,
+  prepareInkAnnotationForStore,
+} from "@/lib/inkGeometry";
 import type { Annotation, FormField } from "@/types";
 import { FieldType } from "@/types";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
@@ -40,22 +44,23 @@ export const createControlSlice: EditorStoreSlice<
     });
   },
 
-  addAnnotation: (annotation) => {
+  addAnnotation: (annotation, opts) => {
     const { saveCheckpoint } = get();
     saveCheckpoint();
     const now = new Date().toISOString();
     set((state) => {
       const author = annotation.author || state.options.userName;
-      const annotationWithDetails = {
+      const annotationWithDetails = prepareInkAnnotationForStore({
         ...annotation,
         updatedAt: now,
         author,
-      } satisfies Annotation;
+      } satisfies Annotation);
       const shouldSwitch = shouldSwitchToSelectAfterUse(state.tool);
       const isForcedContinuous = state.keys.ctrl || state.keys.meta;
+      const shouldSelect = opts?.select !== false;
       return {
         annotations: [...state.annotations, annotationWithDetails],
-        selectedId: annotationWithDetails.id,
+        selectedId: shouldSelect ? annotationWithDetails.id : state.selectedId,
         tool: shouldSwitch && !isForcedContinuous ? "select" : state.tool,
         isDirty: true,
       };
@@ -69,13 +74,15 @@ export const createControlSlice: EditorStoreSlice<
     const now = new Date().toISOString();
     set((state) => {
       const authorFallback = state.options.userName;
-      const batch = annotations.map(
-        (annotation) =>
-          ({
-            ...annotation,
-            updatedAt: now,
-            author: annotation.author || authorFallback,
-          }) satisfies Annotation,
+      const batch = prepareAnnotationsForStore(
+        annotations.map(
+          (annotation) =>
+            ({
+              ...annotation,
+              updatedAt: now,
+              author: annotation.author || authorFallback,
+            }) satisfies Annotation,
+        ),
       );
 
       const shouldSelect = opts?.select !== false;
@@ -170,11 +177,28 @@ export const createControlSlice: EditorStoreSlice<
         ...(shouldMarkEdited ? { isEdited: true } : null),
         ...(shouldResetFontOnFirstEdit ? { fontFamily: "Helvetica" } : null),
       };
+      const shouldRecomputeInkRect =
+        current?.type === "ink" &&
+        (updates.thickness !== undefined ||
+          updates.strokes !== undefined ||
+          updates.points !== undefined ||
+          current.rect === undefined);
+      const shouldRecomputeInkPath =
+        current?.type === "ink" &&
+        (updates.strokes !== undefined ||
+          updates.points !== undefined ||
+          !current.svgPath);
 
       return {
         annotations: state.annotations.map((annotation) =>
           annotation.id === id
-            ? { ...annotation, ...updatesWithTime }
+            ? prepareInkAnnotationForStore(
+                { ...annotation, ...updatesWithTime },
+                {
+                  recomputeRect: shouldRecomputeInkRect,
+                  recomputeSvgPath: shouldRecomputeInkPath,
+                },
+              )
             : annotation,
         ),
         isDirty: true,

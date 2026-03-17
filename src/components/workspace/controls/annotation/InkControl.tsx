@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button";
 import { FloatingToolbar } from "../FloatingToolbar";
 import { ColorPickerPopover } from "@/components/toolbar/ColorPickerPopover";
 import { ControlWrapper } from "../ControlWrapper";
+import {
+  getInkBoundingRect,
+  getInkStrokes,
+  getInkSvgPath,
+} from "@/lib/inkGeometry";
 import { getContrastColor } from "@/utils/colors";
 
 export const InkControl: React.FC<AnnotationControlProps> = (props) => {
@@ -24,71 +29,25 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
 
   const strokes = useMemo(() => {
-    if (data.strokes && data.strokes.length > 0) return data.strokes;
-    if (data.points && data.points.length > 0) return [data.points];
-    return [];
+    return getInkStrokes(data);
   }, [data.points, data.strokes]);
 
-  // Calculate bounding box
   const bounds = useMemo(() => {
-    if (strokes.length === 0) return null;
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-
-    strokes.forEach((stroke) => {
-      stroke.forEach((p) => {
-        if (p.x < minX) minX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y > maxY) maxY = p.y;
-      });
-    });
-
-    // Add some padding
-    const padding = (data.thickness || 1) / 2;
+    const rect = data.rect || getInkBoundingRect(strokes, data.thickness);
+    if (!rect) return null;
     return {
-      x: minX - padding,
-      y: minY - padding,
-      width: maxX - minX + padding * 2,
-      height: maxY - minY + padding * 2,
-      originX: minX - padding,
-      originY: minY - padding,
+      ...rect,
+      originX: rect.x,
+      originY: rect.y,
     };
-  }, [strokes, data.thickness]);
+  }, [strokes, data.rect, data.thickness]);
 
-  // Construct path data relative to bounding box
   const pathData = useMemo(() => {
-    // Optimization: If we have an AP stream (svgPath), we don't need to calculate the path from points
     if (data.svgPath) return data.svgPath;
-    if (strokes.length === 0 || !bounds) return "";
+    return getInkSvgPath(strokes) || "";
+  }, [strokes, data.svgPath]);
 
-    const strokeToPath = (points: { x: number; y: number }[]) => {
-      if (points.length < 2) return "";
-      let d = `M ${points[0].x} ${points[0].y}`;
-
-      // Use quadratic curves for smooth ink
-      for (let i = 1; i < points.length - 1; i++) {
-        const p = points[i];
-        const nextP = points[i + 1];
-        const midX = (p.x + nextP.x) / 2;
-        const midY = (p.y + nextP.y) / 2;
-        d += ` Q ${p.x} ${p.y}, ${midX} ${midY}`;
-      }
-
-      const lastP = points[points.length - 1];
-      d += ` L ${lastP.x} ${lastP.y}`;
-      return d;
-    };
-
-    return strokes
-      .map((s) => strokeToPath(s))
-      .filter(Boolean)
-      .join(" ");
-  }, [strokes, bounds, data.svgPath]);
-
-  if (!bounds || strokes.length === 0) return null;
+  if (!bounds || !pathData) return null;
 
   const isInkHighlight = data.intent === "InkHighlight";
 
