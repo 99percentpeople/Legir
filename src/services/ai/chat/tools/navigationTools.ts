@@ -7,10 +7,23 @@ import {
   navigatePageArgsSchema,
 } from "./shared";
 
+const NAVIGATE_PAGE_TOOL_PROMPTS = [
+  "Use navigate_page only when the user explicitly asks you to go to a page now. If you are only referencing a page in the answer, prefer a clickable page link instead.",
+];
+
+const FOCUS_CONTROL_TOOL_PROMPTS = [
+  "Use focus_control only when the user explicitly asks you to open, focus, or select a specific field or annotation now. If the user mainly needs guidance, answer with a natural clickable control link instead.",
+];
+
+const FOCUS_RESULT_TOOL_PROMPTS = [
+  "Use focus_result only when the user explicitly asks you to jump to a search hit now. Otherwise prefer a clickable result link so the user can choose when to open it.",
+];
+
 export const navigationToolModule = defineToolModule((_ctx) => ({
   navigate_page: createToolBuilder("navigate_page")
     .write()
     .description("Scroll the workspace to the top of a specific page.")
+    .promptInstructions(NAVIGATE_PAGE_TOOL_PROMPTS)
     .inputSchema(navigatePageArgsSchema)
     .build(async ({ args, ctx: toolCtx }) => {
       const { page_number } = args;
@@ -29,6 +42,7 @@ export const navigationToolModule = defineToolModule((_ctx) => ({
     .description(
       "Focus an existing field or annotation by id and scroll it into view. Use control_id from list_fields or list_annotations. Optionally set select true if the control should also become selected.",
     )
+    .promptInstructions(FOCUS_CONTROL_TOOL_PROMPTS)
     .inputSchema(focusControlArgsSchema)
     .build(async ({ args, ctx: toolCtx }) => {
       const control = args.control_id.trim()
@@ -61,6 +75,7 @@ export const navigationToolModule = defineToolModule((_ctx) => ({
     .description(
       "Scroll the workspace to a previously returned search result id.",
     )
+    .promptInstructions(FOCUS_RESULT_TOOL_PROMPTS)
     .inputSchema(focusResultArgsSchema)
     .build(async ({ args, ctx: toolCtx }) => {
       const resultId = args.result_id.trim();

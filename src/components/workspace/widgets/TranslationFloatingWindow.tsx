@@ -29,6 +29,7 @@ import { cn } from "@/utils/cn";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { TranslateOptionId } from "@/types";
 import { Spinner } from "@/components/ui/spinner";
+import { StreamingCursor } from "@/components/ui/streaming-cursor";
 import { useShallow } from "zustand/react/shallow";
 import { selectTranslationFloatingWindowState } from "@/store/selectors";
 
@@ -87,11 +88,7 @@ function ResultOutputBox({
       )}
     >
       {output}
-      {isLoading && (
-        <span className="text-muted-foreground animation-duration-[.5s] inline-block animate-pulse">
-          ⬤
-        </span>
-      )}
+      {isLoading && <StreamingCursor />}
       {error && <span className="text-destructive text-xs">{error}</span>}
     </div>
   );

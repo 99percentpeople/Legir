@@ -70,6 +70,7 @@ import { appEventBus } from "@/lib/eventBus";
 import { cn } from "@/utils/cn";
 import { StreamMarkdown } from "@/components/markdown/StreamMarkdown";
 import { useStickyBottomScroll } from "./useStickyBottomScroll";
+import { StreamingCursor } from "@/components/ui/streaming-cursor";
 
 export interface AiChatPanelProps {
   isFloating: boolean;
@@ -383,16 +384,13 @@ const ThinkingMessageBubble = ({
   );
 };
 
-const PendingAssistantBubble = ({ label }: { label: string }) => {
-  return (
-    <div className="flex justify-start">
-      <div className="bg-muted text-foreground inline-flex max-w-[88%] items-center gap-2 rounded-lg px-3 py-2 text-sm">
-        <Spinner size="sm" />
-        <span>{label}</span>
-      </div>
+const PendingAssistantBubble = () => (
+  <div className="flex justify-start">
+    <div className="inline-flex max-w-[88%] items-center px-3 py-2 text-sm">
+      <StreamingCursor />
     </div>
-  );
-};
+  </div>
+);
 
 const MessageActionBar = ({
   align,
@@ -1790,8 +1788,10 @@ export function AiChatPanel({
                     ) : (
                       <div
                         className={cn(
-                          "flex max-w-[90%] min-w-0 flex-col gap-2",
-                          isUser ? "items-end" : "w-full items-start",
+                          "flex min-w-0 flex-col gap-2",
+                          isUser
+                            ? "max-w-[90%] items-end"
+                            : "w-full items-start",
                         )}
                       >
                         {isUser &&
@@ -1895,24 +1895,33 @@ export function AiChatPanel({
                                   "max-w-full min-w-0 rounded-lg px-3 py-2 text-sm",
                                   isUser
                                     ? "bg-primary text-primary-foreground whitespace-pre-wrap"
-                                    : "bg-muted text-foreground w-full",
+                                    : "text-foreground w-full",
                                 )}
                               >
                                 {hasVisibleText ? (
                                   isUser ? (
-                                    item.text
+                                    <p className="whitespace-pre-wrap">
+                                      {item.text}
+                                    </p>
                                   ) : (
                                     <StreamMarkdown
                                       source={item.text}
                                       streaming={item.isStreaming}
+                                      trailing={
+                                        item.isStreaming ? (
+                                          <StreamingCursor />
+                                        ) : undefined
+                                      }
                                       className="w-full"
                                       onOpenDocumentLink={onOpenDocumentLink}
                                     />
                                   )
                                 ) : null}
-                                {!isUser && item.isStreaming ? (
+                                {!isUser &&
+                                item.isStreaming &&
+                                !hasVisibleText ? (
                                   <div className="mt-1.5 flex items-center">
-                                    <Spinner size="sm" />
+                                    <StreamingCursor />
                                   </div>
                                 ) : null}
                               </div>
@@ -1965,9 +1974,7 @@ export function AiChatPanel({
 
               return <ToolTimelineCall key={item.id} item={item} t={t} />;
             })}
-            {isAwaitingFirstResponse ? (
-              <PendingAssistantBubble label={t("ai_chat.responding")} />
-            ) : null}
+            {isAwaitingFirstResponse ? <PendingAssistantBubble /> : null}
           </div>
         ) : null}
 

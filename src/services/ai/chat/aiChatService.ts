@@ -23,10 +23,14 @@ const createFinalAnswerPrompt = (messages: AiChatMessageRecord[]) =>
   [
     buildAiChatTurnPrompt({ messages }),
     "",
-    "Provide the final answer to the user now.",
+    "Provide the final user-facing answer now.",
     "Do not call any tools.",
     "Reply in the same language as the user's most recent message.",
-    "Use plain natural language.",
+    "Lead with the answer or next useful action.",
+    "Use light markdown when it improves readability.",
+    'If you include an internal document link, use a correct clickable format such as [text](/document/page/3) or <a href="/document/page/3">text</a>, never a bare /document/... path.',
+    "If exact page numbers, control_ids, or result_ids already exist in the conversation, keep any helpful document links in the answer.",
+    "Offer one concrete follow-up suggestion or question only when it adds value.",
   ].join("\n");
 
 const buildChatProviderOptions = (options: {

@@ -38,18 +38,21 @@ const SEARCH_DOCUMENT_TOOL_PROMPTS = [
   "When plain search may fail because of whitespace, punctuation, line breaks, or OCR noise, retry regex such as word1\\s*word2.",
   "search_document result_ids only refer to the exact matchText of each hit. snippet is surrounding context only.",
   "If you need multiple independent search_document calls for different keywords or ranges, issue them in the same step so they can run in parallel.",
+  "When presenting search hits to the user, prefer natural clickable result links so the user can click into the exact match.",
 ];
 
 const LIST_ANNOTATIONS_TOOL_PROMPTS = [
   "If the user asks about comments, notes, highlights, links, or annotations, call list_annotations.",
   "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
   "When list_annotations returns link annotations, inspect linkUrl and linkDestPageNumber to understand the hyperlink target.",
+  "When pointing the user to a known annotation, prefer a natural clickable control link instead of plain id text.",
 ];
 
 const LIST_FIELDS_TOOL_PROMPTS = [
   "If the user asks to fill or update form fields and ids, options, or field mapping are unclear, call list_fields first.",
   "If the user asks where a field is, wants to inspect field geometry, or needs a visually targetable field list, call list_fields with include_layout: true.",
   "If form-filling instructions may be encoded in comments, highlights, or notes, call list_annotations together with list_fields before filling.",
+  "When answering where a field is, pair the field id with a natural clickable control link and, if layout is available, add a short page-area description.",
 ];
 
 export const documentToolModule = defineToolModule((ctx) => {

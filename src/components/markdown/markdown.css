@@ -40,7 +40,7 @@
       @apply my-3 list-decimal pl-5;
     }
 
-    p {
+    p:not(:first-child):not(:last-child) {
       @apply my-3;
     }
 
