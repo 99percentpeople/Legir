@@ -178,6 +178,43 @@ const setLayerDimensions = (div: HTMLElement, viewport: ViewportLike) => {
   div.setAttribute("data-main-rotation", String(viewport.rotation ?? 0));
 };
 
+const setTextDivStyles = (options: {
+  textDiv: HTMLSpanElement;
+  leftPct: string;
+  topPct: string;
+  fontHeightPx: string;
+  fontFamily: string;
+  scaleX?: number | null;
+  rotateDeg?: number | null;
+}) => {
+  const {
+    textDiv,
+    leftPct,
+    topPct,
+    fontHeightPx,
+    fontFamily,
+    scaleX,
+    rotateDeg,
+  } = options;
+  const styleParts = [
+    `left:${leftPct}`,
+    `top:${topPct}`,
+    `--font-height:${fontHeightPx}`,
+  ];
+  if (typeof scaleX === "number" && Number.isFinite(scaleX) && scaleX > 0) {
+    styleParts.push(`--scale-x:${scaleX}`);
+  }
+  if (
+    typeof rotateDeg === "number" &&
+    Number.isFinite(rotateDeg) &&
+    rotateDeg !== 0
+  ) {
+    styleParts.push(`--rotate:${rotateDeg}deg`);
+  }
+  textDiv.style.cssText = styleParts.join(";");
+  textDiv.style.fontFamily = fontFamily;
+};
+
 export const buildTextLayer = (
   container: HTMLDivElement,
   textContent: TextContent,
@@ -250,11 +287,6 @@ export const buildTextLayer = (
     }
 
     const textDiv = document.createElement("span");
-    const divStyle = textDiv.style;
-    divStyle.left = `${((100 * left) / pageWidth).toFixed(2)}%`;
-    divStyle.top = `${((100 * top) / pageHeight).toFixed(2)}%`;
-    divStyle.setProperty("--font-height", `${fontHeight.toFixed(2)}px`);
-    divStyle.fontFamily = fontFamily;
     textDiv.setAttribute("role", "presentation");
     textDiv.textContent = item.str;
     textDiv.dir = item.dir || "ltr";
@@ -289,6 +321,7 @@ export const buildTextLayer = (
       canvasWidth !== 0 &&
       hasText &&
       (!isDenseTextPage || style.vertical || angle !== 0);
+    let scaleX: number | null = null;
 
     if (shouldMeasureTextWidth) {
       const normalizedWidth = getNormalizedTextWidth({
@@ -300,16 +333,20 @@ export const buildTextLayer = (
         lang: textContent.lang,
       });
       if (normalizedWidth && fontHeight > 0) {
-        divStyle.setProperty(
-          "--scale-x",
-          String(canvasWidth / (normalizedWidth * fontHeight)),
-        );
+        scaleX = canvasWidth / (normalizedWidth * fontHeight);
       }
     }
 
-    if (angle !== 0) {
-      divStyle.setProperty("--rotate", `${(angle * 180) / Math.PI}deg`);
-    }
+    const rotateDeg = angle !== 0 ? (angle * 180) / Math.PI : null;
+    setTextDivStyles({
+      textDiv,
+      leftPct: `${((100 * left) / pageWidth).toFixed(2)}%`,
+      topPct: `${((100 * top) / pageHeight).toFixed(2)}%`,
+      fontHeightPx: `${fontHeight.toFixed(2)}px`,
+      fontFamily,
+      scaleX,
+      rotateDeg,
+    });
 
     if (hasText) {
       currentContainer.append(textDiv);
