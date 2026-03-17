@@ -9,8 +9,15 @@ import type { ViewportLike } from "@/services/pdfService/types";
 
 const MAX_TEXT_DIVS_TO_RENDER = 100000;
 const DEFAULT_FONT_SIZE = 30;
+// Paper-like PDFs often have thousands of text items on a normal-sized page.
+// Above this threshold, per-item measureText becomes a visible main-thread cost.
+const DENSE_TEXT_LAYER_ITEM_THRESHOLD = 1500;
 
 const ascentCache = new Map<string, number>();
+const normalizedTextWidthCache = new WeakMap<
+  TextContent,
+  Array<number | null>
+>();
 
 let minFontSize: number | null = null;
 let textLayerCtx: CanvasRenderingContext2D | null = null;
@@ -62,6 +69,48 @@ const getFontSubstitution = (style: TextStyle) => {
   if (typeof maybe.fontSubstitution !== "string") return undefined;
   const trimmed = maybe.fontSubstitution.trim();
   return trimmed ? trimmed : undefined;
+};
+
+const getNormalizedTextWidthCache = (textContent: TextContent) => {
+  let cache = normalizedTextWidthCache.get(textContent);
+  if (cache) return cache;
+  cache = [];
+  normalizedTextWidthCache.set(textContent, cache);
+  return cache;
+};
+
+const getNormalizedTextWidth = (options: {
+  textContent: TextContent;
+  itemIndex: number;
+  fontFamily: string;
+  fontSize: number;
+  text: string;
+  lang: string | null;
+}) => {
+  const { textContent, itemIndex, fontFamily, fontSize, text, lang } = options;
+  const cache = getNormalizedTextWidthCache(textContent);
+  const cached = cache[itemIndex];
+  if (typeof cached === "number") {
+    return cached > 0 ? cached : null;
+  }
+
+  const ctx = getTextLayerContext();
+  if (!ctx || !text || !(fontSize > 0)) {
+    cache[itemIndex] = 0;
+    return null;
+  }
+
+  if (lang) ctx.canvas.lang = lang;
+  ensureCtxFont(ctx, fontSize, fontFamily);
+  const measuredWidth = ctx.measureText(text).width;
+  if (!(measuredWidth > 0)) {
+    cache[itemIndex] = 0;
+    return null;
+  }
+
+  const normalizedWidth = measuredWidth / fontSize;
+  cache[itemIndex] = normalizedWidth;
+  return normalizedWidth;
 };
 
 const getAscent = (
@@ -147,12 +196,13 @@ export const buildTextLayer = (
   const layoutScale =
     viewport.scale *
     (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
-  const ctx = getTextLayerContext();
+  const isDenseTextPage =
+    textContent.items.length >= DENSE_TEXT_LAYER_ITEM_THRESHOLD;
 
   let currentContainer: HTMLElement = container;
   let textDivCount = 0;
 
-  for (const item of textContent.items) {
+  for (const [itemIndex, item] of textContent.items.entries()) {
     if (textDivCount > MAX_TEXT_DIVS_TO_RENDER) break;
 
     if (isMarkedContent(item)) {
@@ -233,13 +283,26 @@ export const buildTextLayer = (
         : item.width || 0
       : 0;
 
-    if (canvasWidth !== 0 && hasText && ctx) {
-      ensureCtxFont(ctx, fontHeight * layoutScale, fontFamily);
-      const measured = ctx.measureText(textDiv.textContent || "");
-      if (measured.width > 0) {
+    // For dense horizontal text pages, rely on the browser text box width instead of
+    // re-measuring every run. Rotated/vertical text keeps precise scaling.
+    const shouldMeasureTextWidth =
+      canvasWidth !== 0 &&
+      hasText &&
+      (!isDenseTextPage || style.vertical || angle !== 0);
+
+    if (shouldMeasureTextWidth) {
+      const normalizedWidth = getNormalizedTextWidth({
+        textContent,
+        itemIndex,
+        fontFamily,
+        fontSize: fontHeight * layoutScale,
+        text: textDiv.textContent || "",
+        lang: textContent.lang,
+      });
+      if (normalizedWidth && fontHeight > 0) {
         divStyle.setProperty(
           "--scale-x",
-          String((canvasWidth * layoutScale) / measured.width),
+          String(canvasWidth / (normalizedWidth * fontHeight)),
         );
       }
     }

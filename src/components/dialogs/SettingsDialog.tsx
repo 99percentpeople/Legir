@@ -331,42 +331,42 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
           <TabsList className="text-foreground h-min flex-col gap-1 rounded-none bg-transparent py-1">
             <TabsTrigger
               value="general"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               <Globe className="h-4 w-4" />
               {t("settings.tabs.general")}
             </TabsTrigger>
             <TabsTrigger
               value="export"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               <FileText className="h-4 w-4" />
               {t("settings.tabs.export")}
             </TabsTrigger>
             <TabsTrigger
               value="snapping"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               <Magnet className="h-4 w-4" />
               {t("settings.tabs.snapping")}
             </TabsTrigger>
             <TabsTrigger
               value="llm"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               <BrainCircuit className="h-4 w-4" />
               {t("settings.tabs.llm")}
             </TabsTrigger>
             <TabsTrigger
               value="ai_chat"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               <MessageSquare className="h-4 w-4" />
               {t("settings.tabs.ai_chat")}
             </TabsTrigger>
             <TabsTrigger
               value="debug"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start text-base after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               <Bug className="h-4 w-4" />
               {t("settings.tabs.debug")}
@@ -1088,36 +1088,47 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                               PDF Page Zoom Render Timing Metrics
                             </div>
                             <div>
-                              <span className="font-mono">page waiting</span>
-                              : no active measurement yet.
+                              <span className="font-mono">page waiting</span>:
+                              no active measurement yet.
                             </div>
                             <div>
-                              <span className="font-mono">page current waiting / partial / ready</span>
-                              : current visible page state without a new render session.
+                              <span className="font-mono">
+                                page current waiting / partial / ready
+                              </span>
+                              : current visible page state without a new render
+                              session.
                             </div>
                             <div>
-                              <span className="font-mono">page first rendering / partial / ready</span>
-                              : initial render state when the page first enters view.
+                              <span className="font-mono">
+                                page first rendering / partial / ready
+                              </span>
+                              : initial render state when the page first enters
+                              view.
                             </div>
                             <div>
-                              <span className="font-mono">page zoom rendering / partial / ready</span>
+                              <span className="font-mono">
+                                page zoom rendering / partial / ready
+                              </span>
                               : rerender state after a zoom scale change.
                             </div>
                             <div>
-                              <span className="font-mono">zoom</span>
-                              : the target scale of the current or last measured render.
+                              <span className="font-mono">zoom</span>: the
+                              target scale of the current or last measured
+                              render.
                             </div>
                             <div>
-                              <span className="font-mono">canvas</span>
-                              : time from session start until the PDF bitmap layer is ready.
+                              <span className="font-mono">canvas</span>: time
+                              from session start until the PDF bitmap layer is
+                              ready.
                             </div>
                             <div>
-                              <span className="font-mono">text</span>
-                              : time from session start until the text layer is ready.
+                              <span className="font-mono">text</span>: time from
+                              session start until the text layer is ready.
                             </div>
                             <div>
-                              <span className="font-mono">total</span>
-                              : time from session start until both canvas and text are ready.
+                              <span className="font-mono">total</span>: time
+                              from session start until both canvas and text are
+                              ready.
                             </div>
                           </TooltipContent>
                         </Tooltip>
@@ -1165,44 +1176,52 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                               Workspace Zoom Jank Metrics
                             </div>
                             <div>
-                              <span className="font-mono">workspace zooming / workspace last</span>
-                              : current zoom session in progress / latest completed zoom session.
+                              <span className="font-mono">
+                                workspace zooming / workspace last
+                              </span>
+                              : current zoom session in progress / latest
+                              completed zoom session.
                             </div>
                             <div>
-                              <span className="font-mono">scale</span>
-                              : start and end scale of the continuous zoom session.
+                              <span className="font-mono">scale</span>: start
+                              and end scale of the continuous zoom session.
                             </div>
                             <div>
-                              <span className="font-mono">duration</span>
-                              : total wall-clock length of the zoom session, not pure lag time.
+                              <span className="font-mono">duration</span>: total
+                              wall-clock length of the zoom session, not pure
+                              lag time.
                             </div>
                             <div>
-                              <span className="font-mono">response</span>
-                              : delay from the first zoom input to the first committed scale update.
+                              <span className="font-mono">response</span>: delay
+                              from the first zoom input to the first committed
+                              scale update.
                             </div>
                             <div>
-                              <span className="font-mono">stall</span>
-                              : total time above a 60fps frame budget during the zoom session.
+                              <span className="font-mono">stall</span>: total
+                              time above a 60fps frame budget during the zoom
+                              session.
                             </div>
                             <div>
-                              <span className="font-mono">avg</span>
-                              : average frame time during the zoom session. Lower is better.
+                              <span className="font-mono">avg</span>: average
+                              frame time during the zoom session. Lower is
+                              better.
                             </div>
                             <div>
-                              <span className="font-mono">worst</span>
-                              : slowest frame observed during the zoom session.
+                              <span className="font-mono">worst</span>: slowest
+                              frame observed during the zoom session.
                             </div>
                             <div>
-                              <span className="font-mono">jank</span>
-                              : number of frames taking 20ms or more.
+                              <span className="font-mono">jank</span>: number of
+                              frames taking 20ms or more.
                             </div>
                             <div>
-                              <span className="font-mono">dropped</span>
-                              : estimated dropped frames based on a 60fps frame budget.
+                              <span className="font-mono">dropped</span>:
+                              estimated dropped frames based on a 60fps frame
+                              budget.
                             </div>
                             <div>
-                              <span className="font-mono">steps</span>
-                              : number of zoom input steps received in the session.
+                              <span className="font-mono">steps</span>: number
+                              of zoom input steps received in the session.
                             </div>
                           </TooltipContent>
                         </Tooltip>
