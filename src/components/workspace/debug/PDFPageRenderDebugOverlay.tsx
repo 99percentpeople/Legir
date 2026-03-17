@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo } from "react";
+import React, { useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   connectPDFPageRenderDebug,
@@ -37,16 +37,17 @@ const PDFPageRenderDebugOverlay: React.FC<PDFPageRenderDebugOverlayProps> = ({
     });
   }, [debugJustEnabled, isInView, pageIndex, scale]);
 
-  const totalReadyMs = useMemo(() => {
+  const totalReadyMs = (() => {
     if (!renderTiming) return null;
-    const values = [renderTiming.canvasReadyMs, renderTiming.textReadyMs].filter(
-      (value): value is number => value !== null,
-    );
+    const values = [
+      renderTiming.canvasReadyMs,
+      renderTiming.textReadyMs,
+    ].filter((value): value is number => value !== null);
     if (values.length === 0) return null;
     return Math.max(...values);
-  }, [renderTiming]);
+  })();
 
-  const renderStatusLabel = useMemo(() => {
+  const renderStatusLabel = (() => {
     if (!renderTiming || renderTiming.kind === null) {
       if (!currentReadyState || currentReadyState.targetScale === null) {
         return "page waiting";
@@ -77,7 +78,7 @@ const PDFPageRenderDebugOverlay: React.FC<PDFPageRenderDebugOverlayProps> = ({
     if (isReady) return "page zoom ready";
     if (isPartial) return "page zoom partial";
     return "page zoom rendering";
-  }, [currentReadyState, renderTiming]);
+  })();
 
   const displayScale =
     renderTiming?.targetScale ?? currentReadyState?.targetScale ?? null;
