@@ -51,6 +51,7 @@ import { useLanguage, Language, LANGUAGES } from "../language-provider";
 import { useTheme } from "../theme-provider";
 import { Separator } from "../ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { useEditorStore } from "@/store/useEditorStore";
 import {
   checkLlmProviderConfig,
@@ -1055,6 +1056,168 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </div>
                   <p className="text-muted-foreground px-1 text-xs">
                     {t("settings.debug.pdf_text_layer_debug_desc")}
+                  </p>
+                </div>
+                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bug className="text-primary h-4 w-4" />
+                      <div className="flex items-center gap-1.5">
+                        <Label
+                          htmlFor="debug-pdf-zoom-render-timing"
+                          className="mb-0 font-semibold"
+                        >
+                          {t("settings.debug.pdf_zoom_render_timing")}
+                        </Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground inline-flex items-center transition-colors"
+                              aria-label="Show PDF page zoom render timing metrics"
+                            >
+                              <AlertCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            align="start"
+                            className="max-w-sm space-y-1 text-left"
+                          >
+                            <div className="font-medium">
+                              PDF Page Zoom Render Timing Metrics
+                            </div>
+                            <div>
+                              <span className="font-mono">page waiting</span>
+                              : no active measurement yet.
+                            </div>
+                            <div>
+                              <span className="font-mono">page current waiting / partial / ready</span>
+                              : current visible page state without a new render session.
+                            </div>
+                            <div>
+                              <span className="font-mono">page first rendering / partial / ready</span>
+                              : initial render state when the page first enters view.
+                            </div>
+                            <div>
+                              <span className="font-mono">page zoom rendering / partial / ready</span>
+                              : rerender state after a zoom scale change.
+                            </div>
+                            <div>
+                              <span className="font-mono">zoom</span>
+                              : the target scale of the current or last measured render.
+                            </div>
+                            <div>
+                              <span className="font-mono">canvas</span>
+                              : time from session start until the PDF bitmap layer is ready.
+                            </div>
+                            <div>
+                              <span className="font-mono">text</span>
+                              : time from session start until the text layer is ready.
+                            </div>
+                            <div>
+                              <span className="font-mono">total</span>
+                              : time from session start until both canvas and text are ready.
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+                    <Switch
+                      id="debug-pdf-zoom-render-timing"
+                      checked={options.debugOptions.pdfZoomRenderTiming}
+                      onCheckedChange={(c) =>
+                        updateDebugOption("pdfZoomRenderTiming", c)
+                      }
+                    />
+                  </div>
+                  <p className="text-muted-foreground px-1 text-xs">
+                    {t("settings.debug.pdf_zoom_render_timing_desc")}
+                  </p>
+                </div>
+                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bug className="text-primary h-4 w-4" />
+                      <div className="flex items-center gap-1.5">
+                        <Label
+                          htmlFor="debug-workspace-zoom-jank"
+                          className="mb-0 font-semibold"
+                        >
+                          {t("settings.debug.workspace_zoom_jank")}
+                        </Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground inline-flex items-center transition-colors"
+                              aria-label="Show workspace zoom jank metrics"
+                            >
+                              <AlertCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            align="start"
+                            className="max-w-sm space-y-1 text-left"
+                          >
+                            <div className="font-medium">
+                              Workspace Zoom Jank Metrics
+                            </div>
+                            <div>
+                              <span className="font-mono">workspace zooming / workspace last</span>
+                              : current zoom session in progress / latest completed zoom session.
+                            </div>
+                            <div>
+                              <span className="font-mono">scale</span>
+                              : start and end scale of the continuous zoom session.
+                            </div>
+                            <div>
+                              <span className="font-mono">duration</span>
+                              : total wall-clock length of the zoom session, not pure lag time.
+                            </div>
+                            <div>
+                              <span className="font-mono">response</span>
+                              : delay from the first zoom input to the first committed scale update.
+                            </div>
+                            <div>
+                              <span className="font-mono">stall</span>
+                              : total time above a 60fps frame budget during the zoom session.
+                            </div>
+                            <div>
+                              <span className="font-mono">avg</span>
+                              : average frame time during the zoom session. Lower is better.
+                            </div>
+                            <div>
+                              <span className="font-mono">worst</span>
+                              : slowest frame observed during the zoom session.
+                            </div>
+                            <div>
+                              <span className="font-mono">jank</span>
+                              : number of frames taking 20ms or more.
+                            </div>
+                            <div>
+                              <span className="font-mono">dropped</span>
+                              : estimated dropped frames based on a 60fps frame budget.
+                            </div>
+                            <div>
+                              <span className="font-mono">steps</span>
+                              : number of zoom input steps received in the session.
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+                    <Switch
+                      id="debug-workspace-zoom-jank"
+                      checked={options.debugOptions.workspaceZoomJank}
+                      onCheckedChange={(c) =>
+                        updateDebugOption("workspaceZoomJank", c)
+                      }
+                    />
+                  </div>
+                  <p className="text-muted-foreground px-1 text-xs">
+                    {t("settings.debug.workspace_zoom_jank_desc")}
                   </p>
                 </div>
               </div>

@@ -497,6 +497,11 @@ const zhTW = {
     debug: {
       pdf_text_layer_debug: "PDF 文本層調試",
       pdf_text_layer_debug_desc: "顯示 PDF.js 文本層",
+      pdf_zoom_render_timing: "PDF 縮放渲染耗時",
+      pdf_zoom_render_timing_desc: "顯示每頁在縮放後的 canvas/text 渲染耗時。",
+      workspace_zoom_jank: "Workspace 縮放卡頓",
+      workspace_zoom_jank_desc:
+        "顯示工作區整體縮放的幀統計，包括最慢幀和掉幀數。",
     },
     snapping: {
       enabled: "啟用對齊",

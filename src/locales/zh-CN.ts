@@ -525,6 +525,11 @@ const zhCN = {
     debug: {
       pdf_text_layer_debug: "PDF 文本层调试",
       pdf_text_layer_debug_desc: "显示 PDF.js 文本层",
+      pdf_zoom_render_timing: "PDF 缩放渲染耗时",
+      pdf_zoom_render_timing_desc: "显示每页在缩放后的 canvas/text 渲染耗时。",
+      workspace_zoom_jank: "Workspace 缩放卡顿",
+      workspace_zoom_jank_desc:
+        "显示工作区整体缩放的帧统计，包括最慢帧和掉帧数。",
     },
     borders: "对齐边框",
     centers: "对齐中心",

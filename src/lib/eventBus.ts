@@ -73,6 +73,12 @@ export type AppEventMap = {
   "workspace:scrollContainerReady": {
     element: HTMLElement;
   };
+  "workspace:zoomInput": {
+    at: number;
+    source: "wheel";
+    fromScale: number;
+    targetScale: number;
+  };
   "workspace:openTranslate": {
     sourceText?: string;
     autoTranslate?: boolean;

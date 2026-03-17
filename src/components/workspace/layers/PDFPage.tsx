@@ -1,7 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import type { PageData, PDFSearchResult } from "@/types";
+import { useEditorStore } from "@/store/useEditorStore";
 import PDFCanvasLayer from "./PDFCanvasLayer";
 import PDFTextLayer from "./PDFTextLayer";
+
+const PDFPageRenderDebugOverlay = React.lazy(
+  () => import("../debug/PDFPageRenderDebugOverlay"),
+);
 
 interface PDFPageProps {
   page: PageData;
@@ -28,11 +33,17 @@ const PDFPage: React.FC<PDFPageProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
+  const [debugOverlayHost, setDebugOverlayHost] = useState<HTMLElement | null>(
+    null,
+  );
+  const pdfZoomRenderTimingDebug = useEditorStore(
+    (s) => s.options.debugOptions.pdfZoomRenderTiming,
+  );
+  const wasDebugEnabledRef = useRef(pdfZoomRenderTimingDebug);
 
   const containerWidth = page.width;
   const containerHeight = page.height;
 
-  // Intersection Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -54,6 +65,17 @@ const PDFPage: React.FC<PDFPageProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    setDebugOverlayHost(containerRef.current?.parentElement ?? null);
+  }, []);
+
+  const debugJustEnabled =
+    pdfZoomRenderTimingDebug && !wasDebugEnabledRef.current;
+
+  useEffect(() => {
+    wasDebugEnabledRef.current = pdfZoomRenderTimingDebug;
+  }, [pdfZoomRenderTimingDebug]);
+
   return (
     <div
       ref={containerRef}
@@ -65,7 +87,6 @@ const PDFPage: React.FC<PDFPageProps> = ({
     >
       <PDFCanvasLayer page={page} scale={scale} isInView={isInView} />
 
-      {/* Text Layer */}
       <PDFTextLayer
         page={page}
         scale={scale}
@@ -78,6 +99,18 @@ const PDFPage: React.FC<PDFPageProps> = ({
         searchResults={searchResults}
         activeSearchResultId={activeSearchResultId}
       />
+
+      {pdfZoomRenderTimingDebug && (
+        <Suspense fallback={null}>
+          <PDFPageRenderDebugOverlay
+            pageIndex={page.pageIndex}
+            scale={scale}
+            isInView={isInView}
+            debugJustEnabled={debugJustEnabled}
+            overlayHost={debugOverlayHost}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

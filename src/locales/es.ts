@@ -514,6 +514,12 @@ const es = {
     debug: {
       pdf_text_layer_debug: "Depuración de capa de texto de PDF",
       pdf_text_layer_debug_desc: "Mostrar la capa de texto de PDF.js",
+      pdf_zoom_render_timing: "Tiempo de render al hacer zoom en PDF",
+      pdf_zoom_render_timing_desc:
+        "Muestra la latencia de render de canvas/texto por página tras cada cambio de zoom.",
+      workspace_zoom_jank: "Tirones de zoom del workspace",
+      workspace_zoom_jank_desc:
+        "Muestra estadísticas de cuadros del zoom global del workspace, incluido el peor cuadro y los cuadros perdidos.",
     },
     borders: "Ajustar a bordes",
     centers: "Ajustar a centros",

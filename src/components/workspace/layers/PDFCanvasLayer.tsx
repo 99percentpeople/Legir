@@ -20,6 +20,10 @@ import {
   getWorkspaceRenderDpr,
   isHeavyWorkspacePage,
 } from "../lib/renderPerformance";
+import {
+  reportPDFPageRenderLayerReady,
+  reportPDFPageRenderLayerState,
+} from "../debug/pdfPageRenderTelemetry";
 import PDFTileLayer from "./PDFTileLayer";
 
 interface PDFCanvasLayerProps {
@@ -376,6 +380,12 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
           setActiveCanvas(targetId);
           setIsRendered(true);
           renderedScaleRef.current = renderScale;
+          reportPDFPageRenderLayerReady({
+            pageIndex,
+            layer: "canvas",
+            scale: renderScale,
+            completedAt: performance.now(),
+          });
           const targetCanvas =
             targetId === "A" ? canvasARef.current : canvasBRef.current;
           if (targetCanvas) {
@@ -401,6 +411,62 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     renderScale,
     tileState.tileMode,
     updateImageData,
+  ]);
+
+  useEffect(() => {
+    if (!isInView) {
+      return;
+    }
+
+    if (tileState.tileMode) {
+      if (!tileState.hasAllTilesRendered) return;
+      reportPDFPageRenderLayerReady({
+        pageIndex,
+        layer: "canvas",
+        scale: renderScale,
+        completedAt: performance.now(),
+      });
+      return;
+    }
+
+    if (!isRendered || renderedScaleRef.current !== renderScale) return;
+    reportPDFPageRenderLayerReady({
+      pageIndex,
+      layer: "canvas",
+      scale: renderScale,
+      completedAt: performance.now(),
+    });
+  }, [
+    isInView,
+    isRendered,
+    pageIndex,
+    renderScale,
+    tileState.hasAllTilesRendered,
+    tileState.tileMode,
+  ]);
+
+  useEffect(() => {
+    if (!isInView) {
+      return;
+    }
+
+    const ready = tileState.tileMode
+      ? tileState.hasAllTilesRendered
+      : isRendered && renderedScaleRef.current === renderScale;
+
+    reportPDFPageRenderLayerState({
+      pageIndex,
+      layer: "canvas",
+      ready,
+      scale: renderScale,
+    });
+  }, [
+    isInView,
+    isRendered,
+    pageIndex,
+    renderScale,
+    tileState.hasAllTilesRendered,
+    tileState.tileMode,
   ]);
 
   const hasUsableTileBuffer = tileState.hasUsableTileBuffer;

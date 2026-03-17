@@ -513,6 +513,12 @@ const ja = {
     debug: {
       pdf_text_layer_debug: "PDF.js テキストレイヤーのデバッグ",
       pdf_text_layer_debug_desc: "PDF.js テキストレイヤーを表示します",
+      pdf_zoom_render_timing: "PDF ズーム描画時間",
+      pdf_zoom_render_timing_desc:
+        "ズーム変更ごとのページ単位の canvas/text 描画遅延を表示します。",
+      workspace_zoom_jank: "Workspace ズームのカクつき",
+      workspace_zoom_jank_desc:
+        "ワークスペース全体のズーム時のフレーム統計を表示し、最遅フレームやドロップフレーム数を確認できます。",
     },
     borders: "境界線にスナップ",
     centers: "中心にスナップ",

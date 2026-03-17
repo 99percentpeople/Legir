@@ -519,6 +519,12 @@ const fr = {
     debug: {
       pdf_text_layer_debug: "Afficher la couche de texte de PDF",
       pdf_text_layer_debug_desc: "Afficher la couche de texte de PDF.js",
+      pdf_zoom_render_timing: "Temps de rendu du zoom PDF",
+      pdf_zoom_render_timing_desc:
+        "Affiche la latence de rendu canvas/texte par page après chaque changement de zoom.",
+      workspace_zoom_jank: "Saccades du zoom de l'espace de travail",
+      workspace_zoom_jank_desc:
+        "Affiche les statistiques de frames du zoom global de l'espace de travail, y compris la frame la plus lente et les frames perdues.",
     },
     borders: "Ancrer aux bordures",
     centers: "Ancrer aux centres",

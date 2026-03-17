@@ -529,6 +529,12 @@ const en = {
     debug: {
       pdf_text_layer_debug: "PDF Text Layer Debug",
       pdf_text_layer_debug_desc: "Show the text layer of the PDF.js",
+      pdf_zoom_render_timing: "PDF Zoom Render Timing",
+      pdf_zoom_render_timing_desc:
+        "Show per-page canvas/text render latency after each zoom change.",
+      workspace_zoom_jank: "Workspace Zoom Jank",
+      workspace_zoom_jank_desc:
+        "Show overall workspace zoom frame stats, including worst frame and dropped frames.",
     },
     borders: "Snap to Borders",
     centers: "Snap to Centers",

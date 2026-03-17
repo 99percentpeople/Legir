@@ -1,4 +1,5 @@
 import React, {
+  Suspense,
   useRef,
   useState,
   useEffect,
@@ -56,6 +57,10 @@ import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+
+const WorkspaceZoomJankOverlay = React.lazy(
+  () => import("./debug/WorkspaceZoomJankOverlay"),
+);
 
 // Workspace = the editor canvas.
 //
@@ -676,6 +681,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     textSelectionToolbarVisible: textSelectionToolbar.isVisible,
     updateTextSelectionToolbar,
   });
+  const workspaceZoomJankDebugEnabled =
+    editorState.options.debugOptions.workspaceZoomJank;
 
   const wasRestoringRef = useRef(false);
   useEffect(() => {
@@ -2173,6 +2180,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
           closeTextSelectionPopover();
         }}
       />
+      {workspaceZoomJankDebugEnabled && (
+        <Suspense fallback={null}>
+          <WorkspaceZoomJankOverlay scale={editorState.scale} />
+        </Suspense>
+      )}
 
       {shouldVirtualizePages ? (
         <div className="flex min-h-full min-w-full">

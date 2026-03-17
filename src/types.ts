@@ -191,6 +191,8 @@ export interface SnappingOptions {
 
 export interface DebugOptions {
   pdfTextLayer: boolean;
+  pdfZoomRenderTiming: boolean;
+  workspaceZoomJank: boolean;
 }
 
 export type AppLLMModelOption = {

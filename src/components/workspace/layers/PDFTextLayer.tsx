@@ -25,6 +25,10 @@ import {
   getPdfSearchHighlightRects,
   selectPdfSearchTextRange,
 } from "../lib/pdfSearchHighlights";
+import {
+  reportPDFPageRenderLayerReady,
+  reportPDFPageRenderLayerState,
+} from "../debug/pdfPageRenderTelemetry";
 
 interface PDFTextLayerProps {
   page: PageData;
@@ -248,7 +252,18 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
           const textContent = await textContentPromise;
           if (isCancelled()) return;
-          if (!textContent) return;
+          if (!textContent) {
+            container.replaceChildren();
+            ensureEndOfContent(container);
+            setRenderedScale(targetScale);
+            reportPDFPageRenderLayerReady({
+              pageIndex,
+              layer: "text",
+              scale: targetScale,
+              completedAt: performance.now(),
+            });
+            return;
+          }
 
           const staging = document.createElement("div");
           setLayerVars(staging, targetScale);
@@ -262,6 +277,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
           ensureEndOfContent(container);
           setRenderedScale(targetScale);
+          reportPDFPageRenderLayerReady({
+            pageIndex,
+            layer: "text",
+            scale: targetScale,
+            completedAt: performance.now(),
+          });
         },
       ),
     [
@@ -548,6 +569,37 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
   const shouldDisplay = isInView || isSelecting;
   const shouldHideByVisibility = !isInView && isSelecting;
+
+  useEffect(() => {
+    if (!isInView || renderedScale !== renderScale) {
+      return;
+    }
+
+    reportPDFPageRenderLayerReady({
+      pageIndex,
+      layer: "text",
+      scale: renderScale,
+      completedAt: performance.now(),
+    });
+  }, [
+    isInView,
+    pageIndex,
+    renderScale,
+    renderedScale,
+  ]);
+
+  useEffect(() => {
+    if (!isInView) {
+      return;
+    }
+
+    reportPDFPageRenderLayerState({
+      pageIndex,
+      layer: "text",
+      ready: renderedScale === renderScale,
+      scale: renderScale,
+    });
+  }, [isInView, pageIndex, renderScale, renderedScale]);
 
   useEffect(() => {
     if (!textLayerRef.current || !isInView || renderedScale === null) {

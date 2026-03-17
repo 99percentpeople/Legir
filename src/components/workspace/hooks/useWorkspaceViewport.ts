@@ -13,6 +13,7 @@ import {
 import type { WorkspaceEditorState } from "@/types";
 import { useEventListener } from "@/hooks/useEventListener";
 import { pickClosestRectCandidate } from "@/lib/viewportMath";
+import { appEventBus } from "@/lib/eventBus";
 
 export const useWorkspaceViewport = (opts: {
   containerRef: RefObject<HTMLDivElement>;
@@ -250,6 +251,15 @@ export const useWorkspaceViewport = (opts: {
         newScale = Number(newScale.toFixed(3));
 
         if (Math.abs(newScale - baseScale) < 0.001) return;
+
+        if (opts.editorState.options.debugOptions.workspaceZoomJank) {
+          appEventBus.emit("workspace:zoomInput", {
+            at: performance.now(),
+            source: "wheel",
+            fromScale: currentScale,
+            targetScale: newScale,
+          });
+        }
 
         const rect = container.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
