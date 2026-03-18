@@ -348,6 +348,12 @@ const splitMarkdownStream = (
           });
 
           pushStableSlice(source, stableBlocks, blockStart, lineRecord.start);
+          // Once the prefix before the list is committed, exclude it from the
+          // mutable tail immediately. Otherwise the deferred pending render can
+          // show that prefix again while the list is still streaming.
+          if (blockStart < lineRecord.start) {
+            blockStart = lineRecord.start;
+          }
           pushStableSlice(source, stableBlocks, lineRecord.start, stableEnd);
 
           if (stableEnd > lineRecord.start) {
@@ -369,6 +375,9 @@ const splitMarkdownStream = (
             source.length,
           );
           pushStableSlice(source, stableBlocks, blockStart, lineRecord.start);
+          if (blockStart < lineRecord.start) {
+            blockStart = lineRecord.start;
+          }
           pushStableSlice(source, stableBlocks, lineRecord.start, stableEnd);
 
           if (stableEnd > lineRecord.start) {
@@ -392,6 +401,9 @@ const splitMarkdownStream = (
           });
 
           pushStableSlice(source, stableBlocks, blockStart, lineRecord.start);
+          if (blockStart < lineRecord.start) {
+            blockStart = lineRecord.start;
+          }
           pushStableSlice(source, stableBlocks, lineRecord.start, stableEnd);
 
           if (stableEnd > lineRecord.start) {
@@ -562,7 +574,12 @@ export const StreamMarkdown = React.memo(function StreamMarkdown({
   );
   const { stableBlocks, pendingSource } = segmentedSource;
   const deferredPendingSource = React.useDeferredValue(pendingSource);
-  const renderPendingSource = streaming ? deferredPendingSource : pendingSource;
+  const renderPendingSource =
+    streaming &&
+    deferredPendingSource.length <= pendingSource.length &&
+    pendingSource.startsWith(deferredPendingSource)
+      ? deferredPendingSource
+      : pendingSource;
   const [committedSegments, setCommittedSegments] = React.useState<
     MarkdownHtmlSegment[]
   >(() => stableBlocks.map(buildMarkdownSegment));

@@ -9,7 +9,13 @@
 import type { ZodTypeAny } from "zod";
 import type { ToolSet } from "ai";
 import type { AiDocumentLinkTarget } from "@/services/ai/utils/documentLinks";
-import type { PDFMetadata, PDFOutlineItem, PDFSearchResult } from "@/types";
+import type {
+  PageFlowDirection,
+  PageLayoutMode,
+  PDFMetadata,
+  PDFOutlineItem,
+  PDFSearchResult,
+} from "@/types";
 
 export type AiToolName =
   | "get_document_context"
@@ -66,6 +72,10 @@ export interface AiDocumentContext {
   pageCount: number;
   currentPageNumber: number | null;
   visiblePageNumbers: number[];
+  scale: number;
+  zoomPercent: number;
+  pageLayout: PageLayoutMode;
+  pageFlow: PageFlowDirection;
   selectedText: string;
   pageAssetSummary: AiDocumentPageAssetSummary[];
   outlinePreview: Array<{
@@ -364,6 +374,9 @@ export interface AiDocumentSnapshot {
   }>;
   outline: PDFOutlineItem[];
   currentPageIndex: number;
+  scale: number;
+  pageLayout: PageLayoutMode;
+  pageFlow: PageFlowDirection;
 }
 
 export interface AiTextSelectionContext {

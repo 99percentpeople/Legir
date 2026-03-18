@@ -2,6 +2,7 @@ import {
   normalizeAiToolArgsDeep,
   toSnakeCaseKeysDeep,
 } from "@/services/ai/utils/toolCase";
+import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
 import type {
   AiChatMessageAttachment,
   AiChatMessageRecord,
@@ -380,7 +381,11 @@ export const toTitleSnippet = (text: string) => {
 
 export const stringifyToolPayload = (payload: unknown) => {
   try {
-    const json = JSON.stringify(toSnakeCaseKeysDeep(payload ?? null), null, 2);
+    const json = JSON.stringify(
+      toSnakeCaseKeysDeep(omitEmptyArrayFieldsDeep(payload ?? null)),
+      null,
+      2,
+    );
     if (typeof json === "string") return json;
   } catch {
     // ignore

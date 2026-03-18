@@ -304,6 +304,48 @@ const buildPageRange = (
   return out;
 };
 
+const parseWorkspacePageNumber = (value: string) => {
+  const pageIndex = Number.parseInt(value.replace(/^page-/, ""), 10);
+  if (!Number.isFinite(pageIndex) || pageIndex < 0) return null;
+  return pageIndex + 1;
+};
+
+const getVisibleWorkspacePageNumbers = (totalPages: number) => {
+  if (typeof document === "undefined" || totalPages <= 0) return [];
+
+  const scrollContainer = document.querySelector(
+    '[data-workspace-scroll-container="true"]',
+  );
+  if (!(scrollContainer instanceof HTMLElement)) return [];
+
+  const containerRect = scrollContainer.getBoundingClientRect();
+  if (containerRect.width <= 0 || containerRect.height <= 0) return [];
+
+  const visiblePageNumbers = new Set<number>();
+  for (const pageElement of scrollContainer.querySelectorAll<HTMLElement>(
+    '[id^="page-"]',
+  )) {
+    const pageNumber = parseWorkspacePageNumber(pageElement.id);
+    if (!pageNumber || pageNumber > totalPages) continue;
+
+    const rect = pageElement.getBoundingClientRect();
+    if (
+      rect.width <= 0 ||
+      rect.height <= 0 ||
+      rect.right <= containerRect.left ||
+      rect.left >= containerRect.right ||
+      rect.bottom <= containerRect.top ||
+      rect.top >= containerRect.bottom
+    ) {
+      continue;
+    }
+
+    visiblePageNumbers.add(pageNumber);
+  }
+
+  return Array.from(visiblePageNumbers).sort((left, right) => left - right);
+};
+
 export const createDocumentContextService = (options: {
   getSnapshot: () => AiDocumentSnapshot;
   getSelectedTextContext: () => AiTextSelectionContext | null;
@@ -374,14 +416,26 @@ export const createDocumentContextService = (options: {
     getDocumentContext: () => {
       const snapshot = getSnapshot();
       const selected = getSelectedTextContext();
+      const computedVisiblePageNumbers = getVisibleWorkspacePageNumbers(
+        snapshot.pages.length,
+      );
+      const fallbackVisiblePageNumbers =
+        snapshot.pages.length > 0 ? [snapshot.currentPageIndex + 1] : [];
+      const visiblePageNumbers =
+        computedVisiblePageNumbers.length > 0
+          ? computedVisiblePageNumbers
+          : fallbackVisiblePageNumbers;
 
       return {
         filename: snapshot.filename,
         pageCount: snapshot.pages.length,
         currentPageNumber:
           snapshot.pages.length > 0 ? snapshot.currentPageIndex + 1 : null,
-        visiblePageNumbers:
-          snapshot.pages.length > 0 ? [snapshot.currentPageIndex + 1] : [],
+        visiblePageNumbers,
+        scale: Number(snapshot.scale.toFixed(3)),
+        zoomPercent: Math.round(snapshot.scale * 100),
+        pageLayout: snapshot.pageLayout,
+        pageFlow: snapshot.pageFlow,
         selectedText: selected?.text ?? "",
         outlinePreview: snapshot.outline.slice(0, 12).map((item) => ({
           title: item.title,

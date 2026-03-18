@@ -24,6 +24,7 @@ const MULTI_PAGE_SUMMARY_FALLBACK_PROMPT =
 
 const DOCUMENT_CONTEXT_TOOL_PROMPTS = [
   "get_document_context includes per-page type breakdowns for form fields and supported annotations on pages that actually contain them, which is useful before form filling or annotation inspection.",
+  "get_document_context also includes the current viewport context: all visible pages intersecting the workspace viewport, current zoom scale and percent, page layout mode, and page flow direction.",
 ];
 
 const READ_PAGES_TOOL_PROMPTS = [
@@ -62,7 +63,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_document_context: createToolBuilder("get_document_context")
       .read()
       .description(
-        "Get lightweight runtime context for the currently opened PDF document, including per-page form-field and annotation type breakdowns only for pages that actually contain them.",
+        "Get lightweight runtime context for the currently opened PDF document, including all pages currently visible in the workspace viewport, current zoom scale and percent, page layout mode, page flow direction, and per-page form-field and annotation type breakdowns only for pages that actually contain them.",
       )
       .promptInstructions([
         ...DOCUMENT_CONTEXT_TOOL_PROMPTS,

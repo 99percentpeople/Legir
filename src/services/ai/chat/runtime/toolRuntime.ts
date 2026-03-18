@@ -1,5 +1,6 @@
 import { tool, type ToolSet } from "ai";
 
+import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
 import {
   normalizeAiToolArgsDeep,
   toSnakeCaseKeysDeep,
@@ -49,8 +50,9 @@ const createToolConversationMessage = (options: {
   payload: unknown;
 }): AiChatMessageRecord => {
   const argsText = stringifyToolArgs(options.args);
+  const normalizedPayload = omitEmptyArrayFieldsDeep(options.payload ?? null);
   const resultJson = truncateText(
-    JSON.stringify(toSnakeCaseKeysDeep(options.payload ?? null)),
+    JSON.stringify(toSnakeCaseKeysDeep(normalizedPayload)),
     TOOL_RESULT_MAX_CHARS,
   );
 

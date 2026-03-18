@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  if (Object.prototype.toString.call(value) !== "[object Object]") return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
 export const extractJsonObject = (text: string): unknown => {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -34,3 +40,32 @@ export const parseJsonTextWithSchema = <T>(
   }
   return result.data;
 };
+
+const omitEmptyArrayFieldsDeepInternal = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => omitEmptyArrayFieldsDeepInternal(item));
+  }
+
+  if (!isPlainObject(value)) {
+    return value;
+  }
+
+  const normalized: Record<string, unknown> = {};
+  for (const [key, rawValue] of Object.entries(value)) {
+    if (Array.isArray(rawValue) && rawValue.length === 0) {
+      continue;
+    }
+
+    const nextValue = omitEmptyArrayFieldsDeepInternal(rawValue);
+    if (Array.isArray(nextValue) && nextValue.length === 0) {
+      continue;
+    }
+
+    normalized[key] = nextValue;
+  }
+
+  return normalized;
+};
+
+export const omitEmptyArrayFieldsDeep = <T>(value: T) =>
+  omitEmptyArrayFieldsDeepInternal(value) as T;

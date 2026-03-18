@@ -5,6 +5,7 @@ import type {
   AiToolName,
 } from "./types";
 import type { AiToolContext } from "./aiToolContext";
+import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
 import { aiToolModules } from "./tools";
 import {
   createErrorPayload,
@@ -31,12 +32,18 @@ export const createAiToolRegistry = (ctx: AiToolContext) => {
       const handler = handlers[name as AiToolName];
       if (!handler) {
         return {
-          payload: createErrorPayload("UNKNOWN_TOOL", `Unknown tool: ${name}`),
+          payload: omitEmptyArrayFieldsDeep(
+            createErrorPayload("UNKNOWN_TOOL", `Unknown tool: ${name}`),
+          ),
           summary: `Unknown tool: ${name}`,
         } satisfies AiToolExecutionResult;
       }
 
-      return await handler.execute(rawArgs, ctx, signal, onProgress);
+      const result = await handler.execute(rawArgs, ctx, signal, onProgress);
+      return {
+        ...result,
+        payload: omitEmptyArrayFieldsDeep(result.payload),
+      } satisfies AiToolExecutionResult;
     },
   };
 };
