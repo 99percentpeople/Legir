@@ -329,7 +329,7 @@ const ThinkingMessageBubble = ({
       onOpenChange={setOpen}
       className={cn("max-w-[88%]", isStreaming && "w-full")}
     >
-      <div className="border-border/70 bg-muted/30 text-muted-foreground w-full rounded-lg border border-dashed px-3 py-2">
+      <div className="border-border/70 bg-muted/80 text-muted-foreground w-full rounded-lg border border-dashed px-3 py-2 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <CollapsibleTrigger asChild>
             <button
@@ -1772,6 +1772,9 @@ export function AiChatPanel({
                     key={item.id}
                     className={cn(
                       "flex",
+                      isThinking &&
+                        item.isStreaming &&
+                        "sticky top-0 z-10 items-start",
                       isUser ? "justify-end" : "justify-start",
                     )}
                   >

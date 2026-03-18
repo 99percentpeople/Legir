@@ -4,11 +4,11 @@
   .markdown {
     @apply w-full max-w-full min-w-0 leading-6 break-words;
 
-    > :first-child {
+    :first-child * {
       margin-top: 0;
     }
 
-    > :last-child {
+    :last-child * {
       margin-bottom: 0;
     }
 
@@ -28,6 +28,39 @@
       @apply bg-background/80 rounded-[0.35rem] px-1.5 py-0.5 font-mono text-[0.92em];
     }
 
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      @apply text-foreground font-semibold tracking-tight;
+    }
+
+    h1 {
+      @apply mt-6 mb-3 text-2xl leading-tight;
+    }
+
+    h2 {
+      @apply mt-5 mb-3 text-xl leading-tight;
+    }
+
+    h3 {
+      @apply mt-4 mb-2.5 text-lg leading-snug;
+    }
+
+    h4 {
+      @apply mt-4 mb-2 text-base leading-snug;
+    }
+
+    h5 {
+      @apply mt-3 mb-2 text-sm leading-snug;
+    }
+
+    h6 {
+      @apply mt-3 mb-2 text-xs leading-snug;
+    }
+
     hr {
       @apply border-border my-4;
     }
@@ -40,7 +73,7 @@
       @apply my-3 list-decimal pl-5;
     }
 
-    p:not(:first-child):not(:last-child) {
+    p {
       @apply my-3;
     }
 
