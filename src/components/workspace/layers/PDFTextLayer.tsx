@@ -19,8 +19,8 @@ import {
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { buildTextLayer } from "../lib/pdfTextLayer";
-import { isHeavyWorkspacePage } from "../lib/renderPerformance";
 import { useTextLayerSelection } from "../hooks/useTextLayerSelection";
+import { useDeferredRenderScale } from "../hooks/useDeferredRenderScale";
 import {
   getPdfSearchHighlightRects,
   selectPdfSearchTextRange,
@@ -96,14 +96,18 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     }),
     [page.viewBox, page.userUnit, page.rotation],
   );
-  const isHeavyPage = useMemo(
-    () => isHeavyWorkspacePage(pageInfo, scale),
-    [pageInfo, scale],
+  const pageRenderIdentity = useMemo(
+    () =>
+      `${pageIndex}:${page.rotation}:${page.userUnit}:${page.viewBox.join(",")}`,
+    [page.pageIndex, page.rotation, page.userUnit, page.viewBox],
   );
-  // Large engineering pages can have extremely expensive text-layer DOM.
-  // Coalesce scale changes onto the next paint and keep a smooth CSS-scaled layer meanwhile.
-  const [renderScale, setRenderScale] = useState(scale);
-  const renderScaleRafRef = useRef<number | null>(null);
+  // Keep the current text layer visually scaled during zoom and only rebuild the
+  // DOM after the zoom input has settled for a short idle window.
+  const renderScale = useDeferredRenderScale({
+    identity: pageRenderIdentity,
+    scale,
+    immediate: renderedScale === null,
+  });
 
   const {
     pagePortalEl,
@@ -301,7 +305,6 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     setIsSelecting(false);
     setIsRendering(false);
     setSearchHighlightRects([]);
-    setRenderScale(scale);
     pendingTextRangeFocusRef.current = null;
     endOfContentRef.current = null;
     prevRangeRef.current = null;
@@ -310,39 +313,6 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       textLayerRef.current.innerHTML = "";
     }
   }, [pageIndex, pageInfo]);
-
-  useEffect(() => {
-    if (!isHeavyPage) {
-      setRenderScale((prev) => (prev === scale ? prev : scale));
-      return;
-    }
-
-    if (renderScale === scale) return;
-
-    if (renderScaleRafRef.current !== null) {
-      window.cancelAnimationFrame(renderScaleRafRef.current);
-    }
-
-    renderScaleRafRef.current = window.requestAnimationFrame(() => {
-      renderScaleRafRef.current = null;
-      setRenderScale(scale);
-    });
-
-    return () => {
-      if (renderScaleRafRef.current !== null) {
-        window.cancelAnimationFrame(renderScaleRafRef.current);
-        renderScaleRafRef.current = null;
-      }
-    };
-  }, [isHeavyPage, renderScale, scale]);
-
-  useEffect(() => {
-    return () => {
-      if (renderScaleRafRef.current !== null) {
-        window.cancelAnimationFrame(renderScaleRafRef.current);
-      }
-    };
-  }, []);
 
   // 2. Handle Selection Logic (Web Select API)
   // Replaces the old 'pointerdown' logic with native 'selectionchange'
@@ -581,12 +551,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       scale: renderScale,
       completedAt: performance.now(),
     });
-  }, [
-    isInView,
-    pageIndex,
-    renderScale,
-    renderedScale,
-  ]);
+  }, [isInView, pageIndex, renderScale, renderedScale]);
 
   useEffect(() => {
     if (!isInView) {
@@ -626,7 +591,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [activeSearchResultId, isInView, renderedScale, scale, searchResults]);
+  }, [activeSearchResultId, isInView, renderedScale, searchResults]);
 
   return (
     <>

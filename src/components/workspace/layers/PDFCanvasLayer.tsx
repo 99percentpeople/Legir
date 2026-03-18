@@ -16,14 +16,12 @@ import {
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { useEditorStore } from "@/store/useEditorStore";
-import {
-  getWorkspaceRenderDpr,
-  isHeavyWorkspacePage,
-} from "../lib/renderPerformance";
+import { getWorkspaceRenderDpr } from "../lib/renderPerformance";
 import {
   reportPDFPageRenderLayerReady,
   reportPDFPageRenderLayerState,
 } from "../debug/pdfPageRenderTelemetry";
+import { useDeferredRenderScale } from "../hooks/useDeferredRenderScale";
 import PDFTileLayer from "./PDFTileLayer";
 
 interface PDFCanvasLayerProps {
@@ -71,14 +69,18 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     }),
     [page.viewBox, page.userUnit, page.rotation],
   );
-  const isHeavyPage = useMemo(
-    () => isHeavyWorkspacePage(pageInfo, scale),
-    [pageInfo, scale],
+  const pageRenderIdentity = useMemo(
+    () =>
+      `${pageIndex}:${page.rotation}:${page.userUnit}:${page.viewBox.join(",")}`,
+    [page.pageIndex, page.rotation, page.userUnit, page.viewBox],
   );
-  // For oversized drawings, keep stretching the last good bitmap during zoom
-  // and coalesce render-scale updates onto the next paint instead of blocking input.
-  const [renderScale, setRenderScale] = useState(scale);
-  const renderScaleRafRef = useRef<number | null>(null);
+  // Keep stretching the last good bitmap during zoom and only request a new
+  // raster once the scale has been stable for a short idle window.
+  const renderScale = useDeferredRenderScale({
+    identity: pageRenderIdentity,
+    scale,
+    immediate: !isRendered,
+  });
 
   const updateImageData = useCallback(
     async (canvas: HTMLCanvasElement, renderEpoch?: number) => {
@@ -174,41 +176,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   useLayoutEffect(() => {
     renderedScaleRef.current = null;
     setIsRendered(false);
-    setRenderScale(scale);
   }, [pageIndex, pageInfo]);
-
-  useEffect(() => {
-    if (!isHeavyPage) {
-      setRenderScale((prev) => (prev === scale ? prev : scale));
-      return;
-    }
-
-    if (renderScale === scale) return;
-
-    if (renderScaleRafRef.current !== null) {
-      window.cancelAnimationFrame(renderScaleRafRef.current);
-    }
-
-    renderScaleRafRef.current = window.requestAnimationFrame(() => {
-      renderScaleRafRef.current = null;
-      setRenderScale(scale);
-    });
-
-    return () => {
-      if (renderScaleRafRef.current !== null) {
-        window.cancelAnimationFrame(renderScaleRafRef.current);
-        renderScaleRafRef.current = null;
-      }
-    };
-  }, [isHeavyPage, renderScale, scale]);
-
-  useEffect(() => {
-    return () => {
-      if (renderScaleRafRef.current !== null) {
-        window.cancelAnimationFrame(renderScaleRafRef.current);
-      }
-    };
-  }, []);
 
   useLayoutEffect(() => {
     renderEpochRef.current += 1;
