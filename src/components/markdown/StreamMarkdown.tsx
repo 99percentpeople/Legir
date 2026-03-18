@@ -215,7 +215,6 @@ const scanListBlock = (
   startIndex: number,
   listKind: MarkdownListKind,
 ) => {
-  const itemStarts = [startIndex];
   let scanIndex = startIndex + 1;
 
   while (scanIndex < lines.length) {
@@ -224,7 +223,6 @@ const scanListBlock = (
     const nextKind = getListItemKind(nextLine);
 
     if (nextKind === listKind) {
-      itemStarts.push(scanIndex);
       scanIndex += 1;
       continue;
     }
@@ -238,7 +236,6 @@ const scanListBlock = (
   }
 
   return {
-    itemStarts,
     endLineIndex: scanIndex,
   };
 };
@@ -331,35 +328,36 @@ const splitMarkdownStream = (
       } else {
         const currentListKind = getListItemKind(line);
         if (currentListKind) {
-          // Freeze completed list items early, but leave the trailing item live
-          // until the stream proves the list has actually moved on.
-          const { itemStarts, endLineIndex } = scanListBlock(
+          const { endLineIndex } = scanListBlock(
             lines,
             lineIndex,
             currentListKind,
           );
-          const stableEnd = resolveStableBlockEnd({
-            lines,
-            endLineIndex,
-            sourceLength: source.length,
-            streaming,
-            trailingOpenStartOffset:
-              lines[itemStarts[itemStarts.length - 1]!]!.start,
-          });
 
           pushStableSlice(source, stableBlocks, blockStart, lineRecord.start);
-          // Once the prefix before the list is committed, exclude it from the
-          // mutable tail immediately. Otherwise the deferred pending render can
-          // show that prefix again while the list is still streaming.
           if (blockStart < lineRecord.start) {
             blockStart = lineRecord.start;
           }
-          pushStableSlice(source, stableBlocks, lineRecord.start, stableEnd);
 
-          if (stableEnd > lineRecord.start) {
-            blockStart = stableEnd;
-            lineIndex =
-              stableEnd < source.length ? endLineIndex - 1 : lines.length;
+          // Keep an open streaming list together as one mutable block. Splitting
+          // completed items into committed segments causes the list container to
+          // be rebuilt as separate lists, which makes bullets and indentation
+          // visibly jump while the model is still typing.
+          if (streaming && endLineIndex >= lines.length) {
+            lineIndex = lines.length;
+          } else {
+            const stableEnd = getLineStartOffset(
+              lines,
+              endLineIndex,
+              source.length,
+            );
+            pushStableSlice(source, stableBlocks, lineRecord.start, stableEnd);
+
+            if (stableEnd > lineRecord.start) {
+              blockStart = stableEnd;
+              lineIndex =
+                stableEnd < source.length ? endLineIndex - 1 : lines.length;
+            }
           }
         } else if (
           isPotentialTableRow(line) &&
