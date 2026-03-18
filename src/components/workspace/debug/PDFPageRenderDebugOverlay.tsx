@@ -11,6 +11,7 @@ interface PDFPageRenderDebugOverlayProps {
   scale: number;
   isInView: boolean;
   debugJustEnabled: boolean;
+  textLayerEnabled: boolean;
   overlayHost?: HTMLElement | null;
 }
 
@@ -19,6 +20,7 @@ const PDFPageRenderDebugOverlay: React.FC<PDFPageRenderDebugOverlayProps> = ({
   scale,
   isInView,
   debugJustEnabled,
+  textLayerEnabled,
   overlayHost,
 }) => {
   const { renderTiming, currentReadyState } =
@@ -41,7 +43,7 @@ const PDFPageRenderDebugOverlay: React.FC<PDFPageRenderDebugOverlayProps> = ({
     if (!renderTiming) return null;
     const values = [
       renderTiming.canvasReadyMs,
-      renderTiming.textReadyMs,
+      textLayerEnabled ? renderTiming.textReadyMs : null,
     ].filter((value): value is number => value !== null);
     if (values.length === 0) return null;
     return Math.max(...values);
@@ -54,10 +56,10 @@ const PDFPageRenderDebugOverlay: React.FC<PDFPageRenderDebugOverlayProps> = ({
       }
       const isReady =
         currentReadyState.canvasReady === true &&
-        currentReadyState.textReady === true;
+        (!textLayerEnabled || currentReadyState.textReady === true);
       const isPartial =
         currentReadyState.canvasReady === true ||
-        currentReadyState.textReady === true;
+        (textLayerEnabled && currentReadyState.textReady === true);
 
       if (isReady) return "page current ready";
       if (isPartial) return "page current partial";
@@ -65,9 +67,11 @@ const PDFPageRenderDebugOverlay: React.FC<PDFPageRenderDebugOverlayProps> = ({
     }
 
     const isReady =
-      renderTiming.canvasReadyMs !== null && renderTiming.textReadyMs !== null;
+      renderTiming.canvasReadyMs !== null &&
+      (!textLayerEnabled || renderTiming.textReadyMs !== null);
     const isPartial =
-      renderTiming.canvasReadyMs !== null || renderTiming.textReadyMs !== null;
+      renderTiming.canvasReadyMs !== null ||
+      (textLayerEnabled && renderTiming.textReadyMs !== null);
 
     if (renderTiming.kind === "initial") {
       if (isReady) return "page first ready";
@@ -87,10 +91,16 @@ const PDFPageRenderDebugOverlay: React.FC<PDFPageRenderDebugOverlayProps> = ({
       <div className="pointer-events-none absolute top-2 right-2 z-[70] rounded-md bg-black/70 px-2 py-1 font-mono text-[11px] leading-4 text-white shadow-lg">
         <div>{renderStatusLabel}</div>
         <div>
-          {`zoom ${displayScale === null ? "--" : `${Math.round(displayScale * 100)}%`}`}
+          {`zoom ${
+            displayScale === null ? "--" : `${Math.round(displayScale * 100)}%`
+          }`}
         </div>
         <div>{`canvas ${renderTiming.canvasReadyMs ?? "--"} ms`}</div>
-        <div>{`text ${renderTiming.textReadyMs ?? "--"} ms`}</div>
+        <div>
+          {`text ${
+            textLayerEnabled ? `${renderTiming.textReadyMs ?? "--"} ms` : "off"
+          }`}
+        </div>
         <div>{`total ${totalReadyMs ?? "--"} ms`}</div>
       </div>
     ) : null;

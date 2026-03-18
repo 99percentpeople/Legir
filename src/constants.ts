@@ -82,6 +82,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
     },
     debugOptions: {
       pdfTextLayer: false,
+      disablePdfTextLayer: false,
       pdfZoomRenderTiming: false,
       workspaceZoomJank: false,
     },

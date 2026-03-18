@@ -39,6 +39,9 @@ const PDFPage: React.FC<PDFPageProps> = ({
   const pdfZoomRenderTimingDebug = useEditorStore(
     (s) => s.options.debugOptions.pdfZoomRenderTiming,
   );
+  const disablePdfTextLayer = useEditorStore(
+    (s) => s.options.debugOptions.disablePdfTextLayer,
+  );
   const wasDebugEnabledRef = useRef(pdfZoomRenderTimingDebug);
 
   const containerWidth = page.width;
@@ -87,18 +90,20 @@ const PDFPage: React.FC<PDFPageProps> = ({
     >
       <PDFCanvasLayer page={page} scale={scale} isInView={isInView} />
 
-      <PDFTextLayer
-        page={page}
-        scale={scale}
-        isInView={isInView}
-        isSelectMode={isSelectMode}
-        cursor={textLayerCursor}
-        isHighlighting={isHighlighting}
-        highlightColor={highlightColor}
-        highlightOpacity={highlightOpacity}
-        searchResults={searchResults}
-        activeSearchResultId={activeSearchResultId}
-      />
+      {!disablePdfTextLayer && (
+        <PDFTextLayer
+          page={page}
+          scale={scale}
+          isInView={isInView}
+          isSelectMode={isSelectMode}
+          cursor={textLayerCursor}
+          isHighlighting={isHighlighting}
+          highlightColor={highlightColor}
+          highlightOpacity={highlightOpacity}
+          searchResults={searchResults}
+          activeSearchResultId={activeSearchResultId}
+        />
+      )}
 
       {pdfZoomRenderTimingDebug && (
         <Suspense fallback={null}>
@@ -107,6 +112,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
             scale={scale}
             isInView={isInView}
             debugJustEnabled={debugJustEnabled}
+            textLayerEnabled={!disablePdfTextLayer}
             overlayHost={debugOverlayHost}
           />
         </Suspense>

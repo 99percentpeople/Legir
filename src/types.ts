@@ -191,6 +191,7 @@ export interface SnappingOptions {
 
 export interface DebugOptions {
   pdfTextLayer: boolean;
+  disablePdfTextLayer: boolean;
   pdfZoomRenderTiming: boolean;
   workspaceZoomJank: boolean;
 }

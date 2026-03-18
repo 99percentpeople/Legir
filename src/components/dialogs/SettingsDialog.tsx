@@ -1062,6 +1062,31 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Bug className="text-primary h-4 w-4" />
+                      <Label
+                        htmlFor="debug-disable-pdf-text-layer"
+                        className="mb-0 font-semibold"
+                      >
+                        Disable PDF Text Layer
+                      </Label>
+                    </div>
+                    <Switch
+                      id="debug-disable-pdf-text-layer"
+                      checked={options.debugOptions.disablePdfTextLayer}
+                      onCheckedChange={(c) =>
+                        updateDebugOption("disablePdfTextLayer", c)
+                      }
+                    />
+                  </div>
+                  <p className="text-muted-foreground px-1 text-xs">
+                    Unmounts PDFTextLayer for profiling. Text selection, text
+                    search highlighting, and text-based highlight drawing will
+                    stop working while this is enabled.
+                  </p>
+                </div>
+                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bug className="text-primary h-4 w-4" />
                       <div className="flex items-center gap-1.5">
                         <Label
                           htmlFor="debug-pdf-zoom-render-timing"
@@ -1127,7 +1152,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                             </div>
                             <div>
                               <span className="font-mono">total</span>: time
-                              from session start until both canvas and text are
+                              from session start until all required layers are
                               ready.
                             </div>
                           </TooltipContent>
