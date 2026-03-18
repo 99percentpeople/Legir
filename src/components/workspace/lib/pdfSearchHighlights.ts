@@ -27,6 +27,8 @@ type TextNodePosition = {
   offset: number;
 };
 
+type TextNodeBoundaryAffinity = "next" | "previous";
+
 type ScrollRestoreTarget = {
   element: HTMLElement;
 };
@@ -59,6 +61,7 @@ const collectTextNodeBoundaries = (root: HTMLElement): TextNodeBoundary[] => {
 const locateTextNodePosition = (
   boundaries: TextNodeBoundary[],
   offset: number,
+  affinity: TextNodeBoundaryAffinity = "next",
 ): TextNodePosition | null => {
   if (boundaries.length === 0) return null;
 
@@ -66,6 +69,17 @@ const locateTextNodePosition = (
   const clamped = Math.max(0, Math.min(offset, last.end));
 
   for (const boundary of boundaries) {
+    if (
+      affinity === "previous" &&
+      clamped > boundary.start &&
+      clamped === boundary.end
+    ) {
+      return {
+        node: boundary.node,
+        offset: boundary.node.data.length,
+      };
+    }
+
     if (clamped >= boundary.start && clamped < boundary.end) {
       return {
         node: boundary.node,
@@ -84,15 +98,71 @@ const createTextRange = (
   boundaries: TextNodeBoundary[],
   startOffset: number,
   endOffset: number,
+  options?: {
+    endAffinity?: TextNodeBoundaryAffinity;
+  },
 ) => {
   const start = locateTextNodePosition(boundaries, startOffset);
-  const end = locateTextNodePosition(boundaries, endOffset);
+  // Search/selection offsets are text-only. When an end offset lands exactly on a
+  // text-node boundary, prefer the previous text node so DOM-only separators like
+  // <br> are not pulled into the reconstructed Range.
+  const end = locateTextNodePosition(
+    boundaries,
+    endOffset,
+    options?.endAffinity ?? "previous",
+  );
   if (!start || !end) return null;
 
   const range = document.createRange();
   range.setStart(start.node, start.offset);
   range.setEnd(end.node, end.offset);
   return range;
+};
+
+const getTextOffsetFromBoundary = (
+  boundaries: TextNodeBoundary[],
+  node: Node,
+  offset: number,
+) => {
+  // Convert the DOM boundary back into a text-only offset by walking real text
+  // nodes. This keeps <br> and other non-text DOM helpers out of serialized
+  // offsets, so restoring the selection later does not grow past the last glyph.
+  const point = document.createRange();
+  point.setStart(node, offset);
+  point.collapse(true);
+
+  let textOffset = 0;
+
+  for (const boundary of boundaries) {
+    const start = document.createRange();
+    start.setStart(boundary.node, 0);
+    start.collapse(true);
+
+    const end = document.createRange();
+    end.setStart(boundary.node, boundary.node.length);
+    end.collapse(true);
+
+    const vsEnd = point.compareBoundaryPoints(Range.START_TO_START, end);
+    if (vsEnd >= 0) {
+      textOffset = boundary.end;
+      continue;
+    }
+
+    const vsStart = point.compareBoundaryPoints(Range.START_TO_START, start);
+    if (vsStart <= 0) {
+      return textOffset;
+    }
+
+    if (node === boundary.node && node instanceof Text) {
+      return (
+        boundary.start + Math.max(0, Math.min(boundary.node.length, offset))
+      );
+    }
+
+    return textOffset;
+  }
+
+  return textOffset;
 };
 
 const toLocalHighlightRect = (
@@ -258,6 +328,7 @@ export const selectPdfSearchTextRange = (
   endOffset: number,
   options?: {
     restoreScrollTarget?: ScrollRestoreTarget;
+    endAffinity?: TextNodeBoundaryAffinity;
   },
 ) => {
   const boundaries = collectTextNodeBoundaries(root);
@@ -266,7 +337,9 @@ export const selectPdfSearchTextRange = (
   const selection = window.getSelection?.();
   if (!selection) return false;
 
-  const range = createTextRange(boundaries, startOffset, endOffset);
+  const range = createTextRange(boundaries, startOffset, endOffset, {
+    endAffinity: options?.endAffinity,
+  });
   if (!range) return false;
 
   const restoreTarget = options?.restoreScrollTarget;
@@ -302,6 +375,9 @@ export const getPdfSearchSelectionOffsets = (
   }
 
   const range = selection.getRangeAt(0);
+  const boundaries = collectTextNodeBoundaries(root);
+  if (boundaries.length === 0) return null;
+
   const isWithinRoot = (node: Node | null) => {
     if (!node) return false;
     const element = node instanceof Element ? node : node.parentElement;
@@ -315,16 +391,16 @@ export const getPdfSearchSelectionOffsets = (
     return null;
   }
 
-  const startRange = document.createRange();
-  startRange.selectNodeContents(root);
-  startRange.setEnd(range.startContainer, range.startOffset);
-
-  const endRange = document.createRange();
-  endRange.selectNodeContents(root);
-  endRange.setEnd(range.endContainer, range.endOffset);
-
-  const startOffset = startRange.toString().length;
-  const endOffset = endRange.toString().length;
+  const startOffset = getTextOffsetFromBoundary(
+    boundaries,
+    range.startContainer,
+    range.startOffset,
+  );
+  const endOffset = getTextOffsetFromBoundary(
+    boundaries,
+    range.endContainer,
+    range.endOffset,
+  );
   if (endOffset <= startOffset) return null;
 
   return { startOffset, endOffset };

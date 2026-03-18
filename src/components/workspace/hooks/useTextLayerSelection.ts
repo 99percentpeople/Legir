@@ -308,6 +308,96 @@ export const useTextLayerSelection = (opts: {
     return span ?? null;
   }, []);
 
+  const getSelectionTerminalRect = useCallback(
+    (range: Range, kind: "start" | "end") => {
+      const rects = Array.from(range.getClientRects()).filter(
+        (rect) => rect.width > 0.5 || rect.height > 0.5,
+      );
+      if (rects.length === 0) return null;
+      return kind === "start" ? rects[0] : rects[rects.length - 1];
+    },
+    [],
+  );
+
+  const getPreviousSelectionBoundary = useCallback(
+    (layer: HTMLDivElement, node: Node, offset: number) => {
+      try {
+        const boundaryRange = document.createRange();
+        boundaryRange.setStart(node, offset);
+        boundaryRange.collapse(true);
+
+        const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+        let candidate: Text | null = null;
+
+        while (walker.nextNode()) {
+          const current = walker.currentNode;
+          if (!(current instanceof Text) || !current.data) continue;
+          const relation = boundaryRange.comparePoint(
+            current,
+            current.data.length,
+          );
+          if (relation < 0 || relation === 0) {
+            candidate = current;
+            continue;
+          }
+          break;
+        }
+
+        if (!candidate) return null;
+        return {
+          node: candidate,
+          offset: candidate.data.length,
+          span: getCaretSpan(candidate),
+        };
+      } catch {
+        return null;
+      }
+    },
+    [getCaretSpan],
+  );
+
+  const resolveSelectionBoundary = useCallback(
+    (
+      layer: HTMLDivElement,
+      range: Range,
+      kind: "start" | "end",
+    ): {
+      node: Node;
+      offset: number;
+      span: HTMLSpanElement | null;
+      fallbackRect: DOMRect | null;
+    } | null => {
+      const node = kind === "start" ? range.startContainer : range.endContainer;
+      const offset = kind === "start" ? range.startOffset : range.endOffset;
+      const nodeLayer = (() => {
+        const el = node instanceof Element ? node : node.parentElement;
+        return el?.closest?.(".textLayer") ?? null;
+      })();
+      if (nodeLayer !== layer) return null;
+
+      if (kind === "end" && offset === 0) {
+        // Browsers often normalize a line-end selection boundary to the start of
+        // the next text run. For handle placement we want the visual end of the
+        // selected glyphs, so fall back to the previous text node boundary.
+        const previous = getPreviousSelectionBoundary(layer, node, offset);
+        if (previous) {
+          return {
+            ...previous,
+            fallbackRect: getSelectionTerminalRect(range, kind),
+          };
+        }
+      }
+
+      return {
+        node,
+        offset,
+        span: getCaretSpan(node),
+        fallbackRect: getSelectionTerminalRect(range, kind),
+      };
+    },
+    [getCaretSpan, getPreviousSelectionBoundary, getSelectionTerminalRect],
+  );
+
   const updateSelectionHandles = useCallback(() => {
     if (!isSelectMode) {
       setSelectionHandles({ start: null, end: null });
@@ -327,14 +417,6 @@ export const useTextLayerSelection = (opts: {
     }
 
     const range = sel.getRangeAt(0);
-    const getClosestLayer = (node: Node | null) => {
-      if (!node) return null;
-      const el = node instanceof Element ? node : node.parentElement;
-      return el?.closest?.(".textLayer") ?? null;
-    };
-
-    const startLayer = getClosestLayer(range.startContainer);
-    const endLayer = getClosestLayer(range.endContainer);
 
     const pageRect = pageEl.getBoundingClientRect();
     const handleWidth = PDF_TEXT_SELECTION_HANDLE_WIDTH_PX;
@@ -403,19 +485,20 @@ export const useTextLayerSelection = (opts: {
       return 0;
     };
 
-    const startRect =
-      startLayer === layerEl
-        ? getCaretClientRect(range.startContainer, range.startOffset)
-        : null;
-    const endRect =
-      endLayer === layerEl
-        ? getCaretClientRect(range.endContainer, range.endOffset)
-        : null;
+    const startBoundary = resolveSelectionBoundary(layerEl, range, "start");
+    const endBoundary = resolveSelectionBoundary(layerEl, range, "end");
 
-    const startSpan =
-      startLayer === layerEl ? getCaretSpan(range.startContainer) : null;
-    const endSpan =
-      endLayer === layerEl ? getCaretSpan(range.endContainer) : null;
+    const startRect = startBoundary
+      ? (getCaretClientRect(startBoundary.node, startBoundary.offset) ??
+        startBoundary.fallbackRect)
+      : null;
+    const endRect = endBoundary
+      ? (getCaretClientRect(endBoundary.node, endBoundary.offset) ??
+        endBoundary.fallbackRect)
+      : null;
+
+    const startSpan = startBoundary?.span ?? null;
+    const endSpan = endBoundary?.span ?? null;
     const startRotateDeg = startSpan ? getSpanRotationDeg(startSpan) : null;
     const endRotateDeg = endSpan ? getSpanRotationDeg(endSpan) : null;
 
@@ -564,10 +647,13 @@ export const useTextLayerSelection = (opts: {
   }, [
     getCaretSpan,
     getCaretClientRect,
+    getSelectionTerminalRect,
+    getPreviousSelectionBoundary,
     getSpanRotationDeg,
     isDraggingSelectionHandle,
     isSelectMode,
     pagePortalEl,
+    resolveSelectionBoundary,
     textLayerRef,
   ]);
 
