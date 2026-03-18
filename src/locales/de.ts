@@ -328,6 +328,7 @@ const de = {
     tool_details: "Details",
     tool_args: "Argumente",
     tool_result: "Rohes Ergebnis",
+    responding: "Warte auf Antwort",
     thinking: "Denken",
     thought_complete: "Nachgedacht",
     thought_for: "Nachgedacht für {duration}",
@@ -341,13 +342,25 @@ const de = {
       desc: "Dadurch werden die aktuellen Chat-Nachrichten, die Tool-Historie und die Suchergebnisse entfernt.",
       confirm: "Chat löschen",
     },
+    copy: "Kopieren",
+    copied: "Kopiert",
+    switch_branch: "Branch wechseln",
+    edit: "Bearbeiten",
     send: "Senden",
     stop: "Stoppen",
     cancel_edit: "Bearbeitung abbrechen",
+    regenerate: "Neu generieren",
+    branch_edit: "Bearbeitungs-Branch",
+    branch_regenerate: "Neu generierter Branch",
     messages: "Nachrichten",
     tools: "Werkzeuge",
     error_title: "Anfrage fehlgeschlagen",
     retry: "Erneut versuchen",
+    tool_schedule_log: "Ausführungsprotokoll",
+    tool_progress_layer: "Ebene {count}",
+    tool_progress_pending: "{count} wartend",
+    tool_progress_running: "{count} laufend",
+    tool_progress_done: "{count} abgeschlossen",
     input_placeholder:
       "Bitten Sie die KI, PDF-Inhalte zu lesen, zu suchen, zu springen oder hervorzuheben...",
     input_hint: "Enter zum Senden, Shift+Enter für eine neue Zeile.",
@@ -399,6 +412,34 @@ const de = {
           "Alle Kommentare und Hervorhebungen in diesem PDF auflisten",
       },
     },
+  },
+  debug_overlay: {
+    page_waiting: "Seite wartet",
+    page_current_ready: "Seite aktuell bereit",
+    page_current_partial: "Seite aktuell teilweise bereit",
+    page_current_waiting: "Seite aktuell wartend",
+    page_first_ready: "erste Darstellung bereit",
+    page_first_partial: "erste Darstellung teilweise bereit",
+    page_first_rendering: "erste Darstellung läuft",
+    page_zoom_ready: "Zoom-Render bereit",
+    page_zoom_partial: "Zoom-Render teilweise bereit",
+    page_zoom_rendering: "Zoom-Render läuft",
+    workspace_zooming: "Workspace zoomt",
+    workspace_last: "Workspace zuletzt",
+    scale: "Skala",
+    duration: "Dauer",
+    response: "Antwort",
+    stall: "Blockierung",
+    avg: "Durchschn.",
+    worst: "Schlimmste",
+    jank: "Ruckler",
+    dropped: "Verloren",
+    steps: "Schritte",
+    zoom: "Zoom",
+    canvas: "Canvas",
+    text: "Text",
+    total: "Gesamt",
+    off: "aus",
   },
   workspace: {
     no_pdf:
@@ -493,6 +534,7 @@ const de = {
       export: "Export",
       snapping: "Einrasten",
       llm: "LLM",
+      ai_chat: "AI Chat",
       debug: "Debug",
     },
     language: "Sprache",
@@ -516,12 +558,59 @@ const de = {
     debug: {
       pdf_text_layer_debug: "PDF Text Layer Debug",
       pdf_text_layer_debug_desc: "PDF.js Text Layer anzeigen",
+      disable_pdf_text_layer: "PDF-Textlayer deaktivieren",
+      disable_pdf_text_layer_desc:
+        "Hängt PDFTextLayer für Profiling aus. Textauswahl, Textsuch-Hervorhebungen und textbasierte Hervorhebungen funktionieren dann nicht mehr.",
       pdf_zoom_render_timing: "PDF-Zoom-Renderzeit",
       pdf_zoom_render_timing_desc:
         "Zeigt die Renderlatenz von Canvas/Text pro Seite nach jeder Zoom-Änderung an.",
+      pdf_zoom_render_timing_tooltip_label:
+        "Metriken für PDF-Seiten-Zoom-Rendering anzeigen",
+      pdf_zoom_render_timing_tooltip_title:
+        "Metriken für PDF-Seiten-Zoom-Rendering",
+      pdf_zoom_render_timing_tooltip_waiting:
+        "Noch keine aktive Messung vorhanden.",
+      pdf_zoom_render_timing_tooltip_current:
+        "Aktueller sichtbarer Seitenstatus ohne neue Render-Sitzung.",
+      pdf_zoom_render_timing_tooltip_initial:
+        "Status des ersten Renderns, wenn die Seite erstmals sichtbar wird.",
+      pdf_zoom_render_timing_tooltip_zoom:
+        "Rerender-Status nach einer Änderung des Zoomfaktors.",
+      pdf_zoom_render_timing_tooltip_scale:
+        "Zielskalierung des aktuellen oder zuletzt gemessenen Renderns.",
+      pdf_zoom_render_timing_tooltip_canvas:
+        "Zeit vom Sitzungsstart bis die PDF-Bitmap-Ebene bereit ist.",
+      pdf_zoom_render_timing_tooltip_text:
+        "Zeit vom Sitzungsstart bis die Textebene bereit ist.",
+      pdf_zoom_render_timing_tooltip_total:
+        "Zeit vom Sitzungsstart bis alle benötigten Ebenen bereit sind.",
       workspace_zoom_jank: "Workspace-Zoom-Ruckeln",
       workspace_zoom_jank_desc:
         "Zeigt die Frame-Statistik des gesamten Workspace-Zooms an, inklusive langsamstem Frame und verlorenen Frames.",
+      workspace_zoom_jank_tooltip_label:
+        "Metriken für Zoom-Ruckeln im Workspace anzeigen",
+      workspace_zoom_jank_tooltip_title:
+        "Metriken für Zoom-Ruckeln im Workspace",
+      workspace_zoom_jank_tooltip_status:
+        "Aktuelle laufende Zoom-Sitzung / zuletzt abgeschlossene Zoom-Sitzung.",
+      workspace_zoom_jank_tooltip_scale:
+        "Start- und Endskalierung der zusammenhängenden Zoom-Sitzung.",
+      workspace_zoom_jank_tooltip_duration:
+        "Gesamte reale Dauer der Zoom-Sitzung, nicht nur reine Verzögerungszeit.",
+      workspace_zoom_jank_tooltip_response:
+        "Verzögerung vom ersten Zoom-Eingang bis zur ersten übernommenen Skalierungsänderung.",
+      workspace_zoom_jank_tooltip_stall:
+        "Gesamtzeit über einem 60-fps-Frame-Budget während der Sitzung.",
+      workspace_zoom_jank_tooltip_avg:
+        "Durchschnittliche Frame-Zeit während der Zoom-Sitzung. Niedriger ist besser.",
+      workspace_zoom_jank_tooltip_worst:
+        "Langsamster beobachteter Frame während der Zoom-Sitzung.",
+      workspace_zoom_jank_tooltip_jank:
+        "Anzahl der Frames mit 20 ms oder mehr.",
+      workspace_zoom_jank_tooltip_dropped:
+        "Geschätzte verlorene Frames basierend auf einem 60-fps-Budget.",
+      workspace_zoom_jank_tooltip_steps:
+        "Anzahl der während der Sitzung empfangenen Zoom-Eingabeschritte.",
     },
     borders: "An Rändern einrasten",
     centers: "An Mitten einrasten",
@@ -546,6 +635,23 @@ const de = {
       custom_models_translate: "Benutzerdefinierte Modelle (Übersetzung)",
       custom_models_vision: "Benutzerdefinierte Modelle (Vision)",
       custom_models_placeholder: "Modell-ID eingeben und Enter drücken",
+    },
+    ai_chat: {
+      title: "AI-Chat-Werkzeuge",
+      description:
+        "Konfigurieren Sie das KI-Dokument-Zusammenfassungswerkzeug und wählen Sie ein Zusammenfassungsmodell für lange Zusammenfassungen.",
+      digest_enabled: "Digest-Werkzeug aktivieren",
+      digest_enabled_desc:
+        "Schaltet get_document_digest für den AI-Chat ein oder aus.",
+      summary_model: "Digest-Zusammenfassungsmodell",
+      summary_model_placeholder: "Modell auswählen",
+      summary_model_desc:
+        "Wird von get_document_digest verwendet. Wenn das Digest-Werkzeug deaktiviert ist oder kein Modell ausgewählt wurde, ist dieses Werkzeug nicht verfügbar.",
+      no_models: "Keine verfügbaren Modelle",
+      digest_chars_per_chunk: "Ausgabelänge pro Ebene",
+      digest_source_chars_per_chunk: "Eingabebudget pro Ebene",
+      digest_sampling_desc:
+        "Das Eingabebudget bestimmt, wie viel Material jede Zusammenfassungsebene prüfen kann, während die Ausgabelänge bestimmt, wie viel jede Ebene behält. Eine Erhöhung des Eingabebudgets verbessert die Gesamtabdeckung des Dokuments in der Regel stärker als eine Erhöhung der Ausgabelänge.",
     },
     done: "Fertig",
   },

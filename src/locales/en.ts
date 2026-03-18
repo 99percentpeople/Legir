@@ -409,6 +409,34 @@ const en = {
       },
     },
   },
+  debug_overlay: {
+    page_waiting: "page waiting",
+    page_current_ready: "page current ready",
+    page_current_partial: "page current partial",
+    page_current_waiting: "page current waiting",
+    page_first_ready: "page first ready",
+    page_first_partial: "page first partial",
+    page_first_rendering: "page first rendering",
+    page_zoom_ready: "page zoom ready",
+    page_zoom_partial: "page zoom partial",
+    page_zoom_rendering: "page zoom rendering",
+    workspace_zooming: "workspace zooming",
+    workspace_last: "workspace last",
+    scale: "scale",
+    duration: "duration",
+    response: "response",
+    stall: "stall",
+    avg: "avg",
+    worst: "worst",
+    jank: "jank",
+    dropped: "dropped",
+    steps: "steps",
+    zoom: "zoom",
+    canvas: "canvas",
+    text: "text",
+    total: "total",
+    off: "off",
+  },
   annotation: {
     font_missing_warning:
       "This PDF uses a subset/embedded font that may be missing glyphs. When you edit this text, it will be re-rendered using the default font.",
@@ -529,12 +557,55 @@ const en = {
     debug: {
       pdf_text_layer_debug: "PDF Text Layer Debug",
       pdf_text_layer_debug_desc: "Show the text layer of the PDF.js",
+      disable_pdf_text_layer: "Disable PDF Text Layer",
+      disable_pdf_text_layer_desc:
+        "Unmount PDFTextLayer for profiling. Text selection, text search highlighting, and text-based highlight drawing will stop working while this is enabled.",
       pdf_zoom_render_timing: "PDF Zoom Render Timing",
       pdf_zoom_render_timing_desc:
         "Show per-page canvas/text render latency after each zoom change.",
+      pdf_zoom_render_timing_tooltip_label:
+        "Show PDF page zoom render timing metrics",
+      pdf_zoom_render_timing_tooltip_title:
+        "PDF Page Zoom Render Timing Metrics",
+      pdf_zoom_render_timing_tooltip_waiting: "No active measurement yet.",
+      pdf_zoom_render_timing_tooltip_current:
+        "Current visible page state without a new render session.",
+      pdf_zoom_render_timing_tooltip_initial:
+        "Initial render state when the page first enters view.",
+      pdf_zoom_render_timing_tooltip_zoom:
+        "Rerender state after a zoom scale change.",
+      pdf_zoom_render_timing_tooltip_scale:
+        "The target scale of the current or last measured render.",
+      pdf_zoom_render_timing_tooltip_canvas:
+        "Time from session start until the PDF bitmap layer is ready.",
+      pdf_zoom_render_timing_tooltip_text:
+        "Time from session start until the text layer is ready.",
+      pdf_zoom_render_timing_tooltip_total:
+        "Time from session start until all required layers are ready.",
       workspace_zoom_jank: "Workspace Zoom Jank",
       workspace_zoom_jank_desc:
         "Show overall workspace zoom frame stats, including worst frame and dropped frames.",
+      workspace_zoom_jank_tooltip_label: "Show workspace zoom jank metrics",
+      workspace_zoom_jank_tooltip_title: "Workspace Zoom Jank Metrics",
+      workspace_zoom_jank_tooltip_status:
+        "Current zoom session in progress / latest completed zoom session.",
+      workspace_zoom_jank_tooltip_scale:
+        "Start and end scale of the continuous zoom session.",
+      workspace_zoom_jank_tooltip_duration:
+        "Total wall-clock length of the zoom session, not pure lag time.",
+      workspace_zoom_jank_tooltip_response:
+        "Delay from the first zoom input to the first committed scale update.",
+      workspace_zoom_jank_tooltip_stall:
+        "Total time above a 60fps frame budget during the zoom session.",
+      workspace_zoom_jank_tooltip_avg:
+        "Average frame time during the zoom session. Lower is better.",
+      workspace_zoom_jank_tooltip_worst:
+        "Slowest frame observed during the zoom session.",
+      workspace_zoom_jank_tooltip_jank: "Number of frames taking 20ms or more.",
+      workspace_zoom_jank_tooltip_dropped:
+        "Estimated dropped frames based on a 60fps frame budget.",
+      workspace_zoom_jank_tooltip_steps:
+        "Number of zoom input steps received in the session.",
     },
     borders: "Snap to Borders",
     centers: "Snap to Centers",

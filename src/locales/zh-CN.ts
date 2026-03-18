@@ -406,6 +406,34 @@ const zhCN = {
       },
     },
   },
+  debug_overlay: {
+    page_waiting: "页面等待中",
+    page_current_ready: "页面当前已就绪",
+    page_current_partial: "页面当前部分就绪",
+    page_current_waiting: "页面当前等待中",
+    page_first_ready: "页面首次渲染已就绪",
+    page_first_partial: "页面首次渲染部分就绪",
+    page_first_rendering: "页面首次渲染中",
+    page_zoom_ready: "页面缩放重渲染已就绪",
+    page_zoom_partial: "页面缩放重渲染部分就绪",
+    page_zoom_rendering: "页面缩放重渲染中",
+    workspace_zooming: "工作区缩放中",
+    workspace_last: "工作区最近一次",
+    scale: "缩放",
+    duration: "时长",
+    response: "响应",
+    stall: "卡顿",
+    avg: "平均",
+    worst: "最慢",
+    jank: "卡顿帧",
+    dropped: "掉帧",
+    steps: "步数",
+    zoom: "缩放",
+    canvas: "画布",
+    text: "文本",
+    total: "总计",
+    off: "关闭",
+  },
   annotation: {
     font_missing_warning:
       "该 PDF 使用了精简/嵌入字体，可能缺少字形。编辑此自由文本后将使用默认字体重新排版。",
@@ -525,11 +553,45 @@ const zhCN = {
     debug: {
       pdf_text_layer_debug: "PDF 文本层调试",
       pdf_text_layer_debug_desc: "显示 PDF.js 文本层",
+      disable_pdf_text_layer: "禁用 PDF 文本层",
+      disable_pdf_text_layer_desc:
+        "为性能分析卸载 PDFTextLayer。启用后，文本选择、文本搜索高亮以及基于文本的高亮绘制都会失效。",
       pdf_zoom_render_timing: "PDF 缩放渲染耗时",
       pdf_zoom_render_timing_desc: "显示每页在缩放后的 canvas/text 渲染耗时。",
+      pdf_zoom_render_timing_tooltip_label: "显示 PDF 页面缩放渲染指标",
+      pdf_zoom_render_timing_tooltip_title: "PDF 页面缩放渲染指标",
+      pdf_zoom_render_timing_tooltip_waiting: "当前还没有激活的测量会话。",
+      pdf_zoom_render_timing_tooltip_current:
+        "当前可见页面在没有新渲染会话时的状态。",
+      pdf_zoom_render_timing_tooltip_initial:
+        "页面第一次进入视口时的首渲染状态。",
+      pdf_zoom_render_timing_tooltip_zoom: "缩放比例变化后的重渲染状态。",
+      pdf_zoom_render_timing_tooltip_scale:
+        "当前或最近一次测量渲染的目标缩放比例。",
+      pdf_zoom_render_timing_tooltip_canvas:
+        "从会话开始到 PDF 位图层就绪的耗时。",
+      pdf_zoom_render_timing_tooltip_text: "从会话开始到文本层就绪的耗时。",
+      pdf_zoom_render_timing_tooltip_total:
+        "从会话开始到所有必需图层就绪的总耗时。",
       workspace_zoom_jank: "Workspace 缩放卡顿",
       workspace_zoom_jank_desc:
         "显示工作区整体缩放的帧统计，包括最慢帧和掉帧数。",
+      workspace_zoom_jank_tooltip_label: "显示工作区缩放卡顿指标",
+      workspace_zoom_jank_tooltip_title: "工作区缩放卡顿指标",
+      workspace_zoom_jank_tooltip_status:
+        "当前正在进行的缩放会话 / 最近一次已完成的缩放会话。",
+      workspace_zoom_jank_tooltip_scale: "连续缩放会话的起始与结束缩放比例。",
+      workspace_zoom_jank_tooltip_duration:
+        "缩放会话的总墙钟时长，不等于纯卡顿时间。",
+      workspace_zoom_jank_tooltip_response:
+        "从第一次缩放输入到第一次提交缩放更新的延迟。",
+      workspace_zoom_jank_tooltip_stall:
+        "缩放会话中超过 60fps 帧预算的累计时间。",
+      workspace_zoom_jank_tooltip_avg: "缩放会话中的平均帧时长，越低越好。",
+      workspace_zoom_jank_tooltip_worst: "缩放会话中观测到的最慢一帧。",
+      workspace_zoom_jank_tooltip_jank: "耗时达到 20ms 及以上的帧数。",
+      workspace_zoom_jank_tooltip_dropped: "基于 60fps 帧预算估算的掉帧数。",
+      workspace_zoom_jank_tooltip_steps: "会话中接收到的缩放输入步数。",
     },
     borders: "对齐边框",
     centers: "对齐中心",

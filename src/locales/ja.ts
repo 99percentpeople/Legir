@@ -326,6 +326,7 @@ const ja = {
     tool_details: "詳細",
     tool_args: "引数",
     tool_result: "生の結果",
+    responding: "応答を待機中",
     thinking: "思考中",
     thought_complete: "考えました",
     thought_for: "{duration}考えました",
@@ -339,13 +340,25 @@ const ja = {
       desc: "現在の会話メッセージ、ツール履歴、検索結果が削除されます。",
       confirm: "会話をクリア",
     },
+    copy: "コピー",
+    copied: "コピー済み",
+    switch_branch: "ブランチを切り替え",
+    edit: "編集",
     send: "送信",
     stop: "停止",
     cancel_edit: "編集をキャンセル",
+    regenerate: "再生成",
+    branch_edit: "編集ブランチ",
+    branch_regenerate: "再生成ブランチ",
     messages: "メッセージ",
     tools: "ツール実行",
     error_title: "リクエストに失敗しました",
     retry: "再試行",
+    tool_schedule_log: "実行ログ",
+    tool_progress_layer: "レイヤー {count}",
+    tool_progress_pending: "{count} 件待機中",
+    tool_progress_running: "{count} 件実行中",
+    tool_progress_done: "{count} 件完了",
     input_placeholder:
       "AI に PDF の内容を読ませたり、検索、移動、ハイライトさせたりできます...",
     input_hint: "Enter で送信、Shift+Enter で改行します。",
@@ -396,6 +409,34 @@ const ja = {
         annotations: "この PDF の注釈とハイライトを一覧表示して",
       },
     },
+  },
+  debug_overlay: {
+    page_waiting: "ページ待機中",
+    page_current_ready: "ページ現在準備完了",
+    page_current_partial: "ページ現在一部準備完了",
+    page_current_waiting: "ページ現在待機中",
+    page_first_ready: "ページ初回描画完了",
+    page_first_partial: "ページ初回描画一部完了",
+    page_first_rendering: "ページ初回描画中",
+    page_zoom_ready: "ページズーム再描画完了",
+    page_zoom_partial: "ページズーム再描画一部完了",
+    page_zoom_rendering: "ページズーム再描画中",
+    workspace_zooming: "ワークスペースをズーム中",
+    workspace_last: "ワークスペース前回",
+    scale: "倍率",
+    duration: "時間",
+    response: "応答",
+    stall: "停滞",
+    avg: "平均",
+    worst: "最悪",
+    jank: "カクつき",
+    dropped: "ドロップ",
+    steps: "ステップ",
+    zoom: "ズーム",
+    canvas: "キャンバス",
+    text: "テキスト",
+    total: "合計",
+    off: "オフ",
   },
   workspace: {
     no_pdf:
@@ -490,6 +531,7 @@ const ja = {
       export: "エクスポート",
       snapping: "スナップ",
       llm: "LLM",
+      ai_chat: "AI チャット",
       debug: "デバッグ",
     },
     language: "言語",
@@ -513,12 +555,54 @@ const ja = {
     debug: {
       pdf_text_layer_debug: "PDF.js テキストレイヤーのデバッグ",
       pdf_text_layer_debug_desc: "PDF.js テキストレイヤーを表示します",
+      disable_pdf_text_layer: "PDF テキストレイヤーを無効化",
+      disable_pdf_text_layer_desc:
+        "性能分析のために PDFTextLayer をアンマウントします。有効にすると、テキスト選択、テキスト検索ハイライト、テキストベースのハイライト描画は使えなくなります。",
       pdf_zoom_render_timing: "PDF ズーム描画時間",
       pdf_zoom_render_timing_desc:
         "ズーム変更ごとのページ単位の canvas/text 描画遅延を表示します。",
+      pdf_zoom_render_timing_tooltip_label: "PDF ページのズーム描画指標を表示",
+      pdf_zoom_render_timing_tooltip_title: "PDF ページのズーム描画指標",
+      pdf_zoom_render_timing_tooltip_waiting:
+        "まだ有効な測定セッションはありません。",
+      pdf_zoom_render_timing_tooltip_current:
+        "新しい描画セッションがないときの現在の可視ページ状態です。",
+      pdf_zoom_render_timing_tooltip_initial:
+        "ページが初めて表示領域に入ったときの初回描画状態です。",
+      pdf_zoom_render_timing_tooltip_zoom: "ズーム倍率変更後の再描画状態です。",
+      pdf_zoom_render_timing_tooltip_scale:
+        "現在または直近に測定した描画の目標倍率です。",
+      pdf_zoom_render_timing_tooltip_canvas:
+        "セッション開始から PDF ビットマップ層が準備完了になるまでの時間です。",
+      pdf_zoom_render_timing_tooltip_text:
+        "セッション開始からテキストレイヤーが準備完了になるまでの時間です。",
+      pdf_zoom_render_timing_tooltip_total:
+        "セッション開始から必要なすべてのレイヤーが準備完了になるまでの時間です。",
       workspace_zoom_jank: "Workspace ズームのカクつき",
       workspace_zoom_jank_desc:
         "ワークスペース全体のズーム時のフレーム統計を表示し、最遅フレームやドロップフレーム数を確認できます。",
+      workspace_zoom_jank_tooltip_label:
+        "ワークスペースのズームカクつき指標を表示",
+      workspace_zoom_jank_tooltip_title: "ワークスペースのズームカクつき指標",
+      workspace_zoom_jank_tooltip_status:
+        "現在進行中のズームセッション / 直近で完了したズームセッションです。",
+      workspace_zoom_jank_tooltip_scale:
+        "連続ズームセッションの開始倍率と終了倍率です。",
+      workspace_zoom_jank_tooltip_duration:
+        "ズームセッション全体の実時間であり、純粋な遅延時間ではありません。",
+      workspace_zoom_jank_tooltip_response:
+        "最初のズーム入力から最初の倍率更新が反映されるまでの遅延です。",
+      workspace_zoom_jank_tooltip_stall:
+        "ズームセッション中に 60fps のフレーム予算を超えた累計時間です。",
+      workspace_zoom_jank_tooltip_avg:
+        "ズームセッション中の平均フレーム時間です。低いほど良いです。",
+      workspace_zoom_jank_tooltip_worst:
+        "ズームセッション中に観測された最も遅いフレームです。",
+      workspace_zoom_jank_tooltip_jank: "20ms 以上かかったフレーム数です。",
+      workspace_zoom_jank_tooltip_dropped:
+        "60fps のフレーム予算を基に推定したドロップフレーム数です。",
+      workspace_zoom_jank_tooltip_steps:
+        "セッション中に受け取ったズーム入力ステップ数です。",
     },
     borders: "境界線にスナップ",
     centers: "中心にスナップ",
@@ -543,6 +627,23 @@ const ja = {
       custom_models_translate: "カスタムモデル（翻訳）",
       custom_models_vision: "カスタムモデル（ビジョン）",
       custom_models_placeholder: "モデルIDを入力して Enter で追加",
+    },
+    ai_chat: {
+      title: "AI チャットツール",
+      description:
+        "AI ドキュメント要約ツールを設定し、長文要約用のサマリーモデルを選択します。",
+      digest_enabled: "要約ツールを有効化",
+      digest_enabled_desc:
+        "AI チャットで get_document_digest を使えるかどうかを切り替えます。",
+      summary_model: "要約モデル",
+      summary_model_placeholder: "モデルを選択",
+      summary_model_desc:
+        "get_document_digest で使用します。要約ツールが無効、またはモデルが未選択の場合、このツールは利用できません。",
+      no_models: "利用可能なモデルがありません",
+      digest_chars_per_chunk: "各レイヤーの要約出力長",
+      digest_source_chars_per_chunk: "各レイヤーの要約入力予算",
+      digest_sampling_desc:
+        "入力予算は各要約レイヤーがどれだけの内容を確認できるかを決め、出力長は各レイヤーがどれだけの情報を残すかを決めます。通常は、出力長を増やすより入力予算を増やすほうが文書全体のカバー率を改善しやすくなります。",
     },
     done: "完了",
   },

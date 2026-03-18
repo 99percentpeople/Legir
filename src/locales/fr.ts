@@ -329,6 +329,7 @@ const fr = {
     tool_details: "Détails",
     tool_args: "Arguments",
     tool_result: "Résultat brut",
+    responding: "En attente de réponse",
     thinking: "Réflexion",
     thought_complete: "A réfléchi",
     thought_for: "Réflexion pendant {duration}",
@@ -342,13 +343,25 @@ const fr = {
       desc: "Cela supprimera les messages actuels, l'historique des outils et les résultats de recherche.",
       confirm: "Effacer la conversation",
     },
+    copy: "Copier",
+    copied: "Copié",
+    switch_branch: "Changer de branche",
+    edit: "Modifier",
     send: "Envoyer",
     stop: "Arrêter",
     cancel_edit: "Annuler la modification",
+    regenerate: "Régénérer",
+    branch_edit: "Branche modifiée",
+    branch_regenerate: "Branche régénérée",
     messages: "Messages",
     tools: "Outils",
     error_title: "Échec de la requête",
     retry: "Réessayer",
+    tool_schedule_log: "Journal d'exécution",
+    tool_progress_layer: "Couche {count}",
+    tool_progress_pending: "{count} en attente",
+    tool_progress_running: "{count} en cours",
+    tool_progress_done: "{count} terminés",
     input_placeholder:
       "Demandez à l'IA de lire, rechercher, naviguer ou surligner le contenu du PDF...",
     input_hint:
@@ -400,6 +413,34 @@ const fr = {
         annotations: "Liste tous les commentaires et surlignages de ce PDF",
       },
     },
+  },
+  debug_overlay: {
+    page_waiting: "page en attente",
+    page_current_ready: "page actuelle prête",
+    page_current_partial: "page actuelle partielle",
+    page_current_waiting: "page actuelle en attente",
+    page_first_ready: "premier rendu prêt",
+    page_first_partial: "premier rendu partiel",
+    page_first_rendering: "premier rendu en cours",
+    page_zoom_ready: "rendu de zoom prêt",
+    page_zoom_partial: "rendu de zoom partiel",
+    page_zoom_rendering: "rendu de zoom en cours",
+    workspace_zooming: "zoom workspace en cours",
+    workspace_last: "dernier zoom workspace",
+    scale: "échelle",
+    duration: "durée",
+    response: "réponse",
+    stall: "blocage",
+    avg: "moy",
+    worst: "max",
+    jank: "saccades",
+    dropped: "images perdues",
+    steps: "pas",
+    zoom: "zoom",
+    canvas: "canvas",
+    text: "texte",
+    total: "total",
+    off: "désactivé",
   },
   workspace: {
     no_pdf:
@@ -495,6 +536,7 @@ const fr = {
       export: "Export",
       snapping: "Ancrage",
       llm: "LLM",
+      ai_chat: "Chat IA",
       debug: "Débogage",
     },
     language: "Langue",
@@ -519,12 +561,59 @@ const fr = {
     debug: {
       pdf_text_layer_debug: "Afficher la couche de texte de PDF",
       pdf_text_layer_debug_desc: "Afficher la couche de texte de PDF.js",
+      disable_pdf_text_layer: "Désactiver la couche de texte PDF",
+      disable_pdf_text_layer_desc:
+        "Démonte PDFTextLayer pour le profilage. La sélection de texte, le surlignage des recherches textuelles et le surlignage basé sur le texte cesseront de fonctionner tant que cette option est activée.",
       pdf_zoom_render_timing: "Temps de rendu du zoom PDF",
       pdf_zoom_render_timing_desc:
         "Affiche la latence de rendu canvas/texte par page après chaque changement de zoom.",
+      pdf_zoom_render_timing_tooltip_label:
+        "Afficher les métriques de rendu du zoom PDF par page",
+      pdf_zoom_render_timing_tooltip_title:
+        "Métriques de rendu du zoom PDF par page",
+      pdf_zoom_render_timing_tooltip_waiting:
+        "Aucune mesure active pour le moment.",
+      pdf_zoom_render_timing_tooltip_current:
+        "État actuel de la page visible sans nouvelle session de rendu.",
+      pdf_zoom_render_timing_tooltip_initial:
+        "État du rendu initial lorsque la page entre dans la zone visible.",
+      pdf_zoom_render_timing_tooltip_zoom:
+        "État du rerendu après un changement de zoom.",
+      pdf_zoom_render_timing_tooltip_scale:
+        "Échelle cible du rendu courant ou du dernier rendu mesuré.",
+      pdf_zoom_render_timing_tooltip_canvas:
+        "Temps écoulé entre le début de la session et la disponibilité de la couche bitmap PDF.",
+      pdf_zoom_render_timing_tooltip_text:
+        "Temps écoulé entre le début de la session et la disponibilité de la couche texte.",
+      pdf_zoom_render_timing_tooltip_total:
+        "Temps écoulé entre le début de la session et la disponibilité de toutes les couches requises.",
       workspace_zoom_jank: "Saccades du zoom de l'espace de travail",
       workspace_zoom_jank_desc:
         "Affiche les statistiques de frames du zoom global de l'espace de travail, y compris la frame la plus lente et les frames perdues.",
+      workspace_zoom_jank_tooltip_label:
+        "Afficher les métriques de saccades du zoom de l'espace de travail",
+      workspace_zoom_jank_tooltip_title:
+        "Métriques de saccades du zoom de l'espace de travail",
+      workspace_zoom_jank_tooltip_status:
+        "Session de zoom en cours / dernière session de zoom terminée.",
+      workspace_zoom_jank_tooltip_scale:
+        "Échelle de départ et de fin de la session de zoom continue.",
+      workspace_zoom_jank_tooltip_duration:
+        "Durée totale réelle de la session de zoom, pas seulement le temps de latence.",
+      workspace_zoom_jank_tooltip_response:
+        "Délai entre la première entrée de zoom et la première mise à jour d'échelle validée.",
+      workspace_zoom_jank_tooltip_stall:
+        "Temps cumulé au-dessus d'un budget de frame de 60 fps pendant la session.",
+      workspace_zoom_jank_tooltip_avg:
+        "Temps moyen par frame pendant la session de zoom. Plus bas est préférable.",
+      workspace_zoom_jank_tooltip_worst:
+        "Frame la plus lente observée pendant la session de zoom.",
+      workspace_zoom_jank_tooltip_jank:
+        "Nombre de frames prenant 20 ms ou plus.",
+      workspace_zoom_jank_tooltip_dropped:
+        "Nombre estimé de frames perdues sur la base d'un budget de 60 fps.",
+      workspace_zoom_jank_tooltip_steps:
+        "Nombre d'entrées de zoom reçues pendant la session.",
     },
     borders: "Ancrer aux bordures",
     centers: "Ancrer aux centres",
@@ -550,6 +639,23 @@ const fr = {
       custom_models_vision: "Modèles personnalisés (Vision)",
       custom_models_placeholder:
         "Saisissez un ID de modèle puis appuyez sur Entrée",
+    },
+    ai_chat: {
+      title: "Outils de chat IA",
+      description:
+        "Configure l'outil de résumé du document IA et choisissez un modèle de résumé pour les synthèses longues.",
+      digest_enabled: "Activer l'outil de synthèse",
+      digest_enabled_desc:
+        "Active ou désactive get_document_digest dans le chat IA.",
+      summary_model: "Modèle de synthèse",
+      summary_model_placeholder: "Sélectionner un modèle",
+      summary_model_desc:
+        "Utilisé par get_document_digest. Si l'outil de synthèse est désactivé ou si aucun modèle n'est sélectionné, cet outil devient indisponible.",
+      no_models: "Aucun modèle disponible",
+      digest_chars_per_chunk: "Longueur de sortie par couche",
+      digest_source_chars_per_chunk: "Budget d'entrée par couche",
+      digest_sampling_desc:
+        "Le budget d'entrée détermine la quantité de contenu que chaque couche de synthèse peut examiner, tandis que la longueur de sortie détermine ce qu'elle conserve. Augmenter le budget d'entrée améliore généralement plus la couverture globale du document qu'augmenter la longueur de sortie.",
     },
     done: "Terminé",
   },

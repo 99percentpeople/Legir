@@ -1066,7 +1066,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                         htmlFor="debug-disable-pdf-text-layer"
                         className="mb-0 font-semibold"
                       >
-                        Disable PDF Text Layer
+                        {t("settings.debug.disable_pdf_text_layer")}
                       </Label>
                     </div>
                     <Switch
@@ -1078,9 +1078,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     />
                   </div>
                   <p className="text-muted-foreground px-1 text-xs">
-                    Unmounts PDFTextLayer for profiling. Text selection, text
-                    search highlighting, and text-based highlight drawing will
-                    stop working while this is enabled.
+                    {t("settings.debug.disable_pdf_text_layer_desc")}
                   </p>
                 </div>
                 <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
@@ -1099,7 +1097,9 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                             <button
                               type="button"
                               className="text-muted-foreground hover:text-foreground inline-flex items-center transition-colors"
-                              aria-label="Show PDF page zoom render timing metrics"
+                              aria-label={t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_label",
+                              )}
                             >
                               <AlertCircle className="h-3.5 w-3.5" />
                             </button>
@@ -1110,50 +1110,87 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                             className="max-w-sm space-y-1 text-left"
                           >
                             <div className="font-medium">
-                              PDF Page Zoom Render Timing Metrics
-                            </div>
-                            <div>
-                              <span className="font-mono">page waiting</span>:
-                              no active measurement yet.
-                            </div>
-                            <div>
-                              <span className="font-mono">
-                                page current waiting / partial / ready
-                              </span>
-                              : current visible page state without a new render
-                              session.
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_title",
+                              )}
                             </div>
                             <div>
                               <span className="font-mono">
-                                page first rendering / partial / ready
+                                {t("debug_overlay.page_waiting")}
                               </span>
-                              : initial render state when the page first enters
-                              view.
+                              :{" "}
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_waiting",
+                              )}
                             </div>
                             <div>
                               <span className="font-mono">
-                                page zoom rendering / partial / ready
+                                {t("debug_overlay.page_current_waiting")} /{" "}
+                                {t("debug_overlay.page_current_partial")} /{" "}
+                                {t("debug_overlay.page_current_ready")}
                               </span>
-                              : rerender state after a zoom scale change.
+                              :{" "}
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_current",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">zoom</span>: the
-                              target scale of the current or last measured
-                              render.
+                              <span className="font-mono">
+                                {t("debug_overlay.page_first_rendering")} /{" "}
+                                {t("debug_overlay.page_first_partial")} /{" "}
+                                {t("debug_overlay.page_first_ready")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_initial",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">canvas</span>: time
-                              from session start until the PDF bitmap layer is
-                              ready.
+                              <span className="font-mono">
+                                {t("debug_overlay.page_zoom_rendering")} /{" "}
+                                {t("debug_overlay.page_zoom_partial")} /{" "}
+                                {t("debug_overlay.page_zoom_ready")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_zoom",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">text</span>: time from
-                              session start until the text layer is ready.
+                              <span className="font-mono">
+                                {t("debug_overlay.zoom")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_scale",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">total</span>: time
-                              from session start until all required layers are
-                              ready.
+                              <span className="font-mono">
+                                {t("debug_overlay.canvas")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_canvas",
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-mono">
+                                {t("debug_overlay.text")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_text",
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-mono">
+                                {t("debug_overlay.total")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.pdf_zoom_render_timing_tooltip_total",
+                              )}
                             </div>
                           </TooltipContent>
                         </Tooltip>
@@ -1187,7 +1224,9 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                             <button
                               type="button"
                               className="text-muted-foreground hover:text-foreground inline-flex items-center transition-colors"
-                              aria-label="Show workspace zoom jank metrics"
+                              aria-label={t(
+                                "settings.debug.workspace_zoom_jank_tooltip_label",
+                              )}
                             >
                               <AlertCircle className="h-3.5 w-3.5" />
                             </button>
@@ -1198,55 +1237,100 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                             className="max-w-sm space-y-1 text-left"
                           >
                             <div className="font-medium">
-                              Workspace Zoom Jank Metrics
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_title",
+                              )}
                             </div>
                             <div>
                               <span className="font-mono">
-                                workspace zooming / workspace last
+                                {t("debug_overlay.workspace_zooming")} /{" "}
+                                {t("debug_overlay.workspace_last")}
                               </span>
-                              : current zoom session in progress / latest
-                              completed zoom session.
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_status",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">scale</span>: start
-                              and end scale of the continuous zoom session.
+                              <span className="font-mono">
+                                {t("debug_overlay.scale")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_scale",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">duration</span>: total
-                              wall-clock length of the zoom session, not pure
-                              lag time.
+                              <span className="font-mono">
+                                {t("debug_overlay.duration")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_duration",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">response</span>: delay
-                              from the first zoom input to the first committed
-                              scale update.
+                              <span className="font-mono">
+                                {t("debug_overlay.response")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_response",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">stall</span>: total
-                              time above a 60fps frame budget during the zoom
-                              session.
+                              <span className="font-mono">
+                                {t("debug_overlay.stall")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_stall",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">avg</span>: average
-                              frame time during the zoom session. Lower is
-                              better.
+                              <span className="font-mono">
+                                {t("debug_overlay.avg")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_avg",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">worst</span>: slowest
-                              frame observed during the zoom session.
+                              <span className="font-mono">
+                                {t("debug_overlay.worst")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_worst",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">jank</span>: number of
-                              frames taking 20ms or more.
+                              <span className="font-mono">
+                                {t("debug_overlay.jank")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_jank",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">dropped</span>:
-                              estimated dropped frames based on a 60fps frame
-                              budget.
+                              <span className="font-mono">
+                                {t("debug_overlay.dropped")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_dropped",
+                              )}
                             </div>
                             <div>
-                              <span className="font-mono">steps</span>: number
-                              of zoom input steps received in the session.
+                              <span className="font-mono">
+                                {t("debug_overlay.steps")}
+                              </span>
+                              :{" "}
+                              {t(
+                                "settings.debug.workspace_zoom_jank_tooltip_steps",
+                              )}
                             </div>
                           </TooltipContent>
                         </Tooltip>
