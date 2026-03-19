@@ -16,6 +16,7 @@ export type AiChatSessionUiState = {
   timeline: AiChatTimelineItem[];
   runStatus: AiChatRunStatus;
   lastError: string | null;
+  awaitingContinue: boolean;
   highlightedResultIds: string[];
   conversation: AiChatMessageRecord[];
   searchResultsById: Map<string, AiStoredSearchResult>;
@@ -27,6 +28,7 @@ export const getAiChatSessionUiState = (
   timeline: session.timeline,
   runStatus: session.runStatus,
   lastError: session.lastError,
+  awaitingContinue: session.awaitingContinue,
   highlightedResultIds: session.highlightedResultIds,
   conversation: session.conversation,
   searchResultsById: session.searchResultsById,
@@ -39,6 +41,7 @@ export const getIdleAiChatSessionUiState = (): Omit<
   timeline: [],
   runStatus: "idle",
   lastError: null,
+  awaitingContinue: false,
   highlightedResultIds: [],
 });
 

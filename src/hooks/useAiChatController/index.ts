@@ -54,6 +54,7 @@ import {
   pushUserConversationMessage,
   resolveSelectedAiChatModel,
   restoreConversationAfterTimelineMutation,
+  type AiChatFlatModel,
 } from "@/hooks/useAiChatController/conversationActions";
 import { createAiChatToolContext } from "@/hooks/useAiChatController/toolContext";
 import { applyAiChatSessionUiState } from "@/hooks/useAiChatController/uiStateSync";
@@ -104,6 +105,7 @@ export const useAiChatController = (editorState: EditorState) => {
   const [timeline, setTimeline] = useState<AiChatTimelineItem[]>(() => []);
   const [runStatus, setRunStatus] = useState<AiChatRunStatus>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
+  const [awaitingContinue, setAwaitingContinue] = useState(false);
   const [highlightedResultIds, setHighlightedResultIds] = useState<string[]>(
     [],
   );
@@ -150,6 +152,7 @@ export const useAiChatController = (editorState: EditorState) => {
       setTimeline,
       setRunStatus,
       setLastError,
+      setAwaitingContinue,
       setHighlightedResultIds,
     });
   }, []);
@@ -160,6 +163,7 @@ export const useAiChatController = (editorState: EditorState) => {
     setTimeline([]);
     setRunStatus("idle");
     setLastError(null);
+    setAwaitingContinue(false);
     setHighlightedResultIds([]);
   }, []);
 
@@ -178,30 +182,45 @@ export const useAiChatController = (editorState: EditorState) => {
     [registryVersion],
   );
 
+  const toolCapableChatModelGroups = useMemo(
+    () =>
+      chatModelGroups
+        .map((group) => ({
+          ...group,
+          models: group.models.filter(
+            (model) => model.capabilities.supportsToolCalls,
+          ),
+        }))
+        .filter((group) => group.models.length > 0),
+    [chatModelGroups],
+  );
+
   const modelSelectGroups = useMemo<ModelSelectGroup[]>(() => {
-    return chatModelGroups.map((group) => ({
+    return toolCapableChatModelGroups.map((group) => ({
       id: group.providerId,
       label: group.label,
       options: group.models.map((model) => ({
         value: `${group.providerId}:${model.id}`,
         label: model.label,
+        capabilities: model.capabilities,
         disabled: !group.isAvailable,
       })),
     }));
-  }, [chatModelGroups]);
+  }, [toolCapableChatModelGroups]);
 
   const flatModels = useMemo(
     () =>
-      chatModelGroups.flatMap((group) =>
+      toolCapableChatModelGroups.flatMap((group) =>
         group.models.map((model) => ({
           providerId: group.providerId,
           providerLabel: group.label,
           modelId: model.id,
           modelLabel: model.label,
+          capabilities: model.capabilities,
           isAvailable: group.isAvailable,
         })),
       ),
-    [chatModelGroups],
+    [toolCapableChatModelGroups],
   );
 
   const selectedChatModel = useMemo(
@@ -385,6 +404,10 @@ export const useAiChatController = (editorState: EditorState) => {
           pageFlow: editorState.pageFlow,
         }),
         getSelectedTextContext,
+        getPdfSource: () => ({
+          pdfBytes: editorState.pdfBytes,
+          password: editorState.pdfOpenPassword,
+        }),
         getDigestConfig: () => ({
           charsPerChunk: digestCharsPerChunk,
           sourceCharsPerChunk:
@@ -408,6 +431,8 @@ export const useAiChatController = (editorState: EditorState) => {
       editorState.pageFlow,
       editorState.pageLayout,
       editorState.pages,
+      editorState.pdfBytes,
+      editorState.pdfOpenPassword,
       editorState.scale,
       getSelectedTextContext,
       summarizeDigestChunk,
@@ -435,6 +460,7 @@ export const useAiChatController = (editorState: EditorState) => {
           setTimeline,
           setRunStatus,
           setLastError,
+          setAwaitingContinue,
           setHighlightedResultIds,
         });
         return;
@@ -456,6 +482,7 @@ export const useAiChatController = (editorState: EditorState) => {
       setTimeline,
       setRunStatus,
       setLastError,
+      setAwaitingContinue,
       setHighlightedResultIds,
     });
   }, [documentIdentity, resetDraftConversationUi]);
@@ -519,8 +546,11 @@ export const useAiChatController = (editorState: EditorState) => {
   );
 
   const toolRegistry = useMemo(
-    () => createAiToolRegistry(toolContext),
-    [toolContext],
+    () =>
+      createAiToolRegistry(toolContext, {
+        modelCapabilities: selectedChatModel?.capabilities,
+      }),
+    [selectedChatModel?.capabilities, toolContext],
   );
 
   const appendTimelineItem = useCallback(
@@ -605,6 +635,7 @@ export const useAiChatController = (editorState: EditorState) => {
       setTimeline,
       setRunStatus,
       setLastError,
+      setAwaitingContinue,
       setHighlightedResultIds,
     });
 
@@ -642,6 +673,134 @@ export const useAiChatController = (editorState: EditorState) => {
     [],
   );
 
+  const runAssistantTurn = useCallback(
+    async (options: {
+      session: AiChatSessionData;
+      selected: AiChatFlatModel;
+      assistantBranchAnchorId?: string;
+    }) => {
+      const { session, selected, assistantBranchAnchorId } = options;
+      const sessionId = session.id;
+
+      setLastError(null);
+      setAwaitingContinue(false);
+      setRunStatus("running");
+      session.lastError = null;
+      session.awaitingContinue = false;
+      session.runStatus = "running";
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const appOptions = useEditorStore.getState().options;
+        const result = await aiChatService.runConversation({
+          appOptions,
+          modelCache: editorState.llmModelCache,
+          messages: conversationRef.current,
+          modelKey: `${selected.providerId}:${selected.modelId}`,
+          toolRegistry,
+          signal: controller.signal,
+          onAssistantUpdate: (update) => {
+            if (
+              assistantBranchAnchorId &&
+              (update.phase === "delta" || update.phase === "end")
+            ) {
+              applyAssistantUpdate({
+                ...update,
+                branchAnchorId: assistantBranchAnchorId,
+              });
+              return;
+            }
+            applyAssistantUpdate(update);
+          },
+          onToolUpdate: applyToolUpdate,
+        });
+
+        applyConversationSuccess({
+          session,
+          conversationRef,
+          conversation: result.conversation,
+        });
+        session.awaitingContinue = result.awaitingContinue;
+        if (
+          assistantBranchAnchorId &&
+          session.branchKind === "regenerate" &&
+          result.assistantMessage.trim()
+        ) {
+          const nextTitle = getFirstLineTitleSnippet(result.assistantMessage);
+          if (nextTitle && nextTitle !== session.title) {
+            session.title = nextTitle;
+            touchSessionSummary(sessionId, {
+              title: nextTitle,
+            });
+          }
+        }
+        setAwaitingContinue(result.awaitingContinue);
+        setRunStatus("idle");
+      } catch (error) {
+        session.awaitingContinue = false;
+
+        if (isAbortError(error)) {
+          setAwaitingContinue(false);
+          setRunStatus("idle");
+          session.runStatus = "idle";
+
+          setTimeline((prev) => {
+            const next = finalizeStreamingTimeline(
+              prev,
+              new Date().toISOString(),
+              "Cancelled",
+            );
+
+            session.timeline = next;
+            restoreConversationAfterTimelineMutation({
+              session,
+              conversationRef,
+              timeline: next,
+            });
+            return next;
+          });
+          return;
+        }
+
+        const carriedConversation = extractAiChatErrorConversation(error);
+        setTimeline((prev) => {
+          const next = finalizeStreamingTimeline(
+            prev,
+            new Date().toISOString(),
+            "Failed",
+          );
+          session.timeline = next;
+          restoreConversationAfterTimelineMutation({
+            session,
+            conversationRef,
+            timeline: next,
+            carriedConversation,
+          });
+          return next;
+        });
+
+        const message =
+          error instanceof Error ? error.message : "AI chat request failed.";
+        setAwaitingContinue(false);
+        setLastError(message);
+        setRunStatus("error");
+        session.lastError = message;
+        session.runStatus = "error";
+      } finally {
+        abortRef.current = null;
+      }
+    },
+    [
+      applyAssistantUpdate,
+      applyToolUpdate,
+      editorState.llmModelCache,
+      toolRegistry,
+      touchSessionSummary,
+    ],
+  );
+
   const sendMessage = useCallback(
     async (input: AiChatUserMessageInput) => {
       const prepared = prepareAiChatUserInput(input);
@@ -654,10 +813,12 @@ export const useAiChatController = (editorState: EditorState) => {
       const selected = resolveSelectedAiChatModel(flatModels, selectedModelKey);
       if (!selected) {
         setLastError("No available AI chat model.");
+        setAwaitingContinue(false);
         setRunStatus("error");
         const session = sessionsRef.current.get(activeSessionIdRef.current);
         if (session) {
           session.lastError = "No available AI chat model.";
+          session.awaitingContinue = false;
           session.runStatus = "error";
         }
         return;
@@ -731,133 +892,73 @@ export const useAiChatController = (editorState: EditorState) => {
       });
       appendTimelineItem(userItem);
 
-      setLastError(null);
-      setRunStatus("running");
-      session.lastError = null;
-      session.runStatus = "running";
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-
       pushUserConversationMessage({
         session,
         conversationRef,
         conversationText,
       });
 
-      try {
-        const assistantBranchAnchorId = getPendingBranchAnchorId(
-          session,
-          "assistant",
-        );
-        const appOptions = useEditorStore.getState().options;
-        const result = await aiChatService.runConversation({
-          appOptions,
-          modelCache: editorState.llmModelCache,
-          messages: conversationRef.current,
-          modelKey: `${selected.providerId}:${selected.modelId}`,
-          toolRegistry,
-          signal: controller.signal,
-          onAssistantUpdate: (update) => {
-            if (
-              assistantBranchAnchorId &&
-              (update.phase === "delta" || update.phase === "end")
-            ) {
-              applyAssistantUpdate({
-                ...update,
-                branchAnchorId: assistantBranchAnchorId,
-              });
-              return;
-            }
-            applyAssistantUpdate(update);
-          },
-          onToolUpdate: applyToolUpdate,
-        });
-
-        applyConversationSuccess({
-          session,
-          conversationRef,
-          conversation: result.conversation,
-        });
-        if (
-          assistantBranchAnchorId &&
-          session.branchKind === "regenerate" &&
-          result.assistantMessage.trim()
-        ) {
-          const nextTitle = getFirstLineTitleSnippet(result.assistantMessage);
-          if (nextTitle && nextTitle !== session.title) {
-            session.title = nextTitle;
-            touchSessionSummary(sessionId, {
-              title: nextTitle,
-            });
-          }
-        }
-        setRunStatus("idle");
-      } catch (error) {
-        if (isAbortError(error)) {
-          setRunStatus("idle");
-          session.runStatus = "idle";
-
-          setTimeline((prev) => {
-            const next = finalizeStreamingTimeline(
-              prev,
-              new Date().toISOString(),
-              "Cancelled",
-            );
-
-            session.timeline = next;
-            restoreConversationAfterTimelineMutation({
-              session,
-              conversationRef,
-              timeline: next,
-            });
-            return next;
-          });
-          return;
-        }
-
-        const carriedConversation = extractAiChatErrorConversation(error);
-        setTimeline((prev) => {
-          const next = finalizeStreamingTimeline(
-            prev,
-            new Date().toISOString(),
-            "Failed",
-          );
-          session.timeline = next;
-          restoreConversationAfterTimelineMutation({
-            session,
-            conversationRef,
-            timeline: next,
-            carriedConversation,
-          });
-          return next;
-        });
-
-        const message =
-          error instanceof Error ? error.message : "AI chat request failed.";
-        setLastError(message);
-        setRunStatus("error");
-        session.lastError = message;
-        session.runStatus = "error";
-      } finally {
-        abortRef.current = null;
-      }
+      const assistantBranchAnchorId = getPendingBranchAnchorId(
+        session,
+        "assistant",
+      );
+      await runAssistantTurn({
+        session,
+        selected,
+        assistantBranchAnchorId,
+      });
     },
     [
       appendTimelineItem,
-      applyAssistantUpdate,
-      applyToolUpdate,
+      createBranchSession,
       flatModels,
       getPendingBranchAnchorId,
       isDraftConversation,
-      createBranchSession,
       materializeDraftConversation,
+      runAssistantTurn,
       runStatus,
       selectedModelKey,
-      toolRegistry,
       touchSessionSummary,
     ],
   );
+
+  const continueConversation = useCallback(async () => {
+    if (runStatus === "running" || runStatus === "cancelling") {
+      return;
+    }
+
+    const session = sessionsRef.current.get(activeSessionIdRef.current);
+    if (!session || !session.awaitingContinue) return;
+
+    const selected = resolveSelectedAiChatModel(flatModels, selectedModelKey);
+    if (!selected) {
+      setLastError("No available AI chat model.");
+      setAwaitingContinue(false);
+      setRunStatus("error");
+      if (session) {
+        session.lastError = "No available AI chat model.";
+        session.awaitingContinue = false;
+        session.runStatus = "error";
+      }
+      return;
+    }
+
+    const assistantBranchAnchorId = getPendingBranchAnchorId(
+      session,
+      "assistant",
+    );
+    await runAssistantTurn({
+      session,
+      selected,
+      assistantBranchAnchorId,
+    });
+  }, [
+    flatModels,
+    getPendingBranchAnchorId,
+    runAssistantTurn,
+    runStatus,
+    selectedModelKey,
+  ]);
 
   function createBranchSession(options: {
     sourceSession: AiChatSessionData;
@@ -918,6 +1019,7 @@ export const useAiChatController = (editorState: EditorState) => {
       setTimeline,
       setRunStatus,
       setLastError,
+      setAwaitingContinue,
       setHighlightedResultIds,
     });
 
@@ -1058,10 +1160,12 @@ export const useAiChatController = (editorState: EditorState) => {
     session.updatedAt = updatedAt;
     session.runStatus = "idle";
     session.lastError = null;
+    session.awaitingContinue = false;
 
     setTimeline(nextTimeline);
     setRunStatus("idle");
     setLastError(null);
+    setAwaitingContinue(false);
 
     restoreConversationAfterTimelineMutation({
       session,
@@ -1156,6 +1260,7 @@ export const useAiChatController = (editorState: EditorState) => {
     session.highlightedResultIds = [];
     session.runStatus = "idle";
     session.lastError = null;
+    session.awaitingContinue = false;
 
     applyAiChatSessionUiState({
       session,
@@ -1164,6 +1269,7 @@ export const useAiChatController = (editorState: EditorState) => {
       setTimeline,
       setRunStatus,
       setLastError,
+      setAwaitingContinue,
       setHighlightedResultIds,
     });
 
@@ -1272,6 +1378,7 @@ export const useAiChatController = (editorState: EditorState) => {
         setTimeline,
         setRunStatus,
         setLastError,
+        setAwaitingContinue,
         setHighlightedResultIds,
       });
     },
@@ -1311,10 +1418,12 @@ export const useAiChatController = (editorState: EditorState) => {
     timeline,
     runStatus,
     lastError,
+    awaitingContinue,
     selectedModelKey,
     setSelectedModelKey,
     modelSelectGroups,
     sendMessage,
+    continueConversation,
     regenerateAssistantMessage,
     retryLastFailedMessage,
     editUserMessage,

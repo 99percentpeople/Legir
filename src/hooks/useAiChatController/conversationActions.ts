@@ -3,6 +3,7 @@ import type {
   AiChatMessageRecord,
   AiChatTimelineItem,
 } from "@/services/ai/chat/types";
+import type { LLMModelCapabilities } from "@/types";
 
 import {
   buildConversationMessageContent,
@@ -17,6 +18,7 @@ export type AiChatFlatModel = {
   providerLabel: string;
   modelId: string;
   modelLabel: string;
+  capabilities: LLMModelCapabilities;
   isAvailable: boolean;
 };
 
@@ -105,6 +107,8 @@ export const applyConversationSuccess = (options: {
   options.conversationRef.current = options.conversation;
   options.session.conversation = options.conversation;
   options.session.runStatus = "idle";
+  options.session.lastError = null;
+  options.session.awaitingContinue = false;
 };
 
 export const restoreConversationAfterTimelineMutation = (options: {

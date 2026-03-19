@@ -8,8 +8,11 @@
  */
 import type { ZodTypeAny } from "zod";
 import type { ToolSet } from "ai";
+import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 import type { AiDocumentLinkTarget } from "@/services/ai/utils/documentLinks";
 import type {
+  LLMModelCapabilities,
+  LLMModelModality,
   PageFlowDirection,
   PageLayoutMode,
   PDFMetadata,
@@ -20,8 +23,9 @@ import type {
 export type AiToolName =
   | "get_document_context"
   | "get_document_metadata"
+  | "get_pages_image"
   | "get_document_digest"
-  | "read_pages"
+  | "get_pages_text"
   | "search_document"
   | "list_annotations"
   | "update_annotation_texts"
@@ -39,6 +43,12 @@ export interface AiChatToolDefinition {
   accessType: "read" | "write";
   inputSchema: ZodTypeAny;
   promptInstructions?: string[];
+  requiredInputModalities?: LLMModelModality[];
+  toModelOutput?: (options: {
+    toolCallId: string;
+    input: unknown;
+    output: unknown;
+  }) => ToolResultOutput | PromiseLike<ToolResultOutput>;
 }
 
 export interface AiChatMessageRecord {
@@ -68,7 +78,6 @@ export interface AiDocumentPageAssetSummary {
 }
 
 export interface AiDocumentContext {
-  filename: string;
   pageCount: number;
   currentPageNumber: number | null;
   visiblePageNumbers: number[];
@@ -85,6 +94,7 @@ export interface AiDocumentContext {
 }
 
 export interface AiDocumentMetadata {
+  filename: string;
   title?: string;
   author?: string;
   subject?: string;
@@ -106,6 +116,27 @@ export interface AiReadablePage {
   charCount: number;
   lineCount?: number;
   lines?: AiReadablePageLine[];
+}
+
+export interface AiRenderedPageImage {
+  pageNumber: number;
+  pageWidth: number;
+  pageHeight: number;
+  rotation: number;
+  targetWidth: number;
+  renderedWidth: number;
+  renderedHeight: number;
+  mimeType: string;
+  renderAnnotations: boolean;
+  base64Data: string;
+}
+
+export interface AiRenderedPageImageBatch {
+  requestedPageCount: number;
+  returnedPageCount: number;
+  truncated: boolean;
+  maxPagesPerCall: number;
+  pages: AiRenderedPageImage[];
 }
 
 export interface AiDocumentDigestChunk {
@@ -389,6 +420,7 @@ export interface AiTextSelectionContext {
 export interface AiToolExecutionResult {
   payload: unknown;
   summary: string;
+  modelOutput?: unknown;
 }
 
 export interface AiToolExecutionProgressItem {
@@ -464,9 +496,8 @@ export type AiChatAssistantUpdate =
     };
 
 export interface AiChatToolRuntime {
-  aiTools: ToolSet;
+  tools: ToolSet;
   toolCallsById: Map<string, AiChatToolCallRecord>;
-  sawToolActivity: () => boolean;
   handleStreamToolError: (options: {
     toolCallId: string;
     toolName: string;
@@ -474,4 +505,8 @@ export interface AiChatToolRuntime {
     batchId: string;
     error: unknown;
   }) => void;
+}
+
+export interface AiToolRegistryOptions {
+  modelCapabilities?: LLMModelCapabilities;
 }

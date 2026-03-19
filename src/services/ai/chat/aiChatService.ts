@@ -1,4 +1,4 @@
-import { generateText, stepCountIs, streamText } from "ai";
+import { stepCountIs, streamText, type OnFinishEvent, type ToolSet } from "ai";
 
 import {
   buildAiChatTurnPrompt,
@@ -9,8 +9,6 @@ import {
   resolveAiSdkLanguageModel,
   resolveAiSdkModelSpecifierForTask,
 } from "@/services/ai/sdk";
-import { getConfiguredAiSdkProvider } from "@/services/ai/sdk/providers";
-import type { AiSdkProviderId } from "@/services/ai/sdk/types";
 import type { AppOptions, EditorState } from "@/types";
 import type {
   AiChatAssistantUpdate,
@@ -19,51 +17,11 @@ import type {
   AiToolRegistry,
 } from "./types";
 
-const createFinalAnswerPrompt = (messages: AiChatMessageRecord[]) =>
-  [
-    buildAiChatTurnPrompt({ messages }),
-    "",
-    "Provide the final user-facing answer now.",
-    "Do not call any tools.",
-    "Reply in the same language as the user's most recent message.",
-    "Lead with the answer or next useful action.",
-    "Use light markdown when it improves readability.",
-    'If you include an internal document link, use a correct clickable format such as [text](/document/page/3) or <a href="/document/page/3">text</a>, never a bare /document/... path.',
-    "If exact page numbers, control_ids, or result_ids already exist in the conversation, keep any helpful document links in the answer.",
-    "Offer one concrete follow-up suggestion or question only when it adds value.",
-  ].join("\n");
-
-const buildChatProviderOptions = (options: {
-  appOptions: AppOptions;
-  providerId: AiSdkProviderId;
-}) => {
-  const provider = getConfiguredAiSdkProvider(
-    options.appOptions,
-    options.providerId,
-  );
-
-  if (!provider) {
-    return undefined;
-  }
-
-  if (provider.backendKind === "openai") {
-    return {
-      openai: {
-        parallelToolCalls: true,
-      },
-    } as const;
-  }
-
-  if (provider.backendKind === "openai-compatible") {
-    return {
-      [provider.providerId]: {
-        parallel_tool_calls: true,
-      },
-    };
-  }
-
-  return undefined;
-};
+type AiChatStreamFinishEvent = Pick<
+  OnFinishEvent<ToolSet>,
+  "finishReason" | "steps"
+>;
+type AiChatStreamFinishResolver = (result: AiChatStreamFinishEvent) => void;
 
 export const aiChatService = {
   async runConversation(options: {
@@ -92,6 +50,7 @@ export const aiChatService = {
     const turnId = `ai_turn_${Date.now()}_${Math.random()
       .toString(36)
       .slice(2, 8)}`;
+    const maxToolSteps = Math.max(0, Math.trunc(maxToolRounds));
     const modelSpecifier = resolveAiSdkModelSpecifierForTask({
       appOptions,
       modelCache,
@@ -99,16 +58,17 @@ export const aiChatService = {
       modelKey,
     });
     const model = resolveAiSdkLanguageModel(appOptions, modelSpecifier);
-    const providerOptions = buildChatProviderOptions({
-      appOptions,
-      providerId: modelSpecifier.providerId,
-    });
     const toolDefinitions = toolRegistry.getDefinitions();
     let currentBatchId = `${turnId}:step_0`;
     let stepIndex = 0;
-    let toolRoundCount = 0;
     let assistantMessage = "";
     let reasoningText = "";
+    let resolveFinishEvent: AiChatStreamFinishResolver | null = null;
+    const finishEventPromise = new Promise<AiChatStreamFinishEvent>(
+      (resolve) => {
+        resolveFinishEvent = resolve;
+      },
+    );
     const toolRuntime = createAiChatToolRuntime({
       toolDefinitions,
       toolRegistry,
@@ -125,9 +85,18 @@ export const aiChatService = {
         prompt: buildAiChatTurnPrompt({
           messages: conversation,
         }),
-        ...(providerOptions ? { providerOptions } : null),
-        tools: toolRuntime.aiTools,
-        stopWhen: stepCountIs(maxToolRounds + 1),
+        experimental_include: {
+          requestBody: false,
+        },
+        tools: toolRuntime.tools,
+        stopWhen: stepCountIs(maxToolSteps),
+        onFinish: ({ finishReason, steps }) => {
+          resolveFinishEvent?.({
+            finishReason,
+            steps,
+          });
+          resolveFinishEvent = null;
+        },
         abortSignal: signal,
       });
 
@@ -139,9 +108,6 @@ export const aiChatService = {
         }
 
         if (part.type === "finish-step") {
-          if (part.finishReason === "tool-calls") {
-            toolRoundCount += 1;
-          }
           continue;
         }
 
@@ -176,35 +142,22 @@ export const aiChatService = {
         }
       }
 
-      const [finalText, steps] = await Promise.all([result.text, result.steps]);
+      const [finalText, finishEvent] = await Promise.all([
+        result.text,
+        finishEventPromise,
+      ]);
       if (!assistantMessage && finalText) {
         assistantMessage = finalText.trim();
       } else {
         assistantMessage = assistantMessage.trim();
       }
 
-      if (!assistantMessage && toolRuntime.sawToolActivity()) {
-        const finalAnswer = await generateText({
-          model,
-          system: getAiChatSystemInstruction({ toolDefinitions }),
-          prompt: createFinalAnswerPrompt(conversation),
-          abortSignal: signal,
-        });
-        assistantMessage = finalAnswer.text.trim();
-        if (!reasoningText && finalAnswer.reasoningText) {
-          reasoningText = finalAnswer.reasoningText.trim();
-        }
-      }
-
-      const lastStep = steps.at(-1);
-      if (
-        toolRoundCount >= maxToolRounds &&
-        lastStep &&
-        lastStep.toolResults.length > 0 &&
-        !assistantMessage
-      ) {
-        throw new Error("The AI assistant exceeded the maximum tool rounds.");
-      }
+      const lastStep = finishEvent.steps.at(-1);
+      const awaitingContinue =
+        maxToolSteps > 0 &&
+        finishEvent.steps.length >= maxToolSteps &&
+        !!lastStep &&
+        lastStep.toolResults.length > 0;
 
       const finalReasoningText = reasoningText.trim();
       if (assistantMessage) {
@@ -226,6 +179,7 @@ export const aiChatService = {
       return {
         assistantMessage,
         conversation,
+        awaitingContinue,
       };
     } catch (error) {
       const normalized =

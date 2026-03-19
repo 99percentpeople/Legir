@@ -6,10 +6,13 @@ import {
   AI_CHAT_DIGEST_SUMMARY_CONCURRENCY,
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
+  AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
   AI_CHAT_MAX_READ_PAGES_PER_CALL,
 } from "@/constants";
+import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
 import { pageTranslationService } from "@/services/pageTranslationService";
+import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { roundAiRect } from "@/services/ai/utils/geometry";
 import { serializePageTextContent } from "@/services/ai/utils/pageTextSerialization";
@@ -17,6 +20,8 @@ import type {
   AiDocumentDigestChunk,
   AiDocumentDigestSourceKind,
   AiDocumentMetadata,
+  AiRenderedPageImage,
+  AiRenderedPageImageBatch,
   AiDocumentSnapshot,
   AiReadablePage,
   AiReadablePageLine,
@@ -244,6 +249,7 @@ const normalizeMetadataKeywords = (keywords: string | string[] | undefined) => {
 const normalizeDocumentMetadata = (
   snapshot: AiDocumentSnapshot,
 ): AiDocumentMetadata => ({
+  filename: snapshot.filename,
   title: snapshot.metadata.title?.trim() || undefined,
   author: snapshot.metadata.author?.trim() || undefined,
   subject: snapshot.metadata.subject?.trim() || undefined,
@@ -310,6 +316,18 @@ const parseWorkspacePageNumber = (value: string) => {
   return pageIndex + 1;
 };
 
+const AI_PAGE_IMAGE_TARGET_WIDTH_DEFAULT = 1024;
+const AI_PAGE_IMAGE_TARGET_WIDTH_MIN = 512;
+const AI_PAGE_IMAGE_TARGET_WIDTH_MAX = 1536;
+
+const clampPageImageTargetWidth = (value: number | undefined) =>
+  clampNumber(
+    Math.trunc(value ?? AI_PAGE_IMAGE_TARGET_WIDTH_DEFAULT) ||
+      AI_PAGE_IMAGE_TARGET_WIDTH_DEFAULT,
+    AI_PAGE_IMAGE_TARGET_WIDTH_MIN,
+    AI_PAGE_IMAGE_TARGET_WIDTH_MAX,
+  );
+
 const getVisibleWorkspacePageNumbers = (totalPages: number) => {
   if (typeof document === "undefined" || totalPages <= 0) return [];
 
@@ -349,6 +367,10 @@ const getVisibleWorkspacePageNumbers = (totalPages: number) => {
 export const createDocumentContextService = (options: {
   getSnapshot: () => AiDocumentSnapshot;
   getSelectedTextContext: () => AiTextSelectionContext | null;
+  getPdfSource?: () => {
+    pdfBytes?: Uint8Array | null;
+    password?: string | null;
+  };
   getDigestConfig?: () => {
     charsPerChunk?: number;
     sourceCharsPerChunk?: number;
@@ -366,6 +388,7 @@ export const createDocumentContextService = (options: {
   const {
     getSnapshot,
     getSelectedTextContext,
+    getPdfSource,
     getDigestConfig,
     summarizeDigestChunk,
   } = options;
@@ -412,6 +435,113 @@ export const createDocumentContextService = (options: {
     return normalized;
   };
 
+  const renderPageImage = async ({
+    pageNumber,
+    targetWidth,
+    renderAnnotations = true,
+    signal,
+  }: {
+    pageNumber: number;
+    targetWidth?: number;
+    renderAnnotations?: boolean;
+    signal?: AbortSignal;
+  }): Promise<AiRenderedPageImage> => {
+    const snapshot = getSnapshot();
+    const resolvedPageNumber = clampPageNumbers(
+      [pageNumber],
+      snapshot.pages.length,
+      1,
+    )[0];
+    const pageIndex =
+      typeof resolvedPageNumber === "number" ? resolvedPageNumber - 1 : -1;
+    const page = snapshot.pages[pageIndex];
+
+    if (!page || resolvedPageNumber < 1) {
+      throw new Error(`Invalid page number: ${pageNumber}`);
+    }
+
+    const resolvedTargetWidth = clampPageImageTargetWidth(targetWidth);
+    const pageViewport = createViewportFromPageInfo(
+      {
+        viewBox: page.viewBox,
+        userUnit: page.userUnit,
+        rotation: page.rotation,
+      },
+      {
+        scale: 1,
+        rotation: page.rotation,
+      },
+    );
+    const renderedWidth = Math.max(1, Math.round(resolvedTargetWidth));
+    const renderedHeight = Math.max(
+      1,
+      Math.round((renderedWidth / pageViewport.width) * pageViewport.height),
+    );
+
+    const renderCurrentDocumentPage = () =>
+      pdfWorkerService.renderPageImage({
+        pageIndex,
+        targetWidth: resolvedTargetWidth,
+        renderAnnotations,
+        mimeType: "image/png",
+        priority: 0,
+        signal,
+      });
+
+    let imageBytes: Uint8Array;
+    let mimeType: string;
+
+    try {
+      ({ bytes: imageBytes, mimeType } = await renderCurrentDocumentPage());
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error ?? "");
+      if (!message.includes("PDF Document not loaded")) {
+        throw error;
+      }
+
+      const pdfSource = getPdfSource?.();
+      const pdfBytes = pdfSource?.pdfBytes;
+      if (!pdfBytes || pdfBytes.byteLength === 0) {
+        throw error;
+      }
+
+      ({ bytes: imageBytes, mimeType } = await pdfWorkerService.renderPageImage(
+        {
+          pageIndex,
+          targetWidth: resolvedTargetWidth,
+          renderAnnotations,
+          mimeType: "image/png",
+          priority: 0,
+          signal,
+          isNewDoc: true,
+          data: pdfBytes,
+          password:
+            typeof pdfSource?.password === "string"
+              ? pdfSource.password
+              : undefined,
+        },
+      ));
+    }
+
+    if (!imageBytes || imageBytes.byteLength === 0) {
+      throw new Error(`Failed to render page image for page ${pageNumber}.`);
+    }
+
+    return {
+      pageNumber: resolvedPageNumber,
+      pageWidth: Math.round(pageViewport.width),
+      pageHeight: Math.round(pageViewport.height),
+      rotation: page.rotation,
+      targetWidth: resolvedTargetWidth,
+      renderedWidth,
+      renderedHeight,
+      mimeType: mimeType || "image/png",
+      renderAnnotations,
+      base64Data: convertUint8ArrayToBase64(imageBytes),
+    };
+  };
+
   return {
     getDocumentContext: () => {
       const snapshot = getSnapshot();
@@ -427,7 +557,6 @@ export const createDocumentContextService = (options: {
           : fallbackVisiblePageNumbers;
 
       return {
-        filename: snapshot.filename,
         pageCount: snapshot.pages.length,
         currentPageNumber:
           snapshot.pages.length > 0 ? snapshot.currentPageIndex + 1 : null,
@@ -448,6 +577,50 @@ export const createDocumentContextService = (options: {
     getDocumentMetadata: () => {
       const snapshot = getSnapshot();
       return normalizeDocumentMetadata(snapshot);
+    },
+
+    getPagesImage: async ({
+      pageNumbers,
+      targetWidth,
+      renderAnnotations = true,
+      signal,
+    }: {
+      pageNumbers: number[];
+      targetWidth?: number;
+      renderAnnotations?: boolean;
+      signal?: AbortSignal;
+    }): Promise<AiRenderedPageImageBatch> => {
+      const snapshot = getSnapshot();
+      const requestedPageNumbers = clampPageNumbers(
+        pageNumbers,
+        snapshot.pages.length,
+        snapshot.pages.length,
+      );
+      const resolvedPageNumbers = clampPageNumbers(
+        requestedPageNumbers,
+        snapshot.pages.length,
+        AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+      );
+
+      const pages: AiRenderedPageImage[] = [];
+      for (const pageNumber of resolvedPageNumbers) {
+        pages.push(
+          await renderPageImage({
+            pageNumber,
+            targetWidth,
+            renderAnnotations,
+            signal,
+          }),
+        );
+      }
+
+      return {
+        requestedPageCount: requestedPageNumbers.length,
+        returnedPageCount: pages.length,
+        truncated: requestedPageNumbers.length > pages.length,
+        maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+        pages,
+      };
     },
 
     getDocumentDigest: summarizeDigestChunk

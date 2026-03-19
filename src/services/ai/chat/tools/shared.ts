@@ -70,6 +70,10 @@ type AiToolBuilderState<
   description?: string;
   inputSchema: TSchema;
   promptInstructions: string[];
+  requiredInputModalities: NonNullable<
+    AiChatToolDefinition["requiredInputModalities"]
+  >;
+  toModelOutput?: AiChatToolDefinition["toModelOutput"];
 };
 
 type AiToolBuilderExecuteOptions<TSchema extends ZodTypeAny> = {
@@ -251,6 +255,7 @@ const pageNumberInputSchema = z.preprocess((value) => {
   }
   return value;
 }, positiveIntSchema);
+export const pageNumberSchema = pageNumberInputSchema;
 
 const pageNumbersArraySchema = z.array(pageNumberInputSchema);
 
@@ -299,6 +304,22 @@ const createConfiguredToolBuilder = <
       ...state,
       promptInstructions: instructions.map((instruction) => instruction.trim()),
     }),
+  requiresInputModalities: (
+    requiredInputModalities: NonNullable<
+      AiChatToolDefinition["requiredInputModalities"]
+    >,
+  ) =>
+    createConfiguredToolBuilder({
+      ...state,
+      requiredInputModalities: requiredInputModalities.map((modality) =>
+        modality.trim().toLowerCase(),
+      ),
+    }),
+  toModelOutput: (toModelOutput: AiChatToolDefinition["toModelOutput"]) =>
+    createConfiguredToolBuilder({
+      ...state,
+      toModelOutput,
+    }),
   inputSchema: <TNextSchema extends ZodTypeAny>(inputSchema: TNextSchema) =>
     createConfiguredToolBuilder<TName, TNextSchema>({
       ...state,
@@ -325,6 +346,8 @@ const createConfiguredToolBuilder = <
         description: state.description,
         inputSchema: state.inputSchema,
         promptInstructions: state.promptInstructions,
+        requiredInputModalities: state.requiredInputModalities,
+        toModelOutput: state.toModelOutput,
       }),
       execute: async (rawArgs, ctx, signal, onProgress) => {
         const parsed = parseToolArgs(state.inputSchema, rawArgs);
@@ -350,6 +373,7 @@ export const createToolBuilder = <TName extends AiToolName>(name: TName) =>
     enabled: true,
     inputSchema: emptyObjectSchema,
     promptInstructions: [],
+    requiredInputModalities: [],
   });
 
 export const annotationTypesSchema = z.array(

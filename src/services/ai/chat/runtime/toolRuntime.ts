@@ -90,7 +90,6 @@ export const createAiChatToolRuntime = (options: {
   const startedToolCalls = new Set<string>();
   const toolCallsById = new Map<string, AiChatToolCallRecord>();
   let writeQueue: Promise<void> = Promise.resolve();
-  let sawToolActivity = false;
 
   const notifyToolStart = (call: AiChatToolCallRecord, batchId: string) => {
     if (startedToolCalls.has(call.id)) return;
@@ -118,12 +117,15 @@ export const createAiChatToolRuntime = (options: {
     });
   };
 
-  const aiTools: ToolSet = {};
+  const tools: ToolSet = {};
 
   for (const definition of toolDefinitions) {
-    aiTools[definition.name] = tool({
+    tools[definition.name] = tool({
       description: definition.description,
       inputSchema: definition.inputSchema,
+      ...(definition.toModelOutput
+        ? { toModelOutput: definition.toModelOutput }
+        : {}),
       execute: async (input, executeOptions) => {
         const call: AiChatToolCallRecord = {
           id: executeOptions.toolCallId,
@@ -131,8 +133,6 @@ export const createAiChatToolRuntime = (options: {
           args: toToolArgsRecord(input),
         };
         const batchId = options.getCurrentBatchId();
-
-        sawToolActivity = true;
         toolCallsById.set(call.id, call);
         notifyToolStart(call, batchId);
 
@@ -170,7 +170,7 @@ export const createAiChatToolRuntime = (options: {
               result,
             });
 
-            return result.payload;
+            return result.modelOutput ?? result.payload;
           } catch (error) {
             const normalized =
               error instanceof Error ? error : new Error(String(error));
@@ -215,9 +215,8 @@ export const createAiChatToolRuntime = (options: {
   }
 
   return {
-    aiTools,
+    tools,
     toolCallsById,
-    sawToolActivity: () => sawToolActivity,
     handleStreamToolError: ({
       toolCallId,
       toolName,

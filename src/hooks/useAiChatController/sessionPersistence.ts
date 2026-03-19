@@ -41,6 +41,8 @@ export type PersistedAiChatSession = {
   timeline: AiChatTimelineItem[];
   searchResults: AiStoredSearchResult[];
   highlightedResultIds: string[];
+  lastError?: string | null;
+  awaitingContinue?: boolean;
 };
 
 type PersistedAiChatState = {
@@ -65,6 +67,7 @@ export type AiChatSessionData = {
   highlightedResultIds: string[];
   runStatus: AiChatRunStatus;
   lastError: string | null;
+  awaitingContinue: boolean;
 };
 
 export type RestoredAiChatDocumentState = {
@@ -437,6 +440,7 @@ export const createAiChatSessionData = (
   highlightedResultIds: [],
   runStatus: "idle",
   lastError: null,
+  awaitingContinue: false,
 });
 
 export const restorePersistedAiChatDocumentState = (
@@ -543,7 +547,9 @@ export const restorePersistedAiChatDocumentState = (
         searchResultsById,
         highlightedResultIds,
         runStatus: "idle",
-        lastError: null,
+        lastError:
+          typeof session.lastError === "string" ? session.lastError : null,
+        awaitingContinue: session.awaitingContinue === true,
       };
 
       sessionsMap.set(nextSession.id, nextSession);
@@ -622,6 +628,8 @@ export const persistAiChatDocumentState = (options: {
         timeline: normalizeTimelineForPersist(data.timeline),
         searchResults: trimmedSearchResults,
         highlightedResultIds: data.highlightedResultIds,
+        lastError: data.lastError,
+        awaitingContinue: data.awaitingContinue,
       };
     });
 
@@ -663,6 +671,8 @@ export const persistAiChatDocumentState = (options: {
             timeline: normalizeTimelineForPersist(activeData.timeline),
             searchResults: trimmedSearchResults,
             highlightedResultIds: activeData.highlightedResultIds,
+            lastError: activeData.lastError,
+            awaitingContinue: activeData.awaitingContinue,
           },
         ],
       };

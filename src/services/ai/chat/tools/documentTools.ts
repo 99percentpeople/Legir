@@ -1,4 +1,8 @@
-import { AI_CHAT_MAX_READ_PAGES_PER_CALL } from "@/constants";
+import { z } from "zod";
+import {
+  AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+  AI_CHAT_MAX_READ_PAGES_PER_CALL,
+} from "@/constants";
 
 import {
   createErrorPayload,
@@ -6,6 +10,8 @@ import {
   defineToolModule,
   emptyObjectSchema,
   getDocumentDigestArgsSchema,
+  pageNumberSchema,
+  pageNumbersSchema,
   listAnnotationsArgsSchema,
   listFormFieldsArgsSchema,
   readPagesArgsSchema,
@@ -14,6 +20,104 @@ import {
   summarizeListedFormFields,
   summarizeSearchResults,
 } from "./shared";
+import type {
+  AiRenderedPageImage,
+  AiRenderedPageImageBatch,
+} from "@/services/ai/chat/types";
+
+const DEFAULT_PAGE_IMAGE_TARGET_WIDTH = 1024;
+const getPagesImageArgsSchema = z
+  .object({
+    page_numbers: pageNumbersSchema
+      .optional()
+      .default([])
+      .describe(
+        "Optional 1-based page numbers to render. Defaults to the current page when omitted.",
+      ),
+    target_width: pageNumberSchema
+      .optional()
+      .default(DEFAULT_PAGE_IMAGE_TARGET_WIDTH)
+      .describe(
+        "Optional target raster width in pixels for the full-page image. Higher values preserve more detail but use more vision tokens.",
+      ),
+    render_annotations: z
+      .boolean()
+      .optional()
+      .default(true)
+      .describe(
+        "When true, include native PDF annotations in the rendered page image when supported by the PDF renderer.",
+      ),
+  })
+  .strict();
+
+const toPagesImageModelOutput = (output: unknown) => {
+  if (!output || typeof output !== "object") {
+    return {
+      type: "text" as const,
+      value: "Page images unavailable.",
+    };
+  }
+
+  const batch = output as AiRenderedPageImageBatch;
+  if (!Array.isArray(batch.pages) || batch.pages.length === 0) {
+    return {
+      type: "text" as const,
+      value: "Page images unavailable.",
+    };
+  }
+
+  const attachedPages = batch.pages.filter(
+    (pageImage): pageImage is AiRenderedPageImage =>
+      typeof pageImage.base64Data === "string" &&
+      !!pageImage.base64Data &&
+      typeof pageImage.mimeType === "string" &&
+      !!pageImage.mimeType,
+  );
+
+  if (attachedPages.length === 0) {
+    return {
+      type: "text" as const,
+      value: "Page images unavailable.",
+    };
+  }
+
+  const content: Array<
+    | { type: "text"; text: string }
+    | {
+        type: "image-data";
+        data: string;
+        mediaType: string;
+        providerOptions: { openai: { imageDetail: "low" } };
+      }
+  > = [
+    {
+      type: "text",
+      text: `Full-page images for page${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageImage) => pageImage.pageNumber).join(", ")}. Use these images for visual inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss.`,
+    },
+  ];
+
+  for (const pageImage of attachedPages) {
+    content.push({
+      type: "text",
+      text: `Page ${pageImage.pageNumber} image. Rendered at ${pageImage.renderedWidth}x${pageImage.renderedHeight}.`,
+    });
+    content.push({
+      type: "image-data",
+      data: pageImage.base64Data,
+      mediaType: pageImage.mimeType,
+      providerOptions: {
+        openai: {
+          imageDetail: "low",
+        },
+      },
+    });
+  }
+
+  return {
+    type: "content" as const,
+    value: content,
+  };
+};
 
 const METADATA_TOOL_PROMPTS = [
   "If the user asks about document metadata, call get_document_metadata.",
@@ -27,12 +131,19 @@ const DOCUMENT_CONTEXT_TOOL_PROMPTS = [
   "get_document_context also includes the current viewport context: all visible pages intersecting the workspace viewport, current zoom scale and percent, page layout mode, and page flow direction.",
 ];
 
-const READ_PAGES_TOOL_PROMPTS = [
-  "read_pages text preserves inferred spaces and line breaks from the PDF while remaining compatible with anchor highlighting.",
-  "If one read_pages call can cover all needed pages, prefer that over many tiny page reads.",
-  "If you need multiple independent read-only tools such as get_document_context, get_document_metadata, read_pages, search_document, or get_document_digest, you may call those read tools in parallel in the same step.",
-  "For tables, forms, multi-column pages, or irregular layout, call read_pages with include_layout true before creating document anchors.",
-  "When read_pages returns line data, prefer anchors that stay within one line or two adjacent lines instead of stitching distant layout regions together.",
+const PAGE_IMAGE_TOOL_PROMPTS = [
+  "If the task depends on full-page visual appearance, call get_pages_image before making visual claims.",
+  "Use get_pages_image for scanned pages, handwriting, signatures, stamps, tables, diagrams, charts, or complex layout that plain text extraction may miss.",
+  "If get_pages_text or search_document returns empty text, OCR noise, or misses the needed content on a page, do not stop there. Call get_pages_image for that page and inspect it visually.",
+  "When the user asks about a page and the text layer is missing or unreliable, use get_pages_image before concluding that the page content is unavailable.",
+  "If you need several page images, prefer one get_pages_image call with multiple page_numbers over many tiny calls when possible.",
+];
+
+const GET_PAGES_TEXT_TOOL_PROMPTS = [
+  "get_pages_text preserves inferred spaces and line breaks from the PDF while remaining compatible with anchor highlighting.",
+  "For tables, forms, multi-column pages, or irregular layout, call get_pages_text with include_layout true before creating document anchors.",
+  "When get_pages_text returns line data, prefer anchors that stay within one line or two adjacent lines instead of stitching distant layout regions together.",
+  "If get_pages_text returns no useful text for a page and get_pages_image is available, follow up with get_pages_image instead of assuming the page has no usable content.",
 ];
 
 const SEARCH_DOCUMENT_TOOL_PROMPTS = [
@@ -77,14 +188,14 @@ export const documentToolModule = defineToolModule((ctx) => {
         };
         return {
           payload,
-          summary: `Context for ${payload.filename}, ${payload.pageCount} pages`,
+          summary: `Context for ${payload.pageCount} pages`,
         };
       }),
 
     get_document_metadata: createToolBuilder("get_document_metadata")
       .read()
       .description(
-        "Get PDF document metadata such as title, author, subject, keywords, creator, producer, and creation/modification dates.",
+        "Get PDF document metadata such as filename, title, author, subject, keywords, creator, producer, and creation/modification dates.",
       )
       .promptInstructions(METADATA_TOOL_PROMPTS)
       .inputSchema(emptyObjectSchema)
@@ -97,6 +208,72 @@ export const documentToolModule = defineToolModule((ctx) => {
         return {
           payload,
           summary: `Metadata with ${availableKeys} populated field${availableKeys === 1 ? "" : "s"}`,
+        };
+      }),
+
+    get_pages_image: createToolBuilder("get_pages_image")
+      .read()
+      .requiresInputModalities(["image"])
+      .description(
+        `Render one or more full PDF pages as images for multimodal inspection. The JSON payload stays lightweight for the chat UI, while the actual page images are attached to the model context for visual reasoning. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} pages per call.`,
+      )
+      .promptInstructions(PAGE_IMAGE_TOOL_PROMPTS)
+      .inputSchema(getPagesImageArgsSchema)
+      .toModelOutput(({ output }) => toPagesImageModelOutput(output))
+      .build(async ({ args, ctx: toolCtx, signal }) => {
+        const documentContext = toolCtx.getDocumentContext();
+        const pageNumbers =
+          args.page_numbers.length > 0
+            ? args.page_numbers
+            : [
+                documentContext.currentPageNumber ??
+                  documentContext.visiblePageNumbers[0],
+              ].filter(
+                (pageNumber): pageNumber is number =>
+                  typeof pageNumber === "number",
+              );
+
+        if (pageNumbers.length === 0) {
+          return {
+            payload: createErrorPayload(
+              "NO_PAGE_AVAILABLE",
+              "get_pages_image requires at least one valid page number or an active page in the current document.",
+            ),
+            summary: "get_pages_image failed: no page available",
+          };
+        }
+
+        const pageImageBatch = await toolCtx.getPagesImage({
+          pageNumbers,
+          targetWidth: args.target_width,
+          renderAnnotations: args.render_annotations,
+          signal,
+        });
+
+        return {
+          payload: {
+            requestedPageCount: pageImageBatch.requestedPageCount,
+            returnedPageCount: pageImageBatch.returnedPageCount,
+            truncated: pageImageBatch.truncated,
+            maxPagesPerCall: pageImageBatch.maxPagesPerCall,
+            pages: pageImageBatch.pages.map((pageImage) => ({
+              pageNumber: pageImage.pageNumber,
+              pageWidth: pageImage.pageWidth,
+              pageHeight: pageImage.pageHeight,
+              rotation: pageImage.rotation,
+              targetWidth: pageImage.targetWidth,
+              renderedWidth: pageImage.renderedWidth,
+              renderedHeight: pageImage.renderedHeight,
+              mimeType: pageImage.mimeType,
+              renderAnnotations: pageImage.renderAnnotations,
+              imageAttachedForModel: true,
+              modelAttachmentMode: "multimodal_tool_result",
+            })),
+          },
+          modelOutput: pageImageBatch,
+          summary: pageImageBatch.truncated
+            ? `Rendered ${pageImageBatch.returnedPageCount} of ${pageImageBatch.requestedPageCount} requested page images (limit ${pageImageBatch.maxPagesPerCall})`
+            : `Rendered full-page image${pageImageBatch.returnedPageCount === 1 ? "" : "s"} for ${pageImageBatch.returnedPageCount} page${pageImageBatch.returnedPageCount === 1 ? "" : "s"}`,
         };
       }),
 
@@ -127,12 +304,12 @@ export const documentToolModule = defineToolModule((ctx) => {
         };
       }),
 
-    read_pages: createToolBuilder("read_pages")
+    get_pages_text: createToolBuilder("get_pages_text")
       .read()
       .description(
         `Read full text for one or more pages. Returned text preserves inferred spaces and line breaks from PDF layout while staying compatible with anchor highlighting. Optionally include per-line layout rectangles. Returns at most ${AI_CHAT_MAX_READ_PAGES_PER_CALL} pages per call.`,
       )
-      .promptInstructions(READ_PAGES_TOOL_PROMPTS)
+      .promptInstructions(GET_PAGES_TEXT_TOOL_PROMPTS)
       .inputSchema(readPagesArgsSchema)
       .build(async ({ args, ctx: toolCtx, signal }) => {
         const result = await toolCtx.readPages({

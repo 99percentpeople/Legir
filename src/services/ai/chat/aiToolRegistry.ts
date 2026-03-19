@@ -1,11 +1,13 @@
 import type {
   AiChatToolDefinition,
+  AiToolRegistryOptions,
   AiToolExecutionProgress,
   AiToolExecutionResult,
   AiToolName,
 } from "./types";
 import type { AiToolContext } from "./aiToolContext";
 import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
+import { modelSupportsInputModality } from "@/services/ai/sdk/modelCapabilities";
 import { aiToolModules } from "./tools";
 import {
   createErrorPayload,
@@ -13,14 +15,39 @@ import {
   type AiToolHandler,
 } from "./tools/shared";
 
-export const createAiToolRegistry = (ctx: AiToolContext) => {
+const supportsToolDefinition = (
+  definition: AiChatToolDefinition,
+  options: AiToolRegistryOptions | undefined,
+) => {
+  const requiredInputModalities = definition.requiredInputModalities ?? [];
+  if (requiredInputModalities.length === 0) return true;
+
+  return requiredInputModalities.every((modality) =>
+    modelSupportsInputModality(options?.modelCapabilities, modality),
+  );
+};
+
+export const createAiToolRegistry = (
+  ctx: AiToolContext,
+  options?: AiToolRegistryOptions,
+) => {
   const handlers = createToolHandlerMap(aiToolModules, ctx) satisfies Partial<
     Record<AiToolName, AiToolHandler>
   >;
+  const filteredHandlers = Object.fromEntries(
+    Object.entries(handlers).filter(
+      (entry): entry is [AiToolName, AiToolHandler] => {
+        const handler = entry[1];
+        return Boolean(
+          handler && supportsToolDefinition(handler.definition, options),
+        );
+      },
+    ),
+  ) satisfies Partial<Record<AiToolName, AiToolHandler>>;
 
   return {
     getDefinitions: (): AiChatToolDefinition[] =>
-      Object.values(handlers)
+      Object.values(filteredHandlers)
         .filter((handler): handler is AiToolHandler => Boolean(handler))
         .map((handler) => handler.definition),
     execute: async (
@@ -29,7 +56,7 @@ export const createAiToolRegistry = (ctx: AiToolContext) => {
       signal?: AbortSignal,
       onProgress?: (progress: AiToolExecutionProgress) => void,
     ) => {
-      const handler = handlers[name as AiToolName];
+      const handler = filteredHandlers[name as AiToolName];
       if (!handler) {
         return {
           payload: omitEmptyArrayFieldsDeep(

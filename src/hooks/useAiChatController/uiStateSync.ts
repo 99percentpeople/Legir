@@ -19,6 +19,7 @@ type AiChatUiStateSetters = {
   setTimeline: (timeline: AiChatTimelineItem[]) => void;
   setRunStatus: (status: AiChatRunStatus) => void;
   setLastError: (error: string | null) => void;
+  setAwaitingContinue: (value: boolean) => void;
   setHighlightedResultIds: (ids: string[]) => void;
 };
 
@@ -34,5 +35,6 @@ export const applyAiChatSessionUiState = (
   options.setTimeline(uiState.timeline);
   options.setRunStatus(uiState.runStatus);
   options.setLastError(uiState.lastError);
+  options.setAwaitingContinue(uiState.awaitingContinue);
   options.setHighlightedResultIds(uiState.highlightedResultIds);
 };
