@@ -224,7 +224,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                         variant="destructive"
                         size="icon"
                         onClick={() => handleDeleteRecent(entry.path)}
-                        aria-label={t("common.delete")}
+                        aria-label={t("common.actions.delete")}
                       >
                         <Trash2 />
                       </Button>

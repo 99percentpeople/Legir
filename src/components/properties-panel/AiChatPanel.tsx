@@ -90,12 +90,14 @@ export interface AiChatPanelProps {
   timeline: AiChatTimelineItem[];
   runStatus: "idle" | "running" | "cancelling" | "error";
   lastError: string | null;
+  awaitingContinue: boolean;
 
   selectedModelKey?: string;
   onSelectModel: (value: string) => void;
   modelGroups: ModelSelectGroup[];
 
   onSend: (input: AiChatUserMessageInput) => void;
+  onContinueConversation: () => Promise<void> | void;
   onRegenerateMessage: (messageId: string) => Promise<void> | void;
   onRetryLastError: () => Promise<void> | void;
   onEditUserMessage: (messageId: string) => {
@@ -431,13 +433,13 @@ const MessageActionBar = ({
           size="icon"
           className="text-muted-foreground h-6 w-6"
           onClick={onCopy}
-          aria-label={copied ? t("ai_chat.copied") : t("ai_chat.copy")}
+          aria-label={copied ? t("ai_chat.copied") : t("common.actions.copy")}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        {copied ? t("ai_chat.copied") : t("ai_chat.copy")}
+        {copied ? t("ai_chat.copied") : t("common.actions.copy")}
       </TooltipContent>
     </Tooltip>
     {branchOptions && branchOptions.length > 1 && onSelectBranch ? (
@@ -503,12 +505,14 @@ const MessageActionBar = ({
             size="icon"
             className="text-muted-foreground h-6 w-6"
             onClick={onEdit}
-            aria-label={t("ai_chat.edit")}
+            aria-label={t("common.actions.edit")}
           >
             <Pencil size={12} />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="bottom">{t("ai_chat.edit")}</TooltipContent>
+        <TooltipContent side="bottom">
+          {t("common.actions.edit")}
+        </TooltipContent>
       </Tooltip>
     ) : null}
     {canRegenerate && onRegenerate ? (
@@ -520,12 +524,14 @@ const MessageActionBar = ({
             size="icon"
             className="text-muted-foreground h-6 w-6"
             onClick={onRegenerate}
-            aria-label={t("ai_chat.regenerate")}
+            aria-label={t("common.actions.regenerate")}
           >
             <RotateCcw size={12} />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="bottom">{t("ai_chat.regenerate")}</TooltipContent>
+        <TooltipContent side="bottom">
+          {t("common.actions.regenerate")}
+        </TooltipContent>
       </Tooltip>
     ) : null}
   </div>
@@ -685,10 +691,12 @@ export function AiChatPanel({
   timeline,
   runStatus,
   lastError,
+  awaitingContinue,
   selectedModelKey,
   onSelectModel,
   modelGroups,
   onSend,
+  onContinueConversation,
   onRegenerateMessage,
   onRetryLastError,
   onEditUserMessage,
@@ -723,13 +731,16 @@ export function AiChatPanel({
   const scrollContainerRef = React.useRef<HTMLElement | null>(null);
   const isNearBottomRef = React.useRef(true);
   const scrollRafRef = React.useRef<number | null>(null);
+  const nextTimelineScrollBehaviorRef = React.useRef<ScrollBehavior | null>(
+    null,
+  );
   const previousSessionIdRef = React.useRef<string | null>(null);
   const draftRef = React.useRef("");
   const inlineEditStateRef = React.useRef<typeof inlineEditState>(null);
   const copiedTimeoutRef = React.useRef<number | null>(null);
 
   const scheduleScrollToBottom = React.useCallback(
-    (force = false) => {
+    (force = false, behavior: ScrollBehavior = "auto") => {
       if (!isOpen) return;
       if (!force && !isNearBottomRef.current) return;
       const scrollEl =
@@ -741,7 +752,14 @@ export function AiChatPanel({
       scrollContainerRef.current = scrollEl;
       if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
       scrollRafRef.current = requestAnimationFrame(() => {
-        scrollEl.scrollTop = scrollEl.scrollHeight;
+        if (behavior === "smooth") {
+          scrollEl.scrollTo({
+            top: scrollEl.scrollHeight,
+            behavior: "smooth",
+          });
+        } else {
+          scrollEl.scrollTop = scrollEl.scrollHeight;
+        }
         isNearBottomRef.current = true;
         scrollRafRef.current = null;
       });
@@ -855,12 +873,15 @@ export function AiChatPanel({
   }, [isOpen, scheduleScrollToBottom]);
 
   React.useEffect(() => {
-    scheduleScrollToBottom(false);
+    const nextBehavior = nextTimelineScrollBehaviorRef.current;
+    nextTimelineScrollBehaviorRef.current = null;
+    scheduleScrollToBottom(Boolean(nextBehavior), nextBehavior ?? "auto");
   }, [runStatus, scheduleScrollToBottom, timeline]);
 
   const handleSend = React.useCallback(() => {
     const text = draft.trim();
     if (!text && pendingAttachments.length === 0) return;
+    nextTimelineScrollBehaviorRef.current = "smooth";
     onSend({
       text: text || t("ai_chat.selection_only_message"),
       displayText: text,
@@ -951,6 +972,7 @@ export function AiChatPanel({
     if (!inlineEditState) return;
     const text = inlineEditState.text.trim();
     if (!text && inlineEditState.attachments.length === 0) return;
+    nextTimelineScrollBehaviorRef.current = "smooth";
     onSend({
       text: text || t("ai_chat.selection_only_message"),
       displayText: text,
@@ -1093,8 +1115,12 @@ export function AiChatPanel({
           variant={actionIsStop ? "outline" : "default"}
           onClick={actionIsStop ? onStop : handleSend}
           disabled={actionIsStop ? runStatus === "cancelling" : !canSend}
-          aria-label={actionIsStop ? t("ai_chat.stop") : t("ai_chat.send")}
-          title={actionIsStop ? t("ai_chat.stop") : t("ai_chat.send")}
+          aria-label={
+            actionIsStop ? t("common.actions.stop") : t("common.actions.send")
+          }
+          title={
+            actionIsStop ? t("common.actions.stop") : t("common.actions.send")
+          }
         >
           {actionIsStop ? (
             runStatus === "cancelling" ? (
@@ -1569,7 +1595,7 @@ export function AiChatPanel({
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 shrink-0"
-                    aria-label={t("ai_chat.delete")}
+                    aria-label={t("common.actions.delete")}
                     disabled={isBusy}
                     onClick={(event) => {
                       event.preventDefault();
@@ -1596,7 +1622,7 @@ export function AiChatPanel({
               disabled={isBusy || timeline.length === 0}
             >
               <Trash2 size={14} />
-              {t("ai_chat.clear")}
+              {t("common.actions.clear")}
             </Button>
           </div>
         </PopoverContent>
@@ -1871,7 +1897,7 @@ export function AiChatPanel({
                                 size="icon"
                                 className="text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground h-6 w-6 rounded-md"
                                 onClick={handleCancelInlineEdit}
-                                aria-label={t("ai_chat.cancel_edit")}
+                                aria-label={t("common.actions.cancel")}
                               >
                                 <X size={13} />
                               </Button>
@@ -1884,7 +1910,7 @@ export function AiChatPanel({
                                   inlineEditState.text.trim().length === 0 &&
                                   inlineEditState.attachments.length === 0
                                 }
-                                aria-label={t("ai_chat.send")}
+                                aria-label={t("common.actions.send")}
                               >
                                 <Send size={13} />
                               </Button>
@@ -2003,9 +2029,31 @@ export function AiChatPanel({
                   }}
                 >
                   <RotateCcw size={14} />
-                  {t("ai_chat.retry")}
+                  {t("common.actions.retry")}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {awaitingContinue ? (
+          <Card className="bg-muted/15 border-dashed">
+            <CardContent className="flex items-center justify-between gap-3 p-3">
+              <div className="text-sm font-medium">
+                {t("ai_chat.continue_reason_tool_limit")}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={runStatus === "running" || runStatus === "cancelling"}
+                onClick={() => {
+                  void onContinueConversation();
+                }}
+              >
+                <Sparkles size={14} />
+                {t("common.actions.continue")}
+              </Button>
             </CardContent>
           </Card>
         ) : null}
@@ -2026,7 +2074,7 @@ export function AiChatPanel({
               variant="outline"
               onClick={() => setClearConfirmOpen(false)}
             >
-              {t("common.cancel")}
+              {t("common.actions.cancel")}
             </Button>
             <Button
               type="button"

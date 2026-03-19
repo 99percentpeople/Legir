@@ -1577,11 +1577,15 @@ const EditorPage: React.FC<EditorPageProps> = ({
               timeline={aiChat.timeline}
               runStatus={aiChat.runStatus}
               lastError={aiChat.lastError}
+              awaitingContinue={aiChat.awaitingContinue}
               selectedModelKey={aiChat.selectedModelKey}
               onSelectModel={aiChat.setSelectedModelKey}
               modelGroups={aiChat.modelSelectGroups}
               onSend={(input) => {
                 void aiChat.sendMessage(input);
+              }}
+              onContinueConversation={() => {
+                void aiChat.continueConversation();
               }}
               onRegenerateMessage={(messageId) => {
                 void aiChat.regenerateAssistantMessage(messageId);

@@ -261,6 +261,7 @@ export function PageTranslatePanel({
           return {
             value: opt.id,
             label: optLabel,
+            capabilities: opt.capabilities,
             disabled: !translateService.isOptionAvailable(opt.id),
           };
         }),
@@ -403,7 +404,7 @@ export function PageTranslatePanel({
                 onClick={onCancel}
                 className="w-full"
               >
-                {t("common.cancel")}
+                {t("common.actions.cancel")}
               </Button>
             ) : (
               <Button
@@ -766,7 +767,7 @@ export function PageTranslatePanel({
               }
               onClick={onDeleteSelectedParagraphs}
             >
-              {t("common.delete")}
+              {t("common.actions.delete")}
             </Button>
           </div>
 

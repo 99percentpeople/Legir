@@ -97,9 +97,9 @@ const PdfPasswordDialog: React.FC<PdfPasswordDialogProps> = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
-            {t("common.cancel")}
+            {t("common.actions.cancel")}
           </Button>
-          <Button onClick={handleSubmit}>{t("common.continue")}</Button>
+          <Button onClick={handleSubmit}>{t("common.actions.continue")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

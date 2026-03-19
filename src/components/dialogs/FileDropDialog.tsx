@@ -37,7 +37,7 @@ const FileDropDialog: React.FC<FileDropDialogProps> = ({
         <DialogDescription>{t("dialog.file_drop.desc")}</DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            {t("common.cancel")}
+            {t("common.actions.cancel")}
           </Button>
 
           {isDirty && (

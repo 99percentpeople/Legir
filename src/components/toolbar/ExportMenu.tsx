@@ -51,7 +51,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
 
   const saveDisabled = disabled || (tauri && !isDirty);
 
-  const primaryLabel = t(tauri ? "common.save" : "toolbar.export");
+  const primaryLabel = t(tauri ? "common.actions.save" : "toolbar.export");
   const PrimaryIcon = tauri ? Save : Download;
 
   const isMobile = useIsMobile();

@@ -104,7 +104,7 @@ export const SignatureControl: React.FC<FormControlProps> = (props) => {
                   });
                 }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 absolute top-1 right-1 z-20 rounded-sm p-1 opacity-0 shadow-md transition-opacity group-hover:opacity-100"
-                title={t("common.delete")}
+                title={t("common.actions.delete")}
               >
                 <Trash2 size={12} />
               </button>

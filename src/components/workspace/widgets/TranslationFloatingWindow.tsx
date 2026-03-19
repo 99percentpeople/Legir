@@ -149,6 +149,7 @@ export const TranslationFloatingWindow: React.FC<
           return {
             value: opt.id,
             label: optLabel,
+            capabilities: opt.capabilities,
             disabled: !translateService.isOptionAvailable(opt.id),
           };
         }),
@@ -351,7 +352,7 @@ export const TranslationFloatingWindow: React.FC<
           <Languages size={16} /> {t("translate.title")}
         </>
       }
-      closeLabel={t("common.close")}
+      closeLabel={t("common.actions.close")}
       onClose={() => {
         cancelStream();
         setIsLoading(false);
@@ -451,7 +452,7 @@ export const TranslationFloatingWindow: React.FC<
                         {isLoading ? (
                           <>
                             <Spinner />
-                            {t("common.cancel")}
+                            {t("common.actions.cancel")}
                           </>
                         ) : (
                           <>
@@ -572,7 +573,7 @@ export const TranslationFloatingWindow: React.FC<
                         {isLoading ? (
                           <>
                             <Spinner />
-                            {t("common.cancel")}
+                            {t("common.actions.cancel")}
                           </>
                         ) : (
                           <>

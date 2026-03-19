@@ -174,7 +174,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={isSearchActive ? (onExitSearch ?? onClose) : onClose}
             className="h-8 w-8 shrink-0"
             title={
-              isSearchActive ? t("sidebar.exit_search") : t("common.close")
+              isSearchActive
+                ? t("sidebar.exit_search")
+                : t("common.actions.close")
             }
           >
             <X size={16} />
