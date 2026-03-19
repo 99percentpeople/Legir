@@ -59,11 +59,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type {
+  AiChatMessageAttachment,
   AiDocumentLinkTarget,
   AiChatSessionSummary,
   AiChatTimelineItem,
   AiChatUserMessageInput,
-  AiChatSelectionAttachment,
 } from "@/services/ai/chat/types";
 import { TimeAgoText } from "@/components/timeText";
 import { appEventBus } from "@/lib/eventBus";
@@ -102,7 +102,7 @@ export interface AiChatPanelProps {
   onRetryLastError: () => Promise<void> | void;
   onEditUserMessage: (messageId: string) => {
     text: string;
-    attachments?: AiChatSelectionAttachment[];
+    attachments?: AiChatMessageAttachment[];
     sourceSessionId: string;
     targetMessageId: string;
   } | null;
@@ -144,33 +144,95 @@ const PromptButton = ({
   </button>
 );
 
-const getSelectionAttachmentLocationLabel = (
+const getAnnotationAttachmentTypeLabel = (
   t: TranslateFn,
-  attachment: AiChatSelectionAttachment,
-) =>
-  t("ai_chat.attachment_location", {
-    page: attachment.pageIndex + 1,
-    start: attachment.startOffset,
-    end: attachment.endOffset,
-  });
+  attachment: Extract<
+    AiChatMessageAttachment,
+    { kind: "annotation_reference" }
+  >,
+) => {
+  switch (attachment.annotationType) {
+    case "highlight":
+      return t("toolbar.highlight");
+    case "ink":
+      return t("toolbar.ink");
+    case "comment":
+      return t("toolbar.comment");
+    case "freetext":
+      return t("toolbar.freetext");
+    case "link":
+      return t("properties.link.title");
+    default:
+      return attachment.annotationType;
+  }
+};
 
-const getSelectionAttachmentKey = (attachment: AiChatSelectionAttachment) =>
-  `${attachment.pageIndex}:${attachment.startOffset}:${attachment.endOffset}`;
+const getMessageAttachmentLocationLabel = (
+  t: TranslateFn,
+  attachment: AiChatMessageAttachment,
+) => {
+  if (attachment.kind === "workspace_selection") {
+    return t("ai_chat.attachment_location", {
+      page: attachment.pageIndex + 1,
+      start: attachment.startOffset,
+      end: attachment.endOffset,
+    });
+  }
+
+  return t("ai_chat.annotation_attachment_location", {
+    type: getAnnotationAttachmentTypeLabel(t, attachment),
+    page: attachment.pageIndex + 1,
+  });
+};
+
+const getMessageAttachmentKey = (attachment: AiChatMessageAttachment) => {
+  if (attachment.kind === "workspace_selection") {
+    return `${attachment.pageIndex}:${attachment.startOffset}:${attachment.endOffset}`;
+  }
+
+  return `annotation:${attachment.annotationId}`;
+};
+
+const getMessageAttachmentCopyText = (attachment: AiChatMessageAttachment) => {
+  if (attachment.kind === "workspace_selection") {
+    return attachment.text.trim();
+  }
+
+  return [
+    attachment.highlightedText?.trim(),
+    attachment.text?.trim(),
+    attachment.linkUrl?.trim(),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+};
+
+const getAttachmentOnlyMessage = (
+  t: TranslateFn,
+  attachments: AiChatMessageAttachment[],
+) => {
+  if (
+    attachments.every((attachment) => attachment.kind === "workspace_selection")
+  ) {
+    return t("ai_chat.selection_only_message");
+  }
+
+  return t("ai_chat.attachment_only_message");
+};
 
 const getMessageCopyText = (item: MessageTimelineItem) => {
   if (item.role === "assistant") {
     return item.text.trim();
   }
 
-  const selectionTexts =
+  const attachmentTexts =
     item.role === "user"
       ? (item.attachments ?? [])
-          .filter((attachment) => attachment.kind === "workspace_selection")
-          .map((attachment) => attachment.text.trim())
+          .map((attachment) => getMessageAttachmentCopyText(attachment))
           .filter(Boolean)
       : [];
 
-  return [item.text.trim(), ...selectionTexts].filter(Boolean).join("\n\n");
+  return [item.text.trim(), ...attachmentTexts].filter(Boolean).join("\n\n");
 };
 
 const getMessageBranchAnchorId = (item: MessageTimelineItem) =>
@@ -204,7 +266,7 @@ const isLastAssistantSegmentForTurn = (
     );
 };
 
-const SelectionAttachmentChip = ({
+const MessageAttachmentChip = ({
   t,
   attachment,
   onRemove,
@@ -212,9 +274,9 @@ const SelectionAttachmentChip = ({
   inverted = false,
 }: {
   t: TranslateFn;
-  attachment: AiChatSelectionAttachment;
+  attachment: AiChatMessageAttachment;
   onRemove?: () => void;
-  onActivate?: (attachment: AiChatSelectionAttachment) => void;
+  onActivate?: (attachment: AiChatMessageAttachment) => void;
   inverted?: boolean;
 }) => (
   <div
@@ -231,14 +293,14 @@ const SelectionAttachmentChip = ({
         "inline-flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-1 text-left transition-colors",
         inverted ? "hover:bg-primary-foreground/5" : "hover:bg-accent",
       )}
-      title={getSelectionAttachmentLocationLabel(t, attachment)}
+      title={getMessageAttachmentLocationLabel(t, attachment)}
       onClick={() => {
         onActivate?.(attachment);
       }}
     >
       <FileText size={12} className="shrink-0 opacity-70" />
       <span className="truncate">
-        {getSelectionAttachmentLocationLabel(t, attachment)}
+        {getMessageAttachmentLocationLabel(t, attachment)}
       </span>
     </button>
     {onRemove ? (
@@ -707,12 +769,12 @@ export function AiChatPanel({
   const { t } = useLanguage();
   const [draft, setDraft] = React.useState("");
   const [pendingAttachments, setPendingAttachments] = React.useState<
-    AiChatSelectionAttachment[]
+    AiChatMessageAttachment[]
   >([]);
   const [inlineEditState, setInlineEditState] = React.useState<{
     messageId: string;
     text: string;
-    attachments: AiChatSelectionAttachment[];
+    attachments: AiChatMessageAttachment[];
     sourceSessionId: string;
     targetMessageId: string;
   } | null>(null);
@@ -788,8 +850,6 @@ export function AiChatPanel({
       "workspace:askAi",
       (attachment) => {
         appEventBus.clearSticky("workspace:askAi");
-        if (attachment.kind !== "workspace_selection") return;
-        if (!attachment.text.trim()) return;
         const nextFocusTarget =
           inlineEditStateRef.current !== null
             ? inlineEditTextareaRef
@@ -800,8 +860,8 @@ export function AiChatPanel({
             if (!prev) return prev;
             return prev.attachments.some(
               (item) =>
-                getSelectionAttachmentKey(item) ===
-                getSelectionAttachmentKey(attachment),
+                getMessageAttachmentKey(item) ===
+                getMessageAttachmentKey(attachment),
             )
               ? prev
               : {
@@ -813,8 +873,8 @@ export function AiChatPanel({
           setPendingAttachments((prev) =>
             prev.some(
               (item) =>
-                getSelectionAttachmentKey(item) ===
-                getSelectionAttachmentKey(attachment),
+                getMessageAttachmentKey(item) ===
+                getMessageAttachmentKey(attachment),
             )
               ? prev
               : [...prev, attachment],
@@ -883,7 +943,7 @@ export function AiChatPanel({
     if (!text && pendingAttachments.length === 0) return;
     nextTimelineScrollBehaviorRef.current = "smooth";
     onSend({
-      text: text || t("ai_chat.selection_only_message"),
+      text: text || getAttachmentOnlyMessage(t, pendingAttachments),
       displayText: text,
       attachments:
         pendingAttachments.length > 0 ? pendingAttachments : undefined,
@@ -893,15 +953,27 @@ export function AiChatPanel({
   }, [draft, onSend, pendingAttachments, t]);
 
   const handleActivateAttachment = React.useCallback(
-    (attachment: AiChatSelectionAttachment) => {
+    (attachment: AiChatMessageAttachment) => {
+      if (attachment.kind === "workspace_selection") {
+        appEventBus.emit(
+          "workspace:focusTextRange",
+          {
+            pageIndex: attachment.pageIndex,
+            startOffset: attachment.startOffset,
+            endOffset: attachment.endOffset,
+            rect: attachment.rect,
+            behavior: "smooth",
+          },
+          { sticky: true },
+        );
+        return;
+      }
+
       appEventBus.emit(
-        "workspace:focusTextRange",
+        "workspace:focusControl",
         {
-          pageIndex: attachment.pageIndex,
-          startOffset: attachment.startOffset,
-          endOffset: attachment.endOffset,
-          rect: attachment.rect,
-          behavior: "auto",
+          id: attachment.annotationId,
+          behavior: "smooth",
         },
         { sticky: true },
       );
@@ -957,9 +1029,7 @@ export function AiChatPanel({
       setInlineEditState({
         messageId: item.id,
         text: restored.text,
-        attachments: (restored.attachments?.filter(
-          (attachment) => attachment.kind === "workspace_selection",
-        ) ?? []) as AiChatSelectionAttachment[],
+        attachments: restored.attachments ?? [],
         sourceSessionId: restored.sourceSessionId,
         targetMessageId: restored.targetMessageId,
       });
@@ -974,7 +1044,7 @@ export function AiChatPanel({
     if (!text && inlineEditState.attachments.length === 0) return;
     nextTimelineScrollBehaviorRef.current = "smooth";
     onSend({
-      text: text || t("ai_chat.selection_only_message"),
+      text: text || getAttachmentOnlyMessage(t, inlineEditState.attachments),
       displayText: text,
       attachments:
         inlineEditState.attachments.length > 0
@@ -994,15 +1064,15 @@ export function AiChatPanel({
   }, [focusTextareaAtEnd]);
 
   const handleRemoveInlineEditAttachment = React.useCallback(
-    (attachment: AiChatSelectionAttachment) => {
+    (attachment: AiChatMessageAttachment) => {
       setInlineEditState((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           attachments: prev.attachments.filter(
             (item) =>
-              getSelectionAttachmentKey(item) !==
-              getSelectionAttachmentKey(attachment),
+              getMessageAttachmentKey(item) !==
+              getMessageAttachmentKey(attachment),
           ),
         };
       });
@@ -1067,8 +1137,8 @@ export function AiChatPanel({
         <div className="px-1 pb-1">
           <div className="flex flex-wrap gap-2">
             {pendingAttachments.map((attachment) => (
-              <SelectionAttachmentChip
-                key={getSelectionAttachmentKey(attachment)}
+              <MessageAttachmentChip
+                key={getMessageAttachmentKey(attachment)}
                 t={t}
                 attachment={attachment}
                 onActivate={(nextAttachment) => {
@@ -1078,8 +1148,8 @@ export function AiChatPanel({
                   setPendingAttachments((prev) =>
                     prev.filter(
                       (item) =>
-                        getSelectionAttachmentKey(item) !==
-                        getSelectionAttachmentKey(attachment),
+                        getMessageAttachmentKey(item) !==
+                        getMessageAttachmentKey(attachment),
                     ),
                   )
                 }
@@ -1787,12 +1857,8 @@ export function AiChatPanel({
                     : true;
                 const isInlineEditingThisMessage =
                   inlineEditState?.messageId === item.id;
-                const selectionAttachments = userMessage
-                  ? (userMessage.attachments?.filter(
-                      (attachment) => attachment.kind === "workspace_selection",
-                    ) ?? [])
-                  : [];
-                const hasSelectionAttachments = selectionAttachments.length > 0;
+                const messageAttachments = userMessage?.attachments ?? [];
+                const hasMessageAttachments = messageAttachments.length > 0;
                 return (
                   <div
                     key={item.id}
@@ -1824,12 +1890,12 @@ export function AiChatPanel({
                         )}
                       >
                         {isUser &&
-                        hasSelectionAttachments &&
+                        hasMessageAttachments &&
                         !isInlineEditingThisMessage ? (
                           <div className="space-y-2">
-                            {selectionAttachments.map((attachment, index) => (
-                              <SelectionAttachmentChip
-                                key={`${item.id}:attachment:${index}`}
+                            {messageAttachments.map((attachment, index) => (
+                              <MessageAttachmentChip
+                                key={`${item.id}:attachment:${index}:${getMessageAttachmentKey(attachment)}`}
                                 t={t}
                                 attachment={attachment}
                                 onActivate={(nextAttachment) => {
@@ -1845,10 +1911,8 @@ export function AiChatPanel({
                               <div className="flex flex-wrap gap-2">
                                 {inlineEditState.attachments.map(
                                   (attachment) => (
-                                    <SelectionAttachmentChip
-                                      key={getSelectionAttachmentKey(
-                                        attachment,
-                                      )}
+                                    <MessageAttachmentChip
+                                      key={getMessageAttachmentKey(attachment)}
                                       t={t}
                                       attachment={attachment}
                                       inverted

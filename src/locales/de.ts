@@ -369,9 +369,12 @@ const de = {
     attachment_selected_text: "Ausgewählter Text",
     attachment_page_short: "S.{page}",
     attachment_location: "S.{page} · {start}-{end}",
+    annotation_attachment_location: "{type} · S.{page}",
     attachment_remove: "Anhang entfernen",
     selection_only_message:
       "Bitte erkläre den angehängten ausgewählten Text aus dem aktuellen PDF.",
+    attachment_only_message:
+      "Bitte erkläre die angehängte Anmerkung oder Dokumentreferenz aus dem aktuellen PDF.",
     selection_prompt:
       "Bitte erkläre den folgenden ausgewählten Text aus dem aktuellen PDF und nutze bei Bedarf den Dokumentkontext.\n\nAusgewählter Text:\n{text}",
     empty_title: "Fragen Sie nach dem aktuellen PDF",

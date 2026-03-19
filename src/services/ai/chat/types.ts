@@ -35,6 +35,7 @@ export type AiToolName =
   | "navigate_page"
   | "focus_result"
   | "highlight_results"
+  | "delete_highlights"
   | "clear_highlights";
 
 export interface AiChatToolDefinition {
@@ -244,6 +245,22 @@ export interface AiHighlightAnnotationCreateResult {
   }>;
 }
 
+export interface AiHighlightAnnotationDeleteResultItem {
+  ok: boolean;
+  annotationId: string;
+  pageNumber?: number;
+  highlightedText?: string;
+  text?: string;
+  status: "deleted" | "rejected";
+  reason?: string;
+}
+
+export interface AiHighlightAnnotationDeleteBatchResult {
+  deletedCount: number;
+  rejectedCount: number;
+  deletions: AiHighlightAnnotationDeleteResultItem[];
+}
+
 export type AiFormFieldKind =
   | "text"
   | "checkbox"
@@ -323,7 +340,20 @@ export interface AiChatSelectionAttachment {
   rect: { x: number; y: number; width: number; height: number };
 }
 
-export type AiChatMessageAttachment = AiChatSelectionAttachment;
+export interface AiChatAnnotationAttachment {
+  kind: "annotation_reference";
+  annotationId: string;
+  annotationType: AiAnnotationKind;
+  pageIndex: number;
+  text?: string;
+  highlightedText?: string;
+  linkUrl?: string;
+  linkDestPageIndex?: number;
+}
+
+export type AiChatMessageAttachment =
+  | AiChatSelectionAttachment
+  | AiChatAnnotationAttachment;
 
 export type AiChatUserMessageInput =
   | string

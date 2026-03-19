@@ -329,10 +329,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
     if (autoTranslate) setTranslateAutoToken((x) => x + 1);
   });
 
-  useAppEvent("workspace:askAi", (attachment) => {
-    const trimmed = attachment.text.trim();
-    if (!trimmed) return;
-
+  useAppEvent("workspace:askAi", () => {
     openAiChatPanel();
   });
 

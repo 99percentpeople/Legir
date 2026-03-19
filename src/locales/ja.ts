@@ -367,9 +367,12 @@ const ja = {
     attachment_selected_text: "選択テキスト",
     attachment_page_short: "{page}ページ",
     attachment_location: "{page}ページ · {start}-{end}",
+    annotation_attachment_location: "{type} · {page}ページ",
     attachment_remove: "添付を削除",
     selection_only_message:
       "現在の PDF に添付した選択テキストについて説明してください。",
+    attachment_only_message:
+      "現在の PDF に添付した注釈またはドキュメント参照について説明してください。",
     selection_prompt:
       "現在の PDF の文脈も踏まえて、次の選択テキストを説明してください。\n\n選択テキスト:\n{text}",
     empty_title: "現在の PDF について質問する",

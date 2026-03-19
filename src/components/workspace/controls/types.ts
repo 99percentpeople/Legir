@@ -35,6 +35,8 @@ export interface BaseControlProps<T = FormField | Annotation> {
   onDelete?: (id: string) => void;
   /** Optional callback to trigger edit mode (e.g., text editing) */
   onEdit?: (id: string) => void;
+  /** Optional callback to forward the selected control to AI chat */
+  onAskAi?: (id: string) => void;
   /** Optional callback to start resizing */
   onResizeStart?: (handle: string, e: React.PointerEvent) => void;
 }

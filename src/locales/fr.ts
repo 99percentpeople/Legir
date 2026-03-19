@@ -371,9 +371,12 @@ const fr = {
     attachment_selected_text: "Texte sélectionné",
     attachment_page_short: "P{page}",
     attachment_location: "P{page} · {start}-{end}",
+    annotation_attachment_location: "{type} · P{page}",
     attachment_remove: "Retirer la pièce jointe",
     selection_only_message:
       "Veuillez expliquer le texte sélectionné joint depuis le PDF actuel.",
+    attachment_only_message:
+      "Veuillez expliquer l’annotation ou la référence de document jointe depuis le PDF actuel.",
     selection_prompt:
       "Explique le texte sélectionné ci-dessous en tenant compte du contexte du PDF si utile.\n\nTexte sélectionné :\n{text}",
     empty_title: "Posez une question sur le PDF actuel",

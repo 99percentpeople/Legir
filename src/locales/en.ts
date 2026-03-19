@@ -365,9 +365,12 @@ const en = {
     attachment_selected_text: "Selected text",
     attachment_page_short: "P{page}",
     attachment_location: "P{page} · {start}-{end}",
+    annotation_attachment_location: "{type} · P{page}",
     attachment_remove: "Remove attachment",
     selection_only_message:
       "Please explain the attached selected text from the current PDF.",
+    attachment_only_message:
+      "Please explain the attached annotation or document reference from the current PDF.",
     selection_prompt:
       "Please explain the following selected text from the current PDF. Use the surrounding document context when it helps.\n\nSelected text:\n{text}",
     empty_title: "Ask About The Current PDF",

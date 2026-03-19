@@ -22,9 +22,10 @@ import {
   isKnownFontKey,
   splitTextRuns,
 } from "@/lib/fonts";
+import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 
 export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
-  const { data, isSelected, onUpdate, onDelete, onEdit } = props;
+  const { data, isSelected, onUpdate, onDelete, onEdit, onAskAi } = props;
   const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -219,6 +220,8 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
         >
           <MessageSquare size={16} />
         </Button>
+
+        <AnnotationAskAiButton annotation={data} onAskAi={onAskAi} />
 
         <Button
           variant="ghost"

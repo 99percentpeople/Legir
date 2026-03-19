@@ -484,6 +484,22 @@ export const updateAnnotationTextsArgsSchema = z.preprocess(
     .strict(),
 );
 
+export const deleteHighlightsArgsSchema = z.preprocess(
+  (value) => value,
+  z
+    .object({
+      annotation_ids: z
+        .preprocess(
+          (value) => (typeof value === "string" ? [value] : value),
+          z.array(z.string().min(1)).min(1),
+        )
+        .describe(
+          "One or more highlight annotation ids to delete. Pass either a single id string or an array of id strings in the same annotation_ids field.",
+        ),
+    })
+    .strict(),
+);
+
 export const listFormFieldsArgsSchema = z
   .object({
     page_numbers: pageNumbersSchema.optional().default([]),

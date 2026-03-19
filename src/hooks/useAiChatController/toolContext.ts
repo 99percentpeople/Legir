@@ -27,6 +27,7 @@ import {
 import type {
   AiAnnotationKind,
   AiAnnotationSummary,
+  AiHighlightAnnotationDeleteBatchResult,
   AiAnnotationTextBatchUpdateResult,
   AiAnnotationListResult,
   AiAnnotationTextUpdateResult,
@@ -1850,6 +1851,98 @@ export const createAiChatToolContext = (options: {
     };
   };
 
+  const deleteHighlightAnnotations = (optionsInput: {
+    annotationIds: string[];
+  }): AiHighlightAnnotationDeleteBatchResult => {
+    const currentStore = useEditorStore.getState();
+    const requestedAnnotationIds = Array.from(
+      new Set(
+        optionsInput.annotationIds
+          .map((annotationId) => annotationId.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    const deletions: AiHighlightAnnotationDeleteBatchResult["deletions"] = [];
+    const annotationIdsToDelete = new Set<string>();
+    let deletedCount = 0;
+    let rejectedCount = 0;
+    let deletedAiHighlightCount = 0;
+
+    for (const annotationId of requestedAnnotationIds) {
+      const annotation = currentStore.annotations.find(
+        (item) => item.id === annotationId,
+      );
+      if (!annotation) {
+        rejectedCount += 1;
+        deletions.push({
+          ok: false,
+          annotationId,
+          status: "rejected",
+          reason: "Annotation not found.",
+        });
+        continue;
+      }
+
+      const type = getAiAnnotationKind(annotation);
+      if (type !== "highlight") {
+        rejectedCount += 1;
+        deletions.push({
+          ok: false,
+          annotationId: annotation.id,
+          pageNumber: annotation.pageIndex + 1,
+          highlightedText: annotation.highlightedText?.trim() || undefined,
+          text: annotation.text?.trim() || undefined,
+          status: "rejected",
+          reason: "Annotation is not a highlight.",
+        });
+        continue;
+      }
+
+      annotationIdsToDelete.add(annotation.id);
+      deletedCount += 1;
+      if (
+        annotation.meta?.kind === "ai_search_highlight" ||
+        annotation.meta?.kind === "ai_selection_highlight" ||
+        annotation.meta?.kind === "ai_document_anchor_highlight"
+      ) {
+        deletedAiHighlightCount += 1;
+      }
+      deletions.push({
+        ok: true,
+        annotationId: annotation.id,
+        pageNumber: annotation.pageIndex + 1,
+        highlightedText: annotation.highlightedText?.trim() || undefined,
+        text: annotation.text?.trim() || undefined,
+        status: "deleted",
+      });
+    }
+
+    if (annotationIdsToDelete.size > 0) {
+      currentStore.saveCheckpoint();
+      currentStore.setState((state) => ({
+        annotations: state.annotations.filter(
+          (annotation) => !annotationIdsToDelete.has(annotation.id),
+        ),
+        selectedId:
+          state.selectedId && annotationIdsToDelete.has(state.selectedId)
+            ? null
+            : state.selectedId,
+        isDirty: true,
+      }));
+    }
+
+    if (deletedAiHighlightCount > 0) {
+      clearActiveHighlightedResultIds();
+    }
+
+    return {
+      deletedCount,
+      rejectedCount,
+      deletions,
+    };
+  };
+
   const clearSearchHighlights = () => {
     const store = useEditorStore.getState();
     const aiHighlightIds = store.annotations
@@ -1911,6 +2004,7 @@ export const createAiChatToolContext = (options: {
     clearActiveHighlightedResultIds,
     listAnnotations,
     createSearchHighlightAnnotations,
+    deleteHighlightAnnotations,
     clearSearchHighlights,
     navigatePage,
     focusSearchResult,

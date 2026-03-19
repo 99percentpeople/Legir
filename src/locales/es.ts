@@ -369,9 +369,12 @@ const es = {
     attachment_selected_text: "Texto seleccionado",
     attachment_page_short: "P{page}",
     attachment_location: "P{page} · {start}-{end}",
+    annotation_attachment_location: "{type} · P{page}",
     attachment_remove: "Quitar adjunto",
     selection_only_message:
       "Explica el texto seleccionado adjunto del PDF actual.",
+    attachment_only_message:
+      "Explica la anotación o referencia del documento adjunta del PDF actual.",
     selection_prompt:
       "Explica el siguiente texto seleccionado del PDF actual y usa el contexto del documento cuando ayude.\n\nTexto seleccionado:\n{text}",
     empty_title: "Pregunta sobre el PDF actual",

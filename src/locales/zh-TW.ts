@@ -359,8 +359,10 @@ const zhTW = {
     attachment_selected_text: "選取文字",
     attachment_page_short: "第{page}頁",
     attachment_location: "第{page}頁 · {start}-{end}",
+    annotation_attachment_location: "{type} · 第{page}頁",
     attachment_remove: "移除附件",
     selection_only_message: "請說明目前 PDF 中這段已附加的選取文字。",
+    attachment_only_message: "請說明目前 PDF 中這個已附加的註解或文件引用。",
     selection_prompt:
       "請結合目前 PDF 的上下文，說明下面這段我選取的內容。\n\n選取文字：\n{text}",
     empty_title: "開始詢問目前 PDF",

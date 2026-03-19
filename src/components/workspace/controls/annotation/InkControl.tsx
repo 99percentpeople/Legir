@@ -15,6 +15,7 @@ import {
   getInkSvgPath,
 } from "@/lib/inkGeometry";
 import { getContrastColor } from "@/utils/colors";
+import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 
 export const InkControl: React.FC<AnnotationControlProps> = (props) => {
   const {
@@ -25,6 +26,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
     onUpdate,
     onDelete,
     onEdit,
+    onAskAi,
   } = props;
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
 
@@ -93,6 +95,8 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
               >
                 <MessageSquare size={16} />
               </Button>
+
+              <AnnotationAskAiButton annotation={data} onAskAi={onAskAi} />
 
               <Button
                 variant="ghost"

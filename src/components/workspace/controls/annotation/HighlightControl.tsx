@@ -11,6 +11,7 @@ import { ColorPickerPopover } from "@/components/toolbar/ColorPickerPopover";
 import { Annotation } from "@/types";
 import { ControlWrapper } from "../ControlWrapper";
 import { getContrastColor } from "@/utils/colors";
+import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 
 interface HighlightRectProps {
   r: { x: number; y: number; width: number; height: number };
@@ -24,6 +25,7 @@ interface HighlightRectProps {
   onUpdate?: (id: string, updates: Partial<Annotation>) => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
+  onAskAi?: (id: string) => void;
   isAnnotationMode?: boolean;
 }
 
@@ -38,6 +40,7 @@ interface HighlightPolygonProps {
   onUpdate?: (id: string, updates: Partial<Annotation>) => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
+  onAskAi?: (id: string) => void;
   isAnnotationMode?: boolean;
 }
 
@@ -90,6 +93,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
   onUpdate,
   onDelete,
   onEdit,
+  onAskAi,
   isAnnotationMode = true,
 }) => {
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
@@ -139,6 +143,8 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
         >
           <MessageSquare size={16} />
         </Button>
+
+        <AnnotationAskAiButton annotation={data} onAskAi={onAskAi} />
 
         <Button
           variant="ghost"
@@ -209,6 +215,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
   onUpdate,
   onDelete,
   onEdit,
+  onAskAi,
   isAnnotationMode = true,
 }) => {
   const bounds = getRectBounds(rects);
@@ -260,6 +267,8 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
         >
           <MessageSquare size={16} />
         </Button>
+
+        <AnnotationAskAiButton annotation={data} onAskAi={onAskAi} />
 
         <Button
           variant="ghost"
@@ -336,6 +345,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
   onUpdate,
   onDelete,
   onEdit,
+  onAskAi,
   isAnnotationMode,
 }) => {
   if (data.rects && data.rects.length > 0) {
@@ -351,6 +361,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
         onUpdate={onUpdate}
         onDelete={onDelete}
         onEdit={onEdit}
+        onAskAi={onAskAi}
         isAnnotationMode={isAnnotationMode}
       />
     );
@@ -367,6 +378,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
         onUpdate={onUpdate}
         onDelete={onDelete}
         onEdit={onEdit}
+        onAskAi={onAskAi}
         isAnnotationMode={isAnnotationMode}
       />
     );

@@ -157,6 +157,7 @@ const LIST_ANNOTATIONS_TOOL_PROMPTS = [
   "If the user asks about comments, notes, highlights, links, or annotations, call list_annotations.",
   "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
   "When list_annotations returns link annotations, inspect linkUrl and linkDestPageNumber to understand the hyperlink target.",
+  "If the user wants to delete one or more specific highlights and ids are not already known, call list_annotations first so you can pass the exact highlight annotation ids to delete_highlights.",
   "When pointing the user to a known annotation, prefer a natural clickable control link instead of plain id text.",
 ];
 

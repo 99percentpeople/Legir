@@ -365,8 +365,10 @@ const zhCN = {
     attachment_selected_text: "选中文本",
     attachment_page_short: "第{page}页",
     attachment_location: "第{page}页 · {start}-{end}",
+    annotation_attachment_location: "{type} · 第{page}页",
     attachment_remove: "移除附件",
     selection_only_message: "请解释当前 PDF 中这个已附加的选中文本。",
+    attachment_only_message: "请解释当前 PDF 中这个已附加的注释或文档引用。",
     selection_prompt:
       "请结合当前 PDF 的上下文，解释下面这段我选中的内容。\n\n选中文本：\n{text}",
     empty_title: "开始询问当前 PDF",

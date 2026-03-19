@@ -57,6 +57,7 @@ import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 
 const WorkspaceZoomJankOverlay = React.lazy(
   () => import("./debug/WorkspaceZoomJankOverlay"),
@@ -329,6 +330,27 @@ const Workspace: React.FC<WorkspaceProps> = ({
     textSelectionToolbar.selection,
     textSelectionToolbar.text,
   ]);
+
+  const handleAskAiFromAnnotation = useCallback((annotation: Annotation) => {
+    const attachment: AiChatMessageAttachment = {
+      kind: "annotation_reference",
+      annotationId: annotation.id,
+      annotationType: annotation.type,
+      pageIndex: annotation.pageIndex,
+      ...(annotation.text?.trim() ? { text: annotation.text.trim() } : null),
+      ...(annotation.highlightedText?.trim()
+        ? { highlightedText: annotation.highlightedText.trim() }
+        : null),
+      ...(annotation.linkUrl?.trim()
+        ? { linkUrl: annotation.linkUrl.trim() }
+        : null),
+      ...(typeof annotation.linkDestPageIndex === "number"
+        ? { linkDestPageIndex: annotation.linkDestPageIndex }
+        : null),
+    };
+
+    appEventBus.emit("workspace:askAi", attachment, { sticky: true });
+  }, []);
 
   useAppEvent(
     "workspace:navigatePage",
@@ -2050,6 +2072,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
               onUpdate={onUpdateAnnotation}
               onDelete={onDeleteAnnotation}
               onEdit={onEditAnnotation}
+              onAskAi={() => {
+                handleAskAiFromAnnotation(annot);
+              }}
               onControlResizeStart={handleResizePointerDown}
             />
           );

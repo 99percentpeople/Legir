@@ -10,9 +10,10 @@ import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { useMouse } from "@/hooks/useMouse";
 import { getContrastColor } from "@/utils/colors";
+import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 
 export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
-  const { data, isSelected, onUpdate, onDelete, onEdit } = props;
+  const { data, isSelected, onUpdate, onDelete, onEdit, onAskAi } = props;
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
 
   // Ensure rect exists, otherwise default
@@ -49,6 +50,8 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
         >
           <Pencil size={16} />
         </Button>
+
+        <AnnotationAskAiButton annotation={data} onAskAi={onAskAi} />
 
         <Button
           variant="ghost"

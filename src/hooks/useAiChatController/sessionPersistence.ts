@@ -184,10 +184,27 @@ const truncateMessageAttachments = (
   attachments: AiChatMessageAttachment[] | undefined,
 ) =>
   normalizeMessageAttachments(attachments)?.map((attachment) => {
-    if (attachment.kind !== "workspace_selection") return attachment;
+    if (attachment.kind === "workspace_selection") {
+      return {
+        ...attachment,
+        text: truncateText(attachment.text, 4_000),
+      };
+    }
+
     return {
       ...attachment,
-      text: truncateText(attachment.text, 4_000),
+      text:
+        typeof attachment.text === "string"
+          ? truncateText(attachment.text, 4_000)
+          : undefined,
+      highlightedText:
+        typeof attachment.highlightedText === "string"
+          ? truncateText(attachment.highlightedText, 4_000)
+          : undefined,
+      linkUrl:
+        typeof attachment.linkUrl === "string"
+          ? truncateText(attachment.linkUrl, 1_000)
+          : undefined,
     };
   });
 
@@ -195,16 +212,32 @@ const formatMessageAttachmentForConversation = (
   attachment: AiChatMessageAttachment,
   attachmentIndex: number,
 ) => {
-  if (attachment.kind !== "workspace_selection") return "";
+  if (attachment.kind === "workspace_selection") {
+    return [
+      "SELECTION_ATTACHMENT",
+      `attachment_index: ${attachmentIndex + 1}`,
+      `page_number: ${attachment.pageIndex + 1}`,
+      `start_offset: ${attachment.startOffset}`,
+      `end_offset: ${attachment.endOffset}`,
+      "text:",
+      attachment.text,
+    ].join("\n");
+  }
 
   return [
-    "SELECTION_ATTACHMENT",
+    "ANNOTATION_ATTACHMENT",
     `attachment_index: ${attachmentIndex + 1}`,
+    `annotation_id: ${attachment.annotationId}`,
+    `annotation_type: ${attachment.annotationType}`,
     `page_number: ${attachment.pageIndex + 1}`,
-    `start_offset: ${attachment.startOffset}`,
-    `end_offset: ${attachment.endOffset}`,
-    "text:",
-    attachment.text,
+    ...(attachment.highlightedText
+      ? ["highlighted_text:", attachment.highlightedText]
+      : []),
+    ...(attachment.text ? ["annotation_text:", attachment.text] : []),
+    ...(attachment.linkUrl ? [`link_url: ${attachment.linkUrl}`] : []),
+    ...(typeof attachment.linkDestPageIndex === "number"
+      ? [`link_dest_page_number: ${attachment.linkDestPageIndex + 1}`]
+      : []),
   ].join("\n");
 };
 

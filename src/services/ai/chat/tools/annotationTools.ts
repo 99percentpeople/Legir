@@ -1,6 +1,7 @@
 import {
   createErrorPayload,
   createToolBuilder,
+  deleteHighlightsArgsSchema,
   defineToolModule,
   emptyObjectSchema,
   highlightResultsArgsSchema,
@@ -20,6 +21,13 @@ const HIGHLIGHT_RESULTS_TOOL_PROMPTS = [
   "end_inclusive_anchor is inclusive: the created highlight must include that text.",
   "Choose short, exact anchors from visible text. Do not infer sentence structure inside a selection attachment. Whitespace is flexible during matching. Prefer 2 to 8 words, extend only when needed for uniqueness, and shorten aggressively if a long anchor fails.",
   "If highlight_results returns missing_count > 0, retry only the missing anchors with shorter, more distinctive text.",
+];
+
+const DELETE_HIGHLIGHTS_TOOL_PROMPTS = [
+  "If the user wants to delete specific highlights and exact annotation ids are not already known, call list_annotations first to identify the target highlight annotation ids.",
+  "Use delete_highlights for both single-target and multi-target highlight deletion. Always pass annotation_ids, using either one id string or an array of id strings in that same field.",
+  "delete_highlights only removes highlight annotations. Do not use it for comments, ink, free text, or link annotations.",
+  "Use clear_highlights only when the user wants to clear all AI-created highlights at once.",
 ];
 
 export const annotationToolModule = defineToolModule((_ctx) => ({
@@ -106,6 +114,31 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
               ? `Created ${result.createdCount} highlight annotation${result.createdCount === 1 ? "" : "s"}, ${result.skippedExistingCount} skipped, ${result.missingCount} missing`
               : `Created ${result.createdCount} highlight annotation${result.createdCount === 1 ? "" : "s"}`
             : "highlight_results completed with no new highlights",
+      };
+    }),
+
+  delete_highlights: createToolBuilder("delete_highlights")
+    .write()
+    .description(
+      "Delete one or more existing highlight annotations by id. Always use annotation_ids; it may be either a single id string or an array of id strings. Use list_annotations first when you need to locate the target highlight ids.",
+    )
+    .promptInstructions(DELETE_HIGHLIGHTS_TOOL_PROMPTS)
+    .inputSchema(deleteHighlightsArgsSchema)
+    .build(async ({ args, ctx: toolCtx }) => {
+      const result = toolCtx.deleteHighlightAnnotations({
+        annotationIds: args.annotation_ids.map((annotationId) =>
+          annotationId.trim(),
+        ),
+      });
+
+      return {
+        payload: result,
+        summary:
+          result.deletedCount > 0
+            ? result.rejectedCount > 0
+              ? `Deleted ${result.deletedCount} highlight annotation${result.deletedCount === 1 ? "" : "s"}, ${result.rejectedCount} rejected`
+              : `Deleted ${result.deletedCount} highlight annotation${result.deletedCount === 1 ? "" : "s"}`
+            : "delete_highlights completed with no deletions",
       };
     }),
 

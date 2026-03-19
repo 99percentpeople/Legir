@@ -1,4 +1,4 @@
-import type { AiChatSelectionAttachment } from "@/services/ai/chat/types";
+import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 
 export type Unsubscribe = () => void;
 
@@ -83,7 +83,7 @@ export type AppEventMap = {
     sourceText?: string;
     autoTranslate?: boolean;
   };
-  "workspace:askAi": AiChatSelectionAttachment;
+  "workspace:askAi": AiChatMessageAttachment;
   "workspace:focusControl": {
     id: string;
     behavior?: "auto" | "smooth";
