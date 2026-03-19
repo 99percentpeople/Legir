@@ -125,8 +125,11 @@ function SelectLabel({
 function SelectItem({
   className,
   children,
+  itemText,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & {
+  itemText?: string;
+}) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -141,7 +144,18 @@ function SelectItem({
           <CheckIcon className="pointer-events-none" />
         </SelectPrimitive.ItemIndicator>
       </span>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      {itemText ? (
+        <>
+          <SelectPrimitive.ItemText asChild>
+            <span className="sr-only">{itemText}</span>
+          </SelectPrimitive.ItemText>
+          <div aria-hidden className="flex min-w-0 flex-1 items-start">
+            {children}
+          </div>
+        </>
+      ) : (
+        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      )}
     </SelectPrimitive.Item>
   );
 }

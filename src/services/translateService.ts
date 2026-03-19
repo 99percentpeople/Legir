@@ -1,15 +1,17 @@
-import type { TranslateOptionId } from "@/types";
+import type { LLMModelCapabilities, TranslateOptionId } from "@/types";
 
 export interface TranslateOption {
   id: TranslateOptionId;
   label: string;
   labelKey?: string;
+  capabilities?: LLMModelCapabilities;
 }
 
 export interface TranslateOptionRegistration {
   id: string;
   label: string;
   labelKey?: string;
+  capabilities?: LLMModelCapabilities;
 }
 
 export interface TranslateOptionGroup {
@@ -234,6 +236,7 @@ export class TranslateService {
         id: this.buildFullOptionId(g.id, opt.id),
         label: opt.label,
         labelKey: opt.labelKey,
+        capabilities: opt.capabilities,
       })),
     }));
   }

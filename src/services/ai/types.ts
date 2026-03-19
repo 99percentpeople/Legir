@@ -5,15 +5,11 @@
  * form detection, translation, summarization, or older AI integrations.
  * Chat-specific tool/runtime/message contracts live under `src/services/ai/chat`.
  */
-import type { FieldType, FormField } from "@/types";
+import type { AppLLMModelOption, FieldType, FormField } from "@/types";
 
 export type LLMProviderId = string;
 
-export type LLMModelOption = {
-  id: string;
-  label: string;
-  labelKey?: string;
-};
+export type LLMModelOption = AppLLMModelOption;
 
 export interface LLMTranslateTextOptions {
   modelId?: string;

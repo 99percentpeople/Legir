@@ -200,13 +200,35 @@ export type AppLLMModelOption = {
   id: string;
   label: string;
   labelKey?: string;
+  capabilities: LLMModelCapabilities;
 };
+
+export type LLMModelModality =
+  | "text"
+  | "image"
+  | "audio"
+  | "video"
+  | "file"
+  | (string & {});
+
+export interface LLMModelCapabilities {
+  inputModalities: LLMModelModality[];
+  outputModalities: LLMModelModality[];
+  supportsImageInput: boolean;
+  supportsToolCalls: boolean;
+}
+
+export type LLMCustomModelCapability = "text" | "image" | "tools";
+
+export interface LLMCustomModelConfig {
+  id: string;
+  capabilities: LLMCustomModelCapability[];
+}
 
 export interface LLMProviderOptions {
   apiKey?: string;
   apiUrl?: string;
-  customTranslateModels: string[];
-  customVisionModels: string[];
+  customModels: LLMCustomModelConfig[];
 }
 
 export type LLMOptions = Record<AiProviderId, LLMProviderOptions>;

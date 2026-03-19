@@ -32,7 +32,11 @@ import {
   getFormDetectModelGroups,
   subscribeLLMModelRegistry,
 } from "@/services/ai";
-import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
+import {
+  filterModelSelectGroups,
+  ModelSelect,
+  type ModelSelectGroup,
+} from "@/components/ModelSelect";
 
 export interface FormDetectionOptions {
   pageRange: string;
@@ -82,28 +86,42 @@ export function FormDetectionOptionsForm({
       options: g.models.map((m) => ({
         value: `${g.providerId}:${m.id}`,
         label: m.labelKey ? t(m.labelKey) : m.label,
+        capabilities: m.capabilities,
         disabled: !g.isAvailable,
       })),
     }));
   }, [modelGroups, t]);
+  const imageModelFilter = React.useCallback(
+    (option: { capabilities?: { supportsImageInput?: boolean } }) =>
+      option.capabilities?.supportsImageInput === true,
+    [],
+  );
+  const visibleModelSelectGroups = React.useMemo(
+    () => filterModelSelectGroups(modelSelectGroups, imageModelFilter),
+    [imageModelFilter, modelSelectGroups],
+  );
   const flatModels = React.useMemo(
     () =>
       modelGroups.flatMap((g) =>
-        g.models.map((m) => ({ providerId: g.providerId, model: m })),
+        g.models
+          .filter((m) => m.capabilities.supportsImageInput)
+          .map((m) => ({
+            providerId: g.providerId,
+            model: m,
+            isAvailable: g.isAvailable,
+          })),
       ),
     [modelGroups],
   );
 
   const getDefaultModelKey = React.useCallback(() => {
-    const firstAvailable = modelGroups.find(
-      (g) => g.isAvailable && g.models.length > 0,
-    );
+    const firstAvailable = flatModels.find((item) => item.isAvailable);
     if (firstAvailable) {
-      return `${firstAvailable.providerId}:${firstAvailable.models[0].id}`;
+      return `${firstAvailable.providerId}:${firstAvailable.model.id}`;
     }
     const firstAny = flatModels[0];
     return firstAny ? `${firstAny.providerId}:${firstAny.model.id}` : undefined;
-  }, [flatModels, modelGroups]);
+  }, [flatModels]);
 
   const [pageRange, setPageRange] = useState<string>("All");
   const [selectedModelKey, setSelectedModelKey] = useState<string | undefined>(
@@ -313,7 +331,7 @@ export function FormDetectionOptionsForm({
         </div>
 
         {/* Model */}
-        {flatModels.length > 0 && (
+        {visibleModelSelectGroups.length > 0 && (
           <>
             <Separator />
             <div className="space-y-2">
@@ -323,6 +341,7 @@ export function FormDetectionOptionsForm({
                 onValueChange={(v) => setSelectedModelKey(v)}
                 placeholder={t("common.select")}
                 groups={modelSelectGroups}
+                optionFilter={imageModelFilter}
                 showSeparators={false}
               />
             </div>
@@ -507,7 +526,7 @@ const FormDetectionDialog: React.FC<FormDetectionDialogProps> = ({
           renderFooter={({ isValid, onConfirm }) => (
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>
-                {t("common.cancel")}
+                {t("common.actions.cancel")}
               </Button>
               <Button
                 onClick={() => {

@@ -13,6 +13,7 @@ export type AiProviderBackendKind =
   | "openai"
   | "google"
   | "deepseek"
+  | "openrouter"
   | "openai-compatible";
 
 export interface AiProviderSpec {
@@ -50,7 +51,7 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
   {
     id: "openrouter",
     label: "OpenRouter",
-    backendKind: "openai-compatible",
+    backendKind: "openrouter",
     defaultBaseUrl: "https://openrouter.ai/api/v1",
     allowCustomBaseUrl: true,
     fallbackModelId: "",

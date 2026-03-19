@@ -6,7 +6,9 @@
  * folders.
  */
 import type { LanguageModel } from "ai";
+import type { LLMModelOption } from "@/services/ai/types";
 import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
+import type { AppOptions, EditorState, LLMModelCapabilities } from "@/types";
 
 export type AiSdkProviderId = AiProviderId;
 
@@ -14,6 +16,7 @@ export type AiSdkBackendKind =
   | "openai"
   | "google"
   | "deepseek"
+  | "openrouter"
   | "openai-compatible";
 
 export interface AiSdkProviderConfig {
@@ -32,4 +35,36 @@ export interface AiSdkModelSpecifier {
 export interface AiSdkResolvedLanguageModel {
   specifier: AiSdkModelSpecifier;
   model: LanguageModel;
+}
+
+export type AiSdkTaskModelKind = "translate" | "vision" | "chat" | "summarize";
+
+export interface AiSdkDiscoveredModel {
+  id: string;
+  label?: string;
+  capabilities: LLMModelCapabilities;
+}
+
+export interface AiSdkModelCatalogProviderRequest {
+  appOptions: AppOptions;
+  signal?: AbortSignal;
+}
+
+export interface AiSdkModelCatalogProviderTaskRequest {
+  appOptions: AppOptions;
+  modelCache: EditorState["llmModelCache"];
+  kind: AiSdkTaskModelKind;
+}
+
+export interface AiSdkModelCatalogProvider {
+  readonly providerId: AiSdkProviderId;
+  fetchModels: (
+    options: AiSdkModelCatalogProviderRequest,
+  ) => Promise<LLMModelOption[]>;
+  getModelsForTask: (
+    options: AiSdkModelCatalogProviderTaskRequest,
+  ) => LLMModelOption[];
+  checkConfig: (
+    options: AiSdkModelCatalogProviderRequest,
+  ) => Promise<void> | void;
 }

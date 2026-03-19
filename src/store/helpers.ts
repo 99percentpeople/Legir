@@ -1,4 +1,3 @@
-import { filterSupportedGeminiToolCallingModelIds } from "@/services/ai/utils/geminiModelSupport";
 import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
 import {
   AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
@@ -11,6 +10,8 @@ import type {
   AppOptions,
   EditorState,
   EditorUiState,
+  LLMCustomModelCapability,
+  LLMCustomModelConfig,
   LLMOptions,
   PageData,
 } from "@/types";
@@ -30,6 +31,68 @@ const clampDigestSourceChars = (value: unknown) => {
   );
 };
 
+const CUSTOM_MODEL_CAPABILITY_ORDER: LLMCustomModelCapability[] = [
+  "text",
+  "image",
+  "tools",
+];
+
+const normalizeCustomModelCapability = (value: string) => {
+  if (value === "text" || value === "image" || value === "tools") {
+    return value;
+  }
+  return null;
+};
+
+const normalizeCustomModelCapabilities = (
+  values: readonly string[] | undefined,
+): LLMCustomModelCapability[] => {
+  const seen = new Set<LLMCustomModelCapability>(["text"]);
+  const normalized: LLMCustomModelCapability[] = ["text"];
+
+  for (const value of values ?? []) {
+    const capability = normalizeCustomModelCapability(value);
+    if (!capability || seen.has(capability)) continue;
+    seen.add(capability);
+    normalized.push(capability);
+  }
+
+  return CUSTOM_MODEL_CAPABILITY_ORDER.filter((capability) =>
+    normalized.includes(capability),
+  );
+};
+
+const normalizeCustomModelConfigs = (
+  customModels: readonly LLMCustomModelConfig[] | undefined,
+): LLMCustomModelConfig[] => {
+  const byId = new Map<string, Set<LLMCustomModelCapability>>();
+
+  const upsert = (
+    modelId: string,
+    capabilities: readonly LLMCustomModelCapability[],
+  ) => {
+    const normalizedId = modelId.trim();
+    if (!normalizedId) return;
+
+    const nextCapabilities =
+      byId.get(normalizedId) || new Set<LLMCustomModelCapability>();
+    for (const capability of normalizeCustomModelCapabilities(capabilities)) {
+      nextCapabilities.add(capability);
+    }
+    byId.set(normalizedId, nextCapabilities);
+  };
+
+  for (const model of customModels || []) {
+    if (!model?.id) continue;
+    upsert(model.id, normalizeCustomModelCapabilities(model.capabilities));
+  }
+
+  return [...byId.entries()].map(([id, capabilities]) => ({
+    id,
+    capabilities: normalizeCustomModelCapabilities([...capabilities]),
+  }));
+};
+
 // Keep provider keys stable even when individual provider config is missing.
 export const createEmptyLlmOptions = (): LLMOptions =>
   Object.fromEntries(
@@ -38,8 +101,7 @@ export const createEmptyLlmOptions = (): LLMOptions =>
       {
         apiKey: "",
         apiUrl: "",
-        customTranslateModels: [],
-        customVisionModels: [],
+        customModels: [],
       },
     ]),
   ) as LLMOptions;
@@ -60,26 +122,21 @@ export const mergeLlmOptions = (
 
 export const trimLlmOptions = (options: LLMOptions): LLMOptions =>
   Object.fromEntries(
-    AI_PROVIDER_IDS.map((providerId) => [
-      providerId,
-      {
-        ...options[providerId],
-        apiKey: (options[providerId].apiKey || "").trim(),
-        apiUrl: (options[providerId].apiUrl || "").trim(),
-        customTranslateModels:
-          providerId === "gemini"
-            ? filterSupportedGeminiToolCallingModelIds(
-                options[providerId].customTranslateModels || [],
-              )
-            : options[providerId].customTranslateModels || [],
-        customVisionModels:
-          providerId === "gemini"
-            ? filterSupportedGeminiToolCallingModelIds(
-                options[providerId].customVisionModels || [],
-              )
-            : options[providerId].customVisionModels || [],
-      },
-    ]),
+    AI_PROVIDER_IDS.map((providerId) => {
+      const providerOptions = options[providerId];
+
+      return [
+        providerId,
+        {
+          ...providerOptions,
+          apiKey: (providerOptions.apiKey || "").trim(),
+          apiUrl: (providerOptions.apiUrl || "").trim(),
+          customModels: normalizeCustomModelConfigs(
+            providerOptions.customModels,
+          ),
+        },
+      ];
+    }),
   ) as LLMOptions;
 
 export const applyEnvLlmDefaults = (options: LLMOptions): LLMOptions => ({

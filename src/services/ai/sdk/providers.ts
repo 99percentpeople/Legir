@@ -3,6 +3,7 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { ProviderV3 } from "@ai-sdk/provider";
 
 import {
@@ -116,6 +117,15 @@ export const createAiSdkProviders = (options: AppOptions) => {
       providers[config.providerId] = createOpenAI({
         name: config.providerId,
         apiKey: config.apiKey,
+        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+      });
+      continue;
+    }
+
+    if (config.backendKind === "openrouter") {
+      providers[config.providerId] = createOpenRouter({
+        apiKey: config.apiKey,
+        compatibility: "strict",
         ...(config.baseURL ? { baseURL: config.baseURL } : {}),
       });
       continue;

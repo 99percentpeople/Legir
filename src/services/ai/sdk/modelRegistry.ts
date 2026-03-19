@@ -5,7 +5,7 @@ import {
   AI_PROVIDER_SPECS,
   isAiProviderId,
 } from "@/services/ai/sdk/providerCatalog";
-import { filterSupportedGeminiToolCallingModelIds } from "@/services/ai/utils/geminiModelSupport";
+import { getAiSdkModelCatalogProvider } from "@/services/ai/sdk/modelCatalogProviders";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { AppLLMModelOption, AppOptions, EditorState } from "@/types";
 import { createAiSdkProviderRegistry } from "@/services/ai/sdk/providers";
@@ -14,11 +14,11 @@ import type {
   AiSdkModelSpecifier,
   AiSdkProviderId,
   AiSdkResolvedLanguageModel,
+  AiSdkTaskModelKind,
 } from "@/services/ai/sdk/types";
 
 const MODEL_SPECIFIER_SEPARATOR = ":";
 
-type AiSdkTaskModelKind = "translate" | "vision" | "chat" | "summarize";
 type AiSdkModelCache = EditorState["llmModelCache"];
 
 export type AiSdkModelGroup = {
@@ -30,7 +30,13 @@ export type AiSdkModelGroup = {
   models: AppLLMModelOption[];
 };
 
-const dedupeModelOptions = (models: Array<{ id: string; label?: string }>) => {
+const dedupeModelOptions = (
+  models: Array<{
+    id: string;
+    label?: string;
+    capabilities: AppLLMModelOption["capabilities"];
+  }>,
+) => {
   const output: AppLLMModelOption[] = [];
   const seen = new Set<string>();
 
@@ -41,14 +47,12 @@ const dedupeModelOptions = (models: Array<{ id: string; label?: string }>) => {
     output.push({
       id,
       label: (model.label || id).trim() || id,
+      capabilities: model.capabilities,
     });
   }
 
   return output;
 };
-
-const getCacheBucket = (kind: AiSdkTaskModelKind) =>
-  kind === "vision" ? "visionModels" : "translateModels";
 
 export const parseAiSdkModelSpecifier = (
   value: string | null | undefined,
@@ -102,49 +106,19 @@ export const resolveAiSdkLanguageModelFromCurrentOptions = (
   specifier: AiSdkModelSpecifier,
 ) => resolveAiSdkLanguageModel(useEditorStore.getState().options, specifier);
 
-export const getAiSdkProviderCustomModels = (options: {
-  appOptions: AppOptions;
-  modelCache: AiSdkModelCache;
-  providerId: AiSdkProviderId;
-  kind: AiSdkTaskModelKind;
-}) => {
-  const ids =
-    options.kind === "vision"
-      ? options.appOptions.llm[options.providerId].customVisionModels
-      : options.appOptions.llm[options.providerId].customTranslateModels;
-
-  const normalizedIds =
-    options.providerId === "gemini"
-      ? filterSupportedGeminiToolCallingModelIds(ids || [])
-      : (ids || []).map((id) => id.trim()).filter(Boolean);
-  const knownIds =
-    options.providerId === "gemini"
-      ? new Set(
-          options.modelCache[options.providerId][
-            getCacheBucket(options.kind)
-          ].map((model) => model.id),
-        )
-      : null;
-
-  return normalizedIds
-    .filter((id, index, list) => list.indexOf(id) === index)
-    .filter((id) => !knownIds || knownIds.size === 0 || knownIds.has(id))
-    .map((id) => ({
-      id,
-      label: id,
-    }));
-};
-
 export const getAiSdkProviderModelOptions = (options: {
   appOptions: AppOptions;
   modelCache: AiSdkModelCache;
   providerId: AiSdkProviderId;
   kind: AiSdkTaskModelKind;
 }) =>
-  dedupeModelOptions([
-    ...options.modelCache[options.providerId][getCacheBucket(options.kind)],
-    ...getAiSdkProviderCustomModels(options),
-  ]);
+  dedupeModelOptions(
+    getAiSdkModelCatalogProvider(options.providerId).getModelsForTask({
+      appOptions: options.appOptions,
+      modelCache: options.modelCache,
+      kind: options.kind,
+    }),
+  );
 
 export const getAiSdkModelGroups = (options: {
   appOptions: AppOptions;

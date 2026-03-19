@@ -97,6 +97,7 @@ const registerTranslateOptionsFromProviders = () => {
         id: model.id,
         label: model.label,
         labelKey: model.labelKey,
+        capabilities: model.capabilities,
       })),
       isLLM: true,
       isAvailable: () =>

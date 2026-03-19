@@ -2,6 +2,7 @@ export * from "./types";
 export * from "./providers";
 export * from "./modelRegistry";
 export * from "./modelCatalog";
+export * from "./modelCapabilities";
 export * from "./tasks/summarizeText";
 export * from "./tasks/translateText";
 export * from "./tasks/translatePageBlocksStructured";

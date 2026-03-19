@@ -15,6 +15,8 @@ import {
   Loader2,
   BrainCircuit,
   MessageSquare,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
   Dialog,
@@ -39,6 +41,7 @@ import {
 import {
   DebugOptions,
   AppOptions,
+  LLMCustomModelCapability,
   SnappingOptions,
   ThumbnailsLayoutMode,
 } from "@/types";
@@ -52,14 +55,17 @@ import { useTheme } from "../theme-provider";
 import { Separator } from "../ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { useEditorStore } from "@/store/useEditorStore";
 import {
   checkLlmProviderConfig,
   getChatModelGroups,
   loadModels,
 } from "@/services/ai";
-import { type Tag, TagInput } from "emblor";
+import { ModelCapabilityBadges } from "@/components/ModelCapabilityBadges";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
+import { ProviderLogo } from "@/components/ProviderLogo";
+import { createCustomModelCapabilities } from "@/services/ai/sdk/modelCapabilities";
 import {
   AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
@@ -118,44 +124,33 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const modelUpdateTimersRef = useRef<Partial<Record<LlmProviderId, number>>>(
     {},
   );
-  const [
-    activeTranslateTagIndexByProvider,
-    setActiveTranslateTagIndexByProvider,
-  ] = useState<Partial<Record<LlmProviderId, number | null>>>({});
-  const [activeVisionTagIndexByProvider, setActiveVisionTagIndexByProvider] =
-    useState<Partial<Record<LlmProviderId, number | null>>>({});
+  const [customModelNameByProvider, setCustomModelNameByProvider] = useState<
+    Partial<Record<LlmProviderId, string>>
+  >({});
+  const [customModelCapabilityByProvider, setCustomModelCapabilityByProvider] =
+    useState<Partial<Record<LlmProviderId, LLMCustomModelCapability[]>>>({});
 
-  const tagStyles = useMemo(
-    () => ({
-      inlineTagsContainer:
-        "border-input rounded-md bg-transparent dark:bg-input/30 shadow-xs transition-[color,box-shadow] focus-within:border-ring outline-none focus-within:ring-[3px] focus-within:ring-ring/50 p-1 gap-1",
-      input:
-        "w-full min-w-[80px] shadow-none px-2 h-7 focus-visible:outline-none",
-      tag: {
-        body: "h-7 relative bg-background border border-input hover:bg-background rounded-md font-medium text-xs ps-2 pe-7 flex items-center",
-        closeButton:
-          "absolute -inset-y-px -end-px p-0 rounded-e-md flex size-7 transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] text-muted-foreground/80 hover:text-foreground justify-center items-center",
-      },
-    }),
-    [],
+  const customModelCapabilityOptions = useMemo(
+    () =>
+      [
+        {
+          value: "text",
+          label: t("settings.llm.custom_model_capability_text"),
+        },
+        {
+          value: "image",
+          label: t("settings.llm.custom_model_capability_image"),
+        },
+        {
+          value: "tools",
+          label: t("settings.llm.custom_model_capability_tools"),
+        },
+      ] satisfies Array<{
+        value: LLMCustomModelCapability;
+        label: string;
+      }>,
+    [t],
   );
-
-  const normalizeModelIds = (tags: Tag[]) => {
-    const out: string[] = [];
-    const seen = new Set<string>();
-    for (const t of tags) {
-      const text = (t.text || "").trim();
-      if (!text) continue;
-      if (seen.has(text)) continue;
-      seen.add(text);
-      out.push(text);
-    }
-    return out;
-  };
-
-  const toTags = (ids: string[]): Tag[] => {
-    return ids.map((id) => ({ id, text: id }));
-  };
 
   const scheduleModelRegistryUpdate = (provider: LlmProviderId) => {
     const prev = modelUpdateTimersRef.current[provider];
@@ -189,6 +184,49 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     updateLlmProviderOptions(provider, { apiUrl: value });
   };
 
+  const getCustomModelDraftCapabilities = (provider: LlmProviderId) => {
+    const values = customModelCapabilityByProvider[provider] || [
+      "text",
+      "tools",
+    ];
+    const normalized = new Set<LLMCustomModelCapability>(["text", ...values]);
+    return ["text", "image", "tools"].filter((value) =>
+      normalized.has(value as LLMCustomModelCapability),
+    ) as LLMCustomModelCapability[];
+  };
+
+  const addCustomModel = (provider: LlmProviderId) => {
+    const id = (customModelNameByProvider[provider] || "").trim();
+    if (!id) return;
+
+    const capabilities = getCustomModelDraftCapabilities(provider);
+    const currentModels = options.llm[provider].customModels || [];
+    const hasExisting = currentModels.some((model) => model.id === id);
+    const nextCustomModels = hasExisting
+      ? currentModels.map((model) =>
+          model.id === id ? { id, capabilities } : model,
+        )
+      : [...currentModels, { id, capabilities }];
+
+    updateLlmProviderOptions(provider, {
+      customModels: nextCustomModels,
+    });
+    setCustomModelNameByProvider((prev) => ({
+      ...prev,
+      [provider]: "",
+    }));
+    scheduleModelRegistryUpdate(provider);
+  };
+
+  const removeCustomModel = (provider: LlmProviderId, id: string) => {
+    updateLlmProviderOptions(provider, {
+      customModels: (options.llm[provider].customModels || []).filter(
+        (model) => model.id !== id,
+      ),
+    });
+    scheduleModelRegistryUpdate(provider);
+  };
+
   const updateAiChatOptions = (patch: Partial<AppOptions["aiChat"]>) => {
     onChange({
       ...options,
@@ -206,10 +244,15 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
       options: group.models.map((model) => ({
         value: `${group.providerId}:${model.id}`,
         label: model.label,
+        capabilities: model.capabilities,
         disabled: !group.isAvailable,
       })),
     }));
   }, [llmModelCache, options.llm]);
+
+  const selectedLlmProviderSpec =
+    AI_PROVIDER_SPECS.find((spec) => spec.id === llmProviderTab) ??
+    AI_PROVIDER_SPECS[0];
 
   const digestOutputRatioDenominator =
     options.aiChat.digestOutputRatioDenominator;
@@ -618,12 +661,40 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     onValueChange={(v) => setLlmProviderTab(v as LlmProviderId)}
                   >
                     <SelectTrigger className="h-8 w-[160px]">
-                      <SelectValue placeholder={t("common.select")} />
+                      <SelectValue placeholder={t("common.select")}>
+                        <div className="flex items-center gap-1.5">
+                          <ProviderLogo
+                            providerId={selectedLlmProviderSpec.id}
+                            size={14}
+                            className="text-foreground/80"
+                          />
+                          <span>
+                            {selectedLlmProviderSpec.labelKey
+                              ? t(selectedLlmProviderSpec.labelKey)
+                              : selectedLlmProviderSpec.label}
+                          </span>
+                        </div>
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {AI_PROVIDER_SPECS.map((spec) => (
-                        <SelectItem key={spec.id} value={spec.id}>
-                          {spec.labelKey ? t(spec.labelKey) : spec.label}
+                        <SelectItem
+                          key={spec.id}
+                          value={spec.id}
+                          itemText={
+                            spec.labelKey ? t(spec.labelKey) : spec.label
+                          }
+                        >
+                          <div className="flex items-center gap-2">
+                            <ProviderLogo
+                              providerId={spec.id}
+                              size={14}
+                              className="text-foreground/80"
+                            />
+                            <span>
+                              {spec.labelKey ? t(spec.labelKey) : spec.label}
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -743,17 +814,21 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                           </div>
                           {llmModelCache[spec.id].translateModels.length > 0 ? (
                             <div className="bg-background/80 max-h-36 overflow-auto rounded-md border p-2">
-                              <div className="flex flex-wrap gap-1.5">
+                              <div className="flex flex-col gap-1.5">
                                 {llmModelCache[spec.id].translateModels.map(
                                   (model) => (
                                     <span
                                       key={`${spec.id}:fetched:${model.id}`}
-                                      className="bg-muted text-muted-foreground inline-flex max-w-full min-w-0 items-center rounded-md px-2 py-1 text-[11px]"
+                                      className="bg-muted inline-flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-1 text-[11px]"
                                       title={model.id}
                                     >
-                                      <span className="truncate">
+                                      <span className="min-w-0 flex-1">
                                         {model.id}
                                       </span>
+                                      <ModelCapabilityBadges
+                                        capabilities={model.capabilities}
+                                        className="shrink-0 flex-nowrap"
+                                      />
                                     </span>
                                   ),
                                 )}
@@ -767,118 +842,138 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                         </div>
 
                         <div className="bg-muted/30 border-border flex flex-col gap-3 rounded-lg border p-3">
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="space-y-1">
                             <Label className="text-xs">
-                              {t("settings.llm.custom_models_translate")}
+                              {t("settings.llm.custom_models")}
                             </Label>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-muted-foreground h-6 px-2 text-xs"
-                              disabled={
-                                (providerOptions.customTranslateModels || [])
-                                  .length === 0
-                              }
-                              onClick={() => {
-                                updateLlmProviderOptions(spec.id, {
-                                  customTranslateModels: [],
-                                });
-                                scheduleModelRegistryUpdate(spec.id);
-                              }}
-                            >
-                              {t("settings.llm.clear_custom_models")}
-                            </Button>
+                            <p className="text-muted-foreground text-xs">
+                              {t("settings.llm.custom_models_desc")}
+                            </p>
                           </div>
-                          <TagInput
-                            id={`llm-${spec.id}-translate-models`}
-                            placeholder={t(
-                              "settings.llm.custom_models_placeholder",
-                            )}
-                            tags={toTags(
-                              providerOptions.customTranslateModels || [],
-                            )}
-                            setTags={(newTags) => {
-                              const prevTags = toTags(
-                                providerOptions.customTranslateModels || [],
-                              );
-                              const updated =
-                                typeof newTags === "function"
-                                  ? newTags(prevTags)
-                                  : newTags;
-                              updateLlmProviderOptions(spec.id, {
-                                customTranslateModels:
-                                  normalizeModelIds(updated),
-                              });
-                              scheduleModelRegistryUpdate(spec.id);
-                            }}
-                            activeTagIndex={
-                              activeTranslateTagIndexByProvider[spec.id] ?? null
-                            }
-                            setActiveTagIndex={(index) =>
-                              setActiveTranslateTagIndexByProvider((prev) => ({
-                                ...prev,
-                                [spec.id]: index,
-                              }))
-                            }
-                            styleClasses={tagStyles}
-                          />
 
-                          <div className="flex items-center justify-between gap-2">
-                            <Label className="text-xs">
-                              {t("settings.llm.custom_models_vision")}
-                            </Label>
+                          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                            <Input
+                              id={`llm-${spec.id}-custom-model-name`}
+                              placeholder={t(
+                                "settings.llm.custom_model_name_placeholder",
+                              )}
+                              value={customModelNameByProvider[spec.id] || ""}
+                              onChange={(event) =>
+                                setCustomModelNameByProvider((prev) => ({
+                                  ...prev,
+                                  [spec.id]: event.target.value,
+                                }))
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key !== "Enter") return;
+                                event.preventDefault();
+                                addCustomModel(spec.id);
+                              }}
+                            />
                             <Button
                               type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-muted-foreground h-6 px-2 text-xs"
+                              onClick={() => addCustomModel(spec.id)}
                               disabled={
-                                (providerOptions.customVisionModels || [])
-                                  .length === 0
+                                !(
+                                  customModelNameByProvider[spec.id] || ""
+                                ).trim()
                               }
-                              onClick={() => {
-                                updateLlmProviderOptions(spec.id, {
-                                  customVisionModels: [],
-                                });
-                                scheduleModelRegistryUpdate(spec.id);
-                              }}
                             >
-                              {t("settings.llm.clear_custom_models")}
+                              <Plus className="mr-1 h-4 w-4" />
+                              {t("settings.llm.custom_model_add")}
                             </Button>
                           </div>
-                          <TagInput
-                            id={`llm-${spec.id}-vision-models`}
-                            placeholder={t(
-                              "settings.llm.custom_models_placeholder",
-                            )}
-                            tags={toTags(
-                              providerOptions.customVisionModels || [],
-                            )}
-                            setTags={(newTags) => {
-                              const prevTags = toTags(
-                                providerOptions.customVisionModels || [],
-                              );
-                              const updated =
-                                typeof newTags === "function"
-                                  ? newTags(prevTags)
-                                  : newTags;
-                              updateLlmProviderOptions(spec.id, {
-                                customVisionModels: normalizeModelIds(updated),
-                              });
-                              scheduleModelRegistryUpdate(spec.id);
-                            }}
-                            activeTagIndex={
-                              activeVisionTagIndexByProvider[spec.id] ?? null
-                            }
-                            setActiveTagIndex={(index) =>
-                              setActiveVisionTagIndexByProvider((prev) => ({
-                                ...prev,
-                                [spec.id]: index,
-                              }))
-                            }
-                            styleClasses={tagStyles}
-                          />
+
+                          <div className="space-y-2">
+                            <Label className="text-xs">
+                              {t("settings.llm.custom_model_capability")}
+                            </Label>
+                            <ToggleGroup
+                              type="multiple"
+                              variant="outline"
+                              size="sm"
+                              spacing={1}
+                              value={getCustomModelDraftCapabilities(spec.id)}
+                              onValueChange={(value) => {
+                                const nextValues =
+                                  new Set<LLMCustomModelCapability>(["text"]);
+                                for (const item of value) {
+                                  if (
+                                    item === "text" ||
+                                    item === "image" ||
+                                    item === "tools"
+                                  ) {
+                                    nextValues.add(item);
+                                  }
+                                }
+                                setCustomModelCapabilityByProvider((prev) => ({
+                                  ...prev,
+                                  [spec.id]: ["text", "image", "tools"].filter(
+                                    (item) =>
+                                      nextValues.has(
+                                        item as LLMCustomModelCapability,
+                                      ),
+                                  ) as LLMCustomModelCapability[],
+                                }));
+                              }}
+                              className="w-full flex-wrap"
+                            >
+                              {customModelCapabilityOptions.map((option) => (
+                                <ToggleGroupItem
+                                  key={option.value}
+                                  value={option.value}
+                                  disabled={option.value === "text"}
+                                  className="min-w-20"
+                                >
+                                  {option.label}
+                                </ToggleGroupItem>
+                              ))}
+                            </ToggleGroup>
+                          </div>
+
+                          {(providerOptions.customModels || []).length > 0 ? (
+                            <div className="bg-background/80 max-h-48 overflow-auto rounded-md border p-2">
+                              <div className="flex flex-col gap-1.5">
+                                {(providerOptions.customModels || []).map(
+                                  (model) => (
+                                    <div
+                                      key={`${spec.id}:custom:${model.id}`}
+                                      className="bg-muted flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-1"
+                                    >
+                                      <span
+                                        className="min-w-0 flex-1 text-[11px]"
+                                        title={model.id}
+                                      >
+                                        {model.id}
+                                      </span>
+                                      <ModelCapabilityBadges
+                                        capabilities={createCustomModelCapabilities(
+                                          model.capabilities,
+                                        )}
+                                        className="shrink-0 flex-nowrap"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0"
+                                        onClick={() =>
+                                          removeCustomModel(spec.id, model.id)
+                                        }
+                                        aria-label={t("common.actions.delete")}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground text-xs">
+                              {t("settings.llm.custom_models_empty")}
+                            </p>
+                          )}
                         </div>
                       </TabsContent>
                     );
