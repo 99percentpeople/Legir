@@ -90,7 +90,24 @@ const PDFSearchPanel: React.FC<PDFSearchPanelProps> = ({
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden">
-      <div className="border-border bg-muted/30 flex shrink-0 flex-col gap-2 border-b px-3 py-2">
+      <div className="border-border bg-muted/30 flex shrink-0 flex-wrap-reverse justify-between gap-2 border-b px-3 py-2">
+        <div className="text-muted-foreground flex flex-1 items-center justify-between gap-2 text-[11px] text-nowrap">
+          <span>
+            {t("sidebar.search_results_summary", {
+              total: results.length,
+              pages: groupedResults.length,
+            })}
+          </span>
+          {activeResultIndex >= 0 && (
+            <span>
+              {t("sidebar.search_current_result", {
+                current: activeResultIndex + 1,
+                total: results.length,
+              })}
+            </span>
+          )}
+        </div>
+
         <ToggleGroup
           type="multiple"
           variant="default"
@@ -103,7 +120,7 @@ const PDFSearchPanel: React.FC<PDFSearchPanelProps> = ({
             if (nextCaseSensitive !== caseSensitive) onToggleCaseSensitive();
             if (nextRegex !== (mode === "regex")) onToggleRegex();
           }}
-          className="self-end"
+          className="ml-auto"
           aria-label={t("sidebar.search_results_summary", {
             total: results.length,
             pages: groupedResults.length,
@@ -126,23 +143,6 @@ const PDFSearchPanel: React.FC<PDFSearchPanelProps> = ({
             .*
           </ToggleGroupItem>
         </ToggleGroup>
-
-        <div className="text-muted-foreground flex items-center justify-between gap-2 text-[11px]">
-          <span>
-            {t("sidebar.search_results_summary", {
-              total: results.length,
-              pages: groupedResults.length,
-            })}
-          </span>
-          {activeResultIndex >= 0 && (
-            <span>
-              {t("sidebar.search_current_result", {
-                current: activeResultIndex + 1,
-                total: results.length,
-              })}
-            </span>
-          )}
-        </div>
       </div>
 
       <div ref={listRef} className="flex-1 overflow-y-auto p-2">
