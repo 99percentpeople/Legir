@@ -4,11 +4,11 @@
   .markdown {
     @apply w-full max-w-full min-w-0 leading-6 break-words;
 
-    > .contents:first-child > * {
+    > .contents:first-child > :first-child {
       margin-top: 0;
     }
 
-    > .contents:last-child > * {
+    > .contents:last-child > :last-child {
       margin-bottom: 0;
     }
 
