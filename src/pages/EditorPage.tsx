@@ -46,6 +46,10 @@ import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
 import { findPdfSearchResults, type PDFSearchMode } from "../lib/pdfSearch";
 import { getPdfSearchSelectionOffsets } from "../components/workspace/lib/pdfSearchHighlights";
 import {
+  calculateWorkspaceFitScreenScale,
+  calculateWorkspaceFitWidthScale,
+} from "../components/workspace/lib/calculateWorkspaceFitScale";
+import {
   getDistanceSquaredBetweenPoints,
   getPointToRectDistanceSquared,
   getRectCenter,
@@ -1294,6 +1298,48 @@ const EditorPage: React.FC<EditorPageProps> = ({
     },
     [setState],
   );
+  const getWorkspaceViewport = useCallback(() => {
+    const el = workspaceScrollContainerRef.current;
+    if (el) return { width: el.clientWidth, height: el.clientHeight };
+    if (typeof window !== "undefined") {
+      return { width: window.innerWidth, height: window.innerHeight };
+    }
+    return { width: 0, height: 0 };
+  }, []);
+  const handleZoomIn = useCallback(() => {
+    const currentScale = useEditorStore.getState().scale;
+    setState({ scale: Math.min(5.0, currentScale * 1.25) });
+  }, [setState]);
+  const handleZoomOut = useCallback(() => {
+    const currentScale = useEditorStore.getState().scale;
+    setState({ scale: Math.max(0.25, currentScale / 1.25) });
+  }, [setState]);
+  const handleFitWidth = useCallback(() => {
+    const liveState = useEditorStore.getState();
+    setState({
+      scale: calculateWorkspaceFitWidthScale({
+        pages: liveState.pages,
+        pageIndex: liveState.currentPageIndex,
+        pageLayout: liveState.pageLayout,
+        pageFlow: liveState.pageFlow,
+        viewport: getWorkspaceViewport(),
+      }),
+      fitTrigger: Date.now(),
+    });
+  }, [getWorkspaceViewport, setState]);
+  const handleFitScreen = useCallback(() => {
+    const liveState = useEditorStore.getState();
+    setState({
+      scale: calculateWorkspaceFitScreenScale({
+        pages: liveState.pages,
+        pageIndex: liveState.currentPageIndex,
+        pageLayout: liveState.pageLayout,
+        pageFlow: liveState.pageFlow,
+        viewport: getWorkspaceViewport(),
+      }),
+      fitTrigger: Date.now(),
+    });
+  }, [getWorkspaceViewport, setState]);
 
   const canRenderRightPanel =
     state.mode === "form" || state.mode === "annotation" || selectedControl;
@@ -1307,6 +1353,21 @@ const EditorPage: React.FC<EditorPageProps> = ({
         editorState={state}
         isSaving={state.isSaving}
         isDirty={state.isDirty}
+        hideModeSelector={isMobile}
+        hideToolSection={isMobile}
+        compactZoomControl={isMobile}
+        showPageSettingsControl={isMobile}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onFitWidth={handleFitWidth}
+        onFitScreen={handleFitScreen}
+        onPageLayoutChange={(layout) => {
+          setState({ pageLayout: layout, fitTrigger: Date.now() });
+        }}
+        onPageFlowChange={(flow) => {
+          setState({ pageFlow: flow, fitTrigger: Date.now() });
+        }}
+        onToggleFullscreen={toggleFullscreen}
         onToolChange={(tool: Tool) => setTool(tool)}
         onModeChange={(mode) => setState({ mode, tool: "select" })}
         onPenStyleChange={handlePenStyleChange}
@@ -1522,6 +1583,53 @@ const EditorPage: React.FC<EditorPageProps> = ({
           activePdfSearchResultId={
             isPdfSearchOpen ? activePdfSearchResultId : null
           }
+          mobileToolbar={{
+            isDirty: state.isDirty,
+            canUndo: state.past.length > 0,
+            canRedo: state.future.length > 0,
+            onModeChange: (mode) => setState({ mode, tool: "select" }),
+            onPenStyleChange: handlePenStyleChange,
+            onHighlightStyleChange: handleHighlightStyleChange,
+            onCommentStyleChange: handleCommentStyleChange,
+            onFreetextStyleChange: handleFreetextStyleChange,
+            onUndo: undo,
+            onRedo: redo,
+            onOpenShortcuts: () => openDialog("shortcuts"),
+            onOpenSearch: openPdfSearch,
+            isFieldListOpen: state.isSidebarOpen,
+            onToggleFieldList: () =>
+              setUiState((prev) => {
+                const next = !prev.isSidebarOpen;
+                if (prev.isPanelFloating && next)
+                  return { isSidebarOpen: true, isRightPanelOpen: false };
+                return { isSidebarOpen: next };
+              }),
+            isPropertiesPanelOpen: state.isRightPanelOpen,
+            onTogglePropertiesPanel: () =>
+              setUiState((prev) => {
+                const next = !prev.isRightPanelOpen;
+                if (prev.isPanelFloating && next)
+                  return { isRightPanelOpen: true, isSidebarOpen: false };
+                return { isRightPanelOpen: next };
+              }),
+            onOpenSettings: () => openDialog("settings"),
+            isSearchOpen: isPdfSearchOpen,
+            onExport,
+            onSaveDraft,
+            onSaveAs,
+            onPrint,
+            onExit,
+            onClose: () => {
+              if (!state.isDirty) {
+                onExit();
+                return;
+              }
+              setState({
+                activeDialog: "close_confirm",
+                closeConfirmSource: "menu",
+              });
+            },
+          }}
         />
 
         <RightPanelTabDock

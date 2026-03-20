@@ -7,29 +7,54 @@ import React, {
 } from "react";
 
 import FloatingBar from "@/components/toolbar/FloatingBar";
+import MobileFloatingToolbar from "@/components/toolbar/MobileFloatingToolbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { calculateWorkspaceFitScreenScale } from "@/components/workspace/lib/calculateWorkspaceFitScale";
+import { appEventBus } from "@/lib/eventBus";
 import { useEditorStore } from "@/store/useEditorStore";
 import {
   selectEditorCanvasActions,
   selectEditorCanvasState,
 } from "@/store/selectors";
-import type { PDFSearchResult } from "@/types";
-import {
-  FIT_SCREEN_PADDING_X,
-  FIT_SCREEN_PADDING_Y,
-  FIT_WIDTH_PADDING_X,
-  WORKSPACE_BASE_PAGE_GAP_PX,
-} from "@/constants";
+import type { EditorState, PDFSearchResult, PenStyle } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 
 const Workspace = React.lazy(() => import("@/components/workspace/Workspace"));
+const MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX = 96;
 
 type EditorCanvasPaneProps = {
   onEditAnnotation: (id: string) => void;
   onToggleFullscreen: () => void;
   pdfSearchResultsByPage: Map<number, PDFSearchResult[]>;
   activePdfSearchResultId: string | null;
+  mobileToolbar: {
+    isDirty: boolean;
+    canUndo: boolean;
+    canRedo: boolean;
+    onModeChange: (mode: EditorState["mode"]) => void;
+    onPenStyleChange: (style: Partial<PenStyle>) => void;
+    onHighlightStyleChange: (style: Partial<PenStyle>) => void;
+    onCommentStyleChange: (style: { color: string }) => void;
+    onFreetextStyleChange: (style: { color: string }) => void;
+    onUndo: () => void;
+    onRedo: () => void;
+    onOpenShortcuts: () => void;
+    onOpenSearch: () => void;
+    isFieldListOpen: boolean;
+    onToggleFieldList: () => void;
+    isPropertiesPanelOpen: boolean;
+    onTogglePropertiesPanel: () => void;
+    onOpenSettings: () => void;
+    isSearchOpen: boolean;
+    onExport: () => Promise<boolean>;
+    onSaveDraft: (silent?: boolean) => Promise<void>;
+    onSaveAs: () => Promise<boolean>;
+    onPrint: () => void;
+    onExit: () => void;
+    onClose: () => void;
+  };
 };
 
 export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
@@ -37,7 +62,9 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
   onToggleFullscreen,
   pdfSearchResultsByPage,
   activePdfSearchResultId,
+  mobileToolbar,
 }) => {
+  const isMobile = useIsMobile();
   const state = useEditorStore(useShallow(selectEditorCanvasState));
   const {
     addField,
@@ -124,6 +151,16 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
     },
     [setTool],
   );
+  const handleNavigatePage = useCallback(
+    (pageIndex: number) => {
+      setState({ currentPageIndex: pageIndex });
+      appEventBus.emit("workspace:navigatePage", {
+        pageIndex,
+        behavior: "smooth",
+      });
+    },
+    [setState],
+  );
   const handleClearPageTranslateParagraphSelection = useCallback(() => {
     setSelectedPageTranslateParagraphIds([]);
   }, [setSelectedPageTranslateParagraphIds]);
@@ -137,64 +174,15 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
     return { width: 0, height: 0 };
   }, []);
 
-  const calculateFitWidthScale = useCallback(
-    (pageIndex: number = 0) => {
-      if (!state.pages || state.pages.length === 0) return 1.0;
-      const targetIndex = Math.max(
-        0,
-        Math.min(pageIndex, state.pages.length - 1),
-      );
-      const page = state.pages[targetIndex];
-      if (!page.width) return 1.0;
-
-      const { width } = getWorkspaceViewport();
-      const availableWidth = width - FIT_WIDTH_PADDING_X;
-      if (state.pageLayout !== "single") {
-        if (state.pageFlow === "horizontal") {
-          const scale = availableWidth / page.width;
-          return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
-        }
-        const denom = page.width * 2 + WORKSPACE_BASE_PAGE_GAP_PX;
-        const scale = denom > 0 ? availableWidth / denom : 1.0;
-        return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
-      }
-
-      const scale = availableWidth / page.width;
-      return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
-    },
-    [getWorkspaceViewport, state.pageFlow, state.pageLayout, state.pages],
-  );
-
   const calculateFitScreenScale = useCallback(
     (pageIndex: number = 0) => {
-      if (!state.pages || state.pages.length === 0) return 1.0;
-      const targetIndex = Math.max(
-        0,
-        Math.min(pageIndex, state.pages.length - 1),
-      );
-      const page = state.pages[targetIndex];
-      if (!page.width || !page.height) return 1.0;
-
-      const { width, height } = getWorkspaceViewport();
-      const availableWidth = width - FIT_SCREEN_PADDING_X;
-      const availableHeight = height - FIT_SCREEN_PADDING_Y;
-
-      const widthScale =
-        state.pageLayout !== "single"
-          ? (() => {
-              if (state.pageFlow === "horizontal") {
-                return availableWidth / page.width;
-              }
-              const denom = page.width * 2 + WORKSPACE_BASE_PAGE_GAP_PX;
-              return denom > 0 ? availableWidth / denom : 1.0;
-            })()
-          : availableWidth / page.width;
-      const heightScale =
-        state.pageLayout !== "single" && state.pageFlow === "horizontal"
-          ? availableHeight / (page.height * 2 + WORKSPACE_BASE_PAGE_GAP_PX)
-          : availableHeight / page.height;
-      const scale = Math.min(widthScale, heightScale);
-      return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
+      return calculateWorkspaceFitScreenScale({
+        pages: state.pages,
+        pageIndex,
+        pageLayout: state.pageLayout,
+        pageFlow: state.pageFlow,
+        viewport: getWorkspaceViewport(),
+      });
     },
     [getWorkspaceViewport, state.pageFlow, state.pageLayout, state.pages],
   );
@@ -279,31 +267,40 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
           onInitialScrollApplied={handleInitialScrollApplied}
           pdfSearchResultsByPage={pdfSearchResultsByPage}
           activePdfSearchResultId={activePdfSearchResultId}
+          bottomOverlayInsetPx={
+            isMobile ? MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX : undefined
+          }
         />
       </Suspense>
-      <FloatingBar
-        scale={state.scale}
-        pageLayout={state.pageLayout}
-        pageFlow={state.pageFlow}
-        isFullscreen={state.isFullscreen}
-        onPageLayoutChange={(layout) => {
-          setState({ pageLayout: layout, fitTrigger: Date.now() });
-        }}
-        onPageFlowChange={(flow) => {
-          setState({ pageFlow: flow, fitTrigger: Date.now() });
-        }}
-        onToggleFullscreen={onToggleFullscreen}
-        onZoomIn={() => updateScale(state.scale * 1.25)}
-        onZoomOut={() => updateScale(state.scale / 1.25)}
-        onFitWidth={() => {
-          updateScale(calculateFitWidthScale(state.currentPageIndex));
-          setState({ fitTrigger: Date.now() });
-        }}
-        onFitScreen={() => {
-          updateScale(calculateFitScreenScale(state.currentPageIndex));
-          setState({ fitTrigger: Date.now() });
-        }}
-      />
+      {isMobile ? (
+        <MobileFloatingToolbar
+          currentPageIndex={state.currentPageIndex}
+          editorState={state}
+          onNavigatePage={handleNavigatePage}
+          onToolChange={handleToolChange}
+          onModeChange={mobileToolbar.onModeChange}
+          onPenStyleChange={mobileToolbar.onPenStyleChange}
+          onHighlightStyleChange={mobileToolbar.onHighlightStyleChange}
+          onCommentStyleChange={mobileToolbar.onCommentStyleChange}
+          onFreetextStyleChange={mobileToolbar.onFreetextStyleChange}
+        />
+      ) : (
+        <FloatingBar
+          currentPageIndex={state.currentPageIndex}
+          pageCount={state.pages.length}
+          pageLayout={state.pageLayout}
+          pageFlow={state.pageFlow}
+          isFullscreen={state.isFullscreen}
+          onNavigatePage={handleNavigatePage}
+          onPageLayoutChange={(layout) => {
+            setState({ pageLayout: layout, fitTrigger: Date.now() });
+          }}
+          onPageFlowChange={(flow) => {
+            setState({ pageFlow: flow, fitTrigger: Date.now() });
+          }}
+          onToggleFullscreen={onToggleFullscreen}
+        />
+      )}
     </div>
   );
 };

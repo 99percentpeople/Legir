@@ -140,7 +140,7 @@ export function RightPanelTabDock({
   return (
     <div
       className={cn(
-        "bg-background/95 absolute top-3 z-30 flex flex-col gap-0.5 rounded-l-lg rounded-r-none border border-r-0 p-0.5 pr-0 shadow-lg backdrop-blur",
+        "bg-background/72 border-border/70 absolute top-3 z-30 flex flex-col gap-0.5 rounded-l-lg rounded-r-none border border-r-0 p-0.5 pr-0 shadow-xl backdrop-blur-md",
       )}
       style={{ right: rightOffsetPx + (isFloating ? 0 : scrollbarWidthPx) }}
     >
@@ -156,8 +156,12 @@ export function RightPanelTabDock({
             className={cn(
               "group grid w-8 grid-rows-[auto_auto] place-items-center rounded-l-md rounded-r-none py-2 transition-all duration-300",
               "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
-              disabled ? "cursor-not-allowed opacity-40" : "hover:bg-muted",
-              isActive ? "bg-muted text-foreground" : "text-muted-foreground",
+              disabled
+                ? "cursor-not-allowed opacity-40"
+                : "hover:bg-background/60",
+              isActive
+                ? "bg-background/80 text-foreground"
+                : "text-muted-foreground",
             )}
           >
             <div

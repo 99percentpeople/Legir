@@ -1,0 +1,434 @@
+import React from "react";
+import {
+  CheckSquare,
+  ChevronDown,
+  CircleDot,
+  Edit3,
+  Eraser,
+  Hand,
+  Highlighter,
+  List,
+  MessageCirclePlus,
+  MousePointer2,
+  Palette,
+  PenLine,
+  PenTool,
+  Type,
+} from "lucide-react";
+
+import { ANNOTATION_STYLES } from "@/constants";
+import type { EditorCanvasState, EditorState, PenStyle, Tool } from "@/types";
+import { useLanguage } from "../language-provider";
+import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { Separator } from "../ui/separator";
+import { ColorPickerPopover } from "./ColorPickerPopover";
+import PageNumberDropdownControl from "./PageNumberDropdownControl";
+
+interface MobileFloatingToolbarProps {
+  currentPageIndex: number;
+  editorState: EditorCanvasState;
+  onNavigatePage: (pageIndex: number) => void;
+  onToolChange: (tool: Tool) => void;
+  onModeChange: (mode: EditorState["mode"]) => void;
+  onPenStyleChange: (style: Partial<PenStyle>) => void;
+  onHighlightStyleChange?: (style: Partial<PenStyle>) => void;
+  onCommentStyleChange?: (style: { color: string }) => void;
+  onFreetextStyleChange?: (style: { color: string }) => void;
+}
+
+const isMovementTool = (tool: Tool): tool is "select" | "pan" =>
+  tool === "select" || tool === "pan";
+
+const isAnnotationTool = (
+  tool: Tool,
+): tool is
+  | "draw_highlight"
+  | "draw_ink"
+  | "draw_comment"
+  | "draw_freetext"
+  | "eraser" =>
+  tool === "draw_highlight" ||
+  tool === "draw_ink" ||
+  tool === "draw_comment" ||
+  tool === "draw_freetext" ||
+  tool === "eraser";
+
+const isFormTool = (
+  tool: Tool,
+): tool is
+  | "draw_text"
+  | "draw_checkbox"
+  | "draw_radio"
+  | "draw_dropdown"
+  | "draw_signature" =>
+  tool === "draw_text" ||
+  tool === "draw_checkbox" ||
+  tool === "draw_radio" ||
+  tool === "draw_dropdown" ||
+  tool === "draw_signature";
+
+const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
+  currentPageIndex,
+  editorState,
+  onNavigatePage,
+  onToolChange,
+  onModeChange,
+  onPenStyleChange,
+  onHighlightStyleChange,
+  onCommentStyleChange,
+  onFreetextStyleChange,
+}) => {
+  const { t } = useLanguage();
+  const contentTool =
+    editorState.mode === "annotation"
+      ? isAnnotationTool(editorState.tool)
+        ? editorState.tool
+        : "draw_highlight"
+      : isFormTool(editorState.tool)
+        ? editorState.tool
+        : "draw_text";
+  const activeTool = isMovementTool(editorState.tool)
+    ? editorState.tool
+    : contentTool;
+
+  const getToolLabel = (tool: Tool) => {
+    switch (tool) {
+      case "pan":
+        return t("toolbar.pan");
+      case "select":
+        return t("toolbar.select");
+      case "draw_text":
+        return t("toolbar.text");
+      case "draw_checkbox":
+        return t("toolbar.checkbox");
+      case "draw_radio":
+        return t("toolbar.radio");
+      case "draw_dropdown":
+        return t("toolbar.dropdown");
+      case "draw_signature":
+        return t("toolbar.signature");
+      case "draw_highlight":
+        return t("toolbar.highlight_text");
+      case "draw_ink":
+        return t("toolbar.ink");
+      case "draw_comment":
+        return t("toolbar.comment");
+      case "draw_freetext":
+        return t("toolbar.freetext");
+      case "eraser":
+        return t("toolbar.eraser");
+    }
+  };
+
+  const getToolIcon = (tool: Tool) => {
+    switch (tool) {
+      case "pan":
+        return <Hand size={16} />;
+      case "select":
+        return <MousePointer2 size={16} />;
+      case "draw_text":
+        return <Type size={16} />;
+      case "draw_checkbox":
+        return <CheckSquare size={16} />;
+      case "draw_radio":
+        return <CircleDot size={16} />;
+      case "draw_dropdown":
+        return <List size={16} />;
+      case "draw_signature":
+        return <PenLine size={16} />;
+      case "eraser":
+        return <Eraser size={16} />;
+      case "draw_highlight":
+        return <Highlighter size={16} />;
+      case "draw_ink":
+        return <PenLine size={16} />;
+      case "draw_comment":
+        return <MessageCirclePlus size={16} />;
+      case "draw_freetext":
+        return <Type size={16} />;
+    }
+  };
+
+  const getStyleColor = () => {
+    switch (editorState.tool) {
+      case "draw_highlight":
+        return (
+          editorState.highlightStyle?.color || ANNOTATION_STYLES.highlight.color
+        );
+      case "draw_ink":
+        return editorState.penStyle.color;
+      case "draw_comment":
+        return (
+          editorState.commentStyle?.color || ANNOTATION_STYLES.comment.color
+        );
+      case "draw_freetext":
+        return (
+          editorState.freetextStyle?.color || ANNOTATION_STYLES.freetext.color
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderStyleTrigger = (title: string, color: string) => (
+    <Button variant="ghost" size="icon" className="h-8 w-8" title={title}>
+      <Palette size={16} className="text-foreground" fill={color} />
+    </Button>
+  );
+
+  const renderStylePopover = () => {
+    switch (editorState.tool) {
+      case "draw_highlight":
+        return (
+          <ColorPickerPopover
+            color={
+              editorState.highlightStyle?.color ||
+              ANNOTATION_STYLES.highlight.color
+            }
+            thickness={
+              editorState.highlightStyle?.thickness ||
+              ANNOTATION_STYLES.highlight.thickness
+            }
+            opacity={
+              editorState.highlightStyle?.opacity ??
+              ANNOTATION_STYLES.highlight.opacity
+            }
+            previewStrokeLinecap="butt"
+            onColorChange={(color) =>
+              onHighlightStyleChange
+                ? onHighlightStyleChange({ color })
+                : onPenStyleChange({ color })
+            }
+            onThicknessChange={(thickness) =>
+              onHighlightStyleChange
+                ? onHighlightStyleChange({ thickness })
+                : onPenStyleChange({ thickness })
+            }
+            onOpacityChange={(opacity) =>
+              onHighlightStyleChange
+                ? onHighlightStyleChange({ opacity })
+                : onPenStyleChange({ opacity })
+            }
+            isActive
+            side="top"
+            title={t("toolbar.highlight_free_properties")}
+          >
+            {renderStyleTrigger(
+              t("toolbar.highlight_free_properties"),
+              editorState.highlightStyle?.color ||
+                ANNOTATION_STYLES.highlight.color,
+            )}
+          </ColorPickerPopover>
+        );
+      case "draw_ink":
+        return (
+          <ColorPickerPopover
+            color={editorState.penStyle.color}
+            thickness={editorState.penStyle.thickness}
+            opacity={editorState.penStyle.opacity}
+            onColorChange={(color) => onPenStyleChange({ color })}
+            onThicknessChange={(thickness) => onPenStyleChange({ thickness })}
+            onOpacityChange={(opacity) => onPenStyleChange({ opacity })}
+            isActive
+            side="top"
+            title={t("toolbar.ink_properties")}
+          >
+            {renderStyleTrigger(
+              t("toolbar.ink_properties"),
+              editorState.penStyle.color,
+            )}
+          </ColorPickerPopover>
+        );
+      case "draw_comment":
+        return (
+          <ColorPickerPopover
+            color={editorState.commentStyle?.color}
+            onColorChange={(color) =>
+              onCommentStyleChange && onCommentStyleChange({ color })
+            }
+            isActive
+            showThickness={false}
+            side="top"
+            title={t("toolbar.comment_properties")}
+          >
+            {renderStyleTrigger(
+              t("toolbar.comment_properties"),
+              editorState.commentStyle?.color ||
+                ANNOTATION_STYLES.comment.color,
+            )}
+          </ColorPickerPopover>
+        );
+      case "draw_freetext":
+        return (
+          <ColorPickerPopover
+            color={editorState.freetextStyle?.color}
+            onColorChange={(color) =>
+              onFreetextStyleChange && onFreetextStyleChange({ color })
+            }
+            isActive
+            showThickness={false}
+            side="top"
+            title={t("toolbar.freetext_properties")}
+          >
+            {renderStyleTrigger(
+              t("toolbar.freetext_properties"),
+              editorState.freetextStyle?.color ||
+                ANNOTATION_STYLES.freetext.color,
+            )}
+          </ColorPickerPopover>
+        );
+      default:
+        return null;
+    }
+  };
+  const stylePopover = renderStylePopover();
+  const styleColor = getStyleColor();
+
+  return (
+    <div
+      className="pointer-events-none absolute left-1/2 z-40 -translate-x-1/2"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}
+    >
+      <div className="pointer-events-auto max-w-[calc(100vw-1.5rem)] px-3">
+        <div className="bg-background/72 border-border/70 no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border p-1 shadow-xl backdrop-blur-md transition-colors duration-200">
+          <PageNumberDropdownControl
+            currentPageIndex={currentPageIndex}
+            pageCount={editorState.pages.length}
+            className="shrink-0"
+            onNavigatePage={onNavigatePage}
+          />
+
+          <Separator orientation="vertical" className="mx-1 shrink-0" />
+
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                title={t("mode.select")}
+              >
+                {editorState.mode === "annotation" ? (
+                  <PenTool size={16} />
+                ) : (
+                  <Edit3 size={16} />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start">
+              <DropdownMenuRadioGroup
+                value={editorState.mode}
+                onValueChange={onModeChange}
+              >
+                <DropdownMenuRadioItem value="annotation">
+                  <PenTool size={14} />
+                  {t("mode.annotation")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="form">
+                  <Edit3 size={14} />
+                  {t("mode.form")}
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Separator orientation="vertical" className="mx-1 shrink-0" />
+
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 shrink-0 gap-1 px-2"
+                title={getToolLabel(activeTool)}
+              >
+                {getToolIcon(activeTool)}
+                <span className="max-w-20 truncate text-xs">
+                  {getToolLabel(activeTool)}
+                </span>
+                <ChevronDown size={12} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="center" className="min-w-52">
+              <DropdownMenuRadioGroup
+                value={activeTool}
+                onValueChange={(value) => onToolChange(value as Tool)}
+              >
+                <DropdownMenuRadioItem value="select">
+                  <MousePointer2 size={14} />
+                  {t("toolbar.select")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="pan">
+                  <Hand size={14} />
+                  {t("toolbar.pan")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuSeparator />
+                {editorState.mode === "annotation" ? (
+                  <>
+                    <DropdownMenuRadioItem value="draw_highlight">
+                      <Highlighter size={14} />
+                      {t("toolbar.highlight_text")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="draw_ink">
+                      <PenLine size={14} />
+                      {t("toolbar.ink")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="draw_comment">
+                      <MessageCirclePlus size={14} />
+                      {t("toolbar.comment")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="draw_freetext">
+                      <Type size={14} />
+                      {t("toolbar.freetext")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="eraser">
+                      <Eraser size={14} />
+                      {t("toolbar.eraser")}
+                    </DropdownMenuRadioItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuRadioItem value="draw_text">
+                      <Type size={14} />
+                      {t("toolbar.text")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="draw_checkbox">
+                      <CheckSquare size={14} />
+                      {t("toolbar.checkbox")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="draw_radio">
+                      <CircleDot size={14} />
+                      {t("toolbar.radio")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="draw_dropdown">
+                      <List size={14} />
+                      {t("toolbar.dropdown")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="draw_signature">
+                      <PenLine size={14} />
+                      {t("toolbar.signature")}
+                    </DropdownMenuRadioItem>
+                  </>
+                )}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {stylePopover && styleColor ? (
+            <div className="shrink-0">{stylePopover}</div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default MobileFloatingToolbar;
