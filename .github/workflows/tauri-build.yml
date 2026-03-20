@@ -18,24 +18,33 @@ jobs:
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: tauri-windows-x64
+            portable_artifact_name: tauri-windows-x64-portable
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact_name: tauri-linux-x64
+            portable_artifact_name: tauri-linux-x64-portable
           - platform: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             artifact_name: tauri-linux-arm64
+            portable_artifact_name: tauri-linux-arm64-portable
           - platform: macos-15-intel
             target: x86_64-apple-darwin
             artifact_name: tauri-macos-x64
+            portable_artifact_name: tauri-macos-x64-portable
           - platform: macos-15
             target: aarch64-apple-darwin
             artifact_name: tauri-macos-arm64
+            portable_artifact_name: tauri-macos-arm64-portable
 
     runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Set short commit SHA
+        shell: bash
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
       - name: Install Linux dependencies
         if: startsWith(matrix.platform, 'ubuntu-')
@@ -72,6 +81,64 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.artifact_name }}
+          name: ${{ matrix.artifact_name }}-${{ env.SHORT_SHA }}
           path: src-tauri/target/${{ matrix.target }}/release/bundle/**
+          if-no-files-found: error
+
+      - name: Prepare Windows portable
+        if: contains(matrix.target, 'windows')
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path portable-out | Out-Null
+          $source = Get-ChildItem "src-tauri/target/${{ matrix.target }}/release" -File -Filter *.exe | Select-Object -First 1
+          if (-not $source) { throw "Windows executable not found." }
+          $destination = Join-Path "portable-out" ("{0}-{1}{2}" -f $source.BaseName, $env:SHORT_SHA, $source.Extension)
+          Copy-Item $source.FullName $destination
+
+      - name: Prepare Linux portable
+        if: contains(matrix.target, 'linux')
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p portable-out
+          source_file="$(find "src-tauri/target/${{ matrix.target }}/release/bundle/appimage" -maxdepth 1 -type f -name '*.AppImage' | head -n 1)"
+          [ -n "$source_file" ]
+          base_name="$(basename "$source_file")"
+          stem="${base_name%.AppImage}"
+          cp "$source_file" "portable-out/${stem}-${SHORT_SHA}.AppImage"
+
+      - name: Prepare macOS portable
+        if: contains(matrix.target, 'apple-darwin')
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p portable-out
+          source_app="$(find "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -type d -name '*.app' | head -n 1)"
+          [ -n "$source_app" ]
+          app_name="$(basename "$source_app")"
+          stem="${app_name%.app}"
+          cp -R "$source_app" "portable-out/${stem}-${SHORT_SHA}.app"
+
+      - name: Upload Windows portable
+        if: contains(matrix.target, 'windows')
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.portable_artifact_name }}-${{ env.SHORT_SHA }}
+          path: portable-out/*.exe
+          if-no-files-found: error
+
+      - name: Upload Linux portable
+        if: contains(matrix.target, 'linux')
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.portable_artifact_name }}-${{ env.SHORT_SHA }}
+          path: portable-out/*.AppImage
+          if-no-files-found: error
+
+      - name: Upload macOS portable
+        if: contains(matrix.target, 'apple-darwin')
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.portable_artifact_name }}-${{ env.SHORT_SHA }}
+          path: portable-out/*.app
           if-no-files-found: error
