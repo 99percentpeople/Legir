@@ -39,6 +39,7 @@ import {
   type TextSelectionToolbarState,
 } from "./hooks/useWorkspaceTextSelection";
 import { useWorkspaceViewport } from "./hooks/useWorkspaceViewport";
+import { useWorkspaceTouchPinch } from "./hooks/useWorkspaceTouchPinch";
 import { useWorkspacePointerCoords } from "./hooks/useWorkspacePointerCoords";
 import { useWorkspaceEraser } from "./hooks/useWorkspaceEraser";
 import { useWorkspaceInitialScroll } from "./hooks/useWorkspaceInitialScroll";
@@ -104,6 +105,7 @@ interface WorkspaceProps {
   onInitialScrollApplied?: () => void;
   pdfSearchResultsByPage?: Map<number, PDFSearchResult[]>;
   activePdfSearchResultId?: string | null;
+  bottomOverlayInsetPx?: number;
 }
 
 type Rect = {
@@ -143,9 +145,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onInitialScrollApplied,
   pdfSearchResultsByPage,
   activePdfSearchResultId,
+  bottomOverlayInsetPx = 0,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const pinchGestureActiveRef = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -204,6 +208,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     y: number;
   } | null>(null);
   const [activePageIndex, setActivePageIndex] = useState<number | null>(null);
+  const [isPinchZooming, setIsPinchZooming] = useState(false);
 
   // Ink specific state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -265,6 +270,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setTextSelectionToolbar,
     textSelectionVirtualRef,
     textSelectingPages,
+    textPointerSelectingPages,
+    isTextSelectionHandleDragging,
     updateTextSelectionToolbar,
   } = useWorkspaceTextSelection({
     editorState,
@@ -279,6 +286,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
       prev.isVisible ? { ...prev, isVisible: false } : prev,
     );
   }, [setTextSelectionToolbar]);
+
+  const updatePinchGestureActive = useCallback((active: boolean) => {
+    pinchGestureActiveRef.current = active;
+    setIsPinchZooming(active);
+  }, []);
 
   const resolveSelectionAttachmentRect = useCallback(
     async (selection: TextSelectionPayload) => {
@@ -498,17 +510,51 @@ const Workspace: React.FC<WorkspaceProps> = ({
   // Auto-scroll when interacting near edges
   const isInteracting = !!(
     dragStart ||
-    isDrawing ||
     isErasing ||
     movingFieldId ||
     movingAnnotationId ||
     resizingFieldId ||
     resizingAnnotationId
   );
-  useAutoScroll(containerRef, { enabled: isInteracting });
+  const isTextSelectionAutoScrolling =
+    isTextSelectionHandleDragging ||
+    Object.keys(textPointerSelectingPages).length > 0;
+  useAutoScroll(containerRef, {
+    enabled: isInteracting || isTextSelectionAutoScrolling,
+  });
 
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
+
+  const clearActiveInteractionState = useCallback(() => {
+    setDragStart(null);
+    setDragCurrent(null);
+    setActivePageIndex(null);
+    setMovingFieldId(null);
+    setMoveOffset(null);
+    setMoveStartRaw(null);
+    setMovingAnnotationId(null);
+    setResizingFieldId(null);
+    setResizingAnnotationId(null);
+    setResizeStart(null);
+    setResizeHandle(null);
+    setSnapLines([]);
+    setIsDrawing(false);
+    setIsErasing(false);
+  }, []);
+
+  const abortActiveInteractions = useCallback(() => {
+    endPan();
+    resetGlobalCursor();
+    cancelInProgressInkStroke();
+    closeTextSelectionPopover();
+    clearActiveInteractionState();
+  }, [
+    cancelInProgressInkStroke,
+    clearActiveInteractionState,
+    closeTextSelectionPopover,
+    endPan,
+  ]);
 
   // Track if any interactive operation is in progress
   // NOTE: Definition moved up to be used by useAutoScroll hook
@@ -610,6 +656,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
     };
   }, [editorState.pageFlow, editorState.pageLayout, editorState.scale]);
 
+  const workspaceBottomPaddingPx = useMemo(() => {
+    return Math.max(
+      WORKSPACE_BOTTOM_PADDING_PX,
+      Math.ceil(bottomOverlayInsetPx) + 16,
+    );
+  }, [bottomOverlayInsetPx]);
+
   // Large PDFs can overwhelm layout/paint when rendering all pages at once.
   // Virtualization keeps the DOM small by only mounting pages near the viewport.
   const shouldVirtualizePages =
@@ -625,6 +678,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       pageLayout: editorState.pageLayout,
       pageFlow: editorState.pageFlow,
       scale: editorState.scale,
+      bottomPaddingPx: workspaceBottomPaddingPx,
     });
   }, [
     editorState.pageFlow,
@@ -632,6 +686,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     editorState.pages,
     editorState.scale,
     pageRowsForLayout,
+    workspaceBottomPaddingPx,
   ]);
 
   const pageIndexToItemIndex = useMemo(() => {
@@ -692,16 +747,35 @@ const Workspace: React.FC<WorkspaceProps> = ({
   );
 
   const allowPageIndexChange = !editorState.pendingViewStateRestore;
-  const { handleViewportScroll } = useWorkspaceViewport({
+  const { handleViewportScroll, panViewportBy, zoomAtClientPoint } =
+    useWorkspaceViewport({
+      containerRef,
+      contentRef,
+      editorState,
+      onScaleChange,
+      isPanning,
+      fitTrigger,
+      onPageIndexChange: allowPageIndexChange ? onPageIndexChange : undefined,
+      textSelectionToolbarVisible: textSelectionToolbar.isVisible,
+      updateTextSelectionToolbar,
+    });
+
+  useWorkspaceTouchPinch({
     containerRef,
-    contentRef,
-    editorState,
-    onScaleChange,
-    isPanning,
-    fitTrigger,
-    onPageIndexChange: allowPageIndexChange ? onPageIndexChange : undefined,
-    textSelectionToolbarVisible: textSelectionToolbar.isVisible,
-    updateTextSelectionToolbar,
+    enabled: editorState.pages.length > 0,
+    scale: editorState.scale,
+    tool: editorState.tool,
+    onPinchStart: abortActiveInteractions,
+    onPinchStateChange: updatePinchGestureActive,
+    onPinchZoom: ({ clientX, clientY, newScale }) => {
+      void zoomAtClientPoint({
+        clientX,
+        clientY,
+        newScale,
+        source: "pinch",
+      });
+    },
+    onPinchPan: panViewportBy,
   });
   const workspaceZoomJankDebugEnabled =
     editorState.options.debugOptions.workspaceZoomJank;
@@ -1306,10 +1380,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   // --- Handlers ---
   const handleContainerPointerDown = (e: React.PointerEvent) => {
+    if (pinchGestureActiveRef.current) return;
     if (startPan(e)) return;
   };
 
   const handlePointerDown = (e: React.PointerEvent, pageIndex: number) => {
+    if (pinchGestureActiveRef.current) return;
     if (e.button === 1) return;
     if (isPanModeActive) return;
 
@@ -1434,6 +1510,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (pinchGestureActiveRef.current) return;
     // Panning Logic
     if (movePan(e)) return;
 
@@ -1499,6 +1576,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   const handlePointerUp = (e?: React.PointerEvent | React.MouseEvent) => {
+    if (pinchGestureActiveRef.current) return;
     if (endPan(e)) return;
 
     const shouldCreateTextHighlight =
@@ -1649,24 +1727,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
     }
 
-    setDragStart(null);
-    setDragCurrent(null);
-    setActivePageIndex(null);
-    setMovingFieldId(null);
-    setMoveStartRaw(null);
-    setMovingAnnotationId(null);
-    setResizingFieldId(null);
-    setResizingAnnotationId(null);
-    setResizeStart(null);
-    setResizeHandle(null);
-    setSnapLines([]);
-    setIsDrawing(false);
-    setIsErasing(false);
+    clearActiveInteractionState();
   };
 
   const handleFieldPointerDown = useCallback(
     (e: React.PointerEvent, field: FormField) => {
       const state = editorStateRef.current;
+      if (pinchGestureActiveRef.current) return;
       if (e.button === 1) return;
       if (isPanModeActive) return;
 
@@ -1763,6 +1830,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const handleAnnotationPointerDown = useCallback(
     (e: React.PointerEvent, annotation: Annotation) => {
       const state = editorStateRef.current;
+      if (pinchGestureActiveRef.current) return;
       if (e.button === 1) return;
       if (isPanModeActive) return;
 
@@ -1815,6 +1883,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const handleResizePointerDown = useCallback(
     (handle: string, e: React.PointerEvent, data: FormField | Annotation) => {
       const state = editorStateRef.current;
+      if (pinchGestureActiveRef.current) return;
       if (e.button === 1) return;
       if (isPanModeActive) return;
       e.stopPropagation();
@@ -2166,12 +2235,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
       className="relative flex-1 overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
       style={{
         cursor: isPanModeActive ? "grab" : undefined,
+        touchAction: "none",
+        scrollPaddingBottom: workspaceBottomPaddingPx,
         "--scale": editorState.scale,
       }}
       onPointerDown={handleContainerPointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onPointerLeave={handlePointerUp}
+      data-ff-pinch-zooming={isPinchZooming ? "1" : undefined}
       onScroll={handleScroll}
     >
       <WorkspaceTextSelectionPopover
@@ -2253,7 +2326,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
           )}
           style={{
             ...contentLayoutStyle,
-            paddingBottom: WORKSPACE_BOTTOM_PADDING_PX,
+            paddingBottom: workspaceBottomPaddingPx,
           }}
         >
           {pagesWithControls.map((page) => {

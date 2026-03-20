@@ -61,6 +61,10 @@ export type AppEventMap = {
     pageIndex: number;
     isSelecting: boolean;
   };
+  "workspace:textPointerSelectingChange": {
+    pageIndex: number;
+    isSelecting: boolean;
+  };
   "workspace:textSelectionHandleDraggingChange": {
     dragging: boolean;
     handleKind?: "start" | "end";
@@ -75,7 +79,7 @@ export type AppEventMap = {
   };
   "workspace:zoomInput": {
     at: number;
-    source: "wheel";
+    source: "wheel" | "pinch";
     fromScale: number;
     targetScale: number;
   };

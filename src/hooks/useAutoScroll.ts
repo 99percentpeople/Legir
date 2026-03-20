@@ -32,7 +32,7 @@ export const useAutoScroll = (
     if (!enabled) {
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
-        requestRef.current = undefined;
+        requestRef.current = null;
       }
       return;
     }

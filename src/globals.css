@@ -125,6 +125,7 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scrollbar-width: none;
+  overscroll-behavior-y: contain;
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -147,6 +148,10 @@
   body,
   #root {
     @apply h-full w-full;
+  }
+  html,
+  body {
+    overscroll-behavior-y: contain;
   }
   #root {
     @apply flex flex-col;

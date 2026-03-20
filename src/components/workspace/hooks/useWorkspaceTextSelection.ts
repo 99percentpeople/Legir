@@ -213,9 +213,25 @@ export const useWorkspaceTextSelection = (opts: {
   const [textSelectingPages, setTextSelectingPages] = useState<
     Record<number, true>
   >({});
+  const [textPointerSelectingPages, setTextPointerSelectingPages] = useState<
+    Record<number, true>
+  >({});
+  const [isTextSelectionHandleDragging, setIsTextSelectionHandleDragging] =
+    useState(false);
 
   useAppEvent("workspace:textSelectingChange", (payload) => {
     setTextSelectingPages((prev) => {
+      const has = !!prev[payload.pageIndex];
+      if (has === payload.isSelecting) return prev;
+      const next = { ...prev };
+      if (payload.isSelecting) next[payload.pageIndex] = true;
+      else delete next[payload.pageIndex];
+      return next;
+    });
+  });
+
+  useAppEvent("workspace:textPointerSelectingChange", (payload) => {
+    setTextPointerSelectingPages((prev) => {
       const has = !!prev[payload.pageIndex];
       if (has === payload.isSelecting) return prev;
       const next = { ...prev };
@@ -241,6 +257,7 @@ export const useWorkspaceTextSelection = (opts: {
     "workspace:textSelectionHandleDraggingChange",
     ({ dragging, handleKind }) => {
       isHandleDraggingRef.current = dragging;
+      setIsTextSelectionHandleDragging(dragging);
       if (handleKind) preferredHandleKindRef.current = handleKind;
       if (dragging) {
         setTextSelectionToolbar((prev) =>
@@ -619,6 +636,8 @@ export const useWorkspaceTextSelection = (opts: {
     setTextSelectionToolbar,
     textSelectionVirtualRef,
     textSelectingPages,
+    textPointerSelectingPages,
+    isTextSelectionHandleDragging,
     updateTextSelectionToolbar,
   };
 };

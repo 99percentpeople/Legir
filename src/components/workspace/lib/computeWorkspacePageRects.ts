@@ -36,10 +36,11 @@ export const computeWorkspacePageRects = <TPage extends PageLike>(opts: {
   pageLayout: PageLayoutMode;
   pageFlow: PageFlowDirection;
   scale: number;
+  bottomPaddingPx?: number;
 }) => {
   const paddingTopPx = WORKSPACE_BASE_PADDING_PX;
   const paddingSidePx = WORKSPACE_BASE_PADDING_PX;
-  const paddingBottomPx = WORKSPACE_BOTTOM_PADDING_PX;
+  const paddingBottomPx = opts.bottomPaddingPx ?? WORKSPACE_BOTTOM_PADDING_PX;
   const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * opts.scale;
 
   const rects: Rect[] = new Array(opts.pages.length);
