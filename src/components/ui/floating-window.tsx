@@ -400,10 +400,12 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
 
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onUp);
 
     return () => {
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
     };
   }, [
     isOpen,
@@ -457,6 +459,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           "flex cursor-move items-center justify-between gap-2 border-b px-3 py-2",
           headerClassName,
         )}
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => {
           const target = e.target as HTMLElement | null;
           if (target?.closest?.("[data-floating-window-no-drag]")) return;
@@ -497,35 +500,43 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       {/* Resize handles (8 directions) */}
       <div
         className="absolute top-0 left-0 h-3 w-3 cursor-nwse-resize bg-transparent"
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => startResize(e, "nw")}
       />
       <div
         className="absolute top-0 right-0 h-3 w-3 cursor-nesw-resize bg-transparent"
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => startResize(e, "ne")}
       />
       <div
         className="absolute bottom-0 left-0 h-3 w-3 cursor-nesw-resize bg-transparent"
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => startResize(e, "sw")}
       />
       <div
         className="absolute right-0 bottom-0 h-3 w-3 cursor-nwse-resize bg-transparent"
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => startResize(e, "se")}
       />
 
       <div
         className="absolute top-0 right-2 left-2 h-2 cursor-ns-resize bg-transparent"
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => startResize(e, "n")}
       />
       <div
         className="absolute right-2 bottom-0 left-2 h-2 cursor-ns-resize bg-transparent"
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => startResize(e, "s")}
       />
       <div
         className="absolute top-2 bottom-2 left-0 w-2 cursor-ew-resize bg-transparent"
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => startResize(e, "w")}
       />
       <div
         className="absolute top-2 right-0 bottom-2 w-2 cursor-ew-resize bg-transparent"
+        style={{ touchAction: "none" }}
         onPointerDown={(e) => startResize(e, "e")}
       />
     </div>,
