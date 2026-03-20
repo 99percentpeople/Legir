@@ -27,6 +27,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
     if (typeof document === "undefined") return false;
     return document.body.dataset.ffControlTransforming === "1";
   });
+  const [open, setOpen] = useState(() => !isTransforming);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -45,8 +46,12 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    setOpen(!isTransforming);
+  }, [isTransforming, isVisible]);
+
   return (
-    <Popover open={!isTransforming}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <div
           aria-hidden
