@@ -23,7 +23,7 @@ import {
   translateService,
   type TranslateOptionGroup,
 } from "@/services/translateService";
-import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
+import { AI_PROVIDER_IDS_SORTED_BY_LABEL } from "@/services/ai/sdk/providerCatalog";
 import { FloatingWindow } from "@/components/ui/floating-window";
 import { cn } from "@/utils/cn";
 import { useEditorStore } from "@/store/useEditorStore";
@@ -121,12 +121,12 @@ export const TranslationFloatingWindow: React.FC<
   const modelSelectGroups = useMemo<ModelSelectGroup[]>(() => {
     const weight = (groupId: string) => {
       if (groupId === "cloud") return 0;
-      const providerIndex = AI_PROVIDER_IDS.indexOf(
-        groupId as (typeof AI_PROVIDER_IDS)[number],
+      const providerIndex = AI_PROVIDER_IDS_SORTED_BY_LABEL.indexOf(
+        groupId as (typeof AI_PROVIDER_IDS_SORTED_BY_LABEL)[number],
       );
       return providerIndex >= 0
         ? providerIndex + 1
-        : AI_PROVIDER_IDS.length + 1;
+        : AI_PROVIDER_IDS_SORTED_BY_LABEL.length + 1;
     };
 
     const sorted = optionGroups

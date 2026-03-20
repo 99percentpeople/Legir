@@ -1,18 +1,21 @@
+import { AnthropicModelCatalogProvider } from "./anthropic";
 import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
 import type { AiSdkModelCatalogProvider } from "@/services/ai/sdk/types";
 import { DeepSeekModelCatalogProvider } from "./deepseek";
 import { GeminiModelCatalogProvider } from "./gemini";
-import { OpenAiCompatibleModelCatalogProvider } from "./openAiCompatible";
+import { GroqModelCatalogProvider } from "./groq";
 import { OpenAiModelCatalogProvider } from "./openAi";
 import { OpenRouterModelCatalogProvider } from "./openRouter";
+import { XaiModelCatalogProvider } from "./xai";
 
 const modelCatalogProviders: AiSdkModelCatalogProvider[] = [
   new OpenAiModelCatalogProvider(),
+  new AnthropicModelCatalogProvider(),
   new GeminiModelCatalogProvider(),
   new OpenRouterModelCatalogProvider(),
   new DeepSeekModelCatalogProvider(),
-  new OpenAiCompatibleModelCatalogProvider("groq"),
-  new OpenAiCompatibleModelCatalogProvider("xai"),
+  new GroqModelCatalogProvider(),
+  new XaiModelCatalogProvider(),
 ];
 
 const providersById = new Map(

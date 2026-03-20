@@ -1,4 +1,5 @@
 import type { LLMModelOption } from "@/services/ai/types";
+import { createCustomModelCapabilities } from "@/services/ai/sdk/modelCapabilities";
 import {
   getAiProviderSpec,
   type AiProviderId,
@@ -77,6 +78,24 @@ export abstract class BaseAiSdkModelCatalogProvider implements AiSdkModelCatalog
 
   protected normalizeDiscoveredModels(models: AiSdkDiscoveredModel[]) {
     return normalizeModelOptions(models);
+  }
+
+  protected getCachedAndCustomModels(
+    options: AiSdkModelCatalogProviderTaskRequest,
+  ) {
+    const fetchedModels =
+      options.modelCache[this.providerId][
+        options.kind === "vision" ? "visionModels" : "translateModels"
+      ];
+    const customModels = options.appOptions.llm[
+      this.providerId
+    ].customModels.map((model) => ({
+      id: model.id,
+      label: model.id,
+      capabilities: createCustomModelCapabilities(model.capabilities),
+    }));
+
+    return [...fetchedModels, ...customModels];
   }
 
   protected async parseJsonOrThrow<T>(options: {

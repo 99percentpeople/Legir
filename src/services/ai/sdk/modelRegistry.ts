@@ -2,7 +2,7 @@ import type { LanguageModel } from "ai";
 
 import {
   AI_PROVIDER_IDS,
-  AI_PROVIDER_SPECS,
+  AI_PROVIDER_SPECS_SORTED_BY_LABEL,
   isAiProviderId,
 } from "@/services/ai/sdk/providerCatalog";
 import { getAiSdkModelCatalogProvider } from "@/services/ai/sdk/modelCatalogProviders";
@@ -125,7 +125,7 @@ export const getAiSdkModelGroups = (options: {
   modelCache: AiSdkModelCache;
   kind: AiSdkTaskModelKind;
 }) =>
-  AI_PROVIDER_SPECS.map(
+  AI_PROVIDER_SPECS_SORTED_BY_LABEL.map(
     (spec): AiSdkModelGroup => ({
       providerId: spec.id,
       label: spec.label,

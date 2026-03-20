@@ -14,9 +14,12 @@ export type AiSdkProviderId = AiProviderId;
 
 export type AiSdkBackendKind =
   | "openai"
+  | "anthropic"
   | "google"
   | "deepseek"
   | "openrouter"
+  | "groq"
+  | "xai"
   | "openai-compatible";
 
 export interface AiSdkProviderConfig {

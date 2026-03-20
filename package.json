@@ -27,10 +27,13 @@
     ]
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/deepseek": "^2.0.24",
     "@ai-sdk/google": "^3.0.43",
+    "@ai-sdk/groq": "^3.0.29",
     "@ai-sdk/openai": "^3.0.41",
     "@ai-sdk/openai-compatible": "^2.0.35",
+    "@ai-sdk/xai": "^3.0.67",
     "@cantoo/pdf-lib": "2.5.3",
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource-variable/geist-mono": "^5.2.7",

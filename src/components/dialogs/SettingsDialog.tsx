@@ -47,7 +47,7 @@ import {
 } from "@/types";
 import {
   AI_PROVIDER_IDS,
-  AI_PROVIDER_SPECS,
+  AI_PROVIDER_SPECS_SORTED_BY_LABEL,
   type AiProviderId,
 } from "@/services/ai/sdk/providerCatalog";
 import { useLanguage, Language, LANGUAGES } from "../language-provider";
@@ -110,7 +110,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     ) as Record<LlmProviderId, T>;
 
   const [llmProviderTab, setLlmProviderTab] = useState<LlmProviderId>(
-    AI_PROVIDER_IDS[0],
+    AI_PROVIDER_SPECS_SORTED_BY_LABEL[0]?.id ?? AI_PROVIDER_IDS[0],
   );
 
   const [llmCheckStatus, setLlmCheckStatus] = useState<
@@ -251,8 +251,9 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   }, [llmModelCache, options.llm]);
 
   const selectedLlmProviderSpec =
-    AI_PROVIDER_SPECS.find((spec) => spec.id === llmProviderTab) ??
-    AI_PROVIDER_SPECS[0];
+    AI_PROVIDER_SPECS_SORTED_BY_LABEL.find(
+      (spec) => spec.id === llmProviderTab,
+    ) ?? AI_PROVIDER_SPECS_SORTED_BY_LABEL[0];
 
   const digestOutputRatioDenominator =
     options.aiChat.digestOutputRatioDenominator;
@@ -677,7 +678,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {AI_PROVIDER_SPECS.map((spec) => (
+                      {AI_PROVIDER_SPECS_SORTED_BY_LABEL.map((spec) => (
                         <SelectItem
                           key={spec.id}
                           value={spec.id}
@@ -702,7 +703,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 </div>
 
                 <Tabs value={llmProviderTab}>
-                  {AI_PROVIDER_SPECS.map((spec) => {
+                  {AI_PROVIDER_SPECS_SORTED_BY_LABEL.map((spec) => {
                     const providerOptions = options.llm[spec.id];
                     const checkStatus = llmCheckStatus[spec.id];
                     const fetchStatus = llmFetchStatus[spec.id];

@@ -19,7 +19,7 @@ import {
 import { FONT_FAMILY_MAP } from "@/constants";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
-import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
+import { AI_PROVIDER_IDS_SORTED_BY_LABEL } from "@/services/ai/sdk/providerCatalog";
 import { PanelLayout } from "./PanelLayout";
 import {
   translateService,
@@ -233,12 +233,12 @@ export function PageTranslatePanel({
   const modelSelectGroups = useMemo<ModelSelectGroup[]>(() => {
     const weight = (groupId: string) => {
       if (groupId === "cloud") return 0;
-      const providerIndex = AI_PROVIDER_IDS.indexOf(
-        groupId as (typeof AI_PROVIDER_IDS)[number],
+      const providerIndex = AI_PROVIDER_IDS_SORTED_BY_LABEL.indexOf(
+        groupId as (typeof AI_PROVIDER_IDS_SORTED_BY_LABEL)[number],
       );
       return providerIndex >= 0
         ? providerIndex + 1
-        : AI_PROVIDER_IDS.length + 1;
+        : AI_PROVIDER_IDS_SORTED_BY_LABEL.length + 1;
     };
 
     const sorted = optionGroups

@@ -1,5 +1,6 @@
 export const AI_PROVIDER_IDS = [
   "openai",
+  "anthropic",
   "gemini",
   "openrouter",
   "deepseek",
@@ -11,9 +12,12 @@ export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
 
 export type AiProviderBackendKind =
   | "openai"
+  | "anthropic"
   | "google"
   | "deepseek"
   | "openrouter"
+  | "groq"
+  | "xai"
   | "openai-compatible";
 
 export interface AiProviderSpec {
@@ -36,6 +40,16 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
     defaultBaseUrl: "https://api.openai.com/v1",
     allowCustomBaseUrl: true,
     fallbackModelId: "gpt-4.1-mini",
+    unavailableMessageKey: "properties.form_detection.api_key_missing",
+    modelListMode: "openai",
+  },
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    backendKind: "anthropic",
+    defaultBaseUrl: "https://api.anthropic.com/v1",
+    allowCustomBaseUrl: true,
+    fallbackModelId: "claude-sonnet-4-6",
     unavailableMessageKey: "properties.form_detection.api_key_missing",
     modelListMode: "openai",
   },
@@ -71,7 +85,7 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
   {
     id: "groq",
     label: "Groq",
-    backendKind: "openai-compatible",
+    backendKind: "groq",
     defaultBaseUrl: "https://api.groq.com/openai/v1",
     allowCustomBaseUrl: true,
     fallbackModelId: "",
@@ -81,7 +95,7 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
   {
     id: "xai",
     label: "xAI",
-    backendKind: "openai-compatible",
+    backendKind: "xai",
     defaultBaseUrl: "https://api.x.ai/v1",
     allowCustomBaseUrl: true,
     fallbackModelId: "",
@@ -93,6 +107,19 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
 export const AI_PROVIDER_LABELS = Object.fromEntries(
   AI_PROVIDER_SPECS.map((spec) => [spec.id, spec.label]),
 ) as Record<AiProviderId, string>;
+
+export const compareAiProviderIdsByLabel = (
+  left: AiProviderId,
+  right: AiProviderId,
+) => AI_PROVIDER_LABELS[left].localeCompare(AI_PROVIDER_LABELS[right], "en");
+
+export const AI_PROVIDER_IDS_SORTED_BY_LABEL = [...AI_PROVIDER_IDS].sort(
+  compareAiProviderIdsByLabel,
+);
+
+export const AI_PROVIDER_SPECS_SORTED_BY_LABEL = [...AI_PROVIDER_SPECS].sort(
+  (left, right) => compareAiProviderIdsByLabel(left.id, right.id),
+);
 
 export const isAiProviderId = (value: string): value is AiProviderId =>
   AI_PROVIDER_IDS.includes(value as AiProviderId);

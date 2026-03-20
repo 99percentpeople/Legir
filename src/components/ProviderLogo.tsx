@@ -1,3 +1,4 @@
+import Anthropic from "@lobehub/icons/es/Anthropic";
 import DeepSeek from "@lobehub/icons/es/DeepSeek";
 import Gemini from "@lobehub/icons/es/Gemini";
 import Groq from "@lobehub/icons/es/Groq";
@@ -10,6 +11,7 @@ import { cn } from "@/utils/cn";
 
 const providerLogos = {
   openai: OpenAI,
+  anthropic: Anthropic,
   gemini: Gemini,
   openrouter: OpenRouter,
   deepseek: DeepSeek,

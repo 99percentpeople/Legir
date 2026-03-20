@@ -1,8 +1,11 @@
 import { createProviderRegistry, type ProviderRegistryProvider } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGroq } from "@ai-sdk/groq";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createXai } from "@ai-sdk/xai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { ProviderV3 } from "@ai-sdk/provider";
 
@@ -113,6 +116,15 @@ export const createAiSdkProviders = (options: AppOptions) => {
       continue;
     }
 
+    if (config.backendKind === "anthropic") {
+      providers[config.providerId] = createAnthropic({
+        name: config.providerId,
+        apiKey: config.apiKey,
+        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+      });
+      continue;
+    }
+
     if (config.backendKind === "openai") {
       providers[config.providerId] = createOpenAI({
         name: config.providerId,
@@ -126,6 +138,22 @@ export const createAiSdkProviders = (options: AppOptions) => {
       providers[config.providerId] = createOpenRouter({
         apiKey: config.apiKey,
         compatibility: "strict",
+        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+      });
+      continue;
+    }
+
+    if (config.backendKind === "groq") {
+      providers[config.providerId] = createGroq({
+        apiKey: config.apiKey,
+        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+      });
+      continue;
+    }
+
+    if (config.backendKind === "xai") {
+      providers[config.providerId] = createXai({
+        apiKey: config.apiKey,
         ...(config.baseURL ? { baseURL: config.baseURL } : {}),
       });
       continue;
