@@ -1,35 +1,35 @@
-name: publish-tauri
+name: build-tauri
 
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "v*"
+  pull_request:
+
+concurrency:
+  group: tauri-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    permissions:
-      contents: write
-
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            args: "--target x86_64-pc-windows-msvc"
+            artifact_name: tauri-windows-x64
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            args: "--target x86_64-unknown-linux-gnu"
+            artifact_name: tauri-linux-x64
           - platform: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            args: "--target aarch64-unknown-linux-gnu"
+            artifact_name: tauri-linux-arm64
           - platform: macos-15-intel
             target: x86_64-apple-darwin
-            args: "--target x86_64-apple-darwin"
+            artifact_name: tauri-macos-x64
           - platform: macos-15
             target: aarch64-apple-darwin
-            args: "--target aarch64-apple-darwin"
+            artifact_name: tauri-macos-arm64
 
     runs-on: ${{ matrix.platform }}
 
@@ -37,7 +37,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Linux dependencies (Ubuntu only)
+      - name: Install Linux dependencies
         if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
@@ -65,15 +65,12 @@ jobs:
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build & publish release
-        uses: tauri-apps/tauri-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Tauri app
+        run: bun run build:app -- --target ${{ matrix.target }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "FormForge PDF Editor ${{ github.ref_name }}"
-          releaseBody: "See the assets to download and install this version."
-          generateReleaseNotes: true
-          prerelease: false
-          releaseDraft: false
-          args: ${{ matrix.args }}
+          name: ${{ matrix.artifact_name }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/**
+          if-no-files-found: error
