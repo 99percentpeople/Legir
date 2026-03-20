@@ -536,15 +536,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <Settings size={20} />
           </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onOpenShortcuts}
-            className="h-8 w-8 sm:h-9 sm:w-9"
-            title={t("toolbar.shortcuts")}
-          >
-            <Keyboard size={20} />
-          </Button>
+          {!compactZoomControl && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenShortcuts}
+              className="h-8 w-8 sm:h-9 sm:w-9"
+              title={t("toolbar.shortcuts")}
+            >
+              <Keyboard size={20} />
+            </Button>
+          )}
 
           {!editorState.isPanelFloating && (
             <Button
