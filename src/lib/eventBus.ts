@@ -61,10 +61,6 @@ export type AppEventMap = {
     pageIndex: number;
     isSelecting: boolean;
   };
-  "workspace:textPointerSelectingChange": {
-    pageIndex: number;
-    isSelecting: boolean;
-  };
   "workspace:textSelectionHandleDraggingChange": {
     dragging: boolean;
     handleKind?: "start" | "end";

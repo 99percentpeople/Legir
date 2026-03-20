@@ -65,6 +65,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   const [renderedScale, setRenderedScale] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const [hasSelectableText, setHasSelectableText] = useState(false);
   const [searchHighlightRects, setSearchHighlightRects] = useState<
     Array<{
       key: string;
@@ -118,7 +119,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   } = useTextLayerSelection({
     pageIndex,
     textLayerRef,
-    isSelectMode,
+    isSelectMode: isSelectMode && hasSelectableText,
     scale,
     renderedScale,
     isInView,
@@ -258,7 +259,8 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           if (isCancelled()) return;
           if (!textContent) {
             container.replaceChildren();
-            ensureEndOfContent(container);
+            endOfContentRef.current = null;
+            setHasSelectableText(false);
             setRenderedScale(targetScale);
             reportPDFPageRenderLayerReady({
               pageIndex,
@@ -278,8 +280,14 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           syncTextLayerContainerStyles(staging, container);
 
           container.replaceChildren(...Array.from(staging.childNodes));
-
-          ensureEndOfContent(container);
+          const nextHasSelectableText =
+            container.querySelector("span[role='presentation']") !== null;
+          if (nextHasSelectableText) {
+            ensureEndOfContent(container);
+          } else {
+            endOfContentRef.current = null;
+          }
+          setHasSelectableText(nextHasSelectableText);
           setRenderedScale(targetScale);
           reportPDFPageRenderLayerReady({
             pageIndex,
@@ -304,6 +312,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     setRenderedScale(null);
     setIsSelecting(false);
     setIsRendering(false);
+    setHasSelectableText(false);
     setSearchHighlightRects([]);
     pendingTextRangeFocusRef.current = null;
     endOfContentRef.current = null;
@@ -317,17 +326,15 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   // 2. Handle Selection Logic (Web Select API)
   // Replaces the old 'pointerdown' logic with native 'selectionchange'
   useEffect(() => {
-    if (!isSelectMode) {
+    if (!isSelectMode || !hasSelectableText) {
       setIsSelecting(false);
       prevRangeRef.current = null;
       const container = textLayerRef.current;
       const endDiv = endOfContentRef.current;
       if (container && endDiv) {
-        container.append(endDiv);
-        endDiv.style.width = "";
-        endDiv.style.height = "";
-        endDiv.style.userSelect = "";
+        endDiv.remove();
       }
+      endOfContentRef.current = null;
       return;
     }
 
@@ -424,7 +431,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [ensureEndOfContent, isSelectMode]);
+  }, [ensureEndOfContent, hasSelectableText, isSelectMode]);
 
   // 3. Propagate state change (via global event bus)
   useEffect(() => {
@@ -455,7 +462,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     }
 
     // Pause re-rendering if user is currently selecting text to avoid UI jitter
-    if (isSelectMode && isSelecting) {
+    if (isSelectMode && hasSelectableText && isSelecting) {
       pendingScaleRef.current = renderScale;
       return;
     }
@@ -490,6 +497,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     };
   }, [
     isInView,
+    hasSelectableText,
     isSelectMode,
     isSelecting,
     renderScale,
@@ -500,12 +508,17 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   // 6. Handle Zoom-while-Selecting Recovery
   // If a zoom happened while selecting, we skipped render. Retrigger it now that selection ended.
   useEffect(() => {
-    if (!isSelectMode || pendingScaleRef.current === null || isSelecting)
+    if (
+      !isSelectMode ||
+      !hasSelectableText ||
+      pendingScaleRef.current === null ||
+      isSelecting
+    )
       return;
 
     // Force a re-render by incrementing sequence or just relying on dependency change.
     // Since 'isSelecting' changed to false, Effect #6 will naturally re-run.
-  }, [isSelecting, isSelectMode]);
+  }, [hasSelectableText, isSelecting, isSelectMode]);
 
   useAppEvent(
     "workspace:scrollContainerReady",
@@ -604,14 +617,15 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           isRendering && "textLayer-rendering",
           pdfTextLayerDebug && "textLayer-debug",
         )}
-        tabIndex={0}
+        tabIndex={hasSelectableText ? 0 : -1}
         data-main-rotation={page.rotation ?? 0}
-        data-selectable={isSelectMode}
+        data-selectable={isSelectMode && hasSelectableText}
         style={{
           display: shouldDisplay ? "block" : "none",
           visibility: shouldHideByVisibility ? "hidden" : "visible",
-          pointerEvents: shouldHideByVisibility ? "none" : undefined,
-          cursor,
+          pointerEvents:
+            shouldHideByVisibility || !hasSelectableText ? "none" : undefined,
+          cursor: hasSelectableText ? cursor : undefined,
           "--scale-factor": String(renderedScale ?? scale),
           "--user-unit": String(userUnit),
           ...(textLayerSmoothScale && {

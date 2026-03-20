@@ -213,25 +213,12 @@ export const useWorkspaceTextSelection = (opts: {
   const [textSelectingPages, setTextSelectingPages] = useState<
     Record<number, true>
   >({});
-  const [textPointerSelectingPages, setTextPointerSelectingPages] = useState<
-    Record<number, true>
-  >({});
+  const [isTextSelectionDragging, setIsTextSelectionDragging] = useState(false);
   const [isTextSelectionHandleDragging, setIsTextSelectionHandleDragging] =
     useState(false);
 
   useAppEvent("workspace:textSelectingChange", (payload) => {
     setTextSelectingPages((prev) => {
-      const has = !!prev[payload.pageIndex];
-      if (has === payload.isSelecting) return prev;
-      const next = { ...prev };
-      if (payload.isSelecting) next[payload.pageIndex] = true;
-      else delete next[payload.pageIndex];
-      return next;
-    });
-  });
-
-  useAppEvent("workspace:textPointerSelectingChange", (payload) => {
-    setTextPointerSelectingPages((prev) => {
       const has = !!prev[payload.pageIndex];
       if (has === payload.isSelecting) return prev;
       const next = { ...prev };
@@ -568,6 +555,7 @@ export const useWorkspaceTextSelection = (opts: {
       const target = e.target as HTMLElement | null;
       if (target?.closest?.(".textLayer")) {
         isTextSelectingRef.current = true;
+        setIsTextSelectionDragging(true);
         preferredHandleKindRef.current = null;
         setTextSelectionToolbar((prev) =>
           prev.isVisible ? { ...prev, isVisible: false } : prev,
@@ -587,6 +575,7 @@ export const useWorkspaceTextSelection = (opts: {
       // prematurely showing a toolbar with a transient (0,0) bounding rect.
       requestAnimationFrame(() => {
         isTextSelectingRef.current = false;
+        setIsTextSelectionDragging(false);
         updateTextSelectionToolbar();
       });
     },
@@ -599,6 +588,7 @@ export const useWorkspaceTextSelection = (opts: {
     () => {
       if (!isTextSelectingRef.current) return;
       isTextSelectingRef.current = false;
+      setIsTextSelectionDragging(false);
       setTextSelectionToolbar((prev) =>
         prev.isVisible ? { ...prev, isVisible: false } : prev,
       );
@@ -636,7 +626,7 @@ export const useWorkspaceTextSelection = (opts: {
     setTextSelectionToolbar,
     textSelectionVirtualRef,
     textSelectingPages,
-    textPointerSelectingPages,
+    isTextSelectionDragging,
     isTextSelectionHandleDragging,
     updateTextSelectionToolbar,
   };

@@ -89,22 +89,6 @@ export const useTextLayerSelection = (opts: {
     );
   }, [pageIndex]);
 
-  useEffect(() => {
-    appEventBus.emit("workspace:textPointerSelectingChange", {
-      pageIndex,
-      isSelecting: isPointerSelectingText,
-    });
-  }, [isPointerSelectingText, pageIndex]);
-
-  useEffect(() => {
-    return () => {
-      appEventBus.emit("workspace:textPointerSelectingChange", {
-        pageIndex,
-        isSelecting: false,
-      });
-    };
-  }, [pageIndex]);
-
   const doc =
     typeof document !== "undefined"
       ? (document as Document & {

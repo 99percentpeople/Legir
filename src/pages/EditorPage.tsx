@@ -105,6 +105,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   } = editorStore;
 
   const isMobile = useIsMobile();
+  const defaultTool: Tool = isMobile ? "pan" : "select";
   const prevSelectedIdRef = useRef<string | null>(null);
   const skipNextWindowCloseRef = useRef(false);
   const initialTitleRef = useRef<string | null>(null);
@@ -154,6 +155,14 @@ const EditorPage: React.FC<EditorPageProps> = ({
       }),
     [],
   );
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const currentState = useEditorStore.getState();
+    if (currentState.tool !== "select") return;
+    if (currentState.selectedId) return;
+    currentState.setTool("pan");
+  }, [isMobile]);
 
   const {
     isPageTranslating,
@@ -221,6 +230,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
       }
     })();
   }, [setState, tauri]);
+
+  const handleModeChange = useCallback(
+    (mode: EditorState["mode"]) => {
+      setState({ mode, tool: defaultTool });
+    },
+    [defaultTool, setState],
+  );
 
   useEventListener(
     tauri ? undefined : window,
@@ -1080,8 +1096,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
         if (isInput) target.blur();
         if (currentState.selectedId) {
           currentState.selectControl(null);
-        } else if (currentState.tool !== "select") {
-          currentState.setTool("select");
+        } else if (currentState.tool !== defaultTool) {
+          currentState.setTool(defaultTool);
         }
         return;
       }
@@ -1369,7 +1385,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         }}
         onToggleFullscreen={toggleFullscreen}
         onToolChange={(tool: Tool) => setTool(tool)}
-        onModeChange={(mode) => setState({ mode, tool: "select" })}
+        onModeChange={handleModeChange}
         onPenStyleChange={handlePenStyleChange}
         onHighlightStyleChange={handleHighlightStyleChange}
         onCommentStyleChange={handleCommentStyleChange}
@@ -1587,7 +1603,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
             isDirty: state.isDirty,
             canUndo: state.past.length > 0,
             canRedo: state.future.length > 0,
-            onModeChange: (mode) => setState({ mode, tool: "select" }),
+            onModeChange: handleModeChange,
             onPenStyleChange: handlePenStyleChange,
             onHighlightStyleChange: handleHighlightStyleChange,
             onCommentStyleChange: handleCommentStyleChange,

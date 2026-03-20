@@ -270,7 +270,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setTextSelectionToolbar,
     textSelectionVirtualRef,
     textSelectingPages,
-    textPointerSelectingPages,
+    isTextSelectionDragging,
     isTextSelectionHandleDragging,
     updateTextSelectionToolbar,
   } = useWorkspaceTextSelection({
@@ -518,7 +518,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   );
   const isTextSelectionAutoScrolling =
     isTextSelectionHandleDragging ||
-    Object.keys(textPointerSelectingPages).length > 0;
+    (isTextSelectionDragging && Object.keys(textSelectingPages).length > 0);
   useAutoScroll(containerRef, {
     enabled: isInteracting || isTextSelectionAutoScrolling,
   });
