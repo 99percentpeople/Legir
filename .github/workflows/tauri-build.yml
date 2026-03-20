@@ -101,11 +101,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p portable-out
-          source_file="$(find "src-tauri/target/${{ matrix.target }}/release/bundle/appimage" -maxdepth 1 -type f -name '*.AppImage' | head -n 1)"
+          release_dir="src-tauri/target/${{ matrix.target }}/release"
+          source_file="$(find "$release_dir" -maxdepth 1 -type f -executable | head -n 1)"
           [ -n "$source_file" ]
           base_name="$(basename "$source_file")"
-          stem="${base_name%.AppImage}"
-          cp "$source_file" "portable-out/${stem}-${SHORT_SHA}.AppImage"
+          install -m 755 "$source_file" "portable-out/${base_name}-${SHORT_SHA}"
 
       - name: Prepare macOS portable
         if: contains(matrix.target, 'apple-darwin')
@@ -113,11 +113,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p portable-out
-          source_app="$(find "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -type d -name '*.app' | head -n 1)"
-          [ -n "$source_app" ]
-          app_name="$(basename "$source_app")"
-          stem="${app_name%.app}"
-          cp -R "$source_app" "portable-out/${stem}-${SHORT_SHA}.app"
+          source_file="src-tauri/target/${{ matrix.target }}/release/app"
+          [ -f "$source_file" ]
+          base_name="$(basename "$source_file")"
+          install -m 755 "$source_file" "portable-out/${base_name}-${SHORT_SHA}"
 
       - name: Upload Windows portable
         if: contains(matrix.target, 'windows')
@@ -132,7 +131,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.portable_artifact_name }}-${{ env.SHORT_SHA }}
-          path: portable-out/*.AppImage
+          path: portable-out/*
           if-no-files-found: error
 
       - name: Upload macOS portable
@@ -140,5 +139,5 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.portable_artifact_name }}-${{ env.SHORT_SHA }}
-          path: portable-out/*.app
+          path: portable-out/*
           if-no-files-found: error
