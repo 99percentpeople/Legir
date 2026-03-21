@@ -52,13 +52,12 @@ import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
 import { getFocusRect } from "./lib/getFocusRect";
 import { VirtualizedPages } from "./VirtualizedPages";
 import { computeWorkspacePageRects } from "./lib/computeWorkspacePageRects";
-import { isTauri } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
+import { openExternalUrl } from "@/services/platform";
 
 const WorkspaceZoomJankOverlay = React.lazy(
   () => import("./debug/WorkspaceZoomJankOverlay"),
@@ -116,6 +115,21 @@ type Rect = {
 };
 
 type TextSelectionPayload = NonNullable<TextSelectionToolbarState["selection"]>;
+
+const translateRect = (rect: Rect, dx: number, dy: number): Rect => ({
+  ...rect,
+  x: rect.x + dx,
+  y: rect.y + dy,
+});
+
+const translatePoint = (
+  point: { x: number; y: number },
+  dx: number,
+  dy: number,
+) => ({
+  x: point.x + dx,
+  y: point.y + dy,
+});
 
 const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
@@ -912,6 +926,37 @@ const Workspace: React.FC<WorkspaceProps> = ({
         onUpdateAnnotation(movingAnnotationId, {
           rect: { ...annot.rect, x: newOuterX + dx, y: newOuterY + dy },
           pageIndex: pageIndex,
+        });
+        return;
+      }
+
+      if (annot.type === "ink") {
+        const dx = newOuterX - annot.rect.x;
+        const dy = newOuterY - annot.rect.y;
+        const nextStrokes = annot.strokes?.map((stroke) =>
+          stroke.map((point) => translatePoint(point, dx, dy)),
+        );
+        const nextPoints =
+          annot.points?.map((point) => translatePoint(point, dx, dy)) ??
+          nextStrokes?.[0];
+
+        onUpdateAnnotation(movingAnnotationId, {
+          pageIndex,
+          ...(nextPoints ? { points: nextPoints } : null),
+          ...(nextStrokes ? { strokes: nextStrokes } : null),
+          appearanceStreamContent: undefined,
+        });
+        return;
+      }
+
+      if (annot.type === "highlight" && annot.rects?.length) {
+        const dx = newOuterX - annot.rect.x;
+        const dy = newOuterY - annot.rect.y;
+
+        onUpdateAnnotation(movingAnnotationId, {
+          rect: { ...annot.rect, x: newOuterX, y: newOuterY },
+          rects: annot.rects.map((rect) => translateRect(rect, dx, dy)),
+          pageIndex,
         });
         return;
       }
@@ -2269,11 +2314,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
           const q = textSelectionToolbar.text.trim();
           if (q) {
             const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-            if (isTauri()) {
-              openUrl(url);
-            } else {
-              window.open(url, "_blank", "noopener,noreferrer");
-            }
+            void openExternalUrl(url);
           }
           closeTextSelectionPopover();
         }}
