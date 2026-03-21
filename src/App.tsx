@@ -7,15 +7,7 @@ import PdfPasswordDialog from "./components/dialogs/PdfPasswordDialog";
 import { EditorState, FormField } from "./types";
 import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
 import { analyzePageForFields } from "./services/ai";
-import { saveDraft, getDraft } from "./services/storageService";
-import {
-  exportPdfBytes,
-  openFileFromPath,
-  openFile,
-  pickSaveTarget,
-  writeToSaveTarget,
-  type SaveTarget,
-} from "./services/fileOps";
+import { getDraft } from "./services/storageService";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
 import { useEditorStore } from "./store/useEditorStore";
@@ -23,18 +15,32 @@ import { useLocation } from "wouter";
 import AppRoutes from "./AppRoutes";
 import { useAppInitialization } from "./app/useAppInitialization";
 import { recentFilesService } from "./services/recentFilesService";
-import { isTauri } from "@tauri-apps/api/core";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";
 import { useShallow } from "zustand/react/shallow";
 import { selectAppShellState } from "@/store/selectors";
+import {
+  exportPdfBytes,
+  getPlatformDocumentSaveMode,
+  getSavedDraftViewState,
+  getSavedViewStateForSaveTarget,
+  hasSavedDraftSession,
+  openFile,
+  openFileFromPath,
+  pickSaveTarget,
+  persistPlatformDraftSession,
+  saveEditorViewState,
+  setSavedDraftSession,
+  writeToSaveTarget,
+  type SaveTarget,
+} from "@/services/platform";
 
 // App orchestrator (not just UI).
 //
 // This file coordinates the main user journeys:
 // - Open/parse a PDF -> populate the editor store
 // - Render landing/editor routes
-// - Save/export (Web vs Tauri) via `fileOps`
+// - Save/export via the unified `services/platform` APIs
 // - Web draft persistence via `storageService`
 // - AI field detection via `services/ai`
 //
@@ -45,6 +51,7 @@ import { selectAppShellState } from "@/store/selectors";
 
 const App: React.FC = () => {
   const { t } = useLanguage();
+  const platformDocumentSaveMode = getPlatformDocumentSaveMode();
 
   const workspaceScrollContainerRef = React.useRef<HTMLElement | null>(null);
 
@@ -130,26 +137,14 @@ const App: React.FC = () => {
       // - All heavy work should be wrapped by `withProcessing()` so UI can display status/spinners.
       const run = async () => {
         recentFilesService.cancelPreviewTasks();
-
-        if (isTauri() && typeof document !== "undefined") {
-          const snapshot = useEditorStore.getState();
-          const tauriPath =
-            snapshot.saveTarget?.kind === "tauri"
-              ? snapshot.saveTarget.path
-              : null;
-          if (tauriPath) {
-            const el = workspaceScrollContainerRef.current;
-            if (el) {
-              recentFilesService.saveTauriViewState({
-                path: tauriPath,
-                scale: snapshot.scale,
-                pageIndex: snapshot.currentPageIndex,
-                scrollLeft: el.scrollLeft,
-                scrollTop: el.scrollTop,
-              });
-            }
-          }
-        }
+        const snapshot = useEditorStore.getState();
+        saveEditorViewState({
+          saveTarget: snapshot.saveTarget,
+          pagesLength: snapshot.pages.length,
+          scale: snapshot.scale,
+          currentPageIndex: snapshot.currentPageIndex,
+          scrollContainer: workspaceScrollContainerRef.current,
+        });
 
         resetDocument();
 
@@ -206,26 +201,23 @@ const App: React.FC = () => {
             exportPassword: openPassword ?? null,
           });
 
-          // Web: overwrite any previous draft immediately so the latest opened file
-          // becomes the resumable session (even before the user makes edits).
-          if (!isTauri()) {
-            try {
-              await saveDraft({
-                pdfBytes,
-                fields,
-                annotations,
-                metadata,
-                filename: options.filename,
-              });
-              recentFilesService.setWebSession(true);
+          try {
+            const persistedDraft = await persistPlatformDraftSession({
+              pdfBytes,
+              fields,
+              annotations,
+              metadata,
+              filename: options.filename,
+            });
+            if (persistedDraft) {
               setState({
                 hasSavedSession: true,
                 lastSavedAt: new Date(),
                 isDirty: false,
               });
-            } catch {
-              // ignore
             }
+          } catch {
+            // ignore
           }
 
           if (options.saveTarget?.kind === "tauri") {
@@ -237,7 +229,9 @@ const App: React.FC = () => {
               targetWidth: 240,
             });
 
-            const lastViewState = recentFilesService.getViewState(tauriPath);
+            const lastViewState = getSavedViewStateForSaveTarget(
+              options.saveTarget,
+            );
             if (lastViewState) {
               const restoredPageIndex =
                 typeof lastViewState.pageIndex === "number"
@@ -276,7 +270,7 @@ const App: React.FC = () => {
         .then(run);
       return loadQueueRef.current;
     },
-    [navigate, setState, t],
+    [loadDocument, navigate, resetDocument, setState, t, withProcessing],
   );
 
   const handleUpload = async (file: File) => {
@@ -343,11 +337,11 @@ const App: React.FC = () => {
   const handleResumeSession = async () => {
     const draft = await getDraft();
     if (!draft) {
-      recentFilesService.setWebSession(false);
+      setSavedDraftSession(false);
       setState({ hasSavedSession: false });
       return;
     }
-    const viewState = recentFilesService.getWebDraftView();
+    const viewState = getSavedDraftViewState();
     await withProcessing(t("app.loading_draft"), async () => {
       pdfDisposeRef.current?.();
       pdfDisposeRef.current = null;
@@ -573,20 +567,14 @@ const App: React.FC = () => {
           renderAnnotations: true,
           forcePreviewRender: true,
         });
-
-        if (typeof document !== "undefined") {
-          const snapshot = useEditorStore.getState();
-          const el = workspaceScrollContainerRef.current;
-          if (el) {
-            recentFilesService.saveTauriViewState({
-              path: tauriTarget.path,
-              scale: snapshot.scale,
-              pageIndex: snapshot.currentPageIndex,
-              scrollLeft: 0,
-              scrollTop: 0,
-            });
-          }
-        }
+        const liveSnapshot = useEditorStore.getState();
+        saveEditorViewState({
+          saveTarget: target as EditorState["saveTarget"],
+          pagesLength: liveSnapshot.pages.length,
+          scale: liveSnapshot.scale,
+          currentPageIndex: liveSnapshot.currentPageIndex,
+          scrollContainer: workspaceScrollContainerRef.current,
+        });
       }
 
       toast.success(t("app.save_success"));
@@ -694,80 +682,66 @@ const App: React.FC = () => {
     });
   }, [generatePDF, t, withProcessing]);
 
-  const handleSaveDraft = async (silent = false) => {
-    const snapshot = useEditorStore.getState();
-    if (!snapshot.pdfBytes) return;
+  const handleSaveDraft = useCallback(
+    async (silent = false) => {
+      if (platformDocumentSaveMode !== "draft") return;
 
-    setState({ isSaving: true });
+      const snapshot = useEditorStore.getState();
+      if (!snapshot.pdfBytes) return;
 
-    try {
-      await saveDraft({
-        pdfBytes: snapshot.pdfBytes,
-        fields: snapshot.fields,
-        annotations: snapshot.annotations,
-        metadata: snapshot.metadata,
-        filename: snapshot.filename,
-      });
-      recentFilesService.setWebSession(true);
-      setState({
-        hasSavedSession: true,
-        isDirty: false,
-        lastSavedAt: new Date(),
-      });
-    } catch (error) {
-      console.error("Save draft failed:", error);
-      if (!silent) toast.error("Failed to save draft.");
-    } finally {
-      setState({ isSaving: false });
-    }
-  };
+      setState({ isSaving: true });
 
-  const closeSession = async () => {
+      try {
+        await persistPlatformDraftSession({
+          pdfBytes: snapshot.pdfBytes,
+          fields: snapshot.fields,
+          annotations: snapshot.annotations,
+          metadata: snapshot.metadata,
+          filename: snapshot.filename,
+        });
+        setState({
+          hasSavedSession: true,
+          isDirty: false,
+          lastSavedAt: new Date(),
+        });
+      } catch (error) {
+        console.error("Save draft failed:", error);
+        if (!silent) toast.error("Failed to save draft.");
+      } finally {
+        setState({ isSaving: false });
+      }
+    },
+    [platformDocumentSaveMode, setState],
+  );
+
+  const closeSession = useCallback(async () => {
     recentFilesService.cancelPreviewTasks();
-    if (isTauri()) {
-      const snapshot = useEditorStore.getState();
-      const tauriPath =
-        snapshot.saveTarget?.kind === "tauri" ? snapshot.saveTarget.path : null;
-
-      if (tauriPath) {
-        const el = workspaceScrollContainerRef.current;
-        if (el) {
-          recentFilesService.saveTauriViewState({
-            path: tauriPath,
-            scale: snapshot.scale,
-            pageIndex: snapshot.currentPageIndex,
-            scrollLeft: el.scrollLeft,
-            scrollTop: el.scrollTop,
-          });
-        }
-      }
-    }
-
-    if (!isTauri() && typeof document !== "undefined") {
-      const snapshot = useEditorStore.getState();
-      if (snapshot.pages.length > 0) {
-        const el = workspaceScrollContainerRef.current;
-        if (el) {
-          recentFilesService.saveWebDraftViewState({
-            scale: snapshot.scale,
-            scrollLeft: el.scrollLeft,
-            scrollTop: el.scrollTop,
-          });
-        }
-      }
-    }
+    const snapshot = useEditorStore.getState();
+    saveEditorViewState({
+      saveTarget: snapshot.saveTarget,
+      pagesLength: snapshot.pages.length,
+      scale: snapshot.scale,
+      currentPageIndex: snapshot.currentPageIndex,
+      scrollContainer: workspaceScrollContainerRef.current,
+    });
 
     pdfDisposeRef.current?.();
     pdfDisposeRef.current = null;
 
-    const hasDraft = !isTauri() ? recentFilesService.hasWebSession() : false;
+    const hasDraft = hasSavedDraftSession();
 
     resetDocument();
-    if (!isTauri()) {
-      setState({ hasSavedSession: hasDraft });
-    }
+    setState({ hasSavedSession: hasDraft });
     navigate("/");
-  };
+  }, [navigate, resetDocument, setState]);
+
+  const saveCurrentDocumentBeforeOpen = useCallback(async () => {
+    if (platformDocumentSaveMode === "draft") {
+      await handleSaveDraft(true);
+      return true;
+    }
+    return await handleExport();
+  }, [handleExport, handleSaveDraft, platformDocumentSaveMode]);
 
   const onEditorSaveDraft = useCallback(
     async (silent?: boolean) => {
@@ -830,12 +804,8 @@ const App: React.FC = () => {
           setFileDropDialogOpen(false);
           setPendingFileDropPath(null);
           if (!path) return;
-          if (isTauri()) {
-            const ok = await handleExport();
-            if (!ok) return;
-          } else {
-            await handleSaveDraft(true);
-          }
+          const ok = await saveCurrentDocumentBeforeOpen();
+          if (!ok) return;
           await openDroppedPdfPath(path);
         }}
         onOpen={async () => {

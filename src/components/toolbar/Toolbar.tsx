@@ -39,7 +39,6 @@ import {
 } from "../ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { useLanguage } from "../language-provider";
-import { canSaveAs } from "../../services/fileOps";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import ZoomDropdownControl from "./ZoomDropdownControl";
@@ -47,7 +46,7 @@ import PageSettingsDropdownControl from "./PageSettingsDropdownControl";
 import { ANNOTATION_STYLES } from "@/constants";
 import { getContrastColor } from "@/utils/colors";
 import ExportMenu from "./ExportMenu";
-import { isTauri } from "@tauri-apps/api/core";
+import { canSaveAs, usePlatformUi } from "@/services/platform";
 import { useEditorStore } from "@/store/useEditorStore";
 
 interface ToolbarProps {
@@ -134,7 +133,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const { t } = useLanguage();
   const { mode, tool } = editorState;
   const hasSaveAs = useRef(canSaveAs());
-  const tauri = isTauri();
+  const { documentSaveMode } = usePlatformUi();
+  const tauri = documentSaveMode === "file";
   const liveScale = useEditorStore((state) => state.scale);
   const livePageLayout = useEditorStore((state) => state.pageLayout);
   const livePageFlow = useEditorStore((state) => state.pageFlow);
@@ -147,7 +147,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
         hideToolSection ? "justify-between" : "lg:justify-between",
       )}
     >
-      {/* Left Section: Mode Selection & History */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-2">
         <div className="flex items-center gap-1">
           <Button
@@ -215,7 +214,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
           {!hideModeSelector && (
             <>
-              {/* Mode Selector */}
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -503,7 +501,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </div>
       )}
 
-      {/* Right Section: Utilities & Export */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <SaveStatusIndicator
           isSaving={isSaving}
@@ -512,7 +509,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
           className="flex"
         />
 
-        {/* Utilities Group */}
         <div className="flex items-center gap-1">
           {showPageSettingsControl && (
             <PageSettingsDropdownControl
@@ -564,7 +560,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
           )}
         </div>
 
-        {/* Export Dropdown */}
         <ExportMenu
           disabled={editorState.pages.length === 0}
           isDirty={!!isDirty}

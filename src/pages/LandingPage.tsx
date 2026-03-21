@@ -15,15 +15,19 @@ import { ModeToggle } from "../components/toolbar/mode-toggle";
 import { LanguageToggle } from "../components/toolbar/language-toggle";
 import PDFUploader from "../components/PDFUploader";
 import { useLanguage } from "../components/language-provider";
-import { isTauri } from "@tauri-apps/api/core";
 import { Input } from "../components/ui/input";
 import {
   recentFilesService,
   type RecentFileEntry,
 } from "../services/recentFilesService";
 import { toast } from "sonner";
-import { confirm } from "@tauri-apps/plugin-dialog";
 import { TimeAgoText } from "../components/timeText";
+import {
+  confirmPlatformAction,
+  PlatformSwitch,
+  usePlatformUi,
+} from "@/services/platform";
+
 export interface LandingPageProps {
   onUpload: (file: File) => void;
   onOpen?: () => Promise<void>;
@@ -40,16 +44,15 @@ const LandingPage: React.FC<LandingPageProps> = ({
   onResume,
 }) => {
   const { t } = useLanguage();
+  const { supportsRecentFiles } = usePlatformUi();
 
   const [recentFiles, setRecentFiles] = useState<RecentFileEntry[]>([]);
   const [query, setQuery] = useState("");
 
-  const isDesktop = isTauri();
-
   useEffect(() => {
-    if (!isDesktop) return;
+    if (!supportsRecentFiles) return;
     setRecentFiles(recentFilesService.getAll());
-  }, [isDesktop]);
+  }, [supportsRecentFiles]);
 
   const filteredRecentFiles = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -67,7 +70,9 @@ const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   const handleClearAll = async () => {
-    const ok = await confirm(t("landing.desktop.confirm_clear_all"));
+    const ok = await confirmPlatformAction(
+      t("landing.desktop.confirm_clear_all"),
+    );
     if (!ok) return;
     const next = recentFilesService.clear();
     setRecentFiles(next);
@@ -78,184 +83,257 @@ const LandingPage: React.FC<LandingPageProps> = ({
     try {
       await onOpenRecent(entry.path);
     } catch (e) {
-      toast.error(e?.message || t("landing.desktop.open_fail"));
+      const message = e instanceof Error ? e.message : "";
+      toast.error(message || t("landing.desktop.open_fail"));
     }
   };
 
-  if (isDesktop) {
-    return (
-      <div className="bg-background flex min-h-screen flex-col transition-colors duration-200">
-        <div className="border-border bg-card/50 fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b px-6 backdrop-blur-sm">
-          <div className="text-foreground flex items-center gap-2 text-xl font-bold">
-            <div className="bg-primary text-primary-foreground rounded-md p-1.5">
-              <FileType size={20} strokeWidth={2.5} />
-            </div>
-            <span>{process.env.APP_NAME}</span>
-          </div>
-          <div className="flex items-center gap-2">
+  return (
+    <PlatformSwitch
+      desktop={
+        <DesktopLandingView
+          query={query}
+          recentFiles={recentFiles}
+          filteredRecentFiles={filteredRecentFiles}
+          onQueryChange={setQuery}
+          onClearQuery={() => setQuery("")}
+          onOpen={onOpen}
+          onOpenRecent={handleOpenRecent}
+          onDeleteRecent={handleDeleteRecent}
+          onClearAll={handleClearAll}
+          t={t}
+        />
+      }
+      web={
+        <WebLandingView
+          hasSavedSession={hasSavedSession}
+          onOpen={onOpen}
+          onResume={onResume}
+          onUpload={onUpload}
+          t={t}
+        />
+      }
+    />
+  );
+};
+
+type LandingTranslation = ReturnType<typeof useLanguage>["t"];
+
+type LandingHeaderProps = {
+  rightSlot?: React.ReactNode;
+};
+
+const LandingHeader: React.FC<LandingHeaderProps> = ({ rightSlot }) => {
+  return (
+    <div className="border-border bg-card/50 fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b px-6 backdrop-blur-sm">
+      <div className="text-foreground flex items-center gap-2 text-xl font-bold">
+        <div className="bg-primary text-primary-foreground rounded-md p-1.5">
+          <FileType size={20} strokeWidth={2.5} />
+        </div>
+        <span>{process.env.APP_NAME}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {rightSlot ?? (
+          <>
             <LanguageToggle />
             <ModeToggle />
-          </div>
-        </div>
-
-        <div className="flex flex-1 flex-col gap-6 p-6 pt-24">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-1">
-              <h1 className="text-foreground text-2xl font-bold tracking-tight">
-                {t("landing.desktop.recent_title")}
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                {t("landing.desktop.recent_subtitle")}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative w-full sm:w-80">
-                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("landing.desktop.search_placeholder")}
-                  className="pl-9"
-                />
-                {query.trim() ? (
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    className="absolute top-1/2 right-1 -translate-y-1/2"
-                    onClick={() => setQuery("")}
-                  >
-                    <X />
-                  </Button>
-                ) : null}
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => void onOpen?.()}
-                  className="gap-2"
-                  disabled={!onOpen}
-                >
-                  <FolderOpen />
-                  {t("landing.desktop.open_pdf")}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleClearAll}
-                  className="gap-2"
-                  disabled={recentFiles.length === 0}
-                >
-                  <Trash2 />
-                  {t("landing.desktop.clear_all")}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-border bg-card rounded-xl border">
-            <div className="border-border flex items-center justify-between border-b p-4">
-              <div className="text-sm font-medium">
-                {t("landing.desktop.file_count", {
-                  count: filteredRecentFiles.length,
-                })}
-              </div>
-            </div>
-
-            <div className="divide-border divide-y">
-              {filteredRecentFiles.length === 0 ? (
-                <div className="text-muted-foreground p-6 text-sm">
-                  {t("landing.desktop.no_recent_files")}
-                </div>
-              ) : (
-                filteredRecentFiles.map((entry) => (
-                  <div
-                    key={entry.path}
-                    tabIndex={0}
-                    className="group hover:bg-accent/40 flex items-center justify-between gap-4 p-4 transition-colors outline-none"
-                  >
-                    <div className="flex min-w-0 items-center gap-4">
-                      <div className="bg-muted ring-border relative h-16 w-16 shrink-0 overflow-hidden rounded-md ring-1">
-                        {entry.previewDataUrl ? (
-                          <img
-                            src={entry.previewDataUrl}
-                            alt={entry.filename}
-                            className="h-full w-full object-contain"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="text-muted-foreground flex h-full w-full items-center justify-center text-xs">
-                            {t("landing.desktop.pdf_badge")}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="text-foreground truncate font-medium">
-                          {entry.filename}
-                        </div>
-                        <div className="text-muted-foreground truncate text-xs">
-                          {entry.path}
-                        </div>
-                        <div className="text-muted-foreground mt-1 text-xs">
-                          <TimeAgoText time={entry.lastOpenedAt} />
-                          {typeof entry.lastViewState?.pageIndex ===
-                            "number" && (
-                            <span className="ml-2">
-                              {t("sidebar.page", {
-                                page: entry.lastViewState.pageIndex + 1,
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* recent action buttons */}
-                    <div className="invisible flex shrink-0 items-center gap-2 opacity-0 transition-all duration-200 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-                      <Button
-                        variant="secondary"
-                        onClick={() => void handleOpenRecent(entry)}
-                        disabled={!onOpenRecent}
-                      >
-                        {t("landing.desktop.open")}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => handleDeleteRecent(entry.path)}
-                        aria-label={t("common.actions.delete")}
-                      >
-                        <Trash2 />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+};
 
+type DesktopLandingViewProps = {
+  query: string;
+  recentFiles: RecentFileEntry[];
+  filteredRecentFiles: RecentFileEntry[];
+  onQueryChange: (value: string) => void;
+  onClearQuery: () => void;
+  onOpen?: () => Promise<void>;
+  onOpenRecent: (entry: RecentFileEntry) => Promise<void>;
+  onDeleteRecent: (path: string) => void;
+  onClearAll: () => void | Promise<void>;
+  t: LandingTranslation;
+};
+
+const DesktopLandingView: React.FC<DesktopLandingViewProps> = ({
+  query,
+  recentFiles,
+  filteredRecentFiles,
+  onQueryChange,
+  onClearQuery,
+  onOpen,
+  onOpenRecent,
+  onDeleteRecent,
+  onClearAll,
+  t,
+}) => {
   return (
     <div className="bg-background flex min-h-screen flex-col transition-colors duration-200">
-      {/* Header */}
-      <div className="border-border bg-card/50 fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b px-6 backdrop-blur-sm">
-        <div className="text-foreground flex items-center gap-2 text-xl font-bold">
-          <div className="bg-primary text-primary-foreground rounded-md p-1.5">
-            <FileType size={20} strokeWidth={2.5} />
+      <LandingHeader />
+
+      <div className="flex flex-1 flex-col gap-6 p-6 pt-24">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-foreground text-2xl font-bold tracking-tight">
+              {t("landing.desktop.recent_title")}
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              {t("landing.desktop.recent_subtitle")}
+            </p>
           </div>
-          <span>{process.env.APP_NAME}</span>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-80">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <Input
+                value={query}
+                onChange={(e) => onQueryChange(e.target.value)}
+                placeholder={t("landing.desktop.search_placeholder")}
+                className="pl-9"
+              />
+              {query.trim() ? (
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  className="absolute top-1/2 right-1 -translate-y-1/2"
+                  onClick={onClearQuery}
+                >
+                  <X />
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => void onOpen?.()}
+                className="gap-2"
+                disabled={!onOpen}
+              >
+                <FolderOpen />
+                {t("landing.desktop.open_pdf")}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void onClearAll();
+                }}
+                className="gap-2"
+                disabled={recentFiles.length === 0}
+              >
+                <Trash2 />
+                {t("landing.desktop.clear_all")}
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <LanguageToggle />
-          <ModeToggle />
+
+        <div className="border-border bg-card rounded-xl border">
+          <div className="border-border flex items-center justify-between border-b p-4">
+            <div className="text-sm font-medium">
+              {t("landing.desktop.file_count", {
+                count: filteredRecentFiles.length,
+              })}
+            </div>
+          </div>
+
+          <div className="divide-border divide-y">
+            {filteredRecentFiles.length === 0 ? (
+              <div className="text-muted-foreground p-6 text-sm">
+                {t("landing.desktop.no_recent_files")}
+              </div>
+            ) : (
+              filteredRecentFiles.map((entry) => (
+                <div
+                  key={entry.path}
+                  tabIndex={0}
+                  className="group hover:bg-accent/40 flex items-center justify-between gap-4 p-4 transition-colors outline-none"
+                >
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className="bg-muted ring-border relative h-16 w-16 shrink-0 overflow-hidden rounded-md ring-1">
+                      {entry.previewDataUrl ? (
+                        <img
+                          src={entry.previewDataUrl}
+                          alt={entry.filename}
+                          className="h-full w-full object-contain"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="text-muted-foreground flex h-full w-full items-center justify-center text-xs">
+                          {t("landing.desktop.pdf_badge")}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="text-foreground truncate font-medium">
+                        {entry.filename}
+                      </div>
+                      <div className="text-muted-foreground truncate text-xs">
+                        {entry.path}
+                      </div>
+                      <div className="text-muted-foreground mt-1 text-xs">
+                        <TimeAgoText time={entry.lastOpenedAt} />
+                        {typeof entry.lastViewState?.pageIndex === "number" && (
+                          <span className="ml-2">
+                            {t("sidebar.page", {
+                              page: entry.lastViewState.pageIndex + 1,
+                            })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="invisible flex shrink-0 items-center gap-2 opacity-0 transition-all duration-200 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        void onOpenRecent(entry);
+                      }}
+                    >
+                      {t("landing.desktop.open")}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => onDeleteRecent(entry.path)}
+                      aria-label={t("common.actions.delete")}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
+    </div>
+  );
+};
 
-      {/* Main Content */}
+type WebLandingViewProps = {
+  hasSavedSession?: boolean;
+  onOpen?: () => Promise<void>;
+  onResume?: () => void;
+  onUpload: (file: File) => void;
+  t: LandingTranslation;
+};
+
+const WebLandingView: React.FC<WebLandingViewProps> = ({
+  hasSavedSession,
+  onOpen,
+  onResume,
+  onUpload,
+  t,
+}) => {
+  return (
+    <div className="bg-background flex min-h-screen flex-col transition-colors duration-200">
+      <LandingHeader />
+
       <div className="flex flex-1 flex-col items-center justify-center gap-12 p-6 pt-24">
         <div className="animate-in fade-in slide-in-from-bottom-4 max-w-3xl space-y-4 text-center duration-700">
           <h1 className="from-primary bg-linear-to-r to-blue-600 bg-clip-text pb-2 text-4xl font-extrabold tracking-tight text-transparent lg:text-6xl">
@@ -300,7 +378,6 @@ const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </div>
 
-      {/* Footer */}
       <div className="text-muted-foreground border-border bg-muted/20 border-t py-6 text-center text-sm">
         <p>
           {t("landing.footer.copyright", {

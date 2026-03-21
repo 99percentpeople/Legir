@@ -4,7 +4,7 @@ import { Card, CardContent } from "./ui/card";
 import { buttonVariants } from "./ui/button";
 import { cn } from "@/utils/cn";
 import { useLanguage } from "./language-provider";
-import { canOpenWithPicker } from "../services/fileOps";
+import { canOpenWithPicker } from "@/services/platform";
 
 interface PDFUploaderProps {
   onUpload: (file: File) => void;

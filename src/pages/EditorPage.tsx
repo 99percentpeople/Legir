@@ -36,11 +36,6 @@ import type {
 } from "../types";
 import type { FormDetectionOptions } from "../components/FormDetectionOptionsForm";
 import { ANNOTATION_STYLES } from "../constants";
-import { isTauri } from "@tauri-apps/api/core";
-import {
-  type CloseRequestedEvent,
-  getCurrentWindow,
-} from "@tauri-apps/api/window";
 import { recentFilesService } from "../services/recentFilesService";
 import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
 import { findPdfSearchResults, type PDFSearchMode } from "../lib/pdfSearch";
@@ -57,6 +52,17 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { selectEditorPageShellState } from "@/store/selectors";
 import { EditorCanvasPane } from "@/pages/editor/EditorCanvasPane";
+import {
+  closePlatformWindow,
+  exitPlatformFullscreen,
+  getPlatformDocumentSaveMode,
+  listenForPlatformCloseRequested,
+  saveDraftViewStateIfSupported,
+  saveEditorViewState,
+  setPlatformFullscreen,
+  setPlatformWindowTitle,
+  subscribePlatformFullscreenChange,
+} from "@/services/platform";
 
 export interface EditorPageProps {
   onExport: () => Promise<boolean>;
@@ -77,7 +83,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
 }) => {
   const editorStore = useEditorStore(useShallow(selectEditorPageShellState));
   const state = editorStore;
-  const tauri = isTauri();
   const { t, effectiveLanguage } = useLanguage();
   const {
     setState,
@@ -106,6 +111,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const isMobile = useIsMobile();
   const defaultTool: Tool = isMobile ? "pan" : "select";
+  const platformDocumentSaveMode = getPlatformDocumentSaveMode();
   const prevSelectedIdRef = useRef<string | null>(null);
   const skipNextWindowCloseRef = useRef(false);
   const initialTitleRef = useRef<string | null>(null);
@@ -198,38 +204,46 @@ const EditorPage: React.FC<EditorPageProps> = ({
     });
   }, [setUiState]);
 
-  const toggleFullscreen = useCallback(() => {
-    const next = !useEditorStore.getState().isFullscreen;
-    setState({ isFullscreen: next });
-
-    if (tauri) {
-      void (async () => {
-        try {
-          const win = getCurrentWindow();
-          await win.setFullscreen(next);
-        } catch (error) {
-          console.error("Failed to toggle fullscreen", error);
-          setState({ isFullscreen: !next });
-        }
-      })();
-      return;
-    }
-
-    void (async () => {
+  const setEditorFullscreen = useCallback(
+    async (next: boolean) => {
+      setState({ isFullscreen: next });
       try {
-        if (next) {
-          await document.documentElement.requestFullscreen();
-        } else {
-          if (document.fullscreenElement) {
-            await document.exitFullscreen();
-          }
-        }
+        await setPlatformFullscreen(next);
       } catch (error) {
         console.error("Failed to toggle fullscreen", error);
         setState({ isFullscreen: !next });
       }
+    },
+    [setState],
+  );
+
+  const exitEditorFullscreen = useCallback(async () => {
+    try {
+      await exitPlatformFullscreen();
+    } catch (error) {
+      console.error("Failed to exit fullscreen", error);
+    } finally {
+      setState({ isFullscreen: false });
+    }
+  }, [setState]);
+
+  const toggleFullscreen = useCallback(() => {
+    const next = !useEditorStore.getState().isFullscreen;
+    void setEditorFullscreen(next);
+  }, [setEditorFullscreen]);
+
+  const handleExitEditorPage = useCallback(() => {
+    void (async () => {
+      await exitEditorFullscreen();
+      onExit();
     })();
-  }, [setState, tauri]);
+  }, [exitEditorFullscreen, onExit]);
+
+  useEffect(() => {
+    return () => {
+      void exitEditorFullscreen();
+    };
+  }, [exitEditorFullscreen]);
 
   const handleModeChange = useCallback(
     (mode: EditorState["mode"]) => {
@@ -239,7 +253,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   );
 
   useEventListener(
-    tauri ? undefined : window,
+    typeof window !== "undefined" ? window : null,
     "keydown",
     (e: KeyboardEvent) => {
       if (e.key === "F11") {
@@ -249,17 +263,16 @@ const EditorPage: React.FC<EditorPageProps> = ({
     },
   );
 
-  useEventListener(tauri ? undefined : document, "fullscreenchange", () => {
-    console.log("fullscreenchange");
-    setState({ isFullscreen: !!document.fullscreenElement });
-  });
+  useEffect(() => {
+    return subscribePlatformFullscreenChange((isFullscreen) => {
+      setState({ isFullscreen });
+    });
+  }, [setState]);
 
   useAppEvent(
     "workspace:scrollContainerReady",
     ({ element }) => {
       workspaceScrollContainerRef.current = element;
-
-      if (tauri) return;
 
       try {
         webViewStateRef.current.cleanup?.();
@@ -287,10 +300,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
             left: element.scrollLeft,
             top: element.scrollTop,
           };
-          recentFilesService.saveWebDraftViewState({
+          saveDraftViewStateIfSupported({
+            pagesLength: snapshot.pages.length,
             scale: snapshot.scale,
-            scrollLeft: last.left,
-            scrollTop: last.top,
+            scrollContainer: {
+              scrollLeft: last.left,
+              scrollTop: last.top,
+            },
           });
         });
       };
@@ -830,7 +846,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   useEffect(() => {
     const appName = process.env.APP_NAME;
 
-    if (!tauri && typeof document !== "undefined") {
+    if (typeof document !== "undefined") {
       if (initialTitleRef.current === null) {
         initialTitleRef.current = document.title;
       }
@@ -841,161 +857,144 @@ const EditorPage: React.FC<EditorPageProps> = ({
       ? `${state.filename || appName} - ${appName}`
       : appName;
 
-    if (tauri) {
-      let cancelled = false;
-      void (async () => {
-        try {
-          if (cancelled) return;
-          const win = getCurrentWindow();
-          await win.setTitle(nextTitle);
-        } catch {
-          // ignore
-        }
-      })();
-
-      return () => {
-        cancelled = true;
-        void (async () => {
-          try {
-            const win = getCurrentWindow();
-            await win.setTitle(appName);
-          } catch {
-            // ignore
-          }
-        })();
-      };
-    }
-
-    if (typeof document !== "undefined") {
-      document.title = nextTitle;
-    }
+    void setPlatformWindowTitle(nextTitle).catch(() => {
+      // ignore
+    });
 
     return () => {
-      if (typeof document !== "undefined") {
-        document.title = initialTitleRef.current ?? appName;
-      }
+      void setPlatformWindowTitle(initialTitleRef.current ?? appName).catch(
+        () => {
+          // ignore
+        },
+      );
     };
-  }, [tauri, state.filename, state.pages.length, t]);
+  }, [state.filename, state.pages.length]);
 
   useEffect(() => {
-    if (tauri) {
-      if (state.pages.length === 0) return;
+    let unlisten: null | (() => void) = null;
+    let cancelled = false;
 
-      let unlisten: null | (() => void) = null;
-      let cancelled = false;
-      (async () => {
-        const win = getCurrentWindow();
-        unlisten = await win.onCloseRequested((event: CloseRequestedEvent) => {
-          if (skipNextWindowCloseRef.current) {
-            skipNextWindowCloseRef.current = false;
-            return;
-          }
+    void (async () => {
+      unlisten = await listenForPlatformCloseRequested((event) => {
+        if (skipNextWindowCloseRef.current) {
+          skipNextWindowCloseRef.current = false;
+          return;
+        }
 
-          recentFilesService.cancelPreviewTasks();
+        recentFilesService.cancelPreviewTasks();
 
-          const { isDirty, pages, setState } = useEditorStore.getState();
-          if (!pages || pages.length === 0) return;
+        const snapshot = useEditorStore.getState();
+        if (!snapshot.pages || snapshot.pages.length === 0) return;
 
-          const snapshot = useEditorStore.getState();
-          const tauriPath =
-            snapshot.saveTarget?.kind === "tauri"
-              ? snapshot.saveTarget.path
-              : null;
-          if (tauriPath) {
-            const el = workspaceScrollContainerRef.current;
-            if (el) {
-              recentFilesService.saveTauriViewState({
-                path: tauriPath,
-                scale: snapshot.scale,
-                pageIndex: snapshot.currentPageIndex,
-                scrollLeft: el.scrollLeft,
-                scrollTop: el.scrollTop,
-              });
-            }
-          }
-
-          if (!isDirty) return;
-          try {
-            event.preventDefault();
-          } catch {
-            // ignore
-          }
-          setState({
-            activeDialog: "close_confirm",
-            closeConfirmSource: "window",
-          });
+        saveEditorViewState({
+          saveTarget: snapshot.saveTarget,
+          pagesLength: snapshot.pages.length,
+          scale: snapshot.scale,
+          currentPageIndex: snapshot.currentPageIndex,
+          scrollContainer: workspaceScrollContainerRef.current,
         });
 
-        if (cancelled) {
-          try {
-            unlisten?.();
-          } catch {
-            // ignore
-          }
-          unlisten = null;
-        }
-      })();
+        if (!snapshot.isDirty) return;
+        event.preventDefault();
+        snapshot.setState({
+          activeDialog: "close_confirm",
+          closeConfirmSource: "window",
+        });
+      });
 
-      return () => {
-        cancelled = true;
+      if (cancelled) {
         try {
           unlisten?.();
         } catch {
           // ignore
         }
-      };
-    }
-  }, [tauri, state.isDirty, state.pages.length]);
+        unlisten = null;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try {
+        unlisten?.();
+      } catch {
+        // ignore
+      }
+    };
+  }, [state.isDirty, state.pages.length]);
 
   const closeConfirmOpen = state.activeDialog === "close_confirm";
   const closeSource = state.closeConfirmSource || "menu";
 
-  const closeDialog = () => {
+  const closeDialog = useCallback(() => {
     setState({ activeDialog: null, closeConfirmSource: null });
-  };
+  }, [setState]);
+
+  const runPrimarySaveAction = useCallback(
+    async (silentDraft = false) => {
+      if (platformDocumentSaveMode === "draft") {
+        await onSaveDraft(silentDraft);
+        return true;
+      }
+
+      const snapshot = useEditorStore.getState();
+      if (!snapshot.isDirty) return false;
+      return await onExport();
+    },
+    [onExport, onSaveDraft, platformDocumentSaveMode],
+  );
 
   const closeWindow = async () => {
     recentFilesService.cancelPreviewTasks();
     const snapshot = useEditorStore.getState();
-    const tauriPath =
-      snapshot.saveTarget?.kind === "tauri" ? snapshot.saveTarget.path : null;
-    if (tauriPath) {
-      const el = workspaceScrollContainerRef.current;
-      if (el) {
-        recentFilesService.saveTauriViewState({
-          path: tauriPath,
-          scale: snapshot.scale,
-          pageIndex: snapshot.currentPageIndex,
-          scrollLeft: el.scrollLeft,
-          scrollTop: el.scrollTop,
-        });
-      }
-    }
+    saveEditorViewState({
+      saveTarget: snapshot.saveTarget,
+      pagesLength: snapshot.pages.length,
+      scale: snapshot.scale,
+      currentPageIndex: snapshot.currentPageIndex,
+      scrollContainer: workspaceScrollContainerRef.current,
+    });
 
     skipNextWindowCloseRef.current = true;
-    await getCurrentWindow().close();
+    await closePlatformWindow();
   };
 
-  const persistWebViewState = useCallback(() => {
+  const finishConfirmedClose = useCallback(async () => {
+    if (closeSource === "window") {
+      await closeWindow();
+      return;
+    }
+    handleExitEditorPage();
+  }, [closeSource, closeWindow, handleExitEditorPage]);
+
+  const persistDraftViewState = useCallback(() => {
     const snapshot = useEditorStore.getState();
-    if (!snapshot.pages || snapshot.pages.length === 0) return;
     const el = workspaceScrollContainerRef.current;
     if (!el) return;
 
     const last = webViewStateRef.current.lastScroll;
-    recentFilesService.saveWebDraftViewState({
+    saveDraftViewStateIfSupported({
+      pagesLength: snapshot.pages.length,
       scale: snapshot.scale,
-      scrollLeft: last?.left ?? el.scrollLeft,
-      scrollTop: last?.top ?? el.scrollTop,
+      scrollContainer:
+        last === null
+          ? el
+          : {
+              scrollLeft: last.left,
+              scrollTop: last.top,
+            },
     });
   }, []);
 
   useEventListener<BeforeUnloadEvent>(
-    !tauri && typeof window !== "undefined" ? window : null,
+    typeof window !== "undefined" ? window : null,
     "beforeunload",
     (e) => {
-      persistWebViewState();
-      if (state.pages.length > 0 && state.isDirty) {
+      persistDraftViewState();
+      if (
+        platformDocumentSaveMode === "draft" &&
+        state.pages.length > 0 &&
+        state.isDirty
+      ) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -1003,10 +1002,11 @@ const EditorPage: React.FC<EditorPageProps> = ({
   );
 
   useEventListener(
-    !tauri && typeof window !== "undefined" ? window : null,
+    typeof window !== "undefined" ? window : null,
     "pagehide",
     () => {
-      persistWebViewState();
+      persistDraftViewState();
+      if (platformDocumentSaveMode !== "draft") return;
       const snapshot = useEditorStore.getState();
       if (snapshot.isDirty) {
         void onSaveDraft(true);
@@ -1015,11 +1015,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
   );
 
   useEventListener(
-    !tauri && typeof document !== "undefined" ? document : null,
+    typeof document !== "undefined" ? document : null,
     "visibilitychange",
     () => {
       if (document.visibilityState !== "hidden") return;
-      persistWebViewState();
+      persistDraftViewState();
+      if (platformDocumentSaveMode !== "draft") return;
       const snapshot = useEditorStore.getState();
       if (snapshot.isDirty) {
         void onSaveDraft(true);
@@ -1028,7 +1029,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   );
 
   useEffect(() => {
-    if (tauri) return;
+    if (platformDocumentSaveMode !== "draft") return;
     if (state.pages.length > 0 && state.pdfBytes) {
       const timer = setTimeout(() => {
         if (!state.isDirty) return;
@@ -1037,7 +1038,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
       return () => clearTimeout(timer);
     }
   }, [
-    tauri,
     state.isDirty,
     state.fields,
     state.annotations,
@@ -1046,6 +1046,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
     state.pages.length,
     state.pdfBytes,
     onSaveDraft,
+    platformDocumentSaveMode,
   ]);
 
   useEventListener<KeyboardEvent>(
@@ -1104,12 +1105,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (tauri) {
-          if (!currentState.isDirty) return;
-          void onExport();
-          return;
-        }
-        onSaveDraft(false);
+        void runPrimarySaveAction(false);
         return;
       }
 
@@ -1393,10 +1389,10 @@ const EditorPage: React.FC<EditorPageProps> = ({
         onExport={onExport}
         onSaveDraft={onSaveDraft}
         onSaveAs={onSaveAs}
-        onExit={onExit}
+        onExit={handleExitEditorPage}
         onClose={() => {
           if (!state.isDirty) {
-            onExit();
+            handleExitEditorPage();
             return;
           }
           setState({
@@ -1451,28 +1447,15 @@ const EditorPage: React.FC<EditorPageProps> = ({
             <Button
               variant="secondary"
               onClick={async () => {
-                if (tauri) {
-                  if (state.isDirty) {
-                    const ok = await onExport();
-                    if (!ok) return;
-                  }
-                  closeDialog();
-                  if (closeSource === "window") {
-                    await closeWindow();
-                    return;
-                  }
-                  onExit();
-                  return;
-                }
-
                 if (state.isDirty) {
-                  await onSaveDraft(false);
+                  const ok = await runPrimarySaveAction(false);
+                  if (!ok && platformDocumentSaveMode === "file") return;
                 }
                 closeDialog();
-                onExit();
+                await finishConfirmedClose();
               }}
             >
-              {tauri
+              {platformDocumentSaveMode === "file"
                 ? t("dialog.confirm_close.save_close")
                 : t("dialog.confirm_close.save_draft_close")}
             </Button>
@@ -1480,11 +1463,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
               variant="destructive"
               onClick={async () => {
                 closeDialog();
-                if (tauri && closeSource === "window") {
-                  await closeWindow();
-                  return;
-                }
-                onExit();
+                await finishConfirmedClose();
               }}
             >
               {t("dialog.confirm_close.confirm")}
@@ -1634,10 +1613,10 @@ const EditorPage: React.FC<EditorPageProps> = ({
             onSaveDraft,
             onSaveAs,
             onPrint,
-            onExit,
+            onExit: handleExitEditorPage,
             onClose: () => {
               if (!state.isDirty) {
-                onExit();
+                handleExitEditorPage();
                 return;
               }
               setState({

@@ -9,8 +9,6 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { isTauri } from "@tauri-apps/api/core";
-
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -22,6 +20,7 @@ import { Separator } from "../ui/separator";
 import { useLanguage } from "../language-provider";
 import { ButtonGroup } from "../ui/button-group";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { usePlatformUi } from "@/services/platform";
 
 export interface ExportMenuProps {
   disabled: boolean;
@@ -47,14 +46,26 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
   onClose,
 }) => {
   const { t } = useLanguage();
-  const tauri = isTauri();
+  const { documentSaveMode } = usePlatformUi();
+  const isFileSaveMode = documentSaveMode === "file";
 
-  const saveDisabled = disabled || (tauri && !isDirty);
-
-  const primaryLabel = t(tauri ? "common.actions.save" : "toolbar.export");
-  const PrimaryIcon = tauri ? Save : Download;
+  const saveDisabled = disabled || (isFileSaveMode && !isDirty);
+  const primaryLabel = t(
+    isFileSaveMode ? "common.actions.save" : "toolbar.export",
+  );
+  const PrimaryIcon = isFileSaveMode ? Save : Download;
 
   const isMobile = useIsMobile();
+
+  const handleSaveAndExit = async (save: () => Promise<boolean>) => {
+    const ok = await save();
+    if (!ok) return;
+
+    if (!isFileSaveMode) {
+      await onSaveDraft(false);
+    }
+    onExit();
+  };
 
   return (
     <ButtonGroup>
@@ -87,7 +98,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
           </DropdownMenuItem>
           <Separator className="my-1 sm:hidden" />
 
-          {!tauri && (
+          {!isFileSaveMode && (
             <DropdownMenuItem
               onClick={() => {
                 void onSaveDraft(false);
@@ -107,30 +118,18 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
           <Separator className="my-1" />
 
           <DropdownMenuItem
-            onClick={async () => {
-              const ok = await onPrimary();
-              if (!ok) return;
-
-              if (!tauri) {
-                await onSaveDraft(false);
-              }
-              onExit();
+            onClick={() => {
+              void handleSaveAndExit(onPrimary);
             }}
             disabled={saveDisabled}
           >
             <FileText size={16} />
-            {t(tauri ? "toolbar.save_close" : "toolbar.export_close")}
+            {t(isFileSaveMode ? "toolbar.save_close" : "toolbar.export_close")}
           </DropdownMenuItem>
           {hasSaveAs && (
             <DropdownMenuItem
-              onClick={async () => {
-                const ok = await onSaveAs();
-                if (!ok) return;
-
-                if (!tauri) {
-                  await onSaveDraft(false);
-                }
-                onExit();
+              onClick={() => {
+                void handleSaveAndExit(onSaveAs);
               }}
             >
               <FileText size={16} />

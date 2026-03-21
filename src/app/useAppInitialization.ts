@@ -4,13 +4,16 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { getStartupOpenPdfArg, openFileFromPath } from "../services/fileOps";
-import { recentFilesService } from "../services/recentFilesService";
-import { isTauri, invoke } from "@tauri-apps/api/core";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEditorStore, type EditorActions } from "../store/useEditorStore";
 import type { EditorState } from "../types";
 import { loadModels } from "@/services/ai";
+import {
+  getPlatformUserName,
+  getStartupOpenDocumentPath,
+  hasSavedDraftSession,
+  listenForPlatformFileDrop,
+  openFileFromPath,
+} from "@/services/platform";
 
 export function useAppInitialization({
   loadIntoEditor,
@@ -45,7 +48,7 @@ export function useAppInitialization({
       void loadModels();
 
       try {
-        const startupPath = await getStartupOpenPdfArg();
+        const startupPath = await getStartupOpenDocumentPath();
         throwIfCancelled();
 
         if (startupPath) {
@@ -66,16 +69,14 @@ export function useAppInitialization({
       }
 
       setState({
-        hasSavedSession: recentFilesService.hasWebSession(),
+        hasSavedSession: hasSavedDraftSession(),
       });
-
-      if (!isTauri()) return;
 
       try {
         const snapshot = useEditorStore.getState();
         const existing = snapshot.options?.userName;
         if (!existing) {
-          const name = await invoke<string | null>("get_system_username");
+          const name = await getPlatformUserName();
           throwIfCancelled();
           const current = useEditorStore.getState().options?.userName;
           if (!current && typeof name === "string" && name.trim().length > 0) {
@@ -83,27 +84,7 @@ export function useAppInitialization({
           }
         }
 
-        const webview = getCurrentWebview();
-        unlisten = await webview.onDragDropEvent((event: unknown) => {
-          const payload =
-            typeof event === "object" && event !== null && "payload" in event
-              ? (event as { payload?: unknown }).payload
-              : null;
-
-          if (typeof payload !== "object" || payload === null) return;
-          if (
-            !("type" in payload) ||
-            (payload as { type?: unknown }).type !== "drop"
-          )
-            return;
-
-          const rawPaths = (payload as { paths?: unknown }).paths;
-          const paths: string[] = Array.isArray(rawPaths)
-            ? rawPaths.filter((p): p is string => typeof p === "string")
-            : [];
-          const firstPdf = paths.find((p) => typeof p === "string") || null;
-          if (!firstPdf) return;
-
+        unlisten = await listenForPlatformFileDrop((firstPdf) => {
           const { isProcessing, pages } = useEditorStore.getState();
           if (isProcessing) return;
 

@@ -1,5 +1,5 @@
 import type { PDFFont, PDFDocument } from "@cantoo/pdf-lib";
-import { isTauri, invoke } from "@tauri-apps/api/core";
+import { getPlatformSystemFontBytes, isDesktopApp } from "@/services/platform";
 
 type Fontkit = Parameters<PDFDocument["registerFontkit"]>[0];
 
@@ -134,28 +134,6 @@ export const loadAndEmbedExportFonts = async (args: {
     }
   };
 
-  const loadSystemFontBytes = async (args: {
-    families: string[];
-    generic: "serif" | "sans-serif";
-  }): Promise<Uint8Array | undefined> => {
-    if (!isTauri()) return undefined;
-    try {
-      const result = await invoke<Uint8Array | number[] | null>(
-        "get_system_font_bytes",
-        {
-          families: args.families,
-          generic: args.generic,
-        },
-      );
-      if (!result) return undefined;
-      if (result instanceof Uint8Array) return result;
-      if (Array.isArray(result)) return new Uint8Array(result);
-      return undefined;
-    } catch {
-      return undefined;
-    }
-  };
-
   // Optional user-provided font -> treat as default CJK sans fallback
   if (customFont?.bytes && customFont.bytes.byteLength > 0) {
     const embedded = await embedFont(customFont.bytes, subset);
@@ -170,8 +148,8 @@ export const loadAndEmbedExportFonts = async (args: {
   for (const def of BUILT_IN_EXPORT_FONTS) {
     if (includeFontIds && !includeFontIds.has(def.id)) continue;
 
-    const bytes = isTauri()
-      ? await loadSystemFontBytes({
+    const bytes = isDesktopApp()
+      ? await getPlatformSystemFontBytes({
           families: def.systemFamilies,
           generic: def.generic,
         })
@@ -200,7 +178,7 @@ export const loadAndEmbedSelectedSystemFonts = async (args: {
   families: string[];
   subset?: boolean;
 }) => {
-  if (!isTauri()) return;
+  if (!isDesktopApp()) return;
 
   const { pdfDoc, fontMap, fontkit } = args;
   const subset = args.subset ?? true;
@@ -247,18 +225,11 @@ export const loadAndEmbedSelectedSystemFonts = async (args: {
     if (skipKeys.has(family)) continue;
 
     try {
-      const result = await invoke<Uint8Array | number[] | null>(
-        "get_system_font_bytes",
-        {
-          families: [family],
-          generic: null,
-        },
-      );
-      if (!result) continue;
-
-      const bytes =
-        result instanceof Uint8Array ? result : new Uint8Array(result);
-      if (bytes.byteLength === 0) continue;
+      const bytes = await getPlatformSystemFontBytes({
+        families: [family],
+        generic: null,
+      });
+      if (!bytes || bytes.byteLength === 0) continue;
 
       const embedded = await embedFont(bytes);
       if (embedded) {

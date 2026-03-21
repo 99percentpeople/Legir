@@ -2,10 +2,9 @@ import React, { useCallback, useMemo } from "react";
 import { AnnotationControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { appEventBus } from "@/lib/eventBus";
-import { isTauri } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { useLanguage } from "@/components/language-provider";
 import { useEditorStore } from "@/store/useEditorStore";
+import { openExternalUrl } from "@/services/platform";
 
 const getSafeUrl = (raw: string) => {
   try {
@@ -67,27 +66,10 @@ export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
       }
 
       if (!safeUrl) return;
-
-      if (isTauri()) {
-        event?.preventDefault();
-        void openUrl(safeUrl);
-        return;
-      }
-
-      if (typeof window !== "undefined") {
-        window.open(safeUrl, "_blank", "noopener,noreferrer");
-      }
+      event?.preventDefault();
+      void openExternalUrl(safeUrl);
     },
-    [
-      destPageIndex,
-      safeUrl,
-      id,
-      onSelect,
-      isModifierPressed,
-      appEventBus,
-      isTauri,
-      openUrl,
-    ],
+    [destPageIndex, safeUrl, id, onSelect, isModifierPressed, appEventBus],
   );
 
   const handleClick = useCallback(
