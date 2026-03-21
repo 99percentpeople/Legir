@@ -41,6 +41,8 @@ export type Tool =
   | "draw_freetext"
   | "eraser";
 
+export type MoveDirection = "UP" | "DOWN" | "LEFT" | "RIGHT";
+
 export interface FieldStyle {
   borderColor?: string; // Hex
   backgroundColor?: string; // Hex
@@ -106,6 +108,8 @@ export interface Annotation {
   author?: string; // Creator/Author of the annotation
   color?: string;
   backgroundColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
   opacity?: number; // For highlight
   thickness?: number; // For ink
   size?: number; // For text
@@ -337,7 +341,12 @@ export interface EditorState {
   penStyle: PenStyle;
   highlightStyle?: PenStyle;
   commentStyle?: { color: string; opacity: number };
-  freetextStyle?: { color: string; size: number };
+  freetextStyle?: {
+    color: string;
+    size: number;
+    borderColor?: string;
+    borderWidth?: number;
+  };
 
   selectedId: string | null;
 

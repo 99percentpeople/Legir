@@ -105,8 +105,31 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   const baseOpacity = Math.min(1, Math.max(0, data.opacity ?? 1));
   const hasText = (data.text || "").length > 0;
   const hasBackgroundColor = (data.backgroundColor || "").trim().length > 0;
+  const borderWidth =
+    typeof data.borderWidth === "number" && Number.isFinite(data.borderWidth)
+      ? Math.max(0, data.borderWidth)
+      : 0;
+  const hasBorder = borderWidth > 0;
+  const borderColor = data.borderColor || data.color || "#000000";
+  const innerContentWidth = Math.max(
+    1,
+    (data.rect?.width ?? 1) - borderWidth * 2,
+  );
+  const innerContentHeight = Math.max(
+    1,
+    (data.rect?.height ?? 1) - borderWidth * 2,
+  );
   const effectiveOpacity =
     baseOpacity * (!hasText && !hasBackgroundColor ? 0.5 : 1);
+  const contentBoxStyle: React.CSSProperties = {
+    backgroundColor: data.backgroundColor || undefined,
+    borderStyle: hasBorder ? "solid" : "none",
+    borderColor: hasBorder ? borderColor : undefined,
+    borderWidth: hasBorder
+      ? `calc(${borderWidth}px * var(--scale, 1))`
+      : undefined,
+    boxSizing: "border-box",
+  };
 
   useEffect(() => {
     if (!isSelected) {
@@ -258,12 +281,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
               transformOrigin: "50% 50%",
             }}
           >
-            <div
-              className="h-full w-full"
-              style={{
-                backgroundColor: data.backgroundColor || undefined,
-              }}
-            >
+            <div className="h-full w-full" style={contentBoxStyle}>
               {isEditing ? (
                 <textarea
                   ref={textareaRef}
@@ -312,12 +330,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
             </div>
           </div>
         ) : (
-          <div
-            className="h-full w-full"
-            style={{
-              backgroundColor: data.backgroundColor || undefined,
-            }}
-          >
+          <div className="h-full w-full" style={contentBoxStyle}>
             {isEditing ? (
               <textarea
                 ref={textareaRef}
@@ -346,8 +359,8 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
                 <div
                   className="absolute top-0 left-0"
                   style={{
-                    width: `${Math.max(1, data.rect?.width ?? 1)}px`,
-                    height: `${Math.max(1, data.rect?.height ?? 1)}px`,
+                    width: `${innerContentWidth}px`,
+                    height: `${innerContentHeight}px`,
                     transform: "scale(var(--scale, 1))",
                     transformOrigin: "0 0",
                     fontFamily: resolvedFontFamily,

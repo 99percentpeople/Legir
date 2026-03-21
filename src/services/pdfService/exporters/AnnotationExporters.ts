@@ -184,6 +184,20 @@ export class FreeTextExporter implements IAnnotationExporter {
     const bgR = bgColorObj?.red;
     const bgG = bgColorObj?.green;
     const bgB = bgColorObj?.blue;
+    const borderWidth =
+      typeof annotation.borderWidth === "number" &&
+      Number.isFinite(annotation.borderWidth)
+        ? Math.max(0, annotation.borderWidth)
+        : 0;
+    const hasBorder = borderWidth > 0;
+    const borderColorObj = hasBorder
+      ? hexToPdfColor(
+          annotation.borderColor || annotation.color || "#000000",
+        ) || rgb(0, 0, 0)
+      : undefined;
+    const borderR = borderColorObj?.red;
+    const borderG = borderColorObj?.green;
+    const borderB = borderColorObj?.blue;
 
     const opacity =
       typeof annotation.opacity === "number"
@@ -305,11 +319,16 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     const baseFontRef = baseFont.ref;
     const cjkFontRef = cjkFont?.ref;
+    const contentInset = hasBorder ? borderWidth : 0;
+    const contentX = x + contentInset;
+    const contentY = y + contentInset;
+    const contentW = Math.max(0, w - contentInset * 2);
+    const contentH = Math.max(0, h - contentInset * 2);
 
     // 2. Prepare text wrapping
     const paragraphs = text.split(/\r\n|\r|\n/);
     const lines: string[] = [];
-    const availableWidth = Math.max(0, w);
+    const availableWidth = contentW;
 
     const measureWidth = (s: string) => {
       if (!useMixedFonts || !cjkFont) {
@@ -451,6 +470,13 @@ export class FreeTextExporter implements IAnnotationExporter {
         typeof bgB === "number"
           ? rgb(bgR, bgG, bgB)
           : undefined;
+      const borderColor =
+        hasBorder &&
+        typeof borderR === "number" &&
+        typeof borderG === "number" &&
+        typeof borderB === "number"
+          ? rgb(borderR, borderG, borderB)
+          : undefined;
 
       const hasRotation = rotationDeg !== 0;
       const cx = x + w / 2;
@@ -474,7 +500,22 @@ export class FreeTextExporter implements IAnnotationExporter {
           height: h,
           color: bg,
           opacity,
-          borderWidth: 0,
+          rotate: hasRotation ? degrees(-rotationDeg) : undefined,
+        });
+      }
+      if (hasBorder && borderColor) {
+        const inset = borderWidth / 2;
+        const strokeW = Math.max(0, w - borderWidth);
+        const strokeH = Math.max(0, h - borderWidth);
+        const rp = rotatePoint(x + inset, y + inset);
+        page.drawRectangle({
+          x: rp.x,
+          y: rp.y,
+          width: strokeW,
+          height: strokeH,
+          borderColor,
+          borderWidth,
+          opacity,
           rotate: hasRotation ? degrees(-rotationDeg) : undefined,
         });
       }
@@ -538,14 +579,14 @@ export class FreeTextExporter implements IAnnotationExporter {
             : annotation.alignment === "right"
               ? 2
               : 0;
-        if (q === 1) return x + (w - lw) / 2;
-        if (q === 2) return x + (w - lw);
-        return x;
+        if (q === 1) return contentX + (contentW - lw) / 2;
+        if (q === 2) return contentX + (contentW - lw);
+        return contentX;
       };
 
       for (let li = 0; li < lines.length; li++) {
         const lineText = lines[li]!;
-        const drawY = y + h - lineHeight - li * lineHeight;
+        const drawY = contentY + contentH - lineHeight - li * lineHeight;
 
         if (!useMixedFonts || !cjkFont || !cjkResourceName) {
           const runFont =
@@ -637,7 +678,8 @@ export class FreeTextExporter implements IAnnotationExporter {
       });
     }
 
-    const startY = h - lineHeight;
+    const startX = contentInset;
+    const startY = contentInset + contentH - lineHeight;
 
     const pdfNum = (n: number) => {
       if (!Number.isFinite(n)) return "0";
@@ -670,10 +712,21 @@ export class FreeTextExporter implements IAnnotationExporter {
     ) {
       appearanceOps += ` ${bgR} ${bgG} ${bgB} rg 0 0 ${w} ${h} re f`;
     }
+    if (
+      hasBorder &&
+      typeof borderR === "number" &&
+      typeof borderG === "number" &&
+      typeof borderB === "number"
+    ) {
+      const inset = borderWidth / 2;
+      const strokeW = Math.max(0, w - borderWidth);
+      const strokeH = Math.max(0, h - borderWidth);
+      appearanceOps += ` ${borderR} ${borderG} ${borderB} RG ${pdfNum(borderWidth)} w ${pdfNum(inset)} ${pdfNum(inset)} ${pdfNum(strokeW)} ${pdfNum(strokeH)} re S`;
+    }
     appearanceOps += ` ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${pdfNum(lineHeight)} TL`;
 
     // Initial position
-    appearanceOps += ` 0 ${startY} Td`;
+    appearanceOps += ` ${pdfNum(startX)} ${pdfNum(startY)} Td`;
 
     let currentResource = baseResourceName;
 
@@ -787,12 +840,19 @@ export class FreeTextExporter implements IAnnotationExporter {
       Subtype: "FreeText",
       F: 4, // Print flag
       Rect: [rectX, rectY, rectX + aabbW, rectY + aabbH],
-      RD: [0, 0, 0, 0],
+      RD: [contentInset, contentInset, contentInset, contentInset],
       Contents: PDFHexString.fromText(text),
       DA: PDFString.of(da),
       AP: { N: appearanceRef },
       Q: q,
-      BS: { W: 0 },
+      BS: { W: hasBorder ? borderWidth : 0 },
+      C:
+        hasBorder &&
+        typeof borderR === "number" &&
+        typeof borderG === "number" &&
+        typeof borderB === "number"
+          ? [borderR, borderG, borderB]
+          : undefined,
       Rotate: pdfRotation,
       MK: pdfRotation !== undefined ? { R: pdfRotation } : undefined,
       IC:

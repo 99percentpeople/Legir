@@ -7,6 +7,7 @@ import type {
   EditorState,
   EditorUiState,
   FormField,
+  MoveDirection,
   PageData,
   PDFMetadata,
   PDFOutlineItem,
@@ -48,10 +49,7 @@ export interface EditorActions {
   }) => void;
   addField: (field: FormField) => void;
   updateField: (id: string, updates: Partial<FormField>) => void;
-  moveField: (
-    direction: "UP" | "DOWN" | "LEFT" | "RIGHT",
-    isFast?: boolean,
-  ) => void;
+  moveSelectedControl: (direction: MoveDirection, isFast?: boolean) => void;
   addAnnotation: (annotation: Annotation, opts?: { select?: boolean }) => void;
   addAnnotations: (
     annotations: Annotation[],

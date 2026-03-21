@@ -150,6 +150,8 @@ export const ANNOTATION_STYLES = {
   freetext: {
     color: "#000000",
     size: 12,
+    borderColor: "#000000",
+    borderWidth: 1,
   },
 };
 

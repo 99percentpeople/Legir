@@ -6,6 +6,7 @@ import { Palette } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { NumberInput } from "@/components/ui/number-input";
 import {
   Select,
   SelectContent,
@@ -61,6 +62,10 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
 
   const isTransparent = !data.backgroundColor;
   const isFlatten = Boolean(data.flatten);
+  const borderWidth =
+    typeof data.borderWidth === "number" && Number.isFinite(data.borderWidth)
+      ? Math.max(0, data.borderWidth)
+      : 0;
 
   return (
     <div>
@@ -123,6 +128,29 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             onChange={(e) => onChange({ backgroundColor: e.target.value })}
             className="border-input bg-background h-8 w-full cursor-pointer rounded border disabled:opacity-50"
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>{t("properties.border_color")}</Label>
+            <input
+              type="color"
+              value={data.borderColor || "#000000"}
+              onMouseDown={onTriggerHistorySave}
+              onChange={(e) => onChange({ borderColor: e.target.value })}
+              className="border-input bg-background h-8 w-full cursor-pointer rounded border"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t("properties.border_width")}</Label>
+            <NumberInput
+              minValue={0}
+              maxValue={10}
+              value={borderWidth}
+              onFocus={onTriggerHistorySave}
+              onChange={(val) => onChange({ borderWidth: val })}
+            />
+          </div>
         </div>
 
         {/* Opacity */}

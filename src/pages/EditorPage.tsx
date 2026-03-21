@@ -30,6 +30,7 @@ import type {
   EditorState,
   EditorUiState,
   FormField,
+  MoveDirection,
   PDFMetadata,
   PDFSearchResult,
   Tool,
@@ -1139,20 +1140,33 @@ const EditorPage: React.FC<EditorPageProps> = ({
         return;
       }
 
+      const isMoveKey = [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+      ].includes(e.key);
+      const isSelectedField = currentState.fields.some(
+        (f) => f.id === currentState.selectedId,
+      );
+      const isSelectedAnnotation = currentState.annotations.some(
+        (a) => a.id === currentState.selectedId,
+      );
+
       if (
-        currentState.mode === "form" &&
         currentState.selectedId &&
-        currentState.fields.some((f) => f.id === currentState.selectedId) &&
-        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
+        isMoveKey &&
+        ((currentState.mode === "form" && isSelectedField) ||
+          (currentState.mode === "annotation" && isSelectedAnnotation))
       ) {
         e.preventDefault();
         const isFast = e.shiftKey;
-        let direction: "UP" | "DOWN" | "LEFT" | "RIGHT" = "UP";
+        let direction: MoveDirection = "UP";
         if (e.key === "ArrowUp") direction = "UP";
         else if (e.key === "ArrowDown") direction = "DOWN";
         else if (e.key === "ArrowLeft") direction = "LEFT";
         else if (e.key === "ArrowRight") direction = "RIGHT";
-        currentState.moveField(direction, isFast);
+        currentState.moveSelectedControl(direction, isFast);
         return;
       }
 

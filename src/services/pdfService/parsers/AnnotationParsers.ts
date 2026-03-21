@@ -439,6 +439,184 @@ export class FreeTextParser implements IAnnotationParser {
       return best?.hex;
     };
 
+    const parseStrokeColorFromContentStream = (content: string) => {
+      const tokens = content.trim().split(/\s+/);
+
+      const to01 = (n: number) => {
+        if (!Number.isFinite(n)) return 0;
+        if (n <= 1.01) return Math.max(0, Math.min(1, n));
+        return Math.max(0, Math.min(1, n / 255));
+      };
+
+      const rgbHexFrom3 = (r: number, g: number, b: number) =>
+        rgbArrayToHex([to01(r) * 255, to01(g) * 255, to01(b) * 255]);
+
+      const cmykHexFrom4 = (c: number, m: number, y: number, k: number) => {
+        const c01 = to01(c);
+        const m01 = to01(m);
+        const y01 = to01(y);
+        const k01 = to01(k);
+        const rr = 255 * (1 - c01) * (1 - k01);
+        const gg = 255 * (1 - m01) * (1 - k01);
+        const bb = 255 * (1 - y01) * (1 - k01);
+        return rgbArrayToHex([rr, gg, bb]);
+      };
+
+      let inText = false;
+      let currentStrokeHex: string | undefined = undefined;
+      let lastRect: { x: number; y: number; w: number; h: number } | undefined =
+        undefined;
+
+      let best:
+        | {
+            hex: string;
+            area: number;
+          }
+        | undefined = undefined;
+
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+
+        if (token === "BT") {
+          inText = true;
+          continue;
+        }
+        if (token === "ET") {
+          inText = false;
+          continue;
+        }
+
+        if (token === "RG" && i >= 3) {
+          const r = parseFloat(tokens[i - 3]);
+          const g = parseFloat(tokens[i - 2]);
+          const b = parseFloat(tokens[i - 1]);
+          const hex = rgbHexFrom3(r, g, b);
+          if (hex) currentStrokeHex = hex;
+          continue;
+        }
+
+        if (token === "G" && i >= 1) {
+          const gray = parseFloat(tokens[i - 1]);
+          const hex = rgbHexFrom3(gray, gray, gray);
+          if (hex) currentStrokeHex = hex;
+          continue;
+        }
+
+        if (token === "K" && i >= 4) {
+          const c = parseFloat(tokens[i - 4]);
+          const m = parseFloat(tokens[i - 3]);
+          const y = parseFloat(tokens[i - 2]);
+          const k = parseFloat(tokens[i - 1]);
+          const hex = cmykHexFrom4(c, m, y, k);
+          if (hex) currentStrokeHex = hex;
+          continue;
+        }
+
+        if (token === "SC" && i >= 1) {
+          const nums: number[] = [];
+          for (let j = i - 1; j >= 0 && nums.length < 4; j--) {
+            const v = parseFloat(tokens[j]);
+            if (isNaN(v)) break;
+            nums.unshift(v);
+          }
+          const hex =
+            nums.length === 3
+              ? rgbHexFrom3(nums[0], nums[1], nums[2])
+              : nums.length === 1
+                ? rgbHexFrom3(nums[0], nums[0], nums[0])
+                : nums.length === 4
+                  ? cmykHexFrom4(nums[0], nums[1], nums[2], nums[3])
+                  : undefined;
+          if (hex) currentStrokeHex = hex;
+          continue;
+        }
+
+        if (token === "SCN" && i >= 1) {
+          const nums: number[] = [];
+          for (let j = i - 1; j >= 0 && nums.length < 4; j--) {
+            const t = tokens[j];
+            if (!t || t.startsWith("/")) continue;
+            const v = parseFloat(t);
+            if (isNaN(v)) break;
+            nums.unshift(v);
+          }
+          const hex =
+            nums.length === 4
+              ? cmykHexFrom4(nums[0], nums[1], nums[2], nums[3])
+              : nums.length === 3
+                ? rgbHexFrom3(nums[0], nums[1], nums[2])
+                : nums.length === 1
+                  ? rgbHexFrom3(nums[0], nums[0], nums[0])
+                  : undefined;
+          if (hex) currentStrokeHex = hex;
+          continue;
+        }
+
+        if (token === "re" && i >= 4) {
+          const x = parseFloat(tokens[i - 4]);
+          const y = parseFloat(tokens[i - 3]);
+          const w = parseFloat(tokens[i - 2]);
+          const h = parseFloat(tokens[i - 1]);
+          if (!isNaN(x) && !isNaN(y) && !isNaN(w) && !isNaN(h)) {
+            lastRect = { x, y, w, h };
+          }
+          continue;
+        }
+
+        if (
+          token === "S" ||
+          token === "s" ||
+          token === "B" ||
+          token === "B*" ||
+          token === "b" ||
+          token === "b*"
+        ) {
+          if (!inText && lastRect && currentStrokeHex) {
+            const area = Math.abs(lastRect.w * lastRect.h);
+            if (Number.isFinite(area) && area > 0) {
+              if (!best || area > best.area) {
+                best = { hex: currentStrokeHex, area };
+              }
+            }
+          }
+          lastRect = undefined;
+        }
+      }
+
+      return best?.hex;
+    };
+
+    const parseColorArrayFromAnnotDict = (value: unknown) => {
+      if (!(value instanceof PDFArray)) return undefined;
+      const nums: number[] = [];
+      for (let i = 0; i < Math.min(3, value.size()); i++) {
+        const item = value.lookup(i);
+        if (item instanceof PDFNumber) nums.push(item.asNumber());
+      }
+      const normalized = normalizePdfColorToRgb255(nums);
+      return normalized ? rgbArrayToHex(normalized) : undefined;
+    };
+
+    const parseBorderWidthFromAnnotDict = (annot: PDFDict) => {
+      const bs = annot.lookup(PDFName.of("BS"));
+      if (bs instanceof PDFDict) {
+        const w = bs.lookup(PDFName.of("W"));
+        if (w instanceof PDFNumber) {
+          return Math.max(0, w.asNumber());
+        }
+      }
+
+      const border = annot.lookup(PDFName.of("Border"));
+      if (border instanceof PDFArray && border.size() >= 3) {
+        const w = border.lookup(2);
+        if (w instanceof PDFNumber) {
+          return Math.max(0, w.asNumber());
+        }
+      }
+
+      return undefined;
+    };
+
     const parseTextColorFromContentStream = (content: string) => {
       const extractTextSection = () => {
         try {
@@ -872,7 +1050,15 @@ export class FreeTextParser implements IAnnotationParser {
         })();
         const initialColorArray = annotation.color;
         const normalizedRgb = normalizePdfColorToRgb255(initialColorArray);
-        let color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#000000";
+        let borderColor = normalizedRgb
+          ? rgbArrayToHex(normalizedRgb)
+          : undefined;
+        let color = borderColor || "#000000";
+        let borderWidth =
+          typeof annotation.borderStyle?.width === "number" &&
+          Number.isFinite(annotation.borderStyle.width)
+            ? Math.max(0, annotation.borderStyle.width)
+            : undefined;
 
         let backgroundColor: string | undefined = undefined;
         if (annotation.backgroundColor) {
@@ -1103,6 +1289,16 @@ export class FreeTextParser implements IAnnotationParser {
               } else {
                 const libAnnot = lookedUp;
 
+                const dictBorderColor = parseColorArrayFromAnnotDict(
+                  libAnnot.lookup(PDFName.of("C")),
+                );
+                if (dictBorderColor) borderColor = dictBorderColor;
+
+                const dictBorderWidth = parseBorderWidthFromAnnotDict(libAnnot);
+                if (typeof dictBorderWidth === "number") {
+                  borderWidth = dictBorderWidth;
+                }
+
                 const rawContents = libAnnot.lookup(PDFName.of("Contents"));
                 const contentsDecoded = decodePdfString(rawContents);
                 if (contentsDecoded && (!contents || contents.trim() === "")) {
@@ -1316,6 +1512,12 @@ export class FreeTextParser implements IAnnotationParser {
                       if (apFillHex && !backgroundColor)
                         backgroundColor = apFillHex;
 
+                      const apStrokeHex =
+                        parseStrokeColorFromContentStream(apContent);
+                      if (apStrokeHex && !borderColor) {
+                        borderColor = apStrokeHex;
+                      }
+
                       const apFont = parseFontFromContentStream(apContent);
                       if (apFont?.fontSize) fontSize = apFont.fontSize;
 
@@ -1526,6 +1728,8 @@ export class FreeTextParser implements IAnnotationParser {
           rect: innerRect,
           color: color,
           backgroundColor,
+          borderColor,
+          borderWidth,
           opacity: opacity,
           rotationDeg,
           text: contents,

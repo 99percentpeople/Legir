@@ -369,6 +369,8 @@ export const initialState: EditorState = {
   freetextStyle: {
     color: ANNOTATION_STYLES.freetext.color,
     size: ANNOTATION_STYLES.freetext.size,
+    borderColor: ANNOTATION_STYLES.freetext.borderColor,
+    borderWidth: ANNOTATION_STYLES.freetext.borderWidth,
   },
   isProcessing: false,
   past: [],

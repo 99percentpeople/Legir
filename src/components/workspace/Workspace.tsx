@@ -24,6 +24,7 @@ import {
   WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES,
 } from "@/constants";
 import { cn } from "@/utils/cn";
+import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import { usePointerCapture } from "@/hooks/usePointerCapture";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
@@ -115,21 +116,6 @@ type Rect = {
 };
 
 type TextSelectionPayload = NonNullable<TextSelectionToolbarState["selection"]>;
-
-const translateRect = (rect: Rect, dx: number, dy: number): Rect => ({
-  ...rect,
-  x: rect.x + dx,
-  y: rect.y + dy,
-});
-
-const translatePoint = (
-  point: { x: number; y: number },
-  dx: number,
-  dy: number,
-) => ({
-  x: point.x + dx,
-  y: point.y + dy,
-});
 
 const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
@@ -921,48 +907,20 @@ const Workspace: React.FC<WorkspaceProps> = ({
           annot.rect,
           annot.rotationDeg,
         );
-        const dx = (outer.width - annot.rect.width) / 2;
-        const dy = (outer.height - annot.rect.height) / 2;
+        const dx = newOuterX - outer.x;
+        const dy = newOuterY - outer.y;
         onUpdateAnnotation(movingAnnotationId, {
-          rect: { ...annot.rect, x: newOuterX + dx, y: newOuterY + dy },
+          ...getMovedAnnotationUpdates(annot, dx, dy),
           pageIndex: pageIndex,
         });
         return;
       }
 
-      if (annot.type === "ink") {
-        const dx = newOuterX - annot.rect.x;
-        const dy = newOuterY - annot.rect.y;
-        const nextStrokes = annot.strokes?.map((stroke) =>
-          stroke.map((point) => translatePoint(point, dx, dy)),
-        );
-        const nextPoints =
-          annot.points?.map((point) => translatePoint(point, dx, dy)) ??
-          nextStrokes?.[0];
-
-        onUpdateAnnotation(movingAnnotationId, {
-          pageIndex,
-          ...(nextPoints ? { points: nextPoints } : null),
-          ...(nextStrokes ? { strokes: nextStrokes } : null),
-          appearanceStreamContent: undefined,
-        });
-        return;
-      }
-
-      if (annot.type === "highlight" && annot.rects?.length) {
-        const dx = newOuterX - annot.rect.x;
-        const dy = newOuterY - annot.rect.y;
-
-        onUpdateAnnotation(movingAnnotationId, {
-          rect: { ...annot.rect, x: newOuterX, y: newOuterY },
-          rects: annot.rects.map((rect) => translateRect(rect, dx, dy)),
-          pageIndex,
-        });
-        return;
-      }
+      const dx = newOuterX - annot.rect.x;
+      const dy = newOuterY - annot.rect.y;
 
       onUpdateAnnotation(movingAnnotationId, {
-        rect: { ...annot.rect, x: newOuterX, y: newOuterY },
+        ...getMovedAnnotationUpdates(annot, dx, dy),
         pageIndex: pageIndex,
       });
     }
@@ -1730,6 +1688,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
               size:
                 editorState.freetextStyle?.size ||
                 ANNOTATION_STYLES.freetext.size,
+              borderColor:
+                editorState.freetextStyle?.borderColor ||
+                ANNOTATION_STYLES.freetext.borderColor,
+              borderWidth:
+                editorState.freetextStyle?.borderWidth ??
+                ANNOTATION_STYLES.freetext.borderWidth,
               text: "New Freetext",
             });
 
@@ -1759,6 +1723,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
             ANNOTATION_STYLES.freetext.color,
           size:
             editorState.freetextStyle?.size || ANNOTATION_STYLES.freetext.size,
+          borderColor:
+            editorState.freetextStyle?.borderColor ||
+            ANNOTATION_STYLES.freetext.borderColor,
+          borderWidth:
+            editorState.freetextStyle?.borderWidth ??
+            ANNOTATION_STYLES.freetext.borderWidth,
           text: "New Freetext",
         });
 

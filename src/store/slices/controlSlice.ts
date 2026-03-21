@@ -1,4 +1,9 @@
 import { ANNOTATION_STYLES } from "@/constants";
+import {
+  getMoveDelta,
+  getMovedAnnotationUpdates,
+  getMovedFieldUpdates,
+} from "@/lib/controlMovement";
 import { shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
 import {
   prepareAnnotationsForStore,
@@ -25,7 +30,7 @@ export const createControlSlice: EditorStoreSlice<
     | "openDialog"
     | "closeDialog"
     | "setKeys"
-    | "moveField"
+    | "moveSelectedControl"
     | "setAllFreetextFlatten"
   >
 > = (set, get) => ({
@@ -297,27 +302,65 @@ export const createControlSlice: EditorStoreSlice<
 
   setKeys: (keys) => set((state) => ({ keys: { ...state.keys, ...keys } })),
 
-  moveField: (direction, isFast) => {
+  moveSelectedControl: (direction, isFast) => {
     set((state) => {
       if (!state.selectedId) return state;
+      const { dx, dy } = getMoveDelta(direction, isFast);
+
       const fieldIndex = state.fields.findIndex(
         (field) => field.id === state.selectedId,
       );
-      if (fieldIndex === -1) return state;
+      if (fieldIndex !== -1) {
+        const field = state.fields[fieldIndex];
+        const nextFields = [...state.fields];
+        nextFields[fieldIndex] = {
+          ...field,
+          ...getMovedFieldUpdates(field, dx, dy),
+        };
 
-      const field = state.fields[fieldIndex];
-      let { x, y } = field.rect;
-      const step = isFast ? 10 : 1;
+        return { ...state, fields: nextFields, isDirty: true };
+      }
 
-      if (direction === "UP") y -= step;
-      else if (direction === "DOWN") y += step;
-      else if (direction === "LEFT") x -= step;
-      else if (direction === "RIGHT") x += step;
+      const annotationIndex = state.annotations.findIndex(
+        (annotation) => annotation.id === state.selectedId,
+      );
+      if (annotationIndex === -1) return state;
 
-      const nextFields = [...state.fields];
-      nextFields[fieldIndex] = { ...field, rect: { ...field.rect, x, y } };
+      const annotation = state.annotations[annotationIndex];
+      if (!annotation.rect) return state;
 
-      return { ...state, fields: nextFields, isDirty: true };
+      const shouldMarkEdited =
+        !!annotation.sourcePdfRef && annotation.isEdited !== true;
+      const updatedAt = new Date().toISOString();
+      const baseAnnotation = {
+        ...annotation,
+        updatedAt,
+        ...(shouldMarkEdited ? { isEdited: true } : null),
+      } satisfies Annotation;
+
+      let nextAnnotation: Annotation;
+
+      if (annotation.type === "ink") {
+        nextAnnotation = prepareInkAnnotationForStore(
+          {
+            ...baseAnnotation,
+            ...getMovedAnnotationUpdates(annotation, dx, dy),
+          },
+          {
+            recomputeRect: true,
+            recomputeSvgPath: true,
+          },
+        );
+      } else {
+        nextAnnotation = {
+          ...baseAnnotation,
+          ...getMovedAnnotationUpdates(annotation, dx, dy),
+        };
+      }
+
+      const nextAnnotations = [...state.annotations];
+      nextAnnotations[annotationIndex] = nextAnnotation;
+      return { ...state, annotations: nextAnnotations, isDirty: true };
     });
   },
 
