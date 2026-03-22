@@ -69,6 +69,15 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
               />
             )}
           </div>
+          <div className="space-y-2">
+            <Label>{t("properties.placeholder")}</Label>
+            <Input
+              type="text"
+              value={data.placeholder || ""}
+              onFocus={onTriggerHistorySave}
+              onChange={(e) => onChange({ placeholder: e.target.value })}
+            />
+          </div>
         </div>
       </div>
 

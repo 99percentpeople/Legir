@@ -146,7 +146,6 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
                   onFocus={() => {
                     if (isAnnotationMode) onSelect(data.id);
                   }}
-                  title={data.toolTip}
                 >
                   <option value="" disabled>
                     Select...

@@ -7,6 +7,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSub,
@@ -49,6 +50,7 @@ import { getContrastColor } from "@/utils/colors";
 import type { MoveDirection } from "@/types";
 
 import { FloatingToolbar } from "../FloatingToolbar";
+import { ControlLayerMenuItems } from "../ControlLayerMenuItems";
 import { ControlWrapper } from "../ControlWrapper";
 import type { AnnotationControlProps } from "../types";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
@@ -401,6 +403,12 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       commitAbsolutePoints(nextPoints);
     };
 
+  const canEditShapePoints =
+    isSelectable &&
+    isAnnotationMode &&
+    shapeSupportsVertexInsertion(data.shapeType);
+  const canShowLayerContextMenu = isSelectable && isAnnotationMode;
+
   const contextMenuContent = (
     <>
       {shapeSupportsVertexInsertion(data.shapeType) &&
@@ -509,14 +517,18 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             {t("properties.delete_point") || "Delete Point"}
           </ContextMenuItem>
         )}
+      {canShowLayerContextMenu && props.onReorderLayer && (
+        <>
+          {shapeSupportsVertexInsertion(data.shapeType) &&
+            (contextState.segmentIndex !== null ||
+              contextState.vertexIndex !== null) && <ContextMenuSeparator />}
+          <ControlLayerMenuItems
+            onSelect={(move) => props.onReorderLayer?.(data.id, move)}
+          />
+        </>
+      )}
     </>
   );
-
-  const canShowContextMenu =
-    isSelected &&
-    isSelectable &&
-    isAnnotationMode &&
-    shapeSupportsVertexInsertion(data.shapeType);
 
   const openContextMenu = (
     clientX: number,
@@ -550,7 +562,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
 
   const handleSegmentContextMenu =
     (segmentIndex: number) => (event: React.MouseEvent<SVGPathElement>) => {
-      if (!canShowContextMenu) return;
+      if (!canEditShapePoints) return;
       event.preventDefault();
       event.stopPropagation();
       const point = getAbsolutePointFromClientPosition(
@@ -566,7 +578,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
 
   const handleVertexContextMenu =
     (index: number) => (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!canShowContextMenu) return;
+      if (!canEditShapePoints) return;
       event.preventDefault();
       event.stopPropagation();
       openContextMenu(event.clientX, event.clientY, {
@@ -578,6 +590,19 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
         vertexIndex: index,
       });
     };
+
+  const handleShapeContextMenu = (
+    event: React.MouseEvent<SVGElement | HTMLDivElement>,
+  ) => {
+    if (!canShowLayerContextMenu) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openContextMenu(event.clientX, event.clientY, {
+      point: null,
+      segmentIndex: null,
+      vertexIndex: null,
+    });
+  };
 
   const renderShape = () => {
     switch (data.shapeType) {
@@ -592,6 +617,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={strokeColor}
             strokeWidth={strokeWidth}
             pointerEvents="all"
+            onContextMenu={handleShapeContextMenu}
             {...tooltipHoverProps}
           />
         );
@@ -606,6 +632,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={strokeColor}
             strokeWidth={strokeWidth}
             pointerEvents="all"
+            onContextMenu={handleShapeContextMenu}
             {...tooltipHoverProps}
           />
         );
@@ -617,6 +644,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={strokeColor}
             strokeWidth={strokeWidth}
             pointerEvents="all"
+            onContextMenu={handleShapeContextMenu}
             {...tooltipHoverProps}
           />
         );
@@ -631,6 +659,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             strokeLinejoin="round"
             strokeLinecap="round"
             pointerEvents="stroke"
+            onContextMenu={handleShapeContextMenu}
             {...tooltipHoverProps}
           />
         );
@@ -644,6 +673,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             strokeLinejoin="round"
             strokeLinecap="round"
             pointerEvents="all"
+            onContextMenu={handleShapeContextMenu}
             {...tooltipHoverProps}
           />
         );
@@ -658,6 +688,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               strokeLinejoin="round"
               strokeLinecap="round"
               pointerEvents="stroke"
+              onContextMenu={handleShapeContextMenu}
               {...tooltipHoverProps}
             />
             {startArrowMarker && (
@@ -671,6 +702,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 pointerEvents="all"
+                onContextMenu={handleShapeContextMenu}
                 {...tooltipHoverProps}
               />
             )}
@@ -685,6 +717,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 pointerEvents="all"
+                onContextMenu={handleShapeContextMenu}
                 {...tooltipHoverProps}
               />
             )}
@@ -696,7 +729,12 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   };
 
   return (
-    <ControlWrapper {...props} showBorder={isSelected} resizable={!hasVertices}>
+    <ControlWrapper
+      {...props}
+      showBorder={isSelected}
+      resizable={!hasVertices}
+      contextMenuDisabled={true}
+    >
       <FloatingToolbar isVisible={isSelected}>
         <ColorPickerPopover
           color={strokeColor}
@@ -779,7 +817,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               >
                 {renderShape()}
 
-                {canShowContextMenu &&
+                {canEditShapePoints &&
                   segmentTargets.map((segment) => (
                     <path
                       key={`${data.id}_segment_${segment.index}`}
@@ -824,7 +862,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                       onPointerCancel={handleVertexPointerUp}
                       onKeyDown={handleVertexKeyDown(index)}
                       onContextMenu={
-                        canShowContextMenu
+                        canEditShapePoints
                           ? handleVertexContextMenu(index)
                           : undefined
                       }

@@ -16,6 +16,7 @@ const ja = {
       stop: "停止",
       retry: "再試行",
       regenerate: "再生成",
+      reset_to_default: "デフォルト値にリセット",
     },
   },
   status: {

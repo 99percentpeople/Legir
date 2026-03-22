@@ -16,6 +16,7 @@ const fr = {
       stop: "Arrêter",
       retry: "Réessayer",
       regenerate: "Régénérer",
+      reset_to_default: "Réinitialiser à la valeur par défaut",
     },
   },
   status: {

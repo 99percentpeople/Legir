@@ -6,7 +6,7 @@
  * their source modules instead.
  */
 import React from "react";
-import { FormField, Annotation } from "@/types";
+import { FormField, Annotation, ControlLayerMove } from "@/types";
 
 /**
  * Base properties shared by all workspace controls.
@@ -41,6 +41,10 @@ export interface BaseControlProps<T = FormField | Annotation> {
   onResizeStart?: (handle: string, e: React.PointerEvent) => void;
   /** Optional callback to create a history checkpoint before a custom edit */
   onTriggerHistorySave?: () => void;
+  /** Optional callback to reorder the control's z-layer */
+  onReorderLayer?: (id: string, move: ControlLayerMove) => void;
+  /** Optional callback to reset a form control value back to its default */
+  onResetToDefault?: (id: string) => void;
 }
 
 /**

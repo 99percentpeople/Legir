@@ -92,7 +92,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
                 ? data.value || data.defaultValue || data.name
                 : data.value || ""
             }
-            placeholder={isAnnotationMode ? data.name : undefined}
+            placeholder={isAnnotationMode ? data.placeholder : undefined}
             onChange={(e) => onUpdate(data.id, { value: e.target.value })}
             onPointerDown={(e) => e.stopPropagation()}
             onFocus={() => {
@@ -117,7 +117,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
                 ? data.value || data.defaultValue || data.name
                 : data.value || ""
             }
-            placeholder={isAnnotationMode ? data.name : undefined}
+            placeholder={isAnnotationMode ? data.placeholder : undefined}
             onChange={(e) => onUpdate(data.id, { value: e.target.value })}
             onPointerDown={(e) => e.stopPropagation()}
             onFocus={() => {

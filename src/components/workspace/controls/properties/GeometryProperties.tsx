@@ -1,17 +1,23 @@
 import React from "react";
-import { FormField } from "@/types";
+import { Annotation, FormField } from "@/types";
 import { PropertyPanelProps } from "./types";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
 import { Type } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
+import { registry } from "@/components/workspace/controls/registry/ControlRegistry";
 
-export const GeometryProperties: React.FC<PropertyPanelProps<FormField>> = ({
-  data,
-  onChange,
-  onTriggerHistorySave,
-}) => {
+export const GeometryProperties: React.FC<
+  PropertyPanelProps<FormField | Annotation>
+> = ({ data, onChange, onTriggerHistorySave }) => {
   const { t } = useLanguage();
+  const controlConfig = registry.get(data.type);
+  const supportsSizeEditing =
+    typeof controlConfig?.supportsGeometrySizeEdit === "function"
+      ? controlConfig.supportsGeometrySizeEdit(data)
+      : controlConfig?.supportsGeometrySizeEdit !== undefined
+        ? controlConfig.supportsGeometrySizeEdit
+        : true;
 
   return (
     <div>
@@ -46,8 +52,13 @@ export const GeometryProperties: React.FC<PropertyPanelProps<FormField>> = ({
             aria-label={t("properties.width")}
             value={Math.round(data.rect.width)}
             formatOptions={{ maximumFractionDigits: 0 }}
-            onFocus={onTriggerHistorySave}
-            onChange={(val) => onChange({ rect: { ...data.rect, width: val } })}
+            isReadOnly={!supportsSizeEditing}
+            onFocus={supportsSizeEditing ? onTriggerHistorySave : undefined}
+            onChange={
+              supportsSizeEditing
+                ? (val) => onChange({ rect: { ...data.rect, width: val } })
+                : undefined
+            }
           />
         </div>
         <div className="space-y-1">
@@ -56,9 +67,12 @@ export const GeometryProperties: React.FC<PropertyPanelProps<FormField>> = ({
             aria-label={t("properties.height")}
             value={Math.round(data.rect.height)}
             formatOptions={{ maximumFractionDigits: 0 }}
-            onFocus={onTriggerHistorySave}
-            onChange={(val) =>
-              onChange({ rect: { ...data.rect, height: val } })
+            isReadOnly={!supportsSizeEditing}
+            onFocus={supportsSizeEditing ? onTriggerHistorySave : undefined}
+            onChange={
+              supportsSizeEditing
+                ? (val) => onChange({ rect: { ...data.rect, height: val } })
+                : undefined
             }
           />
         </div>

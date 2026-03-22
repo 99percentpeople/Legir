@@ -29,6 +29,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   fieldFlags?: number;
   fieldValue?: unknown;
   alternativeText?: string;
+  placeholder?: string;
   options?: PdfJsAnnotationOption[];
 
   color?: number[] | Uint8ClampedArray;

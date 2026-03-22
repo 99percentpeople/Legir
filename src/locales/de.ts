@@ -16,6 +16,7 @@ const de = {
       stop: "Stoppen",
       retry: "Erneut versuchen",
       regenerate: "Neu generieren",
+      reset_to_default: "Auf Standardwert zurücksetzen",
     },
   },
   status: {

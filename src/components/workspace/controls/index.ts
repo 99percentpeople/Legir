@@ -1,6 +1,6 @@
 import React from "react";
 import { registry } from "./registry/ControlRegistry";
-import { FieldType } from "@/types";
+import { Annotation, FieldType, FormField } from "@/types";
 
 // Workspace control system.
 //
@@ -33,6 +33,9 @@ type ControlConfig = {
   component: LazyWithPreload<React.ComponentType<any>>;
   propertiesComponent: LazyWithPreload<React.ComponentType<any>>;
   label: string;
+  supportsGeometrySizeEdit?:
+    | boolean
+    | ((data: FormField | Annotation) => boolean);
 };
 
 const CONTROL_CONFIGS: ControlConfig[] = [
@@ -49,6 +52,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Text Field",
+    supportsGeometrySizeEdit: true,
   },
   {
     type: FieldType.CHECKBOX,
@@ -63,6 +67,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Checkbox",
+    supportsGeometrySizeEdit: true,
   },
   {
     type: FieldType.RADIO,
@@ -77,6 +82,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Radio Button",
+    supportsGeometrySizeEdit: true,
   },
   {
     type: FieldType.DROPDOWN,
@@ -91,6 +97,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Dropdown",
+    supportsGeometrySizeEdit: true,
   },
   {
     type: FieldType.SIGNATURE,
@@ -105,6 +112,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Signature",
+    supportsGeometrySizeEdit: true,
   },
   {
     type: "highlight",
@@ -119,6 +127,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Highlight",
+    supportsGeometrySizeEdit: false,
   },
   {
     type: "comment",
@@ -133,6 +142,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Comment",
+    supportsGeometrySizeEdit: false,
   },
   {
     type: "link",
@@ -147,6 +157,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Link",
+    supportsGeometrySizeEdit: false,
   },
   {
     type: "freetext",
@@ -161,6 +172,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "FreeText",
+    supportsGeometrySizeEdit: true,
   },
   {
     type: "ink",
@@ -175,6 +187,7 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Ink",
+    supportsGeometrySizeEdit: false,
   },
   {
     type: "shape",
@@ -189,6 +202,11 @@ const CONTROL_CONFIGS: ControlConfig[] = [
       })),
     ),
     label: "Shape",
+    supportsGeometrySizeEdit: (data: FormField | Annotation) =>
+      data.type === "shape" &&
+      (data.shapeType === "square" ||
+        data.shapeType === "circle" ||
+        data.shapeType === "cloud"),
   },
 ];
 

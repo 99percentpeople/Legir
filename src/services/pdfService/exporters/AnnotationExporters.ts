@@ -16,6 +16,7 @@ import {
   drawSvgPath,
 } from "@cantoo/pdf-lib";
 import { Annotation } from "@/types";
+import { PDF_CUSTOM_KEYS } from "@/constants";
 import { IAnnotationExporter, ViewportLike } from "../types";
 import { setFormForgeHighlightedText } from "../lib/annotationMetadata";
 import { hexToPdfColor } from "../lib/colors";
@@ -166,6 +167,63 @@ export class CommentExporter implements IAnnotationExporter {
     });
 
     const ref = pdfDoc.context.register(commentAnnot);
+    page.node.addAnnot(ref);
+  }
+}
+
+export class LinkExporter implements IAnnotationExporter {
+  shouldExport(annotation: Annotation): boolean {
+    return annotation.type === "link";
+  }
+
+  save(
+    pdfDoc: PDFDocument,
+    page: PDFPage,
+    annotation: Annotation,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+  ): void {
+    if (!annotation.rect) return;
+
+    const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
+    const destPage =
+      typeof annotation.linkDestPageIndex === "number" &&
+      annotation.linkDestPageIndex >= 0 &&
+      annotation.linkDestPageIndex < pdfDoc.getPageCount()
+        ? pdfDoc.getPage(annotation.linkDestPageIndex)
+        : null;
+
+    const linkAnnot = pdfDoc.context.obj({
+      Type: "Annot",
+      Subtype: "Link",
+      F: 4,
+      Rect: [
+        bounds.x,
+        bounds.y,
+        bounds.x + bounds.width,
+        bounds.y + bounds.height,
+      ],
+      Border: [0, 0, 0],
+      A: annotation.linkUrl
+        ? {
+            S: "URI",
+            URI: PDFHexString.fromText(annotation.linkUrl),
+          }
+        : undefined,
+      Dest: destPage ? [destPage.ref, PDFName.of("Fit")] : undefined,
+      P: page.ref,
+      Contents: annotation.text
+        ? PDFHexString.fromText(annotation.text)
+        : undefined,
+      T: annotation.author
+        ? PDFHexString.fromText(annotation.author)
+        : undefined,
+      M: annotation.updatedAt
+        ? PDFString.fromDate(new Date(annotation.updatedAt))
+        : PDFString.fromDate(new Date()),
+    });
+
+    const ref = pdfDoc.context.register(linkAnnot);
     page.node.addAnnot(ref);
   }
 }
@@ -1279,7 +1337,7 @@ export class ShapeExporter implements IAnnotationExporter {
         Number.isFinite(annotation.cloudSpacing)
       ) {
         shapeAnnot.set(
-          PDFName.of("FFCloudSpacing"),
+          PDFName.of(PDF_CUSTOM_KEYS.cloudSpacing),
           pdfDoc.context.obj(annotation.cloudSpacing),
         );
       }
@@ -1377,19 +1435,19 @@ export class ShapeExporter implements IAnnotationExporter {
           Number.isFinite(annotation.arrowSize)
         ) {
           shapeAnnot.set(
-            PDFName.of("FFArrowSize"),
+            PDFName.of(PDF_CUSTOM_KEYS.arrowSize),
             pdfDoc.context.obj(annotation.arrowSize),
           );
         }
         if (shapeAnnot instanceof PDFDict && arrowStyles.start) {
           shapeAnnot.set(
-            PDFName.of("FFStartArrowStyle"),
+            PDFName.of(PDF_CUSTOM_KEYS.startArrowStyle),
             PDFName.of(arrowStyles.start),
           );
         }
         if (shapeAnnot instanceof PDFDict && arrowStyles.end) {
           shapeAnnot.set(
-            PDFName.of("FFEndArrowStyle"),
+            PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle),
             PDFName.of(arrowStyles.end),
           );
         }
@@ -1429,19 +1487,19 @@ export class ShapeExporter implements IAnnotationExporter {
       Number.isFinite(annotation.arrowSize)
     ) {
       shapeAnnot.set(
-        PDFName.of("FFArrowSize"),
+        PDFName.of(PDF_CUSTOM_KEYS.arrowSize),
         pdfDoc.context.obj(annotation.arrowSize),
       );
     }
     if (shapeAnnot instanceof PDFDict && arrowStyles.start) {
       shapeAnnot.set(
-        PDFName.of("FFStartArrowStyle"),
+        PDFName.of(PDF_CUSTOM_KEYS.startArrowStyle),
         PDFName.of(arrowStyles.start),
       );
     }
     if (shapeAnnot instanceof PDFDict && arrowStyles.end) {
       shapeAnnot.set(
-        PDFName.of("FFEndArrowStyle"),
+        PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle),
         PDFName.of(arrowStyles.end),
       );
     }

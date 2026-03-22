@@ -4,7 +4,17 @@ import { ControlProps } from "./types";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getMoveDelta } from "@/lib/controlMovement";
+import { useMouse } from "@/hooks/useMouse";
+import { useLanguage } from "@/components/language-provider";
 import type { Annotation, FormField, MoveDirection } from "@/types";
+import { ControlContextMenu } from "./ControlContextMenu";
+import { ControlLayerMenuItems } from "./ControlLayerMenuItems";
+import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import {
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 
 export type ControlWrapperProps = ControlProps & {
   customRect?: { x: number; y: number; width: number; height: number };
@@ -12,6 +22,7 @@ export type ControlWrapperProps = ControlProps & {
   resizable?: boolean;
   customElementId?: string;
   className?: string;
+  contextMenuDisabled?: boolean;
   children?: React.ReactNode;
 };
 
@@ -20,9 +31,12 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   id,
   isSelected,
   isSelectable,
+  onSelect,
   onResizeStart,
   onUpdate,
   onTriggerHistorySave,
+  onReorderLayer,
+  onResetToDefault,
   data,
   onPointerDown,
   customRect,
@@ -30,10 +44,20 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   resizable = false,
   customElementId,
   className,
+  contextMenuDisabled = false,
 }) => {
+  const { t } = useLanguage();
   const wrapperRef = React.useRef<HTMLDivElement>(null);
   const pendingFocusRef = React.useRef(false);
   const isFreetext = data.type === "freetext";
+  const {
+    ref: tooltipMouseRef,
+    x,
+    y,
+    width,
+    height,
+  } = useMouse<HTMLDivElement>();
+  const [isTooltipOpen, setIsTooltipOpen] = React.useState(false);
 
   useAppEvent(
     "workspace:focusControl",
@@ -52,6 +76,18 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     "link",
     "shape",
   ].includes(data.type);
+  const tooltipText =
+    !isAnnotation && "toolTip" in data && typeof data.toolTip === "string"
+      ? data.toolTip.trim()
+      : "";
+
+  const setWrapperNode = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      wrapperRef.current = node;
+      tooltipMouseRef(node);
+    },
+    [tooltipMouseRef],
+  );
 
   React.useEffect(() => {
     if (!isSelected) return;
@@ -320,26 +356,31 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
 
   const isInkHighlight =
     data.type === "ink" && "intent" in data && data.intent === "InkHighlight";
-  const shouldRaiseZIndexOnHoverOrSelect =
+  const shouldRaiseZIndexWhenSelected =
     data.type !== "highlight" && !isInkHighlight;
   const supportsKeyboardResizeHandles = isSelected && resizable;
 
-  return (
+  const wrapper = (
     <div
-      ref={wrapperRef}
+      ref={setWrapperNode}
       id={elementId || undefined}
       onPointerDown={(e) => {
         if (!isSelectable) return;
         if (e.button !== 0) return;
         onPointerDown?.(e);
       }}
+      onPointerEnter={tooltipText ? () => setIsTooltipOpen(true) : undefined}
+      onPointerLeave={tooltipText ? () => setIsTooltipOpen(false) : undefined}
+      onContextMenuCapture={() => {
+        if (!isSelectable) return;
+        onSelect(id);
+      }}
       className={cn(
         "group absolute outline-none select-none",
         isSelectable
           ? "pointer-events-auto"
           : "pointer-events-none **:pointer-events-none",
-        shouldRaiseZIndexOnHoverOrSelect &&
-          (isSelected ? "z-50" : "hover:z-50"),
+        shouldRaiseZIndexWhenSelected && isSelected && "z-50",
         className,
       )}
       style={{
@@ -471,5 +512,71 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
           <div className="pointer-events-none absolute inset-0 z-50 border border-dashed border-blue-500" />
         ))}
     </div>
+  );
+
+  const canShowLayerContextMenu =
+    !contextMenuDisabled && isSelectable && data.type !== "shape";
+  const canResetFormControlToDefault = !isAnnotation && !!onResetToDefault;
+  const triggerElement = tooltipText ? (
+    <TooltipTrigger asChild>{wrapper}</TooltipTrigger>
+  ) : (
+    wrapper
+  );
+
+  const contextMenuWrapped =
+    canShowLayerContextMenu && onReorderLayer ? (
+      <ControlContextMenu
+        content={
+          <>
+            {canResetFormControlToDefault && (
+              <>
+                <ContextMenuItem onSelect={() => onResetToDefault(id)}>
+                  {t("common.actions.reset_to_default")}
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+              </>
+            )}
+            <ControlLayerMenuItems
+              onSelect={(move) => onReorderLayer(id, move)}
+            />
+          </>
+        }
+      >
+        {triggerElement}
+      </ControlContextMenu>
+    ) : (
+      triggerElement
+    );
+
+  if (!tooltipText) {
+    return contextMenuWrapped;
+  }
+
+  return (
+    <Tooltip delayDuration={0} disableHoverableContent open={isTooltipOpen}>
+      {contextMenuWrapped}
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Content
+          align="center"
+          side="bottom"
+          sideOffset={36}
+          hideWhenDetached
+          className="group z-50"
+          style={{
+            transform: `translate(${x - width / 2}px, ${y - height}px)`,
+          }}
+        >
+          <div
+            className={cn(
+              "dark bg-background text-foreground pointer-events-none rounded-md px-2 py-1 text-xs whitespace-pre-wrap opacity-80 shadow-sm",
+              "animate-in fade-in-0 zoom-in-95 group-data-[side=bottom]:slide-in-from-top-2 group-data-[side=left]:slide-in-from-right-2 group-data-[side=right]:slide-in-from-left-2 group-data-[side=top]:slide-in-from-bottom-2",
+              "group-data-[state=closed]:animate-out group-data-[state=closed]:fade-out-0 group-data-[state=closed]:zoom-out-95",
+            )}
+          >
+            {tooltipText}
+          </div>
+        </TooltipPrimitive.Content>
+      </TooltipPrimitive.Portal>
+    </Tooltip>
   );
 };

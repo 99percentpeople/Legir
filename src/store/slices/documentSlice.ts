@@ -4,6 +4,7 @@ import {
   revokeThumbnailObjectUrls,
 } from "@/store/helpers";
 import { prepareAnnotationsForStore } from "@/lib/inkGeometry";
+import { normalizeControlLayerOrders } from "@/lib/controlLayerOrder";
 import { cancelThumbnailWarmup } from "@/store/slices/runtimeSlice";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 
@@ -16,9 +17,14 @@ export const createDocumentSlice: EditorStoreSlice<
     // Replacing a document invalidates thumbnail caches and edit history.
     revokeThumbnailObjectUrls(get().thumbnailImages);
     revokeLegacyPageThumbnailObjectUrls(get().pages);
+    const normalized = normalizeControlLayerOrders(
+      data.fields,
+      prepareAnnotationsForStore(data.annotations),
+    );
     set({
       ...data,
-      annotations: prepareAnnotationsForStore(data.annotations),
+      fields: normalized.fields,
+      annotations: normalized.annotations,
       thumbnailImages: {},
       past: [],
       future: [],

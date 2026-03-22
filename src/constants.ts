@@ -182,3 +182,11 @@ export const LEFT_SIDEBAR_MAX_WIDTH_PX = 600;
 export const RIGHT_PANEL_MIN_WIDTH_PX = 240;
 export const RIGHT_PANEL_MAX_WIDTH_PX = 600;
 export const AI_CHAT_MAX_PAGE_IMAGES_PER_CALL = 4;
+
+export const PDF_CUSTOM_KEYS = {
+  placeholder: "FFPlaceholder",
+  cloudSpacing: "FFCloudSpacing",
+  arrowSize: "FFArrowSize",
+  startArrowStyle: "FFStartArrowStyle",
+  endArrowStyle: "FFEndArrowStyle",
+} as const;

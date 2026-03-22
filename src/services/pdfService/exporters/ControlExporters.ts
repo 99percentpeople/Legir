@@ -6,6 +6,7 @@ import {
   type PDFFont,
 } from "@cantoo/pdf-lib";
 import { FormField, FieldType } from "@/types";
+import { PDF_CUSTOM_KEYS } from "@/constants";
 import { IControlExporter, ViewportLike } from "../types";
 import { containsNonAscii, isExplicitCjkFontSelection } from "../lib/text";
 import { pickCjkFontFromMap } from "../lib/font-selection";
@@ -83,6 +84,17 @@ export class TextControlExporter implements IControlExporter {
     }
     if (field.toolTip) {
       tf.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
+    } else {
+      tf.acroField.dict.delete(PDFName.of("TU"));
+    }
+
+    if (field.placeholder) {
+      tf.acroField.dict.set(
+        PDFName.of(PDF_CUSTOM_KEYS.placeholder),
+        PDFString.of(field.placeholder),
+      );
+    } else {
+      tf.acroField.dict.delete(PDFName.of(PDF_CUSTOM_KEYS.placeholder));
     }
 
     if (field.style?.fontSize) tf.setFontSize(field.style.fontSize);

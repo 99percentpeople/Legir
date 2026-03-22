@@ -147,6 +147,7 @@ export class InkParser implements IAnnotationParser {
                     annotations.push({
                       id: `imported_ink_lib_${pageIndex + 1}_${idx}`,
                       pageIndex: pageIndex,
+                      layerOrder: idx,
                       type: "ink",
                       subtype: "ink",
                       intent: intent,
@@ -246,6 +247,7 @@ export class HighlightParser implements IAnnotationParser {
         annotations.push({
           id: `imported_highlight_${pageIndex + 1}_${index}`,
           pageIndex: pageIndex,
+          layerOrder: index,
           type: "highlight",
           rect: { x, y, width, height },
           rects: rects,
@@ -308,6 +310,7 @@ export class CommentParser implements IAnnotationParser {
         annotations.push({
           id: `imported_comment_${pageIndex + 1}_${index}`,
           pageIndex: pageIndex,
+          layerOrder: index,
           type: "comment",
           rect: { x, y, width, height },
           color: color,
@@ -1729,6 +1732,7 @@ export class FreeTextParser implements IAnnotationParser {
         annotations.push({
           id: `imported_freetext_${pageIndex + 1}_${index}`,
           pageIndex: pageIndex,
+          layerOrder: index,
           type: "freetext",
           rect: innerRect,
           color: color,
@@ -1833,6 +1837,7 @@ export class ShapeParser implements IAnnotationParser {
         annotations.push({
           id: `imported_shape_${pageIndex + 1}_${index}`,
           pageIndex,
+          layerOrder: index,
           type: "shape",
           shapeType: isCloud
             ? "cloud"
@@ -1884,6 +1889,7 @@ export class ShapeParser implements IAnnotationParser {
       annotations.push({
         id: `imported_shape_${pageIndex + 1}_${index}`,
         pageIndex,
+        layerOrder: index,
         type: "shape",
         shapeType:
           annotation.subtype === "Polygon"
@@ -1955,10 +1961,12 @@ export class LinkParser implements IAnnotationParser {
       annotations.push({
         id: `imported_link_${pageIndex + 1}_${index}`,
         pageIndex,
+        layerOrder: index,
         type: "link",
         rect: { x, y, width, height },
         linkUrl,
         linkDestPageIndex,
+        sourcePdfRef: annotation.sourcePdfRef,
       });
       addedLinks += 1;
     });

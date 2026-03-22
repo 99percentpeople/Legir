@@ -57,6 +57,7 @@ import {
 import fontkit from "pdf-fontkit";
 import { pdfDebug, pdfDebugEnabled } from "./lib/debug";
 import { appEventBus } from "@/lib/eventBus";
+import { PDF_CUSTOM_KEYS } from "@/constants";
 import {
   FormField,
   PageData,
@@ -64,6 +65,7 @@ import {
   PDFOutlineItem,
   Annotation,
 } from "@/types";
+import { getOrderedPageControls } from "@/lib/controlLayerOrder";
 import {
   IAnnotationParser,
   IControlParser,
@@ -93,6 +95,7 @@ import {
   HighlightExporter,
   CommentExporter,
   FreeTextExporter,
+  LinkExporter,
   ShapeExporter,
 } from "./exporters/AnnotationExporters";
 import {
@@ -143,6 +146,7 @@ const annotationExporters: IAnnotationExporter[] = [
   new HighlightExporter(),
   new CommentExporter(),
   new FreeTextExporter(),
+  new LinkExporter(),
   new ShapeExporter(),
 ];
 
@@ -587,6 +591,11 @@ const buildPdfLibAnnotsByPageIndex = async (
 
         const rawTu = lookupInFieldChain(annot, "TU");
         const tu = pdfObjToString(rawTu);
+        const rawPlaceholder = lookupInFieldChain(
+          annot,
+          PDF_CUSTOM_KEYS.placeholder,
+        );
+        const placeholder = pdfObjToString(rawPlaceholder);
 
         const rawV = lookupInFieldChain(annot, "V");
         const fieldValue = extractFieldValue(rawV);
@@ -746,6 +755,7 @@ const buildPdfLibAnnotsByPageIndex = async (
           fieldFlags,
           fieldValue,
           alternativeText: tu,
+          placeholder,
           options,
           color,
           backgroundColor,
@@ -893,19 +903,21 @@ const buildPdfLibAnnotsByPageIndex = async (
       const rectDifferences = pdfArrayToNumberList(
         annot.lookup(PDFName.of("RD")),
       );
-      const cloudSpacingObj = annot.lookup(PDFName.of("FFCloudSpacing"));
+      const cloudSpacingObj = annot.lookup(
+        PDFName.of(PDF_CUSTOM_KEYS.cloudSpacing),
+      );
       const cloudSpacing =
         cloudSpacingObj instanceof PDFNumber
           ? cloudSpacingObj.asNumber()
           : undefined;
-      const arrowSizeObj = annot.lookup(PDFName.of("FFArrowSize"));
+      const arrowSizeObj = annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.arrowSize));
       const arrowSize =
         arrowSizeObj instanceof PDFNumber ? arrowSizeObj.asNumber() : undefined;
       const startArrowStyle = pdfObjToString(
-        annot.lookup(PDFName.of("FFStartArrowStyle")),
+        annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.startArrowStyle)),
       );
       const endArrowStyle = pdfObjToString(
-        annot.lookup(PDFName.of("FFEndArrowStyle")),
+        annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle)),
       );
 
       const base: PdfJsAnnotation = {
@@ -1537,10 +1549,28 @@ export const exportPDF = async (
 
   const form = pdfDoc.getForm();
 
+  const pagesWithFields = new Set(fields.map((field) => field.pageIndex));
+  const pagesWithExportableAnnotations = new Set(
+    annotations
+      .filter((annotation) =>
+        annotationExporters.some((exporter) =>
+          exporter.shouldExport(annotation),
+        ),
+      )
+      .map((annotation) => annotation.pageIndex),
+  );
+  const pagesRequiringFullAnnotationReexport = new Set<number>();
+  for (const pageIndex of pagesWithFields) {
+    if (pagesWithExportableAnnotations.has(pageIndex)) {
+      pagesRequiringFullAnnotationReexport.add(pageIndex);
+    }
+  }
+
   const keepAnnotRefKeysByPage = new Map<number, Set<string>>();
   for (const a of annotations) {
     if (!a?.sourcePdfRef) continue;
     if (a.isEdited) continue;
+    if (pagesRequiringFullAnnotationReexport.has(a.pageIndex)) continue;
     const key = `${a.sourcePdfRef.objectNumber}:${a.sourcePdfRef.generationNumber}`;
     const setForPage =
       keepAnnotRefKeysByPage.get(a.pageIndex) || new Set<string>();
@@ -1683,6 +1713,7 @@ export const exportPDF = async (
               subtype === PDFName.of("Highlight") ||
               subtype === PDFName.of("Text") ||
               subtype === PDFName.of("FreeText") ||
+              subtype === PDFName.of("Link") ||
               subtype === PDFName.of("Square") ||
               subtype === PDFName.of("Circle") ||
               subtype === PDFName.of("Line") ||
@@ -1718,27 +1749,36 @@ export const exportPDF = async (
     }
   }
 
-  // 2. Export Annotations
-  for (const annot of annotations) {
-    if (annot?.sourcePdfRef && !annot.isEdited) continue;
-    const page = pdfDoc.getPage(annot.pageIndex);
-    const exporter = annotationExporters.find((e) => e.shouldExport(annot));
-    if (exporter) {
-      try {
-        const viewport = await getViewportForPage(annot.pageIndex);
-        await exporter.save(pdfDoc, page, annot, fontMap, viewport);
-      } catch (e) {
-        console.error(`Failed to export annotation ${annot.id}`, e);
-      }
-    }
-  }
+  // 2. Export Controls In Layer Order
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const orderedControls = getOrderedPageControls(
+      fields,
+      annotations,
+      pageIndex,
+    );
+    if (orderedControls.length === 0) continue;
 
-  // 3. Export Form Fields
-  for (const field of fields) {
-    const exporter = controlExporters.find((e) => e.shouldExport(field));
-    if (exporter) {
+    const page = pdfDoc.getPage(pageIndex);
+    const viewport = await getViewportForPage(pageIndex);
+
+    for (const entry of orderedControls) {
+      if (entry.kind === "annotation") {
+        const annot = entry.control;
+        if (annot?.sourcePdfRef && !annot.isEdited) continue;
+        const exporter = annotationExporters.find((e) => e.shouldExport(annot));
+        if (!exporter) continue;
+        try {
+          await exporter.save(pdfDoc, page, annot, fontMap, viewport);
+        } catch (e) {
+          console.error(`Failed to export annotation ${annot.id}`, e);
+        }
+        continue;
+      }
+
+      const field = entry.control;
+      const exporter = controlExporters.find((e) => e.shouldExport(field));
+      if (!exporter) continue;
       try {
-        const viewport = await getViewportForPage(field.pageIndex);
         await exporter.save(form, field, fontMap, viewport);
       } catch (e) {
         console.error(`Failed to export field ${field.name}`, e);

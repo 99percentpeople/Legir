@@ -15,6 +15,8 @@ export interface ControlConfig<T = FormField | Annotation> {
   propertiesComponent?: React.ComponentType<PropertyPanelProps<T>>;
   /** Display label for the control */
   label: string;
+  /** Whether width/height can be edited from the shared geometry panel */
+  supportsGeometrySizeEdit?: boolean | ((data: T) => boolean);
   /** Optional custom serializer for control data */
   serialize?: (data: T) => any;
   /** Optional custom deserializer for control data */

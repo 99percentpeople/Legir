@@ -61,6 +61,7 @@ export class TextControlParser implements IControlParser {
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
           pageIndex: pageIndex,
+          layerOrder: index,
           type: FieldType.TEXT,
           name: annotation.fieldName,
           rect: { x, y, width, height },
@@ -69,6 +70,10 @@ export class TextControlParser implements IControlParser {
           value:
             typeof annotation.fieldValue === "string"
               ? annotation.fieldValue
+              : undefined,
+          placeholder:
+            typeof annotation.placeholder === "string"
+              ? annotation.placeholder
               : undefined,
           alignment: alignment,
           multiline: !!(annotation.fieldFlags & 4096),
@@ -128,6 +133,7 @@ export class CheckboxControlParser implements IControlParser {
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
           pageIndex: pageIndex,
+          layerOrder: index,
           type: FieldType.CHECKBOX,
           name: annotation.fieldName,
           rect: { x, y, width, height },
@@ -185,6 +191,7 @@ export class RadioControlParser implements IControlParser {
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
           pageIndex: pageIndex,
+          layerOrder: index,
           type: FieldType.RADIO,
           name: annotation.fieldName,
           rect: { x, y, width, height },
@@ -265,6 +272,7 @@ export class DropdownControlParser implements IControlParser {
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
           pageIndex: pageIndex,
+          layerOrder: index,
           type: FieldType.DROPDOWN,
           name: annotation.fieldName,
           rect: { x, y, width, height },
@@ -326,6 +334,7 @@ export class SignatureControlParser implements IControlParser {
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
           pageIndex: pageIndex,
+          layerOrder: index,
           type: FieldType.SIGNATURE,
           name: annotation.fieldName,
           rect: { x, y, width, height },

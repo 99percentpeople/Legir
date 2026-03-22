@@ -73,8 +73,10 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
     addField,
     addAnnotation,
     updateField,
+    resetFieldToDefault,
     updateAnnotation,
     deleteAnnotation,
+    reorderControlLayer,
     selectControl,
     setTool,
     saveCheckpoint,
@@ -256,8 +258,10 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
           onAddAnnotation={addAnnotation}
           onSelectControl={selectControl}
           onUpdateField={updateField}
+          onResetFieldToDefault={resetFieldToDefault}
           onUpdateAnnotation={updateAnnotation}
           onDeleteAnnotation={deleteAnnotation}
+          onReorderControlLayer={reorderControlLayer}
           onEditAnnotation={onEditAnnotation}
           onScaleChange={updateScale}
           onTriggerHistorySave={saveCheckpoint}

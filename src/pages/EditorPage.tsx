@@ -40,6 +40,7 @@ import { ANNOTATION_STYLES } from "../constants";
 import { recentFilesService } from "../services/recentFilesService";
 import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
 import { findPdfSearchResults, type PDFSearchMode } from "../lib/pdfSearch";
+import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
 import { getPdfSearchSelectionOffsets } from "../components/workspace/lib/pdfSearchHighlights";
 import {
   calculateWorkspaceFitScreenScale,
@@ -1312,6 +1313,31 @@ const EditorPage: React.FC<EditorPageProps> = ({
         (a) => a.id === currentSelectedId,
       );
       if (isAnnotation) {
+        const currentAnnotation = editorStore.annotations.find(
+          (annotation) => annotation.id === currentSelectedId,
+        );
+        const nextRect = updates.rect;
+        const currentRect = currentAnnotation?.rect;
+
+        if (
+          currentAnnotation &&
+          currentRect &&
+          nextRect &&
+          nextRect.width === currentRect.width &&
+          nextRect.height === currentRect.height &&
+          (nextRect.x !== currentRect.x || nextRect.y !== currentRect.y)
+        ) {
+          editorStore.updateAnnotation(currentSelectedId, {
+            ...updates,
+            ...getMovedAnnotationUpdates(
+              currentAnnotation,
+              nextRect.x - currentRect.x,
+              nextRect.y - currentRect.y,
+            ),
+          } as Partial<Annotation>);
+          return;
+        }
+
         editorStore.updateAnnotation(
           currentSelectedId,
           updates as Partial<Annotation>,

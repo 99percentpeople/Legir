@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Annotation, FormField, PageLayoutMode } from "@/types";
+import { getOrderedPageControls } from "@/lib/controlLayerOrder";
 
 export const useWorkspaceDerivedPages = <
   TPage extends { pageIndex: number },
@@ -12,6 +13,10 @@ export const useWorkspaceDerivedPages = <
   const controlsByPage = useMemo(() => {
     const fieldsByPage = new Map<number, FormField[]>();
     const annotationsByPage = new Map<number, Annotation[]>();
+    const orderedControlsByPage = new Map<
+      number,
+      ReturnType<typeof getOrderedPageControls>
+    >();
 
     for (const f of opts.fields) {
       const arr = fieldsByPage.get(f.pageIndex);
@@ -25,7 +30,18 @@ export const useWorkspaceDerivedPages = <
       else annotationsByPage.set(a.pageIndex, [a]);
     }
 
-    return { fieldsByPage, annotationsByPage };
+    const pageIndexes = new Set<number>([
+      ...fieldsByPage.keys(),
+      ...annotationsByPage.keys(),
+    ]);
+    for (const pageIndex of pageIndexes) {
+      orderedControlsByPage.set(
+        pageIndex,
+        getOrderedPageControls(opts.fields, opts.annotations, pageIndex),
+      );
+    }
+
+    return { fieldsByPage, annotationsByPage, orderedControlsByPage };
   }, [opts.fields, opts.annotations]);
 
   const pagesWithControls = useMemo(() => {
@@ -35,6 +51,8 @@ export const useWorkspaceDerivedPages = <
         pageAnnotations:
           controlsByPage.annotationsByPage.get(page.pageIndex) ?? [],
         pageFields: controlsByPage.fieldsByPage.get(page.pageIndex) ?? [],
+        pageControls:
+          controlsByPage.orderedControlsByPage.get(page.pageIndex) ?? [],
       };
     });
   }, [opts.pages, controlsByPage]);

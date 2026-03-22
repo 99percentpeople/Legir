@@ -3,6 +3,7 @@ import type { StateCreator } from "zustand";
 import type {
   Annotation,
   AppOptions,
+  ControlLayerMove,
   DialogName,
   EditorState,
   EditorUiState,
@@ -49,7 +50,9 @@ export interface EditorActions {
   }) => void;
   addField: (field: FormField) => void;
   updateField: (id: string, updates: Partial<FormField>) => void;
+  resetFieldToDefault: (id: string) => void;
   moveSelectedControl: (direction: MoveDirection, isFast?: boolean) => void;
+  reorderControlLayer: (id: string, move: ControlLayerMove) => void;
   addAnnotation: (annotation: Annotation, opts?: { select?: boolean }) => void;
   addAnnotations: (
     annotations: Annotation[],

@@ -10,6 +10,7 @@ import {
   FormField,
   FieldType,
   Annotation,
+  ControlLayerMove,
   Tool,
   PageTranslateParagraphCandidate,
   PDFSearchResult,
@@ -95,8 +96,10 @@ interface WorkspaceProps {
   ) => void;
   onSelectControl: (id: string | null) => void;
   onUpdateField: (id: string, updates: Partial<FormField>) => void;
+  onResetFieldToDefault: (id: string) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   onDeleteAnnotation: (id: string) => void;
+  onReorderControlLayer: (id: string, move: ControlLayerMove) => void;
   onEditAnnotation: (id: string) => void;
   onScaleChange: (newScale: number) => void;
   onTriggerHistorySave: () => void;
@@ -145,8 +148,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onAddAnnotation,
   onSelectControl,
   onUpdateField,
+  onResetFieldToDefault,
   onUpdateAnnotation,
   onDeleteAnnotation,
+  onReorderControlLayer,
   onEditAnnotation,
   onScaleChange,
   onTriggerHistorySave,
@@ -2588,24 +2593,30 @@ const Workspace: React.FC<WorkspaceProps> = ({
           }}
           onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
         >
-          {page.pageFields.map((field) => (
-            <ControlRenderer
-              key={field.id}
-              data={field}
-              id={field.id}
-              isSelected={editorState.selectedId === field.id}
-              zoom={editorState.scale}
-              isAnnotationMode={editorState.mode === "annotation"}
-              isFormMode={editorState.mode === "form"}
-              isSelectable={isSelectable}
-              onControlPointerDown={handleFieldPointerDown}
-              onSelect={onSelectControl}
-              onUpdate={onUpdateField}
-              onControlResizeStart={handleResizePointerDown}
-              onTriggerHistorySave={onTriggerHistorySave}
-            />
-          ))}
-          {page.pageAnnotations.map((annot) => {
+          {page.pageControls.map(({ kind, control }) => {
+            if (kind === "field") {
+              return (
+                <ControlRenderer
+                  key={control.id}
+                  data={control}
+                  id={control.id}
+                  isSelected={editorState.selectedId === control.id}
+                  zoom={editorState.scale}
+                  isAnnotationMode={editorState.mode === "annotation"}
+                  isFormMode={editorState.mode === "form"}
+                  isSelectable={isSelectable}
+                  onControlPointerDown={handleFieldPointerDown}
+                  onSelect={onSelectControl}
+                  onUpdate={onUpdateField}
+                  onResetToDefault={onResetFieldToDefault}
+                  onControlResizeStart={handleResizePointerDown}
+                  onTriggerHistorySave={onTriggerHistorySave}
+                  onReorderLayer={onReorderControlLayer}
+                />
+              );
+            }
+
+            const annot = control;
             const allowSelect = annot.type !== "link";
 
             return (
@@ -2630,6 +2641,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 }}
                 onControlResizeStart={handleResizePointerDown}
                 onTriggerHistorySave={onTriggerHistorySave}
+                onReorderLayer={onReorderControlLayer}
               />
             );
           })}

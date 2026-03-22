@@ -49,6 +49,11 @@ export type Tool =
   | "eraser";
 
 export type MoveDirection = "UP" | "DOWN" | "LEFT" | "RIGHT";
+export type ControlLayerMove =
+  | "bring_forward"
+  | "send_backward"
+  | "bring_to_front"
+  | "send_to_back";
 
 export interface FieldStyle {
   borderColor?: string; // Hex
@@ -64,6 +69,7 @@ export interface FieldStyle {
 export interface FormField {
   id: string;
   pageIndex: number;
+  layerOrder?: number;
   type: FieldType;
   name: string;
   rect: {
@@ -80,6 +86,7 @@ export interface FormField {
   // Value & Defaults
   value?: string; // Current Text / Selected Dropdown Option
   defaultValue?: string; // Default Text / Default Dropdown Option
+  placeholder?: string;
 
   isChecked?: boolean; // Current Checkbox/Radio state
   isDefaultChecked?: boolean; // Default Checkbox/Radio state
@@ -105,6 +112,7 @@ export interface FormField {
 export interface Annotation {
   id: string;
   pageIndex: number;
+  layerOrder?: number;
   type: "highlight" | "ink" | "comment" | "freetext" | "link" | "shape";
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights

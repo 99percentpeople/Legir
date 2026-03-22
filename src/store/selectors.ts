@@ -83,6 +83,8 @@ export const selectEditorCanvasActions = (state: EditorStore) => ({
   addAnnotation: state.addAnnotation,
   addField: state.addField,
   deleteAnnotation: state.deleteAnnotation,
+  reorderControlLayer: state.reorderControlLayer,
+  resetFieldToDefault: state.resetFieldToDefault,
   saveCheckpoint: state.saveCheckpoint,
   selectControl: state.selectControl,
   selectPageTranslateParagraphId: state.selectPageTranslateParagraphId,

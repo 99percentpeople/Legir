@@ -4,6 +4,10 @@ import {
   getMovedAnnotationUpdates,
   getMovedFieldUpdates,
 } from "@/lib/controlMovement";
+import {
+  getNextLayerOrderForPage,
+  reorderControlLayer,
+} from "@/lib/controlLayerOrder";
 import { shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
 import {
   prepareAnnotationsForStore,
@@ -22,9 +26,11 @@ export const createControlSlice: EditorStoreSlice<
     | "addAnnotation"
     | "addAnnotations"
     | "updateField"
+    | "resetFieldToDefault"
     | "updateAnnotation"
     | "deleteAnnotation"
     | "deleteSelection"
+    | "reorderControlLayer"
     | "selectControl"
     | "setTool"
     | "openDialog"
@@ -40,9 +46,17 @@ export const createControlSlice: EditorStoreSlice<
     set((state) => {
       const shouldSwitch = shouldSwitchToSelectAfterUse(state.tool);
       const isForcedContinuous = state.keys.ctrl || state.keys.meta;
+      const nextField = {
+        ...field,
+        layerOrder: getNextLayerOrderForPage(
+          state.fields,
+          state.annotations,
+          field.pageIndex,
+        ),
+      } satisfies FormField;
       return {
-        fields: [...state.fields, field],
-        selectedId: field.id,
+        fields: [...state.fields, nextField],
+        selectedId: nextField.id,
         tool: shouldSwitch && !isForcedContinuous ? "select" : state.tool,
         isDirty: true,
       };
@@ -57,6 +71,11 @@ export const createControlSlice: EditorStoreSlice<
       const author = annotation.author || state.options.userName;
       const annotationWithDetails = prepareInkAnnotationForStore({
         ...annotation,
+        layerOrder: getNextLayerOrderForPage(
+          state.fields,
+          state.annotations,
+          annotation.pageIndex,
+        ),
         updatedAt: now,
         author,
       } satisfies Annotation);
@@ -79,11 +98,23 @@ export const createControlSlice: EditorStoreSlice<
     const now = new Date().toISOString();
     set((state) => {
       const authorFallback = state.options.userName;
+      const pageNextLayerOrder = new Map<number, number>();
       const batch = prepareAnnotationsForStore(
         annotations.map(
           (annotation) =>
             ({
               ...annotation,
+              layerOrder: (() => {
+                const current =
+                  pageNextLayerOrder.get(annotation.pageIndex) ??
+                  getNextLayerOrderForPage(
+                    state.fields,
+                    state.annotations,
+                    annotation.pageIndex,
+                  );
+                pageNextLayerOrder.set(annotation.pageIndex, current + 1);
+                return current;
+              })(),
               updatedAt: now,
               author: annotation.author || authorFallback,
             }) satisfies Annotation,
@@ -122,6 +153,7 @@ export const createControlSlice: EditorStoreSlice<
       const propsToSync = [
         "value",
         "defaultValue",
+        "placeholder",
         "options",
         "required",
         "readOnly",
@@ -160,6 +192,107 @@ export const createControlSlice: EditorStoreSlice<
       );
 
       return { ...state, fields: nextFields, isDirty: true };
+    });
+  },
+
+  resetFieldToDefault: (id) => {
+    const targetField = get().fields.find((field) => field.id === id);
+    if (!targetField) return;
+
+    if (targetField.type === FieldType.RADIO) {
+      const nextFields = get().fields.map((field) => {
+        if (field.type !== FieldType.RADIO || field.name !== targetField.name) {
+          return field;
+        }
+
+        return {
+          ...field,
+          isChecked: !!field.isDefaultChecked,
+        };
+      });
+
+      const changed = nextFields.some((field, index) => {
+        const current = get().fields[index];
+        return current && field.isChecked !== current.isChecked;
+      });
+
+      if (!changed) return;
+
+      const { saveCheckpoint } = get();
+      saveCheckpoint();
+      set((state) => ({
+        ...state,
+        fields: nextFields,
+        selectedId: id,
+        isDirty: true,
+      }));
+      return;
+    }
+
+    const resetUpdates: Partial<FormField> = (() => {
+      switch (targetField.type) {
+        case FieldType.TEXT:
+        case FieldType.DROPDOWN:
+          return { value: targetField.defaultValue ?? "" };
+        case FieldType.CHECKBOX:
+          return { isChecked: !!targetField.isDefaultChecked };
+        case FieldType.SIGNATURE:
+          return { signatureData: undefined };
+        default:
+          return {};
+      }
+    })();
+
+    const changed = Object.entries(resetUpdates).some(([key, value]) => {
+      const typedKey = key as keyof FormField;
+      return targetField[typedKey] !== value;
+    });
+
+    if (!changed) return;
+
+    const { saveCheckpoint, updateField } = get();
+    saveCheckpoint();
+    updateField(id, resetUpdates);
+  },
+
+  reorderControlLayer: (id, move) => {
+    const { saveCheckpoint } = get();
+    saveCheckpoint();
+    set((state) => {
+      const target =
+        state.fields.find((field) => field.id === id) ||
+        state.annotations.find((annotation) => annotation.id === id);
+      if (!target) return state;
+
+      const reordered = reorderControlLayer({
+        fields: state.fields,
+        annotations: state.annotations,
+        targetId: id,
+        move,
+      });
+
+      if (!reordered.changed) return state;
+
+      const updatedAt = new Date().toISOString();
+      const nextAnnotations = reordered.annotations.map((annotation) => {
+        if (annotation.pageIndex !== target.pageIndex) return annotation;
+        if (!annotation.sourcePdfRef || annotation.isEdited === true) {
+          return annotation;
+        }
+        return {
+          ...annotation,
+          isEdited: true,
+          updatedAt,
+        } satisfies Annotation;
+      });
+
+      return {
+        ...state,
+        fields: reordered.fields,
+        annotations: nextAnnotations,
+        selectedId: id,
+        isDirty: true,
+      };
     });
   },
 
