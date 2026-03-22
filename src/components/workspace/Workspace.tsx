@@ -59,6 +59,13 @@ import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 import { openExternalUrl } from "@/services/platform";
+import {
+  getRectAndNormalizedShapePoints,
+  getShapePointsPathData,
+  isOpenLineShapeType,
+  snapShapePointToAngle,
+  shapeSupportsFill,
+} from "@/lib/shapeGeometry";
 
 const WorkspaceZoomJankOverlay = React.lazy(
   () => import("./debug/WorkspaceZoomJankOverlay"),
@@ -116,6 +123,13 @@ type Rect = {
 };
 
 type TextSelectionPayload = NonNullable<TextSelectionToolbarState["selection"]>;
+type Point = { x: number; y: number };
+type ShapeDraftSession = {
+  tool: "draw_shape_polyline" | "draw_shape_polygon";
+  pageIndex: number;
+  points: Point[];
+  hoverPoint: Point | null;
+};
 
 const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
@@ -209,6 +223,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
   } | null>(null);
   const [activePageIndex, setActivePageIndex] = useState<number | null>(null);
   const [isPinchZooming, setIsPinchZooming] = useState(false);
+  const [shapeDraftSession, setShapeDraftSession] =
+    useState<ShapeDraftSession | null>(null);
+  const shapeDraftSessionRef = useRef<ShapeDraftSession | null>(null);
 
   // Ink specific state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -363,6 +380,172 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
     appEventBus.emit("workspace:askAi", attachment, { sticky: true });
   }, []);
+
+  const createShapeAnnotationBase = useCallback(
+    (
+      shapeType: NonNullable<Annotation["shapeType"]>,
+      pageIndex: number,
+    ): Pick<
+      Annotation,
+      | "pageIndex"
+      | "type"
+      | "shapeType"
+      | "color"
+      | "thickness"
+      | "opacity"
+      | "backgroundColor"
+      | "shapeStartArrow"
+      | "shapeEndArrow"
+      | "shapeStartArrowStyle"
+      | "shapeEndArrowStyle"
+      | "arrowSize"
+      | "cloudIntensity"
+      | "cloudSpacing"
+    > => ({
+      pageIndex,
+      type: "shape",
+      shapeType,
+      color: editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color,
+      thickness:
+        editorState.shapeStyle?.thickness || ANNOTATION_STYLES.shape.thickness,
+      opacity:
+        editorState.shapeStyle?.opacity ?? ANNOTATION_STYLES.shape.opacity,
+      backgroundColor: shapeSupportsFill(shapeType)
+        ? editorState.shapeStyle?.backgroundColor
+        : undefined,
+      shapeStartArrow: shapeType === "arrow" ? false : undefined,
+      shapeEndArrow: shapeType === "arrow" ? true : undefined,
+      shapeStartArrowStyle: undefined,
+      shapeEndArrowStyle: shapeType === "arrow" ? "closed_arrow" : undefined,
+      arrowSize: isOpenLineShapeType(shapeType)
+        ? (editorState.shapeStyle?.arrowSize ??
+          ANNOTATION_STYLES.shape.arrowSize)
+        : undefined,
+      cloudIntensity:
+        shapeType === "cloud"
+          ? editorState.shapeStyle?.cloudIntensity ||
+            ANNOTATION_STYLES.shape.cloudIntensity
+          : undefined,
+      cloudSpacing:
+        shapeType === "cloud"
+          ? (editorState.shapeStyle?.cloudSpacing ??
+            ANNOTATION_STYLES.shape.cloudSpacing)
+          : undefined,
+    }),
+    [editorState.shapeStyle],
+  );
+
+  const addShapeFromRect = useCallback(
+    (
+      shapeType: "square" | "circle" | "cloud",
+      pageIndex: number,
+      rect: Rect,
+    ) => {
+      onAddAnnotation({
+        id: `shape_${Date.now()}`,
+        rect,
+        ...createShapeAnnotationBase(shapeType, pageIndex),
+      });
+    },
+    [createShapeAnnotationBase, onAddAnnotation],
+  );
+
+  const addShapeFromPoints = useCallback(
+    (
+      shapeType: "line" | "polyline" | "polygon" | "arrow",
+      pageIndex: number,
+      points: Point[],
+    ) => {
+      const normalized = getRectAndNormalizedShapePoints(points);
+      if (!normalized) return;
+      onAddAnnotation({
+        id: `shape_${Date.now()}`,
+        rect: normalized.rect,
+        shapePoints: normalized.shapePoints,
+        ...createShapeAnnotationBase(shapeType, pageIndex),
+      });
+    },
+    [createShapeAnnotationBase, onAddAnnotation],
+  );
+
+  const finalizeShapeDraftSession = useCallback(
+    (draft: ShapeDraftSession | null) => {
+      if (!draft) return false;
+      const minPointCount = draft.tool === "draw_shape_polygon" ? 3 : 2;
+      if (draft.points.length < minPointCount) {
+        shapeDraftSessionRef.current = null;
+        setShapeDraftSession(null);
+        setActivePageIndex(null);
+        return false;
+      }
+
+      addShapeFromPoints(
+        draft.tool === "draw_shape_polygon" ? "polygon" : "polyline",
+        draft.pageIndex,
+        draft.points,
+      );
+
+      shapeDraftSessionRef.current = null;
+      setShapeDraftSession(null);
+      setActivePageIndex(null);
+      const shouldKeepContinuousDrawing =
+        editorState.keys.ctrl || editorState.keys.meta;
+      if (!shouldKeepContinuousDrawing) {
+        onToolChange("select");
+      }
+      return true;
+    },
+    [
+      addShapeFromPoints,
+      editorState.keys.ctrl,
+      editorState.keys.meta,
+      onToolChange,
+    ],
+  );
+
+  const getShiftConstrainedShapePoint = useCallback(
+    (anchor: Point, point: Point) => snapShapePointToAngle(anchor, point, 15),
+    [],
+  );
+
+  useEffect(() => {
+    if (
+      editorState.mode !== "annotation" ||
+      (editorState.tool !== "draw_shape_polyline" &&
+        editorState.tool !== "draw_shape_polygon")
+    ) {
+      shapeDraftSessionRef.current = null;
+      setShapeDraftSession(null);
+      setActivePageIndex((prev) => (shapeDraftSession ? null : prev));
+    }
+  }, [editorState.mode, editorState.tool, shapeDraftSession]);
+
+  useEffect(() => {
+    if (!shapeDraftSession) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        shapeDraftSessionRef.current = null;
+        setShapeDraftSession(null);
+        setActivePageIndex(null);
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        finalizeShapeDraftSession(shapeDraftSession);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [finalizeShapeDraftSession, shapeDraftSession]);
+
+  useEffect(() => {
+    shapeDraftSessionRef.current = shapeDraftSession;
+  }, [shapeDraftSession]);
 
   useAppEvent(
     "workspace:navigatePage",
@@ -542,6 +725,36 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setIsDrawing(false);
     setIsErasing(false);
   }, []);
+
+  const isFocusedResizeLikeHandleForControl = useCallback(
+    (controlId: string, kind: "field" | "annotation") => {
+      if (typeof document === "undefined") return false;
+
+      const activeElement =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      if (!activeElement) return false;
+
+      const handleElement = activeElement.closest(
+        "[data-ff-keyboard-handle]",
+      ) as HTMLElement | null;
+      if (!handleElement) return false;
+
+      const handleType = handleElement.dataset.ffKeyboardHandle;
+      if (handleType !== "control-resize" && handleType !== "freetext-rotate") {
+        return false;
+      }
+
+      const wrapperId =
+        kind === "annotation"
+          ? `annotation-${controlId}`
+          : `field-element-${controlId}`;
+      const wrapper = document.getElementById(wrapperId);
+      return !!wrapper && wrapper.contains(handleElement);
+    },
+    [],
+  );
 
   const abortActiveInteractions = useCallback(() => {
     endPan();
@@ -978,15 +1191,43 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const deltaX = currentCoords.x - resizeStart.mouseX;
       const deltaY = currentCoords.y - resizeStart.mouseY;
 
-      if (resizeHandle.includes("e")) newW += deltaX;
-      if (resizeHandle.includes("w")) {
-        newX += deltaX;
-        newW -= deltaX;
-      }
-      if (resizeHandle.includes("s")) newH += deltaY;
-      if (resizeHandle.includes("n")) {
-        newY += deltaY;
-        newH -= deltaY;
+      if (
+        annot.type === "shape" &&
+        (annot.shapeType === "square" ||
+          annot.shapeType === "circle" ||
+          annot.shapeType === "cloud") &&
+        editorState.keys.shift &&
+        (resizeHandle === "nw" ||
+          resizeHandle === "ne" ||
+          resizeHandle === "sw" ||
+          resizeHandle === "se")
+      ) {
+        const widthChange = resizeHandle.includes("w") ? -deltaX : deltaX;
+        const heightChange = resizeHandle.includes("n") ? -deltaY : deltaY;
+        const dominant =
+          Math.abs(widthChange) >= Math.abs(heightChange)
+            ? widthChange
+            : heightChange;
+
+        newW = resizeStart.originalRect.width + dominant;
+        newH = resizeStart.originalRect.height + dominant;
+        if (resizeHandle.includes("w")) {
+          newX = resizeStart.originalRect.x - dominant;
+        }
+        if (resizeHandle.includes("n")) {
+          newY = resizeStart.originalRect.y - dominant;
+        }
+      } else {
+        if (resizeHandle.includes("e")) newW += deltaX;
+        if (resizeHandle.includes("w")) {
+          newX += deltaX;
+          newW -= deltaX;
+        }
+        if (resizeHandle.includes("s")) newH += deltaY;
+        if (resizeHandle.includes("n")) {
+          newY += deltaY;
+          newH -= deltaY;
+        }
       }
 
       // Minimum size check
@@ -1384,12 +1625,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
   // --- Handlers ---
   const handleContainerPointerDown = (e: React.PointerEvent) => {
     if (pinchGestureActiveRef.current) return;
+    if (e.button !== 0) return;
     if (startPan(e)) return;
   };
 
   const handlePointerDown = (e: React.PointerEvent, pageIndex: number) => {
     if (pinchGestureActiveRef.current) return;
-    if (e.button === 1) return;
+    if (e.button !== 0) return;
     if (isPanModeActive) return;
 
     const isTextLayerHit = (() => {
@@ -1505,11 +1747,75 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return;
     }
 
+    if (
+      editorState.mode === "annotation" &&
+      (editorState.tool === "draw_shape_polyline" ||
+        editorState.tool === "draw_shape_polygon")
+    ) {
+      const coords = getRelativeCoords(e, pageIndex);
+      const constrainedCoords =
+        e.shiftKey &&
+        shapeDraftSession &&
+        shapeDraftSession.tool === editorState.tool &&
+        shapeDraftSession.pageIndex === pageIndex &&
+        shapeDraftSession.points.length > 0
+          ? getShiftConstrainedShapePoint(
+              shapeDraftSession.points[shapeDraftSession.points.length - 1]!,
+              coords,
+            )
+          : coords;
+      const nextDraft =
+        shapeDraftSession &&
+        shapeDraftSession.tool === editorState.tool &&
+        shapeDraftSession.pageIndex === pageIndex
+          ? {
+              ...shapeDraftSession,
+              points: [...shapeDraftSession.points, constrainedCoords],
+              hoverPoint: constrainedCoords,
+            }
+          : {
+              tool: editorState.tool,
+              pageIndex,
+              points: [constrainedCoords],
+              hoverPoint: constrainedCoords,
+            };
+
+      if (e.detail >= 2) {
+        shapeDraftSessionRef.current = null;
+        void finalizeShapeDraftSession(nextDraft);
+      } else {
+        shapeDraftSessionRef.current = nextDraft;
+        setShapeDraftSession(nextDraft);
+        setActivePageIndex(pageIndex);
+        onSelectControl(null);
+      }
+      return;
+    }
+
     setGlobalCursor("crosshair");
     setActivePageIndex(pageIndex);
     const coords = getRelativeCoords(e, pageIndex);
     setDragStart(coords);
     setDragCurrent(coords);
+  };
+
+  const handlePageContextMenu = (
+    e: React.MouseEvent<HTMLDivElement>,
+    pageIndex: number,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const draft = shapeDraftSessionRef.current;
+    const isShapeDraftTool =
+      editorState.mode === "annotation" &&
+      (editorState.tool === "draw_shape_polyline" ||
+        editorState.tool === "draw_shape_polygon");
+
+    if (!isShapeDraftTool || !draft || draft.pageIndex !== pageIndex) {
+      return;
+    }
+    void finalizeShapeDraftSession(draft);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -1523,6 +1829,29 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setSnapLines([]);
 
     const coords = getRelativeCoords(e, activePageIndex);
+
+    if (
+      shapeDraftSession &&
+      shapeDraftSession.pageIndex === activePageIndex &&
+      (editorState.tool === "draw_shape_polyline" ||
+        editorState.tool === "draw_shape_polygon")
+    ) {
+      const nextHoverPoint =
+        editorState.keys.shift && shapeDraftSession.points.length > 0
+          ? getShiftConstrainedShapePoint(
+              shapeDraftSession.points[shapeDraftSession.points.length - 1]!,
+              coords,
+            )
+          : coords;
+      setShapeDraftSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              hoverPoint: nextHoverPoint,
+            }
+          : prev,
+      );
+    }
 
     // --- INK DRAWING ---
     if (
@@ -1552,7 +1881,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
       let newX = coords.x;
       let newY = coords.y;
 
-      if (editorState.keys.shift) {
+      if (
+        editorState.mode === "annotation" &&
+        (editorState.tool === "draw_shape_line" ||
+          editorState.tool === "draw_shape_arrow") &&
+        editorState.keys.shift
+      ) {
+        const snapped = getShiftConstrainedShapePoint(dragStart, coords);
+        newX = snapped.x;
+        newY = snapped.y;
+      } else if (editorState.keys.shift) {
         const dx = coords.x - dragStart.x;
         const dy = coords.y - dragStart.y;
         const maxDim = Math.max(Math.abs(dx), Math.abs(dy));
@@ -1635,8 +1973,31 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const height = Math.abs(dragCurrent.y - dragStart.y);
       const x = Math.min(dragStart.x, dragCurrent.x);
       const y = Math.min(dragStart.y, dragCurrent.y);
+      const distance = Math.hypot(
+        dragCurrent.x - dragStart.x,
+        dragCurrent.y - dragStart.y,
+      );
 
-      if (width > 5 && height > 5) {
+      if (
+        editorState.mode === "annotation" &&
+        (editorState.tool === "draw_shape_line" ||
+          editorState.tool === "draw_shape_arrow") &&
+        distance > 5
+      ) {
+        addShapeFromPoints(
+          editorState.tool === "draw_shape_arrow" ? "arrow" : "line",
+          activePageIndex,
+          [dragStart, dragCurrent],
+        );
+
+        if (
+          !editorState.keys.shift &&
+          !editorState.keys.ctrl &&
+          shouldSwitchToSelectAfterUse(editorState.tool)
+        ) {
+          onToolChange("select");
+        }
+      } else if (width > 5 && height > 5) {
         if (editorState.mode === "form") {
           let type = FieldType.TEXT;
           if (editorState.tool === "draw_checkbox") type = FieldType.CHECKBOX;
@@ -1704,6 +2065,48 @@ const Workspace: React.FC<WorkspaceProps> = ({
             ) {
               onToolChange("select");
             }
+          } else if (editorState.tool === "draw_shape_rect") {
+            addShapeFromRect("square", activePageIndex, {
+              x,
+              y,
+              width,
+              height,
+            });
+            if (
+              !editorState.keys.shift &&
+              !editorState.keys.ctrl &&
+              shouldSwitchToSelectAfterUse("draw_shape_rect")
+            ) {
+              onToolChange("select");
+            }
+          } else if (editorState.tool === "draw_shape_ellipse") {
+            addShapeFromRect("circle", activePageIndex, {
+              x,
+              y,
+              width,
+              height,
+            });
+            if (
+              !editorState.keys.shift &&
+              !editorState.keys.ctrl &&
+              shouldSwitchToSelectAfterUse("draw_shape_ellipse")
+            ) {
+              onToolChange("select");
+            }
+          } else if (editorState.tool === "draw_shape_cloud") {
+            addShapeFromRect("cloud", activePageIndex, {
+              x,
+              y,
+              width,
+              height,
+            });
+            if (
+              !editorState.keys.shift &&
+              !editorState.keys.ctrl &&
+              shouldSwitchToSelectAfterUse("draw_shape_cloud")
+            ) {
+              onToolChange("select");
+            }
           } else if (editorState.tool === "draw_comment") {
             // Handled in handlePointerDown now for immediate click-to-place
           }
@@ -1742,14 +2145,23 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
     }
 
+    const shouldKeepShapeDraftActive =
+      !!shapeDraftSessionRef.current &&
+      (editorState.tool === "draw_shape_polyline" ||
+        editorState.tool === "draw_shape_polygon");
+
     clearActiveInteractionState();
+
+    if (shouldKeepShapeDraftActive) {
+      setActivePageIndex(shapeDraftSession?.pageIndex ?? null);
+    }
   };
 
   const handleFieldPointerDown = useCallback(
     (e: React.PointerEvent, field: FormField) => {
       const state = editorStateRef.current;
       if (pinchGestureActiveRef.current) return;
-      if (e.button === 1) return;
+      if (e.button !== 0) return;
       if (isPanModeActive) return;
 
       // If we are in Annotation mode, we allow selection but prevent drag logic.
@@ -1766,6 +2178,18 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       e.stopPropagation();
       e.preventDefault();
+
+      if (
+        state.selectedId === field.id &&
+        isFocusedResizeLikeHandleForControl(field.id, "field")
+      ) {
+        if (typeof document !== "undefined") {
+          (document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null
+          )?.blur();
+        }
+      }
 
       // Ensure mouse position is tracked immediately
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -1839,6 +2263,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       onAddField,
       getRelativeCoords,
       isPanModeActive,
+      isFocusedResizeLikeHandleForControl,
     ],
   );
 
@@ -1846,7 +2271,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     (e: React.PointerEvent, annotation: Annotation) => {
       const state = editorStateRef.current;
       if (pinchGestureActiveRef.current) return;
-      if (e.button === 1) return;
+      if (e.button !== 0) return;
       if (isPanModeActive) return;
 
       // Don't swallow event if erasing
@@ -1854,6 +2279,18 @@ const Workspace: React.FC<WorkspaceProps> = ({
       e.stopPropagation();
       e.preventDefault();
       if (state.tool !== "select") return;
+
+      if (
+        state.selectedId === annotation.id &&
+        isFocusedResizeLikeHandleForControl(annotation.id, "annotation")
+      ) {
+        if (typeof document !== "undefined") {
+          (document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null
+          )?.blur();
+        }
+      }
 
       // Ensure mouse position is tracked immediately
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -1892,6 +2329,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       getRelativeCoords,
       isPanModeActive,
       getRotatedFreetextOuterRect,
+      isFocusedResizeLikeHandleForControl,
     ],
   );
 
@@ -1899,7 +2337,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     (handle: string, e: React.PointerEvent, data: FormField | Annotation) => {
       const state = editorStateRef.current;
       if (pinchGestureActiveRef.current) return;
-      if (e.button === 1) return;
+      if (e.button !== 0) return;
       if (isPanModeActive) return;
       e.stopPropagation();
 
@@ -1916,7 +2354,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const coords = getRelativeCoords(e, data.pageIndex);
 
       if (
-        ["freetext", "ink", "highlight", "comment", "link"].includes(data.type)
+        ["freetext", "ink", "highlight", "comment", "link", "shape"].includes(
+          data.type,
+        )
       ) {
         setResizingAnnotationId(data.id);
       } else {
@@ -1967,93 +2407,157 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   // --- Render Helpers ---
 
-  const renderPage = (page: (typeof pagesWithControls)[number]) => (
-    <div
-      id={`page-${page.pageIndex}`}
-      className="relative w-fit flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
-      data-ff-text-selecting={
-        textSelectingPages[page.pageIndex] ? "1" : undefined
-      }
-      style={{
-        cursor: editorState.tool === "draw_highlight" ? "crosshair" : undefined,
-      }}
-      onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
-    >
-      <PDFPage
-        page={page}
-        scale={editorState.scale}
-        isSelectMode={
-          editorState.tool === "select" || editorState.tool === "draw_highlight"
-        }
-        isHighlighting={editorState.tool === "draw_highlight"}
-        highlightColor={
-          editorState.highlightStyle?.color || ANNOTATION_STYLES.highlight.color
-        }
-        highlightOpacity={
-          editorState.highlightStyle?.opacity ??
-          ANNOTATION_STYLES.highlight.opacity
-        }
-        textLayerCursor={
-          editorState.tool === "draw_highlight" ? "crosshair" : undefined
-        }
-        searchResults={pdfSearchResultsByPage?.get(page.pageIndex) ?? []}
-        activeSearchResultId={activePdfSearchResultId}
-      />
+  const renderPage = (page: (typeof pagesWithControls)[number]) => {
+    const shapeDraftPreviewPoints =
+      shapeDraftSession && shapeDraftSession.pageIndex === page.pageIndex
+        ? [
+            ...shapeDraftSession.points,
+            ...(shapeDraftSession.hoverPoint &&
+            (shapeDraftSession.points.length === 0 ||
+              shapeDraftSession.hoverPoint.x !==
+                shapeDraftSession.points[shapeDraftSession.points.length - 1]!
+                  .x ||
+              shapeDraftSession.hoverPoint.y !==
+                shapeDraftSession.points[shapeDraftSession.points.length - 1]!
+                  .y)
+              ? [shapeDraftSession.hoverPoint]
+              : []),
+          ]
+        : null;
 
-      {editorState.pageTranslateOptions.useParagraphs &&
-        (paragraphCandidatesByPage.get(page.pageIndex)?.length ?? 0) > 0 && (
-          <svg
-            className="absolute inset-0 z-10"
-            viewBox={`0 0 ${page.width} ${page.height}`}
-            preserveAspectRatio="none"
-            style={{ pointerEvents: isSelectable ? "auto" : "none" }}
-            onPointerDown={(e) => {
-              if (!isSelectable) return;
-              if (e.target !== e.currentTarget) return;
-              e.stopPropagation();
-              onSelectControl(null);
-              onClearPageTranslateParagraphSelection?.();
-            }}
-          >
-            {(paragraphCandidatesByPage.get(page.pageIndex) ?? []).map((c) => {
-              const isSelected = selectedParagraphIds.has(c.id);
-              const stroke = c.isExcluded ? "#9ca3af" : "#a855f7";
-              const fill = isSelected
-                ? c.isExcluded
-                  ? "rgba(156, 163, 175, 0.18)"
-                  : "rgba(168, 85, 247, 0.18)"
-                : "transparent";
+    return (
+      <div
+        id={`page-${page.pageIndex}`}
+        className="relative w-fit flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
+        data-ff-text-selecting={
+          textSelectingPages[page.pageIndex] ? "1" : undefined
+        }
+        style={{
+          cursor:
+            editorState.tool === "draw_highlight" ? "crosshair" : undefined,
+        }}
+        onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
+        onContextMenu={(e) => handlePageContextMenu(e, page.pageIndex)}
+      >
+        <PDFPage
+          page={page}
+          scale={editorState.scale}
+          isSelectMode={
+            editorState.tool === "select" ||
+            editorState.tool === "draw_highlight"
+          }
+          isHighlighting={editorState.tool === "draw_highlight"}
+          highlightColor={
+            editorState.highlightStyle?.color ||
+            ANNOTATION_STYLES.highlight.color
+          }
+          highlightOpacity={
+            editorState.highlightStyle?.opacity ??
+            ANNOTATION_STYLES.highlight.opacity
+          }
+          textLayerCursor={
+            editorState.tool === "draw_highlight" ? "crosshair" : undefined
+          }
+          searchResults={pdfSearchResultsByPage?.get(page.pageIndex) ?? []}
+          activeSearchResultId={activePdfSearchResultId}
+        />
 
-              const rotationDeg =
-                typeof c.rotationDeg === "number" &&
-                Number.isFinite(c.rotationDeg)
-                  ? c.rotationDeg
-                  : 0;
+        {editorState.pageTranslateOptions.useParagraphs &&
+          (paragraphCandidatesByPage.get(page.pageIndex)?.length ?? 0) > 0 && (
+            <svg
+              className="absolute inset-0 z-10"
+              viewBox={`0 0 ${page.width} ${page.height}`}
+              preserveAspectRatio="none"
+              style={{ pointerEvents: isSelectable ? "auto" : "none" }}
+              onPointerDown={(e) => {
+                if (!isSelectable) return;
+                if (e.target !== e.currentTarget) return;
+                e.stopPropagation();
+                onSelectControl(null);
+                onClearPageTranslateParagraphSelection?.();
+              }}
+            >
+              {(paragraphCandidatesByPage.get(page.pageIndex) ?? []).map(
+                (c) => {
+                  const isSelected = selectedParagraphIds.has(c.id);
+                  const stroke = c.isExcluded ? "#9ca3af" : "#a855f7";
+                  const fill = isSelected
+                    ? c.isExcluded
+                      ? "rgba(156, 163, 175, 0.18)"
+                      : "rgba(168, 85, 247, 0.18)"
+                    : "transparent";
 
-              if (rotationDeg !== 0) {
-                const ir = c.innerRect;
-                const inner =
-                  ir && Number.isFinite(ir.width) && Number.isFinite(ir.height)
-                    ? { width: ir.width, height: ir.height }
-                    : getInnerSizeFromOuterAabb(c.rect, rotationDeg);
-                const cx =
-                  ir && Number.isFinite(ir.x) && Number.isFinite(ir.width)
-                    ? ir.x + ir.width / 2
-                    : c.rect.x + c.rect.width / 2;
-                const cy =
-                  ir && Number.isFinite(ir.y) && Number.isFinite(ir.height)
-                    ? ir.y + ir.height / 2
-                    : c.rect.y + c.rect.height / 2;
+                  const rotationDeg =
+                    typeof c.rotationDeg === "number" &&
+                    Number.isFinite(c.rotationDeg)
+                      ? c.rotationDeg
+                      : 0;
 
-                return (
-                  <g key={c.id}>
+                  if (rotationDeg !== 0) {
+                    const ir = c.innerRect;
+                    const inner =
+                      ir &&
+                      Number.isFinite(ir.width) &&
+                      Number.isFinite(ir.height)
+                        ? { width: ir.width, height: ir.height }
+                        : getInnerSizeFromOuterAabb(c.rect, rotationDeg);
+                    const cx =
+                      ir && Number.isFinite(ir.x) && Number.isFinite(ir.width)
+                        ? ir.x + ir.width / 2
+                        : c.rect.x + c.rect.width / 2;
+                    const cy =
+                      ir && Number.isFinite(ir.y) && Number.isFinite(ir.height)
+                        ? ir.y + ir.height / 2
+                        : c.rect.y + c.rect.height / 2;
+
+                    return (
+                      <g key={c.id}>
+                        <rect
+                          x={c.rect.x}
+                          y={c.rect.y}
+                          width={c.rect.width}
+                          height={c.rect.height}
+                          fill="transparent"
+                          stroke="transparent"
+                          vectorEffect="non-scaling-stroke"
+                          onPointerDown={(e) => {
+                            if (!isSelectable) return;
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onSelectControl(null);
+                            onSelectPageTranslateParagraphId?.(c.id, {
+                              additive: e.ctrlKey || e.metaKey || e.shiftKey,
+                            });
+                          }}
+                        />
+                        <rect
+                          x={cx - inner.width / 2}
+                          y={cy - inner.height / 2}
+                          width={inner.width}
+                          height={inner.height}
+                          fill={fill}
+                          stroke={stroke}
+                          strokeWidth={isSelected ? 2 : 1}
+                          strokeDasharray={c.isExcluded ? "4 2" : undefined}
+                          vectorEffect="non-scaling-stroke"
+                          transform={`rotate(${rotationDeg}, ${cx}, ${cy})`}
+                          style={{ pointerEvents: "none" }}
+                        />
+                      </g>
+                    );
+                  }
+
+                  return (
                     <rect
+                      key={c.id}
                       x={c.rect.x}
                       y={c.rect.y}
                       width={c.rect.width}
                       height={c.rect.height}
-                      fill="transparent"
-                      stroke="transparent"
+                      fill={fill}
+                      stroke={stroke}
+                      strokeWidth={isSelected ? 2 : 1}
+                      strokeDasharray={c.isExcluded ? "4 2" : undefined}
                       vectorEffect="non-scaling-stroke"
                       onPointerDown={(e) => {
                         if (!isSelectable) return;
@@ -2065,183 +2569,207 @@ const Workspace: React.FC<WorkspaceProps> = ({
                         });
                       }}
                     />
-                    <rect
-                      x={cx - inner.width / 2}
-                      y={cy - inner.height / 2}
-                      width={inner.width}
-                      height={inner.height}
-                      fill={fill}
-                      stroke={stroke}
-                      strokeWidth={isSelected ? 2 : 1}
-                      strokeDasharray={c.isExcluded ? "4 2" : undefined}
-                      vectorEffect="non-scaling-stroke"
-                      transform={`rotate(${rotationDeg}, ${cx}, ${cy})`}
-                      style={{ pointerEvents: "none" }}
-                    />
-                  </g>
-                );
-              }
+                  );
+                },
+              )}
+            </svg>
+          )}
 
-              return (
-                <rect
-                  key={c.id}
-                  x={c.rect.x}
-                  y={c.rect.y}
-                  width={c.rect.width}
-                  height={c.rect.height}
-                  fill={fill}
-                  stroke={stroke}
-                  strokeWidth={isSelected ? 2 : 1}
-                  strokeDasharray={c.isExcluded ? "4 2" : undefined}
-                  vectorEffect="non-scaling-stroke"
-                  onPointerDown={(e) => {
-                    if (!isSelectable) return;
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onSelectControl(null);
-                    onSelectPageTranslateParagraphId?.(c.id, {
-                      additive: e.ctrlKey || e.metaKey || e.shiftKey,
-                    });
-                  }}
-                />
-              );
-            })}
-          </svg>
-        )}
-
-      <div
-        className={cn("absolute inset-0 scheme-light")}
-        style={{
-          cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
-          pointerEvents: isPanModeActive
-            ? "auto"
-            : editorState.tool === "select" ||
-                editorState.tool === "draw_highlight"
-              ? "none"
-              : undefined,
-        }}
-        onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
-      >
-        {page.pageFields.map((field) => (
-          <ControlRenderer
-            key={field.id}
-            data={field}
-            id={field.id}
-            isSelected={editorState.selectedId === field.id}
-            isAnnotationMode={editorState.mode === "annotation"}
-            isFormMode={editorState.mode === "form"}
-            isSelectable={isSelectable}
-            onControlPointerDown={handleFieldPointerDown}
-            onSelect={onSelectControl}
-            onUpdate={onUpdateField}
-            onControlResizeStart={handleResizePointerDown}
-          />
-        ))}
-        {page.pageAnnotations.map((annot) => {
-          const allowSelect = annot.type !== "link";
-
-          return (
+        <div
+          className={cn("absolute inset-0 scheme-light")}
+          style={{
+            cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
+            pointerEvents: isPanModeActive
+              ? "auto"
+              : editorState.tool === "select" ||
+                  editorState.tool === "draw_highlight"
+                ? "none"
+                : undefined,
+          }}
+          onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
+        >
+          {page.pageFields.map((field) => (
             <ControlRenderer
-              key={annot.id}
-              data={annot}
-              id={annot.id}
-              isSelected={editorState.selectedId === annot.id}
+              key={field.id}
+              data={field}
+              id={field.id}
+              isSelected={editorState.selectedId === field.id}
+              zoom={editorState.scale}
               isAnnotationMode={editorState.mode === "annotation"}
               isFormMode={editorState.mode === "form"}
               isSelectable={isSelectable}
-              onControlPointerDown={
-                allowSelect ? handleAnnotationPointerDown : undefined
-              }
+              onControlPointerDown={handleFieldPointerDown}
               onSelect={onSelectControl}
-              onUpdate={onUpdateAnnotation}
-              onDelete={onDeleteAnnotation}
-              onEdit={onEditAnnotation}
-              onAskAi={() => {
-                handleAskAiFromAnnotation(annot);
-              }}
+              onUpdate={onUpdateField}
               onControlResizeStart={handleResizePointerDown}
-            />
-          );
-        })}
-
-        {dragStart && dragCurrent && activePageIndex === page.pageIndex && (
-          <div
-            className={cn(
-              "pointer-events-none absolute border-2",
-              editorState.mode === "form"
-                ? "border-blue-500 bg-blue-500/20"
-                : "border-yellow-500 bg-yellow-500/20",
-            )}
-            style={{
-              left: Math.min(dragStart.x, dragCurrent.x) * editorState.scale,
-              top: Math.min(dragStart.y, dragCurrent.y) * editorState.scale,
-              width: Math.abs(dragCurrent.x - dragStart.x) * editorState.scale,
-              height: Math.abs(dragCurrent.y - dragStart.y) * editorState.scale,
-            }}
-          />
-        )}
-      </div>
-
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-        viewBox={`0 0 ${page.width} ${page.height}`}
-        preserveAspectRatio="none"
-      >
-        {isDrawing && activePageIndex === page.pageIndex && (
-          <path
-            ref={liveInkPathRef}
-            d={pointsToPathLib(currentPathRef.current)}
-            stroke={
-              editorState.tool === "draw_highlight"
-                ? editorState.highlightStyle?.color ||
-                  ANNOTATION_STYLES.highlight.color
-                : editorState.penStyle.color
-            }
-            strokeWidth={
-              editorState.tool === "draw_highlight"
-                ? editorState.highlightStyle?.thickness ||
-                  ANNOTATION_STYLES.highlight.thickness
-                : editorState.penStyle.thickness
-            }
-            fill="none"
-            strokeLinecap={
-              editorState.tool === "draw_highlight" ? "butt" : "round"
-            }
-            strokeLinejoin="round"
-            opacity={
-              editorState.tool === "draw_highlight"
-                ? (editorState.highlightStyle?.opacity ??
-                  ANNOTATION_STYLES.highlight.opacity)
-                : editorState.penStyle.opacity
-            }
-          />
-        )}
-      </svg>
-
-      {activePageIndex === page.pageIndex && snapLines.length > 0 && (
-        <div className="pointer-events-none absolute inset-0 z-50">
-          {snapLines.map((line, idx) => (
-            <div
-              key={idx}
-              className="absolute border-dashed border-red-500 opacity-70"
-              style={{
-                borderWidth: 0,
-                [line.type === "vertical"
-                  ? "borderLeftWidth"
-                  : "borderTopWidth"]: "1px",
-                left:
-                  line.type === "vertical" ? line.pos * editorState.scale : 0,
-                top:
-                  line.type === "horizontal" ? line.pos * editorState.scale : 0,
-                width: line.type === "vertical" ? "1px" : "100%",
-                height: line.type === "horizontal" ? "1px" : "100%",
-              }}
+              onTriggerHistorySave={onTriggerHistorySave}
             />
           ))}
+          {page.pageAnnotations.map((annot) => {
+            const allowSelect = annot.type !== "link";
+
+            return (
+              <ControlRenderer
+                key={annot.id}
+                data={annot}
+                id={annot.id}
+                isSelected={editorState.selectedId === annot.id}
+                zoom={editorState.scale}
+                isAnnotationMode={editorState.mode === "annotation"}
+                isFormMode={editorState.mode === "form"}
+                isSelectable={isSelectable}
+                onControlPointerDown={
+                  allowSelect ? handleAnnotationPointerDown : undefined
+                }
+                onSelect={onSelectControl}
+                onUpdate={onUpdateAnnotation}
+                onDelete={onDeleteAnnotation}
+                onEdit={onEditAnnotation}
+                onAskAi={() => {
+                  handleAskAiFromAnnotation(annot);
+                }}
+                onControlResizeStart={handleResizePointerDown}
+                onTriggerHistorySave={onTriggerHistorySave}
+              />
+            );
+          })}
+
+          {dragStart && dragCurrent && activePageIndex === page.pageIndex && (
+            <>
+              {editorState.mode === "annotation" &&
+              (editorState.tool === "draw_shape_line" ||
+                editorState.tool === "draw_shape_arrow") ? (
+                <svg
+                  className="pointer-events-none absolute inset-0"
+                  viewBox={`0 0 ${page.width} ${page.height}`}
+                  preserveAspectRatio="none"
+                >
+                  <line
+                    x1={dragStart.x}
+                    y1={dragStart.y}
+                    x2={dragCurrent.x}
+                    y2={dragCurrent.y}
+                    stroke={
+                      editorState.shapeStyle?.color ||
+                      ANNOTATION_STYLES.shape.color
+                    }
+                    strokeWidth={
+                      editorState.shapeStyle?.thickness ||
+                      ANNOTATION_STYLES.shape.thickness
+                    }
+                    opacity={
+                      editorState.shapeStyle?.opacity ??
+                      ANNOTATION_STYLES.shape.opacity
+                    }
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <div
+                  className={cn(
+                    "pointer-events-none absolute border-2",
+                    editorState.mode === "form"
+                      ? "border-blue-500 bg-blue-500/20"
+                      : "border-yellow-500 bg-yellow-500/20",
+                  )}
+                  style={{
+                    left:
+                      Math.min(dragStart.x, dragCurrent.x) * editorState.scale,
+                    top:
+                      Math.min(dragStart.y, dragCurrent.y) * editorState.scale,
+                    width:
+                      Math.abs(dragCurrent.x - dragStart.x) * editorState.scale,
+                    height:
+                      Math.abs(dragCurrent.y - dragStart.y) * editorState.scale,
+                  }}
+                />
+              )}
+            </>
+          )}
         </div>
-      )}
-    </div>
-  );
+
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+          viewBox={`0 0 ${page.width} ${page.height}`}
+          preserveAspectRatio="none"
+        >
+          {shapeDraftPreviewPoints && shapeDraftPreviewPoints.length > 1 && (
+            <path
+              d={getShapePointsPathData(shapeDraftPreviewPoints)}
+              stroke={
+                editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
+              }
+              strokeWidth={
+                editorState.shapeStyle?.thickness ||
+                ANNOTATION_STYLES.shape.thickness
+              }
+              opacity={
+                editorState.shapeStyle?.opacity ??
+                ANNOTATION_STYLES.shape.opacity
+              }
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+          {isDrawing && activePageIndex === page.pageIndex && (
+            <path
+              ref={liveInkPathRef}
+              d={pointsToPathLib(currentPathRef.current)}
+              stroke={
+                editorState.tool === "draw_highlight"
+                  ? editorState.highlightStyle?.color ||
+                    ANNOTATION_STYLES.highlight.color
+                  : editorState.penStyle.color
+              }
+              strokeWidth={
+                editorState.tool === "draw_highlight"
+                  ? editorState.highlightStyle?.thickness ||
+                    ANNOTATION_STYLES.highlight.thickness
+                  : editorState.penStyle.thickness
+              }
+              fill="none"
+              strokeLinecap={
+                editorState.tool === "draw_highlight" ? "butt" : "round"
+              }
+              strokeLinejoin="round"
+              opacity={
+                editorState.tool === "draw_highlight"
+                  ? (editorState.highlightStyle?.opacity ??
+                    ANNOTATION_STYLES.highlight.opacity)
+                  : editorState.penStyle.opacity
+              }
+            />
+          )}
+        </svg>
+
+        {activePageIndex === page.pageIndex && snapLines.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 z-50">
+            {snapLines.map((line, idx) => (
+              <div
+                key={idx}
+                className="absolute border-dashed border-red-500 opacity-70"
+                style={{
+                  borderWidth: 0,
+                  [line.type === "vertical"
+                    ? "borderLeftWidth"
+                    : "borderTopWidth"]: "1px",
+                  left:
+                    line.type === "vertical" ? line.pos * editorState.scale : 0,
+                  top:
+                    line.type === "horizontal"
+                      ? line.pos * editorState.scale
+                      : 0,
+                  width: line.type === "vertical" ? "1px" : "100%",
+                  height: line.type === "horizontal" ? "1px" : "100%",
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -2261,6 +2789,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       onPointerLeave={handlePointerUp}
       data-ff-pinch-zooming={isPinchZooming ? "1" : undefined}
       onScroll={handleScroll}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <WorkspaceTextSelectionPopover
         toolbar={textSelectionToolbar}

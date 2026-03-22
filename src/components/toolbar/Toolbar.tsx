@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   MousePointer2,
   Type,
@@ -16,9 +16,9 @@ import {
   PenTool,
   Edit3,
   Eraser,
-  MessageCirclePlus,
   Hand,
   Search,
+  MessageCircle,
 } from "lucide-react";
 import {
   EditorState,
@@ -48,6 +48,14 @@ import { getContrastColor } from "@/utils/colors";
 import ExportMenu from "./ExportMenu";
 import { canSaveAs, usePlatformUi } from "@/services/platform";
 import { useEditorStore } from "@/store/useEditorStore";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {
+  getShapeToolIcon,
+  getShapeToolLabel,
+  isShapeTool,
+  SHAPE_TOOL_GROUPS,
+  type ShapeTool,
+} from "./shapeTools";
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -70,6 +78,9 @@ interface ToolbarProps {
   onHighlightStyleChange?: (style: Partial<PenStyle>) => void;
   onCommentStyleChange?: (style: { color: string }) => void;
   onFreetextStyleChange?: (style: { color: string }) => void;
+  onShapeStyleChange?: (
+    style: Partial<NonNullable<EditorState["shapeStyle"]>>,
+  ) => void;
   onExport: () => Promise<boolean>;
   onSaveDraft: (silent?: boolean) => Promise<void>;
   onSaveAs: () => Promise<boolean>;
@@ -111,6 +122,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onHighlightStyleChange,
   onCommentStyleChange: onCommentStyleChange,
   onFreetextStyleChange: onFreetextStyleChange,
+  onShapeStyleChange,
   onExport,
   onSaveDraft,
   onSaveAs,
@@ -139,6 +151,25 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const livePageLayout = useEditorStore((state) => state.pageLayout);
   const livePageFlow = useEditorStore((state) => state.pageFlow);
   const liveIsFullscreen = useEditorStore((state) => state.isFullscreen);
+  const [shapePopoverOpen, setShapePopoverOpen] = useState(false);
+  const [lastShapeTool, setLastShapeTool] = useState<ShapeTool>(() =>
+    isShapeTool(tool) ? tool : "draw_shape_rect",
+  );
+
+  useEffect(() => {
+    if (!isShapeTool(tool)) return;
+    setLastShapeTool(tool);
+  }, [tool]);
+
+  const activeShapeTool = isShapeTool(tool) ? tool : lastShapeTool;
+  const ActiveShapeIcon = getShapeToolIcon(activeShapeTool);
+  const activeShapeLabel = getShapeToolLabel(t, activeShapeTool);
+
+  const handleShapeToolSelect = (shapeTool: ShapeTool) => {
+    setLastShapeTool(shapeTool);
+    setShapePopoverOpen(false);
+    onToolChange(shapeTool);
+  };
 
   return (
     <div
@@ -447,7 +478,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                         backgroundColor: editorState.commentStyle?.color,
                       }}
                     >
-                      <MessageCirclePlus
+                      <MessageCircle
                         size={14}
                         color={getContrastColor(
                           editorState.commentStyle?.color,
@@ -493,6 +524,98 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     isActive={tool === "draw_freetext"}
                     showThickness={false}
                     title={t("toolbar.freetext_properties")}
+                  />
+                </div>
+                <div className="flex items-center gap-0">
+                  <Popover
+                    modal={false}
+                    open={shapePopoverOpen}
+                    onOpenChange={setShapePopoverOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9",
+                          isShapeTool(tool) &&
+                            "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+                        )}
+                        title={activeShapeLabel}
+                      >
+                        <ActiveShapeIcon size={16} />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-72 p-3">
+                      <div className="space-y-3">
+                        {SHAPE_TOOL_GROUPS.map((group, index) => (
+                          <div key={group.id} className="space-y-2">
+                            {index > 0 ? <Separator /> : null}
+                            <div className="text-muted-foreground px-1 text-xs font-medium">
+                              {t(group.labelKey)}
+                            </div>
+                            <div
+                              className={cn(
+                                "grid gap-1",
+                                group.id === "box"
+                                  ? "grid-cols-3"
+                                  : "grid-cols-4",
+                              )}
+                            >
+                              {group.tools.map((shapeTool) => {
+                                const ShapeIcon = getShapeToolIcon(shapeTool);
+                                const isActive = activeShapeTool === shapeTool;
+
+                                return (
+                                  <Button
+                                    key={shapeTool}
+                                    variant="ghost"
+                                    className={cn(
+                                      "h-auto min-h-16 flex-col gap-2 px-2 py-2 text-xs",
+                                      isActive &&
+                                        "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+                                    )}
+                                    onClick={() =>
+                                      handleShapeToolSelect(shapeTool)
+                                    }
+                                  >
+                                    <ShapeIcon size={18} />
+                                    <span className="leading-none">
+                                      {getShapeToolLabel(t, shapeTool)}
+                                    </span>
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <ColorPickerPopover
+                    color={
+                      editorState.shapeStyle?.color ||
+                      ANNOTATION_STYLES.shape.color
+                    }
+                    thickness={
+                      editorState.shapeStyle?.thickness ||
+                      ANNOTATION_STYLES.shape.thickness
+                    }
+                    opacity={
+                      editorState.shapeStyle?.opacity ??
+                      ANNOTATION_STYLES.shape.opacity
+                    }
+                    onColorChange={(color) =>
+                      onShapeStyleChange && onShapeStyleChange({ color })
+                    }
+                    onThicknessChange={(thickness) =>
+                      onShapeStyleChange && onShapeStyleChange({ thickness })
+                    }
+                    onOpacityChange={(opacity) =>
+                      onShapeStyleChange && onShapeStyleChange({ opacity })
+                    }
+                    isActive={isShapeTool(tool)}
+                    title={t("toolbar.shape_properties")}
                   />
                 </div>
               </ToggleGroup>

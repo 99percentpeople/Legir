@@ -377,7 +377,7 @@ export const createToolBuilder = <TName extends AiToolName>(name: TName) =>
   });
 
 export const annotationTypesSchema = z.array(
-  z.enum(["comment", "highlight", "ink", "freetext", "link"]),
+  z.enum(["comment", "highlight", "ink", "freetext", "shape", "link"]),
 );
 export const stringArraySchema = z.array(z.string());
 

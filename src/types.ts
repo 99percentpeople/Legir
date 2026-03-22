@@ -39,6 +39,13 @@ export type Tool =
   | "draw_ink"
   | "draw_comment"
   | "draw_freetext"
+  | "draw_shape_rect"
+  | "draw_shape_ellipse"
+  | "draw_shape_line"
+  | "draw_shape_polyline"
+  | "draw_shape_polygon"
+  | "draw_shape_arrow"
+  | "draw_shape_cloud"
   | "eraser";
 
 export type MoveDirection = "UP" | "DOWN" | "LEFT" | "RIGHT";
@@ -98,7 +105,7 @@ export interface FormField {
 export interface Annotation {
   id: string;
   pageIndex: number;
-  type: "highlight" | "ink" | "comment" | "freetext" | "link";
+  type: "highlight" | "ink" | "comment" | "freetext" | "link" | "shape";
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
@@ -117,7 +124,7 @@ export interface Annotation {
   fontFamily?: string; // For text
   rotationDeg?: number;
   alignment?: "left" | "center" | "right"; // For comment text alignment
-  subtype?: "ink" | "polyline" | "line"; // To preserve original PDF subtype
+  subtype?: string; // To preserve original PDF subtype
   intent?: string; // For PDF Intent (IT), e.g., "InkHighlight"
   updatedAt?: string; // ISO Date string for modification date
   svgPath?: string; // Imported appearance path data
@@ -125,6 +132,36 @@ export interface Annotation {
   linkUrl?: string;
   linkDestPageIndex?: number;
   flatten?: boolean;
+  shapeType?:
+    | "square"
+    | "circle"
+    | "line"
+    | "polyline"
+    | "polygon"
+    | "arrow"
+    | "cloud";
+  shapePoints?: { x: number; y: number }[];
+  shapeStartArrow?: boolean;
+  shapeEndArrow?: boolean;
+  shapeStartArrowStyle?:
+    | "closed_arrow"
+    | "line_arrow"
+    | "hollow_arrow"
+    | "circle"
+    | "square"
+    | "diamond"
+    | "slash";
+  shapeEndArrowStyle?:
+    | "closed_arrow"
+    | "line_arrow"
+    | "hollow_arrow"
+    | "circle"
+    | "square"
+    | "diamond"
+    | "slash";
+  arrowSize?: number;
+  cloudIntensity?: number;
+  cloudSpacing?: number;
 
   meta?:
     | {
@@ -347,6 +384,15 @@ export interface EditorState {
     borderColor?: string;
     borderWidth?: number;
   };
+  shapeStyle?: {
+    color: string;
+    thickness: number;
+    opacity: number;
+    backgroundColor?: string;
+    arrowSize?: number;
+    cloudIntensity?: number;
+    cloudSpacing?: number;
+  };
 
   selectedId: string | null;
 
@@ -466,6 +512,7 @@ export type WorkspaceEditorState = Pick<
   | "pageTranslateSelectedParagraphIds"
   | "penStyle"
   | "pendingViewStateRestore"
+  | "shapeStyle"
   | "scale"
   | "selectedId"
   | "tool"

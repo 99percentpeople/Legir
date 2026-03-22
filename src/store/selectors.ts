@@ -4,6 +4,13 @@ import type { EditorStore } from "@/store/store.types";
 const EMPTY_THUMBNAIL_IMAGES: EditorStore["thumbnailImages"] = {};
 const EMPTY_PENDING_VIEW_STATE_RESTORE: EditorStore["pendingViewStateRestore"] =
   null;
+const EMPTY_KEYS: EditorStore["keys"] = {
+  ctrl: false,
+  shift: false,
+  alt: false,
+  meta: false,
+  space: false,
+};
 
 // App shell should only observe the broad lifecycle state it actually renders.
 export const selectAppShellState = (state: EditorStore) => ({
@@ -30,6 +37,7 @@ export const selectEditorPageShellState = (
   state: EditorStore,
 ): EditorStore => ({
   ...state,
+  keys: EMPTY_KEYS,
   thumbnailImages: EMPTY_THUMBNAIL_IMAGES,
   scale: 1,
   pageLayout: "single",
@@ -65,6 +73,7 @@ export const selectEditorCanvasState = (
   pdfBytes: state.pdfBytes,
   penStyle: state.penStyle,
   pendingViewStateRestore: state.pendingViewStateRestore,
+  shapeStyle: state.shapeStyle,
   scale: state.scale,
   selectedId: state.selectedId,
   tool: state.tool,

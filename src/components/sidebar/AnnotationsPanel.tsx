@@ -8,6 +8,7 @@ import {
   Highlighter,
   Pen,
   Type,
+  Shapes,
 } from "lucide-react";
 import { Annotation } from "@/types";
 import { useLanguage } from "../language-provider";
@@ -103,6 +104,8 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
         return <Pen size={12} className="text-muted-foreground" />;
       case "freetext":
         return <Type size={12} className="text-muted-foreground" />;
+      case "shape":
+        return <Shapes size={12} className="text-muted-foreground" />;
       default:
         return <MessageCircle size={12} className="text-muted-foreground" />;
     }
@@ -204,6 +207,7 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
     highlight: "toolbar.highlight",
     ink: "toolbar.ink",
     freetext: "toolbar.freetext",
+    shape: "toolbar.shape",
   };
 
   const allAnnotations = useMemo(

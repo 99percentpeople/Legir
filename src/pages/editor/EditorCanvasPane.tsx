@@ -38,6 +38,9 @@ type EditorCanvasPaneProps = {
     onHighlightStyleChange: (style: Partial<PenStyle>) => void;
     onCommentStyleChange: (style: { color: string }) => void;
     onFreetextStyleChange: (style: { color: string }) => void;
+    onShapeStyleChange: (
+      style: Partial<NonNullable<EditorState["shapeStyle"]>>,
+    ) => void;
     onUndo: () => void;
     onRedo: () => void;
     onOpenShortcuts: () => void;
@@ -98,6 +101,7 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
         state.pageTranslateSelectedParagraphIds,
       penStyle: state.penStyle,
       pendingViewStateRestore: state.pendingViewStateRestore,
+      shapeStyle: state.shapeStyle,
       scale: state.scale,
       selectedId: state.selectedId,
       tool: state.tool,
@@ -119,6 +123,7 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
       state.pageTranslateSelectedParagraphIds,
       state.penStyle,
       state.pendingViewStateRestore,
+      state.shapeStyle,
       state.scale,
       state.selectedId,
       state.tool,
@@ -283,6 +288,7 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
           onHighlightStyleChange={mobileToolbar.onHighlightStyleChange}
           onCommentStyleChange={mobileToolbar.onCommentStyleChange}
           onFreetextStyleChange={mobileToolbar.onFreetextStyleChange}
+          onShapeStyleChange={mobileToolbar.onShapeStyleChange}
         />
       ) : (
         <FloatingBar

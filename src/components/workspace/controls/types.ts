@@ -39,6 +39,8 @@ export interface BaseControlProps<T = FormField | Annotation> {
   onAskAi?: (id: string) => void;
   /** Optional callback to start resizing */
   onResizeStart?: (handle: string, e: React.PointerEvent) => void;
+  /** Optional callback to create a history checkpoint before a custom edit */
+  onTriggerHistorySave?: () => void;
 }
 
 /**

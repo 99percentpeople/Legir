@@ -34,10 +34,23 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   color?: number[] | Uint8ClampedArray;
   backgroundColor?: number[] | Uint8ClampedArray;
   fillColor?: number[] | Uint8ClampedArray;
+  interiorColor?: number[] | Uint8ClampedArray;
   borderStyle?: {
     width?: number;
     style?: "solid" | "dashed" | "underline";
   };
+  line?: number[];
+  vertices?: number[];
+  lineEndings?: string[];
+  arrowSize?: number;
+  startArrowStyle?: string;
+  endArrowStyle?: string;
+  borderEffect?: {
+    style?: string;
+    intensity?: number;
+  };
+  rectDifferences?: number[];
+  cloudSpacing?: number;
   defaultAppearance?: string;
   DA?: string;
   textAlignment?: number;

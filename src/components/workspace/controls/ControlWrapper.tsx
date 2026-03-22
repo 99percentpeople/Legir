@@ -3,6 +3,8 @@ import { cn } from "@/utils/cn";
 import { ControlProps } from "./types";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { getMoveDelta } from "@/lib/controlMovement";
+import type { Annotation, FormField, MoveDirection } from "@/types";
 
 export type ControlWrapperProps = ControlProps & {
   customRect?: { x: number; y: number; width: number; height: number };
@@ -19,6 +21,8 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   isSelected,
   isSelectable,
   onResizeStart,
+  onUpdate,
+  onTriggerHistorySave,
   data,
   onPointerDown,
   customRect,
@@ -29,6 +33,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
 }) => {
   const wrapperRef = React.useRef<HTMLDivElement>(null);
   const pendingFocusRef = React.useRef(false);
+  const isFreetext = data.type === "freetext";
 
   useAppEvent(
     "workspace:focusControl",
@@ -45,6 +50,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     "ink",
     "freetext",
     "link",
+    "shape",
   ].includes(data.type);
 
   React.useEffect(() => {
@@ -82,9 +88,199 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const handleResizePointerDown = (e: React.PointerEvent, handle: string) => {
     e.stopPropagation();
     e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).focus({ preventScroll: true });
+    } catch {
+      // ignore
+    }
     if (onResizeStart) {
       onResizeStart(handle, e);
     }
+  };
+
+  const handleDirectionKey = (
+    key: string,
+  ): { direction: MoveDirection; dx: number; dy: number } | null => {
+    let direction: MoveDirection;
+    if (key === "ArrowUp") direction = "UP";
+    else if (key === "ArrowDown") direction = "DOWN";
+    else if (key === "ArrowLeft") direction = "LEFT";
+    else if (key === "ArrowRight") direction = "RIGHT";
+    else return null;
+
+    const { dx, dy } = getMoveDelta(direction, false);
+    return { direction, dx, dy };
+  };
+
+  const normalizeRotationDeg = (deg: number) => {
+    if (!Number.isFinite(deg)) return 0;
+    let next = deg % 360;
+    if (next <= -180) next += 360;
+    if (next > 180) next -= 360;
+    return next;
+  };
+
+  const getFreetextInnerRectFromOuterAabb = (outerRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) => {
+    const rotationDeg =
+      isFreetext &&
+      typeof data.rotationDeg === "number" &&
+      Number.isFinite(data.rotationDeg)
+        ? data.rotationDeg
+        : 0;
+
+    if (rotationDeg === 0) {
+      return outerRect;
+    }
+
+    const theta = (rotationDeg * Math.PI) / 180;
+    const absCos = Math.abs(Math.cos(theta));
+    const absSin = Math.abs(Math.sin(theta));
+    const det = absCos * absCos - absSin * absSin;
+
+    if (!Number.isFinite(det) || Math.abs(det) < 1e-6) {
+      return outerRect;
+    }
+
+    const width = (outerRect.width * absCos - outerRect.height * absSin) / det;
+    const height = (outerRect.height * absCos - outerRect.width * absSin) / det;
+
+    if (
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      return outerRect;
+    }
+
+    const cx = outerRect.x + outerRect.width / 2;
+    const cy = outerRect.y + outerRect.height / 2;
+
+    return {
+      x: cx - width / 2,
+      y: cy - height / 2,
+      width,
+      height,
+    };
+  };
+
+  const commitKeyboardRectUpdate = (nextRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) => {
+    const actualRect = isFreetext
+      ? getFreetextInnerRectFromOuterAabb(nextRect)
+      : nextRect;
+
+    if (isAnnotation) {
+      (onUpdate as (id: string, updates: Partial<Annotation>) => void)(id, {
+        rect: actualRect,
+      });
+      return;
+    }
+
+    (onUpdate as (id: string, updates: Partial<FormField>) => void)(id, {
+      rect: actualRect,
+    });
+  };
+
+  const getKeyboardResizedRect = (handle: string, dx: number, dy: number) => {
+    let nextX = rect.x;
+    let nextY = rect.y;
+    let nextW = rect.width;
+    let nextH = rect.height;
+
+    if (handle.includes("e")) nextW += dx;
+    if (handle.includes("w")) {
+      nextX += dx;
+      nextW -= dx;
+    }
+    if (handle.includes("s")) nextH += dy;
+    if (handle.includes("n")) {
+      nextY += dy;
+      nextH -= dy;
+    }
+
+    if (nextW < 5) {
+      if (handle.includes("w")) nextX = rect.x + rect.width - 5;
+      nextW = 5;
+    }
+    if (nextH < 5) {
+      if (handle.includes("n")) nextY = rect.y + rect.height - 5;
+      nextH = 5;
+    }
+
+    if (
+      nextX === rect.x &&
+      nextY === rect.y &&
+      nextW === rect.width &&
+      nextH === rect.height
+    ) {
+      return null;
+    }
+
+    return { x: nextX, y: nextY, width: nextW, height: nextH };
+  };
+
+  const handleResizeHandleKeyDown =
+    (handle: string) => (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!resizable || !isSelected || handle === "rotate") return;
+      const directionMeta = handleDirectionKey(e.key);
+      if (!directionMeta) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const step = e.shiftKey ? 10 : 1;
+      const dx = directionMeta.dx * step;
+      const dy = directionMeta.dy * step;
+      const nextRect = getKeyboardResizedRect(handle, dx, dy);
+      if (!nextRect) return;
+
+      if (!e.repeat) {
+        onTriggerHistorySave?.();
+      }
+
+      commitKeyboardRectUpdate(nextRect);
+    };
+
+  const handleRotateHandleKeyDown = (
+    e: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (!isFreetext || !isSelected) return;
+    if (
+      e.key !== "ArrowUp" &&
+      e.key !== "ArrowDown" &&
+      e.key !== "ArrowLeft" &&
+      e.key !== "ArrowRight"
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!e.repeat) {
+      onTriggerHistorySave?.();
+    }
+
+    const step = e.shiftKey ? 15 : 1;
+    const delta = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -step : step;
+    const currentRotation =
+      typeof data.rotationDeg === "number" && Number.isFinite(data.rotationDeg)
+        ? data.rotationDeg
+        : 0;
+
+    (onUpdate as (id: string, updates: Partial<Annotation>) => void)(id, {
+      rotationDeg: normalizeRotationDeg(currentRotation + delta),
+    });
   };
 
   // Get label for overlay
@@ -126,6 +322,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     data.type === "ink" && "intent" in data && data.intent === "InkHighlight";
   const shouldRaiseZIndexOnHoverOrSelect =
     data.type !== "highlight" && !isInkHighlight;
+  const supportsKeyboardResizeHandles = isSelected && resizable;
 
   return (
     <div
@@ -133,7 +330,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       id={elementId || undefined}
       onPointerDown={(e) => {
         if (!isSelectable) return;
-        if (e.button === 1) return;
+        if (e.button !== 0) return;
         onPointerDown?.(e);
       }}
       className={cn(
@@ -199,6 +396,14 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                           "-right-1.5 -bottom-1.5 cursor-nwse-resize",
                       )}
                       onPointerDown={(e) => handleResizePointerDown(e, h)}
+                      tabIndex={supportsKeyboardResizeHandles ? 0 : -1}
+                      data-ff-keyboard-handle="control-resize"
+                      aria-label={`${label} resize ${h}`}
+                      onKeyDown={
+                        supportsKeyboardResizeHandles
+                          ? handleResizeHandleKeyDown(h)
+                          : undefined
+                      }
                     />
                   ))}
 
@@ -206,6 +411,12 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                   <div
                     className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
                     onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
+                    tabIndex={isFreetext ? 0 : -1}
+                    data-ff-keyboard-handle="freetext-rotate"
+                    aria-label={`${label} rotate`}
+                    onKeyDown={
+                      isFreetext ? handleRotateHandleKeyDown : undefined
+                    }
                   />
                 </div>
               </>
@@ -226,6 +437,14 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                       h === "se" && "-right-1.5 -bottom-1.5 cursor-nwse-resize",
                     )}
                     onPointerDown={(e) => handleResizePointerDown(e, h)}
+                    tabIndex={supportsKeyboardResizeHandles ? 0 : -1}
+                    data-ff-keyboard-handle="control-resize"
+                    aria-label={`${label} resize ${h}`}
+                    onKeyDown={
+                      supportsKeyboardResizeHandles
+                        ? handleResizeHandleKeyDown(h)
+                        : undefined
+                    }
                   />
                 ))}
 
@@ -237,6 +456,10 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                       onPointerDown={(e) =>
                         handleResizePointerDown(e, "rotate")
                       }
+                      tabIndex={0}
+                      data-ff-keyboard-handle="freetext-rotate"
+                      aria-label={`${label} rotate`}
+                      onKeyDown={handleRotateHandleKeyDown}
                     />
                   </>
                 )}

@@ -1146,6 +1146,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
         "ArrowLeft",
         "ArrowRight",
       ].includes(e.key);
+      const isKeyboardHandleTarget =
+        target instanceof HTMLElement &&
+        !!target.closest("[data-ff-keyboard-handle]");
       const isSelectedField = currentState.fields.some(
         (f) => f.id === currentState.selectedId,
       );
@@ -1154,6 +1157,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
       );
 
       if (
+        !isKeyboardHandleTarget &&
         currentState.selectedId &&
         isMoveKey &&
         ((currentState.mode === "form" && isSelectedField) ||
@@ -1258,6 +1262,16 @@ const EditorPage: React.FC<EditorPageProps> = ({
       setState((prev) => ({
         ...prev,
         freetextStyle: { ...prev.freetextStyle!, ...style },
+      }));
+    },
+    [setState],
+  );
+
+  const handleShapeStyleChange = useCallback(
+    (style: Partial<NonNullable<EditorState["shapeStyle"]>>) => {
+      setState((prev) => ({
+        ...prev,
+        shapeStyle: { ...prev.shapeStyle!, ...style },
       }));
     },
     [setState],
@@ -1400,6 +1414,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         onHighlightStyleChange={handleHighlightStyleChange}
         onCommentStyleChange={handleCommentStyleChange}
         onFreetextStyleChange={handleFreetextStyleChange}
+        onShapeStyleChange={handleShapeStyleChange}
         onExport={onExport}
         onSaveDraft={onSaveDraft}
         onSaveAs={onSaveAs}
@@ -1601,6 +1616,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
             onHighlightStyleChange: handleHighlightStyleChange,
             onCommentStyleChange: handleCommentStyleChange,
             onFreetextStyleChange: handleFreetextStyleChange,
+            onShapeStyleChange: handleShapeStyleChange,
             onUndo: undo,
             onRedo: redo,
             onOpenShortcuts: () => openDialog("shortcuts"),

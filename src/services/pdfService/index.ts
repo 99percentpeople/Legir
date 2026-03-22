@@ -79,6 +79,7 @@ import {
   CommentParser,
   FreeTextParser,
   LinkParser,
+  ShapeParser,
 } from "./parsers/AnnotationParsers";
 import {
   TextControlParser,
@@ -92,6 +93,7 @@ import {
   HighlightExporter,
   CommentExporter,
   FreeTextExporter,
+  ShapeExporter,
 } from "./exporters/AnnotationExporters";
 import {
   TextControlExporter,
@@ -125,6 +127,7 @@ const annotationParsers: IAnnotationParser[] = [
   new CommentParser(),
   new FreeTextParser(),
   new LinkParser(),
+  new ShapeParser(),
 ];
 
 const controlParsers: IControlParser[] = [
@@ -140,6 +143,7 @@ const annotationExporters: IAnnotationExporter[] = [
   new HighlightExporter(),
   new CommentExporter(),
   new FreeTextExporter(),
+  new ShapeExporter(),
 ];
 
 const controlExporters: IControlExporter[] = [
@@ -829,7 +833,12 @@ const buildPdfLibAnnotsByPageIndex = async (
       if (
         subtypeName !== "Highlight" &&
         subtypeName !== "Text" &&
-        subtypeName !== "FreeText"
+        subtypeName !== "FreeText" &&
+        subtypeName !== "Square" &&
+        subtypeName !== "Circle" &&
+        subtypeName !== "Line" &&
+        subtypeName !== "PolyLine" &&
+        subtypeName !== "Polygon"
       ) {
         continue;
       }
@@ -850,18 +859,93 @@ const buildPdfLibAnnotsByPageIndex = async (
       const contents = pdfObjToString(annot.lookup(PDFName.of("Contents")));
       const modificationDate = pdfObjToString(annot.lookup(PDFName.of("M")));
       const highlightedText = getFormForgeHighlightedText(annot);
+      const borderWidth = extractBorderWidth(annot);
+      const borderStyleType = extractBorderStyle(annot);
+      const interiorColor = pdfArrayToNumberList(
+        annot.lookup(PDFName.of("IC")),
+      );
+      const line = pdfArrayToNumberList(annot.lookup(PDFName.of("L")));
+      const vertices = pdfArrayToNumberList(
+        annot.lookup(PDFName.of("Vertices")),
+      );
+      const lineEndings = (() => {
+        const raw = annot.lookup(PDFName.of("LE"));
+        if (!(raw instanceof PDFArray)) return undefined;
+        const values = [];
+        for (let idx = 0; idx < raw.size(); idx++) {
+          const value = pdfObjToString(raw.lookup(idx));
+          if (value) values.push(value);
+        }
+        return values.length > 0 ? values : undefined;
+      })();
+      const borderEffect = (() => {
+        const raw = annot.lookup(PDFName.of("BE"));
+        if (!(raw instanceof PDFDict)) return undefined;
+        const style = pdfObjToString(raw.lookup(PDFName.of("S")));
+        const intensityObj = raw.lookup(PDFName.of("I"));
+        const intensity =
+          intensityObj instanceof PDFNumber
+            ? intensityObj.asNumber()
+            : undefined;
+        if (!style && typeof intensity !== "number") return undefined;
+        return { style, intensity };
+      })();
+      const rectDifferences = pdfArrayToNumberList(
+        annot.lookup(PDFName.of("RD")),
+      );
+      const cloudSpacingObj = annot.lookup(PDFName.of("FFCloudSpacing"));
+      const cloudSpacing =
+        cloudSpacingObj instanceof PDFNumber
+          ? cloudSpacingObj.asNumber()
+          : undefined;
+      const arrowSizeObj = annot.lookup(PDFName.of("FFArrowSize"));
+      const arrowSize =
+        arrowSizeObj instanceof PDFNumber ? arrowSizeObj.asNumber() : undefined;
+      const startArrowStyle = pdfObjToString(
+        annot.lookup(PDFName.of("FFStartArrowStyle")),
+      );
+      const endArrowStyle = pdfObjToString(
+        annot.lookup(PDFName.of("FFEndArrowStyle")),
+      );
 
       const base: PdfJsAnnotation = {
         subtype: subtypeName,
         rect,
         sourcePdfRef,
         color,
+        interiorColor,
         opacity,
         title,
         contents,
         highlightedText,
         modificationDate,
+        borderStyle:
+          typeof borderWidth === "number" || borderStyleType
+            ? { width: borderWidth, style: borderStyleType }
+            : undefined,
+        rectDifferences,
+        cloudSpacing,
+        arrowSize,
+        startArrowStyle,
+        endArrowStyle,
       };
+
+      if (
+        subtypeName === "Square" ||
+        subtypeName === "Circle" ||
+        subtypeName === "Line" ||
+        subtypeName === "PolyLine" ||
+        subtypeName === "Polygon"
+      ) {
+        pushForPage({
+          ...base,
+          line,
+          vertices,
+          lineEndings,
+          borderEffect,
+        });
+        continue;
+      }
 
       if (subtypeName === "Highlight") {
         const qp = pdfArrayToNumberList(annot.lookup(PDFName.of("QuadPoints")));
@@ -1598,7 +1682,12 @@ export const exportPDF = async (
               subtype === PDFName.of("Ink") ||
               subtype === PDFName.of("Highlight") ||
               subtype === PDFName.of("Text") ||
-              subtype === PDFName.of("FreeText")
+              subtype === PDFName.of("FreeText") ||
+              subtype === PDFName.of("Square") ||
+              subtype === PDFName.of("Circle") ||
+              subtype === PDFName.of("Line") ||
+              subtype === PDFName.of("PolyLine") ||
+              subtype === PDFName.of("Polygon")
             ) {
               toRemove.push(i);
             }

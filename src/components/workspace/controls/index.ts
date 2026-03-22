@@ -176,6 +176,20 @@ const CONTROL_CONFIGS: ControlConfig[] = [
     ),
     label: "Ink",
   },
+  {
+    type: "shape",
+    component: lazyWithPreload(() =>
+      import("./annotation/ShapeControl").then((module) => ({
+        default: module.ShapeControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/ShapeProperties").then((module) => ({
+        default: module.ShapeProperties,
+      })),
+    ),
+    label: "Shape",
+  },
 ];
 
 let controlsPreloaded = false;

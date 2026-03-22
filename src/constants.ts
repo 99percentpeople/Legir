@@ -153,6 +153,15 @@ export const ANNOTATION_STYLES = {
     borderColor: "#000000",
     borderWidth: 1,
   },
+  shape: {
+    color: "#e61b1b",
+    thickness: 2,
+    opacity: 1.0,
+    backgroundColor: undefined,
+    arrowSize: 10,
+    cloudIntensity: 2,
+    cloudSpacing: 28,
+  },
 };
 
 export const FONT_FAMILY_MAP: Record<string, string> = {

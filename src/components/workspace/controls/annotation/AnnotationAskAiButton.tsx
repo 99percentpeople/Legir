@@ -33,6 +33,8 @@ const getAnnotationAskAiPreview = (
       return t("toolbar.comment");
     case "freetext":
       return t("toolbar.freetext");
+    case "shape":
+      return t("toolbar.shape");
     case "link":
       return t("properties.link.title");
     default:

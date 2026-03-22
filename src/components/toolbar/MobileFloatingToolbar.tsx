@@ -8,7 +8,7 @@ import {
   Hand,
   Highlighter,
   List,
-  MessageCirclePlus,
+  MessageCircle,
   MousePointer2,
   Palette,
   PenLine,
@@ -23,6 +23,7 @@ import { Button } from "../ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -31,6 +32,12 @@ import {
 import { Separator } from "../ui/separator";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import PageNumberDropdownControl from "./PageNumberDropdownControl";
+import {
+  getShapeToolIcon,
+  getShapeToolLabel,
+  isShapeTool,
+  SHAPE_TOOL_GROUPS,
+} from "./shapeTools";
 
 interface MobileFloatingToolbarProps {
   currentPageIndex: number;
@@ -42,6 +49,9 @@ interface MobileFloatingToolbarProps {
   onHighlightStyleChange?: (style: Partial<PenStyle>) => void;
   onCommentStyleChange?: (style: { color: string }) => void;
   onFreetextStyleChange?: (style: { color: string }) => void;
+  onShapeStyleChange?: (
+    style: Partial<NonNullable<EditorState["shapeStyle"]>>,
+  ) => void;
 }
 
 const isMovementTool = (tool: Tool): tool is "select" | "pan" =>
@@ -54,11 +64,19 @@ const isAnnotationTool = (
   | "draw_ink"
   | "draw_comment"
   | "draw_freetext"
+  | "draw_shape_rect"
+  | "draw_shape_ellipse"
+  | "draw_shape_line"
+  | "draw_shape_polyline"
+  | "draw_shape_polygon"
+  | "draw_shape_arrow"
+  | "draw_shape_cloud"
   | "eraser" =>
   tool === "draw_highlight" ||
   tool === "draw_ink" ||
   tool === "draw_comment" ||
   tool === "draw_freetext" ||
+  isShapeTool(tool) ||
   tool === "eraser";
 
 const isFormTool = (
@@ -85,6 +103,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   onHighlightStyleChange,
   onCommentStyleChange,
   onFreetextStyleChange,
+  onShapeStyleChange,
 }) => {
   const { t } = useLanguage();
   const contentTool =
@@ -100,6 +119,10 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
     : contentTool;
 
   const getToolLabel = (tool: Tool) => {
+    if (isShapeTool(tool)) {
+      return getShapeToolLabel(t, tool);
+    }
+
     switch (tool) {
       case "pan":
         return t("toolbar.pan");
@@ -129,6 +152,11 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   };
 
   const getToolIcon = (tool: Tool) => {
+    if (isShapeTool(tool)) {
+      const ShapeIcon = getShapeToolIcon(tool);
+      return <ShapeIcon size={16} />;
+    }
+
     switch (tool) {
       case "pan":
         return <Hand size={16} />;
@@ -151,7 +179,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_ink":
         return <PenLine size={16} />;
       case "draw_comment":
-        return <MessageCirclePlus size={16} />;
+        return <MessageCircle size={16} />;
       case "draw_freetext":
         return <Type size={16} />;
     }
@@ -173,6 +201,14 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
         return (
           editorState.freetextStyle?.color || ANNOTATION_STYLES.freetext.color
         );
+      case "draw_shape_rect":
+      case "draw_shape_ellipse":
+      case "draw_shape_line":
+      case "draw_shape_polyline":
+      case "draw_shape_polygon":
+      case "draw_shape_arrow":
+      case "draw_shape_cloud":
+        return editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color;
       default:
         return null;
     }
@@ -285,6 +321,44 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
             )}
           </ColorPickerPopover>
         );
+      case "draw_shape_rect":
+      case "draw_shape_ellipse":
+      case "draw_shape_line":
+      case "draw_shape_polyline":
+      case "draw_shape_polygon":
+      case "draw_shape_arrow":
+      case "draw_shape_cloud":
+        return (
+          <ColorPickerPopover
+            color={
+              editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
+            }
+            thickness={
+              editorState.shapeStyle?.thickness ||
+              ANNOTATION_STYLES.shape.thickness
+            }
+            opacity={
+              editorState.shapeStyle?.opacity ?? ANNOTATION_STYLES.shape.opacity
+            }
+            onColorChange={(color) =>
+              onShapeStyleChange && onShapeStyleChange({ color })
+            }
+            onThicknessChange={(thickness) =>
+              onShapeStyleChange && onShapeStyleChange({ thickness })
+            }
+            onOpacityChange={(opacity) =>
+              onShapeStyleChange && onShapeStyleChange({ opacity })
+            }
+            isActive
+            side="top"
+            title={t("toolbar.shape_properties")}
+          >
+            {renderStyleTrigger(
+              t("toolbar.shape_properties"),
+              editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color,
+            )}
+          </ColorPickerPopover>
+        );
       default:
         return null;
     }
@@ -382,13 +456,35 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                       {t("toolbar.ink")}
                     </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="draw_comment">
-                      <MessageCirclePlus size={14} />
+                      <MessageCircle size={14} />
                       {t("toolbar.comment")}
                     </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="draw_freetext">
                       <Type size={14} />
                       {t("toolbar.freetext")}
                     </DropdownMenuRadioItem>
+                    <DropdownMenuSeparator />
+                    {SHAPE_TOOL_GROUPS.map((group, index) => (
+                      <React.Fragment key={group.id}>
+                        {index > 0 ? <DropdownMenuSeparator /> : null}
+                        <DropdownMenuLabel>
+                          {t(group.labelKey)}
+                        </DropdownMenuLabel>
+                        {group.tools.map((shapeTool) => {
+                          const ShapeIcon = getShapeToolIcon(shapeTool);
+                          return (
+                            <DropdownMenuRadioItem
+                              key={shapeTool}
+                              value={shapeTool}
+                            >
+                              <ShapeIcon size={14} />
+                              {getShapeToolLabel(t, shapeTool)}
+                            </DropdownMenuRadioItem>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))}
+                    <DropdownMenuSeparator />
                     <DropdownMenuRadioItem value="eraser">
                       <Eraser size={14} />
                       {t("toolbar.eraser")}

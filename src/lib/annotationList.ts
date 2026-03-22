@@ -5,6 +5,7 @@ export const ANNOTATION_LIST_TYPES = [
   "highlight",
   "ink",
   "freetext",
+  "shape",
   "link",
 ] as const;
 
@@ -21,6 +22,7 @@ export const getAnnotationListType = (
     annotation.type === "highlight" ||
     annotation.type === "ink" ||
     annotation.type === "freetext" ||
+    annotation.type === "shape" ||
     annotation.type === "link"
   ) {
     return annotation.type;

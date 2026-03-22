@@ -170,6 +170,7 @@ export type AiAnnotationKind =
   | "highlight"
   | "ink"
   | "freetext"
+  | "shape"
   | "link";
 
 export interface AiAnnotationSummary {

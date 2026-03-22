@@ -9,7 +9,11 @@ import {
   StandardFonts,
   PDFDict,
   type PDFFont,
+  type PDFOperator,
   PDFRef,
+  drawRectangle,
+  drawEllipse,
+  drawSvgPath,
 } from "@cantoo/pdf-lib";
 import { Annotation } from "@/types";
 import { IAnnotationExporter, ViewportLike } from "../types";
@@ -18,6 +22,17 @@ import { hexToPdfColor } from "../lib/colors";
 import { generateInkAppearanceOps } from "../lib/ink";
 import { containsNonAscii, isSerifFamily } from "../lib/text";
 import { uiPointToPdfPoint, uiRectToPdfBounds } from "../lib/coords";
+import {
+  arrowStyleToPdfLineEndingName,
+  getDefaultArrowSize,
+  getCloudGeometry,
+  getCloudPathData,
+  getShapeAbsolutePoints,
+  getShapeArrowStyles,
+  getLineEndingMarker,
+  getShapePointsPathData,
+  getTrimmedOpenLinePointsForArrows,
+} from "@/lib/shapeGeometry";
 
 export class HighlightExporter implements IAnnotationExporter {
   shouldExport(annotation: Annotation): boolean {
@@ -872,6 +887,565 @@ export class FreeTextExporter implements IAnnotationExporter {
     });
 
     const ref = pdfDoc.context.register(freeTextAnnot);
+    page.node.addAnnot(ref);
+  }
+}
+
+const registerAppearanceStream = (
+  pdfDoc: PDFDocument,
+  operators: PDFOperator[],
+  bbox: [number, number, number, number],
+  opacity?: number,
+) => {
+  if (operators.length === 0) return undefined;
+
+  const baseResources = {
+    ProcSet: [
+      PDFName.of("PDF"),
+      PDFName.of("Text"),
+      PDFName.of("ImageB"),
+      PDFName.of("ImageC"),
+      PDFName.of("ImageI"),
+    ],
+  };
+
+  let resourcesObj = pdfDoc.context.obj(baseResources);
+  if (typeof opacity === "number" && opacity < 1) {
+    const gsDict = pdfDoc.context.obj({ CA: opacity, ca: opacity });
+    const gsRef = pdfDoc.context.register(gsDict);
+    resourcesObj = pdfDoc.context.obj({
+      ...baseResources,
+      ExtGState: {
+        GS0: gsRef,
+      },
+    });
+  }
+
+  const appearanceStream = pdfDoc.context.contentStream(operators, {
+    Type: PDFName.of("XObject"),
+    Subtype: PDFName.of("Form"),
+    FormType: 1,
+    BBox: bbox,
+    Resources: resourcesObj,
+  });
+
+  return pdfDoc.context.register(appearanceStream);
+};
+
+const buildShapeAppearanceOperators = (
+  shapeType: NonNullable<Annotation["shapeType"]>,
+  pdfRect: { x: number; y: number; width: number; height: number } | null,
+  pdfPoints: Array<{ x: number; y: number }>,
+  arrowStyles: ReturnType<typeof getShapeArrowStyles>,
+  arrowSize: number | undefined,
+  cloudIntensity: number | undefined,
+  cloudSpacing: number | undefined,
+  stroke: ReturnType<typeof rgb>,
+  fill: ReturnType<typeof rgb> | undefined,
+  thickness: number,
+  graphicsState?: string,
+): {
+  bbox: [number, number, number, number];
+  operators: PDFOperator[];
+  rectInset?: number;
+} | null => {
+  if (
+    shapeType === "square" ||
+    shapeType === "circle" ||
+    shapeType === "cloud"
+  ) {
+    if (!pdfRect) return null;
+    const x = pdfRect.x;
+    const y = pdfRect.y;
+    const width = Math.max(1, pdfRect.width);
+    const height = Math.max(1, pdfRect.height);
+    const baseBBox: [number, number, number, number] = [
+      x,
+      y,
+      x + width,
+      y + height,
+    ];
+
+    if (shapeType === "square") {
+      return {
+        bbox: baseBBox,
+        operators: drawRectangle({
+          x: x + thickness / 2,
+          y: y + thickness / 2,
+          width: Math.max(1, width - thickness),
+          height: Math.max(1, height - thickness),
+          color: fill,
+          rotate: degrees(0),
+          xSkew: degrees(0),
+          ySkew: degrees(0),
+          borderColor: stroke,
+          borderWidth: thickness,
+          graphicsState,
+        }),
+      };
+    }
+
+    if (shapeType === "circle") {
+      return {
+        bbox: baseBBox,
+        operators: drawEllipse({
+          x: x + width / 2,
+          y: y + height / 2,
+          xScale: Math.max(1, width / 2 - thickness / 2),
+          yScale: Math.max(1, height / 2 - thickness / 2),
+          color: fill,
+          borderColor: stroke,
+          borderWidth: thickness,
+          graphicsState,
+        }),
+      };
+    }
+
+    const geometry = getCloudGeometry(
+      {
+        x: 0,
+        y: 0,
+        width,
+        height,
+      },
+      {
+        intensity: cloudIntensity,
+        strokeWidth: thickness,
+        spacing: cloudSpacing,
+      },
+    );
+    const bbox: [number, number, number, number] = [
+      x - geometry.overflow,
+      y - geometry.overflow,
+      x + width + geometry.overflow,
+      y + height + geometry.overflow,
+    ];
+    const svgPath = getCloudPathData(
+      {
+        x: geometry.overflow + geometry.pathRect.x,
+        y: geometry.overflow + geometry.pathRect.y,
+        width: geometry.pathRect.width,
+        height: geometry.pathRect.height,
+      },
+      geometry.intensity,
+      geometry.spacing,
+    );
+
+    return {
+      bbox,
+      operators: drawSvgPath(svgPath, {
+        x: bbox[0],
+        y: bbox[3],
+        scale: 1,
+        color: undefined,
+        borderColor: stroke,
+        borderWidth: thickness,
+        graphicsState,
+      }),
+      rectInset: geometry.overflow,
+    };
+  }
+
+  if (pdfPoints.length < 2) return null;
+
+  const hasAnyArrow = !!arrowStyles.start || !!arrowStyles.end;
+  const resolvedArrowSize =
+    typeof arrowSize === "number" && Number.isFinite(arrowSize)
+      ? Math.max(6, arrowSize)
+      : getDefaultArrowSize(thickness);
+  const arrowPadding = hasAnyArrow ? Math.max(thickness, resolvedArrowSize) : 0;
+  const padding = Math.max(thickness, arrowPadding);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const point of pdfPoints) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+
+  const bbox: [number, number, number, number] = [
+    minX - padding,
+    minY - padding,
+    maxX + padding,
+    maxY + padding,
+  ];
+
+  const localPoints = pdfPoints.map((point) => ({
+    x: point.x - bbox[0],
+    y: bbox[3] - point.y,
+  }));
+  const trimmedLocalPoints = hasAnyArrow
+    ? getTrimmedOpenLinePointsForArrows(
+        localPoints,
+        arrowStyles,
+        thickness,
+        resolvedArrowSize,
+      )
+    : localPoints;
+
+  const operators = [
+    ...drawSvgPath(
+      getShapePointsPathData(trimmedLocalPoints, {
+        closed: shapeType === "polygon",
+      }),
+      {
+        x: bbox[0],
+        y: bbox[3],
+        scale: 1,
+        color: shapeType === "polygon" ? fill : undefined,
+        borderColor: stroke,
+        borderWidth: thickness,
+        borderLineCap: 1,
+        graphicsState,
+      },
+    ),
+  ];
+
+  if (hasAnyArrow) {
+    const markers = [
+      getLineEndingMarker(
+        localPoints,
+        "start",
+        arrowStyles.start,
+        thickness,
+        resolvedArrowSize,
+      ),
+      getLineEndingMarker(
+        localPoints,
+        "end",
+        arrowStyles.end,
+        thickness,
+        resolvedArrowSize,
+      ),
+    ];
+
+    for (const marker of markers) {
+      if (!marker) continue;
+      operators.push(
+        ...drawSvgPath(marker.pathData, {
+          x: bbox[0],
+          y: bbox[3],
+          scale: 1,
+          color: marker.fillMode === "stroke" ? stroke : undefined,
+          borderColor: stroke,
+          borderWidth: Math.max(1, thickness * 0.9),
+          borderLineCap: 1,
+          graphicsState,
+        }),
+      );
+    }
+  }
+
+  return { bbox, operators };
+};
+
+export class ShapeExporter implements IAnnotationExporter {
+  shouldExport(annotation: Annotation): boolean {
+    return annotation.type === "shape";
+  }
+
+  save(
+    pdfDoc: PDFDocument,
+    page: PDFPage,
+    annotation: Annotation,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+  ): void {
+    if (
+      annotation.type !== "shape" ||
+      !annotation.rect ||
+      !annotation.shapeType
+    ) {
+      return;
+    }
+
+    const stroke = hexToPdfColor(annotation.color || "#000000") || rgb(0, 0, 0);
+    const arrowStyles = getShapeArrowStyles(annotation);
+    const fill = annotation.backgroundColor
+      ? hexToPdfColor(annotation.backgroundColor)
+      : undefined;
+    const thickness =
+      typeof annotation.thickness === "number" &&
+      Number.isFinite(annotation.thickness)
+        ? Math.max(1, annotation.thickness)
+        : 2;
+    const opacity =
+      typeof annotation.opacity === "number"
+        ? Math.min(1, Math.max(0, annotation.opacity))
+        : undefined;
+    const graphicsState =
+      typeof opacity === "number" && opacity < 1 ? "GS0" : undefined;
+
+    const buildCommon = (rectValues: number[]) => ({
+      Type: "Annot",
+      F: 4,
+      Rect: rectValues,
+      C: [stroke.red, stroke.green, stroke.blue],
+      CA: opacity,
+      BS: { W: thickness, S: PDFName.of("S") },
+      IC:
+        fill &&
+        annotation.shapeType !== "arrow" &&
+        annotation.shapeType !== "line" &&
+        annotation.shapeType !== "polyline" &&
+        annotation.shapeType !== "cloud"
+          ? [fill.red, fill.green, fill.blue]
+          : undefined,
+      P: page.ref,
+      T: annotation.author
+        ? PDFHexString.fromText(annotation.author)
+        : undefined,
+      Contents: annotation.text
+        ? PDFHexString.fromText(annotation.text)
+        : undefined,
+      M: annotation.updatedAt
+        ? PDFString.fromDate(new Date(annotation.updatedAt))
+        : PDFString.fromDate(new Date()),
+    });
+
+    if (
+      annotation.shapeType === "square" ||
+      annotation.shapeType === "circle" ||
+      annotation.shapeType === "cloud"
+    ) {
+      const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
+      const appearance = buildShapeAppearanceOperators(
+        annotation.shapeType,
+        bounds,
+        [],
+        arrowStyles,
+        annotation.arrowSize,
+        annotation.cloudIntensity,
+        annotation.cloudSpacing,
+        stroke,
+        fill,
+        thickness,
+        graphicsState,
+      );
+      const rectValues =
+        annotation.shapeType === "cloud" && appearance
+          ? [...appearance.bbox]
+          : [
+              bounds.x,
+              bounds.y,
+              bounds.x + bounds.width,
+              bounds.y + bounds.height,
+            ];
+      const appearanceRef = appearance
+        ? registerAppearanceStream(
+            pdfDoc,
+            appearance.operators,
+            appearance.bbox,
+            opacity,
+          )
+        : undefined;
+      const shapeAnnot = pdfDoc.context.obj({
+        ...buildCommon(rectValues),
+        Subtype: annotation.shapeType === "circle" ? "Circle" : "Square",
+        BE:
+          annotation.shapeType === "cloud"
+            ? {
+                S: PDFName.of("C"),
+                I:
+                  typeof annotation.cloudIntensity === "number"
+                    ? annotation.cloudIntensity
+                    : 2,
+              }
+            : undefined,
+        RD:
+          annotation.shapeType === "cloud"
+            ? [
+                appearance?.rectInset ?? 0,
+                appearance?.rectInset ?? 0,
+                appearance?.rectInset ?? 0,
+                appearance?.rectInset ?? 0,
+              ]
+            : undefined,
+      });
+      if (shapeAnnot instanceof PDFDict && appearanceRef) {
+        shapeAnnot.set(
+          PDFName.of("AP"),
+          pdfDoc.context.obj({ N: appearanceRef }),
+        );
+      }
+      if (
+        shapeAnnot instanceof PDFDict &&
+        annotation.shapeType === "cloud" &&
+        typeof annotation.cloudSpacing === "number" &&
+        Number.isFinite(annotation.cloudSpacing)
+      ) {
+        shapeAnnot.set(
+          PDFName.of("FFCloudSpacing"),
+          pdfDoc.context.obj(annotation.cloudSpacing),
+        );
+      }
+      const ref = pdfDoc.context.register(shapeAnnot);
+      page.node.addAnnot(ref);
+      return;
+    }
+
+    const absolutePoints = getShapeAbsolutePoints(annotation);
+    if (absolutePoints.length < 2) return;
+    const pdfPoints = absolutePoints.map((point) =>
+      uiPointToPdfPoint(page, point, viewport),
+    );
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const point of pdfPoints) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+
+    const hasAnyArrow = !!arrowStyles.start || !!arrowStyles.end;
+    const resolvedArrowSize =
+      typeof annotation.arrowSize === "number" &&
+      Number.isFinite(annotation.arrowSize)
+        ? Math.max(6, annotation.arrowSize)
+        : getDefaultArrowSize(thickness);
+    const linePadding = hasAnyArrow
+      ? Math.max(thickness, resolvedArrowSize)
+      : thickness;
+    const paddedRect: [number, number, number, number] = [
+      minX - linePadding,
+      minY - linePadding,
+      maxX + linePadding,
+      maxY + linePadding,
+    ];
+    const appearance = buildShapeAppearanceOperators(
+      annotation.shapeType,
+      null,
+      pdfPoints,
+      arrowStyles,
+      annotation.arrowSize,
+      undefined,
+      undefined,
+      stroke,
+      fill,
+      thickness,
+      graphicsState,
+    );
+    const appearanceRef = appearance
+      ? registerAppearanceStream(
+          pdfDoc,
+          appearance.operators,
+          appearance.bbox,
+          opacity,
+        )
+      : undefined;
+
+    if (annotation.shapeType === "line" || annotation.shapeType === "arrow") {
+      if (pdfPoints.length === 2) {
+        const shapeAnnot = pdfDoc.context.obj({
+          ...buildCommon(paddedRect),
+          Subtype: "Line",
+          L: [
+            pdfPoints[0]!.x,
+            pdfPoints[0]!.y,
+            pdfPoints[1]!.x,
+            pdfPoints[1]!.y,
+          ],
+          LE: hasAnyArrow
+            ? [
+                PDFName.of(
+                  arrowStyleToPdfLineEndingName(arrowStyles.start) || "None",
+                ),
+                PDFName.of(
+                  arrowStyleToPdfLineEndingName(arrowStyles.end) || "None",
+                ),
+              ]
+            : undefined,
+        });
+        if (shapeAnnot instanceof PDFDict && appearanceRef) {
+          shapeAnnot.set(
+            PDFName.of("AP"),
+            pdfDoc.context.obj({ N: appearanceRef }),
+          );
+        }
+        if (
+          shapeAnnot instanceof PDFDict &&
+          hasAnyArrow &&
+          typeof annotation.arrowSize === "number" &&
+          Number.isFinite(annotation.arrowSize)
+        ) {
+          shapeAnnot.set(
+            PDFName.of("FFArrowSize"),
+            pdfDoc.context.obj(annotation.arrowSize),
+          );
+        }
+        if (shapeAnnot instanceof PDFDict && arrowStyles.start) {
+          shapeAnnot.set(
+            PDFName.of("FFStartArrowStyle"),
+            PDFName.of(arrowStyles.start),
+          );
+        }
+        if (shapeAnnot instanceof PDFDict && arrowStyles.end) {
+          shapeAnnot.set(
+            PDFName.of("FFEndArrowStyle"),
+            PDFName.of(arrowStyles.end),
+          );
+        }
+        const ref = pdfDoc.context.register(shapeAnnot);
+        page.node.addAnnot(ref);
+        return;
+      }
+    }
+
+    const vertices = pdfPoints.flatMap((point) => [point.x, point.y]);
+    const isPolygon = annotation.shapeType === "polygon";
+    const shapeAnnot = pdfDoc.context.obj({
+      ...buildCommon(paddedRect),
+      Subtype: isPolygon ? "Polygon" : "PolyLine",
+      Vertices: vertices,
+      LE: hasAnyArrow
+        ? [
+            PDFName.of(
+              arrowStyleToPdfLineEndingName(arrowStyles.start) || "None",
+            ),
+            PDFName.of(
+              arrowStyleToPdfLineEndingName(arrowStyles.end) || "None",
+            ),
+          ]
+        : undefined,
+    });
+    if (shapeAnnot instanceof PDFDict && appearanceRef) {
+      shapeAnnot.set(
+        PDFName.of("AP"),
+        pdfDoc.context.obj({ N: appearanceRef }),
+      );
+    }
+    if (
+      shapeAnnot instanceof PDFDict &&
+      hasAnyArrow &&
+      typeof annotation.arrowSize === "number" &&
+      Number.isFinite(annotation.arrowSize)
+    ) {
+      shapeAnnot.set(
+        PDFName.of("FFArrowSize"),
+        pdfDoc.context.obj(annotation.arrowSize),
+      );
+    }
+    if (shapeAnnot instanceof PDFDict && arrowStyles.start) {
+      shapeAnnot.set(
+        PDFName.of("FFStartArrowStyle"),
+        PDFName.of(arrowStyles.start),
+      );
+    }
+    if (shapeAnnot instanceof PDFDict && arrowStyles.end) {
+      shapeAnnot.set(
+        PDFName.of("FFEndArrowStyle"),
+        PDFName.of(arrowStyles.end),
+      );
+    }
+    const ref = pdfDoc.context.register(shapeAnnot);
     page.node.addAnnot(ref);
   }
 }

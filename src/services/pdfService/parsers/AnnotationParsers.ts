@@ -24,6 +24,11 @@ import {
   pdfFontToAppFontKey,
   pdfFontToCssFontFamily,
 } from "../lib/pdf-font-names";
+import {
+  getRectAndNormalizedShapePoints,
+  normalizeShapeArrowStyle,
+  pdfLineEndingNameToArrowStyle,
+} from "@/lib/shapeGeometry";
 
 const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
@@ -1746,6 +1751,169 @@ export class FreeTextParser implements IAnnotationParser {
         });
       }
     }
+    return annotations;
+  }
+}
+
+export class ShapeParser implements IAnnotationParser {
+  parse(context: ParserContext): Annotation[] {
+    const { pageAnnotations, pageIndex, viewport } = context;
+    const annotations: Annotation[] = [];
+
+    const getColorHex = (
+      value: number[] | Uint8ClampedArray | undefined,
+      fallback?: string,
+    ) => {
+      const normalized = normalizePdfColorToRgb255(value);
+      const hex = normalized ? rgbArrayToHex(normalized) : undefined;
+      return hex || fallback;
+    };
+
+    for (let index = 0; index < pageAnnotations.length; index++) {
+      const annotation = pageAnnotations[index];
+      if (
+        annotation.subtype !== "Square" &&
+        annotation.subtype !== "Circle" &&
+        annotation.subtype !== "Line" &&
+        annotation.subtype !== "PolyLine" &&
+        annotation.subtype !== "Polygon"
+      ) {
+        continue;
+      }
+
+      const strokeColor = getColorHex(annotation.color, "#000000");
+      const fillColor =
+        getColorHex(annotation.interiorColor) ||
+        getColorHex(annotation.fillColor);
+      const thickness =
+        typeof annotation.borderStyle?.width === "number" &&
+        Number.isFinite(annotation.borderStyle.width)
+          ? Math.max(1, annotation.borderStyle.width)
+          : 2;
+      const opacity =
+        typeof annotation.opacity === "number"
+          ? Math.min(1, Math.max(0, annotation.opacity))
+          : 1;
+      const author = annotation.title || undefined;
+      const updatedAt = parsePDFDate(annotation.modificationDate);
+      const borderEffectStyle = annotation.borderEffect?.style;
+      const isCloud =
+        annotation.subtype === "Square" && borderEffectStyle === "C";
+      const startArrowStyle =
+        normalizeShapeArrowStyle(annotation.startArrowStyle) ??
+        pdfLineEndingNameToArrowStyle(annotation.lineEndings?.[0]);
+      const endArrowStyle =
+        normalizeShapeArrowStyle(annotation.endArrowStyle) ??
+        pdfLineEndingNameToArrowStyle(annotation.lineEndings?.[1]);
+      const isArrow = !!startArrowStyle || !!endArrowStyle;
+
+      if (annotation.subtype === "Square" || annotation.subtype === "Circle") {
+        const importedRect = pdfJsRectToUiRect(annotation.rect, viewport);
+        const cloudInset =
+          isCloud &&
+          Array.isArray(annotation.rectDifferences) &&
+          annotation.rectDifferences.length === 4
+            ? Math.max(
+                0,
+                annotation.rectDifferences.reduce(
+                  (sum, value) => sum + (Number.isFinite(value) ? value : 0),
+                  0,
+                ) / 4,
+              )
+            : 0;
+        const rect =
+          isCloud && cloudInset > 0
+            ? {
+                x: importedRect.x + cloudInset,
+                y: importedRect.y + cloudInset,
+                width: Math.max(1, importedRect.width - cloudInset * 2),
+                height: Math.max(1, importedRect.height - cloudInset * 2),
+              }
+            : importedRect;
+        annotations.push({
+          id: `imported_shape_${pageIndex + 1}_${index}`,
+          pageIndex,
+          type: "shape",
+          shapeType: isCloud
+            ? "cloud"
+            : annotation.subtype === "Circle"
+              ? "circle"
+              : "square",
+          rect,
+          color: strokeColor,
+          backgroundColor:
+            annotation.subtype === "Circle" || annotation.subtype === "Square"
+              ? fillColor
+              : undefined,
+          thickness,
+          opacity,
+          text: annotation.contents || undefined,
+          author,
+          updatedAt,
+          sourcePdfRef: annotation.sourcePdfRef,
+          cloudIntensity: isCloud
+            ? annotation.borderEffect?.intensity || 2
+            : undefined,
+          cloudSpacing: isCloud ? annotation.cloudSpacing : undefined,
+          isEdited: false,
+          subtype: annotation.subtype.toLowerCase(),
+        });
+        continue;
+      }
+
+      const rawNumbers =
+        annotation.subtype === "Line" ? annotation.line : annotation.vertices;
+      if (!rawNumbers || rawNumbers.length < 4) continue;
+
+      const points = [];
+      for (
+        let pointIndex = 0;
+        pointIndex < rawNumbers.length;
+        pointIndex += 2
+      ) {
+        const [x, y] = viewport.convertToViewportPoint(
+          rawNumbers[pointIndex]!,
+          rawNumbers[pointIndex + 1]!,
+        );
+        points.push({ x, y });
+      }
+
+      const normalized = getRectAndNormalizedShapePoints(points);
+      if (!normalized) continue;
+
+      annotations.push({
+        id: `imported_shape_${pageIndex + 1}_${index}`,
+        pageIndex,
+        type: "shape",
+        shapeType:
+          annotation.subtype === "Polygon"
+            ? "polygon"
+            : isArrow
+              ? "arrow"
+              : annotation.subtype === "Line"
+                ? "line"
+                : "polyline",
+        rect: normalized.rect,
+        shapePoints: normalized.shapePoints,
+        shapeStartArrow: isArrow ? !!startArrowStyle : undefined,
+        shapeEndArrow: isArrow ? !!endArrowStyle : undefined,
+        shapeStartArrowStyle: startArrowStyle ?? undefined,
+        shapeEndArrowStyle: endArrowStyle ?? undefined,
+        arrowSize: isArrow ? annotation.arrowSize : undefined,
+        color: strokeColor,
+        backgroundColor:
+          annotation.subtype === "Polygon" ? fillColor : undefined,
+        thickness,
+        opacity,
+        text: annotation.contents || undefined,
+        author,
+        updatedAt,
+        sourcePdfRef: annotation.sourcePdfRef,
+        isEdited: false,
+        subtype: annotation.subtype.toLowerCase(),
+      });
+    }
+
     return annotations;
   }
 }
