@@ -289,7 +289,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         // We pass the tile size to the worker
         const success = await pdfWorkerService.renderPage({
           pageIndex,
-          scale: scale * dpr,
+          scale: renderScale * dpr,
           canvas: offscreenCanvas,
           canvasId: targetId,
           priority: isInView ? -1 : 0,

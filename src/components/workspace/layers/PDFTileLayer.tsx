@@ -20,6 +20,52 @@ type TileInfo = {
   priority: number;
 };
 
+const getViewportExpandedBounds = (
+  rect: [number, number, number, number],
+  baseW: number,
+  baseH: number,
+  marginMultiplier: number,
+) => {
+  const [vl, vt, vr, vb] = rect;
+  const marginX = Math.min(0.4, (TILE_MAX_DIM / baseW) * marginMultiplier);
+  const marginY = Math.min(0.4, (TILE_MAX_DIM / baseH) * marginMultiplier);
+
+  return {
+    left: vl - marginX,
+    top: vt - marginY,
+    right: vr + marginX,
+    bottom: vb + marginY,
+  };
+};
+
+const tileIntersectsViewportRect = (
+  tile: Pick<TileInfo, "x" | "y" | "w" | "h">,
+  baseW: number,
+  baseH: number,
+  rect: [number, number, number, number],
+  marginMultiplier: number,
+) => {
+  if (!baseW || !baseH) return true;
+
+  const bounds = getViewportExpandedBounds(
+    rect,
+    Math.max(baseW, 1),
+    Math.max(baseH, 1),
+    marginMultiplier,
+  );
+  const x0 = tile.x / baseW;
+  const y0 = tile.y / baseH;
+  const x1 = (tile.x + tile.w) / baseW;
+  const y1 = (tile.y + tile.h) / baseH;
+
+  return (
+    x1 >= bounds.left &&
+    x0 <= bounds.right &&
+    y1 >= bounds.top &&
+    y0 <= bounds.bottom
+  );
+};
+
 interface PDFTileLayerProps {
   page: PageData;
   scale: number;
@@ -341,6 +387,28 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       centerX = cssX * dpr;
       centerY = cssY * dpr;
       viewportCenterRef.current = [centerX, centerY];
+
+      const leftCss = Math.min(
+        Math.max(cRect.left - pRect.left, 0),
+        pRect.width,
+      );
+      const topCss = Math.min(Math.max(cRect.top - pRect.top, 0), pRect.height);
+      const rightCss = Math.min(
+        Math.max(cRect.right - pRect.left, 0),
+        pRect.width,
+      );
+      const bottomCss = Math.min(
+        Math.max(cRect.bottom - pRect.top, 0),
+        pRect.height,
+      );
+      const cssPageW = pRect.width || 1;
+      const cssPageH = pRect.height || 1;
+      viewportRectNormRef.current = [
+        leftCss / cssPageW,
+        topCss / cssPageH,
+        rightCss / cssPageW,
+        bottomCss / cssPageH,
+      ];
     }
     for (let y = 0; y < pageH; y += TILE_MAX_DIM) {
       for (let x = 0; x < pageW; x += TILE_MAX_DIM) {
@@ -637,10 +705,38 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       let inFlight = 0;
       let completed = 0;
 
-      const pendingTiles = backTiles.filter(
+      const allPendingTiles = backTiles.filter(
         (t) => !tileRenderedRef.current.has(t.canvasId),
       );
-      const totalToRender = pendingTiles.length;
+      const viewportRectNorm = viewportRectNormRef.current;
+      const shouldScopeToViewport =
+        viewportRectNorm !== null && backTilesPageW > 0 && backTilesPageH > 0;
+      const urgentPendingTiles = shouldScopeToViewport
+        ? allPendingTiles.filter((tile) =>
+            tileIntersectsViewportRect(
+              tile,
+              backTilesPageW,
+              backTilesPageH,
+              viewportRectNorm,
+              2.5,
+            ),
+          )
+        : allPendingTiles;
+      const deferredPendingTiles = !shouldScopeToViewport
+        ? []
+        : allPendingTiles.filter(
+            (tile) =>
+              !tileIntersectsViewportRect(
+                tile,
+                backTilesPageW,
+                backTilesPageH,
+                viewportRectNorm,
+                2.5,
+              ),
+          );
+      const pendingTiles = urgentPendingTiles.slice();
+      const backgroundTiles = deferredPendingTiles.slice();
+      const totalToRender = pendingTiles.length + backgroundTiles.length;
 
       const attemptCount = new Map<string, number>();
 
@@ -659,15 +755,15 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         return renderTile(tile, signal);
       };
 
-      const takeNextTile = (): TileInfo | null => {
-        if (pendingTiles.length === 0) return null;
+      const takeBestTile = (source: TileInfo[]): TileInfo | null => {
+        if (source.length === 0) return null;
         const vc = viewportCenterRef.current;
 
         let bestIdx = 0;
         if (vc) {
           let bestP = Infinity;
-          for (let i = 0; i < pendingTiles.length; i++) {
-            const t = pendingTiles[i];
+          for (let i = 0; i < source.length; i++) {
+            const t = source[i];
             const p = getDistanceBetweenPoints(
               { x: t.x + t.w / 2, y: t.y + t.h / 2 },
               { x: vc[0], y: vc[1] },
@@ -678,9 +774,9 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
             }
           }
         } else {
-          let bestP = pendingTiles[0].priority;
-          for (let i = 1; i < pendingTiles.length; i++) {
-            const p = pendingTiles[i].priority;
+          let bestP = source[0].priority;
+          for (let i = 1; i < source.length; i++) {
+            const p = source[i].priority;
             if (p < bestP) {
               bestP = p;
               bestIdx = i;
@@ -688,8 +784,14 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           }
         }
 
-        const [tile] = pendingTiles.splice(bestIdx, 1);
+        const [tile] = source.splice(bestIdx, 1);
         return tile ?? null;
+      };
+
+      const takeNextTile = (): TileInfo | null => {
+        return takeBestTile(
+          pendingTiles.length > 0 ? pendingTiles : backgroundTiles,
+        );
       };
 
       const launchMore = () => {
@@ -731,7 +833,18 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         abortController.abort();
       }
     };
-  }, [backTiles, backTilesKey, isInView, page, pageIndex, scale, tileMode]);
+  }, [
+    backTiles,
+    backTilesKey,
+    backTilesPageH,
+    backTilesPageW,
+    isInView,
+    page,
+    pageIndex,
+    scale,
+    tileMode,
+    viewportVersion,
+  ]);
 
   const hasUsableFrontTileBuffer =
     frontHasAnyRendered &&
@@ -823,21 +936,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           if (!rect) return false;
           if (!baseW || !baseH) return false;
 
-          const [vl, vt, vr, vb] = rect;
-          const marginX = Math.min(0.25, (TILE_MAX_DIM / baseW) * 1.5);
-          const marginY = Math.min(0.25, (TILE_MAX_DIM / baseH) * 1.5);
-          const l = vl - marginX;
-          const t0 = vt - marginY;
-          const r = vr + marginX;
-          const b = vb + marginY;
-
-          const x0 = t.x / baseW;
-          const y0 = t.y / baseH;
-          const x1 = (t.x + t.w) / baseW;
-          const y1 = (t.y + t.h) / baseH;
-
-          const intersects = x1 >= l && x0 <= r && y1 >= t0 && y0 <= b;
-          return !intersects;
+          return !tileIntersectsViewportRect(t, baseW, baseH, rect, 1.5);
         })();
 
         const tileDisplay = !isInView || hideByViewport ? "none" : "block";
