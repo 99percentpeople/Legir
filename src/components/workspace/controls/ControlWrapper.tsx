@@ -7,6 +7,12 @@ import { getMoveDelta } from "@/lib/controlMovement";
 import { useMouse } from "@/hooks/useMouse";
 import { useLanguage } from "@/components/language-provider";
 import type { Annotation, FormField, MoveDirection } from "@/types";
+import {
+  getInnerSizeFromOuterAabb,
+  normalizeRightAngleRotationDeg,
+  normalizeRotationDeg,
+  rotateOuterRectKeepingCenter,
+} from "@/lib/controlRotation";
 import { ControlContextMenu } from "./ControlContextMenu";
 import { ControlLayerMenuItems } from "./ControlLayerMenuItems";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
@@ -76,6 +82,8 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     "link",
     "shape",
   ].includes(data.type);
+  const isFormField = !isAnnotation;
+  const supportsRotation = data.type === "freetext" || isFormField;
   const tooltipText =
     !isAnnotation && "toolTip" in data && typeof data.toolTip === "string"
       ? data.toolTip.trim()
@@ -146,14 +154,6 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
 
     const { dx, dy } = getMoveDelta(direction, false);
     return { direction, dx, dy };
-  };
-
-  const normalizeRotationDeg = (deg: number) => {
-    if (!Number.isFinite(deg)) return 0;
-    let next = deg % 360;
-    if (next <= -180) next += 360;
-    if (next > 180) next -= 360;
-    return next;
   };
 
   const getFreetextInnerRectFromOuterAabb = (outerRect: {
@@ -290,7 +290,8 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const handleRotateHandleKeyDown = (
     e: React.KeyboardEvent<HTMLDivElement>,
   ) => {
-    if (!isFreetext || !isSelected) return;
+    if (!supportsRotation || !isSelected) return;
+    if (!rect) return;
     if (
       e.key !== "ArrowUp" &&
       e.key !== "ArrowDown" &&
@@ -307,15 +308,27 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       onTriggerHistorySave?.();
     }
 
-    const step = e.shiftKey ? 15 : 1;
-    const delta = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -step : step;
+    const direction = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1;
     const currentRotation =
       typeof data.rotationDeg === "number" && Number.isFinite(data.rotationDeg)
         ? data.rotationDeg
         : 0;
 
-    (onUpdate as (id: string, updates: Partial<Annotation>) => void)(id, {
-      rotationDeg: normalizeRotationDeg(currentRotation + delta),
+    if (isAnnotation) {
+      const step = e.shiftKey ? 15 : 1;
+      const delta = direction * step;
+      (onUpdate as (id: string, updates: Partial<Annotation>) => void)(id, {
+        rotationDeg: normalizeRotationDeg(currentRotation + delta),
+      });
+      return;
+    }
+
+    const nextRotation = normalizeRightAngleRotationDeg(
+      currentRotation + direction * 90,
+    );
+    (onUpdate as (id: string, updates: Partial<FormField>) => void)(id, {
+      rect: rotateOuterRectKeepingCenter(rect, currentRotation, nextRotation),
+      rotationDeg: nextRotation,
     });
   };
 
@@ -323,7 +336,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const label = "name" in data ? (data as { name: string }).name : data.type;
 
   const rotationDeg =
-    data.type === "freetext" &&
+    supportsRotation &&
     "rotationDeg" in data &&
     typeof data.rotationDeg === "number" &&
     Number.isFinite(data.rotationDeg)
@@ -346,6 +359,17 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       innerTop,
     };
   })();
+  const formFieldContentGeometry = (() => {
+    if (!isFormField) return null;
+
+    const innerSize = getInnerSizeFromOuterAabb(rect, rotationDeg);
+    return {
+      innerW: innerSize.width,
+      innerH: innerSize.height,
+      innerLeft: (rect.width - innerSize.width) / 2,
+      innerTop: (rect.height - innerSize.height) / 2,
+    };
+  })();
 
   // Determine ID based on type for sidebar navigation
   const defaultElementId = isAnnotation
@@ -359,6 +383,94 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const shouldRaiseZIndexWhenSelected =
     data.type !== "highlight" && !isInkHighlight;
   const supportsKeyboardResizeHandles = isSelected && resizable;
+  const supportsKeyboardRotateHandle = isSelected && supportsRotation;
+  const renderedChildren =
+    isFormField && formFieldContentGeometry ? (
+      <div
+        className="absolute"
+        style={{
+          left: `calc(${formFieldContentGeometry.innerLeft}px * var(--scale, 1))`,
+          top: `calc(${formFieldContentGeometry.innerTop}px * var(--scale, 1))`,
+          width: `calc(${formFieldContentGeometry.innerW}px * var(--scale, 1))`,
+          height: `calc(${formFieldContentGeometry.innerH}px * var(--scale, 1))`,
+          transform: `rotate(${rotationDeg}deg)`,
+          transformOrigin: "50% 50%",
+        }}
+      >
+        {children}
+      </div>
+    ) : (
+      children
+    );
+  const formFieldRotateHandle =
+    isFormField && formFieldContentGeometry ? (
+      <div
+        className="pointer-events-none absolute"
+        style={{
+          left: `calc(${formFieldContentGeometry.innerLeft}px * var(--scale, 1))`,
+          top: `calc(${formFieldContentGeometry.innerTop}px * var(--scale, 1))`,
+          width: `calc(${formFieldContentGeometry.innerW}px * var(--scale, 1))`,
+          height: `calc(${formFieldContentGeometry.innerH}px * var(--scale, 1))`,
+          transform: `rotate(${rotationDeg}deg)`,
+          transformOrigin: "50% 50%",
+        }}
+      >
+        <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-dashed border-blue-500" />
+        <div
+          className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
+          onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
+          tabIndex={supportsKeyboardRotateHandle ? 0 : -1}
+          data-ff-keyboard-handle="control-rotate"
+          aria-label={`${label} rotate`}
+          onKeyDown={
+            supportsKeyboardRotateHandle ? handleRotateHandleKeyDown : undefined
+          }
+        />
+      </div>
+    ) : null;
+  const resizeHandles = ["nw", "ne", "sw", "se"] as const;
+
+  const getResizeHandleClassName = (handle: (typeof resizeHandles)[number]) =>
+    cn(
+      "pointer-events-auto absolute z-30 h-3 w-3 border border-blue-500 bg-white",
+      handle === "nw" && "-top-1.5 -left-1.5 cursor-nwse-resize",
+      handle === "ne" && "-top-1.5 -right-1.5 cursor-nesw-resize",
+      handle === "sw" && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
+      handle === "se" && "-right-1.5 -bottom-1.5 cursor-nwse-resize",
+    );
+
+  const renderResizeHandles = () =>
+    resizeHandles.map((handle) => (
+      <div
+        key={handle}
+        className={getResizeHandleClassName(handle)}
+        onPointerDown={(e) => handleResizePointerDown(e, handle)}
+        tabIndex={supportsKeyboardResizeHandles ? 0 : -1}
+        data-ff-keyboard-handle="control-resize"
+        aria-label={`${label} resize ${handle}`}
+        onKeyDown={
+          supportsKeyboardResizeHandles
+            ? handleResizeHandleKeyDown(handle)
+            : undefined
+        }
+      />
+    ));
+
+  const renderRotateHandle = () => (
+    <>
+      <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-dashed border-blue-500" />
+      <div
+        className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
+        onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
+        tabIndex={supportsKeyboardRotateHandle ? 0 : -1}
+        data-ff-keyboard-handle="control-rotate"
+        aria-label={`${label} rotate`}
+        onKeyDown={
+          supportsKeyboardRotateHandle ? handleRotateHandleKeyDown : undefined
+        }
+      />
+    </>
+  );
 
   const wrapper = (
     <div
@@ -391,7 +503,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
         cursor: isSelectable ? "pointer" : "inherit",
       }}
     >
-      {children}
+      {renderedChildren}
 
       {/* Selection Overlay */}
       {showBorder &&
@@ -424,41 +536,8 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                   }}
                 >
                   <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
-                  {["nw", "ne", "sw", "se"].map((h) => (
-                    <div
-                      key={h}
-                      className={cn(
-                        "pointer-events-auto absolute z-30 h-3 w-3 border border-blue-500 bg-white",
-                        h === "nw" && "-top-1.5 -left-1.5 cursor-nwse-resize",
-                        h === "ne" && "-top-1.5 -right-1.5 cursor-nesw-resize",
-                        h === "sw" &&
-                          "-bottom-1.5 -left-1.5 cursor-nesw-resize",
-                        h === "se" &&
-                          "-right-1.5 -bottom-1.5 cursor-nwse-resize",
-                      )}
-                      onPointerDown={(e) => handleResizePointerDown(e, h)}
-                      tabIndex={supportsKeyboardResizeHandles ? 0 : -1}
-                      data-ff-keyboard-handle="control-resize"
-                      aria-label={`${label} resize ${h}`}
-                      onKeyDown={
-                        supportsKeyboardResizeHandles
-                          ? handleResizeHandleKeyDown(h)
-                          : undefined
-                      }
-                    />
-                  ))}
-
-                  <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-dashed border-blue-500" />
-                  <div
-                    className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
-                    onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
-                    tabIndex={isFreetext ? 0 : -1}
-                    data-ff-keyboard-handle="freetext-rotate"
-                    aria-label={`${label} rotate`}
-                    onKeyDown={
-                      isFreetext ? handleRotateHandleKeyDown : undefined
-                    }
-                  />
+                  {renderResizeHandles()}
+                  {renderRotateHandle()}
                 </div>
               </>
             ) : (
@@ -467,42 +546,10 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                 <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap shadow-sm">
                   {label}
                 </span>
-                {["nw", "ne", "sw", "se"].map((h) => (
-                  <div
-                    key={h}
-                    className={cn(
-                      "pointer-events-auto absolute z-30 h-3 w-3 border border-blue-500 bg-white",
-                      h === "nw" && "-top-1.5 -left-1.5 cursor-nwse-resize",
-                      h === "ne" && "-top-1.5 -right-1.5 cursor-nesw-resize",
-                      h === "sw" && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
-                      h === "se" && "-right-1.5 -bottom-1.5 cursor-nwse-resize",
-                    )}
-                    onPointerDown={(e) => handleResizePointerDown(e, h)}
-                    tabIndex={supportsKeyboardResizeHandles ? 0 : -1}
-                    data-ff-keyboard-handle="control-resize"
-                    aria-label={`${label} resize ${h}`}
-                    onKeyDown={
-                      supportsKeyboardResizeHandles
-                        ? handleResizeHandleKeyDown(h)
-                        : undefined
-                    }
-                  />
-                ))}
+                {renderResizeHandles()}
 
-                {data.type === "freetext" && (
-                  <>
-                    <div className="pointer-events-none absolute -top-3 left-1/2 z-20 h-3 w-0 -translate-x-1/2 border-l border-dashed border-blue-500" />
-                    <div
-                      className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
-                      onPointerDown={(e) =>
-                        handleResizePointerDown(e, "rotate")
-                      }
-                      tabIndex={0}
-                      data-ff-keyboard-handle="freetext-rotate"
-                      aria-label={`${label} rotate`}
-                      onKeyDown={handleRotateHandleKeyDown}
-                    />
-                  </>
+                {supportsRotation && (
+                  <>{formFieldRotateHandle ?? renderRotateHandle()}</>
                 )}
               </>
             )}

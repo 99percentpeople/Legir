@@ -61,6 +61,12 @@ import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 import { openExternalUrl } from "@/services/platform";
 import {
+  getInnerSizeFromOuterAabb as getInnerSizeFromOuterAabbLib,
+  getRotatedOuterRect as getRotatedOuterRectLib,
+  normalizeRightAngleRotationDeg,
+  rotateOuterRectKeepingCenter,
+} from "@/lib/controlRotation";
+import {
   getRectAndNormalizedShapePoints,
   getShapePointsPathData,
   isOpenLineShapeType,
@@ -759,7 +765,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (!handleElement) return false;
 
       const handleType = handleElement.dataset.ffKeyboardHandle;
-      if (handleType !== "control-resize" && handleType !== "freetext-rotate") {
+      if (handleType !== "control-resize" && handleType !== "control-rotate") {
         return false;
       }
 
@@ -1050,53 +1056,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const getRotatedFreetextOuterRect = React.useCallback(
     (rect: Rect, rotationDeg: number) => {
-      const theta = (rotationDeg * Math.PI) / 180;
-      const cos = Math.cos(theta);
-      const sin = Math.sin(theta);
-      const absCos = Math.abs(cos);
-      const absSin = Math.abs(sin);
-
-      const outerW = absCos * rect.width + absSin * rect.height;
-      const outerH = absSin * rect.width + absCos * rect.height;
-      const cx = rect.x + rect.width / 2;
-      const cy = rect.y + rect.height / 2;
-
-      return {
-        x: cx - outerW / 2,
-        y: cy - outerH / 2,
-        width: outerW,
-        height: outerH,
-      };
+      return getRotatedOuterRectLib(rect, rotationDeg);
     },
     [],
   );
 
   const getInnerSizeFromOuterAabb = React.useCallback(
     (outer: Rect, rotationDeg: number) => {
-      if (!Number.isFinite(rotationDeg) || rotationDeg === 0) {
-        return { width: outer.width, height: outer.height };
-      }
-
-      const theta = (rotationDeg * Math.PI) / 180;
-      const absCos = Math.abs(Math.cos(theta));
-      const absSin = Math.abs(Math.sin(theta));
-      const det = absCos * absCos - absSin * absSin;
-      if (!Number.isFinite(det) || Math.abs(det) < 1e-6) {
-        return { width: outer.width, height: outer.height };
-      }
-
-      const width = (outer.width * absCos - outer.height * absSin) / det;
-      const height = (outer.height * absCos - outer.width * absSin) / det;
-      if (
-        !Number.isFinite(width) ||
-        !Number.isFinite(height) ||
-        width <= 0 ||
-        height <= 0
-      ) {
-        return { width: outer.width, height: outer.height };
-      }
-
-      return { width, height };
+      return getInnerSizeFromOuterAabbLib(outer, rotationDeg);
     },
     [],
   );
@@ -1341,16 +1308,50 @@ const Workspace: React.FC<WorkspaceProps> = ({
     )
       return;
 
+    const field = editorState.fields.find(
+      (candidate) => candidate.id === resizingFieldId,
+    );
+    if (!field) return;
+
     const coords = getRelativeCoordsFromPoint(
       clientX,
       clientY,
-      activePageIndex,
+      field.pageIndex,
     );
     const { enabled, threshold: baseThreshold } =
       editorState.options.snappingOptions;
     const threshold = baseThreshold / editorState.scale;
     const shouldSnap =
       enabled && !editorState.keys.alt && editorState.mode === "form";
+
+    if (resizeHandle === "rotate") {
+      const pivot =
+        resizeStart.rotatePivot ??
+        ({
+          x: resizeStart.originalRect.x + resizeStart.originalRect.width / 2,
+          y: resizeStart.originalRect.y + resizeStart.originalRect.height / 2,
+        } satisfies { x: number; y: number });
+      const startAngle = resizeStart.rotateStartAngleRad ?? 0;
+      const currentAngle = Math.atan2(coords.y - pivot.y, coords.x - pivot.x);
+      const deltaDeg = ((currentAngle - startAngle) * 180) / Math.PI;
+      const baseDeg =
+        typeof resizeStart.originalRotationDeg === "number"
+          ? resizeStart.originalRotationDeg
+          : typeof field.rotationDeg === "number"
+            ? field.rotationDeg
+            : 0;
+      const nextRotation = normalizeRightAngleRotationDeg(baseDeg + deltaDeg);
+
+      onUpdateField(resizingFieldId, {
+        rect: rotateOuterRectKeepingCenter(
+          resizeStart.originalRect,
+          baseDeg,
+          nextRotation,
+        ),
+        rotationDeg: nextRotation,
+      });
+      return;
+    }
 
     const dx = coords.x - resizeStart.mouseX;
     const dy = coords.y - resizeStart.mouseY;
@@ -2392,7 +2393,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
           mouseY: coords.y,
         };
 
-        if (handle === "rotate" && data.type === "freetext") {
+        const supportsRotation =
+          data.type === "freetext" ||
+          !["highlight", "ink", "comment", "link", "shape"].includes(data.type);
+
+        if (handle === "rotate" && supportsRotation) {
           const pivot = {
             x: data.rect.x + data.rect.width / 2,
             y: data.rect.y + data.rect.height / 2,

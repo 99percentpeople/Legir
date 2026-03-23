@@ -2,10 +2,23 @@ import React from "react";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { cn } from "@/utils/cn";
+import { getInnerSizeFromOuterAabb } from "@/lib/controlRotation";
 
 export const RadioControl: React.FC<FormControlProps> = (props) => {
   const { data, isFormMode, isAnnotationMode, isSelectable, onUpdate } = props;
   const style = data.style || {};
+  const rotationDeg =
+    typeof data.rotationDeg === "number" && Number.isFinite(data.rotationDeg)
+      ? data.rotationDeg
+      : 0;
+  const visualRect =
+    rotationDeg === 0
+      ? data.rect
+      : getInnerSizeFromOuterAabb(data.rect, rotationDeg);
+  const circleSizePercent =
+    (Math.min(visualRect.width, visualRect.height) / visualRect.width) * 100;
+  const circleHeightPercent =
+    (Math.min(visualRect.width, visualRect.height) / visualRect.height) * 100;
 
   // Radio doesn't use the common container style for background/border on the wrapper
   // It renders a circle inside.
@@ -34,8 +47,8 @@ export const RadioControl: React.FC<FormControlProps> = (props) => {
         <div
           className="relative box-border flex items-center justify-center rounded-full border border-black"
           style={{
-            width: `${(Math.min(data.rect.width, data.rect.height) / data.rect.width) * 100}%`,
-            height: `${(Math.min(data.rect.width, data.rect.height) / data.rect.height) * 100}%`,
+            width: `${circleSizePercent}%`,
+            height: `${circleHeightPercent}%`,
             backgroundColor: !style.isTransparent
               ? style.backgroundColor
               : "white",

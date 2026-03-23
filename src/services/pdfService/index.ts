@@ -67,6 +67,7 @@ import {
   PreservedSourceAnnotationRef,
 } from "@/types";
 import { getOrderedPageControls } from "@/lib/controlLayerOrder";
+import { getControlRotationFromWidgetRotation } from "@/lib/controlRotation";
 import {
   IAnnotationParser,
   IControlParser,
@@ -746,6 +747,37 @@ const buildPdfLibAnnotsByPageIndex = async (
         const radioButton = isBtn && isRadio;
 
         const buttonValue = isBtn ? extractWidgetOnValue(annot) : undefined;
+        const rawWidgetRotation = (() => {
+          let r: number | undefined = undefined;
+          try {
+            const rotateObj = annot.lookup(PDFName.of("Rotate"));
+            if (rotateObj instanceof PDFNumber) r = rotateObj.asNumber();
+          } catch {
+            // ignore
+          }
+
+          if (typeof r !== "number") {
+            try {
+              const mk = annot.lookup(PDFName.of("MK"));
+              if (mk instanceof PDFDict) {
+                const mkR = mk.lookup(PDFName.of("R"));
+                if (mkR instanceof PDFNumber) r = mkR.asNumber();
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          if (typeof r !== "number" || !Number.isFinite(r)) return undefined;
+          return r;
+        })();
+        const rotation =
+          typeof rawWidgetRotation === "number"
+            ? getControlRotationFromWidgetRotation(
+                page.getRotation().angle,
+                rawWidgetRotation,
+              )
+            : undefined;
 
         pushForPage({
           subtype: "Widget",
@@ -767,6 +799,7 @@ const buildPdfLibAnnotsByPageIndex = async (
           defaultAppearance: da,
           DA: da,
           textAlignment,
+          rotation,
           checkBox: checkBox || undefined,
           radioButton: radioButton || undefined,
           buttonValue,

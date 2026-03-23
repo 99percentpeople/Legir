@@ -108,6 +108,7 @@ export interface FormField {
   multiline?: boolean; // For Text
   maxLength?: number; // For Text
   alignment?: "left" | "center" | "right"; // For Text
+  rotationDeg?: number;
 }
 
 export interface Annotation {

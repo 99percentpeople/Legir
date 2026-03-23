@@ -3,6 +3,7 @@ import type { PDFPage } from "@cantoo/pdf-lib";
 import type { ViewportLike } from "../types";
 import { hexToPdfColor } from "./colors";
 import { uiRectToPdfBounds } from "./coords";
+import { getWidgetRotationFromControlRotation } from "@/lib/controlRotation";
 
 export const getCommonControlExportOpts = (
   field: FormField,
@@ -26,4 +27,27 @@ export const getCommonControlExportOpts = (
     borderWidth: hasBorder ? bw : 0,
     textColor: hexToPdfColor(field.style?.textColor),
   };
+};
+
+export const applyWidgetExportRotation = (
+  widget:
+    | {
+        getOrCreateAppearanceCharacteristics: () => {
+          setRotation: (rotation: number) => void;
+        };
+      }
+    | undefined,
+  page: PDFPage,
+  fieldRotationDeg?: number,
+) => {
+  if (!widget) return 0;
+
+  const widgetRotation = getWidgetRotationFromControlRotation(
+    page.getRotation().angle,
+    fieldRotationDeg ?? 0,
+  );
+  if (widgetRotation === 0) return 0;
+
+  widget.getOrCreateAppearanceCharacteristics().setRotation(widgetRotation);
+  return widgetRotation;
 };

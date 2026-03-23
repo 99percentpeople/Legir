@@ -3,6 +3,7 @@ import {
   PDFName,
   PDFString,
   TextAlignment,
+  degrees,
   type PDFFont,
 } from "@cantoo/pdf-lib";
 import { FormField, FieldType } from "@/types";
@@ -10,7 +11,14 @@ import { PDF_CUSTOM_KEYS } from "@/constants";
 import { IControlExporter, ViewportLike } from "../types";
 import { containsNonAscii, isExplicitCjkFontSelection } from "../lib/text";
 import { pickCjkFontFromMap } from "../lib/font-selection";
-import { getCommonControlExportOpts } from "../lib/control-export";
+import {
+  applyWidgetExportRotation,
+  getCommonControlExportOpts,
+} from "../lib/control-export";
+import {
+  getInnerSizeFromOuterAabb,
+  normalizeRightAngleRotationDeg,
+} from "@/lib/controlRotation";
 
 export class TextControlExporter implements IControlExporter {
   shouldExport(field: FormField): boolean {
@@ -78,6 +86,12 @@ export class TextControlExporter implements IControlExporter {
     }
 
     tf.addToPage(page, { ...commonOpts, font: fieldFont });
+    applyWidgetExportRotation(
+      tf.acroField.getWidgets().at(-1),
+      page,
+      field.rotationDeg,
+    );
+    const appearanceFont = fieldFont ?? form.getDefaultFont();
 
     if (field.value) {
       tf.setText(field.value);
@@ -104,12 +118,10 @@ export class TextControlExporter implements IControlExporter {
 
     if (field.multiline) tf.enableMultiline();
 
-    if (fieldFont) {
-      try {
-        tf.updateAppearances(fieldFont);
-      } catch (e) {
-        console.warn("Failed to update text field appearances", e);
-      }
+    try {
+      tf.updateAppearances(appearanceFont);
+    } catch (e) {
+      console.warn("Failed to update text field appearances", e);
     }
   }
 }
@@ -136,11 +148,22 @@ export class CheckboxControlExporter implements IControlExporter {
     }
 
     cb.addToPage(page, commonOpts);
+    applyWidgetExportRotation(
+      cb.acroField.getWidgets().at(-1),
+      page,
+      field.rotationDeg,
+    );
     if (field.isChecked) cb.check();
     else cb.uncheck();
 
     if (field.toolTip) {
       cb.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
+    }
+
+    try {
+      cb.updateAppearances();
+    } catch (e) {
+      console.warn("Failed to update checkbox appearances", e);
     }
   }
 }
@@ -211,6 +234,12 @@ export class DropdownControlExporter implements IControlExporter {
       }
 
       ol.addToPage(page, { ...commonOpts, font: fieldFont });
+      applyWidgetExportRotation(
+        ol.acroField.getWidgets().at(-1),
+        page,
+        field.rotationDeg,
+      );
+      const appearanceFont = fieldFont ?? form.getDefaultFont();
       if (field.options) ol.setOptions(field.options);
 
       ol.enableMultiselect();
@@ -229,12 +258,10 @@ export class DropdownControlExporter implements IControlExporter {
       }
 
       if (field.style?.fontSize) ol.setFontSize(field.style.fontSize);
-      if (fieldFont) {
-        try {
-          ol.updateAppearances(fieldFont);
-        } catch (e) {
-          console.warn("Failed to update option list appearances", e);
-        }
+      try {
+        ol.updateAppearances(appearanceFont);
+      } catch (e) {
+        console.warn("Failed to update option list appearances", e);
       }
     } else {
       let dd;
@@ -245,6 +272,12 @@ export class DropdownControlExporter implements IControlExporter {
       }
 
       dd.addToPage(page, { ...commonOpts, font: fieldFont });
+      applyWidgetExportRotation(
+        dd.acroField.getWidgets().at(-1),
+        page,
+        field.rotationDeg,
+      );
+      const appearanceFont = fieldFont ?? form.getDefaultFont();
       if (field.options) dd.setOptions(field.options);
       if (field.allowCustomValue) dd.enableEditing();
 
@@ -261,12 +294,10 @@ export class DropdownControlExporter implements IControlExporter {
       }
 
       if (field.style?.fontSize) dd.setFontSize(field.style.fontSize);
-      if (fieldFont) {
-        try {
-          dd.updateAppearances(fieldFont);
-        } catch (e) {
-          console.warn("Failed to update dropdown appearances", e);
-        }
+      try {
+        dd.updateAppearances(appearanceFont);
+      } catch (e) {
+        console.warn("Failed to update dropdown appearances", e);
       }
     }
   }
@@ -298,9 +329,20 @@ export class RadioControlExporter implements IControlExporter {
 
     const val = field.radioValue || field.exportValue || `Choice_${field.id}`;
     rg.addOptionToPage(val, page, commonOpts);
+    applyWidgetExportRotation(
+      rg.acroField.getWidgets().at(-1),
+      page,
+      field.rotationDeg,
+    );
 
     if (field.isChecked) {
       rg.select(val);
+    }
+
+    try {
+      rg.updateAppearances();
+    } catch (e) {
+      console.warn("Failed to update radio appearances", e);
     }
   }
 }
@@ -335,27 +377,45 @@ export class SignatureControlExporter implements IControlExporter {
       const common = getCommonControlExportOpts(field, page, viewport);
       const boxWidth = common.width;
       const boxHeight = common.height;
+      const rotationDeg = normalizeRightAngleRotationDeg(
+        field.rotationDeg ?? 0,
+      );
+      const innerBox =
+        rotationDeg === 0
+          ? { width: boxWidth, height: boxHeight }
+          : getInnerSizeFromOuterAabb(
+              { width: boxWidth, height: boxHeight },
+              rotationDeg,
+            );
 
-      let drawWidth = boxWidth;
-      let drawHeight = boxHeight;
-      let drawX = common.x;
-      let drawY = common.y;
+      let drawWidth = innerBox.width;
+      let drawHeight = innerBox.height;
 
       const scaleMode = field.imageScaleMode || "contain";
 
       if (scaleMode === "contain") {
-        const widthRatio = boxWidth / imgDims.width;
-        const heightRatio = boxHeight / imgDims.height;
+        const widthRatio = innerBox.width / imgDims.width;
+        const heightRatio = innerBox.height / imgDims.height;
         const scale = Math.min(widthRatio, heightRatio);
 
         drawWidth = imgDims.width * scale;
         drawHeight = imgDims.height * scale;
+      }
 
-        const offsetX = (boxWidth - drawWidth) / 2;
-        const offsetY = (boxHeight - drawHeight) / 2;
+      const centerX = common.x + boxWidth / 2;
+      const centerY = common.y + boxHeight / 2;
+      let drawX = centerX - drawWidth / 2;
+      let drawY = centerY - drawHeight / 2;
 
-        drawX += offsetX;
-        drawY += offsetY;
+      if (rotationDeg === 90) {
+        drawX = centerX + drawHeight / 2;
+        drawY = centerY - drawWidth / 2;
+      } else if (rotationDeg === 180) {
+        drawX = centerX + drawWidth / 2;
+        drawY = centerY + drawHeight / 2;
+      } else if (rotationDeg === 270) {
+        drawX = centerX - drawHeight / 2;
+        drawY = centerY + drawWidth / 2;
       }
 
       page.drawImage(image, {
@@ -363,6 +423,7 @@ export class SignatureControlExporter implements IControlExporter {
         y: drawY,
         width: drawWidth,
         height: drawHeight,
+        rotate: rotationDeg !== 0 ? degrees(rotationDeg) : undefined,
       });
       return; // Done
     }
@@ -384,9 +445,21 @@ export class SignatureControlExporter implements IControlExporter {
     }
 
     tf.addToPage(page, { ...commonOpts, font: fieldFont });
+    applyWidgetExportRotation(
+      tf.acroField.getWidgets().at(-1),
+      page,
+      field.rotationDeg,
+    );
+    const appearanceFont = fieldFont ?? form.getDefaultFont();
 
     if (field.toolTip) {
       tf.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
+    }
+
+    try {
+      tf.updateAppearances(appearanceFont);
+    } catch (e) {
+      console.warn("Failed to update signature appearances", e);
     }
   }
 }

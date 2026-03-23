@@ -78,6 +78,11 @@ export class TextControlParser implements IControlParser {
           alignment: alignment,
           multiline: !!(annotation.fieldFlags & 4096),
           toolTip: annotation.alternativeText || undefined,
+          rotationDeg:
+            typeof annotation.rotation === "number" &&
+            Number.isFinite(annotation.rotation)
+              ? annotation.rotation
+              : undefined,
         });
       }
     });
@@ -142,6 +147,11 @@ export class CheckboxControlParser implements IControlParser {
           isChecked: isChecked,
           exportValue: exportValue, // Might need refinement
           toolTip: annotation.alternativeText || undefined,
+          rotationDeg:
+            typeof annotation.rotation === "number" &&
+            Number.isFinite(annotation.rotation)
+              ? annotation.rotation
+              : undefined,
         });
       }
     });
@@ -201,6 +211,11 @@ export class RadioControlParser implements IControlParser {
           radioValue: radioValue,
           exportValue: radioValue,
           toolTip: annotation.alternativeText || undefined,
+          rotationDeg:
+            typeof annotation.rotation === "number" &&
+            Number.isFinite(annotation.rotation)
+              ? annotation.rotation
+              : undefined,
         });
       }
     });
@@ -288,6 +303,11 @@ export class DropdownControlParser implements IControlParser {
           allowCustomValue: allowCustomValue,
           alignment: alignment,
           toolTip: annotation.alternativeText || undefined,
+          rotationDeg:
+            typeof annotation.rotation === "number" &&
+            Number.isFinite(annotation.rotation)
+              ? annotation.rotation
+              : undefined,
         });
       }
     });
@@ -341,6 +361,11 @@ export class SignatureControlParser implements IControlParser {
           required: !!(annotation.fieldFlags & 2),
           style: style,
           toolTip: annotation.alternativeText || undefined,
+          rotationDeg:
+            typeof annotation.rotation === "number" &&
+            Number.isFinite(annotation.rotation)
+              ? annotation.rotation
+              : undefined,
         });
       }
     });
