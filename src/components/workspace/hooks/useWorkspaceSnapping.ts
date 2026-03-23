@@ -8,12 +8,19 @@ export type SnapLine = {
   end: number;
 };
 
+type SnapRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export const useWorkspaceSnapping = (opts: {
   editorState: Pick<WorkspaceEditorState, "fields" | "mode" | "options">;
 }) => {
   const applySnapping = useCallback(
     (
-      rect: any,
+      rect: SnapRect,
       pageIndex: number,
       excludeId: string | null,
       threshold: number,

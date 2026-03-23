@@ -23,7 +23,8 @@ import type {
 export type AiToolName =
   | "get_document_context"
   | "get_document_metadata"
-  | "get_pages_image"
+  | "get_pages_visual"
+  | "summarize_pages_visual"
   | "get_document_digest"
   | "get_pages_text"
   | "search_document"
@@ -140,6 +141,32 @@ export interface AiRenderedPageImageBatch {
   pages: AiRenderedPageImage[];
 }
 
+export interface AiRenderedPageVisualSummaryPage {
+  pageNumber: number;
+  pageWidth: number;
+  pageHeight: number;
+  rotation: number;
+  targetWidth: number;
+  renderedWidth: number;
+  renderedHeight: number;
+  renderAnnotations: boolean;
+}
+
+export interface AiRenderedPageVisualSummaryResult {
+  requestedPageCount: number;
+  returnedPageCount: number;
+  truncated: boolean;
+  maxPagesPerCall: number;
+  pages: AiRenderedPageVisualSummaryPage[];
+  summary: string;
+}
+
+export interface AiSummaryInstructions {
+  known_information?: string;
+  remaining_uncertainties?: string;
+  what_to_add_or_verify?: string;
+}
+
 export interface AiDocumentDigestChunk {
   startPage: number;
   endPage: number;
@@ -173,10 +200,20 @@ export type AiAnnotationKind =
   | "shape"
   | "link";
 
+export type AiShapeAnnotationSubType =
+  | "square"
+  | "circle"
+  | "line"
+  | "polyline"
+  | "polygon"
+  | "arrow"
+  | "cloud";
+
 export interface AiAnnotationSummary {
   id: string;
   pageNumber: number;
   type: AiAnnotationKind;
+  subType?: AiShapeAnnotationSubType;
   text?: string;
   highlightedText?: string;
   author?: string;

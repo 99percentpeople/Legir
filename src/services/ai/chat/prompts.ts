@@ -14,10 +14,11 @@ import {
   buildPromptSection,
   collectToolPromptInstructions,
   createAiChatPromptContext,
+  formatSummaryInstructionsForPrompt,
   hasTool,
-  normalizeSummaryInstructions,
   serializePromptJson,
 } from "@/services/ai/utils/promptHelpers";
+import type { AiSummaryInstructions } from "@/services/ai/chat/types";
 
 export const getAiChatSystemInstruction = (options?: {
   toolDefinitions?: AiChatToolDefinition[];
@@ -49,9 +50,12 @@ export const getAiChatSystemInstruction = (options?: {
     "Prefer tools for document search, page reading, metadata, annotations, fields, form filling, highlighting, and navigation when the task depends on the open PDF.",
     "All AI tool page numbers are 1-based. The first PDF page is page 1, not page 0.",
   ];
-  if (hasTool(context, "get_pages_image")) {
+  if (
+    hasTool(context, "get_pages_visual") ||
+    hasTool(context, "summarize_pages_visual")
+  ) {
     groundingLines.push(
-      "If text extraction is empty, severely degraded, or clearly misses the needed visual content on a page, do not give up. Inspect the page image before concluding the content cannot be checked.",
+      "If text extraction is empty, severely degraded, or clearly misses the needed visual content on a page, do not give up. Inspect the rendered page visually before concluding the content cannot be checked.",
     );
   }
   sections.push(buildPromptSection("Grounding", groundingLines));
@@ -103,9 +107,12 @@ export const getAiChatSystemInstruction = (options?: {
     "Tool arguments and tool result field names use snake_case.",
     "Use the available tools directly. Do not describe fake tool calls or JSON wrappers.",
   ];
-  if (hasTool(context, "get_pages_image")) {
+  if (
+    hasTool(context, "get_pages_visual") ||
+    hasTool(context, "summarize_pages_visual")
+  ) {
     toolUsageLines.push(
-      "If get_pages_text or search_document does not yield usable text for a relevant page, try get_pages_image before telling the user the page cannot be inspected.",
+      "If get_pages_text or search_document does not yield usable text for a relevant page, try get_pages_visual or summarize_pages_visual before telling the user the page cannot be inspected.",
     );
   }
   if (context.readToolNames.length > 0) {
@@ -141,10 +148,10 @@ export const buildDocumentDigestSummaryPrompt = (options: {
   startPage: number;
   endPage: number;
   maxChars: number;
-  summaryInstructions?: string;
+  summaryInstructions?: AiSummaryInstructions;
 }) => {
   const pageLabel = buildPageRangeLabel(options.startPage, options.endPage);
-  const extraInstructions = normalizeSummaryInstructions(
+  const summaryInstructionLines = formatSummaryInstructionsForPrompt(
     options.summaryInstructions,
   );
   const lines = [
@@ -161,9 +168,8 @@ export const buildDocumentDigestSummaryPrompt = (options: {
     `- Keep the summary within about ${options.maxChars} characters.`,
   ];
 
-  if (extraInstructions) {
-    lines.push("- Additional focus instructions:");
-    lines.push(extraInstructions);
+  if (summaryInstructionLines.length > 0) {
+    lines.push(...summaryInstructionLines);
   }
 
   return lines.join("\n");
@@ -173,10 +179,10 @@ export const buildDocumentDigestMergePrompt = (options: {
   startPage: number;
   endPage: number;
   maxChars: number;
-  summaryInstructions?: string;
+  summaryInstructions?: AiSummaryInstructions;
 }) => {
   const pageLabel = buildPageRangeLabel(options.startPage, options.endPage);
-  const extraInstructions = normalizeSummaryInstructions(
+  const summaryInstructionLines = formatSummaryInstructionsForPrompt(
     options.summaryInstructions,
   );
   const lines = [
@@ -193,9 +199,8 @@ export const buildDocumentDigestMergePrompt = (options: {
     `- Keep the summary within about ${options.maxChars} characters.`,
   ];
 
-  if (extraInstructions) {
-    lines.push("- Additional focus instructions:");
-    lines.push(extraInstructions);
+  if (summaryInstructionLines.length > 0) {
+    lines.push(...summaryInstructionLines);
   }
 
   return lines.join("\n");

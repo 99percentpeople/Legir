@@ -659,7 +659,14 @@ const zhTW = {
     },
     ai_chat: {
       title: "AI 問答工具",
-      description: "配置 AI 文件摘要工具，並為長篇摘要選擇摘要模型。",
+      description: "配置 AI 文件摘要工具，以及渲染頁視覺總結工具。",
+      visual_summary_enabled: "啟用視覺總結工具",
+      visual_summary_enabled_desc:
+        "控制 AI 問答中的 summarize_pages_visual 是否可用。這讓純文字對話模型也能委派已設定的視覺模型檢查渲染後的頁面。",
+      visual_summary_model: "視覺總結模型",
+      visual_summary_model_placeholder: "選擇視覺模型",
+      visual_summary_model_desc:
+        "供 summarize_pages_visual 使用。如果停用工具或未選擇視覺模型，這個工具將不可用。",
       digest_enabled: "啟用摘要工具",
       digest_enabled_desc: "控制 AI 問答中的 get_document_digest 是否可用。",
       summary_model: "摘要總結模型",

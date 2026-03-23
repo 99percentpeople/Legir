@@ -18,7 +18,7 @@ export type WorkspaceTextSelectionPopoverState = {
 
 export interface WorkspaceTextSelectionPopoverProps {
   toolbar: WorkspaceTextSelectionPopoverState;
-  virtualRef: any;
+  virtualRef: React.ComponentProps<typeof PopoverAnchor>["virtualRef"];
   onClose: () => void;
   onHighlight: () => void;
   onSearchWeb: () => void;

@@ -19,7 +19,6 @@ export const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({
   onUpdate,
   onDelete,
   onEdit,
-  scale,
 }) => {
   // Only render for comments currently
   if (annotation.type !== "comment") return null;

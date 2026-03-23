@@ -4,6 +4,7 @@ export * from "./modelRegistry";
 export * from "./modelCatalog";
 export * from "./modelCapabilities";
 export * from "./tasks/summarizeText";
+export * from "./tasks/summarizePageImages";
 export * from "./tasks/translateText";
 export * from "./tasks/translatePageBlocksStructured";
 export * from "./tasks/analyzePageForFields";

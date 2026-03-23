@@ -21,7 +21,7 @@ export const resolveDest = async (
   if (typeof dest === "string") {
     try {
       dest = await pdf.getDestination(dest);
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -35,7 +35,7 @@ export const resolveDest = async (
       return index;
     }
     return null;
-  } catch (e) {
+  } catch {
     return null;
   }
 };

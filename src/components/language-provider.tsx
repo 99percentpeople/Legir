@@ -74,7 +74,7 @@ const DAYJS_LOCALE_MAP: Record<ConcreteLanguage, string> = {
 };
 
 // Explicitly map dayjs loaders to ensure Vite can bundle them correctly
-const dayjsLocales: Record<string, () => Promise<any>> = {
+const dayjsLocales: Record<string, () => Promise<unknown>> = {
   "zh-cn": () => import("dayjs/locale/zh-cn"),
   "zh-tw": () => import("dayjs/locale/zh-tw"),
   ja: () => import("dayjs/locale/ja"),
@@ -88,6 +88,12 @@ const localeModules = import.meta.glob("../locales/*.ts", { eager: false });
 
 const LanguageProviderContext =
   createContext<LanguageProviderState>(initialState);
+
+const hasLabelString = (value: unknown): value is { label: string } =>
+  !!value &&
+  typeof value === "object" &&
+  "label" in value &&
+  typeof (value as { label?: unknown }).label === "string";
 
 const LOCALE_DICT_CACHE_PREFIX = "ff-locale-dict-cache:";
 
@@ -251,29 +257,19 @@ export function LanguageProvider({
 
     const direct = dict[key];
     if (typeof direct === "string") return direct;
-    if (
-      direct &&
-      typeof direct === "object" &&
-      typeof direct.label === "string"
-    )
-      return direct.label;
+    if (hasLabelString(direct)) return direct.label;
 
     const parts = key.split(".").filter(Boolean);
     if (parts.length === 0) return undefined;
 
-    let current: any = dict;
+    let current: unknown = dict;
     for (const part of parts) {
       if (!current || typeof current !== "object") return undefined;
-      current = current[part];
+      current = (current as Record<string, unknown>)[part];
     }
 
     if (typeof current === "string") return current;
-    if (
-      current &&
-      typeof current === "object" &&
-      typeof current.label === "string"
-    )
-      return current.label;
+    if (hasLabelString(current)) return current.label;
     return undefined;
   };
 

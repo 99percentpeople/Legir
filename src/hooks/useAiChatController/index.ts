@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
   getChatModelGroups,
+  summarizePageImages,
   subscribeLLMModelRegistry,
   summarizeText,
 } from "@/services/ai";
@@ -24,6 +25,7 @@ import type {
   AiChatUserMessageInput,
   AiChatMessageRecord,
   AiDocumentDigestSourceKind,
+  AiSummaryInstructions,
   AiStoredSearchResult,
   AiTextSelectionContext,
 } from "@/services/ai/chat/types";
@@ -64,6 +66,7 @@ import {
   finalizeStreamingTimeline,
 } from "@/hooks/useAiChatController/timelineUpdates";
 import { appEventBus } from "@/lib/eventBus";
+import { exportPDF } from "@/services/pdfService";
 
 const isAbortError = (error: unknown) =>
   error instanceof Error && error.name === "AbortError";
@@ -253,6 +256,9 @@ export const useAiChatController = (editorState: EditorState) => {
     [editorState.options.aiChat.digestSummaryModelKey, flatModels],
   );
   const digestEnabled = editorState.options.aiChat.digestEnabled;
+  const visualSummaryEnabled = editorState.options.aiChat.visualSummaryEnabled;
+  const visualSummaryModelKey =
+    editorState.options.aiChat.visualSummaryModelKey?.trim() || "";
 
   const digestCharsPerChunk = useMemo(() => {
     const sourceChars = Math.max(
@@ -277,7 +283,7 @@ export const useAiChatController = (editorState: EditorState) => {
       sampledText: string;
       maxChars: number;
       sourceKind?: AiDocumentDigestSourceKind;
-      summaryInstructions?: string;
+      summaryInstructions?: AiSummaryInstructions;
       signal?: AbortSignal;
     }) => {
       const modelKey = editorState.options.aiChat.digestSummaryModelKey?.trim();
@@ -310,6 +316,68 @@ export const useAiChatController = (editorState: EditorState) => {
       });
     },
     [editorState.options.aiChat.digestSummaryModelKey],
+  );
+
+  const summarizeRenderedPages = useCallback(
+    async (options: {
+      pages: Parameters<typeof summarizePageImages>[0];
+      summaryInstructions?: AiSummaryInstructions;
+      signal?: AbortSignal;
+    }) => {
+      if (!visualSummaryModelKey) return "";
+
+      return await summarizePageImages(options.pages, {
+        modelKey: visualSummaryModelKey,
+        summaryInstructions: options.summaryInstructions,
+        signal: options.signal,
+      });
+    },
+    [visualSummaryModelKey],
+  );
+
+  const getRenderablePdfBytes = useCallback(
+    async (options: { pageNumbers: number[]; signal?: AbortSignal }) => {
+      const snapshot = useEditorStore.getState();
+      if (!snapshot.pdfBytes) {
+        throw new Error("No PDF is currently loaded.");
+      }
+
+      const pageIndexes = Array.from(
+        new Set(
+          options.pageNumbers
+            .map((pageNumber) => Math.trunc(pageNumber) - 1)
+            .filter(
+              (pageIndex) =>
+                Number.isFinite(pageIndex) &&
+                pageIndex >= 0 &&
+                pageIndex < snapshot.pages.length,
+            ),
+        ),
+      ).sort((left, right) => left - right);
+
+      if (pageIndexes.length === 0) {
+        throw new Error("No valid pages were selected for AI rendering.");
+      }
+
+      const pageIndexSet = new Set(pageIndexes);
+
+      return await exportPDF(
+        snapshot.pdfBytes,
+        snapshot.fields.filter((field) => pageIndexSet.has(field.pageIndex)),
+        snapshot.metadata,
+        snapshot.annotations.filter((annotation) =>
+          pageIndexSet.has(annotation.pageIndex),
+        ),
+        undefined,
+        {
+          openPassword: snapshot.pdfOpenPassword,
+          removeTextUnderFlattenedFreetext:
+            snapshot.options.removeTextUnderFlattenedFreetext,
+          pageIndexes,
+        },
+      );
+    },
+    [],
   );
 
   const getDefaultModelKey = useCallback(() => {
@@ -408,6 +476,7 @@ export const useAiChatController = (editorState: EditorState) => {
           pdfBytes: editorState.pdfBytes,
           password: editorState.pdfOpenPassword,
         }),
+        getRenderablePdfBytes,
         getDigestConfig: () => ({
           charsPerChunk: digestCharsPerChunk,
           sourceCharsPerChunk:
@@ -416,6 +485,10 @@ export const useAiChatController = (editorState: EditorState) => {
         summarizeDigestChunk:
           digestEnabled && digestSummaryModel
             ? summarizeDigestChunk
+            : undefined,
+        summarizeRenderedPages:
+          visualSummaryEnabled && visualSummaryModelKey
+            ? summarizeRenderedPages
             : undefined,
       }),
     [
@@ -427,6 +500,8 @@ export const useAiChatController = (editorState: EditorState) => {
       editorState.filename,
       editorState.metadata,
       editorState.options.aiChat.digestSourceCharsPerChunk,
+      editorState.options.aiChat.visualSummaryEnabled,
+      editorState.options.aiChat.visualSummaryModelKey,
       editorState.outline,
       editorState.pageFlow,
       editorState.pageLayout,
@@ -434,8 +509,12 @@ export const useAiChatController = (editorState: EditorState) => {
       editorState.pdfBytes,
       editorState.pdfOpenPassword,
       editorState.scale,
+      getRenderablePdfBytes,
       getSelectedTextContext,
       summarizeDigestChunk,
+      summarizeRenderedPages,
+      visualSummaryEnabled,
+      visualSummaryModelKey,
     ],
   );
 

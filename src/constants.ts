@@ -104,6 +104,8 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       digestSourceCharsPerChunk: 12000,
       digestOutputRatioDenominator: 3,
       digestSummaryModelKey: "",
+      visualSummaryEnabled: true,
+      visualSummaryModelKey: "",
     },
   },
 };

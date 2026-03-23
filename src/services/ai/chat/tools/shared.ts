@@ -380,6 +380,34 @@ export const annotationTypesSchema = z.array(
   z.enum(["comment", "highlight", "ink", "freetext", "shape", "link"]),
 );
 export const stringArraySchema = z.array(z.string());
+export const summaryInstructionsSchema = z
+  .object({
+    known_information: z
+      .string()
+      .optional()
+      .default("")
+      .describe(
+        "Facts, findings, or context already known from earlier tool calls.",
+      ),
+    remaining_uncertainties: z
+      .string()
+      .optional()
+      .default("")
+      .describe(
+        "Open questions, ambiguities, or missing details that still need checking.",
+      ),
+    what_to_add_or_verify: z
+      .string()
+      .optional()
+      .default("")
+      .describe(
+        "What this new summary should add, compare, confirm, or verify.",
+      ),
+  })
+  .strict()
+  .describe(
+    "Optional structured guidance for summary tools. Use known_information, remaining_uncertainties, and what_to_add_or_verify instead of a free-form string.",
+  );
 
 export const getDocumentDigestArgsSchema = z
   .object({
@@ -391,12 +419,7 @@ export const getDocumentDigestArgsSchema = z
     ),
     chars_per_chunk: positiveIntSchema.optional(),
     source_chars_per_chunk: positiveIntSchema.optional(),
-    summary_instructions: z
-      .string()
-      .optional()
-      .describe(
-        "Optional extra instructions passed to the digest summarizer, for example to focus on methods, risks, conclusions, or action items.",
-      ),
+    summary_instructions: summaryInstructionsSchema.optional(),
   })
   .strict()
   .superRefine((value, ctx) => {

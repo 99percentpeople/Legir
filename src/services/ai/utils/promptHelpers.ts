@@ -1,4 +1,7 @@
-import type { AiChatToolDefinition } from "@/services/ai/chat/types";
+import type {
+  AiChatToolDefinition,
+  AiSummaryInstructions,
+} from "@/services/ai/chat/types";
 
 export type AiChatPromptContext = {
   toolDefinitions: AiChatToolDefinition[];
@@ -73,11 +76,47 @@ export const buildPageRangeLabel = (startPage: number, endPage: number) => {
   return `pages ${startPage}-${endPage}`;
 };
 
-export const normalizeSummaryInstructions = (summaryInstructions?: string) => {
-  const trimmed = summaryInstructions?.trim();
-  if (!trimmed) {
-    return "";
+export const normalizeSummaryInstructions = (
+  summaryInstructions?: Partial<AiSummaryInstructions>,
+) => {
+  if (!summaryInstructions) {
+    return null;
   }
 
-  return trimmed;
+  const normalized = {
+    known_information: summaryInstructions.known_information?.trim() || "",
+    remaining_uncertainties:
+      summaryInstructions.remaining_uncertainties?.trim() || "",
+    what_to_add_or_verify:
+      summaryInstructions.what_to_add_or_verify?.trim() || "",
+  };
+
+  if (
+    !normalized.known_information &&
+    !normalized.remaining_uncertainties &&
+    !normalized.what_to_add_or_verify
+  ) {
+    return null;
+  }
+
+  return normalized;
+};
+
+export const formatSummaryInstructionsForPrompt = (
+  summaryInstructions?: Partial<AiSummaryInstructions>,
+) => {
+  const normalized = normalizeSummaryInstructions(summaryInstructions);
+  if (!normalized) {
+    return [];
+  }
+
+  return [
+    "Summary instructions:",
+    "Known information:",
+    normalized.known_information || "(none provided)",
+    "Remaining uncertainties:",
+    normalized.remaining_uncertainties || "(none provided)",
+    "What to add or verify:",
+    normalized.what_to_add_or_verify || "(none provided)",
+  ];
 };

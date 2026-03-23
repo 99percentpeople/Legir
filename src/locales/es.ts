@@ -685,7 +685,14 @@ const es = {
     ai_chat: {
       title: "Herramientas de chat IA",
       description:
-        "Configura la herramienta de resumen de documentos por IA y elige un modelo de resumen para resúmenes largos.",
+        "Configura la herramienta de resumen de documentos por IA y la herramienta de resumen visual de páginas renderizadas.",
+      visual_summary_enabled: "Habilitar la herramienta de resumen visual",
+      visual_summary_enabled_desc:
+        "Activa o desactiva summarize_pages_visual para el chat IA. Esto permite que los modelos de chat solo de texto deleguen la inspección visual de páginas renderizadas a un modelo de visión.",
+      visual_summary_model: "Modelo de resumen visual",
+      visual_summary_model_placeholder: "Selecciona un modelo de visión",
+      visual_summary_model_desc:
+        "Lo usa summarize_pages_visual. Si la herramienta está desactivada o no se ha seleccionado un modelo de visión, esta herramienta no estará disponible.",
       digest_enabled: "Habilitar la herramienta de resumen",
       digest_enabled_desc:
         "Activa o desactiva get_document_digest para el chat IA.",

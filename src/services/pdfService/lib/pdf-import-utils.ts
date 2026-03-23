@@ -63,9 +63,14 @@ export const summarizePdfObjForDebug = (obj: unknown): unknown => {
       return { type: "PDFDict", keys };
     }
 
+    const unknownObj = obj as {
+      constructor?: { name?: string };
+      toString?: () => string;
+    };
+
     return {
-      type: (obj as any)?.constructor?.name ?? typeof obj,
-      value: (obj as any)?.toString?.(),
+      type: unknownObj.constructor?.name ?? typeof obj,
+      value: unknownObj.toString?.(),
     };
   } catch {
     return { type: "unknown" };

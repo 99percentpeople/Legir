@@ -241,6 +241,11 @@ export const normalizeAiChatOptions = (
         }),
     ),
     digestSummaryModelKey: next.digestSummaryModelKey || "",
+    visualSummaryEnabled:
+      typeof next.visualSummaryEnabled === "boolean"
+        ? next.visualSummaryEnabled
+        : true,
+    visualSummaryModelKey: next.visualSummaryModelKey || "",
   };
 };
 

@@ -48,7 +48,7 @@ export const parsePDFDate = (
       return iso;
     }
     return undefined;
-  } catch (e) {
+  } catch {
     return undefined;
   }
 };

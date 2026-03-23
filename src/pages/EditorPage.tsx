@@ -153,6 +153,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
     startOffset: number;
     endOffset: number;
   } | null>(null);
+  const pdfSearchOpenedWithSidebarRef = useRef(false);
   useEffect(
     () =>
       useEditorStore.subscribe((nextState) => {
@@ -618,6 +619,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
     }
     if (selectedSearch?.query) setPdfSearchQuery(selectedSearch.query);
     if (!isPdfSearchOpen) {
+      pdfSearchOpenedWithSidebarRef.current = state.isSidebarOpen;
       setPdfSearchResults([]);
       setActivePdfSearchResultId(null);
     }
@@ -629,15 +631,26 @@ const EditorPage: React.FC<EditorPageProps> = ({
       }
       return { isSidebarOpen: true };
     });
-  }, [getWorkspaceSelectedSearchText, isPdfSearchOpen, setUiState]);
+  }, [
+    getWorkspaceSelectedSearchText,
+    isPdfSearchOpen,
+    setUiState,
+    state.isSidebarOpen,
+  ]);
 
   const closePdfSearch = useCallback(() => {
     const activeResult =
       pdfSearchResults.find(
         (result) => result.id === activePdfSearchResultId,
       ) ?? null;
+    const shouldKeepSidebarOpen = pdfSearchOpenedWithSidebarRef.current;
 
     setIsPdfSearchOpen(false);
+    pdfSearchOpenedWithSidebarRef.current = false;
+
+    if (!shouldKeepSidebarOpen) {
+      setUiState({ isSidebarOpen: false });
+    }
 
     if (!activeResult) return;
 
@@ -654,7 +667,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         { sticky: true },
       );
     });
-  }, [activePdfSearchResultId, pdfSearchResults]);
+  }, [activePdfSearchResultId, pdfSearchResults, setUiState]);
 
   useEffect(() => {
     const trimmedQuery = pdfSearchQuery.trim();

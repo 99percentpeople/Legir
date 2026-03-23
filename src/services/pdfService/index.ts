@@ -1373,6 +1373,7 @@ export const exportPDF = async (
     openPassword?: string | null;
     exportPassword?: string | null;
     removeTextUnderFlattenedFreetext?: boolean;
+    pageIndexes?: number[];
   },
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
@@ -1460,6 +1461,22 @@ export const exportPDF = async (
   );
 
   const pdfLibPages = pdfDoc.getPages();
+  const targetPageIndexes = Array.isArray(options?.pageIndexes)
+    ? Array.from(
+        new Set(
+          options.pageIndexes
+            .map((pageIndex) => Math.trunc(pageIndex))
+            .filter(
+              (pageIndex) =>
+                Number.isFinite(pageIndex) &&
+                pageIndex >= 0 &&
+                pageIndex < pdfLibPages.length,
+            ),
+        ),
+      ).sort((left, right) => left - right)
+    : [];
+  const targetPageIndexSet =
+    targetPageIndexes.length > 0 ? new Set(targetPageIndexes) : null;
   const viewportCache = new Map<number, ViewportLike>();
   const getViewportForPage = async (pageIndex: number) => {
     const cached = viewportCache.get(pageIndex);
@@ -1688,6 +1705,7 @@ export const exportPDF = async (
   // 1.5 Cleanup Existing Annotations (Ink, Highlight, Comment)
   const pages = pdfDoc.getPages();
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    if (targetPageIndexSet && !targetPageIndexSet.has(pageIndex)) continue;
     const page = pages[pageIndex];
     try {
       const annots = page.node.Annots();
@@ -1751,6 +1769,7 @@ export const exportPDF = async (
 
   // 2. Export Controls In Layer Order
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    if (targetPageIndexSet && !targetPageIndexSet.has(pageIndex)) continue;
     const orderedControls = getOrderedPageControls(
       fields,
       annotations,
@@ -1783,6 +1802,19 @@ export const exportPDF = async (
       } catch (e) {
         console.error(`Failed to export field ${field.name}`, e);
       }
+    }
+  }
+
+  if (targetPageIndexes.length > 0) {
+    const indexesToRemove = Array.from(
+      { length: pages.length },
+      (_, index) => index,
+    )
+      .filter((pageIndex) => !targetPageIndexSet?.has(pageIndex))
+      .sort((left, right) => right - left);
+
+    for (const pageIndex of indexesToRemove) {
+      pdfDoc.removePage(pageIndex);
     }
   }
 

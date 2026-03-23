@@ -677,7 +677,14 @@ const ja = {
     ai_chat: {
       title: "AI チャットツール",
       description:
-        "AI ドキュメント要約ツールを設定し、長文要約用のサマリーモデルを選択します。",
+        "AI ドキュメント要約ツールと、レンダリング済みページの視覚要約ツールを設定します。",
+      visual_summary_enabled: "視覚要約ツールを有効化",
+      visual_summary_enabled_desc:
+        "AI チャットで summarize_pages_visual を使えるかどうかを切り替えます。これにより、テキスト専用のチャットモデルでもレンダリング済みページの視覚確認をビジョンモデルに委任できます。",
+      visual_summary_model: "視覚要約モデル",
+      visual_summary_model_placeholder: "ビジョンモデルを選択",
+      visual_summary_model_desc:
+        "summarize_pages_visual で使用します。ツールが無効、またはビジョンモデルが未選択の場合、このツールは利用できません。",
       digest_enabled: "要約ツールを有効化",
       digest_enabled_desc:
         "AI チャットで get_document_digest を使えるかどうかを切り替えます。",

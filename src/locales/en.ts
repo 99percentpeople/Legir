@@ -685,7 +685,14 @@ const en = {
     ai_chat: {
       title: "AI Chat Tools",
       description:
-        "Configure the AI document digest tool and choose a summary model for long-form summaries.",
+        "Configure the AI document digest tool and the rendered-page visual summary tool.",
+      visual_summary_enabled: "Enable visual summary tool",
+      visual_summary_enabled_desc:
+        "Turns summarize_pages_visual on or off for AI chat. This lets text-only chat models delegate rendered page inspection to a configured vision model.",
+      visual_summary_model: "Visual summary model",
+      visual_summary_model_placeholder: "Select a vision model",
+      visual_summary_model_desc:
+        "Used by summarize_pages_visual. If the tool is disabled or no vision model is selected, the visual summary tool is unavailable.",
       digest_enabled: "Enable digest tool",
       digest_enabled_desc: "Turns get_document_digest on or off for AI chat.",
       summary_model: "Digest summary model",

@@ -120,7 +120,7 @@ export const extractInkAppearance = (
         }
       }
     }
-  } catch (e) {
+  } catch {
     // Ignore
   }
   return { strokePaths, rawStrokeStreams };

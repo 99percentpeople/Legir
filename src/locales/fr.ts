@@ -689,7 +689,14 @@ const fr = {
     ai_chat: {
       title: "Outils de chat IA",
       description:
-        "Configure l'outil de résumé du document IA et choisissez un modèle de résumé pour les synthèses longues.",
+        "Configure l'outil de résumé du document IA et l'outil de résumé visuel des pages rendues.",
+      visual_summary_enabled: "Activer l'outil de résumé visuel",
+      visual_summary_enabled_desc:
+        "Active ou désactive summarize_pages_visual dans le chat IA. Cela permet aux modèles de chat textuels de déléguer l'inspection visuelle des pages rendues à un modèle vision.",
+      visual_summary_model: "Modèle de résumé visuel",
+      visual_summary_model_placeholder: "Sélectionner un modèle vision",
+      visual_summary_model_desc:
+        "Utilisé par summarize_pages_visual. Si l'outil est désactivé ou si aucun modèle vision n'est sélectionné, cet outil devient indisponible.",
       digest_enabled: "Activer l'outil de synthèse",
       digest_enabled_desc:
         "Active ou désactive get_document_digest dans le chat IA.",

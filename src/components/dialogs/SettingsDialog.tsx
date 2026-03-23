@@ -60,10 +60,15 @@ import { useEditorStore } from "@/store/useEditorStore";
 import {
   checkLlmProviderConfig,
   getChatModelGroups,
+  getVisionModelGroups,
   loadModels,
 } from "@/services/ai";
 import { ModelCapabilityBadges } from "@/components/ModelCapabilityBadges";
-import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
+import {
+  filterModelSelectGroups,
+  ModelSelect,
+  type ModelSelectGroup,
+} from "@/components/ModelSelect";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { createCustomModelCapabilities } from "@/services/ai/sdk/modelCapabilities";
 import {
@@ -249,6 +254,26 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
       })),
     }));
   }, [llmModelCache, options.llm]);
+  const imageModelFilter = React.useCallback(
+    (option: { capabilities?: { supportsImageInput?: boolean } }) =>
+      option.capabilities?.supportsImageInput === true,
+    [],
+  );
+  const aiVisionModelGroups = useMemo<ModelSelectGroup[]>(() => {
+    return filterModelSelectGroups(
+      getVisionModelGroups().map((group) => ({
+        id: group.providerId,
+        label: group.labelKey ? t(group.labelKey) : group.label,
+        options: group.models.map((model) => ({
+          value: `${group.providerId}:${model.id}`,
+          label: model.labelKey ? t(model.labelKey) : model.label,
+          capabilities: model.capabilities,
+          disabled: !group.isAvailable,
+        })),
+      })),
+      imageModelFilter,
+    );
+  }, [imageModelFilter, llmModelCache, options.llm, t]);
 
   const selectedLlmProviderSpec =
     AI_PROVIDER_SPECS_SORTED_BY_LABEL.find(
@@ -259,6 +284,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     options.aiChat.digestOutputRatioDenominator;
   const digestEnabled = options.aiChat.digestEnabled;
   const digestSourceCharsPerChunk = options.aiChat.digestSourceCharsPerChunk;
+  const visualSummaryEnabled = options.aiChat.visualSummaryEnabled;
 
   const checkLlmProvider = async (provider: LlmProviderId) => {
     const apiKey = (options.llm[provider].apiKey || "").trim();
@@ -985,6 +1011,63 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
             <TabsContent value="ai_chat">
               <div className="space-y-6">
+                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="ai-chat-visual-summary-enabled"
+                        className="font-semibold"
+                      >
+                        {t("settings.ai_chat.visual_summary_enabled")}
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings.ai_chat.visual_summary_enabled_desc")}
+                      </p>
+                    </div>
+                    <Switch
+                      id="ai-chat-visual-summary-enabled"
+                      checked={visualSummaryEnabled}
+                      onCheckedChange={(checked) =>
+                        updateAiChatOptions({
+                          visualSummaryEnabled: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold">
+                      {t("settings.ai_chat.visual_summary_model")}
+                    </Label>
+                    <ModelSelect
+                      value={options.aiChat.visualSummaryModelKey || undefined}
+                      onValueChange={(value) =>
+                        updateAiChatOptions({
+                          visualSummaryModelKey: value,
+                        })
+                      }
+                      placeholder={
+                        aiVisionModelGroups.length > 0
+                          ? t(
+                              "settings.ai_chat.visual_summary_model_placeholder",
+                            )
+                          : t("settings.ai_chat.no_models")
+                      }
+                      groups={aiVisionModelGroups}
+                      disabled={
+                        !visualSummaryEnabled ||
+                        aiVisionModelGroups.length === 0
+                      }
+                      showSeparators
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      {t("settings.ai_chat.visual_summary_model_desc")}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">

@@ -686,7 +686,14 @@ const de = {
     ai_chat: {
       title: "AI-Chat-Werkzeuge",
       description:
-        "Konfigurieren Sie das KI-Dokument-Zusammenfassungswerkzeug und wählen Sie ein Zusammenfassungsmodell für lange Zusammenfassungen.",
+        "Konfigurieren Sie das KI-Dokument-Zusammenfassungswerkzeug und das visuelle Zusammenfassungswerkzeug für gerenderte Seiten.",
+      visual_summary_enabled: "Visuelles Zusammenfassungswerkzeug aktivieren",
+      visual_summary_enabled_desc:
+        "Schaltet summarize_pages_visual für den AI-Chat ein oder aus. So können textbasierte Chat-Modelle die Prüfung gerenderter Seiten an ein Vision-Modell delegieren.",
+      visual_summary_model: "Modell für visuelle Zusammenfassung",
+      visual_summary_model_placeholder: "Vision-Modell auswählen",
+      visual_summary_model_desc:
+        "Wird von summarize_pages_visual verwendet. Wenn das Werkzeug deaktiviert ist oder kein Vision-Modell ausgewählt wurde, ist dieses Werkzeug nicht verfügbar.",
       digest_enabled: "Digest-Werkzeug aktivieren",
       digest_enabled_desc:
         "Schaltet get_document_digest für den AI-Chat ein oder aus.",

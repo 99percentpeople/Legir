@@ -37,9 +37,9 @@ type EventListenersInput =
   | EventListenerSpec[]
   | Record<
       string,
-      | ((event: any) => void)
+      | ((event: Event) => void)
       | {
-          handler: (event: any) => void;
+          handler: (event: Event) => void;
           options?: boolean | AddEventListenerOptions;
         }
     >;
@@ -76,7 +76,7 @@ export const useEventListeners = (
       {
         type: string;
         options?: boolean | AddEventListenerOptions;
-        handlerRef: { current: (event: any) => void };
+        handlerRef: { current: (event: Event) => void };
         listener: EventListener;
       }
     >(),

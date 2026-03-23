@@ -159,6 +159,7 @@ const summarizeAnnotation = (
     id: annotation.id,
     pageNumber: annotation.pageIndex + 1,
     type,
+    subType: annotation.type === "shape" ? annotation.shapeType : undefined,
     text: (annotation.text || "").trim() || undefined,
     highlightedText: (annotation.highlightedText || "").trim() || undefined,
     author: (annotation.author || "").trim() || undefined,

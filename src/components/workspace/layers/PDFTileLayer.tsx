@@ -606,8 +606,10 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         }
 
         return ok;
-      } catch (error: any) {
-        if (error?.phase === "pre-send") {
+      } catch (error: unknown) {
+        const renderError = error as { phase?: string; name?: string };
+
+        if (renderError.phase === "pre-send") {
           if (tileDetachedCanvasRef.current.get(tile.canvasId)) {
             tileTransferredRef.current.delete(tile.canvasId);
           }
@@ -618,8 +620,8 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         }
 
         if (
-          error?.name !== "RenderingCancelledException" &&
-          error?.name !== "AbortError"
+          renderError.name !== "RenderingCancelledException" &&
+          renderError.name !== "AbortError"
         ) {
           console.error("Render error:", error);
         }
@@ -700,7 +702,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           inFlight += 1;
 
           void renderWithRetry(tile)
-            .then((ok) => {
+            .then(() => {
               if (signal.aborted) return;
               if (renderEpochRef.current !== epoch) return;
             })
@@ -775,7 +777,6 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     [...frontTiles, ...midTiles, ...backTiles].map((t) => t.canvasId),
   );
 
-  const frontTileIdSet = new Set(frontTiles.map((t) => t.canvasId));
   const midTileIdSet = new Set(midTiles.map((t) => t.canvasId));
   const backTileIdSet = new Set(backTiles.map((t) => t.canvasId));
   const tileByIdInPaintOrder = new Map<string, TileInfo>();
@@ -804,7 +805,6 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       {allTiles.map((t) => {
         const isBack = backTileIdSet.has(t.canvasId);
         const isMid = midTileIdSet.has(t.canvasId);
-        const isFront = frontTileIdSet.has(t.canvasId);
 
         const baseW = isBack
           ? backTilesPageW

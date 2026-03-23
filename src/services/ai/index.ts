@@ -12,6 +12,7 @@ import {
   getAiSdkProviderModelOptions,
   parseAiSdkModelSpecifier,
   resolveAiSdkModelSpecifierForTask,
+  summarizePageImagesWithAiSdk,
   summarizeTextWithAiSdk,
   translateTextStreamWithAiSdk,
   translateTextWithAiSdk,
@@ -23,6 +24,10 @@ import type {
   LLMSummarizeTextOptions,
   LLMTranslateTextOptions,
 } from "./types";
+import type {
+  AiRenderedPageImage,
+  AiSummaryInstructions,
+} from "@/services/ai/chat/types";
 
 export * from "@/services/ai/sdk";
 
@@ -244,12 +249,15 @@ export type FormDetectModelGroup = {
   models: LLMModelOption[];
 };
 
-export const getFormDetectModelGroups = (): FormDetectModelGroup[] =>
+export const getVisionModelGroups = (): FormDetectModelGroup[] =>
   getAiSdkModelGroups({
     appOptions: getCurrentOptions(),
     modelCache: getCurrentModelCache(),
     kind: "vision",
   });
+
+export const getFormDetectModelGroups = (): FormDetectModelGroup[] =>
+  getVisionModelGroups();
 
 export type ChatModelGroup = {
   providerId: string;
@@ -373,6 +381,36 @@ export const summarizeText = async (
     appOptions: getCurrentOptions(),
     specifier,
     prompt: options.prompt,
+    signal: options.signal,
+  });
+};
+
+export type SummarizePageImagesOptions = {
+  modelKey?: string;
+  providerId?: string;
+  modelId?: string;
+  summaryInstructions?: AiSummaryInstructions;
+  signal?: AbortSignal;
+};
+
+export const summarizePageImages = async (
+  pages: AiRenderedPageImage[],
+  options: SummarizePageImagesOptions,
+) => {
+  const specifier = resolveAiSdkModelSpecifierForTask({
+    appOptions: getCurrentOptions(),
+    modelCache: getCurrentModelCache(),
+    kind: "vision",
+    modelKey: options.modelKey,
+    providerId: options.providerId,
+    modelId: options.modelId,
+  });
+
+  return await summarizePageImagesWithAiSdk({
+    appOptions: getCurrentOptions(),
+    specifier,
+    pages,
+    summaryInstructions: options.summaryInstructions,
     signal: options.signal,
   });
 };

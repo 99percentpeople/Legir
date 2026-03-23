@@ -22,6 +22,8 @@ import type {
   AiDocumentMetadata,
   AiRenderedPageImage,
   AiRenderedPageImageBatch,
+  AiRenderedPageVisualSummaryResult,
+  AiSummaryInstructions,
   AiDocumentSnapshot,
   AiReadablePage,
   AiReadablePageLine,
@@ -371,6 +373,10 @@ export const createDocumentContextService = (options: {
     pdfBytes?: Uint8Array | null;
     password?: string | null;
   };
+  getRenderablePdfBytes?: (options: {
+    pageNumbers: number[];
+    signal?: AbortSignal;
+  }) => Promise<Uint8Array>;
   getDigestConfig?: () => {
     charsPerChunk?: number;
     sourceCharsPerChunk?: number;
@@ -381,7 +387,12 @@ export const createDocumentContextService = (options: {
     sampledText: string;
     maxChars: number;
     sourceKind?: AiDocumentDigestSourceKind;
-    summaryInstructions?: string;
+    summaryInstructions?: AiSummaryInstructions;
+    signal?: AbortSignal;
+  }) => Promise<string>;
+  summarizeRenderedPages?: (options: {
+    pages: AiRenderedPageImage[];
+    summaryInstructions?: AiSummaryInstructions;
     signal?: AbortSignal;
   }) => Promise<string>;
 }) => {
@@ -389,8 +400,10 @@ export const createDocumentContextService = (options: {
     getSnapshot,
     getSelectedTextContext,
     getPdfSource,
+    getRenderablePdfBytes,
     getDigestConfig,
     summarizeDigestChunk,
+    summarizeRenderedPages,
   } = options;
 
   const pageTextCache = new Map<number, string>();
@@ -542,6 +555,154 @@ export const createDocumentContextService = (options: {
     };
   };
 
+  const renderPageImageBatch = async ({
+    pageNumbers,
+    targetWidth,
+    renderAnnotations = true,
+    signal,
+  }: {
+    pageNumbers: number[];
+    targetWidth?: number;
+    renderAnnotations?: boolean;
+    signal?: AbortSignal;
+  }): Promise<AiRenderedPageImageBatch> => {
+    const snapshot = getSnapshot();
+    const requestedPageNumbers = clampPageNumbers(
+      pageNumbers,
+      snapshot.pages.length,
+      snapshot.pages.length,
+    );
+    const resolvedPageNumbers = clampPageNumbers(
+      requestedPageNumbers,
+      snapshot.pages.length,
+      AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+    );
+
+    if (resolvedPageNumbers.length === 0) {
+      return {
+        requestedPageCount: requestedPageNumbers.length,
+        returnedPageCount: 0,
+        truncated: requestedPageNumbers.length > 0,
+        maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+        pages: [],
+      };
+    }
+
+    if (!getRenderablePdfBytes) {
+      const pages: AiRenderedPageImage[] = [];
+      for (const pageNumber of resolvedPageNumbers) {
+        pages.push(
+          await renderPageImage({
+            pageNumber,
+            targetWidth,
+            renderAnnotations,
+            signal,
+          }),
+        );
+      }
+
+      return {
+        requestedPageCount: requestedPageNumbers.length,
+        returnedPageCount: pages.length,
+        truncated: requestedPageNumbers.length > pages.length,
+        maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+        pages,
+      };
+    }
+
+    const renderablePdfBytes = await getRenderablePdfBytes({
+      pageNumbers: resolvedPageNumbers,
+      signal,
+    });
+    if (!renderablePdfBytes || renderablePdfBytes.byteLength === 0) {
+      throw new Error("Failed to export a renderable PDF snapshot.");
+    }
+
+    const resolvedTargetWidth = clampPageImageTargetWidth(targetWidth);
+    const docId = `ai_render_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const pages: AiRenderedPageImage[] = [];
+
+    try {
+      await pdfWorkerService.loadDocument(renderablePdfBytes, {
+        docId,
+        signal,
+      });
+
+      for (
+        let subsetPageIndex = 0;
+        subsetPageIndex < resolvedPageNumbers.length;
+        subsetPageIndex += 1
+      ) {
+        throwIfAborted(signal);
+
+        const pageNumber = resolvedPageNumbers[subsetPageIndex]!;
+        const sourcePage = snapshot.pages[pageNumber - 1];
+        if (!sourcePage) {
+          throw new Error(`Invalid page number: ${pageNumber}`);
+        }
+
+        const pageViewport = createViewportFromPageInfo(
+          {
+            viewBox: sourcePage.viewBox,
+            userUnit: sourcePage.userUnit,
+            rotation: sourcePage.rotation,
+          },
+          {
+            scale: 1,
+            rotation: sourcePage.rotation,
+          },
+        );
+        const renderedWidth = Math.max(1, Math.round(resolvedTargetWidth));
+        const renderedHeight = Math.max(
+          1,
+          Math.round(
+            (renderedWidth / pageViewport.width) * pageViewport.height,
+          ),
+        );
+
+        const { bytes: imageBytes, mimeType } =
+          await pdfWorkerService.renderPageImage({
+            docId,
+            pageIndex: subsetPageIndex,
+            targetWidth: resolvedTargetWidth,
+            renderAnnotations,
+            mimeType: "image/png",
+            priority: 0,
+            signal,
+          });
+
+        if (!imageBytes || imageBytes.byteLength === 0) {
+          throw new Error(
+            `Failed to render exported page image for page ${pageNumber}.`,
+          );
+        }
+
+        pages.push({
+          pageNumber,
+          pageWidth: Math.round(pageViewport.width),
+          pageHeight: Math.round(pageViewport.height),
+          rotation: sourcePage.rotation,
+          targetWidth: resolvedTargetWidth,
+          renderedWidth,
+          renderedHeight,
+          mimeType: mimeType || "image/png",
+          renderAnnotations,
+          base64Data: convertUint8ArrayToBase64(imageBytes),
+        });
+      }
+    } finally {
+      pdfWorkerService.unloadDocument(docId);
+    }
+
+    return {
+      requestedPageCount: requestedPageNumbers.length,
+      returnedPageCount: pages.length,
+      truncated: requestedPageNumbers.length > pages.length,
+      maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+      pages,
+    };
+  };
+
   return {
     getDocumentContext: () => {
       const snapshot = getSnapshot();
@@ -579,7 +740,7 @@ export const createDocumentContextService = (options: {
       return normalizeDocumentMetadata(snapshot);
     },
 
-    getPagesImage: async ({
+    getPagesVisual: async ({
       pageNumbers,
       targetWidth,
       renderAnnotations = true,
@@ -590,38 +751,60 @@ export const createDocumentContextService = (options: {
       renderAnnotations?: boolean;
       signal?: AbortSignal;
     }): Promise<AiRenderedPageImageBatch> => {
-      const snapshot = getSnapshot();
-      const requestedPageNumbers = clampPageNumbers(
+      return await renderPageImageBatch({
         pageNumbers,
-        snapshot.pages.length,
-        snapshot.pages.length,
-      );
-      const resolvedPageNumbers = clampPageNumbers(
-        requestedPageNumbers,
-        snapshot.pages.length,
-        AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
-      );
+        targetWidth,
+        renderAnnotations,
+        signal,
+      });
+    },
 
-      const pages: AiRenderedPageImage[] = [];
-      for (const pageNumber of resolvedPageNumbers) {
-        pages.push(
-          await renderPageImage({
-            pageNumber,
+    summarizePagesVisual: summarizeRenderedPages
+      ? async ({
+          pageNumbers,
+          targetWidth,
+          renderAnnotations = true,
+          summaryInstructions,
+          signal,
+        }: {
+          pageNumbers: number[];
+          targetWidth?: number;
+          renderAnnotations?: boolean;
+          summaryInstructions?: AiSummaryInstructions;
+          signal?: AbortSignal;
+        }): Promise<AiRenderedPageVisualSummaryResult> => {
+          const pageImageBatch = await renderPageImageBatch({
+            pageNumbers,
             targetWidth,
             renderAnnotations,
             signal,
-          }),
-        );
-      }
+          });
 
-      return {
-        requestedPageCount: requestedPageNumbers.length,
-        returnedPageCount: pages.length,
-        truncated: requestedPageNumbers.length > pages.length,
-        maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
-        pages,
-      };
-    },
+          const summary = await summarizeRenderedPages({
+            pages: pageImageBatch.pages,
+            summaryInstructions,
+            signal,
+          });
+
+          return {
+            requestedPageCount: pageImageBatch.requestedPageCount,
+            returnedPageCount: pageImageBatch.returnedPageCount,
+            truncated: pageImageBatch.truncated,
+            maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+            pages: pageImageBatch.pages.map((page) => ({
+              pageNumber: page.pageNumber,
+              pageWidth: page.pageWidth,
+              pageHeight: page.pageHeight,
+              rotation: page.rotation,
+              targetWidth: page.targetWidth,
+              renderedWidth: page.renderedWidth,
+              renderedHeight: page.renderedHeight,
+              renderAnnotations: page.renderAnnotations,
+            })),
+            summary,
+          };
+        }
+      : undefined,
 
     getDocumentDigest: summarizeDigestChunk
       ? async ({

@@ -669,7 +669,14 @@ const zhCN = {
     },
     ai_chat: {
       title: "AI 问答工具",
-      description: "配置 AI 文档摘要工具，并为长篇总结单独指定摘要模型。",
+      description: "配置 AI 文档摘要工具，以及渲染页视觉总结工具。",
+      visual_summary_enabled: "启用视觉总结工具",
+      visual_summary_enabled_desc:
+        "控制 AI 问答里的 summarize_pages_visual 是否可用。这样纯文本对话模型也能委托已配置的视觉模型检查渲染后的页面。",
+      visual_summary_model: "视觉总结模型",
+      visual_summary_model_placeholder: "选择视觉模型",
+      visual_summary_model_desc:
+        "用于 summarize_pages_visual。关闭工具或未选择视觉模型时，这个工具不可用。",
       digest_enabled: "启用摘要工具",
       digest_enabled_desc: "控制 AI 问答里的 get_document_digest 是否可用。",
       summary_model: "摘要模型",

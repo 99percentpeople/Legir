@@ -10,6 +10,7 @@ import {
   defineToolModule,
   emptyObjectSchema,
   getDocumentDigestArgsSchema,
+  summaryInstructionsSchema,
   pageNumberSchema,
   pageNumbersSchema,
   listAnnotationsArgsSchema,
@@ -23,10 +24,11 @@ import {
 import type {
   AiRenderedPageImage,
   AiRenderedPageImageBatch,
+  AiRenderedPageVisualSummaryResult,
 } from "@/services/ai/chat/types";
 
 const DEFAULT_PAGE_IMAGE_TARGET_WIDTH = 1024;
-const getPagesImageArgsSchema = z
+const getPagesVisualArgsSchema = z
   .object({
     page_numbers: pageNumbersSchema
       .optional()
@@ -50,11 +52,17 @@ const getPagesImageArgsSchema = z
   })
   .strict();
 
-const toPagesImageModelOutput = (output: unknown) => {
+const summarizePagesVisualArgsSchema = getPagesVisualArgsSchema
+  .extend({
+    summary_instructions: summaryInstructionsSchema.optional(),
+  })
+  .strict();
+
+const toPagesVisualModelOutput = (output: unknown) => {
   if (!output || typeof output !== "object") {
     return {
       type: "text" as const,
-      value: "Page images unavailable.",
+      value: "Page visuals unavailable.",
     };
   }
 
@@ -62,22 +70,22 @@ const toPagesImageModelOutput = (output: unknown) => {
   if (!Array.isArray(batch.pages) || batch.pages.length === 0) {
     return {
       type: "text" as const,
-      value: "Page images unavailable.",
+      value: "Page visuals unavailable.",
     };
   }
 
   const attachedPages = batch.pages.filter(
-    (pageImage): pageImage is AiRenderedPageImage =>
-      typeof pageImage.base64Data === "string" &&
-      !!pageImage.base64Data &&
-      typeof pageImage.mimeType === "string" &&
-      !!pageImage.mimeType,
+    (pageVisual): pageVisual is AiRenderedPageImage =>
+      typeof pageVisual.base64Data === "string" &&
+      !!pageVisual.base64Data &&
+      typeof pageVisual.mimeType === "string" &&
+      !!pageVisual.mimeType,
   );
 
   if (attachedPages.length === 0) {
     return {
       type: "text" as const,
-      value: "Page images unavailable.",
+      value: "Page visuals unavailable.",
     };
   }
 
@@ -92,19 +100,19 @@ const toPagesImageModelOutput = (output: unknown) => {
   > = [
     {
       type: "text",
-      text: `Full-page images for page${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageImage) => pageImage.pageNumber).join(", ")}. Use these images for visual inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss.`,
+      text: `Full-page visuals for page${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageVisual) => pageVisual.pageNumber).join(", ")}. Use these visuals for inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss.`,
     },
   ];
 
-  for (const pageImage of attachedPages) {
+  for (const pageVisual of attachedPages) {
     content.push({
       type: "text",
-      text: `Page ${pageImage.pageNumber} image. Rendered at ${pageImage.renderedWidth}x${pageImage.renderedHeight}.`,
+      text: `Page ${pageVisual.pageNumber} visual. Rendered at ${pageVisual.renderedWidth}x${pageVisual.renderedHeight}.`,
     });
     content.push({
       type: "image-data",
-      data: pageImage.base64Data,
-      mediaType: pageImage.mimeType,
+      data: pageVisual.base64Data,
+      mediaType: pageVisual.mimeType,
       providerOptions: {
         openai: {
           imageDetail: "low",
@@ -131,22 +139,32 @@ const DOCUMENT_CONTEXT_TOOL_PROMPTS = [
   "get_document_context also includes the current viewport context: all visible pages intersecting the workspace viewport, current zoom scale and percent, page layout mode, and page flow direction.",
 ];
 
-const PAGE_IMAGE_TOOL_PROMPTS = [
-  "If the task depends on full-page visual appearance, call get_pages_image before making visual claims.",
-  "Use get_pages_image for scanned pages, handwriting, signatures, stamps, tables, diagrams, charts, or complex layout that plain text extraction may miss.",
-  "If get_pages_text or search_document returns empty text, OCR noise, or misses the needed content on a page, do not stop there. Call get_pages_image for that page and inspect it visually.",
-  "When the user asks about a page and the text layer is missing or unreliable, use get_pages_image before concluding that the page content is unavailable.",
-  "If you need several page images, prefer one get_pages_image call with multiple page_numbers over many tiny calls when possible.",
+const PAGE_VISUAL_TOOL_PROMPTS = [
+  "If the task depends on full-page visual appearance, call get_pages_visual before making visual claims.",
+  "get_pages_visual renders the current edited document state, not just the originally opened PDF bytes.",
+  "Use get_pages_visual for scanned pages, handwriting, signatures, stamps, tables, diagrams, charts, or complex layout that plain text extraction may miss.",
+  "If get_pages_text or search_document returns empty text, OCR noise, or misses the needed content on a page, do not stop there. Call get_pages_visual for that page and inspect it visually.",
+  "When the user asks about a page and the text layer is missing or unreliable, use get_pages_visual before concluding that the page content is unavailable.",
+  "If you need several page visuals, prefer one get_pages_visual call with multiple page_numbers over many tiny calls when possible.",
+];
+
+const PAGE_VISUAL_SUMMARY_TOOL_PROMPTS = [
+  "Use summarize_pages_visual when page appearance matters but the current chat model cannot inspect images directly.",
+  "summarize_pages_visual inspects the current edited document state, not just the originally opened PDF bytes.",
+  "summarize_pages_visual renders full pages and delegates the visual inspection to a configured vision model, then returns a plain-text summary you can reason over.",
+  "Pass summary_instructions when the user cares about specific visual details such as tables, handwriting, stamps, diagrams, signatures, highlights, or layout defects.",
+  "summary_instructions is a structured object with known_information, remaining_uncertainties, and what_to_add_or_verify.",
 ];
 
 const GET_PAGES_TEXT_TOOL_PROMPTS = [
   "get_pages_text preserves inferred spaces and line breaks from the PDF while remaining compatible with anchor highlighting.",
   "For tables, forms, multi-column pages, or irregular layout, call get_pages_text with include_layout true before creating document anchors.",
   "When get_pages_text returns line data, prefer anchors that stay within one line or two adjacent lines instead of stitching distant layout regions together.",
-  "If get_pages_text returns no useful text for a page and get_pages_image is available, follow up with get_pages_image instead of assuming the page has no usable content.",
+  "If get_pages_text returns no useful text for a page and get_pages_visual is available, follow up with get_pages_visual instead of assuming the page has no usable content.",
 ];
 
 const SEARCH_DOCUMENT_TOOL_PROMPTS = [
+  "search_document only works on documents or pages that have a usable text layer. It is ineffective for image-only scans unless OCR text is already present.",
   "When plain search may fail because of whitespace, punctuation, line breaks, or OCR noise, retry regex such as word1\\s*word2.",
   "search_document result_ids only refer to the exact matchText of each hit. snippet is surrounding context only.",
   "If you need multiple independent search_document calls for different keywords or ranges, issue them in the same step so they can run in parallel.",
@@ -170,6 +188,7 @@ const LIST_FIELDS_TOOL_PROMPTS = [
 
 export const documentToolModule = defineToolModule((ctx) => {
   const getDocumentDigest = ctx.getDocumentDigest;
+  const summarizePagesVisual = ctx.summarizePagesVisual;
 
   return {
     get_document_context: createToolBuilder("get_document_context")
@@ -212,15 +231,15 @@ export const documentToolModule = defineToolModule((ctx) => {
         };
       }),
 
-    get_pages_image: createToolBuilder("get_pages_image")
+    get_pages_visual: createToolBuilder("get_pages_visual")
       .read()
       .requiresInputModalities(["image"])
       .description(
-        `Render one or more full PDF pages as images for multimodal inspection. The JSON payload stays lightweight for the chat UI, while the actual page images are attached to the model context for visual reasoning. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} pages per call.`,
+        `Render one or more full PDF pages from the current edited document state as visuals for multimodal inspection. The JSON payload stays lightweight for the chat UI, while the actual rendered visuals are attached to the model context for visual reasoning. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} pages per call.`,
       )
-      .promptInstructions(PAGE_IMAGE_TOOL_PROMPTS)
-      .inputSchema(getPagesImageArgsSchema)
-      .toModelOutput(({ output }) => toPagesImageModelOutput(output))
+      .promptInstructions(PAGE_VISUAL_TOOL_PROMPTS)
+      .inputSchema(getPagesVisualArgsSchema)
+      .toModelOutput(({ output }) => toPagesVisualModelOutput(output))
       .build(async ({ args, ctx: toolCtx, signal }) => {
         const documentContext = toolCtx.getDocumentContext();
         const pageNumbers =
@@ -238,13 +257,13 @@ export const documentToolModule = defineToolModule((ctx) => {
           return {
             payload: createErrorPayload(
               "NO_PAGE_AVAILABLE",
-              "get_pages_image requires at least one valid page number or an active page in the current document.",
+              "get_pages_visual requires at least one valid page number or an active page in the current document.",
             ),
-            summary: "get_pages_image failed: no page available",
+            summary: "get_pages_visual failed: no page available",
           };
         }
 
-        const pageImageBatch = await toolCtx.getPagesImage({
+        const pageVisualBatch = await toolCtx.getPagesVisual({
           pageNumbers,
           targetWidth: args.target_width,
           renderAnnotations: args.render_annotations,
@@ -253,28 +272,85 @@ export const documentToolModule = defineToolModule((ctx) => {
 
         return {
           payload: {
-            requestedPageCount: pageImageBatch.requestedPageCount,
-            returnedPageCount: pageImageBatch.returnedPageCount,
-            truncated: pageImageBatch.truncated,
-            maxPagesPerCall: pageImageBatch.maxPagesPerCall,
-            pages: pageImageBatch.pages.map((pageImage) => ({
-              pageNumber: pageImage.pageNumber,
-              pageWidth: pageImage.pageWidth,
-              pageHeight: pageImage.pageHeight,
-              rotation: pageImage.rotation,
-              targetWidth: pageImage.targetWidth,
-              renderedWidth: pageImage.renderedWidth,
-              renderedHeight: pageImage.renderedHeight,
-              mimeType: pageImage.mimeType,
-              renderAnnotations: pageImage.renderAnnotations,
+            requestedPageCount: pageVisualBatch.requestedPageCount,
+            returnedPageCount: pageVisualBatch.returnedPageCount,
+            truncated: pageVisualBatch.truncated,
+            maxPagesPerCall: pageVisualBatch.maxPagesPerCall,
+            pages: pageVisualBatch.pages.map((pageVisual) => ({
+              pageNumber: pageVisual.pageNumber,
+              pageWidth: pageVisual.pageWidth,
+              pageHeight: pageVisual.pageHeight,
+              rotation: pageVisual.rotation,
+              targetWidth: pageVisual.targetWidth,
+              renderedWidth: pageVisual.renderedWidth,
+              renderedHeight: pageVisual.renderedHeight,
+              mimeType: pageVisual.mimeType,
+              renderAnnotations: pageVisual.renderAnnotations,
               imageAttachedForModel: true,
               modelAttachmentMode: "multimodal_tool_result",
             })),
           },
-          modelOutput: pageImageBatch,
-          summary: pageImageBatch.truncated
-            ? `Rendered ${pageImageBatch.returnedPageCount} of ${pageImageBatch.requestedPageCount} requested page images (limit ${pageImageBatch.maxPagesPerCall})`
-            : `Rendered full-page image${pageImageBatch.returnedPageCount === 1 ? "" : "s"} for ${pageImageBatch.returnedPageCount} page${pageImageBatch.returnedPageCount === 1 ? "" : "s"}`,
+          modelOutput: pageVisualBatch,
+          summary: pageVisualBatch.truncated
+            ? `Rendered ${pageVisualBatch.returnedPageCount} of ${pageVisualBatch.requestedPageCount} requested page visuals (limit ${pageVisualBatch.maxPagesPerCall})`
+            : `Rendered full-page visual${pageVisualBatch.returnedPageCount === 1 ? "" : "s"} for ${pageVisualBatch.returnedPageCount} page${pageVisualBatch.returnedPageCount === 1 ? "" : "s"}`,
+        };
+      }),
+
+    summarize_pages_visual: createToolBuilder("summarize_pages_visual")
+      .enable(Boolean(summarizePagesVisual))
+      .read()
+      .description(
+        `Render one or more full PDF pages from the current edited document state and return a plain-text visual summary produced by a configured vision model. Use this when page appearance matters but the current chat model cannot inspect images directly. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} pages per call.`,
+      )
+      .promptInstructions(PAGE_VISUAL_SUMMARY_TOOL_PROMPTS)
+      .inputSchema(summarizePagesVisualArgsSchema)
+      .build(async ({ args, ctx: toolCtx, signal }) => {
+        const documentContext = toolCtx.getDocumentContext();
+        const pageNumbers =
+          args.page_numbers.length > 0
+            ? args.page_numbers
+            : [
+                documentContext.currentPageNumber ??
+                  documentContext.visiblePageNumbers[0],
+              ].filter(
+                (pageNumber): pageNumber is number =>
+                  typeof pageNumber === "number",
+              );
+
+        if (pageNumbers.length === 0) {
+          return {
+            payload: createErrorPayload(
+              "NO_PAGE_AVAILABLE",
+              "summarize_pages_visual requires at least one valid page number or an active page in the current document.",
+            ),
+            summary: "summarize_pages_visual failed: no page available",
+          };
+        }
+
+        const visualSummary = await summarizePagesVisual!({
+          pageNumbers,
+          targetWidth: args.target_width,
+          renderAnnotations: args.render_annotations,
+          summaryInstructions: args.summary_instructions,
+          signal,
+        });
+
+        const payload: AiRenderedPageVisualSummaryResult = {
+          requestedPageCount: visualSummary.requestedPageCount,
+          returnedPageCount: visualSummary.returnedPageCount,
+          truncated: visualSummary.truncated,
+          maxPagesPerCall: visualSummary.maxPagesPerCall,
+          pages: visualSummary.pages,
+          summary: visualSummary.summary,
+        };
+
+        return {
+          payload,
+          modelOutput: payload.summary,
+          summary: payload.truncated
+            ? `Summarized ${payload.returnedPageCount} of ${payload.requestedPageCount} requested rendered pages`
+            : `Summarized rendered page${payload.returnedPageCount === 1 ? "" : "s"} for ${payload.returnedPageCount} page${payload.returnedPageCount === 1 ? "" : "s"}`,
         };
       }),
 
@@ -282,10 +358,11 @@ export const documentToolModule = defineToolModule((ctx) => {
       .enable(Boolean(getDocumentDigest))
       .read()
       .description(
-        "Get an AI digest for exactly one contiguous page range. start_page and end_page are required. This tool can summarize very large ranges, including a whole document, because it automatically chunks and merges long ranges internally. The payload includes overall_excerpt for the full requested range plus per-chunk excerpts for supporting detail. Optionally pass summary_instructions to tell the digest summarizer what to focus on.",
+        "Get an AI digest for exactly one contiguous page range. start_page and end_page are required. This tool can summarize very large ranges, including a whole document, because it automatically chunks and merges long ranges internally. The payload includes overall_excerpt for the full requested range plus per-chunk excerpts for supporting detail. Optionally pass summary_instructions as a structured object to guide the digest summarizer.",
       )
       .promptInstructions([
         "If the user asks for a whole-document or many-page summary, call get_document_context first and then call get_document_digest once for the full needed page range before any targeted page reads. get_document_digest already handles internal chunking for long ranges.",
+        "summary_instructions is a structured object with known_information, remaining_uncertainties, and what_to_add_or_verify.",
       ])
       .inputSchema(getDocumentDigestArgsSchema)
       .build(async ({ args, signal, onProgress }) => {
@@ -294,7 +371,7 @@ export const documentToolModule = defineToolModule((ctx) => {
           endPage: args.end_page,
           charsPerChunk: args.chars_per_chunk,
           sourceCharsPerChunk: args.source_chars_per_chunk,
-          summaryInstructions: args.summary_instructions?.trim() || undefined,
+          summaryInstructions: args.summary_instructions,
           signal,
           onProgress,
         });
@@ -330,7 +407,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     search_document: createToolBuilder("search_document")
       .read()
       .description(
-        "Search the current document and return result ids that can be focused or highlighted later. result_id highlights only the exact matchText for that search hit; snippet is context only and cannot be highlighted directly. For longer phrases, sentences, or ranges, use selection_anchors or document_anchors with highlight_results. Supports plain substring search and regex search for flexible whitespace or token patterns.",
+        "Search the current document and return result ids that can be focused or highlighted later. This only works when the PDF pages have a usable text layer, so it is not effective for image-only scans unless OCR text is already present. result_id highlights only the exact matchText for that search hit; snippet is context only and cannot be highlighted directly. For longer phrases, sentences, or ranges, use selection_anchors or document_anchors with highlight_results. Supports plain substring search and regex search for flexible whitespace or token patterns.",
       )
       .promptInstructions(SEARCH_DOCUMENT_TOOL_PROMPTS)
       .inputSchema(searchDocumentArgsSchema)
@@ -370,7 +447,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     list_annotations: createToolBuilder("list_annotations")
       .read()
       .description(
-        "List existing annotations in the current document, including comments, highlights, free text, ink, and hyperlink annotations. Highlight annotations include note/comment text plus highlightedText when the source text is known. Link annotations include linkUrl and linkDestPageNumber when available.",
+        "List existing annotations in the current document, including comments, highlights, free text, ink, shape, and hyperlink annotations. Shape annotations include subType. Highlight annotations include note/comment text plus highlightedText when the source text is known. Link annotations include linkUrl and linkDestPageNumber when available.",
       )
       .promptInstructions(LIST_ANNOTATIONS_TOOL_PROMPTS)
       .inputSchema(listAnnotationsArgsSchema)

@@ -16,8 +16,6 @@ export const renderPage = async (options: {
       scale = 1.0,
       renderAnnotations = false,
       signal,
-      pdfBytes,
-      password,
     } = options;
 
     const { bytes, mimeType } = await pdfWorkerService.renderPageImage({

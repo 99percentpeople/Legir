@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { PDFOutlineItem, PageData } from "../../types";
+import { PDFOutlineItem } from "../../types";
 import { ChevronRight, ChevronDown, Book, File, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
