@@ -227,6 +227,113 @@ export const snapShapePointToAngle = (
   };
 };
 
+const getSnappedAngleCandidateDirections = (
+  anchor: ShapePoint,
+  point: ShapePoint,
+  stepDeg = 15,
+) => {
+  const dx = point.x - anchor.x;
+  const dy = point.y - anchor.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance < 0.001) return [];
+
+  const stepRad = (Math.PI * stepDeg) / 180;
+  const angle = Math.atan2(dy, dx);
+  const rawStep = angle / stepRad;
+  const candidateSteps = new Set([
+    Math.floor(rawStep),
+    Math.round(rawStep),
+    Math.ceil(rawStep),
+  ]);
+
+  return [...candidateSteps].map((stepIndex) => {
+    const snappedAngle = stepIndex * stepRad;
+    return {
+      x: Math.cos(snappedAngle),
+      y: Math.sin(snappedAngle),
+    };
+  });
+};
+
+const getRayIntersection = (
+  pointA: ShapePoint,
+  dirA: ShapePoint,
+  pointB: ShapePoint,
+  dirB: ShapePoint,
+): ShapePoint | null => {
+  const determinant = dirA.x * dirB.y - dirA.y * dirB.x;
+  if (Math.abs(determinant) < 0.0001) return null;
+
+  const deltaX = pointB.x - pointA.x;
+  const deltaY = pointB.y - pointA.y;
+  const t = (deltaX * dirB.y - deltaY * dirB.x) / determinant;
+  const u = (deltaX * dirA.y - deltaY * dirA.x) / determinant;
+
+  if (t < -0.001 || u < -0.001) return null;
+
+  return {
+    x: pointA.x + dirA.x * t,
+    y: pointA.y + dirA.y * t,
+  };
+};
+
+export const snapShapePointBetweenAnchors = (
+  previousAnchor: ShapePoint,
+  nextAnchor: ShapePoint,
+  point: ShapePoint,
+  stepDeg = 15,
+): ShapePoint => {
+  const previousDirections = getSnappedAngleCandidateDirections(
+    previousAnchor,
+    point,
+    stepDeg,
+  );
+  const nextDirections = getSnappedAngleCandidateDirections(
+    nextAnchor,
+    point,
+    stepDeg,
+  );
+
+  if (!previousDirections.length || !nextDirections.length) {
+    return point;
+  }
+
+  const snappedFromPrevious = snapShapePointToAngle(
+    previousAnchor,
+    point,
+    stepDeg,
+  );
+  const snappedFromNext = snapShapePointToAngle(nextAnchor, point, stepDeg);
+  let bestIntersection: ShapePoint | null = null;
+  let bestIntersectionDistance = Infinity;
+
+  for (const previousDirection of previousDirections) {
+    for (const nextDirection of nextDirections) {
+      const intersection = getRayIntersection(
+        previousAnchor,
+        previousDirection,
+        nextAnchor,
+        nextDirection,
+      );
+      if (!intersection) continue;
+      const intersectionDistance = distanceSquared(intersection, point);
+      if (intersectionDistance < bestIntersectionDistance) {
+        bestIntersection = intersection;
+        bestIntersectionDistance = intersectionDistance;
+      }
+    }
+  }
+
+  if (!bestIntersection) {
+    return distanceSquared(snappedFromPrevious, point) <=
+      distanceSquared(snappedFromNext, point)
+      ? snappedFromPrevious
+      : snappedFromNext;
+  }
+
+  return bestIntersection;
+};
+
 export const getShapeBoundingRect = (
   points: ShapePoint[],
   padding = 0,

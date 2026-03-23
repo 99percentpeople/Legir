@@ -36,6 +36,7 @@ import {
   isClosedShapeType,
   getShapeMinimumPointCount,
   getShapePointsPathData,
+  snapShapePointBetweenAnchors,
   snapShapePointToAngle,
   SHAPE_ARROW_STYLE_OPTIONS,
   type ShapeArrowStyle,
@@ -363,19 +364,40 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     );
     let nextPoint = rawNextPoint;
 
-    const anchorPoint =
-      event.shiftKey && (isOpenLineShape || isClosedShapeType(data.shapeType))
-        ? vertexIndex === 0
-          ? isClosedShapeType(data.shapeType)
-            ? (absolutePoints[absolutePoints.length - 1] ?? null)
-            : (absolutePoints[1] ?? null)
-          : (absolutePoints[vertexIndex - 1] ?? null)
-        : null;
     if (
-      anchorPoint &&
-      !(anchorPoint.x === rawNextPoint.x && anchorPoint.y === rawNextPoint.y)
+      event.shiftKey &&
+      (isOpenLineShape || isClosedShapeType(data.shapeType))
     ) {
-      nextPoint = snapShapePointToAngle(anchorPoint, rawNextPoint, 15);
+      if (isClosedShapeType(data.shapeType) && absolutePoints.length >= 3) {
+        const previousAnchor =
+          vertexIndex === 0
+            ? (absolutePoints[absolutePoints.length - 1] ?? null)
+            : (absolutePoints[vertexIndex - 1] ?? null);
+        const nextAnchor =
+          absolutePoints[(vertexIndex + 1) % absolutePoints.length] ?? null;
+
+        if (previousAnchor && nextAnchor) {
+          nextPoint = snapShapePointBetweenAnchors(
+            previousAnchor,
+            nextAnchor,
+            rawNextPoint,
+            15,
+          );
+        }
+      } else {
+        const anchorPoint =
+          vertexIndex === 0
+            ? (absolutePoints[1] ?? null)
+            : (absolutePoints[vertexIndex - 1] ?? null);
+        if (
+          anchorPoint &&
+          !(
+            anchorPoint.x === rawNextPoint.x && anchorPoint.y === rawNextPoint.y
+          )
+        ) {
+          nextPoint = snapShapePointToAngle(anchorPoint, rawNextPoint, 15);
+        }
+      }
     }
 
     const nextPoints = absolutePoints.map((point, index) =>
