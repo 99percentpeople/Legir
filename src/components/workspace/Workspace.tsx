@@ -128,7 +128,10 @@ type Rect = {
 type TextSelectionPayload = NonNullable<TextSelectionToolbarState["selection"]>;
 type Point = { x: number; y: number };
 type ShapeDraftSession = {
-  tool: "draw_shape_polyline" | "draw_shape_polygon";
+  tool:
+    | "draw_shape_polyline"
+    | "draw_shape_polygon"
+    | "draw_shape_cloud_polygon";
   pageIndex: number;
   points: Point[];
   hoverPoint: Point | null;
@@ -427,12 +430,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
           ANNOTATION_STYLES.shape.arrowSize)
         : undefined,
       cloudIntensity:
-        shapeType === "cloud"
+        shapeType === "cloud" || shapeType === "cloud_polygon"
           ? editorState.shapeStyle?.cloudIntensity ||
             ANNOTATION_STYLES.shape.cloudIntensity
           : undefined,
       cloudSpacing:
-        shapeType === "cloud"
+        shapeType === "cloud" || shapeType === "cloud_polygon"
           ? (editorState.shapeStyle?.cloudSpacing ??
             ANNOTATION_STYLES.shape.cloudSpacing)
           : undefined,
@@ -457,7 +460,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const addShapeFromPoints = useCallback(
     (
-      shapeType: "line" | "polyline" | "polygon" | "arrow",
+      shapeType: "line" | "polyline" | "polygon" | "cloud_polygon" | "arrow",
       pageIndex: number,
       points: Point[],
     ) => {
@@ -476,7 +479,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const finalizeShapeDraftSession = useCallback(
     (draft: ShapeDraftSession | null) => {
       if (!draft) return false;
-      const minPointCount = draft.tool === "draw_shape_polygon" ? 3 : 2;
+      const minPointCount =
+        draft.tool === "draw_shape_polygon" ||
+        draft.tool === "draw_shape_cloud_polygon"
+          ? 3
+          : 2;
       if (draft.points.length < minPointCount) {
         shapeDraftSessionRef.current = null;
         setShapeDraftSession(null);
@@ -485,7 +492,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
 
       addShapeFromPoints(
-        draft.tool === "draw_shape_polygon" ? "polygon" : "polyline",
+        draft.tool === "draw_shape_polygon"
+          ? "polygon"
+          : draft.tool === "draw_shape_cloud_polygon"
+            ? "cloud_polygon"
+            : "polyline",
         draft.pageIndex,
         draft.points,
       );
@@ -517,7 +528,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (
       editorState.mode !== "annotation" ||
       (editorState.tool !== "draw_shape_polyline" &&
-        editorState.tool !== "draw_shape_polygon")
+        editorState.tool !== "draw_shape_polygon" &&
+        editorState.tool !== "draw_shape_cloud_polygon")
     ) {
       shapeDraftSessionRef.current = null;
       setShapeDraftSession(null);
@@ -1755,7 +1767,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (
       editorState.mode === "annotation" &&
       (editorState.tool === "draw_shape_polyline" ||
-        editorState.tool === "draw_shape_polygon")
+        editorState.tool === "draw_shape_polygon" ||
+        editorState.tool === "draw_shape_cloud_polygon")
     ) {
       const coords = getRelativeCoords(e, pageIndex);
       const constrainedCoords =
@@ -1815,7 +1828,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     const isShapeDraftTool =
       editorState.mode === "annotation" &&
       (editorState.tool === "draw_shape_polyline" ||
-        editorState.tool === "draw_shape_polygon");
+        editorState.tool === "draw_shape_polygon" ||
+        editorState.tool === "draw_shape_cloud_polygon");
 
     if (!isShapeDraftTool || !draft || draft.pageIndex !== pageIndex) {
       return;
@@ -1839,7 +1853,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
       shapeDraftSession &&
       shapeDraftSession.pageIndex === activePageIndex &&
       (editorState.tool === "draw_shape_polyline" ||
-        editorState.tool === "draw_shape_polygon")
+        editorState.tool === "draw_shape_polygon" ||
+        editorState.tool === "draw_shape_cloud_polygon")
     ) {
       const nextHoverPoint =
         editorState.keys.shift && shapeDraftSession.points.length > 0
@@ -2153,7 +2168,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     const shouldKeepShapeDraftActive =
       !!shapeDraftSessionRef.current &&
       (editorState.tool === "draw_shape_polyline" ||
-        editorState.tool === "draw_shape_polygon");
+        editorState.tool === "draw_shape_polygon" ||
+        editorState.tool === "draw_shape_cloud_polygon");
 
     clearActiveInteractionState();
 

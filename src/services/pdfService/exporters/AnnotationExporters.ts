@@ -28,10 +28,12 @@ import {
   getDefaultArrowSize,
   getCloudGeometry,
   getCloudPathData,
+  getPolygonCloudGeometry,
   getShapeAbsolutePoints,
   getShapeArrowStyles,
   getLineEndingMarker,
   getShapePointsPathData,
+  isClosedShapeType,
   getTrimmedOpenLinePointsForArrows,
 } from "@/lib/shapeGeometry";
 
@@ -998,7 +1000,7 @@ const buildShapeAppearanceOperators = (
   arrowSize: number | undefined,
   cloudIntensity: number | undefined,
   cloudSpacing: number | undefined,
-  stroke: ReturnType<typeof rgb>,
+  stroke: ReturnType<typeof rgb> | undefined,
   fill: ReturnType<typeof rgb> | undefined,
   thickness: number,
   graphicsState?: string,
@@ -1007,6 +1009,8 @@ const buildShapeAppearanceOperators = (
   operators: PDFOperator[];
   rectInset?: number;
 } | null => {
+  const strokeWidth = stroke ? Math.max(0, thickness) : 0;
+
   if (
     shapeType === "square" ||
     shapeType === "circle" ||
@@ -1028,16 +1032,16 @@ const buildShapeAppearanceOperators = (
       return {
         bbox: baseBBox,
         operators: drawRectangle({
-          x: x + thickness / 2,
-          y: y + thickness / 2,
-          width: Math.max(1, width - thickness),
-          height: Math.max(1, height - thickness),
+          x: x + strokeWidth / 2,
+          y: y + strokeWidth / 2,
+          width: Math.max(1, width - strokeWidth),
+          height: Math.max(1, height - strokeWidth),
           color: fill,
           rotate: degrees(0),
           xSkew: degrees(0),
           ySkew: degrees(0),
           borderColor: stroke,
-          borderWidth: thickness,
+          borderWidth: strokeWidth,
           graphicsState,
         }),
       };
@@ -1049,11 +1053,11 @@ const buildShapeAppearanceOperators = (
         operators: drawEllipse({
           x: x + width / 2,
           y: y + height / 2,
-          xScale: Math.max(1, width / 2 - thickness / 2),
-          yScale: Math.max(1, height / 2 - thickness / 2),
+          xScale: Math.max(1, width / 2 - strokeWidth / 2),
+          yScale: Math.max(1, height / 2 - strokeWidth / 2),
           color: fill,
           borderColor: stroke,
-          borderWidth: thickness,
+          borderWidth: strokeWidth,
           graphicsState,
         }),
       };
@@ -1068,7 +1072,7 @@ const buildShapeAppearanceOperators = (
       },
       {
         intensity: cloudIntensity,
-        strokeWidth: thickness,
+        strokeWidth,
         spacing: cloudSpacing,
       },
     );
@@ -1097,7 +1101,7 @@ const buildShapeAppearanceOperators = (
         scale: 1,
         color: undefined,
         borderColor: stroke,
-        borderWidth: thickness,
+        borderWidth: strokeWidth,
         graphicsState,
       }),
       rectInset: geometry.overflow,
@@ -1106,13 +1110,28 @@ const buildShapeAppearanceOperators = (
 
   if (pdfPoints.length < 2) return null;
 
-  const hasAnyArrow = !!arrowStyles.start || !!arrowStyles.end;
+  const hasAnyArrow =
+    strokeWidth > 0 && (!!arrowStyles.start || !!arrowStyles.end);
   const resolvedArrowSize =
     typeof arrowSize === "number" && Number.isFinite(arrowSize)
       ? Math.max(6, arrowSize)
-      : getDefaultArrowSize(thickness);
-  const arrowPadding = hasAnyArrow ? Math.max(thickness, resolvedArrowSize) : 0;
-  const padding = Math.max(thickness, arrowPadding);
+      : getDefaultArrowSize(Math.max(1, strokeWidth || thickness));
+  const polygonCloudGeometry =
+    shapeType === "cloud_polygon"
+      ? getPolygonCloudGeometry(pdfPoints, {
+          intensity: cloudIntensity,
+          strokeWidth,
+          spacing: cloudSpacing,
+        })
+      : null;
+  const arrowPadding = hasAnyArrow
+    ? Math.max(strokeWidth, resolvedArrowSize)
+    : 0;
+  const padding = Math.max(
+    strokeWidth,
+    arrowPadding,
+    polygonCloudGeometry?.overflow ?? 0,
+  );
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -1140,28 +1159,66 @@ const buildShapeAppearanceOperators = (
     ? getTrimmedOpenLinePointsForArrows(
         localPoints,
         arrowStyles,
-        thickness,
+        strokeWidth,
         resolvedArrowSize,
       )
     : localPoints;
 
-  const operators = [
-    ...drawSvgPath(
-      getShapePointsPathData(trimmedLocalPoints, {
-        closed: shapeType === "polygon",
-      }),
-      {
+  const operators: PDFOperator[] = [];
+
+  if (shapeType === "cloud_polygon") {
+    if (fill) {
+      operators.push(
+        ...drawSvgPath(getShapePointsPathData(localPoints, { closed: true }), {
+          x: bbox[0],
+          y: bbox[3],
+          scale: 1,
+          color: fill,
+          borderColor: undefined,
+          borderWidth: 0,
+          graphicsState,
+        }),
+      );
+    }
+  } else {
+    operators.push(
+      ...drawSvgPath(
+        getShapePointsPathData(trimmedLocalPoints, {
+          closed: isClosedShapeType(shapeType),
+        }),
+        {
+          x: bbox[0],
+          y: bbox[3],
+          scale: 1,
+          color: shapeType === "polygon" ? fill : undefined,
+          borderColor: stroke,
+          borderWidth: strokeWidth,
+          borderLineCap: 1,
+          graphicsState,
+        },
+      ),
+    );
+  }
+
+  if (shapeType === "cloud_polygon" && stroke && strokeWidth > 0) {
+    const localCloudGeometry = getPolygonCloudGeometry(localPoints, {
+      intensity: cloudIntensity,
+      strokeWidth,
+      spacing: cloudSpacing,
+    });
+    operators.push(
+      ...drawSvgPath(localCloudGeometry.pathData, {
         x: bbox[0],
         y: bbox[3],
         scale: 1,
-        color: shapeType === "polygon" ? fill : undefined,
+        color: undefined,
         borderColor: stroke,
-        borderWidth: thickness,
+        borderWidth: strokeWidth,
         borderLineCap: 1,
         graphicsState,
-      },
-    ),
-  ];
+      }),
+    );
+  }
 
   if (hasAnyArrow) {
     const markers = [
@@ -1169,14 +1226,14 @@ const buildShapeAppearanceOperators = (
         localPoints,
         "start",
         arrowStyles.start,
-        thickness,
+        strokeWidth,
         resolvedArrowSize,
       ),
       getLineEndingMarker(
         localPoints,
         "end",
         arrowStyles.end,
-        thickness,
+        strokeWidth,
         resolvedArrowSize,
       ),
     ];
@@ -1190,7 +1247,7 @@ const buildShapeAppearanceOperators = (
           scale: 1,
           color: marker.fillMode === "stroke" ? stroke : undefined,
           borderColor: stroke,
-          borderWidth: Math.max(1, thickness * 0.9),
+          borderWidth: Math.max(1, strokeWidth * 0.9),
           borderLineCap: 1,
           graphicsState,
         }),
@@ -1221,30 +1278,50 @@ export class ShapeExporter implements IAnnotationExporter {
       return;
     }
 
-    const stroke = hexToPdfColor(annotation.color || "#000000") || rgb(0, 0, 0);
+    const thickness =
+      typeof annotation.thickness === "number" &&
+      Number.isFinite(annotation.thickness)
+        ? Math.max(0, annotation.thickness)
+        : 2;
+    const stroke =
+      thickness > 0
+        ? hexToPdfColor(annotation.color || "#000000") || rgb(0, 0, 0)
+        : undefined;
     const arrowStyles = getShapeArrowStyles(annotation);
     const fill = annotation.backgroundColor
       ? hexToPdfColor(annotation.backgroundColor)
       : undefined;
-    const thickness =
-      typeof annotation.thickness === "number" &&
-      Number.isFinite(annotation.thickness)
-        ? Math.max(1, annotation.thickness)
-        : 2;
+    const hasStroke = !!stroke && thickness > 0;
+    const hasFill = !!fill;
+
+    if (!hasStroke && !hasFill) {
+      return;
+    }
+
     const opacity =
       typeof annotation.opacity === "number"
         ? Math.min(1, Math.max(0, annotation.opacity))
         : undefined;
     const graphicsState =
       typeof opacity === "number" && opacity < 1 ? "GS0" : undefined;
+    const suppressNativeCloudPolygonStroke =
+      annotation.shapeType === "cloud_polygon";
+    const nativeStroke = suppressNativeCloudPolygonStroke ? undefined : stroke;
+    const nativeBorderWidth = suppressNativeCloudPolygonStroke
+      ? 0
+      : hasStroke
+        ? thickness
+        : 0;
 
     const buildCommon = (rectValues: number[]) => ({
       Type: "Annot",
       F: 4,
       Rect: rectValues,
-      C: [stroke.red, stroke.green, stroke.blue],
+      C: nativeStroke
+        ? [nativeStroke.red, nativeStroke.green, nativeStroke.blue]
+        : undefined,
       CA: opacity,
-      BS: { W: thickness, S: PDFName.of("S") },
+      BS: { W: nativeBorderWidth, S: PDFName.of("S") },
       IC:
         fill &&
         annotation.shapeType !== "arrow" &&
@@ -1384,8 +1461,8 @@ export class ShapeExporter implements IAnnotationExporter {
       pdfPoints,
       arrowStyles,
       annotation.arrowSize,
-      undefined,
-      undefined,
+      annotation.cloudIntensity,
+      annotation.cloudSpacing,
       stroke,
       fill,
       thickness,
@@ -1458,10 +1535,17 @@ export class ShapeExporter implements IAnnotationExporter {
     }
 
     const vertices = pdfPoints.flatMap((point) => [point.x, point.y]);
-    const isPolygon = annotation.shapeType === "polygon";
+    const isPolygon =
+      annotation.shapeType === "polygon" ||
+      annotation.shapeType === "cloud_polygon";
+    const rectValues =
+      annotation.shapeType === "cloud_polygon" && appearance
+        ? [...appearance.bbox]
+        : paddedRect;
     const shapeAnnot = pdfDoc.context.obj({
-      ...buildCommon(paddedRect),
+      ...buildCommon(rectValues),
       Subtype: isPolygon ? "Polygon" : "PolyLine",
+      Border: annotation.shapeType === "cloud_polygon" ? [0, 0, 0] : undefined,
       Vertices: vertices,
       LE: hasAnyArrow
         ? [
@@ -1501,6 +1585,58 @@ export class ShapeExporter implements IAnnotationExporter {
       shapeAnnot.set(
         PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle),
         PDFName.of(arrowStyles.end),
+      );
+    }
+    if (
+      shapeAnnot instanceof PDFDict &&
+      annotation.shapeType === "cloud_polygon"
+    ) {
+      shapeAnnot.set(
+        PDFName.of(PDF_CUSTOM_KEYS.shapeSubType),
+        PDFName.of("cloud_polygon"),
+      );
+    }
+    if (
+      shapeAnnot instanceof PDFDict &&
+      annotation.shapeType === "cloud_polygon" &&
+      typeof annotation.cloudIntensity === "number" &&
+      Number.isFinite(annotation.cloudIntensity)
+    ) {
+      shapeAnnot.set(
+        PDFName.of(PDF_CUSTOM_KEYS.cloudIntensity),
+        pdfDoc.context.obj(annotation.cloudIntensity),
+      );
+    }
+    if (
+      shapeAnnot instanceof PDFDict &&
+      annotation.shapeType === "cloud_polygon" &&
+      typeof annotation.cloudSpacing === "number" &&
+      Number.isFinite(annotation.cloudSpacing)
+    ) {
+      shapeAnnot.set(
+        PDFName.of(PDF_CUSTOM_KEYS.cloudSpacing),
+        pdfDoc.context.obj(annotation.cloudSpacing),
+      );
+    }
+    if (
+      shapeAnnot instanceof PDFDict &&
+      annotation.shapeType === "cloud_polygon" &&
+      annotation.color
+    ) {
+      shapeAnnot.set(
+        PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeColor),
+        PDFHexString.fromText(annotation.color),
+      );
+    }
+    if (
+      shapeAnnot instanceof PDFDict &&
+      annotation.shapeType === "cloud_polygon" &&
+      typeof annotation.thickness === "number" &&
+      Number.isFinite(annotation.thickness)
+    ) {
+      shapeAnnot.set(
+        PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeWidth),
+        pdfDoc.context.obj(annotation.thickness),
       );
     }
     const ref = pdfDoc.context.register(shapeAnnot);

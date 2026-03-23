@@ -62,10 +62,14 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
       ? Math.max(12, Math.min(96, data.cloudSpacing))
       : 28;
   const pointCount = data.shapePoints?.length ?? 2;
+  const isCloudShapeType =
+    data.shapeType === "cloud" || data.shapeType === "cloud_polygon";
   const canSwitchBoxShapeType =
     data.shapeType === "square" ||
     data.shapeType === "circle" ||
     data.shapeType === "cloud";
+  const canSwitchPolygonShapeType =
+    data.shapeType === "polygon" || data.shapeType === "cloud_polygon";
 
   const arrowStyleLabel = (style: ShapeArrowStyle) =>
     t(`properties.arrow_style_${style}`) ||
@@ -127,6 +131,40 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
                 <SelectItem value="square">{t("toolbar.square")}</SelectItem>
                 <SelectItem value="circle">{t("toolbar.circle")}</SelectItem>
                 <SelectItem value="cloud">{t("toolbar.cloud")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {canSwitchPolygonShapeType && (
+          <div className="space-y-2">
+            <Label>{t("properties.shape_type") || "Shape Type"}</Label>
+            <Select
+              value={data.shapeType}
+              onValueChange={(value) => {
+                onTriggerHistorySave();
+                onChange({
+                  shapeType: value as "polygon" | "cloud_polygon",
+                  cloudIntensity:
+                    value === "cloud_polygon"
+                      ? cloudIntensity
+                      : data.cloudIntensity,
+                  cloudSpacing:
+                    value === "cloud_polygon"
+                      ? cloudSpacing
+                      : data.cloudSpacing,
+                  appearanceStreamContent: undefined,
+                });
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="polygon">{t("toolbar.polygon")}</SelectItem>
+                <SelectItem value="cloud_polygon">
+                  {t("toolbar.cloud_polygon") || "Cloud Polygon"}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -324,7 +362,7 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             </Button>
           )}
 
-        {data.shapeType === "cloud" && (
+        {isCloudShapeType && (
           <>
             <div className="space-y-2">
               <div className="flex items-center justify-between">

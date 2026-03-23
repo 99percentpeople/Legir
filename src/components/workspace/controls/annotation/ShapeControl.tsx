@@ -30,8 +30,10 @@ import {
   getShapeTypeWithoutArrow,
   getCloudGeometry,
   getCloudPathData,
+  getPolygonCloudPathData,
   getRectAndNormalizedShapePoints,
   getShapeAbsolutePoints,
+  isClosedShapeType,
   getShapeMinimumPointCount,
   getShapePointsPathData,
   snapShapePointToAngle,
@@ -73,13 +75,15 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const strokeColor = data.color || "#000000";
   const strokeWidth =
     typeof data.thickness === "number" && Number.isFinite(data.thickness)
-      ? Math.max(1, data.thickness)
+      ? Math.max(0, data.thickness)
       : 2;
   const opacity =
     typeof data.opacity === "number" && Number.isFinite(data.opacity)
-      ? Math.max(0.05, Math.min(1, data.opacity))
+      ? Math.max(0, Math.min(1, data.opacity))
       : 1;
   const fillColor = data.backgroundColor || "none";
+  const hasStroke = opacity > 0 && strokeWidth > 0;
+  const hasFill = opacity > 0 && fillColor !== "none";
   const segmentHitWidth = Math.max(12, strokeWidth * 4);
   const hasVertices = shapeSupportsVertices(data.shapeType);
   const isOpenLineShape = isOpenLineShapeType(data.shapeType);
@@ -151,7 +155,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
           ? trimmedLocalPoints
           : localPoints,
         {
-          closed: data.shapeType === "polygon",
+          closed: isClosedShapeType(data.shapeType),
         },
       ),
     [
@@ -176,7 +180,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       d: `M ${point.x} ${point.y} L ${localPoints[index + 1]!.x} ${localPoints[index + 1]!.y}`,
     }));
 
-    if (data.shapeType === "polygon") {
+    if (isClosedShapeType(data.shapeType)) {
       const lastPoint = localPoints[localPoints.length - 1]!;
       const firstPoint = localPoints[0]!;
       targets.push({
@@ -212,6 +216,21 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     data.cloudSpacing,
     data.rect,
     data.shapeType,
+    strokeWidth,
+  ]);
+  const cloudPolygonPath = useMemo(() => {
+    if (data.shapeType !== "cloud_polygon") return "";
+    return getPolygonCloudPathData(
+      localPoints,
+      data.cloudIntensity,
+      data.cloudSpacing,
+      strokeWidth,
+    );
+  }, [
+    data.cloudIntensity,
+    data.cloudSpacing,
+    data.shapeType,
+    localPoints,
     strokeWidth,
   ]);
 
@@ -342,21 +361,23 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       event.clientX,
       event.clientY,
     );
+    let nextPoint = rawNextPoint;
+
     const anchorPoint =
-      event.shiftKey && (isOpenLineShape || data.shapeType === "polygon")
-        ? data.shapeType === "polygon"
-          ? vertexIndex === 0
+      event.shiftKey && (isOpenLineShape || isClosedShapeType(data.shapeType))
+        ? vertexIndex === 0
+          ? isClosedShapeType(data.shapeType)
             ? (absolutePoints[absolutePoints.length - 1] ?? null)
-            : (absolutePoints[vertexIndex - 1] ?? null)
-          : vertexIndex === 0
-            ? (absolutePoints[1] ?? null)
-            : (absolutePoints[vertexIndex - 1] ?? null)
+            : (absolutePoints[1] ?? null)
+          : (absolutePoints[vertexIndex - 1] ?? null)
         : null;
-    const nextPoint =
+    if (
       anchorPoint &&
       !(anchorPoint.x === rawNextPoint.x && anchorPoint.y === rawNextPoint.y)
-        ? snapShapePointToAngle(anchorPoint, rawNextPoint, 15)
-        : rawNextPoint;
+    ) {
+      nextPoint = snapShapePointToAngle(anchorPoint, rawNextPoint, 15);
+    }
+
     const nextPoints = absolutePoints.map((point, index) =>
       index === vertexIndex ? nextPoint : point,
     );
@@ -613,9 +634,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             y={strokeWidth / 2}
             width={Math.max(1, data.rect!.width - strokeWidth)}
             height={Math.max(1, data.rect!.height - strokeWidth)}
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
+            fill={hasFill ? fillColor : "none"}
+            stroke={hasStroke ? strokeColor : "none"}
+            strokeWidth={hasStroke ? strokeWidth : 0}
             pointerEvents="all"
             onContextMenu={handleShapeContextMenu}
             {...tooltipHoverProps}
@@ -628,9 +649,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             cy={data.rect!.height / 2}
             rx={Math.max(1, data.rect!.width / 2 - strokeWidth / 2)}
             ry={Math.max(1, data.rect!.height / 2 - strokeWidth / 2)}
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
+            fill={hasFill ? fillColor : "none"}
+            stroke={hasStroke ? strokeColor : "none"}
+            strokeWidth={hasStroke ? strokeWidth : 0}
             pointerEvents="all"
             onContextMenu={handleShapeContextMenu}
             {...tooltipHoverProps}
@@ -641,8 +662,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
           <path
             d={cloudPath}
             fill="none"
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
+            stroke={hasStroke ? strokeColor : "none"}
+            strokeWidth={hasStroke ? strokeWidth : 0}
             pointerEvents="all"
             onContextMenu={handleShapeContextMenu}
             {...tooltipHoverProps}
@@ -654,8 +675,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
           <path
             d={polyPath}
             fill="none"
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
+            stroke={hasStroke ? strokeColor : "none"}
+            strokeWidth={hasStroke ? strokeWidth : 0}
             strokeLinejoin="round"
             strokeLinecap="round"
             pointerEvents="stroke"
@@ -667,9 +688,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
         return (
           <path
             d={polyPath}
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
+            fill={hasFill ? fillColor : "none"}
+            stroke={hasStroke ? strokeColor : "none"}
+            strokeWidth={hasStroke ? strokeWidth : 0}
             strokeLinejoin="round"
             strokeLinecap="round"
             pointerEvents="all"
@@ -677,14 +698,40 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             {...tooltipHoverProps}
           />
         );
+      case "cloud_polygon":
+        return (
+          <>
+            {hasFill && (
+              <path
+                d={polyPath}
+                fill={fillColor}
+                stroke="none"
+                pointerEvents="all"
+                onContextMenu={handleShapeContextMenu}
+                {...tooltipHoverProps}
+              />
+            )}
+            <path
+              d={cloudPolygonPath}
+              fill="none"
+              stroke={hasStroke ? strokeColor : "none"}
+              strokeWidth={hasStroke ? strokeWidth : 0}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              pointerEvents="stroke"
+              onContextMenu={handleShapeContextMenu}
+              {...tooltipHoverProps}
+            />
+          </>
+        );
       case "arrow":
         return (
           <>
             <path
               d={polyPath}
               fill="none"
-              stroke={strokeColor}
-              strokeWidth={strokeWidth}
+              stroke={hasStroke ? strokeColor : "none"}
+              strokeWidth={hasStroke ? strokeWidth : 0}
               strokeLinejoin="round"
               strokeLinecap="round"
               pointerEvents="stroke"
@@ -695,10 +742,12 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               <path
                 d={startArrowMarker.pathData}
                 fill={
-                  startArrowMarker.fillMode === "stroke" ? strokeColor : "none"
+                  hasStroke && startArrowMarker.fillMode === "stroke"
+                    ? strokeColor
+                    : "none"
                 }
-                stroke={strokeColor}
-                strokeWidth={Math.max(1, strokeWidth * 0.9)}
+                stroke={hasStroke ? strokeColor : "none"}
+                strokeWidth={hasStroke ? Math.max(1, strokeWidth * 0.9) : 0}
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 pointerEvents="all"
@@ -710,10 +759,12 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               <path
                 d={endArrowMarker.pathData}
                 fill={
-                  endArrowMarker.fillMode === "stroke" ? strokeColor : "none"
+                  hasStroke && endArrowMarker.fillMode === "stroke"
+                    ? strokeColor
+                    : "none"
                 }
-                stroke={strokeColor}
-                strokeWidth={Math.max(1, strokeWidth * 0.9)}
+                stroke={hasStroke ? strokeColor : "none"}
+                strokeWidth={hasStroke ? Math.max(1, strokeWidth * 0.9) : 0}
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 pointerEvents="all"

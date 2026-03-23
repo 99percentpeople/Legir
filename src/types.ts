@@ -44,6 +44,7 @@ export type Tool =
   | "draw_shape_line"
   | "draw_shape_polyline"
   | "draw_shape_polygon"
+  | "draw_shape_cloud_polygon"
   | "draw_shape_arrow"
   | "draw_shape_cloud"
   | "eraser";

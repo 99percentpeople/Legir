@@ -21,6 +21,7 @@ const TOOL_BEHAVIORS: Record<Tool, ToolBehavior> = {
   draw_shape_line: { isContinuous: false },
   draw_shape_polyline: { isContinuous: true },
   draw_shape_polygon: { isContinuous: true },
+  draw_shape_cloud_polygon: { isContinuous: true },
   draw_shape_arrow: { isContinuous: false },
   draw_shape_cloud: { isContinuous: false },
   eraser: { isContinuous: true },
@@ -46,6 +47,7 @@ export const getCursor = (tool: Tool) => {
     case "draw_comment":
     case "draw_shape_polyline":
     case "draw_shape_polygon":
+    case "draw_shape_cloud_polygon":
       return "crosshair";
     default:
       return "crosshair";

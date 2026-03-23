@@ -206,6 +206,7 @@ export type AiShapeAnnotationSubType =
   | "line"
   | "polyline"
   | "polygon"
+  | "cloud_polygon"
   | "arrow"
   | "cloud";
 

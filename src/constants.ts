@@ -187,8 +187,12 @@ export const AI_CHAT_MAX_PAGE_IMAGES_PER_CALL = 4;
 
 export const PDF_CUSTOM_KEYS = {
   placeholder: "FFPlaceholder",
+  shapeSubType: "FFShapeSubType",
+  cloudIntensity: "FFCloudIntensity",
   cloudSpacing: "FFCloudSpacing",
   arrowSize: "FFArrowSize",
   startArrowStyle: "FFStartArrowStyle",
   endArrowStyle: "FFEndArrowStyle",
+  shapeStrokeColor: "FFShapeStrokeColor",
+  shapeStrokeWidth: "FFShapeStrokeWidth",
 } as const;

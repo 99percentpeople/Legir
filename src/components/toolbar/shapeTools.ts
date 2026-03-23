@@ -17,6 +17,7 @@ export type ShapeTool =
   | "draw_shape_line"
   | "draw_shape_polyline"
   | "draw_shape_polygon"
+  | "draw_shape_cloud_polygon"
   | "draw_shape_arrow"
   | "draw_shape_cloud";
 
@@ -66,6 +67,12 @@ const SHAPE_TOOL_DEFINITIONS: Record<ShapeTool, ShapeToolDefinition> = {
     Icon: Pentagon,
     group: "path",
   },
+  draw_shape_cloud_polygon: {
+    tool: "draw_shape_cloud_polygon",
+    labelKey: "toolbar.cloud_polygon",
+    Icon: Cloud,
+    group: "path",
+  },
   draw_shape_arrow: {
     tool: "draw_shape_arrow",
     labelKey: "toolbar.arrow",
@@ -91,6 +98,7 @@ export const SHAPE_TOOL_GROUPS: ReadonlyArray<{
       "draw_shape_line",
       "draw_shape_polyline",
       "draw_shape_polygon",
+      "draw_shape_cloud_polygon",
       "draw_shape_arrow",
     ],
   },

@@ -1905,7 +1905,9 @@ export class ShapeParser implements IAnnotationParser {
           updatedAt,
           sourcePdfRef: annotation.sourcePdfRef,
           cloudIntensity: isCloud
-            ? annotation.borderEffect?.intensity || 2
+            ? (annotation.cloudIntensity ??
+              annotation.borderEffect?.intensity ??
+              2)
             : undefined,
           cloudSpacing: isCloud ? annotation.cloudSpacing : undefined,
           isEdited: false,
@@ -1971,6 +1973,12 @@ export class ShapeParser implements IAnnotationParser {
         author,
         updatedAt,
         sourcePdfRef: annotation.sourcePdfRef,
+        cloudIntensity: isCloudPolygon
+          ? (annotation.cloudIntensity ??
+            annotation.borderEffect?.intensity ??
+            2)
+          : undefined,
+        cloudSpacing: isCloudPolygon ? annotation.cloudSpacing : undefined,
         isEdited: false,
         subtype: annotation.subtype.toLowerCase(),
       });

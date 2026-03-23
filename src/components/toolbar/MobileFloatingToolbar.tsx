@@ -69,6 +69,7 @@ const isAnnotationTool = (
   | "draw_shape_line"
   | "draw_shape_polyline"
   | "draw_shape_polygon"
+  | "draw_shape_cloud_polygon"
   | "draw_shape_arrow"
   | "draw_shape_cloud"
   | "eraser" =>
@@ -206,6 +207,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_shape_line":
       case "draw_shape_polyline":
       case "draw_shape_polygon":
+      case "draw_shape_cloud_polygon":
       case "draw_shape_arrow":
       case "draw_shape_cloud":
         return editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color;
@@ -326,6 +328,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_shape_line":
       case "draw_shape_polyline":
       case "draw_shape_polygon":
+      case "draw_shape_cloud_polygon":
       case "draw_shape_arrow":
       case "draw_shape_cloud":
         return (

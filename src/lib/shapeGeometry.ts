@@ -18,11 +18,17 @@ export const SHAPE_ARROW_STYLE_OPTIONS: ShapeArrowStyle[] = [
 
 const MIN_RECT_DIMENSION = 1;
 
-export const SHAPE_FILL_TYPES: ShapeType[] = ["square", "circle", "polygon"];
+export const SHAPE_FILL_TYPES: ShapeType[] = [
+  "square",
+  "circle",
+  "polygon",
+  "cloud_polygon",
+];
 export const SHAPE_VERTEX_TYPES: ShapeType[] = [
   "line",
   "polyline",
   "polygon",
+  "cloud_polygon",
   "arrow",
 ];
 
@@ -36,7 +42,8 @@ export const shapeSupportsVertexInsertion = (shapeType?: ShapeType | null) =>
   shapeType === "line" ||
   shapeType === "arrow" ||
   shapeType === "polyline" ||
-  shapeType === "polygon";
+  shapeType === "polygon" ||
+  shapeType === "cloud_polygon";
 
 export const isOpenLineShapeType = (shapeType?: ShapeType | null) =>
   shapeType === "line" || shapeType === "polyline" || shapeType === "arrow";
@@ -62,6 +69,7 @@ export const getShapeTypeAfterPointDeletion = (
   remainingPointCount: number,
 ): ShapeType => {
   if (shapeType === "polygon") return "polygon";
+  if (shapeType === "cloud_polygon") return "cloud_polygon";
   if (shapeType === "arrow") return "arrow";
   if (shapeType === "polyline" || shapeType === "line") {
     return remainingPointCount > 2 ? "polyline" : "line";
@@ -178,10 +186,10 @@ export const hasAnyShapeArrow = (
 };
 
 export const isClosedShapeType = (shapeType?: ShapeType | null) =>
-  shapeType === "polygon";
+  shapeType === "polygon" || shapeType === "cloud_polygon";
 
 export const getShapeMinimumPointCount = (shapeType?: ShapeType | null) => {
-  if (shapeType === "polygon") return 3;
+  if (shapeType === "polygon" || shapeType === "cloud_polygon") return 3;
   if (shapeType === "arrow" || shapeType === "polyline") return 2;
   if (shapeType === "line") return 2;
   return 0;
@@ -790,6 +798,172 @@ export const getCloudPathData = (
   return commands.join(" ");
 };
 
+const getCloudBumpRatio = (intensity = 2) =>
+  Math.max(0.18, Math.min(0.38, 0.18 + (intensity - 1) * 0.08));
+
+const getPolygonCloudCentroid = (points: ShapePoint[]) => {
+  if (!points.length) {
+    return { x: 0, y: 0 };
+  }
+
+  let signedArea = 0;
+  let centroidX = 0;
+  let centroidY = 0;
+
+  for (let index = 0; index < points.length; index++) {
+    const current = points[index]!;
+    const next = points[(index + 1) % points.length]!;
+    const cross = current.x * next.y - next.x * current.y;
+    signedArea += cross;
+    centroidX += (current.x + next.x) * cross;
+    centroidY += (current.y + next.y) * cross;
+  }
+
+  if (Math.abs(signedArea) < 0.001) {
+    const total = points.reduce(
+      (acc, point) => ({
+        x: acc.x + point.x,
+        y: acc.y + point.y,
+      }),
+      { x: 0, y: 0 },
+    );
+    return {
+      x: total.x / points.length,
+      y: total.y / points.length,
+    };
+  }
+
+  const factor = 1 / (3 * signedArea);
+  return {
+    x: centroidX * factor,
+    y: centroidY * factor,
+  };
+};
+
+export const getPolygonCloudGeometry = (
+  points: ShapePoint[],
+  options?: {
+    intensity?: number;
+    strokeWidth?: number;
+    spacing?: number;
+  },
+) => {
+  const intensity =
+    typeof options?.intensity === "number" && Number.isFinite(options.intensity)
+      ? options.intensity
+      : 2;
+  const strokeWidth =
+    typeof options?.strokeWidth === "number" &&
+    Number.isFinite(options.strokeWidth)
+      ? Math.max(0, options.strokeWidth)
+      : 0;
+  const spacing = getCloudSpacing(options?.spacing);
+  const ratio = getCloudBumpRatio(intensity);
+
+  if (points.length < 3) {
+    return {
+      intensity,
+      strokeWidth,
+      spacing,
+      overflow: strokeWidth / 2,
+      pathData: getShapePointsPathData(points, { closed: true }),
+    };
+  }
+
+  const centroid = getPolygonCloudCentroid(points);
+  const commands = [`M ${points[0]!.x} ${points[0]!.y}`];
+  let maxBump = 0;
+  let hasSegment = false;
+
+  for (let index = 0; index < points.length; index++) {
+    const start = points[index]!;
+    const end = points[(index + 1) % points.length]!;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+
+    if (length < 0.001) {
+      continue;
+    }
+
+    hasSegment = true;
+    const segmentCount = Math.max(1, Math.round(length / spacing));
+    const step = length / segmentCount;
+    const bump = Math.max(4, step * ratio);
+    maxBump = Math.max(maxBump, bump);
+    const leftNormal = { x: -dy / length, y: dx / length };
+    const rightNormal = { x: dy / length, y: -dx / length };
+    const midPoint = {
+      x: start.x + dx / 2,
+      y: start.y + dy / 2,
+    };
+    const leftDistance = distanceSquared(
+      {
+        x: midPoint.x + leftNormal.x * bump,
+        y: midPoint.y + leftNormal.y * bump,
+      },
+      centroid,
+    );
+    const rightDistance = distanceSquared(
+      {
+        x: midPoint.x + rightNormal.x * bump,
+        y: midPoint.y + rightNormal.y * bump,
+      },
+      centroid,
+    );
+    const outwardNormal =
+      leftDistance >= rightDistance ? leftNormal : rightNormal;
+
+    for (let segmentOffset = 0; segmentOffset < segmentCount; segmentOffset++) {
+      const endT = (segmentOffset + 1) / segmentCount;
+      const controlT = (segmentOffset + 0.5) / segmentCount;
+      const segmentEnd = {
+        x: start.x + dx * endT,
+        y: start.y + dy * endT,
+      };
+      const controlPoint = {
+        x: start.x + dx * controlT + outwardNormal.x * bump,
+        y: start.y + dy * controlT + outwardNormal.y * bump,
+      };
+      commands.push(
+        `Q ${controlPoint.x} ${controlPoint.y} ${segmentEnd.x} ${segmentEnd.y}`,
+      );
+    }
+  }
+
+  if (!hasSegment) {
+    return {
+      intensity,
+      strokeWidth,
+      spacing,
+      overflow: strokeWidth / 2,
+      pathData: getShapePointsPathData(points, { closed: true }),
+    };
+  }
+
+  commands.push("Z");
+
+  return {
+    intensity,
+    strokeWidth,
+    spacing,
+    overflow: maxBump + strokeWidth / 2,
+    pathData: commands.join(" "),
+  };
+};
+
+export const getPolygonCloudPathData = (
+  points: ShapePoint[],
+  intensity = 2,
+  spacing = 28,
+  strokeWidth = 0,
+) =>
+  getPolygonCloudGeometry(points, {
+    intensity,
+    spacing,
+    strokeWidth,
+  }).pathData;
+
 export const getCloudSpacing = (spacing?: number) =>
   typeof spacing === "number" && Number.isFinite(spacing)
     ? Math.max(12, spacing)
@@ -824,7 +998,7 @@ export const getCloudGeometry = (
   const sideCount = Math.max(2, Math.round(pathRect.height / spacing));
   const stepX = pathRect.width / topCount;
   const stepY = pathRect.height / sideCount;
-  const ratio = Math.max(0.18, Math.min(0.38, 0.18 + (intensity - 1) * 0.08));
+  const ratio = getCloudBumpRatio(intensity);
   const bump = Math.max(4, Math.min(stepX, stepY) * ratio);
   const overflow = bump;
 

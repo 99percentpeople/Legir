@@ -909,12 +909,32 @@ const buildPdfLibAnnotsByPageIndex = async (
       const rectDifferences = pdfArrayToNumberList(
         annot.lookup(PDFName.of("RD")),
       );
+      const shapeSubType = pdfObjToString(
+        annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.shapeSubType)),
+      );
+      const cloudIntensityObj = annot.lookup(
+        PDFName.of(PDF_CUSTOM_KEYS.cloudIntensity),
+      );
+      const cloudIntensity =
+        cloudIntensityObj instanceof PDFNumber
+          ? cloudIntensityObj.asNumber()
+          : undefined;
       const cloudSpacingObj = annot.lookup(
         PDFName.of(PDF_CUSTOM_KEYS.cloudSpacing),
       );
       const cloudSpacing =
         cloudSpacingObj instanceof PDFNumber
           ? cloudSpacingObj.asNumber()
+          : undefined;
+      const shapeStrokeColor = pdfObjToString(
+        annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeColor)),
+      );
+      const shapeStrokeWidthObj = annot.lookup(
+        PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeWidth),
+      );
+      const shapeStrokeWidth =
+        shapeStrokeWidthObj instanceof PDFNumber
+          ? shapeStrokeWidthObj.asNumber()
           : undefined;
       const arrowSizeObj = annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.arrowSize));
       const arrowSize =
@@ -943,7 +963,11 @@ const buildPdfLibAnnotsByPageIndex = async (
             ? { width: borderWidth, style: borderStyleType }
             : undefined,
         rectDifferences,
+        shapeSubType,
+        cloudIntensity,
         cloudSpacing,
+        shapeStrokeColor,
+        shapeStrokeWidth,
         arrowSize,
         startArrowStyle,
         endArrowStyle,
@@ -1036,6 +1060,7 @@ export const loadPDF = async (
   pages: PageData[];
   fields: FormField[];
   annotations: Annotation[];
+  preservedSourceAnnotations: PreservedSourceAnnotationRef[];
   metadata: PDFMetadata;
   outline: PDFOutlineItem[];
   openPassword?: string;

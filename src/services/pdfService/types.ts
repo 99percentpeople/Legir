@@ -52,7 +52,11 @@ export type PdfJsAnnotation = Record<string, unknown> & {
     intensity?: number;
   };
   rectDifferences?: number[];
+  shapeSubType?: string;
+  cloudIntensity?: number;
   cloudSpacing?: number;
+  shapeStrokeColor?: string;
+  shapeStrokeWidth?: number;
   defaultAppearance?: string;
   DA?: string;
   textAlignment?: number;
@@ -93,6 +97,7 @@ export interface ParserContext {
   pageAnnotations: PdfJsAnnotation[];
   pageIndex: number;
   viewport: ViewportLike;
+  preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
   pdfDoc?: PDFDocument;
   fontMap?: Map<string, string>;
   globalDA?: string;
