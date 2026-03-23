@@ -39,6 +39,44 @@ const SIDEBAR_ANNOTATION_LIST_TYPES = ANNOTATION_LIST_TYPES.filter(
   (type): type is SidebarAnnotationListType => type !== "link",
 );
 
+const getAnnotationListTypeIcon = (
+  type: SidebarAnnotationListType | Annotation,
+) => {
+  const iconClassName = "text-muted-foreground";
+
+  if (typeof type !== "string") {
+    if (type.type === "ink" && type.intent === "InkHighlight") {
+      return <Highlighter size={12} className={iconClassName} />;
+    }
+
+    switch (type.type) {
+      case "highlight":
+        return <Highlighter size={12} className={iconClassName} />;
+      case "ink":
+        return <Pen size={12} className={iconClassName} />;
+      case "freetext":
+        return <Type size={12} className={iconClassName} />;
+      case "shape":
+        return <Shapes size={12} className={iconClassName} />;
+      default:
+        return <MessageCircle size={12} className={iconClassName} />;
+    }
+  }
+
+  switch (type) {
+    case "highlight":
+      return <Highlighter size={12} className={iconClassName} />;
+    case "ink":
+      return <Pen size={12} className={iconClassName} />;
+    case "freetext":
+      return <Type size={12} className={iconClassName} />;
+    case "shape":
+      return <Shapes size={12} className={iconClassName} />;
+    default:
+      return <MessageCircle size={12} className={iconClassName} />;
+  }
+};
+
 // --- Annotation Card ---
 interface AnnotationCardProps {
   annotation: Annotation;
@@ -93,24 +131,6 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
     }
   }, [isSelected]);
 
-  const getIcon = () => {
-    if (annotation.type === "ink" && annotation.intent === "InkHighlight") {
-      return <Highlighter size={12} className="text-muted-foreground" />;
-    }
-    switch (annotation.type) {
-      case "highlight":
-        return <Highlighter size={12} className="text-muted-foreground" />;
-      case "ink":
-        return <Pen size={12} className="text-muted-foreground" />;
-      case "freetext":
-        return <Type size={12} className="text-muted-foreground" />;
-      case "shape":
-        return <Shapes size={12} className="text-muted-foreground" />;
-      default:
-        return <MessageCircle size={12} className="text-muted-foreground" />;
-    }
-  };
-
   return (
     <div
       ref={cardRef}
@@ -134,7 +154,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
       >
         <div className="flex items-center justify-between gap-2">
           <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
-            {getIcon()}
+            {getAnnotationListTypeIcon(annotation)}
             <span className="max-w-[120px] truncate">{annotation.author}</span>
           </div>
           <Button
@@ -296,7 +316,10 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
                   );
                 }}
               >
-                {t(annotationTypeLabelKey[type])}
+                <span className="flex items-center gap-2">
+                  {getAnnotationListTypeIcon(type)}
+                  <span>{t(annotationTypeLabelKey[type])}</span>
+                </span>
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>

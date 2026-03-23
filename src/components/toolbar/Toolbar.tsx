@@ -554,39 +554,63 @@ const Toolbar: React.FC<ToolbarProps> = ({
                             <div className="text-muted-foreground px-1 text-xs font-medium">
                               {t(group.labelKey)}
                             </div>
-                            <div
-                              className={cn(
-                                "grid gap-1",
-                                group.id === "box"
-                                  ? "grid-cols-3"
-                                  : "grid-cols-4",
-                              )}
-                            >
-                              {group.tools.map((shapeTool) => {
-                                const ShapeIcon = getShapeToolIcon(shapeTool);
-                                const isActive = activeShapeTool === shapeTool;
+                            {(() => {
+                              const paddedTools: Array<ShapeTool | null> = [
+                                ...group.tools,
+                              ];
+                              const slotCount =
+                                group.slotCount ?? group.tools.length;
 
-                                return (
-                                  <Button
-                                    key={shapeTool}
-                                    variant="ghost"
-                                    className={cn(
-                                      "h-auto min-h-16 flex-col gap-2 px-2 py-2 text-xs",
-                                      isActive &&
-                                        "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
-                                    )}
-                                    onClick={() =>
-                                      handleShapeToolSelect(shapeTool)
+                              while (paddedTools.length < slotCount) {
+                                paddedTools.push(null);
+                              }
+
+                              return (
+                                <div
+                                  className="grid gap-1"
+                                  style={{
+                                    gridTemplateColumns: `repeat(${group.columns}, minmax(0, 1fr))`,
+                                  }}
+                                >
+                                  {paddedTools.map((shapeTool, itemIndex) => {
+                                    if (!shapeTool) {
+                                      return (
+                                        <div
+                                          key={`${group.id}-empty-${itemIndex}`}
+                                          aria-hidden="true"
+                                          className="min-h-16"
+                                        />
+                                      );
                                     }
-                                  >
-                                    <ShapeIcon size={18} />
-                                    <span className="leading-none">
-                                      {getShapeToolLabel(t, shapeTool)}
-                                    </span>
-                                  </Button>
-                                );
-                              })}
-                            </div>
+
+                                    const ShapeIcon =
+                                      getShapeToolIcon(shapeTool);
+                                    const isActive =
+                                      activeShapeTool === shapeTool;
+
+                                    return (
+                                      <Button
+                                        key={shapeTool}
+                                        variant="ghost"
+                                        className={cn(
+                                          "h-auto min-h-16 flex-col gap-2 px-2 py-2 text-xs",
+                                          isActive &&
+                                            "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+                                        )}
+                                        onClick={() =>
+                                          handleShapeToolSelect(shapeTool)
+                                        }
+                                      >
+                                        <ShapeIcon size={18} />
+                                        <span className="leading-none">
+                                          {getShapeToolLabel(t, shapeTool)}
+                                        </span>
+                                      </Button>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
                           </div>
                         ))}
                       </div>

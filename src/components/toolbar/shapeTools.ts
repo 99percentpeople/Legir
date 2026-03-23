@@ -85,11 +85,15 @@ export const SHAPE_TOOL_GROUPS: ReadonlyArray<{
   id: ShapeToolGroupId;
   labelKey: string;
   tools: ShapeTool[];
+  columns: number;
+  slotCount?: number;
 }> = [
   {
     id: "box",
     labelKey: "toolbar.shape_box_tools",
     tools: ["draw_shape_rect", "draw_shape_ellipse", "draw_shape_cloud"],
+    columns: 4,
+    slotCount: 4,
   },
   {
     id: "path",
@@ -101,6 +105,7 @@ export const SHAPE_TOOL_GROUPS: ReadonlyArray<{
       "draw_shape_cloud_polygon",
       "draw_shape_arrow",
     ],
+    columns: 4,
   },
 ];
 
