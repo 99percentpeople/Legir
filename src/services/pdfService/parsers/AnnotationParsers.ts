@@ -38,6 +38,18 @@ const normalizeRotationDeg = (deg: number) => {
   return d;
 };
 
+const PDF_ANNOT_FLAG_INVISIBLE = 1 << 0;
+const PDF_ANNOT_FLAG_HIDDEN = 1 << 1;
+const PDF_ANNOT_FLAG_NO_VIEW = 1 << 5;
+
+const hasHiddenAnnotationFlag = (flags?: number) =>
+  typeof flags === "number" &&
+  (flags &
+    (PDF_ANNOT_FLAG_INVISIBLE |
+      PDF_ANNOT_FLAG_HIDDEN |
+      PDF_ANNOT_FLAG_NO_VIEW)) !==
+    0;
+
 export class InkParser implements IAnnotationParser {
   async parse(context: ParserContext): Promise<Annotation[]> {
     const { pageIndex, pdfDoc, viewport } = context;
@@ -1761,8 +1773,20 @@ export class FreeTextParser implements IAnnotationParser {
 
 export class ShapeParser implements IAnnotationParser {
   parse(context: ParserContext): Annotation[] {
-    const { pageAnnotations, pageIndex, viewport } = context;
+    const { pageAnnotations, pageIndex, viewport, preservedSourceAnnotations } =
+      context;
     const annotations: Annotation[] = [];
+
+    const preserveSourceAnnotation = (
+      annotation: (typeof pageAnnotations)[number] | undefined,
+    ) => {
+      if (!annotation?.sourcePdfRef || !preservedSourceAnnotations) return;
+      preservedSourceAnnotations.push({
+        pageIndex,
+        sourcePdfRef: annotation.sourcePdfRef,
+        subtype: annotation.subtype,
+      });
+    };
 
     const getColorHex = (
       value: number[] | Uint8ClampedArray | undefined,
@@ -1785,24 +1809,48 @@ export class ShapeParser implements IAnnotationParser {
         continue;
       }
 
-      const strokeColor = getColorHex(annotation.color, "#000000");
+      if (hasHiddenAnnotationFlag(annotation.annotationFlags)) {
+        preserveSourceAnnotation(annotation);
+        continue;
+      }
+
+      const explicitThickness =
+        typeof annotation.shapeStrokeWidth === "number" &&
+        Number.isFinite(annotation.shapeStrokeWidth)
+          ? Math.max(0, annotation.shapeStrokeWidth)
+          : typeof annotation.borderStyle?.width === "number" &&
+              Number.isFinite(annotation.borderStyle.width)
+            ? Math.max(0, annotation.borderStyle.width)
+            : undefined;
+      const inferredStrokeColor =
+        annotation.shapeStrokeColor || getColorHex(annotation.color);
+      const thickness = explicitThickness ?? (inferredStrokeColor ? 1 : 0);
+      const strokeColor =
+        annotation.shapeStrokeColor ||
+        getColorHex(annotation.color, thickness > 0 ? "#000000" : undefined);
       const fillColor =
         getColorHex(annotation.interiorColor) ||
         getColorHex(annotation.fillColor);
-      const thickness =
-        typeof annotation.borderStyle?.width === "number" &&
-        Number.isFinite(annotation.borderStyle.width)
-          ? Math.max(1, annotation.borderStyle.width)
-          : 2;
       const opacity =
         typeof annotation.opacity === "number"
           ? Math.min(1, Math.max(0, annotation.opacity))
           : 1;
+      const hasVisibleStroke = opacity > 0 && !!strokeColor && thickness > 0;
+      const hasVisibleFill = opacity > 0 && !!fillColor;
+
+      if (!hasVisibleStroke && !hasVisibleFill) {
+        preserveSourceAnnotation(annotation);
+        continue;
+      }
+
       const author = annotation.title || undefined;
       const updatedAt = parsePDFDate(annotation.modificationDate);
       const borderEffectStyle = annotation.borderEffect?.style;
       const isCloud =
         annotation.subtype === "Square" && borderEffectStyle === "C";
+      const isCloudPolygon =
+        annotation.shapeSubType === "cloud_polygon" ||
+        (annotation.subtype === "Polygon" && borderEffectStyle === "C");
       const startArrowStyle =
         normalizeShapeArrowStyle(annotation.startArrowStyle) ??
         pdfLineEndingNameToArrowStyle(annotation.lineEndings?.[0]);
@@ -1868,7 +1916,10 @@ export class ShapeParser implements IAnnotationParser {
 
       const rawNumbers =
         annotation.subtype === "Line" ? annotation.line : annotation.vertices;
-      if (!rawNumbers || rawNumbers.length < 4) continue;
+      if (!rawNumbers || rawNumbers.length < 4) {
+        preserveSourceAnnotation(annotation);
+        continue;
+      }
 
       const points = [];
       for (
@@ -1884,7 +1935,10 @@ export class ShapeParser implements IAnnotationParser {
       }
 
       const normalized = getRectAndNormalizedShapePoints(points);
-      if (!normalized) continue;
+      if (!normalized) {
+        preserveSourceAnnotation(annotation);
+        continue;
+      }
 
       annotations.push({
         id: `imported_shape_${pageIndex + 1}_${index}`,
@@ -1893,7 +1947,9 @@ export class ShapeParser implements IAnnotationParser {
         type: "shape",
         shapeType:
           annotation.subtype === "Polygon"
-            ? "polygon"
+            ? isCloudPolygon
+              ? "cloud_polygon"
+              : "polygon"
             : isArrow
               ? "arrow"
               : annotation.subtype === "Line"

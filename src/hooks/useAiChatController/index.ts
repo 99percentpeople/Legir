@@ -374,6 +374,10 @@ export const useAiChatController = (editorState: EditorState) => {
           removeTextUnderFlattenedFreetext:
             snapshot.options.removeTextUnderFlattenedFreetext,
           pageIndexes,
+          preservedSourceAnnotations:
+            snapshot.preservedSourceAnnotations.filter((annotation) =>
+              pageIndexSet.has(annotation.pageIndex),
+            ),
         },
       );
     },

@@ -64,6 +64,7 @@ import {
   PDFMetadata,
   PDFOutlineItem,
   Annotation,
+  PreservedSourceAnnotationRef,
 } from "@/types";
 import { getOrderedPageControls } from "@/lib/controlLayerOrder";
 import {
@@ -868,6 +869,11 @@ const buildPdfLibAnnotsByPageIndex = async (
       const title = pdfObjToString(annot.lookup(PDFName.of("T")));
       const contents = pdfObjToString(annot.lookup(PDFName.of("Contents")));
       const modificationDate = pdfObjToString(annot.lookup(PDFName.of("M")));
+      const annotationFlagsObj = annot.lookup(PDFName.of("F"));
+      const annotationFlags =
+        annotationFlagsObj instanceof PDFNumber
+          ? annotationFlagsObj.asNumber()
+          : undefined;
       const highlightedText = getFormForgeHighlightedText(annot);
       const borderWidth = extractBorderWidth(annot);
       const borderStyleType = extractBorderStyle(annot);
@@ -924,6 +930,7 @@ const buildPdfLibAnnotsByPageIndex = async (
         subtype: subtypeName,
         rect,
         sourcePdfRef,
+        annotationFlags,
         color,
         interiorColor,
         opacity,
@@ -1129,6 +1136,7 @@ export const loadPDF = async (
     const pages: PageData[] = [];
     const fields: FormField[] = [];
     const annotations: Annotation[] = [];
+    const preservedSourceAnnotations: PreservedSourceAnnotationRef[] = [];
 
     let pdfLibAnnotsByPageIndex: Map<number, PdfJsAnnotation[]> | undefined =
       undefined;
@@ -1236,6 +1244,7 @@ export const loadPDF = async (
       page: PageData;
       fields: FormField[];
       annotations: Annotation[];
+      preservedSourceAnnotations: PreservedSourceAnnotationRef[];
     }[] = new Array(numPages);
 
     const maxConcurrency = Math.min(4, numPages);
@@ -1266,11 +1275,14 @@ export const loadPDF = async (
             number,
           ]);
         const pageAnnotations = pdfLibAnnotsByPageIndex?.get(idx) || [];
+        const preservedSourceAnnotationsForPage: PreservedSourceAnnotationRef[] =
+          [];
 
         const context: ParserContext = {
           pageAnnotations,
           pageIndex: idx,
           viewport,
+          preservedSourceAnnotations: preservedSourceAnnotationsForPage,
           pdfDoc,
           fontMap,
           globalDA,
@@ -1311,6 +1323,7 @@ export const loadPDF = async (
           },
           fields: fieldsForPage,
           annotations: annotsForPage,
+          preservedSourceAnnotations: preservedSourceAnnotationsForPage,
         };
       }
     };
@@ -1323,6 +1336,7 @@ export const loadPDF = async (
       pages.push(r.page);
       fields.push(...r.fields);
       annotations.push(...r.annotations);
+      preservedSourceAnnotations.push(...r.preservedSourceAnnotations);
     }
 
     pdfDebug("import:annotations", "annotations_final", () => {
@@ -1351,6 +1365,7 @@ export const loadPDF = async (
       pages,
       fields,
       annotations,
+      preservedSourceAnnotations,
       metadata,
       outline,
       openPassword,
@@ -1374,6 +1389,7 @@ export const exportPDF = async (
     exportPassword?: string | null;
     removeTextUnderFlattenedFreetext?: boolean;
     pageIndexes?: number[];
+    preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
   },
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
@@ -1593,6 +1609,18 @@ export const exportPDF = async (
       keepAnnotRefKeysByPage.get(a.pageIndex) || new Set<string>();
     setForPage.add(key);
     keepAnnotRefKeysByPage.set(a.pageIndex, setForPage);
+  }
+
+  for (const preserved of options?.preservedSourceAnnotations || []) {
+    if (!preserved?.sourcePdfRef) continue;
+    if (targetPageIndexSet && !targetPageIndexSet.has(preserved.pageIndex)) {
+      continue;
+    }
+    const key = `${preserved.sourcePdfRef.objectNumber}:${preserved.sourcePdfRef.generationNumber}`;
+    const setForPage =
+      keepAnnotRefKeysByPage.get(preserved.pageIndex) || new Set<string>();
+    setForPage.add(key);
+    keepAnnotRefKeysByPage.set(preserved.pageIndex, setForPage);
   }
 
   const hasNonFlattenFreeText = annotations.some(

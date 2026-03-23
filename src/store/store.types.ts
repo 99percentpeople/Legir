@@ -12,6 +12,7 @@ import type {
   PageData,
   PDFMetadata,
   PDFOutlineItem,
+  PreservedSourceAnnotationRef,
   Tool,
 } from "@/types";
 
@@ -42,6 +43,7 @@ export interface EditorActions {
     pages: PageData[];
     fields: FormField[];
     annotations: Annotation[];
+    preservedSourceAnnotations: PreservedSourceAnnotationRef[];
     outline: PDFOutlineItem[];
     metadata: PDFMetadata;
     filename: string;

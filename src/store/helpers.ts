@@ -352,6 +352,7 @@ export const initialState: EditorState = {
   thumbnailImages: {},
   fields: [],
   annotations: [],
+  preservedSourceAnnotations: [],
   outline: [],
   selectedId: null,
   scale: 1.0,

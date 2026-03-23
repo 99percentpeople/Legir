@@ -53,6 +53,7 @@ export const createDocumentSlice: EditorStoreSlice<
       thumbnailImages: initialState.thumbnailImages,
       fields: initialState.fields,
       annotations: initialState.annotations,
+      preservedSourceAnnotations: initialState.preservedSourceAnnotations,
       outline: initialState.outline,
       selectedId: initialState.selectedId,
       scale: initialState.scale,

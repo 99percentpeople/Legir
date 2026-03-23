@@ -176,6 +176,7 @@ const App: React.FC = () => {
             pages,
             fields,
             annotations,
+            preservedSourceAnnotations,
             metadata,
             outline,
             openPassword,
@@ -192,6 +193,7 @@ const App: React.FC = () => {
             pages,
             fields,
             annotations,
+            preservedSourceAnnotations,
             outline,
             scale: 1.0,
           });
@@ -350,6 +352,7 @@ const App: React.FC = () => {
       const {
         pages,
         annotations: fileAnnotations,
+        preservedSourceAnnotations,
         outline,
         openPassword,
         dispose,
@@ -368,6 +371,7 @@ const App: React.FC = () => {
               ...fileAnnotations.filter((a) => a.type === "link"),
             ]
           : fileAnnotations,
+        preservedSourceAnnotations,
         metadata: draft.metadata,
         filename: draft.filename,
         saveTarget: null,
@@ -518,6 +522,7 @@ const App: React.FC = () => {
         exportPassword: snapshot.exportPassword,
         removeTextUnderFlattenedFreetext:
           snapshot.options.removeTextUnderFlattenedFreetext,
+        preservedSourceAnnotations: snapshot.preservedSourceAnnotations,
       },
     );
   }, []);

@@ -6,7 +6,7 @@
  * `src/types.ts`.
  */
 import { PDFDocument, PDFForm, PDFPage, type PDFFont } from "@cantoo/pdf-lib";
-import { Annotation, FormField } from "@/types";
+import { Annotation, FormField, PreservedSourceAnnotationRef } from "@/types";
 
 // [x, y, width, height]
 export type Tile = [number, number, number, number];
@@ -23,6 +23,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   rect: [number, number, number, number];
 
   sourcePdfRef?: { objectNumber: number; generationNumber: number };
+  annotationFlags?: number;
 
   fieldName?: string;
   fieldType?: string;

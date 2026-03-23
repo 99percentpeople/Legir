@@ -146,6 +146,7 @@ export interface Annotation {
     | "line"
     | "polyline"
     | "polygon"
+    | "cloud_polygon"
     | "arrow"
     | "cloud";
   shapePoints?: { x: number; y: number }[];
@@ -224,6 +225,12 @@ export interface HistorySnapshot {
   annotations: Annotation[];
   metadata: PDFMetadata;
   exportPassword: string | null;
+}
+
+export interface PreservedSourceAnnotationRef {
+  pageIndex: number;
+  sourcePdfRef: { objectNumber: number; generationNumber: number };
+  subtype?: string;
 }
 
 export type EditorSaveTarget =
@@ -380,6 +387,7 @@ export interface EditorState {
   thumbnailImages: Record<number, string>;
   fields: FormField[];
   annotations: Annotation[];
+  preservedSourceAnnotations: PreservedSourceAnnotationRef[];
   outline: PDFOutlineItem[];
 
   mode: EditorMode;
