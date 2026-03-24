@@ -17,6 +17,15 @@ export const dispatchSyntheticContextMenuEscape = () => {
   );
 };
 
+export const isContextMenuContentTarget = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest(
+      '[data-slot="context-menu-content"], [data-slot="context-menu-sub-content"]',
+    ),
+  );
+};
+
 type ControlContextMenuProps = {
   disabled?: boolean;
   children: React.ReactNode;

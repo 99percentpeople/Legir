@@ -60,7 +60,10 @@ import type { MoveDirection } from "@/types";
 
 import { FloatingToolbar } from "../FloatingToolbar";
 import { ControlLayerMenuItems } from "../ControlLayerMenuItems";
-import { dispatchSyntheticContextMenuEscape } from "../ControlContextMenu";
+import {
+  dispatchSyntheticContextMenuEscape,
+  isContextMenuContentTarget,
+} from "../ControlContextMenu";
 import { ControlWrapper } from "../ControlWrapper";
 import type { AnnotationControlProps } from "../types";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
@@ -1091,6 +1094,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             className="h-full w-full"
             onPointerDownCapture={(event) => {
               if (event.button !== 0) return;
+              if (isContextMenuContentTarget(event.target)) return;
               if (!contextMenuOpenRef.current) return;
               event.preventDefault();
               event.stopPropagation();

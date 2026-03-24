@@ -16,6 +16,7 @@ import {
 import {
   ControlContextMenu,
   dispatchSyntheticContextMenuEscape,
+  isContextMenuContentTarget,
 } from "./ControlContextMenu";
 import { ControlLayerMenuItems } from "./ControlLayerMenuItems";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
@@ -501,6 +502,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       onPointerDownCapture={(e) => {
         if (!hasControlContextMenu) return;
         if (e.button !== 0) return;
+        if (isContextMenuContentTarget(e.target)) return;
         if (!dismissContextMenu()) return;
         e.preventDefault();
         e.stopPropagation();
