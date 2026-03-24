@@ -6,21 +6,34 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 
+export const dispatchSyntheticContextMenuEscape = () => {
+  if (typeof document === "undefined") return;
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+};
+
 type ControlContextMenuProps = {
   disabled?: boolean;
   children: React.ReactNode;
   content: React.ReactNode;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export const ControlContextMenu: React.FC<ControlContextMenuProps> = ({
   disabled = false,
   children,
   content,
+  onOpenChange,
 }) => {
   if (disabled) return <>{children}</>;
 
   return (
-    <ContextMenu modal={false}>
+    <ContextMenu modal={false} onOpenChange={onOpenChange}>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent
         className="z-50 min-w-40"

@@ -554,6 +554,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (!event.isTrusted) return;
         event.preventDefault();
         shapeDraftSessionRef.current = null;
         setShapeDraftSession(null);

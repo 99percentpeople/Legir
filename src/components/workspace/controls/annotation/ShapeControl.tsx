@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 import { Palette, Trash2 } from "lucide-react";
 
@@ -54,6 +60,7 @@ import type { MoveDirection } from "@/types";
 
 import { FloatingToolbar } from "../FloatingToolbar";
 import { ControlLayerMenuItems } from "../ControlLayerMenuItems";
+import { dispatchSyntheticContextMenuEscape } from "../ControlContextMenu";
 import { ControlWrapper } from "../ControlWrapper";
 import type { AnnotationControlProps } from "../types";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
@@ -266,9 +273,30 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   } = useMouse<SVGSVGElement>();
   const menuTriggerRef = useRef<HTMLDivElement | null>(null);
   const vertexDragIndexRef = useRef<number | null>(null);
+  const contextMenuOpenRef = useRef(false);
   const [menuAnchor, setMenuAnchor] = useState({ x: 0, y: 0 });
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
   const tooltipText = data.text?.trim() || "";
+
+  const resetContextState = useCallback(() => {
+    setContextState({
+      point: null,
+      segmentIndex: null,
+      vertexIndex: null,
+    });
+  }, []);
+
+  const dismissContextMenu = useCallback(() => {
+    if (!contextMenuOpenRef.current) return;
+    contextMenuOpenRef.current = false;
+    dispatchSyntheticContextMenuEscape();
+  }, []);
+
+  useEffect(() => {
+    if (isSelected) return;
+    resetContextState();
+    dismissContextMenu();
+  }, [dismissContextMenu, isSelected, resetContextState]);
 
   const setSvgRefs = useCallback(
     (node: SVGSVGElement | null) => {
@@ -463,7 +491,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     isAnnotationMode &&
     isSelected &&
     shapeSupportsVertexInsertion(data.shapeType);
-  const canShowLayerContextMenu = isSelectable && isAnnotationMode;
+  const canShowLayerContextMenu = isSelectable;
 
   const contextMenuContent = (
     <>
@@ -664,11 +692,13 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     event: React.PointerEvent<SVGElement>,
   ) => {
     if (!isSelectable) return;
-    if (event.button !== 0) return;
+    if (event.button !== 0 && event.button !== 2) return;
     event.stopPropagation();
     event.preventDefault();
     props.onSelect(data.id);
-    props.onPointerDown?.(event);
+    if (event.button === 0) {
+      props.onPointerDown?.(event);
+    }
   };
 
   const contentHitAreaProps = {
@@ -679,6 +709,10 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const selectionHitAreaProps = {
     onPointerDown: handleSelectionHitPointerDown,
     ...contentHitAreaProps,
+  };
+  const selectedContextHitAreaProps = {
+    onContextMenu: handleShapeContextMenu,
+    ...tooltipHoverProps,
   };
 
   const renderShape = () => {
@@ -1053,8 +1087,25 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
         disableHoverableContent
       >
         <TooltipTrigger asChild>
-          <div className="h-full w-full">
-            <ContextMenu modal={false}>
+          <div
+            className="h-full w-full"
+            onPointerDownCapture={(event) => {
+              if (event.button !== 0) return;
+              if (!contextMenuOpenRef.current) return;
+              event.preventDefault();
+              event.stopPropagation();
+              dismissContextMenu();
+            }}
+          >
+            <ContextMenu
+              modal={false}
+              onOpenChange={(open) => {
+                contextMenuOpenRef.current = open;
+                if (!open) {
+                  resetContextState();
+                }
+              }}
+            >
               <ContextMenuTrigger asChild>
                 <div
                   ref={menuTriggerRef}
@@ -1080,6 +1131,18 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 {renderShape()}
 
                 {!isSelected && renderSelectionHitArea()}
+
+                {isSelected && (
+                  <rect
+                    x={0}
+                    y={0}
+                    width={Math.max(1, data.rect.width)}
+                    height={Math.max(1, data.rect.height)}
+                    fill={HIT_TEST_PAINT}
+                    pointerEvents="all"
+                    {...selectedContextHitAreaProps}
+                  />
+                )}
 
                 {canEditShapePoints &&
                   segmentTargets.map((segment) => (

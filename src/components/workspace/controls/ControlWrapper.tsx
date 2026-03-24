@@ -13,7 +13,10 @@ import {
   normalizeRotationDeg,
   rotateOuterRectKeepingCenter,
 } from "@/lib/controlRotation";
-import { ControlContextMenu } from "./ControlContextMenu";
+import {
+  ControlContextMenu,
+  dispatchSyntheticContextMenuEscape,
+} from "./ControlContextMenu";
 import { ControlLayerMenuItems } from "./ControlLayerMenuItems";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
@@ -55,6 +58,8 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const { t } = useLanguage();
   const wrapperRef = React.useRef<HTMLDivElement>(null);
   const pendingFocusRef = React.useRef(false);
+  const wasSelectedRef = React.useRef(isSelected);
+  const contextMenuOpenRef = React.useRef(false);
   const isFreetext = data.type === "freetext";
   const {
     ref: tooltipMouseRef,
@@ -64,6 +69,13 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     height,
   } = useMouse<HTMLDivElement>();
   const [isTooltipOpen, setIsTooltipOpen] = React.useState(false);
+
+  const dismissContextMenu = React.useCallback(() => {
+    if (!contextMenuOpenRef.current) return false;
+    contextMenuOpenRef.current = false;
+    dispatchSyntheticContextMenuEscape();
+    return true;
+  }, []);
 
   useAppEvent(
     "workspace:focusControl",
@@ -122,6 +134,13 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
 
     appEventBus.clearSticky("workspace:focusControl");
   }, [isSelected, isAnnotation]);
+
+  React.useEffect(() => {
+    if (wasSelectedRef.current && !isSelected) {
+      dismissContextMenu();
+    }
+    wasSelectedRef.current = isSelected;
+  }, [dismissContextMenu, isSelected]);
 
   // Extract rect safely
   const baseRect = "rect" in data ? data.rect : undefined;
@@ -384,6 +403,9 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     data.type !== "highlight" && !isInkHighlight;
   const supportsKeyboardResizeHandles = isSelected && resizable;
   const supportsKeyboardRotateHandle = isSelected && supportsRotation;
+  const canShowLayerContextMenu =
+    !contextMenuDisabled && isSelectable && data.type !== "shape";
+  const hasControlContextMenu = canShowLayerContextMenu && !!onReorderLayer;
   const renderedChildren =
     isFormField && formFieldContentGeometry ? (
       <div
@@ -476,6 +498,13 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     <div
       ref={setWrapperNode}
       id={elementId || undefined}
+      onPointerDownCapture={(e) => {
+        if (!hasControlContextMenu) return;
+        if (e.button !== 0) return;
+        if (!dismissContextMenu()) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
       onPointerDown={(e) => {
         if (!isSelectable) return;
         if (e.button !== 0) return;
@@ -561,8 +590,6 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     </div>
   );
 
-  const canShowLayerContextMenu =
-    !contextMenuDisabled && isSelectable && data.type !== "shape";
   const canResetFormControlToDefault = !isAnnotation && !!onResetToDefault;
   const triggerElement = tooltipText ? (
     <TooltipTrigger asChild>{wrapper}</TooltipTrigger>
@@ -570,30 +597,32 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     wrapper
   );
 
-  const contextMenuWrapped =
-    canShowLayerContextMenu && onReorderLayer ? (
-      <ControlContextMenu
-        content={
-          <>
-            {canResetFormControlToDefault && (
-              <>
-                <ContextMenuItem onSelect={() => onResetToDefault(id)}>
-                  {t("common.actions.reset_to_default")}
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-              </>
-            )}
-            <ControlLayerMenuItems
-              onSelect={(move) => onReorderLayer(id, move)}
-            />
-          </>
-        }
-      >
-        {triggerElement}
-      </ControlContextMenu>
-    ) : (
-      triggerElement
-    );
+  const contextMenuWrapped = hasControlContextMenu ? (
+    <ControlContextMenu
+      onOpenChange={(open) => {
+        contextMenuOpenRef.current = open;
+      }}
+      content={
+        <>
+          {canResetFormControlToDefault && (
+            <>
+              <ContextMenuItem onSelect={() => onResetToDefault(id)}>
+                {t("common.actions.reset_to_default")}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+            </>
+          )}
+          <ControlLayerMenuItems
+            onSelect={(move) => onReorderLayer(id, move)}
+          />
+        </>
+      }
+    >
+      {triggerElement}
+    </ControlContextMenu>
+  ) : (
+    triggerElement
+  );
 
   if (!tooltipText) {
     return contextMenuWrapped;

@@ -1102,6 +1102,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
       }
 
       if (e.key === "Escape") {
+        if (!e.isTrusted) {
+          return;
+        }
         if (currentState.activeDialog) return;
         if (isPdfSearchOpen) {
           e.preventDefault();
