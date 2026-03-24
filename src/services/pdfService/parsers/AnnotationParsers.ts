@@ -1831,12 +1831,17 @@ export class ShapeParser implements IAnnotationParser {
       const fillColor =
         getColorHex(annotation.interiorColor) ||
         getColorHex(annotation.fillColor);
-      const opacity =
+      const strokeOpacity =
         typeof annotation.opacity === "number"
           ? Math.min(1, Math.max(0, annotation.opacity))
           : 1;
-      const hasVisibleStroke = opacity > 0 && !!strokeColor && thickness > 0;
-      const hasVisibleFill = opacity > 0 && !!fillColor;
+      const fillOpacity =
+        typeof annotation.shapeFillOpacity === "number"
+          ? Math.min(1, Math.max(0, annotation.shapeFillOpacity))
+          : strokeOpacity;
+      const hasVisibleStroke =
+        strokeOpacity > 0 && !!strokeColor && thickness > 0;
+      const hasVisibleFill = fillOpacity > 0 && !!fillColor;
 
       if (!hasVisibleStroke && !hasVisibleFill) {
         preserveSourceAnnotation(annotation);
@@ -1899,7 +1904,11 @@ export class ShapeParser implements IAnnotationParser {
               ? fillColor
               : undefined,
           thickness,
-          opacity,
+          opacity: strokeOpacity,
+          backgroundOpacity:
+            annotation.subtype === "Circle" || annotation.subtype === "Square"
+              ? fillOpacity
+              : undefined,
           text: annotation.contents || undefined,
           author,
           updatedAt,
@@ -1968,7 +1977,9 @@ export class ShapeParser implements IAnnotationParser {
         backgroundColor:
           annotation.subtype === "Polygon" ? fillColor : undefined,
         thickness,
-        opacity,
+        opacity: strokeOpacity,
+        backgroundOpacity:
+          annotation.subtype === "Polygon" ? fillOpacity : undefined,
         text: annotation.contents || undefined,
         author,
         updatedAt,

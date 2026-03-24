@@ -21,6 +21,7 @@ const MIN_RECT_DIMENSION = 1;
 export const SHAPE_FILL_TYPES: ShapeType[] = [
   "square",
   "circle",
+  "cloud",
   "polygon",
   "cloud_polygon",
 ];

@@ -3,6 +3,7 @@ import { Annotation, FormField } from "@/types";
 import { PropertyPanelProps } from "./types";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
+import { Slider } from "@/components/ui/slider";
 import { Type } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { registry } from "@/components/workspace/controls/registry/ControlRegistry";
@@ -30,11 +31,18 @@ export const GeometryProperties: React.FC<
         ? controlConfig.supportsGeometrySizeEdit
         : true;
   const isFormField = "name" in data && "style" in data;
+  const isFreeText = data.type === "freetext";
   const rotationDeg =
     isFormField &&
     typeof data.rotationDeg === "number" &&
     Number.isFinite(data.rotationDeg)
       ? normalizeRightAngleRotationDeg(data.rotationDeg)
+      : 0;
+  const freeTextRotationDeg =
+    isFreeText &&
+    typeof data.rotationDeg === "number" &&
+    Number.isFinite(data.rotationDeg)
+      ? data.rotationDeg
       : 0;
 
   return (
@@ -126,6 +134,24 @@ export const GeometryProperties: React.FC<
               ))}
             </SelectContent>
           </Select>
+        </div>
+      )}
+      {isFreeText && (
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">{t("properties.rotation")}</Label>
+            <span className="text-muted-foreground text-xs">
+              {Math.round(freeTextRotationDeg)}°
+            </span>
+          </div>
+          <Slider
+            value={[freeTextRotationDeg]}
+            min={-180}
+            max={180}
+            step={1}
+            onValueCommit={onTriggerHistorySave}
+            onValueChange={(vals) => onChange({ rotationDeg: vals[0] })}
+          />
         </div>
       )}
     </div>

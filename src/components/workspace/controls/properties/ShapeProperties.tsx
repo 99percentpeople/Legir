@@ -27,6 +27,7 @@ import {
 import type { Annotation } from "@/types";
 
 import type { PropertyPanelProps } from "./types";
+import { ColorPropertyInput } from "./ColorPropertyInput";
 
 export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   data,
@@ -38,9 +39,9 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   const strokeColor = data.color || "#000000";
   const thickness =
     typeof data.thickness === "number" && Number.isFinite(data.thickness)
-      ? Math.max(1, data.thickness)
+      ? Math.max(0, data.thickness)
       : 2;
-  const opacity =
+  const strokeOpacity =
     typeof data.opacity === "number" && Number.isFinite(data.opacity)
       ? Math.max(0.05, Math.min(1, data.opacity))
       : 1;
@@ -48,6 +49,11 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   const supportsArrowSize = isOpenLineShapeType(data.shapeType);
   const arrowStyles = getShapeArrowStyles(data);
   const isTransparent = !data.backgroundColor;
+  const fillOpacity =
+    typeof data.backgroundOpacity === "number" &&
+    Number.isFinite(data.backgroundOpacity)
+      ? Math.max(0.05, Math.min(1, data.backgroundOpacity))
+      : strokeOpacity;
   const arrowSize =
     typeof data.arrowSize === "number" && Number.isFinite(data.arrowSize)
       ? Math.max(6, Math.min(64, data.arrowSize))
@@ -172,17 +178,25 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
 
         <div className="space-y-2">
           <Label>{t("properties.color")}</Label>
-          <input
-            type="color"
-            value={strokeColor}
-            onMouseDown={onTriggerHistorySave}
-            onChange={(e) =>
+          <ColorPropertyInput
+            title={t("properties.color")}
+            paletteType="foreground"
+            color={strokeColor}
+            opacity={strokeOpacity}
+            showOpacity
+            onInteractionStart={onTriggerHistorySave}
+            onColorChange={(color) =>
               onChange({
-                color: e.target.value,
+                color,
                 appearanceStreamContent: undefined,
               })
             }
-            className="border-input bg-background h-8 w-full cursor-pointer rounded border"
+            onOpacityChange={(nextOpacity) =>
+              onChange({
+                opacity: nextOpacity,
+                appearanceStreamContent: undefined,
+              })
+            }
           />
         </div>
 
@@ -193,35 +207,13 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
           </div>
           <Slider
             value={[thickness]}
-            min={1}
+            min={0}
             max={20}
             step={1}
             onValueCommit={onTriggerHistorySave}
             onValueChange={(values) =>
               onChange({
                 thickness: values[0],
-                appearanceStreamContent: undefined,
-              })
-            }
-          />
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>{t("properties.opacity")}</Label>
-            <span className="text-muted-foreground text-xs">
-              {Math.round(opacity * 100)}%
-            </span>
-          </div>
-          <Slider
-            value={[opacity]}
-            min={0.05}
-            max={1}
-            step={0.05}
-            onValueCommit={onTriggerHistorySave}
-            onValueChange={(values) =>
-              onChange({
-                opacity: values[0],
                 appearanceStreamContent: undefined,
               })
             }
@@ -326,18 +318,26 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
                 </Label>
               </div>
             </div>
-            <input
-              type="color"
+            <ColorPropertyInput
+              title={t("properties.background")}
+              paletteType="background"
               disabled={isTransparent}
-              value={data.backgroundColor || "#ffffff"}
-              onMouseDown={onTriggerHistorySave}
-              onChange={(e) =>
+              color={data.backgroundColor || "#ffffff"}
+              opacity={fillOpacity}
+              showOpacity
+              onInteractionStart={onTriggerHistorySave}
+              onColorChange={(backgroundColor) =>
                 onChange({
-                  backgroundColor: e.target.value,
+                  backgroundColor,
                   appearanceStreamContent: undefined,
                 })
               }
-              className="border-input bg-background h-8 w-full cursor-pointer rounded border disabled:opacity-50"
+              onOpacityChange={(backgroundOpacity) =>
+                onChange({
+                  backgroundOpacity,
+                  appearanceStreamContent: undefined,
+                })
+              }
             />
           </div>
         )}

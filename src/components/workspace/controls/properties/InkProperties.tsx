@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Palette, PenTool } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
+import { ColorPropertyInput } from "./ColorPropertyInput";
 
 export const InkProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   data,
@@ -23,17 +24,25 @@ export const InkProperties: React.FC<PropertyPanelProps<Annotation>> = ({
         {/* Color */}
         <div className="space-y-2">
           <Label>{t("properties.color")}</Label>
-          <input
-            type="color"
-            value={data.color || "#000000"}
-            onMouseDown={onTriggerHistorySave}
-            onChange={(e) =>
+          <ColorPropertyInput
+            title={t("properties.color")}
+            paletteType="foreground"
+            color={data.color || "#000000"}
+            opacity={data.opacity ?? 1}
+            showOpacity
+            onInteractionStart={onTriggerHistorySave}
+            onColorChange={(color) =>
               onChange({
-                color: e.target.value,
+                color,
                 appearanceStreamContent: undefined,
               })
             }
-            className="border-input bg-background h-8 w-full cursor-pointer rounded border"
+            onOpacityChange={(opacity) =>
+              onChange({
+                opacity,
+                appearanceStreamContent: undefined,
+              })
+            }
           />
         </div>
 
@@ -57,29 +66,6 @@ export const InkProperties: React.FC<PropertyPanelProps<Annotation>> = ({
               onTriggerHistorySave();
               onChange({
                 thickness: vals[0],
-                appearanceStreamContent: undefined,
-              });
-            }}
-          />
-        </div>
-
-        {/* Opacity */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>{t("properties.opacity")}</Label>
-            <span className="text-muted-foreground text-xs">
-              {Math.round(((data.opacity ?? 1) as number) * 100)}%
-            </span>
-          </div>
-          <Slider
-            value={[data.opacity ?? 1]}
-            min={0.05}
-            max={1}
-            step={0.05}
-            onValueChange={(vals) => {
-              onTriggerHistorySave();
-              onChange({
-                opacity: vals[0],
                 appearanceStreamContent: undefined,
               });
             }}

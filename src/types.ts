@@ -125,6 +125,7 @@ export interface Annotation {
   author?: string; // Creator/Author of the annotation
   color?: string;
   backgroundColor?: string;
+  backgroundOpacity?: number;
   borderColor?: string;
   borderWidth?: number;
   opacity?: number; // For highlight
@@ -409,6 +410,7 @@ export interface EditorState {
     thickness: number;
     opacity: number;
     backgroundColor?: string;
+    backgroundOpacity?: number;
     arrowSize?: number;
     cloudIntensity?: number;
     cloudSpacing?: number;

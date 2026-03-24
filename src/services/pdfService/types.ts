@@ -55,6 +55,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   shapeSubType?: string;
   cloudIntensity?: number;
   cloudSpacing?: number;
+  shapeFillOpacity?: number;
   shapeStrokeColor?: string;
   shapeStrokeWidth?: number;
   defaultAppearance?: string;

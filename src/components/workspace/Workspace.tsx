@@ -408,6 +408,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       | "thickness"
       | "opacity"
       | "backgroundColor"
+      | "backgroundOpacity"
       | "shapeStartArrow"
       | "shapeEndArrow"
       | "shapeStartArrowStyle"
@@ -421,11 +422,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
       shapeType,
       color: editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color,
       thickness:
-        editorState.shapeStyle?.thickness || ANNOTATION_STYLES.shape.thickness,
+        editorState.shapeStyle?.thickness ?? ANNOTATION_STYLES.shape.thickness,
       opacity:
         editorState.shapeStyle?.opacity ?? ANNOTATION_STYLES.shape.opacity,
       backgroundColor: shapeSupportsFill(shapeType)
         ? editorState.shapeStyle?.backgroundColor
+        : undefined,
+      backgroundOpacity: shapeSupportsFill(shapeType)
+        ? (editorState.shapeStyle?.backgroundOpacity ??
+          editorState.shapeStyle?.opacity ??
+          ANNOTATION_STYLES.shape.backgroundOpacity)
         : undefined,
       shapeStartArrow: shapeType === "arrow" ? false : undefined,
       shapeEndArrow: shapeType === "arrow" ? true : undefined,
@@ -2450,6 +2456,18 @@ const Workspace: React.FC<WorkspaceProps> = ({
               : []),
           ]
         : null;
+    const shapeDraftClosingPreview =
+      shapeDraftSession &&
+      shapeDraftSession.pageIndex === page.pageIndex &&
+      (shapeDraftSession.tool === "draw_shape_polygon" ||
+        shapeDraftSession.tool === "draw_shape_cloud_polygon") &&
+      shapeDraftPreviewPoints &&
+      shapeDraftPreviewPoints.length > 1
+        ? {
+            start: shapeDraftPreviewPoints[shapeDraftPreviewPoints.length - 1]!,
+            end: shapeDraftPreviewPoints[0]!,
+          }
+        : null;
 
     return (
       <div
@@ -2687,7 +2705,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                       ANNOTATION_STYLES.shape.color
                     }
                     strokeWidth={
-                      editorState.shapeStyle?.thickness ||
+                      editorState.shapeStyle?.thickness ??
                       ANNOTATION_STYLES.shape.thickness
                     }
                     opacity={
@@ -2727,23 +2745,49 @@ const Workspace: React.FC<WorkspaceProps> = ({
           preserveAspectRatio="none"
         >
           {shapeDraftPreviewPoints && shapeDraftPreviewPoints.length > 1 && (
-            <path
-              d={getShapePointsPathData(shapeDraftPreviewPoints)}
-              stroke={
-                editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
-              }
-              strokeWidth={
-                editorState.shapeStyle?.thickness ||
-                ANNOTATION_STYLES.shape.thickness
-              }
-              opacity={
-                editorState.shapeStyle?.opacity ??
-                ANNOTATION_STYLES.shape.opacity
-              }
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <>
+              <path
+                d={getShapePointsPathData(shapeDraftPreviewPoints)}
+                stroke={
+                  editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
+                }
+                strokeWidth={
+                  editorState.shapeStyle?.thickness ??
+                  ANNOTATION_STYLES.shape.thickness
+                }
+                opacity={
+                  editorState.shapeStyle?.opacity ??
+                  ANNOTATION_STYLES.shape.opacity
+                }
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {shapeDraftClosingPreview && (
+                <path
+                  d={getShapePointsPathData([
+                    shapeDraftClosingPreview.start,
+                    shapeDraftClosingPreview.end,
+                  ])}
+                  stroke={
+                    editorState.shapeStyle?.color ||
+                    ANNOTATION_STYLES.shape.color
+                  }
+                  strokeWidth={
+                    editorState.shapeStyle?.thickness ??
+                    ANNOTATION_STYLES.shape.thickness
+                  }
+                  opacity={
+                    (editorState.shapeStyle?.opacity ??
+                      ANNOTATION_STYLES.shape.opacity) * 0.8
+                  }
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray="6 4"
+                />
+              )}
+            </>
           )}
           {isDrawing && activePageIndex === page.pageIndex && (
             <path

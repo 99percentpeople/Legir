@@ -5,44 +5,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Button } from "../ui/button";
 import { ChevronDown } from "lucide-react";
 import { useLanguage } from "../language-provider";
-
-const PEN_COLORS = [
-  // Row 1
-  "#000000",
-  "#58595b",
-  "#808285",
-  "#a7a9ac",
-  "#d1d3d4",
-  "#ffffff",
-  // Row 2
-  "#b31564",
-  "#e61b1b",
-  "#ff5500",
-  "#ffaa00",
-  "#ffce00",
-  "#ffe600",
-  // Row 3
-  "#a2e61b",
-  "#26e600",
-  "#008055",
-  "#00aacc",
-  "#004de6",
-  "#3d00b8",
-  // Row 4
-  "#6600cc",
-  "#600080",
-  "#f7d7c4",
-  "#bb9167",
-  "#8e562e",
-  "#613d30",
-  // Row 5
-  "#ff80ff",
-  "#ffc680",
-  "#ffff80",
-  "#9bd6a9",
-  "#80d6ff",
-  "#bcb3ff",
-];
+import { ColorPaletteControl } from "../ui/color-palette";
+import type { ColorPaletteType } from "@/lib/colorPalette";
 
 interface ColorPickerPopoverProps {
   color: string;
@@ -53,11 +17,15 @@ interface ColorPickerPopoverProps {
   onOpacityChange?: (opacity: number) => void;
   isActive?: boolean;
   showThickness?: boolean;
+  minThickness?: number;
   showOpacity?: boolean;
+  paletteType?: ColorPaletteType;
   previewStrokeLinecap?: "round" | "butt" | "square";
   side?: React.ComponentProps<typeof PopoverContent>["side"];
+  align?: React.ComponentProps<typeof PopoverContent>["align"];
   title?: string;
   children?: React.ReactNode;
+  onInteractionStart?: () => void;
 }
 
 export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
@@ -69,15 +37,38 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   onOpacityChange,
   isActive = false,
   showThickness = true,
+  minThickness = 1,
   showOpacity = true,
+  paletteType = "foreground",
   previewStrokeLinecap = "round",
   side = "bottom",
+  align = "center",
   title = "Properties",
   children,
+  onInteractionStart,
 }) => {
   const { t } = useLanguage();
+
+  const [open, setOpen] = React.useState(false);
+  const hasStartedInteractionRef = React.useRef(false);
+
+  const ensureInteractionStarted = React.useCallback(() => {
+    if (hasStartedInteractionRef.current) return;
+    hasStartedInteractionRef.current = true;
+    onInteractionStart?.();
+  }, [onInteractionStart]);
+
   return (
-    <Popover modal={false}>
+    <Popover
+      modal={false}
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          hasStartedInteractionRef.current = false;
+        }
+      }}
+    >
       <PopoverTrigger asChild>
         {children ? (
           children
@@ -96,28 +87,27 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-4" side={side} align="center">
+      <PopoverContent className="w-72 p-4" side={side} align={align}>
         <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-sm font-medium">
-              {t("properties.color")}
-            </label>
-            <div className="grid grid-cols-6 gap-2">
-              {PEN_COLORS.map((c) => (
-                <button
-                  key={c}
-                  className={cn(
-                    "h-6 w-6 rounded-full border border-gray-200 transition-transform hover:scale-110",
-                    color === c &&
-                      "ring-primary scale-110 ring-2 ring-offset-2",
-                  )}
-                  style={{ backgroundColor: c }}
-                  onClick={() => onColorChange(c)}
-                  title={c}
-                />
-              ))}
-            </div>
-          </div>
+          <ColorPaletteControl
+            color={color}
+            opacity={opacity}
+            paletteType={paletteType}
+            onColorChange={(nextColor) => {
+              ensureInteractionStarted();
+              onColorChange(nextColor);
+            }}
+            onOpacityChange={
+              onOpacityChange
+                ? (nextOpacity) => {
+                    ensureInteractionStarted();
+                    onOpacityChange(nextOpacity);
+                  }
+                : undefined
+            }
+            onInteractionStart={ensureInteractionStarted}
+            showOpacity={showOpacity}
+          />
 
           {showThickness && thickness !== undefined && onThicknessChange && (
             <>
@@ -133,6 +123,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
                     fill="none"
                     stroke={color}
                     strokeWidth={thickness}
+                    opacity={opacity}
                     strokeLinecap={previewStrokeLinecap}
                     strokeLinejoin="round"
                   />
@@ -152,9 +143,12 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
                   defaultValue={[thickness]}
                   value={[thickness]}
                   max={20}
-                  min={1}
+                  min={minThickness}
                   step={1}
-                  onValueChange={(val) => onThicknessChange(val[0])}
+                  onValueChange={(val) => {
+                    ensureInteractionStarted();
+                    onThicknessChange(val[0]);
+                  }}
                 />
                 <div className="text-muted-foreground mt-1 flex justify-between text-xs">
                   <span>Thin</span>
@@ -162,27 +156,6 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
                 </div>
               </div>
             </>
-          )}
-
-          {showOpacity && opacity !== undefined && onOpacityChange && (
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label className="text-sm font-medium">
-                  {t("properties.opacity")}
-                </label>
-                <span className="text-muted-foreground text-xs">
-                  {Math.round(opacity * 100)}%
-                </span>
-              </div>
-              <Slider
-                defaultValue={[opacity]}
-                value={[opacity]}
-                max={1}
-                min={0.05}
-                step={0.05}
-                onValueChange={(val) => onOpacityChange(val[0])}
-              />
-            </div>
           )}
         </div>
       </PopoverContent>

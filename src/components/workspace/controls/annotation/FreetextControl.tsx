@@ -207,6 +207,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
         </Popover>
 
         <ColorPickerPopover
+          paletteType="foreground"
           color={data.color || "#000000"}
           onColorChange={(c) => onUpdate?.(data.id, { color: c })}
           showThickness={false}

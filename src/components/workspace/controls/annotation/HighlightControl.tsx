@@ -117,6 +117,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
     >
       <FloatingToolbar isVisible={!!showToolbar}>
         <ColorPickerPopover
+          paletteType="background"
           color={data.color || "#000000"}
           onColorChange={(c) => onUpdate?.(data.id, { color: c })}
           showThickness={false}
@@ -241,6 +242,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
     >
       <FloatingToolbar isVisible={!!showToolbar}>
         <ColorPickerPopover
+          paletteType="background"
           color={data.color || "#000000"}
           onColorChange={(c) => onUpdate?.(data.id, { color: c })}
           showThickness={false}

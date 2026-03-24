@@ -24,6 +24,7 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
     <ControlWrapper {...props} showBorder={false}>
       <FloatingToolbar isVisible={isSelected}>
         <ColorPickerPopover
+          paletteType="foreground"
           color={data.color || "#000000"}
           onColorChange={(c) => onUpdate?.(data.id, { color: c })}
           showThickness={false}

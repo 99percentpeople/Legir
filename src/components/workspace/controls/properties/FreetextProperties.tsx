@@ -17,6 +17,7 @@ import {
 import { FONT_FAMILY_MAP } from "@/constants";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
+import { ColorPropertyInput } from "./ColorPropertyInput";
 
 export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   data,
@@ -39,11 +40,6 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   }, []);
 
   const displaySize = Math.round((data.size || 12) as number);
-  const displayOpacity = Math.round(((data.opacity ?? 1) as number) * 100);
-  const rotationDeg =
-    typeof data.rotationDeg === "number" ? data.rotationDeg : 0;
-  const displayRotationDeg = Math.round(rotationDeg);
-
   const lineHeightMultiplier =
     typeof data.lineHeight === "number" &&
     Number.isFinite(data.lineHeight) &&
@@ -91,12 +87,15 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
         {/* Color */}
         <div className="space-y-2">
           <Label>{t("properties.color")}</Label>
-          <input
-            type="color"
-            value={data.color || "#000000"}
-            onMouseDown={onTriggerHistorySave}
-            onChange={(e) => onChange({ color: e.target.value })}
-            className="border-input bg-background h-8 w-full cursor-pointer rounded border"
+          <ColorPropertyInput
+            title={t("properties.color")}
+            paletteType="foreground"
+            color={data.color || "#000000"}
+            opacity={data.opacity ?? 1}
+            showOpacity
+            onInteractionStart={onTriggerHistorySave}
+            onColorChange={(color) => onChange({ color })}
+            onOpacityChange={(opacity) => onChange({ opacity })}
           />
         </div>
 
@@ -120,25 +119,25 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
               </Label>
             </div>
           </div>
-          <input
-            type="color"
+          <ColorPropertyInput
+            title={t("properties.background")}
+            paletteType="background"
             disabled={isTransparent}
-            value={data.backgroundColor || "#ffffff"}
-            onMouseDown={onTriggerHistorySave}
-            onChange={(e) => onChange({ backgroundColor: e.target.value })}
-            className="border-input bg-background h-8 w-full cursor-pointer rounded border disabled:opacity-50"
+            color={data.backgroundColor || "#ffffff"}
+            onInteractionStart={onTriggerHistorySave}
+            onColorChange={(backgroundColor) => onChange({ backgroundColor })}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label>{t("properties.border_color")}</Label>
-            <input
-              type="color"
-              value={data.borderColor || "#000000"}
-              onMouseDown={onTriggerHistorySave}
-              onChange={(e) => onChange({ borderColor: e.target.value })}
-              className="border-input bg-background h-8 w-full cursor-pointer rounded border"
+            <ColorPropertyInput
+              title={t("properties.border_color")}
+              paletteType="foreground"
+              color={data.borderColor || "#000000"}
+              onInteractionStart={onTriggerHistorySave}
+              onColorChange={(borderColor) => onChange({ borderColor })}
             />
           </div>
           <div className="space-y-2">
@@ -151,24 +150,6 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
               onChange={(val) => onChange({ borderWidth: val })}
             />
           </div>
-        </div>
-
-        {/* Opacity */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>{t("properties.opacity")}</Label>
-            <span className="text-muted-foreground text-xs">
-              {displayOpacity}%
-            </span>
-          </div>
-          <Slider
-            value={[data.opacity ?? 1]}
-            min={0.05}
-            max={1}
-            step={0.05}
-            onValueCommit={onTriggerHistorySave}
-            onValueChange={(vals) => onChange({ opacity: vals[0] })}
-          />
         </div>
 
         <div className="space-y-2">
@@ -247,23 +228,6 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             step={0.05}
             onValueCommit={onTriggerHistorySave}
             onValueChange={(vals) => onChange({ lineHeight: vals[0] })}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>{t("properties.rotation") || "Rotation"}</Label>
-            <span className="text-muted-foreground text-xs">
-              {displayRotationDeg}°
-            </span>
-          </div>
-          <Slider
-            value={[rotationDeg]}
-            min={-180}
-            max={180}
-            step={1}
-            onValueCommit={onTriggerHistorySave}
-            onValueChange={(vals) => onChange({ rotationDeg: vals[0] })}
           />
         </div>
       </div>

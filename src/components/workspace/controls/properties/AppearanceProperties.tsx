@@ -11,12 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Palette, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { Palette } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { FONT_FAMILY_MAP } from "@/constants";
-import { cn } from "@/utils/cn";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
+import { ColorPropertyInput } from "./ColorPropertyInput";
 
 export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
   data,
@@ -82,15 +82,15 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="color"
+            <ColorPropertyInput
+              title={t("properties.background")}
+              paletteType="background"
               disabled={style.isTransparent}
-              value={style.backgroundColor || "#ffffff"}
-              onMouseDown={onTriggerHistorySave}
-              onChange={(e) =>
-                handleStyleChange("backgroundColor", e.target.value)
+              color={style.backgroundColor || "#ffffff"}
+              onInteractionStart={onTriggerHistorySave}
+              onColorChange={(color) =>
+                handleStyleChange("backgroundColor", color)
               }
-              className="border-input bg-background h-8 w-full cursor-pointer rounded border disabled:opacity-50"
             />
           </div>
         </div>
@@ -99,12 +99,11 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label>{t("properties.border_color")}</Label>
-            <input
-              type="color"
-              value={style.borderColor || "#000000"}
-              onMouseDown={onTriggerHistorySave}
-              onChange={(e) => handleStyleChange("borderColor", e.target.value)}
-              className="border-input bg-background h-8 w-full cursor-pointer rounded border"
+            <ColorPropertyInput
+              title={t("properties.border_color")}
+              color={style.borderColor || "#000000"}
+              onInteractionStart={onTriggerHistorySave}
+              onColorChange={(color) => handleStyleChange("borderColor", color)}
             />
           </div>
           <div className="space-y-2">
@@ -136,14 +135,14 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
               </div>
               <div className="space-y-2">
                 <Label>{t("properties.text_color")}</Label>
-                <input
-                  type="color"
-                  value={style.textColor || "#000000"}
-                  onMouseDown={onTriggerHistorySave}
-                  onChange={(e) =>
-                    handleStyleChange("textColor", e.target.value)
+                <ColorPropertyInput
+                  title={t("properties.text_color")}
+                  paletteType="foreground"
+                  color={style.textColor || "#000000"}
+                  onInteractionStart={onTriggerHistorySave}
+                  onColorChange={(color) =>
+                    handleStyleChange("textColor", color)
                   }
-                  className="border-input bg-background h-8 w-full cursor-pointer rounded border"
                 />
               </div>
             </div>
@@ -193,57 +192,6 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Alignment only for Text fields */}
-            {data.type === FieldType.TEXT && (
-              <div className="space-y-2">
-                <Label>{t("properties.alignment")}</Label>
-                <div className="bg-muted border-input flex rounded-md border p-1">
-                  <button
-                    onClick={() => {
-                      onTriggerHistorySave();
-                      onChange({ alignment: "left" });
-                    }}
-                    className={cn(
-                      "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                      (data.alignment || "left") === "left" &&
-                        "bg-background text-foreground shadow-sm",
-                    )}
-                    title={t("properties.alignment_options.left")}
-                  >
-                    <AlignLeft size={16} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      onTriggerHistorySave();
-                      onChange({ alignment: "center" });
-                    }}
-                    className={cn(
-                      "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                      data.alignment === "center" &&
-                        "bg-background text-foreground shadow-sm",
-                    )}
-                    title={t("properties.alignment_options.center")}
-                  >
-                    <AlignCenter size={16} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      onTriggerHistorySave();
-                      onChange({ alignment: "right" });
-                    }}
-                    className={cn(
-                      "text-foreground/50 hover:bg-background hover:text-foreground flex flex-1 justify-center rounded p-1 transition-colors",
-                      data.alignment === "right" &&
-                        "bg-background text-foreground shadow-sm",
-                    )}
-                    title={t("properties.alignment_options.right")}
-                  >
-                    <AlignRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

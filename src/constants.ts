@@ -124,6 +124,24 @@ export const PEN_COLORS = [
   "#ff80ff", "#ffc680", "#ffff80", "#80ff9e", "#80d6ff", "#bcb3ff",
 ];
 
+export const FOREGROUND_COMMON_COLORS = [
+  "#000000",
+  "#58595b",
+  "#e61b1b",
+  "#ff5500",
+  "#004de6",
+  "#008055",
+] as const;
+
+export const BACKGROUND_COMMON_COLORS = [
+  "#ffffff",
+  "#ffce00",
+  "#ffc680",
+  "#ff80ff",
+  "#80ff9e",
+  "#80d6ff",
+] as const;
+
 export const DEFAULT_FIELD_STYLE = {
   borderColor: "#000000",
   backgroundColor: "#e6f2ff", // Light blue-ish hint by default
@@ -160,6 +178,7 @@ export const ANNOTATION_STYLES = {
     thickness: 2,
     opacity: 1.0,
     backgroundColor: undefined,
+    backgroundOpacity: 1.0,
     arrowSize: 10,
     cloudIntensity: 2,
     cloudSpacing: 28,
@@ -190,6 +209,7 @@ export const PDF_CUSTOM_KEYS = {
   shapeSubType: "FFShapeSubType",
   cloudIntensity: "FFCloudIntensity",
   cloudSpacing: "FFCloudSpacing",
+  shapeFillOpacity: "FFShapeFillOpacity",
   arrowSize: "FFArrowSize",
   startArrowStyle: "FFStartArrowStyle",
   endArrowStyle: "FFEndArrowStyle",

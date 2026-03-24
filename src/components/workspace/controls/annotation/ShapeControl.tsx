@@ -78,13 +78,18 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     typeof data.thickness === "number" && Number.isFinite(data.thickness)
       ? Math.max(0, data.thickness)
       : 2;
-  const opacity =
+  const strokeOpacity =
     typeof data.opacity === "number" && Number.isFinite(data.opacity)
       ? Math.max(0, Math.min(1, data.opacity))
       : 1;
+  const fillOpacity =
+    typeof data.backgroundOpacity === "number" &&
+    Number.isFinite(data.backgroundOpacity)
+      ? Math.max(0, Math.min(1, data.backgroundOpacity))
+      : strokeOpacity;
   const fillColor = data.backgroundColor || "none";
-  const hasStroke = opacity > 0 && strokeWidth > 0;
-  const hasFill = opacity > 0 && fillColor !== "none";
+  const hasStroke = strokeOpacity > 0 && strokeWidth > 0;
+  const hasFill = fillOpacity > 0 && fillColor !== "none";
   const segmentHitWidth = Math.max(12, strokeWidth * 4);
   const hasVertices = shapeSupportsVertices(data.shapeType);
   const isOpenLineShape = isOpenLineShapeType(data.shapeType);
@@ -657,7 +662,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             width={Math.max(1, data.rect!.width - strokeWidth)}
             height={Math.max(1, data.rect!.height - strokeWidth)}
             fill={hasFill ? fillColor : "none"}
+            fillOpacity={hasFill ? fillOpacity : undefined}
             stroke={hasStroke ? strokeColor : "none"}
+            strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
             pointerEvents="all"
             onContextMenu={handleShapeContextMenu}
@@ -672,7 +679,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             rx={Math.max(1, data.rect!.width / 2 - strokeWidth / 2)}
             ry={Math.max(1, data.rect!.height / 2 - strokeWidth / 2)}
             fill={hasFill ? fillColor : "none"}
+            fillOpacity={hasFill ? fillOpacity : undefined}
             stroke={hasStroke ? strokeColor : "none"}
+            strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
             pointerEvents="all"
             onContextMenu={handleShapeContextMenu}
@@ -683,8 +692,10 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
         return (
           <path
             d={cloudPath}
-            fill="none"
+            fill={hasFill ? fillColor : "none"}
+            fillOpacity={hasFill ? fillOpacity : undefined}
             stroke={hasStroke ? strokeColor : "none"}
+            strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
             pointerEvents="all"
             onContextMenu={handleShapeContextMenu}
@@ -698,6 +709,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             d={polyPath}
             fill="none"
             stroke={hasStroke ? strokeColor : "none"}
+            strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -711,7 +723,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
           <path
             d={polyPath}
             fill={hasFill ? fillColor : "none"}
+            fillOpacity={hasFill ? fillOpacity : undefined}
             stroke={hasStroke ? strokeColor : "none"}
+            strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -722,29 +736,19 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
         );
       case "cloud_polygon":
         return (
-          <>
-            {hasFill && (
-              <path
-                d={polyPath}
-                fill={fillColor}
-                stroke="none"
-                pointerEvents="all"
-                onContextMenu={handleShapeContextMenu}
-                {...tooltipHoverProps}
-              />
-            )}
-            <path
-              d={cloudPolygonPath}
-              fill="none"
-              stroke={hasStroke ? strokeColor : "none"}
-              strokeWidth={hasStroke ? strokeWidth : 0}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              pointerEvents="stroke"
-              onContextMenu={handleShapeContextMenu}
-              {...tooltipHoverProps}
-            />
-          </>
+          <path
+            d={cloudPolygonPath}
+            fill={hasFill ? fillColor : "none"}
+            fillOpacity={hasFill ? fillOpacity : undefined}
+            stroke={hasStroke ? strokeColor : "none"}
+            strokeOpacity={hasStroke ? strokeOpacity : undefined}
+            strokeWidth={hasStroke ? strokeWidth : 0}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            pointerEvents={hasFill ? "all" : "stroke"}
+            onContextMenu={handleShapeContextMenu}
+            {...tooltipHoverProps}
+          />
         );
       case "arrow":
         return (
@@ -753,6 +757,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               d={polyPath}
               fill="none"
               stroke={hasStroke ? strokeColor : "none"}
+              strokeOpacity={hasStroke ? strokeOpacity : undefined}
               strokeWidth={hasStroke ? strokeWidth : 0}
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -768,7 +773,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                     ? strokeColor
                     : "none"
                 }
+                fillOpacity={hasStroke ? strokeOpacity : undefined}
                 stroke={hasStroke ? strokeColor : "none"}
+                strokeOpacity={hasStroke ? strokeOpacity : undefined}
                 strokeWidth={hasStroke ? Math.max(1, strokeWidth * 0.9) : 0}
                 strokeLinejoin="round"
                 strokeLinecap="round"
@@ -785,7 +792,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                     ? strokeColor
                     : "none"
                 }
+                fillOpacity={hasStroke ? strokeOpacity : undefined}
                 stroke={hasStroke ? strokeColor : "none"}
+                strokeOpacity={hasStroke ? strokeOpacity : undefined}
                 strokeWidth={hasStroke ? Math.max(1, strokeWidth * 0.9) : 0}
                 strokeLinejoin="round"
                 strokeLinecap="round"
@@ -810,9 +819,11 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     >
       <FloatingToolbar isVisible={isSelected}>
         <ColorPickerPopover
+          paletteType="foreground"
           color={strokeColor}
           thickness={strokeWidth}
-          opacity={opacity}
+          minThickness={0}
+          opacity={strokeOpacity}
           onColorChange={(color) =>
             onUpdate(data.id, {
               color,
@@ -886,7 +897,6 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 height="100%"
                 className="overflow-visible"
                 viewBox={`0 0 ${Math.max(1, data.rect.width)} ${Math.max(1, data.rect.height)}`}
-                opacity={opacity}
               >
                 {renderShape()}
 

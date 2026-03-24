@@ -227,6 +227,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_highlight":
         return (
           <ColorPickerPopover
+            paletteType="background"
             color={
               editorState.highlightStyle?.color ||
               ANNOTATION_STYLES.highlight.color
@@ -269,6 +270,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_ink":
         return (
           <ColorPickerPopover
+            paletteType="foreground"
             color={editorState.penStyle.color}
             thickness={editorState.penStyle.thickness}
             opacity={editorState.penStyle.opacity}
@@ -288,6 +290,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_comment":
         return (
           <ColorPickerPopover
+            paletteType="foreground"
             color={editorState.commentStyle?.color}
             onColorChange={(color) =>
               onCommentStyleChange && onCommentStyleChange({ color })
@@ -307,6 +310,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_freetext":
         return (
           <ColorPickerPopover
+            paletteType="foreground"
             color={editorState.freetextStyle?.color}
             onColorChange={(color) =>
               onFreetextStyleChange && onFreetextStyleChange({ color })
@@ -333,13 +337,15 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_shape_cloud":
         return (
           <ColorPickerPopover
+            paletteType="foreground"
             color={
               editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
             }
             thickness={
-              editorState.shapeStyle?.thickness ||
+              editorState.shapeStyle?.thickness ??
               ANNOTATION_STYLES.shape.thickness
             }
+            minThickness={0}
             opacity={
               editorState.shapeStyle?.opacity ?? ANNOTATION_STYLES.shape.opacity
             }

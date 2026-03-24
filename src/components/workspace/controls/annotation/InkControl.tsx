@@ -69,6 +69,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
               className="pointer-events-auto"
             >
               <ColorPickerPopover
+                paletteType="foreground"
                 color={data.color || "#000000"}
                 onColorChange={(c) => onUpdate?.(data.id, { color: c })}
                 showThickness={false}

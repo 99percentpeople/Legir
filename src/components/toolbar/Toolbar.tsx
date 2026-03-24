@@ -404,6 +404,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   </div>
                 </ToggleGroupItem>
                 <ColorPickerPopover
+                  paletteType="background"
                   color={
                     editorState.highlightStyle?.color ||
                     ANNOTATION_STYLES.highlight.color
@@ -454,6 +455,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     </div>
                   </ToggleGroupItem>
                   <ColorPickerPopover
+                    paletteType="foreground"
                     color={editorState.penStyle.color}
                     thickness={editorState.penStyle.thickness}
                     opacity={editorState.penStyle.opacity}
@@ -487,6 +489,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     </div>
                   </ToggleGroupItem>
                   <ColorPickerPopover
+                    paletteType="foreground"
                     color={editorState.commentStyle?.color}
                     onColorChange={(color) =>
                       onCommentStyleChange && onCommentStyleChange({ color })
@@ -517,6 +520,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     </div>
                   </ToggleGroupItem>
                   <ColorPickerPopover
+                    paletteType="foreground"
                     color={editorState.freetextStyle?.color}
                     onColorChange={(color) =>
                       onFreetextStyleChange && onFreetextStyleChange({ color })
@@ -617,14 +621,16 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     </PopoverContent>
                   </Popover>
                   <ColorPickerPopover
+                    paletteType="foreground"
                     color={
                       editorState.shapeStyle?.color ||
                       ANNOTATION_STYLES.shape.color
                     }
                     thickness={
-                      editorState.shapeStyle?.thickness ||
+                      editorState.shapeStyle?.thickness ??
                       ANNOTATION_STYLES.shape.thickness
                     }
+                    minThickness={0}
                     opacity={
                       editorState.shapeStyle?.opacity ??
                       ANNOTATION_STYLES.shape.opacity

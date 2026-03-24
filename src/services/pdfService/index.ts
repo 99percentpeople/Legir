@@ -959,6 +959,13 @@ const buildPdfLibAnnotsByPageIndex = async (
         cloudSpacingObj instanceof PDFNumber
           ? cloudSpacingObj.asNumber()
           : undefined;
+      const shapeFillOpacityObj = annot.lookup(
+        PDFName.of(PDF_CUSTOM_KEYS.shapeFillOpacity),
+      );
+      const shapeFillOpacity =
+        shapeFillOpacityObj instanceof PDFNumber
+          ? shapeFillOpacityObj.asNumber()
+          : undefined;
       const shapeStrokeColor = pdfObjToString(
         annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeColor)),
       );
@@ -999,6 +1006,7 @@ const buildPdfLibAnnotsByPageIndex = async (
         shapeSubType,
         cloudIntensity,
         cloudSpacing,
+        shapeFillOpacity,
         shapeStrokeColor,
         shapeStrokeWidth,
         arrowSize,

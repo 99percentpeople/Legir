@@ -383,6 +383,7 @@ export const initialState: EditorState = {
     thickness: ANNOTATION_STYLES.shape.thickness,
     opacity: ANNOTATION_STYLES.shape.opacity,
     backgroundColor: ANNOTATION_STYLES.shape.backgroundColor,
+    backgroundOpacity: ANNOTATION_STYLES.shape.backgroundOpacity,
     arrowSize: ANNOTATION_STYLES.shape.arrowSize,
     cloudIntensity: ANNOTATION_STYLES.shape.cloudIntensity,
     cloudSpacing: ANNOTATION_STYLES.shape.cloudSpacing,

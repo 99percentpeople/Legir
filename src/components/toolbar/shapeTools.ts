@@ -21,7 +21,7 @@ export type ShapeTool =
   | "draw_shape_arrow"
   | "draw_shape_cloud";
 
-type ShapeToolGroupId = "box" | "path";
+type ShapeToolGroupId = "box" | "path" | "polygon";
 
 type ShapeToolDefinition = {
   tool: ShapeTool;
@@ -65,13 +65,13 @@ const SHAPE_TOOL_DEFINITIONS: Record<ShapeTool, ShapeToolDefinition> = {
     tool: "draw_shape_polygon",
     labelKey: "toolbar.polygon",
     Icon: Pentagon,
-    group: "path",
+    group: "polygon",
   },
   draw_shape_cloud_polygon: {
     tool: "draw_shape_cloud_polygon",
     labelKey: "toolbar.cloud_polygon",
     Icon: Cloud,
-    group: "path",
+    group: "polygon",
   },
   draw_shape_arrow: {
     tool: "draw_shape_arrow",
@@ -98,14 +98,16 @@ export const SHAPE_TOOL_GROUPS: ReadonlyArray<{
   {
     id: "path",
     labelKey: "toolbar.shape_path_tools",
-    tools: [
-      "draw_shape_line",
-      "draw_shape_polyline",
-      "draw_shape_polygon",
-      "draw_shape_cloud_polygon",
-      "draw_shape_arrow",
-    ],
+    tools: ["draw_shape_line", "draw_shape_polyline", "draw_shape_arrow"],
     columns: 4,
+    slotCount: 4,
+  },
+  {
+    id: "polygon",
+    labelKey: "toolbar.shape_polygon_tools",
+    tools: ["draw_shape_polygon", "draw_shape_cloud_polygon"],
+    columns: 4,
+    slotCount: 4,
   },
 ];
 

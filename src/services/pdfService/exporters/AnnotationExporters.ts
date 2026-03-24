@@ -955,7 +955,7 @@ const registerAppearanceStream = (
   pdfDoc: PDFDocument,
   operators: PDFOperator[],
   bbox: [number, number, number, number],
-  opacity?: number,
+  graphicsStates?: Record<string, number>,
 ) => {
   if (operators.length === 0) return undefined;
 
@@ -970,14 +970,20 @@ const registerAppearanceStream = (
   };
 
   let resourcesObj = pdfDoc.context.obj(baseResources);
-  if (typeof opacity === "number" && opacity < 1) {
-    const gsDict = pdfDoc.context.obj({ CA: opacity, ca: opacity });
-    const gsRef = pdfDoc.context.register(gsDict);
+  const graphicsStateEntries = Object.entries(graphicsStates ?? {}).filter(
+    ([, opacity]) => typeof opacity === "number" && opacity >= 0 && opacity < 1,
+  );
+  if (graphicsStateEntries.length > 0) {
+    const extGState = Object.fromEntries(
+      graphicsStateEntries.map(([name, opacity]) => {
+        const gsDict = pdfDoc.context.obj({ CA: opacity, ca: opacity });
+        const gsRef = pdfDoc.context.register(gsDict);
+        return [name, gsRef];
+      }),
+    );
     resourcesObj = pdfDoc.context.obj({
       ...baseResources,
-      ExtGState: {
-        GS0: gsRef,
-      },
+      ExtGState: extGState,
     });
   }
 
@@ -1003,7 +1009,8 @@ const buildShapeAppearanceOperators = (
   stroke: ReturnType<typeof rgb> | undefined,
   fill: ReturnType<typeof rgb> | undefined,
   thickness: number,
-  graphicsState?: string,
+  strokeGraphicsState?: string,
+  fillGraphicsState?: string,
 ): {
   bbox: [number, number, number, number];
   operators: PDFOperator[];
@@ -1029,37 +1036,80 @@ const buildShapeAppearanceOperators = (
     ];
 
     if (shapeType === "square") {
+      const operators: PDFOperator[] = [];
+      if (fill) {
+        operators.push(
+          ...drawRectangle({
+            x: x + strokeWidth / 2,
+            y: y + strokeWidth / 2,
+            width: Math.max(1, width - strokeWidth),
+            height: Math.max(1, height - strokeWidth),
+            color: fill,
+            rotate: degrees(0),
+            xSkew: degrees(0),
+            ySkew: degrees(0),
+            borderColor: undefined,
+            borderWidth: 0,
+            graphicsState: fillGraphicsState,
+          }),
+        );
+      }
+      if (stroke) {
+        operators.push(
+          ...drawRectangle({
+            x: x + strokeWidth / 2,
+            y: y + strokeWidth / 2,
+            width: Math.max(1, width - strokeWidth),
+            height: Math.max(1, height - strokeWidth),
+            color: undefined,
+            rotate: degrees(0),
+            xSkew: degrees(0),
+            ySkew: degrees(0),
+            borderColor: stroke,
+            borderWidth: strokeWidth,
+            graphicsState: strokeGraphicsState,
+          }),
+        );
+      }
       return {
         bbox: baseBBox,
-        operators: drawRectangle({
-          x: x + strokeWidth / 2,
-          y: y + strokeWidth / 2,
-          width: Math.max(1, width - strokeWidth),
-          height: Math.max(1, height - strokeWidth),
-          color: fill,
-          rotate: degrees(0),
-          xSkew: degrees(0),
-          ySkew: degrees(0),
-          borderColor: stroke,
-          borderWidth: strokeWidth,
-          graphicsState,
-        }),
+        operators,
       };
     }
 
     if (shapeType === "circle") {
+      const operators: PDFOperator[] = [];
+      if (fill) {
+        operators.push(
+          ...drawEllipse({
+            x: x + width / 2,
+            y: y + height / 2,
+            xScale: Math.max(1, width / 2 - strokeWidth / 2),
+            yScale: Math.max(1, height / 2 - strokeWidth / 2),
+            color: fill,
+            borderColor: undefined,
+            borderWidth: 0,
+            graphicsState: fillGraphicsState,
+          }),
+        );
+      }
+      if (stroke) {
+        operators.push(
+          ...drawEllipse({
+            x: x + width / 2,
+            y: y + height / 2,
+            xScale: Math.max(1, width / 2 - strokeWidth / 2),
+            yScale: Math.max(1, height / 2 - strokeWidth / 2),
+            color: undefined,
+            borderColor: stroke,
+            borderWidth: strokeWidth,
+            graphicsState: strokeGraphicsState,
+          }),
+        );
+      }
       return {
         bbox: baseBBox,
-        operators: drawEllipse({
-          x: x + width / 2,
-          y: y + height / 2,
-          xScale: Math.max(1, width / 2 - strokeWidth / 2),
-          yScale: Math.max(1, height / 2 - strokeWidth / 2),
-          color: fill,
-          borderColor: stroke,
-          borderWidth: strokeWidth,
-          graphicsState,
-        }),
+        operators,
       };
     }
 
@@ -1093,17 +1143,37 @@ const buildShapeAppearanceOperators = (
       geometry.spacing,
     );
 
+    const operators: PDFOperator[] = [];
+    if (fill) {
+      operators.push(
+        ...drawSvgPath(svgPath, {
+          x: bbox[0],
+          y: bbox[3],
+          scale: 1,
+          color: fill,
+          borderColor: undefined,
+          borderWidth: 0,
+          graphicsState: fillGraphicsState,
+        }),
+      );
+    }
+    if (stroke) {
+      operators.push(
+        ...drawSvgPath(svgPath, {
+          x: bbox[0],
+          y: bbox[3],
+          scale: 1,
+          color: undefined,
+          borderColor: stroke,
+          borderWidth: strokeWidth,
+          graphicsState: strokeGraphicsState,
+        }),
+      );
+    }
+
     return {
       bbox,
-      operators: drawSvgPath(svgPath, {
-        x: bbox[0],
-        y: bbox[3],
-        scale: 1,
-        color: undefined,
-        borderColor: stroke,
-        borderWidth: strokeWidth,
-        graphicsState,
-      }),
+      operators,
       rectInset: geometry.overflow,
     };
   }
@@ -1167,57 +1237,71 @@ const buildShapeAppearanceOperators = (
   const operators: PDFOperator[] = [];
 
   if (shapeType === "cloud_polygon") {
+    const localCloudGeometry = getPolygonCloudGeometry(localPoints, {
+      intensity: cloudIntensity,
+      strokeWidth,
+      spacing: cloudSpacing,
+    });
     if (fill) {
       operators.push(
-        ...drawSvgPath(getShapePointsPathData(localPoints, { closed: true }), {
+        ...drawSvgPath(localCloudGeometry.pathData, {
           x: bbox[0],
           y: bbox[3],
           scale: 1,
           color: fill,
           borderColor: undefined,
           borderWidth: 0,
-          graphicsState,
+          borderLineCap: 1,
+          graphicsState: fillGraphicsState,
+        }),
+      );
+    }
+    if (stroke) {
+      operators.push(
+        ...drawSvgPath(localCloudGeometry.pathData, {
+          x: bbox[0],
+          y: bbox[3],
+          scale: 1,
+          color: undefined,
+          borderColor: stroke,
+          borderWidth: strokeWidth,
+          borderLineCap: 1,
+          graphicsState: strokeGraphicsState,
         }),
       );
     }
   } else {
-    operators.push(
-      ...drawSvgPath(
-        getShapePointsPathData(trimmedLocalPoints, {
-          closed: isClosedShapeType(shapeType),
-        }),
-        {
+    const pathData = getShapePointsPathData(trimmedLocalPoints, {
+      closed: isClosedShapeType(shapeType),
+    });
+    if (shapeType === "polygon" && fill) {
+      operators.push(
+        ...drawSvgPath(pathData, {
           x: bbox[0],
           y: bbox[3],
           scale: 1,
-          color: shapeType === "polygon" ? fill : undefined,
+          color: fill,
+          borderColor: undefined,
+          borderWidth: 0,
+          borderLineCap: 1,
+          graphicsState: fillGraphicsState,
+        }),
+      );
+    }
+    if (stroke) {
+      operators.push(
+        ...drawSvgPath(pathData, {
+          x: bbox[0],
+          y: bbox[3],
+          scale: 1,
+          color: undefined,
           borderColor: stroke,
           borderWidth: strokeWidth,
           borderLineCap: 1,
-          graphicsState,
-        },
-      ),
-    );
-  }
-
-  if (shapeType === "cloud_polygon" && stroke && strokeWidth > 0) {
-    const localCloudGeometry = getPolygonCloudGeometry(localPoints, {
-      intensity: cloudIntensity,
-      strokeWidth,
-      spacing: cloudSpacing,
-    });
-    operators.push(
-      ...drawSvgPath(localCloudGeometry.pathData, {
-        x: bbox[0],
-        y: bbox[3],
-        scale: 1,
-        color: undefined,
-        borderColor: stroke,
-        borderWidth: strokeWidth,
-        borderLineCap: 1,
-        graphicsState,
-      }),
-    );
+          graphicsState: strokeGraphicsState,
+        }),
+      );
+    }
   }
 
   if (hasAnyArrow) {
@@ -1249,7 +1333,7 @@ const buildShapeAppearanceOperators = (
           borderColor: stroke,
           borderWidth: Math.max(1, strokeWidth * 0.9),
           borderLineCap: 1,
-          graphicsState,
+          graphicsState: strokeGraphicsState,
         }),
       );
     }
@@ -1283,14 +1367,23 @@ export class ShapeExporter implements IAnnotationExporter {
       Number.isFinite(annotation.thickness)
         ? Math.max(0, annotation.thickness)
         : 2;
+    const strokeOpacity =
+      typeof annotation.opacity === "number"
+        ? Math.min(1, Math.max(0, annotation.opacity))
+        : 1;
+    const fillOpacity =
+      typeof annotation.backgroundOpacity === "number"
+        ? Math.min(1, Math.max(0, annotation.backgroundOpacity))
+        : strokeOpacity;
     const stroke =
-      thickness > 0
+      strokeOpacity > 0 && thickness > 0
         ? hexToPdfColor(annotation.color || "#000000") || rgb(0, 0, 0)
         : undefined;
     const arrowStyles = getShapeArrowStyles(annotation);
-    const fill = annotation.backgroundColor
-      ? hexToPdfColor(annotation.backgroundColor)
-      : undefined;
+    const fill =
+      fillOpacity > 0 && annotation.backgroundColor
+        ? hexToPdfColor(annotation.backgroundColor)
+        : undefined;
     const hasStroke = !!stroke && thickness > 0;
     const hasFill = !!fill;
 
@@ -1298,12 +1391,14 @@ export class ShapeExporter implements IAnnotationExporter {
       return;
     }
 
-    const opacity =
-      typeof annotation.opacity === "number"
-        ? Math.min(1, Math.max(0, annotation.opacity))
-        : undefined;
-    const graphicsState =
-      typeof opacity === "number" && opacity < 1 ? "GS0" : undefined;
+    const strokeGraphicsState =
+      hasStroke && strokeOpacity < 1 ? "GS_STROKE" : undefined;
+    const fillGraphicsState =
+      hasFill && fillOpacity < 1 ? "GS_FILL" : undefined;
+    const appearanceGraphicsStates = {
+      ...(strokeGraphicsState ? { [strokeGraphicsState]: strokeOpacity } : {}),
+      ...(fillGraphicsState ? { [fillGraphicsState]: fillOpacity } : {}),
+    };
     const suppressNativeCloudPolygonStroke =
       annotation.shapeType === "cloud_polygon";
     const nativeStroke = suppressNativeCloudPolygonStroke ? undefined : stroke;
@@ -1320,14 +1415,13 @@ export class ShapeExporter implements IAnnotationExporter {
       C: nativeStroke
         ? [nativeStroke.red, nativeStroke.green, nativeStroke.blue]
         : undefined,
-      CA: opacity,
+      CA: hasStroke ? strokeOpacity : hasFill ? fillOpacity : undefined,
       BS: { W: nativeBorderWidth, S: PDFName.of("S") },
       IC:
         fill &&
         annotation.shapeType !== "arrow" &&
         annotation.shapeType !== "line" &&
-        annotation.shapeType !== "polyline" &&
-        annotation.shapeType !== "cloud"
+        annotation.shapeType !== "polyline"
           ? [fill.red, fill.green, fill.blue]
           : undefined,
       P: page.ref,
@@ -1359,7 +1453,8 @@ export class ShapeExporter implements IAnnotationExporter {
         stroke,
         fill,
         thickness,
-        graphicsState,
+        strokeGraphicsState,
+        fillGraphicsState,
       );
       const rectValues =
         annotation.shapeType === "cloud" && appearance
@@ -1375,7 +1470,7 @@ export class ShapeExporter implements IAnnotationExporter {
             pdfDoc,
             appearance.operators,
             appearance.bbox,
-            opacity,
+            appearanceGraphicsStates,
           )
         : undefined;
       const shapeAnnot = pdfDoc.context.obj({
@@ -1405,6 +1500,16 @@ export class ShapeExporter implements IAnnotationExporter {
         shapeAnnot.set(
           PDFName.of("AP"),
           pdfDoc.context.obj({ N: appearanceRef }),
+        );
+      }
+      if (
+        shapeAnnot instanceof PDFDict &&
+        hasFill &&
+        typeof fillOpacity === "number"
+      ) {
+        shapeAnnot.set(
+          PDFName.of(PDF_CUSTOM_KEYS.shapeFillOpacity),
+          pdfDoc.context.obj(fillOpacity),
         );
       }
       if (
@@ -1440,7 +1545,7 @@ export class ShapeExporter implements IAnnotationExporter {
       maxY = Math.max(maxY, point.y);
     }
 
-    const hasAnyArrow = !!arrowStyles.start || !!arrowStyles.end;
+    const hasAnyArrow = hasStroke && (!!arrowStyles.start || !!arrowStyles.end);
     const resolvedArrowSize =
       typeof annotation.arrowSize === "number" &&
       Number.isFinite(annotation.arrowSize)
@@ -1448,7 +1553,9 @@ export class ShapeExporter implements IAnnotationExporter {
         : getDefaultArrowSize(thickness);
     const linePadding = hasAnyArrow
       ? Math.max(thickness, resolvedArrowSize)
-      : thickness;
+      : hasStroke
+        ? thickness
+        : 0;
     const paddedRect: [number, number, number, number] = [
       minX - linePadding,
       minY - linePadding,
@@ -1466,14 +1573,15 @@ export class ShapeExporter implements IAnnotationExporter {
       stroke,
       fill,
       thickness,
-      graphicsState,
+      strokeGraphicsState,
+      fillGraphicsState,
     );
     const appearanceRef = appearance
       ? registerAppearanceStream(
           pdfDoc,
           appearance.operators,
           appearance.bbox,
-          opacity,
+          appearanceGraphicsStates,
         )
       : undefined;
 
@@ -1585,6 +1693,16 @@ export class ShapeExporter implements IAnnotationExporter {
       shapeAnnot.set(
         PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle),
         PDFName.of(arrowStyles.end),
+      );
+    }
+    if (
+      shapeAnnot instanceof PDFDict &&
+      hasFill &&
+      typeof fillOpacity === "number"
+    ) {
+      shapeAnnot.set(
+        PDFName.of(PDF_CUSTOM_KEYS.shapeFillOpacity),
+        pdfDoc.context.obj(fillOpacity),
       );
     }
     if (
