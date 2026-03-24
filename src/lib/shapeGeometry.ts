@@ -908,12 +908,24 @@ export const getCloudPathData = (
 const getCloudBumpRatio = (intensity = 2) =>
   Math.max(0.18, Math.min(0.38, 0.18 + (intensity - 1) * 0.08));
 
+const getPolygonSignedArea = (points: ShapePoint[]) => {
+  let signedArea = 0;
+
+  for (let index = 0; index < points.length; index++) {
+    const current = points[index]!;
+    const next = points[(index + 1) % points.length]!;
+    signedArea += current.x * next.y - next.x * current.y;
+  }
+
+  return signedArea / 2;
+};
+
 const getPolygonCloudCentroid = (points: ShapePoint[]) => {
   if (!points.length) {
     return { x: 0, y: 0 };
   }
 
-  let signedArea = 0;
+  const signedArea = getPolygonSignedArea(points);
   let centroidX = 0;
   let centroidY = 0;
 
@@ -921,7 +933,6 @@ const getPolygonCloudCentroid = (points: ShapePoint[]) => {
     const current = points[index]!;
     const next = points[(index + 1) % points.length]!;
     const cross = current.x * next.y - next.x * current.y;
-    signedArea += cross;
     centroidX += (current.x + next.x) * cross;
     centroidY += (current.y + next.y) * cross;
   }
@@ -945,6 +956,49 @@ const getPolygonCloudCentroid = (points: ShapePoint[]) => {
     x: centroidX * factor,
     y: centroidY * factor,
   };
+};
+
+const getPolygonSegmentOutwardNormal = (args: {
+  dx: number;
+  dy: number;
+  length: number;
+  bump: number;
+  start: ShapePoint;
+  signedArea: number;
+  centroid: ShapePoint | null;
+}) => {
+  const { dx, dy, length, bump, start, signedArea, centroid } = args;
+  const leftNormal = { x: -dy / length, y: dx / length };
+  const rightNormal = { x: dy / length, y: -dx / length };
+
+  if (Math.abs(signedArea) >= 0.001) {
+    return signedArea >= 0 ? rightNormal : leftNormal;
+  }
+
+  if (!centroid) {
+    return rightNormal;
+  }
+
+  const midPoint = {
+    x: start.x + dx / 2,
+    y: start.y + dy / 2,
+  };
+  const leftDistance = distanceSquared(
+    {
+      x: midPoint.x + leftNormal.x * bump,
+      y: midPoint.y + leftNormal.y * bump,
+    },
+    centroid,
+  );
+  const rightDistance = distanceSquared(
+    {
+      x: midPoint.x + rightNormal.x * bump,
+      y: midPoint.y + rightNormal.y * bump,
+    },
+    centroid,
+  );
+
+  return leftDistance >= rightDistance ? leftNormal : rightNormal;
 };
 
 export const getPolygonCloudGeometry = (
@@ -977,7 +1031,9 @@ export const getPolygonCloudGeometry = (
     };
   }
 
-  const centroid = getPolygonCloudCentroid(points);
+  const signedArea = getPolygonSignedArea(points);
+  const centroid =
+    Math.abs(signedArea) < 0.001 ? getPolygonCloudCentroid(points) : null;
   const commands = [`M ${points[0]!.x} ${points[0]!.y}`];
   let maxBump = 0;
   let hasSegment = false;
@@ -998,28 +1054,15 @@ export const getPolygonCloudGeometry = (
     const step = length / segmentCount;
     const bump = Math.max(4, step * ratio);
     maxBump = Math.max(maxBump, bump);
-    const leftNormal = { x: -dy / length, y: dx / length };
-    const rightNormal = { x: dy / length, y: -dx / length };
-    const midPoint = {
-      x: start.x + dx / 2,
-      y: start.y + dy / 2,
-    };
-    const leftDistance = distanceSquared(
-      {
-        x: midPoint.x + leftNormal.x * bump,
-        y: midPoint.y + leftNormal.y * bump,
-      },
+    const outwardNormal = getPolygonSegmentOutwardNormal({
+      dx,
+      dy,
+      length,
+      bump,
+      start,
+      signedArea,
       centroid,
-    );
-    const rightDistance = distanceSquared(
-      {
-        x: midPoint.x + rightNormal.x * bump,
-        y: midPoint.y + rightNormal.y * bump,
-      },
-      centroid,
-    );
-    const outwardNormal =
-      leftDistance >= rightDistance ? leftNormal : rightNormal;
+    });
 
     for (let segmentOffset = 0; segmentOffset < segmentCount; segmentOffset++) {
       const endT = (segmentOffset + 1) / segmentCount;
