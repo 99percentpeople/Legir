@@ -30,7 +30,7 @@ import {
   getShapeTypeWithoutArrow,
   getCloudGeometry,
   getCloudPathData,
-  getPolygonCloudPathData,
+  getPolygonCloudGeometry,
   getRectAndNormalizedShapePoints,
   getShapeAbsolutePoints,
   isClosedShapeType,
@@ -57,6 +57,8 @@ import { ControlLayerMenuItems } from "../ControlLayerMenuItems";
 import { ControlWrapper } from "../ControlWrapper";
 import type { AnnotationControlProps } from "../types";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
+
+const HIT_TEST_PAINT = "rgba(0, 0, 0, 0.001)";
 
 export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const {
@@ -224,14 +226,13 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     data.shapeType,
     strokeWidth,
   ]);
-  const cloudPolygonPath = useMemo(() => {
-    if (data.shapeType !== "cloud_polygon") return "";
-    return getPolygonCloudPathData(
-      localPoints,
-      data.cloudIntensity,
-      data.cloudSpacing,
+  const cloudPolygonGeometry = useMemo(() => {
+    if (data.shapeType !== "cloud_polygon") return null;
+    return getPolygonCloudGeometry(localPoints, {
+      intensity: data.cloudIntensity,
+      spacing: data.cloudSpacing,
       strokeWidth,
-    );
+    });
   }, [
     data.cloudIntensity,
     data.cloudSpacing,
@@ -239,6 +240,12 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     localPoints,
     strokeWidth,
   ]);
+  const cloudPolygonPath =
+    data.shapeType === "cloud_polygon"
+      ? (cloudPolygonGeometry?.pathData ?? "")
+      : "";
+  const cloudPolygonSelectionSegments =
+    cloudPolygonGeometry?.segmentPaths ?? [];
 
   const [contextState, setContextState] = useState<{
     point: { x: number; y: number } | null;
@@ -454,6 +461,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const canEditShapePoints =
     isSelectable &&
     isAnnotationMode &&
+    isSelected &&
     shapeSupportsVertexInsertion(data.shapeType);
   const canShowLayerContextMenu = isSelectable && isAnnotationMode;
 
@@ -652,6 +660,27 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     });
   };
 
+  const handleSelectionHitPointerDown = (
+    event: React.PointerEvent<SVGElement>,
+  ) => {
+    if (!isSelectable) return;
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    props.onSelect(data.id);
+    props.onPointerDown?.(event);
+  };
+
+  const contentHitAreaProps = {
+    style: isSelectable ? { cursor: "pointer" } : undefined,
+    onContextMenu: handleShapeContextMenu,
+    ...tooltipHoverProps,
+  };
+  const selectionHitAreaProps = {
+    onPointerDown: handleSelectionHitPointerDown,
+    ...contentHitAreaProps,
+  };
+
   const renderShape = () => {
     switch (data.shapeType) {
       case "square":
@@ -666,9 +695,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
-            pointerEvents="all"
-            onContextMenu={handleShapeContextMenu}
-            {...tooltipHoverProps}
+            pointerEvents={hasFill ? "all" : "stroke"}
+            {...contentHitAreaProps}
           />
         );
       case "circle":
@@ -683,9 +711,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
-            pointerEvents="all"
-            onContextMenu={handleShapeContextMenu}
-            {...tooltipHoverProps}
+            pointerEvents={hasFill ? "all" : "stroke"}
+            {...contentHitAreaProps}
           />
         );
       case "cloud":
@@ -697,9 +724,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
-            pointerEvents="all"
-            onContextMenu={handleShapeContextMenu}
-            {...tooltipHoverProps}
+            pointerEvents={hasFill ? "all" : "stroke"}
+            {...contentHitAreaProps}
           />
         );
       case "line":
@@ -714,8 +740,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             strokeLinejoin="round"
             strokeLinecap="round"
             pointerEvents="stroke"
-            onContextMenu={handleShapeContextMenu}
-            {...tooltipHoverProps}
+            {...contentHitAreaProps}
           />
         );
       case "polygon":
@@ -729,9 +754,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             strokeWidth={hasStroke ? strokeWidth : 0}
             strokeLinejoin="round"
             strokeLinecap="round"
-            pointerEvents="all"
-            onContextMenu={handleShapeContextMenu}
-            {...tooltipHoverProps}
+            pointerEvents={hasFill ? "all" : "stroke"}
+            {...contentHitAreaProps}
           />
         );
       case "cloud_polygon":
@@ -746,8 +770,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             strokeLinejoin="round"
             strokeLinecap="round"
             pointerEvents={hasFill ? "all" : "stroke"}
-            onContextMenu={handleShapeContextMenu}
-            {...tooltipHoverProps}
+            {...contentHitAreaProps}
           />
         );
       case "arrow":
@@ -762,8 +785,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               strokeLinejoin="round"
               strokeLinecap="round"
               pointerEvents="stroke"
-              onContextMenu={handleShapeContextMenu}
-              {...tooltipHoverProps}
+              {...contentHitAreaProps}
             />
             {startArrowMarker && (
               <path
@@ -780,8 +802,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 pointerEvents="all"
-                onContextMenu={handleShapeContextMenu}
-                {...tooltipHoverProps}
+                {...contentHitAreaProps}
               />
             )}
             {endArrowMarker && (
@@ -799,8 +820,165 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 pointerEvents="all"
-                onContextMenu={handleShapeContextMenu}
-                {...tooltipHoverProps}
+                {...contentHitAreaProps}
+              />
+            )}
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderSelectionHitArea = () => {
+    switch (data.shapeType) {
+      case "square":
+        return (
+          <rect
+            x={strokeWidth / 2}
+            y={strokeWidth / 2}
+            width={Math.max(1, data.rect!.width - strokeWidth)}
+            height={Math.max(1, data.rect!.height - strokeWidth)}
+            fill={hasFill ? HIT_TEST_PAINT : "none"}
+            fillOpacity={hasFill ? 1 : undefined}
+            stroke={HIT_TEST_PAINT}
+            strokeWidth={segmentHitWidth}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents={hasFill ? "all" : "stroke"}
+            {...selectionHitAreaProps}
+          />
+        );
+      case "circle":
+        return (
+          <ellipse
+            cx={data.rect!.width / 2}
+            cy={data.rect!.height / 2}
+            rx={Math.max(1, data.rect!.width / 2 - strokeWidth / 2)}
+            ry={Math.max(1, data.rect!.height / 2 - strokeWidth / 2)}
+            fill={hasFill ? HIT_TEST_PAINT : "none"}
+            fillOpacity={hasFill ? 1 : undefined}
+            stroke={HIT_TEST_PAINT}
+            strokeWidth={segmentHitWidth}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents={hasFill ? "all" : "stroke"}
+            {...selectionHitAreaProps}
+          />
+        );
+      case "cloud":
+        return (
+          <path
+            d={cloudPath}
+            fill={hasFill ? HIT_TEST_PAINT : "none"}
+            fillOpacity={hasFill ? 1 : undefined}
+            stroke={HIT_TEST_PAINT}
+            strokeWidth={segmentHitWidth}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents={hasFill ? "all" : "stroke"}
+            {...selectionHitAreaProps}
+          />
+        );
+      case "line":
+      case "polyline":
+        return (
+          <path
+            d={polyPath}
+            fill="none"
+            stroke={HIT_TEST_PAINT}
+            strokeWidth={segmentHitWidth}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="stroke"
+            {...selectionHitAreaProps}
+          />
+        );
+      case "polygon":
+        return (
+          <path
+            d={polyPath}
+            fill={hasFill ? HIT_TEST_PAINT : "none"}
+            fillOpacity={hasFill ? 1 : undefined}
+            stroke={HIT_TEST_PAINT}
+            strokeWidth={segmentHitWidth}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents={hasFill ? "all" : "stroke"}
+            {...selectionHitAreaProps}
+          />
+        );
+      case "cloud_polygon":
+        return hasFill ? (
+          <path
+            d={cloudPolygonPath}
+            fill={HIT_TEST_PAINT}
+            fillOpacity={1}
+            stroke={HIT_TEST_PAINT}
+            strokeWidth={segmentHitWidth}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="all"
+            {...selectionHitAreaProps}
+          />
+        ) : (
+          <>
+            {cloudPolygonSelectionSegments.map((segmentPath, index) => (
+              <path
+                key={`${data.id}_cloud_hit_${index}`}
+                d={segmentPath}
+                fill="none"
+                stroke={HIT_TEST_PAINT}
+                strokeWidth={segmentHitWidth}
+                strokeLinejoin="round"
+                strokeLinecap="butt"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="stroke"
+                {...selectionHitAreaProps}
+              />
+            ))}
+          </>
+        );
+      case "arrow":
+        return (
+          <>
+            <path
+              d={polyPath}
+              fill="none"
+              stroke={HIT_TEST_PAINT}
+              strokeWidth={segmentHitWidth}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="stroke"
+              {...selectionHitAreaProps}
+            />
+            {startArrowMarker && (
+              <path
+                d={startArrowMarker.pathData}
+                fill={HIT_TEST_PAINT}
+                stroke={HIT_TEST_PAINT}
+                strokeWidth={Math.max(6, segmentHitWidth * 0.75)}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="all"
+                {...selectionHitAreaProps}
+              />
+            )}
+            {endArrowMarker && (
+              <path
+                d={endArrowMarker.pathData}
+                fill={HIT_TEST_PAINT}
+                stroke={HIT_TEST_PAINT}
+                strokeWidth={Math.max(6, segmentHitWidth * 0.75)}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="all"
+                {...selectionHitAreaProps}
               />
             )}
           </>
@@ -816,6 +994,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       showBorder={isSelected}
       resizable={!hasVertices}
       contextMenuDisabled={true}
+      className={!isSelected ? "pointer-events-none" : undefined}
     >
       <FloatingToolbar isVisible={isSelected}>
         <ColorPickerPopover
@@ -899,6 +1078,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 viewBox={`0 0 ${Math.max(1, data.rect.width)} ${Math.max(1, data.rect.height)}`}
               >
                 {renderShape()}
+
+                {!isSelected && renderSelectionHitArea()}
 
                 {canEditShapePoints &&
                   segmentTargets.map((segment) => (

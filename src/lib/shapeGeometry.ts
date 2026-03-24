@@ -5,6 +5,14 @@ export type ShapeRect = { x: number; y: number; width: number; height: number };
 export type ShapeType = NonNullable<Annotation["shapeType"]>;
 export type ShapeArrowStyle = NonNullable<Annotation["shapeStartArrowStyle"]>;
 export type ShapeArrowEndpoint = "start" | "end";
+export type PolygonCloudGeometry = {
+  intensity: number;
+  strokeWidth: number;
+  spacing: number;
+  overflow: number;
+  pathData: string;
+  segmentPaths: string[];
+};
 
 export const SHAPE_ARROW_STYLE_OPTIONS: ShapeArrowStyle[] = [
   "closed_arrow",
@@ -1009,7 +1017,7 @@ export const getPolygonCloudGeometry = (
     strokeWidth?: number;
     spacing?: number;
   },
-) => {
+): PolygonCloudGeometry => {
   const intensity =
     typeof options?.intensity === "number" && Number.isFinite(options.intensity)
       ? options.intensity
@@ -1029,6 +1037,7 @@ export const getPolygonCloudGeometry = (
       spacing,
       overflow: strokeWidth / 2,
       pathData: getShapePointsPathData(points, { closed: true }),
+      segmentPaths: [],
     };
   }
 
@@ -1036,6 +1045,7 @@ export const getPolygonCloudGeometry = (
   const centroid =
     Math.abs(signedArea) < 0.001 ? getPolygonCloudCentroid(points) : null;
   const commands = [`M ${points[0]!.x} ${points[0]!.y}`];
+  const segmentPaths: string[] = [];
   let maxBump = 0;
   let hasSegment = false;
 
@@ -1066,8 +1076,13 @@ export const getPolygonCloudGeometry = (
     });
 
     for (let segmentOffset = 0; segmentOffset < segmentCount; segmentOffset++) {
+      const startT = segmentOffset / segmentCount;
       const endT = (segmentOffset + 1) / segmentCount;
       const controlT = (segmentOffset + 0.5) / segmentCount;
+      const segmentStart = {
+        x: start.x + dx * startT,
+        y: start.y + dy * startT,
+      };
       const segmentEnd = {
         x: start.x + dx * endT,
         y: start.y + dy * endT,
@@ -1079,6 +1094,9 @@ export const getPolygonCloudGeometry = (
       commands.push(
         `Q ${controlPoint.x} ${controlPoint.y} ${segmentEnd.x} ${segmentEnd.y}`,
       );
+      segmentPaths.push(
+        `M ${segmentStart.x} ${segmentStart.y} Q ${controlPoint.x} ${controlPoint.y} ${segmentEnd.x} ${segmentEnd.y}`,
+      );
     }
   }
 
@@ -1089,6 +1107,7 @@ export const getPolygonCloudGeometry = (
       spacing,
       overflow: strokeWidth / 2,
       pathData: getShapePointsPathData(points, { closed: true }),
+      segmentPaths: [],
     };
   }
 
@@ -1100,6 +1119,7 @@ export const getPolygonCloudGeometry = (
     spacing,
     overflow: maxBump + strokeWidth / 2,
     pathData: commands.join(" "),
+    segmentPaths,
   };
 };
 
