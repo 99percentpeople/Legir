@@ -7,6 +7,7 @@ const zhCN = {
     processing: "处理中...",
     actions: {
       cancel: "取消",
+      done: "完成",
       continue: "继续",
       save: "保存",
       delete: "删除",
@@ -35,6 +36,7 @@ const zhCN = {
     undo: "撤销 (Ctrl+Z)",
     redo: "重做 (Ctrl+Y)",
     select: "选择",
+    select_text: "选字",
     pan: "拖动",
     text: "文本",
     checkbox: "复选框",

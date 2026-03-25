@@ -260,7 +260,10 @@ export const useWorkspaceTextSelection = (opts: {
   );
 
   const updateTextSelectionToolbar = useCallback(() => {
-    if (editorState.tool !== "select" || editorState.mode !== "annotation") {
+    if (
+      (editorState.tool !== "select" && editorState.tool !== "select_text") ||
+      editorState.mode !== "annotation"
+    ) {
       setTextSelectionToolbar((prev) =>
         prev.isVisible ? { ...prev, isVisible: false } : prev,
       );
@@ -551,7 +554,7 @@ export const useWorkspaceTextSelection = (opts: {
     (e) => {
       const state = editorStateRef.current;
       if (!state) return;
-      if (state.tool !== "select") return;
+      if (state.tool !== "select" && state.tool !== "select_text") return;
       const target = e.target as HTMLElement | null;
       if (target?.closest?.(".textLayer")) {
         isTextSelectingRef.current = true;

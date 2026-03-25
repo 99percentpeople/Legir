@@ -7,6 +7,7 @@ const en = {
     processing: "Processing...",
     actions: {
       cancel: "Cancel",
+      done: "Done",
       continue: "Continue",
       save: "Save",
       delete: "Delete",
@@ -35,6 +36,7 @@ const en = {
     undo: "Undo (Ctrl+Z)",
     redo: "Redo (Ctrl+Y)",
     select: "Select",
+    select_text: "Select Text",
     pan: "Pan",
     text: "Text",
     checkbox: "Checkbox",

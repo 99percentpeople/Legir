@@ -75,6 +75,21 @@
   color: transparent;
 }
 
+.textLayer[data-selectable="false"] {
+  pointer-events: none;
+}
+
+.textLayer[data-selectable="false"] :is(span, br) {
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.textLayer[data-selectable="true"],
+.textLayer[data-selectable="true"] :is(span, br) {
+  -webkit-touch-callout: none;
+}
+
 .ff-pdf-search-hit-rect {
   --ff-search-hit-bg: color-mix(in srgb, #ffce00 30%, transparent);
   --ff-search-hit-active-bg: color-mix(in srgb, #ff9f0a 40%, transparent);

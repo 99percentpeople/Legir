@@ -5,6 +5,7 @@ const ja = {
     processing: "処理中...",
     actions: {
       cancel: "キャンセル",
+      done: "完了",
       continue: "続ける",
       save: "保存",
       delete: "削除",
@@ -33,6 +34,7 @@ const ja = {
     undo: "元に戻す (Ctrl+Z)",
     redo: "やり直し (Ctrl+Y)",
     select: "選択",
+    select_text: "テキスト選択",
     pan: "移動",
     text: "テキスト",
     checkbox: "チェックボックス",

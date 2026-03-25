@@ -5,6 +5,7 @@ const de = {
     processing: "Verarbeitung...",
     actions: {
       cancel: "Abbrechen",
+      done: "Fertig",
       continue: "Fortfahren",
       save: "Speichern",
       delete: "Löschen",
@@ -33,6 +34,7 @@ const de = {
     undo: "Rückgängig (Ctrl+Z)",
     redo: "Wiederholen (Ctrl+Y)",
     select: "Auswählen",
+    select_text: "Text auswählen",
     pan: "Verschieben",
     text: "Text",
     checkbox: "Kontrollkästchen",

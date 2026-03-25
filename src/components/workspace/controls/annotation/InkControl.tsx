@@ -57,7 +57,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
     <ControlWrapper
       {...props}
       customRect={bounds}
-      className="pointer-events-none"
+      className={isSelected ? undefined : "pointer-events-none"}
       showBorder={isSelected}
       resizable={false}
     >

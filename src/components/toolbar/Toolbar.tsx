@@ -27,6 +27,7 @@ import {
   PenStyle,
   Tool,
 } from "@/types";
+import { isToolMobileOnly } from "@/lib/tool-behavior";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { cn } from "@/utils/cn";
@@ -144,6 +145,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   const { t } = useLanguage();
   const { mode, tool } = editorState;
+  const toolbarTool = isToolMobileOnly(tool) ? "select" : tool;
   const hasSaveAs = useRef(canSaveAs());
   const { documentSaveMode } = usePlatformUi();
   const tauri = documentSaveMode === "file";
@@ -291,7 +293,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             {mode === "form" ? (
               <ToggleGroup
                 type="single"
-                value={editorState.keys.space ? "pan" : tool}
+                value={editorState.keys.space ? "pan" : toolbarTool}
                 onValueChange={(value) => {
                   if (value) onToolChange(value as Tool);
                 }}
@@ -352,7 +354,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             ) : (
               <ToggleGroup
                 type="single"
-                value={editorState.keys.space ? "pan" : tool}
+                value={editorState.keys.space ? "pan" : toolbarTool}
                 onValueChange={(value) => {
                   if (value) onToolChange(value as Tool);
                 }}

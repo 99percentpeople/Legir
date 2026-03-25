@@ -27,6 +27,7 @@ export type ThumbnailsLayoutMode = "single" | "double";
 export type Tool =
   // Common
   | "select"
+  | "select_text"
   | "pan"
   // Form Tools
   | "draw_text"

@@ -1,7 +1,7 @@
 import React from "react";
 import {
+  Check,
   CheckSquare,
-  ChevronDown,
   CircleDot,
   Edit3,
   Eraser,
@@ -13,10 +13,14 @@ import {
   Palette,
   PenLine,
   PenTool,
+  TextSelect,
   Type,
+  X,
 } from "lucide-react";
 
 import { ANNOTATION_STYLES } from "@/constants";
+import { useAppEvent } from "@/hooks/useAppEventBus";
+import { appEventBus, type AppEventMap } from "@/lib/eventBus";
 import type { EditorCanvasState, EditorState, PenStyle, Tool } from "@/types";
 import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";
@@ -60,6 +64,7 @@ const isMovementTool = (tool: Tool): tool is "select" | "pan" =>
 const isAnnotationTool = (
   tool: Tool,
 ): tool is
+  | "select_text"
   | "draw_highlight"
   | "draw_ink"
   | "draw_comment"
@@ -73,6 +78,7 @@ const isAnnotationTool = (
   | "draw_shape_arrow"
   | "draw_shape_cloud"
   | "eraser" =>
+  tool === "select_text" ||
   tool === "draw_highlight" ||
   tool === "draw_ink" ||
   tool === "draw_comment" ||
@@ -94,6 +100,8 @@ const isFormTool = (
   tool === "draw_dropdown" ||
   tool === "draw_signature";
 
+type ShapeDraftState = AppEventMap["workspace:shapeDraftStateChange"];
+
 const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   currentPageIndex,
   editorState,
@@ -107,6 +115,22 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   onShapeStyleChange,
 }) => {
   const { t } = useLanguage();
+  const [shapeDraftState, setShapeDraftState] = React.useState<ShapeDraftState>(
+    {
+      active: false,
+      tool: null,
+      canFinish: false,
+    },
+  );
+
+  useAppEvent(
+    "workspace:shapeDraftStateChange",
+    (payload) => {
+      setShapeDraftState(payload);
+    },
+    { replayLast: true },
+  );
+
   const contentTool =
     editorState.mode === "annotation"
       ? isAnnotationTool(editorState.tool)
@@ -118,6 +142,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   const activeTool = isMovementTool(editorState.tool)
     ? editorState.tool
     : contentTool;
+  const showShapeDraftActions = shapeDraftState.active;
 
   const getToolLabel = (tool: Tool) => {
     if (isShapeTool(tool)) {
@@ -131,6 +156,8 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
         return t("toolbar.select");
       case "draw_text":
         return t("toolbar.text");
+      case "select_text":
+        return t("toolbar.select_text");
       case "draw_checkbox":
         return t("toolbar.checkbox");
       case "draw_radio":
@@ -165,6 +192,8 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
         return <MousePointer2 size={16} />;
       case "draw_text":
         return <Type size={16} />;
+      case "select_text":
+        return <TextSelect size={16} />;
       case "draw_checkbox":
         return <CheckSquare size={16} />;
       case "draw_radio":
@@ -374,6 +403,12 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   };
   const stylePopover = renderStylePopover();
   const styleColor = getStyleColor();
+  const handleCancelShapeDraft = React.useCallback(() => {
+    appEventBus.emit("workspace:cancelShapeDraft", {});
+  }, []);
+  const handleFinishShapeDraft = React.useCallback(() => {
+    appEventBus.emit("workspace:finishShapeDraft", {});
+  }, []);
 
   return (
     <div
@@ -434,10 +469,6 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                 title={getToolLabel(activeTool)}
               >
                 {getToolIcon(activeTool)}
-                <span className="max-w-20 truncate text-xs">
-                  {getToolLabel(activeTool)}
-                </span>
-                <ChevronDown size={12} />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="center" className="min-w-52">
@@ -448,6 +479,10 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                 <DropdownMenuRadioItem value="select">
                   <MousePointer2 size={14} />
                   {t("toolbar.select")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="select_text">
+                  <TextSelect size={14} />
+                  {t("toolbar.select_text")}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="pan">
                   <Hand size={14} />
@@ -529,6 +564,32 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
 
           {stylePopover && styleColor ? (
             <div className="shrink-0">{stylePopover}</div>
+          ) : null}
+
+          {showShapeDraftActions ? (
+            <>
+              <Separator orientation="vertical" className="mx-1 shrink-0" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={handleCancelShapeDraft}
+                title={t("common.actions.cancel")}
+                aria-label={t("common.actions.cancel")}
+              >
+                <X size={14} />
+              </Button>
+              <Button
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={handleFinishShapeDraft}
+                disabled={!shapeDraftState.canFinish}
+                title={t("common.actions.done")}
+                aria-label={t("common.actions.done")}
+              >
+                <Check size={14} />
+              </Button>
+            </>
           ) : null}
         </div>
       </div>

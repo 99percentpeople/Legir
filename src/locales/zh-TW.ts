@@ -5,6 +5,7 @@ const zhTW = {
     processing: "處理中...",
     actions: {
       cancel: "取消",
+      done: "完成",
       continue: "繼續",
       save: "儲存",
       delete: "刪除",
@@ -33,6 +34,7 @@ const zhTW = {
     undo: "復原 (Ctrl+Z)",
     redo: "重做 (Ctrl+Y)",
     select: "選擇",
+    select_text: "選字",
     pan: "拖動",
     text: "文字",
     checkbox: "核取方塊",

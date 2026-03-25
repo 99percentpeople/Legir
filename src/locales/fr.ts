@@ -5,6 +5,7 @@ const fr = {
     processing: "Traitement...",
     actions: {
       cancel: "Annuler",
+      done: "Terminer",
       continue: "Continuer",
       save: "Enregistrer",
       delete: "Supprimer",
@@ -33,6 +34,7 @@ const fr = {
     undo: "Annuler (Ctrl+Z)",
     redo: "Rétablir (Ctrl+Y)",
     select: "Sélectionner",
+    select_text: "Sélection de texte",
     pan: "Panoramique",
     text: "Texte",
     checkbox: "Case à cocher",

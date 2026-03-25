@@ -27,6 +27,7 @@ interface HighlightRectProps {
   onEdit?: (id: string) => void;
   onAskAi?: (id: string) => void;
   isAnnotationMode?: boolean;
+  onPointerDown?: AnnotationControlProps["onPointerDown"];
 }
 
 interface HighlightPolygonProps {
@@ -42,6 +43,7 @@ interface HighlightPolygonProps {
   onEdit?: (id: string) => void;
   onAskAi?: (id: string) => void;
   isAnnotationMode?: boolean;
+  onPointerDown?: AnnotationControlProps["onPointerDown"];
 }
 
 const getRectBounds = (
@@ -95,6 +97,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
   onEdit,
   onAskAi,
   isAnnotationMode = true,
+  onPointerDown,
 }) => {
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
 
@@ -113,7 +116,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
       showBorder={isSelected}
       resizable={false}
       data={data}
-      className="pointer-events-none"
+      className={isSelected ? undefined : "pointer-events-none"}
     >
       <FloatingToolbar isVisible={!!showToolbar}>
         <ColorPickerPopover
@@ -173,6 +176,9 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
               e.stopPropagation();
               e.preventDefault();
               onSelect(data.id);
+              if (isSelected) {
+                onPointerDown?.(e);
+              }
             }}
           />
         </TooltipTrigger>
@@ -218,6 +224,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
   onEdit,
   onAskAi,
   isAnnotationMode = true,
+  onPointerDown,
 }) => {
   const bounds = getRectBounds(rects);
   const d = rectsToPath(rects, { x: bounds.x, y: bounds.y });
@@ -238,7 +245,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
       showBorder={isSelected}
       resizable={false}
       data={data}
-      className="pointer-events-none"
+      className={isSelected ? undefined : "pointer-events-none"}
     >
       <FloatingToolbar isVisible={!!showToolbar}>
         <ColorPickerPopover
@@ -305,6 +312,9 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
                   e.stopPropagation();
                   e.preventDefault();
                   onSelect(data.id);
+                  if (isSelected) {
+                    onPointerDown?.(e);
+                  }
                 }}
               />
             </TooltipTrigger>
@@ -349,6 +359,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
   onEdit,
   onAskAi,
   isAnnotationMode,
+  onPointerDown,
 }) => {
   if (data.rects && data.rects.length > 0) {
     return (
@@ -365,6 +376,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
         onEdit={onEdit}
         onAskAi={onAskAi}
         isAnnotationMode={isAnnotationMode}
+        onPointerDown={onPointerDown}
       />
     );
   } else if (data.rect) {
@@ -382,6 +394,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
         onEdit={onEdit}
         onAskAi={onAskAi}
         isAnnotationMode={isAnnotationMode}
+        onPointerDown={onPointerDown}
       />
     );
   }

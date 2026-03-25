@@ -2,6 +2,11 @@ import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 
 export type Unsubscribe = () => void;
 
+type ShapeDraftTool =
+  | "draw_shape_polyline"
+  | "draw_shape_polygon"
+  | "draw_shape_cloud_polygon";
+
 export class EventBus<Events extends Record<string, unknown>> {
   private listeners = new Map<
     keyof Events,
@@ -103,6 +108,16 @@ export type AppEventMap = {
     behavior?: "auto" | "smooth";
     skipScroll?: boolean;
   };
+  "workspace:shapeDraftStateChange": {
+    active: boolean;
+    tool: ShapeDraftTool | null;
+    canFinish: boolean;
+  };
+  "workspace:pinchGestureActiveChange": {
+    active: boolean;
+  };
+  "workspace:finishShapeDraft": Record<string, never>;
+  "workspace:cancelShapeDraft": Record<string, never>;
   "sidebar:focusAnnotation": {
     id: string;
   };

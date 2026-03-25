@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, type RefObject } from "react";
 import { prepareInkAnnotationForStore } from "@/lib/inkGeometry";
+import { INK_SESSION_CHUNK_IDLE_DELAY_MS } from "@/constants";
 import { Annotation, EditorState, Tool, WorkspaceEditorState } from "@/types";
 
 type Point = { x: number; y: number };
@@ -15,6 +16,7 @@ interface UseInkSessionParams {
   onCancelInProgressStroke: () => void;
   onTriggerHistorySave: () => void;
   pointSpacingPx?: number;
+  chunkIdleDelayMs?: number;
 }
 
 export const useInkSession = ({
@@ -25,11 +27,13 @@ export const useInkSession = ({
   onCancelInProgressStroke,
   onTriggerHistorySave,
   pointSpacingPx = 4,
+  chunkIdleDelayMs = INK_SESSION_CHUNK_IDLE_DELAY_MS,
 }: UseInkSessionParams) => {
   const inkSessionIdRef = useRef<string | null>(null);
   const inkSessionPageIndexRef = useRef<number | null>(null);
   const inkSessionStrokesRef = useRef<Point[][]>([]);
   const inkSessionToolRef = useRef<Tool | null>(null);
+  const sessionChunkTimeoutRef = useRef<number | null>(null);
   const prevToolRef = useRef<Tool>(editorState.tool);
 
   const commitEditorStateRef = useCallback(
@@ -41,12 +45,32 @@ export const useInkSession = ({
     [editorStateRef],
   );
 
+  const clearSessionChunkTimeout = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (sessionChunkTimeoutRef.current === null) return;
+    window.clearTimeout(sessionChunkTimeoutRef.current);
+    sessionChunkTimeoutRef.current = null;
+  }, []);
+
   const resetSession = useCallback(() => {
+    clearSessionChunkTimeout();
     inkSessionIdRef.current = null;
     inkSessionPageIndexRef.current = null;
     inkSessionStrokesRef.current = [];
     inkSessionToolRef.current = null;
-  }, []);
+  }, [clearSessionChunkTimeout]);
+
+  const scheduleSessionChunkTimeout = useCallback(() => {
+    clearSessionChunkTimeout();
+    if (typeof window === "undefined") return;
+    sessionChunkTimeoutRef.current = window.setTimeout(() => {
+      sessionChunkTimeoutRef.current = null;
+      inkSessionIdRef.current = null;
+      inkSessionPageIndexRef.current = null;
+      inkSessionStrokesRef.current = [];
+      inkSessionToolRef.current = null;
+    }, chunkIdleDelayMs);
+  }, [chunkIdleDelayMs, clearSessionChunkTimeout]);
 
   useEffect(() => {
     const prev = prevToolRef.current;
@@ -64,6 +88,12 @@ export const useInkSession = ({
 
     prevToolRef.current = next;
   }, [editorState.tool, onCancelInProgressStroke, resetSession]);
+
+  useEffect(() => {
+    return () => {
+      clearSessionChunkTimeout();
+    };
+  }, [clearSessionChunkTimeout]);
 
   const getMinPointDistancePdf = useCallback(() => {
     const desiredScreenPx = pointSpacingPx;
@@ -94,6 +124,7 @@ export const useInkSession = ({
   const appendStroke = useCallback(
     (pageIndex: number, stroke: Point[]) => {
       if (stroke.length <= 1) return;
+      clearSessionChunkTimeout();
 
       const state = editorStateRef.current;
       if (!state) return;
@@ -154,6 +185,7 @@ export const useInkSession = ({
           onUpdateAnnotation(sessionId, {
             strokes: inkSessionStrokesRef.current,
           });
+          scheduleSessionChunkTimeout();
           return;
         }
       }
@@ -187,9 +219,12 @@ export const useInkSession = ({
         annotations: [...currentState.annotations, nextAnnotation],
       }));
       onAddAnnotation(nextAnnotation, { select: false });
+      scheduleSessionChunkTimeout();
     },
     [
+      clearSessionChunkTimeout,
       commitEditorStateRef,
+      scheduleSessionChunkTimeout,
       editorState.highlightStyle,
       editorState.penStyle,
       editorStateRef,
@@ -200,7 +235,12 @@ export const useInkSession = ({
     ],
   );
 
+  const beginStroke = useCallback(() => {
+    clearSessionChunkTimeout();
+  }, [clearSessionChunkTimeout]);
+
   return {
+    beginStroke,
     appendStroke,
     resetSession,
     inkSessionIdRef,

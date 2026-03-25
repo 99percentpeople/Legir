@@ -30,8 +30,13 @@ import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import { usePointerCapture } from "@/hooks/usePointerCapture";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useCanvasPanning } from "@/hooks/useCanvasPanning";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { useInkSession } from "./hooks/useInkSession";
-import { getCursor, shouldSwitchToSelectAfterUse } from "@/lib/tool-behavior";
+import {
+  getCursor,
+  shouldSwitchToSelectAfterUse,
+  toolUsesTextLayerSelection,
+} from "@/lib/tool-behavior";
 import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionPopover";
 import PDFPage from "./layers/PDFPage";
 import { ControlRenderer, preloadControls, registerControls } from "./controls";
@@ -143,6 +148,48 @@ type ShapeDraftSession = {
   hoverPoint: Point | null;
 };
 
+type PendingTouchMove =
+  | {
+      kind: "field";
+      pointerId: number;
+      clientX: number;
+      clientY: number;
+      pageIndex: number;
+      id: string;
+      rect: Rect;
+    }
+  | {
+      kind: "annotation";
+      pointerId: number;
+      clientX: number;
+      clientY: number;
+      pageIndex: number;
+      id: string;
+      rect: Rect;
+    };
+
+type PendingTouchResize = {
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  handle: string;
+  data: FormField | Annotation;
+};
+
+const TOUCH_DRAG_START_DISTANCE_PX = 8;
+const TOUCH_SHAPE_DRAFT_FINISH_DISTANCE_PX = 18;
+
+const getShapeDraftMinimumPointCount = (tool: ShapeDraftSession["tool"]) =>
+  tool === "draw_shape_polygon" || tool === "draw_shape_cloud_polygon" ? 3 : 2;
+
+const getTouchShapeDraftFinishPoint = (draft: ShapeDraftSession) => {
+  if (draft.points.length === 0) return null;
+  if (draft.tool === "draw_shape_polyline") {
+    return draft.points[draft.points.length - 1] ?? null;
+  }
+  return draft.points[0] ?? null;
+};
+
 const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
   let d = deg % 360;
@@ -175,6 +222,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   activePdfSearchResultId,
   bottomOverlayInsetPx = 0,
 }) => {
+  const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinchGestureActiveRef = useRef(false);
@@ -275,7 +323,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     liveInkPathRef.current?.setAttribute("d", "");
   }, [cancelLiveInkPathSync]);
 
-  const { appendStroke, shouldAppendPoint } = useInkSession({
+  const { beginStroke, appendStroke, shouldAppendPoint } = useInkSession({
     editorState,
     editorStateRef,
     onAddAnnotation,
@@ -321,6 +369,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const updatePinchGestureActive = useCallback((active: boolean) => {
     pinchGestureActiveRef.current = active;
     setIsPinchZooming(active);
+    appEventBus.emit("workspace:pinchGestureActiveChange", { active });
   }, []);
 
   const resolveSelectionAttachmentRect = useCallback(
@@ -491,11 +540,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const finalizeShapeDraftSession = useCallback(
     (draft: ShapeDraftSession | null) => {
       if (!draft) return false;
-      const minPointCount =
-        draft.tool === "draw_shape_polygon" ||
-        draft.tool === "draw_shape_cloud_polygon"
-          ? 3
-          : 2;
+      const minPointCount = getShapeDraftMinimumPointCount(draft.tool);
       if (draft.points.length < minPointCount) {
         shapeDraftSessionRef.current = null;
         setShapeDraftSession(null);
@@ -576,6 +621,48 @@ const Workspace: React.FC<WorkspaceProps> = ({
   useEffect(() => {
     shapeDraftSessionRef.current = shapeDraftSession;
   }, [shapeDraftSession]);
+
+  useEffect(() => {
+    appEventBus.emit(
+      "workspace:shapeDraftStateChange",
+      shapeDraftSession
+        ? {
+            active: true,
+            tool: shapeDraftSession.tool,
+            canFinish:
+              shapeDraftSession.points.length >=
+              getShapeDraftMinimumPointCount(shapeDraftSession.tool),
+          }
+        : {
+            active: false,
+            tool: null,
+            canFinish: false,
+          },
+      { sticky: true },
+    );
+  }, [shapeDraftSession]);
+
+  useEffect(() => {
+    return () => {
+      appEventBus.clearSticky("workspace:shapeDraftStateChange");
+    };
+  }, []);
+
+  useAppEvent("workspace:cancelShapeDraft", () => {
+    if (!shapeDraftSessionRef.current) return;
+    shapeDraftSessionRef.current = null;
+    setShapeDraftSession(null);
+    setActivePageIndex(null);
+  });
+
+  useAppEvent("workspace:finishShapeDraft", () => {
+    const draft = shapeDraftSessionRef.current;
+    if (!draft) return;
+    if (draft.points.length < getShapeDraftMinimumPointCount(draft.tool)) {
+      return;
+    }
+    void finalizeShapeDraftSession(draft);
+  });
 
   useAppEvent(
     "workspace:navigatePage",
@@ -683,6 +770,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
     y: number;
     originalRect: Rect;
   } | null>(null);
+  const pendingTouchMoveRef = useRef<PendingTouchMove | null>(null);
+  const pendingTouchResizeRef = useRef<PendingTouchResize | null>(null);
 
   const [resizeStart, setResizeStart] = useState<{
     originalRect: Rect;
@@ -740,6 +829,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const lastMousePosRef = useRef({ x: 0, y: 0 });
 
   const clearActiveInteractionState = useCallback(() => {
+    pendingTouchMoveRef.current = null;
+    pendingTouchResizeRef.current = null;
     setDragStart(null);
     setDragCurrent(null);
     setActivePageIndex(null);
@@ -1038,6 +1129,129 @@ const Workspace: React.FC<WorkspaceProps> = ({
       contentRef,
       getPageRectByPageIndex,
     });
+
+  const activatePendingTouchMove = useCallback(
+    (e: React.PointerEvent) => {
+      const pending = pendingTouchMoveRef.current;
+      if (!pending || pending.pointerId !== e.pointerId) return false;
+
+      pendingTouchMoveRef.current = null;
+      capturePointer(e);
+      onTriggerHistorySave();
+      setGlobalCursor("move");
+      setActivePageIndex(pending.pageIndex);
+
+      const coords = getRelativeCoords(e, pending.pageIndex);
+
+      if (pending.kind === "field") {
+        setMovingFieldId(pending.id);
+        setMoveOffset({
+          x: coords.x - pending.rect.x,
+          y: coords.y - pending.rect.y,
+        });
+        setMoveStartRaw({
+          x: coords.x,
+          y: coords.y,
+          originalRect: { ...pending.rect },
+        });
+        return true;
+      }
+
+      setMovingAnnotationId(pending.id);
+      setMoveOffset({
+        x: coords.x - pending.rect.x,
+        y: coords.y - pending.rect.y,
+      });
+      return true;
+    },
+    [capturePointer, getRelativeCoords, onTriggerHistorySave],
+  );
+
+  const startResizeInteraction = useCallback(
+    (handle: string, e: React.PointerEvent, data: FormField | Annotation) => {
+      const state = editorStateRef.current;
+
+      closeTextSelectionPopover();
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+      capturePointer(e);
+
+      if (state.tool !== "select") return;
+
+      onTriggerHistorySave();
+      setActivePageIndex(data.pageIndex);
+      const coords = getRelativeCoords(e, data.pageIndex);
+
+      if (
+        ["freetext", "ink", "highlight", "comment", "link", "shape"].includes(
+          data.type,
+        )
+      ) {
+        setResizingAnnotationId(data.id);
+      } else {
+        setResizingFieldId(data.id);
+      }
+
+      setResizeHandle(handle);
+      if (data.rect) {
+        const base = {
+          originalRect: { ...data.rect },
+          mouseX: coords.x,
+          mouseY: coords.y,
+        };
+
+        const supportsRotation =
+          data.type === "freetext" ||
+          !["highlight", "ink", "comment", "link", "shape"].includes(data.type);
+
+        if (handle === "rotate" && supportsRotation) {
+          const pivot = {
+            x: data.rect.x + data.rect.width / 2,
+            y: data.rect.y + data.rect.height / 2,
+          };
+          const startAngleRad = Math.atan2(
+            coords.y - pivot.y,
+            coords.x - pivot.x,
+          );
+          setResizeStart({
+            ...base,
+            originalRotationDeg:
+              typeof data.rotationDeg === "number" ? data.rotationDeg : 0,
+            rotateStartAngleRad: startAngleRad,
+            rotatePivot: pivot,
+          });
+        } else {
+          setResizeStart(base);
+        }
+      }
+
+      let cursor = "default";
+      if (["nw", "se"].includes(handle)) cursor = "nwse-resize";
+      else if (["ne", "sw"].includes(handle)) cursor = "nesw-resize";
+      else if (["n", "s"].includes(handle)) cursor = "ns-resize";
+      else if (["e", "w"].includes(handle)) cursor = "ew-resize";
+      else if (handle === "rotate") cursor = "grab";
+
+      setGlobalCursor(cursor);
+    },
+    [
+      capturePointer,
+      closeTextSelectionPopover,
+      getRelativeCoords,
+      onTriggerHistorySave,
+    ],
+  );
+
+  const activatePendingTouchResize = useCallback(
+    (e: React.PointerEvent) => {
+      const pending = pendingTouchResizeRef.current;
+      if (!pending || pending.pointerId !== e.pointerId) return false;
+
+      pendingTouchResizeRef.current = null;
+      startResizeInteraction(pending.handle, e, pending.data);
+      return true;
+    },
+    [startResizeInteraction],
+  );
 
   const { checkEraserCollision } = useWorkspaceEraser({
     editorState,
@@ -1668,7 +1882,24 @@ const Workspace: React.FC<WorkspaceProps> = ({
       );
     })();
 
+    if (editorState.tool === "select_text") {
+      if (editorState.selectedId) {
+        onSelectControl(null);
+      }
+      if (isTextLayerHit) {
+        return;
+      }
+      closeTextSelectionPopover();
+      onSelectControl(null);
+      return;
+    }
+
     if (editorState.tool === "select" && isTextLayerHit) {
+      if (editorState.selectedId) {
+        closeTextSelectionPopover();
+        e.preventDefault();
+        e.stopPropagation();
+      }
       onSelectControl(null);
       return;
     }
@@ -1722,6 +1953,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       setGlobalCursor("crosshair");
       setActivePageIndex(pageIndex);
       const coords = getRelativeCoords(e, pageIndex);
+      beginStroke();
       setIsDrawing(true);
       currentPathRef.current = [coords];
       return;
@@ -1779,32 +2011,49 @@ const Workspace: React.FC<WorkspaceProps> = ({
         editorState.tool === "draw_shape_cloud_polygon")
     ) {
       const coords = getRelativeCoords(e, pageIndex);
-      const constrainedCoords =
-        e.shiftKey &&
-        shapeDraftSession &&
-        shapeDraftSession.tool === editorState.tool &&
-        shapeDraftSession.pageIndex === pageIndex &&
-        shapeDraftSession.points.length > 0
-          ? getShiftConstrainedShapePoint(
-              shapeDraftSession.points[shapeDraftSession.points.length - 1]!,
-              coords,
-            )
-          : coords;
-      const nextDraft =
+      const existingDraft =
         shapeDraftSession &&
         shapeDraftSession.tool === editorState.tool &&
         shapeDraftSession.pageIndex === pageIndex
-          ? {
-              ...shapeDraftSession,
-              points: [...shapeDraftSession.points, constrainedCoords],
-              hoverPoint: constrainedCoords,
-            }
-          : {
-              tool: editorState.tool,
-              pageIndex,
-              points: [constrainedCoords],
-              hoverPoint: constrainedCoords,
-            };
+          ? shapeDraftSession
+          : null;
+      const finishPoint = existingDraft
+        ? getTouchShapeDraftFinishPoint(existingDraft)
+        : null;
+      const canFinishOnTouch =
+        e.pointerType === "touch" &&
+        !!existingDraft &&
+        existingDraft.points.length >=
+          getShapeDraftMinimumPointCount(existingDraft.tool) &&
+        !!finishPoint &&
+        Math.hypot(coords.x - finishPoint.x, coords.y - finishPoint.y) <=
+          TOUCH_SHAPE_DRAFT_FINISH_DISTANCE_PX / editorState.scale;
+
+      if (canFinishOnTouch && existingDraft) {
+        shapeDraftSessionRef.current = null;
+        void finalizeShapeDraftSession(existingDraft);
+        return;
+      }
+
+      const constrainedCoords =
+        e.shiftKey && existingDraft && existingDraft.points.length > 0
+          ? getShiftConstrainedShapePoint(
+              existingDraft.points[existingDraft.points.length - 1]!,
+              coords,
+            )
+          : coords;
+      const nextDraft = existingDraft
+        ? {
+            ...existingDraft,
+            points: [...existingDraft.points, constrainedCoords],
+            hoverPoint: constrainedCoords,
+          }
+        : {
+            tool: editorState.tool,
+            pageIndex,
+            points: [constrainedCoords],
+            hoverPoint: constrainedCoords,
+          };
 
       if (e.detail >= 2) {
         shapeDraftSessionRef.current = null;
@@ -1856,6 +2105,28 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setSnapLines([]);
 
     const coords = getRelativeCoords(e, activePageIndex);
+    const pendingTouchMove = pendingTouchMoveRef.current;
+    const pendingTouchResize = pendingTouchResizeRef.current;
+
+    if (pendingTouchMove && pendingTouchMove.pointerId === e.pointerId) {
+      const dx = e.clientX - pendingTouchMove.clientX;
+      const dy = e.clientY - pendingTouchMove.clientY;
+      if (Math.hypot(dx, dy) < TOUCH_DRAG_START_DISTANCE_PX) {
+        return;
+      }
+      activatePendingTouchMove(e);
+      return;
+    }
+
+    if (pendingTouchResize && pendingTouchResize.pointerId === e.pointerId) {
+      const dx = e.clientX - pendingTouchResize.clientX;
+      const dy = e.clientY - pendingTouchResize.clientY;
+      if (Math.hypot(dx, dy) < TOUCH_DRAG_START_DISTANCE_PX) {
+        return;
+      }
+      activatePendingTouchResize(e);
+      return;
+    }
 
     if (
       shapeDraftSession &&
@@ -1947,6 +2218,17 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const handlePointerUp = (e?: React.PointerEvent | React.MouseEvent) => {
     if (pinchGestureActiveRef.current) return;
     if (endPan(e)) return;
+
+    if (e && "pointerId" in e) {
+      const pendingTouchMove = pendingTouchMoveRef.current;
+      if (pendingTouchMove && pendingTouchMove.pointerId === e.pointerId) {
+        pendingTouchMoveRef.current = null;
+      }
+      const pendingTouchResize = pendingTouchResizeRef.current;
+      if (pendingTouchResize && pendingTouchResize.pointerId === e.pointerId) {
+        pendingTouchResizeRef.current = null;
+      }
+    }
 
     const shouldCreateTextHighlight =
       editorStateRef.current.mode === "annotation" &&
@@ -2197,6 +2479,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       // Instead we likely want to fill them out.
       if (state.mode === "annotation") {
         e.stopPropagation();
+        closeTextSelectionPopover();
         onSelectControl(field.id); // Sync selection with sidebar
         return;
       }
@@ -2207,6 +2490,22 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       e.stopPropagation();
       e.preventDefault();
+      closeTextSelectionPopover();
+
+      if (e.pointerType === "touch") {
+        onSelectControl(field.id);
+        setActivePageIndex(field.pageIndex);
+        pendingTouchMoveRef.current = {
+          kind: "field",
+          pointerId: e.pointerId,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          pageIndex: field.pageIndex,
+          id: field.id,
+          rect: { ...field.rect },
+        };
+        return;
+      }
 
       if (
         state.selectedId === field.id &&
@@ -2287,6 +2586,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     },
     [
       capturePointer,
+      closeTextSelectionPopover,
       onTriggerHistorySave,
       onSelectControl,
       onAddField,
@@ -2307,7 +2607,36 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (state.tool === "eraser") return;
       e.stopPropagation();
       e.preventDefault();
+      closeTextSelectionPopover();
       if (state.tool !== "select") return;
+
+      const rotationDeg =
+        annotation.type === "freetext" &&
+        typeof annotation.rotationDeg === "number" &&
+        Number.isFinite(annotation.rotationDeg)
+          ? annotation.rotationDeg
+          : 0;
+      const outerRect =
+        annotation.type === "freetext" && rotationDeg !== 0
+          ? getRotatedFreetextOuterRect(annotation.rect, rotationDeg)
+          : annotation.rect;
+
+      if (e.pointerType === "touch") {
+        onSelectControl(annotation.id);
+        setActivePageIndex(annotation.pageIndex);
+        if (outerRect && annotation.type !== "highlight") {
+          pendingTouchMoveRef.current = {
+            kind: "annotation",
+            pointerId: e.pointerId,
+            clientX: e.clientX,
+            clientY: e.clientY,
+            pageIndex: annotation.pageIndex,
+            id: annotation.id,
+            rect: { ...outerRect },
+          };
+        }
+        return;
+      }
 
       if (
         state.selectedId === annotation.id &&
@@ -2338,21 +2667,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (annotation.rect && annotation.type !== "highlight") {
         setGlobalCursor("move");
         setMovingAnnotationId(annotation.id);
-        const rotationDeg =
-          annotation.type === "freetext" &&
-          typeof annotation.rotationDeg === "number" &&
-          Number.isFinite(annotation.rotationDeg)
-            ? annotation.rotationDeg
-            : 0;
-        const outerRect =
-          annotation.type === "freetext" && rotationDeg !== 0
-            ? getRotatedFreetextOuterRect(annotation.rect, rotationDeg)
-            : annotation.rect;
         setMoveOffset({ x: coords.x - outerRect.x, y: coords.y - outerRect.y });
       }
     },
     [
       capturePointer,
+      closeTextSelectionPopover,
       onTriggerHistorySave,
       onSelectControl,
       getRelativeCoords,
@@ -2364,83 +2684,37 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const handleResizePointerDown = useCallback(
     (handle: string, e: React.PointerEvent, data: FormField | Annotation) => {
-      const state = editorStateRef.current;
       if (pinchGestureActiveRef.current) return;
       if (e.button !== 0) return;
       if (isPanModeActive) return;
       e.stopPropagation();
-
-      // Ensure mouse position is tracked immediately
-      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-
-      // Capture pointer to ensure events track even over scrollbars/outside window
-      capturePointer(e);
-
-      if (state.tool !== "select") return;
-
-      onTriggerHistorySave();
-      setActivePageIndex(data.pageIndex);
-      const coords = getRelativeCoords(e, data.pageIndex);
-
-      if (
-        ["freetext", "ink", "highlight", "comment", "link", "shape"].includes(
-          data.type,
-        )
-      ) {
-        setResizingAnnotationId(data.id);
-      } else {
-        setResizingFieldId(data.id);
-      }
-
-      setResizeHandle(handle);
-      if (data.rect) {
-        const base = {
-          originalRect: { ...data.rect },
-          mouseX: coords.x,
-          mouseY: coords.y,
+      if (e.pointerType === "touch") {
+        pendingTouchResizeRef.current = {
+          pointerId: e.pointerId,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          handle,
+          data,
         };
-
-        const supportsRotation =
-          data.type === "freetext" ||
-          !["highlight", "ink", "comment", "link", "shape"].includes(data.type);
-
-        if (handle === "rotate" && supportsRotation) {
-          const pivot = {
-            x: data.rect.x + data.rect.width / 2,
-            y: data.rect.y + data.rect.height / 2,
-          };
-          const startAngleRad = Math.atan2(
-            coords.y - pivot.y,
-            coords.x - pivot.x,
-          );
-          setResizeStart({
-            ...base,
-            originalRotationDeg:
-              typeof data.rotationDeg === "number" ? data.rotationDeg : 0,
-            rotateStartAngleRad: startAngleRad,
-            rotatePivot: pivot,
-          });
-        } else {
-          setResizeStart(base);
-        }
+        setActivePageIndex(data.pageIndex);
+        return;
       }
 
-      // Set Global Cursor based on handle
-      let cursor = "default";
-      if (["nw", "se"].includes(handle)) cursor = "nwse-resize";
-      else if (["ne", "sw"].includes(handle)) cursor = "nesw-resize";
-      else if (["n", "s"].includes(handle)) cursor = "ns-resize";
-      else if (["e", "w"].includes(handle)) cursor = "ew-resize";
-      else if (handle === "rotate") cursor = "grab";
-
-      setGlobalCursor(cursor);
+      startResizeInteraction(handle, e, data);
     },
-    [capturePointer, onTriggerHistorySave, getRelativeCoords, isPanModeActive],
+    [isPanModeActive, startResizeInteraction],
   );
 
   // --- Render Helpers ---
 
   const renderPage = (page: (typeof pagesWithControls)[number]) => {
+    const textLayerSelectable = toolUsesTextLayerSelection(editorState.tool, {
+      isMobile,
+    });
+    const shapeDraftBasePoints =
+      shapeDraftSession && shapeDraftSession.pageIndex === page.pageIndex
+        ? shapeDraftSession.points
+        : null;
     const shapeDraftPreviewPoints =
       shapeDraftSession && shapeDraftSession.pageIndex === page.pageIndex
         ? [
@@ -2456,6 +2730,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
               ? [shapeDraftSession.hoverPoint]
               : []),
           ]
+        : null;
+    const shapeDraftFinishPoint =
+      shapeDraftSession &&
+      shapeDraftSession.pageIndex === page.pageIndex &&
+      shapeDraftSession.points.length >=
+        getShapeDraftMinimumPointCount(shapeDraftSession.tool)
+        ? getTouchShapeDraftFinishPoint(shapeDraftSession)
         : null;
     const shapeDraftClosingPreview =
       shapeDraftSession &&
@@ -2487,10 +2768,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         <PDFPage
           page={page}
           scale={editorState.scale}
-          isSelectMode={
-            editorState.tool === "select" ||
-            editorState.tool === "draw_highlight"
-          }
+          isSelectMode={textLayerSelectable}
           isHighlighting={editorState.tool === "draw_highlight"}
           highlightColor={
             editorState.highlightStyle?.color ||
@@ -2501,7 +2779,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
             ANNOTATION_STYLES.highlight.opacity
           }
           textLayerCursor={
-            editorState.tool === "draw_highlight" ? "crosshair" : undefined
+            editorState.tool === "draw_highlight"
+              ? "crosshair"
+              : editorState.tool === "select_text"
+                ? "text"
+                : undefined
           }
           searchResults={pdfSearchResultsByPage?.get(page.pageIndex) ?? []}
           activeSearchResultId={activePdfSearchResultId}
@@ -2627,6 +2909,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             pointerEvents: isPanModeActive
               ? "auto"
               : editorState.tool === "select" ||
+                  editorState.tool === "select_text" ||
                   editorState.tool === "draw_highlight"
                 ? "none"
                 : undefined,
@@ -2745,6 +3028,19 @@ const Workspace: React.FC<WorkspaceProps> = ({
           viewBox={`0 0 ${page.width} ${page.height}`}
           preserveAspectRatio="none"
         >
+          {shapeDraftBasePoints &&
+            shapeDraftBasePoints.map((point, index) => (
+              <circle
+                key={`shape-draft-point-${index}`}
+                cx={point.x}
+                cy={point.y}
+                r={4 / editorState.scale}
+                fill={
+                  editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
+                }
+                opacity={0.9}
+              />
+            ))}
           {shapeDraftPreviewPoints && shapeDraftPreviewPoints.length > 1 && (
             <>
               <path
@@ -2788,6 +3084,31 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   strokeDasharray="6 4"
                 />
               )}
+            </>
+          )}
+          {shapeDraftFinishPoint && (
+            <>
+              <circle
+                cx={shapeDraftFinishPoint.x}
+                cy={shapeDraftFinishPoint.y}
+                r={10 / editorState.scale}
+                fill="rgba(255, 255, 255, 0.2)"
+                stroke={
+                  editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
+                }
+                strokeWidth={2 / editorState.scale}
+                strokeDasharray={`${4 / editorState.scale} ${3 / editorState.scale}`}
+                opacity={0.95}
+              />
+              <circle
+                cx={shapeDraftFinishPoint.x}
+                cy={shapeDraftFinishPoint.y}
+                r={4 / editorState.scale}
+                fill={
+                  editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
+                }
+                opacity={1}
+              />
             </>
           )}
           {isDrawing && activePageIndex === page.pageIndex && (

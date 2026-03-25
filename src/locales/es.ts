@@ -5,6 +5,7 @@ const es = {
     processing: "Procesando...",
     actions: {
       cancel: "Cancelar",
+      done: "Listo",
       continue: "Continuar",
       save: "Guardar",
       delete: "Eliminar",
@@ -33,6 +34,7 @@ const es = {
     undo: "Deshacer (Ctrl+Z)",
     redo: "Rehacer (Ctrl+Y)",
     select: "Seleccionar",
+    select_text: "Seleccionar texto",
     pan: "Desplazar",
     text: "Texto",
     checkbox: "Casilla de verificación",

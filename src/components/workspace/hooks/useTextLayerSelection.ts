@@ -26,6 +26,8 @@ export type TextSelectionHandlesState = {
 };
 
 type ManualSelectionState = {
+  pointerId: number | null;
+  pointerType: PointerEvent["pointerType"];
   anchorNode: Node;
   anchorOffset: number;
   activeLayer: HTMLDivElement;
@@ -40,6 +42,20 @@ type ManualSelectionState = {
   lineBandEnd: number;
   lineLayer: HTMLDivElement | null;
 };
+
+type PendingTouchManualSelectionState = {
+  pointerId: number;
+  activeLayer: HTMLDivElement;
+  anchorTarget: {
+    range: Range;
+    rect: DOMRect;
+    span: HTMLSpanElement;
+  };
+  startX: number;
+  startY: number;
+};
+
+const TOUCH_TEXT_SELECTION_START_DISTANCE_PX = 8;
 
 export const useTextLayerSelection = (opts: {
   pageIndex: number;
@@ -66,6 +82,9 @@ export const useTextLayerSelection = (opts: {
     activeHandleKind: "start" | "end";
   } | null>(null);
   const manualSelectionRef = useRef<ManualSelectionState | null>(null);
+  const pendingTouchManualSelectionRef =
+    useRef<PendingTouchManualSelectionState | null>(null);
+  const pinchGestureActiveRef = useRef(false);
   const [isDraggingSelectionHandle, setIsDraggingSelectionHandle] =
     useState(false);
   const isPointerSelectingTextRef = useRef(false);
@@ -677,48 +696,16 @@ export const useTextLayerSelection = (opts: {
   }, [updateSelectionHandles]);
 
   useEffect(() => {
+    const setPointerSelectingTextState = (isSelecting: boolean) => {
+      if (isPointerSelectingTextRef.current === isSelecting) return;
+      isPointerSelectingTextRef.current = isSelecting;
+      setIsPointerSelectingText(isSelecting);
+    };
+
     if (!isSelectMode) {
-      if (isPointerSelectingTextRef.current) {
-        isPointerSelectingTextRef.current = false;
-        setIsPointerSelectingText(false);
-      }
-      return;
-    }
-    if (typeof document === "undefined") return;
-
-    const onPointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      const target = e.target as HTMLElement | null;
-      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
-
-      const layer = target?.closest?.(".textLayer") as HTMLDivElement | null;
-      if (!layer || layer !== textLayerRef.current) return;
-
-      isPointerSelectingTextRef.current = true;
-      setIsPointerSelectingText(true);
-    };
-
-    const onPointerEnd = () => {
-      if (!isPointerSelectingTextRef.current) return;
-      requestAnimationFrame(() => {
-        isPointerSelectingTextRef.current = false;
-        setIsPointerSelectingText(false);
-      });
-    };
-
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("pointerup", onPointerEnd, true);
-    document.addEventListener("pointercancel", onPointerEnd, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("pointerup", onPointerEnd, true);
-      document.removeEventListener("pointercancel", onPointerEnd, true);
-    };
-  }, [isSelectMode, textLayerRef]);
-
-  useEffect(() => {
-    if (!isSelectMode) {
+      pendingTouchManualSelectionRef.current = null;
       manualSelectionRef.current = null;
+      setPointerSelectingTextState(false);
       return;
     }
     if (typeof document === "undefined") return;
@@ -816,13 +803,57 @@ export const useTextLayerSelection = (opts: {
       return { range: collapsed, rect, span };
     };
 
+    const clearPendingTouchManualSelection = () => {
+      pendingTouchManualSelectionRef.current = null;
+    };
+
     const clearManualSelection = () => {
       manualSelectionRef.current = null;
+      setPointerSelectingTextState(false);
+    };
+
+    const removeManualSelectionListeners = () => {
+      document.removeEventListener(
+        "pointermove",
+        handleManualPointerMove,
+        true,
+      );
+      document.removeEventListener("pointerup", handleManualPointerEnd, true);
+      document.removeEventListener(
+        "pointercancel",
+        handleManualPointerEnd,
+        true,
+      );
+    };
+
+    const cancelTouchManualSelection = (opts?: {
+      clearSelection?: boolean;
+    }) => {
+      const activeManual = manualSelectionRef.current;
+      const hadTouchSelection =
+        !!pendingTouchManualSelectionRef.current ||
+        activeManual?.pointerType === "touch";
+
+      clearPendingTouchManualSelection();
+
+      if (!hadTouchSelection) return;
+
+      if (opts?.clearSelection && activeManual?.pointerType === "touch") {
+        window.getSelection()?.removeAllRanges();
+      }
+
+      clearManualSelection();
+      removeManualSelectionListeners();
     };
 
     const handleManualPointerMove = (e: PointerEvent) => {
       const state = manualSelectionRef.current;
       if (!state) return;
+      if (state.pointerId !== null && e.pointerId !== state.pointerId) return;
+      if (state.pointerType === "touch" && pinchGestureActiveRef.current) {
+        cancelTouchManualSelection({ clearSelection: true });
+        return;
+      }
       const sel = window.getSelection();
       if (!sel) return;
       const dx = Math.abs(e.clientX - state.startX);
@@ -928,8 +959,16 @@ export const useTextLayerSelection = (opts: {
       }
     };
 
-    const handleManualPointerEnd = () => {
+    const handleManualPointerEnd = (e?: PointerEvent) => {
       const state = manualSelectionRef.current;
+      if (
+        e &&
+        state &&
+        state.pointerId !== null &&
+        e.pointerId !== state.pointerId
+      ) {
+        return;
+      }
       const sel = window.getSelection();
       if (state && !state.didDrag && sel?.isCollapsed) {
         // Only clear a collapsed anchor selection (no drag). Avoid wiping
@@ -937,17 +976,7 @@ export const useTextLayerSelection = (opts: {
         sel.removeAllRanges();
       }
       clearManualSelection();
-      document.removeEventListener(
-        "pointermove",
-        handleManualPointerMove,
-        true,
-      );
-      document.removeEventListener("pointerup", handleManualPointerEnd, true);
-      document.removeEventListener(
-        "pointercancel",
-        handleManualPointerEnd,
-        true,
-      );
+      removeManualSelectionListeners();
     };
 
     const startManualSelection = (
@@ -956,9 +985,12 @@ export const useTextLayerSelection = (opts: {
       startX: number,
       startY: number,
       sel: Selection,
+      pointerId: number | null,
+      pointerType: PointerEvent["pointerType"],
     ) => {
       // Manual anchor keeps whitespace drags locked to the intended line, instead
       // of letting the browser jump the selection to a later text run.
+      clearPendingTouchManualSelection();
       sel.removeAllRanges();
       sel.addRange(anchorTarget.range);
       const lineInfo = getLineInfoForRect(
@@ -968,6 +1000,8 @@ export const useTextLayerSelection = (opts: {
         getLineBandAxisForSpan(anchorTarget.span),
       );
       manualSelectionRef.current = {
+        pointerId,
+        pointerType,
         anchorNode: anchorTarget.range.startContainer,
         anchorOffset: anchorTarget.range.startOffset,
         activeLayer,
@@ -982,9 +1016,50 @@ export const useTextLayerSelection = (opts: {
         lineBandEnd: lineInfo.lineBandEnd,
         lineLayer: activeLayer,
       };
+      setPointerSelectingTextState(true);
       document.addEventListener("pointermove", handleManualPointerMove, true);
       document.addEventListener("pointerup", handleManualPointerEnd, true);
       document.addEventListener("pointercancel", handleManualPointerEnd, true);
+    };
+
+    const handlePendingTouchPointerMove = (e: PointerEvent) => {
+      const pending = pendingTouchManualSelectionRef.current;
+      if (!pending || e.pointerId !== pending.pointerId) return;
+      if (pinchGestureActiveRef.current) {
+        clearPendingTouchManualSelection();
+        return;
+      }
+
+      const dx = e.clientX - pending.startX;
+      const dy = e.clientY - pending.startY;
+      if (Math.hypot(dx, dy) < TOUCH_TEXT_SELECTION_START_DISTANCE_PX) {
+        e.preventDefault();
+        return;
+      }
+
+      const sel = window.getSelection();
+      if (!sel) {
+        clearPendingTouchManualSelection();
+        return;
+      }
+
+      startManualSelection(
+        pending.anchorTarget,
+        pending.activeLayer,
+        pending.startX,
+        pending.startY,
+        sel,
+        pending.pointerId,
+        "touch",
+      );
+      handleManualPointerMove(e);
+      e.preventDefault();
+    };
+
+    const handlePendingTouchPointerEnd = (e: PointerEvent) => {
+      const pending = pendingTouchManualSelectionRef.current;
+      if (!pending || e.pointerId !== pending.pointerId) return;
+      clearPendingTouchManualSelection();
     };
 
     const selectWordFromRange = (anchorRange: Range, sel: Selection) => {
@@ -1129,6 +1204,8 @@ export const useTextLayerSelection = (opts: {
           e.clientX,
           e.clientY,
           sel,
+          null,
+          "mouse",
         );
         e.preventDefault();
       }
@@ -1145,7 +1222,34 @@ export const useTextLayerSelection = (opts: {
       if (target?.closest?.("[data-ff-selection-handle='1']")) return;
       const activeLayer = textLayerRef.current;
       if (!activeLayer) return;
+      const pageEl =
+        pagePortalEl ??
+        ((typeof document !== "undefined"
+          ? document.getElementById(`page-${pageIndex}`)
+          : null) as HTMLElement | null);
+      const isWithinCurrentPage = !!pageEl && pageEl.contains(target);
+      if (!isWithinCurrentPage) return;
       const isTouchPointer = e.pointerType === "touch";
+
+      if (isTouchPointer) {
+        const activeTouchPointerId =
+          pendingTouchManualSelectionRef.current?.pointerId ??
+          (manualSelectionRef.current?.pointerType === "touch"
+            ? manualSelectionRef.current.pointerId
+            : null);
+        if (
+          activeTouchPointerId !== null &&
+          activeTouchPointerId !== e.pointerId
+        ) {
+          cancelTouchManualSelection({ clearSelection: true });
+          e.preventDefault();
+          return;
+        }
+        if (pinchGestureActiveRef.current) {
+          e.preventDefault();
+          return;
+        }
+      }
 
       const textLayer = target.closest(".textLayer");
       const directTextTarget = target.closest("span, br");
@@ -1155,12 +1259,13 @@ export const useTextLayerSelection = (opts: {
         if (sel && !sel.isCollapsed) {
           sel.removeAllRanges();
         }
+        if (isTouchPointer) {
+          e.preventDefault();
+        }
         return;
       }
 
       if (textLayer !== activeLayer) return;
-
-      if (isTouchPointer) return;
 
       const directRange = getCaretRangeFromPoint(e.clientX, e.clientY);
       const directContainer = directRange?.startContainer;
@@ -1203,37 +1308,82 @@ export const useTextLayerSelection = (opts: {
       const anchorTarget =
         directTarget ?? getNearestTextTarget(activeLayer, e.clientX, e.clientY);
       if (anchorTarget) {
-        startManualSelection(
-          anchorTarget,
-          activeLayer,
-          e.clientX,
-          e.clientY,
-          sel,
-        );
+        if (isTouchPointer) {
+          pendingTouchManualSelectionRef.current = {
+            pointerId: e.pointerId,
+            activeLayer,
+            anchorTarget,
+            startX: e.clientX,
+            startY: e.clientY,
+          };
+        } else {
+          startManualSelection(
+            anchorTarget,
+            activeLayer,
+            e.clientX,
+            e.clientY,
+            sel,
+            e.pointerId,
+            e.pointerType,
+          );
+        }
         e.preventDefault();
         return;
       }
       if (sel && !sel.isCollapsed) {
         sel.removeAllRanges();
       }
+      if (isTouchPointer) {
+        e.preventDefault();
+      }
     };
 
     document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener(
+      "pointermove",
+      handlePendingTouchPointerMove,
+      true,
+    );
+    document.addEventListener("pointerup", handlePendingTouchPointerEnd, true);
+    document.addEventListener(
+      "pointercancel",
+      handlePendingTouchPointerEnd,
+      true,
+    );
+
+    const unsubPinchGesture = appEventBus.on(
+      "workspace:pinchGestureActiveChange",
+      ({ active }) => {
+        pinchGestureActiveRef.current = active;
+        if (active) {
+          cancelTouchManualSelection({ clearSelection: true });
+        }
+      },
+      { replayLast: true },
+    );
+
     return () => {
+      unsubPinchGesture();
       document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
       document.removeEventListener(
         "pointermove",
-        handleManualPointerMove,
+        handlePendingTouchPointerMove,
         true,
       );
-      document.removeEventListener("pointerup", handleManualPointerEnd, true);
+      document.removeEventListener(
+        "pointerup",
+        handlePendingTouchPointerEnd,
+        true,
+      );
       document.removeEventListener(
         "pointercancel",
-        handleManualPointerEnd,
+        handlePendingTouchPointerEnd,
         true,
       );
+      removeManualSelectionListeners();
+      clearPendingTouchManualSelection();
       clearManualSelection();
     };
   }, [
@@ -1243,6 +1393,8 @@ export const useTextLayerSelection = (opts: {
     getSpanRotationDeg,
     getTextLayerFromPoint,
     isSelectMode,
+    pageIndex,
+    pagePortalEl,
     textLayerRef,
   ]);
 

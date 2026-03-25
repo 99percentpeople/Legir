@@ -26,6 +26,7 @@ import { ColorPickerPopover } from "@/components/toolbar/ColorPickerPopover";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { useMouse } from "@/hooks/useMouse";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   getDefaultArrowSize,
   getLineEndingMarker,
@@ -276,6 +277,17 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   } = useMouse<SVGSVGElement>();
   const menuTriggerRef = useRef<HTMLDivElement | null>(null);
   const vertexDragIndexRef = useRef<number | null>(null);
+  const activeVertexPointerRef = useRef<{
+    pointerId: number;
+    element: HTMLDivElement | null;
+  } | null>(null);
+  const pendingTouchVertexDragRef = useRef<{
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+    vertexIndex: number;
+  } | null>(null);
+  const pinchGestureActiveRef = useRef(false);
   const contextMenuOpenRef = useRef(false);
   const [menuAnchor, setMenuAnchor] = useState({ x: 0, y: 0 });
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
@@ -300,6 +312,25 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     resetContextState();
     dismissContextMenu();
   }, [dismissContextMenu, isSelected, resetContextState]);
+
+  useAppEvent("workspace:pinchGestureActiveChange", ({ active }) => {
+    pinchGestureActiveRef.current = active;
+    if (!active) return;
+
+    pendingTouchVertexDragRef.current = null;
+    vertexDragIndexRef.current = null;
+    const activeVertexPointer = activeVertexPointerRef.current;
+    if (activeVertexPointer) {
+      try {
+        activeVertexPointer.element?.releasePointerCapture(
+          activeVertexPointer.pointerId,
+        );
+      } catch {
+        // ignore
+      }
+    }
+    activeVertexPointerRef.current = null;
+  });
 
   const setSvgRefs = useCallback(
     (node: SVGSVGElement | null) => {
@@ -377,7 +408,14 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
 
   const handleVertexPointerDown =
     (vertexIndex: number) => (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!isSelectable || !isSelected || event.button !== 0) return;
+      if (
+        !isSelectable ||
+        !isSelected ||
+        event.button !== 0 ||
+        pinchGestureActiveRef.current
+      ) {
+        return;
+      }
       event.stopPropagation();
       event.preventDefault();
       try {
@@ -385,10 +423,23 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       } catch {
         // ignore
       }
+      if (event.pointerType === "touch") {
+        pendingTouchVertexDragRef.current = {
+          pointerId: event.pointerId,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          vertexIndex,
+        };
+        return;
+      }
       onTriggerHistorySave?.();
       vertexDragIndexRef.current = vertexIndex;
       try {
         event.currentTarget.setPointerCapture(event.pointerId);
+        activeVertexPointerRef.current = {
+          pointerId: event.pointerId,
+          element: event.currentTarget,
+        };
       } catch {
         // ignore
       }
@@ -397,6 +448,30 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const handleVertexPointerMove = (
     event: React.PointerEvent<HTMLDivElement>,
   ) => {
+    if (pinchGestureActiveRef.current) return;
+    const pendingTouchVertexDrag = pendingTouchVertexDragRef.current;
+    if (
+      pendingTouchVertexDrag &&
+      pendingTouchVertexDrag.pointerId === event.pointerId
+    ) {
+      const dx = event.clientX - pendingTouchVertexDrag.clientX;
+      const dy = event.clientY - pendingTouchVertexDrag.clientY;
+      if (Math.hypot(dx, dy) < 8) {
+        return;
+      }
+      pendingTouchVertexDragRef.current = null;
+      onTriggerHistorySave?.();
+      vertexDragIndexRef.current = pendingTouchVertexDrag.vertexIndex;
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        activeVertexPointerRef.current = {
+          pointerId: event.pointerId,
+          element: event.currentTarget,
+        };
+      } catch {
+        // ignore
+      }
+    }
     const vertexIndex = vertexDragIndexRef.current;
     if (vertexIndex === null) return;
     event.stopPropagation();
@@ -450,6 +525,13 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   };
 
   const handleVertexPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const pendingTouchVertexDrag = pendingTouchVertexDragRef.current;
+    if (
+      pendingTouchVertexDrag &&
+      pendingTouchVertexDrag.pointerId === event.pointerId
+    ) {
+      pendingTouchVertexDragRef.current = null;
+    }
     if (vertexDragIndexRef.current === null) return;
     event.stopPropagation();
     event.preventDefault();
@@ -459,6 +541,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       // ignore
     }
     vertexDragIndexRef.current = null;
+    activeVertexPointerRef.current = null;
   };
 
   const handleVertexKeyDown =
