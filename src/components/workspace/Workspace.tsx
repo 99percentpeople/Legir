@@ -1092,20 +1092,25 @@ const Workspace: React.FC<WorkspaceProps> = ({
     [onPageIndexChange],
   );
   const pinnedVirtualPageIndex = activePageIndex ?? viewportPageIndex;
-  const { handleViewportScroll, panViewportBy, zoomAtClientPoint } =
-    useWorkspaceViewport({
-      containerRef,
-      contentRef,
-      editorState,
-      onScaleChange,
-      isPanning,
-      fitTrigger,
-      onPageIndexChange: allowPageIndexChange
-        ? handleViewportPageIndexChange
-        : undefined,
-      textSelectionToolbarVisible: textSelectionToolbar.isVisible,
-      updateTextSelectionToolbar,
-    });
+  const {
+    handleViewportScroll,
+    panViewportBy,
+    zoomAtClientPoint,
+    zoomBetweenClientPoints,
+  } = useWorkspaceViewport({
+    containerRef,
+    contentRef,
+    editorState,
+    getPageRectByPageIndex,
+    onScaleChange,
+    isPanning,
+    fitTrigger,
+    onPageIndexChange: allowPageIndexChange
+      ? handleViewportPageIndexChange
+      : undefined,
+    textSelectionToolbarVisible: textSelectionToolbar.isVisible,
+    updateTextSelectionToolbar,
+  });
 
   useWorkspaceTouchPinch({
     containerRef,
@@ -1114,7 +1119,28 @@ const Workspace: React.FC<WorkspaceProps> = ({
     tool: editorState.tool,
     onPinchStart: abortActiveInteractions,
     onPinchStateChange: updatePinchGestureActive,
-    onPinchZoom: ({ clientX, clientY, newScale }) => {
+    onPinchZoom: ({
+      clientX,
+      clientY,
+      previousClientX,
+      previousClientY,
+      newScale,
+    }) => {
+      if (
+        typeof previousClientX === "number" &&
+        typeof previousClientY === "number"
+      ) {
+        void zoomBetweenClientPoints({
+          anchorClientX: previousClientX,
+          anchorClientY: previousClientY,
+          targetClientX: clientX,
+          targetClientY: clientY,
+          newScale,
+          source: "pinch",
+        });
+        return;
+      }
+
       void zoomAtClientPoint({
         clientX,
         clientY,

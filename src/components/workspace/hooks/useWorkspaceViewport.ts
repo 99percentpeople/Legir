@@ -51,6 +51,14 @@ export const useWorkspaceViewport = (opts: {
   containerRef: RefObject<HTMLDivElement>;
   contentRef: RefObject<HTMLDivElement>;
   editorState: WorkspaceEditorState;
+  getPageRectByPageIndex?: (pageIndex: number) => {
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+    right?: number;
+    bottom?: number;
+  } | null;
   onScaleChange: (newScale: number) => void;
   isPanning: boolean;
   fitTrigger?: number;
@@ -176,6 +184,49 @@ export const useWorkspaceViewport = (opts: {
       opts.onPageIndexChange?.(pageIndex);
     },
     [opts.onPageIndexChange],
+  );
+
+  const findClosestPageIndexByLayoutRect = useCallback(
+    (contentX: number, contentY: number) => {
+      const getRect = opts.getPageRectByPageIndex;
+      if (!getRect) return null;
+
+      const candidates = opts.editorState.pages
+        .map((page) => {
+          const rect = getRect(page.pageIndex);
+          if (!rect) return null;
+          return {
+            pageIndex: page.pageIndex,
+            rect: {
+              left: rect.left,
+              top: rect.top,
+              right:
+                typeof rect.right === "number"
+                  ? rect.right
+                  : rect.left + rect.width,
+              bottom:
+                typeof rect.bottom === "number"
+                  ? rect.bottom
+                  : rect.top + rect.height,
+            },
+          };
+        })
+        .filter(Boolean) as Array<{
+        pageIndex: number;
+        rect: { left: number; top: number; right: number; bottom: number };
+      }>;
+
+      if (candidates.length === 0) return null;
+
+      return (
+        pickClosestRectCandidate(
+          { x: contentX, y: contentY },
+          candidates,
+          (candidate) => candidate.rect,
+        )?.pageIndex ?? null
+      );
+    },
+    [opts.editorState.pages, opts.getPageRectByPageIndex],
   );
 
   const findPageNearPointByDom = useCallback(
@@ -321,6 +372,19 @@ export const useWorkspaceViewport = (opts: {
     ],
   );
 
+  const getContainerMousePosition = useCallback(
+    (clientX: number, clientY: number) => {
+      const container = opts.containerRef.current;
+      if (!container) return null;
+      const rect = container.getBoundingClientRect();
+      return {
+        mouseX: clientX - rect.left,
+        mouseY: clientY - rect.top,
+      };
+    },
+    [opts.containerRef],
+  );
+
   const getZoomAnchorAtClientPoint = useCallback(
     (
       clientX: number,
@@ -447,6 +511,53 @@ export const useWorkspaceViewport = (opts: {
       });
     },
     [getZoomAnchorAtClientPoint, opts.editorState.scale, queueZoomCommit],
+  );
+
+  const zoomBetweenClientPoints = useCallback(
+    (options: {
+      anchorClientX: number;
+      anchorClientY: number;
+      targetClientX: number;
+      targetClientY: number;
+      newScale: number;
+      source: WorkspaceZoomSource;
+      fromScale?: number;
+    }) => {
+      const currentScale =
+        pendingZoomCommitRef.current?.scale ?? opts.editorState.scale;
+      const nextScale = Number(
+        clampWorkspaceScale(options.newScale).toFixed(3),
+      );
+      const fromScale = options.fromScale ?? currentScale;
+      const anchor = getZoomAnchorAtClientPoint(
+        options.anchorClientX,
+        options.anchorClientY,
+        currentScale,
+        nextScale,
+      );
+      const mousePosition = getContainerMousePosition(
+        options.targetClientX,
+        options.targetClientY,
+      );
+      if (!anchor || !mousePosition) return false;
+
+      return queueZoomCommit({
+        scale: nextScale,
+        anchor: {
+          ...anchor,
+          mouseX: mousePosition.mouseX,
+          mouseY: mousePosition.mouseY,
+        },
+        source: options.source,
+        fromScale,
+      });
+    },
+    [
+      getContainerMousePosition,
+      getZoomAnchorAtClientPoint,
+      opts.editorState.scale,
+      queueZoomCommit,
+    ],
   );
 
   const panViewportBy = useCallback(
@@ -636,7 +747,16 @@ export const useWorkspaceViewport = (opts: {
             hitPageElAt(centerX, centerY - probe) ||
             hitPageElAt(centerX, centerY + probe);
 
-          if (!pageEl) return;
+          if (!pageEl) {
+            const fallbackPageIndex = findClosestPageIndexByLayoutRect(
+              c.scrollLeft + c.clientWidth / 2,
+              c.scrollTop + c.clientHeight / 2,
+            );
+            if (fallbackPageIndex !== null && shouldNotifyPageIndex) {
+              notifyPageIndexChange(fallbackPageIndex);
+            }
+            return;
+          }
 
           const idx = Number(pageEl.id.slice("page-".length));
           if (Number.isNaN(idx)) return;
@@ -753,6 +873,8 @@ export const useWorkspaceViewport = (opts: {
     opts.editorState.pageLayout,
     opts.editorState.pages,
     opts.editorState.scale,
+    findClosestPageIndexByLayoutRect,
+    opts.getPageRectByPageIndex,
     opts.onPageIndexChange,
     opts.textSelectionToolbarVisible,
     opts.updateTextSelectionToolbar,
@@ -797,5 +919,10 @@ export const useWorkspaceViewport = (opts: {
     opts.fitTrigger,
   ]);
 
-  return { handleViewportScroll, panViewportBy, zoomAtClientPoint };
+  return {
+    handleViewportScroll,
+    panViewportBy,
+    zoomAtClientPoint,
+    zoomBetweenClientPoints,
+  };
 };

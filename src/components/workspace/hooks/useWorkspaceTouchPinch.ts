@@ -18,10 +18,14 @@ type SingleTouchSession = {
   startPoint: TouchPoint;
   lastPoint: TouchPoint;
   isActive: boolean;
+  inertiaEligible: boolean;
 };
 
 const MIN_PINCH_DISTANCE_PX = 8;
 const SINGLE_TOUCH_PAN_THRESHOLD_PX = 6;
+const TOUCH_PAN_INERTIA_MIN_SPEED_PX_PER_MS = 0.08;
+const TOUCH_PAN_INERTIA_STOP_SPEED_PX_PER_MS = 0.015;
+const TOUCH_PAN_INERTIA_DECAY_PER_FRAME = 0.94;
 
 const clampWorkspaceScale = (scale: number) => {
   return Math.max(0.25, Math.min(5.0, scale));
@@ -109,6 +113,8 @@ export const useWorkspaceTouchPinch = (opts: {
   onPinchZoom: (args: {
     clientX: number;
     clientY: number;
+    previousClientX?: number;
+    previousClientY?: number;
     newScale: number;
   }) => void;
   onPinchPan: (deltaX: number, deltaY: number) => void;
@@ -116,6 +122,14 @@ export const useWorkspaceTouchPinch = (opts: {
   const activeTouchPointsRef = useRef(new Map<number, TouchPoint>());
   const pinchSessionRef = useRef<PinchSession | null>(null);
   const singleTouchSessionRef = useRef<SingleTouchSession | null>(null);
+  const singleTouchVelocityRef = useRef({ x: 0, y: 0 });
+  const singleTouchLastSampleRef = useRef<{
+    clientX: number;
+    clientY: number;
+    time: number;
+  } | null>(null);
+  const inertiaRafRef = useRef<number | null>(null);
+  const inertiaLastFrameTimeRef = useRef<number | null>(null);
   const liveScaleRef = useRef(opts.scale);
   const gestureActiveRef = useRef(false);
 
@@ -144,6 +158,16 @@ export const useWorkspaceTouchPinch = (opts: {
 
   const clearSingleTouchSession = useCallback(() => {
     singleTouchSessionRef.current = null;
+    singleTouchLastSampleRef.current = null;
+  }, []);
+
+  const cancelSingleTouchInertia = useCallback(() => {
+    if (inertiaRafRef.current !== null) {
+      cancelAnimationFrame(inertiaRafRef.current);
+      inertiaRafRef.current = null;
+    }
+    inertiaLastFrameTimeRef.current = null;
+    singleTouchVelocityRef.current = { x: 0, y: 0 };
   }, []);
 
   const endViewportGesture = useCallback(() => {
@@ -151,6 +175,52 @@ export const useWorkspaceTouchPinch = (opts: {
     clearSingleTouchSession();
     updateGestureActive(false);
   }, [clearPinchSession, clearSingleTouchSession, updateGestureActive]);
+
+  const startSingleTouchInertia = useCallback(() => {
+    const initialVelocity = { ...singleTouchVelocityRef.current };
+    if (
+      Math.hypot(initialVelocity.x, initialVelocity.y) <
+      TOUCH_PAN_INERTIA_MIN_SPEED_PX_PER_MS
+    ) {
+      singleTouchVelocityRef.current = { x: 0, y: 0 };
+      return;
+    }
+
+    cancelSingleTouchInertia();
+    singleTouchVelocityRef.current = initialVelocity;
+
+    const tick = (now: number) => {
+      const lastFrame = inertiaLastFrameTimeRef.current ?? now;
+      const dt = Math.max(1, now - lastFrame);
+      inertiaLastFrameTimeRef.current = now;
+
+      const deltaX = singleTouchVelocityRef.current.x * dt;
+      const deltaY = singleTouchVelocityRef.current.y * dt;
+      if (Math.abs(deltaX) >= 0.1 || Math.abs(deltaY) >= 0.1) {
+        opts.onPinchPan(deltaX, deltaY);
+      }
+
+      const decay = Math.pow(TOUCH_PAN_INERTIA_DECAY_PER_FRAME, dt / 16.667);
+      singleTouchVelocityRef.current = {
+        x: singleTouchVelocityRef.current.x * decay,
+        y: singleTouchVelocityRef.current.y * decay,
+      };
+
+      if (
+        Math.hypot(
+          singleTouchVelocityRef.current.x,
+          singleTouchVelocityRef.current.y,
+        ) < TOUCH_PAN_INERTIA_STOP_SPEED_PX_PER_MS
+      ) {
+        cancelSingleTouchInertia();
+        return;
+      }
+
+      inertiaRafRef.current = requestAnimationFrame(tick);
+    };
+
+    inertiaRafRef.current = requestAnimationFrame(tick);
+  }, [cancelSingleTouchInertia, opts]);
 
   const startPinchSession = useCallback(
     (event?: TouchEvent) => {
@@ -197,6 +267,7 @@ export const useWorkspaceTouchPinch = (opts: {
 
       const container = opts.containerRef.current;
       if (!container) return;
+      cancelSingleTouchInertia();
 
       for (const touch of touchListToArray(event.changedTouches)) {
         const target = touch.target;
@@ -216,7 +287,14 @@ export const useWorkspaceTouchPinch = (opts: {
             startPoint: point,
             lastPoint: point,
             isActive: false,
+            inertiaEligible: true,
           };
+          singleTouchLastSampleRef.current = {
+            clientX: point.clientX,
+            clientY: point.clientY,
+            time: performance.now(),
+          };
+          singleTouchVelocityRef.current = { x: 0, y: 0 };
         }
       }
 
@@ -227,6 +305,7 @@ export const useWorkspaceTouchPinch = (opts: {
       }
     },
     [
+      cancelSingleTouchInertia,
       opts.containerRef,
       opts.enabled,
       opts.tool,
@@ -262,22 +341,28 @@ export const useWorkspaceTouchPinch = (opts: {
               (distance / pinchSession.initialDistance),
           ).toFixed(3),
         );
+        const scaleChanged =
+          Math.abs(nextScale - pinchSession.lastScale) >= 0.001;
+        const previousMidpoint = pinchSession.lastMidpoint;
 
-        if (Math.abs(deltaX) >= 0.5 || Math.abs(deltaY) >= 0.5) {
-          opts.onPinchPan(deltaX, deltaY);
-        }
-
-        pinchSession.lastMidpoint = midpoint;
-
-        if (Math.abs(nextScale - pinchSession.lastScale) >= 0.001) {
+        if (scaleChanged) {
           pinchSession.lastScale = nextScale;
           liveScaleRef.current = nextScale;
           opts.onPinchZoom({
             clientX: midpoint.clientX,
             clientY: midpoint.clientY,
+            previousClientX: previousMidpoint.clientX,
+            previousClientY: previousMidpoint.clientY,
             newScale: nextScale,
           });
+          pinchSession.lastMidpoint = midpoint;
+          return;
         }
+
+        if (Math.abs(deltaX) >= 0.5 || Math.abs(deltaY) >= 0.5) {
+          opts.onPinchPan(deltaX, deltaY);
+        }
+        pinchSession.lastMidpoint = midpoint;
         return;
       }
 
@@ -299,6 +384,26 @@ export const useWorkspaceTouchPinch = (opts: {
         stopTouchEvent(event);
         const deltaX = point.clientX - singleTouchSession.lastPoint.clientX;
         const deltaY = point.clientY - singleTouchSession.lastPoint.clientY;
+        const now = performance.now();
+        const lastSample = singleTouchLastSampleRef.current;
+        if (lastSample) {
+          const dt = now - lastSample.time;
+          if (dt > 0) {
+            const instantVelocityX = deltaX / dt;
+            const instantVelocityY = deltaY / dt;
+            singleTouchVelocityRef.current = {
+              x:
+                singleTouchVelocityRef.current.x * 0.2 + instantVelocityX * 0.8,
+              y:
+                singleTouchVelocityRef.current.y * 0.2 + instantVelocityY * 0.8,
+            };
+          }
+        }
+        singleTouchLastSampleRef.current = {
+          clientX: point.clientX,
+          clientY: point.clientY,
+          time: now,
+        };
         singleTouchSession.lastPoint = point;
 
         if (Math.abs(deltaX) >= 0.5 || Math.abs(deltaY) >= 0.5) {
@@ -326,6 +431,12 @@ export const useWorkspaceTouchPinch = (opts: {
       const container = opts.containerRef.current;
       if (!container) return;
       syncTrackedTouches(event.touches, container);
+      const shouldStartSingleTouchInertia =
+        event.type === "touchend" &&
+        !!singleTouchSessionRef.current?.isActive &&
+        !!singleTouchSessionRef.current?.inertiaEligible &&
+        !pinchSessionRef.current &&
+        activeTouchPointsRef.current.size === 0;
 
       if (pinchSessionRef.current) {
         stopTouchEvent(event);
@@ -339,13 +450,23 @@ export const useWorkspaceTouchPinch = (opts: {
             startPoint: remainingPoint,
             lastPoint: remainingPoint,
             isActive: false,
+            inertiaEligible: false,
           };
+          singleTouchLastSampleRef.current = {
+            clientX: remainingPoint.clientX,
+            clientY: remainingPoint.clientY,
+            time: performance.now(),
+          };
+          singleTouchVelocityRef.current = { x: 0, y: 0 };
           return;
         }
       }
 
       if (activeTouchPointsRef.current.size === 0) {
         endViewportGesture();
+        if (shouldStartSingleTouchInertia) {
+          startSingleTouchInertia();
+        }
         return;
       }
 
@@ -361,10 +482,12 @@ export const useWorkspaceTouchPinch = (opts: {
       }
     },
     [
+      cancelSingleTouchInertia,
       clearPinchSession,
       endViewportGesture,
       opts.containerRef,
       startPinchSession,
+      startSingleTouchInertia,
       syncTrackedTouches,
     ],
   );
@@ -395,13 +518,15 @@ export const useWorkspaceTouchPinch = (opts: {
   useEffect(() => {
     if (opts.enabled) return;
     activeTouchPointsRef.current.clear();
+    cancelSingleTouchInertia();
     endViewportGesture();
-  }, [endViewportGesture, opts.enabled]);
+  }, [cancelSingleTouchInertia, endViewportGesture, opts.enabled]);
 
   useEffect(() => {
     return () => {
       activeTouchPointsRef.current.clear();
+      cancelSingleTouchInertia();
       endViewportGesture();
     };
-  }, [endViewportGesture]);
+  }, [cancelSingleTouchInertia, endViewportGesture]);
 };
