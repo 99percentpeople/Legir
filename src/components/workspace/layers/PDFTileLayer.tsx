@@ -8,7 +8,10 @@ import {
   getDistanceBetweenPoints,
   getDistanceSquaredBetweenPoints,
 } from "@/lib/viewportMath";
-import { getWorkspaceRenderDpr } from "../lib/renderPerformance";
+import {
+  getWorkspaceRenderDpr,
+  getWorkspaceTileMaxDim,
+} from "../lib/renderPerformance";
 
 type TileInfo = {
   key: string;
@@ -24,11 +27,12 @@ const getViewportExpandedBounds = (
   rect: [number, number, number, number],
   baseW: number,
   baseH: number,
+  tileMaxDim: number,
   marginMultiplier: number,
 ) => {
   const [vl, vt, vr, vb] = rect;
-  const marginX = Math.min(0.4, (TILE_MAX_DIM / baseW) * marginMultiplier);
-  const marginY = Math.min(0.4, (TILE_MAX_DIM / baseH) * marginMultiplier);
+  const marginX = Math.min(0.4, (tileMaxDim / baseW) * marginMultiplier);
+  const marginY = Math.min(0.4, (tileMaxDim / baseH) * marginMultiplier);
 
   return {
     left: vl - marginX,
@@ -43,6 +47,7 @@ const tileIntersectsViewportRect = (
   baseW: number,
   baseH: number,
   rect: [number, number, number, number],
+  tileMaxDim: number,
   marginMultiplier: number,
 ) => {
   if (!baseW || !baseH) return true;
@@ -51,6 +56,7 @@ const tileIntersectsViewportRect = (
     rect,
     Math.max(baseW, 1),
     Math.max(baseH, 1),
+    tileMaxDim,
     marginMultiplier,
   );
   const x0 = tile.x / baseW;
@@ -115,10 +121,13 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
   const [frontTilesPageW, setFrontTilesPageW] = useState<number>(0);
   const [frontTilesPageH, setFrontTilesPageH] = useState<number>(0);
+  const [frontTilesMaxDim, setFrontTilesMaxDim] = useState<number>(0);
   const [midTilesPageW, setMidTilesPageW] = useState<number>(0);
   const [midTilesPageH, setMidTilesPageH] = useState<number>(0);
+  const [midTilesMaxDim, setMidTilesMaxDim] = useState<number>(0);
   const [backTilesPageW, setBackTilesPageW] = useState<number>(0);
   const [backTilesPageH, setBackTilesPageH] = useState<number>(0);
+  const [backTilesMaxDim, setBackTilesMaxDim] = useState<number>(0);
 
   const tileCanvasElsRef = useRef(new Map<string, HTMLCanvasElement>());
   const tileDetachedCanvasRef = useRef(new Map<string, OffscreenCanvas>());
@@ -341,13 +350,17 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       setBackTilesKey("");
       setBackTilesPageW(0);
       setBackTilesPageH(0);
+      setBackTilesMaxDim(0);
       return;
     }
 
+    const tileMaxDim = getWorkspaceTileMaxDim(pageW, pageH);
+
     setBackTilesPageW(pageW);
     setBackTilesPageH(pageH);
+    setBackTilesMaxDim(tileMaxDim);
 
-    const epoch = `${pageIndex}_${scale}_${dpr}_${pageW}x${pageH}`;
+    const epoch = `${pageIndex}_${scale}_${dpr}_${pageW}x${pageH}_${tileMaxDim}`;
 
     if (backTilesKey && backTilesKey !== epoch) {
       const backHasAnyRendered = backTiles.some((t) =>
@@ -360,6 +373,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           setFrontTilesKey(midTilesKey);
           setFrontTilesPageW(midTilesPageW);
           setFrontTilesPageH(midTilesPageH);
+          setFrontTilesMaxDim(midTilesMaxDim);
           setFrontHasAnyRendered(true);
         }
 
@@ -367,6 +381,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         setMidTilesKey(backTilesKey);
         setMidTilesPageW(backTilesPageW);
         setMidTilesPageH(backTilesPageH);
+        setMidTilesMaxDim(backTilesMaxDim);
       }
     }
 
@@ -410,10 +425,10 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         bottomCss / cssPageH,
       ];
     }
-    for (let y = 0; y < pageH; y += TILE_MAX_DIM) {
-      for (let x = 0; x < pageW; x += TILE_MAX_DIM) {
-        const w = Math.min(TILE_MAX_DIM, pageW - x);
-        const h = Math.min(TILE_MAX_DIM, pageH - y);
+    for (let y = 0; y < pageH; y += tileMaxDim) {
+      for (let x = 0; x < pageW; x += tileMaxDim) {
+        const w = Math.min(tileMaxDim, pageW - x);
+        const h = Math.min(tileMaxDim, pageH - y);
         const key = `${x}_${y}_${w}_${h}`;
         const priority = getDistanceBetweenPoints(
           { x: x + w / 2, y: y + h / 2 },
@@ -540,14 +555,17 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     setFrontTilesKey("");
     setFrontTilesPageW(0);
     setFrontTilesPageH(0);
+    setFrontTilesMaxDim(0);
     setMidTiles([]);
     setMidTilesKey("");
     setMidTilesPageW(0);
     setMidTilesPageH(0);
+    setMidTilesMaxDim(0);
     setBackTiles([]);
     setBackTilesKey("");
     setBackTilesPageW(0);
     setBackTilesPageH(0);
+    setBackTilesMaxDim(0);
     setFrontHasAnyRendered(false);
     didInitFrontFromBackKeyRef.current = "";
     setHasAnyTileRendered(false);
@@ -669,6 +687,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
             setFrontTilesKey(backTilesKey);
             setFrontTilesPageW(backTilesPageW);
             setFrontTilesPageH(backTilesPageH);
+            setFrontTilesMaxDim(backTilesMaxDim);
             setFrontHasAnyRendered(true);
           }
         }
@@ -708,35 +727,8 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       const allPendingTiles = backTiles.filter(
         (t) => !tileRenderedRef.current.has(t.canvasId),
       );
-      const viewportRectNorm = viewportRectNormRef.current;
-      const shouldScopeToViewport =
-        viewportRectNorm !== null && backTilesPageW > 0 && backTilesPageH > 0;
-      const urgentPendingTiles = shouldScopeToViewport
-        ? allPendingTiles.filter((tile) =>
-            tileIntersectsViewportRect(
-              tile,
-              backTilesPageW,
-              backTilesPageH,
-              viewportRectNorm,
-              2.5,
-            ),
-          )
-        : allPendingTiles;
-      const deferredPendingTiles = !shouldScopeToViewport
-        ? []
-        : allPendingTiles.filter(
-            (tile) =>
-              !tileIntersectsViewportRect(
-                tile,
-                backTilesPageW,
-                backTilesPageH,
-                viewportRectNorm,
-                2.5,
-              ),
-          );
-      const pendingTiles = urgentPendingTiles.slice();
-      const backgroundTiles = deferredPendingTiles.slice();
-      const totalToRender = pendingTiles.length + backgroundTiles.length;
+      const pendingTiles = allPendingTiles.slice();
+      const totalToRender = pendingTiles.length;
 
       const attemptCount = new Map<string, number>();
 
@@ -788,11 +780,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         return tile ?? null;
       };
 
-      const takeNextTile = (): TileInfo | null => {
-        return takeBestTile(
-          pendingTiles.length > 0 ? pendingTiles : backgroundTiles,
-        );
-      };
+      const takeNextTile = (): TileInfo | null => takeBestTile(pendingTiles);
 
       const launchMore = () => {
         if (signal.aborted) return;
@@ -910,7 +898,6 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     return null;
   }
 
-  // Used to re-render tiles when the viewport changes (per-tile hidden optimization).
   void viewportVersion;
 
   return (
@@ -929,6 +916,11 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           : isMid
             ? midTilesPageH
             : frontTilesPageH;
+        const tileMaxDim = isBack
+          ? backTilesMaxDim
+          : isMid
+            ? midTilesMaxDim
+            : frontTilesMaxDim;
 
         const hideByViewport = (() => {
           if (!tileMode) return false;
@@ -936,7 +928,14 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           if (!rect) return false;
           if (!baseW || !baseH) return false;
 
-          return !tileIntersectsViewportRect(t, baseW, baseH, rect, 1.5);
+          return !tileIntersectsViewportRect(
+            t,
+            baseW,
+            baseH,
+            rect,
+            tileMaxDim || TILE_MAX_DIM,
+            1.5,
+          );
         })();
 
         const tileDisplay = !isInView || hideByViewport ? "none" : "block";

@@ -1,4 +1,5 @@
 import {
+  TILE_MAX_DIM,
   WORKSPACE_HEAVY_PAGE_DPR_CAP,
   WORKSPACE_HEAVY_PAGE_PIXEL_THRESHOLD,
 } from "@/constants";
@@ -42,4 +43,35 @@ export const getWorkspaceRenderDpr = (
   }
 
   return requestedDpr;
+};
+
+const WORKSPACE_TILE_MEDIUM_DIM = 1536;
+const WORKSPACE_TILE_SMALL_DIM = 1024;
+const WORKSPACE_TILE_MEDIUM_EDGE_THRESHOLD = 8000;
+const WORKSPACE_TILE_SMALL_EDGE_THRESHOLD = 12000;
+const WORKSPACE_TILE_MEDIUM_PIXEL_THRESHOLD = 24_000_000;
+const WORKSPACE_TILE_SMALL_PIXEL_THRESHOLD = 48_000_000;
+
+export const getWorkspaceTileMaxDim = (
+  pageWidth: number,
+  pageHeight: number,
+) => {
+  const pixelCount = Math.max(0, Math.ceil(pageWidth) * Math.ceil(pageHeight));
+  const maxEdge = Math.max(pageWidth, pageHeight);
+
+  if (
+    pixelCount >= WORKSPACE_TILE_SMALL_PIXEL_THRESHOLD ||
+    maxEdge >= WORKSPACE_TILE_SMALL_EDGE_THRESHOLD
+  ) {
+    return WORKSPACE_TILE_SMALL_DIM;
+  }
+
+  if (
+    pixelCount >= WORKSPACE_TILE_MEDIUM_PIXEL_THRESHOLD ||
+    maxEdge >= WORKSPACE_TILE_MEDIUM_EDGE_THRESHOLD
+  ) {
+    return WORKSPACE_TILE_MEDIUM_DIM;
+  }
+
+  return TILE_MAX_DIM;
 };
