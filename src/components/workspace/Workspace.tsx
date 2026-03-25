@@ -284,6 +284,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
     y: number;
   } | null>(null);
   const [activePageIndex, setActivePageIndex] = useState<number | null>(null);
+  const [viewportPageIndex, setViewportPageIndex] = useState<number | null>(
+    null,
+  );
   const [isPinchZooming, setIsPinchZooming] = useState(false);
   const [shapeDraftSession, setShapeDraftSession] =
     useState<ShapeDraftSession | null>(null);
@@ -1081,6 +1084,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
   );
 
   const allowPageIndexChange = !editorState.pendingViewStateRestore;
+  const handleViewportPageIndexChange = useCallback(
+    (index: number) => {
+      setViewportPageIndex(index);
+      onPageIndexChange?.(index);
+    },
+    [onPageIndexChange],
+  );
+  const pinnedVirtualPageIndex = activePageIndex ?? viewportPageIndex;
   const { handleViewportScroll, panViewportBy, zoomAtClientPoint } =
     useWorkspaceViewport({
       containerRef,
@@ -1089,7 +1100,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
       onScaleChange,
       isPanning,
       fitTrigger,
-      onPageIndexChange: allowPageIndexChange ? onPageIndexChange : undefined,
+      onPageIndexChange: allowPageIndexChange
+        ? handleViewportPageIndexChange
+        : undefined,
       textSelectionToolbarVisible: textSelectionToolbar.isVisible,
       updateTextSelectionToolbar,
     });
@@ -3242,8 +3255,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
               axis={virtualAxis}
               overscan={WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES}
               pinIndex={
-                typeof activePageIndex === "number"
-                  ? (pageIndexToItemIndex.get(activePageIndex) ?? null)
+                typeof pinnedVirtualPageIndex === "number"
+                  ? (pageIndexToItemIndex.get(pinnedVirtualPageIndex) ?? null)
                   : null
               }
               items={pagesWithControls}

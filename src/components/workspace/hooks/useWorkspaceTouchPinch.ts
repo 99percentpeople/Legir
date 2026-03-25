@@ -41,6 +41,23 @@ const touchToPoint = (touch: Touch): TouchPoint => ({
   clientY: touch.clientY,
 });
 
+const getTouchesWithinContainer = (
+  touches: TouchList,
+  container: HTMLElement,
+) => {
+  const rect = container.getBoundingClientRect();
+  const hitSlop = 24;
+
+  return touchListToArray(touches).filter((touch) => {
+    return (
+      touch.clientX >= rect.left - hitSlop &&
+      touch.clientX <= rect.right + hitSlop &&
+      touch.clientY >= rect.top - hitSlop &&
+      touch.clientY <= rect.bottom + hitSlop
+    );
+  });
+};
+
 const getTouchDistance = (a: TouchPoint, b: TouchPoint) => {
   return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
 };
@@ -99,11 +116,11 @@ export const useWorkspaceTouchPinch = (opts: {
   const activeTouchPointsRef = useRef(new Map<number, TouchPoint>());
   const pinchSessionRef = useRef<PinchSession | null>(null);
   const singleTouchSessionRef = useRef<SingleTouchSession | null>(null);
-  const scaleRef = useRef(opts.scale);
+  const liveScaleRef = useRef(opts.scale);
   const gestureActiveRef = useRef(false);
 
   useEffect(() => {
-    scaleRef.current = opts.scale;
+    liveScaleRef.current = opts.scale;
   }, [opts.scale]);
 
   const updateGestureActive = useCallback(
@@ -137,11 +154,12 @@ export const useWorkspaceTouchPinch = (opts: {
 
   const startPinchSession = useCallback(
     (event?: TouchEvent) => {
-      if (!opts.enabled || activeTouchPointsRef.current.size !== 2) {
+      if (!opts.enabled || activeTouchPointsRef.current.size < 2) {
         return false;
       }
 
       const [first, second] = Array.from(activeTouchPointsRef.current.values());
+      if (!first || !second) return false;
       const midpoint = getTouchMidpoint(first, second);
 
       beginViewportGesture();
@@ -151,8 +169,8 @@ export const useWorkspaceTouchPinch = (opts: {
           MIN_PINCH_DISTANCE_PX,
           getTouchDistance(first, second),
         ),
-        initialScale: scaleRef.current,
-        lastScale: scaleRef.current,
+        initialScale: liveScaleRef.current,
+        lastScale: liveScaleRef.current,
         lastMidpoint: midpoint,
       };
 
@@ -162,12 +180,16 @@ export const useWorkspaceTouchPinch = (opts: {
     [beginViewportGesture, clearSingleTouchSession, opts.enabled],
   );
 
-  const updateTrackedTouches = useCallback((touches: TouchList) => {
-    for (const touch of touchListToArray(touches)) {
-      if (!activeTouchPointsRef.current.has(touch.identifier)) continue;
-      activeTouchPointsRef.current.set(touch.identifier, touchToPoint(touch));
-    }
-  }, []);
+  const syncTrackedTouches = useCallback(
+    (touches: TouchList, container: HTMLElement) => {
+      const nextMap = new Map<number, TouchPoint>();
+      for (const touch of getTouchesWithinContainer(touches, container)) {
+        nextMap.set(touch.identifier, touchToPoint(touch));
+      }
+      activeTouchPointsRef.current = nextMap;
+    },
+    [],
+  );
 
   const handleTouchStart = useCallback(
     (event: TouchEvent) => {
@@ -198,24 +220,35 @@ export const useWorkspaceTouchPinch = (opts: {
         }
       }
 
-      if (activeTouchPointsRef.current.size === 2) {
+      syncTrackedTouches(event.touches, container);
+
+      if (activeTouchPointsRef.current.size >= 2) {
         startPinchSession(event);
       }
     },
-    [opts.containerRef, opts.enabled, opts.tool, startPinchSession],
+    [
+      opts.containerRef,
+      opts.enabled,
+      opts.tool,
+      startPinchSession,
+      syncTrackedTouches,
+    ],
   );
 
   const handleTouchMove = useCallback(
     (event: TouchEvent) => {
-      updateTrackedTouches(event.changedTouches);
+      const container = opts.containerRef.current;
+      if (!container) return;
+      syncTrackedTouches(event.touches, container);
 
       const pinchSession = pinchSessionRef.current;
-      if (pinchSession && activeTouchPointsRef.current.size === 2) {
+      if (pinchSession && activeTouchPointsRef.current.size >= 2) {
         stopTouchEvent(event);
 
         const [first, second] = Array.from(
           activeTouchPointsRef.current.values(),
         );
+        if (!first || !second) return;
         const midpoint = getTouchMidpoint(first, second);
         const distance = Math.max(
           MIN_PINCH_DISTANCE_PX,
@@ -238,6 +271,7 @@ export const useWorkspaceTouchPinch = (opts: {
 
         if (Math.abs(nextScale - pinchSession.lastScale) >= 0.001) {
           pinchSession.lastScale = nextScale;
+          liveScaleRef.current = nextScale;
           opts.onPinchZoom({
             clientX: midpoint.clientX,
             clientY: midpoint.clientY,
@@ -273,24 +307,25 @@ export const useWorkspaceTouchPinch = (opts: {
         return;
       }
 
-      if (activeTouchPointsRef.current.size === 2) {
+      if (activeTouchPointsRef.current.size >= 2) {
         startPinchSession(event);
       }
     },
     [
       beginViewportGesture,
+      opts.containerRef,
       opts.onPinchPan,
       opts.onPinchZoom,
       startPinchSession,
-      updateTrackedTouches,
+      syncTrackedTouches,
     ],
   );
 
   const handleTouchEnd = useCallback(
     (event: TouchEvent) => {
-      for (const touch of touchListToArray(event.changedTouches)) {
-        activeTouchPointsRef.current.delete(touch.identifier);
-      }
+      const container = opts.containerRef.current;
+      if (!container) return;
+      syncTrackedTouches(event.touches, container);
 
       if (pinchSessionRef.current) {
         stopTouchEvent(event);
@@ -303,7 +338,7 @@ export const useWorkspaceTouchPinch = (opts: {
           singleTouchSessionRef.current = {
             startPoint: remainingPoint,
             lastPoint: remainingPoint,
-            isActive: true,
+            isActive: false,
           };
           return;
         }
@@ -321,11 +356,17 @@ export const useWorkspaceTouchPinch = (opts: {
         }
       }
 
-      if (activeTouchPointsRef.current.size === 2) {
+      if (activeTouchPointsRef.current.size >= 2) {
         startPinchSession(event);
       }
     },
-    [clearPinchSession, endViewportGesture, startPinchSession],
+    [
+      clearPinchSession,
+      endViewportGesture,
+      opts.containerRef,
+      startPinchSession,
+      syncTrackedTouches,
+    ],
   );
 
   useEventListeners(typeof document !== "undefined" ? document : null, [

@@ -425,7 +425,8 @@ export const useWorkspaceViewport = (opts: {
       source: WorkspaceZoomSource;
       fromScale?: number;
     }) => {
-      const currentScale = opts.editorState.scale;
+      const currentScale =
+        pendingZoomCommitRef.current?.scale ?? opts.editorState.scale;
       const nextScale = Number(
         clampWorkspaceScale(options.newScale).toFixed(3),
       );
