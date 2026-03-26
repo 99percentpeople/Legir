@@ -246,6 +246,26 @@ export const summarizeListedAnnotations = (total: number, returned: number) => {
 };
 
 export const positiveIntSchema = z.number().int().positive();
+const finiteNumberSchema = z.preprocess((value) => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return value;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+  return value;
+}, z.number().finite());
+const nonNegativeNumberSchema = finiteNumberSchema.refine(
+  (value) => value >= 0,
+  {
+    message: "Expected a non-negative number.",
+  },
+);
+const positiveNumberSchema = finiteNumberSchema.refine((value) => value > 0, {
+  message: "Expected a positive number.",
+});
 const pageNumberInputSchema = z.preprocess((value) => {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -379,6 +399,9 @@ export const createToolBuilder = <TName extends AiToolName>(name: TName) =>
 export const annotationTypesSchema = z.array(
   z.enum(["comment", "highlight", "ink", "freetext", "shape", "link"]),
 );
+export const formFieldKindsSchema = z.array(
+  z.enum(["text", "checkbox", "radio", "dropdown", "signature"]),
+);
 export const stringArraySchema = z.array(z.string());
 export const summaryInstructionsSchema = z
   .object({
@@ -507,7 +530,7 @@ export const updateAnnotationTextsArgsSchema = z.preprocess(
     .strict(),
 );
 
-export const deleteHighlightsArgsSchema = z.preprocess(
+export const deleteAnnotationsArgsSchema = z.preprocess(
   (value) => value,
   z
     .object({
@@ -517,7 +540,7 @@ export const deleteHighlightsArgsSchema = z.preprocess(
           z.array(z.string().min(1)).min(1),
         )
         .describe(
-          "One or more highlight annotation ids to delete. Pass either a single id string or an array of id strings in the same annotation_ids field.",
+          "One or more annotation ids to delete. Pass either a single id string or an array of id strings in the same annotation_ids field.",
         ),
     })
     .strict(),
@@ -555,6 +578,470 @@ export const fillFormFieldsArgsSchema = z
       .min(1),
   })
   .strict();
+
+const formFieldAlignmentSchema = z.enum(["left", "center", "right"]);
+const unitIntervalNumberSchema = finiteNumberSchema.refine(
+  (value) => value >= 0 && value <= 1,
+  {
+    message: "Expected a number between 0 and 1.",
+  },
+);
+const optionalFiniteNumberSchema = z.preprocess((value) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+  return undefined;
+}, z.number().finite().optional());
+const optionalPositiveNumberSchema = z.preprocess((value) => {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+  }
+  return undefined;
+}, z.number().finite().positive().optional());
+const optionalNonNegativeNumberSchema = z.preprocess((value) => {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric) && numeric >= 0) {
+      return numeric;
+    }
+  }
+  return undefined;
+}, z.number().finite().nonnegative().optional());
+const optionalPageNumberSchema = z.preprocess((value) => {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return Math.trunc(numeric);
+    }
+  }
+  return undefined;
+}, z.number().int().positive().optional());
+const optionalStringSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value : undefined),
+  z.string().optional(),
+);
+const optionalTrimmedStringSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim() : undefined),
+  z.string().optional(),
+);
+const optionalBooleanSchema = z.preprocess(
+  (value) => (typeof value === "boolean" ? value : undefined),
+  z.boolean().optional(),
+);
+export const pageRectArgsSchema = z
+  .object({
+    x: nonNegativeNumberSchema,
+    y: nonNegativeNumberSchema,
+    width: positiveNumberSchema,
+    height: positiveNumberSchema,
+  })
+  .strict();
+const loosePageRectArgsSchema = z
+  .object({
+    x: optionalFiniteNumberSchema,
+    y: optionalFiniteNumberSchema,
+    width: optionalPositiveNumberSchema,
+    height: optionalPositiveNumberSchema,
+  })
+  .passthrough();
+const looseAnnotationPointArgsSchema = z
+  .object({
+    x: optionalFiniteNumberSchema,
+    y: optionalFiniteNumberSchema,
+  })
+  .passthrough();
+const shapeArrowStyleSchema = z.enum([
+  "closed_arrow",
+  "line_arrow",
+  "hollow_arrow",
+  "circle",
+  "square",
+  "diamond",
+  "slash",
+]);
+const formFieldRectPatchArgsSchema = z
+  .object({
+    x: nonNegativeNumberSchema.optional(),
+    y: nonNegativeNumberSchema.optional(),
+    width: positiveNumberSchema.optional(),
+    height: positiveNumberSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.x === undefined &&
+      value.y === undefined &&
+      value.width === undefined &&
+      value.height === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "rect must include at least one of x, y, width, or height when provided.",
+      });
+    }
+  });
+
+const annotationRectPatchArgsSchema = formFieldRectPatchArgsSchema;
+
+const fieldStyleArgsSchema = z
+  .object({
+    border_color: z.string().min(1).optional(),
+    background_color: z.string().min(1).optional(),
+    border_width: nonNegativeNumberSchema.optional(),
+    border_style: z.enum(["solid", "dashed", "underline"]).optional(),
+    text_color: z.string().min(1).optional(),
+    font_size: positiveNumberSchema.optional(),
+    font_family: z.string().min(1).optional(),
+    is_transparent: z.boolean().optional(),
+  })
+  .strict();
+
+const updateFormFieldInputSchema = z
+  .object({
+    field_id: z.string().min(1),
+    rect: formFieldRectPatchArgsSchema.optional(),
+    required: z.boolean().optional(),
+    read_only: z.boolean().optional(),
+    tool_tip: z.string().optional(),
+    placeholder: z.string().optional(),
+    options: z.array(z.string()).min(1).optional(),
+    multiline: z.boolean().optional(),
+    alignment: formFieldAlignmentSchema.optional(),
+    is_multi_select: z.boolean().optional(),
+    allow_custom_value: z.boolean().optional(),
+    export_value: z.string().optional(),
+    style: fieldStyleArgsSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const hasStyleUpdate = !!value.style && Object.keys(value.style).length > 0;
+    const hasRectUpdate = !!value.rect;
+    const hasOtherUpdate =
+      value.required !== undefined ||
+      value.read_only !== undefined ||
+      value.tool_tip !== undefined ||
+      value.placeholder !== undefined ||
+      value.options !== undefined ||
+      value.multiline !== undefined ||
+      value.alignment !== undefined ||
+      value.is_multi_select !== undefined ||
+      value.allow_custom_value !== undefined ||
+      value.export_value !== undefined;
+
+    if (!hasStyleUpdate && !hasRectUpdate && !hasOtherUpdate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Each update must include at least one property to change.",
+      });
+    }
+  });
+
+export const updateFormFieldsArgsSchema = z
+  .object({
+    updates: z.array(updateFormFieldInputSchema).min(1),
+  })
+  .strict();
+
+const sharedAnnotationStyleArgsSchema = z.object({
+  color: z.string().min(1).optional(),
+  opacity: unitIntervalNumberSchema.optional(),
+});
+
+const freetextAnnotationStyleArgsSchema = sharedAnnotationStyleArgsSchema
+  .extend({
+    background_color: z.string().min(1).optional(),
+    border_color: z.string().min(1).optional(),
+    border_width: nonNegativeNumberSchema.optional(),
+    font_size: positiveNumberSchema.optional(),
+    font_family: z.string().min(1).optional(),
+    line_height: positiveNumberSchema.optional(),
+    alignment: formFieldAlignmentSchema.optional(),
+    flatten: z.boolean().optional(),
+    rotation_deg: finiteNumberSchema.optional(),
+  })
+  .strict();
+
+const shapeAnnotationStyleArgsSchema = sharedAnnotationStyleArgsSchema
+  .extend({
+    background_color: z.string().min(1).optional(),
+    background_opacity: unitIntervalNumberSchema.optional(),
+    thickness: nonNegativeNumberSchema.optional(),
+    arrow_size: positiveNumberSchema.optional(),
+    start_arrow_style: shapeArrowStyleSchema.optional(),
+    end_arrow_style: shapeArrowStyleSchema.optional(),
+    cloud_intensity: positiveNumberSchema.optional(),
+    cloud_spacing: positiveNumberSchema.optional(),
+  })
+  .strict();
+
+const ensureAnnotationPatchPayload = (
+  value: {
+    text?: string;
+    rect?: unknown;
+    style?: Record<string, unknown>;
+  },
+  ctx: z.RefinementCtx,
+) => {
+  const hasTextUpdate = value.text !== undefined;
+  const hasRectUpdate = !!value.rect;
+  const hasStyleUpdate = !!value.style && Object.keys(value.style).length > 0;
+
+  if (!hasTextUpdate && !hasRectUpdate && !hasStyleUpdate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Each update must include at least one property to change.",
+    });
+  }
+};
+
+const highlightAnnotationUpdateInputSchema = z
+  .object({
+    annotation_id: z.string().min(1),
+    text: z.string().optional(),
+    rect: annotationRectPatchArgsSchema.optional(),
+    style: sharedAnnotationStyleArgsSchema.strict().optional(),
+  })
+  .strict()
+  .superRefine(ensureAnnotationPatchPayload);
+
+const freetextAnnotationUpdateInputSchema = z
+  .object({
+    annotation_id: z.string().min(1),
+    text: z.string().optional(),
+    rect: annotationRectPatchArgsSchema.optional(),
+    style: freetextAnnotationStyleArgsSchema.optional(),
+  })
+  .strict()
+  .superRefine(ensureAnnotationPatchPayload);
+
+const shapeAnnotationUpdateInputSchema = z
+  .object({
+    annotation_id: z.string().min(1),
+    text: z.string().optional(),
+    rect: annotationRectPatchArgsSchema.optional(),
+    style: shapeAnnotationStyleArgsSchema.optional(),
+  })
+  .strict()
+  .superRefine(ensureAnnotationPatchPayload);
+
+const createSingleOrBatchAnnotationUpdateArgsSchema = <
+  TSchema extends ZodTypeAny,
+>(
+  itemSchema: TSchema,
+) =>
+  z.preprocess(
+    (value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return value;
+      }
+      const record = value as Record<string, unknown>;
+      if ("updates" in record) return record;
+      if (typeof record.annotation_id === "string") {
+        return { updates: [record] };
+      }
+      return record;
+    },
+    z
+      .object({
+        updates: z.array(itemSchema).min(1),
+      })
+      .strict(),
+  );
+
+export const updateHighlightAnnotationsArgsSchema =
+  createSingleOrBatchAnnotationUpdateArgsSchema(
+    highlightAnnotationUpdateInputSchema,
+  );
+
+export const updateFreetextAnnotationsArgsSchema =
+  createSingleOrBatchAnnotationUpdateArgsSchema(
+    freetextAnnotationUpdateInputSchema,
+  );
+
+export const updateShapeAnnotationsArgsSchema =
+  createSingleOrBatchAnnotationUpdateArgsSchema(
+    shapeAnnotationUpdateInputSchema,
+  );
+
+const createFreetextAnnotationInputSchema = z
+  .object({
+    page_number: optionalPageNumberSchema,
+    text: optionalStringSchema,
+    rect: loosePageRectArgsSchema.optional(),
+    style: z
+      .object({
+        color: optionalTrimmedStringSchema,
+        opacity: unitIntervalNumberSchema.optional().catch(undefined),
+        background_color: optionalTrimmedStringSchema,
+        border_color: optionalTrimmedStringSchema,
+        border_width: optionalNonNegativeNumberSchema,
+        font_size: optionalPositiveNumberSchema,
+        font_family: optionalTrimmedStringSchema,
+        line_height: optionalPositiveNumberSchema,
+        alignment: formFieldAlignmentSchema.optional().catch(undefined),
+        flatten: optionalBooleanSchema,
+        rotation_deg: optionalFiniteNumberSchema,
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+export const createFreetextAnnotationsArgsSchema = z
+  .object({
+    annotations: z.array(createFreetextAnnotationInputSchema).min(1),
+  })
+  .strict();
+
+const createShapeAnnotationInputSchema = z
+  .object({
+    page_number: optionalPageNumberSchema,
+    shape_type: z
+      .enum([
+        "square",
+        "circle",
+        "line",
+        "polyline",
+        "polygon",
+        "cloud_polygon",
+        "arrow",
+        "cloud",
+      ])
+      .optional()
+      .catch(undefined),
+    rect: loosePageRectArgsSchema.optional(),
+    points: z.array(looseAnnotationPointArgsSchema).optional(),
+    annotation_text: optionalStringSchema,
+    style: z
+      .object({
+        color: optionalTrimmedStringSchema,
+        opacity: unitIntervalNumberSchema.optional().catch(undefined),
+        background_color: optionalTrimmedStringSchema,
+        background_opacity: unitIntervalNumberSchema
+          .optional()
+          .catch(undefined),
+        thickness: optionalNonNegativeNumberSchema,
+        arrow_size: optionalPositiveNumberSchema,
+        start_arrow_style: shapeArrowStyleSchema.optional().catch(undefined),
+        end_arrow_style: shapeArrowStyleSchema.optional().catch(undefined),
+        cloud_intensity: optionalPositiveNumberSchema,
+        cloud_spacing: optionalPositiveNumberSchema,
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+export const createShapeAnnotationsArgsSchema = z
+  .object({
+    annotations: z.array(createShapeAnnotationInputSchema).min(1),
+  })
+  .strict();
+
+export const detectFormFieldsArgsSchema = z
+  .object({
+    page_numbers: pageNumbersSchema.optional().default([]),
+    allowed_types: formFieldKindsSchema.optional().default([]),
+    user_intent: z
+      .string()
+      .optional()
+      .describe(
+        "Optional short intent summary for what the user wants to create, for example 'create the fillable fields on this page' or 'only detect signature and date areas'.",
+      ),
+    extra_prompt: z
+      .string()
+      .optional()
+      .describe(
+        "Optional extra constraints for detection, such as ignoring instructional text or focusing on a specific section.",
+      ),
+  })
+  .strict();
+
+const createFormFieldInputSchema = z
+  .object({
+    page_number: pageNumberSchema,
+    name: z.string().trim().min(1),
+    type: z.enum(["text", "checkbox", "radio", "dropdown", "signature"]),
+    rect: pageRectArgsSchema,
+    required: z.boolean().optional(),
+    read_only: z.boolean().optional(),
+    tool_tip: z.string().trim().min(1).optional(),
+    placeholder: z.string().optional(),
+    options: z.array(z.string()).optional().default([]),
+    multiline: z.boolean().optional(),
+    alignment: formFieldAlignmentSchema.optional(),
+    is_multi_select: z.boolean().optional(),
+    allow_custom_value: z.boolean().optional(),
+    export_value: z.string().trim().min(1).optional(),
+    style: fieldStyleArgsSchema.optional(),
+  })
+  .strict();
+
+export const createFormFieldsArgsSchema = z
+  .object({
+    batch_id: z
+      .string()
+      .optional()
+      .describe(
+        "Optional detected-field batch id. If omitted, apply the most recent draft batch from this conversation.",
+      ),
+    draft_ids: z
+      .preprocess(
+        (value) => (typeof value === "string" ? [value] : value),
+        z.array(z.string().min(1)).optional().default([]),
+      )
+      .describe(
+        "Optional subset of detected draft ids to create. If omitted, create every draft field in the selected batch.",
+      ),
+    fields: z
+      .array(createFormFieldInputSchema)
+      .optional()
+      .default([])
+      .describe(
+        "Optional direct field definitions in actual page coordinates. Use this when the current chat model has already inspected page visuals and is ready to create fields directly.",
+      ),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.fields.length > 0 &&
+      (typeof value.batch_id === "string" || value.draft_ids.length > 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Pass either fields for direct creation or batch_id/draft_ids for a detected batch, not both.",
+        path: ["fields"],
+      });
+    }
+  });
 
 export const focusControlArgsSchema = z
   .object({

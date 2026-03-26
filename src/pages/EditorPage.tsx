@@ -8,7 +8,6 @@ import { Button } from "../components/ui/button";
 import { appEventBus } from "@/lib/eventBus";
 import { RightPanelTabDock } from "../components/properties-panel/RightPanelTabDock";
 import { PropertiesPanel } from "../components/properties-panel/PropertiesPanel";
-import { FormDetectionPanel } from "../components/properties-panel/FormDetectionPanel";
 import { PageTranslatePanel } from "../components/properties-panel/PageTranslatePanel";
 import { AiChatPanel } from "../components/properties-panel/AiChatPanel";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -35,7 +34,6 @@ import type {
   PDFSearchResult,
   Tool,
 } from "../types";
-import type { FormDetectionOptions } from "../components/FormDetectionOptionsForm";
 import { ANNOTATION_STYLES } from "../constants";
 import { recentFilesService } from "../services/recentFilesService";
 import { pdfWorkerService } from "../services/pdfService/pdfWorkerService";
@@ -72,7 +70,6 @@ export interface EditorPageProps {
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
-  onAdvancedDetect: (options: FormDetectionOptions) => void;
 }
 
 const EditorPage: React.FC<EditorPageProps> = ({
@@ -81,7 +78,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
   onSaveAs,
   onExit,
   onPrint,
-  onAdvancedDetect,
 }) => {
   const editorStore = useEditorStore(useShallow(selectEditorPageShellState));
   const state = editorStore;
@@ -1769,27 +1765,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
               onStop={aiChat.stop}
               onOpenDocumentLink={aiChat.openDocumentLink}
               disabledReason={aiChat.disabledReason}
-            />
-          ) : state.rightPanelTab === "form_detect" ? (
-            <FormDetectionPanel
-              isFloating={state.isPanelFloating}
-              isOpen={state.isRightPanelOpen}
-              onOpen={() => {
-                setUiState((prev) => {
-                  if (prev.isPanelFloating) {
-                    return { isRightPanelOpen: true, isSidebarOpen: false };
-                  }
-                  return { isRightPanelOpen: true };
-                });
-              }}
-              width={state.rightPanelWidth}
-              onResize={(w) => setUiState({ rightPanelWidth: w })}
-              onCollapse={() => setUiState({ isRightPanelOpen: false })}
-              totalPages={state.pages.length}
-              isProcessing={state.isProcessing}
-              onDetect={(options) => {
-                onAdvancedDetect(options);
-              }}
+              formToolsEnabled={aiChat.formToolsEnabled}
             />
           ) : state.rightPanelTab === "page_translate" ? (
             <PageTranslatePanel

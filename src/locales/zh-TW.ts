@@ -64,8 +64,6 @@ const zhTW = {
     shape_polygon_tools: "多邊形圖形",
     settings: "設定",
     shortcuts: "快捷鍵 (?)",
-    form_detect: "表單識別",
-    form_custom: "自訂識別...",
     export: "匯出",
     save_as: "另存為...",
     save_draft: "儲存草稿",
@@ -360,7 +358,6 @@ const zhTW = {
   right_panel: {
     tabs: {
       ai_chat: "AI 問答",
-      form_detect: "表單識別",
       page_translate: "全頁翻譯",
       properties: "屬性編輯",
     },
@@ -433,6 +430,11 @@ const zhTW = {
       highlight: "把所有包含簽名的位置高亮出來",
     },
     starters: {
+      forms: {
+        title: "製作表單",
+        current_page: "識別並建立這一頁的可填寫欄位",
+        signature_dates: "只識別目前頁面的簽名與日期欄位",
+      },
       reading: {
         title: "閱讀摘要",
         current_page: "總結目前頁面內容",
@@ -666,7 +668,18 @@ const zhTW = {
     },
     ai_chat: {
       title: "AI 問答工具",
-      description: "配置 AI 文件摘要工具，以及渲染頁視覺總結工具。",
+      description:
+        "配置 AI 問答能力，包括表單製作工具、文件摘要工具以及渲染頁視覺總結工具。",
+      form_tools_enabled: "啟用 AI 表單工具",
+      form_tools_enabled_desc:
+        "允許 AI 問答根據對話請求建立新的表單欄位。如果你只希望它做唯讀問答與欄位填值，請保持關閉。",
+      detect_form_fields_enabled: "啟用 detect_form_fields 後備偵測",
+      detect_form_fields_enabled_desc:
+        "當目前對話模型不能直接看圖時，允許 AI 問答使用獨立的 detect_form_fields 視覺工具作為後備偵測。",
+      form_tools_vision_model: "表單工具視覺模型",
+      form_tools_vision_model_placeholder: "選擇視覺模型",
+      form_tools_vision_model_desc:
+        "detect_form_fields 專用的視覺模型。這個工具不會使用目前聊天模型，且只有在啟用後備偵測時才會運行。",
       visual_summary_enabled: "啟用視覺總結工具",
       visual_summary_enabled_desc:
         "控制 AI 問答中的 summarize_pages_visual 是否可用。這讓純文字對話模型也能委派已設定的視覺模型檢查渲染後的頁面。",

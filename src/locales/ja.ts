@@ -64,8 +64,6 @@ const ja = {
     shape_polygon_tools: "多角形図形",
     settings: "設定",
     shortcuts: "ショートカット一覧 (?)",
-    form_detect: "フォーム検出",
-    form_custom: "独自検出...",
     export: "書き出し",
     save_as: "名前を付けて保存...",
     save_draft: "下書きを保存",
@@ -361,7 +359,6 @@ const ja = {
   right_panel: {
     tabs: {
       ai_chat: "AI チャット",
-      form_detect: "フォーム検出",
       page_translate: "ページ翻訳",
       properties: "設定編集",
     },
@@ -440,6 +437,11 @@ const ja = {
       highlight: "署名の出現箇所をすべてハイライトして",
     },
     starters: {
+      forms: {
+        title: "フォーム作成",
+        current_page: "このページの入力可能フィールドを検出して作成して",
+        signature_dates: "現在のページで署名欄と日付欄だけを検出して",
+      },
       reading: {
         title: "読む・要約する",
         current_page: "現在のページを要約して",
@@ -684,7 +686,17 @@ const ja = {
     ai_chat: {
       title: "AI チャットツール",
       description:
-        "AI ドキュメント要約ツールと、レンダリング済みページの視覚要約ツールを設定します。",
+        "フォーム作成ツール、ドキュメント要約ツール、レンダリング済みページの視覚要約ツールを含む AI チャット機能を設定します。",
+      form_tools_enabled: "AI フォームツールを有効化",
+      form_tools_enabled_desc:
+        "会話から新しいフォームフィールドを作成できるようにします。読み取り専用の Q&A と既存フィールド入力だけでよい場合は無効のままにしてください。",
+      detect_form_fields_enabled: "detect_form_fields フォールバックを有効化",
+      detect_form_fields_enabled_desc:
+        "現在のチャットモデルがページ画像を直接確認できないときに、専用の detect_form_fields ビジョンツールを使えるようにします。",
+      form_tools_vision_model: "フォームツール用ビジョンモデル",
+      form_tools_vision_model_placeholder: "ビジョンモデルを選択",
+      form_tools_vision_model_desc:
+        "detect_form_fields 専用のビジョンモデルです。このツールは現在のチャットモデルを使わず、フォールバック検出が有効なときだけ実行されます。",
       visual_summary_enabled: "視覚要約ツールを有効化",
       visual_summary_enabled_desc:
         "AI チャットで summarize_pages_visual を使えるかどうかを切り替えます。これにより、テキスト専用のチャットモデルでもレンダリング済みページの視覚確認をビジョンモデルに委任できます。",

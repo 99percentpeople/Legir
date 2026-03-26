@@ -69,8 +69,6 @@ const en = {
     shape_polygon_tools: "Polygon Shapes",
     settings: "Settings",
     shortcuts: "Keyboard Shortcuts (?)",
-    form_detect: "Form Detect",
-    form_custom: "Custom Detect...",
     export: "Export",
     save_as: "Save As...",
     save_draft: "Save Draft",
@@ -365,7 +363,6 @@ const en = {
   right_panel: {
     tabs: {
       ai_chat: "AI Chat",
-      form_detect: "Form Detect",
       page_translate: "Page Translate",
       properties: "Property Editing",
     },
@@ -443,6 +440,12 @@ const en = {
       highlight: "Highlight all occurrences of signature",
     },
     starters: {
+      forms: {
+        title: "Build Forms",
+        current_page: "Detect and create the fillable fields on this page",
+        signature_dates:
+          "Detect only signature and date fields on the current page",
+      },
       reading: {
         title: "Read & Summarize",
         current_page: "Summarize the current page",
@@ -692,7 +695,17 @@ const en = {
     ai_chat: {
       title: "AI Chat Tools",
       description:
-        "Configure the AI document digest tool and the rendered-page visual summary tool.",
+        "Configure AI chat capabilities including form-building tools, the document digest tool, and the rendered-page visual summary tool.",
+      form_tools_enabled: "Enable AI form tools",
+      form_tools_enabled_desc:
+        "Allow AI chat to create new form fields from conversation requests. Leave this off if you only want read-only Q&A and field filling.",
+      detect_form_fields_enabled: "Enable detect_form_fields fallback",
+      detect_form_fields_enabled_desc:
+        "Allow AI chat to use the dedicated detect_form_fields vision tool when the current chat model cannot inspect page images directly.",
+      form_tools_vision_model: "Form tools vision model",
+      form_tools_vision_model_placeholder: "Select a vision model",
+      form_tools_vision_model_desc:
+        "Dedicated vision model for detect_form_fields. This tool never uses the current chat model and only runs when the fallback detector is enabled.",
       visual_summary_enabled: "Enable visual summary tool",
       visual_summary_enabled_desc:
         "Turns summarize_pages_visual on or off for AI chat. This lets text-only chat models delegate rendered page inspection to a configured vision model.",

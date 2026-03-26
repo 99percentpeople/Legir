@@ -80,6 +80,51 @@ const getFirstLineTitleSnippet = (text: string) => {
   return toTitleSnippet(firstLine);
 };
 
+const FIELD_BATCH_CONFIRMATION_PATTERNS = [
+  /\b(confirm|confirmed|go ahead|proceed|apply (it|them|this)|create (it|them|these)|use this plan|looks good)\b/i,
+  /(确认|确认创建|按这个|照这个|就按这个|开始创建|开始吧|应用这个|没问题，创建|可以创建|就这样)/,
+];
+
+const isDetectedFieldBatchConfirmationMessage = (text: string) => {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  return FIELD_BATCH_CONFIRMATION_PATTERNS.some((pattern) =>
+    pattern.test(normalized),
+  );
+};
+
+const updateDetectedFieldBatchConfirmation = (options: {
+  session: AiChatSessionData;
+  userMessageId: string;
+  text: string;
+}) => {
+  const latestDraftBatch = options.session.pendingDetectedFieldBatches.find(
+    (batch) => batch.status === "draft",
+  );
+  if (!latestDraftBatch) return;
+
+  const shouldConfirm = isDetectedFieldBatchConfirmationMessage(options.text);
+  options.session.pendingDetectedFieldBatches =
+    options.session.pendingDetectedFieldBatches.map((batch) => {
+      if (batch.status !== "draft") return batch;
+      if (!shouldConfirm || batch.batchId !== latestDraftBatch.batchId) {
+        return {
+          ...batch,
+          confirmedAt: undefined,
+          confirmedByMessageId: undefined,
+          confirmedByUserText: undefined,
+        };
+      }
+
+      return {
+        ...batch,
+        confirmedAt: new Date().toISOString(),
+        confirmedByMessageId: options.userMessageId,
+        confirmedByUserText: options.text.trim(),
+      };
+    });
+};
+
 export const useAiChatController = (editorState: EditorState) => {
   const [registryVersion, setRegistryVersion] = useState(0);
   const [selectedModelKey, setSelectedModelKey] = useState<string | undefined>(
@@ -617,10 +662,21 @@ export const useAiChatController = (editorState: EditorState) => {
         sessionsRef,
         activeSessionIdRef,
         setHighlightedResultIds,
+        formToolsEnabled: editorState.options.aiChat.formToolsEnabled,
+        detectFormFieldsEnabled:
+          editorState.options.aiChat.detectFormFieldsEnabled,
+        formToolsVisionModelKey:
+          editorState.options.aiChat.formToolsVisionModelKey,
         selectedChatModel,
         selectedChatModelAuthor,
       }),
-    [selectedChatModel, selectedChatModelAuthor],
+    [
+      editorState.options.aiChat.formToolsEnabled,
+      editorState.options.aiChat.detectFormFieldsEnabled,
+      editorState.options.aiChat.formToolsVisionModelKey,
+      selectedChatModel,
+      selectedChatModelAuthor,
+    ],
   );
 
   const toolContext = useMemo(
@@ -975,6 +1031,12 @@ export const useAiChatController = (editorState: EditorState) => {
       });
       appendTimelineItem(userItem);
 
+      updateDetectedFieldBatchConfirmation({
+        session,
+        userMessageId: userItem.id,
+        text: displayText || text,
+      });
+
       pushUserConversationMessage({
         session,
         conversationRef,
@@ -1075,6 +1137,28 @@ export const useAiChatController = (editorState: EditorState) => {
       options.sourceSession.searchResultsById,
     );
     nextSession.highlightedResultIds = [];
+    nextSession.pendingDetectedFieldBatches =
+      options.sourceSession.pendingDetectedFieldBatches.map((batch) => ({
+        ...batch,
+        pageNumbers: [...batch.pageNumbers],
+        allowedTypes: batch.allowedTypes ? [...batch.allowedTypes] : undefined,
+        drafts: batch.drafts.map((draft) => ({
+          draftId: draft.draftId,
+          field: {
+            ...draft.field,
+            rect: { ...draft.field.rect },
+            style: draft.field.style ? { ...draft.field.style } : undefined,
+            options: draft.field.options ? [...draft.field.options] : undefined,
+          },
+          summary: {
+            ...draft.summary,
+            rect: { ...draft.summary.rect },
+            options: draft.summary.options
+              ? [...draft.summary.options]
+              : undefined,
+          },
+        })),
+      }));
     nextSession.runStatus = "idle";
     nextSession.lastError = null;
 
@@ -1341,6 +1425,7 @@ export const useAiChatController = (editorState: EditorState) => {
     session.conversation = [];
     session.searchResultsById = new Map();
     session.highlightedResultIds = [];
+    session.pendingDetectedFieldBatches = [];
     session.runStatus = "idle";
     session.lastError = null;
     session.awaitingContinue = false;
@@ -1517,5 +1602,6 @@ export const useAiChatController = (editorState: EditorState) => {
     highlightedSearchResultsByPage,
     hasAvailableModel,
     disabledReason,
+    formToolsEnabled: editorState.options.aiChat.formToolsEnabled,
   };
 };

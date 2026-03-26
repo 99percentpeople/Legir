@@ -2,7 +2,6 @@ import React from "react";
 import {
   BookA,
   FileText,
-  Form,
   Languages,
   MessageSquare,
   SlidersHorizontal,
@@ -16,7 +15,6 @@ import { appEventBus } from "@/lib/eventBus";
 export type RightPanelTabId =
   | "document"
   | "properties"
-  | "form_detect"
   | "ai_chat"
   | "translate"
   | "page_translate"
@@ -108,11 +106,6 @@ export function RightPanelTabDock({
       id: "ai_chat",
       title: t("right_panel.tabs.ai_chat"),
       Icon: MessageSquare,
-    },
-    {
-      id: "form_detect",
-      title: t("right_panel.tabs.form_detect"),
-      Icon: Form,
     },
     { id: "translate", title: t("translate.title"), Icon: Languages },
     {

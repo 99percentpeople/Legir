@@ -110,7 +110,10 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   useEffect(() => {
     if (isSelected) {
       if (cardRef.current) {
-        cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        cardRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
       }
 
       const activeElement = document.activeElement;
@@ -153,9 +156,11 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
         )}
       >
         <div className="flex items-center justify-between gap-2">
-          <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
+          <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs font-medium">
             {getAnnotationListTypeIcon(annotation)}
-            <span className="max-w-[120px] truncate">{annotation.author}</span>
+            <span className="min-w-0 flex-1 truncate" title={annotation.author}>
+              {annotation.author}
+            </span>
           </div>
           <Button
             variant="ghost"
@@ -170,20 +175,32 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
           </Button>
         </div>
 
-        <Textarea
-          rows={1}
-          id={`annotation-input-${annotation.id}`}
-          ref={textareaRef}
-          className="text-foreground placeholder:text-muted-foreground/50 min-h-10 w-full resize-none border-none bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
-          value={annotation.text || ""}
-          placeholder={t("sidebar.add_remark")}
-          onChange={(e) =>
-            onUpdate({
-              text: e.target.value,
-            })
-          }
-          onClick={(e) => e.stopPropagation()}
-        />
+        {isSelected ? (
+          <Textarea
+            rows={1}
+            id={`annotation-input-${annotation.id}`}
+            ref={textareaRef}
+            className="text-foreground placeholder:text-muted-foreground/50 min-h-10 w-full resize-none border-none bg-transparent px-0 py-2 text-sm leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent"
+            value={annotation.text || ""}
+            placeholder={t("sidebar.add_remark")}
+            onChange={(e) =>
+              onUpdate({
+                text: e.target.value,
+              })
+            }
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <div
+            className={cn(
+              "text-foreground min-h-10 w-full py-2 text-sm leading-5",
+              annotation.text ? "truncate" : "text-muted-foreground/50 italic",
+            )}
+            title={annotation.text || t("sidebar.add_remark")}
+          >
+            {annotation.text || t("sidebar.add_remark")}
+          </div>
+        )}
         {annotation.updatedAt && (
           <div className="border-border/50 text-muted-foreground mt-2 flex items-center justify-between border-t pt-2 text-[10px]">
             <span className="flex items-center gap-1">

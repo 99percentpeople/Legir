@@ -64,8 +64,6 @@ const de = {
     shape_polygon_tools: "Polygonformen",
     settings: "Einstellungen",
     shortcuts: "Tastenkürzel (?)",
-    form_detect: "Formularerkennung",
-    form_custom: "Benutzerdefinierte Erkennung...",
     export: "Exportieren",
     save_as: "Speichern unter...",
     save_draft: "Entwurf speichern",
@@ -363,7 +361,6 @@ const de = {
   right_panel: {
     tabs: {
       ai_chat: "AI Chat",
-      form_detect: "Formularerkennung",
       page_translate: "Seite übersetzen",
       properties: "Eigenschaften bearbeiten",
     },
@@ -442,6 +439,13 @@ const de = {
       highlight: "Alle Vorkommen von Unterschrift hervorheben",
     },
     starters: {
+      forms: {
+        title: "Formulare erstellen",
+        current_page:
+          "Erkenne und erstelle die ausfüllbaren Felder auf dieser Seite",
+        signature_dates:
+          "Erkenne auf der aktuellen Seite nur Signatur- und Datumsfelder",
+      },
       reading: {
         title: "Lesen & Zusammenfassen",
         current_page: "Aktuelle Seite zusammenfassen",
@@ -693,7 +697,17 @@ const de = {
     ai_chat: {
       title: "AI-Chat-Werkzeuge",
       description:
-        "Konfigurieren Sie das KI-Dokument-Zusammenfassungswerkzeug und das visuelle Zusammenfassungswerkzeug für gerenderte Seiten.",
+        "Konfigurieren Sie KI-Chat-Funktionen einschließlich Formularwerkzeugen, dem Dokument-Zusammenfassungswerkzeug und dem visuellen Zusammenfassungswerkzeug für gerenderte Seiten.",
+      form_tools_enabled: "KI-Formularwerkzeuge aktivieren",
+      form_tools_enabled_desc:
+        "Erlaubt dem AI-Chat, neue Formularfelder aus Gesprächsanfragen zu erstellen. Deaktiviert lassen, wenn nur schreibgeschützter Chat und Feldbefüllung gewünscht sind.",
+      detect_form_fields_enabled: "detect_form_fields-Fallback aktivieren",
+      detect_form_fields_enabled_desc:
+        "Erlaubt dem AI-Chat, das dedizierte Vision-Werkzeug detect_form_fields zu verwenden, wenn das aktuelle Chat-Modell Seitenbilder nicht direkt prüfen kann.",
+      form_tools_vision_model: "Vision-Modell für Formularwerkzeuge",
+      form_tools_vision_model_placeholder: "Vision-Modell auswählen",
+      form_tools_vision_model_desc:
+        "Dediziertes Vision-Modell für detect_form_fields. Dieses Werkzeug verwendet niemals das aktuelle Chat-Modell und läuft nur, wenn die Fallback-Erkennung aktiviert ist.",
       visual_summary_enabled: "Visuelles Zusammenfassungswerkzeug aktivieren",
       visual_summary_enabled_desc:
         "Schaltet summarize_pages_visual für den AI-Chat ein oder aus. So können textbasierte Chat-Modelle die Prüfung gerenderter Seiten an ein Vision-Modell delegieren.",

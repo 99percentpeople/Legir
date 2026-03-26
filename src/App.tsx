@@ -1,12 +1,10 @@
 import React, { useCallback, useState } from "react";
 import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import SettingsDialog from "./components/dialogs/SettingsDialog";
-import type { FormDetectionOptions } from "./components/FormDetectionOptionsForm";
 import FileDropDialog from "./components/dialogs/FileDropDialog";
 import PdfPasswordDialog from "./components/dialogs/PdfPasswordDialog";
-import { EditorState, FormField } from "./types";
-import { loadPDF, exportPDF, renderPage } from "./services/pdfService";
-import { analyzePageForFields } from "./services/ai";
+import { EditorState } from "./types";
+import { loadPDF, exportPDF } from "./services/pdfService";
 import { getDraft } from "./services/storageService";
 import { useLanguage } from "./components/language-provider";
 import { toast } from "sonner";
@@ -76,9 +74,7 @@ const App: React.FC = () => {
   const {
     setState,
     setOptions,
-    saveCheckpoint,
     resetDocument,
-    setProcessingStatus,
     withProcessing,
     loadDocument,
     isProcessing,
@@ -400,114 +396,6 @@ const App: React.FC = () => {
     });
   };
 
-  const handleAdvancedDetect = useCallback(
-    async (options: FormDetectionOptions) => {
-      const snapshot = useEditorStore.getState();
-      if (snapshot.pages.length === 0 || !snapshot.pdfBytes) return;
-
-      // Parse the page range from options
-      const targetPageIndices = (() => {
-        const range = options.pageRange;
-        const totalPages = snapshot.pages.length;
-        if (!range || range.toLowerCase() === "all") {
-          return Array.from({ length: totalPages }, (_, i) => i);
-        }
-
-        const pages = new Set<number>();
-        const parts = range.split(",");
-        for (const part of parts) {
-          const p = part.trim();
-          if (!p) continue;
-
-          if (p.includes("-")) {
-            const [start, end] = p.split("-").map((n) => parseInt(n));
-            if (!isNaN(start) && !isNaN(end)) {
-              for (let i = start; i <= end; i++) {
-                if (i >= 1 && i <= totalPages) pages.add(i - 1);
-              }
-            }
-          } else {
-            const num = parseInt(p);
-            if (!isNaN(num) && num >= 1 && num <= totalPages) {
-              pages.add(num - 1);
-            }
-          }
-        }
-        return Array.from(pages).sort((a, b) => a - b);
-      })();
-
-      if (targetPageIndices.length === 0) {
-        toast.error("Invalid page range selected.");
-        return;
-      }
-
-      await withProcessing(null, async () => {
-        let allNewFields: FormField[] = [];
-
-        for (let i = 0; i < targetPageIndices.length; i++) {
-          const pageIndex = targetPageIndices[i];
-          const page = snapshot.pages[pageIndex];
-
-          setProcessingStatus(
-            t("app.analyzing", {
-              current: i + 1,
-              total: targetPageIndices.length,
-            }),
-          );
-
-          const base64Image = await renderPage({
-            pageIndex,
-            pdfBytes: snapshot.pdfBytes,
-            password: snapshot.pdfOpenPassword,
-          });
-
-          if (base64Image) {
-            const fields = await analyzePageForFields(
-              base64Image,
-              page.pageIndex,
-              page.width,
-              page.height,
-              [],
-              {
-                allowedTypes:
-                  options.allowedTypes.length > 0
-                    ? options.allowedTypes
-                    : undefined,
-                extraPrompt: options.extraPrompt,
-                providerId: options.providerId,
-                modelId: options.modelId,
-              },
-            );
-
-            // Apply custom style if needed
-            if (options.useCustomStyle) {
-              fields.forEach((f) => {
-                f.style = { ...f.style, ...options.defaultStyle };
-              });
-            }
-
-            allNewFields = [...allNewFields, ...fields];
-          }
-        }
-
-        if (allNewFields.length > 0) {
-          saveCheckpoint();
-          setState((prev) => ({
-            ...prev,
-            fields: [...prev.fields, ...allNewFields],
-            isDirty: true,
-          }));
-        } else {
-          toast.info(t("app.no_new_fields"));
-        }
-      }).catch((e) => {
-        console.error(e);
-        toast.error(t("app.auto_detect_fail", { error: e.message }));
-      });
-    },
-    [saveCheckpoint, setProcessingStatus, setState, t, withProcessing],
-  );
-
   const generatePDF = useCallback(async () => {
     const snapshot = useEditorStore.getState();
     if (!snapshot.pdfBytes) return null;
@@ -781,7 +669,6 @@ const App: React.FC = () => {
           onSaveAs: handleSaveAs,
           onExit: onEditorExit,
           onPrint: onEditorPrint,
-          onAdvancedDetect: handleAdvancedDetect,
         }}
       />
 

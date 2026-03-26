@@ -73,6 +73,86 @@ const toToolArgsRecord = (input: unknown) =>
     ? (input as Record<string, unknown>)
     : {};
 
+const formatIssuePath = (path: unknown) =>
+  Array.isArray(path)
+    ? path
+        .map((segment) =>
+          typeof segment === "number" ? `[${segment}]` : String(segment),
+        )
+        .join(".")
+    : "";
+
+const formatStructuredIssues = (issues: unknown) => {
+  if (!Array.isArray(issues)) return null;
+
+  const formatted = issues
+    .map((issue) => {
+      if (!issue || typeof issue !== "object") return null;
+      const path = formatIssuePath(
+        (issue as { path?: unknown }).path as Array<string | number>,
+      );
+      const message = (issue as { message?: unknown }).message;
+      if (typeof message !== "string" || !message.trim()) return null;
+      return path ? `${path}: ${message}` : message;
+    })
+    .filter((message): message is string => Boolean(message));
+
+  return formatted.length > 0 ? formatted.join("; ") : null;
+};
+
+const getObjectProperty = (value: unknown, key: string) =>
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)[key]
+    : undefined;
+
+const extractToolErrorDetails = (
+  error: unknown,
+  toolName: string,
+): { code: string; message: string } => {
+  const name = getObjectProperty(error, "name");
+  const message = getObjectProperty(error, "message");
+  const cause = getObjectProperty(error, "cause");
+  const directIssues = formatStructuredIssues(
+    getObjectProperty(error, "issues"),
+  );
+  const causeIssues = formatStructuredIssues(
+    getObjectProperty(cause, "issues"),
+  );
+  const detailedMessage =
+    directIssues ||
+    causeIssues ||
+    (typeof message === "string" && message.trim() ? message : null) ||
+    (typeof getObjectProperty(cause, "message") === "string"
+      ? (getObjectProperty(cause, "message") as string)
+      : null) ||
+    `Tool call failed: ${toolName}`;
+  const isValidationError =
+    name === "AI_TypeValidationError" ||
+    name === "TypeValidationError" ||
+    name === "ZodError" ||
+    !!directIssues ||
+    !!causeIssues;
+
+  return {
+    code: isValidationError ? "INVALID_ARGUMENTS" : "TOOL_CALL_FAILED",
+    message: detailedMessage,
+  };
+};
+
+const normalizeToolError = (error: unknown, toolName: string) => {
+  const details = extractToolErrorDetails(error, toolName);
+  const normalized = new Error(details.message);
+  normalized.name = details.code;
+  return {
+    error: normalized,
+    payload: {
+      ok: false,
+      error: details.code,
+      message: details.message,
+    },
+  };
+};
+
 export const createAiChatToolRuntime = (options: {
   toolDefinitions: AiChatToolDefinition[];
   toolRegistry: AiToolRegistry;
@@ -172,28 +252,24 @@ export const createAiChatToolRuntime = (options: {
 
             return result.modelOutput ?? result.payload;
           } catch (error) {
-            const normalized =
-              error instanceof Error ? error : new Error(String(error));
+            const normalized = normalizeToolError(error, definition.name);
 
             conversation.push(
               createToolConversationMessage({
                 callId: call.id,
                 toolName: definition.name,
                 args: call.args,
-                payload: {
-                  ok: false,
-                  error: normalized.message,
-                },
+                payload: normalized.payload,
               }),
             );
 
             notifyToolError({
               call,
               batchId,
-              error: normalized,
+              error: normalized.error,
             });
 
-            throw normalized;
+            throw normalized.error;
           }
         };
 
@@ -229,14 +305,21 @@ export const createAiChatToolRuntime = (options: {
         name: toolName,
         args: toToolArgsRecord(input),
       };
+      toolCallsById.set(call.id, call);
+      const normalized = normalizeToolError(error, toolName);
       notifyToolStart(call, batchId);
+      conversation.push(
+        createToolConversationMessage({
+          callId: call.id,
+          toolName,
+          args: call.args,
+          payload: normalized.payload,
+        }),
+      );
       notifyToolError({
         call,
         batchId,
-        error:
-          error instanceof Error
-            ? error
-            : new Error(`Tool call failed: ${toolName}`),
+        error: normalized.error,
       });
     },
   };

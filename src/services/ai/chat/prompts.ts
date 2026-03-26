@@ -2,6 +2,7 @@ import type {
   AiChatMessageRecord,
   AiChatToolDefinition,
 } from "@/services/ai/chat/types";
+import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 import {
   buildAiDocumentControlLink,
   buildAiDocumentPageLink,
@@ -35,6 +36,26 @@ export const getAiChatSystemInstruction = (options?: {
   );
 
   const sections: string[] = [];
+  const canCreateFormFields = hasTool(context, "create_form_fields");
+  const canUpdateFormFields = hasTool(context, "update_form_fields");
+  const canDetectFormFields = hasTool(context, "detect_form_fields");
+  const canInspectPageVisuals = hasTool(context, "get_pages_visual");
+  const canCreateFreetextAnnotations = hasTool(
+    context,
+    "create_freetext_annotations",
+  );
+  const canCreateShapeAnnotations = hasTool(
+    context,
+    "create_shape_annotations",
+  );
+  const annotationUpdateToolNames = [
+    "update_highlight_annotations",
+    "update_freetext_annotations",
+    "update_shape_annotations",
+  ].filter((toolName) => hasTool(context, toolName));
+  const canUpdateAnnotations = annotationUpdateToolNames.length > 0;
+  const canCreateVisualAnnotations =
+    canCreateFreetextAnnotations || canCreateShapeAnnotations;
 
   sections.push(
     buildPromptSection("Role", [
@@ -49,6 +70,7 @@ export const getAiChatSystemInstruction = (options?: {
     "Use tools before making document-specific claims, and never imply you can see page content without tool output.",
     "Prefer tools for document search, page reading, metadata, annotations, fields, form filling, highlighting, and navigation when the task depends on the open PDF.",
     "All AI tool page numbers are 1-based. The first PDF page is page 1, not page 0.",
+    AI_PAGE_COORDINATE_CONVENTION,
   ];
   if (
     hasTool(context, "get_pages_visual") ||
@@ -90,12 +112,55 @@ export const getAiChatSystemInstruction = (options?: {
   );
 
   sections.push(
-    buildPromptSection("Action boundaries", [
-      "Prefer internal clickable links for optional navigation in explanatory answers.",
-      "Use navigate_page, focus_control, or focus_result when the user explicitly asks you to jump, open, focus, or select something now.",
-      "You may only modify existing form field values. Never create, delete, move, resize, restyle, or rename fields.",
-      "After a successful direct UI action, do not repeat it unless the user asks for another location, more results, or verification.",
-    ]),
+    buildPromptSection(
+      "Action boundaries",
+      [
+        "Prefer internal clickable links for optional navigation in explanatory answers.",
+        "Use navigate_page, focus_control, or focus_result when the user explicitly asks you to jump, open, focus, or select something now.",
+        canCreateFormFields || canUpdateFormFields
+          ? [
+              canCreateFormFields
+                ? "You may create new form fields only through create_form_fields."
+                : null,
+              canUpdateFormFields
+                ? "You may update existing field geometry, properties, or styles only through update_form_fields."
+                : null,
+              "Use fill_form_fields only for current field values. Never claim to create or restyle fields without the corresponding tool calls.",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : "You may only modify existing form field values. Never create, delete, move, resize, restyle, or rename fields.",
+        canCreateFormFields
+          ? canInspectPageVisuals
+            ? "For any form-building request, confirm the user's requirements first. If page visuals are available, inspect them yourself, summarize the proposed fields briefly, and wait for the user's explicit confirmation before create_form_fields."
+            : canDetectFormFields
+              ? "For any form-building request, confirm the user's requirements first. When you need visual inspection, use detect_form_fields with the dedicated fallback vision model, summarize the candidate fields briefly, and wait for the user's explicit confirmation before create_form_fields."
+              : "For any form-building request, explain briefly that the current chat model cannot inspect visuals and detect_form_fields is disabled in settings, so AI form creation is unavailable until one of those visual paths is enabled."
+          : "If the user asks for AI-driven form creation, explain briefly that AI form tools are currently disabled in settings.",
+        canUpdateFormFields
+          ? "If the user asks to move, resize, restyle, or reconfigure existing fields, prefer update_form_fields and list_fields rather than recreating the fields."
+          : "If the user asks to restyle or reconfigure existing fields and no update tool is available, explain briefly that only field-value filling is supported.",
+        canCreateVisualAnnotations || canUpdateAnnotations
+          ? [
+              canCreateFreetextAnnotations
+                ? "You may create visible text overlays or callouts only through create_freetext_annotations."
+                : null,
+              canCreateShapeAnnotations
+                ? "You may create boxes, circles, arrows, lines, or other drawn callouts only through create_shape_annotations."
+                : null,
+              canUpdateAnnotations
+                ? `You may update existing annotations only through the type-specific annotation update tools that match list_annotations output: ${annotationUpdateToolNames.join(", ")}. Prefer update_annotation_texts when the task is limited to note/comment text.`
+                : null,
+              canInspectPageVisuals
+                ? "When annotation placement, geometry, or styling depends on page appearance, inspect the relevant page with get_pages_visual first and then use actual page coordinates."
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : null,
+        "After a successful direct UI action, do not repeat it unless the user asks for another location, more results, or verification.",
+      ].filter(Boolean),
+    ),
   );
 
   const toolUsageLines = [

@@ -7,12 +7,14 @@ import type {
   AiChatMessageAttachment,
   AiChatMessageRecord,
   AiChatSelectionAttachment,
+  AiDetectedFormFieldDraft,
+  AiFormFieldKind,
   AiChatSessionSummary,
   AiChatTimelineItem,
   AiChatUserMessageInput,
   AiStoredSearchResult,
 } from "@/services/ai/chat/types";
-import type { PDFSearchResult } from "@/types";
+import type { FormField, PDFSearchResult } from "@/types";
 
 export type AiChatRunStatus = "idle" | "running" | "cancelling" | "error";
 
@@ -41,6 +43,7 @@ export type PersistedAiChatSession = {
   timeline: AiChatTimelineItem[];
   searchResults: AiStoredSearchResult[];
   highlightedResultIds: string[];
+  pendingDetectedFieldBatches?: AiDetectedFormFieldBatchState[];
   lastError?: string | null;
   awaitingContinue?: boolean;
 };
@@ -65,9 +68,30 @@ export type AiChatSessionData = {
   conversation: AiChatMessageRecord[];
   searchResultsById: Map<string, AiStoredSearchResult>;
   highlightedResultIds: string[];
+  pendingDetectedFieldBatches: AiDetectedFormFieldBatchState[];
   runStatus: AiChatRunStatus;
   lastError: string | null;
   awaitingContinue: boolean;
+};
+
+export type AiDetectedFormFieldDraftState = {
+  draftId: string;
+  field: FormField;
+  summary: AiDetectedFormFieldDraft;
+};
+
+export type AiDetectedFormFieldBatchState = {
+  batchId: string;
+  createdAt: string;
+  status: "draft" | "applied" | "discarded";
+  pageNumbers: number[];
+  allowedTypes?: AiFormFieldKind[];
+  userIntent?: string;
+  extraPrompt?: string;
+  confirmedAt?: string;
+  confirmedByMessageId?: string;
+  confirmedByUserText?: string;
+  drafts: AiDetectedFormFieldDraftState[];
 };
 
 export type RestoredAiChatDocumentState = {
@@ -317,6 +341,7 @@ export const normalizeTimelineForPersist = (items: AiChatTimelineItem[]) => {
         typeof item.resultText === "string"
           ? truncateText(item.resultText, MAX_PERSIST_TOOL_RESULT_CHARS)
           : undefined,
+      previewImages: undefined,
       error:
         typeof item.error === "string"
           ? truncateText(item.error, 8_000)
@@ -471,6 +496,7 @@ export const createAiChatSessionData = (
   conversation: [],
   searchResultsById: new Map(),
   highlightedResultIds: [],
+  pendingDetectedFieldBatches: [],
   runStatus: "idle",
   lastError: null,
   awaitingContinue: false,
@@ -545,6 +571,99 @@ export const restorePersistedAiChatDocumentState = (
             .map((value) => (typeof value === "string" ? value : ""))
             .filter(Boolean)
         : [];
+      const pendingDetectedFieldBatches = Array.isArray(
+        session.pendingDetectedFieldBatches,
+      )
+        ? (session.pendingDetectedFieldBatches
+            .map((batch) => {
+              if (!batch || typeof batch !== "object") return null;
+              const batchId =
+                typeof batch.batchId === "string" ? batch.batchId : "";
+              if (!batchId) return null;
+
+              const drafts = Array.isArray(batch.drafts)
+                ? (batch.drafts
+                    .map((draft) => {
+                      if (!draft || typeof draft !== "object") return null;
+                      const draftId =
+                        typeof draft.draftId === "string" ? draft.draftId : "";
+                      const field = (draft as { field?: unknown }).field;
+                      const summary = (draft as { summary?: unknown }).summary;
+                      if (
+                        !draftId ||
+                        !field ||
+                        typeof field !== "object" ||
+                        !summary ||
+                        typeof summary !== "object"
+                      ) {
+                        return null;
+                      }
+
+                      return {
+                        draftId,
+                        field: field as FormField,
+                        summary: summary as AiDetectedFormFieldDraft,
+                      } satisfies AiDetectedFormFieldDraftState;
+                    })
+                    .filter(Boolean) as AiDetectedFormFieldDraftState[])
+                : [];
+
+              const pageNumbers = Array.isArray(batch.pageNumbers)
+                ? batch.pageNumbers
+                    .map((value) =>
+                      typeof value === "number" && Number.isFinite(value)
+                        ? Math.max(1, Math.trunc(value))
+                        : 0,
+                    )
+                    .filter((value) => value > 0)
+                : [];
+
+              const allowedTypes = Array.isArray(batch.allowedTypes)
+                ? (batch.allowedTypes
+                    .map((value) => (typeof value === "string" ? value : ""))
+                    .filter(Boolean) as AiFormFieldKind[])
+                : undefined;
+
+              return {
+                batchId,
+                createdAt:
+                  typeof batch.createdAt === "string"
+                    ? batch.createdAt
+                    : updatedAt,
+                status:
+                  batch.status === "applied" || batch.status === "discarded"
+                    ? batch.status
+                    : "draft",
+                pageNumbers,
+                allowedTypes:
+                  allowedTypes && allowedTypes.length > 0
+                    ? allowedTypes
+                    : undefined,
+                userIntent:
+                  typeof batch.userIntent === "string"
+                    ? batch.userIntent
+                    : undefined,
+                extraPrompt:
+                  typeof batch.extraPrompt === "string"
+                    ? batch.extraPrompt
+                    : undefined,
+                confirmedAt:
+                  typeof batch.confirmedAt === "string"
+                    ? batch.confirmedAt
+                    : undefined,
+                confirmedByMessageId:
+                  typeof batch.confirmedByMessageId === "string"
+                    ? batch.confirmedByMessageId
+                    : undefined,
+                confirmedByUserText:
+                  typeof batch.confirmedByUserText === "string"
+                    ? batch.confirmedByUserText
+                    : undefined,
+                drafts,
+              } satisfies AiDetectedFormFieldBatchState;
+            })
+            .filter(Boolean) as AiDetectedFormFieldBatchState[])
+        : [];
 
       const nextSession: AiChatSessionData = {
         id: session.id,
@@ -579,6 +698,7 @@ export const restorePersistedAiChatDocumentState = (
         conversation: restoreConversationFromTimeline(timeline),
         searchResultsById,
         highlightedResultIds,
+        pendingDetectedFieldBatches,
         runStatus: "idle",
         lastError:
           typeof session.lastError === "string" ? session.lastError : null,
@@ -661,6 +781,7 @@ export const persistAiChatDocumentState = (options: {
         timeline: normalizeTimelineForPersist(data.timeline),
         searchResults: trimmedSearchResults,
         highlightedResultIds: data.highlightedResultIds,
+        pendingDetectedFieldBatches: data.pendingDetectedFieldBatches,
         lastError: data.lastError,
         awaitingContinue: data.awaitingContinue,
       };
@@ -704,6 +825,7 @@ export const persistAiChatDocumentState = (options: {
             timeline: normalizeTimelineForPersist(activeData.timeline),
             searchResults: trimmedSearchResults,
             highlightedResultIds: activeData.highlightedResultIds,
+            pendingDetectedFieldBatches: activeData.pendingDetectedFieldBatches,
             lastError: activeData.lastError,
             awaitingContinue: activeData.awaitingContinue,
           },

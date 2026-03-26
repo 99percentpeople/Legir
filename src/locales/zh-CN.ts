@@ -69,8 +69,6 @@ const zhCN = {
     shape_polygon_tools: "多边形图形",
     settings: "设置",
     shortcuts: "快捷键 (?)",
-    form_detect: "表单识别",
-    form_custom: "自定义识别...",
     export: "导出",
     save_as: "另存为...",
     save_draft: "保存草稿",
@@ -366,7 +364,6 @@ const zhCN = {
   right_panel: {
     tabs: {
       ai_chat: "AI 问答",
-      form_detect: "表单识别",
       page_translate: "全页翻译",
       properties: "属性编辑",
     },
@@ -439,6 +436,11 @@ const zhCN = {
       highlight: "把所有包含签名的位置高亮出来",
     },
     starters: {
+      forms: {
+        title: "制作表单",
+        current_page: "识别并创建这一页的可填写字段",
+        signature_dates: "只识别当前页的签名和日期字段",
+      },
       reading: {
         title: "阅读总结",
         current_page: "总结当前页内容",
@@ -676,7 +678,18 @@ const zhCN = {
     },
     ai_chat: {
       title: "AI 问答工具",
-      description: "配置 AI 文档摘要工具，以及渲染页视觉总结工具。",
+      description:
+        "配置 AI 问答能力，包括表单制作工具、文档摘要工具以及渲染页视觉总结工具。",
+      form_tools_enabled: "启用 AI 表单工具",
+      form_tools_enabled_desc:
+        "允许 AI 问答根据对话请求创建新的表单字段。如果你只希望它做只读问答和字段填值，请保持关闭。",
+      detect_form_fields_enabled: "启用 detect_form_fields 后备检测",
+      detect_form_fields_enabled_desc:
+        "当当前对话模型不能直接看图时，允许 AI 问答使用独立的 detect_form_fields 视觉工具做后备检测。",
+      form_tools_vision_model: "表单工具视觉模型",
+      form_tools_vision_model_placeholder: "选择视觉模型",
+      form_tools_vision_model_desc:
+        "detect_form_fields 专用的视觉模型。这个工具不会使用当前聊天模型，且只有在开启后备检测时才会运行。",
       visual_summary_enabled: "启用视觉总结工具",
       visual_summary_enabled_desc:
         "控制 AI 问答里的 summarize_pages_visual 是否可用。这样纯文本对话模型也能委托已配置的视觉模型检查渲染后的页面。",

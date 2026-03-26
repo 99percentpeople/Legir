@@ -246,6 +246,15 @@ export const normalizeAiChatOptions = (
         ? next.visualSummaryEnabled
         : true,
     visualSummaryModelKey: next.visualSummaryModelKey || "",
+    formToolsEnabled:
+      typeof next.formToolsEnabled === "boolean"
+        ? next.formToolsEnabled
+        : false,
+    detectFormFieldsEnabled:
+      typeof next.detectFormFieldsEnabled === "boolean"
+        ? next.detectFormFieldsEnabled
+        : false,
+    formToolsVisionModelKey: next.formToolsVisionModelKey || "",
   };
 };
 

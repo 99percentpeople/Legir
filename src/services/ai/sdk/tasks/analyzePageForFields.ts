@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { DEFAULT_FIELD_STYLE } from "@/constants";
 import { parseJsonTextWithSchema } from "@/services/ai/utils/json";
+import { formatAiPageCoordinateBounds } from "@/services/ai/utils/pageCoordinates";
 import { resolveAiSdkLanguageModel } from "@/services/ai/sdk/modelRegistry";
 import type { AiSdkModelSpecifier } from "@/services/ai/sdk/types";
 import type { LLMAnalyzePageForFieldsOptions } from "@/services/ai/types";
@@ -13,16 +14,20 @@ import {
   type AppOptions,
 } from "@/types";
 
+const coordinateValueSchema = z.union([z.number(), z.string()]);
+
 const formFieldResponseSchema = z.object({
   fields: z
     .array(
       z.object({
         label: z.string(),
         type: z.enum(["text", "checkbox", "radio", "dropdown", "signature"]),
-        box_2d: z
-          .array(z.union([z.number(), z.string()]))
-          .min(4)
-          .max(4),
+        rect: z.object({
+          x: coordinateValueSchema,
+          y: coordinateValueSchema,
+          width: coordinateValueSchema,
+          height: coordinateValueSchema,
+        }),
         options: z.array(z.string()).nullish(),
         text_preferences: z
           .object({
@@ -43,10 +48,10 @@ const formFieldResponseSchema = z.object({
     .default([]),
 });
 
-const clampBoxCoordinate = (value: unknown) => {
+const clampAbsoluteCoordinate = (value: unknown, max: number) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
-  return Math.max(0, Math.min(1000, numeric));
+  return Math.max(0, Math.min(max, numeric));
 };
 
 const normalizeFieldLabel = (rawLabel: string, index: number) => {
@@ -71,7 +76,7 @@ const buildFormDetectPrompt = (options: {
   existingFieldsSummary: Array<{
     id: string;
     type: string;
-    box_2d: [number, number, number, number];
+    rect: { x: number; y: number; width: number; height: number };
   }>;
   allowedTypes: FieldType[];
   extraPrompt?: string;
@@ -118,7 +123,8 @@ Analyze the image and identify the precise bounding boxes for user-fillable form
 
 Context:
 - Image Aspect Ratio: ${options.pageWidth}:${options.pageHeight}
-- Existing Detected Fields (in 0-1000 scale [ymin, xmin, ymax, xmax]): ${JSON.stringify(
+- ${formatAiPageCoordinateBounds(options.pageWidth, options.pageHeight)}
+- Existing Detected Fields (page-space rect): ${JSON.stringify(
     options.existingFieldsSummary,
   )}
 
@@ -133,9 +139,9 @@ Target Elements (ONLY detect these types):
 ${typeDescriptions.map((description, index) => `${index + 1}. ${description}`).join("\n")}
 
 Bounding Box Rules:
-- Coordinates must be on a scale of 0 to 1000 relative to image dimensions.
-- 0 is the top or left edge, 1000 is the bottom or right edge.
-- Format: [ymin, xmin, ymax, xmax]
+- Prefer page-space coordinates using the actual PDF page size.
+- Use rect: { x, y, width, height } where x/y start at the top-left of the page.
+- width and height must be positive and must align tightly to the fillable area.
 - TIGHT FIT: The box must contain ONLY the fillable area.
 - EXCLUDE LABELS: Do NOT include the label text in the box.
 
@@ -164,7 +170,7 @@ Return a JSON object with a "fields" array.
 Each item must include:
 - label: string
 - type: one of ${JSON.stringify(currentSchemaEnum)}
-- box_2d: [ymin, xmin, ymax, xmax]
+- rect: { x: number, y: number, width: number, height: number } in actual page coordinates
 Optional:
 - options: string[] (dropdown only)
 - text_preferences: { alignment: "left"|"center"|"right", multiline: boolean }
@@ -199,16 +205,12 @@ export const analyzePageForFieldsWithAiSdk = async (options: {
   const existingFieldsSummary = typedExistingFields.map((field) => ({
     id: field.id,
     type: field.type,
-    box_2d: [
-      Math.round((field.rect.y / options.pageHeight) * 1000),
-      Math.round((field.rect.x / options.pageWidth) * 1000),
-      Math.round(
-        ((field.rect.y + field.rect.height) / options.pageHeight) * 1000,
-      ),
-      Math.round(
-        ((field.rect.x + field.rect.width) / options.pageWidth) * 1000,
-      ),
-    ] as [number, number, number, number],
+    rect: {
+      x: Math.round(field.rect.x),
+      y: Math.round(field.rect.y),
+      width: Math.round(field.rect.width),
+      height: Math.round(field.rect.height),
+    },
   }));
 
   const result = await generateText({
@@ -250,16 +252,18 @@ export const analyzePageForFieldsWithAiSdk = async (options: {
   );
 
   return parsed.fields.map((item, index) => {
-    const [ymin, xmin, ymax, xmax] = item.box_2d;
-    const yMinVal = clampBoxCoordinate(ymin);
-    const xMinVal = clampBoxCoordinate(xmin);
-    const yMaxVal = clampBoxCoordinate(ymax);
-    const xMaxVal = clampBoxCoordinate(xmax);
-
-    const x = (xMinVal / 1000) * options.pageWidth;
-    const y = (yMinVal / 1000) * options.pageHeight;
-    const width = ((xMaxVal - xMinVal) / 1000) * options.pageWidth;
-    const height = ((yMaxVal - yMinVal) / 1000) * options.pageHeight;
+    const resolvedRect = {
+      x: clampAbsoluteCoordinate(item.rect.x, options.pageWidth),
+      y: clampAbsoluteCoordinate(item.rect.y, options.pageHeight),
+      width: Math.max(
+        1,
+        clampAbsoluteCoordinate(item.rect.width, options.pageWidth),
+      ),
+      height: Math.max(
+        1,
+        clampAbsoluteCoordinate(item.rect.height, options.pageHeight),
+      ),
+    };
 
     const fieldType = normalizeFieldType(item.type);
     const rawLabel = item.label.trim() || `Field_${index}`;
@@ -309,7 +313,7 @@ export const analyzePageForFieldsWithAiSdk = async (options: {
       pageIndex: options.pageIndex,
       type: fieldType,
       name: normalizeFieldLabel(rawLabel, index),
-      rect: { x, y, width, height },
+      rect: resolvedRect,
       required: false,
       style,
       options: dropdownOptions,

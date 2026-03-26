@@ -8,6 +8,12 @@ import type { AppOptions } from "@/types";
 
 type SummarizePageImagesInput = {
   pageNumber: number;
+  cropRect?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
   renderedWidth: number;
   renderedHeight: number;
   base64Data: string;
@@ -69,7 +75,9 @@ export const summarizePageImagesWithAiSdk = async (options: {
           ...options.pages.flatMap((page) => [
             {
               type: "text" as const,
-              text: `Page ${page.pageNumber} image rendered at ${page.renderedWidth}x${page.renderedHeight}.`,
+              text: page.cropRect
+                ? `Page ${page.pageNumber} cropped region x=${page.cropRect.x}, y=${page.cropRect.y}, width=${page.cropRect.width}, height=${page.cropRect.height}, rendered at ${page.renderedWidth}x${page.renderedHeight}.`
+                : `Page ${page.pageNumber} image rendered at ${page.renderedWidth}x${page.renderedHeight}.`,
             },
             {
               type: "image" as const,

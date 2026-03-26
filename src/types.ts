@@ -300,6 +300,9 @@ export interface AiChatOptions {
   digestSummaryModelKey?: string;
   visualSummaryEnabled: boolean;
   visualSummaryModelKey?: string;
+  formToolsEnabled: boolean;
+  detectFormFieldsEnabled: boolean;
+  formToolsVisionModelKey?: string;
 }
 
 export interface AppOptions {

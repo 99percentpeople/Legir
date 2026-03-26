@@ -30,13 +30,21 @@ export type AiToolName =
   | "search_document"
   | "list_annotations"
   | "update_annotation_texts"
+  | "update_highlight_annotations"
+  | "update_freetext_annotations"
+  | "update_shape_annotations"
+  | "create_freetext_annotations"
+  | "create_shape_annotations"
   | "list_fields"
   | "fill_form_fields"
+  | "update_form_fields"
+  | "detect_form_fields"
+  | "create_form_fields"
   | "focus_control"
   | "navigate_page"
   | "focus_result"
   | "highlight_results"
-  | "delete_highlights"
+  | "delete_annotations"
   | "clear_highlights";
 
 export interface AiChatToolDefinition {
@@ -79,10 +87,26 @@ export interface AiDocumentPageAssetSummary {
   annotationTypes: AiTypeCount<AiAnnotationKind>[];
 }
 
+export interface AiPageSpaceRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AiDocumentViewportPageRect {
+  pageNumber: number;
+  pageWidth: number;
+  pageHeight: number;
+  rect: AiPageSpaceRect;
+}
+
 export interface AiDocumentContext {
   pageCount: number;
   currentPageNumber: number | null;
   visiblePageNumbers: number[];
+  currentViewportRect: AiDocumentViewportPageRect | null;
+  viewportPageRects: AiDocumentViewportPageRect[];
   scale: number;
   zoomPercent: number;
   pageLayout: PageLayoutMode;
@@ -125,6 +149,7 @@ export interface AiRenderedPageImage {
   pageWidth: number;
   pageHeight: number;
   rotation: number;
+  cropRect?: AiPageSpaceRect;
   targetWidth: number;
   renderedWidth: number;
   renderedHeight: number;
@@ -146,6 +171,7 @@ export interface AiRenderedPageVisualSummaryPage {
   pageWidth: number;
   pageHeight: number;
   rotation: number;
+  cropRect?: AiPageSpaceRect;
   targetWidth: number;
   renderedWidth: number;
   renderedHeight: number;
@@ -284,20 +310,166 @@ export interface AiHighlightAnnotationCreateResult {
   }>;
 }
 
-export interface AiHighlightAnnotationDeleteResultItem {
+export interface AiAnnotationDeleteResultItem {
   ok: boolean;
   annotationId: string;
   pageNumber?: number;
+  type?: AiAnnotationKind;
+  subType?: AiShapeAnnotationSubType;
   highlightedText?: string;
   text?: string;
   status: "deleted" | "rejected";
   reason?: string;
 }
 
-export interface AiHighlightAnnotationDeleteBatchResult {
+export interface AiAnnotationDeleteBatchResult {
   deletedCount: number;
   rejectedCount: number;
-  deletions: AiHighlightAnnotationDeleteResultItem[];
+  deletions: AiAnnotationDeleteResultItem[];
+}
+
+export interface AiCreateAnnotationResultItem {
+  annotationId?: string;
+  pageNumber?: number;
+  type?: AiAnnotationKind;
+  subType?: AiShapeAnnotationSubType;
+  text?: string;
+  rect?: { x: number; y: number; width: number; height: number };
+  status: "created" | "skipped" | "rejected";
+  reason?: string;
+}
+
+export interface AiCreateAnnotationsResult {
+  createdCount: number;
+  skippedCount: number;
+  rejectedCount: number;
+  annotations: AiCreateAnnotationResultItem[];
+}
+
+export interface AiCreateFreetextAnnotationInput {
+  pageNumber?: number;
+  text?: string;
+  rect?: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  };
+  style?: {
+    color?: string;
+    opacity?: number;
+    backgroundColor?: string;
+    borderColor?: string;
+    borderWidth?: number;
+    fontSize?: number;
+    fontFamily?: string;
+    lineHeight?: number;
+    alignment?: "left" | "center" | "right";
+    flatten?: boolean;
+    rotationDeg?: number;
+  };
+}
+
+export interface AiCreateShapeAnnotationInput {
+  pageNumber?: number;
+  shapeType?: AiShapeAnnotationSubType;
+  rect?: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  };
+  points?: Array<{ x?: number; y?: number }>;
+  annotationText?: string;
+  style?: {
+    color?: string;
+    opacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    thickness?: number;
+    arrowSize?: number;
+    startArrowStyle?:
+      | "closed_arrow"
+      | "line_arrow"
+      | "hollow_arrow"
+      | "circle"
+      | "square"
+      | "diamond"
+      | "slash";
+    endArrowStyle?:
+      | "closed_arrow"
+      | "line_arrow"
+      | "hollow_arrow"
+      | "circle"
+      | "square"
+      | "diamond"
+      | "slash";
+    cloudIntensity?: number;
+    cloudSpacing?: number;
+  };
+}
+
+export interface AiUpdateAnnotationInput {
+  annotationId: string;
+  annotationType: AiAnnotationKind;
+  text?: string;
+  rect?: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  };
+  style?: {
+    color?: string;
+    opacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    borderColor?: string;
+    borderWidth?: number;
+    fontSize?: number;
+    fontFamily?: string;
+    lineHeight?: number;
+    alignment?: "left" | "center" | "right";
+    flatten?: boolean;
+    rotationDeg?: number;
+    thickness?: number;
+    arrowSize?: number;
+    startArrowStyle?:
+      | "closed_arrow"
+      | "line_arrow"
+      | "hollow_arrow"
+      | "circle"
+      | "square"
+      | "diamond"
+      | "slash";
+    endArrowStyle?:
+      | "closed_arrow"
+      | "line_arrow"
+      | "hollow_arrow"
+      | "circle"
+      | "square"
+      | "diamond"
+      | "slash";
+    cloudIntensity?: number;
+    cloudSpacing?: number;
+  };
+}
+
+export interface AiAnnotationUpdateResultItem {
+  annotationId: string;
+  pageNumber?: number;
+  type?: AiAnnotationKind;
+  subType?: AiShapeAnnotationSubType;
+  status: "updated" | "unchanged" | "rejected";
+  reason?: string;
+  updatedProperties?: string[];
+}
+
+export interface AiAnnotationUpdateResult {
+  updatedCount: number;
+  unchangedCount: number;
+  rejectedCount: number;
+  updates: AiAnnotationUpdateResultItem[];
 }
 
 export type AiFormFieldKind =
@@ -357,6 +529,125 @@ export interface AiFormFieldFillResult {
   updatedCount: number;
   rejectedCount: number;
   updates: AiFormFieldFillResultItem[];
+}
+
+export interface AiUpdateFormFieldInput {
+  fieldId: string;
+  rect?: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  };
+  required?: boolean;
+  readOnly?: boolean;
+  toolTip?: string;
+  placeholder?: string;
+  options?: string[];
+  multiline?: boolean;
+  alignment?: "left" | "center" | "right";
+  isMultiSelect?: boolean;
+  allowCustomValue?: boolean;
+  exportValue?: string;
+  style?: {
+    borderColor?: string;
+    backgroundColor?: string;
+    borderWidth?: number;
+    borderStyle?: "solid" | "dashed" | "underline";
+    textColor?: string;
+    fontSize?: number;
+    fontFamily?: string;
+    isTransparent?: boolean;
+  };
+}
+
+export interface AiFormFieldUpdateResultItem {
+  fieldId: string;
+  pageNumber?: number;
+  name?: string;
+  type?: AiFormFieldKind;
+  status: "updated" | "unchanged" | "rejected";
+  reason?: string;
+  affectedFieldIds?: string[];
+  updatedProperties?: string[];
+}
+
+export interface AiFormFieldUpdateResult {
+  updatedCount: number;
+  unchangedCount: number;
+  rejectedCount: number;
+  updates: AiFormFieldUpdateResultItem[];
+}
+
+export interface AiDetectedFormFieldDraft {
+  draftId: string;
+  pageNumber: number;
+  name: string;
+  type: AiFormFieldKind;
+  rect: { x: number; y: number; width: number; height: number };
+  options?: string[];
+  multiline?: boolean;
+  alignment?: "left" | "center" | "right";
+}
+
+export interface AiCreateFormFieldInput {
+  pageNumber: number;
+  name: string;
+  type: AiFormFieldKind;
+  rect: { x: number; y: number; width: number; height: number };
+  required?: boolean;
+  readOnly?: boolean;
+  toolTip?: string;
+  placeholder?: string;
+  options?: string[];
+  multiline?: boolean;
+  alignment?: "left" | "center" | "right";
+  isMultiSelect?: boolean;
+  allowCustomValue?: boolean;
+  exportValue?: string;
+  style?: {
+    borderColor?: string;
+    backgroundColor?: string;
+    borderWidth?: number;
+    borderStyle?: "solid" | "dashed" | "underline";
+    textColor?: string;
+    fontSize?: number;
+    fontFamily?: string;
+    isTransparent?: boolean;
+  };
+}
+
+export interface AiDetectedFormFieldBatch {
+  batchId: string;
+  status: "draft" | "applied" | "discarded";
+  createdAt: string;
+  pageNumbers: number[];
+  requestedPageCount: number;
+  detectedCount: number;
+  userIntent?: string;
+  allowedTypes?: AiFormFieldKind[];
+  extraPrompt?: string;
+  fields: AiDetectedFormFieldDraft[];
+}
+
+export interface AiCreateFormFieldsResultItem {
+  draftId?: string;
+  fieldId?: string;
+  pageNumber?: number;
+  name?: string;
+  type?: AiFormFieldKind;
+  status: "created" | "skipped" | "rejected";
+  reason?: string;
+}
+
+export interface AiCreateFormFieldsResult {
+  batchId?: string;
+  status: "created" | "not_found" | "rejected";
+  createdCount: number;
+  skippedCount: number;
+  rejectedCount: number;
+  fields: AiCreateFormFieldsResultItem[];
+  reason?: string;
 }
 
 export interface AiChatUiMessage {
@@ -445,6 +736,7 @@ export type AiChatTimelineItem =
       progressItems?: AiToolExecutionProgressItem[];
       progressCounts?: AiToolExecutionProgressCounts;
       resultText?: string;
+      previewImages?: AiChatToolPreviewImage[];
       error?: string;
       createdAt: string;
     };
@@ -510,6 +802,15 @@ export interface AiToolExecutionProgress {
   details?: string[];
   items?: AiToolExecutionProgressItem[];
   counts?: AiToolExecutionProgressCounts;
+}
+
+export interface AiChatToolPreviewImage {
+  id: string;
+  src: string;
+  alt: string;
+  label: string;
+  width?: number;
+  height?: number;
 }
 
 export interface AiToolRegistry {

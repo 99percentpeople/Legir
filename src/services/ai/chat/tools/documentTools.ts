@@ -12,7 +12,7 @@ import {
   getDocumentDigestArgsSchema,
   summaryInstructionsSchema,
   pageNumberSchema,
-  pageNumbersSchema,
+  pageRectArgsSchema,
   listAnnotationsArgsSchema,
   listFormFieldsArgsSchema,
   readPagesArgsSchema,
@@ -21,26 +21,46 @@ import {
   summarizeListedFormFields,
   summarizeSearchResults,
 } from "./shared";
+import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 import type {
+  AiPageSpaceRect,
   AiRenderedPageImage,
   AiRenderedPageImageBatch,
   AiRenderedPageVisualSummaryResult,
 } from "@/services/ai/chat/types";
 
 const DEFAULT_PAGE_IMAGE_TARGET_WIDTH = 1024;
-const getPagesVisualArgsSchema = z
+const pageVisualTargetSchema = z.union([
+  pageNumberSchema,
+  z
+    .object({
+      page: pageNumberSchema.describe("1-based page number to render."),
+      rect: pageRectArgsSchema.describe(
+        "Page-space rectangle to crop from the rendered page image.",
+      ),
+    })
+    .strict(),
+]);
+const pageVisualTargetsSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+}, z.array(pageVisualTargetSchema));
+
+const getPagesVisualArgsSchemaBase = z
   .object({
-    page_numbers: pageNumbersSchema
+    pages: pageVisualTargetsSchema
       .optional()
       .default([])
       .describe(
-        "Optional 1-based page numbers to render. Defaults to the current page when omitted.",
+        "Optional page visual requests. Each item may be a 1-based page number for a full-page render or an object like { page, rect } to render a cropped page-space region. Defaults to the current page when omitted.",
       ),
     target_width: pageNumberSchema
       .optional()
       .default(DEFAULT_PAGE_IMAGE_TARGET_WIDTH)
       .describe(
-        "Optional target raster width in pixels for the full-page image. Higher values preserve more detail but use more vision tokens.",
+        "Optional target raster width in pixels for the rendered page image before any crop is applied. Higher values preserve more detail but use more vision tokens.",
       ),
     render_annotations: z
       .boolean()
@@ -51,12 +71,16 @@ const getPagesVisualArgsSchema = z
       ),
   })
   .strict();
+const getPagesVisualArgsSchema = getPagesVisualArgsSchemaBase;
 
-const summarizePagesVisualArgsSchema = getPagesVisualArgsSchema
+const summarizePagesVisualArgsSchemaBase = getPagesVisualArgsSchemaBase
   .extend({
     summary_instructions: summaryInstructionsSchema.optional(),
   })
   .strict();
+const summarizePagesVisualArgsSchema = summarizePagesVisualArgsSchemaBase;
+
+type PageVisualRequestArg = number | { page: number; rect: AiPageSpaceRect };
 
 const toPagesVisualModelOutput = (output: unknown) => {
   if (!output || typeof output !== "object") {
@@ -100,14 +124,17 @@ const toPagesVisualModelOutput = (output: unknown) => {
   > = [
     {
       type: "text",
-      text: `Full-page visuals for page${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageVisual) => pageVisual.pageNumber).join(", ")}. Use these visuals for inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss.`,
+      text: `Rendered page visuals for request${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageVisual, index) => `#${index + 1} (page ${pageVisual.pageNumber})`).join(", ")}. Requests may be full pages or cropped page-space regions. Use these visuals for inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss. ${AI_PAGE_COORDINATE_CONVENTION}`,
     },
   ];
 
-  for (const pageVisual of attachedPages) {
+  for (const [index, pageVisual] of attachedPages.entries()) {
+    const cropLabel = pageVisual.cropRect
+      ? ` Cropped region x=${pageVisual.cropRect.x}, y=${pageVisual.cropRect.y}, width=${pageVisual.cropRect.width}, height=${pageVisual.cropRect.height}.`
+      : " Full page render.";
     content.push({
       type: "text",
-      text: `Page ${pageVisual.pageNumber} visual. Rendered at ${pageVisual.renderedWidth}x${pageVisual.renderedHeight}.`,
+      text: `Request #${index + 1}: page ${pageVisual.pageNumber} visual. Actual page size ${pageVisual.pageWidth}x${pageVisual.pageHeight}.${cropLabel} Rendered at ${pageVisual.renderedWidth}x${pageVisual.renderedHeight}.`,
     });
     content.push({
       type: "image-data",
@@ -136,22 +163,26 @@ const MULTI_PAGE_SUMMARY_FALLBACK_PROMPT =
 
 const DOCUMENT_CONTEXT_TOOL_PROMPTS = [
   "get_document_context includes per-page type breakdowns for form fields and supported annotations on pages that actually contain them, which is useful before form filling or annotation inspection.",
-  "get_document_context also includes the current viewport context: all visible pages intersecting the workspace viewport, current zoom scale and percent, page layout mode, and page flow direction.",
+  "get_document_context also includes the current viewport context: all visible pages intersecting the workspace viewport, page-space viewport rects for those visible pages, current zoom scale and percent, page layout mode, and page flow direction.",
 ];
 
 const PAGE_VISUAL_TOOL_PROMPTS = [
   "If the task depends on full-page visual appearance, call get_pages_visual before making visual claims.",
   "get_pages_visual renders the current edited document state, not just the originally opened PDF bytes.",
+  "Each get_pages_visual pages item may be a page number for a full-page image or an object like { page, rect } to render only a page-space region.",
+  AI_PAGE_COORDINATE_CONVENTION,
   "Use get_pages_visual for scanned pages, handwriting, signatures, stamps, tables, diagrams, charts, or complex layout that plain text extraction may miss.",
   "If get_pages_text or search_document returns empty text, OCR noise, or misses the needed content on a page, do not stop there. Call get_pages_visual for that page and inspect it visually.",
   "When the user asks about a page and the text layer is missing or unreliable, use get_pages_visual before concluding that the page content is unavailable.",
-  "If you need several page visuals, prefer one get_pages_visual call with multiple page_numbers over many tiny calls when possible.",
+  "If you need several page visuals, prefer one get_pages_visual call with multiple pages over many tiny calls when possible.",
 ];
 
 const PAGE_VISUAL_SUMMARY_TOOL_PROMPTS = [
   "Use summarize_pages_visual when page appearance matters but the current chat model cannot inspect images directly.",
   "summarize_pages_visual inspects the current edited document state, not just the originally opened PDF bytes.",
-  "summarize_pages_visual renders full pages and delegates the visual inspection to a configured vision model, then returns a plain-text summary you can reason over.",
+  "summarize_pages_visual accepts the same pages format as get_pages_visual, including { page, rect } cropped region requests.",
+  AI_PAGE_COORDINATE_CONVENTION,
+  "summarize_pages_visual renders requested page visuals and delegates the visual inspection to a configured vision model, then returns a plain-text summary you can reason over.",
   "Pass summary_instructions when the user cares about specific visual details such as tables, handwriting, stamps, diagrams, signatures, highlights, or layout defects.",
   "summary_instructions is a structured object with known_information, remaining_uncertainties, and what_to_add_or_verify.",
 ];
@@ -175,7 +206,7 @@ const LIST_ANNOTATIONS_TOOL_PROMPTS = [
   "If the user asks about comments, notes, highlights, links, or annotations, call list_annotations.",
   "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
   "When list_annotations returns link annotations, inspect linkUrl and linkDestPageNumber to understand the hyperlink target.",
-  "If the user wants to delete one or more specific highlights and ids are not already known, call list_annotations first so you can pass the exact highlight annotation ids to delete_highlights.",
+  "If the user wants to delete one or more specific annotations and ids are not already known, call list_annotations first so you can pass the exact annotation ids to delete_annotations.",
   "When pointing the user to a known annotation, prefer a natural clickable control link instead of plain id text.",
 ];
 
@@ -194,7 +225,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_document_context: createToolBuilder("get_document_context")
       .read()
       .description(
-        "Get lightweight runtime context for the currently opened PDF document, including all pages currently visible in the workspace viewport, current zoom scale and percent, page layout mode, page flow direction, and per-page form-field and annotation type breakdowns only for pages that actually contain them.",
+        "Get lightweight runtime context for the currently opened PDF document, including all pages currently visible in the workspace viewport, page-space viewport rects for visible pages, current zoom scale and percent, page layout mode, page flow direction, and per-page form-field and annotation type breakdowns only for pages that actually contain them.",
       )
       .promptInstructions([
         ...DOCUMENT_CONTEXT_TOOL_PROMPTS,
@@ -235,16 +266,16 @@ export const documentToolModule = defineToolModule((ctx) => {
       .read()
       .requiresInputModalities(["image"])
       .description(
-        `Render one or more full PDF pages from the current edited document state as visuals for multimodal inspection. The JSON payload stays lightweight for the chat UI, while the actual rendered visuals are attached to the model context for visual reasoning. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} pages per call.`,
+        `Render one or more PDF page visuals from the current edited document state for multimodal inspection. Each pages item may request a full page or a cropped page-space region. The JSON payload stays lightweight for the chat UI, while the actual rendered visuals are attached to the model context for visual reasoning. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} visuals per call.`,
       )
       .promptInstructions(PAGE_VISUAL_TOOL_PROMPTS)
       .inputSchema(getPagesVisualArgsSchema)
       .toModelOutput(({ output }) => toPagesVisualModelOutput(output))
       .build(async ({ args, ctx: toolCtx, signal }) => {
         const documentContext = toolCtx.getDocumentContext();
-        const pageNumbers =
-          args.page_numbers.length > 0
-            ? args.page_numbers
+        const pageRequests: PageVisualRequestArg[] =
+          args.pages.length > 0
+            ? (args.pages as PageVisualRequestArg[])
             : [
                 documentContext.currentPageNumber ??
                   documentContext.visiblePageNumbers[0],
@@ -253,18 +284,18 @@ export const documentToolModule = defineToolModule((ctx) => {
                   typeof pageNumber === "number",
               );
 
-        if (pageNumbers.length === 0) {
+        if (pageRequests.length === 0) {
           return {
             payload: createErrorPayload(
               "NO_PAGE_AVAILABLE",
-              "get_pages_visual requires at least one valid page number or an active page in the current document.",
+              "get_pages_visual requires at least one valid page request or an active page in the current document.",
             ),
             summary: "get_pages_visual failed: no page available",
           };
         }
 
         const pageVisualBatch = await toolCtx.getPagesVisual({
-          pageNumbers,
+          pageNumbers: pageRequests,
           targetWidth: args.target_width,
           renderAnnotations: args.render_annotations,
           signal,
@@ -281,6 +312,7 @@ export const documentToolModule = defineToolModule((ctx) => {
               pageWidth: pageVisual.pageWidth,
               pageHeight: pageVisual.pageHeight,
               rotation: pageVisual.rotation,
+              cropRect: pageVisual.cropRect,
               targetWidth: pageVisual.targetWidth,
               renderedWidth: pageVisual.renderedWidth,
               renderedHeight: pageVisual.renderedHeight,
@@ -293,7 +325,7 @@ export const documentToolModule = defineToolModule((ctx) => {
           modelOutput: pageVisualBatch,
           summary: pageVisualBatch.truncated
             ? `Rendered ${pageVisualBatch.returnedPageCount} of ${pageVisualBatch.requestedPageCount} requested page visuals (limit ${pageVisualBatch.maxPagesPerCall})`
-            : `Rendered full-page visual${pageVisualBatch.returnedPageCount === 1 ? "" : "s"} for ${pageVisualBatch.returnedPageCount} page${pageVisualBatch.returnedPageCount === 1 ? "" : "s"}`,
+            : `Rendered ${pageVisualBatch.returnedPageCount} page visual${pageVisualBatch.returnedPageCount === 1 ? "" : "s"}`,
         };
       }),
 
@@ -301,15 +333,15 @@ export const documentToolModule = defineToolModule((ctx) => {
       .enable(Boolean(summarizePagesVisual))
       .read()
       .description(
-        `Render one or more full PDF pages from the current edited document state and return a plain-text visual summary produced by a configured vision model. Use this when page appearance matters but the current chat model cannot inspect images directly. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} pages per call.`,
+        `Render one or more PDF page visuals from the current edited document state and return a plain-text visual summary produced by a configured vision model. Each pages item may request a full page or a cropped page-space region. Use this when page appearance matters but the current chat model cannot inspect images directly. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} visuals per call.`,
       )
       .promptInstructions(PAGE_VISUAL_SUMMARY_TOOL_PROMPTS)
       .inputSchema(summarizePagesVisualArgsSchema)
       .build(async ({ args, ctx: toolCtx, signal }) => {
         const documentContext = toolCtx.getDocumentContext();
-        const pageNumbers =
-          args.page_numbers.length > 0
-            ? args.page_numbers
+        const pageRequests: PageVisualRequestArg[] =
+          args.pages.length > 0
+            ? (args.pages as PageVisualRequestArg[])
             : [
                 documentContext.currentPageNumber ??
                   documentContext.visiblePageNumbers[0],
@@ -318,18 +350,18 @@ export const documentToolModule = defineToolModule((ctx) => {
                   typeof pageNumber === "number",
               );
 
-        if (pageNumbers.length === 0) {
+        if (pageRequests.length === 0) {
           return {
             payload: createErrorPayload(
               "NO_PAGE_AVAILABLE",
-              "summarize_pages_visual requires at least one valid page number or an active page in the current document.",
+              "summarize_pages_visual requires at least one valid page request or an active page in the current document.",
             ),
             summary: "summarize_pages_visual failed: no page available",
           };
         }
 
         const visualSummary = await summarizePagesVisual!({
-          pageNumbers,
+          pageNumbers: pageRequests,
           targetWidth: args.target_width,
           renderAnnotations: args.render_annotations,
           summaryInstructions: args.summary_instructions,

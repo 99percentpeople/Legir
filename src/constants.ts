@@ -107,6 +107,9 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       digestSummaryModelKey: "",
       visualSummaryEnabled: true,
       visualSummaryModelKey: "",
+      formToolsEnabled: false,
+      detectFormFieldsEnabled: false,
+      formToolsVisionModelKey: "",
     },
   },
 };

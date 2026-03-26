@@ -20,6 +20,8 @@ import type {
   AiDocumentDigestChunk,
   AiDocumentDigestSourceKind,
   AiDocumentMetadata,
+  AiDocumentViewportPageRect,
+  AiPageSpaceRect,
   AiRenderedPageImage,
   AiRenderedPageImageBatch,
   AiRenderedPageVisualSummaryResult,
@@ -366,6 +368,190 @@ const getVisibleWorkspacePageNumbers = (totalPages: number) => {
   return Array.from(visiblePageNumbers).sort((left, right) => left - right);
 };
 
+type PageVisualRequest = number | { page: number; rect: AiPageSpaceRect };
+type ResolvedPageVisualRequest = {
+  pageNumber: number;
+  cropRect?: AiPageSpaceRect;
+};
+type RenderedPageImageSource = Omit<AiRenderedPageImage, "base64Data"> & {
+  imageBytes: Uint8Array;
+};
+
+const buildPageViewport = (page: AiDocumentSnapshot["pages"][number]) =>
+  createViewportFromPageInfo(
+    {
+      viewBox: page.viewBox,
+      userUnit: page.userUnit,
+      rotation: page.rotation,
+    },
+    {
+      scale: 1,
+      rotation: page.rotation,
+    },
+  );
+
+const getRenderedImageDimensions = (options: {
+  pageWidth: number;
+  pageHeight: number;
+  targetWidth?: number;
+}) => {
+  const finalScale =
+    typeof options.targetWidth === "number"
+      ? Math.min(1, Math.max(0.05, options.targetWidth / options.pageWidth))
+      : 1;
+
+  return {
+    renderedWidth: Math.max(1, Math.round(options.pageWidth * finalScale)),
+    renderedHeight: Math.max(1, Math.round(options.pageHeight * finalScale)),
+  };
+};
+
+const clampPageSpaceRectToBounds = (
+  pageWidth: number,
+  pageHeight: number,
+  rect: AiPageSpaceRect,
+): AiPageSpaceRect | null => {
+  const left = clampNumber(rect.x, 0, pageWidth);
+  const top = clampNumber(rect.y, 0, pageHeight);
+  const right = clampNumber(rect.x + rect.width, 0, pageWidth);
+  const bottom = clampNumber(rect.y + rect.height, 0, pageHeight);
+
+  if (right <= left || bottom <= top) {
+    return null;
+  }
+
+  return roundAiRect({
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  });
+};
+
+const buildResolvedPageVisualRequestSignature = (
+  request: ResolvedPageVisualRequest,
+) =>
+  request.cropRect
+    ? [
+        request.pageNumber,
+        request.cropRect.x,
+        request.cropRect.y,
+        request.cropRect.width,
+        request.cropRect.height,
+      ].join(":")
+    : `${request.pageNumber}:full`;
+
+const resolvePageVisualRequests = (
+  requests: PageVisualRequest[],
+  snapshot: AiDocumentSnapshot,
+  maxRequests = Number.POSITIVE_INFINITY,
+) => {
+  const resolved: ResolvedPageVisualRequest[] = [];
+  const seen = new Set<string>();
+
+  for (const rawRequest of requests) {
+    const rawPageNumber =
+      typeof rawRequest === "number" ? rawRequest : rawRequest.page;
+    const pageNumber = Math.trunc(rawPageNumber);
+    if (!Number.isFinite(pageNumber)) continue;
+    if (pageNumber < 1 || pageNumber > snapshot.pages.length) continue;
+
+    const page = snapshot.pages[pageNumber - 1];
+    if (!page) continue;
+
+    const cropRect =
+      typeof rawRequest === "number"
+        ? undefined
+        : clampPageSpaceRectToBounds(page.width, page.height, rawRequest.rect);
+    if (typeof rawRequest !== "number" && !cropRect) continue;
+
+    const request: ResolvedPageVisualRequest = cropRect
+      ? { pageNumber, cropRect }
+      : { pageNumber };
+    const signature = buildResolvedPageVisualRequestSignature(request);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    resolved.push(request);
+
+    if (resolved.length >= maxRequests) {
+      break;
+    }
+  }
+
+  return resolved;
+};
+
+const getWorkspaceViewportPageRects = (
+  snapshot: AiDocumentSnapshot,
+): AiDocumentViewportPageRect[] => {
+  if (typeof document === "undefined" || snapshot.pages.length === 0) {
+    return [];
+  }
+
+  const scrollContainer = document.querySelector(
+    '[data-workspace-scroll-container="true"]',
+  );
+  if (!(scrollContainer instanceof HTMLElement)) return [];
+
+  const containerRect = scrollContainer.getBoundingClientRect();
+  if (containerRect.width <= 0 || containerRect.height <= 0) return [];
+
+  const pageRects: AiDocumentViewportPageRect[] = [];
+  for (const pageElement of scrollContainer.querySelectorAll<HTMLElement>(
+    '[id^="page-"]',
+  )) {
+    const pageNumber = parseWorkspacePageNumber(pageElement.id);
+    if (!pageNumber || pageNumber > snapshot.pages.length) continue;
+
+    const page = snapshot.pages[pageNumber - 1];
+    if (!page) continue;
+
+    const pageRect = pageElement.getBoundingClientRect();
+    if (
+      pageRect.width <= 0 ||
+      pageRect.height <= 0 ||
+      pageRect.right <= containerRect.left ||
+      pageRect.left >= containerRect.right ||
+      pageRect.bottom <= containerRect.top ||
+      pageRect.top >= containerRect.bottom
+    ) {
+      continue;
+    }
+
+    const leftCss = Math.max(containerRect.left - pageRect.left, 0);
+    const topCss = Math.max(containerRect.top - pageRect.top, 0);
+    const rightCss = Math.min(
+      containerRect.right - pageRect.left,
+      pageRect.width,
+    );
+    const bottomCss = Math.min(
+      containerRect.bottom - pageRect.top,
+      pageRect.height,
+    );
+
+    const scaleX = pageRect.width / Math.max(page.width, 1);
+    const scaleY = pageRect.height / Math.max(page.height, 1);
+    if (scaleX <= 0 || scaleY <= 0) continue;
+
+    const rect = clampPageSpaceRectToBounds(page.width, page.height, {
+      x: leftCss / scaleX,
+      y: topCss / scaleY,
+      width: (rightCss - leftCss) / scaleX,
+      height: (bottomCss - topCss) / scaleY,
+    });
+    if (!rect) continue;
+
+    pageRects.push({
+      pageNumber,
+      pageWidth: page.width,
+      pageHeight: page.height,
+      rect,
+    });
+  }
+
+  return pageRects.sort((left, right) => left.pageNumber - right.pageNumber);
+};
+
 export const createDocumentContextService = (options: {
   getSnapshot: () => AiDocumentSnapshot;
   getSelectedTextContext: () => AiTextSelectionContext | null;
@@ -448,7 +634,7 @@ export const createDocumentContextService = (options: {
     return normalized;
   };
 
-  const renderPageImage = async ({
+  const renderPageImageSourceFromCurrentDocument = async ({
     pageNumber,
     targetWidth,
     renderAnnotations = true,
@@ -458,7 +644,7 @@ export const createDocumentContextService = (options: {
     targetWidth?: number;
     renderAnnotations?: boolean;
     signal?: AbortSignal;
-  }): Promise<AiRenderedPageImage> => {
+  }): Promise<RenderedPageImageSource> => {
     const snapshot = getSnapshot();
     const resolvedPageNumber = clampPageNumbers(
       [pageNumber],
@@ -485,11 +671,11 @@ export const createDocumentContextService = (options: {
         rotation: page.rotation,
       },
     );
-    const renderedWidth = Math.max(1, Math.round(resolvedTargetWidth));
-    const renderedHeight = Math.max(
-      1,
-      Math.round((renderedWidth / pageViewport.width) * pageViewport.height),
-    );
+    const { renderedWidth, renderedHeight } = getRenderedImageDimensions({
+      pageWidth: pageViewport.width,
+      pageHeight: pageViewport.height,
+      targetWidth: resolvedTargetWidth,
+    });
 
     const renderCurrentDocumentPage = () =>
       pdfWorkerService.renderPageImage({
@@ -551,8 +737,230 @@ export const createDocumentContextService = (options: {
       renderedHeight,
       mimeType: mimeType || "image/png",
       renderAnnotations,
-      base64Data: convertUint8ArrayToBase64(imageBytes),
+      imageBytes,
     };
+  };
+
+  const loadCanvasImageSource = async (
+    bytes: Uint8Array,
+    mimeType: string,
+  ): Promise<CanvasImageSource> => {
+    const blob = new Blob([bytes.slice()], { type: mimeType || "image/png" });
+
+    if (typeof createImageBitmap === "function") {
+      return await createImageBitmap(blob);
+    }
+
+    if (typeof Image === "undefined" || typeof URL === "undefined") {
+      throw new Error("Image cropping is unavailable in this environment.");
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      return await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () =>
+          reject(new Error("Failed to decode rendered page image."));
+        image.src = objectUrl;
+      });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+
+  const releaseCanvasImageSource = (source: CanvasImageSource) => {
+    if (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap) {
+      source.close();
+    }
+  };
+
+  const getCanvasImageSourceDimensions = (source: CanvasImageSource) => {
+    if (
+      typeof source === "object" &&
+      source !== null &&
+      "naturalWidth" in source &&
+      "naturalHeight" in source &&
+      typeof source.naturalWidth === "number" &&
+      typeof source.naturalHeight === "number"
+    ) {
+      return {
+        width: source.naturalWidth,
+        height: source.naturalHeight,
+      };
+    }
+
+    if (
+      typeof source === "object" &&
+      source !== null &&
+      "width" in source &&
+      "height" in source &&
+      typeof source.width === "number" &&
+      typeof source.height === "number"
+    ) {
+      return {
+        width: source.width,
+        height: source.height,
+      };
+    }
+
+    return null;
+  };
+
+  const createRasterSurface = (width: number, height: number) => {
+    if (typeof OffscreenCanvas === "function") {
+      const canvas = new OffscreenCanvas(width, height);
+      return { canvas, context: canvas.getContext("2d") };
+    }
+
+    if (typeof document !== "undefined") {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      return { canvas, context: canvas.getContext("2d") };
+    }
+
+    throw new Error("Canvas rendering is unavailable in this environment.");
+  };
+
+  const canvasToPngBytes = async (
+    canvas: OffscreenCanvas | HTMLCanvasElement,
+  ) => {
+    const blob =
+      typeof OffscreenCanvas === "function" && canvas instanceof OffscreenCanvas
+        ? await canvas.convertToBlob({ type: "image/png" })
+        : await new Promise<Blob>((resolve, reject) => {
+            (canvas as HTMLCanvasElement).toBlob((value) => {
+              if (value) {
+                resolve(value);
+                return;
+              }
+              reject(new Error("Failed to encode cropped page image."));
+            }, "image/png");
+          });
+
+    return new Uint8Array(await blob.arrayBuffer());
+  };
+
+  const materializeRenderedPageImage = async (
+    source: RenderedPageImageSource,
+    cropRect?: AiPageSpaceRect,
+  ): Promise<AiRenderedPageImage> => {
+    if (!cropRect) {
+      return {
+        pageNumber: source.pageNumber,
+        pageWidth: source.pageWidth,
+        pageHeight: source.pageHeight,
+        rotation: source.rotation,
+        targetWidth: source.targetWidth,
+        renderedWidth: source.renderedWidth,
+        renderedHeight: source.renderedHeight,
+        mimeType: source.mimeType,
+        renderAnnotations: source.renderAnnotations,
+        base64Data: convertUint8ArrayToBase64(source.imageBytes),
+      };
+    }
+
+    const clampedCropRect = clampPageSpaceRectToBounds(
+      source.pageWidth,
+      source.pageHeight,
+      cropRect,
+    );
+    if (!clampedCropRect) {
+      throw new Error(
+        `Invalid crop rect for page ${source.pageNumber}: no visible area remained after clamping.`,
+      );
+    }
+
+    const imageSource = await loadCanvasImageSource(
+      source.imageBytes,
+      source.mimeType,
+    );
+
+    const decodedSize = getCanvasImageSourceDimensions(imageSource);
+    const sourceImageWidth = Math.max(
+      1,
+      decodedSize?.width ?? source.renderedWidth,
+    );
+    const sourceImageHeight = Math.max(
+      1,
+      decodedSize?.height ?? source.renderedHeight,
+    );
+    const sourceX = Math.max(
+      0,
+      Math.min(
+        sourceImageWidth - 1,
+        Math.floor((clampedCropRect.x / source.pageWidth) * sourceImageWidth),
+      ),
+    );
+    const sourceY = Math.max(
+      0,
+      Math.min(
+        sourceImageHeight - 1,
+        Math.floor((clampedCropRect.y / source.pageHeight) * sourceImageHeight),
+      ),
+    );
+    const sourceRight = Math.max(
+      sourceX + 1,
+      Math.min(
+        sourceImageWidth,
+        Math.ceil(
+          ((clampedCropRect.x + clampedCropRect.width) / source.pageWidth) *
+            sourceImageWidth,
+        ),
+      ),
+    );
+    const sourceBottom = Math.max(
+      sourceY + 1,
+      Math.min(
+        sourceImageHeight,
+        Math.ceil(
+          ((clampedCropRect.y + clampedCropRect.height) / source.pageHeight) *
+            sourceImageHeight,
+        ),
+      ),
+    );
+    const croppedWidth = Math.max(1, sourceRight - sourceX);
+    const croppedHeight = Math.max(1, sourceBottom - sourceY);
+
+    try {
+      const { canvas, context } = createRasterSurface(
+        croppedWidth,
+        croppedHeight,
+      );
+      if (!context) {
+        throw new Error("Failed to initialize canvas for page crop.");
+      }
+
+      context.drawImage(
+        imageSource,
+        sourceX,
+        sourceY,
+        croppedWidth,
+        croppedHeight,
+        0,
+        0,
+        croppedWidth,
+        croppedHeight,
+      );
+
+      const croppedBytes = await canvasToPngBytes(canvas);
+      return {
+        pageNumber: source.pageNumber,
+        pageWidth: source.pageWidth,
+        pageHeight: source.pageHeight,
+        rotation: source.rotation,
+        cropRect: clampedCropRect,
+        targetWidth: source.targetWidth,
+        renderedWidth: croppedWidth,
+        renderedHeight: croppedHeight,
+        mimeType: "image/png",
+        renderAnnotations: source.renderAnnotations,
+        base64Data: convertUint8ArrayToBase64(croppedBytes),
+      };
+    } finally {
+      releaseCanvasImageSource(imageSource);
+    }
   };
 
   const renderPageImageBatch = async ({
@@ -561,66 +969,75 @@ export const createDocumentContextService = (options: {
     renderAnnotations = true,
     signal,
   }: {
-    pageNumbers: number[];
+    pageNumbers: PageVisualRequest[];
     targetWidth?: number;
     renderAnnotations?: boolean;
     signal?: AbortSignal;
   }): Promise<AiRenderedPageImageBatch> => {
     const snapshot = getSnapshot();
-    const requestedPageNumbers = clampPageNumbers(
+    const requestedPageRequests = resolvePageVisualRequests(
       pageNumbers,
-      snapshot.pages.length,
-      snapshot.pages.length,
+      snapshot,
     );
-    const resolvedPageNumbers = clampPageNumbers(
-      requestedPageNumbers,
-      snapshot.pages.length,
+    const resolvedPageRequests = resolvePageVisualRequests(
+      pageNumbers,
+      snapshot,
       AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
     );
 
-    if (resolvedPageNumbers.length === 0) {
+    if (resolvedPageRequests.length === 0) {
       return {
-        requestedPageCount: requestedPageNumbers.length,
+        requestedPageCount: requestedPageRequests.length,
         returnedPageCount: 0,
-        truncated: requestedPageNumbers.length > 0,
+        truncated: requestedPageRequests.length > 0,
         maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
         pages: [],
       };
     }
 
+    const resolvedTargetWidth = clampPageImageTargetWidth(targetWidth);
+    const pages: AiRenderedPageImage[] = [];
+
     if (!getRenderablePdfBytes) {
-      const pages: AiRenderedPageImage[] = [];
-      for (const pageNumber of resolvedPageNumbers) {
-        pages.push(
-          await renderPageImage({
-            pageNumber,
-            targetWidth,
+      const pageSources = new Map<number, RenderedPageImageSource>();
+      for (const request of resolvedPageRequests) {
+        let source = pageSources.get(request.pageNumber);
+        if (!source) {
+          source = await renderPageImageSourceFromCurrentDocument({
+            pageNumber: request.pageNumber,
+            targetWidth: resolvedTargetWidth,
             renderAnnotations,
             signal,
-          }),
+          });
+          pageSources.set(request.pageNumber, source);
+        }
+
+        pages.push(
+          await materializeRenderedPageImage(source, request.cropRect),
         );
       }
 
       return {
-        requestedPageCount: requestedPageNumbers.length,
+        requestedPageCount: requestedPageRequests.length,
         returnedPageCount: pages.length,
-        truncated: requestedPageNumbers.length > pages.length,
+        truncated: requestedPageRequests.length > pages.length,
         maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
         pages,
       };
     }
 
+    const uniquePageNumbers = Array.from(
+      new Set(resolvedPageRequests.map((request) => request.pageNumber)),
+    );
     const renderablePdfBytes = await getRenderablePdfBytes({
-      pageNumbers: resolvedPageNumbers,
+      pageNumbers: uniquePageNumbers,
       signal,
     });
     if (!renderablePdfBytes || renderablePdfBytes.byteLength === 0) {
       throw new Error("Failed to export a renderable PDF snapshot.");
     }
 
-    const resolvedTargetWidth = clampPageImageTargetWidth(targetWidth);
     const docId = `ai_render_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const pages: AiRenderedPageImage[] = [];
 
     try {
       await pdfWorkerService.loadDocument(renderablePdfBytes, {
@@ -628,37 +1045,26 @@ export const createDocumentContextService = (options: {
         signal,
       });
 
+      const pageSources = new Map<number, RenderedPageImageSource>();
       for (
         let subsetPageIndex = 0;
-        subsetPageIndex < resolvedPageNumbers.length;
+        subsetPageIndex < uniquePageNumbers.length;
         subsetPageIndex += 1
       ) {
         throwIfAborted(signal);
 
-        const pageNumber = resolvedPageNumbers[subsetPageIndex]!;
+        const pageNumber = uniquePageNumbers[subsetPageIndex]!;
         const sourcePage = snapshot.pages[pageNumber - 1];
         if (!sourcePage) {
           throw new Error(`Invalid page number: ${pageNumber}`);
         }
 
-        const pageViewport = createViewportFromPageInfo(
-          {
-            viewBox: sourcePage.viewBox,
-            userUnit: sourcePage.userUnit,
-            rotation: sourcePage.rotation,
-          },
-          {
-            scale: 1,
-            rotation: sourcePage.rotation,
-          },
-        );
-        const renderedWidth = Math.max(1, Math.round(resolvedTargetWidth));
-        const renderedHeight = Math.max(
-          1,
-          Math.round(
-            (renderedWidth / pageViewport.width) * pageViewport.height,
-          ),
-        );
+        const pageViewport = buildPageViewport(sourcePage);
+        const { renderedWidth, renderedHeight } = getRenderedImageDimensions({
+          pageWidth: pageViewport.width,
+          pageHeight: pageViewport.height,
+          targetWidth: resolvedTargetWidth,
+        });
 
         const { bytes: imageBytes, mimeType } =
           await pdfWorkerService.renderPageImage({
@@ -677,7 +1083,7 @@ export const createDocumentContextService = (options: {
           );
         }
 
-        pages.push({
+        pageSources.set(pageNumber, {
           pageNumber,
           pageWidth: Math.round(pageViewport.width),
           pageHeight: Math.round(pageViewport.height),
@@ -687,17 +1093,29 @@ export const createDocumentContextService = (options: {
           renderedHeight,
           mimeType: mimeType || "image/png",
           renderAnnotations,
-          base64Data: convertUint8ArrayToBase64(imageBytes),
+          imageBytes,
         });
+      }
+
+      for (const request of resolvedPageRequests) {
+        const source = pageSources.get(request.pageNumber);
+        if (!source) {
+          throw new Error(
+            `Rendered page source missing for page ${request.pageNumber}.`,
+          );
+        }
+        pages.push(
+          await materializeRenderedPageImage(source, request.cropRect),
+        );
       }
     } finally {
       pdfWorkerService.unloadDocument(docId);
     }
 
     return {
-      requestedPageCount: requestedPageNumbers.length,
+      requestedPageCount: requestedPageRequests.length,
       returnedPageCount: pages.length,
-      truncated: requestedPageNumbers.length > pages.length,
+      truncated: requestedPageRequests.length > pages.length,
       maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
       pages,
     };
@@ -716,12 +1134,21 @@ export const createDocumentContextService = (options: {
         computedVisiblePageNumbers.length > 0
           ? computedVisiblePageNumbers
           : fallbackVisiblePageNumbers;
+      const viewportPageRects = getWorkspaceViewportPageRects(snapshot);
+      const currentViewportRect =
+        viewportPageRects.find(
+          (item) => item.pageNumber === snapshot.currentPageIndex + 1,
+        ) ??
+        viewportPageRects[0] ??
+        null;
 
       return {
         pageCount: snapshot.pages.length,
         currentPageNumber:
           snapshot.pages.length > 0 ? snapshot.currentPageIndex + 1 : null,
         visiblePageNumbers,
+        currentViewportRect,
+        viewportPageRects,
         scale: Number(snapshot.scale.toFixed(3)),
         zoomPercent: Math.round(snapshot.scale * 100),
         pageLayout: snapshot.pageLayout,
@@ -746,7 +1173,7 @@ export const createDocumentContextService = (options: {
       renderAnnotations = true,
       signal,
     }: {
-      pageNumbers: number[];
+      pageNumbers: PageVisualRequest[];
       targetWidth?: number;
       renderAnnotations?: boolean;
       signal?: AbortSignal;
@@ -767,7 +1194,7 @@ export const createDocumentContextService = (options: {
           summaryInstructions,
           signal,
         }: {
-          pageNumbers: number[];
+          pageNumbers: PageVisualRequest[];
           targetWidth?: number;
           renderAnnotations?: boolean;
           summaryInstructions?: AiSummaryInstructions;
@@ -796,6 +1223,7 @@ export const createDocumentContextService = (options: {
               pageWidth: page.pageWidth,
               pageHeight: page.pageHeight,
               rotation: page.rotation,
+              cropRect: page.cropRect,
               targetWidth: page.targetWidth,
               renderedWidth: page.renderedWidth,
               renderedHeight: page.renderedHeight,

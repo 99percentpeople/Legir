@@ -1015,6 +1015,92 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <Label
+                        htmlFor="ai-chat-form-tools-enabled"
+                        className="font-semibold"
+                      >
+                        {t("settings.ai_chat.form_tools_enabled")}
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings.ai_chat.form_tools_enabled_desc")}
+                      </p>
+                    </div>
+                    <Switch
+                      id="ai-chat-form-tools-enabled"
+                      checked={options.aiChat.formToolsEnabled}
+                      onCheckedChange={(checked) =>
+                        updateAiChatOptions({
+                          formToolsEnabled: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="ai-chat-detect-form-fields-enabled"
+                        className="font-semibold"
+                      >
+                        {t("settings.ai_chat.detect_form_fields_enabled")}
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings.ai_chat.detect_form_fields_enabled_desc")}
+                      </p>
+                    </div>
+                    <Switch
+                      id="ai-chat-detect-form-fields-enabled"
+                      checked={options.aiChat.detectFormFieldsEnabled}
+                      onCheckedChange={(checked) =>
+                        updateAiChatOptions({
+                          detectFormFieldsEnabled: checked,
+                        })
+                      }
+                      disabled={!options.aiChat.formToolsEnabled}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold">
+                      {t("settings.ai_chat.form_tools_vision_model")}
+                    </Label>
+                    <ModelSelect
+                      value={
+                        options.aiChat.formToolsVisionModelKey || undefined
+                      }
+                      onValueChange={(value) =>
+                        updateAiChatOptions({
+                          formToolsVisionModelKey: value,
+                        })
+                      }
+                      placeholder={
+                        aiVisionModelGroups.length > 0
+                          ? t(
+                              "settings.ai_chat.form_tools_vision_model_placeholder",
+                            )
+                          : t("settings.ai_chat.no_models")
+                      }
+                      groups={aiVisionModelGroups}
+                      disabled={
+                        !options.aiChat.formToolsEnabled ||
+                        !options.aiChat.detectFormFieldsEnabled ||
+                        aiVisionModelGroups.length === 0
+                      }
+                      showSeparators
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      {t("settings.ai_chat.form_tools_vision_model_desc")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label
                         htmlFor="ai-chat-visual-summary-enabled"
                         className="font-semibold"
                       >

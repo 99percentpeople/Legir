@@ -1,5 +1,6 @@
 import type {
   AiChatAssistantUpdate,
+  AiChatToolPreviewImage,
   AiChatTimelineItem,
   AiChatToolUpdate,
   AiToolName,
@@ -20,6 +21,73 @@ export const getAssistantSegmentId = (turnId: string, segmentIndex: number) =>
   segmentIndex <= 0 ? turnId : `${turnId}:segment_${segmentIndex}`;
 
 const getTurnIdFromBatchId = (batchId: string) => batchId.split(":step_")[0]!;
+
+const getObjectRecord = (value: unknown) =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const extractToolPreviewImages = (
+  update: Extract<AiChatToolUpdate, { phase: "success" }>,
+): AiChatToolPreviewImage[] | undefined => {
+  const modelOutput = getObjectRecord(update.result.modelOutput);
+  const payload = getObjectRecord(update.result.payload);
+  const candidatePages = Array.isArray(modelOutput?.pages)
+    ? modelOutput.pages
+    : Array.isArray(payload?.pages)
+      ? payload.pages
+      : null;
+
+  if (!candidatePages) return undefined;
+
+  const previews: AiChatToolPreviewImage[] = [];
+  for (const [index, entry] of candidatePages.entries()) {
+    const page = getObjectRecord(entry);
+    if (!page) continue;
+
+    const base64Data =
+      typeof page.base64Data === "string" && page.base64Data.trim()
+        ? page.base64Data.trim()
+        : null;
+    if (!base64Data) continue;
+
+    const mimeType =
+      typeof page.mimeType === "string" && page.mimeType.trim()
+        ? page.mimeType.trim()
+        : "image/png";
+    const pageNumber =
+      typeof page.pageNumber === "number" && Number.isFinite(page.pageNumber)
+        ? page.pageNumber
+        : null;
+    const cropRect = getObjectRecord(page.cropRect);
+    const renderedWidth =
+      typeof page.renderedWidth === "number" &&
+      Number.isFinite(page.renderedWidth)
+        ? page.renderedWidth
+        : undefined;
+    const renderedHeight =
+      typeof page.renderedHeight === "number" &&
+      Number.isFinite(page.renderedHeight)
+        ? page.renderedHeight
+        : undefined;
+    const label = pageNumber
+      ? cropRect
+        ? `Page ${pageNumber} crop`
+        : `Page ${pageNumber}`
+      : `Image ${index + 1}`;
+
+    previews.push({
+      id: `${update.call.id}:preview:${index}`,
+      src: `data:${mimeType};base64,${base64Data}`,
+      alt: label,
+      label,
+      width: renderedWidth,
+      height: renderedHeight,
+    });
+  }
+
+  return previews.length > 0 ? previews : undefined;
+};
 
 const isAssistantTurnSegment = (
   item: AiChatTimelineItem,
@@ -351,6 +419,7 @@ export const applyToolUpdateToTimeline = (
               progressItems: undefined,
               progressCounts: undefined,
               resultText: stringifyToolPayload(update.result.payload),
+              previewImages: extractToolPreviewImages(update),
             }
           : item,
       ),

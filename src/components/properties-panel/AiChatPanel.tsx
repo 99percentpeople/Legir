@@ -63,6 +63,7 @@ import type {
   AiDocumentLinkTarget,
   AiChatSessionSummary,
   AiChatTimelineItem,
+  AiChatToolPreviewImage,
   AiChatUserMessageInput,
 } from "@/services/ai/chat/types";
 import { TimeAgoText } from "@/components/timeText";
@@ -109,6 +110,7 @@ export interface AiChatPanelProps {
   onStop: () => void;
   onOpenDocumentLink: (target: AiDocumentLinkTarget) => void;
   disabledReason: "no_document" | "no_model" | null;
+  formToolsEnabled: boolean;
 }
 
 type TranslateFn = (
@@ -626,6 +628,7 @@ const ToolTimelineCall = ({
     },
   );
   const resultText = item.resultText?.trim();
+  const previewImages = item.previewImages ?? [];
   React.useEffect(() => {
     if (!detailsOpen || progressLogs.length === 0) return;
     scrollProgressLogToBottom(false);
@@ -701,6 +704,19 @@ const ToolTimelineCall = ({
           </div>
         ) : null}
 
+        {previewImages.length ? (
+          <div className="space-y-2">
+            <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+              {t("sidebar.thumbnails")}
+            </div>
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {previewImages.map((preview) => (
+                <ToolTimelineImagePreview key={preview.id} preview={preview} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {resultText ? (
           <>
             <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
@@ -731,6 +747,33 @@ const ToolTimelineCall = ({
     </Collapsible>
   );
 };
+
+const ToolTimelineImagePreview = ({
+  preview,
+}: {
+  preview: AiChatToolPreviewImage;
+}) => (
+  <a
+    href={preview.src}
+    target="_blank"
+    rel="noreferrer"
+    className="bg-muted/30 border-border/60 hover:border-border block shrink-0 overflow-hidden rounded-md border transition-colors"
+    title={preview.label}
+  >
+    <img
+      src={preview.src}
+      alt={preview.alt}
+      className="block h-28 w-auto max-w-[220px] bg-white object-contain"
+      loading="lazy"
+    />
+    <div className="text-muted-foreground border-border/60 border-t px-2 py-1 text-[11px]">
+      {preview.label}
+      {preview.width && preview.height
+        ? ` · ${preview.width}×${preview.height}`
+        : ""}
+    </div>
+  </a>
+);
 
 const getSessionTitle = (
   t: (key: string) => string,
@@ -767,6 +810,7 @@ export function AiChatPanel({
   onStop,
   onOpenDocumentLink,
   disabledReason,
+  formToolsEnabled,
 }: AiChatPanelProps) {
   const { t } = useLanguage();
   const [draft, setDraft] = React.useState("");
@@ -1082,8 +1126,8 @@ export function AiChatPanel({
     [],
   );
 
-  const starterGroups = React.useMemo(
-    () => [
+  const starterGroups = React.useMemo(() => {
+    const groups = [
       {
         id: "reading",
         title: t("ai_chat.starters.reading.title"),
@@ -1108,9 +1152,21 @@ export function AiChatPanel({
           t("ai_chat.starters.actions.annotations"),
         ],
       },
-    ],
-    [t],
-  );
+    ];
+
+    if (formToolsEnabled) {
+      groups.unshift({
+        id: "forms",
+        title: t("ai_chat.starters.forms.title"),
+        prompts: [
+          t("ai_chat.starters.forms.current_page"),
+          t("ai_chat.starters.forms.signature_dates"),
+        ],
+      });
+    }
+
+    return groups;
+  }, [formToolsEnabled, t]);
 
   const canSend =
     !disabledReason &&

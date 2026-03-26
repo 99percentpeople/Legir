@@ -64,8 +64,6 @@ const fr = {
     shape_polygon_tools: "Formes polygonales",
     settings: "Paramètres",
     shortcuts: "Raccourcis clavier (?)",
-    form_detect: "Détection de formulaires",
-    form_custom: "Détection personnalisée...",
     export: "Exporter",
     save_as: "Enregistrer sous...",
     save_draft: "Enregistrer le brouillon",
@@ -364,7 +362,6 @@ const fr = {
   right_panel: {
     tabs: {
       ai_chat: "Chat IA",
-      form_detect: "Détection de formulaires",
       page_translate: "Traduire la page",
       properties: "Édition des propriétés",
     },
@@ -444,6 +441,12 @@ const fr = {
       highlight: "Surligne toutes les occurrences de signature",
     },
     starters: {
+      forms: {
+        title: "Créer des formulaires",
+        current_page: "Détecte et crée les champs remplissables sur cette page",
+        signature_dates:
+          "Détecte uniquement les champs de signature et de date sur la page actuelle",
+      },
       reading: {
         title: "Lire & Résumer",
         current_page: "Résume la page actuelle",
@@ -696,7 +699,17 @@ const fr = {
     ai_chat: {
       title: "Outils de chat IA",
       description:
-        "Configure l'outil de résumé du document IA et l'outil de résumé visuel des pages rendues.",
+        "Configure les capacités du chat IA, y compris les outils de création de formulaires, l'outil de résumé du document et l'outil de résumé visuel des pages rendues.",
+      form_tools_enabled: "Activer les outils de formulaire IA",
+      form_tools_enabled_desc:
+        "Permet au chat IA de créer de nouveaux champs de formulaire à partir des demandes conversationnelles. Laissez cette option désactivée si vous ne voulez que des questions-réponses en lecture seule et le remplissage des champs.",
+      detect_form_fields_enabled: "Activer le fallback detect_form_fields",
+      detect_form_fields_enabled_desc:
+        "Permet au chat IA d'utiliser l'outil visuel dédié detect_form_fields lorsque le modèle de chat actuel ne peut pas inspecter directement les images de page.",
+      form_tools_vision_model: "Modèle vision pour les formulaires",
+      form_tools_vision_model_placeholder: "Sélectionner un modèle vision",
+      form_tools_vision_model_desc:
+        "Modèle vision dédié à detect_form_fields. Cet outil n'utilise jamais le modèle de chat actuel et ne s'exécute que lorsque la détection de secours est activée.",
       visual_summary_enabled: "Activer l'outil de résumé visuel",
       visual_summary_enabled_desc:
         "Active ou désactive summarize_pages_visual dans le chat IA. Cela permet aux modèles de chat textuels de déléguer l'inspection visuelle des pages rendues à un modèle vision.",
