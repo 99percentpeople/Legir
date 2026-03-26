@@ -523,8 +523,10 @@ export const useWorkspaceViewport = (opts: {
       source: WorkspaceZoomSource;
       fromScale?: number;
     }) => {
-      const currentScale =
-        pendingZoomCommitRef.current?.scale ?? opts.editorState.scale;
+      // Wheel zoom anchors must be computed against the scale that is actually
+      // on screen right now. A pending zoom commit may already have a newer
+      // target scale, but the DOM/page rects still reflect the rendered scale.
+      const currentScale = opts.editorState.scale;
       const nextScale = Number(
         clampWorkspaceScale(options.newScale).toFixed(3),
       );
