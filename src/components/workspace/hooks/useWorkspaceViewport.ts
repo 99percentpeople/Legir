@@ -270,6 +270,40 @@ export const useWorkspaceViewport = (opts: {
     [],
   );
 
+  const resolveDoubleLayoutViewportCenterPage = useCallback(
+    (container: HTMLDivElement | HTMLElement) => {
+      const rect = container.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * opts.editorState.scale;
+      const probe = Math.max(8, Math.min(256, gapPx / 2 + 4));
+
+      const domHit = findPageNearPointByDom(centerX, centerY, probe, probe);
+      if (domHit) {
+        return {
+          pageIndex: domHit.pageIndex,
+          pageRect: domHit.rect,
+        };
+      }
+
+      const fallbackPageIndex = findClosestPageIndexByLayoutRect(
+        container.scrollLeft + container.clientWidth / 2,
+        container.scrollTop + container.clientHeight / 2,
+      );
+      if (fallbackPageIndex === null) return null;
+
+      return {
+        pageIndex: fallbackPageIndex,
+        pageRect: null,
+      };
+    },
+    [
+      findClosestPageIndexByLayoutRect,
+      findPageNearPointByDom,
+      opts.editorState.scale,
+    ],
+  );
+
   const getContentZoomAnchor = useCallback(
     (
       clientX: number,
@@ -710,10 +744,12 @@ export const useWorkspaceViewport = (opts: {
           const lockedPageIndex = pageIndexLockRef.current;
           if (typeof lockedPageIndex === "number") {
             const rect = c.getBoundingClientRect();
-            const centerPageIndex = getPageIndexAtClientPoint(
-              rect.left + rect.width / 2,
-              rect.top + rect.height / 2,
-            );
+            const centerPageIndex = isDoubleLayout
+              ? (resolveDoubleLayoutViewportCenterPage(c)?.pageIndex ?? null)
+              : getPageIndexAtClientPoint(
+                  rect.left + rect.width / 2,
+                  rect.top + rect.height / 2,
+                );
 
             if (
               centerPageIndex === null ||
@@ -728,54 +764,30 @@ export const useWorkspaceViewport = (opts: {
         }
 
         if (isDoubleLayout) {
-          const rect = c.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
+          const resolvedCenterPage = resolveDoubleLayoutViewportCenterPage(c);
+          if (!resolvedCenterPage) return;
 
-          const hitPageElAt = (x: number, y: number) => {
-            const pageIndex = getPageIndexAtClientPoint(x, y);
-            if (pageIndex === null) return null;
-            return document.getElementById(`page-${pageIndex}`);
-          };
-
-          const gapPx = WORKSPACE_BASE_PAGE_GAP_PX * opts.editorState.scale;
-          const probe = Math.max(8, Math.min(256, gapPx / 2 + 4));
-          const pageEl =
-            hitPageElAt(centerX, centerY) ||
-            hitPageElAt(centerX - probe, centerY) ||
-            hitPageElAt(centerX + probe, centerY) ||
-            hitPageElAt(centerX, centerY - probe) ||
-            hitPageElAt(centerX, centerY + probe);
-
-          if (!pageEl) {
-            const fallbackPageIndex = findClosestPageIndexByLayoutRect(
-              c.scrollLeft + c.clientWidth / 2,
-              c.scrollTop + c.clientHeight / 2,
-            );
-            if (fallbackPageIndex !== null && shouldNotifyPageIndex) {
-              notifyPageIndexChange(fallbackPageIndex);
-            }
-            return;
+          const idx = resolvedCenterPage.pageIndex;
+          const r = resolvedCenterPage.pageRect;
+          if (r) {
+            const rect = c.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const pageW = r.width / opts.editorState.scale;
+            const pageH = r.height / opts.editorState.scale;
+            viewportAnchorRef.current = {
+              scale: opts.editorState.scale,
+              pageIndex: idx,
+              pageX: Math.max(
+                0,
+                Math.min(pageW, (centerX - r.left) / opts.editorState.scale),
+              ),
+              pageY: Math.max(
+                0,
+                Math.min(pageH, (centerY - r.top) / opts.editorState.scale),
+              ),
+            };
           }
-
-          const idx = Number(pageEl.id.slice("page-".length));
-          if (Number.isNaN(idx)) return;
-
-          const r = pageEl.getBoundingClientRect();
-          const pageW = r.width / opts.editorState.scale;
-          const pageH = r.height / opts.editorState.scale;
-          viewportAnchorRef.current = {
-            scale: opts.editorState.scale,
-            pageIndex: idx,
-            pageX: Math.max(
-              0,
-              Math.min(pageW, (centerX - r.left) / opts.editorState.scale),
-            ),
-            pageY: Math.max(
-              0,
-              Math.min(pageH, (centerY - r.top) / opts.editorState.scale),
-            ),
-          };
           if (shouldNotifyPageIndex) notifyPageIndexChange(idx);
           return;
         }
@@ -880,6 +892,7 @@ export const useWorkspaceViewport = (opts: {
     opts.updateTextSelectionToolbar,
     getPageIndexAtClientPoint,
     notifyPageIndexChange,
+    resolveDoubleLayoutViewportCenterPage,
   ]);
 
   useEffect(() => {
