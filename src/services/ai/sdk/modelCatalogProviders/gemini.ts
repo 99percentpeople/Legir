@@ -5,11 +5,16 @@ import {
   modelSupportsInputModality,
 } from "@/services/ai/sdk/modelCapabilities";
 import type {
+  AiSdkModelCallOptions,
+  AiSdkModelCatalogProviderCallOptionsRequest,
   AiSdkModelCatalogProviderRequest,
   AiSdkModelCatalogProviderTaskRequest,
   AiSdkTaskModelKind,
 } from "@/services/ai/sdk/types";
-import { isSupportedGeminiToolCallingModelId } from "@/services/ai/utils/geminiModelSupport";
+import {
+  isSupportedGeminiThinkingModelId,
+  isSupportedGeminiToolCallingModelId,
+} from "@/services/ai/utils/geminiModelSupport";
 import { BaseAiSdkModelCatalogProvider } from "./base";
 
 const GEMINI_MODELS_ENDPOINT =
@@ -125,5 +130,26 @@ export class GeminiModelCatalogProvider extends BaseAiSdkModelCatalogProvider {
         matchesGeminiTask(model.capabilities, options.kind),
       ),
     );
+  }
+
+  override resolveCallOptions(
+    options: AiSdkModelCatalogProviderCallOptionsRequest,
+  ): AiSdkModelCallOptions | undefined {
+    if (
+      options.kind !== "chat" ||
+      !isSupportedGeminiThinkingModelId(options.modelId)
+    ) {
+      return undefined;
+    }
+
+    return {
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            includeThoughts: true,
+          },
+        },
+      },
+    };
   }
 }

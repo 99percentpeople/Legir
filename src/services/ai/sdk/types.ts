@@ -5,6 +5,7 @@
  * here. Higher-level chat/task payloads should stay in their own feature
  * folders.
  */
+import type { SharedV3ProviderOptions } from "@ai-sdk/provider";
 import type { LanguageModel } from "ai";
 import type { LLMModelOption } from "@/services/ai/types";
 import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
@@ -38,9 +39,14 @@ export interface AiSdkModelSpecifier {
 export interface AiSdkResolvedLanguageModel {
   specifier: AiSdkModelSpecifier;
   model: LanguageModel;
+  callOptions?: AiSdkModelCallOptions;
 }
 
 export type AiSdkTaskModelKind = "translate" | "vision" | "chat" | "summarize";
+
+export interface AiSdkModelCallOptions {
+  providerOptions?: SharedV3ProviderOptions;
+}
 
 export interface AiSdkDiscoveredModel {
   id: string;
@@ -59,6 +65,11 @@ export interface AiSdkModelCatalogProviderTaskRequest {
   kind: AiSdkTaskModelKind;
 }
 
+export interface AiSdkModelCatalogProviderCallOptionsRequest {
+  modelId: string;
+  kind: AiSdkTaskModelKind;
+}
+
 export interface AiSdkModelCatalogProvider {
   readonly providerId: AiSdkProviderId;
   fetchModels: (
@@ -67,6 +78,9 @@ export interface AiSdkModelCatalogProvider {
   getModelsForTask: (
     options: AiSdkModelCatalogProviderTaskRequest,
   ) => LLMModelOption[];
+  resolveCallOptions?: (
+    options: AiSdkModelCatalogProviderCallOptionsRequest,
+  ) => AiSdkModelCallOptions | undefined;
   checkConfig: (
     options: AiSdkModelCatalogProviderRequest,
   ) => Promise<void> | void;

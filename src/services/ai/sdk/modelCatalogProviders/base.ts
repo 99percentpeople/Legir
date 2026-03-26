@@ -9,8 +9,10 @@ import {
   normalizeBaseUrl,
 } from "@/services/ai/sdk/providers";
 import type {
+  AiSdkModelCallOptions,
   AiSdkDiscoveredModel,
   AiSdkModelCatalogProvider,
+  AiSdkModelCatalogProviderCallOptionsRequest,
   AiSdkModelCatalogProviderRequest,
   AiSdkModelCatalogProviderTaskRequest,
 } from "@/services/ai/sdk/types";
@@ -50,6 +52,12 @@ export abstract class BaseAiSdkModelCatalogProvider implements AiSdkModelCatalog
   abstract getModelsForTask(
     options: AiSdkModelCatalogProviderTaskRequest,
   ): LLMModelOption[];
+
+  resolveCallOptions(
+    _options: AiSdkModelCatalogProviderCallOptionsRequest,
+  ): AiSdkModelCallOptions | undefined {
+    return undefined;
+  }
 
   async checkConfig(options: AiSdkModelCatalogProviderRequest) {
     await this.fetchModels(options);

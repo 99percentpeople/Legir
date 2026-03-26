@@ -97,10 +97,18 @@ export const resolveAiSdkLanguageModel = (
 export const resolveAiSdkLanguageModelDetailed = (
   options: AppOptions,
   specifier: AiSdkModelSpecifier,
-): AiSdkResolvedLanguageModel => ({
-  specifier,
-  model: resolveAiSdkLanguageModel(options, specifier),
-});
+  kind: AiSdkTaskModelKind,
+): AiSdkResolvedLanguageModel => {
+  const provider = getAiSdkModelCatalogProvider(specifier.providerId);
+  return {
+    specifier,
+    model: resolveAiSdkLanguageModel(options, specifier),
+    callOptions: provider.resolveCallOptions?.({
+      modelId: specifier.modelId,
+      kind,
+    }),
+  };
+};
 
 export const resolveAiSdkLanguageModelFromCurrentOptions = (
   specifier: AiSdkModelSpecifier,

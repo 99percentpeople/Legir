@@ -23,3 +23,12 @@ export const filterSupportedGeminiToolCallingModelIds = (ids: string[]) => {
     return isSupportedGeminiToolCallingModelId(id);
   });
 };
+
+export const isSupportedGeminiThinkingModelId = (modelId: string) => {
+  const normalized = modelId.trim().toLowerCase();
+  if (!normalized) return false;
+
+  return (
+    normalized.startsWith("gemini-2.5") || normalized.startsWith("gemini-3")
+  );
+};

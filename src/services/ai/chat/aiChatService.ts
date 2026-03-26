@@ -6,7 +6,7 @@ import {
 } from "@/services/ai/chat/prompts";
 import { createAiChatToolRuntime } from "@/services/ai/chat/runtime/toolRuntime";
 import {
-  resolveAiSdkLanguageModel,
+  resolveAiSdkLanguageModelDetailed,
   resolveAiSdkModelSpecifierForTask,
 } from "@/services/ai/sdk";
 import type { AppOptions, EditorState } from "@/types";
@@ -57,7 +57,11 @@ export const aiChatService = {
       kind: "chat",
       modelKey,
     });
-    const model = resolveAiSdkLanguageModel(appOptions, modelSpecifier);
+    const resolvedModel = resolveAiSdkLanguageModelDetailed(
+      appOptions,
+      modelSpecifier,
+      "chat",
+    );
     const toolDefinitions = toolRegistry.getDefinitions();
     let currentBatchId = `${turnId}:step_0`;
     let stepIndex = 0;
@@ -80,7 +84,8 @@ export const aiChatService = {
 
     try {
       const result = streamText({
-        model,
+        model: resolvedModel.model,
+        ...(resolvedModel.callOptions ?? null),
         system: getAiChatSystemInstruction({ toolDefinitions }),
         prompt: buildAiChatTurnPrompt({
           messages: conversation,
