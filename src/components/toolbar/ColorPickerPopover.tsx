@@ -7,6 +7,7 @@ import { ChevronDown } from "lucide-react";
 import { useLanguage } from "../language-provider";
 import { ColorPaletteControl } from "../ui/color-palette";
 import type { ColorPaletteType } from "@/lib/colorPalette";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 
 interface ColorPickerPopoverProps {
   color: string;
@@ -52,6 +53,10 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   const [open, setOpen] = React.useState(false);
   const hasStartedInteractionRef = React.useRef(false);
 
+  useAppEvent("workspace:pointerDown", () => {
+    setOpen(false);
+  });
+
   const ensureInteractionStarted = React.useCallback(() => {
     if (hasStartedInteractionRef.current) return;
     hasStartedInteractionRef.current = true;
@@ -87,7 +92,12 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-4" side={side} align={align}>
+      <PopoverContent
+        className="w-72 p-4"
+        side={side}
+        align={align}
+        data-ff-block-modifier-wheel-zoom="1"
+      >
         <div className="space-y-4">
           <ColorPaletteControl
             color={color}

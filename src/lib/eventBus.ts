@@ -116,6 +116,7 @@ export type AppEventMap = {
   "workspace:pinchGestureActiveChange": {
     active: boolean;
   };
+  "workspace:pointerDown": Record<string, never>;
   "workspace:finishShapeDraft": Record<string, never>;
   "workspace:cancelShapeDraft": Record<string, never>;
   "sidebar:focusAnnotation": {

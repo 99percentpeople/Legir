@@ -21,6 +21,7 @@ import { useLanguage } from "../language-provider";
 import { ButtonGroup } from "../ui/button-group";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePlatformUi } from "@/services/platform";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 
 export interface ExportMenuProps {
   disabled: boolean;
@@ -47,6 +48,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
 }) => {
   const { t } = useLanguage();
   const { documentSaveMode } = usePlatformUi();
+  const [open, setOpen] = React.useState(false);
   const isFileSaveMode = documentSaveMode === "file";
 
   const saveDisabled = disabled || (isFileSaveMode && !isDirty);
@@ -56,6 +58,10 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
   const PrimaryIcon = isFileSaveMode ? Save : Download;
 
   const isMobile = useIsMobile();
+
+  useAppEvent("workspace:pointerDown", () => {
+    setOpen(false);
+  });
 
   const handleSaveAndExit = async (save: () => Promise<boolean>) => {
     const ok = await save();
@@ -80,14 +86,18 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
         </Button>
       )}
 
-      <DropdownMenu modal={false}>
+      <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <Button size="icon" disabled={disabled}>
             <PrimaryIcon size={16} className="sm:hidden" />
             <ChevronDown size={16} className="hidden sm:block" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuContent
+          align="end"
+          className="min-w-56"
+          data-ff-block-modifier-wheel-zoom="1"
+        >
           <DropdownMenuItem
             onClick={onPrimary}
             className="sm:hidden"

@@ -45,6 +45,7 @@ import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import ZoomDropdownControl from "./ZoomDropdownControl";
 import PageSettingsDropdownControl from "./PageSettingsDropdownControl";
 import { ANNOTATION_STYLES } from "@/constants";
+import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getContrastColor } from "@/utils/colors";
 import ExportMenu from "./ExportMenu";
 import { canSaveAs, usePlatformUi } from "@/services/platform";
@@ -153,6 +154,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const livePageLayout = useEditorStore((state) => state.pageLayout);
   const livePageFlow = useEditorStore((state) => state.pageFlow);
   const liveIsFullscreen = useEditorStore((state) => state.isFullscreen);
+  const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
   const [shapePopoverOpen, setShapePopoverOpen] = useState(false);
   const [lastShapeTool, setLastShapeTool] = useState<ShapeTool>(() =>
     isShapeTool(tool) ? tool : "draw_shape_rect",
@@ -173,12 +177,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
     onToolChange(shapeTool);
   };
 
+  useAppEvent("workspace:pointerDown", () => {
+    setZoomMenuOpen(false);
+    setModeMenuOpen(false);
+    setPageSettingsOpen(false);
+    setShapePopoverOpen(false);
+  });
+
   return (
     <div
       className={cn(
         "bg-background border-border text-foreground relative z-30 flex h-12 items-center gap-2 border-b px-2 sm:px-4",
         hideToolSection ? "justify-between" : "lg:justify-between",
       )}
+      data-ff-block-modifier-wheel-zoom="1"
     >
       <div className="flex shrink-0 items-center gap-2 sm:gap-2">
         <div className="flex items-center gap-1">
@@ -239,6 +251,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
             scale={liveScale}
             disabled={editorState.pages.length === 0}
             compact={compactZoomControl}
+            open={zoomMenuOpen}
+            onOpenChange={setZoomMenuOpen}
             onZoomIn={onZoomIn}
             onZoomOut={onZoomOut}
             onFitWidth={onFitWidth}
@@ -247,7 +261,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
           {!hideModeSelector && (
             <>
-              <DropdownMenu modal={false}>
+              <DropdownMenu
+                modal={false}
+                open={modeMenuOpen}
+                onOpenChange={setModeMenuOpen}
+              >
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
@@ -262,7 +280,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
+                <DropdownMenuContent
+                  align="start"
+                  data-ff-block-modifier-wheel-zoom="1"
+                >
                   <DropdownMenuRadioGroup
                     value={mode}
                     onValueChange={onModeChange}
@@ -552,7 +573,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
                         <ActiveShapeIcon size={16} />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" className="w-72 p-3">
+                    <PopoverContent
+                      align="start"
+                      className="w-72 p-3"
+                      data-ff-block-modifier-wheel-zoom="1"
+                    >
                       <div className="space-y-3">
                         {SHAPE_TOOL_GROUPS.map((group, index) => (
                           <div key={group.id} className="space-y-2">
@@ -671,6 +696,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
               pageFlow={livePageFlow}
               isFullscreen={liveIsFullscreen}
               align="end"
+              open={pageSettingsOpen}
+              onOpenChange={setPageSettingsOpen}
               onPageLayoutChange={onPageLayoutChange}
               onPageFlowChange={onPageFlowChange}
               onToggleFullscreen={onToggleFullscreen}

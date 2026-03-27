@@ -32,6 +32,8 @@ type PageSettingsDropdownControlProps = {
   align?: "start" | "center" | "end";
   sideOffset?: number;
   triggerClassName?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onPageLayoutChange: (layout: PageLayoutMode) => void;
   onPageFlowChange: (flow: PageFlowDirection) => void;
   onToggleFullscreen: () => void;
@@ -47,6 +49,8 @@ const PageSettingsDropdownControl: React.FC<
   align = "end",
   sideOffset = 4,
   triggerClassName,
+  open,
+  onOpenChange,
   onPageLayoutChange,
   onPageFlowChange,
   onToggleFullscreen,
@@ -54,7 +58,7 @@ const PageSettingsDropdownControl: React.FC<
   const { t } = useLanguage();
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -70,6 +74,7 @@ const PageSettingsDropdownControl: React.FC<
         align={align}
         sideOffset={sideOffset}
         className="min-w-48"
+        data-ff-block-modifier-wheel-zoom="1"
       >
         <DropdownMenuLabel>{t("toolbar.page_settings")}</DropdownMenuLabel>
         <DropdownMenuSeparator />

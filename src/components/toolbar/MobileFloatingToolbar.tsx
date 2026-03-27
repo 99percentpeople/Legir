@@ -122,6 +122,9 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       canFinish: false,
     },
   );
+  const [pageMenuOpen, setPageMenuOpen] = React.useState(false);
+  const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
+  const [toolMenuOpen, setToolMenuOpen] = React.useState(false);
 
   useAppEvent(
     "workspace:shapeDraftStateChange",
@@ -130,6 +133,11 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
     },
     { replayLast: true },
   );
+  useAppEvent("workspace:pointerDown", () => {
+    setPageMenuOpen(false);
+    setModeMenuOpen(false);
+    setToolMenuOpen(false);
+  });
 
   const contentTool =
     editorState.mode === "annotation"
@@ -415,18 +423,27 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       className="pointer-events-none absolute left-1/2 z-40 -translate-x-1/2"
       style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}
     >
-      <div className="pointer-events-auto max-w-[calc(100vw-1.5rem)] px-3">
+      <div
+        className="pointer-events-auto max-w-[calc(100vw-1.5rem)] px-3"
+        data-ff-block-modifier-wheel-zoom="1"
+      >
         <div className="bg-background/72 border-border/70 no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border p-1 shadow-xl backdrop-blur-md transition-colors duration-200">
           <PageNumberDropdownControl
             currentPageIndex={currentPageIndex}
             pageCount={editorState.pages.length}
             className="shrink-0"
+            open={pageMenuOpen}
+            onOpenChange={setPageMenuOpen}
             onNavigatePage={onNavigatePage}
           />
 
           <Separator orientation="vertical" className="mx-1 shrink-0" />
 
-          <DropdownMenu modal={false}>
+          <DropdownMenu
+            modal={false}
+            open={modeMenuOpen}
+            onOpenChange={setModeMenuOpen}
+          >
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -441,7 +458,11 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start">
+            <DropdownMenuContent
+              side="top"
+              align="start"
+              data-ff-block-modifier-wheel-zoom="1"
+            >
               <DropdownMenuRadioGroup
                 value={editorState.mode}
                 onValueChange={onModeChange}
@@ -460,7 +481,11 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
 
           <Separator orientation="vertical" className="mx-1 shrink-0" />
 
-          <DropdownMenu modal={false}>
+          <DropdownMenu
+            modal={false}
+            open={toolMenuOpen}
+            onOpenChange={setToolMenuOpen}
+          >
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -471,7 +496,12 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                 {getToolIcon(activeTool)}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="center" className="min-w-52">
+            <DropdownMenuContent
+              side="top"
+              align="center"
+              className="min-w-52"
+              data-ff-block-modifier-wheel-zoom="1"
+            >
               <DropdownMenuRadioGroup
                 value={activeTool}
                 onValueChange={(value) => onToolChange(value as Tool)}

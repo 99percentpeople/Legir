@@ -462,6 +462,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
         style={{ touchAction: "none" }}
         onPointerDown={(e) => {
           const target = e.target as HTMLElement | null;
+          if (target && !e.currentTarget.contains(target)) return;
           if (target?.closest?.("[data-floating-window-no-drag]")) return;
           e.preventDefault();
           hasUserMovedRef.current = true;

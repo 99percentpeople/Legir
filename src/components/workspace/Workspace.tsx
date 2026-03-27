@@ -1907,6 +1907,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (startPan(e)) return;
   };
 
+  const handleWorkspacePointerDownCapture = (e: React.PointerEvent) => {
+    if (pinchGestureActiveRef.current) return;
+    if (e.button !== 0) return;
+    appEventBus.emit("workspace:pointerDown", {});
+  };
+
   const handlePointerDown = (e: React.PointerEvent, pageIndex: number) => {
     if (pinchGestureActiveRef.current) return;
     if (e.button !== 0) return;
@@ -3220,6 +3226,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         scrollPaddingBottom: workspaceBottomPaddingPx,
         "--scale": editorState.scale,
       }}
+      onPointerDownCapture={handleWorkspacePointerDownCapture}
       onPointerDown={handleContainerPointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

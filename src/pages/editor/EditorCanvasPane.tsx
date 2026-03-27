@@ -23,6 +23,8 @@ import { useShallow } from "zustand/react/shallow";
 
 const Workspace = React.lazy(() => import("@/components/workspace/Workspace"));
 const MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX = 96;
+const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
+  "[data-ff-block-modifier-wheel-zoom='1']";
 
 type EditorCanvasPaneProps = {
   onEditAnnotation: (id: string) => void;
@@ -142,6 +144,33 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
     },
     { replayLast: true },
   );
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+
+      const rawTarget = event.target;
+      if (!(rawTarget instanceof Node)) return;
+
+      const target =
+        rawTarget instanceof Element ? rawTarget : rawTarget.parentElement;
+      if (!target?.closest?.(BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    document.addEventListener("wheel", handleWheel, {
+      capture: true,
+      passive: false,
+    });
+
+    return () => {
+      document.removeEventListener("wheel", handleWheel, true);
+    };
+  }, []);
 
   const handleInitialScrollApplied = useCallback(() => {
     setState({ pendingViewStateRestore: null });

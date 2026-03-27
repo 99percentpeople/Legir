@@ -23,6 +23,8 @@ type PageNumberDropdownControlProps = {
   side?: "top" | "bottom" | "left" | "right";
   align?: "start" | "center" | "end";
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onNavigatePage: (pageIndex: number) => void;
 };
 
@@ -61,6 +63,8 @@ const PageNumberDropdownControl: React.FC<PageNumberDropdownControlProps> = ({
   side = "top",
   align = "center",
   className,
+  open,
+  onOpenChange,
   onNavigatePage,
 }) => {
   const { t } = useLanguage();
@@ -90,7 +94,7 @@ const PageNumberDropdownControl: React.FC<PageNumberDropdownControlProps> = ({
         >
           <ChevronLeft size={16} />
         </Button>
-        <DropdownMenu modal={false}>
+        <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -107,7 +111,12 @@ const PageNumberDropdownControl: React.FC<PageNumberDropdownControlProps> = ({
               </span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side={side} align={align} className="min-w-44">
+          <DropdownMenuContent
+            side={side}
+            align={align}
+            className="min-w-44"
+            data-ff-block-modifier-wheel-zoom="1"
+          >
             <DropdownMenuLabel>{t("toolbar.page")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup
@@ -149,7 +158,7 @@ const PageNumberDropdownControl: React.FC<PageNumberDropdownControlProps> = ({
   }
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -167,7 +176,12 @@ const PageNumberDropdownControl: React.FC<PageNumberDropdownControlProps> = ({
           <ChevronDown size={12} className="text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align={align} className="min-w-44">
+      <DropdownMenuContent
+        side={side}
+        align={align}
+        className="min-w-44"
+        data-ff-block-modifier-wheel-zoom="1"
+      >
         <DropdownMenuLabel>{t("toolbar.page")}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem

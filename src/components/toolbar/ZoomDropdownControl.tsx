@@ -26,6 +26,8 @@ type ZoomDropdownControlProps = {
   side?: "top" | "bottom" | "left" | "right";
   align?: "start" | "center" | "end";
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitWidth: () => void;
@@ -39,6 +41,8 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
   side = "bottom",
   align = "start",
   className,
+  open,
+  onOpenChange,
   onZoomIn,
   onZoomOut,
   onFitWidth,
@@ -60,7 +64,7 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
         >
           <ZoomOut size={16} />
         </Button>
-        <DropdownMenu modal={false}>
+        <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -72,7 +76,12 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
               <span className="min-w-11 text-center">{percentage}</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side={side} align={align} className="min-w-44">
+          <DropdownMenuContent
+            side={side}
+            align={align}
+            className="min-w-44"
+            data-ff-block-modifier-wheel-zoom="1"
+          >
             <DropdownMenuLabel>{t("toolbar.zoom")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onFitWidth}>
@@ -100,7 +109,7 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
   }
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -113,7 +122,12 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
           <ChevronDown size={12} className="text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align={align} className="min-w-44">
+      <DropdownMenuContent
+        side={side}
+        align={align}
+        className="min-w-44"
+        data-ff-block-modifier-wheel-zoom="1"
+      >
         <DropdownMenuLabel>{t("toolbar.zoom")}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onZoomIn}>
