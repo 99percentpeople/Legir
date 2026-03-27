@@ -6,6 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
+import { useEventListener } from "@/hooks/useEventListener";
 import { appEventBus } from "@/lib/eventBus";
 import { resetGlobalCursor, setGlobalCursor } from "@/lib/cursor";
 import {
@@ -118,6 +119,7 @@ export const useTextLayerSelection = (opts: {
           ) => { offsetNode: Node; offset: number } | null;
         })
       : null;
+  const documentTarget = typeof document !== "undefined" ? document : null;
 
   const getCaretRangeFromPoint = useCallback(
     (x: number, y: number) => {
@@ -281,6 +283,82 @@ export const useTextLayerSelection = (opts: {
     }
     return null;
   }, []);
+
+  const handleTouchStart = useCallback(
+    (e: TouchEvent) => {
+      if (!e.cancelable) return;
+      if (e.touches.length !== 1) return;
+      if (pinchGestureActiveRef.current) return;
+
+      const activeLayer = textLayerRef.current;
+      if (!activeLayer) return;
+
+      const touch = e.touches[0] ?? e.changedTouches[0];
+      if (!touch) return;
+
+      const rawTarget = e.target;
+      if (!(rawTarget instanceof Node)) return;
+
+      const target =
+        rawTarget instanceof HTMLElement ? rawTarget : rawTarget.parentElement;
+      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
+      if (target?.closest?.("[data-ff-text-selection-popover='1']")) return;
+
+      const pageEl =
+        pagePortalEl ??
+        ((typeof document !== "undefined"
+          ? document.getElementById(`page-${pageIndex}`)
+          : null) as HTMLElement | null);
+      if (!pageEl) return;
+      if (!pageEl.contains(rawTarget)) return;
+
+      const hitTextLayer =
+        target?.closest?.(".textLayer") ??
+        getTextLayerFromPoint(touch.clientX, touch.clientY);
+      const textLayer =
+        hitTextLayer instanceof HTMLDivElement ? hitTextLayer : null;
+      if (textLayer !== activeLayer) return;
+
+      const anchorTarget = getNearestTextTarget(
+        activeLayer,
+        touch.clientX,
+        touch.clientY,
+      );
+      if (!anchorTarget) return;
+
+      e.preventDefault();
+    },
+    [
+      getNearestTextTarget,
+      getTextLayerFromPoint,
+      pageIndex,
+      pagePortalEl,
+      textLayerRef,
+    ],
+  );
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!e.cancelable) return;
+    if (e.touches.length !== 1) return;
+    if (pinchGestureActiveRef.current) return;
+
+    const hasTouchSelectionInteraction =
+      !!pendingTouchManualSelectionRef.current ||
+      manualSelectionRef.current?.pointerType === "touch";
+
+    if (!hasTouchSelectionInteraction) return;
+    e.preventDefault();
+  }, []);
+
+  useEventListener<TouchEvent>(documentTarget, "touchstart", handleTouchStart, {
+    capture: true,
+    passive: false,
+  });
+
+  useEventListener<TouchEvent>(documentTarget, "touchmove", handleTouchMove, {
+    capture: true,
+    passive: false,
+  });
 
   const getCaretClientRect = useCallback((node: Node, offset: number) => {
     try {

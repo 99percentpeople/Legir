@@ -10,6 +10,7 @@ import FloatingBar from "@/components/toolbar/FloatingBar";
 import MobileFloatingToolbar from "@/components/toolbar/MobileFloatingToolbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useEventListener } from "@/hooks/useEventListener";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { calculateWorkspaceFitScreenScale } from "@/components/workspace/lib/calculateWorkspaceFitScale";
 import { appEventBus } from "@/lib/eventBus";
@@ -145,10 +146,10 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
     { replayLast: true },
   );
 
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    const handleWheel = (event: WheelEvent) => {
+  useEventListener<WheelEvent>(
+    typeof document !== "undefined" ? document : null,
+    "wheel",
+    (event) => {
       if (!(event.ctrlKey || event.metaKey)) return;
 
       const rawTarget = event.target;
@@ -160,17 +161,12 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
 
       event.preventDefault();
       event.stopPropagation();
-    };
-
-    document.addEventListener("wheel", handleWheel, {
+    },
+    {
       capture: true,
       passive: false,
-    });
-
-    return () => {
-      document.removeEventListener("wheel", handleWheel, true);
-    };
-  }, []);
+    },
+  );
 
   const handleInitialScrollApplied = useCallback(() => {
     setState({ pendingViewStateRestore: null });

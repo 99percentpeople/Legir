@@ -556,6 +556,46 @@ export const useWorkspaceTextSelection = (opts: {
       if (!state) return;
       if (state.tool !== "select" && state.tool !== "select_text") return;
       const target = e.target as HTMLElement | null;
+      if (
+        target?.closest?.("[data-ff-selection-handle='1']") ||
+        target?.closest?.("[data-ff-text-selection-popover='1']")
+      ) {
+        return;
+      }
+
+      const selection = window.getSelection?.();
+      const range =
+        selection && selection.rangeCount > 0 && !selection.isCollapsed
+          ? selection.getRangeAt(0)
+          : null;
+      const getClosestTextLayer = (node: Node | null) => {
+        if (!node) return null;
+        const el = node instanceof Element ? node : node.parentElement;
+        return el?.closest?.(".textLayer") ?? null;
+      };
+      const selectionIsFromTextLayer =
+        !!range &&
+        (!!getClosestTextLayer(range.startContainer) ||
+          !!getClosestTextLayer(range.endContainer));
+      const pointerInsideSelection =
+        !!range &&
+        Array.from(range.getClientRects()).some(
+          (rect) =>
+            rect.width > 0 &&
+            rect.height > 0 &&
+            e.clientX >= rect.left &&
+            e.clientX <= rect.right &&
+            e.clientY >= rect.top &&
+            e.clientY <= rect.bottom,
+        );
+
+      if (selectionIsFromTextLayer && !pointerInsideSelection) {
+        selection?.removeAllRanges();
+        setTextSelectionToolbar((prev) =>
+          prev.isVisible ? { ...prev, isVisible: false } : prev,
+        );
+      }
+
       if (target?.closest?.(".textLayer")) {
         isTextSelectingRef.current = true;
         setIsTextSelectionDragging(true);
