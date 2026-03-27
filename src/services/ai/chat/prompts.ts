@@ -1,7 +1,4 @@
-import type {
-  AiChatMessageRecord,
-  AiChatToolDefinition,
-} from "@/services/ai/chat/types";
+import type { AiChatToolDefinition } from "@/services/ai/chat/types";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 import {
   buildPageRangeLabel,
@@ -9,7 +6,6 @@ import {
   createAiChatPromptContext,
   formatSummaryInstructionsForPrompt,
   hasTool,
-  serializePromptJson,
 } from "@/services/ai/utils/promptHelpers";
 import type { AiSummaryInstructions } from "@/services/ai/chat/types";
 
@@ -48,7 +44,7 @@ export const getAiChatSystemInstruction = (options?: {
   );
 
   const groundingLines = [
-    'Treat every "TOOL_RESULT" block as authoritative.',
+    "Treat tool-result messages as authoritative.",
     "Use tools before making document-specific claims.",
     "Never imply that you can see page content without tool output.",
     "All AI tool page numbers are 1-based.",
@@ -154,19 +150,6 @@ export const getAiChatSystemInstruction = (options?: {
   sections.push(buildPromptSection("Tool usage", toolUsageLines));
 
   return sections.join("\n\n");
-};
-
-export const buildAiChatTurnPrompt = (options: {
-  messages: AiChatMessageRecord[];
-}) => {
-  return [
-    "Conversation so far is serialized below as JSON.",
-    "Each item contains a role and content string.",
-    'Any content that starts with "TOOL_RESULT" is authoritative tool output from this session.',
-    "",
-    "Conversation so far:",
-    serializePromptJson(options.messages),
-  ].join("\n");
 };
 
 export const buildDocumentDigestSummaryPrompt = (options: {

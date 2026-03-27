@@ -1,3 +1,5 @@
+import { modelMessageSchema } from "ai";
+
 import type {
   AiChatMessageAttachment,
   AiChatMessageRecord,
@@ -133,29 +135,9 @@ export const extractAiChatErrorConversation = (
   if (!error || typeof error !== "object") return null;
   const raw = (error as { conversation?: unknown }).conversation;
   if (!Array.isArray(raw)) return null;
-  const messages = raw
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const role = (item as { role?: unknown }).role;
-      const content = (item as { content?: unknown }).content;
-      if (
-        role !== "system" &&
-        role !== "user" &&
-        role !== "assistant" &&
-        role !== "tool"
-      ) {
-        return null;
-      }
-      if (typeof content !== "string") return null;
-      const toolCallId = (item as { toolCallId?: unknown }).toolCallId;
-      const toolName = (item as { toolName?: unknown }).toolName;
-      return {
-        role,
-        content,
-        ...(typeof toolCallId === "string" ? { toolCallId } : null),
-        ...(typeof toolName === "string" ? { toolName } : null),
-      } satisfies AiChatMessageRecord;
-    })
-    .filter(Boolean) as AiChatMessageRecord[];
+  const messages = raw.flatMap((item) => {
+    const parsed = modelMessageSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
   return messages;
 };

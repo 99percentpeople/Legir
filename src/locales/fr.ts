@@ -707,6 +707,14 @@ const fr = {
       title: "Outils de chat IA",
       description:
         "Configure les capacités du chat IA, y compris les outils de création de formulaires, l'outil de résumé du document et l'outil de résumé visuel des pages rendues.",
+      context_pruning_enabled: "Activer la compression du contexte",
+      context_pruning_enabled_desc:
+        "Réduit l'ancien raisonnement et l'historique des outils avant chaque étape du modèle afin de diminuer la consommation de tokens.",
+      max_tool_rounds: "Nombre maximal de tours d'outils",
+      tool_history_window: "Fenêtre d'historique des outils",
+      visual_tool_history_window: "Fenêtre d'historique des outils visuels",
+      context_pruning_desc:
+        "Les fenêtres d'historique sont comptées en blocs de messages récents. Des valeurs plus faibles réduisent plus agressivement les tokens, surtout pour les outils visuels.",
       form_tools_enabled: "Activer les outils de formulaire IA",
       form_tools_enabled_desc:
         "Permet au chat IA de créer de nouveaux champs de formulaire à partir des demandes conversationnelles. Laissez cette option désactivée si vous ne voulez que des questions-réponses en lecture seule et le remplissage des champs.",

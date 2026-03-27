@@ -677,6 +677,14 @@ const zhTW = {
       title: "AI 問答工具",
       description:
         "配置 AI 問答能力，包括表單製作工具、文件摘要工具以及渲染頁視覺總結工具。",
+      context_pruning_enabled: "啟用上下文壓縮",
+      context_pruning_enabled_desc:
+        "在每一步模型呼叫前裁剪較舊的思考內容與工具歷史，以降低 token 消耗。",
+      max_tool_rounds: "最大工具輪數",
+      tool_history_window: "一般工具歷史視窗",
+      visual_tool_history_window: "視覺工具歷史視窗",
+      context_pruning_desc:
+        "工具歷史視窗按最近訊息區塊計算。數值越小，壓縮越激進，尤其會更快移除舊的視覺結果。",
       form_tools_enabled: "啟用 AI 表單工具",
       form_tools_enabled_desc:
         "允許 AI 問答根據對話請求建立新的表單欄位。如果你只希望它做唯讀問答與欄位填值，請保持關閉。",

@@ -1,6 +1,7 @@
 import type {
   AiChatAssistantUpdate,
   AiChatToolPreviewImage,
+  AiChatTokenUsageSummary,
   AiChatTimelineItem,
   AiChatToolUpdate,
   AiToolName,
@@ -493,3 +494,49 @@ export const finalizeStreamingTimeline = (
     }
     return item;
   });
+
+export const applyUsageSnapshotToTurnTimeline = (
+  prev: AiChatTimelineItem[],
+  options: {
+    turnId: string;
+    tokenUsage: AiChatTokenUsageSummary;
+    contextTokens: number;
+  },
+) =>
+  prev.map((item) => {
+    const belongsToTurn =
+      (item.kind === "message" &&
+        item.role === "assistant" &&
+        (item.turnId === options.turnId || item.id === options.turnId)) ||
+      (item.kind === "tool" && item.turnId === options.turnId);
+    if (!belongsToTurn) return item;
+
+    return {
+      ...item,
+      tokenUsageSnapshot: { ...options.tokenUsage },
+      contextTokensSnapshot: options.contextTokens,
+    };
+  });
+
+export const getLatestTimelineUsageSnapshot = (
+  items: AiChatTimelineItem[],
+): {
+  tokenUsage?: AiChatTokenUsageSummary;
+  contextTokens?: number;
+} | null => {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (!item) continue;
+    const hasTokenUsage = !!item.tokenUsageSnapshot;
+    const hasContextTokens = typeof item.contextTokensSnapshot === "number";
+    if (!hasTokenUsage && !hasContextTokens) continue;
+    return {
+      tokenUsage: item.tokenUsageSnapshot
+        ? { ...item.tokenUsageSnapshot }
+        : undefined,
+      contextTokens: hasContextTokens ? item.contextTokensSnapshot : undefined,
+    };
+  }
+
+  return null;
+};

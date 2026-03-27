@@ -64,8 +64,10 @@ import { createAiChatToolContext } from "@/hooks/useAiChatController/toolContext
 import { applyAiChatSessionUiState } from "@/hooks/useAiChatController/uiStateSync";
 import {
   applyAssistantUpdateToTimeline,
+  applyUsageSnapshotToTurnTimeline,
   applyToolUpdateToTimeline,
   finalizeStreamingTimeline,
+  getLatestTimelineUsageSnapshot,
 } from "@/hooks/useAiChatController/timelineUpdates";
 import { appEventBus } from "@/lib/eventBus";
 import { exportPDF } from "@/services/pdfService";
@@ -81,6 +83,9 @@ const getFirstLineTitleSnippet = (text: string) => {
       .find(Boolean) ?? "";
   return toTitleSnippet(firstLine);
 };
+
+const getTimelineContextTokens = (items: AiChatTimelineItem[]) =>
+  getLatestTimelineUsageSnapshot(items)?.contextTokens ?? 0;
 
 const FIELD_BATCH_CONFIRMATION_PATTERNS = [
   /\b(confirm|confirmed|go ahead|proceed|apply (it|them|this)|create (it|them|these)|use this plan|looks good)\b/i,
@@ -900,6 +905,15 @@ export const useAiChatController = (editorState: EditorState) => {
           result.tokenUsage,
         );
         session.contextTokens = result.contextTokens;
+        setTimeline((prev) => {
+          const next = applyUsageSnapshotToTurnTimeline(prev, {
+            turnId: result.turnId,
+            tokenUsage: session.tokenUsage,
+            contextTokens: session.contextTokens,
+          });
+          session.timeline = next;
+          return next;
+        });
         session.awaitingContinue = result.awaitingContinue;
         if (
           assistantBranchAnchorId &&
@@ -1200,6 +1214,8 @@ export const useAiChatController = (editorState: EditorState) => {
           },
         })),
       }));
+    nextSession.tokenUsage = { ...options.sourceSession.tokenUsage };
+    nextSession.contextTokens = getTimelineContextTokens(nextTimeline);
     nextSession.runStatus = "idle";
     nextSession.lastError = null;
 
@@ -1371,11 +1387,14 @@ export const useAiChatController = (editorState: EditorState) => {
     session.runStatus = "idle";
     session.lastError = null;
     session.awaitingContinue = false;
+    session.contextTokens = getTimelineContextTokens(nextTimeline);
 
     setTimeline(nextTimeline);
     setRunStatus("idle");
     setLastError(null);
     setAwaitingContinue(false);
+    setTokenUsage(session.tokenUsage);
+    setContextTokens(session.contextTokens);
 
     restoreConversationAfterTimelineMutation({
       session,

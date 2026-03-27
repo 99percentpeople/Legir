@@ -304,6 +304,10 @@ export interface AiChatOptions {
   formToolsEnabled: boolean;
   detectFormFieldsEnabled: boolean;
   formToolsVisionModelKey?: string;
+  contextPruningEnabled: boolean;
+  toolHistoryMessageWindow: number;
+  visualToolHistoryMessageWindow: number;
+  maxToolRounds: number;
 }
 
 export interface AppOptions {

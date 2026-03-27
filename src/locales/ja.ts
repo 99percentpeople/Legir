@@ -694,6 +694,14 @@ const ja = {
       title: "AI チャットツール",
       description:
         "フォーム作成ツール、ドキュメント要約ツール、レンダリング済みページの視覚要約ツールを含む AI チャット機能を設定します。",
+      context_pruning_enabled: "コンテキスト圧縮を有効化",
+      context_pruning_enabled_desc:
+        "各モデルステップの前に古い推論内容とツール履歴を削減し、トークン消費を抑えます。",
+      max_tool_rounds: "最大ツールラウンド数",
+      tool_history_window: "通常ツール履歴ウィンドウ",
+      visual_tool_history_window: "視覚ツール履歴ウィンドウ",
+      context_pruning_desc:
+        "ツール履歴ウィンドウは末尾のメッセージブロック数で数えます。値を小さくすると、特に視覚系ツールでより積極的にトークンを節約します。",
       form_tools_enabled: "AI フォームツールを有効化",
       form_tools_enabled_desc:
         "会話から新しいフォームフィールドを作成できるようにします。読み取り専用の Q&A と既存フィールド入力だけでよい場合は無効のままにしてください。",

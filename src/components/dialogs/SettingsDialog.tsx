@@ -76,6 +76,12 @@ import {
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
   AI_CHAT_DIGEST_SOURCE_CHARS_STEP,
+  AI_CHAT_MAX_TOOL_ROUNDS_MAX,
+  AI_CHAT_MAX_TOOL_ROUNDS_MIN,
+  AI_CHAT_TOOL_HISTORY_WINDOW_MAX,
+  AI_CHAT_TOOL_HISTORY_WINDOW_MIN,
+  AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
+  AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
 } from "@/constants";
 
 interface SettingsDialogProps {
@@ -288,6 +294,11 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const digestEnabled = options.aiChat.digestEnabled;
   const digestSourceCharsPerChunk = options.aiChat.digestSourceCharsPerChunk;
   const visualSummaryEnabled = options.aiChat.visualSummaryEnabled;
+  const contextPruningEnabled = options.aiChat.contextPruningEnabled;
+  const toolHistoryMessageWindow = options.aiChat.toolHistoryMessageWindow;
+  const visualToolHistoryMessageWindow =
+    options.aiChat.visualToolHistoryMessageWindow;
+  const maxToolRounds = options.aiChat.maxToolRounds;
 
   const clearFetchedLlmModels = (provider: LlmProviderId) => {
     useEditorStore.getState().setState((state) => ({
@@ -999,6 +1010,130 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
             <TabsContent value="ai_chat">
               <div className="space-y-6">
+                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label
+                        htmlFor="ai-chat-max-tool-rounds"
+                        className="font-semibold"
+                      >
+                        {t("settings.ai_chat.max_tool_rounds")}
+                      </Label>
+                      <span className="text-muted-foreground text-xs">
+                        {maxToolRounds}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[maxToolRounds]}
+                      min={AI_CHAT_MAX_TOOL_ROUNDS_MIN}
+                      max={AI_CHAT_MAX_TOOL_ROUNDS_MAX}
+                      step={1}
+                      onValueChange={(values) => {
+                        const next = values[0];
+                        if (!Number.isFinite(next)) return;
+                        updateAiChatOptions({
+                          maxToolRounds: next,
+                        });
+                      }}
+                    />
+                    <div className="text-muted-foreground flex justify-between text-xs">
+                      <span>{AI_CHAT_MAX_TOOL_ROUNDS_MIN}</span>
+                      <span>{AI_CHAT_MAX_TOOL_ROUNDS_MAX}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="ai-chat-context-pruning-enabled"
+                        className="font-semibold"
+                      >
+                        {t("settings.ai_chat.context_pruning_enabled")}
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings.ai_chat.context_pruning_enabled_desc")}
+                      </p>
+                    </div>
+                    <Switch
+                      id="ai-chat-context-pruning-enabled"
+                      checked={contextPruningEnabled}
+                      onCheckedChange={(checked) =>
+                        updateAiChatOptions({
+                          contextPruningEnabled: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ai-chat-tool-history-window">
+                          {t("settings.ai_chat.tool_history_window")}
+                        </Label>
+                        <span className="text-muted-foreground text-xs">
+                          {toolHistoryMessageWindow}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[toolHistoryMessageWindow]}
+                        disabled={!contextPruningEnabled}
+                        min={AI_CHAT_TOOL_HISTORY_WINDOW_MIN}
+                        max={AI_CHAT_TOOL_HISTORY_WINDOW_MAX}
+                        step={1}
+                        onValueChange={(values) => {
+                          const next = values[0];
+                          if (!Number.isFinite(next)) return;
+                          updateAiChatOptions({
+                            toolHistoryMessageWindow: next,
+                          });
+                        }}
+                      />
+                      <div className="text-muted-foreground flex justify-between text-xs">
+                        <span>{AI_CHAT_TOOL_HISTORY_WINDOW_MIN}</span>
+                        <span>{AI_CHAT_TOOL_HISTORY_WINDOW_MAX}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="ai-chat-visual-tool-history-window">
+                          {t("settings.ai_chat.visual_tool_history_window")}
+                        </Label>
+                        <span className="text-muted-foreground text-xs">
+                          {visualToolHistoryMessageWindow}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[visualToolHistoryMessageWindow]}
+                        disabled={!contextPruningEnabled}
+                        min={AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN}
+                        max={AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX}
+                        step={1}
+                        onValueChange={(values) => {
+                          const next = values[0];
+                          if (!Number.isFinite(next)) return;
+                          updateAiChatOptions({
+                            visualToolHistoryMessageWindow: next,
+                          });
+                        }}
+                      />
+                      <div className="text-muted-foreground flex justify-between text-xs">
+                        <span>{AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN}</span>
+                        <span>{AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-muted-foreground text-xs">
+                    {t("settings.ai_chat.context_pruning_desc")}
+                  </p>
+                </div>
+
                 <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">

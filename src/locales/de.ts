@@ -705,6 +705,14 @@ const de = {
       title: "AI-Chat-Werkzeuge",
       description:
         "Konfigurieren Sie KI-Chat-Funktionen einschließlich Formularwerkzeugen, dem Dokument-Zusammenfassungswerkzeug und dem visuellen Zusammenfassungswerkzeug für gerenderte Seiten.",
+      context_pruning_enabled: "Kontextkomprimierung aktivieren",
+      context_pruning_enabled_desc:
+        "Beschneidet ältere Reasoning- und Tool-Historie vor jedem Modellschritt, um den Token-Verbrauch zu senken.",
+      max_tool_rounds: "Maximale Tool-Runden",
+      tool_history_window: "Fenster für allgemeine Tool-Historie",
+      visual_tool_history_window: "Fenster für visuelle Tool-Historie",
+      context_pruning_desc:
+        "Die Tool-Historienfenster werden in nachlaufenden Nachrichtenblöcken gezählt. Kleinere Werte sparen aggressiver Tokens, besonders bei visuellen Tools.",
       form_tools_enabled: "KI-Formularwerkzeuge aktivieren",
       form_tools_enabled_desc:
         "Erlaubt dem AI-Chat, neue Formularfelder aus Gesprächsanfragen zu erstellen. Deaktiviert lassen, wenn nur schreibgeschützter Chat und Feldbefüllung gewünscht sind.",

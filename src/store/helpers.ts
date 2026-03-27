@@ -3,6 +3,12 @@ import {
   AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
+  AI_CHAT_MAX_TOOL_ROUNDS_MAX,
+  AI_CHAT_MAX_TOOL_ROUNDS_MIN,
+  AI_CHAT_TOOL_HISTORY_WINDOW_MAX,
+  AI_CHAT_TOOL_HISTORY_WINDOW_MIN,
+  AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
+  AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
   ANNOTATION_STYLES,
   DEFAULT_EDITOR_UI_STATE,
 } from "@/constants";
@@ -29,6 +35,19 @@ const clampDigestSourceChars = (value: unknown) => {
     AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
     Math.min(AI_CHAT_DIGEST_SOURCE_CHARS_MAX, next),
   );
+};
+
+const clampAiChatInteger = (
+  value: unknown,
+  options: {
+    fallback: number;
+    min: number;
+    max: number;
+  },
+) => {
+  const next = Math.trunc(Number(value) || 0);
+  if (!Number.isFinite(next) || next <= 0) return options.fallback;
+  return Math.max(options.min, Math.min(options.max, next));
 };
 
 const CUSTOM_MODEL_CAPABILITY_ORDER: LLMCustomModelCapability[] = [
@@ -257,6 +276,33 @@ export const normalizeAiChatOptions = (
         ? next.detectFormFieldsEnabled
         : false,
     formToolsVisionModelKey: next.formToolsVisionModelKey || "",
+    contextPruningEnabled:
+      typeof next.contextPruningEnabled === "boolean"
+        ? next.contextPruningEnabled
+        : true,
+    toolHistoryMessageWindow: clampAiChatInteger(
+      next.toolHistoryMessageWindow,
+      {
+        fallback:
+          DEFAULT_EDITOR_UI_STATE.options.aiChat.toolHistoryMessageWindow,
+        min: AI_CHAT_TOOL_HISTORY_WINDOW_MIN,
+        max: AI_CHAT_TOOL_HISTORY_WINDOW_MAX,
+      },
+    ),
+    visualToolHistoryMessageWindow: clampAiChatInteger(
+      next.visualToolHistoryMessageWindow,
+      {
+        fallback:
+          DEFAULT_EDITOR_UI_STATE.options.aiChat.visualToolHistoryMessageWindow,
+        min: AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
+        max: AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
+      },
+    ),
+    maxToolRounds: clampAiChatInteger(next.maxToolRounds, {
+      fallback: DEFAULT_EDITOR_UI_STATE.options.aiChat.maxToolRounds,
+      min: AI_CHAT_MAX_TOOL_ROUNDS_MIN,
+      max: AI_CHAT_MAX_TOOL_ROUNDS_MAX,
+    }),
   };
 };
 

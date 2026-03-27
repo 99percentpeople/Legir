@@ -1,72 +1,12 @@
 import { tool, type ToolSet } from "ai";
 
-import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
-import {
-  normalizeAiToolArgsDeep,
-  toSnakeCaseKeysDeep,
-} from "@/services/ai/utils/toolCase";
 import type {
-  AiChatMessageRecord,
   AiChatToolCallRecord,
   AiChatToolDefinition,
   AiChatToolRuntime,
   AiChatToolUpdate,
   AiToolRegistry,
 } from "@/services/ai/chat/types";
-
-const TOOL_RESULT_MAX_CHARS = 60_000;
-
-const truncateText = (value: string, maxChars: number) => {
-  const text = String(value ?? "");
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, Math.max(0, maxChars - 14))}…(truncated)`;
-};
-
-const stringifyToolArgs = (args: Record<string, unknown>) => {
-  try {
-    return JSON.stringify(normalizeAiToolArgsDeep(args ?? {}), null, 2);
-  } catch {
-    return "{}";
-  }
-};
-
-const formatToolMessageContent = (options: {
-  toolName: string;
-  argsText: string;
-  resultJson: string;
-}) => {
-  return [
-    "TOOL_RESULT",
-    `name: ${options.toolName}`,
-    `arguments: ${options.argsText}`,
-    `result: ${options.resultJson}`,
-  ].join("\n");
-};
-
-const createToolConversationMessage = (options: {
-  callId: string;
-  toolName: string;
-  args: Record<string, unknown>;
-  payload: unknown;
-}): AiChatMessageRecord => {
-  const argsText = stringifyToolArgs(options.args);
-  const normalizedPayload = omitEmptyArrayFieldsDeep(options.payload ?? null);
-  const resultJson = truncateText(
-    JSON.stringify(toSnakeCaseKeysDeep(normalizedPayload)),
-    TOOL_RESULT_MAX_CHARS,
-  );
-
-  return {
-    role: "tool",
-    content: formatToolMessageContent({
-      toolName: options.toolName,
-      argsText,
-      resultJson,
-    }),
-    toolCallId: options.callId,
-    toolName: options.toolName,
-  };
-};
 
 const toToolArgsRecord = (input: unknown) =>
   input && typeof input === "object" && !Array.isArray(input)
@@ -156,13 +96,11 @@ const normalizeToolError = (error: unknown, toolName: string) => {
 export const createAiChatToolRuntime = (options: {
   toolDefinitions: AiChatToolDefinition[];
   toolRegistry: AiToolRegistry;
-  conversation: AiChatMessageRecord[];
   signal?: AbortSignal;
   onToolUpdate?: (update: AiChatToolUpdate) => void;
   getCurrentBatchId: () => string;
 }): AiChatToolRuntime => {
-  const { toolDefinitions, toolRegistry, conversation, signal, onToolUpdate } =
-    options;
+  const { toolDefinitions, toolRegistry, signal, onToolUpdate } = options;
 
   const definitionsByName = new Map<string, AiChatToolDefinition>(
     toolDefinitions.map((definition) => [definition.name, definition]),
@@ -233,15 +171,6 @@ export const createAiChatToolRuntime = (options: {
               },
             );
 
-            conversation.push(
-              createToolConversationMessage({
-                callId: call.id,
-                toolName: definition.name,
-                args: call.args,
-                payload: result.payload,
-              }),
-            );
-
             onToolUpdate?.({
               phase: "success",
               call,
@@ -253,15 +182,6 @@ export const createAiChatToolRuntime = (options: {
             return result.modelOutput ?? result.payload;
           } catch (error) {
             const normalized = normalizeToolError(error, definition.name);
-
-            conversation.push(
-              createToolConversationMessage({
-                callId: call.id,
-                toolName: definition.name,
-                args: call.args,
-                payload: normalized.payload,
-              }),
-            );
 
             notifyToolError({
               call,
@@ -308,14 +228,6 @@ export const createAiChatToolRuntime = (options: {
       toolCallsById.set(call.id, call);
       const normalized = normalizeToolError(error, toolName);
       notifyToolStart(call, batchId);
-      conversation.push(
-        createToolConversationMessage({
-          callId: call.id,
-          toolName,
-          args: call.args,
-          payload: normalized.payload,
-        }),
-      );
       notifyToolError({
         call,
         batchId,

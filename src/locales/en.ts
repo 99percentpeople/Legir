@@ -703,6 +703,14 @@ const en = {
       title: "AI Chat Tools",
       description:
         "Configure AI chat capabilities including form-building tools, the document digest tool, and the rendered-page visual summary tool.",
+      context_pruning_enabled: "Enable context pruning",
+      context_pruning_enabled_desc:
+        "Trim older reasoning and tool history before each model step to reduce token usage.",
+      max_tool_rounds: "Max tool rounds",
+      tool_history_window: "General tool history window",
+      visual_tool_history_window: "Visual tool history window",
+      context_pruning_desc:
+        "Tool history windows are counted in trailing message blocks. Lower values reduce token usage more aggressively, especially for visual tools.",
       form_tools_enabled: "Enable AI form tools",
       form_tools_enabled_desc:
         "Allow AI chat to create new form fields from conversation requests. Leave this off if you only want read-only Q&A and field filling.",

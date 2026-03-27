@@ -46,6 +46,12 @@ export const AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS = [
 ] as const;
 export const AI_CHAT_DIGEST_OUTPUT_CHARS_MIN = 180;
 export const AI_CHAT_DIGEST_OUTPUT_CHARS_MAX = 12000;
+export const AI_CHAT_MAX_TOOL_ROUNDS_MIN = 1;
+export const AI_CHAT_MAX_TOOL_ROUNDS_MAX = 20;
+export const AI_CHAT_TOOL_HISTORY_WINDOW_MIN = 1;
+export const AI_CHAT_TOOL_HISTORY_WINDOW_MAX = 16;
+export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN = 1;
+export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX = 8;
 
 export const DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES: PageTranslateOptions = {
   fontFamily: "Helvetica",
@@ -111,6 +117,10 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       formToolsEnabled: false,
       detectFormFieldsEnabled: false,
       formToolsVisionModelKey: "",
+      contextPruningEnabled: true,
+      toolHistoryMessageWindow: 8,
+      visualToolHistoryMessageWindow: 1,
+      maxToolRounds: 10,
     },
   },
 };

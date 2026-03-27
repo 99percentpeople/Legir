@@ -687,6 +687,14 @@ const zhCN = {
       title: "AI 问答工具",
       description:
         "配置 AI 问答能力，包括表单制作工具、文档摘要工具以及渲染页视觉总结工具。",
+      context_pruning_enabled: "启用上下文压缩",
+      context_pruning_enabled_desc:
+        "在每一步模型调用前裁剪较旧的思考内容和工具历史，以降低 token 消耗。",
+      max_tool_rounds: "最大工具轮数",
+      tool_history_window: "普通工具历史窗口",
+      visual_tool_history_window: "视觉工具历史窗口",
+      context_pruning_desc:
+        "工具历史窗口按最近消息块计算。数值越小，压缩越激进，尤其会更快移除旧的视觉结果。",
       form_tools_enabled: "启用 AI 表单工具",
       form_tools_enabled_desc:
         "允许 AI 问答根据对话请求创建新的表单字段。如果你只希望它做只读问答和字段填值，请保持关闭。",

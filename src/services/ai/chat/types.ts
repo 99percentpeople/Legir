@@ -7,7 +7,7 @@
  * alongside the runtime implementation instead of here.
  */
 import type { ZodTypeAny } from "zod";
-import type { ToolSet } from "ai";
+import type { ModelMessage, ToolSet } from "ai";
 import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 import type { AiDocumentLinkTarget } from "@/services/ai/utils/documentLinks";
 import type {
@@ -61,12 +61,7 @@ export interface AiChatToolDefinition {
   }) => ToolResultOutput | PromiseLike<ToolResultOutput>;
 }
 
-export interface AiChatMessageRecord {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  toolCallId?: string;
-  toolName?: string;
-}
+export type AiChatMessageRecord = ModelMessage;
 
 export interface AiChatToolCallRecord {
   id: string;
@@ -728,6 +723,8 @@ export type AiChatTimelineItem =
       durationMs?: number;
       createdAt: string;
       isStreaming?: boolean;
+      tokenUsageSnapshot?: AiChatTokenUsageSummary;
+      contextTokensSnapshot?: number;
     }
   | {
       id: string;
@@ -747,6 +744,8 @@ export type AiChatTimelineItem =
       previewImages?: AiChatToolPreviewImage[];
       error?: string;
       createdAt: string;
+      tokenUsageSnapshot?: AiChatTokenUsageSummary;
+      contextTokensSnapshot?: number;
     };
 
 export interface AiChatSessionSummary {

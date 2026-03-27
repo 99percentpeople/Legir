@@ -6,11 +6,13 @@ import {
   type ToolSet,
 } from "ai";
 
-import {
-  buildAiChatTurnPrompt,
-  getAiChatSystemInstruction,
-} from "@/services/ai/chat/prompts";
+import { getAiChatSystemInstruction } from "@/services/ai/chat/prompts";
+import { pruneAiChatMessages } from "@/services/ai/chat/runtime/messagePruning";
 import { createAiChatToolRuntime } from "@/services/ai/chat/runtime/toolRuntime";
+import {
+  AI_CHAT_MAX_TOOL_ROUNDS_MAX,
+  AI_CHAT_MAX_TOOL_ROUNDS_MIN,
+} from "@/constants";
 import {
   resolveAiSdkLanguageModelDetailed,
   resolveAiSdkModelSpecifierForTask,
@@ -26,7 +28,7 @@ import type {
 
 type AiChatStreamFinishEvent = Pick<
   OnFinishEvent<ToolSet>,
-  "finishReason" | "steps" | "totalUsage"
+  "finishReason" | "steps" | "totalUsage" | "response"
 >;
 type AiChatStreamFinishResolver = (result: AiChatStreamFinishEvent) => void;
 
@@ -101,14 +103,21 @@ export const aiChatService = {
       onToolUpdate,
       onAssistantUpdate,
       onUsageUpdate,
-      maxToolRounds = 10,
+      maxToolRounds = appOptions.aiChat.maxToolRounds,
     } = options;
 
-    const conversation: AiChatMessageRecord[] = [...options.messages];
+    const baseConversation: AiChatMessageRecord[] = [...options.messages];
+    const initialMessages = pruneAiChatMessages(
+      baseConversation,
+      appOptions.aiChat,
+    );
     const turnId = `ai_turn_${Date.now()}_${Math.random()
       .toString(36)
       .slice(2, 8)}`;
-    const maxToolSteps = Math.max(0, Math.trunc(maxToolRounds));
+    const maxToolSteps = Math.max(
+      AI_CHAT_MAX_TOOL_ROUNDS_MIN,
+      Math.min(AI_CHAT_MAX_TOOL_ROUNDS_MAX, Math.trunc(maxToolRounds || 0)),
+    );
     const modelSpecifier = resolveAiSdkModelSpecifierForTask({
       appOptions,
       modelCache,
@@ -134,19 +143,20 @@ export const aiChatService = {
     const toolRuntime = createAiChatToolRuntime({
       toolDefinitions,
       toolRegistry,
-      conversation,
       signal,
       onToolUpdate,
       getCurrentBatchId: () => currentBatchId,
     });
+    let latestResponseMessages: AiChatMessageRecord[] = [];
 
     try {
       const result = streamText({
         model: resolvedModel.model,
         ...(resolvedModel.callOptions ?? null),
         system: getAiChatSystemInstruction({ toolDefinitions }),
-        prompt: buildAiChatTurnPrompt({
-          messages: conversation,
+        messages: initialMessages,
+        prepareStep: ({ messages }) => ({
+          messages: pruneAiChatMessages(messages, appOptions.aiChat),
         }),
         experimental_include: {
           requestBody: false,
@@ -154,17 +164,19 @@ export const aiChatService = {
         tools: toolRuntime.tools,
         stopWhen: stepCountIs(maxToolSteps),
         onStepFinish: (step) => {
+          latestResponseMessages = step.response.messages;
           onUsageUpdate?.({
             tokenUsage: toAiChatTokenUsageSummary(step.usage),
             contextTokens: getAiChatContextTokens(step.usage),
             stepNumber: step.stepNumber,
           });
         },
-        onFinish: ({ finishReason, steps, totalUsage }) => {
+        onFinish: ({ finishReason, steps, totalUsage, response }) => {
           resolveFinishEvent?.({
             finishReason,
             steps,
             totalUsage,
+            response,
           });
           resolveFinishEvent = null;
         },
@@ -233,6 +245,10 @@ export const aiChatService = {
         result.text,
         finishEventPromise,
       ]);
+      const conversation: AiChatMessageRecord[] = [
+        ...baseConversation,
+        ...finishEvent.response.messages,
+      ];
       if (!assistantMessage && finalText) {
         assistantMessage = finalText.trim();
       } else {
@@ -247,13 +263,6 @@ export const aiChatService = {
         lastStep.toolResults.length > 0;
 
       const finalReasoningText = reasoningText.trim();
-      if (assistantMessage) {
-        conversation.push({
-          role: "assistant",
-          content: assistantMessage,
-        });
-      }
-
       onAssistantUpdate?.({
         phase: "end",
         turnId,
@@ -264,6 +273,7 @@ export const aiChatService = {
       });
 
       return {
+        turnId,
         assistantMessage,
         conversation,
         awaitingContinue,
@@ -276,15 +286,18 @@ export const aiChatService = {
         "AI chat request failed.",
       );
       const partialAssistantMessage = assistantMessage.trim();
-      const carriedConversation = partialAssistantMessage
-        ? [
-            ...conversation,
-            {
-              role: "assistant" as const,
-              content: partialAssistantMessage,
-            },
-          ]
-        : conversation;
+      const carriedConversation = [
+        ...baseConversation,
+        ...latestResponseMessages,
+        ...(partialAssistantMessage
+          ? [
+              {
+                role: "assistant" as const,
+                content: partialAssistantMessage,
+              },
+            ]
+          : []),
+      ];
       (
         normalized as Error & { conversation?: AiChatMessageRecord[] }
       ).conversation = carriedConversation;

@@ -703,6 +703,14 @@ const es = {
       title: "Herramientas de chat IA",
       description:
         "Configura las capacidades del chat IA, incluidas las herramientas para crear formularios, el resumen de documentos y el resumen visual de páginas renderizadas.",
+      context_pruning_enabled: "Habilitar compresión de contexto",
+      context_pruning_enabled_desc:
+        "Recorta razonamiento antiguo e historial de herramientas antes de cada paso del modelo para reducir el consumo de tokens.",
+      max_tool_rounds: "Máximo de rondas de herramientas",
+      tool_history_window: "Ventana de historial general",
+      visual_tool_history_window: "Ventana de historial visual",
+      context_pruning_desc:
+        "Las ventanas de historial se cuentan en bloques recientes de mensajes. Valores más bajos reducen tokens de forma más agresiva, especialmente para herramientas visuales.",
       form_tools_enabled: "Habilitar herramientas de formularios con IA",
       form_tools_enabled_desc:
         "Permite que el chat IA cree nuevos campos de formulario a partir de solicitudes conversacionales. Déjalo desactivado si solo quieres preguntas y respuestas de solo lectura y rellenado de campos.",

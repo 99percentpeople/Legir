@@ -3,6 +3,7 @@ import {
   toSnakeCaseKeysDeep,
 } from "@/services/ai/utils/toolCase";
 import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
+import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 import type {
   AiChatMessageAttachment,
   AiChatMessageRecord,
@@ -391,6 +392,61 @@ export const restoreConversationFromTimeline = (
         text: string;
       }
     | undefined;
+  let pendingToolBatch:
+    | {
+        batchId: string;
+        callParts: Array<{
+          type: "tool-call";
+          toolCallId: string;
+          toolName: string;
+          input: Record<string, unknown>;
+        }>;
+        resultParts: Array<{
+          type: "tool-result";
+          toolCallId: string;
+          toolName: string;
+          output: ToolResultOutput;
+        }>;
+      }
+    | undefined;
+
+  const parseToolArgs = (argsText: string) => {
+    try {
+      const parsed = JSON.parse(argsText);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const parseToolOutput = (
+    item: Extract<AiChatTimelineItem, { kind: "tool" }>,
+  ): ToolResultOutput | null => {
+    const rawText =
+      typeof item.resultText === "string" && item.resultText.trim()
+        ? item.resultText.trim()
+        : typeof item.error === "string" && item.error.trim()
+          ? item.error.trim()
+          : typeof item.resultSummary === "string" && item.resultSummary.trim()
+            ? item.resultSummary.trim()
+            : "";
+
+    if (!rawText) return null;
+
+    try {
+      return {
+        type: item.status === "error" ? "error-json" : "json",
+        value: JSON.parse(rawText),
+      };
+    } catch {
+      return {
+        type: item.status === "error" ? "error-text" : "text",
+        value: rawText,
+      };
+    }
+  };
 
   const flushPendingAssistant = () => {
     if (!pendingAssistant) return;
@@ -401,9 +457,30 @@ export const restoreConversationFromTimeline = (
     pendingAssistant = undefined;
   };
 
+  const flushPendingToolBatch = () => {
+    if (!pendingToolBatch) return;
+
+    if (pendingToolBatch.callParts.length > 0) {
+      conversation.push({
+        role: "assistant",
+        content: pendingToolBatch.callParts,
+      });
+    }
+
+    if (pendingToolBatch.resultParts.length > 0) {
+      conversation.push({
+        role: "tool",
+        content: pendingToolBatch.resultParts,
+      });
+    }
+
+    pendingToolBatch = undefined;
+  };
+
   for (const item of items) {
     if (item.kind === "message") {
       if (item.role === "thinking") continue;
+      flushPendingToolBatch();
       if (item.role === "assistant") {
         const turnId = item.turnId ?? item.id;
         if (!pendingAssistant || pendingAssistant.turnId !== turnId) {
@@ -430,23 +507,37 @@ export const restoreConversationFromTimeline = (
       continue;
     }
 
-    if (
-      item.resultText &&
-      (item.status === "done" || item.status === "error")
-    ) {
-      conversation.push({
-        role: "tool",
-        content: [
-          "TOOL_RESULT",
-          `name: ${item.toolName}`,
-          `arguments: ${item.argsText}`,
-          `result: ${item.resultText}`,
-        ].join("\n"),
-        toolCallId: item.toolCallId,
-        toolName: item.toolName,
-      });
+    flushPendingAssistant();
+    const toolOutput = parseToolOutput(item);
+    if (!toolOutput) {
+      flushPendingToolBatch();
+      continue;
     }
+
+    const batchId = item.batchId ?? item.toolCallId;
+    if (!pendingToolBatch || pendingToolBatch.batchId !== batchId) {
+      flushPendingToolBatch();
+      pendingToolBatch = {
+        batchId,
+        callParts: [],
+        resultParts: [],
+      };
+    }
+
+    pendingToolBatch.callParts.push({
+      type: "tool-call",
+      toolCallId: item.toolCallId,
+      toolName: item.toolName,
+      input: parseToolArgs(item.argsText),
+    });
+    pendingToolBatch.resultParts.push({
+      type: "tool-result",
+      toolCallId: item.toolCallId,
+      toolName: item.toolName,
+      output: toolOutput,
+    });
   }
+  flushPendingToolBatch();
   flushPendingAssistant();
   return conversation;
 };
