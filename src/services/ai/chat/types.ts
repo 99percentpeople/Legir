@@ -74,6 +74,14 @@ export interface AiChatToolCallRecord {
   args: Record<string, unknown>;
 }
 
+export interface AiChatTokenUsageSummary {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  reasoningTokens: number;
+  cachedInputTokens: number;
+}
+
 export type { AiDocumentLinkTarget };
 
 export interface AiTypeCount<TType extends string = string> {

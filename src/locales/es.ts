@@ -405,6 +405,11 @@ const es = {
     input_placeholder:
       "Pide a la IA que lea, busque, navegue o resalte contenido del PDF...",
     input_hint: "Pulsa Enter para enviar, Shift+Enter para una nueva línea.",
+    token_usage: "Tokens",
+    token_usage_context: "Contexto",
+    token_usage_input: "Entrada",
+    token_usage_output: "Salida",
+    token_usage_total: "Total",
     attachment_selected_text: "Texto seleccionado",
     attachment_page_short: "P{page}",
     attachment_location: "P{page} · {start}-{end}",

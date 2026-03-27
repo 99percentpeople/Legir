@@ -31,9 +31,11 @@ import type {
 } from "@/services/ai/chat/types";
 import type { ModelSelectGroup } from "@/components/ModelSelect";
 import {
+  addAiChatTokenUsageSummary,
   type AiChatRunStatus,
   type AiChatSessionData,
   canUseLocalStorage,
+  createEmptyAiChatTokenUsageSummary,
   createAiChatSessionData,
   createAiChatSessionId,
   loadPersistedSelectedModelKey,
@@ -154,6 +156,10 @@ export const useAiChatController = (editorState: EditorState) => {
   const [runStatus, setRunStatus] = useState<AiChatRunStatus>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
   const [awaitingContinue, setAwaitingContinue] = useState(false);
+  const [tokenUsage, setTokenUsage] = useState(() =>
+    createEmptyAiChatTokenUsageSummary(),
+  );
+  const [contextTokens, setContextTokens] = useState(0);
   const [highlightedResultIds, setHighlightedResultIds] = useState<string[]>(
     [],
   );
@@ -201,6 +207,8 @@ export const useAiChatController = (editorState: EditorState) => {
       setRunStatus,
       setLastError,
       setAwaitingContinue,
+      setTokenUsage,
+      setContextTokens,
       setHighlightedResultIds,
     });
   }, []);
@@ -212,6 +220,8 @@ export const useAiChatController = (editorState: EditorState) => {
     setRunStatus("idle");
     setLastError(null);
     setAwaitingContinue(false);
+    setTokenUsage(createEmptyAiChatTokenUsageSummary());
+    setContextTokens(0);
     setHighlightedResultIds([]);
   }, []);
 
@@ -589,6 +599,8 @@ export const useAiChatController = (editorState: EditorState) => {
           setRunStatus,
           setLastError,
           setAwaitingContinue,
+          setTokenUsage,
+          setContextTokens,
           setHighlightedResultIds,
         });
         return;
@@ -611,6 +623,8 @@ export const useAiChatController = (editorState: EditorState) => {
       setRunStatus,
       setLastError,
       setAwaitingContinue,
+      setTokenUsage,
+      setContextTokens,
       setHighlightedResultIds,
     });
   }, [documentIdentity, resetDraftConversationUi]);
@@ -645,6 +659,7 @@ export const useAiChatController = (editorState: EditorState) => {
     lastError,
     runStatus,
     sessions,
+    tokenUsage,
     timeline,
   ]);
 
@@ -775,6 +790,8 @@ export const useAiChatController = (editorState: EditorState) => {
       setRunStatus,
       setLastError,
       setAwaitingContinue,
+      setTokenUsage,
+      setContextTokens,
       setHighlightedResultIds,
     });
 
@@ -820,6 +837,9 @@ export const useAiChatController = (editorState: EditorState) => {
     }) => {
       const { session, selected, assistantBranchAnchorId } = options;
       const sessionId = session.id;
+      const tokenUsageBeforeTurn = { ...session.tokenUsage };
+      let stepTokenUsage = createEmptyAiChatTokenUsageSummary();
+      let latestStepContextTokens = session.contextTokens;
 
       setLastError(null);
       setAwaitingContinue(false);
@@ -854,6 +874,20 @@ export const useAiChatController = (editorState: EditorState) => {
             applyAssistantUpdate(update);
           },
           onToolUpdate: applyToolUpdate,
+          onUsageUpdate: (update) => {
+            stepTokenUsage = addAiChatTokenUsageSummary(
+              stepTokenUsage,
+              update.tokenUsage,
+            );
+            latestStepContextTokens = update.contextTokens;
+            session.tokenUsage = addAiChatTokenUsageSummary(
+              tokenUsageBeforeTurn,
+              stepTokenUsage,
+            );
+            session.contextTokens = latestStepContextTokens;
+            setTokenUsage(session.tokenUsage);
+            setContextTokens(session.contextTokens);
+          },
         });
 
         applyConversationSuccess({
@@ -861,6 +895,11 @@ export const useAiChatController = (editorState: EditorState) => {
           conversationRef,
           conversation: result.conversation,
         });
+        session.tokenUsage = addAiChatTokenUsageSummary(
+          tokenUsageBeforeTurn,
+          result.tokenUsage,
+        );
+        session.contextTokens = result.contextTokens;
         session.awaitingContinue = result.awaitingContinue;
         if (
           assistantBranchAnchorId &&
@@ -875,6 +914,8 @@ export const useAiChatController = (editorState: EditorState) => {
             });
           }
         }
+        setTokenUsage(session.tokenUsage);
+        setContextTokens(session.contextTokens);
         setAwaitingContinue(result.awaitingContinue);
         setRunStatus("idle");
       } catch (error) {
@@ -1187,6 +1228,8 @@ export const useAiChatController = (editorState: EditorState) => {
       setRunStatus,
       setLastError,
       setAwaitingContinue,
+      setTokenUsage,
+      setContextTokens,
       setHighlightedResultIds,
     });
 
@@ -1426,6 +1469,8 @@ export const useAiChatController = (editorState: EditorState) => {
     session.searchResultsById = new Map();
     session.highlightedResultIds = [];
     session.pendingDetectedFieldBatches = [];
+    session.tokenUsage = createEmptyAiChatTokenUsageSummary();
+    session.contextTokens = 0;
     session.runStatus = "idle";
     session.lastError = null;
     session.awaitingContinue = false;
@@ -1438,6 +1483,8 @@ export const useAiChatController = (editorState: EditorState) => {
       setRunStatus,
       setLastError,
       setAwaitingContinue,
+      setTokenUsage,
+      setContextTokens,
       setHighlightedResultIds,
     });
 
@@ -1547,6 +1594,8 @@ export const useAiChatController = (editorState: EditorState) => {
         setRunStatus,
         setLastError,
         setAwaitingContinue,
+        setTokenUsage,
+        setContextTokens,
         setHighlightedResultIds,
       });
     },
@@ -1587,6 +1636,8 @@ export const useAiChatController = (editorState: EditorState) => {
     runStatus,
     lastError,
     awaitingContinue,
+    tokenUsage,
+    contextTokens,
     selectedModelKey,
     setSelectedModelKey,
     modelSelectGroups,

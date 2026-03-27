@@ -405,6 +405,11 @@ const de = {
     input_placeholder:
       "Bitten Sie die KI, PDF-Inhalte zu lesen, zu suchen, zu springen oder hervorzuheben...",
     input_hint: "Enter zum Senden, Shift+Enter für eine neue Zeile.",
+    token_usage: "Token",
+    token_usage_context: "Kontext",
+    token_usage_input: "Eingabe",
+    token_usage_output: "Ausgabe",
+    token_usage_total: "Gesamt",
     attachment_selected_text: "Ausgewählter Text",
     attachment_page_short: "S.{page}",
     attachment_location: "S.{page} · {start}-{end}",

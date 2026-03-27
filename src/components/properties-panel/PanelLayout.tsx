@@ -123,7 +123,9 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
 
       {/* Footer */}
       {footer && (
-        <div className="border-border bg-muted/30 border-t p-4">{footer}</div>
+        <div className="border-border bg-muted/30 border-t px-4 py-2">
+          {footer}
+        </div>
       )}
     </div>
   );

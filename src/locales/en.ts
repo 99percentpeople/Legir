@@ -406,6 +406,11 @@ const en = {
     input_placeholder:
       "Ask the AI to read, search, jump, or highlight PDF content...",
     input_hint: "Press Enter to send, Shift+Enter for a new line.",
+    token_usage: "Tokens",
+    token_usage_context: "Context",
+    token_usage_input: "In",
+    token_usage_output: "Out",
+    token_usage_total: "Total",
     attachment_selected_text: "Selected text",
     attachment_page_short: "P{page}",
     attachment_location: "P{page} · {start}-{end}",

@@ -1,11 +1,13 @@
 import type {
   AiChatMessageRecord,
+  AiChatTokenUsageSummary,
   AiChatSessionSummary,
   AiChatTimelineItem,
   AiStoredSearchResult,
 } from "@/services/ai/chat/types";
 
 import {
+  createEmptyAiChatTokenUsageSummary,
   createAiChatSessionData,
   createAiChatSessionId,
   type AiChatRunStatus,
@@ -17,6 +19,8 @@ export type AiChatSessionUiState = {
   runStatus: AiChatRunStatus;
   lastError: string | null;
   awaitingContinue: boolean;
+  tokenUsage: AiChatTokenUsageSummary;
+  contextTokens: number;
   highlightedResultIds: string[];
   conversation: AiChatMessageRecord[];
   searchResultsById: Map<string, AiStoredSearchResult>;
@@ -29,6 +33,8 @@ export const getAiChatSessionUiState = (
   runStatus: session.runStatus,
   lastError: session.lastError,
   awaitingContinue: session.awaitingContinue,
+  tokenUsage: session.tokenUsage,
+  contextTokens: session.contextTokens,
   highlightedResultIds: session.highlightedResultIds,
   conversation: session.conversation,
   searchResultsById: session.searchResultsById,
@@ -42,6 +48,8 @@ export const getIdleAiChatSessionUiState = (): Omit<
   runStatus: "idle",
   lastError: null,
   awaitingContinue: false,
+  tokenUsage: createEmptyAiChatTokenUsageSummary(),
+  contextTokens: 0,
   highlightedResultIds: [],
 });
 

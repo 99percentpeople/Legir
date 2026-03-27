@@ -8,6 +8,7 @@ import type {
   AiChatMessageRecord,
   AiChatSelectionAttachment,
   AiDetectedFormFieldDraft,
+  AiChatTokenUsageSummary,
   AiFormFieldKind,
   AiChatSessionSummary,
   AiChatTimelineItem,
@@ -44,6 +45,8 @@ export type PersistedAiChatSession = {
   searchResults: AiStoredSearchResult[];
   highlightedResultIds: string[];
   pendingDetectedFieldBatches?: AiDetectedFormFieldBatchState[];
+  tokenUsage?: AiChatTokenUsageSummary;
+  contextTokens?: number;
   lastError?: string | null;
   awaitingContinue?: boolean;
 };
@@ -69,6 +72,8 @@ export type AiChatSessionData = {
   searchResultsById: Map<string, AiStoredSearchResult>;
   highlightedResultIds: string[];
   pendingDetectedFieldBatches: AiDetectedFormFieldBatchState[];
+  tokenUsage: AiChatTokenUsageSummary;
+  contextTokens: number;
   runStatus: AiChatRunStatus;
   lastError: string | null;
   awaitingContinue: boolean;
@@ -99,6 +104,32 @@ export type RestoredAiChatDocumentState = {
   sessionsMap: Map<string, AiChatSessionData>;
   sessionSummaries: AiChatSessionSummary[];
 };
+
+export const createEmptyAiChatTokenUsageSummary =
+  (): AiChatTokenUsageSummary => ({
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    reasoningTokens: 0,
+    cachedInputTokens: 0,
+  });
+
+export const addAiChatTokenUsageSummary = (
+  base: AiChatTokenUsageSummary,
+  delta: Partial<AiChatTokenUsageSummary> | null | undefined,
+): AiChatTokenUsageSummary => ({
+  inputTokens:
+    base.inputTokens + Math.max(0, Math.trunc(delta?.inputTokens ?? 0)),
+  outputTokens:
+    base.outputTokens + Math.max(0, Math.trunc(delta?.outputTokens ?? 0)),
+  totalTokens:
+    base.totalTokens + Math.max(0, Math.trunc(delta?.totalTokens ?? 0)),
+  reasoningTokens:
+    base.reasoningTokens + Math.max(0, Math.trunc(delta?.reasoningTokens ?? 0)),
+  cachedInputTokens:
+    base.cachedInputTokens +
+    Math.max(0, Math.trunc(delta?.cachedInputTokens ?? 0)),
+});
 
 const INTERRUPTED_AI_CHAT_MESSAGE =
   "The previous AI response was interrupted before it finished.";
@@ -497,6 +528,8 @@ export const createAiChatSessionData = (
   searchResultsById: new Map(),
   highlightedResultIds: [],
   pendingDetectedFieldBatches: [],
+  tokenUsage: createEmptyAiChatTokenUsageSummary(),
+  contextTokens: 0,
   runStatus: "idle",
   lastError: null,
   awaitingContinue: false,
@@ -699,6 +732,32 @@ export const restorePersistedAiChatDocumentState = (
         searchResultsById,
         highlightedResultIds,
         pendingDetectedFieldBatches,
+        tokenUsage:
+          session.tokenUsage && typeof session.tokenUsage === "object"
+            ? {
+                inputTokens: Math.max(
+                  0,
+                  Math.trunc(session.tokenUsage.inputTokens ?? 0),
+                ),
+                outputTokens: Math.max(
+                  0,
+                  Math.trunc(session.tokenUsage.outputTokens ?? 0),
+                ),
+                totalTokens: Math.max(
+                  0,
+                  Math.trunc(session.tokenUsage.totalTokens ?? 0),
+                ),
+                reasoningTokens: Math.max(
+                  0,
+                  Math.trunc(session.tokenUsage.reasoningTokens ?? 0),
+                ),
+                cachedInputTokens: Math.max(
+                  0,
+                  Math.trunc(session.tokenUsage.cachedInputTokens ?? 0),
+                ),
+              }
+            : createEmptyAiChatTokenUsageSummary(),
+        contextTokens: Math.max(0, Math.trunc(session.contextTokens ?? 0)),
         runStatus: "idle",
         lastError:
           typeof session.lastError === "string" ? session.lastError : null,
@@ -782,6 +841,8 @@ export const persistAiChatDocumentState = (options: {
         searchResults: trimmedSearchResults,
         highlightedResultIds: data.highlightedResultIds,
         pendingDetectedFieldBatches: data.pendingDetectedFieldBatches,
+        tokenUsage: data.tokenUsage,
+        contextTokens: data.contextTokens,
         lastError: data.lastError,
         awaitingContinue: data.awaitingContinue,
       };
@@ -826,6 +887,8 @@ export const persistAiChatDocumentState = (options: {
             searchResults: trimmedSearchResults,
             highlightedResultIds: activeData.highlightedResultIds,
             pendingDetectedFieldBatches: activeData.pendingDetectedFieldBatches,
+            tokenUsage: activeData.tokenUsage,
+            contextTokens: activeData.contextTokens,
             lastError: activeData.lastError,
             awaitingContinue: activeData.awaitingContinue,
           },

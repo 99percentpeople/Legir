@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { PanelLayout } from "./PanelLayout";
+import { PanelLayout } from "../PanelLayout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
@@ -62,6 +62,7 @@ import type {
   AiChatMessageAttachment,
   AiDocumentLinkTarget,
   AiChatSessionSummary,
+  AiChatTokenUsageSummary,
   AiChatTimelineItem,
   AiChatToolPreviewImage,
   AiChatUserMessageInput,
@@ -70,7 +71,7 @@ import { TimeAgoText } from "@/components/timeText";
 import { appEventBus } from "@/lib/eventBus";
 import { cn } from "@/utils/cn";
 import { StreamMarkdown } from "@/components/markdown/StreamMarkdown";
-import { useStickyBottomScroll } from "./useStickyBottomScroll";
+import { useStickyBottomScroll } from "../useStickyBottomScroll";
 import { StreamingCursor } from "@/components/ui/streaming-cursor";
 
 export interface AiChatPanelProps {
@@ -92,6 +93,8 @@ export interface AiChatPanelProps {
   runStatus: "idle" | "running" | "cancelling" | "error";
   lastError: string | null;
   awaitingContinue: boolean;
+  tokenUsage: AiChatTokenUsageSummary;
+  contextTokens: number;
 
   selectedModelKey?: string;
   onSelectModel: (value: string) => void;
@@ -826,6 +829,8 @@ export function AiChatPanel({
   runStatus,
   lastError,
   awaitingContinue,
+  tokenUsage,
+  contextTokens,
   selectedModelKey,
   onSelectModel,
   modelGroups,
@@ -873,6 +878,13 @@ export function AiChatPanel({
   const draftRef = React.useRef("");
   const inlineEditStateRef = React.useRef<typeof inlineEditState>(null);
   const copiedTimeoutRef = React.useRef<number | null>(null);
+  const tokenNumberFormatter = React.useMemo(() => new Intl.NumberFormat(), []);
+
+  const formatTokenCount = React.useCallback(
+    (value: number) =>
+      tokenNumberFormatter.format(Math.max(0, Math.trunc(value))),
+    [tokenNumberFormatter],
+  );
 
   const scheduleScrollToBottom = React.useCallback(
     (force = false, behavior: ScrollBehavior = "auto") => {
@@ -1210,83 +1222,111 @@ export function AiChatPanel({
       : t("common.select");
 
   const footer = (
-    <div
-      className={cn(
-        "border-input bg-background rounded-2xl border py-1 pr-1 pl-2 shadow-xs transition-[color,box-shadow]",
-        "focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]",
-        (!!disabledReason || runStatus === "cancelling") &&
-          "bg-muted/20 opacity-80",
-      )}
-    >
-      {pendingAttachments.length > 0 ? (
-        <div className="px-1 pb-1">
-          <div className="flex flex-wrap gap-2">
-            {pendingAttachments.map((attachment) => (
-              <MessageAttachmentChip
-                key={getMessageAttachmentKey(attachment)}
-                t={t}
-                attachment={attachment}
-                onActivate={(nextAttachment) => {
-                  void handleActivateAttachment(nextAttachment);
-                }}
-                onRemove={() =>
-                  setPendingAttachments((prev) =>
-                    prev.filter(
-                      (item) =>
-                        getMessageAttachmentKey(item) !==
-                        getMessageAttachmentKey(attachment),
-                    ),
-                  )
-                }
-              />
-            ))}
+    <div className="space-y-2">
+      <div
+        className={cn(
+          "border-input bg-background rounded-2xl border py-1 pr-1 pl-2 shadow-xs transition-[color,box-shadow]",
+          "focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]",
+          (!!disabledReason || runStatus === "cancelling") &&
+            "bg-muted/20 opacity-80",
+        )}
+      >
+        {pendingAttachments.length > 0 ? (
+          <div className="px-1 pb-1">
+            <div className="flex flex-wrap gap-2">
+              {pendingAttachments.map((attachment) => (
+                <MessageAttachmentChip
+                  key={getMessageAttachmentKey(attachment)}
+                  t={t}
+                  attachment={attachment}
+                  onActivate={(nextAttachment) => {
+                    void handleActivateAttachment(nextAttachment);
+                  }}
+                  onRemove={() =>
+                    setPendingAttachments((prev) =>
+                      prev.filter(
+                        (item) =>
+                          getMessageAttachmentKey(item) !==
+                          getMessageAttachmentKey(attachment),
+                      ),
+                    )
+                  }
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
-      <div className="flex items-end gap-2">
-        <Textarea
-          ref={textareaRef}
-          rows={1}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={t("ai_chat.input_placeholder")}
-          disabled={
-            !!disabledReason || runStatus === "cancelling" || !!inlineEditState
-          }
-          className="max-h-[180px] min-h-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent! px-1 py-1.5 shadow-none focus-visible:ring-0"
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              if (actionIsStop) onStop();
-              else handleSend();
+        ) : null}
+        <div className="flex items-end gap-2">
+          <Textarea
+            ref={textareaRef}
+            rows={1}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={t("ai_chat.input_placeholder")}
+            disabled={
+              !!disabledReason ||
+              runStatus === "cancelling" ||
+              !!inlineEditState
             }
-          }}
-        />
+            className="max-h-[180px] min-h-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent! px-1 py-1.5 shadow-none focus-visible:ring-0"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                if (actionIsStop) onStop();
+                else handleSend();
+              }
+            }}
+          />
 
-        <Button
-          type="button"
-          size="icon"
-          className="shrink-0 rounded-xl"
-          variant={actionIsStop ? "outline" : "default"}
-          onClick={actionIsStop ? onStop : handleSend}
-          disabled={actionIsStop ? runStatus === "cancelling" : !canSend}
-          aria-label={
-            actionIsStop ? t("common.actions.stop") : t("common.actions.send")
-          }
-          title={
-            actionIsStop ? t("common.actions.stop") : t("common.actions.send")
-          }
-        >
-          {actionIsStop ? (
-            runStatus === "cancelling" ? (
-              <Spinner size="sm" />
+          <Button
+            type="button"
+            size="icon"
+            className="shrink-0 rounded-xl"
+            variant={actionIsStop ? "outline" : "default"}
+            onClick={actionIsStop ? onStop : handleSend}
+            disabled={actionIsStop ? runStatus === "cancelling" : !canSend}
+            aria-label={
+              actionIsStop ? t("common.actions.stop") : t("common.actions.send")
+            }
+            title={
+              actionIsStop ? t("common.actions.stop") : t("common.actions.send")
+            }
+          >
+            {actionIsStop ? (
+              runStatus === "cancelling" ? (
+                <Spinner size="sm" />
+              ) : (
+                <Square size={14} />
+              )
             ) : (
-              <Square size={14} />
-            )
-          ) : (
-            <Send size={14} />
-          )}
-        </Button>
+              <Send size={14} />
+            )}
+          </Button>
+        </div>
+      </div>
+      <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px]">
+        <span className="font-medium">{t("ai_chat.token_usage")}</span>
+        <span>
+          {t("ai_chat.token_usage_context")} {formatTokenCount(contextTokens)}
+        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help underline decoration-dotted underline-offset-2">
+              {t("ai_chat.token_usage_total")}{" "}
+              {formatTokenCount(tokenUsage.totalTokens)}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            <div>
+              {t("ai_chat.token_usage_input")}{" "}
+              {formatTokenCount(tokenUsage.inputTokens)}
+            </div>
+            <div>
+              {t("ai_chat.token_usage_output")}{" "}
+              {formatTokenCount(tokenUsage.outputTokens)}
+            </div>
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
@@ -2162,7 +2202,7 @@ export function AiChatPanel({
 
         {lastError ? (
           <Card className="border-destructive/40 bg-destructive/5">
-            <CardContent className="p-3 pt-6">
+            <CardContent className="p-3">
               <div className="text-sm font-medium">
                 {t("ai_chat.error_title")}
               </div>

@@ -4,16 +4,8 @@ import type {
 } from "@/services/ai/chat/types";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 import {
-  buildAiDocumentControlLink,
-  buildAiDocumentPageLink,
-  buildAiDocumentResultLink,
-} from "@/services/ai/utils/documentLinks";
-import {
-  buildHtmlLinkExample,
-  buildMarkdownLinkExample,
   buildPageRangeLabel,
   buildPromptSection,
-  collectToolPromptInstructions,
   createAiChatPromptContext,
   formatSummaryInstructionsForPrompt,
   hasTool,
@@ -25,16 +17,6 @@ export const getAiChatSystemInstruction = (options?: {
   toolDefinitions?: AiChatToolDefinition[];
 }) => {
   const context = createAiChatPromptContext(options?.toolDefinitions);
-  const documentLinkExamples = [
-    `markdown page link: ${buildMarkdownLinkExample("go to page 12", buildAiDocumentPageLink(12))}`,
-    `html page link: ${buildHtmlLinkExample("go to page 12", buildAiDocumentPageLink(12))}`,
-    `markdown control link: ${buildMarkdownLinkExample("field on page 2", buildAiDocumentControlLink("CONTROL_ID"))}`,
-    `html result link: ${buildHtmlLinkExample("match on page 5", buildAiDocumentResultLink("RESULT_ID"))}`,
-  ].join("; ");
-  const toolInstructions = collectToolPromptInstructions(
-    context.toolDefinitions,
-  );
-
   const sections: string[] = [];
   const canCreateFormFields = hasTool(context, "create_form_fields");
   const canUpdateFormFields = hasTool(context, "update_form_fields");
@@ -60,16 +42,16 @@ export const getAiChatSystemInstruction = (options?: {
   sections.push(
     buildPromptSection("Role", [
       "You are the AI assistant inside the FormForge PDF editor.",
-      "Reply in the same language as the user's most recent message.",
-      "If the language is unclear, ask one brief clarifying question in the user's most likely language.",
+      "Reply in the same language as the user's latest message.",
+      "If the language is unclear, ask one short clarifying question.",
     ]),
   );
 
   const groundingLines = [
     'Treat every "TOOL_RESULT" block as authoritative.',
-    "Use tools before making document-specific claims, and never imply you can see page content without tool output.",
-    "Prefer tools for document search, page reading, metadata, annotations, fields, form filling, highlighting, and navigation when the task depends on the open PDF.",
-    "All AI tool page numbers are 1-based. The first PDF page is page 1, not page 0.",
+    "Use tools before making document-specific claims.",
+    "Never imply that you can see page content without tool output.",
+    "All AI tool page numbers are 1-based.",
     AI_PAGE_COORDINATE_CONVENTION,
   ];
   if (
@@ -77,121 +59,99 @@ export const getAiChatSystemInstruction = (options?: {
     hasTool(context, "summarize_pages_visual")
   ) {
     groundingLines.push(
-      "If text extraction is empty, severely degraded, or clearly misses the needed visual content on a page, do not give up. Inspect the rendered page visually before concluding the content cannot be checked.",
+      "If text extraction is missing or unreliable, inspect rendered page visuals before saying the content cannot be checked.",
     );
   }
   sections.push(buildPromptSection("Grounding", groundingLines));
 
   sections.push(
-    buildPromptSection("Answer style", [
-      "Lead with the answer or next useful action, not status chatter.",
-      "Keep answers concise but informative: include the key finding, the relevant location, and the next useful step when it helps.",
-      "When a page, field, annotation, or search hit matters, prefer making it clickable with a natural link instead of plain text.",
-      'Treat annotation_id and result_id as internal tool handles: use them only for follow-up tool calls or silent link construction, and do not print raw ids or labels like "annotation_id:" / "result_id:" unless the user explicitly asks for them.',
-      "When layout or geometry is available, add a short human description such as top left, right side, or lower section. Do not guess location wording without supporting data.",
-      "If there are multiple relevant targets, use a short bullet list so each item says what it is, why it matters, and where to open it.",
-      "After solving the immediate request, offer one concrete follow-up suggestion or question when it would help the user go deeper. Avoid generic closers.",
-      "Use light markdown only when it improves scanning.",
+    buildPromptSection("Answers", [
+      "Lead with the answer or next useful action.",
+      "Be concise and specific.",
+      "When a page, field, annotation, or result matters, prefer a natural clickable document link.",
+      "Do not print raw annotation_id, result_id, or /document/... paths unless the user explicitly asks.",
+      "If layout is known, add a short human location such as top left or right side.",
     ]),
   );
 
   sections.push(
     buildPromptSection("Document links", [
-      `When you include an internal document link, use a correct clickable format: either markdown [text](/document/...) or an HTML anchor like <a href="/document/...">text</a>. Examples: ${documentLinkExamples}.`,
-      `If the answer should let the user jump to a page, write a clickable link like ${buildMarkdownLinkExample("page 3", buildAiDocumentPageLink(3))} or ${buildHtmlLinkExample("page 3", buildAiDocumentPageLink(3))}.`,
-      `If you already have a control_id from list_fields or list_annotations, write a clickable link like ${buildMarkdownLinkExample("field on page 2", buildAiDocumentControlLink("CONTROL_ID"))} or ${buildHtmlLinkExample("field on page 2", buildAiDocumentControlLink("CONTROL_ID"))}.`,
-      `If you already have a result_id from search_document, write a clickable link like ${buildMarkdownLinkExample("match on page 5", buildAiDocumentResultLink("RESULT_ID"))} or ${buildHtmlLinkExample("match on page 5", buildAiDocumentResultLink("RESULT_ID"))}.`,
-      "If you want to show the user where an annotation or search result is, prefer an internal clickable link to that target instead of plain position text or raw ids.",
-      "Never output a bare /document/... path, a raw href, a broken <a> tag without visible text, a code fence, or a JSON wrapper when you mean a clickable document link.",
-      "When linking a control or result, prefer one natural link whose text names the page and item together, instead of a generic label.",
-      'Link text must read naturally in the user\'s language. Avoid boilerplate labels like "Page 3", "Open Field", or "Open Match" unless the user explicitly wants that wording.',
-      "Treat /document/... hrefs as an internal detail. Use them silently inside clickable links and never expose the raw href, path pattern, or URL format unless the user explicitly asks.",
-      "A /document/control/... link scrolls to and focuses that field or annotation. It does not select the control.",
-      "Only create document links after you already have the exact page number, control_id, or result_id from tool output. Never invent document-link targets.",
+      "Use markdown links or HTML anchors for internal document links.",
+      "Only create a page, control, or result link after you have the exact target from tool output.",
+      "Link text should read naturally in the user's language.",
     ]),
   );
 
   sections.push(
     buildPromptSection(
-      "Action boundaries",
+      "Actions",
       [
-        "Prefer internal clickable links for optional navigation in explanatory answers.",
-        "Use navigate_page, focus_control, or focus_result when the user explicitly asks you to jump, open, focus, or select something now.",
+        "Prefer clickable links for optional navigation.",
+        "Use navigate_page, focus_control, or focus_result only when the user explicitly asks you to jump or focus now.",
         canCreateFormFields || canUpdateFormFields
           ? [
               canCreateFormFields
-                ? "You may create new form fields only through create_form_fields."
+                ? "Create new form fields only through create_form_fields."
                 : null,
               canUpdateFormFields
-                ? "You may update existing field geometry, properties, or styles only through update_form_fields."
+                ? "Update existing field geometry, properties, or styles only through update_form_fields."
                 : null,
-              "Use fill_form_fields only for current field values. Never claim to create or restyle fields without the corresponding tool calls.",
+              "Use fill_form_fields only for current field values.",
             ]
               .filter(Boolean)
               .join(" ")
-          : "You may only modify existing form field values. Never create, delete, move, resize, restyle, or rename fields.",
+          : "If form tools are unavailable, only modify existing field values and do not claim to create or restyle fields.",
         canCreateFormFields
           ? canInspectPageVisuals
-            ? "For any form-building request, confirm the user's requirements first. If page visuals are available, inspect them yourself, summarize the proposed fields briefly, and wait for the user's explicit confirmation before create_form_fields."
+            ? "For form-building requests, confirm requirements first. If visuals are available, inspect them yourself, summarize the plan briefly, and prefer that before create_form_fields."
             : canDetectFormFields
-              ? "For any form-building request, confirm the user's requirements first. When you need visual inspection, use detect_form_fields with the dedicated fallback vision model, summarize the candidate fields briefly, and wait for the user's explicit confirmation before create_form_fields."
-              : "For any form-building request, explain briefly that the current chat model cannot inspect visuals and detect_form_fields is disabled in settings, so AI form creation is unavailable until one of those visual paths is enabled."
-          : "If the user asks for AI-driven form creation, explain briefly that AI form tools are currently disabled in settings.",
+              ? "If direct visual inspection is unavailable, use detect_form_fields as the fallback visual path and summarize the candidate plan before create_form_fields."
+              : "If no visual path is available, explain briefly that AI form creation is unavailable until a visual path is enabled."
+          : "If the user asks for AI-driven form creation, explain briefly that AI form tools are disabled in settings.",
         canUpdateFormFields
-          ? "If the user asks to move, resize, restyle, or reconfigure existing fields, prefer update_form_fields and list_fields rather than recreating the fields."
-          : "If the user asks to restyle or reconfigure existing fields and no update tool is available, explain briefly that only field-value filling is supported.",
+          ? "For moving, resizing, restyling, or reconfiguring existing fields, prefer update_form_fields and list_fields instead of recreating fields."
+          : "If field updates are unavailable, explain briefly that only field-value filling is supported.",
         canCreateVisualAnnotations || canUpdateAnnotations
           ? [
               canCreateFreetextAnnotations
-                ? "You may create visible text overlays or callouts only through create_freetext_annotations."
+                ? "Create visible text overlays or callouts only through create_freetext_annotations."
                 : null,
               canCreateShapeAnnotations
-                ? "You may create boxes, circles, arrows, lines, or other drawn callouts only through create_shape_annotations."
+                ? "Create boxes, circles, arrows, lines, or other drawn callouts only through create_shape_annotations."
                 : null,
               canUpdateAnnotations
-                ? `You may update existing annotations only through the type-specific annotation update tools that match list_annotations output: ${annotationUpdateToolNames.join(", ")}. Prefer update_annotation_texts when the task is limited to note/comment text.`
+                ? `Update existing annotations only through the matching annotation update tool: ${annotationUpdateToolNames.join(", ")}. Prefer update_annotation_texts for note/comment text only.`
                 : null,
               canInspectPageVisuals
-                ? "When annotation placement, geometry, or styling depends on page appearance, inspect the relevant page with get_pages_visual first and then use actual page coordinates."
+                ? "When annotation placement or styling depends on page appearance, inspect the page with get_pages_visual first."
                 : null,
             ]
               .filter(Boolean)
               .join(" ")
           : null,
-        "After a successful direct UI action, do not repeat it unless the user asks for another location, more results, or verification.",
+        "After a successful direct UI action, do not repeat it unless the user asks for another one.",
       ].filter(Boolean),
     ),
   );
 
   const toolUsageLines = [
     "Do not stop early on multi-step tasks.",
-    "When multiple read-only tool calls are independent, issue them in parallel in the same step.",
-    "Prefer one broader read call over many tiny read calls when a single call can cover the same need.",
-    "After using tools, answer directly in normal user-facing text once you have enough information.",
-    "If no tool is needed, answer directly without inventing any fake tool call.",
+    "Batch independent read-only tool calls in the same step.",
+    "Prefer one broader read call over many tiny ones when it covers the same need.",
+    "After using tools, answer directly in user-facing text.",
+    "If no tool is needed, answer directly.",
     "Tool arguments and tool result field names use snake_case.",
-    "Use the available tools directly. Do not describe fake tool calls or JSON wrappers.",
+    "Do not describe fake tool calls or JSON wrappers.",
   ];
   if (
     hasTool(context, "get_pages_visual") ||
     hasTool(context, "summarize_pages_visual")
   ) {
     toolUsageLines.push(
-      "If get_pages_text or search_document does not yield usable text for a relevant page, try get_pages_visual or summarize_pages_visual before telling the user the page cannot be inspected.",
-    );
-  }
-  if (context.readToolNames.length > 0) {
-    toolUsageLines.push(
-      `Read-only tools that may be batched in parallel when independent: ${context.readToolNames.join(", ")}.`,
+      "If page text is unusable, try get_pages_visual or summarize_pages_visual before saying the page cannot be inspected.",
     );
   }
   sections.push(buildPromptSection("Tool usage", toolUsageLines));
-
-  if (toolInstructions.length > 0) {
-    sections.push(
-      buildPromptSection("Tool-specific usage rules", toolInstructions),
-    );
-  }
 
   return sections.join("\n\n");
 };

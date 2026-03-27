@@ -1,4 +1,10 @@
-import { stepCountIs, streamText, type OnFinishEvent, type ToolSet } from "ai";
+import {
+  stepCountIs,
+  streamText,
+  type OnFinishEvent,
+  type OnStepFinishEvent,
+  type ToolSet,
+} from "ai";
 
 import {
   buildAiChatTurnPrompt,
@@ -13,15 +19,61 @@ import type { AppOptions, EditorState } from "@/types";
 import type {
   AiChatAssistantUpdate,
   AiChatMessageRecord,
+  AiChatTokenUsageSummary,
   AiChatToolUpdate,
   AiToolRegistry,
 } from "./types";
 
 type AiChatStreamFinishEvent = Pick<
   OnFinishEvent<ToolSet>,
-  "finishReason" | "steps"
+  "finishReason" | "steps" | "totalUsage"
 >;
 type AiChatStreamFinishResolver = (result: AiChatStreamFinishEvent) => void;
+
+const normalizeAiChatStreamError = (
+  error: unknown,
+  fallbackMessage: string,
+): Error => {
+  if (error instanceof Error) return error;
+  if (typeof error === "string" && error.trim()) {
+    return new Error(error.trim());
+  }
+  return new Error(fallbackMessage);
+};
+
+const toAiChatTokenUsageSummary = (
+  usage:
+    | OnFinishEvent<ToolSet>["totalUsage"]
+    | OnStepFinishEvent<ToolSet>["usage"]
+    | null
+    | undefined,
+): AiChatTokenUsageSummary => ({
+  inputTokens: Math.max(0, Math.trunc(usage?.inputTokens ?? 0)),
+  outputTokens: Math.max(0, Math.trunc(usage?.outputTokens ?? 0)),
+  totalTokens: Math.max(0, Math.trunc(usage?.totalTokens ?? 0)),
+  reasoningTokens: Math.max(
+    0,
+    Math.trunc(
+      usage?.outputTokenDetails?.reasoningTokens ?? usage?.reasoningTokens ?? 0,
+    ),
+  ),
+  cachedInputTokens: Math.max(
+    0,
+    Math.trunc(
+      usage?.inputTokenDetails?.cacheReadTokens ??
+        usage?.cachedInputTokens ??
+        0,
+    ),
+  ),
+});
+
+const getAiChatContextTokens = (
+  usage:
+    | OnFinishEvent<ToolSet>["totalUsage"]
+    | OnStepFinishEvent<ToolSet>["usage"]
+    | null
+    | undefined,
+) => Math.max(0, Math.trunc(usage?.inputTokens ?? 0));
 
 export const aiChatService = {
   async runConversation(options: {
@@ -33,6 +85,11 @@ export const aiChatService = {
     signal?: AbortSignal;
     onToolUpdate?: (update: AiChatToolUpdate) => void;
     onAssistantUpdate?: (update: AiChatAssistantUpdate) => void;
+    onUsageUpdate?: (update: {
+      tokenUsage: AiChatTokenUsageSummary;
+      contextTokens: number;
+      stepNumber: number;
+    }) => void;
     maxToolRounds?: number;
   }) {
     const {
@@ -43,6 +100,7 @@ export const aiChatService = {
       signal,
       onToolUpdate,
       onAssistantUpdate,
+      onUsageUpdate,
       maxToolRounds = 10,
     } = options;
 
@@ -95,10 +153,18 @@ export const aiChatService = {
         },
         tools: toolRuntime.tools,
         stopWhen: stepCountIs(maxToolSteps),
-        onFinish: ({ finishReason, steps }) => {
+        onStepFinish: (step) => {
+          onUsageUpdate?.({
+            tokenUsage: toAiChatTokenUsageSummary(step.usage),
+            contextTokens: getAiChatContextTokens(step.usage),
+            stepNumber: step.stepNumber,
+          });
+        },
+        onFinish: ({ finishReason, steps, totalUsage }) => {
           resolveFinishEvent?.({
             finishReason,
             steps,
+            totalUsage,
           });
           resolveFinishEvent = null;
         },
@@ -144,6 +210,22 @@ export const aiChatService = {
             batchId: currentBatchId,
             error: part.error,
           });
+          continue;
+        }
+
+        if (part.type === "abort") {
+          const abortError = new Error(
+            part.reason?.trim() || "AI chat request was aborted.",
+          );
+          abortError.name = "AbortError";
+          throw abortError;
+        }
+
+        if (part.type === "error") {
+          throw normalizeAiChatStreamError(
+            part.error,
+            "AI chat request failed.",
+          );
         }
       }
 
@@ -185,13 +267,27 @@ export const aiChatService = {
         assistantMessage,
         conversation,
         awaitingContinue,
+        tokenUsage: toAiChatTokenUsageSummary(finishEvent.totalUsage),
+        contextTokens: getAiChatContextTokens(lastStep?.usage),
       };
     } catch (error) {
-      const normalized =
-        error instanceof Error ? error : new Error(String(error));
+      const normalized = normalizeAiChatStreamError(
+        error,
+        "AI chat request failed.",
+      );
+      const partialAssistantMessage = assistantMessage.trim();
+      const carriedConversation = partialAssistantMessage
+        ? [
+            ...conversation,
+            {
+              role: "assistant" as const,
+              content: partialAssistantMessage,
+            },
+          ]
+        : conversation;
       (
         normalized as Error & { conversation?: AiChatMessageRecord[] }
-      ).conversation = conversation;
+      ).conversation = carriedConversation;
       throw normalized;
     }
   },
