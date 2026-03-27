@@ -150,7 +150,7 @@ export interface AiRenderedPageImage {
   pageHeight: number;
   rotation: number;
   cropRect?: AiPageSpaceRect;
-  targetWidth: number;
+  pixelDensity: number;
   renderedWidth: number;
   renderedHeight: number;
   mimeType: string;
@@ -172,7 +172,7 @@ export interface AiRenderedPageVisualSummaryPage {
   pageHeight: number;
   rotation: number;
   cropRect?: AiPageSpaceRect;
-  targetWidth: number;
+  pixelDensity: number;
   renderedWidth: number;
   renderedHeight: number;
   renderAnnotations: boolean;

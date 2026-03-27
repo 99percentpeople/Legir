@@ -1,7 +1,7 @@
 import type { LLMModelCapabilities } from "@/types";
 import {
   createCustomModelCapabilities,
-  createModelCapabilities,
+  createOpenAiLikeModelCapabilities,
   modelSupportsInputModality,
 } from "@/services/ai/sdk/modelCapabilities";
 import type {
@@ -18,41 +18,8 @@ type OpenAiModelsResponse = {
   data?: Array<{ id?: string }>;
 };
 
-const supportsOpenAiImageInput = (modelId: string) => {
-  const normalizedModelId = modelId.trim().toLowerCase();
-  if (!normalizedModelId) return false;
-
-  return [
-    /^gpt-4o(?:[-:]|$)/,
-    /^gpt-4\.1(?:[-:]|$)/,
-    /^gpt-4\.5(?:[-:]|$)/,
-    /^gpt-5(?:[-:]|$)/,
-  ].some((pattern) => pattern.test(normalizedModelId));
-};
-
-const supportsOpenAiToolCalls = (modelId: string) => {
-  const normalizedModelId = modelId.trim().toLowerCase();
-  if (!normalizedModelId) return true;
-
-  return ![
-    /(?:^|[-_/])embedding(?:[-_/]|$)/,
-    /(?:^|[-_/])moderation(?:[-_/]|$)/,
-    /(?:^|[-_/])tts(?:[-_/]|$)/,
-    /(?:^|[-_/])whisper(?:[-_/]|$)/,
-    /(?:^|[-_/])transcription(?:[-_/]|$)/,
-    /(?:^|[-_/])speech(?:[-_/]|$)/,
-    /(?:^|[-_/])image(?:[-_/]|$)/,
-  ].some((pattern) => pattern.test(normalizedModelId));
-};
-
 const createOpenAiModelCapabilities = (modelId: string) =>
-  createModelCapabilities({
-    inputModalities: supportsOpenAiImageInput(modelId)
-      ? ["text", "image"]
-      : ["text"],
-    outputModalities: ["text"],
-    supportsToolCalls: supportsOpenAiToolCalls(modelId),
-  });
+  createOpenAiLikeModelCapabilities({ modelId });
 
 const matchesOpenAiTask = (
   capabilities: LLMModelCapabilities,

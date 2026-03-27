@@ -99,6 +99,7 @@ export const createEmptyLlmOptions = (): LLMOptions =>
     AI_PROVIDER_IDS.map((providerId) => [
       providerId,
       {
+        enabled: true,
         apiKey: "",
         apiUrl: "",
         customModels: [],
@@ -129,6 +130,7 @@ export const trimLlmOptions = (options: LLMOptions): LLMOptions =>
         providerId,
         {
           ...providerOptions,
+          enabled: providerOptions.enabled !== false,
           apiKey: (providerOptions.apiKey || "").trim(),
           apiUrl: (providerOptions.apiUrl || "").trim(),
           customModels: normalizeCustomModelConfigs(

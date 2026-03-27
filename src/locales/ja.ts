@@ -662,6 +662,8 @@ const ja = {
       openai: "OpenAI",
       api_key_placeholder: "API キー",
       api_url_placeholder: "API URL（任意）",
+      provider_enabled: "現在のプロバイダーを有効化",
+      provider_enable_required: "先にこのプロバイダーを有効にしてください。",
       check: "確認",
       check_success: "設定OK。",
       check_failed: "確認に失敗しました。",

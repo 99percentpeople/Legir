@@ -654,6 +654,8 @@ const zhCN = {
       openai: "OpenAI",
       api_key_placeholder: "API Key",
       api_url_placeholder: "API URL（可选）",
+      provider_enabled: "启用当前提供商",
+      provider_enable_required: "请先启用当前提供商。",
       check: "检查",
       check_success: "配置正常。",
       check_failed: "检查失败。",

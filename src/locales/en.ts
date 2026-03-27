@@ -670,6 +670,8 @@ const en = {
       openai: "OpenAI",
       api_key_placeholder: "API Key",
       api_url_placeholder: "API URL (optional)",
+      provider_enabled: "Enable provider",
+      provider_enable_required: "Enable this provider first.",
       check: "Check",
       check_success: "Configuration looks good.",
       check_failed: "Check failed.",

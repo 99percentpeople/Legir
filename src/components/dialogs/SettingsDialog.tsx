@@ -96,18 +96,12 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   const llmModelCache = useEditorStore((s) => s.llmModelCache);
   type LlmProviderId = AiProviderId;
-  type ProviderStatus = {
-    state: "idle" | "checking" | "ok" | "error";
-    message: string;
-  };
-  type ProviderFetchStatus = {
-    state: "idle" | "fetching" | "ok" | "error";
+  type ProviderSyncStatus = {
+    state: "idle" | "syncing" | "ok" | "error";
     message: string;
   };
 
-  const buildProviderStatusRecord = <
-    T extends ProviderStatus | ProviderFetchStatus,
-  >(
+  const buildProviderStatusRecord = <T extends ProviderSyncStatus>(
     initial: T,
   ) =>
     Object.fromEntries(
@@ -118,12 +112,8 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     AI_PROVIDER_SPECS_SORTED_BY_LABEL[0]?.id ?? AI_PROVIDER_IDS[0],
   );
 
-  const [llmCheckStatus, setLlmCheckStatus] = useState<
-    Record<LlmProviderId, ProviderStatus>
-  >(buildProviderStatusRecord({ state: "idle", message: "" }));
-
-  const [llmFetchStatus, setLlmFetchStatus] = useState<
-    Record<LlmProviderId, ProviderFetchStatus>
+  const [llmSyncStatus, setLlmSyncStatus] = useState<
+    Record<LlmProviderId, ProviderSyncStatus>
   >(buildProviderStatusRecord({ state: "idle", message: "" }));
 
   const modelUpdateTimersRef = useRef<Partial<Record<LlmProviderId, number>>>(
@@ -187,6 +177,18 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   const updateLlmApiUrl = (provider: LlmProviderId, value: string) => {
     updateLlmProviderOptions(provider, { apiUrl: value });
+  };
+
+  const isLlmProviderEnabled = (provider: LlmProviderId) =>
+    options.llm[provider].enabled !== false;
+
+  const setLlmProviderEnabled = (provider: LlmProviderId, enabled: boolean) => {
+    updateLlmProviderOptions(provider, { enabled });
+    setLlmSyncStatus((prev) => ({
+      ...prev,
+      [provider]: { state: "idle", message: "" },
+    }));
+    scheduleModelRegistryUpdate(provider);
   };
 
   const getCustomModelDraftCapabilities = (provider: LlmProviderId) => {
@@ -279,6 +281,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     AI_PROVIDER_SPECS_SORTED_BY_LABEL.find(
       (spec) => spec.id === llmProviderTab,
     ) ?? AI_PROVIDER_SPECS_SORTED_BY_LABEL[0];
+  const selectedLlmProviderEnabled = isLlmProviderEnabled(llmProviderTab);
 
   const digestOutputRatioDenominator =
     options.aiChat.digestOutputRatioDenominator;
@@ -286,10 +289,34 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const digestSourceCharsPerChunk = options.aiChat.digestSourceCharsPerChunk;
   const visualSummaryEnabled = options.aiChat.visualSummaryEnabled;
 
-  const checkLlmProvider = async (provider: LlmProviderId) => {
+  const clearFetchedLlmModels = (provider: LlmProviderId) => {
+    useEditorStore.getState().setState((state) => ({
+      llmModelCache: {
+        ...state.llmModelCache,
+        [provider]: {
+          ...state.llmModelCache[provider],
+          translateModels: [],
+          visionModels: [],
+        },
+      },
+    }));
+  };
+
+  const syncLlmProviderModels = async (provider: LlmProviderId) => {
+    if (!isLlmProviderEnabled(provider)) {
+      setLlmSyncStatus((prev) => ({
+        ...prev,
+        [provider]: {
+          state: "error",
+          message: t("settings.llm.provider_enable_required"),
+        },
+      }));
+      return;
+    }
+
     const apiKey = (options.llm[provider].apiKey || "").trim();
     if (!apiKey) {
-      setLlmCheckStatus((prev) => ({
+      setLlmSyncStatus((prev) => ({
         ...prev,
         [provider]: {
           state: "error",
@@ -299,60 +326,28 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
       return;
     }
 
-    setLlmCheckStatus((prev) => ({
+    setLlmSyncStatus((prev) => ({
       ...prev,
-      [provider]: { state: "checking", message: "" },
+      [provider]: { state: "syncing", message: "" },
     }));
 
     try {
       await checkLlmProviderConfig(provider);
-      setLlmCheckStatus((prev) => ({
-        ...prev,
-        [provider]: { state: "ok", message: t("settings.llm.check_success") },
-      }));
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : t("settings.llm.check_failed");
-      setLlmCheckStatus((prev) => ({
-        ...prev,
-        [provider]: { state: "error", message: msg },
-      }));
-    }
-  };
-
-  const fetchLlmProviderModels = async (provider: LlmProviderId) => {
-    const apiKey = (options.llm[provider].apiKey || "").trim();
-    if (!apiKey) {
-      setLlmFetchStatus((prev) => ({
-        ...prev,
-        [provider]: {
-          state: "error",
-          message: t("settings.llm.api_key_required"),
-        },
-      }));
-      return;
-    }
-
-    setLlmFetchStatus((prev) => ({
-      ...prev,
-      [provider]: { state: "fetching", message: "" },
-    }));
-
-    try {
       await loadModels({
         providerIds: [provider],
         force: true,
         throwOnError: true,
       });
 
-      setLlmFetchStatus((prev) => ({
+      setLlmSyncStatus((prev) => ({
         ...prev,
         [provider]: { state: "ok", message: t("settings.llm.fetch_success") },
       }));
     } catch (err) {
+      clearFetchedLlmModels(provider);
       const msg =
         err instanceof Error ? err.message : t("settings.llm.fetch_failed");
-      setLlmFetchStatus((prev) => ({
+      setLlmSyncStatus((prev) => ({
         ...prev,
         [provider]: { state: "error", message: msg },
       }));
@@ -683,57 +678,76 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
                 <div className="flex items-center justify-between gap-3">
                   <Label className="text-xs">{t("translate.provider")}</Label>
-                  <Select
-                    value={llmProviderTab}
-                    onValueChange={(v) => setLlmProviderTab(v as LlmProviderId)}
-                  >
-                    <SelectTrigger className="h-8 w-[160px]">
-                      <SelectValue placeholder={t("common.select")}>
-                        <div className="flex items-center gap-1.5">
-                          <ProviderLogo
-                            providerId={selectedLlmProviderSpec.id}
-                            size={14}
-                            className="text-foreground/80"
-                          />
-                          <span>
-                            {selectedLlmProviderSpec.labelKey
-                              ? t(selectedLlmProviderSpec.labelKey)
-                              : selectedLlmProviderSpec.label}
-                          </span>
-                        </div>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {AI_PROVIDER_SPECS_SORTED_BY_LABEL.map((spec) => (
-                        <SelectItem
-                          key={spec.id}
-                          value={spec.id}
-                          itemText={
-                            spec.labelKey ? t(spec.labelKey) : spec.label
-                          }
-                        >
-                          <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id={`llm-provider-enabled-${llmProviderTab}`}
+                        checked={selectedLlmProviderEnabled}
+                        onCheckedChange={(checked) =>
+                          setLlmProviderEnabled(llmProviderTab, checked)
+                        }
+                      />
+                      <Label
+                        htmlFor={`llm-provider-enabled-${llmProviderTab}`}
+                        className="text-xs font-normal"
+                      >
+                        {t("settings.llm.provider_enabled")}
+                      </Label>
+                    </div>
+                    <Select
+                      value={llmProviderTab}
+                      onValueChange={(v) =>
+                        setLlmProviderTab(v as LlmProviderId)
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-[160px]">
+                        <SelectValue placeholder={t("common.select")}>
+                          <div className="flex items-center gap-1.5">
                             <ProviderLogo
-                              providerId={spec.id}
+                              providerId={selectedLlmProviderSpec.id}
                               size={14}
                               className="text-foreground/80"
                             />
                             <span>
-                              {spec.labelKey ? t(spec.labelKey) : spec.label}
+                              {selectedLlmProviderSpec.labelKey
+                                ? t(selectedLlmProviderSpec.labelKey)
+                                : selectedLlmProviderSpec.label}
                             </span>
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AI_PROVIDER_SPECS_SORTED_BY_LABEL.map((spec) => (
+                          <SelectItem
+                            key={spec.id}
+                            value={spec.id}
+                            itemText={
+                              spec.labelKey ? t(spec.labelKey) : spec.label
+                            }
+                          >
+                            <div className="flex items-center gap-2">
+                              <ProviderLogo
+                                providerId={spec.id}
+                                size={14}
+                                className="text-foreground/80"
+                              />
+                              <span>
+                                {spec.labelKey ? t(spec.labelKey) : spec.label}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <Tabs value={llmProviderTab}>
                   {AI_PROVIDER_SPECS_SORTED_BY_LABEL.map((spec) => {
                     const providerOptions = options.llm[spec.id];
-                    const checkStatus = llmCheckStatus[spec.id];
-                    const fetchStatus = llmFetchStatus[spec.id];
+                    const syncStatus = llmSyncStatus[spec.id];
                     const showApiUrl = spec.allowCustomBaseUrl;
+                    const providerEnabled = isLlmProviderEnabled(spec.id);
                     return (
                       <TabsContent
                         key={spec.id}
@@ -768,60 +782,34 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                               variant="outline"
                               size="sm"
                               className="h-8"
-                              onClick={() => void checkLlmProvider(spec.id)}
-                              disabled={checkStatus.state === "checking"}
-                            >
-                              {checkStatus.state === "checking" ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : null}
-                              {t("settings.llm.check")}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8"
                               onClick={() =>
-                                void fetchLlmProviderModels(spec.id)
+                                void syncLlmProviderModels(spec.id)
                               }
-                              disabled={fetchStatus.state === "fetching"}
+                              disabled={
+                                !providerEnabled ||
+                                syncStatus.state === "syncing"
+                              }
                             >
-                              {fetchStatus.state === "fetching" ? (
+                              {syncStatus.state === "syncing" ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : null}
                               {t("settings.llm.fetch_models")}
                             </Button>
                           </div>
 
-                          {checkStatus.state === "ok" ? (
+                          {syncStatus.state === "ok" ? (
                             <div className="flex items-center gap-2 text-xs">
                               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                               <span className="text-muted-foreground">
-                                {checkStatus.message}
+                                {syncStatus.message}
                               </span>
                             </div>
                           ) : null}
-                          {checkStatus.state === "error" ? (
+                          {syncStatus.state === "error" ? (
                             <div className="flex items-center gap-2 text-xs">
                               <AlertCircle className="text-destructive h-4 w-4" />
                               <span className="text-destructive">
-                                {checkStatus.message}
-                              </span>
-                            </div>
-                          ) : null}
-
-                          {fetchStatus.state === "ok" ? (
-                            <div className="flex items-center gap-2 text-xs">
-                              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                              <span className="text-muted-foreground">
-                                {fetchStatus.message}
-                              </span>
-                            </div>
-                          ) : null}
-                          {fetchStatus.state === "error" ? (
-                            <div className="flex items-center gap-2 text-xs">
-                              <AlertCircle className="text-destructive h-4 w-4" />
-                              <span className="text-destructive">
-                                {fetchStatus.message}
+                                {syncStatus.message}
                               </span>
                             </div>
                           ) : null}

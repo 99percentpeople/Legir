@@ -752,28 +752,55 @@ const ToolTimelineImagePreview = ({
   preview,
 }: {
   preview: AiChatToolPreviewImage;
-}) => (
-  <a
-    href={preview.src}
-    target="_blank"
-    rel="noreferrer"
-    className="bg-muted/30 border-border/60 hover:border-border block shrink-0 overflow-hidden rounded-md border transition-colors"
-    title={preview.label}
-  >
-    <img
-      src={preview.src}
-      alt={preview.alt}
-      className="block h-28 w-auto max-w-[220px] bg-white object-contain"
-      loading="lazy"
-    />
-    <div className="text-muted-foreground border-border/60 border-t px-2 py-1 text-[11px]">
-      {preview.label}
-      {preview.width && preview.height
-        ? ` · ${preview.width}×${preview.height}`
-        : ""}
-    </div>
-  </a>
-);
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const dimensionLabel =
+    preview.width && preview.height
+      ? `${preview.width}×${preview.height}`
+      : undefined;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="bg-muted/30 border-border/60 hover:border-border block shrink-0 overflow-hidden rounded-md border text-left transition-colors"
+        title={preview.label}
+      >
+        <img
+          src={preview.src}
+          alt={preview.alt}
+          className="block aspect-square h-28 max-w-[220px] bg-white object-cover"
+          loading="lazy"
+        />
+        <div className="text-muted-foreground border-border/60 border-t px-2 py-1 text-[11px]">
+          {preview.label}
+          {dimensionLabel ? ` · ${dimensionLabel}` : ""}
+        </div>
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[92vh] max-w-5xl flex-col gap-3 overflow-hidden p-4 sm:max-w-5xl">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="min-w-0 truncate text-sm">
+              {preview.label}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {dimensionLabel ?? preview.alt}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-muted/20 border-border/60 flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-md border p-2">
+            <img
+              src={preview.src}
+              alt={preview.alt}
+              className="block h-auto max-h-[75vh] w-auto max-w-full object-contain"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 const getSessionTitle = (
   t: (key: string) => string,
@@ -1781,7 +1808,11 @@ export function AiChatPanel({
           onValueChange={onSelectModel}
           placeholder={modelSelectPlaceholder}
           groups={modelGroups}
-          disabled={modelGroups.length === 0 || disabledReason === "no_model"}
+          disabled={
+            modelGroups.length === 0 ||
+            disabledReason === "no_model" ||
+            actionIsStop
+          }
           showSeparators={false}
           triggerSize="sm"
           triggerTitle={modelSelectPlaceholder}

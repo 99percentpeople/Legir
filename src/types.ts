@@ -286,6 +286,7 @@ export interface LLMCustomModelConfig {
 }
 
 export interface LLMProviderOptions {
+  enabled: boolean;
   apiKey?: string;
   apiUrl?: string;
   customModels: LLMCustomModelConfig[];

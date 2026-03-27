@@ -3,6 +3,7 @@ import {
   AI_CHAT_DIGEST_MERGE_BATCH_SIZE,
   AI_CHAT_DIGEST_OUTPUT_CHARS_MAX,
   AI_CHAT_DIGEST_OUTPUT_CHARS_MIN,
+  AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY,
   AI_CHAT_DIGEST_SUMMARY_CONCURRENCY,
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
@@ -320,18 +321,6 @@ const parseWorkspacePageNumber = (value: string) => {
   return pageIndex + 1;
 };
 
-const AI_PAGE_IMAGE_TARGET_WIDTH_DEFAULT = 1024;
-const AI_PAGE_IMAGE_TARGET_WIDTH_MIN = 512;
-const AI_PAGE_IMAGE_TARGET_WIDTH_MAX = 1536;
-
-const clampPageImageTargetWidth = (value: number | undefined) =>
-  clampNumber(
-    Math.trunc(value ?? AI_PAGE_IMAGE_TARGET_WIDTH_DEFAULT) ||
-      AI_PAGE_IMAGE_TARGET_WIDTH_DEFAULT,
-    AI_PAGE_IMAGE_TARGET_WIDTH_MIN,
-    AI_PAGE_IMAGE_TARGET_WIDTH_MAX,
-  );
-
 const getVisibleWorkspacePageNumbers = (totalPages: number) => {
   if (typeof document === "undefined" || totalPages <= 0) return [];
 
@@ -393,16 +382,17 @@ const buildPageViewport = (page: AiDocumentSnapshot["pages"][number]) =>
 const getRenderedImageDimensions = (options: {
   pageWidth: number;
   pageHeight: number;
-  targetWidth?: number;
+  pixelDensity: number;
 }) => {
-  const finalScale =
-    typeof options.targetWidth === "number"
-      ? Math.min(1, Math.max(0.05, options.targetWidth / options.pageWidth))
-      : 1;
-
   return {
-    renderedWidth: Math.max(1, Math.round(options.pageWidth * finalScale)),
-    renderedHeight: Math.max(1, Math.round(options.pageHeight * finalScale)),
+    renderedWidth: Math.max(
+      1,
+      Math.round(options.pageWidth * options.pixelDensity),
+    ),
+    renderedHeight: Math.max(
+      1,
+      Math.round(options.pageHeight * options.pixelDensity),
+    ),
   };
 };
 
@@ -636,12 +626,10 @@ export const createDocumentContextService = (options: {
 
   const renderPageImageSourceFromCurrentDocument = async ({
     pageNumber,
-    targetWidth,
     renderAnnotations = true,
     signal,
   }: {
     pageNumber: number;
-    targetWidth?: number;
     renderAnnotations?: boolean;
     signal?: AbortSignal;
   }): Promise<RenderedPageImageSource> => {
@@ -659,7 +647,7 @@ export const createDocumentContextService = (options: {
       throw new Error(`Invalid page number: ${pageNumber}`);
     }
 
-    const resolvedTargetWidth = clampPageImageTargetWidth(targetWidth);
+    const pixelDensity = AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY;
     const pageViewport = createViewportFromPageInfo(
       {
         viewBox: page.viewBox,
@@ -674,13 +662,13 @@ export const createDocumentContextService = (options: {
     const { renderedWidth, renderedHeight } = getRenderedImageDimensions({
       pageWidth: pageViewport.width,
       pageHeight: pageViewport.height,
-      targetWidth: resolvedTargetWidth,
+      pixelDensity,
     });
 
     const renderCurrentDocumentPage = () =>
       pdfWorkerService.renderPageImage({
         pageIndex,
-        targetWidth: resolvedTargetWidth,
+        scale: pixelDensity,
         renderAnnotations,
         mimeType: "image/png",
         priority: 0,
@@ -708,7 +696,7 @@ export const createDocumentContextService = (options: {
       ({ bytes: imageBytes, mimeType } = await pdfWorkerService.renderPageImage(
         {
           pageIndex,
-          targetWidth: resolvedTargetWidth,
+          scale: pixelDensity,
           renderAnnotations,
           mimeType: "image/png",
           priority: 0,
@@ -732,7 +720,7 @@ export const createDocumentContextService = (options: {
       pageWidth: Math.round(pageViewport.width),
       pageHeight: Math.round(pageViewport.height),
       rotation: page.rotation,
-      targetWidth: resolvedTargetWidth,
+      pixelDensity,
       renderedWidth,
       renderedHeight,
       mimeType: mimeType || "image/png",
@@ -852,7 +840,7 @@ export const createDocumentContextService = (options: {
         pageWidth: source.pageWidth,
         pageHeight: source.pageHeight,
         rotation: source.rotation,
-        targetWidth: source.targetWidth,
+        pixelDensity: source.pixelDensity,
         renderedWidth: source.renderedWidth,
         renderedHeight: source.renderedHeight,
         mimeType: source.mimeType,
@@ -951,7 +939,7 @@ export const createDocumentContextService = (options: {
         pageHeight: source.pageHeight,
         rotation: source.rotation,
         cropRect: clampedCropRect,
-        targetWidth: source.targetWidth,
+        pixelDensity: source.pixelDensity,
         renderedWidth: croppedWidth,
         renderedHeight: croppedHeight,
         mimeType: "image/png",
@@ -965,12 +953,10 @@ export const createDocumentContextService = (options: {
 
   const renderPageImageBatch = async ({
     pageNumbers,
-    targetWidth,
     renderAnnotations = true,
     signal,
   }: {
     pageNumbers: PageVisualRequest[];
-    targetWidth?: number;
     renderAnnotations?: boolean;
     signal?: AbortSignal;
   }): Promise<AiRenderedPageImageBatch> => {
@@ -995,7 +981,7 @@ export const createDocumentContextService = (options: {
       };
     }
 
-    const resolvedTargetWidth = clampPageImageTargetWidth(targetWidth);
+    const pixelDensity = AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY;
     const pages: AiRenderedPageImage[] = [];
 
     if (!getRenderablePdfBytes) {
@@ -1005,7 +991,6 @@ export const createDocumentContextService = (options: {
         if (!source) {
           source = await renderPageImageSourceFromCurrentDocument({
             pageNumber: request.pageNumber,
-            targetWidth: resolvedTargetWidth,
             renderAnnotations,
             signal,
           });
@@ -1063,14 +1048,14 @@ export const createDocumentContextService = (options: {
         const { renderedWidth, renderedHeight } = getRenderedImageDimensions({
           pageWidth: pageViewport.width,
           pageHeight: pageViewport.height,
-          targetWidth: resolvedTargetWidth,
+          pixelDensity,
         });
 
         const { bytes: imageBytes, mimeType } =
           await pdfWorkerService.renderPageImage({
             docId,
             pageIndex: subsetPageIndex,
-            targetWidth: resolvedTargetWidth,
+            scale: pixelDensity,
             renderAnnotations,
             mimeType: "image/png",
             priority: 0,
@@ -1088,7 +1073,7 @@ export const createDocumentContextService = (options: {
           pageWidth: Math.round(pageViewport.width),
           pageHeight: Math.round(pageViewport.height),
           rotation: sourcePage.rotation,
-          targetWidth: resolvedTargetWidth,
+          pixelDensity,
           renderedWidth,
           renderedHeight,
           mimeType: mimeType || "image/png",
@@ -1169,18 +1154,15 @@ export const createDocumentContextService = (options: {
 
     getPagesVisual: async ({
       pageNumbers,
-      targetWidth,
       renderAnnotations = true,
       signal,
     }: {
       pageNumbers: PageVisualRequest[];
-      targetWidth?: number;
       renderAnnotations?: boolean;
       signal?: AbortSignal;
     }): Promise<AiRenderedPageImageBatch> => {
       return await renderPageImageBatch({
         pageNumbers,
-        targetWidth,
         renderAnnotations,
         signal,
       });
@@ -1189,20 +1171,17 @@ export const createDocumentContextService = (options: {
     summarizePagesVisual: summarizeRenderedPages
       ? async ({
           pageNumbers,
-          targetWidth,
           renderAnnotations = true,
           summaryInstructions,
           signal,
         }: {
           pageNumbers: PageVisualRequest[];
-          targetWidth?: number;
           renderAnnotations?: boolean;
           summaryInstructions?: AiSummaryInstructions;
           signal?: AbortSignal;
         }): Promise<AiRenderedPageVisualSummaryResult> => {
           const pageImageBatch = await renderPageImageBatch({
             pageNumbers,
-            targetWidth,
             renderAnnotations,
             signal,
           });
@@ -1224,7 +1203,7 @@ export const createDocumentContextService = (options: {
               pageHeight: page.pageHeight,
               rotation: page.rotation,
               cropRect: page.cropRect,
-              targetWidth: page.targetWidth,
+              pixelDensity: page.pixelDensity,
               renderedWidth: page.renderedWidth,
               renderedHeight: page.renderedHeight,
               renderAnnotations: page.renderAnnotations,

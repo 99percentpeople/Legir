@@ -24,6 +24,11 @@ export { AI_PROVIDER_LABELS } from "@/services/ai/sdk/providerCatalog";
 export const normalizeOptionalText = (value: string | undefined) =>
   value?.trim() || "";
 
+export const isAiSdkProviderEnabled = (
+  options: AppOptions,
+  providerId: AiSdkProviderId,
+) => options.llm[providerId].enabled !== false;
+
 export const normalizeBaseUrl = (value: string | undefined) => {
   const trimmed = normalizeOptionalText(value);
   if (!trimmed) return "";
@@ -70,6 +75,7 @@ const getProviderConfig = (
   providerId: AiSdkProviderId,
 ): AiSdkProviderConfig | null => {
   const spec = getAiProviderSpec(providerId);
+  if (!isAiSdkProviderEnabled(options, providerId)) return null;
   const apiKey = normalizeOptionalText(options.llm[providerId].apiKey);
   if (!apiKey) return null;
 

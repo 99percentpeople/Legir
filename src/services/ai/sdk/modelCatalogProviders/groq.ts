@@ -1,6 +1,6 @@
 import type { LLMModelCapabilities } from "@/types";
 import {
-  createModelCapabilities,
+  createOpenAiLikeModelCapabilities,
   modelSupportsInputModality,
 } from "@/services/ai/sdk/modelCapabilities";
 import type {
@@ -17,42 +17,10 @@ type GroqModelsResponse = {
   data?: Array<{ id?: string }>;
 };
 
-const matchAny = (value: string, patterns: RegExp[]) =>
-  patterns.some((pattern) => pattern.test(value));
-
-const supportsGroqImageInput = (modelId: string) =>
-  matchAny(modelId.trim().toLowerCase(), [
-    /(?:^|[-_/])(vision|vl)(?:[-_/]|$)/,
-    /(?:^|[-_/])llama-4(?:[-_/]|$)/,
-    /(?:^|[-_/])pixtral(?:[-_/]|$)/,
-    /(?:^|[-_/])gemma-3(?:[-_/]|$)/,
-    /(?:^|[-_/])minicpm[-_]?v(?:[-_/]|$)/,
-    /(?:^|[-_/])phi-3\.5-vision(?:[-_/]|$)/,
-    /(?:^|[-_/])qwen(?:2(?:\.5)?)?[-_]?vl(?:[-_/]|$)/,
-    /(?:^|[-_/])internvl(?:[-_/]|$)/,
-    /(?:^|[-_/])glm-4(?:\.\d+)?v(?:[-_/]|$)/,
-    /(?:^|[-_/])kimi[-_]?vl(?:[-_/]|$)/,
-  ]);
-
-const supportsGroqToolCalls = (modelId: string) =>
-  !matchAny(modelId.trim().toLowerCase(), [
-    /(?:^|[-_/])embedding(?:[-_/]|$)/,
-    /(?:^|[-_/])moderation(?:[-_/]|$)/,
-    /(?:^|[-_/])tts(?:[-_/]|$)/,
-    /(?:^|[-_/])whisper(?:[-_/]|$)/,
-    /(?:^|[-_/])transcription(?:[-_/]|$)/,
-    /(?:^|[-_/])speech(?:[-_/]|$)/,
-    /(?:^|[-_/])audio(?:[-_/]|$)/,
-    /(?:^|[-_/])image(?:[-_/]|$)/,
-  ]);
-
 const createGroqModelCapabilities = (modelId: string) =>
-  createModelCapabilities({
-    inputModalities: supportsGroqImageInput(modelId)
-      ? ["text", "image"]
-      : ["text"],
-    outputModalities: ["text"],
-    supportsToolCalls: supportsGroqToolCalls(modelId),
+  createOpenAiLikeModelCapabilities({
+    modelId,
+    extraNonToolPatterns: [/(?:^|[-_/])audio(?:[-_/]|$)/],
   });
 
 const matchesGroqTask = (

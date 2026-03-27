@@ -22,7 +22,11 @@ import {
   shapeSupportsFill,
 } from "@/lib/shapeGeometry";
 import { useEditorStore } from "@/store/useEditorStore";
-import { analyzePageForFields, parseAiSdkModelSpecifier } from "@/services/ai";
+import {
+  analyzePageForFields,
+  isAiSdkProviderConfigured,
+  parseAiSdkModelSpecifier,
+} from "@/services/ai";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { roundAiRect } from "@/services/ai/utils/geometry";
 import { pruneUndefinedKeys } from "@/services/ai/utils/object";
@@ -1637,6 +1641,16 @@ export const createAiChatToolContext = (options: {
     if (!configuredVisionModelSpecifier) {
       throw new Error(
         "No dedicated vision model is configured for detect_form_fields. Enable the fallback detector and choose a form-tools vision model in settings.",
+      );
+    }
+    if (
+      !isAiSdkProviderConfigured(
+        snapshot.options,
+        configuredVisionModelSpecifier.providerId,
+      )
+    ) {
+      throw new Error(
+        "The configured detect_form_fields vision provider is disabled or missing an API key. Enable that provider in settings or choose a different vision model.",
       );
     }
     const progressItems = pageNumbers.map((pageNumber) => ({

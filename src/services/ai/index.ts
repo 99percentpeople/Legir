@@ -10,7 +10,7 @@ import {
   fetchAiSdkProviderModels,
   getAiSdkModelGroups,
   getAiSdkProviderModelOptions,
-  parseAiSdkModelSpecifier,
+  isAiSdkProviderConfigured,
   resolveAiSdkModelSpecifierForTask,
   summarizePageImagesWithAiSdk,
   summarizeTextWithAiSdk,
@@ -106,7 +106,7 @@ const registerTranslateOptionsFromProviders = () => {
       })),
       isLLM: true,
       isAvailable: () =>
-        !!(getCurrentOptions().llm[group.providerId].apiKey || "").trim(),
+        isAiSdkProviderConfigured(getCurrentOptions(), group.providerId),
       unavailableMessageKey: group.unavailableMessageKey,
       translate: async (text, optionId, translateOptions) => {
         return await translateTextWithAiSdk({
@@ -183,7 +183,7 @@ export const loadModels = async (options?: LoadModelsOptions) => {
       continue;
     }
 
-    if (!(appOptions.llm[providerId].apiKey || "").trim()) {
+    if (!isAiSdkProviderConfigured(appOptions, providerId)) {
       nextCache[providerId] = {
         translateModels: [],
         visionModels: [],
@@ -227,8 +227,8 @@ export const loadModels = async (options?: LoadModelsOptions) => {
 void loadModels();
 
 export const isFormDetectAvailable = () =>
-  AI_PROVIDER_IDS.some(
-    (providerId) => !!(getCurrentOptions().llm[providerId].apiKey || "").trim(),
+  AI_PROVIDER_IDS.some((providerId) =>
+    isAiSdkProviderConfigured(getCurrentOptions(), providerId),
   );
 
 export const getFormDetectModels = (): LLMModelOption[] => {
@@ -269,8 +269,8 @@ export type ChatModelGroup = {
 };
 
 export const isChatAgentAvailable = () =>
-  AI_PROVIDER_IDS.some(
-    (providerId) => !!(getCurrentOptions().llm[providerId].apiKey || "").trim(),
+  AI_PROVIDER_IDS.some((providerId) =>
+    isAiSdkProviderConfigured(getCurrentOptions(), providerId),
   );
 
 export const getChatModelGroups = (): ChatModelGroup[] =>
@@ -362,19 +362,17 @@ export const summarizeText = async (
   text: string,
   options: SummarizeTextOptions,
 ) => {
-  const explicitSpecifier =
-    options.providerId && options.modelId
-      ? parseAiSdkModelSpecifier(`${options.providerId}:${options.modelId}`)
-      : null;
-  const specifier =
-    explicitSpecifier ||
-    resolveAiSdkModelSpecifierForTask({
-      appOptions: getCurrentOptions(),
-      modelCache: getCurrentModelCache(),
-      kind: "summarize",
-      providerId: options.providerId,
-      modelId: options.modelId,
-    });
+  const specifier = resolveAiSdkModelSpecifierForTask({
+    appOptions: getCurrentOptions(),
+    modelCache: getCurrentModelCache(),
+    kind: "summarize",
+    modelKey:
+      options.providerId && options.modelId
+        ? `${options.providerId}:${options.modelId}`
+        : undefined,
+    providerId: options.providerId,
+    modelId: options.modelId,
+  });
 
   return await summarizeTextWithAiSdk({
     text,

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+  AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY,
   AI_CHAT_MAX_READ_PAGES_PER_CALL,
 } from "@/constants";
 
@@ -29,7 +30,6 @@ import type {
   AiRenderedPageVisualSummaryResult,
 } from "@/services/ai/chat/types";
 
-const DEFAULT_PAGE_IMAGE_TARGET_WIDTH = 1024;
 const pageVisualTargetSchema = z.union([
   pageNumberSchema,
   z
@@ -55,12 +55,6 @@ const getPagesVisualArgsSchemaBase = z
       .default([])
       .describe(
         "Optional page visual requests. Each item may be a 1-based page number for a full-page render or an object like { page, rect } to render a cropped page-space region. Defaults to the current page when omitted.",
-      ),
-    target_width: pageNumberSchema
-      .optional()
-      .default(DEFAULT_PAGE_IMAGE_TARGET_WIDTH)
-      .describe(
-        "Optional target raster width in pixels for the rendered page image before any crop is applied. Higher values preserve more detail but use more vision tokens.",
       ),
     render_annotations: z
       .boolean()
@@ -124,7 +118,7 @@ const toPagesVisualModelOutput = (output: unknown) => {
   > = [
     {
       type: "text",
-      text: `Rendered page visuals for request${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageVisual, index) => `#${index + 1} (page ${pageVisual.pageNumber})`).join(", ")}. Requests may be full pages or cropped page-space regions. Use these visuals for inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss. ${AI_PAGE_COORDINATE_CONVENTION}`,
+      text: `Rendered page visuals for request${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageVisual, index) => `#${index + 1} (page ${pageVisual.pageNumber})`).join(", ")}. Requests may be full pages or cropped page-space regions. Use these visuals for inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss. Fixed pixel density ${pageVisualLabelDensity(attachedPages)}. ${AI_PAGE_COORDINATE_CONVENTION}`,
     },
   ];
 
@@ -134,7 +128,7 @@ const toPagesVisualModelOutput = (output: unknown) => {
       : " Full page render.";
     content.push({
       type: "text",
-      text: `Request #${index + 1}: page ${pageVisual.pageNumber} visual. Actual page size ${pageVisual.pageWidth}x${pageVisual.pageHeight}.${cropLabel} Rendered at ${pageVisual.renderedWidth}x${pageVisual.renderedHeight}.`,
+      text: `Request #${index + 1}: page ${pageVisual.pageNumber} visual. Actual page size ${pageVisual.pageWidth}x${pageVisual.pageHeight}.${cropLabel} Rendered at ${pageVisual.renderedWidth}x${pageVisual.renderedHeight} using fixed pixel density ${pageVisual.pixelDensity} px per page-space unit.`,
     });
     content.push({
       type: "image-data",
@@ -170,6 +164,7 @@ const PAGE_VISUAL_TOOL_PROMPTS = [
   "If the task depends on full-page visual appearance, call get_pages_visual before making visual claims.",
   "get_pages_visual renders the current edited document state, not just the originally opened PDF bytes.",
   "Each get_pages_visual pages item may be a page number for a full-page image or an object like { page, rect } to render only a page-space region.",
+  `get_pages_visual uses a fixed pixel density of ${AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY} px per page-space unit. Do not try to choose image size manually.`,
   AI_PAGE_COORDINATE_CONVENTION,
   "Use get_pages_visual for scanned pages, handwriting, signatures, stamps, tables, diagrams, charts, or complex layout that plain text extraction may miss.",
   "If get_pages_text or search_document returns empty text, OCR noise, or misses the needed content on a page, do not stop there. Call get_pages_visual for that page and inspect it visually.",
@@ -181,6 +176,7 @@ const PAGE_VISUAL_SUMMARY_TOOL_PROMPTS = [
   "Use summarize_pages_visual when page appearance matters but the current chat model cannot inspect images directly.",
   "summarize_pages_visual inspects the current edited document state, not just the originally opened PDF bytes.",
   "summarize_pages_visual accepts the same pages format as get_pages_visual, including { page, rect } cropped region requests.",
+  `summarize_pages_visual uses the same fixed pixel density as get_pages_visual: ${AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY} px per page-space unit.`,
   AI_PAGE_COORDINATE_CONVENTION,
   "summarize_pages_visual renders requested page visuals and delegates the visual inspection to a configured vision model, then returns a plain-text summary you can reason over.",
   "Pass summary_instructions when the user cares about specific visual details such as tables, handwriting, stamps, diagrams, signatures, highlights, or layout defects.",
@@ -216,6 +212,13 @@ const LIST_FIELDS_TOOL_PROMPTS = [
   "If form-filling instructions may be encoded in comments, highlights, or notes, call list_annotations together with list_fields before filling.",
   "When answering where a field is, pair the field id with a natural clickable control link and, if layout is available, add a short page-area description.",
 ];
+
+const pageVisualLabelDensity = (pages: AiRenderedPageImage[]) => {
+  const unique = Array.from(new Set(pages.map((page) => page.pixelDensity)));
+  return unique.length === 1
+    ? `${unique[0]} px per page-space unit`
+    : `${unique.join(", ")} px per page-space unit`;
+};
 
 export const documentToolModule = defineToolModule((ctx) => {
   const getDocumentDigest = ctx.getDocumentDigest;
@@ -296,7 +299,6 @@ export const documentToolModule = defineToolModule((ctx) => {
 
         const pageVisualBatch = await toolCtx.getPagesVisual({
           pageNumbers: pageRequests,
-          targetWidth: args.target_width,
           renderAnnotations: args.render_annotations,
           signal,
         });
@@ -313,7 +315,7 @@ export const documentToolModule = defineToolModule((ctx) => {
               pageHeight: pageVisual.pageHeight,
               rotation: pageVisual.rotation,
               cropRect: pageVisual.cropRect,
-              targetWidth: pageVisual.targetWidth,
+              pixelDensity: pageVisual.pixelDensity,
               renderedWidth: pageVisual.renderedWidth,
               renderedHeight: pageVisual.renderedHeight,
               mimeType: pageVisual.mimeType,
@@ -362,7 +364,6 @@ export const documentToolModule = defineToolModule((ctx) => {
 
         const visualSummary = await summarizePagesVisual!({
           pageNumbers: pageRequests,
-          targetWidth: args.target_width,
           renderAnnotations: args.render_annotations,
           summaryInstructions: args.summary_instructions,
           signal,

@@ -1,7 +1,7 @@
 import type { LLMModelCapabilities } from "@/types";
 import {
   createCustomModelCapabilities,
-  createModelCapabilities,
+  createOpenAiLikeModelCapabilities,
   modelSupportsInputModality,
 } from "@/services/ai/sdk/modelCapabilities";
 import type {
@@ -18,33 +18,10 @@ type DeepSeekModelsResponse = {
   data?: Array<{ id?: string }>;
 };
 
-const supportsDeepSeekImageInput = (modelId: string) => {
-  const normalizedModelId = modelId.trim().toLowerCase();
-  if (!normalizedModelId) return false;
-
-  return /(?:^|[-_/])(vision|vl)(?:[-_/]|$)/.test(normalizedModelId);
-};
-
-const supportsDeepSeekToolCalls = (modelId: string) => {
-  const normalizedModelId = modelId.trim().toLowerCase();
-  if (!normalizedModelId) return true;
-
-  return ![
-    /(?:^|[-_/])embedding(?:[-_/]|$)/,
-    /(?:^|[-_/])tts(?:[-_/]|$)/,
-    /(?:^|[-_/])whisper(?:[-_/]|$)/,
-    /(?:^|[-_/])transcription(?:[-_/]|$)/,
-    /(?:^|[-_/])speech(?:[-_/]|$)/,
-  ].some((pattern) => pattern.test(normalizedModelId));
-};
-
 const createDeepSeekModelCapabilities = (modelId: string) =>
-  createModelCapabilities({
-    inputModalities: supportsDeepSeekImageInput(modelId)
-      ? ["text", "image"]
-      : ["text"],
-    outputModalities: ["text"],
-    supportsToolCalls: supportsDeepSeekToolCalls(modelId),
+  createOpenAiLikeModelCapabilities({
+    modelId,
+    extraNonToolPatterns: [],
   });
 
 const matchesDeepSeekTask = (

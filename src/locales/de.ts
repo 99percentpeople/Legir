@@ -672,6 +672,8 @@ const de = {
       openai: "OpenAI",
       api_key_placeholder: "API-Schlüssel",
       api_url_placeholder: "API-URL (optional)",
+      provider_enabled: "Diesen Anbieter aktivieren",
+      provider_enable_required: "Aktivieren Sie zuerst diesen Anbieter.",
       check: "Prüfen",
       check_success: "Konfiguration OK.",
       check_failed: "Prüfung fehlgeschlagen.",

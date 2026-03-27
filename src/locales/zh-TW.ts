@@ -644,6 +644,8 @@ const zhTW = {
       openai: "OpenAI",
       api_key_placeholder: "API Key",
       api_url_placeholder: "API URL（可選）",
+      provider_enabled: "啟用目前提供商",
+      provider_enable_required: "請先啟用目前提供商。",
       check: "檢查",
       check_success: "設定正常。",
       check_failed: "檢查失敗。",

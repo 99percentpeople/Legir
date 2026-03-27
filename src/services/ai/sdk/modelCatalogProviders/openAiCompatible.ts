@@ -1,7 +1,7 @@
 import type { LLMModelCapabilities } from "@/types";
 import {
   createCustomModelCapabilities,
-  createModelCapabilities,
+  createOpenAiLikeModelCapabilities,
   modelSupportsInputModality,
 } from "@/services/ai/sdk/modelCapabilities";
 import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
@@ -19,42 +19,8 @@ type OpenAiCompatibleModelsResponse = {
   data?: Array<{ id?: string }>;
 };
 
-const matchAny = (value: string, patterns: RegExp[]) =>
-  patterns.some((pattern) => pattern.test(value));
-
-const supportsOpenAiCompatibleImageInput = (modelId: string) =>
-  matchAny(modelId.trim().toLowerCase(), [
-    /(?:^|[-_/])(vision|vl)(?:[-_/]|$)/,
-    /(?:^|[-_/])llama-4(?:[-_/]|$)/,
-    /(?:^|[-_/])pixtral(?:[-_/]|$)/,
-    /(?:^|[-_/])gemma-3(?:[-_/]|$)/,
-    /(?:^|[-_/])minicpm[-_]?v(?:[-_/]|$)/,
-    /(?:^|[-_/])phi-3\.5-vision(?:[-_/]|$)/,
-    /(?:^|[-_/])qwen(?:2(?:\.5)?)?[-_]?vl(?:[-_/]|$)/,
-    /(?:^|[-_/])internvl(?:[-_/]|$)/,
-    /(?:^|[-_/])glm-4(?:\.\d+)?v(?:[-_/]|$)/,
-    /(?:^|[-_/])kimi[-_]?vl(?:[-_/]|$)/,
-  ]);
-
-const supportsOpenAiCompatibleToolCalls = (modelId: string) =>
-  !matchAny(modelId.trim().toLowerCase(), [
-    /(?:^|[-_/])embedding(?:[-_/]|$)/,
-    /(?:^|[-_/])moderation(?:[-_/]|$)/,
-    /(?:^|[-_/])tts(?:[-_/]|$)/,
-    /(?:^|[-_/])whisper(?:[-_/]|$)/,
-    /(?:^|[-_/])transcription(?:[-_/]|$)/,
-    /(?:^|[-_/])speech(?:[-_/]|$)/,
-    /(?:^|[-_/])image(?:[-_/]|$)/,
-  ]);
-
 const createOpenAiCompatibleModelCapabilities = (modelId: string) =>
-  createModelCapabilities({
-    inputModalities: supportsOpenAiCompatibleImageInput(modelId)
-      ? ["text", "image"]
-      : ["text"],
-    outputModalities: ["text"],
-    supportsToolCalls: supportsOpenAiCompatibleToolCalls(modelId),
-  });
+  createOpenAiLikeModelCapabilities({ modelId });
 
 const matchesOpenAiCompatibleTask = (
   capabilities: LLMModelCapabilities,

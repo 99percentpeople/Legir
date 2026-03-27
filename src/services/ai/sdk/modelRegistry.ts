@@ -9,7 +9,10 @@ import { getAiSdkModelCatalogProvider } from "@/services/ai/sdk/modelCatalogProv
 import { useEditorStore } from "@/store/useEditorStore";
 import type { AppLLMModelOption, AppOptions, EditorState } from "@/types";
 import { createAiSdkProviderRegistry } from "@/services/ai/sdk/providers";
-import { getAiSdkFallbackModelId } from "@/services/ai/sdk/modelCatalog";
+import {
+  getAiSdkFallbackModelId,
+  isAiSdkProviderConfigured,
+} from "@/services/ai/sdk/modelCatalog";
 import type {
   AiSdkModelSpecifier,
   AiSdkProviderId,
@@ -80,8 +83,8 @@ export const stringifyAiSdkModelSpecifier = (specifier: AiSdkModelSpecifier) =>
   `${specifier.providerId}:${specifier.modelId}`;
 
 export const getConfiguredAiSdkProviderIds = (options: AppOptions) =>
-  AI_PROVIDER_IDS.filter(
-    (providerId) => !!(options.llm[providerId].apiKey || "").trim(),
+  AI_PROVIDER_IDS.filter((providerId) =>
+    isAiSdkProviderConfigured(options, providerId),
   );
 
 export const resolveAiSdkLanguageModel = (
@@ -138,7 +141,7 @@ export const getAiSdkModelGroups = (options: {
       providerId: spec.id,
       label: spec.label,
       labelKey: spec.labelKey,
-      isAvailable: !!(options.appOptions.llm[spec.id].apiKey || "").trim(),
+      isAvailable: isAiSdkProviderConfigured(options.appOptions, spec.id),
       unavailableMessageKey: spec.unavailableMessageKey,
       models: getAiSdkProviderModelOptions({
         appOptions: options.appOptions,
@@ -185,7 +188,10 @@ export const resolveAiSdkModelSpecifierForTask = (options: {
   modelId?: string;
 }): AiSdkModelSpecifier => {
   const explicitSpecifier = parseAiSdkModelSpecifier(options.modelKey);
-  if (explicitSpecifier) {
+  if (
+    explicitSpecifier &&
+    isAiSdkProviderConfigured(options.appOptions, explicitSpecifier.providerId)
+  ) {
     return explicitSpecifier;
   }
 
@@ -195,7 +201,10 @@ export const resolveAiSdkModelSpecifierForTask = (options: {
   });
 
   const requestedModelId = (options.modelId || "").trim();
-  if (requestedModelId) {
+  const canUseRequestedModelId =
+    !!requestedModelId &&
+    (!options.providerId || options.providerId === providerId);
+  if (canUseRequestedModelId) {
     return {
       providerId,
       modelId: requestedModelId,
