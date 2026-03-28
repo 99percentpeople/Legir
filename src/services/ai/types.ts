@@ -22,6 +22,7 @@ export interface LLMTranslateTextOptions {
 export interface LLMSummarizeTextOptions {
   modelId?: string;
   prompt?: string;
+  system?: string;
   signal?: AbortSignal;
 }
 

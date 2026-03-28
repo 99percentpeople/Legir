@@ -304,10 +304,12 @@ export interface AiChatOptions {
   formToolsEnabled: boolean;
   detectFormFieldsEnabled: boolean;
   formToolsVisionModelKey?: string;
-  contextPruningEnabled: boolean;
-  toolHistoryMessageWindow: number;
-  visualToolHistoryMessageWindow: number;
+  contextCompressionEnabled: boolean;
+  contextCompressionThresholdTokens: number;
+  visualHistoryWindow: number;
   maxToolRounds: number;
+  contextCompressionMode: "algorithmic" | "ai";
+  contextCompressionModelKey?: string;
 }
 
 export interface AppOptions {

@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
   getChatModelGroups,
+  parseAiSdkModelSpecifier,
   summarizePageImages,
+  summarizeConversationMemory,
+  summarizeDigestText,
   subscribeLLMModelRegistry,
-  summarizeText,
 } from "@/services/ai";
 import { useEditorStore } from "@/store/useEditorStore";
 import { type EditorState, type PDFSearchResult } from "@/types";
@@ -13,11 +15,13 @@ import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
 import { composeAiToolContext } from "@/services/ai/chat/aiToolContext";
 import { createDocumentContextService } from "@/services/ai/chat/documentContextService";
 import {
+  buildAiChatContextMemorySystemPrompt,
   buildDocumentDigestMergePrompt,
   buildDocumentDigestSummaryPrompt,
 } from "@/services/ai/chat/prompts";
 import type {
   AiChatAssistantUpdate,
+  AiChatContextMemory,
   AiDocumentLinkTarget,
   AiChatSessionSummary,
   AiChatTimelineItem,
@@ -38,6 +42,7 @@ import {
   createEmptyAiChatTokenUsageSummary,
   createAiChatSessionData,
   createAiChatSessionId,
+  getConversationMessageCountForTimelinePrefix,
   loadPersistedSelectedModelKey,
   normalizeMessageAttachments,
   persistAiChatDocumentState,
@@ -62,12 +67,17 @@ import {
 } from "@/hooks/useAiChatController/conversationActions";
 import { createAiChatToolContext } from "@/hooks/useAiChatController/toolContext";
 import { applyAiChatSessionUiState } from "@/hooks/useAiChatController/uiStateSync";
+import { retainAiChatContextMemoryForTimeline } from "@/services/ai/chat/runtime/contextMemory";
+import { defaultAiChatCompressionEngine } from "@/services/ai/chat/runtime/compression/engine";
+import {
+  estimateAiChatMessageTokens,
+  prepareAiChatMessagesForModel,
+} from "@/services/ai/chat/runtime/messageContext";
 import {
   applyAssistantUpdateToTimeline,
   applyUsageSnapshotToTurnTimeline,
   applyToolUpdateToTimeline,
   finalizeStreamingTimeline,
-  getLatestTimelineUsageSnapshot,
 } from "@/hooks/useAiChatController/timelineUpdates";
 import { appEventBus } from "@/lib/eventBus";
 import { exportPDF } from "@/services/pdfService";
@@ -83,9 +93,6 @@ const getFirstLineTitleSnippet = (text: string) => {
       .find(Boolean) ?? "";
   return toTitleSnippet(firstLine);
 };
-
-const getTimelineContextTokens = (items: AiChatTimelineItem[]) =>
-  getLatestTimelineUsageSnapshot(items)?.contextTokens ?? 0;
 
 const FIELD_BATCH_CONFIRMATION_PATTERNS = [
   /\b(confirm|confirmed|go ahead|proceed|apply (it|them|this)|create (it|them|these)|use this plan|looks good)\b/i,
@@ -137,6 +144,8 @@ export const useAiChatController = (editorState: EditorState) => {
   const [selectedModelKey, setSelectedModelKey] = useState<string | undefined>(
     () => loadPersistedSelectedModelKey(),
   );
+  const [contextMemoryPendingVersion, setContextMemoryPendingVersion] =
+    useState(0);
 
   const sessionsRef = useRef<Map<string, AiChatSessionData>>(new Map());
   const initialSession = useMemo(
@@ -156,6 +165,7 @@ export const useAiChatController = (editorState: EditorState) => {
   );
   const [isDraftConversation, setIsDraftConversation] = useState(false);
   const activeSessionIdRef = useRef(activeSessionId);
+  const sessionSummariesRef = useRef(sessions);
 
   const [timeline, setTimeline] = useState<AiChatTimelineItem[]>(() => []);
   const [runStatus, setRunStatus] = useState<AiChatRunStatus>("idle");
@@ -174,11 +184,17 @@ export const useAiChatController = (editorState: EditorState) => {
     sessionsRef.current.get(initialSession.id)!.searchResultsById,
   );
   const abortRef = useRef<AbortController | null>(null);
+  const contextMemoryJobIdsRef = useRef<Map<string, number>>(new Map());
+  const contextMemoryJobSeqRef = useRef(0);
   const searchSeqRef = useRef(0);
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
+
+  useEffect(() => {
+    sessionSummariesRef.current = sessions;
+  }, [sessions]);
 
   const touchSessionSummary = useCallback(
     (sessionId: string, patch: Partial<AiChatSessionSummary>) => {
@@ -217,6 +233,148 @@ export const useAiChatController = (editorState: EditorState) => {
       setHighlightedResultIds,
     });
   }, []);
+
+  const notifyContextMemoryPendingChanged = useCallback(() => {
+    setContextMemoryPendingVersion((value) => value + 1);
+  }, []);
+
+  const estimateProjectedContextTokens = useCallback(
+    (
+      session: Pick<
+        AiChatSessionData,
+        "conversation" | "contextMemory" | "contextTokenOverhead"
+      >,
+      aiChatOptions: Pick<
+        EditorState["options"]["aiChat"],
+        | "contextCompressionEnabled"
+        | "contextCompressionThresholdTokens"
+        | "contextCompressionMode"
+        | "visualHistoryWindow"
+      >,
+    ) => {
+      if (session.conversation.length === 0) return 0;
+
+      const preparedMessages = prepareAiChatMessagesForModel({
+        messages: session.conversation,
+        aiChatOptions,
+        contextMemory: session.contextMemory,
+        turnStartMessageCount: session.conversation.length,
+      });
+      const estimatedMessageTokens =
+        estimateAiChatMessageTokens(preparedMessages);
+      return Math.max(
+        0,
+        estimatedMessageTokens + Math.max(0, session.contextTokenOverhead || 0),
+      );
+    },
+    [],
+  );
+
+  const getTimelineItemCountForConversationMessageCount = useCallback(
+    (timelineItems: AiChatTimelineItem[], conversationMessageCount: number) => {
+      const target = Math.max(0, Math.trunc(conversationMessageCount || 0));
+      if (target <= 0) return 0;
+
+      for (let index = 1; index <= timelineItems.length; index += 1) {
+        if (
+          getConversationMessageCountForTimelinePrefix(timelineItems, index) >=
+          target
+        ) {
+          return index;
+        }
+      }
+
+      return timelineItems.length;
+    },
+    [],
+  );
+
+  const applyAlgorithmicContextCompression = useCallback(
+    (
+      session: Pick<
+        AiChatSessionData,
+        | "conversation"
+        | "timeline"
+        | "contextMemory"
+        | "contextTokens"
+        | "contextTokenOverhead"
+      >,
+      aiChatOptions: Pick<
+        EditorState["options"]["aiChat"],
+        | "contextCompressionEnabled"
+        | "contextCompressionThresholdTokens"
+        | "visualHistoryWindow"
+        | "contextCompressionMode"
+      >,
+    ) => {
+      const nextContextMemory =
+        defaultAiChatCompressionEngine.buildAlgorithmicContextMemory({
+          session,
+          aiChatOptions,
+          estimateProjectedTokens: (contextMemory) =>
+            estimateProjectedContextTokens(
+              {
+                conversation: session.conversation,
+                contextMemory,
+                contextTokenOverhead: session.contextTokenOverhead,
+              },
+              aiChatOptions,
+            ),
+          getTimelineItemCountForConversationMessageCount,
+        });
+
+      session.contextMemory = nextContextMemory;
+      return !!nextContextMemory;
+    },
+    [
+      estimateProjectedContextTokens,
+      getTimelineItemCountForConversationMessageCount,
+    ],
+  );
+
+  const refreshSessionProjectedContext = useCallback(
+    (
+      session: Pick<
+        AiChatSessionData,
+        | "conversation"
+        | "timeline"
+        | "contextMemory"
+        | "contextTokens"
+        | "contextTokenOverhead"
+      >,
+      aiChatOptions: Pick<
+        EditorState["options"]["aiChat"],
+        | "contextCompressionEnabled"
+        | "contextCompressionThresholdTokens"
+        | "visualHistoryWindow"
+        | "contextCompressionMode"
+      >,
+    ) => {
+      session.contextTokens = estimateProjectedContextTokens(
+        session,
+        aiChatOptions,
+      );
+
+      const compressionThreshold = Math.max(
+        0,
+        Math.trunc(aiChatOptions.contextCompressionThresholdTokens || 0),
+      );
+      if (
+        !aiChatOptions.contextCompressionEnabled ||
+        session.contextTokens < compressionThreshold
+      ) {
+        session.contextMemory = undefined;
+      } else if (aiChatOptions.contextCompressionMode === "algorithmic") {
+        applyAlgorithmicContextCompression(session, aiChatOptions);
+      }
+
+      session.contextTokens = estimateProjectedContextTokens(
+        session,
+        aiChatOptions,
+      );
+    },
+    [applyAlgorithmicContextCompression, estimateProjectedContextTokens],
+  );
 
   const resetDraftConversationUi = useCallback(() => {
     conversationRef.current = [];
@@ -355,7 +513,7 @@ export const useAiChatController = (editorState: EditorState) => {
       const providerId = modelKey.slice(0, separatorIndex);
       const modelId = modelKey.slice(separatorIndex + 1);
 
-      return await summarizeText(options.sampledText, {
+      return await summarizeDigestText(options.sampledText, {
         providerId,
         modelId,
         prompt:
@@ -585,6 +743,8 @@ export const useAiChatController = (editorState: EditorState) => {
   useEffect(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    contextMemoryJobIdsRef.current.clear();
+    notifyContextMemoryPendingChanged();
     searchSeqRef.current = 0;
 
     if (isDocumentLoaded) {
@@ -632,7 +792,11 @@ export const useAiChatController = (editorState: EditorState) => {
       setContextTokens,
       setHighlightedResultIds,
     });
-  }, [documentIdentity, resetDraftConversationUi]);
+  }, [
+    documentIdentity,
+    notifyContextMemoryPendingChanged,
+    resetDraftConversationUi,
+  ]);
 
   useEffect(() => {
     persistSelectedModelKey(selectedModelKey);
@@ -779,6 +943,116 @@ export const useAiChatController = (editorState: EditorState) => {
     [touchSessionSummary],
   );
 
+  const persistAiChatSessionsNow = useCallback(() => {
+    if (!canUseLocalStorage()) return;
+    if (!isDocumentLoaded) return;
+
+    persistAiChatDocumentState({
+      documentIdentity,
+      activeSessionId: activeSessionIdRef.current,
+      sessions: sessionSummariesRef.current,
+      sessionsMap: sessionsRef.current,
+    });
+  }, [documentIdentity, isDocumentLoaded]);
+
+  const scheduleContextMemory = useCallback(
+    (session: AiChatSessionData, selected: AiChatFlatModel) => {
+      if (contextMemoryJobIdsRef.current.has(session.id)) return;
+
+      const appOptions = useEditorStore.getState().options;
+      if (appOptions.aiChat.contextCompressionMode !== "ai") return;
+      const plan = defaultAiChatCompressionEngine.buildAiContextMemoryPlan({
+        session,
+        aiChatOptions: appOptions.aiChat,
+      });
+      if (!plan) return;
+
+      const requestedSummaryModel = parseAiSdkModelSpecifier(
+        appOptions.aiChat.contextCompressionModelKey,
+      ) ?? {
+        providerId: selected.providerId,
+        modelId: selected.modelId,
+      };
+      const existingSummary = session.contextMemory?.text?.trim();
+      const sourceText = existingSummary
+        ? [
+            "Existing memory:",
+            existingSummary,
+            "",
+            "New history:",
+            plan.sourceText,
+          ].join("\n\n")
+        : plan.sourceText;
+      const system = buildAiChatContextMemorySystemPrompt({
+        existingSummary,
+      });
+      const candidateCoveredMessageCount = plan.candidateCoveredMessageCount;
+      const jobId = contextMemoryJobSeqRef.current + 1;
+      contextMemoryJobSeqRef.current = jobId;
+      contextMemoryJobIdsRef.current.set(session.id, jobId);
+      notifyContextMemoryPendingChanged();
+
+      void summarizeConversationMemory(sourceText, {
+        providerId: requestedSummaryModel.providerId,
+        modelId: requestedSummaryModel.modelId,
+        system,
+      })
+        .then((text) => {
+          const normalized = text.trim();
+          if (!normalized) return;
+          if (
+            useEditorStore.getState().options.aiChat.contextCompressionMode !==
+            "ai"
+          ) {
+            return;
+          }
+
+          const activeSession = sessionsRef.current.get(session.id);
+          if (!activeSession) return;
+          if (contextMemoryJobIdsRef.current.get(session.id) !== jobId) {
+            return;
+          }
+          if (
+            activeSession.timeline.length <
+              plan.candidateCoveredTimelineItemCount ||
+            activeSession.conversation.length < candidateCoveredMessageCount
+          ) {
+            return;
+          }
+
+          activeSession.contextMemory = {
+            text: normalized,
+            coveredTimelineItemCount: plan.candidateCoveredTimelineItemCount,
+            coveredMessageCount: candidateCoveredMessageCount,
+            updatedAt: new Date().toISOString(),
+          } satisfies AiChatContextMemory;
+
+          activeSession.contextTokens = estimateProjectedContextTokens(
+            activeSession,
+            useEditorStore.getState().options.aiChat,
+          );
+          if (activeSessionIdRef.current === activeSession.id) {
+            setContextTokens(activeSession.contextTokens);
+          }
+          persistAiChatSessionsNow();
+        })
+        .catch(() => {
+          // ignore background summary failures
+        })
+        .finally(() => {
+          if (contextMemoryJobIdsRef.current.get(session.id) === jobId) {
+            contextMemoryJobIdsRef.current.delete(session.id);
+            notifyContextMemoryPendingChanged();
+          }
+        });
+    },
+    [
+      estimateProjectedContextTokens,
+      notifyContextMemoryPendingChanged,
+      persistAiChatSessionsNow,
+    ],
+  );
+
   const materializeDraftConversation = useCallback(() => {
     const fresh = createFreshAiChatSessionBundle(new Date().toISOString());
     sessionsRef.current.set(fresh.id, fresh.session);
@@ -845,6 +1119,7 @@ export const useAiChatController = (editorState: EditorState) => {
       const tokenUsageBeforeTurn = { ...session.tokenUsage };
       let stepTokenUsage = createEmptyAiChatTokenUsageSummary();
       let latestStepContextTokens = session.contextTokens;
+      let latestContextTokenOverhead = session.contextTokenOverhead;
 
       setLastError(null);
       setAwaitingContinue(false);
@@ -863,6 +1138,9 @@ export const useAiChatController = (editorState: EditorState) => {
           modelCache: editorState.llmModelCache,
           messages: conversationRef.current,
           modelKey: `${selected.providerId}:${selected.modelId}`,
+          getContextMemory: appOptions.aiChat.contextCompressionEnabled
+            ? () => session.contextMemory
+            : undefined,
           toolRegistry,
           signal: controller.signal,
           onAssistantUpdate: (update) => {
@@ -885,10 +1163,12 @@ export const useAiChatController = (editorState: EditorState) => {
               update.tokenUsage,
             );
             latestStepContextTokens = update.contextTokens;
+            latestContextTokenOverhead = update.contextTokenOverhead;
             session.tokenUsage = addAiChatTokenUsageSummary(
               tokenUsageBeforeTurn,
               stepTokenUsage,
             );
+            session.contextTokenOverhead = latestContextTokenOverhead;
             session.contextTokens = latestStepContextTokens;
             setTokenUsage(session.tokenUsage);
             setContextTokens(session.contextTokens);
@@ -904,12 +1184,14 @@ export const useAiChatController = (editorState: EditorState) => {
           tokenUsageBeforeTurn,
           result.tokenUsage,
         );
-        session.contextTokens = result.contextTokens;
+        session.contextTokenOverhead = result.contextTokenOverhead;
+        const actualTurnContextTokens = result.contextTokens;
+        session.contextTokens = actualTurnContextTokens;
         setTimeline((prev) => {
           const next = applyUsageSnapshotToTurnTimeline(prev, {
             turnId: result.turnId,
             tokenUsage: session.tokenUsage,
-            contextTokens: session.contextTokens,
+            contextTokens: actualTurnContextTokens,
           });
           session.timeline = next;
           return next;
@@ -928,10 +1210,30 @@ export const useAiChatController = (editorState: EditorState) => {
             });
           }
         }
+
+        const compressionThreshold = Math.max(
+          0,
+          Math.trunc(appOptions.aiChat.contextCompressionThresholdTokens || 0),
+        );
+        if (
+          !appOptions.aiChat.contextCompressionEnabled ||
+          actualTurnContextTokens < compressionThreshold
+        ) {
+          session.contextMemory = undefined;
+        } else if (appOptions.aiChat.contextCompressionMode === "algorithmic") {
+          applyAlgorithmicContextCompression(session, appOptions.aiChat);
+        }
+        session.contextTokens = estimateProjectedContextTokens(
+          session,
+          appOptions.aiChat,
+        );
         setTokenUsage(session.tokenUsage);
         setContextTokens(session.contextTokens);
         setAwaitingContinue(result.awaitingContinue);
         setRunStatus("idle");
+        if (appOptions.aiChat.contextCompressionMode === "ai") {
+          scheduleContextMemory(session, selected);
+        }
       } catch (error) {
         session.awaitingContinue = false;
 
@@ -988,10 +1290,12 @@ export const useAiChatController = (editorState: EditorState) => {
     },
     [
       applyAssistantUpdate,
+      applyAlgorithmicContextCompression,
       applyToolUpdate,
       editorState.llmModelCache,
       toolRegistry,
       touchSessionSummary,
+      scheduleContextMemory,
     ],
   );
 
@@ -1214,8 +1518,20 @@ export const useAiChatController = (editorState: EditorState) => {
           },
         })),
       }));
+    nextSession.contextMemory = retainAiChatContextMemoryForTimeline(
+      options.sourceSession.contextMemory,
+      {
+        timelineItemCount: nextTimeline.length,
+        conversationMessageCount: nextSession.conversation.length,
+      },
+    );
     nextSession.tokenUsage = { ...options.sourceSession.tokenUsage };
-    nextSession.contextTokens = getTimelineContextTokens(nextTimeline);
+    nextSession.contextTokenOverhead =
+      options.sourceSession.contextTokenOverhead;
+    refreshSessionProjectedContext(
+      nextSession,
+      useEditorStore.getState().options.aiChat,
+    );
     nextSession.runStatus = "idle";
     nextSession.lastError = null;
 
@@ -1381,13 +1697,26 @@ export const useAiChatController = (editorState: EditorState) => {
     };
 
     const nextTimeline = session.timeline.slice(0, userIndex);
+    const nextConversation = restoreConversationFromTimeline(nextTimeline);
     const updatedAt = new Date().toISOString();
     session.timeline = nextTimeline;
+    session.conversation = nextConversation;
     session.updatedAt = updatedAt;
     session.runStatus = "idle";
     session.lastError = null;
     session.awaitingContinue = false;
-    session.contextTokens = getTimelineContextTokens(nextTimeline);
+    session.contextTokenOverhead = Math.max(0, session.contextTokenOverhead);
+    session.contextMemory = retainAiChatContextMemoryForTimeline(
+      session.contextMemory,
+      {
+        timelineItemCount: nextTimeline.length,
+        conversationMessageCount: nextConversation.length,
+      },
+    );
+    refreshSessionProjectedContext(
+      session,
+      useEditorStore.getState().options.aiChat,
+    );
 
     setTimeline(nextTimeline);
     setRunStatus("idle");
@@ -1408,7 +1737,12 @@ export const useAiChatController = (editorState: EditorState) => {
     });
 
     await sendMessage(retryInput);
-  }, [runStatus, sendMessage, touchSessionSummary]);
+  }, [
+    refreshSessionProjectedContext,
+    runStatus,
+    sendMessage,
+    touchSessionSummary,
+  ]);
 
   const stop = useCallback(() => {
     if (!abortRef.current) return;
@@ -1488,8 +1822,10 @@ export const useAiChatController = (editorState: EditorState) => {
     session.searchResultsById = new Map();
     session.highlightedResultIds = [];
     session.pendingDetectedFieldBatches = [];
+    session.contextMemory = undefined;
     session.tokenUsage = createEmptyAiChatTokenUsageSummary();
     session.contextTokens = 0;
+    session.contextTokenOverhead = 0;
     session.runStatus = "idle";
     session.lastError = null;
     session.awaitingContinue = false;
@@ -1642,6 +1978,12 @@ export const useAiChatController = (editorState: EditorState) => {
     : !hasAvailableModel
       ? "no_model"
       : null;
+  const isContextCompressionRunning = useMemo(() => {
+    return (
+      !isDraftConversation &&
+      contextMemoryJobIdsRef.current.has(activeSessionId)
+    );
+  }, [activeSessionId, contextMemoryPendingVersion, isDraftConversation]);
 
   return {
     sessions,
@@ -1655,6 +1997,7 @@ export const useAiChatController = (editorState: EditorState) => {
     runStatus,
     lastError,
     awaitingContinue,
+    isContextCompressionRunning,
     tokenUsage,
     contextTokens,
     selectedModelKey,

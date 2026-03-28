@@ -21,7 +21,6 @@ import {
 import type {
   LLMAnalyzePageForFieldsOptions,
   LLMModelOption,
-  LLMSummarizeTextOptions,
   LLMTranslateTextOptions,
 } from "./types";
 import type {
@@ -354,15 +353,11 @@ export const analyzePageForFields = async (
   });
 };
 
-export type SummarizeTextOptions = LLMSummarizeTextOptions & {
+const resolveSummarizeSpecifier = (options: {
   providerId?: string;
-};
-
-export const summarizeText = async (
-  text: string,
-  options: SummarizeTextOptions,
-) => {
-  const specifier = resolveAiSdkModelSpecifierForTask({
+  modelId?: string;
+}) =>
+  resolveAiSdkModelSpecifierForTask({
     appOptions: getCurrentOptions(),
     modelCache: getCurrentModelCache(),
     kind: "summarize",
@@ -374,11 +369,46 @@ export const summarizeText = async (
     modelId: options.modelId,
   });
 
+export type SummarizeDigestTextOptions = {
+  providerId?: string;
+  modelId?: string;
+  prompt?: string;
+  signal?: AbortSignal;
+};
+
+export const summarizeDigestText = async (
+  text: string,
+  options: SummarizeDigestTextOptions,
+) => {
+  const specifier = resolveSummarizeSpecifier(options);
+
   return await summarizeTextWithAiSdk({
     text,
     appOptions: getCurrentOptions(),
     specifier,
     prompt: options.prompt,
+    signal: options.signal,
+  });
+};
+
+export type SummarizeConversationMemoryOptions = {
+  providerId?: string;
+  modelId?: string;
+  system?: string;
+  signal?: AbortSignal;
+};
+
+export const summarizeConversationMemory = async (
+  text: string,
+  options: SummarizeConversationMemoryOptions,
+) => {
+  const specifier = resolveSummarizeSpecifier(options);
+
+  return await summarizeTextWithAiSdk({
+    text,
+    appOptions: getCurrentOptions(),
+    specifier,
+    system: options.system,
     signal: options.signal,
   });
 };

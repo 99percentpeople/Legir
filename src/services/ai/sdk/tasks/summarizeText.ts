@@ -9,6 +9,7 @@ export const summarizeTextWithAiSdk = async (options: {
   appOptions: AppOptions;
   specifier: AiSdkModelSpecifier;
   prompt?: string;
+  system?: string;
   signal?: AbortSignal;
 }) => {
   const model = resolveAiSdkLanguageModel(
@@ -18,11 +19,16 @@ export const summarizeTextWithAiSdk = async (options: {
   const prompt = [options.prompt?.trim(), "", "Source text:", options.text]
     .filter(Boolean)
     .join("\n\n");
+  const system = [
+    "You summarize text faithfully. Return plain text only. Do not use markdown.",
+    options.system?.trim(),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const result = await generateText({
     model,
-    system:
-      "You summarize text faithfully. Return plain text only. Do not use markdown.",
+    system,
     prompt,
     abortSignal: options.signal,
   });

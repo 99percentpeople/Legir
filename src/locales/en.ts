@@ -407,6 +407,7 @@ const en = {
       "Ask the AI to read, search, jump, or highlight PDF content...",
     input_hint: "Press Enter to send, Shift+Enter for a new line.",
     token_usage: "Tokens",
+    context_compression_running: "Compressing",
     token_usage_context: "Context",
     token_usage_input: "In",
     token_usage_output: "Out",
@@ -705,12 +706,25 @@ const en = {
         "Configure AI chat capabilities including form-building tools, the document digest tool, and the rendered-page visual summary tool.",
       context_pruning_enabled: "Enable context pruning",
       context_pruning_enabled_desc:
-        "Trim older reasoning and tool history before each model step to reduce token usage.",
+        "Prune older reasoning once the context token threshold is reached, and prioritize removing older page-image results to reduce token usage.",
+      context_pruning_trigger_context_tokens: "Pruning context threshold",
+      context_pruning_trigger_context_tokens_desc:
+        "Context pruning only starts after the current context reaches this token count.",
       max_tool_rounds: "Max tool rounds",
       tool_history_window: "General tool history window",
       visual_tool_history_window: "Visual tool history window",
       context_pruning_desc:
-        "Tool history windows are counted in trailing message blocks. Lower values reduce token usage more aggressively, especially for visual tools.",
+        "Pruning is triggered only by the context token threshold. The visual tool history window controls how quickly old page-image results are removed.",
+      context_compression_running: "Compressing",
+      context_compression_mode: "Compression mode",
+      context_compression_mode_desc:
+        "Algorithmic compression only prunes old context directly. AI compression also rewrites older context into reusable memory in the background.",
+      context_compression_mode_algorithmic: "Algorithmic compression",
+      context_compression_mode_ai: "AI compression",
+      context_compression_model: "AI compression model",
+      context_compression_model_placeholder: "Select a model",
+      context_compression_model_desc:
+        "Used only in AI compression mode to rewrite older pruned context into compact memory. Leave empty to fall back to the active chat model.",
       form_tools_enabled: "Enable AI form tools",
       form_tools_enabled_desc:
         "Allow AI chat to create new form fields from conversation requests. Leave this off if you only want read-only Q&A and field filling.",

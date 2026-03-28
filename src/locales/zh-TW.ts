@@ -401,6 +401,7 @@ const zhTW = {
     input_placeholder: "讓 AI 讀取、搜尋、跳轉或高亮 PDF 內容...",
     input_hint: "按 Enter 送出，Shift+Enter 換行。",
     token_usage: "Tokens",
+    context_compression_running: "壓縮中",
     token_usage_context: "上下文",
     token_usage_input: "輸入",
     token_usage_output: "輸出",
@@ -679,12 +680,25 @@ const zhTW = {
         "配置 AI 問答能力，包括表單製作工具、文件摘要工具以及渲染頁視覺總結工具。",
       context_pruning_enabled: "啟用上下文壓縮",
       context_pruning_enabled_desc:
-        "在每一步模型呼叫前裁剪較舊的思考內容與工具歷史，以降低 token 消耗。",
+        "根據上下文 token 門檻裁剪較舊的思考內容，並優先移除更早的頁面圖片結果，以降低 token 消耗。",
       max_tool_rounds: "最大工具輪數",
       tool_history_window: "一般工具歷史視窗",
       visual_tool_history_window: "視覺工具歷史視窗",
       context_pruning_desc:
-        "工具歷史視窗按最近訊息區塊計算。數值越小，壓縮越激進，尤其會更快移除舊的視覺結果。",
+        "壓縮只由上下文 token 門檻觸發；視覺工具歷史視窗用於更快移除舊的頁面圖片結果。",
+      context_pruning_trigger_context_tokens: "壓縮上下文門檻",
+      context_pruning_trigger_context_tokens_desc:
+        "只有目前上下文達到這個 token 數後，上下文壓縮才會開始生效。",
+      context_compression_running: "壓縮中",
+      context_compression_mode: "壓縮方式",
+      context_compression_mode_desc:
+        "演算法壓縮只會直接裁切舊上下文；AI 壓縮會在背景把較早的舊上下文改寫成可重用的壓縮記憶。",
+      context_compression_mode_algorithmic: "演算法壓縮",
+      context_compression_mode_ai: "AI 壓縮",
+      context_compression_model: "AI 壓縮模型",
+      context_compression_model_placeholder: "選擇模型",
+      context_compression_model_desc:
+        "僅在 AI 壓縮模式下使用，用於把被裁切的舊上下文改寫成緊湊記憶。留空時會回退到目前的對話模型。",
       form_tools_enabled: "啟用 AI 表單工具",
       form_tools_enabled_desc:
         "允許 AI 問答根據對話請求建立新的表單欄位。如果你只希望它做唯讀問答與欄位填值，請保持關閉。",

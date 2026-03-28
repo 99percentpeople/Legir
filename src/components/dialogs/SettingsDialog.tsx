@@ -72,14 +72,15 @@ import {
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { createCustomModelCapabilities } from "@/services/ai/sdk/modelCapabilities";
 import {
+  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
+  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
+  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_STEP,
   AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
   AI_CHAT_DIGEST_SOURCE_CHARS_STEP,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
-  AI_CHAT_TOOL_HISTORY_WINDOW_MAX,
-  AI_CHAT_TOOL_HISTORY_WINDOW_MIN,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
 } from "@/constants";
@@ -294,11 +295,13 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const digestEnabled = options.aiChat.digestEnabled;
   const digestSourceCharsPerChunk = options.aiChat.digestSourceCharsPerChunk;
   const visualSummaryEnabled = options.aiChat.visualSummaryEnabled;
-  const contextPruningEnabled = options.aiChat.contextPruningEnabled;
-  const toolHistoryMessageWindow = options.aiChat.toolHistoryMessageWindow;
-  const visualToolHistoryMessageWindow =
-    options.aiChat.visualToolHistoryMessageWindow;
+  const contextCompressionEnabled = options.aiChat.contextCompressionEnabled;
+  const visualHistoryWindow = options.aiChat.visualHistoryWindow;
+  const contextCompressionThresholdTokens =
+    options.aiChat.contextCompressionThresholdTokens;
   const maxToolRounds = options.aiChat.maxToolRounds;
+  const contextCompressionMode = options.aiChat.contextCompressionMode;
+  const contextCompressionModelKey = options.aiChat.contextCompressionModelKey;
 
   const clearFetchedLlmModels = (provider: LlmProviderId) => {
     useEditorStore.getState().setState((state) => ({
@@ -1058,10 +1061,10 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     </div>
                     <Switch
                       id="ai-chat-context-pruning-enabled"
-                      checked={contextPruningEnabled}
+                      checked={contextCompressionEnabled}
                       onCheckedChange={(checked) =>
                         updateAiChatOptions({
-                          contextPruningEnabled: checked,
+                          contextCompressionEnabled: checked,
                         })
                       }
                     />
@@ -1069,65 +1072,144 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
                   <Separator />
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <Label htmlFor="ai-chat-tool-history-window">
-                          {t("settings.ai_chat.tool_history_window")}
-                        </Label>
-                        <span className="text-muted-foreground text-xs">
-                          {toolHistoryMessageWindow}
-                        </span>
-                      </div>
-                      <Slider
-                        value={[toolHistoryMessageWindow]}
-                        disabled={!contextPruningEnabled}
-                        min={AI_CHAT_TOOL_HISTORY_WINDOW_MIN}
-                        max={AI_CHAT_TOOL_HISTORY_WINDOW_MAX}
-                        step={1}
-                        onValueChange={(values) => {
-                          const next = values[0];
-                          if (!Number.isFinite(next)) return;
-                          updateAiChatOptions({
-                            toolHistoryMessageWindow: next,
-                          });
-                        }}
-                      />
-                      <div className="text-muted-foreground flex justify-between text-xs">
-                        <span>{AI_CHAT_TOOL_HISTORY_WINDOW_MIN}</span>
-                        <span>{AI_CHAT_TOOL_HISTORY_WINDOW_MAX}</span>
-                      </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="ai-chat-context-pruning-threshold">
+                        {t(
+                          "settings.ai_chat.context_pruning_trigger_context_tokens",
+                        )}
+                      </Label>
+                      <span className="text-muted-foreground text-xs">
+                        {contextCompressionThresholdTokens.toLocaleString()}
+                      </span>
                     </div>
+                    <Slider
+                      value={[contextCompressionThresholdTokens]}
+                      disabled={!contextCompressionEnabled}
+                      min={AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN}
+                      max={AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX}
+                      step={AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_STEP}
+                      onValueChange={(values) => {
+                        const next = values[0];
+                        if (!Number.isFinite(next)) return;
+                        updateAiChatOptions({
+                          contextCompressionThresholdTokens: next,
+                        });
+                      }}
+                    />
+                    <div className="text-muted-foreground flex justify-between text-xs">
+                      <span>
+                        {AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN.toLocaleString()}
+                      </span>
+                      <span>
+                        {AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX.toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      {t(
+                        "settings.ai_chat.context_pruning_trigger_context_tokens_desc",
+                      )}
+                    </p>
+                  </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <Label htmlFor="ai-chat-visual-tool-history-window">
-                          {t("settings.ai_chat.visual_tool_history_window")}
-                        </Label>
-                        <span className="text-muted-foreground text-xs">
-                          {visualToolHistoryMessageWindow}
-                        </span>
-                      </div>
-                      <Slider
-                        value={[visualToolHistoryMessageWindow]}
-                        disabled={!contextPruningEnabled}
-                        min={AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN}
-                        max={AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX}
-                        step={1}
-                        onValueChange={(values) => {
-                          const next = values[0];
-                          if (!Number.isFinite(next)) return;
-                          updateAiChatOptions({
-                            visualToolHistoryMessageWindow: next,
-                          });
-                        }}
-                      />
-                      <div className="text-muted-foreground flex justify-between text-xs">
-                        <span>{AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN}</span>
-                        <span>{AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX}</span>
-                      </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="ai-chat-visual-tool-history-window">
+                        {t("settings.ai_chat.visual_tool_history_window")}
+                      </Label>
+                      <span className="text-muted-foreground text-xs">
+                        {visualHistoryWindow}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[visualHistoryWindow]}
+                      min={AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN}
+                      max={AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX}
+                      step={1}
+                      onValueChange={(values) => {
+                        const next = values[0];
+                        if (!Number.isFinite(next)) return;
+                        updateAiChatOptions({
+                          visualHistoryWindow: next,
+                        });
+                      }}
+                    />
+                    <div className="text-muted-foreground flex justify-between text-xs">
+                      <span>{AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN}</span>
+                      <span>{AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX}</span>
                     </div>
                   </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold">
+                      {t("settings.ai_chat.context_compression_mode")}
+                    </Label>
+                    <Select
+                      value={contextCompressionMode}
+                      disabled={!contextCompressionEnabled}
+                      onValueChange={(value) => {
+                        if (value !== "algorithmic" && value !== "ai") return;
+                        updateAiChatOptions({
+                          contextCompressionMode: value,
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue
+                          placeholder={t(
+                            "settings.ai_chat.context_compression_mode",
+                          )}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="algorithmic">
+                          {t(
+                            "settings.ai_chat.context_compression_mode_algorithmic",
+                          )}
+                        </SelectItem>
+                        <SelectItem value="ai">
+                          {t("settings.ai_chat.context_compression_mode_ai")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-xs">
+                      {t("settings.ai_chat.context_compression_mode_desc")}
+                    </p>
+                  </div>
+
+                  {contextCompressionMode === "ai" ? (
+                    <div className="space-y-2">
+                      <Label className="font-semibold">
+                        {t("settings.ai_chat.context_compression_model")}
+                      </Label>
+                      <ModelSelect
+                        value={contextCompressionModelKey || undefined}
+                        onValueChange={(value) =>
+                          updateAiChatOptions({
+                            contextCompressionModelKey: value,
+                          })
+                        }
+                        placeholder={
+                          aiToolModelGroups.length > 0
+                            ? t(
+                                "settings.ai_chat.context_compression_model_placeholder",
+                              )
+                            : t("settings.ai_chat.no_models")
+                        }
+                        groups={aiToolModelGroups}
+                        disabled={
+                          !contextCompressionEnabled ||
+                          aiToolModelGroups.length === 0
+                        }
+                        showSeparators
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings.ai_chat.context_compression_model_desc")}
+                      </p>
+                    </div>
+                  ) : null}
 
                   <p className="text-muted-foreground text-xs">
                     {t("settings.ai_chat.context_pruning_desc")}

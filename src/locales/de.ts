@@ -406,6 +406,7 @@ const de = {
       "Bitten Sie die KI, PDF-Inhalte zu lesen, zu suchen, zu springen oder hervorzuheben...",
     input_hint: "Enter zum Senden, Shift+Enter für eine neue Zeile.",
     token_usage: "Token",
+    context_compression_running: "Komprimieren",
     token_usage_context: "Kontext",
     token_usage_input: "Eingabe",
     token_usage_output: "Ausgabe",
@@ -707,12 +708,26 @@ const de = {
         "Konfigurieren Sie KI-Chat-Funktionen einschließlich Formularwerkzeugen, dem Dokument-Zusammenfassungswerkzeug und dem visuellen Zusammenfassungswerkzeug für gerenderte Seiten.",
       context_pruning_enabled: "Kontextkomprimierung aktivieren",
       context_pruning_enabled_desc:
-        "Beschneidet ältere Reasoning- und Tool-Historie vor jedem Modellschritt, um den Token-Verbrauch zu senken.",
+        "Beschneidet ältere Reasoning-Inhalte, sobald der Kontext-Token-Schwellenwert erreicht ist, und entfernt bevorzugt ältere Seitenbild-Ergebnisse, um Tokens zu sparen.",
       max_tool_rounds: "Maximale Tool-Runden",
       tool_history_window: "Fenster für allgemeine Tool-Historie",
       visual_tool_history_window: "Fenster für visuelle Tool-Historie",
       context_pruning_desc:
-        "Die Tool-Historienfenster werden in nachlaufenden Nachrichtenblöcken gezählt. Kleinere Werte sparen aggressiver Tokens, besonders bei visuellen Tools.",
+        "Die Komprimierung wird nur durch den Kontext-Token-Schwellenwert ausgelöst. Das Fenster für visuelle Tool-Historie steuert, wie schnell alte Seitenbild-Ergebnisse entfernt werden.",
+      context_pruning_trigger_context_tokens:
+        "Kontextschwelle für Komprimierung",
+      context_pruning_trigger_context_tokens_desc:
+        "Die Kontextkomprimierung beginnt erst, wenn der aktuelle Kontext diese Token-Zahl erreicht.",
+      context_compression_running: "Komprimieren",
+      context_compression_mode: "Komprimierungsmodus",
+      context_compression_mode_desc:
+        "Algorithmische Komprimierung beschneidet alten Kontext nur direkt. KI-Komprimierung schreibt älteren Kontext zusätzlich im Hintergrund in wiederverwendbaren Kompaktspeicher um.",
+      context_compression_mode_algorithmic: "Algorithmische Komprimierung",
+      context_compression_mode_ai: "KI-Komprimierung",
+      context_compression_model: "KI-Komprimierungsmodell",
+      context_compression_model_placeholder: "Modell auswählen",
+      context_compression_model_desc:
+        "Wird nur im KI-Komprimierungsmodus verwendet, um älteren beschnittenen Kontext in kompakten Speicher umzuschreiben. Leer bedeutet Rückfall auf das aktive Chat-Modell.",
       form_tools_enabled: "KI-Formularwerkzeuge aktivieren",
       form_tools_enabled_desc:
         "Erlaubt dem AI-Chat, neue Formularfelder aus Gesprächsanfragen zu erstellen. Deaktiviert lassen, wenn nur schreibgeschützter Chat und Feldbefüllung gewünscht sind.",

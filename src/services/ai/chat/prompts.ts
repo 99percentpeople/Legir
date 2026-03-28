@@ -1,4 +1,5 @@
 import type { AiChatToolDefinition } from "@/services/ai/chat/types";
+import { AI_CHAT_CONVERSATION_SUMMARY_MAX_CHARS } from "@/constants";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 import {
   buildPageRangeLabel,
@@ -150,6 +151,20 @@ export const getAiChatSystemInstruction = (options?: {
   sections.push(buildPromptSection("Tool usage", toolUsageLines));
 
   return sections.join("\n\n");
+};
+
+export const buildAiChatContextMemorySystemPrompt = (options?: {
+  existingSummary?: string;
+}) => {
+  return [
+    options?.existingSummary?.trim()
+      ? "Update the existing chat memory with the new older conversation history."
+      : "Compress older chat history into reusable chat memory.",
+    "This is prior conversation history, not a new user request.",
+    `Keep only durable context: goals, decisions, facts, completed actions, pending tasks, constraints, and latest corrections. Limit to about ${AI_CHAT_CONVERSATION_SUMMARY_MAX_CHARS} characters.`,
+    "Write the memory in first person from the assistant's perspective, using concise notes such as: I know..., The user wants..., I already did..., I still need to....",
+    "Omit chatter, duplicates, raw JSON, long payloads, image data, and reasoning. Return plain text only.",
+  ].join("\n");
 };
 
 export const buildDocumentDigestSummaryPrompt = (options: {

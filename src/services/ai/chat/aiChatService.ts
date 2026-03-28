@@ -7,7 +7,11 @@ import {
 } from "ai";
 
 import { getAiChatSystemInstruction } from "@/services/ai/chat/prompts";
-import { pruneAiChatMessages } from "@/services/ai/chat/runtime/messagePruning";
+import {
+  estimateAiChatMessageTokens,
+  prepareAiChatMessagesForModel,
+  prepareAiChatMessagesForModelRuntime,
+} from "@/services/ai/chat/runtime/messageContext";
 import { createAiChatToolRuntime } from "@/services/ai/chat/runtime/toolRuntime";
 import {
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
@@ -83,6 +87,14 @@ export const aiChatService = {
     modelCache: EditorState["llmModelCache"];
     messages: AiChatMessageRecord[];
     modelKey?: string;
+    getContextMemory?: () =>
+      | {
+          text: string;
+          coveredMessageCount: number;
+          coveredTimelineItemCount: number;
+          updatedAt: string;
+        }
+      | undefined;
     toolRegistry: AiToolRegistry;
     signal?: AbortSignal;
     onToolUpdate?: (update: AiChatToolUpdate) => void;
@@ -90,6 +102,7 @@ export const aiChatService = {
     onUsageUpdate?: (update: {
       tokenUsage: AiChatTokenUsageSummary;
       contextTokens: number;
+      contextTokenOverhead: number;
       stepNumber: number;
     }) => void;
     maxToolRounds?: number;
@@ -98,6 +111,7 @@ export const aiChatService = {
       appOptions,
       modelCache,
       modelKey,
+      getContextMemory,
       toolRegistry,
       signal,
       onToolUpdate,
@@ -107,9 +121,24 @@ export const aiChatService = {
     } = options;
 
     const baseConversation: AiChatMessageRecord[] = [...options.messages];
-    const initialMessages = pruneAiChatMessages(
-      baseConversation,
-      appOptions.aiChat,
+    const turnStartMessageCount = baseConversation.length;
+    const buildStepMessages = async (messages: AiChatMessageRecord[]) =>
+      await prepareAiChatMessagesForModelRuntime({
+        messages,
+        aiChatOptions: appOptions.aiChat,
+        contextMemory: getContextMemory?.(),
+        turnStartMessageCount,
+      });
+    const buildProjectedMessages = (messages: AiChatMessageRecord[]) =>
+      prepareAiChatMessagesForModel({
+        messages,
+        aiChatOptions: appOptions.aiChat,
+        contextMemory: getContextMemory?.(),
+        turnStartMessageCount,
+      });
+    const initialMessages = await buildStepMessages(baseConversation);
+    let latestPreparedMessageTokenEstimate = estimateAiChatMessageTokens(
+      buildProjectedMessages(baseConversation),
     );
     const turnId = `ai_turn_${Date.now()}_${Math.random()
       .toString(36)
@@ -153,11 +182,19 @@ export const aiChatService = {
       const result = streamText({
         model: resolvedModel.model,
         ...(resolvedModel.callOptions ?? null),
-        system: getAiChatSystemInstruction({ toolDefinitions }),
-        messages: initialMessages,
-        prepareStep: ({ messages }) => ({
-          messages: pruneAiChatMessages(messages, appOptions.aiChat),
+        system: getAiChatSystemInstruction({
+          toolDefinitions,
         }),
+        messages: initialMessages,
+        prepareStep: async ({ messages }) => {
+          const preparedMessages = await buildStepMessages(messages);
+          latestPreparedMessageTokenEstimate = estimateAiChatMessageTokens(
+            buildProjectedMessages(messages),
+          );
+          return {
+            messages: preparedMessages,
+          };
+        },
         experimental_include: {
           requestBody: false,
         },
@@ -165,9 +202,14 @@ export const aiChatService = {
         stopWhen: stepCountIs(maxToolSteps),
         onStepFinish: (step) => {
           latestResponseMessages = step.response.messages;
+          const actualContextTokens = getAiChatContextTokens(step.usage);
           onUsageUpdate?.({
             tokenUsage: toAiChatTokenUsageSummary(step.usage),
-            contextTokens: getAiChatContextTokens(step.usage),
+            contextTokens: actualContextTokens,
+            contextTokenOverhead: Math.max(
+              0,
+              actualContextTokens - latestPreparedMessageTokenEstimate,
+            ),
             stepNumber: step.stepNumber,
           });
         },
@@ -279,6 +321,11 @@ export const aiChatService = {
         awaitingContinue,
         tokenUsage: toAiChatTokenUsageSummary(finishEvent.totalUsage),
         contextTokens: getAiChatContextTokens(lastStep?.usage),
+        contextTokenOverhead: Math.max(
+          0,
+          getAiChatContextTokens(lastStep?.usage) -
+            latestPreparedMessageTokenEstimate,
+        ),
       };
     } catch (error) {
       const normalized = normalizeAiChatStreamError(

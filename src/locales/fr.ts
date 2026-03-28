@@ -408,6 +408,7 @@ const fr = {
     input_hint:
       "Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne.",
     token_usage: "Tokens",
+    context_compression_running: "Compression",
     token_usage_context: "Contexte",
     token_usage_input: "Entrée",
     token_usage_output: "Sortie",
@@ -709,12 +710,26 @@ const fr = {
         "Configure les capacités du chat IA, y compris les outils de création de formulaires, l'outil de résumé du document et l'outil de résumé visuel des pages rendues.",
       context_pruning_enabled: "Activer la compression du contexte",
       context_pruning_enabled_desc:
-        "Réduit l'ancien raisonnement et l'historique des outils avant chaque étape du modèle afin de diminuer la consommation de tokens.",
+        "Réduit l'ancien raisonnement une fois le seuil de tokens du contexte atteint, et retire en priorité les anciens résultats d'images de page pour diminuer la consommation de tokens.",
       max_tool_rounds: "Nombre maximal de tours d'outils",
       tool_history_window: "Fenêtre d'historique des outils",
       visual_tool_history_window: "Fenêtre d'historique des outils visuels",
       context_pruning_desc:
-        "Les fenêtres d'historique sont comptées en blocs de messages récents. Des valeurs plus faibles réduisent plus agressivement les tokens, surtout pour les outils visuels.",
+        "La compression n'est déclenchée que par le seuil de tokens du contexte. La fenêtre d'historique visuel contrôle à quelle vitesse les anciens résultats d'images de page sont retirés.",
+      context_pruning_trigger_context_tokens:
+        "Seuil de contexte pour l'élagage",
+      context_pruning_trigger_context_tokens_desc:
+        "L'élagage du contexte ne démarre qu'une fois ce nombre de tokens atteint dans le contexte courant.",
+      context_compression_running: "Compression",
+      context_compression_mode: "Mode de compression",
+      context_compression_mode_desc:
+        "La compression algorithmique retire directement l'ancien contexte. La compression IA réécrit aussi l'ancien contexte en arrière-plan dans une mémoire compacte réutilisable.",
+      context_compression_mode_algorithmic: "Compression algorithmique",
+      context_compression_mode_ai: "Compression IA",
+      context_compression_model: "Modèle de compression IA",
+      context_compression_model_placeholder: "Sélectionner un modèle",
+      context_compression_model_desc:
+        "Utilisé uniquement en mode de compression IA pour réécrire l'ancien contexte retiré dans une mémoire compacte. Si laissé vide, le modèle de chat actif est utilisé.",
       form_tools_enabled: "Activer les outils de formulaire IA",
       form_tools_enabled_desc:
         "Permet au chat IA de créer de nouveaux champs de formulaire à partir des demandes conversationnelles. Laissez cette option désactivée si vous ne voulez que des questions-réponses en lecture seule et le remplissage des champs.",

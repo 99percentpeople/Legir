@@ -407,6 +407,7 @@ const zhCN = {
     input_placeholder: "让 AI 读取、搜索、跳转或高亮 PDF 内容...",
     input_hint: "按 Enter 发送，Shift+Enter 换行。",
     token_usage: "Tokens",
+    context_compression_running: "压缩中",
     token_usage_context: "上下文",
     token_usage_input: "输入",
     token_usage_output: "输出",
@@ -689,12 +690,25 @@ const zhCN = {
         "配置 AI 问答能力，包括表单制作工具、文档摘要工具以及渲染页视觉总结工具。",
       context_pruning_enabled: "启用上下文压缩",
       context_pruning_enabled_desc:
-        "在每一步模型调用前裁剪较旧的思考内容和工具历史，以降低 token 消耗。",
+        "根据上下文 token 阈值裁剪较旧的思考内容，并优先移除更早的页面图片结果，以降低 token 消耗。",
       max_tool_rounds: "最大工具轮数",
       tool_history_window: "普通工具历史窗口",
       visual_tool_history_window: "视觉工具历史窗口",
       context_pruning_desc:
-        "工具历史窗口按最近消息块计算。数值越小，压缩越激进，尤其会更快移除旧的视觉结果。",
+        "压缩只由上下文 token 阈值触发；视觉工具历史窗口用于更快移除旧的页面图片结果。",
+      context_pruning_trigger_context_tokens: "压缩上下文阈值",
+      context_pruning_trigger_context_tokens_desc:
+        "只有当前上下文达到这个 token 数后，上下文压缩才会开始生效。",
+      context_compression_running: "压缩中",
+      context_compression_mode: "压缩方式",
+      context_compression_mode_desc:
+        "算法压缩只会直接裁剪旧上下文；AI 压缩会在后台把较早的旧上下文改写成可复用的压缩记忆。",
+      context_compression_mode_algorithmic: "算法压缩",
+      context_compression_mode_ai: "AI 压缩",
+      context_compression_model: "AI 压缩模型",
+      context_compression_model_placeholder: "选择模型",
+      context_compression_model_desc:
+        "仅在 AI 压缩模式下使用，用于把被裁剪的旧上下文改写成紧凑记忆。留空时会回退到当前对话模型。",
       form_tools_enabled: "启用 AI 表单工具",
       form_tools_enabled_desc:
         "允许 AI 问答根据对话请求创建新的表单字段。如果你只希望它做只读问答和字段填值，请保持关闭。",

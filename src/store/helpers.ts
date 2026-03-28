@@ -1,12 +1,12 @@
 import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
 import {
+  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
+  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
   AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
-  AI_CHAT_TOOL_HISTORY_WINDOW_MAX,
-  AI_CHAT_TOOL_HISTORY_WINDOW_MIN,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
   ANNOTATION_STYLES,
@@ -187,11 +187,7 @@ export const createEmptyLlmModelCache = (): EditorState["llmModelCache"] =>
     ]),
   ) as EditorState["llmModelCache"];
 
-export type PersistedLegacyAiChatOptions = Partial<AppOptions["aiChat"]> & {
-  digestCharsPerChunk?: number;
-  digestSummaryProviderId?: string;
-  digestSummaryModelId?: string;
-};
+export type PersistedAiChatOptions = Partial<AppOptions["aiChat"]>;
 
 const normalizeDigestOutputRatioDenominator = (
   value: unknown,
@@ -207,44 +203,14 @@ const normalizeDigestOutputRatioDenominator = (
   return 3;
 };
 
-const deriveLegacyDigestOutputRatioDenominator = (options: {
-  digestCharsPerChunk?: number;
-  digestSourceCharsPerChunk?: number;
-}) => {
-  const outputChars = Math.max(1, Math.trunc(options.digestCharsPerChunk || 0));
-  const sourceChars = Math.max(
-    outputChars,
-    Math.trunc(options.digestSourceCharsPerChunk || 0),
-  );
-  const rawRatio = sourceChars / outputChars;
-  const candidates: Array<
-    AppOptions["aiChat"]["digestOutputRatioDenominator"]
-  > = [...AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS];
-  return candidates.reduce((best, candidate) =>
-    Math.abs(candidate - rawRatio) < Math.abs(best - rawRatio)
-      ? candidate
-      : best,
-  );
-};
-
 export const normalizeAiChatOptions = (
   base: AppOptions["aiChat"],
-  patch?: PersistedLegacyAiChatOptions,
+  patch?: PersistedAiChatOptions,
 ): AppOptions["aiChat"] => {
   const next = {
     ...base,
     ...patch,
   };
-
-  const legacyProviderId = patch?.digestSummaryProviderId?.trim();
-  const legacyModelId = patch?.digestSummaryModelId?.trim();
-  if (
-    (!next.digestSummaryModelKey || !next.digestSummaryModelKey.trim()) &&
-    legacyProviderId &&
-    legacyModelId
-  ) {
-    next.digestSummaryModelKey = `${legacyProviderId}:${legacyModelId}`;
-  }
 
   return {
     digestEnabled:
@@ -253,13 +219,7 @@ export const normalizeAiChatOptions = (
       next.digestSourceCharsPerChunk,
     ),
     digestOutputRatioDenominator: normalizeDigestOutputRatioDenominator(
-      next.digestOutputRatioDenominator ??
-        deriveLegacyDigestOutputRatioDenominator({
-          digestCharsPerChunk: patch?.digestCharsPerChunk,
-          digestSourceCharsPerChunk: clampDigestSourceChars(
-            next.digestSourceCharsPerChunk,
-          ),
-        }),
+      next.digestOutputRatioDenominator,
     ),
     digestSummaryModelKey: next.digestSummaryModelKey || "",
     visualSummaryEnabled:
@@ -276,33 +236,36 @@ export const normalizeAiChatOptions = (
         ? next.detectFormFieldsEnabled
         : false,
     formToolsVisionModelKey: next.formToolsVisionModelKey || "",
-    contextPruningEnabled:
-      typeof next.contextPruningEnabled === "boolean"
-        ? next.contextPruningEnabled
+    contextCompressionEnabled:
+      typeof next.contextCompressionEnabled === "boolean"
+        ? next.contextCompressionEnabled
         : true,
-    toolHistoryMessageWindow: clampAiChatInteger(
-      next.toolHistoryMessageWindow,
+    contextCompressionThresholdTokens: clampAiChatInteger(
+      next.contextCompressionThresholdTokens,
       {
         fallback:
-          DEFAULT_EDITOR_UI_STATE.options.aiChat.toolHistoryMessageWindow,
-        min: AI_CHAT_TOOL_HISTORY_WINDOW_MIN,
-        max: AI_CHAT_TOOL_HISTORY_WINDOW_MAX,
+          DEFAULT_EDITOR_UI_STATE.options.aiChat
+            .contextCompressionThresholdTokens,
+        min: AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
+        max: AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
       },
     ),
-    visualToolHistoryMessageWindow: clampAiChatInteger(
-      next.visualToolHistoryMessageWindow,
-      {
-        fallback:
-          DEFAULT_EDITOR_UI_STATE.options.aiChat.visualToolHistoryMessageWindow,
-        min: AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
-        max: AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
-      },
-    ),
+    visualHistoryWindow: clampAiChatInteger(next.visualHistoryWindow, {
+      fallback: DEFAULT_EDITOR_UI_STATE.options.aiChat.visualHistoryWindow,
+      min: AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
+      max: AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
+    }),
     maxToolRounds: clampAiChatInteger(next.maxToolRounds, {
       fallback: DEFAULT_EDITOR_UI_STATE.options.aiChat.maxToolRounds,
       min: AI_CHAT_MAX_TOOL_ROUNDS_MIN,
       max: AI_CHAT_MAX_TOOL_ROUNDS_MAX,
     }),
+    contextCompressionMode:
+      next.contextCompressionMode === "algorithmic" ||
+      next.contextCompressionMode === "ai"
+        ? next.contextCompressionMode
+        : DEFAULT_EDITOR_UI_STATE.options.aiChat.contextCompressionMode,
+    contextCompressionModelKey: next.contextCompressionModelKey || "",
   };
 };
 

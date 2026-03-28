@@ -1746,6 +1746,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
               runStatus={aiChat.runStatus}
               lastError={aiChat.lastError}
               awaitingContinue={aiChat.awaitingContinue}
+              isContextCompressionRunning={aiChat.isContextCompressionRunning}
               tokenUsage={aiChat.tokenUsage}
               contextTokens={aiChat.contextTokens}
               selectedModelKey={aiChat.selectedModelKey}

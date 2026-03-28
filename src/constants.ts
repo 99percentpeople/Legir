@@ -48,10 +48,11 @@ export const AI_CHAT_DIGEST_OUTPUT_CHARS_MIN = 180;
 export const AI_CHAT_DIGEST_OUTPUT_CHARS_MAX = 12000;
 export const AI_CHAT_MAX_TOOL_ROUNDS_MIN = 1;
 export const AI_CHAT_MAX_TOOL_ROUNDS_MAX = 20;
-export const AI_CHAT_TOOL_HISTORY_WINDOW_MIN = 1;
-export const AI_CHAT_TOOL_HISTORY_WINDOW_MAX = 16;
 export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN = 1;
 export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX = 8;
+export const AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN = 10_000;
+export const AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX = 1_000_000;
+export const AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_STEP = 10_000;
 
 export const DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES: PageTranslateOptions = {
   fontFamily: "Helvetica",
@@ -117,13 +118,17 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       formToolsEnabled: false,
       detectFormFieldsEnabled: false,
       formToolsVisionModelKey: "",
-      contextPruningEnabled: true,
-      toolHistoryMessageWindow: 8,
-      visualToolHistoryMessageWindow: 1,
+      contextCompressionEnabled: true,
+      contextCompressionThresholdTokens: 12_000,
+      visualHistoryWindow: 1,
       maxToolRounds: 10,
+      contextCompressionMode: "ai",
+      contextCompressionModelKey: "",
     },
   },
 };
+export const AI_CHAT_CONVERSATION_SUMMARY_MAX_SOURCE_CHARS = 18_000;
+export const AI_CHAT_CONVERSATION_SUMMARY_MAX_CHARS = 2_400;
 
 // prettier-ignore
 export const PEN_COLORS = [

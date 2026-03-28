@@ -664,6 +664,13 @@ export interface AiChatUiMessage {
   createdAt: string;
 }
 
+export interface AiChatContextMemory {
+  text: string;
+  coveredTimelineItemCount: number;
+  coveredMessageCount: number;
+  updatedAt: string;
+}
+
 export interface AiChatSelectionAttachment {
   kind: "workspace_selection";
   text: string;

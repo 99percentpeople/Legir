@@ -5,6 +5,7 @@ import {
 import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
 import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 import type {
+  AiChatContextMemory,
   AiChatMessageAttachment,
   AiChatMessageRecord,
   AiChatSelectionAttachment,
@@ -46,8 +47,10 @@ export type PersistedAiChatSession = {
   searchResults: AiStoredSearchResult[];
   highlightedResultIds: string[];
   pendingDetectedFieldBatches?: AiDetectedFormFieldBatchState[];
+  contextMemory?: AiChatContextMemory;
   tokenUsage?: AiChatTokenUsageSummary;
   contextTokens?: number;
+  contextTokenOverhead?: number;
   lastError?: string | null;
   awaitingContinue?: boolean;
 };
@@ -73,8 +76,10 @@ export type AiChatSessionData = {
   searchResultsById: Map<string, AiStoredSearchResult>;
   highlightedResultIds: string[];
   pendingDetectedFieldBatches: AiDetectedFormFieldBatchState[];
+  contextMemory?: AiChatContextMemory;
   tokenUsage: AiChatTokenUsageSummary;
   contextTokens: number;
+  contextTokenOverhead: number;
   runStatus: AiChatRunStatus;
   lastError: string | null;
   awaitingContinue: boolean;
@@ -542,6 +547,14 @@ export const restoreConversationFromTimeline = (
   return conversation;
 };
 
+export const getConversationMessageCountForTimelinePrefix = (
+  items: AiChatTimelineItem[],
+  timelineItemCount: number,
+) =>
+  restoreConversationFromTimeline(
+    items.slice(0, Math.max(0, Math.trunc(timelineItemCount || 0))),
+  ).length;
+
 export const getLatestUserSelectionAttachmentsFromTimeline = (
   items: AiChatTimelineItem[],
 ) => {
@@ -619,8 +632,10 @@ export const createAiChatSessionData = (
   searchResultsById: new Map(),
   highlightedResultIds: [],
   pendingDetectedFieldBatches: [],
+  contextMemory: undefined,
   tokenUsage: createEmptyAiChatTokenUsageSummary(),
   contextTokens: 0,
+  contextTokenOverhead: 0,
   runStatus: "idle",
   lastError: null,
   awaitingContinue: false,
@@ -823,6 +838,31 @@ export const restorePersistedAiChatDocumentState = (
         searchResultsById,
         highlightedResultIds,
         pendingDetectedFieldBatches,
+        contextMemory:
+          session.contextMemory &&
+          typeof session.contextMemory === "object" &&
+          typeof session.contextMemory.text === "string" &&
+          session.contextMemory.text.trim() &&
+          typeof session.contextMemory.coveredTimelineItemCount === "number" &&
+          Number.isFinite(session.contextMemory.coveredTimelineItemCount) &&
+          typeof session.contextMemory.coveredMessageCount === "number" &&
+          Number.isFinite(session.contextMemory.coveredMessageCount)
+            ? {
+                text: session.contextMemory.text.trim(),
+                coveredTimelineItemCount: Math.max(
+                  0,
+                  Math.trunc(session.contextMemory.coveredTimelineItemCount),
+                ),
+                coveredMessageCount: Math.max(
+                  0,
+                  Math.trunc(session.contextMemory.coveredMessageCount),
+                ),
+                updatedAt:
+                  typeof session.contextMemory.updatedAt === "string"
+                    ? session.contextMemory.updatedAt
+                    : updatedAt,
+              }
+            : undefined,
         tokenUsage:
           session.tokenUsage && typeof session.tokenUsage === "object"
             ? {
@@ -849,6 +889,10 @@ export const restorePersistedAiChatDocumentState = (
               }
             : createEmptyAiChatTokenUsageSummary(),
         contextTokens: Math.max(0, Math.trunc(session.contextTokens ?? 0)),
+        contextTokenOverhead: Math.max(
+          0,
+          Math.trunc(session.contextTokenOverhead ?? 0),
+        ),
         runStatus: "idle",
         lastError:
           typeof session.lastError === "string" ? session.lastError : null,
@@ -856,6 +900,15 @@ export const restorePersistedAiChatDocumentState = (
       };
 
       sessionsMap.set(nextSession.id, nextSession);
+      if (
+        nextSession.contextMemory &&
+        (nextSession.contextMemory.coveredTimelineItemCount >
+          nextSession.timeline.length ||
+          nextSession.contextMemory.coveredMessageCount >
+            nextSession.conversation.length)
+      ) {
+        nextSession.contextMemory = undefined;
+      }
       sessionSummaries.push({
         id: nextSession.id,
         title: nextSession.title,
@@ -932,8 +985,10 @@ export const persistAiChatDocumentState = (options: {
         searchResults: trimmedSearchResults,
         highlightedResultIds: data.highlightedResultIds,
         pendingDetectedFieldBatches: data.pendingDetectedFieldBatches,
+        contextMemory: data.contextMemory,
         tokenUsage: data.tokenUsage,
         contextTokens: data.contextTokens,
+        contextTokenOverhead: data.contextTokenOverhead,
         lastError: data.lastError,
         awaitingContinue: data.awaitingContinue,
       };
@@ -978,8 +1033,10 @@ export const persistAiChatDocumentState = (options: {
             searchResults: trimmedSearchResults,
             highlightedResultIds: activeData.highlightedResultIds,
             pendingDetectedFieldBatches: activeData.pendingDetectedFieldBatches,
+            contextMemory: activeData.contextMemory,
             tokenUsage: activeData.tokenUsage,
             contextTokens: activeData.contextTokens,
+            contextTokenOverhead: activeData.contextTokenOverhead,
             lastError: activeData.lastError,
             awaitingContinue: activeData.awaitingContinue,
           },

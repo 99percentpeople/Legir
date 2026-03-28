@@ -93,6 +93,7 @@ export interface AiChatPanelProps {
   runStatus: "idle" | "running" | "cancelling" | "error";
   lastError: string | null;
   awaitingContinue: boolean;
+  isContextCompressionRunning: boolean;
   tokenUsage: AiChatTokenUsageSummary;
   contextTokens: number;
 
@@ -829,6 +830,7 @@ export function AiChatPanel({
   runStatus,
   lastError,
   awaitingContinue,
+  isContextCompressionRunning,
   tokenUsage,
   contextTokens,
   selectedModelKey,
@@ -1327,6 +1329,12 @@ export function AiChatPanel({
             </div>
           </TooltipContent>
         </Tooltip>
+        {isContextCompressionRunning ? (
+          <span className="flex items-center gap-1.5">
+            <Spinner size="sm" />
+            <span>{t("ai_chat.context_compression_running")}</span>
+          </span>
+        ) : null}
       </div>
     </div>
   );
