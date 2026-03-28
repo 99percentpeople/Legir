@@ -22,6 +22,31 @@ const AI_CHAT_CONVERSATION_MEMORY_MARKER = "[FORMFORGE_CONVERSATION_MEMORY_V1]";
 
 const AI_CHAT_CONVERSATION_SUMMARY_TOOL_RESULT_MAX_CHARS = 2_400;
 const AI_CHAT_ALGORITHMIC_MEMORY_LINE_MAX_CHARS = 320;
+const CONTEXT_MEMORY_PREFERRED_TOOL_TEXT_KEYS = [
+  "summary",
+  "result_summary",
+  "message",
+  "reason",
+  "error",
+  "status",
+  "text",
+] as const;
+const CONTEXT_MEMORY_PREFERRED_TOOL_COUNT_KEYS = [
+  "created_count",
+  "updated_count",
+  "deleted_count",
+  "applied_count",
+  "filled_count",
+  "matched_count",
+  "returned_count",
+  "field_count",
+  "annotation_count",
+  "page_count",
+  "requested_page_count",
+  "returned_page_count",
+  "skipped_count",
+  "rejected_count",
+] as const;
 const AI_CHAT_HEAVY_VISUAL_TOOL_NAMES = new Set<AiToolName>([
   "get_pages_visual",
   "summarize_pages_visual",
@@ -68,6 +93,114 @@ const truncateSummarySource = (lines: string[]) => {
   return result.join("\n");
 };
 
+const formatCompactScalar = (value: unknown) => {
+  if (typeof value === "string") return trimText(value);
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return "";
+};
+
+/**
+ * Compresses raw tool output into durable facts.
+ *
+ * The memory model should focus on user intent and resulting document state, so
+ * we aggressively strip away tool mechanics and keep only compact facts such as
+ * counts, short status text, and the most useful message field.
+ */
+const summarizeToolOutputForContextMemory = (
+  toolName: string,
+  output: unknown,
+) => {
+  if (output == null) return "";
+  if (typeof output === "string") {
+    return truncateText(
+      output,
+      AI_CHAT_CONVERSATION_SUMMARY_TOOL_RESULT_MAX_CHARS,
+    );
+  }
+  if (Array.isArray(output)) {
+    return truncateText(
+      safeStringify(output),
+      Math.min(600, AI_CHAT_CONVERSATION_SUMMARY_TOOL_RESULT_MAX_CHARS),
+    );
+  }
+  if (typeof output !== "object") {
+    return formatCompactScalar(output);
+  }
+
+  const record = output as Record<string, unknown>;
+  if (record.type === "content" && Array.isArray(record.value)) {
+    const textParts = record.value
+      .filter(
+        (part) =>
+          part &&
+          typeof part === "object" &&
+          !Array.isArray(part) &&
+          (part as Record<string, unknown>).type === "text" &&
+          typeof (part as Record<string, unknown>).text === "string",
+      )
+      .map((part) => trimText((part as Record<string, unknown>).text as string))
+      .filter(Boolean);
+    if (textParts.length > 0) {
+      return truncateText(
+        textParts.join(" "),
+        AI_CHAT_CONVERSATION_SUMMARY_TOOL_RESULT_MAX_CHARS,
+      );
+    }
+    if (AI_CHAT_HEAVY_VISUAL_TOOL_NAMES.has(toolName as AiToolName)) {
+      return "";
+    }
+  }
+
+  const parts: string[] = [];
+
+  for (const key of CONTEXT_MEMORY_PREFERRED_TOOL_TEXT_KEYS) {
+    const text = formatCompactScalar(record[key]);
+    if (!text) continue;
+    parts.push(truncateText(text, 300));
+    break;
+  }
+
+  for (const key of CONTEXT_MEMORY_PREFERRED_TOOL_COUNT_KEYS) {
+    const value = record[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    parts.push(`${key}=${Math.trunc(value)}`);
+  }
+
+  if (
+    typeof record.page_number === "number" &&
+    Number.isFinite(record.page_number)
+  ) {
+    parts.push(`page_number=${Math.trunc(record.page_number)}`);
+  }
+  if (Array.isArray(record.page_numbers) && record.page_numbers.length > 0) {
+    const pageNumbers = record.page_numbers
+      .map((value) =>
+        typeof value === "number" && Number.isFinite(value)
+          ? Math.trunc(value)
+          : null,
+      )
+      .filter((value): value is number => value !== null)
+      .slice(0, 8);
+    if (pageNumbers.length > 0) {
+      parts.push(`page_numbers=${pageNumbers.join(",")}`);
+    }
+  }
+
+  if (parts.length > 0) {
+    return truncateText(
+      parts.join("; "),
+      AI_CHAT_CONVERSATION_SUMMARY_TOOL_RESULT_MAX_CHARS,
+    );
+  }
+
+  return truncateText(
+    safeStringify(output),
+    Math.min(600, AI_CHAT_CONVERSATION_SUMMARY_TOOL_RESULT_MAX_CHARS),
+  );
+};
+
 const getContextMemorySourceLines = (
   messages: AiChatMessageRecord[],
 ): string[] => {
@@ -80,9 +213,10 @@ const getContextMemorySourceLines = (
       const text = trimText(message.content);
       if (!text) continue;
       if (message.role === "tool") {
-        lines.push(
-          `Tool result: ${truncateText(text, AI_CHAT_CONVERSATION_SUMMARY_TOOL_RESULT_MAX_CHARS)}`,
-        );
+        const toolFact = summarizeToolOutputForContextMemory("tool", text);
+        if (toolFact) {
+          lines.push(`Tool fact: ${toolFact}`);
+        }
       } else {
         const label = message.role === "user" ? "User" : "Assistant";
         lines.push(`${label}: ${text}`);
@@ -107,20 +241,18 @@ const getContextMemorySourceLines = (
         continue;
       }
       if (type === "tool-call") {
-        const toolName =
-          typeof record.toolName === "string" ? record.toolName : "unknown";
-        lines.push(`Tool call ${toolName}: ${safeStringify(record.input)}`);
         continue;
       }
       if (type === "tool-result") {
         const toolName =
           typeof record.toolName === "string" ? record.toolName : "unknown";
-        lines.push(
-          `Tool result ${toolName}: ${truncateText(
-            safeStringify(record.output),
-            AI_CHAT_CONVERSATION_SUMMARY_TOOL_RESULT_MAX_CHARS,
-          )}`,
+        const toolFact = summarizeToolOutputForContextMemory(
+          toolName,
+          record.output,
         );
+        if (toolFact) {
+          lines.push(`Tool fact ${toolName}: ${toolFact}`);
+        }
       }
     }
   }

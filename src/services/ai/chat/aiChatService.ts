@@ -9,7 +9,6 @@ import {
 import { getAiChatSystemInstruction } from "@/services/ai/chat/prompts";
 import {
   estimateAiChatMessageTokens,
-  prepareAiChatMessagesForModel,
   prepareAiChatMessagesForModelRuntime,
 } from "@/services/ai/chat/runtime/messageContext";
 import { createAiChatToolRuntime } from "@/services/ai/chat/runtime/toolRuntime";
@@ -129,17 +128,9 @@ export const aiChatService = {
         contextMemory: getContextMemory?.(),
         turnStartMessageCount,
       });
-    const buildProjectedMessages = (messages: AiChatMessageRecord[]) =>
-      prepareAiChatMessagesForModel({
-        messages,
-        aiChatOptions: appOptions.aiChat,
-        contextMemory: getContextMemory?.(),
-        turnStartMessageCount,
-      });
     const initialMessages = await buildStepMessages(baseConversation);
-    let latestPreparedMessageTokenEstimate = estimateAiChatMessageTokens(
-      buildProjectedMessages(baseConversation),
-    );
+    let latestPreparedMessageTokenEstimate =
+      estimateAiChatMessageTokens(initialMessages);
     const turnId = `ai_turn_${Date.now()}_${Math.random()
       .toString(36)
       .slice(2, 8)}`;
@@ -188,9 +179,8 @@ export const aiChatService = {
         messages: initialMessages,
         prepareStep: async ({ messages }) => {
           const preparedMessages = await buildStepMessages(messages);
-          latestPreparedMessageTokenEstimate = estimateAiChatMessageTokens(
-            buildProjectedMessages(messages),
-          );
+          latestPreparedMessageTokenEstimate =
+            estimateAiChatMessageTokens(preparedMessages);
           return {
             messages: preparedMessages,
           };

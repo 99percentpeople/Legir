@@ -75,6 +75,7 @@ import {
 } from "@/services/ai/chat/runtime/messageContext";
 import {
   applyAssistantUpdateToTimeline,
+  getLatestTimelineUsageSnapshot,
   applyUsageSnapshotToTurnTimeline,
   applyToolUpdateToTimeline,
   finalizeStreamingTimeline,
@@ -289,10 +290,32 @@ export const useAiChatController = (editorState: EditorState) => {
     [],
   );
 
+  const applyLatestTimelineUsageSnapshot = useCallback(
+    (
+      session: Pick<
+        AiChatSessionData,
+        "timeline" | "tokenUsage" | "contextTokens"
+      >,
+    ) => {
+      const snapshot = getLatestTimelineUsageSnapshot(session.timeline);
+      if (!snapshot) {
+        session.contextTokens = 0;
+        return;
+      }
+      if (snapshot.tokenUsage) {
+        session.tokenUsage = snapshot.tokenUsage;
+      }
+      session.contextTokens =
+        typeof snapshot.contextTokens === "number" ? snapshot.contextTokens : 0;
+    },
+    [],
+  );
+
   const applyAlgorithmicContextCompression = useCallback(
     (
       session: Pick<
         AiChatSessionData,
+        | "id"
         | "conversation"
         | "timeline"
         | "contextMemory"
@@ -336,6 +359,7 @@ export const useAiChatController = (editorState: EditorState) => {
     (
       session: Pick<
         AiChatSessionData,
+        | "id"
         | "conversation"
         | "timeline"
         | "contextMemory"
@@ -350,11 +374,6 @@ export const useAiChatController = (editorState: EditorState) => {
         | "contextCompressionMode"
       >,
     ) => {
-      session.contextTokens = estimateProjectedContextTokens(
-        session,
-        aiChatOptions,
-      );
-
       const compressionThreshold = Math.max(
         0,
         Math.trunc(aiChatOptions.contextCompressionThresholdTokens || 0),
@@ -367,13 +386,8 @@ export const useAiChatController = (editorState: EditorState) => {
       } else if (aiChatOptions.contextCompressionMode === "algorithmic") {
         applyAlgorithmicContextCompression(session, aiChatOptions);
       }
-
-      session.contextTokens = estimateProjectedContextTokens(
-        session,
-        aiChatOptions,
-      );
     },
-    [applyAlgorithmicContextCompression, estimateProjectedContextTokens],
+    [applyAlgorithmicContextCompression],
   );
 
   const resetDraftConversationUi = useCallback(() => {
@@ -1027,13 +1041,8 @@ export const useAiChatController = (editorState: EditorState) => {
             updatedAt: new Date().toISOString(),
           } satisfies AiChatContextMemory;
 
-          activeSession.contextTokens = estimateProjectedContextTokens(
-            activeSession,
-            useEditorStore.getState().options.aiChat,
-          );
-          if (activeSessionIdRef.current === activeSession.id) {
-            setContextTokens(activeSession.contextTokens);
-          }
+          const aiChatOptions = useEditorStore.getState().options.aiChat;
+          refreshSessionProjectedContext(activeSession, aiChatOptions);
           persistAiChatSessionsNow();
         })
         .catch(() => {
@@ -1047,9 +1056,9 @@ export const useAiChatController = (editorState: EditorState) => {
         });
     },
     [
-      estimateProjectedContextTokens,
       notifyContextMemoryPendingChanged,
       persistAiChatSessionsNow,
+      refreshSessionProjectedContext,
     ],
   );
 
@@ -1223,10 +1232,7 @@ export const useAiChatController = (editorState: EditorState) => {
         } else if (appOptions.aiChat.contextCompressionMode === "algorithmic") {
           applyAlgorithmicContextCompression(session, appOptions.aiChat);
         }
-        session.contextTokens = estimateProjectedContextTokens(
-          session,
-          appOptions.aiChat,
-        );
+        refreshSessionProjectedContext(session, appOptions.aiChat);
         setTokenUsage(session.tokenUsage);
         setContextTokens(session.contextTokens);
         setAwaitingContinue(result.awaitingContinue);
@@ -1293,6 +1299,7 @@ export const useAiChatController = (editorState: EditorState) => {
       applyAlgorithmicContextCompression,
       applyToolUpdate,
       editorState.llmModelCache,
+      refreshSessionProjectedContext,
       toolRegistry,
       touchSessionSummary,
       scheduleContextMemory,
@@ -1528,6 +1535,7 @@ export const useAiChatController = (editorState: EditorState) => {
     nextSession.tokenUsage = { ...options.sourceSession.tokenUsage };
     nextSession.contextTokenOverhead =
       options.sourceSession.contextTokenOverhead;
+    applyLatestTimelineUsageSnapshot(nextSession);
     refreshSessionProjectedContext(
       nextSession,
       useEditorStore.getState().options.aiChat,
@@ -1713,6 +1721,7 @@ export const useAiChatController = (editorState: EditorState) => {
         conversationMessageCount: nextConversation.length,
       },
     );
+    applyLatestTimelineUsageSnapshot(session);
     refreshSessionProjectedContext(
       session,
       useEditorStore.getState().options.aiChat,
@@ -1738,6 +1747,7 @@ export const useAiChatController = (editorState: EditorState) => {
 
     await sendMessage(retryInput);
   }, [
+    applyLatestTimelineUsageSnapshot,
     refreshSessionProjectedContext,
     runStatus,
     sendMessage,

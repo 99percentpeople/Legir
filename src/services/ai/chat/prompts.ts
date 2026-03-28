@@ -158,12 +158,17 @@ export const buildAiChatContextMemorySystemPrompt = (options?: {
 }) => {
   return [
     options?.existingSummary?.trim()
-      ? "Update the existing chat memory with the new older conversation history."
-      : "Compress older chat history into reusable chat memory.",
-    "This is prior conversation history, not a new user request.",
-    `Keep only durable context: goals, decisions, facts, completed actions, pending tasks, constraints, and latest corrections. Limit to about ${AI_CHAT_CONVERSATION_SUMMARY_MAX_CHARS} characters.`,
-    "Write the memory in first person from the assistant's perspective, using concise notes such as: I know..., The user wants..., I already did..., I still need to....",
-    "Omit chatter, duplicates, raw JSON, long payloads, image data, and reasoning. Return plain text only.",
+      ? "Update my existing context memory using the additional older conversation history."
+      : "Compress older chat history into reusable context memory for myself.",
+    "This input is prior conversation history, not a new user request.",
+    "The goal is resumability: after reading the memory, I should quickly understand what the user wants, what matters, what has already changed, and what is still pending.",
+    `Keep only durable context within about ${AI_CHAT_CONVERSATION_SUMMARY_MAX_CHARS} characters.`,
+    "Prioritize, in this order: user goals and preferences; constraints and corrections; confirmed document facts; completed state changes; pending tasks or open questions.",
+    "Do not produce a generic chronology such as 'I checked..., then I called..., then I updated...'. Record durable outcomes instead of tool mechanics whenever possible.",
+    "If a tool proved an important fact or changed the document state, keep the fact or resulting state, not the raw tool trace.",
+    "Write in first person from the assistant perspective using compact bullet-like notes such as: I know..., The user wants..., I changed..., I still need to....",
+    "Prefer the latest valid decision when the history contains revisions or corrections.",
+    "Omit chatter, duplicates, filler, raw JSON, long payloads, image data, and hidden reasoning. Return plain text only.",
   ].join("\n");
 };
 
