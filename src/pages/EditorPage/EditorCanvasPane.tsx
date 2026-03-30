@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-
 import FloatingBar from "@/components/toolbar/FloatingBar";
 import MobileFloatingToolbar from "@/components/toolbar/MobileFloatingToolbar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,8 +18,9 @@ import {
   selectEditorCanvasActions,
   selectEditorCanvasState,
 } from "@/store/selectors";
-import type { EditorState, PDFSearchResult, PenStyle } from "@/types";
+import type { PDFSearchResult } from "@/types";
 import { useShallow } from "zustand/react/shallow";
+import type { EditorCanvasMobileToolbar } from "./types";
 
 const Workspace = React.lazy(() => import("@/components/workspace/Workspace"));
 const MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX = 96;
@@ -30,37 +30,9 @@ const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
 type EditorCanvasPaneProps = {
   onEditAnnotation: (id: string) => void;
   onToggleFullscreen: () => void;
-  pdfSearchResultsByPage: Map<number, PDFSearchResult[]>;
+  pdfSearchResultsByPage: Map<number, PDFSearchResult[]> | undefined;
   activePdfSearchResultId: string | null;
-  mobileToolbar: {
-    isDirty: boolean;
-    canUndo: boolean;
-    canRedo: boolean;
-    onModeChange: (mode: EditorState["mode"]) => void;
-    onPenStyleChange: (style: Partial<PenStyle>) => void;
-    onHighlightStyleChange: (style: Partial<PenStyle>) => void;
-    onCommentStyleChange: (style: { color: string }) => void;
-    onFreetextStyleChange: (style: { color: string }) => void;
-    onShapeStyleChange: (
-      style: Partial<NonNullable<EditorState["shapeStyle"]>>,
-    ) => void;
-    onUndo: () => void;
-    onRedo: () => void;
-    onOpenShortcuts: () => void;
-    onOpenSearch: () => void;
-    isFieldListOpen: boolean;
-    onToggleFieldList: () => void;
-    isPropertiesPanelOpen: boolean;
-    onTogglePropertiesPanel: () => void;
-    onOpenSettings: () => void;
-    isSearchOpen: boolean;
-    onExport: () => Promise<boolean>;
-    onSaveDraft: (silent?: boolean) => Promise<void>;
-    onSaveAs: () => Promise<boolean>;
-    onPrint: () => void;
-    onExit: () => void;
-    onClose: () => void;
-  };
+  mobileToolbar: EditorCanvasMobileToolbar;
 };
 
 export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
@@ -171,18 +143,21 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
   const handleInitialScrollApplied = useCallback(() => {
     setState({ pendingViewStateRestore: null });
   }, [setState]);
+
   const handlePageIndexChange = useCallback(
     (idx: number) => {
       setState({ currentPageIndex: idx });
     },
     [setState],
   );
+
   const handleToolChange = useCallback(
     (tool: typeof state.tool) => {
       setTool(tool);
     },
     [setTool],
   );
+
   const handleNavigatePage = useCallback(
     (pageIndex: number) => {
       setState({ currentPageIndex: pageIndex });
@@ -193,6 +168,7 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
     },
     [setState],
   );
+
   const handleClearPageTranslateParagraphSelection = useCallback(() => {
     setSelectedPageTranslateParagraphIds([]);
   }, [setSelectedPageTranslateParagraphIds]);

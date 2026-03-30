@@ -43,7 +43,7 @@ import {
 // - AI field detection via `services/ai`
 //
 // Rule of thumb:
-// - Rendering/interaction logic lives in `pages/EditorPage.tsx` and `components/workspace/Workspace.tsx`.
+// - Rendering/interaction logic lives in `pages/EditorPage/index.tsx` and `components/workspace/Workspace.tsx`.
 // - Authoritative editor state lives in `store/useEditorStore.ts`.
 // - PDF import/export pipeline lives in `services/pdfService/index.ts`.
 
