@@ -79,6 +79,10 @@ import {
   snapShapePointToAngle,
   shapeSupportsFill,
 } from "@/lib/shapeGeometry";
+import {
+  duplicateAnnotationForDrag,
+  duplicateFieldForDrag,
+} from "./lib/duplicateControlForDrag";
 
 const WorkspaceZoomJankOverlay = React.lazy(
   () => import("./debug/WorkspaceZoomJankOverlay"),
@@ -2590,36 +2594,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       // Check for Duplicate shortcut (Ctrl/Meta + Drag)
       if (e.ctrlKey || e.metaKey) {
-        const newId = `field_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        // If Radio, keep name to maintain group. For others, increment suffix number or append _1
-        let newName = field.name;
-        if (field.type !== FieldType.RADIO) {
-          const match = field.name.match(/^(.*)_(\d+)$/);
-          if (match) {
-            const prefix = match[1];
-            const num = parseInt(match[2], 10);
-            newName = `${prefix}_${num + 1}`;
-          } else {
-            newName = `${field.name}_1`;
-          }
-        }
-
-        const newField: FormField = {
-          ...field,
-          id: newId,
-          name: newName,
-          // Fix: If duplicating a Radio button in the same group, ensure it starts unchecked
-          // and not default checked to preserve single-selection logic.
-          isChecked: field.type === FieldType.RADIO ? false : field.isChecked,
-          isDefaultChecked:
-            field.type === FieldType.RADIO ? false : field.isDefaultChecked,
-        };
+        const newField = duplicateFieldForDrag(field);
 
         // Add the new field
         onAddField(newField);
 
         // Target the new field for the drag operation
-        targetFieldId = newId;
+        targetFieldId = newField.id;
         // Rect and Page are same as original
       }
 
@@ -2711,22 +2692,36 @@ const Workspace: React.FC<WorkspaceProps> = ({
       capturePointer(e);
 
       onTriggerHistorySave();
-      onSelectControl(annotation.id);
+      let targetAnnotation = annotation;
+      let shouldForceDragMove = false;
+
+      if (e.ctrlKey || e.metaKey) {
+        targetAnnotation = duplicateAnnotationForDrag(annotation);
+        onAddAnnotation(targetAnnotation);
+        shouldForceDragMove = true;
+      }
+
+      onSelectControl(targetAnnotation.id);
       // App handles clearing the selectedId when needed.
 
-      setActivePageIndex(annotation.pageIndex);
-      const coords = getRelativeCoords(e, annotation.pageIndex);
+      setActivePageIndex(targetAnnotation.pageIndex);
+      const coords = getRelativeCoords(e, targetAnnotation.pageIndex);
 
-      // Setup Move (Disable for Highlight to match Pen behavior)
-      if (annotation.rect && annotation.type !== "highlight") {
+      // Keep highlight stationary by default, but allow modifier-drag duplication
+      // to immediately move the newly created copy.
+      if (
+        targetAnnotation.rect &&
+        (targetAnnotation.type !== "highlight" || shouldForceDragMove)
+      ) {
         setGlobalCursor("move");
-        setMovingAnnotationId(annotation.id);
+        setMovingAnnotationId(targetAnnotation.id);
         setMoveOffset({ x: coords.x - outerRect.x, y: coords.y - outerRect.y });
       }
     },
     [
       capturePointer,
       closeTextSelectionPopover,
+      onAddAnnotation,
       onTriggerHistorySave,
       onSelectControl,
       getRelativeCoords,

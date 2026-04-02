@@ -97,11 +97,45 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const pendingFocusRef = useRef(false);
+  const isSelectedRef = useRef(isSelected);
+
+  const focusTextarea = React.useCallback(() => {
+    if (cardRef.current) {
+      cardRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+
+    const activeElement = document.activeElement;
+    if (
+      activeElement instanceof HTMLTextAreaElement &&
+      activeElement !== textareaRef.current
+    ) {
+      activeElement.blur();
+    }
+
+    if (!textareaRef.current) return false;
+
+    textareaRef.current.focus();
+    const len = textareaRef.current.value.length;
+    textareaRef.current.setSelectionRange(len, len);
+    appEventBus.clearSticky("sidebar:focusAnnotation");
+    return true;
+  }, []);
+
+  useEffect(() => {
+    isSelectedRef.current = isSelected;
+  }, [isSelected]);
 
   useAppEvent(
     "sidebar:focusAnnotation",
     (payload) => {
       if (payload.id !== annotation.id) return;
+      if (isSelectedRef.current && focusTextarea()) {
+        pendingFocusRef.current = false;
+        return;
+      }
       pendingFocusRef.current = true;
     },
     { replayLast: true },
@@ -109,30 +143,20 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
 
   useEffect(() => {
     if (isSelected) {
+      if (pendingFocusRef.current) {
+        pendingFocusRef.current = false;
+        focusTextarea();
+        return;
+      }
+
       if (cardRef.current) {
         cardRef.current.scrollIntoView({
           behavior: "smooth",
           block: "nearest",
         });
       }
-
-      const activeElement = document.activeElement;
-      if (
-        activeElement instanceof HTMLTextAreaElement &&
-        activeElement !== textareaRef.current
-      ) {
-        activeElement.blur();
-      }
-
-      if (pendingFocusRef.current && textareaRef.current) {
-        pendingFocusRef.current = false;
-        textareaRef.current.focus();
-        const len = textareaRef.current.value.length;
-        textareaRef.current.setSelectionRange(len, len);
-        appEventBus.clearSticky("sidebar:focusAnnotation");
-      }
     }
-  }, [isSelected]);
+  }, [focusTextarea, isSelected]);
 
   return (
     <div

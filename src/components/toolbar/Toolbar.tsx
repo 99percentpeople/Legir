@@ -19,6 +19,7 @@ import {
   Hand,
   Search,
   MessageCircle,
+  Shapes,
 } from "lucide-react";
 import {
   EditorState,
@@ -164,9 +165,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
     setLastShapeTool(tool);
   }, [tool]);
 
+  const isShapeToolActive = isShapeTool(tool);
   const activeShapeTool = isShapeTool(tool) ? tool : lastShapeTool;
-  const ActiveShapeIcon = getShapeToolIcon(activeShapeTool);
+  const ActiveShapeIcon = isShapeToolActive
+    ? getShapeToolIcon(activeShapeTool)
+    : Shapes;
   const activeShapeLabel = getShapeToolLabel(t, activeShapeTool);
+  const shapeButtonLabel = isShapeToolActive
+    ? activeShapeLabel
+    : t("toolbar.shape");
 
   const handleShapeToolSelect = (shapeTool: ShapeTool) => {
     setLastShapeTool(shapeTool);
@@ -562,10 +569,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
                         size="icon"
                         className={cn(
                           "h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9",
-                          isShapeTool(tool) &&
+                          isShapeToolActive &&
                             "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
                         )}
-                        title={activeShapeLabel}
+                        title={shapeButtonLabel}
                       >
                         <ActiveShapeIcon size={16} />
                       </Button>
