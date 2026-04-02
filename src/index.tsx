@@ -6,7 +6,7 @@ import { ThemeProvider } from "./components/theme-provider";
 import { LanguageProvider } from "./components/language-provider";
 import { Toaster } from "./components/ui/sonner";
 import { Router } from "wouter";
-import { useHashLocation } from "wouter/use-hash-location";
+import { useBootstrapAwareHashLocation } from "./app/useBootstrapAwareHashLocation";
 import { shouldLoadPlatformFontFaces } from "./services/platform";
 
 const rootElement = document.getElementById("root");
@@ -24,7 +24,7 @@ root.render(
     <LanguageProvider defaultLanguage="system" storageKey="ff-ui-language">
       <ThemeProvider defaultTheme="system" storageKey="ff-ui-theme">
         <Toaster position="top-center" />
-        <Router hook={useHashLocation}>
+        <Router hook={useBootstrapAwareHashLocation}>
           <App />
         </Router>
       </ThemeProvider>

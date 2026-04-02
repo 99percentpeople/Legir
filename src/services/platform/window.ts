@@ -2,6 +2,7 @@ import {
   type CloseRequestedEvent,
   getCurrentWindow,
 } from "@tauri-apps/api/window";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 import { isDesktopApp } from "./runtime";
 
@@ -26,6 +27,22 @@ export const setPlatformFullscreen = async (next: boolean) => {
   if (document.fullscreenElement) {
     await document.exitFullscreen();
   }
+};
+
+export const getPlatformWindowId = () => {
+  if (isDesktopApp()) {
+    try {
+      return getCurrentWebview().label;
+    } catch {
+      try {
+        return getCurrentWindow().label;
+      } catch {
+        return "main";
+      }
+    }
+  }
+
+  return "current";
 };
 
 export const exitPlatformFullscreen = async () => {
@@ -86,4 +103,10 @@ export const closePlatformWindow = async () => {
   if (!isDesktopApp()) return;
   const win = getCurrentWindow();
   await win.close();
+};
+
+export const destroyPlatformWindow = async () => {
+  if (!isDesktopApp()) return;
+  const win = getCurrentWindow();
+  await win.destroy();
 };

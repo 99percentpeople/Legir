@@ -20,8 +20,9 @@ const EditorRouteGuard: React.FC<{
   canAccessEditor: boolean;
   isLoading: boolean;
   fallback: React.ReactNode;
+  loadingFallback: React.ReactNode;
   children: React.ReactNode;
-}> = ({ canAccessEditor, isLoading, fallback, children }) => {
+}> = ({ canAccessEditor, isLoading, fallback, loadingFallback, children }) => {
   const [, navigate] = useLocation();
 
   useEffect(() => {
@@ -31,6 +32,7 @@ const EditorRouteGuard: React.FC<{
   }, [canAccessEditor, isLoading, navigate]);
 
   if (!canAccessEditor && !isLoading) return <>{fallback}</>;
+  if (!canAccessEditor && isLoading) return <>{loadingFallback}</>;
   return <>{children}</>;
 };
 
@@ -80,17 +82,18 @@ const AppRoutes: React.FC<AppRoutesProps> = ({
       }
     >
       <Switch>
-        <Route path="/">
-          <LandingPage {...landingProps} />
-        </Route>
         <Route path="/editor">
           <EditorRouteGuard
             canAccessEditor={canAccessEditor}
             isLoading={isLoading}
             fallback={<LandingPage {...landingProps} />}
+            loadingFallback={<EditorRouteFallback />}
           >
             <EditorPage {...editorProps} />
           </EditorRouteGuard>
+        </Route>
+        <Route path="/">
+          <LandingPage {...landingProps} />
         </Route>
         <Route>
           <LandingPage {...landingProps} />
