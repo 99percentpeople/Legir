@@ -89,6 +89,17 @@ class PDFWorkerService {
   private textContentCacheByDocPage = new Map<string, TextContent>();
   private outlineCacheByDocId = new Map<string, PDFOutlineItem[]>();
 
+  private failAllPendingRequests(error: string) {
+    for (const [id, handlers] of Array.from(this.pendingRequests.entries())) {
+      try {
+        handlers.reject({ id, success: false, error });
+      } catch {
+        // ignore
+      }
+    }
+    this.pendingRequests.clear();
+  }
+
   private clearLastRenderScaleForDoc(docId: string) {
     const prefix = `${docId}|`;
     for (const key of Array.from(this.lastRenderScaleByDocPage.keys())) {
@@ -207,15 +218,7 @@ class PDFWorkerService {
         };
 
         this.worker.onmessageerror = () => {
-          const error = "Worker message error";
-          for (const [id, handlers] of Array.from(
-            this.pendingRequests.entries(),
-          )) {
-            try {
-              handlers.reject({ id, success: false, error });
-            } catch {}
-          }
-          this.pendingRequests.clear();
+          this.failAllPendingRequests("Worker message error");
         };
 
         this.worker.onerror = (evt) => {
@@ -224,18 +227,33 @@ class PDFWorkerService {
             "string"
               ? String((evt as unknown as { message: string }).message)
               : "Worker error";
-          for (const [id, handlers] of Array.from(
-            this.pendingRequests.entries(),
-          )) {
-            try {
-              handlers.reject({ id, success: false, error: msg });
-            } catch {}
-          }
-          this.pendingRequests.clear();
+          this.failAllPendingRequests(msg);
         };
       }
     } catch (e) {
       console.error("Failed to initialize PDF Worker", e);
+    }
+  }
+
+  public destroy() {
+    this.failAllPendingRequests("Worker terminated");
+    this.passwordByDocId.clear();
+    this.lastRenderScaleByDocPage.clear();
+    this.textContentCacheByDocPage.clear();
+    this.outlineCacheByDocId.clear();
+    this.requestSeq = 0;
+
+    if (!this.worker) return;
+
+    try {
+      this.worker.onmessage = null;
+      this.worker.onmessageerror = null;
+      this.worker.onerror = null;
+      this.worker.terminate();
+    } catch {
+      // ignore worker shutdown errors
+    } finally {
+      this.worker = null;
     }
   }
 
@@ -815,5 +833,9 @@ class PDFWorkerService {
     });
   }
 }
+
+export { PDFWorkerService };
+
+export const createPdfWorkerService = () => new PDFWorkerService();
 
 export const pdfWorkerService = new PDFWorkerService();

@@ -25,6 +25,7 @@ import {
   WORKSPACE_VIRTUALIZATION_THRESHOLD_PAGES,
 } from "@/constants";
 import { cn } from "@/utils/cn";
+import FileDragOverlay from "@/components/FileDragOverlay";
 import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import { usePointerCapture } from "@/hooks/usePointerCapture";
@@ -62,7 +63,7 @@ import { computeWorkspacePageRects } from "./lib/computeWorkspacePageRects";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
-import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 import { openExternalUrl } from "@/services/platform";
 import {
@@ -99,6 +100,9 @@ registerControls();
 preloadControls();
 
 interface WorkspaceProps {
+  sessionRenderKey?: string | null;
+  workerService: PDFWorkerService | null;
+  isFileDragActive?: boolean;
   editorState: WorkspaceEditorState;
   onAddField: (field: FormField) => void;
   onAddAnnotation: (
@@ -199,6 +203,9 @@ const normalizeRotationDeg = (deg: number) => {
 };
 
 const Workspace: React.FC<WorkspaceProps> = ({
+  sessionRenderKey,
+  workerService,
+  isFileDragActive = false,
   editorState,
   onAddField,
   onAddAnnotation,
@@ -380,7 +387,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const page = editorState.pages[selection.pageIndex];
       if (!page) return null;
 
-      const textContent = await pdfWorkerService.getTextContent({
+      if (!workerService) return null;
+
+      const textContent = await workerService.getTextContent({
         pageIndex: selection.pageIndex,
       });
       const geometry = getPdfSearchRangeGeometry(
@@ -391,7 +400,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       );
       return geometry?.rect ?? null;
     },
-    [editorState.pages],
+    [editorState.pages, workerService],
   );
 
   const handleAskAiFromSelection = useCallback(() => {
@@ -2811,6 +2820,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         onContextMenu={(e) => handlePageContextMenu(e, page.pageIndex)}
       >
         <PDFPage
+          workerService={workerService}
           page={page}
           scale={editorState.scale}
           isSelectMode={textLayerSelectable}
@@ -3216,185 +3226,190 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   return (
-    <div
-      ref={containerRef}
-      data-workspace-scroll-container="true"
-      className="relative flex-1 overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
-      style={{
-        cursor: isPanModeActive ? "grab" : undefined,
-        touchAction: "none",
-        scrollPaddingBottom: workspaceBottomPaddingPx,
-        "--scale": editorState.scale,
-      }}
-      onPointerDownCapture={handleWorkspacePointerDownCapture}
-      onPointerDown={handleContainerPointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-      data-ff-pinch-zooming={isPinchZooming ? "1" : undefined}
-      onScroll={handleScroll}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <WorkspaceTextSelectionPopover
-        toolbar={textSelectionToolbar}
-        virtualRef={textSelectionVirtualRef}
-        onClose={closeTextSelectionPopover}
-        onHighlight={() => {
-          createTextHighlightFromSelection({ force: true });
-          closeTextSelectionPopover();
+    <div className="relative flex-1 overflow-hidden">
+      <FileDragOverlay open={isFileDragActive} />
+      <div
+        ref={containerRef}
+        data-workspace-scroll-container="true"
+        className="relative h-full overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
+        style={{
+          cursor: isPanModeActive ? "grab" : undefined,
+          touchAction: "none",
+          scrollPaddingBottom: workspaceBottomPaddingPx,
+          "--scale": editorState.scale,
         }}
-        onTranslate={() => {
-          const text = textSelectionToolbar.text.trim();
-          if (!text) return;
-          appEventBus.emit("workspace:openTranslate", {
-            sourceText: text,
-            autoTranslate: true,
-          });
-          closeTextSelectionPopover();
-        }}
-        onAskAi={handleAskAiFromSelection}
-        onSearchWeb={() => {
-          const q = textSelectionToolbar.text.trim();
-          if (q) {
-            const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-            void openExternalUrl(url);
-          }
-          closeTextSelectionPopover();
-        }}
-      />
-      {workspaceZoomJankDebugEnabled && (
-        <Suspense fallback={null}>
-          <WorkspaceZoomJankOverlay scale={editorState.scale} />
-        </Suspense>
-      )}
+        onPointerDownCapture={handleWorkspacePointerDownCapture}
+        onPointerDown={handleContainerPointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        data-ff-pinch-zooming={isPinchZooming ? "1" : undefined}
+        onScroll={handleScroll}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <WorkspaceTextSelectionPopover
+          toolbar={textSelectionToolbar}
+          virtualRef={textSelectionVirtualRef}
+          onClose={closeTextSelectionPopover}
+          onHighlight={() => {
+            createTextHighlightFromSelection({ force: true });
+            closeTextSelectionPopover();
+          }}
+          onTranslate={() => {
+            const text = textSelectionToolbar.text.trim();
+            if (!text) return;
+            appEventBus.emit("workspace:openTranslate", {
+              sourceText: text,
+              autoTranslate: true,
+            });
+            closeTextSelectionPopover();
+          }}
+          onAskAi={handleAskAiFromSelection}
+          onSearchWeb={() => {
+            const q = textSelectionToolbar.text.trim();
+            if (q) {
+              const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+              void openExternalUrl(url);
+            }
+            closeTextSelectionPopover();
+          }}
+        />
+        {workspaceZoomJankDebugEnabled && (
+          <Suspense fallback={null}>
+            <WorkspaceZoomJankOverlay scale={editorState.scale} />
+          </Suspense>
+        )}
 
-      {shouldVirtualizePages ? (
-        <div className="flex min-h-full min-w-full">
+        {shouldVirtualizePages ? (
+          <div className="flex min-h-full min-w-full">
+            <div
+              ref={contentRef}
+              // IMPORTANT: `shrink-0` ensures scrollWidth/scrollHeight reflect the
+              // computed content size (otherwise flex can shrink the content and the
+              // scrollbar cannot reach the end).
+              className="relative m-auto shrink-0"
+              style={{
+                width: `${pageLayoutRects.contentWidthPx}px`,
+                height: `${pageLayoutRects.contentHeightPx}px`,
+              }}
+            >
+              <VirtualizedPages
+                enabled={shouldVirtualizePages}
+                containerRef={containerRef}
+                axis={virtualAxis}
+                overscan={WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES}
+                pinIndex={
+                  typeof pinnedVirtualPageIndex === "number"
+                    ? (pageIndexToItemIndex.get(pinnedVirtualPageIndex) ?? null)
+                    : null
+                }
+                items={pagesWithControls}
+                rects={pageLayoutRects.virtualRects}
+                getKey={(p) =>
+                  `${sessionRenderKey ?? "workspace"}:${p.pageIndex}`
+                }
+                renderItem={(page) => renderPage(page)}
+                layoutEpoch={Math.round(editorState.scale * 1000)}
+              />
+            </div>
+          </div>
+        ) : (
           <div
             ref={contentRef}
-            // IMPORTANT: `shrink-0` ensures scrollWidth/scrollHeight reflect the
-            // computed content size (otherwise flex can shrink the content and the
-            // scrollbar cannot reach the end).
-            className="relative m-auto shrink-0"
+            className={cn(
+              "mx-auto grid min-h-full w-fit place-content-center p-8",
+              editorState.pageFlow === "horizontal"
+                ? "content-center items-center justify-items-center"
+                : "items-start justify-items-center",
+            )}
             style={{
-              width: `${pageLayoutRects.contentWidthPx}px`,
-              height: `${pageLayoutRects.contentHeightPx}px`,
+              ...contentLayoutStyle,
+              paddingBottom: workspaceBottomPaddingPx,
             }}
           >
-            <VirtualizedPages
-              enabled={shouldVirtualizePages}
-              containerRef={containerRef}
-              axis={virtualAxis}
-              overscan={WORKSPACE_VIRTUALIZATION_OVERSCAN_PAGES}
-              pinIndex={
-                typeof pinnedVirtualPageIndex === "number"
-                  ? (pageIndexToItemIndex.get(pinnedVirtualPageIndex) ?? null)
-                  : null
+            {pagesWithControls.map((page) => {
+              const placement = pagePlacementByIndex.get(page.pageIndex);
+              const isDoubleLayout = editorState.pageLayout !== "single";
+
+              if (!placement || !isDoubleLayout) {
+                const fallbackIdx = pagesWithControls.findIndex(
+                  (p) => p.pageIndex === page.pageIndex,
+                );
+                const spreadIndex = Math.max(0, fallbackIdx);
+                return (
+                  <div
+                    key={`${sessionRenderKey ?? "workspace"}:${page.pageIndex}`}
+                    style={
+                      editorState.pageFlow === "horizontal"
+                        ? {
+                            gridColumnStart: spreadIndex + 1,
+                            gridRowStart: 1,
+                          }
+                        : {
+                            gridRowStart: spreadIndex + 1,
+                            gridColumnStart: 1,
+                          }
+                    }
+                  >
+                    {renderPage(page)}
+                  </div>
+                );
               }
-              items={pagesWithControls}
-              rects={pageLayoutRects.virtualRects}
-              getKey={(p) => p.pageIndex}
-              renderItem={(page) => renderPage(page)}
-              layoutEpoch={Math.round(editorState.scale * 1000)}
-            />
-          </div>
-        </div>
-      ) : (
-        <div
-          ref={contentRef}
-          className={cn(
-            "mx-auto grid min-h-full w-fit place-content-center p-8",
-            editorState.pageFlow === "horizontal"
-              ? "content-center items-center justify-items-center"
-              : "items-start justify-items-center",
-          )}
-          style={{
-            ...contentLayoutStyle,
-            paddingBottom: workspaceBottomPaddingPx,
-          }}
-        >
-          {pagesWithControls.map((page) => {
-            const placement = pagePlacementByIndex.get(page.pageIndex);
-            const isDoubleLayout = editorState.pageLayout !== "single";
 
-            if (!placement || !isDoubleLayout) {
-              const fallbackIdx = pagesWithControls.findIndex(
-                (p) => p.pageIndex === page.pageIndex,
-              );
-              const spreadIndex = Math.max(0, fallbackIdx);
+              if (editorState.pageFlow === "horizontal") {
+                return (
+                  <div
+                    key={`${sessionRenderKey ?? "workspace"}:${page.pageIndex}`}
+                    style={
+                      placement.isSingleInSpread
+                        ? {
+                            gridColumnStart: placement.spreadIndex + 1,
+                            gridRow: "1 / span 2",
+                            alignSelf: "center",
+                            justifySelf: "center",
+                          }
+                        : {
+                            gridColumnStart: placement.spreadIndex + 1,
+                            gridRowStart: placement.posInSpread + 1,
+                            justifySelf: "start",
+                            alignSelf:
+                              placement.posInSpread === 0 ? "end" : "start",
+                          }
+                    }
+                  >
+                    {renderPage(page)}
+                  </div>
+                );
+              }
+
               return (
                 <div
-                  key={page.pageIndex}
-                  style={
-                    editorState.pageFlow === "horizontal"
-                      ? {
-                          gridColumnStart: spreadIndex + 1,
-                          gridRowStart: 1,
-                        }
-                      : {
-                          gridRowStart: spreadIndex + 1,
-                          gridColumnStart: 1,
-                        }
-                  }
-                >
-                  {renderPage(page)}
-                </div>
-              );
-            }
-
-            if (editorState.pageFlow === "horizontal") {
-              return (
-                <div
-                  key={page.pageIndex}
+                  key={`${sessionRenderKey ?? "workspace"}:${page.pageIndex}`}
                   style={
                     placement.isSingleInSpread
                       ? {
-                          gridColumnStart: placement.spreadIndex + 1,
-                          gridRow: "1 / span 2",
-                          alignSelf: "center",
+                          gridRowStart: placement.spreadIndex + 1,
+                          gridColumn: "1 / span 2",
                           justifySelf: "center",
+                          alignSelf: "start",
                         }
                       : {
-                          gridColumnStart: placement.spreadIndex + 1,
-                          gridRowStart: placement.posInSpread + 1,
-                          justifySelf: "start",
-                          alignSelf:
+                          gridRowStart: placement.spreadIndex + 1,
+                          gridColumnStart: placement.posInSpread + 1,
+                          justifySelf:
                             placement.posInSpread === 0 ? "end" : "start",
+                          alignSelf: "start",
                         }
                   }
                 >
                   {renderPage(page)}
                 </div>
               );
-            }
-
-            return (
-              <div
-                key={page.pageIndex}
-                style={
-                  placement.isSingleInSpread
-                    ? {
-                        gridRowStart: placement.spreadIndex + 1,
-                        gridColumn: "1 / span 2",
-                        justifySelf: "center",
-                        alignSelf: "start",
-                      }
-                    : {
-                        gridRowStart: placement.spreadIndex + 1,
-                        gridColumnStart: placement.posInSpread + 1,
-                        justifySelf:
-                          placement.posInSpread === 0 ? "end" : "start",
-                        alignSelf: "start",
-                      }
-                }
-              >
-                {renderPage(page)}
-              </div>
-            );
-          })}
-        </div>
-      )}
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

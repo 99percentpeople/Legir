@@ -13,7 +13,7 @@ import {
   THUMBNAIL_MIME_TYPE,
   THUMBNAIL_TARGET_WIDTH,
 } from "@/constants";
-import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { useEditorStore } from "@/store/useEditorStore";
 import { getWorkspaceRenderDpr } from "../lib/renderPerformance";
@@ -25,12 +25,14 @@ import { useDeferredRenderScale } from "../hooks/useDeferredRenderScale";
 import PDFTileLayer from "./PDFTileLayer";
 
 interface PDFCanvasLayerProps {
+  workerService: PDFWorkerService | null;
   page: PageData;
   scale: number;
   isInView: boolean;
 }
 
 const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
+  workerService,
   page,
   scale,
   isInView,
@@ -175,12 +177,17 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
   useLayoutEffect(() => {
     renderedScaleRef.current = null;
+    setActiveCanvas("A");
     setIsRendered(false);
-  }, [pageIndex, pageInfo]);
+    isATransferred.current = false;
+    isBTransferred.current = false;
+    detachedCanvasARef.current = null;
+    detachedCanvasBRef.current = null;
+  }, [pageIndex, pageInfo, workerService]);
 
   useLayoutEffect(() => {
     renderEpochRef.current += 1;
-  }, [pageIndex, pageInfo, renderScale]);
+  }, [pageIndex, pageInfo, renderScale, workerService]);
 
   // Stable IDs for canvas elements to allow reuse in Worker
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
@@ -193,15 +200,21 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   const detachedCanvasBRef = useRef<OffscreenCanvas | null>(null);
 
   useEffect(() => {
+    if (!workerService) return;
     return () => {
-      void pdfWorkerService.releaseCanvas({
+      void workerService.releaseCanvas({
         canvasIds: [canvasAId.current, canvasBId.current],
       });
     };
-  }, []);
+  }, [workerService]);
 
   // Rendering Logic with Double Buffering and Debounce
   useEffect(() => {
+    if (!workerService) {
+      setIsRendered(false);
+      return;
+    }
+
     if (tileState.tileMode) {
       return;
     }
@@ -287,7 +300,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         }
 
         // We pass the tile size to the worker
-        const success = await pdfWorkerService.renderPage({
+        const success = await workerService.renderPage({
           pageIndex,
           scale: renderScale * dpr,
           canvas: offscreenCanvas,
@@ -377,6 +390,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     pageIndex,
     pageInfo,
     renderScale,
+    workerService,
     tileState.tileMode,
     updateImageData,
   ]);
@@ -487,6 +501,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       />
 
       <PDFTileLayer
+        workerService={workerService}
         page={page}
         scale={renderScale}
         isInView={isInView}

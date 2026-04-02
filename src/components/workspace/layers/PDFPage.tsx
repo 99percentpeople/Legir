@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect, useRef, useState } from "react";
 import type { PageData, PDFSearchResult } from "@/types";
 import { useEditorStore } from "@/store/useEditorStore";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import PDFCanvasLayer from "./PDFCanvasLayer";
 import PDFTextLayer from "./PDFTextLayer";
 
@@ -9,6 +10,7 @@ const PDFPageRenderDebugOverlay = React.lazy(
 );
 
 interface PDFPageProps {
+  workerService: PDFWorkerService | null;
   page: PageData;
   scale: number;
   isSelectMode?: boolean;
@@ -21,6 +23,7 @@ interface PDFPageProps {
 }
 
 const PDFPage: React.FC<PDFPageProps> = ({
+  workerService,
   page,
   scale,
   isSelectMode = true,
@@ -88,10 +91,16 @@ const PDFPage: React.FC<PDFPageProps> = ({
         height: containerHeight * scale,
       }}
     >
-      <PDFCanvasLayer page={page} scale={scale} isInView={isInView} />
+      <PDFCanvasLayer
+        workerService={workerService}
+        page={page}
+        scale={scale}
+        isInView={isInView}
+      />
 
       {!disablePdfTextLayer && (
         <PDFTextLayer
+          workerService={workerService}
           page={page}
           scale={scale}
           isInView={isInView}

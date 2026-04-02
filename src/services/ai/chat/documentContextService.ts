@@ -14,7 +14,10 @@ import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
 import { pageTranslationService } from "@/services/pageTranslationService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
-import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import {
+  pdfWorkerService,
+  type PDFWorkerService,
+} from "@/services/pdfService/pdfWorkerService";
 import { roundAiRect } from "@/services/ai/utils/geometry";
 import { serializePageTextContent } from "@/services/ai/utils/pageTextSerialization";
 import type {
@@ -571,6 +574,7 @@ export const createDocumentContextService = (options: {
     summaryInstructions?: AiSummaryInstructions;
     signal?: AbortSignal;
   }) => Promise<string>;
+  workerService?: PDFWorkerService;
 }) => {
   const {
     getSnapshot,
@@ -580,6 +584,7 @@ export const createDocumentContextService = (options: {
     getDigestConfig,
     summarizeDigestChunk,
     summarizeRenderedPages,
+    workerService = pdfWorkerService,
   } = options;
 
   const pageTextCache = new Map<number, string>();
@@ -589,7 +594,7 @@ export const createDocumentContextService = (options: {
     const cached = pageTextCache.get(pageIndex);
     if (typeof cached === "string") return cached;
 
-    const textContent = await pdfWorkerService.getTextContent({
+    const textContent = await workerService.getTextContent({
       pageIndex,
       signal,
     });
@@ -613,6 +618,7 @@ export const createDocumentContextService = (options: {
     const lines = await pageTranslationService.extractLinesFromTextLayer({
       pageIndex,
       page,
+      workerService,
       signal,
     });
 
@@ -666,7 +672,7 @@ export const createDocumentContextService = (options: {
     });
 
     const renderCurrentDocumentPage = () =>
-      pdfWorkerService.renderPageImage({
+      workerService.renderPageImage({
         pageIndex,
         scale: pixelDensity,
         renderAnnotations,
@@ -693,22 +699,20 @@ export const createDocumentContextService = (options: {
         throw error;
       }
 
-      ({ bytes: imageBytes, mimeType } = await pdfWorkerService.renderPageImage(
-        {
-          pageIndex,
-          scale: pixelDensity,
-          renderAnnotations,
-          mimeType: "image/png",
-          priority: 0,
-          signal,
-          isNewDoc: true,
-          data: pdfBytes,
-          password:
-            typeof pdfSource?.password === "string"
-              ? pdfSource.password
-              : undefined,
-        },
-      ));
+      ({ bytes: imageBytes, mimeType } = await workerService.renderPageImage({
+        pageIndex,
+        scale: pixelDensity,
+        renderAnnotations,
+        mimeType: "image/png",
+        priority: 0,
+        signal,
+        isNewDoc: true,
+        data: pdfBytes,
+        password:
+          typeof pdfSource?.password === "string"
+            ? pdfSource.password
+            : undefined,
+      }));
     }
 
     if (!imageBytes || imageBytes.byteLength === 0) {
@@ -1025,7 +1029,7 @@ export const createDocumentContextService = (options: {
     const docId = `ai_render_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     try {
-      await pdfWorkerService.loadDocument(renderablePdfBytes, {
+      await workerService.loadDocument(renderablePdfBytes, {
         docId,
         signal,
       });
@@ -1052,7 +1056,7 @@ export const createDocumentContextService = (options: {
         });
 
         const { bytes: imageBytes, mimeType } =
-          await pdfWorkerService.renderPageImage({
+          await workerService.renderPageImage({
             docId,
             pageIndex: subsetPageIndex,
             scale: pixelDensity,
@@ -1094,7 +1098,7 @@ export const createDocumentContextService = (options: {
         );
       }
     } finally {
-      pdfWorkerService.unloadDocument(docId);
+      workerService.unloadDocument(docId);
     }
 
     return {
@@ -1719,7 +1723,7 @@ export const createDocumentContextService = (options: {
           const page = snapshot.pages[pageIndex];
           if (!page) return [];
 
-          const textContent = await pdfWorkerService.getTextContent({
+          const textContent = await workerService.getTextContent({
             pageIndex,
             signal,
           });

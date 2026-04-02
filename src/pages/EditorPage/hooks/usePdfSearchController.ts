@@ -1,7 +1,7 @@
 import React from "react";
 import { appEventBus } from "@/lib/eventBus";
 import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
-import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { EditorState, PDFSearchResult } from "@/types";
 import {
@@ -18,6 +18,7 @@ import type {
 
 interface UsePdfSearchControllerOptions {
   pages: EditorState["pages"];
+  workerService: PDFWorkerService | null;
   sidebarOpen: boolean;
   setUiState: EditorUiStateSetter;
   workspaceScrollContainerRef: React.RefObject<HTMLElement | null>;
@@ -27,6 +28,7 @@ interface UsePdfSearchControllerOptions {
 
 export function usePdfSearchController({
   pages,
+  workerService,
   sidebarOpen,
   setUiState,
   workspaceScrollContainerRef,
@@ -335,7 +337,9 @@ export function usePdfSearchController({
         try {
           const pageMatches = await Promise.all(
             pages.map(async (page) => {
-              const textContent = await pdfWorkerService.getTextContent({
+              if (!workerService) return [];
+
+              const textContent = await workerService.getTextContent({
                 pageIndex: page.pageIndex,
                 signal: abortController.signal,
               });
@@ -414,6 +418,7 @@ export function usePdfSearchController({
     pdfSearchMode,
     pdfSearchQuery,
     t,
+    workerService,
   ]);
 
   const pdfSearchResultsByPage = React.useMemo(() => {

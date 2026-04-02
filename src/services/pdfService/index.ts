@@ -1,4 +1,4 @@
-import { pdfWorkerService } from "./pdfWorkerService";
+import { pdfWorkerService, type PDFWorkerService } from "./pdfWorkerService";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
 import {
   getSystemFontFamilies,
@@ -1095,6 +1095,7 @@ export const loadPDF = async (
   input: File | Uint8Array,
   options?: {
     password?: string | null;
+    workerService?: PDFWorkerService;
   },
 ): Promise<{
   pdfBytes: Uint8Array;
@@ -1125,6 +1126,7 @@ export const loadPDF = async (
   let loadOk = false;
   let openPassword: string | undefined = undefined;
   let pdfDoc: PDFDocument;
+  const workerService = options?.workerService ?? pdfWorkerService;
   const initialPassword =
     typeof options?.password === "string" ? options.password : undefined;
   try {
@@ -1134,7 +1136,7 @@ export const loadPDF = async (
 
     const loadWorker = async (password?: string) => {
       try {
-        return await pdfWorkerService.loadDocument(renderBuffer, {
+        return await workerService.loadDocument(renderBuffer, {
           password,
           onProgress: (payload) => {
             const total =
@@ -1212,7 +1214,7 @@ export const loadPDF = async (
       ): Promise<number | null> => {
         if (!workerReady) return null;
         try {
-          return await pdfWorkerService.resolveDest({ dest: normalizedDest });
+          return await workerService.resolveDest({ dest: normalizedDest });
         } catch {
           return null;
         }
@@ -1297,7 +1299,7 @@ export const loadPDF = async (
     const outlinePromise = (async (): Promise<PDFOutlineItem[]> => {
       if (workerReady) {
         try {
-          const outline = await pdfWorkerService.getOutline();
+          const outline = await workerService.getOutline();
           if (outline) return outline;
         } catch (e) {
           console.warn("Failed to extract outline via worker", e);

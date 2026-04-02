@@ -1,5 +1,8 @@
 import type { TextContent, TextStyle } from "pdfjs-dist/types/src/display/api";
-import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import {
+  pdfWorkerService,
+  type PDFWorkerService,
+} from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import {
   DEFAULT_PDF_TEXT_STYLE,
@@ -422,9 +425,10 @@ const buildContextForPageFromTextLayer = async (args: {
   pages: PageData[];
   pageIndex: number;
   contextWindow: PageTranslateContextWindow;
+  workerService?: PDFWorkerService;
   signal?: AbortSignal;
 }): Promise<Array<{ pageIndex: number; text: string }>> => {
-  const { pages, pageIndex, contextWindow, signal } = args;
+  const { pages, pageIndex, contextWindow, workerService, signal } = args;
 
   const indices = getContextPageIndices(pageIndex, contextWindow, pages.length);
 
@@ -446,6 +450,7 @@ const buildContextForPageFromTextLayer = async (args: {
     const lines = await extractLinesFromTextLayerInternal({
       pageIndex: idx,
       page,
+      workerService,
       signal,
     });
     const raw = lines
@@ -527,6 +532,7 @@ const translatePageLinesStructured = async (args: {
   usePositionAwarePrompt: boolean;
   aiReflowParagraphs: boolean;
   pages: PageData[];
+  workerService?: PDFWorkerService;
   signal?: AbortSignal;
 }) => {
   const usable = args.lines.filter((l) => l.sourceText.trim().length > 0);
@@ -562,6 +568,7 @@ const translatePageLinesStructured = async (args: {
     pages: args.pages,
     pageIndex: args.pageIndex,
     contextWindow: args.contextWindow,
+    workerService: args.workerService,
     signal: args.signal,
   });
 
@@ -622,6 +629,7 @@ const translateParagraphCandidatesStructured = async (args: {
   usePositionAwarePrompt: boolean;
   aiReflowParagraphs: boolean;
   pages: PageData[];
+  workerService?: PDFWorkerService;
   signal?: AbortSignal;
 }) => {
   const ordered = args.candidates.slice().sort((a, b) => {
@@ -658,6 +666,7 @@ const translateParagraphCandidatesStructured = async (args: {
     pages: args.pages,
     pageIndex: args.pageIndex,
     contextWindow: args.contextWindow,
+    workerService: args.workerService,
     signal: args.signal,
   });
 
@@ -717,6 +726,7 @@ const unmergeSelectedParagraphCandidatesFromTextLayer = async (options: {
   pages: PageData[];
   candidates: PageTranslateParagraphCandidate[];
   selectedIds: string[];
+  workerService?: PDFWorkerService;
   signal?: AbortSignal;
   onProgress?: (info: {
     pageIndex: number;
@@ -765,6 +775,7 @@ const unmergeSelectedParagraphCandidatesFromTextLayer = async (options: {
     const lines = await extractLinesFromTextLayerInternal({
       pageIndex,
       page,
+      workerService: options.workerService,
       signal: options.signal,
     });
 
@@ -1772,11 +1783,13 @@ const extractLinesFromTextLayerInternal = async (options: {
   pageIndex: number;
   page: PageData;
   docId?: string;
+  workerService?: PDFWorkerService;
   signal?: AbortSignal;
 }): Promise<PageTranslationLine[]> => {
   const { pageIndex, page, docId, signal } = options;
+  const workerService = options.workerService ?? pdfWorkerService;
 
-  const textContent = await pdfWorkerService.getTextContent({
+  const textContent = await workerService.getTextContent({
     pageIndex,
     docId,
     signal,
@@ -1830,6 +1843,7 @@ export const pageTranslationService = {
     pageIndex: number;
     page: PageData;
     docId?: string;
+    workerService?: PDFWorkerService;
     signal?: AbortSignal;
   }): Promise<PageTranslationLine[]> => {
     return await extractLinesFromTextLayerInternal(options);
@@ -1842,14 +1856,24 @@ export const pageTranslationService = {
     yGap: number;
     splitByFontSize?: boolean;
     docId?: string;
+    workerService?: PDFWorkerService;
     signal?: AbortSignal;
   }): Promise<PageTranslateParagraphCandidate[]> => {
-    const { pageIndex, page, xGap, yGap, splitByFontSize, docId, signal } =
-      options;
+    const {
+      pageIndex,
+      page,
+      xGap,
+      yGap,
+      splitByFontSize,
+      docId,
+      workerService,
+      signal,
+    } = options;
     const lines = await pageTranslationService.extractLinesFromTextLayer({
       pageIndex,
       page,
       docId,
+      workerService,
       signal,
     });
     return buildParagraphCandidatesFromLines({
@@ -1868,6 +1892,7 @@ export const pageTranslationService = {
     yGap: number;
     splitByFontSize?: boolean;
     docId?: string;
+    workerService?: PDFWorkerService;
     signal?: AbortSignal;
     onProgress?: (info: {
       pageIndex: number;
@@ -1896,6 +1921,7 @@ export const pageTranslationService = {
           yGap: options.yGap,
           splitByFontSize: options.splitByFontSize,
           docId: options.docId,
+          workerService: options.workerService,
           signal: options.signal,
         });
       out.push(...candidates);
@@ -1920,6 +1946,7 @@ export const pageTranslationService = {
       padding?: number;
       flattenFreetext?: boolean;
       docId?: string;
+      workerService?: PDFWorkerService;
       signal?: AbortSignal;
       onProgress?: (info: {
         pageIndex: number;
@@ -1949,6 +1976,7 @@ export const pageTranslationService = {
               pageIndex,
               page,
               docId: options.docId,
+              workerService: options.workerService,
               signal: options.signal,
             });
 
@@ -1975,6 +2003,7 @@ export const pageTranslationService = {
               contextWindow: options.contextWindow,
               usePositionAwarePrompt: options.usePositionAwarePrompt,
               aiReflowParagraphs: options.aiReflowParagraphs,
+              workerService: options.workerService,
               signal: options.signal,
             });
 
@@ -2015,6 +2044,7 @@ export const pageTranslationService = {
                 flattenFreetext: options.flattenFreetext,
                 padding: options.padding,
                 docId: options.docId,
+                workerService: options.workerService,
                 signal: options.signal,
                 onProgress: (info) => options.onProgress?.(info),
               },
@@ -2055,6 +2085,7 @@ export const pageTranslationService = {
       aiReflowParagraphs: boolean;
       padding?: number;
       flattenFreetext?: boolean;
+      workerService?: PDFWorkerService;
       signal?: AbortSignal;
       onProgress?: (info: {
         processed: number;
@@ -2117,6 +2148,7 @@ export const pageTranslationService = {
             contextWindow: options.contextWindow,
             usePositionAwarePrompt: options.usePositionAwarePrompt,
             aiReflowParagraphs: options.aiReflowParagraphs,
+            workerService: options.workerService,
             signal: options.signal,
           });
           translatedLines.push(...structured);
@@ -2197,6 +2229,7 @@ export const pageTranslationService = {
     pages: PageData[];
     candidates: PageTranslateParagraphCandidate[];
     selectedIds: string[];
+    workerService?: PDFWorkerService;
     signal?: AbortSignal;
     onProgress?: (info: {
       pageIndex: number;
@@ -2208,6 +2241,7 @@ export const pageTranslationService = {
       pages: options.pages,
       candidates: options.candidates,
       selectedIds: options.selectedIds,
+      workerService: options.workerService,
       signal: options.signal,
       onProgress: options.onProgress,
     });
@@ -2224,6 +2258,7 @@ export const pageTranslationService = {
     };
     usePositionAwarePrompt?: boolean;
     docId?: string;
+    workerService?: PDFWorkerService;
     signal?: AbortSignal;
     onProgress?: (info: {
       pageIndex: number;
@@ -2233,8 +2268,15 @@ export const pageTranslationService = {
       totalLines: number;
     }) => void;
   }): Promise<PageTranslationResult[]> => {
-    const { pages, pageIndices, translate, docId, signal, onProgress } =
-      options;
+    const {
+      pages,
+      pageIndices,
+      translate,
+      docId,
+      workerService,
+      signal,
+      onProgress,
+    } = options;
 
     const results: PageTranslationResult[] = [];
 
@@ -2251,6 +2293,7 @@ export const pageTranslationService = {
         pageIndex,
         page,
         docId,
+        workerService,
         signal,
       });
 
@@ -2277,6 +2320,7 @@ export const pageTranslationService = {
           contextWindow: "none",
           usePositionAwarePrompt: options.usePositionAwarePrompt ?? false,
           aiReflowParagraphs: false,
+          workerService,
           signal,
         });
 
@@ -2808,6 +2852,7 @@ export const pageTranslationService = {
     usePositionAwarePrompt?: boolean;
     flattenFreetext?: boolean;
     docId?: string;
+    workerService?: PDFWorkerService;
     signal?: AbortSignal;
     padding?: number;
     onProgress?: (info: {
@@ -2824,6 +2869,7 @@ export const pageTranslationService = {
       translate: options.translate,
       usePositionAwarePrompt: options.usePositionAwarePrompt,
       docId: options.docId,
+      workerService: options.workerService,
       signal: options.signal,
       onProgress: options.onProgress,
     });

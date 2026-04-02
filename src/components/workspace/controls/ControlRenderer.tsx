@@ -34,9 +34,6 @@ const ControlRendererInner = <T extends FormField | Annotation>(
     ...rest
   } = props;
 
-  // Performance monitoring (Disabled by default to prevent console spam during zoom)
-  // usePerformanceMonitor(`ControlRenderer:${data.type}`, false);
-
   const controlConfig = registry.get(data.type);
 
   const handlePointerDown = React.useCallback(

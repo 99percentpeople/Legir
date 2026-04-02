@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { pageTranslationService } from "@/services/pageTranslationService";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
 import type {
   Annotation,
@@ -15,6 +16,7 @@ type TranslateFn = (key: string) => string;
 
 export const usePageTranslation = (deps: {
   state: EditorState;
+  workerService?: PDFWorkerService | null;
   t: TranslateFn;
   addAnnotations: (
     annotations: Annotation[],
@@ -43,6 +45,7 @@ export const usePageTranslation = (deps: {
 }) => {
   const {
     state,
+    workerService,
     t,
     addAnnotations,
     setState,
@@ -144,6 +147,7 @@ export const usePageTranslation = (deps: {
                 aiReflowParagraphs: options.aiReflowParagraphs,
                 padding: state.pageTranslateOptions.freetextPadding,
                 flattenFreetext: state.pageTranslateOptions.flattenFreetext,
+                workerService: workerService ?? undefined,
                 signal: controller.signal,
                 onProgress: ({ processed, total }) => {
                   const status = `${t("common.processing")} ${processed}/${total}`;
@@ -191,6 +195,7 @@ export const usePageTranslation = (deps: {
               aiReflowParagraphs: options.aiReflowParagraphs,
               padding: state.pageTranslateOptions.freetextPadding,
               flattenFreetext: state.pageTranslateOptions.flattenFreetext,
+              workerService: workerService ?? undefined,
               signal: controller.signal,
               onProgress: ({
                 pageNumber,
@@ -250,6 +255,7 @@ export const usePageTranslation = (deps: {
       state.pageTranslateOptions.flattenFreetext,
       state.pages,
       t,
+      workerService,
       withProcessing,
     ],
   );
@@ -277,6 +283,7 @@ export const usePageTranslation = (deps: {
               yGap: options.yGap,
               splitByFontSize:
                 state.pageTranslateOptions.paragraphSplitByFontSize,
+              workerService: workerService ?? undefined,
               signal: controller.signal,
               onProgress: ({ pageNumber, totalPages }) => {
                 const status = `${t("common.processing")} (${pageNumber}/${totalPages})`;
@@ -311,6 +318,7 @@ export const usePageTranslation = (deps: {
       state.pages,
       state.pageTranslateOptions.paragraphSplitByFontSize,
       t,
+      workerService,
       withProcessing,
     ],
   );
@@ -336,6 +344,7 @@ export const usePageTranslation = (deps: {
               pages: state.pages,
               candidates: state.pageTranslateParagraphCandidates,
               selectedIds,
+              workerService: workerService ?? undefined,
               signal: controller.signal,
               onProgress: ({ pageNumber, totalPages }) => {
                 const status = `${t("common.processing")} (${pageNumber}/${totalPages})`;
@@ -375,6 +384,7 @@ export const usePageTranslation = (deps: {
     state.pageTranslateSelectedParagraphIds,
     state.pages,
     t,
+    workerService,
     withProcessing,
   ]);
 

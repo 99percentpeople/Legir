@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PageData } from "@/types";
 import { MAX_PIXELS_PER_PAGE, TILE_MAX_DIM } from "@/constants";
-import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
@@ -73,6 +73,7 @@ const tileIntersectsViewportRect = (
 };
 
 interface PDFTileLayerProps {
+  workerService: PDFWorkerService | null;
   page: PageData;
   scale: number;
   isInView: boolean;
@@ -86,6 +87,7 @@ interface PDFTileLayerProps {
 }
 
 const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
+  workerService,
   page,
   scale,
   isInView,
@@ -146,7 +148,9 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
   const releaseAndForgetCanvases = (canvasIds: string[]) => {
     if (canvasIds.length === 0) return;
-    void pdfWorkerService.releaseCanvas({ canvasIds });
+    if (workerService) {
+      void workerService.releaseCanvas({ canvasIds });
+    }
     for (const cid of canvasIds) {
       tileCanvasElsRef.current.delete(cid);
       tileDetachedCanvasRef.current.delete(cid);
@@ -186,6 +190,20 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       }
     };
   }, []);
+
+  useEffect(() => {
+    // Important: only release worker-owned tile canvases in cleanup.
+    // Do not reset tile state when `workerService` becomes available on mount:
+    // restored high-zoom sessions rely on `backTiles/backTilesKey` surviving the
+    // first render pass, otherwise tile mode stays blurry until a manual zoom
+    // forces the grid to be rebuilt.
+    return () => {
+      if (!workerService) return;
+      const canvasIds = Array.from(tileCanvasElsRef.current.keys());
+      if (canvasIds.length === 0) return;
+      void workerService.releaseCanvas({ canvasIds });
+    };
+  }, [workerService]);
 
   useEffect(() => {
     if (!scrollContainerEl) return;
@@ -274,7 +292,12 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           }
           reprioritizeBusyRef.current = true;
 
-          void pdfWorkerService
+          if (!workerService) {
+            reprioritizeBusyRef.current = false;
+            return;
+          }
+
+          void workerService
             .reprioritize({
               pageIndex,
               scale: scale * dpr,
@@ -312,15 +335,25 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       reprioritizeQueuedCenterRef.current = null;
       reprioritizeBusyRef.current = false;
     };
-  }, [backTilesKey, pageIndex, scale, scrollContainerEl, tileMode]);
+  }, [
+    backTilesKey,
+    pageIndex,
+    scale,
+    scrollContainerEl,
+    tileMode,
+    workerService,
+  ]);
 
   useLayoutEffect(() => {
     renderEpochRef.current += 1;
-  }, [page, pageIndex, scale, tileMode, backTilesKey]);
+  }, [page, pageIndex, scale, tileMode, backTilesKey, workerService]);
 
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
 
   useEffect(() => {
+    // Tile layout must be derived from the restored scale/viewport and remain
+    // intact through the first render pass. Regressions here tend to break only
+    // session restore/tab switch in tile mode while page-mode still works.
     const dpr = getWorkspaceRenderDpr(
       {
         viewBox: page.viewBox,
@@ -455,7 +488,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
     setBackTiles(nextTiles);
     setBackTilesKey(epoch);
-  }, [backTilesKey, frontTilesKey, page, pageIndex, scale]);
+  }, [backTilesKey, frontTilesKey, page, pageIndex, scale, workerService]);
 
   useEffect(() => {
     if (!tileMode) return;
@@ -585,6 +618,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     if (!tileMode) return;
     if (!backTilesKey) return;
     if (backTiles.length === 0) return;
+    if (!workerService) return;
 
     const epoch = renderEpochRef.current;
     let abortController: AbortController | null = null;
@@ -632,7 +666,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
           tileTransferredRef.current.add(tile.canvasId);
         }
 
-        const ok = await pdfWorkerService.renderPage({
+        const ok = await workerService.renderPage({
           pageIndex,
           scale: scale * dprRef.current,
           canvas: alreadyTransferred ? undefined : offscreenCanvas,
@@ -832,6 +866,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     scale,
     tileMode,
     viewportVersion,
+    workerService,
   ]);
 
   const hasUsableFrontTileBuffer =

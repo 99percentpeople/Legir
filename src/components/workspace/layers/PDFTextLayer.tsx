@@ -16,7 +16,7 @@ import {
   PDF_TEXT_SELECTION_HANDLE_STEM_WIDTH_PX,
   PDF_TEXT_SELECTION_HANDLE_WIDTH_PX,
 } from "@/constants";
-import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { buildTextLayer } from "../lib/pdfTextLayer";
 import { useTextLayerSelection } from "../hooks/useTextLayerSelection";
@@ -31,6 +31,7 @@ import {
 } from "../debug/pdfPageRenderTelemetry";
 
 interface PDFTextLayerProps {
+  workerService: PDFWorkerService | null;
   page: PageData;
   scale: number;
   isInView: boolean;
@@ -44,6 +45,7 @@ interface PDFTextLayerProps {
 }
 
 const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
+  workerService,
   page,
   scale,
   isInView,
@@ -250,7 +252,15 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
             rotation: pageInfo.rotation,
           });
 
-          const textContentPromise = pdfWorkerService.getTextContent({
+          if (!workerService) {
+            container.replaceChildren();
+            endOfContentRef.current = null;
+            setHasSelectableText(false);
+            setRenderedScale(targetScale);
+            return;
+          }
+
+          const textContentPromise = workerService.getTextContent({
             pageIndex,
             signal,
           });
@@ -304,6 +314,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
       pageInfo,
       setLayerVars,
       syncTextLayerContainerStyles,
+      workerService,
     ],
   );
 
@@ -321,7 +332,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     if (textLayerRef.current) {
       textLayerRef.current.innerHTML = "";
     }
-  }, [pageIndex, pageInfo]);
+  }, [pageIndex, pageInfo, workerService]);
 
   // 2. Handle Selection Logic (Web Select API)
   // Replaces the old 'pointerdown' logic with native 'selectionchange'

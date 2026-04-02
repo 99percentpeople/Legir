@@ -27,7 +27,10 @@ import {
   isAiSdkProviderConfigured,
   parseAiSdkModelSpecifier,
 } from "@/services/ai";
-import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
+import {
+  pdfWorkerService,
+  type PDFWorkerService,
+} from "@/services/pdfService/pdfWorkerService";
 import { roundAiRect } from "@/services/ai/utils/geometry";
 import { pruneUndefinedKeys } from "@/services/ai/utils/object";
 import {
@@ -996,7 +999,9 @@ export const createAiChatToolContext = (options: {
   formToolsVisionModelKey?: string;
   selectedChatModel?: SelectedChatModelMeta;
   selectedChatModelAuthor: string;
+  workerService?: PDFWorkerService;
 }) => {
+  const workerService = options.workerService ?? pdfWorkerService;
   const getDocumentPageAssetSummary = () => summarizeDocumentPageAssets();
   const getActiveSession = () =>
     options.sessionsRef.current.get(options.activeSessionIdRef.current) ?? null;
@@ -3144,7 +3149,7 @@ export const createAiChatToolContext = (options: {
       : undefined;
     const pageTextContentCache = new Map<
       number,
-      Awaited<ReturnType<typeof pdfWorkerService.getTextContent>>
+      Awaited<ReturnType<typeof workerService.getTextContent>>
     >();
     const serializedPageTextCache = new Map<
       number,
@@ -3174,7 +3179,7 @@ export const createAiChatToolContext = (options: {
       if (pageTextContentCache.has(pageIndex)) {
         return pageTextContentCache.get(pageIndex) ?? null;
       }
-      const textContent = await pdfWorkerService.getTextContent({ pageIndex });
+      const textContent = await workerService.getTextContent({ pageIndex });
       pageTextContentCache.set(pageIndex, textContent);
       return textContent;
     };

@@ -52,11 +52,9 @@ const documentPolyfillUsage: DocumentPolyfillUsage = {
   },
 };
 
-const shouldLogDocumentPolyfillUse = false;
 const maybeLogDocumentPolyfillUse = (method: string, data?: unknown) => {
   documentPolyfillUsage.calls[method] += 1;
-  if (!shouldLogDocumentPolyfillUse) return;
-  console.debug("[worker] document polyfill used", { method, data });
+  void data;
 };
 
 const getDocumentPolyfillUsageSnapshot = () => ({
@@ -198,17 +196,21 @@ const canvasMap = new Map<string, OffscreenCanvas>();
 // Store active render tasks to allow cancellation
 const activeRenderTasks = new Map<
   string,
-  { cancel: () => void; docId: string }
+  { cancel: () => void; docId: string; canvasId?: string }
 >();
 
 const registerCancellableTask = (
   id: string,
   docId: string,
   onCancel?: () => void,
+  meta?: {
+    canvasId?: string;
+  },
 ) => {
   let isCancelled = false;
   activeRenderTasks.set(id, {
     docId,
+    canvasId: meta?.canvasId,
     cancel: () => {
       isCancelled = true;
       try {
@@ -654,6 +656,9 @@ const renderToCanvas = async (
     () => {
       renderTask?.cancel();
     },
+    {
+      canvasId,
+    },
   );
 
   try {
@@ -938,6 +943,17 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
             if (removed) {
               postSuccess(removed.id, false);
             }
+          }
+          for (const [taskId, task] of Array.from(
+            activeRenderTasks.entries(),
+          )) {
+            if (!task.canvasId || !idsToRelease.has(task.canvasId)) continue;
+            try {
+              task.cancel();
+            } catch {
+              // ignore
+            }
+            activeRenderTasks.delete(taskId);
           }
           for (const cid of idsToRelease) {
             canvasMap.delete(cid);
