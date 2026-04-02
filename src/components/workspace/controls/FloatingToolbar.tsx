@@ -5,6 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { WorkspacePointerDownDismissProvider } from "@/lib/workspacePointerDownDismissContext";
 
 export interface FloatingToolbarProps {
   isVisible: boolean;
@@ -70,7 +71,10 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
         style={style}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        {children}
+        {/* Keep nested style popovers open while interacting inside a selected control. */}
+        <WorkspacePointerDownDismissProvider value={false}>
+          {children}
+        </WorkspacePointerDownDismissProvider>
       </PopoverContent>
     </Popover>
   );

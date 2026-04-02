@@ -8,6 +8,7 @@ import { useLanguage } from "../language-provider";
 import { ColorPaletteControl } from "../ui/color-palette";
 import type { ColorPaletteType } from "@/lib/colorPalette";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useWorkspacePointerDownDismiss } from "@/lib/workspacePointerDownDismissContext";
 
 interface ColorPickerPopoverProps {
   color: string;
@@ -27,6 +28,7 @@ interface ColorPickerPopoverProps {
   title?: string;
   children?: React.ReactNode;
   onInteractionStart?: () => void;
+  closeOnWorkspacePointerDown?: boolean;
 }
 
 export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
@@ -47,13 +49,20 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   title = "Properties",
   children,
   onInteractionStart,
+  closeOnWorkspacePointerDown,
 }) => {
   const { t } = useLanguage();
+  // Most toolbar popovers should close when the user clicks back into the
+  // workspace; floating control toolbars override this via context.
+  const inheritedCloseOnWorkspacePointerDown = useWorkspacePointerDownDismiss();
+  const shouldCloseOnWorkspacePointerDown =
+    closeOnWorkspacePointerDown ?? inheritedCloseOnWorkspacePointerDown;
 
   const [open, setOpen] = React.useState(false);
   const hasStartedInteractionRef = React.useRef(false);
 
   useAppEvent("workspace:pointerDown", () => {
+    if (!shouldCloseOnWorkspacePointerDown) return;
     setOpen(false);
   });
 
