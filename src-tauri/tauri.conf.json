@@ -2,12 +2,12 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "formforge-pdf-editor",
   "version": "0.1.0",
-  "identifier": "com._99percent.formforge",
+  "identifier": "com.-99percent.formforge",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "bun run dev",
-    "beforeBuildCommand": "bun run build -- --mode tauri",
+    "beforeBuildCommand": "bun run build:web:tauri",
     "removeUnusedCommands": true
   },
   "app": {

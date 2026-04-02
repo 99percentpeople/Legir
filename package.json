@@ -14,6 +14,7 @@
     "build": "tsc --noEmit && vite build",
     "build:turbo": "turbo run build",
     "build:app": "tauri build",
+    "build:web:tauri": "turbo run build -- --mode tauri",
     "preview": "bun run build:turbo && vite preview",
     "format": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,css,html,json,md}\"",
     "typecheck": "tsc --noEmit",
