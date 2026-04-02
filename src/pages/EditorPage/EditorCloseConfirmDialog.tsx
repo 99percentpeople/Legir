@@ -11,6 +11,7 @@ import type { TranslateFn } from "./types";
 interface EditorCloseConfirmDialogProps {
   open: boolean;
   isDirty: boolean;
+  documentTitle?: string | null;
   platformDocumentSaveMode: "draft" | "file";
   onCloseDialog: () => void;
   onSaveAndClose: () => Promise<void>;
@@ -21,6 +22,7 @@ interface EditorCloseConfirmDialogProps {
 export function EditorCloseConfirmDialog({
   open,
   isDirty,
+  documentTitle,
   platformDocumentSaveMode,
   onCloseDialog,
   onSaveAndClose,
@@ -36,7 +38,11 @@ export function EditorCloseConfirmDialog({
     >
       <DialogContent>
         <DialogTitle>{t("dialog.confirm_close.title")}</DialogTitle>
-        <DialogDescription>{t("dialog.confirm_close.desc")}</DialogDescription>
+        <DialogDescription>
+          {documentTitle
+            ? t("dialog.confirm_close.desc_named", { filename: documentTitle })
+            : t("dialog.confirm_close.desc")}
+        </DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={onCloseDialog}>
             {t("dialog.confirm_close.cancel")}

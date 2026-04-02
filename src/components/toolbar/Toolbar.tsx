@@ -41,7 +41,6 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { useLanguage } from "../language-provider";
 import { ColorPickerPopover } from "./ColorPickerPopover";
-import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import ZoomDropdownControl from "./ZoomDropdownControl";
 import PageSettingsDropdownControl from "./PageSettingsDropdownControl";
 import { ANNOTATION_STYLES } from "@/constants";
@@ -61,7 +60,6 @@ import {
 
 interface ToolbarProps {
   editorState: EditorState;
-  isSaving?: boolean;
   isDirty?: boolean;
   hideModeSelector?: boolean;
   hideToolSection?: boolean;
@@ -84,7 +82,7 @@ interface ToolbarProps {
     style: Partial<NonNullable<EditorState["shapeStyle"]>>,
   ) => void;
   onExport: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => Promise<void>;
+  onSaveDraft: (silent?: boolean) => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onPrint: () => void;
   onExit: () => void;
@@ -105,7 +103,6 @@ interface ToolbarProps {
 
 const Toolbar: React.FC<ToolbarProps> = ({
   editorState,
-  isSaving = false,
   isDirty = false,
   hideModeSelector = false,
   hideToolSection = false,
@@ -682,13 +679,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
       )}
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <SaveStatusIndicator
-          isSaving={isSaving}
-          isDirty={isDirty}
-          lastSavedAt={editorState.lastSavedAt}
-          className="flex"
-        />
-
         <div className="flex items-center gap-1">
           {showPageSettingsControl && (
             <PageSettingsDropdownControl

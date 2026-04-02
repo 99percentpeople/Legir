@@ -28,7 +28,7 @@ export interface ExportMenuProps {
   isDirty: boolean;
   hasSaveAs: boolean;
   onPrimary: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => Promise<void>;
+  onSaveDraft: (silent?: boolean) => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;

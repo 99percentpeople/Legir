@@ -118,6 +118,8 @@ const fr = {
     confirm_close: {
       title: "Fermer le document ?",
       desc: "Êtes-vous sûr de vouloir fermer ? Toutes les modifications non enregistrées seront perdues.",
+      desc_named:
+        'Êtes-vous sûr de vouloir fermer "{filename}" ? Toutes les modifications non enregistrées seront perdues.',
       save_close: "Enregistrer et fermer",
       export_close: "Exporter et fermer",
       save_draft_close: "Enregistrer le brouillon et fermer",
@@ -817,6 +819,11 @@ const fr = {
     export_fail: "Échec de l'exportation du PDF.",
     save_reopen_fail: "Échec de l'enregistrement et de la réouverture.",
     save_close_fail: "Échec de l'enregistrement et de la fermeture.",
+  },
+  tabs: {
+    detach_to_new_window: "Détacher dans une nouvelle fenêtre",
+    merge_to_window: "Fusionner dans une fenêtre",
+    window_n: "Fenêtre {index}",
   },
 } as const;
 

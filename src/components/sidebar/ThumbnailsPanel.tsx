@@ -31,7 +31,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
   useEffect(() => {
     if (!isActive || !ref.current) return;
     const behavior = scrollBehaviorRef.current;
-    ref.current.scrollIntoView({ behavior, block: "center" });
+    ref.current.scrollIntoView({ behavior, block: "nearest" });
     if (behavior === "auto" && !isRestoringViewState) {
       scrollBehaviorRef.current = "smooth";
     }

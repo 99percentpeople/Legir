@@ -115,17 +115,6 @@ export const writeToSaveTarget = async (
   await writable.close();
 };
 
-export const getStartupOpenDocumentPath = async (): Promise<string | null> => {
-  if (!isDesktopApp()) return null;
-
-  const { getMatches } = await import("@tauri-apps/plugin-cli");
-  const matches = await getMatches();
-  const value = matches?.args?.source.value;
-  const first = Array.isArray(value) ? value[0] : value;
-
-  return typeof first === "string" ? first : null;
-};
-
 export const openFileFromPath = async (
   filePath: string,
 ): Promise<OpenFileResult> => {

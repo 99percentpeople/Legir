@@ -46,6 +46,7 @@ import {
   loadPersistedSelectedModelKey,
   normalizeMessageAttachments,
   persistAiChatDocumentState,
+  type RestoredAiChatDocumentState,
   persistSelectedModelKey,
   restoreConversationFromTimeline,
   restorePersistedAiChatDocumentState,
@@ -82,9 +83,15 @@ import {
 } from "@/hooks/useAiChatController/timelineUpdates";
 import { appEventBus } from "@/lib/eventBus";
 import { exportPDF } from "@/services/pdfService";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
 const isAbortError = (error: unknown) =>
   error instanceof Error && error.name === "AbortError";
+
+const inMemoryAiChatScopeRegistry = new Map<
+  string,
+  RestoredAiChatDocumentState
+>();
 
 const getFirstLineTitleSnippet = (text: string) => {
   const firstLine =
@@ -140,7 +147,21 @@ const updateDetectedFieldBatchConfirmation = (options: {
     });
 };
 
-export const useAiChatController = (editorState: EditorState) => {
+const createInMemoryAiChatDocumentState = (options: {
+  activeSessionId: string;
+  sessions: AiChatSessionSummary[];
+  sessionsMap: Map<string, AiChatSessionData>;
+}): RestoredAiChatDocumentState => ({
+  activeSessionId: options.activeSessionId,
+  sessionsMap: new Map(options.sessionsMap),
+  sessionSummaries: options.sessions.map((session) => ({ ...session })),
+});
+
+export const useAiChatController = (
+  editorState: EditorState,
+  scopeId?: string,
+  workerService?: PDFWorkerService,
+) => {
   const [registryVersion, setRegistryVersion] = useState(0);
   const [selectedModelKey, setSelectedModelKey] = useState<string | undefined>(
     () => loadPersistedSelectedModelKey(),
@@ -691,6 +712,7 @@ export const useAiChatController = (editorState: EditorState) => {
     editorState.pages.length,
     editorState.pdfBytes?.byteLength ?? 0,
   ].join(":");
+  const aiScopeId = scopeId?.trim() || documentIdentity;
 
   const isDocumentLoaded = editorState.pages.length > 0;
 
@@ -726,6 +748,7 @@ export const useAiChatController = (editorState: EditorState) => {
           visualSummaryEnabled && visualSummaryModelKey
             ? summarizeRenderedPages
             : undefined,
+        workerService,
       }),
     [
       digestEnabled,
@@ -751,6 +774,7 @@ export const useAiChatController = (editorState: EditorState) => {
       summarizeRenderedPages,
       visualSummaryEnabled,
       visualSummaryModelKey,
+      workerService,
     ],
   );
 
@@ -760,6 +784,33 @@ export const useAiChatController = (editorState: EditorState) => {
     contextMemoryJobIdsRef.current.clear();
     notifyContextMemoryPendingChanged();
     searchSeqRef.current = 0;
+
+    const restoredInMemory = inMemoryAiChatScopeRegistry.get(aiScopeId);
+    if (restoredInMemory) {
+      sessionsRef.current = restoredInMemory.sessionsMap;
+      setSessions(restoredInMemory.sessionSummaries);
+      setActiveSessionId(restoredInMemory.activeSessionId);
+      setIsDraftConversation(false);
+
+      const active = restoredInMemory.sessionsMap.get(
+        restoredInMemory.activeSessionId,
+      );
+      if (active) {
+        applyAiChatSessionUiState({
+          session: active,
+          conversationRef,
+          searchResultsRef,
+          setTimeline,
+          setRunStatus,
+          setLastError,
+          setAwaitingContinue,
+          setTokenUsage,
+          setContextTokens,
+          setHighlightedResultIds,
+        });
+        return;
+      }
+    }
 
     if (isDocumentLoaded) {
       const restored = restorePersistedAiChatDocumentState(documentIdentity);
@@ -807,6 +858,7 @@ export const useAiChatController = (editorState: EditorState) => {
       setHighlightedResultIds,
     });
   }, [
+    aiScopeId,
     documentIdentity,
     notifyContextMemoryPendingChanged,
     resetDraftConversationUi,
@@ -847,6 +899,32 @@ export const useAiChatController = (editorState: EditorState) => {
   ]);
 
   useEffect(() => {
+    const currentActiveSessionId = activeSessionId;
+    if (!currentActiveSessionId) return;
+    if (!sessionsRef.current.has(currentActiveSessionId)) return;
+
+    inMemoryAiChatScopeRegistry.set(
+      aiScopeId,
+      createInMemoryAiChatDocumentState({
+        activeSessionId: currentActiveSessionId,
+        sessions,
+        sessionsMap: sessionsRef.current,
+      }),
+    );
+  }, [
+    activeSessionId,
+    aiScopeId,
+    awaitingContinue,
+    contextTokens,
+    highlightedResultIds,
+    lastError,
+    runStatus,
+    sessions,
+    timeline,
+    tokenUsage,
+  ]);
+
+  useEffect(() => {
     return () => {
       abortRef.current?.abort();
     };
@@ -867,6 +945,7 @@ export const useAiChatController = (editorState: EditorState) => {
           editorState.options.aiChat.formToolsVisionModelKey,
         selectedChatModel,
         selectedChatModelAuthor,
+        workerService,
       }),
     [
       editorState.options.aiChat.formToolsEnabled,
@@ -874,6 +953,7 @@ export const useAiChatController = (editorState: EditorState) => {
       editorState.options.aiChat.formToolsVisionModelKey,
       selectedChatModel,
       selectedChatModelAuthor,
+      workerService,
     ],
   );
 

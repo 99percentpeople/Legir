@@ -35,8 +35,8 @@ import {
   subscribePlatformFullscreenChange,
 } from "@/services/platform";
 import { EditorCanvasPane } from "./EditorCanvasPane";
-import { EditorCloseConfirmDialog } from "./EditorCloseConfirmDialog";
 import { EditorRightPanel } from "./EditorRightPanel";
+import { EditorTabStrip } from "./components/EditorTabStrip";
 import { useEditorPageKeyboardShortcuts } from "./hooks/useEditorPageKeyboardShortcuts";
 import { useEditorPageLifecycle } from "./hooks/useEditorPageLifecycle";
 import { usePdfSearchController } from "./hooks/usePdfSearchController";
@@ -45,11 +45,27 @@ import type { EditorPageProps } from "./types";
 export type { EditorPageProps } from "./types";
 
 const EditorPage: React.FC<EditorPageProps> = ({
+  windowId,
+  tabs,
+  activeTabId,
+  workerService,
+  isFileDragActive,
+  mergeWindowTargets,
+  onOpenDocument,
+  onRefreshMergeWindowTargets,
+  onSelectTab,
+  onCloseTab,
+  onMoveTab,
+  onDetachTab,
+  onMergeTabToWindow,
+  canDetachTabs,
+  canMergeTabs,
   onExport,
   onSaveDraft,
   onSaveAs,
   onExit,
   onPrint,
+  onRequestCloseCurrentTab,
 }) => {
   const editorStore = useEditorStore(useShallow(selectEditorPageShellState));
   const state = editorStore;
@@ -105,6 +121,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
     handleUnmergeSelectedParagraphs,
   } = usePageTranslation({
     state,
+    workerService,
     t,
     addAnnotations,
     setState,
@@ -116,7 +133,11 @@ const EditorPage: React.FC<EditorPageProps> = ({
     removePageTranslateParagraphCandidatesByPageIndex,
   });
 
-  const aiChat = useAiChatController(state);
+  const aiChat = useAiChatController(
+    state,
+    activeTabId ?? undefined,
+    workerService ?? undefined,
+  );
 
   const openAiChatPanel = React.useCallback(() => {
     setUiState((prev) => {
@@ -178,21 +199,10 @@ const EditorPage: React.FC<EditorPageProps> = ({
     });
   }, [setState]);
 
-  const requestCloseConfirm = React.useCallback(
-    (source: "menu" | "window") => {
-      setState({
-        activeDialog: "close_confirm",
-        closeConfirmSource: source,
-      });
-    },
-    [setState],
-  );
-
   const runPrimarySaveAction = React.useCallback(
     async (silentDraft = false) => {
       if (platformDocumentSaveMode === "draft") {
-        await onSaveDraft(silentDraft);
-        return true;
+        return await onSaveDraft(silentDraft);
       }
 
       const snapshot = useEditorStore.getState();
@@ -202,21 +212,22 @@ const EditorPage: React.FC<EditorPageProps> = ({
     [onExport, onSaveDraft, platformDocumentSaveMode],
   );
 
-  const { workspaceScrollContainerRef, closeWindow } = useEditorPageLifecycle({
+  const { workspaceScrollContainerRef } = useEditorPageLifecycle({
     filename: state.filename,
     pagesLength: state.pages.length,
     isDirty: state.isDirty,
+    hasDirtyTabs: tabs.some((tab) => tab.isDirty),
     pdfBytes: state.pdfBytes,
     fieldsFingerprint: state.fields,
     annotationsFingerprint: state.annotations,
     metadataFingerprint: state.metadata,
     platformDocumentSaveMode,
     onSaveDraft,
-    onRequestCloseConfirm: requestCloseConfirm,
   });
 
   const pdfSearch = usePdfSearchController({
     pages: state.pages,
+    workerService,
     sidebarOpen: state.isSidebarOpen,
     setUiState,
     workspaceScrollContainerRef,
@@ -344,20 +355,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
     appEventBus.clearSticky("workspace:focusTextRange");
   }, [state.filename, state.pages.length, state.pdfBytes]);
 
-  const closeConfirmOpen = state.activeDialog === "close_confirm";
-  const closeSource = state.closeConfirmSource || "menu";
-
-  const closeDialog = React.useCallback(() => {
-    setState({ activeDialog: null, closeConfirmSource: null });
-  }, [setState]);
-
-  const finishConfirmedClose = React.useCallback(async () => {
-    if (closeSource === "window") {
-      await closeWindow();
-      return;
-    }
-    handleExitEditorPage();
-  }, [closeSource, closeWindow, handleExitEditorPage]);
+  React.useEffect(() => {
+    cancelPageTranslate();
+    setIsTranslateOpen(false);
+    setTranslateSourceText("");
+    setTranslateAutoToken(0);
+  }, [activeTabId, cancelPageTranslate]);
 
   const handlePenStyleChange = React.useCallback(
     (style: Partial<EditorState["penStyle"]>) => {
@@ -580,12 +583,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
   }, [setUiState]);
 
   const handleRequestCloseFromUi = React.useCallback(() => {
-    if (!state.isDirty) {
-      handleExitEditorPage();
-      return;
-    }
-    requestCloseConfirm("menu");
-  }, [handleExitEditorPage, requestCloseConfirm, state.isDirty]);
+    onRequestCloseCurrentTab();
+  }, [onRequestCloseCurrentTab]);
 
   const canRenderRightPanel =
     state.mode === "form" || state.mode === "annotation" || !!selectedControl;
@@ -597,9 +596,24 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   return (
     <>
+      <EditorTabStrip
+        windowId={windowId}
+        tabs={tabs}
+        activeTabId={activeTabId}
+        mergeWindowTargets={mergeWindowTargets}
+        onOpenDocument={onOpenDocument}
+        onRefreshMergeWindowTargets={onRefreshMergeWindowTargets}
+        onSelectTab={onSelectTab}
+        onCloseTab={onCloseTab}
+        onMoveTab={onMoveTab}
+        onDetachTab={onDetachTab}
+        onMergeTabToWindow={onMergeTabToWindow}
+        canDetachTabs={canDetachTabs}
+        canMergeTabs={canMergeTabs}
+      />
+
       <Toolbar
         editorState={state}
-        isSaving={state.isSaving}
         isDirty={state.isDirty}
         hideModeSelector={isMobile}
         hideToolSection={isMobile}
@@ -641,24 +655,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
         onTogglePropertiesPanel={toggleRightPanel}
         onOpenSettings={() => openDialog("settings")}
         isSearchOpen={pdfSearch.isPdfSearchOpen}
-      />
-
-      <EditorCloseConfirmDialog
-        open={closeConfirmOpen}
-        isDirty={state.isDirty}
-        platformDocumentSaveMode={platformDocumentSaveMode}
-        onCloseDialog={closeDialog}
-        onSaveAndClose={async () => {
-          const ok = await runPrimarySaveAction(false);
-          if (!ok && platformDocumentSaveMode === "file") return;
-          closeDialog();
-          await finishConfirmedClose();
-        }}
-        onCloseWithoutSaving={async () => {
-          closeDialog();
-          await finishConfirmedClose();
-        }}
-        t={t}
       />
 
       <div className="relative flex flex-1 overflow-hidden">
@@ -748,6 +744,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
         />
 
         <EditorCanvasPane
+          sessionRenderKey={activeTabId}
+          workerService={workerService}
+          isFileDragActive={isFileDragActive}
           onEditAnnotation={handleEditAnnotation}
           onToggleFullscreen={toggleFullscreen}
           pdfSearchResultsByPage={pdfSearch.workspaceTextHighlightsByPage}

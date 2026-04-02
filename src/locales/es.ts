@@ -118,6 +118,8 @@ const es = {
     confirm_close: {
       title: "¿Cerrar documento?",
       desc: "¿Está seguro de que desea cerrar? Se perderán los cambios no guardados.",
+      desc_named:
+        '¿Está seguro de que desea cerrar "{filename}"? Se perderán los cambios no guardados.',
       save_close: "Guardar y cerrar",
       export_close: "Exportar y cerrar",
       save_draft_close: "Guardar borrador y cerrar",
@@ -811,6 +813,11 @@ const es = {
     export_fail: "No se pudo exportar el PDF.",
     save_reopen_fail: "No se pudo guardar y reabrir.",
     save_close_fail: "No se pudo guardar y cerrar.",
+  },
+  tabs: {
+    detach_to_new_window: "Separar en una nueva ventana",
+    merge_to_window: "Combinar en una ventana",
+    window_n: "Ventana {index}",
   },
 } as const;
 

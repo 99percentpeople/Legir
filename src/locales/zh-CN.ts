@@ -123,6 +123,7 @@ const zhCN = {
     confirm_close: {
       title: "关闭文档？",
       desc: "确定要关闭吗？任何未保存的更改都将丢失。",
+      desc_named: "确定要关闭“{filename}”吗？任何未保存的更改都将丢失。",
       save_close: "保存并关闭",
       export_close: "导出并关闭",
       save_draft_close: "保存草稿并关闭",
@@ -793,6 +794,11 @@ const zhCN = {
     export_fail: "导出 PDF 失败。",
     save_reopen_fail: "保存并重新打开失败。",
     save_close_fail: "保存并关闭失败。",
+  },
+  tabs: {
+    detach_to_new_window: "分离到新窗口",
+    merge_to_window: "合并到窗口",
+    window_n: "窗口 {index}",
   },
 } as const;
 

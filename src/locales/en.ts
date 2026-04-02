@@ -123,6 +123,8 @@ const en = {
     confirm_close: {
       title: "Close Document?",
       desc: "Are you sure you want to close? Any unsaved changes will be lost.",
+      desc_named:
+        'Are you sure you want to close "{filename}"? Any unsaved changes will be lost.',
       save_close: "Save and Close",
       export_close: "Export and close",
       save_draft_close: "Save draft and close",
@@ -810,6 +812,11 @@ const en = {
     export_fail: "Failed to export PDF.",
     save_reopen_fail: "Failed to save and reopen.",
     save_close_fail: "Failed to save and close.",
+  },
+  tabs: {
+    detach_to_new_window: "Detach to New Window",
+    merge_to_window: "Merge into Window",
+    window_n: "Window {index}",
   },
 } as const;
 

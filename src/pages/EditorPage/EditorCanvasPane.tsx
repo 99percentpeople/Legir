@@ -18,6 +18,7 @@ import {
   selectEditorCanvasActions,
   selectEditorCanvasState,
 } from "@/store/selectors";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { PDFSearchResult } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 import type { EditorCanvasMobileToolbar } from "./types";
@@ -28,6 +29,9 @@ const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
   "[data-ff-block-modifier-wheel-zoom='1']";
 
 type EditorCanvasPaneProps = {
+  sessionRenderKey: string | null;
+  workerService: PDFWorkerService | null;
+  isFileDragActive: boolean;
   onEditAnnotation: (id: string) => void;
   onToggleFullscreen: () => void;
   pdfSearchResultsByPage: Map<number, PDFSearchResult[]> | undefined;
@@ -36,6 +40,9 @@ type EditorCanvasPaneProps = {
 };
 
 export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
+  sessionRenderKey,
+  workerService,
+  isFileDragActive,
   onEditAnnotation,
   onToggleFullscreen,
   pdfSearchResultsByPage,
@@ -254,6 +261,9 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
         }
       >
         <Workspace
+          sessionRenderKey={sessionRenderKey}
+          workerService={workerService}
+          isFileDragActive={isFileDragActive}
           editorState={workspaceState}
           onAddField={addField}
           onAddAnnotation={addAnnotation}

@@ -118,6 +118,7 @@ const zhTW = {
     confirm_close: {
       title: "關閉文件？",
       desc: "您確定要關閉嗎？任何未儲存的變更都將遺失。",
+      desc_named: "您確定要關閉「{filename}」嗎？任何未儲存的變更都將遺失。",
       save_close: "儲存並關閉",
       export_close: "匯出並關閉",
       save_draft_close: "儲存草稿並關閉",
@@ -783,6 +784,11 @@ const zhTW = {
     export_fail: "匯出 PDF 失敗。",
     save_reopen_fail: "儲存並重新開啟失敗。",
     save_close_fail: "儲存並關閉失敗。",
+  },
+  tabs: {
+    detach_to_new_window: "分離到新視窗",
+    merge_to_window: "合併到視窗",
+    window_n: "視窗 {index}",
   },
 } as const;
 

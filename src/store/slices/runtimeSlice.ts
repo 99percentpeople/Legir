@@ -7,6 +7,7 @@ import {
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { revokeObjectUrlIfNeeded } from "@/store/helpers";
 import type { EditorStoreSlice } from "@/store/store.types";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
 // Thumbnail warmup lives outside the store state on purpose: it is ephemeral
 // runtime control, not app state we want to persist or diff.
@@ -52,9 +53,10 @@ export const createRuntimeSlice: EditorStoreSlice<
 
   setProcessingStatus: (status) => set({ processingStatus: status }),
 
-  warmupThumbnails: () => {
+  warmupThumbnails: (workerService?: PDFWorkerService) => {
     const { pdfBytes, pdfOpenPassword } = get();
     if (!pdfBytes || pdfBytes.byteLength === 0) return;
+    const runtimeWorkerService = workerService ?? pdfWorkerService;
 
     cancelThumbnailWarmup();
     const epoch = thumbnailWarmupEpoch;
@@ -65,7 +67,7 @@ export const createRuntimeSlice: EditorStoreSlice<
       let workerLoaded = false;
       const ensureWorkerLoaded = async () => {
         if (workerLoaded) return;
-        await pdfWorkerService.loadDocument(pdfBytes, {
+        await runtimeWorkerService.loadDocument(pdfBytes, {
           signal,
           password:
             typeof pdfOpenPassword === "string" ? pdfOpenPassword : undefined,
@@ -86,7 +88,7 @@ export const createRuntimeSlice: EditorStoreSlice<
           let bytes: Uint8Array;
           let mimeType: string;
           try {
-            ({ bytes, mimeType } = await pdfWorkerService.renderPageImage({
+            ({ bytes, mimeType } = await runtimeWorkerService.renderPageImage({
               pageIndex,
               targetWidth: THUMBNAIL_TARGET_WIDTH,
               mimeType: THUMBNAIL_MIME_TYPE,
@@ -101,14 +103,16 @@ export const createRuntimeSlice: EditorStoreSlice<
                 : String(error);
             if (message.includes("PDF Document not loaded")) {
               await ensureWorkerLoaded();
-              ({ bytes, mimeType } = await pdfWorkerService.renderPageImage({
-                pageIndex,
-                targetWidth: THUMBNAIL_TARGET_WIDTH,
-                mimeType: THUMBNAIL_MIME_TYPE,
-                quality: THUMBNAIL_JPEG_QUALITY,
-                priority: THUMBNAIL_WARMUP_PRIORITY,
-                signal,
-              }));
+              ({ bytes, mimeType } = await runtimeWorkerService.renderPageImage(
+                {
+                  pageIndex,
+                  targetWidth: THUMBNAIL_TARGET_WIDTH,
+                  mimeType: THUMBNAIL_MIME_TYPE,
+                  quality: THUMBNAIL_JPEG_QUALITY,
+                  priority: THUMBNAIL_WARMUP_PRIORITY,
+                  signal,
+                },
+              ));
             } else {
               throw error;
             }

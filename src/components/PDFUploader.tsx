@@ -11,14 +11,19 @@ interface PDFUploaderProps {
   onOpen?: () => Promise<void>;
 }
 
+const isPdfFile = (file: File) =>
+  file.type === "application/pdf" ||
+  file.name.trim().toLowerCase().endsWith(".pdf");
+
 const PDFUploader: React.FC<PDFUploaderProps> = ({ onUpload, onOpen }) => {
   const { t } = useLanguage();
   const canUseOpenPicker = !!onOpen && canOpenWithPicker();
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
+      e.stopPropagation();
       const files = e.dataTransfer.files;
-      if (files.length > 0 && files[0].type === "application/pdf") {
+      if (files.length > 0 && isPdfFile(files[0])) {
         onUpload(files[0]);
       }
     },

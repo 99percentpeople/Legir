@@ -118,6 +118,8 @@ const de = {
     confirm_close: {
       title: "Dokument schließen?",
       desc: "Sind Sie sicher, dass Sie schließen möchten? Alle ungespeicherten Änderungen gehen verloren.",
+      desc_named:
+        'Sind Sie sicher, dass Sie "{filename}" schließen möchten? Alle ungespeicherten Änderungen gehen verloren.',
       save_close: "Speichern und schließen",
       export_close: "Exportieren und schließen",
       save_draft_close: "Entwurf speichern und schließen",
@@ -814,6 +816,11 @@ const de = {
     export_fail: "Exportieren des PDF fehlgeschlagen.",
     save_reopen_fail: "Speichern und erneutes Öffnen fehlgeschlagen.",
     save_close_fail: "Speichern und Schließen fehlgeschlagen.",
+  },
+  tabs: {
+    detach_to_new_window: "In neues Fenster auslagern",
+    merge_to_window: "In Fenster zusammenführen",
+    window_n: "Fenster {index}",
   },
 } as const;
 

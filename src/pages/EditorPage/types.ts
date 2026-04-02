@@ -6,13 +6,58 @@ import type {
   PDFSearchResult,
   PenStyle,
 } from "@/types";
+import type {
+  EditorTabDescriptor,
+  EditorWindowId,
+} from "@/app/editorTabs/types";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
+
+export interface EditorMergeWindowTarget {
+  windowId: EditorWindowId;
+  label: string;
+}
+
+export type EditorTabDropIntent =
+  | "reorder"
+  | "merge-to-window"
+  | "detach-to-new-window";
+
+export interface EditorTabDragPayload {
+  tabId: string;
+  sourceWindowId: EditorWindowId;
+}
+
+export interface EditorTabDropTarget {
+  intent: EditorTabDropIntent;
+  windowId: EditorWindowId;
+  targetIndex?: number;
+}
 
 export interface EditorPageProps {
+  windowId: EditorWindowId;
+  tabs: EditorTabDescriptor[];
+  activeTabId: string | null;
+  workerService: PDFWorkerService | null;
+  isFileDragActive: boolean;
+  mergeWindowTargets: EditorMergeWindowTarget[];
+  onOpenDocument: () => Promise<void>;
+  onRefreshMergeWindowTargets: () => Promise<void>;
+  onSelectTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
+  onMoveTab: (tabId: string, target: EditorTabDropTarget) => void;
+  onDetachTab: (tabId: string) => Promise<void>;
+  onMergeTabToWindow: (
+    tabId: string,
+    targetWindowId: EditorWindowId,
+  ) => Promise<void>;
+  canDetachTabs: boolean;
+  canMergeTabs: boolean;
   onExport: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => Promise<void>;
+  onSaveDraft: (silent?: boolean) => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
+  onRequestCloseCurrentTab: () => void;
 }
 
 export type TranslateFn = (
@@ -57,7 +102,7 @@ export interface EditorCanvasMobileToolbar {
   onOpenSettings: () => void;
   isSearchOpen: boolean;
   onExport: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => Promise<void>;
+  onSaveDraft: (silent?: boolean) => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onPrint: () => void;
   onExit: () => void;

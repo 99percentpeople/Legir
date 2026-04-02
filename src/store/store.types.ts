@@ -1,4 +1,5 @@
 import type { StateCreator } from "zustand";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
 import type {
   Annotation,
@@ -36,7 +37,7 @@ export interface EditorActions {
   setOptions: (
     updates: Partial<AppOptions> | ((prev: AppOptions) => Partial<AppOptions>),
   ) => void;
-  warmupThumbnails: () => void;
+  warmupThumbnails: (workerService?: PDFWorkerService) => void;
   loadDocument: (data: {
     pdfFile: File | null;
     pdfBytes: Uint8Array;

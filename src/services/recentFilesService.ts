@@ -21,12 +21,11 @@ type PreviewTaskKey = string;
  * Single authoritative service for:
  * - Tauri recent files persistence (localStorage)
  * - Preview thumbnail generation (serialized queue + de-dupe + cancellation)
- * - Web resumable session flags + draft view state
+ * - Web resumable session flags
  */
 export class RecentFilesService {
   private readonly STORAGE_KEY = "ff-recent-files";
   private readonly WEB_SAVED_SESSION_KEY = "ff-web-has-saved-session";
-  private readonly WEB_DRAFT_VIEW_STATE_KEY = "ff-web-draft-view-state";
   private readonly MAX_ENTRIES = 50;
 
   private previewQueue: Promise<void> = Promise.resolve();
@@ -407,70 +406,6 @@ export class RecentFilesService {
       this.WEB_SAVED_SESSION_KEY,
       hasSaved ? "1" : "0",
     );
-  }
-
-  /** Read the persisted Web draft view state. */
-  getWebDraftView(): {
-    scale: number;
-    scrollLeft: number;
-    scrollTop: number;
-    updatedAt: number;
-  } | null {
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(this.WEB_DRAFT_VIEW_STATE_KEY);
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object") return null;
-      const scale = Number(parsed.scale ?? 0);
-      const scrollLeft = Number(parsed.scrollLeft ?? 0);
-      const scrollTop = Number(parsed.scrollTop ?? 0);
-      const updatedAt = Number(parsed.updatedAt ?? 0);
-      if (
-        !Number.isFinite(scale) ||
-        !Number.isFinite(scrollLeft) ||
-        !Number.isFinite(scrollTop) ||
-        !Number.isFinite(updatedAt)
-      ) {
-        return null;
-      }
-      return { scale, scrollLeft, scrollTop, updatedAt };
-    } catch {
-      return null;
-    }
-  }
-
-  private setWebDraftViewState(options: {
-    scale: number;
-    scrollLeft: number;
-    scrollTop: number;
-    updatedAt?: number;
-  }) {
-    if (typeof window === "undefined") return;
-    const now = options.updatedAt ?? Date.now();
-    window.localStorage.setItem(
-      this.WEB_DRAFT_VIEW_STATE_KEY,
-      JSON.stringify({
-        scale: options.scale,
-        scrollLeft: options.scrollLeft,
-        scrollTop: options.scrollTop,
-        updatedAt: now,
-      }),
-    );
-  }
-
-  saveWebDraftViewState(options: {
-    scale: number;
-    scrollLeft: number;
-    scrollTop: number;
-    updatedAt?: number;
-  }) {
-    this.setWebDraftViewState({
-      scale: options.scale,
-      scrollLeft: options.scrollLeft,
-      scrollTop: options.scrollTop,
-      updatedAt: options.updatedAt,
-    });
   }
 }
 

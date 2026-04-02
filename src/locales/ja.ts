@@ -118,6 +118,7 @@ const ja = {
     confirm_close: {
       title: "ドキュメントを閉じますか？",
       desc: "本当に閉じますか？未保存の変更は失われます。",
+      desc_named: "「{filename}」を閉じますか？未保存の変更は失われます。",
       save_close: "保存して閉じる",
       export_close: "書き出して閉じる",
       save_draft_close: "下書きを保存して閉じる",
@@ -802,6 +803,11 @@ const ja = {
     export_fail: "PDF の書き出しに失敗しました。",
     save_reopen_fail: "保存して再開に失敗しました。",
     save_close_fail: "保存して閉じるのに失敗しました。",
+  },
+  tabs: {
+    detach_to_new_window: "新しいウィンドウに分離",
+    merge_to_window: "ウィンドウに統合",
+    window_n: "ウィンドウ {index}",
   },
 } as const;
 
