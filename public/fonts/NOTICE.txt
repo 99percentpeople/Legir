@@ -1,4 +1,4 @@
-This directory contains font files used by Formforge.
+This directory contains font files used by Legir.
 
 Noto Sans SC
 - File: NotoSansSC-Regular.ttf

@@ -1,6 +1,6 @@
 # Fonts
 
-This folder contains font files that can be used by Formforge for:
+This folder contains font files that can be used by Legir for:
 
 - in-app preview (browser rendering)
 - PDF export (embedding fonts so CJK renders correctly)

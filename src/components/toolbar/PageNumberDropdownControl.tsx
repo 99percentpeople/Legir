@@ -115,7 +115,7 @@ const PageNumberDropdownControl: React.FC<PageNumberDropdownControlProps> = ({
             side={side}
             align={align}
             className="min-w-44"
-            data-ff-block-modifier-wheel-zoom="1"
+            data-app-block-modifier-wheel-zoom="1"
           >
             <DropdownMenuLabel>{t("toolbar.page")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -180,7 +180,7 @@ const PageNumberDropdownControl: React.FC<PageNumberDropdownControlProps> = ({
         side={side}
         align={align}
         className="min-w-44"
-        data-ff-block-modifier-wheel-zoom="1"
+        data-app-block-modifier-wheel-zoom="1"
       >
         <DropdownMenuLabel>{t("toolbar.page")}</DropdownMenuLabel>
         <DropdownMenuSeparator />

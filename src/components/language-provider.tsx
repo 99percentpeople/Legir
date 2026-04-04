@@ -50,7 +50,7 @@ type LanguageProviderState = {
   dayjsLocale: string | null;
   isCjk: boolean;
   setLanguage: (language: Language) => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
 };
 
 const initialState: LanguageProviderState = {
@@ -95,8 +95,7 @@ const hasLabelString = (value: unknown): value is { label: string } =>
   "label" in value &&
   typeof (value as { label?: unknown }).label === "string";
 
-const LOCALE_DICT_CACHE_PREFIX = "ff-locale-dict-cache:";
-
+const LOCALE_DICT_CACHE_PREFIX = "app-locale-dict-cache:";
 const resolveSystemLanguage = (): ConcreteLanguage => {
   const browserLang = navigator.language;
   if (browserLang.startsWith("zh")) {
@@ -146,7 +145,7 @@ const writeCachedDict = (lang: ConcreteLanguage, dict: LocaleDict) => {
 export function LanguageProvider({
   children,
   defaultLanguage = "system",
-  storageKey = "ff-ui-language",
+  storageKey = "app-ui-language",
   ...props
 }: LanguageProviderProps) {
   const [language, setLanguage] = useState<Language>(() => {
@@ -273,7 +272,7 @@ export function LanguageProvider({
     return undefined;
   };
 
-  const t = (key: string, params?: Record<string, string | number>) => {
+  const t = (key: string, params?: Record<string, unknown>) => {
     const langDict = translations[effectiveLanguage] || translations["en"];
     let text =
       resolveTranslation(langDict, key) ||

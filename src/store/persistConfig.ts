@@ -11,7 +11,7 @@ export const editorStorePersistConfig: PersistOptions<
   EditorStore,
   Partial<EditorUiState>
 > = {
-  name: "ff-editor-ui-dev",
+  name: "app-editor-ui-dev",
   version: 1,
   storage: createJSONStorage<Partial<EditorUiState>>(() => localStorage),
   partialize: (state: EditorStore) => pickEditorUiState(state),

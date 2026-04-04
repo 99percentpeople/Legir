@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { isDesktopApp, isWindowsPlatform } from "./runtime";
 
-const FOCUS_DOCUMENT_REQUEST_EVENT = "ff://platform-focus-document-request";
+const FOCUS_DOCUMENT_REQUEST_EVENT = "app://platform-focus-document-request";
 
 export type PlatformDroppedPdf =
   | {

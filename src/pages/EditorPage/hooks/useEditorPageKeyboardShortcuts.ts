@@ -131,7 +131,7 @@ export function useEditorPageKeyboardShortcuts({
       ].includes(event.key);
       const isKeyboardHandleTarget =
         target instanceof HTMLElement &&
-        !!target.closest("[data-ff-keyboard-handle]");
+        !!target.closest("[data-app-keyboard-handle]");
       const isSelectedField = currentState.fields.some(
         (field) => field.id === currentState.selectedId,
       );

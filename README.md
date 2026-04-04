@@ -2,9 +2,11 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# FormForge (PDF 表单编辑器)
+# Legir
 
-FormForge 是一个基于 React + Vite 的 PDF 表单/批注编辑器，使用 [pdfjs](https://github.com/mozilla/pdf.js) 进行 PDF 渲染，以及 [pdf-lib](https://github.com/Hopding/pdf-lib) 进行 PDF 操作。 支持在 PDF 上创建和编辑表单控件（Text/Checkbox/Radio/Dropdown/Signature）与批注（Highlight/Ink/Comment/FreeText），并可导出回写到 PDF。
+> Lightweight AI PDF Reader
+
+Legir 是一个基于 React + Vite 的轻量级 AI PDF 阅读器与工作台，使用 [pdfjs](https://github.com/mozilla/pdf.js) 进行 PDF 渲染，以及 [pdf-lib](https://github.com/Hopding/pdf-lib) 进行 PDF 操作。它支持 PDF 阅读、搜索与导航，支持批注（Highlight/Ink/Comment/FreeText）与表单控件（Text/Checkbox/Radio/Dropdown/Signature）的创建和编辑，并可结合 AI 进行文档理解、字段识别和批注辅助，最后导出回写到 PDF。
 
 该项目同时支持：
 

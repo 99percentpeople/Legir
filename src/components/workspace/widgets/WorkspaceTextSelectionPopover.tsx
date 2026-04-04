@@ -63,8 +63,8 @@ export const WorkspaceTextSelectionPopover: React.FC<
       </PopoverTrigger>
 
       <PopoverContent
-        data-ff-text-selection-popover="1"
-        data-ff-block-modifier-wheel-zoom="1"
+        data-app-text-selection-popover="1"
+        data-app-block-modifier-wheel-zoom="1"
         side="top"
         align="center"
         sideOffset={8}

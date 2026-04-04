@@ -1,4 +1,5 @@
 import { FileText, History, Shield, Sparkles } from "lucide-react";
+
 import PDFUploader from "@/components/PDFUploader";
 import { Button } from "@/components/ui/button";
 import { FeatureCard } from "./FeatureCard";

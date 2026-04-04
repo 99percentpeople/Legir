@@ -301,8 +301,8 @@ export const useTextLayerSelection = (opts: {
 
       const target =
         rawTarget instanceof HTMLElement ? rawTarget : rawTarget.parentElement;
-      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
-      if (target?.closest?.("[data-ff-text-selection-popover='1']")) return;
+      if (target?.closest?.("[data-app-selection-handle='1']")) return;
+      if (target?.closest?.("[data-app-text-selection-popover='1']")) return;
 
       const pageEl =
         pagePortalEl ??
@@ -1213,7 +1213,7 @@ export const useTextLayerSelection = (opts: {
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
       const target = e.target as HTMLElement;
-      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
+      if (target?.closest?.("[data-app-selection-handle='1']")) return;
       const activeLayer = textLayerRef.current;
       if (!activeLayer) return;
 
@@ -1297,7 +1297,7 @@ export const useTextLayerSelection = (opts: {
         return;
       }
       const target = e.target as HTMLElement;
-      if (target?.closest?.("[data-ff-selection-handle='1']")) return;
+      if (target?.closest?.("[data-app-selection-handle='1']")) return;
       const activeLayer = textLayerRef.current;
       if (!activeLayer) return;
       const pageEl =

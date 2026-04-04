@@ -26,7 +26,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
 
   const [isTransforming, setIsTransforming] = useState(() => {
     if (typeof document === "undefined") return false;
-    return document.body.dataset.ffControlTransforming === "1";
+    return document.body.dataset.appControlTransforming === "1";
   });
   const [open, setOpen] = useState(() => !isTransforming);
 
@@ -36,12 +36,12 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       setIsTransforming(!!ce.detail?.active);
     };
     window.addEventListener(
-      "ff-control-transforming",
+      "app-control-transforming",
       handler as EventListener,
     );
     return () => {
       window.removeEventListener(
-        "ff-control-transforming",
+        "app-control-transforming",
         handler as EventListener,
       );
     };

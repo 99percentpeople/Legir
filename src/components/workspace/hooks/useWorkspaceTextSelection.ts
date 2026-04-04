@@ -557,8 +557,8 @@ export const useWorkspaceTextSelection = (opts: {
       if (state.tool !== "select" && state.tool !== "select_text") return;
       const target = e.target as HTMLElement | null;
       if (
-        target?.closest?.("[data-ff-selection-handle='1']") ||
-        target?.closest?.("[data-ff-text-selection-popover='1']")
+        target?.closest?.("[data-app-selection-handle='1']") ||
+        target?.closest?.("[data-app-text-selection-popover='1']")
       ) {
         return;
       }

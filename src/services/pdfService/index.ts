@@ -31,7 +31,7 @@ import {
   summarizePdfObjForDebug,
 } from "./lib/pdf-import-utils";
 import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
-import { getFormForgeHighlightedText } from "./lib/annotationMetadata";
+import { getAppHighlightedText } from "./lib/annotationMetadata";
 import {
   PDFDocument,
   EncryptedPDFError,
@@ -907,7 +907,7 @@ const buildPdfLibAnnotsByPageIndex = async (
         annotationFlagsObj instanceof PDFNumber
           ? annotationFlagsObj.asNumber()
           : undefined;
-      const highlightedText = getFormForgeHighlightedText(annot);
+      const highlightedText = getAppHighlightedText(annot);
       const borderWidth = extractBorderWidth(annot);
       const borderStyleType = extractBorderStyle(annot);
       const interiorColor = pdfArrayToNumberList(
@@ -1590,7 +1590,7 @@ export const exportPDF = async (
     if (metadata.isProducerManual && metadata.producer) {
       pdfDoc.setProducer(metadata.producer);
     } else {
-      pdfDoc.setProducer("Formforge");
+      pdfDoc.setProducer("Legir");
     }
 
     // Date Logic with explicit PDFString.fromDate formatting

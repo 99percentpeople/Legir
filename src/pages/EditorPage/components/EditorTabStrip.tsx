@@ -20,7 +20,7 @@ import type {
   EditorTabDropTarget,
 } from "../types";
 
-const EDITOR_TAB_DRAG_MIME = "application/x-formforge-editor-tab";
+const EDITOR_TAB_DRAG_MIME = "application/x-legir-editor-tab";
 
 type TabDropIndicator = {
   tabId: string;

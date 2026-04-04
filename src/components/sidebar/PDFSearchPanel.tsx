@@ -194,10 +194,10 @@ const PDFSearchPanel: React.FC<PDFSearchPanelProps> = ({
                             key={`${result.id}:${index}`}
                             className={cn(
                               segment.highlighted &&
-                                "ff-pdf-search-hit--inline",
+                                "app-pdf-search-hit--inline",
                               segment.highlighted &&
                                 isActive &&
-                                "ff-pdf-search-hit--active",
+                                "app-pdf-search-hit--active",
                             )}
                           >
                             {segment.text}

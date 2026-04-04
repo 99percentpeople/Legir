@@ -1,4 +1,4 @@
-const EDITOR_WINDOW_BOOTSTRAP_QUERY_KEY = "ffWindowBootstrap";
+const EDITOR_WINDOW_BOOTSTRAP_QUERY_KEY = "appWindowBootstrap";
 export const EDITOR_WINDOW_BOOTSTRAP_ROUTE = "/editor";
 
 export type EditorWindowBootstrap =
@@ -13,7 +13,7 @@ export type EditorWindowBootstrap =
 
 declare global {
   interface Window {
-    __FORMFORGE_WINDOW_BOOTSTRAP__?: unknown;
+    __APP_WINDOW_BOOTSTRAP__?: unknown;
   }
 }
 
@@ -69,7 +69,7 @@ const readInjectedWindowBootstrap = () => {
   }
 
   cachedInjectedWindowBootstrap = parseEditorWindowBootstrap(
-    window.__FORMFORGE_WINDOW_BOOTSTRAP__,
+    window.__APP_WINDOW_BOOTSTRAP__,
   );
   return cachedInjectedWindowBootstrap;
 };

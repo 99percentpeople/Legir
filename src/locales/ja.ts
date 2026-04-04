@@ -229,7 +229,7 @@ const ja = {
     creator: "作成者",
     producer: "作成ソフト",
     producer_tooltip:
-      "エクスポート時、手動でロックしない限り 'Formforge' になります。",
+      "エクスポート時、手動でロックしない限り 'Legir' になります。",
     creation_date: "作成日",
     modification_date: "更新日",
     mod_date_auto: "自動 (エクスポート時に更新)",
@@ -499,7 +499,7 @@ const ja = {
       "PDF が読み込まれていません。アップロードボタンを使用してください。",
   },
   uploader: {
-    title: "PDF フォームをアップロード",
+    title: "PDF をアップロード",
     desc: "ファイルをここにドラッグ＆ドロップするか、クリックして参照してください",
     btn: "PDF ファイルを選択",
     note: "ファイルはローカルで安全に処理されます。",
@@ -750,18 +750,18 @@ const ja = {
     done: "完了",
   },
   landing: {
-    title: "AI 搭載 PDF フォームエディター",
+    title: "軽量 AI PDF リーダー",
     subtitle:
-      "プライバシー優先、ブラウザで完全に動作する AI 搭載 PDF フォームビルダー。",
+      "プライバシー優先の AI 搭載 PDF リーダー。読解、ナビゲーション、注釈、フォーム処理に集中できます。",
     resume_session: "前のセッションを再開",
     feature: {
       ai: {
         title: "AI 搭載",
-        desc: "Gemini を使用してフォームフィールドを自動検出します。",
+        desc: "AI がページを解説し、注釈を生成し、PDF の読解作業を支援します。",
       },
       editor: {
-        title: "ビジュアルエディター",
-        desc: "ドラッグ＆ドロップインターフェースでフォームをカスタマイズ。",
+        title: "集中読書",
+        desc: "軽快なワークスペースで PDF を読み、検索し、移動し、注釈できます。",
       },
       local: {
         title: "プライバシー優先",

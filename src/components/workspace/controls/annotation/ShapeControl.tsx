@@ -1262,7 +1262,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                       key={`${data.id}_vertex_${index}`}
                       className="pointer-events-auto absolute h-3 w-3 cursor-move rounded-full border border-blue-500 bg-white"
                       tabIndex={0}
-                      data-ff-keyboard-handle="shape-vertex"
+                      data-app-keyboard-handle="shape-vertex"
                       aria-label={`${data.shapeType} point ${index + 1}`}
                       style={{
                         left: `${(point.x / Math.max(1, data.rect.width)) * 100}%`,

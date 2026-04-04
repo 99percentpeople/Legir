@@ -231,7 +231,7 @@ const es = {
     creator: "Creador",
     producer: "Productor",
     producer_tooltip:
-      "Default a 'Formforge' en exportación a menos que se bloque manualmente.",
+      "Default a 'Legir' en exportación a menos que se bloquee manualmente.",
     creation_date: "Fecha de creación",
     modification_date: "Fecha de modificación",
     mod_date_auto: "Automático (Actualiza en exportación)",
@@ -502,7 +502,7 @@ const es = {
     no_pdf: "No hay PDF cargado. Use el botón de carga para comenzar.",
   },
   uploader: {
-    title: "Suba su formulario PDF",
+    title: "Suba su PDF",
     desc: "Arrastre y suelte su archivo aquí, o haga clic para examinar",
     btn: "Seleccionar archivo PDF",
     note: "Sus archivos se procesan localmente y de forma segura.",
@@ -760,18 +760,18 @@ const es = {
     done: "Hecho",
   },
   landing: {
-    title: "Editor de formularios PDF impulsado por IA",
+    title: "Lector de PDF ligero con IA",
     subtitle:
-      "Un creador de formularios PDF impulsado por IA y centrado en la privacidad que se ejecuta completamente en su navegador.",
+      "Un lector de PDF centrado en la privacidad e impulsado por IA para leer, navegar, anotar y trabajar con formularios.",
     resume_session: "Reanudar sesión anterior",
     feature: {
       ai: {
         title: "Impulsado por IA",
-        desc: "Detectar campos de formulario automáticamente usando Gemini.",
+        desc: "Usa IA para explicar páginas, generar anotaciones y ayudarte a recorrer PDFs.",
       },
       editor: {
-        title: "Editor visual",
-        desc: "Interfaz de arrastrar y soltar para personalizar sus formularios.",
+        title: "Lectura enfocada",
+        desc: "Lee, busca, navega y anota PDFs en un espacio de trabajo ágil.",
       },
       local: {
         title: "Privacidad primero",

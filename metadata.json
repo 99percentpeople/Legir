@@ -1,5 +1,5 @@
 {
-  "name": "FormForge AI - PDF Editor",
-  "description": "A visual PDF form builder with AI-powered field detection. Import PDFs, drag-and-drop form fields, and export interactive forms.",
+  "name": "Legir",
+  "description": "A lightweight AI PDF reader for focused reading, navigation, annotations, and forms.",
   "requestFramePermissions": []
 }

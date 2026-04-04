@@ -1,0 +1,8 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "resources": {
+      "icons/pdf-document.ico": "pdf-document.ico"
+    }
+  }
+}

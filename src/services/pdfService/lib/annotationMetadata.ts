@@ -2,10 +2,10 @@ import { PDFDict, PDFHexString, PDFName } from "@cantoo/pdf-lib";
 
 import { decodePdfString } from "./pdf-objects";
 
-const FORMFORGE_ANNOTATION_METADATA_KEY = PDFName.of("FormForge");
-const FORMFORGE_HIGHLIGHTED_TEXT_KEY = PDFName.of("HighlightedText");
+const LEGIR_ANNOTATION_METADATA_KEY = PDFName.of("Legir");
+const APP_HIGHLIGHTED_TEXT_KEY = PDFName.of("HighlightedText");
 
-export const setFormForgeHighlightedText = (
+export const setAppHighlightedText = (
   pdfDict: PDFDict,
   highlightedText: string | undefined,
 ) => {
@@ -15,12 +15,12 @@ export const setFormForgeHighlightedText = (
   const meta = pdfDict.context.obj({
     HighlightedText: PDFHexString.fromText(normalized),
   });
-  pdfDict.set(FORMFORGE_ANNOTATION_METADATA_KEY, meta);
+  pdfDict.set(LEGIR_ANNOTATION_METADATA_KEY, meta);
 };
 
-export const getFormForgeHighlightedText = (pdfDict: PDFDict) => {
-  const meta = pdfDict.lookup(FORMFORGE_ANNOTATION_METADATA_KEY);
+export const getAppHighlightedText = (pdfDict: PDFDict) => {
+  const meta = pdfDict.lookup(LEGIR_ANNOTATION_METADATA_KEY);
   if (!(meta instanceof PDFDict)) return undefined;
 
-  return decodePdfString(meta.lookup(FORMFORGE_HIGHLIGHTED_TEXT_KEY));
+  return decodePdfString(meta.lookup(APP_HIGHLIGHTED_TEXT_KEY));
 };

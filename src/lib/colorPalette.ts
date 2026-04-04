@@ -4,8 +4,8 @@ import {
   PEN_COLORS,
 } from "@/constants";
 
-const COLOR_PALETTE_STORAGE_KEY = "ff-color-palette-history";
-const COLOR_PALETTE_CHANGE_EVENT = "ff-color-palette-history-change";
+const COLOR_PALETTE_STORAGE_KEY = "app-color-palette-history";
+const COLOR_PALETTE_CHANGE_EVENT = "app-color-palette-history-change";
 const MAX_RECENT_COLORS = 24;
 export const COLOR_PALETTE_COMMON_ROW_SIZE = 6;
 export const COLOR_PALETTE_RECENT_ROW_SIZE = 6;

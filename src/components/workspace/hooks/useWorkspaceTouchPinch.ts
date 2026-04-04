@@ -88,7 +88,7 @@ const canStartViewportGestureFromTarget = (
   return !target.closest(
     [
       ".textLayer",
-      "[data-ff-selection-handle='1']",
+      "[data-app-selection-handle='1']",
       "input",
       "textarea",
       "select",

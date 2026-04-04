@@ -224,7 +224,7 @@ const zhTW = {
     },
     creator: "建立者",
     producer: "製作工具",
-    producer_tooltip: "匯出時預設為 'Formforge'，除非手動鎖定。",
+    producer_tooltip: "匯出時預設為 'Legir'，除非手動鎖定。",
     creation_date: "建立日期",
     modification_date: "修改日期",
     mod_date_auto: "自動更新",
@@ -491,7 +491,7 @@ const zhTW = {
     no_pdf: "未載入 PDF。請使用上傳按鈕開始。",
   },
   uploader: {
-    title: "上傳您的 PDF 表單",
+    title: "上傳您的 PDF",
     desc: "將檔案拖放到此處，或點擊瀏覽",
     btn: "選擇 PDF 檔案",
     note: "您的檔案將在本地安全處理。",
@@ -732,17 +732,18 @@ const zhTW = {
     done: "完成",
   },
   landing: {
-    title: "AI 驅動的 PDF 表單編輯器",
-    subtitle: "隱私優先、AI 驅動的 PDF 表單建構器，完全在瀏覽器中運行。",
+    title: "輕量級 AI PDF 閱讀器",
+    subtitle:
+      "隱私優先、AI 驅動的 PDF 閱讀器，專注於閱讀、導覽、標註與表單處理。",
     resume_session: "恢復上一次工作階段",
     feature: {
       ai: {
         title: "AI 驅動",
-        desc: "使用 Gemini 自動檢測表單欄位。",
+        desc: "用 AI 解釋頁面、生成標註，並協助你完成 PDF 閱讀任務。",
       },
       editor: {
-        title: "視覺化編輯器",
-        desc: "拖放介面客製化您的表單。",
+        title: "專注閱讀",
+        desc: "在反應靈敏的工作區中閱讀、搜尋、導覽和標註 PDF。",
       },
       local: {
         title: "隱私優先",

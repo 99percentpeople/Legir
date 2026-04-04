@@ -233,8 +233,7 @@ const en = {
     },
     creator: "Creator",
     producer: "Producer",
-    producer_tooltip:
-      "Defaults to 'Formforge' on export unless manually locked.",
+    producer_tooltip: "Defaults to 'Legir' on export unless manually locked.",
     creation_date: "Creation Date",
     modification_date: "Modification Date",
     mod_date_auto: "Automatic (Updates on Export)",
@@ -507,7 +506,7 @@ const en = {
     no_pdf: "No PDF loaded. Use the upload button to start.",
   },
   uploader: {
-    title: "Upload your PDF Form",
+    title: "Upload your PDF",
     desc: "Drag and drop your file here, or click to browse",
     btn: "Select PDF File",
     note: "Your files are processed locally and securely.",
@@ -759,18 +758,18 @@ const en = {
     done: "Done",
   },
   landing: {
-    title: "AI-Powered PDF Form Editor",
+    title: "Lightweight AI PDF Reader",
     subtitle:
-      "A privacy-first, AI-powered PDF form builder running entirely in your browser.",
+      "A privacy-first, AI-powered PDF reader for focused reading, navigation, annotations, and forms.",
     resume_session: "Resume Previous Session",
     feature: {
       ai: {
         title: "AI-Powered",
-        desc: "Automatically detect form fields using Gemini.",
+        desc: "Explain pages, generate annotations, and help you work through PDFs with AI.",
       },
       editor: {
-        title: "Visual Editor",
-        desc: "Drag & drop interface to customize your forms.",
+        title: "Focused Reading",
+        desc: "Read, search, navigate, and annotate PDFs in a responsive workspace.",
       },
       local: {
         title: "Privacy First",

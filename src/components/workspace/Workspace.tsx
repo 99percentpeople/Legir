@@ -809,11 +809,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
     // Allow floating toolbars (Popover-based) to hide while dragging/resizing.
     if (typeof document !== "undefined") {
-      document.body.dataset.ffControlTransforming = isTransforming ? "1" : "0";
+      document.body.dataset.appControlTransforming = isTransforming ? "1" : "0";
     }
     if (typeof window !== "undefined") {
       window.dispatchEvent(
-        new CustomEvent("ff-control-transforming", {
+        new CustomEvent("app-control-transforming", {
           detail: { active: isTransforming },
         }),
       );
@@ -874,11 +874,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (!activeElement) return false;
 
       const handleElement = activeElement.closest(
-        "[data-ff-keyboard-handle]",
+        "[data-app-keyboard-handle]",
       ) as HTMLElement | null;
       if (!handleElement) return false;
 
-      const handleType = handleElement.dataset.ffKeyboardHandle;
+      const handleType = handleElement.dataset.appKeyboardHandle;
       if (handleType !== "control-resize" && handleType !== "control-rotate") {
         return false;
       }
@@ -2804,7 +2804,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       <div
         id={`page-${page.pageIndex}`}
         className="relative w-fit flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
-        data-ff-text-selecting={
+        data-app-text-selecting={
           textSelectingPages[page.pageIndex] ? "1" : undefined
         }
         style={{
@@ -3239,7 +3239,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        data-ff-pinch-zooming={isPinchZooming ? "1" : undefined}
+        data-app-pinch-zooming={isPinchZooming ? "1" : undefined}
         onScroll={handleScroll}
         onContextMenu={(e) => e.preventDefault()}
       >

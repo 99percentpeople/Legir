@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "formforge-pdf-editor",
+      "name": "legir-pdf-reader",
       "dependencies": {
         "@ai-sdk/anthropic": "^3.0.58",
         "@ai-sdk/deepseek": "^2.0.24",

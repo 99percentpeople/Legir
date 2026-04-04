@@ -1,8 +1,9 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "formforge-pdf-editor",
+  "productName": "Legir",
+  "mainBinaryName": "Legir",
   "version": "0.1.0",
-  "identifier": "com.-99percent.formforge",
+  "identifier": "com.-99percent.legir",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -15,7 +16,7 @@
       {
         "label": "main",
         "create": false,
-        "title": "Formforge",
+        "title": "Legir",
         "width": 1280,
         "height": 800,
         "minWidth": 640,
@@ -42,15 +43,35 @@
     "fileAssociations": [
       {
         "ext": ["pdf"],
+        "name": "PDF Document",
         "description": "PDF Document",
-        "role": "Editor",
+        "role": "Viewer",
+        "rank": "Alternate",
+        "contentTypes": ["com.adobe.pdf"],
         "mimeType": "application/pdf"
       }
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "template": "windows/installer.nsi",
+        "installerHooks": "windows/file-association-hooks.nsh"
+      },
+      "wix": {
+        "template": "windows/main.wxs",
+        "fragmentPaths": ["windows/pdf-file-icon.wxs"],
+        "componentRefs": [
+          "PdfDocumentUserRegistryCleanup",
+          "PdfDocumentDefaultIcon"
+        ]
+      }
+    },
+    "macOS": {
+      "infoPlist": "Info.plist"
+    }
   },
   "plugins": {
     "cli": {
-      "description": "FormForge PDF Editor CLI",
+      "description": "Legir PDF Reader CLI",
       "args": [
         {
           "name": "source",

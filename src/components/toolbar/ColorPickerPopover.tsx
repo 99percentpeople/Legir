@@ -105,7 +105,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
         className="w-72 p-4"
         side={side}
         align={align}
-        data-ff-block-modifier-wheel-zoom="1"
+        data-app-block-modifier-wheel-zoom="1"
       >
         <div className="space-y-4">
           <ColorPaletteControl

@@ -425,7 +425,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
     >
       <div
         className="pointer-events-auto max-w-[calc(100vw-1.5rem)] px-3"
-        data-ff-block-modifier-wheel-zoom="1"
+        data-app-block-modifier-wheel-zoom="1"
       >
         <div className="bg-background/72 border-border/70 no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border p-1 shadow-xl backdrop-blur-md transition-colors duration-200">
           <PageNumberDropdownControl
@@ -461,7 +461,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
             <DropdownMenuContent
               side="top"
               align="start"
-              data-ff-block-modifier-wheel-zoom="1"
+              data-app-block-modifier-wheel-zoom="1"
             >
               <DropdownMenuRadioGroup
                 value={editorState.mode}
@@ -500,7 +500,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
               side="top"
               align="center"
               className="min-w-52"
-              data-ff-block-modifier-wheel-zoom="1"
+              data-app-block-modifier-wheel-zoom="1"
             >
               <DropdownMenuRadioGroup
                 value={activeTool}

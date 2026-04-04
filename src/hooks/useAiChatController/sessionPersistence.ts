@@ -21,10 +21,10 @@ import type { FormField, PDFSearchResult } from "@/types";
 
 export type AiChatRunStatus = "idle" | "running" | "cancelling" | "error";
 
-export const AI_CHAT_SELECTED_MODEL_KEY = "ff-ai-chat:selected-model";
+export const AI_CHAT_SELECTED_MODEL_KEY = "app-ai-chat:selected-model";
 
 const AI_CHAT_PERSIST_VERSION = 1;
-const AI_CHAT_PERSIST_KEY_PREFIX = "ff-ai-chat:";
+const AI_CHAT_PERSIST_KEY_PREFIX = "app-ai-chat:";
 const MAX_PERSIST_SESSIONS = 20;
 const MAX_PERSIST_TIMELINE_ITEMS = 300;
 const MAX_PERSIST_SEARCH_RESULTS = 800;

@@ -26,7 +26,7 @@ import type { EditorCanvasMobileToolbar } from "./types";
 const Workspace = React.lazy(() => import("@/components/workspace/Workspace"));
 const MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX = 96;
 const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
-  "[data-ff-block-modifier-wheel-zoom='1']";
+  "[data-app-block-modifier-wheel-zoom='1']";
 
 type EditorCanvasPaneProps = {
   sessionRenderKey: string | null;

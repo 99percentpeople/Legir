@@ -39,7 +39,7 @@ const FloatingBar: React.FC<FloatingBarProps> = ({
   return (
     <div
       className="bg-background/72 border-border/70 absolute bottom-6 left-1/2 z-40 flex -translate-x-1/2 transform items-center gap-1 rounded-lg border p-1 shadow-xl backdrop-blur-md transition-colors duration-200"
-      data-ff-block-modifier-wheel-zoom="1"
+      data-app-block-modifier-wheel-zoom="1"
     >
       <PageNumberDropdownControl
         currentPageIndex={currentPageIndex}

@@ -1,6 +1,6 @@
 # Shapes Annotations（形状类型注释）实现规划
 
-本文档是 FormForge 的“形状批注（Shapes Annotations）”功能实施蓝图。目标是新增并完善 PDF 形状注释的：
+本文档是 Legir 的“形状批注（Shapes Annotations）”功能实施蓝图。目标是新增并完善 PDF 形状注释的：
 
 - 导入解析（Import）
 - 在 Workspace 渲染（Render）

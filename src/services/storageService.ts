@@ -1,6 +1,6 @@
 import type { PersistedEditorWorkspaceDraft } from "@/app/editorTabs/persistence";
 
-const DB_NAME = "FormForgeDB";
+const DB_NAME = "LegirDB";
 const STORE_NAME = "session";
 // Cleanup key for the pre-workspace web draft format.
 const LEGACY_DRAFT_KEY = "latest";

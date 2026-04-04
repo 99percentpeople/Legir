@@ -8,7 +8,7 @@ import {
 import type { EditorWindowId } from "@/app/editorTabs/types";
 import { isDesktopApp, isWindowsPlatform } from "./runtime";
 
-const EDITOR_TAB_WORKSPACE_EVENT = "ff://editor-tab-workspace";
+const EDITOR_TAB_WORKSPACE_EVENT = "app://editor-tab-workspace";
 
 export type PlatformEditorTabWorkspaceEvent =
   | {

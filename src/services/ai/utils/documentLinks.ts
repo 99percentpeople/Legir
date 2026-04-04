@@ -31,7 +31,7 @@ export const parseAiDocumentLinkHref = (
 
   let url: URL;
   try {
-    url = new URL(href, "https://formforge.local");
+    url = new URL(href, "https://legir.local");
   } catch {
     return null;
   }

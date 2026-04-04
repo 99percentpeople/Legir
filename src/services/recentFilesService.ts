@@ -24,8 +24,8 @@ type PreviewTaskKey = string;
  * - Web resumable session flags
  */
 export class RecentFilesService {
-  private readonly STORAGE_KEY = "ff-recent-files";
-  private readonly WEB_SAVED_SESSION_KEY = "ff-web-has-saved-session";
+  private readonly STORAGE_KEY = "app-recent-files";
+  private readonly WEB_SAVED_SESSION_KEY = "app-web-has-saved-session";
   private readonly MAX_ENTRIES = 50;
 
   private previewQueue: Promise<void> = Promise.resolve();

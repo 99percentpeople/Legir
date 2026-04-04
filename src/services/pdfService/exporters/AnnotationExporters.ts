@@ -18,7 +18,7 @@ import {
 import { Annotation } from "@/types";
 import { PDF_CUSTOM_KEYS } from "@/constants";
 import { IAnnotationExporter, ViewportLike } from "../types";
-import { setFormForgeHighlightedText } from "../lib/annotationMetadata";
+import { setAppHighlightedText } from "../lib/annotationMetadata";
 import { hexToPdfColor } from "../lib/colors";
 import { generateInkAppearanceOps } from "../lib/ink";
 import { containsNonAscii, isSerifFamily } from "../lib/text";
@@ -112,7 +112,7 @@ export class HighlightExporter implements IAnnotationExporter {
         : PDFString.fromDate(new Date()),
     });
     if (highlightAnnot instanceof PDFDict) {
-      setFormForgeHighlightedText(highlightAnnot, annotation.highlightedText);
+      setAppHighlightedText(highlightAnnot, annotation.highlightedText);
     }
 
     const ref = pdfDoc.context.register(highlightAnnot);

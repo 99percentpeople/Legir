@@ -229,7 +229,7 @@ const zhCN = {
     },
     creator: "创建者",
     producer: "制作工具",
-    producer_tooltip: "导出时默认为 'Formforge'，除非手动锁定。",
+    producer_tooltip: "导出时默认为 'Legir'，除非手动锁定。",
     creation_date: "创建日期",
     modification_date: "修改日期",
     mod_date_auto: "自动更新",
@@ -501,7 +501,7 @@ const zhCN = {
     no_pdf: "未加载 PDF。请使用上传按钮开始。",
   },
   uploader: {
-    title: "上传您的 PDF 表单",
+    title: "上传您的 PDF",
     desc: "将文件拖放到此处，或点击浏览",
     btn: "选择 PDF 文件",
     note: "您的文件将在本地安全处理。",
@@ -742,17 +742,18 @@ const zhCN = {
     done: "完成",
   },
   landing: {
-    title: "AI 驱动的 PDF 表单编辑器",
-    subtitle: "隐私优先、AI 驱动的 PDF 表单构建器，完全在浏览器中运行。",
+    title: "轻量级 AI PDF 阅读器",
+    subtitle:
+      "隐私优先、AI 驱动的 PDF 阅读器，专注阅读、导航、批注与表单处理。",
     resume_session: "恢复上一次会话",
     feature: {
       ai: {
         title: "AI 驱动",
-        desc: "使用 Gemini 自动检测表单字段。",
+        desc: "用 AI 解释页面、生成批注，并帮助你完成 PDF 阅读任务。",
       },
       editor: {
-        title: "可视化编辑器",
-        desc: "拖放界面定制您的表单。",
+        title: "专注阅读",
+        desc: "在响应迅速的工作区中阅读、搜索、导航和批注 PDF。",
       },
       local: {
         title: "隐私优先",

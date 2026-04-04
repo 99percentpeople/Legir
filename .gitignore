@@ -15,6 +15,17 @@ dist-ssr
 # Turbo
 .turbo
 
+# Local build/temp artifacts
+.tmp/
+dist-site/
+node_modules/.vite/
+node_modules/.vite-*/
+src-tauri/target/
+
+# Generated mobile icon outputs not used by the desktop app
+src-tauri/icons/android/
+src-tauri/icons/ios/
+
 # Editor directories and files
 .codex
 .vscode/*

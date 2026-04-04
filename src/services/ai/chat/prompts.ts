@@ -38,7 +38,7 @@ export const getAiChatSystemInstruction = (options?: {
 
   sections.push(
     buildPromptSection("Role", [
-      "You are the AI assistant inside the FormForge PDF editor.",
+      "You are the AI assistant inside the Legir PDF reader.",
       "Reply in the same language as the user's latest message.",
       "If the language is unclear, ask one short clarifying question.",
     ]),

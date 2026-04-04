@@ -443,7 +443,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
           className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
           onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
           tabIndex={supportsKeyboardRotateHandle ? 0 : -1}
-          data-ff-keyboard-handle="control-rotate"
+          data-app-keyboard-handle="control-rotate"
           aria-label={`${label} rotate`}
           onKeyDown={
             supportsKeyboardRotateHandle ? handleRotateHandleKeyDown : undefined
@@ -469,7 +469,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
         className={getResizeHandleClassName(handle)}
         onPointerDown={(e) => handleResizePointerDown(e, handle)}
         tabIndex={supportsKeyboardResizeHandles ? 0 : -1}
-        data-ff-keyboard-handle="control-resize"
+        data-app-keyboard-handle="control-resize"
         aria-label={`${label} resize ${handle}`}
         onKeyDown={
           supportsKeyboardResizeHandles
@@ -486,7 +486,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
         className="pointer-events-auto absolute -top-6 left-1/2 z-30 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-blue-500 bg-white"
         onPointerDown={(e) => handleResizePointerDown(e, "rotate")}
         tabIndex={supportsKeyboardRotateHandle ? 0 : -1}
-        data-ff-keyboard-handle="control-rotate"
+        data-app-keyboard-handle="control-rotate"
         aria-label={`${label} rotate`}
         onKeyDown={
           supportsKeyboardRotateHandle ? handleRotateHandleKeyDown : undefined

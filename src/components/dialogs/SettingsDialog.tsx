@@ -559,14 +559,14 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     <div className="flex items-center gap-2">
                       <User className="text-primary h-4 w-4" />
                       <Label
-                        htmlFor="ff-user-name"
+                        htmlFor="app-user-name"
                         className="mb-0 font-semibold"
                       >
                         {t("settings.user_name")}
                       </Label>
                     </div>
                     <Input
-                      id="ff-user-name"
+                      id="app-user-name"
                       value={options.userName || ""}
                       onChange={(e) =>
                         onChange({ ...options, userName: e.target.value })

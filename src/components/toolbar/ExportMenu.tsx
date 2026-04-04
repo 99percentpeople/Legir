@@ -96,7 +96,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
         <DropdownMenuContent
           align="end"
           className="min-w-56"
-          data-ff-block-modifier-wheel-zoom="1"
+          data-app-block-modifier-wheel-zoom="1"
         >
           <DropdownMenuItem
             onClick={onPrimary}

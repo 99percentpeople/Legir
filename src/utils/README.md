@@ -17,5 +17,5 @@ Do not put code here when it needs:
 
 Rule of thumb:
 
-- If the function still makes sense outside FormForge's feature model, `src/utils` is usually correct.
+- If the function still makes sense outside Legir's feature model, `src/utils` is usually correct.
 - If it depends on project concepts such as fields, annotations, viewport state, or AI workflow, it probably belongs elsewhere.

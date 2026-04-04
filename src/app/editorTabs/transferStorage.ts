@@ -4,7 +4,7 @@ import {
 } from "./transfer";
 import type { EditorTabSession } from "./types";
 
-const DB_NAME = "FormForgeEditorTransferDB";
+const DB_NAME = "LegirEditorTransferDB";
 const STORE_NAME = "tab-transfers";
 const TRANSFER_TTL_MS = 1000 * 60 * 15;
 

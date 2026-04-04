@@ -232,7 +232,7 @@ const de = {
     creator: "Ersteller",
     producer: "Produzent",
     producer_tooltip:
-      "Standardmäßig 'Formforge' auf Export, es wird manuell gesperrt.",
+      "Standardmäßig 'Legir' beim Export, sofern nicht manuell gesperrt.",
     creation_date: "Erstellungsdatum",
     modification_date: "Modifikationsdatum",
     mod_date_auto: "Automatisch (aktualisiert bei Export)",
@@ -505,7 +505,7 @@ const de = {
       "Kein PDF geladen. Verwenden Sie die Upload-Schaltfläche, um zu beginnen.",
   },
   uploader: {
-    title: "Laden Sie Ihr PDF-Formular hoch",
+    title: "Laden Sie Ihr PDF hoch",
     desc: "Ziehen Sie Ihre Datei hierher oder klicken Sie zum Durchsuchen",
     btn: "PDF-Datei auswählen",
     note: "Ihre Dateien werden lokal und sicher verarbeitet.",
@@ -763,18 +763,18 @@ const de = {
     done: "Fertig",
   },
   landing: {
-    title: "KI-gestützter PDF-Formular-Editor",
+    title: "Leichter KI-PDF-Reader",
     subtitle:
-      "Ein datenschutzorientierter, KI-gestützter PDF-Formularersteller, der vollständig in Ihrem Browser läuft.",
+      "Ein datenschutzorientierter, KI-gestützter PDF-Reader zum Lesen, Navigieren, Annotieren und Arbeiten mit Formularen.",
     resume_session: "Vorherige Sitzung fortsetzen",
     feature: {
       ai: {
         title: "KI-gestützt",
-        desc: "Formularfelder automatisch mit Gemini erkennen.",
+        desc: "Nutzen Sie KI, um Seiten zu erklären, Anmerkungen zu erzeugen und PDFs schneller zu erschließen.",
       },
       editor: {
-        title: "Visueller Editor",
-        desc: "Drag & Drop-Oberfläche zur Anpassung Ihrer Formulare.",
+        title: "Fokussiertes Lesen",
+        desc: "Lesen, suchen, navigieren und annotieren Sie PDFs in einem reaktionsschnellen Arbeitsbereich.",
       },
       local: {
         title: "Datenschutz zuerst",

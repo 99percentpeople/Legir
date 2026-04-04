@@ -74,7 +74,7 @@ const PageSettingsDropdownControl: React.FC<
         align={align}
         sideOffset={sideOffset}
         className="min-w-48"
-        data-ff-block-modifier-wheel-zoom="1"
+        data-app-block-modifier-wheel-zoom="1"
       >
         <DropdownMenuLabel>{t("toolbar.page_settings")}</DropdownMenuLabel>
         <DropdownMenuSeparator />

@@ -19,7 +19,7 @@ static SYSTEM_FONT_DB: OnceLock<Mutex<fontdb::Database>> = OnceLock::new();
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 static SECONDARY_WINDOW_COUNTER: AtomicU64 = AtomicU64::new(1);
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-const FOCUS_DOCUMENT_REQUEST_EVENT: &str = "ff://platform-focus-document-request";
+const FOCUS_DOCUMENT_REQUEST_EVENT: &str = "app://platform-focus-document-request";
 
 #[derive(Default)]
 struct WindowDocumentRegistry {
@@ -137,14 +137,14 @@ fn build_startup_init_script(startup_open_document_path: Option<String>) -> Stri
 
     format!(
         r#"
-const __FORMFORGE_WINDOW_BOOTSTRAP__ = {serialized_payload};
-Object.defineProperty(window, "__FORMFORGE_WINDOW_BOOTSTRAP__", {{
+const __APP_WINDOW_BOOTSTRAP__ = {serialized_payload};
+Object.defineProperty(window, "__APP_WINDOW_BOOTSTRAP__", {{
   configurable: false,
   enumerable: false,
   writable: false,
-  value: __FORMFORGE_WINDOW_BOOTSTRAP__ && typeof __FORMFORGE_WINDOW_BOOTSTRAP__ === "object"
-    ? Object.freeze(__FORMFORGE_WINDOW_BOOTSTRAP__)
-    : __FORMFORGE_WINDOW_BOOTSTRAP__
+  value: __APP_WINDOW_BOOTSTRAP__ && typeof __APP_WINDOW_BOOTSTRAP__ === "object"
+    ? Object.freeze(__APP_WINDOW_BOOTSTRAP__)
+    : __APP_WINDOW_BOOTSTRAP__
 }});
 "#
     )

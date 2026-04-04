@@ -194,7 +194,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         "bg-background border-border text-foreground relative z-30 flex h-12 items-center gap-2 border-b px-2 sm:px-4",
         hideToolSection ? "justify-between" : "lg:justify-between",
       )}
-      data-ff-block-modifier-wheel-zoom="1"
+      data-app-block-modifier-wheel-zoom="1"
     >
       <div className="flex shrink-0 items-center gap-2 sm:gap-2">
         <div className="flex items-center gap-1">
@@ -286,7 +286,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="start"
-                  data-ff-block-modifier-wheel-zoom="1"
+                  data-app-block-modifier-wheel-zoom="1"
                 >
                   <DropdownMenuRadioGroup
                     value={mode}
@@ -580,7 +580,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     <PopoverContent
                       align="start"
                       className="w-72 p-3"
-                      data-ff-block-modifier-wheel-zoom="1"
+                      data-app-block-modifier-wheel-zoom="1"
                     >
                       <div className="space-y-3">
                         {SHAPE_TOOL_GROUPS.map((group, index) => (

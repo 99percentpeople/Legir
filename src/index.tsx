@@ -21,8 +21,8 @@ if (shouldLoadPlatformFontFaces()) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <LanguageProvider defaultLanguage="system" storageKey="ff-ui-language">
-      <ThemeProvider defaultTheme="system" storageKey="ff-ui-theme">
+    <LanguageProvider defaultLanguage="system" storageKey="app-ui-language">
+      <ThemeProvider defaultTheme="system" storageKey="app-ui-theme">
         <Toaster position="top-center" />
         <Router hook={useBootstrapAwareHashLocation}>
           <App />

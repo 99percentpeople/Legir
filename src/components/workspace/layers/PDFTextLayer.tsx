@@ -640,7 +640,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           "--scale-factor": String(renderedScale ?? scale),
           "--user-unit": String(userUnit),
           ...(textLayerSmoothScale && {
-            "--ff-smooth-scale": textLayerSmoothScale,
+            "--app-smooth-scale": textLayerSmoothScale,
           }),
           ...(isHighlighting && {
             "--highlight-color": highlightColor,
@@ -649,13 +649,13 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
         }}
       />
       {searchHighlightRects.length > 0 && (
-        <div className="ff-pdf-search-hit-rect-layer">
+        <div className="app-pdf-search-hit-rect-layer">
           {searchHighlightRects.map((rect) => (
             <div
               key={rect.key}
               className={cn(
-                "ff-pdf-search-hit-rect",
-                rect.isActive && "ff-pdf-search-hit-rect--active",
+                "app-pdf-search-hit-rect",
+                rect.isActive && "app-pdf-search-hit-rect--active",
               )}
               style={{
                 left: `${rect.left * 100}%`,
@@ -674,21 +674,23 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           selectionHandles.end) &&
         createPortal(
           <div
-            className="ff-text-selection-handles-layer"
+            className="app-text-selection-handles-layer"
             style={{
-              "--ff-text-selection-handle-width": `${PDF_TEXT_SELECTION_HANDLE_WIDTH_PX}px`,
-              "--ff-text-selection-handle-dot-size": `${PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX}px`,
-              "--ff-text-selection-handle-stem-width": `${PDF_TEXT_SELECTION_HANDLE_STEM_WIDTH_PX}px`,
+              "--app-text-selection-handle-width": `${PDF_TEXT_SELECTION_HANDLE_WIDTH_PX}px`,
+              "--app-text-selection-handle-dot-size": `${PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX}px`,
+              "--app-text-selection-handle-stem-width": `${PDF_TEXT_SELECTION_HANDLE_STEM_WIDTH_PX}px`,
             }}
-            data-ff-handle-dragging={
+            data-app-handle-dragging={
               isDraggingSelectionHandle ? "1" : undefined
             }
-            data-ff-pointer-selecting={isPointerSelectingText ? "1" : undefined}
+            data-app-pointer-selecting={
+              isPointerSelectingText ? "1" : undefined
+            }
           >
             {selectionHandles.start && (
               <div
                 data-handle-kind="start"
-                className="ff-text-selection-handle"
+                className="app-text-selection-handle"
                 style={{
                   left: selectionHandles.start.left,
                   top: selectionHandles.start.top,
@@ -699,10 +701,10 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
                   }),
                 }}
               >
-                <div className="ff-text-selection-handle__stem" />
+                <div className="app-text-selection-handle__stem" />
                 <div
-                  data-ff-selection-handle="1"
-                  className="ff-text-selection-handle__dot"
+                  data-app-selection-handle="1"
+                  className="app-text-selection-handle__dot"
                   onPointerDown={(e) => startSelectionHandleDrag("start", e)}
                 />
               </div>
@@ -710,7 +712,7 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
             {selectionHandles.end && (
               <div
                 data-handle-kind="end"
-                className="ff-text-selection-handle"
+                className="app-text-selection-handle"
                 style={{
                   left: selectionHandles.end.left,
                   top: selectionHandles.end.top,
@@ -721,10 +723,10 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
                   }),
                 }}
               >
-                <div className="ff-text-selection-handle__stem" />
+                <div className="app-text-selection-handle__stem" />
                 <div
-                  data-ff-selection-handle="1"
-                  className="ff-text-selection-handle__dot"
+                  data-app-selection-handle="1"
+                  className="app-text-selection-handle__dot"
                   onPointerDown={(e) => startSelectionHandleDrag("end", e)}
                 />
               </div>

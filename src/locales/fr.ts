@@ -233,7 +233,7 @@ const fr = {
     creator: "Créateur",
     producer: "Producteur",
     producer_tooltip:
-      "Default a 'Formforge' en exportation a moins que se bloque manuellement.",
+      "Par défaut sur 'Legir' à l'export sauf verrouillage manuel.",
     creation_date: "Date de création",
     modification_date: "Date de modification",
     mod_date_auto: "Automatique (Mise à jour en exportation)",
@@ -505,7 +505,7 @@ const fr = {
       "Aucun PDF chargé. Utilisez le bouton de téléchargement pour commencer.",
   },
   uploader: {
-    title: "Téléchargez votre formulaire PDF",
+    title: "Téléchargez votre PDF",
     desc: "Glissez et déposez votre fichier ici, ou cliquez pour parcourir",
     btn: "Sélectionner un fichier PDF",
     note: "Vos fichiers sont traités localement et en toute sécurité.",
@@ -765,18 +765,18 @@ const fr = {
     done: "Terminé",
   },
   landing: {
-    title: "Éditeur de formulaire PDF alimenté par l'IA",
+    title: "Lecteur PDF léger alimenté par l'IA",
     subtitle:
-      "Un générateur de formulaires PDF axé sur la confidentialité et alimenté par l'IA, fonctionnant entièrement dans votre navigateur.",
+      "Un lecteur PDF axé sur la confidentialité et alimenté par l'IA pour lire, naviguer, annoter et traiter des formulaires.",
     resume_session: "Reprendre la session précédente",
     feature: {
       ai: {
         title: "Alimenté par l'IA",
-        desc: "Détectez automatiquement les champs de formulaire à l'aide de Gemini.",
+        desc: "Utilisez l'IA pour expliquer les pages, générer des annotations et vous aider à parcourir les PDF.",
       },
       editor: {
-        title: "Éditeur visuel",
-        desc: "Interface glisser-déposer pour personnaliser vos formulaires.",
+        title: "Lecture ciblée",
+        desc: "Lisez, recherchez, naviguez et annotez des PDF dans un espace de travail réactif.",
       },
       local: {
         title: "Confidentialité d'abord",
