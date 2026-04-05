@@ -1,4 +1,5 @@
 export * from "./app";
+export * from "./documentSession";
 export * from "./external";
 export * from "./files";
 export * from "./fonts";

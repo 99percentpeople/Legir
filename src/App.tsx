@@ -57,6 +57,7 @@ import type {
 } from "@/app/editorTabs/types";
 import {
   acquirePendingEditorWindowBootstrap,
+  applyTauriDocumentUiSession,
   buildEditorWindowBootstrapRoute,
   clearSavedDraftSession,
   destroyPlatformWindow,
@@ -65,6 +66,7 @@ import {
   finishPendingEditorWindowBootstrap,
   getPlatformDocumentSaveMode,
   getSavedDraftWorkspace,
+  getSavedTauriDocumentUiSession,
   getPlatformWindowId,
   getSavedViewStateForSaveTarget,
   hasPendingEditorWindowBootstrap,
@@ -82,6 +84,7 @@ import {
   pickSaveTarget,
   reportPlatformWindowDocuments,
   requestPlatformFocusExistingDocument,
+  saveTauriDocumentUiSession,
   saveEditorViewState,
   writeToSaveTarget,
   type PlatformDroppedPdf,
@@ -210,6 +213,10 @@ const App: React.FC = () => {
       currentPageIndex: snapshot.currentPageIndex,
       scrollContainer: workspaceScrollContainerRef.current,
     });
+
+    if (snapshot.saveTarget?.kind === "tauri") {
+      saveTauriDocumentUiSession(snapshot.saveTarget.path, snapshot);
+    }
 
     return {
       snapshot,
@@ -1017,17 +1024,38 @@ const App: React.FC = () => {
               options.saveTarget?.kind === "tauri"
                 ? getSavedViewStateForSaveTarget(options.saveTarget)
                 : null;
+            const persistedDocumentUiSession =
+              options.saveTarget?.kind === "tauri"
+                ? getSavedTauriDocumentUiSession(options.saveTarget.path)
+                : null;
+            const persistedPendingViewState =
+              persistedDocumentUiSession?.pendingViewStateRestore ??
+              (persistedViewState
+                ? {
+                    scale: persistedViewState.scale,
+                    scrollLeft: persistedViewState.scrollLeft,
+                    scrollTop: persistedViewState.scrollTop,
+                  }
+                : null);
 
             const currentPageIndex =
-              typeof persistedViewState?.pageIndex === "number"
+              typeof persistedDocumentUiSession?.currentPageIndex === "number"
                 ? Math.max(
                     0,
                     Math.min(
                       pages.length - 1,
-                      Math.floor(persistedViewState.pageIndex),
+                      Math.floor(persistedDocumentUiSession.currentPageIndex),
                     ),
                   )
-                : 0;
+                : typeof persistedViewState?.pageIndex === "number"
+                  ? Math.max(
+                      0,
+                      Math.min(
+                        pages.length - 1,
+                        Math.floor(persistedViewState.pageIndex),
+                      ),
+                    )
+                  : 0;
 
             const snapshot = createLoadedEditorTabSnapshot({
               pdfFile: options.pdfFile,
@@ -1042,14 +1070,16 @@ const App: React.FC = () => {
               preservedSourceAnnotations,
               outline,
               currentPageIndex,
-              pendingViewStateRestore: persistedViewState
-                ? {
-                    scale: persistedViewState.scale,
-                    scrollLeft: persistedViewState.scrollLeft,
-                    scrollTop: persistedViewState.scrollTop,
-                  }
-                : null,
+              pendingViewStateRestore: persistedPendingViewState,
             });
+            const hydratedSnapshot =
+              persistedDocumentUiSession !== null
+                ? applyTauriDocumentUiSession(snapshot, {
+                    ...persistedDocumentUiSession,
+                    currentPageIndex,
+                    pendingViewStateRestore: persistedPendingViewState,
+                  })
+                : snapshot;
 
             const postLoadLocalMatch = sourceKey
               ? findTabBySourceKey(sourceKey)
@@ -1076,7 +1106,7 @@ const App: React.FC = () => {
               id: createEditorTabId(),
               title: getEditorTabDisplayTitle(options.filename),
               sourceKey,
-              snapshot,
+              snapshot: hydratedSnapshot,
               thumbnailImages: {},
               workerService,
               disposePdfResources: dispose,
@@ -1802,11 +1832,12 @@ const App: React.FC = () => {
       return;
     }
 
+    captureActiveTabState();
     const result = closeTabImmediately(activeTabId);
     if (result.isLastTab) {
       navigate("/");
     }
-  }, [activeTabId, closeTabImmediately, navigate]);
+  }, [activeTabId, captureActiveTabState, closeTabImmediately, navigate]);
 
   const handleResolveCloseRequest = useCallback(
     async (saveBeforeClose: boolean) => {
