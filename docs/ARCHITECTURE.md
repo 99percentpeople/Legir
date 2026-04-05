@@ -1,222 +1,402 @@
-# Legir 架构与开发指南
+# Legir Architecture
 
-本文档收纳 Legir 的架构、目录结构、核心数据流、扩展点以及 Tauri 桌面端开发说明。
+This document describes the internal architecture of Legir's main application.
 
-## 快速索引
+It intentionally avoids repeating setup, build, and deployment instructions that already live in the root [README.md](../README.md). The focus here is module boundaries, data flow, persistence strategy, and extension points.
 
-- **架构入口**：`src/index.tsx`
-- **应用编排**：`src/App.tsx`
-- **编辑器页面**：`src/pages/EditorPage.tsx`
-- **画布/交互核心**：`src/components/workspace/Workspace.tsx`
-- **控件系统**：`src/components/workspace/controls/*`
-- **编辑器状态（SSOT）**：`src/store/useEditorStore.ts`
-- **PDF 管线**：`src/services/pdfService/index.ts` + `src/services/pdfService/*`
-- **文件打开/保存（Web vs Tauri）**：`src/services/fileOps.ts`
+## Scope
 
----
+This repository currently has two frontend surfaces:
 
-## 运行方式（Web / Tauri）
+- `src/`: the main PDF reader and editor
+- `www/`: a separate marketing site
 
-**Prerequisites:** Node.js（项目 `packageManager` 标记为 `bun`）
+This document focuses on the main app in `src/`. The `www` site is intentionally much simpler and only reuses a small set of presentational components.
 
-- Web dev：`bun run dev`
-- Tauri dev：`bun run dev:app`
-- Web build：`bun run build`
-- Tauri build：`bun run build:app`
+## High-Level Runtime Model
 
-### AI 环境变量（可选）
+At runtime, the main app is composed of five major layers:
 
-用于 AI 自动识别字段（见 `src/services/geminiService.ts`）。在 `.env.local` 中设置：
+1. App shell and routing
+2. Editor tab and window orchestration
+3. PDF loading, rendering, and export services
+4. Editor state and workspace UI
+5. Platform-specific persistence and file handling
 
-- `GEMINI_API_KEY=...`
-- `OPENAI_API_KEY=...`
-- `OPENAI_API_URL=...`（可选，自定义 OpenAI 兼容接口地址）
+The main entry path is:
 
-构建时会在 `vite.config.ts` 中注入为 `process.env.*`；其中 `GEMINI_API_KEY` 会额外映射到 `process.env.API_KEY` / `process.env.GEMINI_API_KEY`。
+- `src/index.tsx`
+- `src/App.tsx`
+- `src/AppRoutes.tsx`
 
----
-
-## 目录结构（关键路径）
+## Top-Level Module Map
 
 ```text
 src/
-  index.tsx                  # 应用入口：Provider + Router
-  App.tsx                    # 应用编排：打开/解析/导出/草稿恢复/AI 识别/路由跳转
-  AppRoutes.tsx              # 路由与 editor 访问保护
+  index.tsx
+  App.tsx
+  AppRoutes.tsx
+
+  app/
+    editorTabs/             Tab snapshots, session transfer, window layout
+    useAppInitialization.ts App bootstrap
+    useBootstrapAwareHashLocation.ts
+
   pages/
-    LandingPage.tsx          # 首页：上传/打开、最近文件（桌面）、恢复草稿
-    EditorPage.tsx           # 编辑器页面：Toolbar/Sidebar/Workspace/PropertiesPanel
-  store/
-    useEditorStore.ts        # Zustand：编辑器“单一状态源”(SSOT) + undo/redo + UI 持久化
-  services/
-    fileOps.ts               # 文件打开/保存抽象（Web vs Tauri）
-    storageService.ts        # Web 草稿存储（IndexedDB）
-    recentFilesService.ts    # 桌面最近文件 + 预览缩略图队列（localStorage，单例服务）
-    geminiService.ts         # AI 识别：从页面截图推断字段位置/类型
-    pdfService/
-      index.ts               # PDF 解析/渲染/导出中心（pdf-lib + pdfjs-dist（worker））
-      pdfWorkerService.ts    # 渲染 worker 编排层（给 workspace 使用）
-      parsers/               # 将 PDF 原生对象 -> FormField/Annotation
-      exporters/             # 将 FormField/Annotation -> 写回 PDF
-      lib/                   # PDF 资源/字体/appearance/outline 等工具库
-      types.ts               # Parser/Exporter 的接口与上下文类型
+    HomePage/               App home page and recent file entry point
+    EditorPage/             Editor shell and route-level orchestration
+
   components/
-    workspace/               # 编辑器画布：PDF 页渲染 + 控件叠加 + 交互
-      Workspace.tsx          # 交互中心：选中/拖拽/缩放/绘制批注
-      layers/PDFPage.tsx     # 单页渲染入口（会走 worker 渲染）
-      controls/              # 控件系统：registry + renderer + wrapper + properties
-    properties-panel/        # 右侧属性面板（文档属性 + 控件属性）
-    sidebar/                 # 左侧面板：页面缩略图、字段/批注列表、outline
-    toolbar/                 # 顶部工具栏/快捷键入口
-    ui/                      # 通用 UI 组件（button/dialog/popover/...）
-  hooks/                     # 交互/性能相关 hooks（panning/ink/autoscroll/...）
-  lib/                       # 跨模块基础能力（tool 行为、字体、通用 utils）
-  utils/                     # 纯工具函数（颜色、PDF date 解析等）
-  workers/                   # Web Worker（如 pdf-render.worker.ts）
-  styles/                    # 样式资源（Tailwind/全局样式补充）
-  types.ts                   # 核心数据结构：EditorState/FormField/Annotation/Tool 等
-  locales/                   # i18n 字典（按语言拆分）
+    workspace/              PDF pages, overlays, controls, interaction layers
+    toolbar/                Editing commands and document actions
+    sidebar/                Page list, outline, field/annotation navigation
+    properties-panel/       Properties and optional AI-related panels
+    home/                   Shared home/branding presentation components
+    ui/                     Shared UI primitives
 
-src-tauri/                   # Tauri 桌面端（Rust）
-  tauri.conf.json            # 桌面端配置（窗口/dragDrop/CLI args/build）
-  capabilities/              # 权限声明（fs/dialog/cli/window 等）
-  src/
-    lib.rs                   # 插件初始化（dialog/fs/cli/log）
+  services/
+    pdfService/             PDF parsing, rendering, export, worker protocol
+    recentFiles/            Recent-file storage adapters and browser handle logic
+    platform/               Web/Tauri abstraction layer
+    ai/                     Optional AI-related service entry points
+    recentFilesService.ts   Desktop recent-files singleton service
+    recentFilePreview.ts    Shared preview generation utility
+    browserDb.ts            Shared IndexedDB setup for browser persistence
 
-public/
-  pdfjs/                     # pdfjs 的 cmaps/standard_fonts（由 viteStaticCopy 复制）
-  fonts/                     # 项目内置字体（用于 CJK 渲染/导出）
+  store/
+    useEditorStore.ts       Editor single source of truth
+    helpers.ts
+    selectors.ts
+
+  locales/                  Translation dictionaries
+
+src-tauri/
+  Tauri host application
 ```
 
----
+## App Shell
 
-## 核心数据流
+### `src/index.tsx`
 
-### 1) 打开 PDF → 进入编辑器
+The root entry mounts the React tree and wires the global providers:
 
-- **入口**：`src/App.tsx`
-- **解析**：`src/services/pdfService.loadPDF(input)`
-  - `pdf-lib`：页面尺寸/旋转/metadata/字段解析与导出写回
-  - `pdfjs-dist`（worker）：渲染、文本层、outline/目的地解析
-- **落地状态**：`src/store/useEditorStore.ts` 的 `loadDocument(...)`
-- **路由**：`src/AppRoutes.tsx` 控制是否可进入编辑器
+- language provider
+- theme provider
+- toaster
+- `wouter` router
 
-#### 桌面端最近文件与缩略图（Tauri）
+The app currently uses a hash-based router through `useBootstrapAwareHashLocation`, which allows the desktop bootstrap flow to redirect to a special editor route without depending on server-side rewrite support.
 
-`src/services/recentFilesService.ts` 负责：
+### `src/App.tsx`
 
-- 维护最近文件列表（localStorage）
-- 维护最近文件的视图状态（scale/scroll/pageIndex）
-- 生成并缓存最近文件的预览缩略图（DataURL）
+`App.tsx` is the orchestration layer. It is responsible for:
 
-实现方式：
+- opening documents from all supported sources
+- deduplicating open documents by source key
+- creating and restoring editor tab sessions
+- wiring recent-files adapters
+- applying persisted global editor UI state
+- coordinating save, export, print, tab close, and multi-window flows
 
-- 提供单例 `recentFilesService`（推荐在业务代码里直接使用实例方法）
-- 缩略图生成使用 **串行队列**（避免并行渲染导致卡顿）
-- 支持 **去重**（同 path/参数不会重复渲染）
-- 支持 **取消**（在切换文档/退出时中止缩略图渲染，减少卡顿）
+This file is intentionally operational rather than purely presentational.
 
-推荐用法：
+### `src/AppRoutes.tsx`
 
-- 打开 PDF 后：优先调用 `recentFilesService.upsertWithBytesPreview(...)`
-  - 复用 `loadPDF()` 已得到的 `pdfBytes`，由 worker 统一生成预览缩略图
-- 保存/导出后：调用 `recentFilesService.upsertWithBytesPreview(..., { forcePreviewRender: true })`
-- 路由切换/退出：调用 `recentFilesService.cancelPreviewTasks()`
+Routing is simple:
 
-### 2) Workspace 渲染：PDF 页 + 控件叠加
+- `/` renders `HomePage`
+- `/editor` renders `EditorPage`
 
-- **PDF 页渲染**：`components/workspace/layers/PDFPage.tsx`（通过 `pdfWorkerService` 走 worker 渲染）
-- **控件渲染**：`components/workspace/controls/ControlRenderer.tsx`
-  - 根据 `data.type` 从 `ControlRegistry` 取对应组件
+The editor route is guarded. If there is no active document/tab session, navigation falls back to the home page.
 
-### 3) 编辑状态：单一状态源（SSOT）
+## Home Page and Recent Files
 
-- 状态统一由 `useEditorStore` 管理（文档 + UI）。
-- Undo/Redo 通过 `past/future` 快照。
-- UI 状态会持久化到 localStorage；大对象/二进制不在 store 持久化。
+The app home page is implemented in:
 
-### 4) 保存/导出
+- `src/pages/HomePage/index.tsx`
+- `src/pages/HomePage/RecentFilesHomeView.tsx`
+- `src/pages/HomePage/hooks/useHomeRecentFiles.ts`
 
-- **导出 PDF bytes**：`services/pdfService.exportPDF(...)`
-- **写入目标**：`services/fileOps.writeToSaveTarget(...)`
-  - Web：File Picker / download
-  - Tauri：filesystem plugin 写文件
-- **Web 草稿**：`services/storageService`（IndexedDB）
+This page does not own persistence itself. It consumes a `HomePageAdapter`, which keeps the UI layer independent from the actual recent-file backend.
 
-### 5) AI 自动识别字段
+The recent-file abstractions live in:
 
-- `services/geminiService.analyzePageForFields(...)`
-- 无 API Key 会抛错；UI 侧应提示用户设置 `.env.local`。
+- `src/services/recentFiles/types.ts`
+- `src/services/recentFiles/index.ts`
 
----
+There are two concrete storage strategies:
 
-## PDF 加载/渲染性能建议
+- Browser: IndexedDB + `FileSystemFileHandle`
+  - `src/services/recentFiles/indexedDbStore.ts`
+  - `src/services/recentFiles/webFiles.ts`
+- Desktop: localStorage-backed recent files with preview management
+  - `src/services/recentFiles/platformStore.ts`
+  - `src/services/recentFilesService.ts`
 
-- **一次加载，多处复用**：`loadPDF()` 用 pdf-lib 解析页面/metadata，并把 `pdfBytes` 交给 worker；渲染/缩略图/outline/文本层复用 worker 内的文档实例，避免重复 `loadDocument()` 或二次读取。
-- **首屏优先、懒渲染**：`PDFPage` 只在进入视口时触发渲染（IntersectionObserver + `isInView`），配合 `pdfWorkerService.reprioritize()` 优先渲染视口中心，缩放时用 `cancelQueuedRenders()` 及时丢弃过期任务。
-- **大页切片渲染**：像素超过 `MAX_PIXELS_PER_PAGE` 时启用 `PDFTileLayer`，通过 `TILE_MAX_DIM` 控制单块尺寸，避免整页渲染阻塞和内存峰值。
-- **低清占位 + 预热缩略图**：`warmupThumbnails()` 用 `renderPageImage` 先生成低分辨率缩略图，在 `PDFCanvasLayer` 作为 `placeholderImage` 显示，提升“可见速度”。
-- **限制 DPR 与分辨率**：`PDFCanvasLayer`/`PDFTileLayer` 将 DPR 夹在 2 以内；缩放时可按需降低渲染分辨率，减少像素量。
-- **缓存与清理**：worker 内部复用 page/text 内容，`pdfWorkerService.getTextContent()` 复用文本内容；切换文档时调用 `pdfWorkerService.unloadDocument()` 与 `pdfWorkerService.releaseCanvas()` 释放旧资源。
-- **可选：延后重解析**：若首屏优先，考虑把 `pdf-lib` 的字段/注释解析放到后台或按需触发，先保证页面渲染与交互就绪。
+### Current Persistence Model
 
----
+Recent files and editor UI state are intentionally separate:
 
-## 扩展点（避免重复实现）
+- Recent files store lightweight metadata and previews
+- Editor UI state is stored globally, not per file
 
-### 添加新的“表单控件类型”
+That global UI session is implemented in:
 
-- 在 `src/types.ts` 的 `FieldType` 中新增类型
-- 在 `src/components/workspace/controls/` 下新增
-  - Canvas 渲染组件（如 `./form/*`）
-  - 属性面板组件（如 `./properties/*`）
-- 在 `src/components/workspace/controls/index.ts` 的 `registerControls()` 注册
+- `src/services/platform/documentSession.ts`
 
-**如果需要导入/导出到 PDF 原生对象**：
+This means reopening a document restores the last editor layout and reading position as a global editor preference rather than a per-document session.
 
-- 增加 parser：`src/services/pdfService/parsers/*`
-- 增加 exporter：`src/services/pdfService/exporters/*`
-- 由 `src/services/pdfService/index.ts` 将其装配进 parser/exporter 数组
+## Document Open Flow
 
-### 添加新的“批注类型”
+The current open flow is:
 
-- 同样通过 `ControlRegistry` 注册（type 为字符串，如 `highlight`/`ink`）
-- PDF 导入/导出同样走 annotation parser/exporter
+1. A file enters from one of several sources:
+   - file picker
+   - recent files
+   - drag and drop
+   - desktop startup/open-file events
+2. `src/services/platform/files.ts` and `src/services/platform/app.ts` normalize the source
+3. `src/App.tsx` loads the PDF through `loadPDF(...)`
+4. A fresh `EditorTabSnapshot` is created
+5. The persisted global UI session is applied
+6. The tab is inserted into the current editor window
+7. The route switches to `/editor`
 
-### 添加新工具（Tool）或快捷键行为
+The file-open abstractions deliberately hide the platform differences:
 
-- `src/types.ts`：扩展 `Tool`
-- `src/lib/tool-behavior.ts`：工具行为/光标/用后切回 select 规则
-- `src/pages/EditorPage.tsx`：键盘事件分发
+- Web uses browser file handles where available
+- Desktop uses Tauri dialog and filesystem APIs
 
-### i18n
+## Editor Tab and Window Model
 
-- `src/components/language-provider.tsx` 使用 `import.meta.glob` 动态加载 `src/locales/*.ts`
-- 新增语言：增加 `src/locales/<lang>.ts`
+Legir treats each open document as a tab session rather than a single monolithic editor instance.
 
----
+The core types live in:
 
-## Tauri / 桌面端（src-tauri）
+- `src/app/editorTabs/types.ts`
 
-### 关键配置
+Important concepts:
+
+- `EditorTabSnapshot`
+  - a serializable view of editor state for one document
+- `EditorTabSession`
+  - snapshot + worker/service/resource ownership
+- `EditorWindowLayout`
+  - tab ordering and active-tab selection for a window
+
+### Snapshot Creation and Restore
+
+Tab snapshot logic lives in:
+
+- `src/app/editorTabs/storeSnapshot.ts`
+
+This module handles:
+
+- creating a snapshot from the live editor store
+- creating the initial snapshot after loading a PDF
+- deriving stable source keys for deduplication
+- restoring a snapshot back into the Zustand store
+
+### Multi-Window Support
+
+Tab and window transfer support lives in:
+
+- `src/app/editorTabs/transfer.ts`
+- `src/app/editorTabs/transferStorage.ts`
+- `src/services/platform/window.ts`
+- `src/services/platform/windowBootstrap.ts`
+- `src/services/platform/tabWorkspace.ts`
+
+The important architectural point is that cross-window movement is based on transferable tab session state rather than reopening the document from scratch whenever possible.
+
+## Editor State
+
+The editor single source of truth is:
+
+- `src/store/useEditorStore.ts`
+
+This store holds both:
+
+- document model state
+- editor UI state
+
+Examples:
+
+- pages, fields, annotations
+- current tool and annotation styles
+- selected object
+- zoom/page position
+- sidebar and right-panel state
+- undo/redo history
+
+State helpers and selectors are split out to:
+
+- `src/store/helpers.ts`
+- `src/store/selectors.ts`
+
+The general rule is:
+
+- persistent, user-visible editor state belongs in the store
+- heavyweight runtime resources do not
+
+Examples of non-store runtime resources:
+
+- worker instances
+- disposal callbacks
+- some transferred tab-session resources
+
+## PDF Pipeline
+
+The PDF pipeline lives in:
+
+- `src/services/pdfService/index.ts`
+- `src/services/pdfService/pdfWorkerService.ts`
+- `src/services/pdfService/pdfRenderer.ts`
+- `src/services/pdfService/workerProtocol.ts`
+
+Responsibilities are split roughly like this:
+
+- `pdf-lib`
+  - PDF mutation and export
+  - form and annotation write-back
+  - metadata-oriented document manipulation
+- `pdfjs-dist`
+  - rendering
+  - text extraction
+  - outline/destination support
+
+### Why a Worker Service Exists
+
+Rendering is coordinated through `pdfWorkerService` so the workspace can:
+
+- render visible pages without blocking the main thread
+- reprioritize work around the viewport
+- cancel stale render requests
+- reuse already-loaded PDF data across page-level rendering tasks
+
+## Workspace Rendering Model
+
+The editor page shell is:
+
+- `src/pages/EditorPage/index.tsx`
+
+The rendering and interaction core is:
+
+- `src/components/workspace/Workspace.tsx`
+
+The workspace combines:
+
+- rendered PDF page layers
+- annotation and control overlays
+- hit-testing and selection
+- dragging/resizing/editing interactions
+
+Important supporting areas:
+
+- `src/components/workspace/layers/`
+- `src/components/workspace/controls/`
+- `src/components/sidebar/`
+- `src/components/properties-panel/`
+- `src/components/toolbar/`
+
+The control system is registry-driven. New form controls or annotation-like tools should be added through the existing control registration flow instead of introducing special-case rendering paths.
+
+## Platform Abstraction Layer
+
+Platform-specific concerns are isolated in:
+
+- `src/services/platform/runtime.ts`
+- `src/services/platform/files.ts`
+- `src/services/platform/app.ts`
+- `src/services/platform/window.ts`
+- `src/services/platform/ui.tsx`
+- `src/services/platform/documentSession.ts`
+
+This layer exists to keep `App.tsx` and the editor UI from having to know about:
+
+- Tauri plugin APIs
+- browser file picker APIs
+- browser drag-and-drop file handles
+- desktop window lifecycle events
+- platform-specific persistence details
+
+As a rule, new platform conditionals should go into `src/services/platform/*` first, not directly into UI components.
+
+## Browser Persistence
+
+The browser-side persistence foundation is:
+
+- `src/services/browserDb.ts`
+
+It provides the IndexedDB setup used by browser recent-files storage. The browser recent-file path stores file handles separately from the recent-file metadata record so metadata can stay lightweight while still supporting reopen flows.
+
+## Optional AI and Translation Layers
+
+AI is optional and should be treated as an enhancement layer, not as the primary architecture.
+
+Relevant modules include:
+
+- `src/services/ai/`
+- `src/services/translateService.ts`
+- `src/services/pageTranslationService.ts`
+- AI-related panels inside `src/components/properties-panel/`
+
+These features should be integrated through service boundaries and editor actions rather than by coupling provider-specific logic into core workspace components.
+
+## Extension Points
+
+### Add a New Form Control
+
+Update the control system rather than adding one-off rendering branches:
+
+- control types in `src/types.ts`
+- control components under `src/components/workspace/controls/`
+- registration in the control registry
+- parser/exporter support in `src/services/pdfService/` if round-trip PDF support is required
+
+### Add a New Annotation-Like Tool
+
+Touch the same broad areas:
+
+- tool type definitions in `src/types.ts`
+- workspace interaction logic
+- control/annotation registry
+- export support if it needs to be written back to PDF
+
+### Add a New Language
+
+Add a locale file under:
+
+- `src/locales/`
+
+The language provider loads locale modules dynamically, so new dictionaries should follow the existing module shape.
+
+### Add a New Platform-Specific Capability
+
+Prefer extending:
+
+- `src/services/platform/*`
+
+before changing higher-level UI code. This keeps platform branching localized and easier to audit.
+
+## Desktop Host
+
+The desktop host lives in `src-tauri/`.
+
+Important areas:
 
 - `src-tauri/tauri.conf.json`
-  - `app.windows[].dragDropEnabled: true`
-  - `plugins.cli.args`：定义 `source` 参数
-- `src-tauri/capabilities/default.json`
-  - 权限声明（fs/dialog/cli/window）
-  - 当前 `fs:allow-read-file` / `fs:allow-write-file` 的 `path: "**"` 权限较宽，收紧时优先从 capabilities 做。
+- `src-tauri/capabilities/`
+- `src-tauri/src/lib.rs`
 
-### 桌面端能力对应的前端实现
+The Tauri layer should remain thin. Most product logic should stay in the TypeScript application unless a capability truly requires native-side handling.
 
-- 打开/保存：`src/services/fileOps.ts`（统一做 Web vs Tauri 分支）
-- 启动参数打开 PDF：`src/services/fileOps.ts#getStartupOpenPdfArg()` → `src/App.tsx` 初始化流程
-- 拖拽打开 PDF：`src/App.tsx` 使用 `getCurrentWebview().onDragDropEvent(...)`
+## Architectural Conventions
 
----
+Current conventions worth preserving:
 
-## Fonts
-
-项目内置 **Noto Sans SC**（sans-serif）与 **Source Han Serif SC**（serif）用于 CJK 渲染/导出。
-
-字体 license/attribution 见 `public/fonts/NOTICE.txt`。
+- Keep the editor store as the single source of truth for active document/editor state
+- Use services for file, platform, and persistence boundaries
+- Keep browser and desktop recent-file backends behind a shared interface
+- Restore editor UI state through one global session path instead of multiple competing persistence systems
+- Prefer extending existing registries and pipelines over adding parallel special-case systems

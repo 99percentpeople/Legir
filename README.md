@@ -1,46 +1,53 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 # Legir
 
-> Lightweight AI PDF Reader
+Legir is a local-first PDF workspace for reading, navigating, annotating, and editing PDF forms.
 
-Legir 是一个基于 React + Vite 的轻量级 AI PDF 阅读器与工作台，使用 [pdfjs](https://github.com/mozilla/pdf.js) 进行 PDF 渲染，以及 [pdf-lib](https://github.com/Hopding/pdf-lib) 进行 PDF 操作。它支持 PDF 阅读、搜索与导航，支持批注（Highlight/Ink/Comment/FreeText）与表单控件（Text/Checkbox/Radio/Dropdown/Signature）的创建和编辑，并可结合 AI 进行文档理解、字段识别和批注辅助，最后导出回写到 PDF。
+It is built for practical document work rather than generic file preview. You can open local PDFs, mark them up, fill or create form controls, and export the result back to PDF. Optional AI-assisted features can help with document understanding, but the core experience remains a fast client-side PDF editor.
 
-该项目同时支持：
+## What You Can Do
 
-- **Web 版**：浏览器中运行（使用 File System Access API）
-- **桌面版**：通过 **Tauri** 打包（使用 Tauri fs API）
+- Read and navigate PDFs in a focused workspace
+- Add annotations such as highlight, ink, comment, free text, and shapes
+- Create and edit form controls such as text, checkbox, radio, dropdown, and signature
+- Reopen recent files and restore the last editor UI state
+- Run in the browser or as a Tauri desktop app
+- Keep the main workflow local-first
 
-## 快速开始
+## Available As
 
-**Prerequisites:** Node.js（推荐使用 Bun）
+- Browser app for local PDF work
+- Tauri desktop app for a native local workflow
+- Separate `www` landing site for marketing / public entry
 
-1. 安装依赖
-   - `bun install`
+## Typical Use Cases
 
-2. （可选）配置 AI / 翻译相关环境变量
+- Review a PDF and leave visual markup
+- Fill or design interactive PDF forms
+- Reopen in-progress document work quickly
+- Use a desktop-style local workflow without sending files to a server
 
-   在 `.env.local` 中设置：
-   - `GEMINI_API_KEY=...`
-   - `OPENAI_API_KEY=...`
-   - `OPENAI_API_URL=...`（可选，用于自定义 OpenAI 兼容接口地址）
+## Quick Start
 
-   说明：构建时会在 `vite.config.ts` 中将这些变量注入为 `process.env.*`，其中 `GEMINI_API_KEY` 同时会映射到 `process.env.API_KEY` / `process.env.GEMINI_API_KEY`。
+```bash
+bun install
+bun run dev
+```
 
-3. 启动 Web 开发服务器
-   - `bun run dev`
+Desktop: `bun run dev:app`  
+Landing site: `bun run dev:www`
 
-4. 启动 Tauri 桌面版开发
-   - `bun run dev:app`
+## Deployment
 
-## 文档
+Deploy the repository root as the app project, and deploy `www/` as a separate Vercel project with `Root Directory = www`.
 
-- 项目架构、目录结构、核心数据流、扩展点：[ARCHITECTURE.md](docs/ARCHITECTURE.md)
+If the landing site needs to link to the app, set:
 
-## Fonts
+```bash
+VITE_APP_URL=https://app.your-domain.com
+```
 
-This project bundles **Noto Sans SC** (sans-serif) and **Source Han Serif SC** (serif) for CJK text rendering/export.
+## For Contributors
 
-See [NOTICE.txt](public/fonts/NOTICE.txt) for license and attribution details.
+For the internal architecture and module layout, see:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
