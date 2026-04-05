@@ -1,0 +1,4 @@
+@source "./";
+@source "../../src";
+
+@import "../../src/globals.css";

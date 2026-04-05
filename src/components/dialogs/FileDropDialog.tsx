@@ -9,7 +9,6 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { useLanguage } from "../language-provider";
-import { PlatformText } from "@/services/platform";
 
 interface FileDropDialogProps {
   isOpen: boolean;
@@ -46,10 +45,7 @@ const FileDropDialog: React.FC<FileDropDialogProps> = ({
               onClick={onSaveAndOpen}
               disabled={!pendingPath}
             >
-              <PlatformText
-                desktop={t("dialog.file_drop.save_open")}
-                web={t("dialog.file_drop.save_draft_open")}
-              />
+              {t("dialog.file_drop.save_open")}
             </Button>
           )}
 

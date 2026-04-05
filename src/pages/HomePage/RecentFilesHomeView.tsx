@@ -1,25 +1,25 @@
 import { FolderOpen, Search, Trash2, X } from "lucide-react";
+import { HomeHeader } from "@/components/home/HomeHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimeAgoText } from "@/components/timeText";
-import { LandingHeader } from "./LandingHeader";
-import type { LandingTranslation } from "./types";
-import type { RecentFileEntry } from "@/services/recentFilesService";
+import type { RecentFileEntry } from "@/services/recentFiles";
+import type { HomePageTranslation } from "./types";
 
-interface DesktopLandingViewProps {
+interface RecentFilesHomeViewProps {
   query: string;
   recentFiles: RecentFileEntry[];
   filteredRecentFiles: RecentFileEntry[];
   onQueryChange: (value: string) => void;
   onClearQuery: () => void;
-  onOpen?: () => Promise<void>;
+  onOpen: () => Promise<void>;
   onOpenRecent: (entry: RecentFileEntry) => Promise<void>;
-  onDeleteRecent: (path: string) => void;
+  onDeleteRecent: (path: string) => void | Promise<void>;
   onClearAll: () => void | Promise<void>;
-  t: LandingTranslation;
+  t: HomePageTranslation;
 }
 
-export function DesktopLandingView({
+export function RecentFilesHomeView({
   query,
   recentFiles,
   filteredRecentFiles,
@@ -30,19 +30,19 @@ export function DesktopLandingView({
   onDeleteRecent,
   onClearAll,
   t,
-}: DesktopLandingViewProps) {
+}: RecentFilesHomeViewProps) {
   return (
     <div className="bg-background flex min-h-screen flex-col transition-colors duration-200">
-      <LandingHeader />
+      <HomeHeader />
 
       <div className="flex flex-1 flex-col gap-6 p-6 pt-24">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <h1 className="text-foreground text-2xl font-bold tracking-tight">
-              {t("landing.desktop.recent_title")}
+              {t("home.desktop.recent_title")}
             </h1>
             <p className="text-muted-foreground text-sm">
-              {t("landing.desktop.recent_subtitle")}
+              {t("home.desktop.recent_subtitle")}
             </p>
           </div>
 
@@ -52,7 +52,7 @@ export function DesktopLandingView({
               <Input
                 value={query}
                 onChange={(event) => onQueryChange(event.target.value)}
-                placeholder={t("landing.desktop.search_placeholder")}
+                placeholder={t("home.desktop.search_placeholder")}
                 className="pl-9"
               />
               {query.trim() ? (
@@ -69,13 +69,9 @@ export function DesktopLandingView({
             </div>
 
             <div className="flex gap-2">
-              <Button
-                onClick={() => void onOpen?.()}
-                className="gap-2"
-                disabled={!onOpen}
-              >
+              <Button onClick={() => void onOpen()} className="gap-2">
                 <FolderOpen />
-                {t("landing.desktop.open_pdf")}
+                {t("home.desktop.open_pdf")}
               </Button>
               <Button
                 variant="outline"
@@ -86,7 +82,7 @@ export function DesktopLandingView({
                 disabled={recentFiles.length === 0}
               >
                 <Trash2 />
-                {t("landing.desktop.clear_all")}
+                {t("home.desktop.clear_all")}
               </Button>
             </div>
           </div>
@@ -95,7 +91,7 @@ export function DesktopLandingView({
         <div className="border-border bg-card rounded-xl border">
           <div className="border-border flex items-center justify-between border-b p-4">
             <div className="text-sm font-medium">
-              {t("landing.desktop.file_count", {
+              {t("home.desktop.file_count", {
                 count: filteredRecentFiles.length,
               })}
             </div>
@@ -104,7 +100,7 @@ export function DesktopLandingView({
           <div className="divide-border divide-y">
             {filteredRecentFiles.length === 0 ? (
               <div className="text-muted-foreground p-6 text-sm">
-                {t("landing.desktop.no_recent_files")}
+                {t("home.desktop.no_recent_files")}
               </div>
             ) : (
               filteredRecentFiles.map((entry) => (
@@ -124,7 +120,7 @@ export function DesktopLandingView({
                         />
                       ) : (
                         <div className="text-muted-foreground flex h-full w-full items-center justify-center text-xs">
-                          {t("landing.desktop.pdf_badge")}
+                          {t("home.desktop.pdf_badge")}
                         </div>
                       )}
                     </div>
@@ -134,17 +130,10 @@ export function DesktopLandingView({
                         {entry.filename}
                       </div>
                       <div className="text-muted-foreground truncate text-xs">
-                        {entry.path}
+                        {entry.locationLabel}
                       </div>
                       <div className="text-muted-foreground mt-1 text-xs">
                         <TimeAgoText time={entry.lastOpenedAt} />
-                        {typeof entry.lastViewState?.pageIndex === "number" ? (
-                          <span className="ml-2">
-                            {t("sidebar.page", {
-                              page: entry.lastViewState.pageIndex + 1,
-                            })}
-                          </span>
-                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -156,12 +145,14 @@ export function DesktopLandingView({
                         void onOpenRecent(entry);
                       }}
                     >
-                      {t("landing.desktop.open")}
+                      {t("home.desktop.open")}
                     </Button>
                     <Button
                       variant="destructive"
                       size="icon"
-                      onClick={() => onDeleteRecent(entry.path)}
+                      onClick={() => {
+                        void onDeleteRecent(entry.path);
+                      }}
                       aria-label={t("common.actions.delete")}
                     >
                       <Trash2 />

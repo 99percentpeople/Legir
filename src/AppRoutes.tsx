@@ -3,14 +3,14 @@ import { Route, Switch, useLocation } from "wouter";
 
 import { Spinner } from "./components/ui/spinner";
 import { Skeleton } from "./components/ui/skeleton";
-import type { LandingPageProps } from "./pages/LandingPage";
+import type { HomePageProps } from "./pages/HomePage";
 import type { EditorPageProps } from "./pages/EditorPage";
 
-const LandingPage = React.lazy(() => import("./pages/LandingPage"));
+const HomePage = React.lazy(() => import("./pages/HomePage"));
 const EditorPage = React.lazy(() => import("./pages/EditorPage"));
 
 interface AppRoutesProps {
-  landingProps: LandingPageProps;
+  homeProps: HomePageProps;
   editorProps: EditorPageProps;
   canAccessEditor: boolean;
   isLoading: boolean;
@@ -36,7 +36,7 @@ const EditorRouteGuard: React.FC<{
   return <>{children}</>;
 };
 
-function LandingRouteFallback() {
+function HomeRouteFallback() {
   return (
     <div className="flex flex-1 items-center justify-center">
       <Spinner size="xl" />
@@ -64,7 +64,7 @@ function EditorRouteFallback() {
 }
 
 const AppRoutes: React.FC<AppRoutesProps> = ({
-  landingProps,
+  homeProps,
   editorProps,
   canAccessEditor,
   isLoading,
@@ -77,7 +77,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({
         location.startsWith("/editor") ? (
           <EditorRouteFallback />
         ) : (
-          <LandingRouteFallback />
+          <HomeRouteFallback />
         )
       }
     >
@@ -86,17 +86,17 @@ const AppRoutes: React.FC<AppRoutesProps> = ({
           <EditorRouteGuard
             canAccessEditor={canAccessEditor}
             isLoading={isLoading}
-            fallback={<LandingPage {...landingProps} />}
+            fallback={<HomePage {...homeProps} />}
             loadingFallback={<EditorRouteFallback />}
           >
             <EditorPage {...editorProps} />
           </EditorRouteGuard>
         </Route>
         <Route path="/">
-          <LandingPage {...landingProps} />
+          <HomePage {...homeProps} />
         </Route>
         <Route>
-          <LandingPage {...landingProps} />
+          <HomePage {...homeProps} />
         </Route>
       </Switch>
     </Suspense>

@@ -762,7 +762,7 @@ const de = {
     },
     done: "Fertig",
   },
-  landing: {
+  home: {
     title: "Leichter KI-PDF-Reader",
     subtitle:
       "Ein datenschutzorientierter, KI-gestützter PDF-Reader zum Lesen, Navigieren, Annotieren und Arbeiten mit Formularen.",

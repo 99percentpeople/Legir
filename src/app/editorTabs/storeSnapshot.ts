@@ -180,7 +180,6 @@ export const createLoadedEditorTabSnapshot = (options: {
 export const restoreEditorTabSnapshot = (
   snapshot: EditorTabSnapshot,
   options?: {
-    hasSavedSession?: boolean;
     isFullscreen?: boolean;
     thumbnailImages?: Record<number, string>;
     workerService?: PDFWorkerService;
@@ -195,7 +194,6 @@ export const restoreEditorTabSnapshot = (
     activeDialog: null,
     actionSignal: null,
     closeConfirmSource: null,
-    hasSavedSession: options?.hasSavedSession ?? store.hasSavedSession,
     isFullscreen: options?.isFullscreen ?? store.isFullscreen,
     isProcessing: false,
     isSaving: false,

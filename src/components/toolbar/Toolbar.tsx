@@ -48,7 +48,7 @@ import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getContrastColor } from "@/utils/colors";
 import ExportMenu from "./ExportMenu";
-import { canSaveAs, usePlatformUi } from "@/services/platform";
+import { canSaveAs } from "@/services/platform";
 import { useEditorStore } from "@/store/useEditorStore";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
@@ -83,7 +83,6 @@ interface ToolbarProps {
     style: Partial<NonNullable<EditorState["shapeStyle"]>>,
   ) => void;
   onExport: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onPrint: () => void;
   onExit: () => void;
@@ -124,7 +123,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onFreetextStyleChange: onFreetextStyleChange,
   onShapeStyleChange,
   onExport,
-  onSaveDraft,
   onSaveAs,
   onPrint,
   onExit,
@@ -146,8 +144,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const { mode, tool } = editorState;
   const toolbarTool = isToolMobileOnly(tool) ? "select" : tool;
   const hasSaveAs = useRef(canSaveAs());
-  const { documentSaveMode } = usePlatformUi();
-  const tauri = documentSaveMode === "file";
   const liveScale = useEditorStore((state) => state.scale);
   const livePageLayout = useEditorStore((state) => state.pageLayout);
   const livePageFlow = useEditorStore((state) => state.pageFlow);
@@ -744,12 +740,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
           isDirty={!!isDirty}
           hasSaveAs={hasSaveAs.current}
           onPrimary={onExport}
-          onSaveDraft={onSaveDraft}
           onSaveAs={onSaveAs}
           onExit={onExit}
           onPrint={onPrint}
           onClose={() => {
-            if (tauri && !isDirty) {
+            if (!isDirty) {
               onExit();
               return;
             }

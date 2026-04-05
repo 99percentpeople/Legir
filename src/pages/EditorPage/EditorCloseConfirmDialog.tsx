@@ -12,7 +12,6 @@ interface EditorCloseConfirmDialogProps {
   open: boolean;
   isDirty: boolean;
   documentTitle?: string | null;
-  platformDocumentSaveMode: "draft" | "file";
   onCloseDialog: () => void;
   onSaveAndClose: () => Promise<void>;
   onCloseWithoutSaving: () => Promise<void>;
@@ -23,7 +22,6 @@ export function EditorCloseConfirmDialog({
   open,
   isDirty,
   documentTitle,
-  platformDocumentSaveMode,
   onCloseDialog,
   onSaveAndClose,
   onCloseWithoutSaving,
@@ -54,9 +52,7 @@ export function EditorCloseConfirmDialog({
               await onSaveAndClose();
             }}
           >
-            {platformDocumentSaveMode === "file"
-              ? t("dialog.confirm_close.save_close")
-              : t("dialog.confirm_close.save_draft_close")}
+            {t("dialog.confirm_close.save_close")}
           </Button>
           <Button
             variant="destructive"

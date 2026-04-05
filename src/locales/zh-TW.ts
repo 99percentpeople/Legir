@@ -731,7 +731,7 @@ const zhTW = {
     },
     done: "完成",
   },
-  landing: {
+  home: {
     title: "輕量級 AI PDF 閱讀器",
     subtitle:
       "隱私優先、AI 驅動的 PDF 閱讀器，專注於閱讀、導覽、標註與表單處理。",

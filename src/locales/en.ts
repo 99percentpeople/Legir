@@ -757,7 +757,7 @@ const en = {
     },
     done: "Done",
   },
-  landing: {
+  home: {
     title: "Lightweight AI PDF Reader",
     subtitle:
       "A privacy-first, AI-powered PDF reader for focused reading, navigation, annotations, and forms.",

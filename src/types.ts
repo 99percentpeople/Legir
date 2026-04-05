@@ -479,7 +479,6 @@ export interface EditorState {
   rightPanelTab: string;
   rightPanelDockTab: string[];
   sidebarTab: string;
-  hasSavedSession: boolean;
   isDirty: boolean;
   currentPageIndex: number;
   pendingViewStateRestore: {

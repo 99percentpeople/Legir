@@ -65,7 +65,6 @@ export const createDocumentSlice: EditorStoreSlice<
       isProcessing: initialState.isProcessing,
       processingStatus: initialState.processingStatus,
       isSaving: initialState.isSaving,
-      hasSavedSession: initialState.hasSavedSession,
       lastSavedAt: initialState.lastSavedAt,
       isDirty: initialState.isDirty,
       currentPageIndex: initialState.currentPageIndex,

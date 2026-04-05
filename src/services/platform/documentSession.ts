@@ -1,9 +1,8 @@
 import type { EditorTabSnapshot } from "@/app/editorTabs/types";
 
-const STORAGE_KEY = "app-tauri-document-ui-sessions";
-const MAX_ENTRIES = 50;
+const STORAGE_KEY = "app-editor-ui-session";
 
-export type PersistedTauriDocumentUiSession = {
+export type PersistedEditorUiSession = {
   updatedAt: number;
   mode: EditorTabSnapshot["mode"];
   tool: EditorTabSnapshot["tool"];
@@ -29,28 +28,9 @@ export type PersistedTauriDocumentUiSession = {
   rightPanelWidth: EditorTabSnapshot["rightPanelWidth"];
 };
 
-type PersistedTauriDocumentUiSessionEntry = {
-  path: string;
-  session: PersistedTauriDocumentUiSession;
-};
-
-const normalizePathKey = (path: string) => {
-  const trimmed = path.trim();
-  if (!trimmed) return "";
-
-  const looksWindowsPath =
-    /^[a-zA-Z]:[\\/]/.test(trimmed) || trimmed.startsWith("\\\\");
-
-  if (looksWindowsPath) {
-    return trimmed.replace(/\//g, "\\").toLowerCase();
-  }
-
-  return trimmed.replace(/\\/g, "/");
-};
-
 const clonePersistedSession = (
-  session: PersistedTauriDocumentUiSession,
-): PersistedTauriDocumentUiSession => ({
+  session: PersistedEditorUiSession,
+): PersistedEditorUiSession => ({
   ...session,
   penStyle: { ...session.penStyle },
   highlightStyle: session.highlightStyle
@@ -70,7 +50,7 @@ const clonePersistedSession = (
 
 const createPersistedSessionFromSnapshot = (
   snapshot: EditorTabSnapshot,
-): PersistedTauriDocumentUiSession => ({
+): PersistedEditorUiSession => ({
   updatedAt: Date.now(),
   mode: snapshot.mode,
   tool: snapshot.tool,
@@ -104,80 +84,44 @@ const createPersistedSessionFromSnapshot = (
   rightPanelWidth: snapshot.rightPanelWidth,
 });
 
-const readEntries = (): PersistedTauriDocumentUiSessionEntry[] => {
-  if (typeof window === "undefined") return [];
+const readSession = (): PersistedEditorUiSession | null => {
+  if (typeof window === "undefined") return null;
 
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
+  if (!raw) return null;
 
   try {
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((entry) => entry && typeof entry === "object")
-      .map((entry) => {
-        const path = typeof entry.path === "string" ? entry.path.trim() : "";
-        const session =
-          entry.session && typeof entry.session === "object"
-            ? (entry.session as PersistedTauriDocumentUiSession)
-            : null;
-        if (!path || !session) return null;
-        return {
-          path,
-          session: clonePersistedSession(session),
-        };
-      })
-      .filter(
-        (entry): entry is PersistedTauriDocumentUiSessionEntry =>
-          entry !== null,
-      );
+    if (!parsed || typeof parsed !== "object") return null;
+    return clonePersistedSession(parsed as PersistedEditorUiSession);
   } catch {
-    return [];
+    return null;
   }
 };
 
-const writeEntries = (entries: PersistedTauriDocumentUiSessionEntry[]) => {
+const writeSession = (session: PersistedEditorUiSession | null) => {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+
+  if (!session) {
+    window.localStorage.removeItem(STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
 };
 
-export const saveTauriDocumentUiSession = (
-  path: string,
+export const saveGlobalEditorUiSession = (snapshot: EditorTabSnapshot) => {
+  writeSession(createPersistedSessionFromSnapshot(snapshot));
+};
+
+export const getSavedGlobalEditorUiSession = () => {
+  const session = readSession();
+  return session ? clonePersistedSession(session) : null;
+};
+
+export const applyGlobalEditorUiSession = (
   snapshot: EditorTabSnapshot,
-) => {
-  const pathKey = normalizePathKey(path);
-  if (!pathKey) return;
-
-  const session = createPersistedSessionFromSnapshot(snapshot);
-  const filtered = readEntries().filter(
-    (entry) => normalizePathKey(entry.path) !== pathKey,
-  );
-
-  writeEntries(
-    [
-      {
-        path,
-        session,
-      },
-      ...filtered,
-    ].slice(0, MAX_ENTRIES),
-  );
-};
-
-export const getSavedTauriDocumentUiSession = (path: string) => {
-  const pathKey = normalizePathKey(path);
-  if (!pathKey) return null;
-
-  const match = readEntries().find(
-    (entry) => normalizePathKey(entry.path) === pathKey,
-  );
-  return match ? clonePersistedSession(match.session) : null;
-};
-
-export const applyTauriDocumentUiSession = (
-  snapshot: EditorTabSnapshot,
-  session: PersistedTauriDocumentUiSession,
+  session: PersistedEditorUiSession,
 ): EditorTabSnapshot => ({
   ...snapshot,
   mode: session.mode,

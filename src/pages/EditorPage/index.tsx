@@ -30,7 +30,6 @@ import type {
 import { useShallow } from "zustand/react/shallow";
 import {
   exitPlatformFullscreen,
-  getPlatformDocumentSaveMode,
   setPlatformFullscreen,
   subscribePlatformFullscreenChange,
 } from "@/services/platform";
@@ -61,7 +60,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
   canDetachTabs,
   canMergeTabs,
   onExport,
-  onSaveDraft,
   onSaveAs,
   onExit,
   onPrint,
@@ -97,7 +95,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const isMobile = useIsMobile();
   const defaultTool: Tool = isMobile ? "pan" : "select";
-  const platformDocumentSaveMode = getPlatformDocumentSaveMode();
   const prevSelectedIdRef = React.useRef<string | null>(null);
 
   const [isTranslateOpen, setIsTranslateOpen] = React.useState(false);
@@ -199,30 +196,16 @@ const EditorPage: React.FC<EditorPageProps> = ({
     });
   }, [setState]);
 
-  const runPrimarySaveAction = React.useCallback(
-    async (silentDraft = false) => {
-      if (platformDocumentSaveMode === "draft") {
-        return await onSaveDraft(silentDraft);
-      }
-
-      const snapshot = useEditorStore.getState();
-      if (!snapshot.isDirty) return false;
-      return await onExport();
-    },
-    [onExport, onSaveDraft, platformDocumentSaveMode],
-  );
+  const runPrimarySaveAction = React.useCallback(async () => {
+    const snapshot = useEditorStore.getState();
+    if (!snapshot.isDirty) return true;
+    return await onExport();
+  }, [onExport]);
 
   const { workspaceScrollContainerRef } = useEditorPageLifecycle({
     filename: state.filename,
     pagesLength: state.pages.length,
-    isDirty: state.isDirty,
     hasDirtyTabs: tabs.some((tab) => tab.isDirty),
-    pdfBytes: state.pdfBytes,
-    fieldsFingerprint: state.fields,
-    annotationsFingerprint: state.annotations,
-    metadataFingerprint: state.metadata,
-    platformDocumentSaveMode,
-    onSaveDraft,
   });
 
   const pdfSearch = usePdfSearchController({
@@ -638,7 +621,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
         onFreetextStyleChange={handleFreetextStyleChange}
         onShapeStyleChange={handleShapeStyleChange}
         onExport={onExport}
-        onSaveDraft={onSaveDraft}
         onSaveAs={onSaveAs}
         onExit={handleExitEditorPage}
         onClose={handleRequestCloseFromUi}
@@ -774,7 +756,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
             onOpenSettings: () => openDialog("settings"),
             isSearchOpen: pdfSearch.isPdfSearchOpen,
             onExport,
-            onSaveDraft,
             onSaveAs,
             onPrint,
             onExit: handleExitEditorPage,

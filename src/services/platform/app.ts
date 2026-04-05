@@ -13,6 +13,7 @@ export type PlatformDroppedPdf =
   | {
       kind: "file";
       file: File;
+      handle?: FileSystemFileHandle;
     };
 
 export interface PlatformFocusDocumentRequest {
@@ -27,13 +28,49 @@ const isPdfFilename = (name: string | null | undefined) => {
   return typeof name === "string" && name.trim().toLowerCase().endsWith(".pdf");
 };
 
-const getFirstDroppedPdfFile = (event: DragEvent) => {
-  const files = event.dataTransfer?.files;
+const getFirstDroppedPdfFile = (transfer: DataTransfer | null | undefined) => {
+  const files = transfer?.files;
   if (!files || files.length === 0) return null;
 
   for (const file of Array.from(files)) {
     if (file.type === "application/pdf" || isPdfFilename(file.name)) {
       return file;
+    }
+  }
+
+  return null;
+};
+
+type DataTransferItemWithFileSystemHandle = DataTransferItem & {
+  getAsFileSystemHandle?: () => Promise<FileSystemHandle | null>;
+};
+
+const getDroppedWebPdfHandle = async (
+  transfer: DataTransfer | null | undefined,
+): Promise<{ handle: FileSystemFileHandle; file: File } | null> => {
+  const items = transfer?.items;
+  if (!items || items.length === 0) return null;
+
+  for (const item of Array.from(items)) {
+    if (item.kind !== "file") continue;
+
+    const itemWithHandle = item as DataTransferItemWithFileSystemHandle;
+    if (typeof itemWithHandle.getAsFileSystemHandle !== "function") continue;
+
+    try {
+      const handle = await itemWithHandle.getAsFileSystemHandle();
+      if (!handle || handle.kind !== "file") continue;
+
+      const fileHandle = handle as FileSystemFileHandle;
+      const file = await fileHandle.getFile();
+      if (file.type === "application/pdf" || isPdfFilename(file.name)) {
+        return {
+          handle: fileHandle,
+          file,
+        };
+      }
+    } catch (error) {
+      console.error("Failed to read dropped file handle", error);
     }
   }
 
@@ -145,23 +182,37 @@ const listenForBrowserFileDrop = async (
     const insideTarget = isWebDragEventInsideTarget(event, options);
     if (!insideTarget) return;
 
-    if (isDesktopApp()) {
-      const filePath = getDroppedPathFromBrowserEvent(event);
-      if (filePath) {
+    const transfer = event.dataTransfer;
+
+    void (async () => {
+      if (isDesktopApp()) {
+        const filePath = getDroppedPathFromBrowserEvent(event);
+        if (filePath) {
+          listener({
+            kind: "path",
+            filePath,
+          });
+          return;
+        }
+      }
+
+      const droppedHandle = await getDroppedWebPdfHandle(transfer);
+      if (droppedHandle) {
         listener({
-          kind: "path",
-          filePath,
+          kind: "file",
+          file: droppedHandle.file,
+          handle: droppedHandle.handle,
         });
         return;
       }
-    }
 
-    const file = getFirstDroppedPdfFile(event);
-    if (!file) return;
-    listener({
-      kind: "file",
-      file,
-    });
+      const file = getFirstDroppedPdfFile(transfer);
+      if (!file) return;
+      listener({
+        kind: "file",
+        file,
+      });
+    })();
   };
 
   window.addEventListener("dragover", handleDragOver);

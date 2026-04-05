@@ -7,7 +7,7 @@ interface UseEditorPageKeyboardShortcutsOptions {
   isPdfSearchOpen: boolean;
   openPdfSearch: () => void;
   closePdfSearch: () => void;
-  runPrimarySaveAction: (silentDraft?: boolean) => Promise<boolean>;
+  runPrimarySaveAction: () => Promise<boolean>;
   onPrint: () => void;
   onToggleFullscreen: () => void;
 }
@@ -89,7 +89,7 @@ export function useEditorPageKeyboardShortcuts({
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        void runPrimarySaveAction(false);
+        void runPrimarySaveAction();
         return;
       }
 

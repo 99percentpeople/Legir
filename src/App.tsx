@@ -13,8 +13,16 @@ import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import SettingsDialog from "./components/dialogs/SettingsDialog";
 import PdfPasswordDialog from "./components/dialogs/PdfPasswordDialog";
 import AppRoutes from "./AppRoutes";
+import {
+  createIndexedDbRecentFilesStore,
+  createPlatformRecentFilesStore,
+  readWebRecentFile,
+  rememberWebRecentFile,
+  type RecentFileEntry,
+} from "@/services/recentFiles";
 import { useLanguage } from "./components/language-provider";
 import { useAppInitialization } from "./app/useAppInitialization";
+import type { HomePageAdapter } from "./pages/HomePage";
 import { useEditorStore } from "./store/useEditorStore";
 import { selectAppShellState } from "@/store/selectors";
 import { loadPDF, exportPDF } from "./services/pdfService";
@@ -27,10 +35,6 @@ import type {
   EditorMergeWindowTarget,
   EditorTabDropTarget,
 } from "./pages/EditorPage/types";
-import {
-  restorePersistedEditorTabSession,
-  type PersistedEditorWorkspaceDraft,
-} from "@/app/editorTabs/persistence";
 import {
   cloneEditorTabThumbnailImages,
   disposeEditorTabSessionResources,
@@ -50,27 +54,22 @@ import {
   saveEditorTabSessionTransfer,
 } from "@/app/editorTabs/transferStorage";
 import { useEditorTabsController } from "@/app/editorTabs/useEditorTabsController";
-import { useWebWorkspacePersistence } from "@/app/editorTabs/useWebWorkspacePersistence";
 import type {
   EditorTabDescriptor,
   EditorTabSession,
 } from "@/app/editorTabs/types";
 import {
   acquirePendingEditorWindowBootstrap,
-  applyTauriDocumentUiSession,
+  applyGlobalEditorUiSession,
   buildEditorWindowBootstrapRoute,
-  clearSavedDraftSession,
+  confirmPlatformAction,
   destroyPlatformWindow,
   emitTabWorkspaceEvent,
   exportPdfBytes,
   finishPendingEditorWindowBootstrap,
-  getPlatformDocumentSaveMode,
-  getSavedDraftWorkspace,
-  getSavedTauriDocumentUiSession,
+  getSavedGlobalEditorUiSession,
   getPlatformWindowId,
-  getSavedViewStateForSaveTarget,
   hasPendingEditorWindowBootstrap,
-  hasSavedDraftSession,
   isDesktopApp,
   listenForPlatformFileDrop,
   listenForPlatformFileDragState,
@@ -84,8 +83,7 @@ import {
   pickSaveTarget,
   reportPlatformWindowDocuments,
   requestPlatformFocusExistingDocument,
-  saveTauriDocumentUiSession,
-  saveEditorViewState,
+  saveGlobalEditorUiSession,
   writeToSaveTarget,
   type PlatformDroppedPdf,
   type SaveTarget,
@@ -125,9 +123,14 @@ const normalizePlatformWindowTitle = (title: string | null | undefined) => {
 
 const App: React.FC = () => {
   const { t } = useLanguage();
-  const platformDocumentSaveMode = getPlatformDocumentSaveMode();
+  const isDesktop = useMemo(() => isDesktopApp(), []);
   const platformWindowId = useMemo(() => getPlatformWindowId(), []);
   const [, navigate] = useLocation();
+  const homeRecentFilesStore = useMemo(() => {
+    return isDesktop
+      ? createPlatformRecentFilesStore()
+      : createIndexedDbRecentFilesStore();
+  }, [isDesktop]);
 
   const workspaceScrollContainerRef = useRef<HTMLElement | null>(null);
   const loadQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -149,7 +152,6 @@ const App: React.FC = () => {
     withProcessing,
     isProcessing,
     processingStatus,
-    hasSavedSession,
     activeDialog,
     options,
   } = appShell;
@@ -206,16 +208,15 @@ const App: React.FC = () => {
       scrollContainer: workspaceScrollContainerRef.current,
     });
 
-    saveEditorViewState({
-      saveTarget: snapshot.saveTarget,
-      pagesLength: snapshot.pages.length,
-      scale: snapshot.scale,
-      currentPageIndex: snapshot.currentPageIndex,
-      scrollContainer: workspaceScrollContainerRef.current,
-    });
+    saveGlobalEditorUiSession(snapshot);
 
-    if (snapshot.saveTarget?.kind === "tauri") {
-      saveTauriDocumentUiSession(snapshot.saveTarget.path, snapshot);
+    if (snapshot.saveTarget?.kind === "web") {
+      void rememberWebRecentFile({
+        handle: snapshot.saveTarget.handle,
+        filename: snapshot.filename ?? snapshot.saveTarget.handle.name,
+      }).catch((error) => {
+        console.error("Failed to persist web recent file state", error);
+      });
     }
 
     return {
@@ -225,10 +226,8 @@ const App: React.FC = () => {
   }, []);
 
   const restoreActiveTabSnapshot = useCallback((session: EditorTabSession) => {
-    const store = useEditorStore.getState();
     restoreEditorTabSnapshot(session.editorSnapshot, {
-      hasSavedSession: store.hasSavedSession,
-      isFullscreen: store.isFullscreen,
+      isFullscreen: useEditorStore.getState().isFullscreen,
       thumbnailImages: session.thumbnailImages,
       workerService: session.workerService,
     });
@@ -299,23 +298,6 @@ const App: React.FC = () => {
 
     return [...tabDescriptors, ...visiblePendingTabs];
   }, [pendingIncomingTabs, tabDescriptors]);
-
-  const {
-    cancelScheduledWebWorkspacePersist,
-    flushWebWorkspaceSessionPersist,
-    requestWebWorkspaceSessionPersist,
-  } = useWebWorkspacePersistence({
-    platformDocumentSaveMode,
-    activeTabId,
-    windowTabIds: windowLayout.tabIds,
-    isProcessing,
-    hasPendingWindowBootstrap,
-    pendingIncomingTabsCount: pendingIncomingTabs.length,
-    captureCurrentTabIntoState,
-    getTabsSnapshot,
-    updateTabSession: tabsBackend.updateSession,
-    setState,
-  });
 
   const createTransferAckWaiter = useCallback(
     (options: { transferId: string; sessionId: string }) => {
@@ -724,34 +706,24 @@ const App: React.FC = () => {
 
   const closeAllTabsToLanding = useCallback(() => {
     recentFilesService.cancelPreviewTasks();
-    cancelScheduledWebWorkspacePersist();
     disposeAllTabs();
     resetDocument();
-    if (platformDocumentSaveMode === "draft") {
-      void clearSavedDraftSession();
-    }
-    setState({ hasSavedSession: false });
     navigate("/");
-  }, [
-    cancelScheduledWebWorkspacePersist,
-    clearSavedDraftSession,
-    disposeAllTabs,
-    navigate,
-    platformDocumentSaveMode,
-    resetDocument,
-    setState,
-  ]);
+  }, [disposeAllTabs, navigate, resetDocument]);
 
   const closeAllTabsAndWindow = useCallback(async () => {
     recentFilesService.cancelPreviewTasks();
-    cancelScheduledWebWorkspacePersist();
     await destroyPlatformWindow();
-  }, [cancelScheduledWebWorkspacePersist, destroyPlatformWindow]);
+  }, [destroyPlatformWindow]);
 
   const closeTabImmediately = useCallback(
     (tabId: string) => {
       const nextTabId = getAdjacentTabId(tabId);
       const removingActiveTab = activeTabId === tabId;
+
+      if (removingActiveTab) {
+        captureActiveTabState();
+      }
 
       removeTab(tabId);
 
@@ -770,20 +742,6 @@ const App: React.FC = () => {
           });
         } else {
           resetDocument();
-          setState({ hasSavedSession: false });
-        }
-      }
-
-      if (platformDocumentSaveMode === "draft") {
-        if (remainingTabs.length === 0) {
-          cancelScheduledWebWorkspacePersist();
-          void clearSavedDraftSession();
-          setState({ hasSavedSession: false });
-        } else {
-          requestWebWorkspaceSessionPersist({
-            immediate: true,
-            silent: true,
-          });
         }
       }
 
@@ -794,15 +752,11 @@ const App: React.FC = () => {
     [
       activateTab,
       activeTabId,
-      cancelScheduledWebWorkspacePersist,
-      clearSavedDraftSession,
+      captureActiveTabState,
       getAdjacentTabId,
       getTabsSnapshot,
-      platformDocumentSaveMode,
-      requestWebWorkspaceSessionPersist,
       removeTab,
       resetDocument,
-      setState,
     ],
   );
 
@@ -831,7 +785,6 @@ const App: React.FC = () => {
           });
         } else {
           resetDocument();
-          setState({ hasSavedSession: hasSavedDraftSession() });
         }
       }
 
@@ -848,7 +801,6 @@ const App: React.FC = () => {
       getTabsSnapshot,
       platformWindowId,
       resetDocument,
-      setState,
       tabsBackend,
     ],
   );
@@ -894,81 +846,6 @@ const App: React.FC = () => {
       .then(task);
     return loadQueueRef.current;
   }, []);
-
-  const restoreWorkspaceDraft = useCallback(
-    async (workspaceDraft: PersistedEditorWorkspaceDraft) => {
-      if (workspaceDraft.tabs.length === 0) {
-        await clearSavedDraftSession();
-        setState({ hasSavedSession: false });
-        return false;
-      }
-
-      const desiredActiveTabId =
-        workspaceDraft.activeTabId &&
-        workspaceDraft.tabs.some((tab) => tab.id === workspaceDraft.activeTabId)
-          ? workspaceDraft.activeTabId
-          : (workspaceDraft.tabs[0]?.id ?? null);
-
-      let restoredAnyTab = false;
-
-      await enqueueLoadTask(async () => {
-        const addedTabIds: string[] = [];
-
-        try {
-          await withProcessing(t("app.loading_draft"), async () => {
-            for (const [index, persistedTab] of workspaceDraft.tabs.entries()) {
-              const restoredTab =
-                await restorePersistedEditorTabSession(persistedTab);
-
-              addTab({
-                id: restoredTab.id,
-                title: restoredTab.title,
-                sourceKey: restoredTab.sourceKey,
-                snapshot: restoredTab.snapshot,
-                thumbnailImages: {},
-                workerService: restoredTab.workerService,
-                disposePdfResources: restoredTab.disposePdfResources,
-                activate: index === 0 || restoredTab.id === desiredActiveTabId,
-              });
-              addedTabIds.push(restoredTab.id);
-            }
-
-            if (
-              desiredActiveTabId &&
-              desiredActiveTabId !== addedTabIds[addedTabIds.length - 1]
-            ) {
-              activateTab(desiredActiveTabId, {
-                skipCaptureCurrent: true,
-              });
-            }
-
-            restoredAnyTab = addedTabIds.length > 0;
-            navigate("/editor");
-          });
-        } catch (error) {
-          addedTabIds
-            .slice()
-            .reverse()
-            .forEach((tabId) => {
-              removeTab(tabId);
-            });
-          throw error;
-        }
-      });
-
-      return restoredAnyTab;
-    },
-    [
-      activateTab,
-      addTab,
-      enqueueLoadTask,
-      navigate,
-      removeTab,
-      setState,
-      t,
-      withProcessing,
-    ],
-  );
 
   const openLoadedDocumentInTab = useCallback(
     async (options: {
@@ -1020,42 +897,21 @@ const App: React.FC = () => {
               dispose,
             } = await loadPDF(options.input, { workerService });
 
-            const persistedViewState =
-              options.saveTarget?.kind === "tauri"
-                ? getSavedViewStateForSaveTarget(options.saveTarget)
-                : null;
-            const persistedDocumentUiSession =
-              options.saveTarget?.kind === "tauri"
-                ? getSavedTauriDocumentUiSession(options.saveTarget.path)
-                : null;
+            const persistedUiSession = getSavedGlobalEditorUiSession();
             const persistedPendingViewState =
-              persistedDocumentUiSession?.pendingViewStateRestore ??
-              (persistedViewState
-                ? {
-                    scale: persistedViewState.scale,
-                    scrollLeft: persistedViewState.scrollLeft,
-                    scrollTop: persistedViewState.scrollTop,
-                  }
-                : null);
-
+              persistedUiSession?.pendingViewStateRestore
+                ? { ...persistedUiSession.pendingViewStateRestore }
+                : null;
             const currentPageIndex =
-              typeof persistedDocumentUiSession?.currentPageIndex === "number"
+              typeof persistedUiSession?.currentPageIndex === "number"
                 ? Math.max(
                     0,
                     Math.min(
                       pages.length - 1,
-                      Math.floor(persistedDocumentUiSession.currentPageIndex),
+                      Math.floor(persistedUiSession.currentPageIndex),
                     ),
                   )
-                : typeof persistedViewState?.pageIndex === "number"
-                  ? Math.max(
-                      0,
-                      Math.min(
-                        pages.length - 1,
-                        Math.floor(persistedViewState.pageIndex),
-                      ),
-                    )
-                  : 0;
+                : 0;
 
             const snapshot = createLoadedEditorTabSnapshot({
               pdfFile: options.pdfFile,
@@ -1073,9 +929,9 @@ const App: React.FC = () => {
               pendingViewStateRestore: persistedPendingViewState,
             });
             const hydratedSnapshot =
-              persistedDocumentUiSession !== null
-                ? applyTauriDocumentUiSession(snapshot, {
-                    ...persistedDocumentUiSession,
+              persistedUiSession !== null
+                ? applyGlobalEditorUiSession(snapshot, {
+                    ...persistedUiSession,
                     currentPageIndex,
                     pendingViewStateRestore: persistedPendingViewState,
                   })
@@ -1123,11 +979,6 @@ const App: React.FC = () => {
               });
             }
 
-            requestWebWorkspaceSessionPersist({
-              immediate: true,
-              silent: true,
-            });
-
             navigate("/editor");
           });
         } catch (error) {
@@ -1147,9 +998,7 @@ const App: React.FC = () => {
       findTabBySourceKey,
       focusExistingTabBySourceKey,
       navigate,
-      setState,
       t,
-      requestWebWorkspaceSessionPersist,
       withProcessing,
     ],
   );
@@ -1166,11 +1015,56 @@ const App: React.FC = () => {
     [openLoadedDocumentInTab],
   );
 
+  const openWebHandleFile = useCallback(
+    async (options: {
+      handle: FileSystemFileHandle;
+      filename: string;
+      bytes: Uint8Array;
+      path?: string;
+    }) => {
+      void rememberWebRecentFile({
+        path: options.path,
+        handle: options.handle,
+        filename: options.filename,
+        pdfBytes: options.bytes,
+      }).catch((error) => {
+        console.error("Failed to remember web recent file", error);
+      });
+
+      const normalizedHandleName = options.handle.name.trim();
+      const sourceKey = normalizedHandleName
+        ? `web-handle:${normalizedHandleName}`
+        : null;
+
+      if (await focusExistingTabBySourceKey(sourceKey)) {
+        return;
+      }
+
+      await openLoadedDocumentInTab({
+        input: options.bytes,
+        pdfFile: null,
+        filename: options.filename,
+        saveTarget: { kind: "web", handle: options.handle },
+        skipInitialSourceKeyLookup: true,
+      });
+    },
+    [focusExistingTabBySourceKey, openLoadedDocumentInTab],
+  );
+
   const handleOpen = useCallback(async () => {
     const picked = await openFile({
       filters: [{ name: "PDF Document", extensions: ["pdf"] }],
     });
     if (!picked) return;
+
+    if (picked.handle) {
+      await openWebHandleFile({
+        handle: picked.handle,
+        filename: picked.filename,
+        bytes: picked.bytes,
+      });
+      return;
+    }
 
     await openLoadedDocumentInTab({
       input: picked.bytes,
@@ -1182,9 +1076,9 @@ const App: React.FC = () => {
           ? { kind: "web", handle: picked.handle }
           : null,
     });
-  }, [openLoadedDocumentInTab]);
+  }, [openLoadedDocumentInTab, openWebHandleFile]);
 
-  const handleOpenRecent = useCallback(
+  const openRecentFileByPath = useCallback(
     async (filePath: string) => {
       if (await focusExistingTabBySourceKey(`tauri:${filePath}`)) {
         return;
@@ -1202,6 +1096,41 @@ const App: React.FC = () => {
     [focusExistingTabBySourceKey, openLoadedDocumentInTab],
   );
 
+  const openRecentWebFile = useCallback(
+    async (entry: RecentFileEntry) => {
+      const { handle, file, bytes } = await readWebRecentFile(entry);
+      await openWebHandleFile({
+        path: entry.path,
+        handle,
+        filename: file.name,
+        bytes,
+      });
+    },
+    [openWebHandleFile],
+  );
+
+  const handleOpenRecent = useCallback(
+    async (entry: RecentFileEntry) => {
+      if (isDesktop) {
+        await openRecentFileByPath(entry.path);
+        return;
+      }
+
+      await openRecentWebFile(entry);
+    },
+    [isDesktop, openRecentFileByPath, openRecentWebFile],
+  );
+
+  const homePageAdapter = useMemo<HomePageAdapter>(
+    () => ({
+      store: homeRecentFilesStore,
+      open: handleOpen,
+      openRecent: handleOpenRecent,
+      confirmClearAll: confirmPlatformAction,
+    }),
+    [handleOpen, handleOpenRecent, homeRecentFilesStore],
+  );
+
   const openDroppedPdfPath = useCallback(
     async (filePath: string) => {
       if (!filePath.toLowerCase().endsWith(".pdf")) {
@@ -1209,9 +1138,9 @@ const App: React.FC = () => {
         return;
       }
 
-      await handleOpenRecent(filePath);
+      await openRecentFileByPath(filePath);
     },
-    [handleOpenRecent],
+    [openRecentFileByPath],
   );
 
   const openDroppedPdf = useCallback(
@@ -1230,9 +1159,19 @@ const App: React.FC = () => {
         return;
       }
 
+      if (payload.handle) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        await openWebHandleFile({
+          handle: payload.handle,
+          filename: file.name,
+          bytes,
+        });
+        return;
+      }
+
       await handleUpload(file);
     },
-    [handleUpload, openDroppedPdfPath],
+    [handleUpload, openDroppedPdfPath, openWebHandleFile],
   );
 
   useEffect(() => {
@@ -1331,30 +1270,7 @@ const App: React.FC = () => {
     t,
   ]);
 
-  useAppInitialization({
-    setState,
-  });
-
-  const handleResumeSession = useCallback(async () => {
-    const workspaceDraft = await getSavedDraftWorkspace();
-    if (!workspaceDraft?.tabs.length) {
-      await clearSavedDraftSession();
-      setState({ hasSavedSession: false });
-      return;
-    }
-
-    try {
-      const restored = await restoreWorkspaceDraft(workspaceDraft);
-      if (restored) {
-        return;
-      }
-      await clearSavedDraftSession();
-      setState({ hasSavedSession: false });
-    } catch (error) {
-      console.error("Failed to resume workspace session:", error);
-      toast.error(t("app.load_error"));
-    }
-  }, [clearSavedDraftSession, restoreWorkspaceDraft, setState, t]);
+  useAppInitialization();
 
   const handleDetachTabToNewWindow = useCallback(
     async (tabId: string) => {
@@ -1603,14 +1519,14 @@ const App: React.FC = () => {
           renderAnnotations: true,
           forcePreviewRender: true,
         });
+      }
 
-        const liveSnapshot = useEditorStore.getState();
-        saveEditorViewState({
-          saveTarget: target as EditorState["saveTarget"],
-          pagesLength: liveSnapshot.pages.length,
-          scale: liveSnapshot.scale,
-          currentPageIndex: liveSnapshot.currentPageIndex,
-          scrollContainer: workspaceScrollContainerRef.current,
+      if (target.kind === "web") {
+        await rememberWebRecentFile({
+          handle: target.handle,
+          filename: nextFilename || target.handle.name || "document.pdf",
+          pdfBytes: modifiedBytes,
+          forcePreviewRender: true,
         });
       }
 
@@ -1654,6 +1570,16 @@ const App: React.FC = () => {
             pdfBytes: modifiedBytes,
             targetWidth: 240,
             renderAnnotations: true,
+            forcePreviewRender: true,
+          });
+        }
+
+        if (result.target.kind === "web") {
+          await rememberWebRecentFile({
+            handle: result.target.handle,
+            filename:
+              result.target.handle.name || snapshot.filename || "document.pdf",
+            pdfBytes: modifiedBytes,
             forcePreviewRender: true,
           });
         }
@@ -1716,30 +1642,11 @@ const App: React.FC = () => {
     });
   }, [generatePDF, t, withProcessing]);
 
-  const handleSaveDraft = useCallback(
-    async (silent = false) => {
-      setState({ isSaving: true });
-
-      try {
-        return await flushWebWorkspaceSessionPersist({
-          silent,
-        });
-      } finally {
-        setState({ isSaving: false });
-      }
-    },
-    [flushWebWorkspaceSessionPersist, setState],
-  );
-
   const runPrimarySaveAction = useCallback(async () => {
-    if (platformDocumentSaveMode === "draft") {
-      return await handleSaveDraft(false);
-    }
-
     const snapshot = useEditorStore.getState();
     if (!snapshot.isDirty) return true;
     return await handleExport();
-  }, [handleExport, handleSaveDraft, platformDocumentSaveMode]);
+  }, [handleExport]);
 
   const startCloseFlow = useCallback(
     async (scope: CloseRequestScope, targetTabIds: string[]) => {
@@ -1832,12 +1739,11 @@ const App: React.FC = () => {
       return;
     }
 
-    captureActiveTabState();
     const result = closeTabImmediately(activeTabId);
     if (result.isLastTab) {
       navigate("/");
     }
-  }, [activeTabId, captureActiveTabState, closeTabImmediately, navigate]);
+  }, [activeTabId, closeTabImmediately, navigate]);
 
   const handleResolveCloseRequest = useCallback(
     async (saveBeforeClose: boolean) => {
@@ -1957,13 +1863,6 @@ const App: React.FC = () => {
     startCloseFlow,
   ]);
 
-  const onEditorSaveDraft = useCallback(
-    async (silent?: boolean) => {
-      return await handleSaveDraft(silent ?? false);
-    },
-    [handleSaveDraft],
-  );
-
   const onEditorCloseCurrentTab = useCallback(() => {
     if (!activeTabId) return;
     void requestCloseTab(activeTabId);
@@ -1990,12 +1889,8 @@ const App: React.FC = () => {
           hasPendingWindowBootstrap ||
           pendingIncomingTabs.length > 0
         }
-        landingProps={{
-          onUpload: handleUpload,
-          onOpen: handleOpen,
-          onOpenRecent: handleOpenRecent,
-          hasSavedSession,
-          onResume: handleResumeSession,
+        homeProps={{
+          adapter: homePageAdapter,
         }}
         editorProps={{
           windowId: platformWindowId,
@@ -2018,7 +1913,6 @@ const App: React.FC = () => {
           canDetachTabs: isDesktopApp() && windowLayout.tabIds.length > 1,
           canMergeTabs: isDesktopApp() && mergeWindowTargets.length > 0,
           onExport: handleExport,
-          onSaveDraft: onEditorSaveDraft,
           onSaveAs: handleSaveAs,
           onExit: onEditorCloseCurrentTabAfterSave,
           onPrint: onEditorPrint,
@@ -2041,7 +1935,6 @@ const App: React.FC = () => {
         open={pendingCloseRequest !== null}
         isDirty={true}
         documentTitle={pendingCloseDocumentTitle}
-        platformDocumentSaveMode={platformDocumentSaveMode}
         onCloseDialog={() => setPendingCloseRequest(null)}
         onSaveAndClose={async () => {
           await handleResolveCloseRequest(true);

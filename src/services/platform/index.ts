@@ -6,6 +6,5 @@ export * from "./fonts";
 export * from "./runtime";
 export * from "./tabWorkspace";
 export * from "./ui";
-export * from "./viewState";
 export * from "./window";
 export * from "./windowBootstrap";

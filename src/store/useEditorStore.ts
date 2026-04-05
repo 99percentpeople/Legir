@@ -14,7 +14,6 @@ import type { EditorStore } from "@/store/store.types";
 // Persistence policy:
 // - Only UI-related state is persisted to localStorage (see `partialize()` below).
 // - Large/binary document data must NOT be persisted here.
-//   Web drafts are handled by `services/storageService.ts` (IndexedDB).
 //
 // Extension guidance:
 // - Adding a new Tool/FieldType usually means updating `types.ts` AND the reducers here

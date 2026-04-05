@@ -759,7 +759,7 @@ const es = {
     },
     done: "Hecho",
   },
-  landing: {
+  home: {
     title: "Lector de PDF ligero con IA",
     subtitle:
       "Un lector de PDF centrado en la privacidad e impulsado por IA para leer, navegar, anotar y trabajar con formularios.",

@@ -1,11 +1,11 @@
 import { LanguageToggle } from "@/components/toolbar/language-toggle";
 import { ModeToggle } from "@/components/toolbar/mode-toggle";
 
-type LandingHeaderProps = {
+type HomeHeaderProps = {
   rightSlot?: React.ReactNode;
 };
 
-export function LandingHeader({ rightSlot }: LandingHeaderProps) {
+export function HomeHeader({ rightSlot }: HomeHeaderProps) {
   return (
     <div className="border-border bg-card/50 fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b px-6 backdrop-blur-sm">
       <div className="text-foreground flex items-center">

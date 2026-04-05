@@ -239,6 +239,34 @@ export const exportPdfBytes = async (options: {
     return { ok: true, kind: "saved", target };
   }
 
+  if (options.existingTarget?.kind === "web") {
+    await writeToSaveTarget(options.existingTarget, options.bytes);
+    return { ok: true, kind: "saved", target: options.existingTarget };
+  }
+
+  if (canSaveWithPicker()) {
+    try {
+      const target = await pickSaveTarget({
+        suggestedName: options.filename,
+        filters: options.filters,
+      });
+      if (!target) return { ok: false, reason: "cancelled" };
+
+      await writeToSaveTarget(target, options.bytes);
+      return { ok: true, kind: "saved", target };
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "name" in error &&
+        error.name === "AbortError"
+      ) {
+        return { ok: false, reason: "cancelled" };
+      }
+      throw error;
+    }
+  }
+
   if (typeof document === "undefined") {
     return { ok: false, reason: "unsupported" };
   }

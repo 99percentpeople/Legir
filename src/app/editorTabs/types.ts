@@ -10,7 +10,6 @@ export type EditorTabSnapshot = Omit<
   | "activeDialog"
   | "actionSignal"
   | "closeConfirmSource"
-  | "hasSavedSession"
   | "isFullscreen"
   | "isProcessing"
   | "isSaving"

@@ -53,7 +53,6 @@ export interface EditorPageProps {
   canDetachTabs: boolean;
   canMergeTabs: boolean;
   onExport: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
@@ -102,7 +101,6 @@ export interface EditorCanvasMobileToolbar {
   onOpenSettings: () => void;
   isSearchOpen: boolean;
   onExport: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onPrint: () => void;
   onExit: () => void;

@@ -749,7 +749,7 @@ const ja = {
     },
     done: "完了",
   },
-  landing: {
+  home: {
     title: "軽量 AI PDF リーダー",
     subtitle:
       "プライバシー優先の AI 搭載 PDF リーダー。読解、ナビゲーション、注釈、フォーム処理に集中できます。",

@@ -764,7 +764,7 @@ const fr = {
     },
     done: "Terminé",
   },
-  landing: {
+  home: {
     title: "Lecteur PDF léger alimenté par l'IA",
     subtitle:
       "Un lecteur PDF axé sur la confidentialité et alimenté par l'IA pour lire, naviguer, annoter et traiter des formulaires.",

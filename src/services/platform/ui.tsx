@@ -1,12 +1,10 @@
 import React from "react";
 
 import { isDesktopApp, isWebApp } from "./runtime";
-import { getPlatformDocumentSaveMode } from "./viewState";
 
 export type PlatformUiState = {
   isDesktop: boolean;
   isWeb: boolean;
-  documentSaveMode: "file" | "draft";
   supportsRecentFiles: boolean;
   shouldLoadFontFaces: boolean;
 };
@@ -16,8 +14,7 @@ const readPlatformUiState = (): PlatformUiState => {
   return {
     isDesktop,
     isWeb: !isDesktop,
-    documentSaveMode: getPlatformDocumentSaveMode(),
-    supportsRecentFiles: isDesktop,
+    supportsRecentFiles: true,
     shouldLoadFontFaces: isWebApp(),
   };
 };

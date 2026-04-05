@@ -16,18 +16,12 @@ const EMPTY_KEYS: EditorStore["keys"] = {
 export const selectAppShellState = (state: EditorStore) => ({
   setState: state.setState,
   setOptions: state.setOptions,
-  saveCheckpoint: state.saveCheckpoint,
   resetDocument: state.resetDocument,
-  setProcessingStatus: state.setProcessingStatus,
   withProcessing: state.withProcessing,
-  loadDocument: state.loadDocument,
   isProcessing: state.isProcessing,
   processingStatus: state.processingStatus,
-  pagesLength: state.pages.length,
-  hasSavedSession: state.hasSavedSession,
   activeDialog: state.activeDialog,
   options: state.options,
-  isDirty: state.isDirty,
 });
 
 // EditorPage shell does not need viewport-scale hot state. Masking these fields

@@ -1,13 +1,9 @@
 import { useEffect } from "react";
-import { useEditorStore, type EditorActions } from "../store/useEditorStore";
+import { useEditorStore } from "../store/useEditorStore";
 import { loadModels } from "@/services/ai";
-import { getPlatformUserName, hasSavedDraftSession } from "@/services/platform";
+import { getPlatformUserName } from "@/services/platform";
 
-export function useAppInitialization({
-  setState,
-}: {
-  setState: EditorActions["setState"];
-}) {
+export function useAppInitialization() {
   useEffect(() => {
     let cancelled = false;
 
@@ -18,10 +14,6 @@ export function useAppInitialization({
       };
 
       void loadModels();
-
-      setState({
-        hasSavedSession: hasSavedDraftSession(),
-      });
 
       try {
         const snapshot = useEditorStore.getState();
@@ -44,5 +36,5 @@ export function useAppInitialization({
     return () => {
       cancelled = true;
     };
-  }, [setState]);
+  }, []);
 }

@@ -5,7 +5,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{js,jsx,ts,tsx}"],
+    files: ["src/**/*.{js,jsx,ts,tsx}", "www/**/*.{js,jsx,ts,tsx}"],
     rules: {
       semi: "error",
       "prefer-const": "error",
@@ -20,6 +20,6 @@ export default tseslint.config(
   },
   {
     // Ignores specific files
-    ignores: ["dist/", "node_modules/", "src-tauri/"],
+    ignores: ["**/dist/**", "**/node_modules/**", "src-tauri/**"],
   },
 );

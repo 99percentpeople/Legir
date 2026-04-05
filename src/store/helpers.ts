@@ -420,7 +420,6 @@ export const initialState: EditorState = {
   pageTranslateSelectedParagraphIds: [],
   ...DEFAULT_EDITOR_UI_STATE,
   isFullscreen: false,
-  hasSavedSession: false,
   isDirty: false,
   currentPageIndex: 0,
   pendingViewStateRestore: null,

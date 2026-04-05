@@ -741,7 +741,7 @@ const zhCN = {
     },
     done: "完成",
   },
-  landing: {
+  home: {
     title: "轻量级 AI PDF 阅读器",
     subtitle:
       "隐私优先、AI 驱动的 PDF 阅读器，专注阅读、导航、批注与表单处理。",

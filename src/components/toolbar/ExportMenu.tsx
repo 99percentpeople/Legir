@@ -1,7 +1,6 @@
 import React from "react";
 import {
   ChevronDown,
-  Download,
   FileText,
   Printer,
   Save,
@@ -20,7 +19,6 @@ import { Separator } from "../ui/separator";
 import { useLanguage } from "../language-provider";
 import { ButtonGroup } from "../ui/button-group";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { usePlatformUi } from "@/services/platform";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 
 export interface ExportMenuProps {
@@ -28,7 +26,6 @@ export interface ExportMenuProps {
   isDirty: boolean;
   hasSaveAs: boolean;
   onPrimary: () => Promise<boolean>;
-  onSaveDraft: (silent?: boolean) => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
@@ -40,22 +37,15 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
   isDirty,
   hasSaveAs,
   onPrimary,
-  onSaveDraft,
   onSaveAs,
   onExit,
   onPrint,
   onClose,
 }) => {
   const { t } = useLanguage();
-  const { documentSaveMode } = usePlatformUi();
   const [open, setOpen] = React.useState(false);
-  const isFileSaveMode = documentSaveMode === "file";
-
-  const saveDisabled = disabled || (isFileSaveMode && !isDirty);
-  const primaryLabel = t(
-    isFileSaveMode ? "common.actions.save" : "toolbar.export",
-  );
-  const PrimaryIcon = isFileSaveMode ? Save : Download;
+  const saveDisabled = disabled || !isDirty;
+  const primaryLabel = t("common.actions.save");
 
   const isMobile = useIsMobile();
 
@@ -66,10 +56,6 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
   const handleSaveAndExit = async (save: () => Promise<boolean>) => {
     const ok = await save();
     if (!ok) return;
-
-    if (!isFileSaveMode) {
-      await onSaveDraft(false);
-    }
     onExit();
   };
 
@@ -81,7 +67,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
           disabled={saveDisabled}
           className="hidden rounded-r-none sm:flex"
         >
-          <PrimaryIcon size={16} />
+          <Save size={16} />
           <span className="hidden sm:inline">{primaryLabel}</span>
         </Button>
       )}
@@ -89,7 +75,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
       <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <Button size="icon" disabled={disabled}>
-            <PrimaryIcon size={16} className="sm:hidden" />
+            <Save size={16} className="sm:hidden" />
             <ChevronDown size={16} className="hidden sm:block" />
           </Button>
         </DropdownMenuTrigger>
@@ -103,21 +89,11 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
             className="sm:hidden"
             disabled={saveDisabled}
           >
-            <PrimaryIcon size={16} />
+            <Save size={16} />
             {primaryLabel}
           </DropdownMenuItem>
           <Separator className="my-1 sm:hidden" />
 
-          {!isFileSaveMode && (
-            <DropdownMenuItem
-              onClick={() => {
-                void onSaveDraft(false);
-              }}
-            >
-              <Save size={16} />
-              {t("toolbar.save_draft")}
-            </DropdownMenuItem>
-          )}
           {hasSaveAs && (
             <DropdownMenuItem onClick={onSaveAs}>
               <SaveAll size={16} />
@@ -134,7 +110,7 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
             disabled={saveDisabled}
           >
             <FileText size={16} />
-            {t(isFileSaveMode ? "toolbar.save_close" : "toolbar.export_close")}
+            {t("toolbar.save_close")}
           </DropdownMenuItem>
           {hasSaveAs && (
             <DropdownMenuItem
