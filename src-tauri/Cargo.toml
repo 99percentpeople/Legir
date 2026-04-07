@@ -1,12 +1,12 @@
 cargo-features = ["profile-rustflags", "trim-paths"]
 
 [package]
-name = "app"
+name = "Legir"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "Legir PDF Reader"
+authors = ["Zach Yuen <yuenzach99@gmail.com>"]
+repository = "https://github.com/99percentpeople/Legir"
+license = "AGPL-3.0-or-later"
 edition = "2021"
 rust-version = "1.77.2"
 

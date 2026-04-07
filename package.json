@@ -2,6 +2,9 @@
   "name": "legir-pdf-reader",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-or-later",
+  "author": "Zach Yuen <yuenzach99@gmail.com>",
+  "repository": "https://github.com/99percentpeople/Legir",
   "type": "module",
   "sideEffects": [
     "**/*.css"
