@@ -23,13 +23,17 @@ import {
 } from "@/components/ui/context-menu";
 import { useLanguage } from "@/components/language-provider";
 import { ColorPickerPopover } from "@/components/toolbar/ColorPickerPopover";
+import { ShapeBorderStyleSection } from "@/components/toolbar/ShapeBorderStyleSection";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { useMouse } from "@/hooks/useMouse";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { getRotatedOuterRect } from "@/lib/controlRotation";
 import {
   getDefaultArrowSize,
   getLineEndingMarker,
+  getShapeMarkerStrokeLinecap,
+  getShapeMarkerStrokeLinejoin,
   getShapeArrowStyles,
   getShapeArrowStyleUpdates,
   getShapeTypeAfterPointDeletion,
@@ -40,9 +44,15 @@ import {
   getPolygonCloudGeometry,
   getRectAndNormalizedShapePoints,
   getShapeAbsolutePoints,
+  getShapeStrokeLinecap,
+  getShapeStrokeLinejoin,
+  getShapeStrokeDashArray,
   isClosedShapeType,
   getShapeMinimumPointCount,
   getShapePointsPathData,
+  normalizeShapeBorderStyle,
+  normalizeShapeDashDensity,
+  rotateShapePoint,
   snapShapePointBetweenAnchors,
   snapShapePointToAngle,
   SHAPE_ARROW_STYLE_OPTIONS,
@@ -103,9 +113,36 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const fillColor = data.backgroundColor || "none";
   const hasStroke = strokeOpacity > 0 && strokeWidth > 0;
   const hasFill = fillOpacity > 0 && fillColor !== "none";
+  const borderStyle = normalizeShapeBorderStyle(data.borderStyle) ?? "solid";
+  const dashDensity = normalizeShapeDashDensity(data.dashDensity);
+  const strokeLinecap = getShapeStrokeLinecap(data.shapeType);
+  const strokeLinejoin = getShapeStrokeLinejoin(data.shapeType);
+  const strokeDasharray = getShapeStrokeDashArray(
+    borderStyle,
+    strokeWidth,
+    dashDensity,
+  );
   const segmentHitWidth = Math.max(12, strokeWidth * 4);
   const hasVertices = shapeSupportsVertices(data.shapeType);
   const isOpenLineShape = isOpenLineShapeType(data.shapeType);
+  const rotationDeg =
+    typeof data.rotationDeg === "number" && Number.isFinite(data.rotationDeg)
+      ? data.rotationDeg
+      : 0;
+  const rotationCenter = useMemo(
+    () => ({
+      x: data.rect!.x + data.rect!.width / 2,
+      y: data.rect!.y + data.rect!.height / 2,
+    }),
+    [data.rect],
+  );
+  const rotatedOuterRect = useMemo(
+    () =>
+      rotationDeg !== 0
+        ? getRotatedOuterRect(data.rect!, rotationDeg)
+        : undefined,
+    [data.rect, rotationDeg],
+  );
   const arrowStyles = useMemo(
     () => getShapeArrowStyles(data),
     [
@@ -167,6 +204,14 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
         : null,
     [arrowSize, arrowStyles.end, isOpenLineShape, localPoints, strokeWidth],
   );
+  const startArrowStrokeLinecap = getShapeMarkerStrokeLinecap(
+    arrowStyles.start,
+  );
+  const startArrowStrokeLinejoin = getShapeMarkerStrokeLinejoin(
+    arrowStyles.start,
+  );
+  const endArrowStrokeLinecap = getShapeMarkerStrokeLinecap(arrowStyles.end);
+  const endArrowStrokeLinejoin = getShapeMarkerStrokeLinejoin(arrowStyles.end);
   const polyPath = useMemo(
     () =>
       getShapePointsPathData(
@@ -351,7 +396,10 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     clientX: number,
     clientY: number,
   ) => {
-    const bounds = svgRef.current?.getBoundingClientRect();
+    const bounds =
+      svgRef.current?.parentElement?.getBoundingClientRect() ??
+      svgRef.current?.getBoundingClientRect();
+    const interactionRect = rotatedOuterRect ?? data.rect!;
     if (!bounds) {
       return {
         x: data.rect!.x,
@@ -359,13 +407,18 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       };
     }
     const localX =
-      ((clientX - bounds.left) / Math.max(1, bounds.width)) * data.rect!.width;
+      ((clientX - bounds.left) / Math.max(1, bounds.width)) *
+      interactionRect.width;
     const localY =
-      ((clientY - bounds.top) / Math.max(1, bounds.height)) * data.rect!.height;
-    return {
-      x: data.rect!.x + localX,
-      y: data.rect!.y + localY,
+      ((clientY - bounds.top) / Math.max(1, bounds.height)) *
+      interactionRect.height;
+    const nextPoint = {
+      x: interactionRect.x + localX,
+      y: interactionRect.y + localY,
     };
+    return rotationDeg !== 0
+      ? rotateShapePoint(nextPoint, rotationCenter, -rotationDeg)
+      : nextPoint;
   };
 
   const commitAbsolutePoints = (
@@ -815,6 +868,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
+            strokeDasharray={strokeDasharray}
             pointerEvents={hasFill ? "all" : "stroke"}
             {...contentHitAreaProps}
           />
@@ -831,6 +885,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
+            strokeDasharray={strokeDasharray}
             pointerEvents={hasFill ? "all" : "stroke"}
             {...contentHitAreaProps}
           />
@@ -844,6 +899,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
+            strokeDasharray={strokeDasharray}
             pointerEvents={hasFill ? "all" : "stroke"}
             {...contentHitAreaProps}
           />
@@ -857,8 +913,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
-            strokeLinejoin="round"
-            strokeLinecap="round"
+            strokeDasharray={strokeDasharray}
+            strokeLinejoin={strokeLinejoin}
+            strokeLinecap={strokeLinecap}
             pointerEvents="stroke"
             {...contentHitAreaProps}
           />
@@ -872,8 +929,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
-            strokeLinejoin="round"
-            strokeLinecap="round"
+            strokeDasharray={strokeDasharray}
+            strokeLinejoin={strokeLinejoin}
+            strokeLinecap={strokeLinecap}
             pointerEvents={hasFill ? "all" : "stroke"}
             {...contentHitAreaProps}
           />
@@ -887,8 +945,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             stroke={hasStroke ? strokeColor : "none"}
             strokeOpacity={hasStroke ? strokeOpacity : undefined}
             strokeWidth={hasStroke ? strokeWidth : 0}
-            strokeLinejoin="round"
-            strokeLinecap="round"
+            strokeDasharray={strokeDasharray}
+            strokeLinejoin={strokeLinejoin}
+            strokeLinecap={strokeLinecap}
             pointerEvents={hasFill ? "all" : "stroke"}
             {...contentHitAreaProps}
           />
@@ -902,8 +961,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               stroke={hasStroke ? strokeColor : "none"}
               strokeOpacity={hasStroke ? strokeOpacity : undefined}
               strokeWidth={hasStroke ? strokeWidth : 0}
-              strokeLinejoin="round"
-              strokeLinecap="round"
+              strokeDasharray={strokeDasharray}
+              strokeLinejoin={strokeLinejoin}
+              strokeLinecap={strokeLinecap}
               pointerEvents="stroke"
               {...contentHitAreaProps}
             />
@@ -919,8 +979,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 stroke={hasStroke ? strokeColor : "none"}
                 strokeOpacity={hasStroke ? strokeOpacity : undefined}
                 strokeWidth={hasStroke ? Math.max(1, strokeWidth * 0.9) : 0}
-                strokeLinejoin="round"
-                strokeLinecap="round"
+                strokeDasharray={strokeDasharray}
+                strokeLinejoin={startArrowStrokeLinejoin}
+                strokeLinecap={startArrowStrokeLinecap}
                 pointerEvents="all"
                 {...contentHitAreaProps}
               />
@@ -937,8 +998,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 stroke={hasStroke ? strokeColor : "none"}
                 strokeOpacity={hasStroke ? strokeOpacity : undefined}
                 strokeWidth={hasStroke ? Math.max(1, strokeWidth * 0.9) : 0}
-                strokeLinejoin="round"
-                strokeLinecap="round"
+                strokeDasharray={strokeDasharray}
+                strokeLinejoin={endArrowStrokeLinejoin}
+                strokeLinecap={endArrowStrokeLinecap}
                 pointerEvents="all"
                 {...contentHitAreaProps}
               />
@@ -992,8 +1054,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             fillOpacity={hasFill ? 1 : undefined}
             stroke={HIT_TEST_PAINT}
             strokeWidth={segmentHitWidth}
-            strokeLinejoin="round"
-            strokeLinecap="round"
+            strokeLinejoin={strokeLinejoin}
+            strokeLinecap={strokeLinecap}
             vectorEffect="non-scaling-stroke"
             pointerEvents={hasFill ? "all" : "stroke"}
             {...selectionHitAreaProps}
@@ -1007,8 +1069,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             fill="none"
             stroke={HIT_TEST_PAINT}
             strokeWidth={segmentHitWidth}
-            strokeLinejoin="round"
-            strokeLinecap="round"
+            strokeLinejoin={strokeLinejoin}
+            strokeLinecap={strokeLinecap}
             vectorEffect="non-scaling-stroke"
             pointerEvents="stroke"
             {...selectionHitAreaProps}
@@ -1022,8 +1084,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
             fillOpacity={hasFill ? 1 : undefined}
             stroke={HIT_TEST_PAINT}
             strokeWidth={segmentHitWidth}
-            strokeLinejoin="round"
-            strokeLinecap="round"
+            strokeLinejoin={strokeLinejoin}
+            strokeLinecap={strokeLinecap}
             vectorEffect="non-scaling-stroke"
             pointerEvents={hasFill ? "all" : "stroke"}
             {...selectionHitAreaProps}
@@ -1069,8 +1131,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               fill="none"
               stroke={HIT_TEST_PAINT}
               strokeWidth={segmentHitWidth}
-              strokeLinejoin="round"
-              strokeLinecap="round"
+              strokeLinejoin={strokeLinejoin}
+              strokeLinecap={strokeLinecap}
               vectorEffect="non-scaling-stroke"
               pointerEvents="stroke"
               {...selectionHitAreaProps}
@@ -1081,8 +1143,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 fill={HIT_TEST_PAINT}
                 stroke={HIT_TEST_PAINT}
                 strokeWidth={Math.max(6, segmentHitWidth * 0.75)}
-                strokeLinejoin="round"
-                strokeLinecap="round"
+                strokeLinejoin={startArrowStrokeLinejoin}
+                strokeLinecap={startArrowStrokeLinecap}
                 vectorEffect="non-scaling-stroke"
                 pointerEvents="all"
                 {...selectionHitAreaProps}
@@ -1094,8 +1156,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 fill={HIT_TEST_PAINT}
                 stroke={HIT_TEST_PAINT}
                 strokeWidth={Math.max(6, segmentHitWidth * 0.75)}
-                strokeLinejoin="round"
-                strokeLinecap="round"
+                strokeLinejoin={endArrowStrokeLinejoin}
+                strokeLinecap={endArrowStrokeLinecap}
                 vectorEffect="non-scaling-stroke"
                 pointerEvents="all"
                 {...selectionHitAreaProps}
@@ -1111,18 +1173,20 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   return (
     <ControlWrapper
       {...props}
+      customRect={rotatedOuterRect}
       showBorder={isSelected}
       resizable={!hasVertices}
       contextMenuDisabled={true}
       className={!isSelected ? "pointer-events-none" : undefined}
     >
-      <FloatingToolbar isVisible={isSelected}>
+      <FloatingToolbar isVisible={isSelected} sideOffset={32}>
         <ColorPickerPopover
           paletteType="foreground"
           color={strokeColor}
           thickness={strokeWidth}
           minThickness={0}
           opacity={strokeOpacity}
+          onInteractionStart={onTriggerHistorySave}
           onColorChange={(color) =>
             onUpdate(data.id, {
               color,
@@ -1140,6 +1204,25 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               opacity: nextOpacity,
               appearanceStreamContent: undefined,
             })
+          }
+          extraContent={
+            <ShapeBorderStyleSection
+              value={borderStyle}
+              dashDensity={dashDensity}
+              onInteractionStart={onTriggerHistorySave}
+              onChange={(nextBorderStyle) =>
+                onUpdate(data.id, {
+                  borderStyle: nextBorderStyle,
+                  appearanceStreamContent: undefined,
+                })
+              }
+              onDashDensityChange={(nextDashDensity) =>
+                onUpdate(data.id, {
+                  dashDensity: nextDashDensity,
+                  appearanceStreamContent: undefined,
+                })
+              }
+            />
           }
           isActive={isSelected}
           side="top"
@@ -1208,81 +1291,107 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                 {contextMenuContent}
               </ContextMenuContent>
 
-              <svg
-                ref={setSvgRefs}
-                width="100%"
-                height="100%"
-                className="overflow-visible"
-                viewBox={`0 0 ${Math.max(1, data.rect.width)} ${Math.max(1, data.rect.height)}`}
+              <div
+                className={
+                  rotationDeg !== 0
+                    ? "absolute top-1/2 left-1/2"
+                    : "relative h-full w-full"
+                }
+                style={
+                  rotationDeg !== 0
+                    ? {
+                        width: `calc(${data.rect.width}px * var(--scale, 1))`,
+                        height: `calc(${data.rect.height}px * var(--scale, 1))`,
+                        transform: `translate(-50%, -50%) rotate(${rotationDeg}deg)`,
+                        transformOrigin: "50% 50%",
+                      }
+                    : undefined
+                }
               >
-                {renderShape()}
+                <div className="relative h-full w-full">
+                  <svg
+                    ref={setSvgRefs}
+                    width="100%"
+                    height="100%"
+                    className="overflow-visible"
+                    viewBox={`0 0 ${Math.max(1, data.rect.width)} ${Math.max(1, data.rect.height)}`}
+                  >
+                    {renderShape()}
 
-                {!isSelected && renderSelectionHitArea()}
+                    {!isSelected && renderSelectionHitArea()}
 
-                {isSelected && (
-                  <rect
-                    x={0}
-                    y={0}
-                    width={Math.max(1, data.rect.width)}
-                    height={Math.max(1, data.rect.height)}
-                    fill={HIT_TEST_PAINT}
-                    pointerEvents="all"
-                    {...selectedContextHitAreaProps}
-                  />
-                )}
+                    {isSelected && (
+                      <rect
+                        x={0}
+                        y={0}
+                        width={Math.max(1, data.rect.width)}
+                        height={Math.max(1, data.rect.height)}
+                        fill={HIT_TEST_PAINT}
+                        pointerEvents="all"
+                        {...selectedContextHitAreaProps}
+                      />
+                    )}
 
-                {canEditShapePoints &&
-                  segmentTargets.map((segment) => (
-                    <path
-                      key={`${data.id}_segment_${segment.index}`}
-                      d={segment.d}
-                      fill="none"
-                      stroke="transparent"
-                      strokeWidth={segmentHitWidth}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      vectorEffect="non-scaling-stroke"
-                      pointerEvents="stroke"
-                      onContextMenu={handleSegmentContextMenu(segment.index)}
-                      onMouseEnter={
-                        tooltipText ? () => setIsTooltipOpen(true) : undefined
-                      }
-                      onMouseLeave={
-                        tooltipText ? () => setIsTooltipOpen(false) : undefined
-                      }
-                    />
-                  ))}
-              </svg>
+                    {canEditShapePoints &&
+                      segmentTargets.map((segment) => (
+                        <path
+                          key={`${data.id}_segment_${segment.index}`}
+                          d={segment.d}
+                          fill="none"
+                          stroke="transparent"
+                          strokeWidth={segmentHitWidth}
+                          strokeLinecap={strokeLinecap}
+                          strokeLinejoin={strokeLinejoin}
+                          vectorEffect="non-scaling-stroke"
+                          pointerEvents="stroke"
+                          onContextMenu={handleSegmentContextMenu(
+                            segment.index,
+                          )}
+                          onMouseEnter={
+                            tooltipText
+                              ? () => setIsTooltipOpen(true)
+                              : undefined
+                          }
+                          onMouseLeave={
+                            tooltipText
+                              ? () => setIsTooltipOpen(false)
+                              : undefined
+                          }
+                        />
+                      ))}
+                  </svg>
 
-              {isSelected &&
-                hasVertices &&
-                localPoints.map((point, index) => {
-                  return (
-                    <div
-                      key={`${data.id}_vertex_${index}`}
-                      className="pointer-events-auto absolute h-3 w-3 cursor-move rounded-full border border-blue-500 bg-white"
-                      tabIndex={0}
-                      data-app-keyboard-handle="shape-vertex"
-                      aria-label={`${data.shapeType} point ${index + 1}`}
-                      style={{
-                        left: `${(point.x / Math.max(1, data.rect.width)) * 100}%`,
-                        top: `${(point.y / Math.max(1, data.rect.height)) * 100}%`,
-                        transform: "translate(-50%, -50%)",
-                        zIndex: 60,
-                      }}
-                      onPointerDown={handleVertexPointerDown(index)}
-                      onPointerMove={handleVertexPointerMove}
-                      onPointerUp={handleVertexPointerUp}
-                      onPointerCancel={handleVertexPointerUp}
-                      onKeyDown={handleVertexKeyDown(index)}
-                      onContextMenu={
-                        canEditShapePoints
-                          ? handleVertexContextMenu(index)
-                          : undefined
-                      }
-                    />
-                  );
-                })}
+                  {isSelected &&
+                    hasVertices &&
+                    localPoints.map((point, index) => {
+                      return (
+                        <div
+                          key={`${data.id}_vertex_${index}`}
+                          className="pointer-events-auto absolute h-3 w-3 cursor-move rounded-full border border-blue-500 bg-white"
+                          tabIndex={0}
+                          data-app-keyboard-handle="shape-vertex"
+                          aria-label={`${data.shapeType} point ${index + 1}`}
+                          style={{
+                            left: `${(point.x / Math.max(1, data.rect.width)) * 100}%`,
+                            top: `${(point.y / Math.max(1, data.rect.height)) * 100}%`,
+                            transform: "translate(-50%, -50%)",
+                            zIndex: 60,
+                          }}
+                          onPointerDown={handleVertexPointerDown(index)}
+                          onPointerMove={handleVertexPointerMove}
+                          onPointerUp={handleVertexPointerUp}
+                          onPointerCancel={handleVertexPointerUp}
+                          onKeyDown={handleVertexKeyDown(index)}
+                          onContextMenu={
+                            canEditShapePoints
+                              ? handleVertexContextMenu(index)
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
+                </div>
+              </div>
             </ContextMenu>
           </div>
         </TooltipTrigger>

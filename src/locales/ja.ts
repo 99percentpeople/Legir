@@ -1,6 +1,8 @@
 const ja = {
   common: {
     select: "選択...",
+    expand: "展開",
+    collapse: "折りたたむ",
     loading: "読み込み中...",
     processing: "処理中...",
     actions: {
@@ -43,6 +45,9 @@ const ja = {
     signature: "署名",
     eraser: "消しゴム",
     highlight: "強調表示",
+    highlight_text: "強調表示",
+    highlight_free: "自由強調表示",
+    highlight_free_properties: "強調表示の設定",
     ink: "手書き",
     ink_properties: "手書き設定",
     comment: "コメント",
@@ -266,6 +271,7 @@ const ja = {
     values_defaults: "値と初期値",
     value: "値",
     default_value: "初期値",
+    placeholder: "プレースホルダー",
     signature_image: "署名画像",
     no_signature: "署名画像がありません",
     upload_signature: "画像をアップロード",
@@ -285,12 +291,7 @@ const ja = {
     selected_default: "初期状態で選択",
     max_length: "最大長",
     unlimited: "無制限",
-    alignment: {
-      label: "配置",
-      left: "左揃え",
-      center: "中央揃え",
-      right: "右揃え",
-    },
+    alignment: "配置",
     alignment_options: {
       left: "左揃え",
       center: "中央揃え",
@@ -311,8 +312,12 @@ const ja = {
     transparent: "透明",
     border_color: "枠線の色",
     border_width: "枠線の幅",
+    border_style: "枠線スタイル",
+    dash_density: "破線の密度",
     text_color: "テキストの色",
     color: "色",
+    solid: "実線",
+    dashed: "破線",
     thickness: "太さ",
     font_size: "フォントサイズ",
     line_height: "行間",
@@ -324,6 +329,10 @@ const ja = {
     custom_color: "カスタムカラー",
     insert_point: "端点を追加",
     delete_point: "端点を削除",
+    bring_forward: "前面へ移動",
+    send_backward: "背面へ移動",
+    bring_to_front: "最前面へ移動",
+    send_to_back: "最背面へ移動",
     add_arrow: "矢印を追加",
     remove_arrow: "矢印を削除",
     none: "なし",
@@ -493,6 +502,10 @@ const ja = {
     text: "テキスト",
     total: "合計",
     off: "オフ",
+  },
+  annotation: {
+    font_missing_warning:
+      "この PDF はサブセット化または埋め込みフォントを使用しており、一部のグリフが欠けている可能性があります。このテキストを編集すると、既定のフォントで再描画されます。",
   },
   workspace: {
     no_pdf:

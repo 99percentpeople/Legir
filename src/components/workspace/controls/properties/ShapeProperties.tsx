@@ -14,12 +14,17 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
+  DEFAULT_SHAPE_DASH_DENSITY,
   getDefaultArrowSize,
   getShapeArrowStyles,
   getShapeArrowStyleUpdates,
   getShapeTypeWithoutArrow,
+  normalizeShapeBorderStyle,
+  normalizeShapeDashDensity,
   isOpenLineShapeType,
   reverseShapePoints,
+  MAX_SHAPE_DASH_DENSITY,
+  MIN_SHAPE_DASH_DENSITY,
   SHAPE_ARROW_STYLE_OPTIONS,
   type ShapeArrowStyle,
   shapeSupportsFill,
@@ -54,6 +59,10 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
     Number.isFinite(data.backgroundOpacity)
       ? Math.max(0.05, Math.min(1, data.backgroundOpacity))
       : strokeOpacity;
+  const borderStyle = normalizeShapeBorderStyle(data.borderStyle) ?? "solid";
+  const dashDensity = normalizeShapeDashDensity(
+    data.dashDensity ?? DEFAULT_SHAPE_DASH_DENSITY,
+  );
   const arrowSize =
     typeof data.arrowSize === "number" && Number.isFinite(data.arrowSize)
       ? Math.max(6, Math.min(64, data.arrowSize))
@@ -219,6 +228,56 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             }
           />
         </div>
+
+        <div className="space-y-2">
+          <Label>{t("properties.border_style") || "Border Style"}</Label>
+          <Select
+            value={borderStyle}
+            onValueChange={(value) => {
+              onTriggerHistorySave();
+              onChange({
+                borderStyle: value as "solid" | "dashed",
+                appearanceStreamContent: undefined,
+              });
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="solid">
+                {t("properties.solid") || "Solid"}
+              </SelectItem>
+              <SelectItem value="dashed">
+                {t("properties.dashed") || "Dashed"}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {borderStyle === "dashed" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>{t("properties.dash_density") || "Dash Density"}</Label>
+              <span className="text-muted-foreground text-xs">
+                {Math.round(dashDensity * 100)}%
+              </span>
+            </div>
+            <Slider
+              value={[dashDensity]}
+              min={MIN_SHAPE_DASH_DENSITY}
+              max={MAX_SHAPE_DASH_DENSITY}
+              step={0.1}
+              onValueCommit={onTriggerHistorySave}
+              onValueChange={(values) =>
+                onChange({
+                  dashDensity: normalizeShapeDashDensity(values[0]),
+                  appearanceStreamContent: undefined,
+                })
+              }
+            />
+          </div>
+        )}
 
         {supportsArrowSize && (
           <>

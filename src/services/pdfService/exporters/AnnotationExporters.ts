@@ -14,6 +14,8 @@ import {
   drawRectangle,
   drawEllipse,
   drawSvgPath,
+  LineJoinStyle,
+  setLineJoin,
 } from "@cantoo/pdf-lib";
 import { Annotation } from "@/types";
 import { PDF_CUSTOM_KEYS } from "@/constants";
@@ -25,6 +27,12 @@ import { generateInkAppearanceOps } from "../lib/ink";
 import { containsNonAscii, isSerifFamily } from "../lib/text";
 import { uiPointToPdfPoint, uiRectToPdfBounds } from "../lib/coords";
 import {
+  buildPdfRotationMatrix,
+  getTransformedPdfRect,
+  type PdfTransformMatrix,
+} from "../lib/appearanceRotation";
+import {
+  arrowStyleNeedsPdfCustomMetadata,
   arrowStyleToPdfLineEndingName,
   getDefaultArrowSize,
   getCloudGeometry,
@@ -32,9 +40,16 @@ import {
   getPolygonCloudGeometry,
   getShapeAbsolutePoints,
   getShapeArrowStyles,
+  getShapeMarkerPdfLineCap,
+  getShapeMarkerPdfLineJoin,
+  getShapePdfLineCap,
+  getShapePdfLineJoin,
+  getShapeStrokeDashArrayValues,
   getLineEndingMarker,
   getShapePointsPathData,
   isClosedShapeType,
+  normalizeShapeDashDensity,
+  normalizeShapeBorderStyle,
   getTrimmedOpenLinePointsForArrows,
 } from "@/lib/shapeGeometry";
 
@@ -937,6 +952,7 @@ const registerAppearanceStream = (
   operators: PDFOperator[],
   bbox: [number, number, number, number],
   graphicsStates?: Record<string, number>,
+  matrix?: PdfTransformMatrix,
 ) => {
   if (operators.length === 0) return undefined;
 
@@ -973,10 +989,16 @@ const registerAppearanceStream = (
     Subtype: PDFName.of("Form"),
     FormType: 1,
     BBox: bbox,
+    Matrix: matrix,
     Resources: resourcesObj,
   });
 
   return pdfDoc.context.register(appearanceStream);
+};
+
+const withPdfLineJoin = (operators: PDFOperator[], lineJoin: LineJoinStyle) => {
+  if (operators.length === 0) return operators;
+  return [operators[0]!, setLineJoin(lineJoin), ...operators.slice(1)];
 };
 
 const buildShapeAppearanceOperators = (
@@ -990,6 +1012,7 @@ const buildShapeAppearanceOperators = (
   stroke: ReturnType<typeof rgb> | undefined,
   fill: ReturnType<typeof rgb> | undefined,
   thickness: number,
+  borderDashArray: number[] | undefined,
   strokeGraphicsState?: string,
   fillGraphicsState?: string,
 ): {
@@ -1031,6 +1054,7 @@ const buildShapeAppearanceOperators = (
             ySkew: degrees(0),
             borderColor: undefined,
             borderWidth: 0,
+            borderDashArray,
             graphicsState: fillGraphicsState,
           }),
         );
@@ -1048,6 +1072,7 @@ const buildShapeAppearanceOperators = (
             ySkew: degrees(0),
             borderColor: stroke,
             borderWidth: strokeWidth,
+            borderDashArray,
             graphicsState: strokeGraphicsState,
           }),
         );
@@ -1070,6 +1095,7 @@ const buildShapeAppearanceOperators = (
             color: fill,
             borderColor: undefined,
             borderWidth: 0,
+            borderDashArray,
             graphicsState: fillGraphicsState,
           }),
         );
@@ -1084,6 +1110,7 @@ const buildShapeAppearanceOperators = (
             color: undefined,
             borderColor: stroke,
             borderWidth: strokeWidth,
+            borderDashArray,
             graphicsState: strokeGraphicsState,
           }),
         );
@@ -1134,6 +1161,7 @@ const buildShapeAppearanceOperators = (
           color: fill,
           borderColor: undefined,
           borderWidth: 0,
+          borderDashArray,
           graphicsState: fillGraphicsState,
         }),
       );
@@ -1147,6 +1175,7 @@ const buildShapeAppearanceOperators = (
           color: undefined,
           borderColor: stroke,
           borderWidth: strokeWidth,
+          borderDashArray,
           graphicsState: strokeGraphicsState,
         }),
       );
@@ -1216,6 +1245,11 @@ const buildShapeAppearanceOperators = (
     : localPoints;
 
   const operators: PDFOperator[] = [];
+  const pathBorderLineCap = getShapePdfLineCap(shapeType);
+  const pathBorderLineJoin =
+    getShapePdfLineJoin(shapeType) === 1
+      ? LineJoinStyle.Round
+      : LineJoinStyle.Miter;
 
   if (shapeType === "cloud_polygon") {
     const localCloudGeometry = getPolygonCloudGeometry(localPoints, {
@@ -1225,30 +1259,38 @@ const buildShapeAppearanceOperators = (
     });
     if (fill) {
       operators.push(
-        ...drawSvgPath(localCloudGeometry.pathData, {
-          x: bbox[0],
-          y: bbox[3],
-          scale: 1,
-          color: fill,
-          borderColor: undefined,
-          borderWidth: 0,
-          borderLineCap: 1,
-          graphicsState: fillGraphicsState,
-        }),
+        ...withPdfLineJoin(
+          drawSvgPath(localCloudGeometry.pathData, {
+            x: bbox[0],
+            y: bbox[3],
+            scale: 1,
+            color: fill,
+            borderColor: undefined,
+            borderWidth: 0,
+            borderDashArray,
+            borderLineCap: pathBorderLineCap,
+            graphicsState: fillGraphicsState,
+          }),
+          pathBorderLineJoin,
+        ),
       );
     }
     if (stroke) {
       operators.push(
-        ...drawSvgPath(localCloudGeometry.pathData, {
-          x: bbox[0],
-          y: bbox[3],
-          scale: 1,
-          color: undefined,
-          borderColor: stroke,
-          borderWidth: strokeWidth,
-          borderLineCap: 1,
-          graphicsState: strokeGraphicsState,
-        }),
+        ...withPdfLineJoin(
+          drawSvgPath(localCloudGeometry.pathData, {
+            x: bbox[0],
+            y: bbox[3],
+            scale: 1,
+            color: undefined,
+            borderColor: stroke,
+            borderWidth: strokeWidth,
+            borderDashArray,
+            borderLineCap: pathBorderLineCap,
+            graphicsState: strokeGraphicsState,
+          }),
+          pathBorderLineJoin,
+        ),
       );
     }
   } else {
@@ -1257,65 +1299,85 @@ const buildShapeAppearanceOperators = (
     });
     if (shapeType === "polygon" && fill) {
       operators.push(
-        ...drawSvgPath(pathData, {
-          x: bbox[0],
-          y: bbox[3],
-          scale: 1,
-          color: fill,
-          borderColor: undefined,
-          borderWidth: 0,
-          borderLineCap: 1,
-          graphicsState: fillGraphicsState,
-        }),
+        ...withPdfLineJoin(
+          drawSvgPath(pathData, {
+            x: bbox[0],
+            y: bbox[3],
+            scale: 1,
+            color: fill,
+            borderColor: undefined,
+            borderWidth: 0,
+            borderDashArray,
+            borderLineCap: pathBorderLineCap,
+            graphicsState: fillGraphicsState,
+          }),
+          pathBorderLineJoin,
+        ),
       );
     }
     if (stroke) {
       operators.push(
-        ...drawSvgPath(pathData, {
-          x: bbox[0],
-          y: bbox[3],
-          scale: 1,
-          color: undefined,
-          borderColor: stroke,
-          borderWidth: strokeWidth,
-          borderLineCap: 1,
-          graphicsState: strokeGraphicsState,
-        }),
+        ...withPdfLineJoin(
+          drawSvgPath(pathData, {
+            x: bbox[0],
+            y: bbox[3],
+            scale: 1,
+            color: undefined,
+            borderColor: stroke,
+            borderWidth: strokeWidth,
+            borderDashArray,
+            borderLineCap: pathBorderLineCap,
+            graphicsState: strokeGraphicsState,
+          }),
+          pathBorderLineJoin,
+        ),
       );
     }
   }
 
   if (hasAnyArrow) {
     const markers = [
-      getLineEndingMarker(
-        localPoints,
-        "start",
-        arrowStyles.start,
-        strokeWidth,
-        resolvedArrowSize,
-      ),
-      getLineEndingMarker(
-        localPoints,
-        "end",
-        arrowStyles.end,
-        strokeWidth,
-        resolvedArrowSize,
-      ),
+      {
+        marker: getLineEndingMarker(
+          localPoints,
+          "start",
+          arrowStyles.start,
+          strokeWidth,
+          resolvedArrowSize,
+        ),
+        style: arrowStyles.start,
+      },
+      {
+        marker: getLineEndingMarker(
+          localPoints,
+          "end",
+          arrowStyles.end,
+          strokeWidth,
+          resolvedArrowSize,
+        ),
+        style: arrowStyles.end,
+      },
     ];
 
-    for (const marker of markers) {
+    for (const { marker, style } of markers) {
       if (!marker) continue;
       operators.push(
-        ...drawSvgPath(marker.pathData, {
-          x: bbox[0],
-          y: bbox[3],
-          scale: 1,
-          color: marker.fillMode === "stroke" ? stroke : undefined,
-          borderColor: stroke,
-          borderWidth: Math.max(1, strokeWidth * 0.9),
-          borderLineCap: 1,
-          graphicsState: strokeGraphicsState,
-        }),
+        ...withPdfLineJoin(
+          drawSvgPath(marker.pathData, {
+            x: bbox[0],
+            y: bbox[3],
+            scale: 1,
+            color: marker.fillMode === "stroke" ? stroke : undefined,
+            borderColor: stroke,
+            borderWidth: Math.max(1, strokeWidth * 0.9),
+            borderDashArray,
+            borderLineCap: getShapeMarkerPdfLineCap(style),
+            graphicsState: strokeGraphicsState,
+          }),
+          getShapeMarkerPdfLineJoin(style) === 1
+            ? LineJoinStyle.Round
+            : LineJoinStyle.Miter,
+        ),
       );
     }
   }
@@ -1361,12 +1423,43 @@ export class ShapeExporter implements IAnnotationExporter {
         ? hexToPdfColor(annotation.color || "#000000") || rgb(0, 0, 0)
         : undefined;
     const arrowStyles = getShapeArrowStyles(annotation);
+    const startArrowCustomStyle = arrowStyleNeedsPdfCustomMetadata(
+      arrowStyles.start,
+    )
+      ? arrowStyles.start
+      : null;
+    const endArrowCustomStyle = arrowStyleNeedsPdfCustomMetadata(
+      arrowStyles.end,
+    )
+      ? arrowStyles.end
+      : null;
     const fill =
       fillOpacity > 0 && annotation.backgroundColor
         ? hexToPdfColor(annotation.backgroundColor)
         : undefined;
     const hasStroke = !!stroke && thickness > 0;
     const hasFill = !!fill;
+    const rotationDeg =
+      typeof annotation.rotationDeg === "number" &&
+      Number.isFinite(annotation.rotationDeg)
+        ? annotation.rotationDeg
+        : 0;
+    const shapeBorderStyle =
+      normalizeShapeBorderStyle(annotation.borderStyle) ?? "solid";
+    const dashDensity = normalizeShapeDashDensity(annotation.dashDensity);
+    const borderDashArray = getShapeStrokeDashArrayValues(
+      shapeBorderStyle,
+      thickness,
+      dashDensity,
+    );
+    const rotationCenterPdf = uiPointToPdfPoint(
+      page,
+      {
+        x: annotation.rect.x + annotation.rect.width / 2,
+        y: annotation.rect.y + annotation.rect.height / 2,
+      },
+      viewport,
+    );
 
     if (!hasStroke && !hasFill) {
       return undefined;
@@ -1380,14 +1473,12 @@ export class ShapeExporter implements IAnnotationExporter {
       ...(strokeGraphicsState ? { [strokeGraphicsState]: strokeOpacity } : {}),
       ...(fillGraphicsState ? { [fillGraphicsState]: fillOpacity } : {}),
     };
-    const suppressNativeCloudPolygonStroke =
-      annotation.shapeType === "cloud_polygon";
-    const nativeStroke = suppressNativeCloudPolygonStroke ? undefined : stroke;
-    const nativeBorderWidth = suppressNativeCloudPolygonStroke
-      ? 0
-      : hasStroke
-        ? thickness
-        : 0;
+    const appearanceMatrix =
+      rotationDeg !== 0
+        ? buildPdfRotationMatrix(-rotationDeg, rotationCenterPdf)
+        : undefined;
+    const nativeStroke = stroke;
+    const nativeBorderWidth = hasStroke ? thickness : 0;
 
     const buildCommon = (rectValues: number[]) => ({
       Type: "Annot",
@@ -1397,7 +1488,11 @@ export class ShapeExporter implements IAnnotationExporter {
         ? [nativeStroke.red, nativeStroke.green, nativeStroke.blue]
         : undefined,
       CA: hasStroke ? strokeOpacity : hasFill ? fillOpacity : undefined,
-      BS: { W: nativeBorderWidth, S: PDFName.of("S") },
+      BS: {
+        W: nativeBorderWidth,
+        S: PDFName.of(shapeBorderStyle === "dashed" ? "D" : "S"),
+        D: shapeBorderStyle === "dashed" ? borderDashArray : undefined,
+      },
       IC:
         fill &&
         annotation.shapeType !== "arrow" &&
@@ -1407,6 +1502,8 @@ export class ShapeExporter implements IAnnotationExporter {
           : undefined,
       P: page.ref,
     });
+    const getRectValues = (rect: [number, number, number, number]) =>
+      appearanceMatrix ? getTransformedPdfRect(rect, appearanceMatrix) : rect;
 
     if (
       annotation.shapeType === "square" ||
@@ -1425,24 +1522,26 @@ export class ShapeExporter implements IAnnotationExporter {
         stroke,
         fill,
         thickness,
+        borderDashArray,
         strokeGraphicsState,
         fillGraphicsState,
       );
-      const rectValues =
-        annotation.shapeType === "cloud" && appearance
-          ? [...appearance.bbox]
-          : [
-              bounds.x,
-              bounds.y,
-              bounds.x + bounds.width,
-              bounds.y + bounds.height,
-            ];
+      const baseRectValues: [number, number, number, number] = appearance
+        ? appearance.bbox
+        : [
+            bounds.x,
+            bounds.y,
+            bounds.x + bounds.width,
+            bounds.y + bounds.height,
+          ];
+      const rectValues = getRectValues(baseRectValues);
       const appearanceRef = appearance
         ? registerAppearanceStream(
             pdfDoc,
             appearance.operators,
             appearance.bbox,
             appearanceGraphicsStates,
+            appearanceMatrix,
           )
         : undefined;
       const shapeAnnot = pdfDoc.context.obj({
@@ -1548,22 +1647,28 @@ export class ShapeExporter implements IAnnotationExporter {
       stroke,
       fill,
       thickness,
+      borderDashArray,
       strokeGraphicsState,
       fillGraphicsState,
     );
+    const baseRectValues: [number, number, number, number] = appearance
+      ? appearance.bbox
+      : paddedRect;
+    const rectValues = getRectValues(baseRectValues);
     const appearanceRef = appearance
       ? registerAppearanceStream(
           pdfDoc,
           appearance.operators,
           appearance.bbox,
           appearanceGraphicsStates,
+          appearanceMatrix,
         )
       : undefined;
 
     if (annotation.shapeType === "line" || annotation.shapeType === "arrow") {
       if (pdfPoints.length === 2) {
         const shapeAnnot = pdfDoc.context.obj({
-          ...buildCommon(paddedRect),
+          ...buildCommon(rectValues),
           Subtype: "Line",
           L: [
             pdfPoints[0]!.x,
@@ -1602,16 +1707,16 @@ export class ShapeExporter implements IAnnotationExporter {
             pdfDoc.context.obj(annotation.arrowSize),
           );
         }
-        if (shapeAnnot instanceof PDFDict && arrowStyles.start) {
+        if (shapeAnnot instanceof PDFDict && startArrowCustomStyle) {
           shapeAnnot.set(
             PDFName.of(PDF_CUSTOM_KEYS.startArrowStyle),
-            PDFName.of(arrowStyles.start),
+            PDFName.of(startArrowCustomStyle),
           );
         }
-        if (shapeAnnot instanceof PDFDict && arrowStyles.end) {
+        if (shapeAnnot instanceof PDFDict && endArrowCustomStyle) {
           shapeAnnot.set(
             PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle),
-            PDFName.of(arrowStyles.end),
+            PDFName.of(endArrowCustomStyle),
           );
         }
         const ref = pdfDoc.context.register(shapeAnnot);
@@ -1624,15 +1729,24 @@ export class ShapeExporter implements IAnnotationExporter {
     const isPolygon =
       annotation.shapeType === "polygon" ||
       annotation.shapeType === "cloud_polygon";
-    const rectValues =
-      annotation.shapeType === "cloud_polygon" && appearance
-        ? [...appearance.bbox]
-        : paddedRect;
     const shapeAnnot = pdfDoc.context.obj({
       ...buildCommon(rectValues),
       Subtype: isPolygon ? "Polygon" : "PolyLine",
-      Border: annotation.shapeType === "cloud_polygon" ? [0, 0, 0] : undefined,
       Vertices: vertices,
+      IT:
+        annotation.shapeType === "cloud_polygon"
+          ? PDFName.of("PolygonCloud")
+          : undefined,
+      BE:
+        annotation.shapeType === "cloud_polygon"
+          ? {
+              S: PDFName.of("C"),
+              I:
+                typeof annotation.cloudIntensity === "number"
+                  ? annotation.cloudIntensity
+                  : 2,
+            }
+          : undefined,
       LE: hasAnyArrow
         ? [
             PDFName.of(
@@ -1661,16 +1775,16 @@ export class ShapeExporter implements IAnnotationExporter {
         pdfDoc.context.obj(annotation.arrowSize),
       );
     }
-    if (shapeAnnot instanceof PDFDict && arrowStyles.start) {
+    if (shapeAnnot instanceof PDFDict && startArrowCustomStyle) {
       shapeAnnot.set(
         PDFName.of(PDF_CUSTOM_KEYS.startArrowStyle),
-        PDFName.of(arrowStyles.start),
+        PDFName.of(startArrowCustomStyle),
       );
     }
-    if (shapeAnnot instanceof PDFDict && arrowStyles.end) {
+    if (shapeAnnot instanceof PDFDict && endArrowCustomStyle) {
       shapeAnnot.set(
         PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle),
-        PDFName.of(arrowStyles.end),
+        PDFName.of(endArrowCustomStyle),
       );
     }
     if (
@@ -1685,26 +1799,6 @@ export class ShapeExporter implements IAnnotationExporter {
     }
     if (
       shapeAnnot instanceof PDFDict &&
-      annotation.shapeType === "cloud_polygon"
-    ) {
-      shapeAnnot.set(
-        PDFName.of(PDF_CUSTOM_KEYS.shapeSubType),
-        PDFName.of("cloud_polygon"),
-      );
-    }
-    if (
-      shapeAnnot instanceof PDFDict &&
-      annotation.shapeType === "cloud_polygon" &&
-      typeof annotation.cloudIntensity === "number" &&
-      Number.isFinite(annotation.cloudIntensity)
-    ) {
-      shapeAnnot.set(
-        PDFName.of(PDF_CUSTOM_KEYS.cloudIntensity),
-        pdfDoc.context.obj(annotation.cloudIntensity),
-      );
-    }
-    if (
-      shapeAnnot instanceof PDFDict &&
       annotation.shapeType === "cloud_polygon" &&
       typeof annotation.cloudSpacing === "number" &&
       Number.isFinite(annotation.cloudSpacing)
@@ -1712,27 +1806,6 @@ export class ShapeExporter implements IAnnotationExporter {
       shapeAnnot.set(
         PDFName.of(PDF_CUSTOM_KEYS.cloudSpacing),
         pdfDoc.context.obj(annotation.cloudSpacing),
-      );
-    }
-    if (
-      shapeAnnot instanceof PDFDict &&
-      annotation.shapeType === "cloud_polygon" &&
-      annotation.color
-    ) {
-      shapeAnnot.set(
-        PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeColor),
-        PDFHexString.fromText(annotation.color),
-      );
-    }
-    if (
-      shapeAnnot instanceof PDFDict &&
-      annotation.shapeType === "cloud_polygon" &&
-      typeof annotation.thickness === "number" &&
-      Number.isFinite(annotation.thickness)
-    ) {
-      shapeAnnot.set(
-        PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeWidth),
-        pdfDoc.context.obj(annotation.thickness),
       );
     }
     const ref = pdfDoc.context.register(shapeAnnot);

@@ -46,6 +46,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   borderStyle?: {
     width?: number;
     style?: "solid" | "dashed" | "underline";
+    dashArray?: number[];
   };
   line?: number[];
   vertices?: number[];
@@ -57,13 +58,11 @@ export type PdfJsAnnotation = Record<string, unknown> & {
     style?: string;
     intensity?: number;
   };
+  intent?: string;
   rectDifferences?: number[];
-  shapeSubType?: string;
-  cloudIntensity?: number;
   cloudSpacing?: number;
   shapeFillOpacity?: number;
-  shapeStrokeColor?: string;
-  shapeStrokeWidth?: number;
+  appearanceRotation?: number;
   defaultAppearance?: string;
   DA?: string;
   textAlignment?: number;

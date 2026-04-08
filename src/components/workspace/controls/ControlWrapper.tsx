@@ -62,6 +62,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const wasSelectedRef = React.useRef(isSelected);
   const contextMenuOpenRef = React.useRef(false);
   const isFreetext = data.type === "freetext";
+  const isShape = data.type === "shape";
   const {
     ref: tooltipMouseRef,
     x,
@@ -96,7 +97,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     "shape",
   ].includes(data.type);
   const isFormField = !isAnnotation;
-  const supportsRotation = data.type === "freetext" || isFormField;
+  const supportsRotation = isFreetext || isShape || isFormField;
   const tooltipText =
     !isAnnotation && "toolTip" in data && typeof data.toolTip === "string"
       ? data.toolTip.trim()
@@ -176,14 +177,14 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     return { direction, dx, dy };
   };
 
-  const getFreetextInnerRectFromOuterAabb = (outerRect: {
+  const getAnnotationInnerRectFromOuterAabb = (outerRect: {
     x: number;
     y: number;
     width: number;
     height: number;
   }) => {
     const rotationDeg =
-      isFreetext &&
+      (isFreetext || isShape) &&
       typeof data.rotationDeg === "number" &&
       Number.isFinite(data.rotationDeg)
         ? data.rotationDeg
@@ -231,9 +232,10 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     width: number;
     height: number;
   }) => {
-    const actualRect = isFreetext
-      ? getFreetextInnerRectFromOuterAabb(nextRect)
-      : nextRect;
+    const actualRect =
+      (isFreetext || isShape) && rotationDeg !== 0
+        ? getAnnotationInnerRectFromOuterAabb(nextRect)
+        : nextRect;
 
     if (isAnnotation) {
       (onUpdate as (id: string, updates: Partial<Annotation>) => void)(id, {
@@ -363,7 +365,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       ? data.rotationDeg
       : 0;
   const shouldRenderRotatedOverlay =
-    data.type === "freetext" && rotationDeg !== 0;
+    (isFreetext || isShape) && rotationDeg !== 0;
 
   const rotatedInnerOverlayGeometry = (() => {
     if (!shouldRenderRotatedOverlay) return null;
@@ -587,7 +589,29 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
           </div>
         ) : (
           /* Non-Resizable Annotation Focus Overlay */
-          <div className="pointer-events-none absolute inset-0 z-50 border border-dashed border-blue-500" />
+          <div className="pointer-events-none absolute inset-0 z-50">
+            {shouldRenderRotatedOverlay && rotatedInnerOverlayGeometry ? (
+              <div
+                className="absolute"
+                style={{
+                  left: `calc(${rotatedInnerOverlayGeometry.innerLeft}px * var(--scale, 1))`,
+                  top: `calc(${rotatedInnerOverlayGeometry.innerTop}px * var(--scale, 1))`,
+                  width: `calc(${rotatedInnerOverlayGeometry.innerW}px * var(--scale, 1))`,
+                  height: `calc(${rotatedInnerOverlayGeometry.innerH}px * var(--scale, 1))`,
+                  transform: `rotate(${rotationDeg}deg)`,
+                  transformOrigin: "50% 50%",
+                }}
+              >
+                <div className="absolute -inset-0.5 border border-dashed border-blue-500" />
+                {supportsRotation && renderRotateHandle()}
+              </div>
+            ) : (
+              <>
+                <div className="absolute inset-0 border border-dashed border-blue-500" />
+                {supportsRotation && renderRotateHandle()}
+              </>
+            )}
+          </div>
         ))}
     </div>
   );

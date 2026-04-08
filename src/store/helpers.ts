@@ -402,6 +402,8 @@ export const initialState: EditorState = {
     color: ANNOTATION_STYLES.shape.color,
     thickness: ANNOTATION_STYLES.shape.thickness,
     opacity: ANNOTATION_STYLES.shape.opacity,
+    borderStyle: ANNOTATION_STYLES.shape.borderStyle,
+    dashDensity: ANNOTATION_STYLES.shape.dashDensity,
     backgroundColor: ANNOTATION_STYLES.shape.backgroundColor,
     backgroundOpacity: ANNOTATION_STYLES.shape.backgroundOpacity,
     arrowSize: ANNOTATION_STYLES.shape.arrowSize,

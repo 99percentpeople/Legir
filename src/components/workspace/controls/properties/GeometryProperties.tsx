@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  normalizeRotationDeg,
   normalizeRightAngleRotationDeg,
   rotateOuterRectKeepingCenter,
 } from "@/lib/controlRotation";
@@ -32,6 +33,7 @@ export const GeometryProperties: React.FC<
         : true;
   const isFormField = "name" in data && "style" in data;
   const isFreeText = data.type === "freetext";
+  const isShape = data.type === "shape";
   const rotationDeg =
     isFormField &&
     typeof data.rotationDeg === "number" &&
@@ -43,6 +45,12 @@ export const GeometryProperties: React.FC<
     typeof data.rotationDeg === "number" &&
     Number.isFinite(data.rotationDeg)
       ? data.rotationDeg
+      : 0;
+  const shapeRotationDeg =
+    isShape &&
+    typeof data.rotationDeg === "number" &&
+    Number.isFinite(data.rotationDeg)
+      ? normalizeRotationDeg(data.rotationDeg)
       : 0;
 
   return (
@@ -136,16 +144,16 @@ export const GeometryProperties: React.FC<
           </Select>
         </div>
       )}
-      {isFreeText && (
+      {(isFreeText || isShape) && (
         <div className="mt-4 space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs">{t("properties.rotation")}</Label>
             <span className="text-muted-foreground text-xs">
-              {Math.round(freeTextRotationDeg)}°
+              {Math.round(isShape ? shapeRotationDeg : freeTextRotationDeg)}°
             </span>
           </div>
           <Slider
-            value={[freeTextRotationDeg]}
+            value={[isShape ? shapeRotationDeg : freeTextRotationDeg]}
             min={-180}
             max={180}
             step={1}

@@ -58,6 +58,7 @@ import {
   SHAPE_TOOL_GROUPS,
   type ShapeTool,
 } from "./shapeTools";
+import { ShapeBorderStyleSection } from "./ShapeBorderStyleSection";
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -670,6 +671,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     }
                     onOpacityChange={(opacity) =>
                       onShapeStyleChange && onShapeStyleChange({ opacity })
+                    }
+                    extraContent={
+                      <ShapeBorderStyleSection
+                        value={
+                          editorState.shapeStyle?.borderStyle ??
+                          ANNOTATION_STYLES.shape.borderStyle
+                        }
+                        dashDensity={
+                          editorState.shapeStyle?.dashDensity ??
+                          ANNOTATION_STYLES.shape.dashDensity
+                        }
+                        onChange={(borderStyle) =>
+                          onShapeStyleChange?.({ borderStyle })
+                        }
+                        onDashDensityChange={(dashDensity) =>
+                          onShapeStyleChange?.({ dashDensity })
+                        }
+                      />
                     }
                     isActive={isShapeTool(tool)}
                     title={t("toolbar.shape_properties")}

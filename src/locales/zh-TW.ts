@@ -1,6 +1,8 @@
 const zhTW = {
   common: {
     select: "選擇...",
+    expand: "展開",
+    collapse: "收合",
     loading: "載入中...",
     processing: "處理中...",
     actions: {
@@ -43,6 +45,9 @@ const zhTW = {
     signature: "簽名",
     eraser: "橡皮擦",
     highlight: "螢光筆",
+    highlight_text: "螢光筆",
+    highlight_free: "自由螢光筆",
+    highlight_free_properties: "螢光筆屬性",
     ink: "墨跡",
     ink_properties: "墨跡屬性",
     comment: "註釋",
@@ -280,12 +285,7 @@ const zhTW = {
     selected_default: "預設選擇",
     max_length: "最大長度",
     unlimited: "不限",
-    alignment: {
-      label: "對齊",
-      left: "靠左對齊",
-      center: "置中",
-      right: "靠右對齊",
-    },
+    alignment: "對齊",
     alignment_options: {
       left: "靠左對齊",
       center: "置中",
@@ -306,8 +306,12 @@ const zhTW = {
     transparent: "透明",
     border_color: "邊框顏色",
     border_width: "邊框寬度",
+    border_style: "邊框樣式",
+    dash_density: "虛線密度",
     text_color: "文字顏色",
     color: "顏色",
+    solid: "實線",
+    dashed: "虛線",
     thickness: "粗細",
     font_size: "字體大小",
     line_height: "行高",
@@ -486,6 +490,10 @@ const zhTW = {
     text: "文字",
     total: "總計",
     off: "關閉",
+  },
+  annotation: {
+    font_missing_warning:
+      "此 PDF 使用了子集/嵌入字型，可能缺少字形。編輯此自由文字後將改用預設字型重新排版。",
   },
   workspace: {
     no_pdf: "未載入 PDF。請使用上傳按鈕開始。",

@@ -74,6 +74,9 @@ import {
 } from "@/lib/controlRotation";
 import {
   getRectAndNormalizedShapePoints,
+  getShapeStrokeLinecap,
+  getShapeStrokeLinejoin,
+  getShapeStrokeDashArray,
   getShapePointsPathData,
   isOpenLineShapeType,
   snapShapePointToAngle,
@@ -189,6 +192,31 @@ const TOUCH_SHAPE_DRAFT_FINISH_DISTANCE_PX = 18;
 
 const getShapeDraftMinimumPointCount = (tool: ShapeDraftSession["tool"]) =>
   tool === "draw_shape_polygon" || tool === "draw_shape_cloud_polygon" ? 3 : 2;
+
+const getShapeTypeFromTool = (
+  tool: Tool | ShapeDraftSession["tool"],
+): Annotation["shapeType"] | undefined => {
+  switch (tool) {
+    case "draw_shape_rect":
+      return "square";
+    case "draw_shape_ellipse":
+      return "circle";
+    case "draw_shape_line":
+      return "line";
+    case "draw_shape_polyline":
+      return "polyline";
+    case "draw_shape_polygon":
+      return "polygon";
+    case "draw_shape_cloud_polygon":
+      return "cloud_polygon";
+    case "draw_shape_arrow":
+      return "arrow";
+    case "draw_shape_cloud":
+      return "cloud";
+    default:
+      return undefined;
+  }
+};
 
 const getTouchShapeDraftFinishPoint = (draft: ShapeDraftSession) => {
   if (draft.points.length === 0) return null;
@@ -472,6 +500,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
       | "color"
       | "thickness"
       | "opacity"
+      | "borderStyle"
+      | "dashDensity"
       | "backgroundColor"
       | "backgroundOpacity"
       | "shapeStartArrow"
@@ -490,6 +520,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
         editorState.shapeStyle?.thickness ?? ANNOTATION_STYLES.shape.thickness,
       opacity:
         editorState.shapeStyle?.opacity ?? ANNOTATION_STYLES.shape.opacity,
+      borderStyle:
+        editorState.shapeStyle?.borderStyle ??
+        ANNOTATION_STYLES.shape.borderStyle,
+      dashDensity:
+        editorState.shapeStyle?.dashDensity ??
+        ANNOTATION_STYLES.shape.dashDensity,
       backgroundColor: shapeSupportsFill(shapeType)
         ? editorState.shapeStyle?.backgroundColor
         : undefined,
@@ -1245,20 +1281,28 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       setResizeHandle(handle);
       if (data.rect) {
+        const interactionRect =
+          (data.type === "freetext" || data.type === "shape") &&
+          typeof data.rotationDeg === "number" &&
+          Number.isFinite(data.rotationDeg) &&
+          data.rotationDeg !== 0
+            ? getRotatedOuterRectLib(data.rect, data.rotationDeg)
+            : data.rect;
         const base = {
-          originalRect: { ...data.rect },
+          originalRect: { ...interactionRect },
           mouseX: coords.x,
           mouseY: coords.y,
         };
 
         const supportsRotation =
           data.type === "freetext" ||
-          !["highlight", "ink", "comment", "link", "shape"].includes(data.type);
+          data.type === "shape" ||
+          !["highlight", "ink", "comment", "link"].includes(data.type);
 
         if (handle === "rotate" && supportsRotation) {
           const pivot = {
-            x: data.rect.x + data.rect.width / 2,
-            y: data.rect.y + data.rect.height / 2,
+            x: interactionRect.x + interactionRect.width / 2,
+            y: interactionRect.y + interactionRect.height / 2,
           };
           const startAngleRad = Math.atan2(
             coords.y - pivot.y,
@@ -1327,16 +1371,39 @@ const Workspace: React.FC<WorkspaceProps> = ({
     );
   };
 
-  const getRotatedFreetextOuterRect = React.useCallback(
-    (rect: Rect, rotationDeg: number) => {
-      return getRotatedOuterRectLib(rect, rotationDeg);
-    },
-    [],
-  );
+  const getAnnotationOuterRect = React.useCallback((annotation: Annotation) => {
+    if (!annotation.rect) return undefined;
+
+    const rotationDeg =
+      (annotation.type === "freetext" || annotation.type === "shape") &&
+      typeof annotation.rotationDeg === "number" &&
+      Number.isFinite(annotation.rotationDeg)
+        ? annotation.rotationDeg
+        : 0;
+
+    if (rotationDeg === 0) return annotation.rect;
+    return getRotatedOuterRectLib(annotation.rect, rotationDeg);
+  }, []);
 
   const getInnerSizeFromOuterAabb = React.useCallback(
     (outer: Rect, rotationDeg: number) => {
       return getInnerSizeFromOuterAabbLib(outer, rotationDeg);
+    },
+    [],
+  );
+
+  const getAnnotationInnerRectFromOuterAabb = React.useCallback(
+    (outer: Rect, rotationDeg: number) => {
+      if (!Number.isFinite(rotationDeg) || rotationDeg === 0) return outer;
+      const inner = getInnerSizeFromOuterAabbLib(outer, rotationDeg);
+      const cx = outer.x + outer.width / 2;
+      const cy = outer.y + outer.height / 2;
+      return {
+        x: cx - inner.width / 2,
+        y: cy - inner.height / 2,
+        width: inner.width,
+        height: inner.height,
+      };
     },
     [],
   );
@@ -1368,15 +1435,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const newOuterY = currentCoords.y - moveOffset.y;
 
       if (
-        annot.type === "freetext" &&
+        (annot.type === "freetext" || annot.type === "shape") &&
         typeof annot.rotationDeg === "number" &&
         Number.isFinite(annot.rotationDeg) &&
         annot.rotationDeg !== 0
       ) {
-        const outer = getRotatedFreetextOuterRect(
-          annot.rect,
-          annot.rotationDeg,
-        );
+        const outer = getAnnotationOuterRect(annot) ?? annot.rect;
         const dx = newOuterX - outer.x;
         const dy = newOuterY - outer.y;
         onUpdateAnnotation(movingAnnotationId, {
@@ -1410,7 +1474,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
         pageIndex,
       );
 
-      if (resizeHandle === "rotate" && annot.type === "freetext") {
+      if (
+        resizeHandle === "rotate" &&
+        (annot.type === "freetext" || annot.type === "shape")
+      ) {
         const pivot =
           resizeStart.rotatePivot ??
           ({
@@ -1501,8 +1568,26 @@ const Workspace: React.FC<WorkspaceProps> = ({
         newH = 5;
       }
 
+      const nextOuterRect = {
+        ...resizeStart.originalRect,
+        x: newX,
+        y: newY,
+        width: newW,
+        height: newH,
+      };
+      const nextRect =
+        (annot.type === "freetext" || annot.type === "shape") &&
+        typeof annot.rotationDeg === "number" &&
+        Number.isFinite(annot.rotationDeg) &&
+        annot.rotationDeg !== 0
+          ? getAnnotationInnerRectFromOuterAabb(
+              nextOuterRect,
+              annot.rotationDeg,
+            )
+          : { ...annot.rect, x: newX, y: newY, width: newW, height: newH };
+
       onUpdateAnnotation(resizingAnnotationId, {
-        rect: { ...annot.rect, x: newX, y: newY, width: newW, height: newH },
+        rect: nextRect,
       });
     }
   };
@@ -2646,14 +2731,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (state.tool !== "select") return;
 
       const rotationDeg =
-        annotation.type === "freetext" &&
+        (annotation.type === "freetext" || annotation.type === "shape") &&
         typeof annotation.rotationDeg === "number" &&
         Number.isFinite(annotation.rotationDeg)
           ? annotation.rotationDeg
           : 0;
       const outerRect =
-        annotation.type === "freetext" && rotationDeg !== 0
-          ? getRotatedFreetextOuterRect(annotation.rect, rotationDeg)
+        rotationDeg !== 0
+          ? (getAnnotationOuterRect(annotation) ?? annotation.rect)
           : annotation.rect;
 
       if (e.pointerType === "touch") {
@@ -2726,7 +2811,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       onSelectControl,
       getRelativeCoords,
       isPanModeActive,
-      getRotatedFreetextOuterRect,
+      getAnnotationOuterRect,
       isFocusedResizeLikeHandleForControl,
     ],
   );
@@ -3046,7 +3131,19 @@ const Workspace: React.FC<WorkspaceProps> = ({
                       editorState.shapeStyle?.opacity ??
                       ANNOTATION_STYLES.shape.opacity
                     }
-                    strokeLinecap="round"
+                    strokeDasharray={getShapeStrokeDashArray(
+                      editorState.shapeStyle?.borderStyle,
+                      editorState.shapeStyle?.thickness ??
+                        ANNOTATION_STYLES.shape.thickness,
+                      editorState.shapeStyle?.dashDensity ??
+                        ANNOTATION_STYLES.shape.dashDensity,
+                    )}
+                    strokeLinecap={getShapeStrokeLinecap(
+                      getShapeTypeFromTool(editorState.tool),
+                    )}
+                    strokeLinejoin={getShapeStrokeLinejoin(
+                      getShapeTypeFromTool(editorState.tool),
+                    )}
                   />
                 </svg>
               ) : (
@@ -3106,9 +3203,20 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   editorState.shapeStyle?.opacity ??
                   ANNOTATION_STYLES.shape.opacity
                 }
+                strokeDasharray={getShapeStrokeDashArray(
+                  editorState.shapeStyle?.borderStyle,
+                  editorState.shapeStyle?.thickness ??
+                    ANNOTATION_STYLES.shape.thickness,
+                  editorState.shapeStyle?.dashDensity ??
+                    ANNOTATION_STYLES.shape.dashDensity,
+                )}
                 fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                strokeLinecap={getShapeStrokeLinecap(
+                  getShapeTypeFromTool(editorState.tool),
+                )}
+                strokeLinejoin={getShapeStrokeLinejoin(
+                  getShapeTypeFromTool(editorState.tool),
+                )}
               />
               {shapeDraftClosingPreview && (
                 <path
@@ -3129,8 +3237,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
                       ANNOTATION_STYLES.shape.opacity) * 0.8
                   }
                   fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                  strokeLinecap={getShapeStrokeLinecap(
+                    getShapeTypeFromTool(editorState.tool),
+                  )}
+                  strokeLinejoin={getShapeStrokeLinejoin(
+                    getShapeTypeFromTool(editorState.tool),
+                  )}
                   strokeDasharray="6 4"
                 />
               )}

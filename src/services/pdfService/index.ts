@@ -17,6 +17,7 @@ import {
 import {
   buildFullFieldNameFromChain,
   decodePdfStreamToText,
+  extractBorderDashArray,
   extractBorderStyle,
   extractBorderWidth,
   extractChoiceOptions,
@@ -31,6 +32,11 @@ import {
   pdfRectFromObj,
   summarizePdfObjForDebug,
 } from "./lib/pdf-import-utils";
+import {
+  getAppearanceStreamMetadata,
+  getRotationDegFromPdfMatrix,
+  parseRotationDegFromAppearanceContent,
+} from "./lib/appearanceRotation";
 import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
 import { getAppHighlightedText } from "./lib/annotationMetadata";
 import {
@@ -1048,6 +1054,10 @@ const buildPdfLibAnnotsByPageIndex = async (
       const highlightedText = getAppHighlightedText(annot);
       const borderWidth = extractBorderWidth(annot);
       const borderStyleType = extractBorderStyle(annot);
+      let finalBorderWidth: number | undefined = borderWidth;
+      let finalBorderStyle: "solid" | "dashed" | "underline" | undefined =
+        borderStyleType;
+      let finalBorderDashArray = extractBorderDashArray(annot);
       const interiorColor = pdfArrayToNumberList(
         annot.lookup(PDFName.of("IC")),
       );
@@ -1065,6 +1075,10 @@ const buildPdfLibAnnotsByPageIndex = async (
         }
         return values.length > 0 ? values : undefined;
       })();
+      const intent = (() => {
+        const raw = annot.lookup(PDFName.of("IT"));
+        return pdfObjToString(raw);
+      })();
       const borderEffect = (() => {
         const raw = annot.lookup(PDFName.of("BE"));
         if (!(raw instanceof PDFDict)) return undefined;
@@ -1080,16 +1094,6 @@ const buildPdfLibAnnotsByPageIndex = async (
       const rectDifferences = pdfArrayToNumberList(
         annot.lookup(PDFName.of("RD")),
       );
-      const shapeSubType = pdfObjToString(
-        annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.shapeSubType)),
-      );
-      const cloudIntensityObj = annot.lookup(
-        PDFName.of(PDF_CUSTOM_KEYS.cloudIntensity),
-      );
-      const cloudIntensity =
-        cloudIntensityObj instanceof PDFNumber
-          ? cloudIntensityObj.asNumber()
-          : undefined;
       const cloudSpacingObj = annot.lookup(
         PDFName.of(PDF_CUSTOM_KEYS.cloudSpacing),
       );
@@ -1104,16 +1108,6 @@ const buildPdfLibAnnotsByPageIndex = async (
         shapeFillOpacityObj instanceof PDFNumber
           ? shapeFillOpacityObj.asNumber()
           : undefined;
-      const shapeStrokeColor = pdfObjToString(
-        annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeColor)),
-      );
-      const shapeStrokeWidthObj = annot.lookup(
-        PDFName.of(PDF_CUSTOM_KEYS.shapeStrokeWidth),
-      );
-      const shapeStrokeWidth =
-        shapeStrokeWidthObj instanceof PDFNumber
-          ? shapeStrokeWidthObj.asNumber()
-          : undefined;
       const arrowSizeObj = annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.arrowSize));
       const arrowSize =
         arrowSizeObj instanceof PDFNumber ? arrowSizeObj.asNumber() : undefined;
@@ -1123,6 +1117,84 @@ const buildPdfLibAnnotsByPageIndex = async (
       const endArrowStyle = pdfObjToString(
         annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle)),
       );
+      const appearance = getAppearanceStreamMetadata(annot);
+      let appearanceContent: string | undefined = undefined;
+      let appearanceContentLoaded = false;
+      const loadAppearanceContent = async () => {
+        if (appearanceContentLoaded) return appearanceContent;
+        appearanceContentLoaded = true;
+        if (!appearance.stream) return undefined;
+        appearanceContent = await decodePdfStreamToText(appearance.stream);
+        return appearanceContent;
+      };
+
+      const rotation = (() => {
+        let value: number | undefined = undefined;
+        try {
+          const rotateObj = annot.lookup(PDFName.of("Rotate"));
+          if (rotateObj instanceof PDFNumber) {
+            value = rotateObj.asNumber();
+          }
+        } catch {
+          // ignore
+        }
+
+        if (typeof value !== "number") {
+          try {
+            const mk = annot.lookup(PDFName.of("MK"));
+            if (mk instanceof PDFDict) {
+              const mkR = mk.lookup(PDFName.of("R"));
+              if (mkR instanceof PDFNumber) {
+                value = mkR.asNumber();
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        return typeof value === "number" && Number.isFinite(value)
+          ? value
+          : undefined;
+      })();
+      let appearanceRotation =
+        appearance.matrix && getRotationDegFromPdfMatrix(appearance.matrix);
+
+      if (
+        typeof finalBorderWidth !== "number" ||
+        typeof finalBorderStyle !== "string" ||
+        !finalBorderDashArray ||
+        typeof appearanceRotation !== "number"
+      ) {
+        try {
+          const apContent = await loadAppearanceContent();
+          if (apContent) {
+            const parsedBorder = parseBorderFromAppearanceStream(apContent);
+            if (
+              typeof finalBorderWidth !== "number" &&
+              typeof parsedBorder.width === "number"
+            ) {
+              finalBorderWidth = parsedBorder.width;
+            }
+            if (typeof finalBorderStyle !== "string" && parsedBorder.style) {
+              finalBorderStyle = parsedBorder.style;
+            }
+            if (
+              !finalBorderDashArray &&
+              Array.isArray(parsedBorder.dashArray) &&
+              parsedBorder.dashArray.length > 0
+            ) {
+              finalBorderDashArray = parsedBorder.dashArray;
+            }
+            if (typeof appearanceRotation !== "number") {
+              appearanceRotation =
+                parseRotationDegFromAppearanceContent(apContent);
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       const base: PdfJsAnnotation = {
         subtype: subtypeName,
@@ -1140,19 +1212,22 @@ const buildPdfLibAnnotsByPageIndex = async (
         replyType,
         popupRef,
         borderStyle:
-          typeof borderWidth === "number" || borderStyleType
-            ? { width: borderWidth, style: borderStyleType }
+          typeof finalBorderWidth === "number" || finalBorderStyle
+            ? {
+                width: finalBorderWidth,
+                style: finalBorderStyle,
+                dashArray: finalBorderDashArray,
+              }
             : undefined,
+        intent,
         rectDifferences,
-        shapeSubType,
-        cloudIntensity,
         cloudSpacing,
         shapeFillOpacity,
-        shapeStrokeColor,
-        shapeStrokeWidth,
         arrowSize,
         startArrowStyle,
         endArrowStyle,
+        rotation,
+        appearanceRotation,
       };
 
       if (

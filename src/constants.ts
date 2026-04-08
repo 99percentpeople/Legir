@@ -197,6 +197,8 @@ export const ANNOTATION_STYLES = {
     color: "#e61b1b",
     thickness: 2,
     opacity: 1.0,
+    borderStyle: "solid" as const,
+    dashDensity: 1,
     backgroundColor: undefined,
     backgroundOpacity: 1.0,
     arrowSize: 10,
@@ -227,13 +229,9 @@ export const AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY = 1.5;
 
 export const PDF_CUSTOM_KEYS = {
   placeholder: "FFPlaceholder",
-  shapeSubType: "FFShapeSubType",
-  cloudIntensity: "FFCloudIntensity",
   cloudSpacing: "FFCloudSpacing",
   shapeFillOpacity: "FFShapeFillOpacity",
   arrowSize: "FFArrowSize",
   startArrowStyle: "FFStartArrowStyle",
   endArrowStyle: "FFEndArrowStyle",
-  shapeStrokeColor: "FFShapeStrokeColor",
-  shapeStrokeWidth: "FFShapeStrokeWidth",
 } as const;

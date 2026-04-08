@@ -5,6 +5,15 @@ export type ShapeRect = { x: number; y: number; width: number; height: number };
 export type ShapeType = NonNullable<Annotation["shapeType"]>;
 export type ShapeArrowStyle = NonNullable<Annotation["shapeStartArrowStyle"]>;
 export type ShapeArrowEndpoint = "start" | "end";
+export type ShapeBorderStyle = Extract<
+  NonNullable<Annotation["borderStyle"]>,
+  "solid" | "dashed"
+>;
+export type ShapeStrokeLinecap = "butt" | "round";
+export type ShapeStrokeLinejoin = "miter" | "round";
+export const DEFAULT_SHAPE_DASH_DENSITY = 1;
+export const MIN_SHAPE_DASH_DENSITY = 0.5;
+export const MAX_SHAPE_DASH_DENSITY = 2.5;
 export type PolygonCloudGeometry = {
   intensity: number;
   strokeWidth: number;
@@ -92,6 +101,150 @@ export const getShapeTypeWithoutArrow = (pointCount: number): ShapeType =>
 export const getDefaultArrowSize = (thickness = 2) =>
   Math.max(10, Math.max(1, thickness) * 4);
 
+export const normalizeShapeBorderStyle = (
+  style: string | null | undefined,
+): ShapeBorderStyle | undefined => {
+  switch (style) {
+    case "solid":
+    case "dashed":
+      return style;
+    default:
+      return undefined;
+  }
+};
+
+export const normalizeShapeDashDensity = (value: number | null | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_SHAPE_DASH_DENSITY;
+  }
+  return Math.max(
+    MIN_SHAPE_DASH_DENSITY,
+    Math.min(MAX_SHAPE_DASH_DENSITY, value),
+  );
+};
+
+export const getShapeStrokeDashArrayValues = (
+  borderStyle: string | null | undefined,
+  strokeWidth = 1,
+  dashDensity = DEFAULT_SHAPE_DASH_DENSITY,
+) => {
+  if (normalizeShapeBorderStyle(borderStyle) !== "dashed") return undefined;
+
+  const width =
+    typeof strokeWidth === "number" && Number.isFinite(strokeWidth)
+      ? Math.max(1, strokeWidth)
+      : 1;
+  const density = normalizeShapeDashDensity(dashDensity);
+  const dash = Math.max(1.5, Math.max(4, width * 3) / density);
+  const gap = Math.max(1, Math.max(3, width * 2) / density);
+
+  return [dash, gap];
+};
+
+export const getShapeStrokeDashArray = (
+  borderStyle: string | null | undefined,
+  strokeWidth = 1,
+  dashDensity = DEFAULT_SHAPE_DASH_DENSITY,
+) =>
+  getShapeStrokeDashArrayValues(borderStyle, strokeWidth, dashDensity)?.join(
+    " ",
+  );
+
+export const getShapeDashDensityFromPattern = (
+  dashArray: number[] | null | undefined,
+  strokeWidth = 1,
+) => {
+  if (!Array.isArray(dashArray) || dashArray.length === 0) return undefined;
+
+  const positiveDashArray = dashArray.filter(
+    (value) => typeof value === "number" && Number.isFinite(value) && value > 0,
+  );
+  if (positiveDashArray.length === 0) return undefined;
+
+  const basePattern = getShapeStrokeDashArrayValues("dashed", strokeWidth);
+  if (!basePattern) return undefined;
+
+  const dash = positiveDashArray[0]!;
+  const gap = positiveDashArray[1] ?? positiveDashArray[0]!;
+  const dashRatio = basePattern[0] / dash;
+  const gapRatio = basePattern[1] / gap;
+  const density = (dashRatio + gapRatio) / 2;
+  return normalizeShapeDashDensity(density);
+};
+
+export const getShapeStrokeLinecap = (
+  shapeType: ShapeType | null | undefined,
+): ShapeStrokeLinecap => {
+  switch (shapeType) {
+    case "cloud":
+    case "cloud_polygon":
+      return "round";
+    case "line":
+    case "polyline":
+    case "polygon":
+    case "arrow":
+      return "butt";
+    default:
+      return "round";
+  }
+};
+
+export const getShapePdfLineCap = (shapeType: ShapeType | null | undefined) =>
+  getShapeStrokeLinecap(shapeType) === "round" ? 1 : 0;
+
+export const getShapeStrokeLinejoin = (
+  shapeType: ShapeType | null | undefined,
+): ShapeStrokeLinejoin => {
+  switch (shapeType) {
+    case "circle":
+    case "cloud":
+    case "cloud_polygon":
+      return "round";
+    case "square":
+    case "line":
+    case "polyline":
+    case "polygon":
+    case "arrow":
+      return "miter";
+    default:
+      return "round";
+  }
+};
+
+export const getShapePdfLineJoin = (shapeType: ShapeType | null | undefined) =>
+  getShapeStrokeLinejoin(shapeType) === "round" ? 1 : 0;
+
+export const getShapeMarkerStrokeLinecap = (
+  style: ShapeArrowStyle | null | undefined,
+): ShapeStrokeLinecap => {
+  switch (style) {
+    case "line_arrow":
+    case "slash":
+      return "butt";
+    default:
+      return "round";
+  }
+};
+
+export const getShapeMarkerPdfLineCap = (
+  style: ShapeArrowStyle | null | undefined,
+) => (getShapeMarkerStrokeLinecap(style) === "round" ? 1 : 0);
+
+export const getShapeMarkerStrokeLinejoin = (
+  style: ShapeArrowStyle | null | undefined,
+): ShapeStrokeLinejoin => {
+  switch (style) {
+    case "circle":
+      return "round";
+    default:
+      return "miter";
+  }
+};
+
+export const getShapeMarkerPdfLineJoin = (
+  style: ShapeArrowStyle | null | undefined,
+) => (getShapeMarkerStrokeLinejoin(style) === "round" ? 1 : 0);
+
 export const normalizeShapeArrowStyle = (
   style: string | null | undefined,
 ): ShapeArrowStyle | null => {
@@ -107,6 +260,30 @@ export const normalizeShapeArrowStyle = (
     default:
       return null;
   }
+};
+
+export const arrowStyleNeedsPdfCustomMetadata = (
+  style: string | null | undefined,
+) => normalizeShapeArrowStyle(style) === "hollow_arrow";
+
+export const resolveShapeArrowStyleFromPdf = ({
+  lineEnding,
+  customStyle,
+}: {
+  lineEnding?: string | null;
+  customStyle?: string | null;
+}): ShapeArrowStyle | null => {
+  const standardStyle = pdfLineEndingNameToArrowStyle(lineEnding);
+  const normalizedCustomStyle = normalizeShapeArrowStyle(customStyle);
+
+  if (
+    normalizedCustomStyle === "hollow_arrow" &&
+    (standardStyle === "closed_arrow" || standardStyle === null)
+  ) {
+    return "hollow_arrow";
+  }
+
+  return standardStyle ?? normalizedCustomStyle;
 };
 
 export const getShapeArrowStyles = (
@@ -211,6 +388,25 @@ export const distanceSquared = (a: ShapePoint, b: ShapePoint) => {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   return dx * dx + dy * dy;
+};
+
+export const rotateShapePoint = (
+  point: ShapePoint,
+  center: ShapePoint,
+  rotationDeg: number,
+): ShapePoint => {
+  if (!Number.isFinite(rotationDeg) || rotationDeg === 0) return point;
+
+  const theta = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+
+  return {
+    x: center.x + cos * dx - sin * dy,
+    y: center.y + sin * dx + cos * dy,
+  };
 };
 
 export const snapShapePointToAngle = (
@@ -685,13 +881,20 @@ export const getLineEndingMarker = (
     case "line_arrow": {
       const halfWidth = size * 0.45;
       const base = { x: tip.x - ux * size, y: tip.y - uy * size };
+      const left = {
+        x: base.x + perp.x * halfWidth,
+        y: base.y + perp.y * halfWidth,
+      };
+      const right = {
+        x: base.x - perp.x * halfWidth,
+        y: base.y - perp.y * halfWidth,
+      };
       return {
         trim: 0,
         pathData: [
-          `M ${tip.x} ${tip.y}`,
-          `L ${base.x + perp.x * halfWidth} ${base.y + perp.y * halfWidth}`,
-          `M ${tip.x} ${tip.y}`,
-          `L ${base.x - perp.x * halfWidth} ${base.y - perp.y * halfWidth}`,
+          `M ${left.x} ${left.y}`,
+          `L ${tip.x} ${tip.y}`,
+          `L ${right.x} ${right.y}`,
         ].join(" "),
         fillMode: "none" as const,
       };

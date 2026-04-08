@@ -15,12 +15,14 @@ import { Annotation, FieldType, FormField } from "@/types";
 //
 // For PDF import/export support, also add parser/exporter implementations under `services/pdf/...`.
 
-type LazyWithPreload<T extends React.ComponentType<any>> =
+type UnsafeComponent = React.ComponentType<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+type LazyWithPreload<T extends UnsafeComponent> =
   React.LazyExoticComponent<T> & {
     preload?: () => Promise<{ default: T }>;
   };
 
-const lazyWithPreload = <T extends React.ComponentType<any>>(
+const lazyWithPreload = <T extends UnsafeComponent>(
   loader: () => Promise<{ default: T }>,
 ) => {
   const Comp = React.lazy(loader) as LazyWithPreload<T>;
@@ -30,8 +32,8 @@ const lazyWithPreload = <T extends React.ComponentType<any>>(
 
 type ControlConfig = {
   type: FieldType | string;
-  component: LazyWithPreload<React.ComponentType<any>>;
-  propertiesComponent: LazyWithPreload<React.ComponentType<any>>;
+  component: LazyWithPreload<UnsafeComponent>;
+  propertiesComponent: LazyWithPreload<UnsafeComponent>;
   label: string;
   supportsGeometrySizeEdit?:
     | boolean
@@ -212,19 +214,32 @@ const CONTROL_CONFIGS: ControlConfig[] = [
 
 let controlsPreloaded = false;
 
-const warmLazy = async (lazyComp: any) => {
-  if (!lazyComp || typeof lazyComp._init !== "function") return;
+type PreloadableLazyComponent = {
+  _init?: (payload: unknown) => void;
+  _payload?: unknown;
+};
+
+const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
+  typeof value === "object" &&
+  value !== null &&
+  "then" in value &&
+  typeof value.then === "function";
+
+const warmLazy = async (lazyComp: unknown) => {
+  if (!lazyComp || typeof lazyComp !== "object") return;
+  const preloadableLazy = lazyComp as PreloadableLazyComponent;
+  if (typeof preloadableLazy._init !== "function") return;
   try {
-    lazyComp._init(lazyComp._payload);
-  } catch (thrown: any) {
-    if (thrown && typeof thrown.then === "function") {
+    preloadableLazy._init(preloadableLazy._payload);
+  } catch (thrown: unknown) {
+    if (isPromiseLike(thrown)) {
       try {
         await thrown;
       } catch {
         return;
       }
       try {
-        lazyComp._init(lazyComp._payload);
+        preloadableLazy._init(preloadableLazy._payload);
       } catch {
         return;
       }

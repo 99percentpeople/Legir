@@ -28,10 +28,17 @@ import {
   pdfFontToCssFontFamily,
 } from "../lib/pdf-font-names";
 import {
+  getShapeDashDensityFromPattern,
   getRectAndNormalizedShapePoints,
-  normalizeShapeArrowStyle,
-  pdfLineEndingNameToArrowStyle,
+  normalizeShapeBorderStyle,
+  normalizeShapeDashDensity,
+  resolveShapeArrowStyleFromPdf,
+  rotateShapePoint,
 } from "@/lib/shapeGeometry";
+import {
+  getInnerSizeFromOuterAabb,
+  getRotatedOuterRect,
+} from "@/lib/controlRotation";
 
 const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
@@ -1834,19 +1841,16 @@ export class ShapeParser implements IAnnotationParser {
       }
 
       const explicitThickness =
-        typeof annotation.shapeStrokeWidth === "number" &&
-        Number.isFinite(annotation.shapeStrokeWidth)
-          ? Math.max(0, annotation.shapeStrokeWidth)
-          : typeof annotation.borderStyle?.width === "number" &&
-              Number.isFinite(annotation.borderStyle.width)
-            ? Math.max(0, annotation.borderStyle.width)
-            : undefined;
-      const inferredStrokeColor =
-        annotation.shapeStrokeColor || getColorHex(annotation.color);
+        typeof annotation.borderStyle?.width === "number" &&
+        Number.isFinite(annotation.borderStyle.width)
+          ? Math.max(0, annotation.borderStyle.width)
+          : undefined;
+      const inferredStrokeColor = getColorHex(annotation.color);
       const thickness = explicitThickness ?? (inferredStrokeColor ? 1 : 0);
-      const strokeColor =
-        annotation.shapeStrokeColor ||
-        getColorHex(annotation.color, thickness > 0 ? "#000000" : undefined);
+      const strokeColor = getColorHex(
+        annotation.color,
+        thickness > 0 ? "#000000" : undefined,
+      );
       const fillColor =
         getColorHex(annotation.interiorColor) ||
         getColorHex(annotation.fillColor);
@@ -1874,15 +1878,42 @@ export class ShapeParser implements IAnnotationParser {
       const isCloud =
         annotation.subtype === "Square" && borderEffectStyle === "C";
       const isCloudPolygon =
-        annotation.shapeSubType === "cloud_polygon" ||
+        annotation.intent === "PolygonCloud" ||
         (annotation.subtype === "Polygon" && borderEffectStyle === "C");
-      const startArrowStyle =
-        normalizeShapeArrowStyle(annotation.startArrowStyle) ??
-        pdfLineEndingNameToArrowStyle(annotation.lineEndings?.[0]);
-      const endArrowStyle =
-        normalizeShapeArrowStyle(annotation.endArrowStyle) ??
-        pdfLineEndingNameToArrowStyle(annotation.lineEndings?.[1]);
+      const startArrowStyle = resolveShapeArrowStyleFromPdf({
+        lineEnding: annotation.lineEndings?.[0],
+        customStyle: annotation.startArrowStyle,
+      });
+      const endArrowStyle = resolveShapeArrowStyleFromPdf({
+        lineEnding: annotation.lineEndings?.[1],
+        customStyle: annotation.endArrowStyle,
+      });
       const isArrow = !!startArrowStyle || !!endArrowStyle;
+      const nativeRotationSource =
+        typeof annotation.rotation === "number" &&
+        Number.isFinite(annotation.rotation)
+          ? annotation.rotation
+          : typeof annotation.appearanceRotation === "number" &&
+              Number.isFinite(annotation.appearanceRotation)
+            ? annotation.appearanceRotation
+            : undefined;
+      const nativeRotationDeg =
+        typeof nativeRotationSource === "number"
+          ? normalizeRotationDeg(-nativeRotationSource)
+          : undefined;
+      const shapeRotationDeg = nativeRotationDeg;
+      const borderStyle = normalizeShapeBorderStyle(
+        annotation.borderStyle?.style,
+      );
+      const dashDensity =
+        borderStyle === "dashed"
+          ? normalizeShapeDashDensity(
+              getShapeDashDensityFromPattern(
+                annotation.borderStyle?.dashArray,
+                thickness,
+              ),
+            )
+          : undefined;
 
       if (annotation.subtype === "Square" || annotation.subtype === "Circle") {
         const importedRect = pdfJsRectToUiRect(annotation.rect, viewport);
@@ -1898,7 +1929,7 @@ export class ShapeParser implements IAnnotationParser {
                 ) / 4,
               )
             : 0;
-        const rect =
+        const adjustedRect =
           isCloud && cloudInset > 0
             ? {
                 x: importedRect.x + cloudInset,
@@ -1907,6 +1938,23 @@ export class ShapeParser implements IAnnotationParser {
                 height: Math.max(1, importedRect.height - cloudInset * 2),
               }
             : importedRect;
+        const rect =
+          typeof shapeRotationDeg === "number" && shapeRotationDeg !== 0
+            ? (() => {
+                const innerSize = getInnerSizeFromOuterAabb(
+                  adjustedRect,
+                  shapeRotationDeg,
+                );
+                const cx = adjustedRect.x + adjustedRect.width / 2;
+                const cy = adjustedRect.y + adjustedRect.height / 2;
+                return {
+                  x: cx - innerSize.width / 2,
+                  y: cy - innerSize.height / 2,
+                  width: innerSize.width,
+                  height: innerSize.height,
+                };
+              })()
+            : adjustedRect;
         annotations.push({
           id: `imported_shape_${pageIndex + 1}_${index}`,
           pageIndex,
@@ -1919,6 +1967,8 @@ export class ShapeParser implements IAnnotationParser {
               : "square",
           rect,
           color: strokeColor,
+          borderStyle,
+          dashDensity,
           backgroundColor:
             annotation.subtype === "Circle" || annotation.subtype === "Square"
               ? fillColor
@@ -1933,10 +1983,10 @@ export class ShapeParser implements IAnnotationParser {
           author,
           updatedAt,
           sourcePdfRef: annotation.sourcePdfRef,
+          intent: annotation.intent,
+          rotationDeg: shapeRotationDeg,
           cloudIntensity: isCloud
-            ? (annotation.cloudIntensity ??
-              annotation.borderEffect?.intensity ??
-              2)
+            ? (annotation.borderEffect?.intensity ?? 2)
             : undefined,
           cloudSpacing: isCloud ? annotation.cloudSpacing : undefined,
           isEdited: false,
@@ -1965,7 +2015,55 @@ export class ShapeParser implements IAnnotationParser {
         points.push({ x, y });
       }
 
-      const normalized = getRectAndNormalizedShapePoints(points);
+      const outerRect = pdfJsRectToUiRect(annotation.rect, viewport);
+      const resolvedPathGeometry = (() => {
+        if (
+          typeof nativeRotationDeg === "number" &&
+          Number.isFinite(nativeRotationDeg) &&
+          nativeRotationDeg !== 0
+        ) {
+          const center = {
+            x: outerRect.x + outerRect.width / 2,
+            y: outerRect.y + outerRect.height / 2,
+          };
+          const rawNormalized = getRectAndNormalizedShapePoints(points);
+          const unrotatedNormalized = getRectAndNormalizedShapePoints(
+            points.map((point) =>
+              rotateShapePoint(point, center, -nativeRotationDeg),
+            ),
+          );
+          const scoreCandidate = (
+            candidate: ReturnType<typeof getRectAndNormalizedShapePoints>,
+          ) => {
+            if (!candidate) return Number.POSITIVE_INFINITY;
+            const predictedOuter = getRotatedOuterRect(
+              candidate.rect,
+              nativeRotationDeg,
+            );
+            return (
+              Math.abs(predictedOuter.x - outerRect.x) +
+              Math.abs(predictedOuter.y - outerRect.y) +
+              Math.abs(predictedOuter.width - outerRect.width) +
+              Math.abs(predictedOuter.height - outerRect.height)
+            );
+          };
+          const rawScore = scoreCandidate(rawNormalized);
+          const unrotatedScore = scoreCandidate(unrotatedNormalized);
+          return {
+            rotationDeg: nativeRotationDeg,
+            normalized:
+              unrotatedScore + 0.5 < rawScore
+                ? unrotatedNormalized
+                : rawNormalized,
+          };
+        }
+
+        return {
+          rotationDeg: undefined,
+          normalized: getRectAndNormalizedShapePoints(points),
+        };
+      })();
+      const normalized = resolvedPathGeometry.normalized;
       if (!normalized) {
         preserveSourceAnnotation(annotation);
         continue;
@@ -1994,20 +2092,22 @@ export class ShapeParser implements IAnnotationParser {
         shapeEndArrowStyle: endArrowStyle ?? undefined,
         arrowSize: isArrow ? annotation.arrowSize : undefined,
         color: strokeColor,
+        borderStyle,
+        dashDensity,
         backgroundColor:
           annotation.subtype === "Polygon" ? fillColor : undefined,
         thickness,
         opacity: strokeOpacity,
+        rotationDeg: resolvedPathGeometry.rotationDeg,
         backgroundOpacity:
           annotation.subtype === "Polygon" ? fillOpacity : undefined,
         text: commentMeta.text,
         author,
         updatedAt,
         sourcePdfRef: annotation.sourcePdfRef,
+        intent: annotation.intent,
         cloudIntensity: isCloudPolygon
-          ? (annotation.cloudIntensity ??
-            annotation.borderEffect?.intensity ??
-            2)
+          ? (annotation.borderEffect?.intensity ?? 2)
           : undefined,
         cloudSpacing: isCloudPolygon ? annotation.cloudSpacing : undefined,
         isEdited: false,

@@ -129,6 +129,8 @@ export interface Annotation {
   backgroundOpacity?: number;
   borderColor?: string;
   borderWidth?: number;
+  borderStyle?: "solid" | "dashed" | "underline";
+  dashDensity?: number;
   opacity?: number; // For highlight
   thickness?: number; // For ink
   size?: number; // For text
@@ -431,6 +433,8 @@ export interface EditorState {
     color: string;
     thickness: number;
     opacity: number;
+    borderStyle?: "solid" | "dashed";
+    dashDensity?: number;
     backgroundColor?: string;
     backgroundOpacity?: number;
     arrowSize?: number;

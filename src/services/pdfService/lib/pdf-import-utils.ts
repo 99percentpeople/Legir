@@ -162,7 +162,7 @@ export const decodePdfStreamToText = async (
  */
 export const parseBorderFromAppearanceStream = (
   content: string,
-): { width?: number; style?: "solid" | "dashed" } => {
+): { width?: number; style?: "solid" | "dashed"; dashArray?: number[] } => {
   // Conservative heuristic:
   // - Require a rectangle path op ('re') and a subsequent stroke op ('s'/'S'/'b'/'B')
   // - Width comes from last 'w' operator, defaulting to 1 when stroking occurs
@@ -171,6 +171,7 @@ export const parseBorderFromAppearanceStream = (
   let sawStrokeAfterRect = false;
   let sawDash = false;
   let lastLineWidth: number | undefined = undefined;
+  let lastDashArray: number[] | undefined = undefined;
 
   const lines = content.split(/\r\n|\r|\n/);
   for (const rawLine of lines) {
@@ -187,7 +188,20 @@ export const parseBorderFromAppearanceStream = (
     }
 
     if (op === "d") {
-      sawDash = true;
+      const bracketStart = line.indexOf("[");
+      const bracketEnd = line.indexOf("]");
+      if (bracketStart >= 0 && bracketEnd > bracketStart) {
+        const dashArray = line
+          .slice(bracketStart + 1, bracketEnd)
+          .trim()
+          .split(/\s+/)
+          .map((value) => Number.parseFloat(value))
+          .filter((value) => Number.isFinite(value) && value >= 0);
+        lastDashArray = dashArray.length > 0 ? dashArray : [];
+        sawDash = dashArray.length > 0;
+      } else {
+        sawDash = true;
+      }
       continue;
     }
 
@@ -213,7 +227,58 @@ export const parseBorderFromAppearanceStream = (
   return {
     width: typeof lastLineWidth === "number" ? lastLineWidth : 1,
     style: sawDash ? "dashed" : "solid",
+    dashArray: sawDash && lastDashArray?.length ? lastDashArray : undefined,
   };
+};
+
+export const extractBorderDashArray = (
+  widgetDict: PDFDict,
+): number[] | undefined => {
+  try {
+    const bs = lookupInFieldChain(widgetDict, "BS");
+    if (bs instanceof PDFDict) {
+      const dash = bs.lookup(PDFName.of("D"));
+      if (dash instanceof PDFArray) {
+        const values: number[] = [];
+        for (let index = 0; index < dash.size(); index++) {
+          const entry = dash.lookup(index);
+          if (entry instanceof PDFNumber) {
+            const value = entry.asNumber();
+            if (Number.isFinite(value) && value >= 0) {
+              values.push(value);
+            }
+          }
+        }
+        if (values.length > 0) return values;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const border = lookupInFieldChain(widgetDict, "Border");
+    if (border instanceof PDFArray && border.size() >= 4) {
+      const dash = border.lookup(3);
+      if (dash instanceof PDFArray) {
+        const values: number[] = [];
+        for (let index = 0; index < dash.size(); index++) {
+          const entry = dash.lookup(index);
+          if (entry instanceof PDFNumber) {
+            const value = entry.asNumber();
+            if (Number.isFinite(value) && value >= 0) {
+              values.push(value);
+            }
+          }
+        }
+        if (values.length > 0) return values;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return undefined;
 };
 
 /**

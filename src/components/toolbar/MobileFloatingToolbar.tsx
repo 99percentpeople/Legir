@@ -36,6 +36,7 @@ import {
 import { Separator } from "../ui/separator";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import PageNumberDropdownControl from "./PageNumberDropdownControl";
+import { ShapeBorderStyleSection } from "./ShapeBorderStyleSection";
 import {
   getShapeToolIcon,
   getShapeToolLabel,
@@ -394,6 +395,24 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
             }
             onOpacityChange={(opacity) =>
               onShapeStyleChange && onShapeStyleChange({ opacity })
+            }
+            extraContent={
+              <ShapeBorderStyleSection
+                value={
+                  editorState.shapeStyle?.borderStyle ??
+                  ANNOTATION_STYLES.shape.borderStyle
+                }
+                dashDensity={
+                  editorState.shapeStyle?.dashDensity ??
+                  ANNOTATION_STYLES.shape.dashDensity
+                }
+                onChange={(borderStyle) =>
+                  onShapeStyleChange?.({ borderStyle })
+                }
+                onDashDensityChange={(dashDensity) =>
+                  onShapeStyleChange?.({ dashDensity })
+                }
+              />
             }
             isActive
             side="top"

@@ -27,6 +27,7 @@ interface ColorPickerPopoverProps {
   align?: React.ComponentProps<typeof PopoverContent>["align"];
   title?: string;
   children?: React.ReactNode;
+  extraContent?: React.ReactNode;
   onInteractionStart?: () => void;
   closeOnWorkspacePointerDown?: boolean;
 }
@@ -48,6 +49,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   align = "center",
   title = "Properties",
   children,
+  extraContent,
   onInteractionStart,
   closeOnWorkspacePointerDown,
 }) => {
@@ -176,6 +178,8 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
               </div>
             </>
           )}
+
+          {extraContent}
         </div>
       </PopoverContent>
     </Popover>
