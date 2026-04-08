@@ -21,6 +21,8 @@ import type {
 } from "../types";
 
 const EDITOR_TAB_DRAG_MIME = "application/x-legir-editor-tab";
+const EDITOR_TAB_DIRTY_DOT_CLASS_NAME =
+  "absolute left-1/2 top-1/2 block h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/60";
 
 type TabDropIndicator = {
   tabId: string;
@@ -169,8 +171,7 @@ export function EditorTabStrip({
 
     if (tab.isDirty) {
       const dirtyDot = document.createElement("span");
-      dirtyDot.className =
-        "absolute left-1/2 top-1/2 block h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/60";
+      dirtyDot.className = EDITOR_TAB_DIRTY_DOT_CLASS_NAME;
       statusSlot.append(dirtyDot);
     }
 
@@ -327,7 +328,7 @@ export function EditorTabStrip({
                 <span className="relative block h-4 w-4 shrink-0">
                   {tab.isDirty && (
                     <span className="pointer-events-none absolute inset-0 transition-opacity duration-150 group-hover:opacity-0">
-                      <span className="absolute top-1/2 left-1/2 block h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500" />
+                      <span className={EDITOR_TAB_DIRTY_DOT_CLASS_NAME} />
                     </span>
                   )}
                   <button
