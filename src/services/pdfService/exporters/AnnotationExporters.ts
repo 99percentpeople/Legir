@@ -18,6 +18,7 @@ import {
 import { Annotation } from "@/types";
 import { PDF_CUSTOM_KEYS } from "@/constants";
 import { IAnnotationExporter, ViewportLike } from "../types";
+import { applyPdfAnnotationCommentMetadata } from "../lib/annotationCommentMeta";
 import { setAppHighlightedText } from "../lib/annotationMetadata";
 import { hexToPdfColor } from "../lib/colors";
 import { generateInkAppearanceOps } from "../lib/ink";
@@ -48,8 +49,8 @@ export class HighlightExporter implements IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
-  ): void {
-    if (!annotation.rect) return;
+  ): PDFRef | undefined {
+    if (!annotation.rect) return undefined;
 
     const targetRects =
       annotation.rects && annotation.rects.length > 0
@@ -101,22 +102,15 @@ export class HighlightExporter implements IAnnotationExporter {
       CA:
         typeof annotation.opacity === "number" ? annotation.opacity : undefined,
       P: page.ref,
-      T: annotation.author
-        ? PDFHexString.fromText(annotation.author)
-        : undefined,
-      Contents: annotation.text
-        ? PDFHexString.fromText(annotation.text)
-        : undefined,
-      M: annotation.updatedAt
-        ? PDFString.fromDate(new Date(annotation.updatedAt))
-        : PDFString.fromDate(new Date()),
     });
     if (highlightAnnot instanceof PDFDict) {
+      applyPdfAnnotationCommentMetadata(highlightAnnot, annotation);
       setAppHighlightedText(highlightAnnot, annotation.highlightedText);
     }
 
     const ref = pdfDoc.context.register(highlightAnnot);
     page.node.addAnnot(ref);
+    return ref;
   }
 }
 
@@ -131,8 +125,8 @@ export class CommentExporter implements IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
-  ): void {
-    if (!annotation.rect) return;
+  ): PDFRef | undefined {
+    if (!annotation.rect) return undefined;
 
     const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
     const x = bounds.x;
@@ -152,24 +146,19 @@ export class CommentExporter implements IAnnotationExporter {
       Subtype: "Text",
       F: 4, // Print
       Rect: [x, y, x + w, y + h],
-      Contents: annotation.text
-        ? PDFHexString.fromText(annotation.text)
-        : undefined,
       C: [r, g, bb],
       CA:
         typeof annotation.opacity === "number" ? annotation.opacity : undefined,
       Name: PDFName.of("Comment"),
       P: page.ref,
-      T: annotation.author
-        ? PDFHexString.fromText(annotation.author)
-        : undefined,
-      M: annotation.updatedAt
-        ? PDFString.fromDate(new Date(annotation.updatedAt))
-        : PDFString.fromDate(new Date()),
     });
+    if (commentAnnot instanceof PDFDict) {
+      applyPdfAnnotationCommentMetadata(commentAnnot, annotation);
+    }
 
     const ref = pdfDoc.context.register(commentAnnot);
     page.node.addAnnot(ref);
+    return ref;
   }
 }
 
@@ -184,8 +173,8 @@ export class LinkExporter implements IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
-  ): void {
-    if (!annotation.rect) return;
+  ): PDFRef | undefined {
+    if (!annotation.rect) return undefined;
 
     const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
     const destPage =
@@ -214,19 +203,14 @@ export class LinkExporter implements IAnnotationExporter {
         : undefined,
       Dest: destPage ? [destPage.ref, PDFName.of("Fit")] : undefined,
       P: page.ref,
-      Contents: annotation.text
-        ? PDFHexString.fromText(annotation.text)
-        : undefined,
-      T: annotation.author
-        ? PDFHexString.fromText(annotation.author)
-        : undefined,
-      M: annotation.updatedAt
-        ? PDFString.fromDate(new Date(annotation.updatedAt))
-        : PDFString.fromDate(new Date()),
     });
+    if (linkAnnot instanceof PDFDict) {
+      applyPdfAnnotationCommentMetadata(linkAnnot, annotation);
+    }
 
     const ref = pdfDoc.context.register(linkAnnot);
     page.node.addAnnot(ref);
+    return ref;
   }
 }
 
@@ -241,8 +225,8 @@ export class FreeTextExporter implements IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
-  ): Promise<void> {
-    if (!annotation.rect) return;
+  ): Promise<PDFRef | undefined> {
+    if (!annotation.rect) return undefined;
 
     const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
     const x = bounds.x;
@@ -727,7 +711,7 @@ export class FreeTextExporter implements IAnnotationExporter {
         flush();
       }
 
-      return;
+      return undefined;
     }
 
     // 3. Generate Appearance Stream (AP)
@@ -916,7 +900,6 @@ export class FreeTextExporter implements IAnnotationExporter {
       F: 4, // Print flag
       Rect: [rectX, rectY, rectX + aabbW, rectY + aabbH],
       RD: [contentInset, contentInset, contentInset, contentInset],
-      Contents: PDFHexString.fromText(text),
       DA: PDFString.of(da),
       AP: { N: appearanceRef },
       Q: q,
@@ -938,16 +921,14 @@ export class FreeTextExporter implements IAnnotationExporter {
           : undefined,
       CA: typeof opacity === "number" ? opacity : undefined,
       P: page.ref,
-      T: annotation.author
-        ? PDFHexString.fromText(annotation.author)
-        : undefined,
-      M: annotation.updatedAt
-        ? PDFString.fromDate(new Date(annotation.updatedAt))
-        : PDFString.fromDate(new Date()),
     });
+    if (freeTextAnnot instanceof PDFDict) {
+      applyPdfAnnotationCommentMetadata(freeTextAnnot, annotation);
+    }
 
     const ref = pdfDoc.context.register(freeTextAnnot);
     page.node.addAnnot(ref);
+    return ref;
   }
 }
 
@@ -1353,13 +1334,13 @@ export class ShapeExporter implements IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
-  ): void {
+  ): PDFRef | undefined {
     if (
       annotation.type !== "shape" ||
       !annotation.rect ||
       !annotation.shapeType
     ) {
-      return;
+      return undefined;
     }
 
     const thickness =
@@ -1388,7 +1369,7 @@ export class ShapeExporter implements IAnnotationExporter {
     const hasFill = !!fill;
 
     if (!hasStroke && !hasFill) {
-      return;
+      return undefined;
     }
 
     const strokeGraphicsState =
@@ -1425,15 +1406,6 @@ export class ShapeExporter implements IAnnotationExporter {
           ? [fill.red, fill.green, fill.blue]
           : undefined,
       P: page.ref,
-      T: annotation.author
-        ? PDFHexString.fromText(annotation.author)
-        : undefined,
-      Contents: annotation.text
-        ? PDFHexString.fromText(annotation.text)
-        : undefined,
-      M: annotation.updatedAt
-        ? PDFString.fromDate(new Date(annotation.updatedAt))
-        : PDFString.fromDate(new Date()),
     });
 
     if (
@@ -1502,6 +1474,9 @@ export class ShapeExporter implements IAnnotationExporter {
           pdfDoc.context.obj({ N: appearanceRef }),
         );
       }
+      if (shapeAnnot instanceof PDFDict) {
+        applyPdfAnnotationCommentMetadata(shapeAnnot, annotation);
+      }
       if (
         shapeAnnot instanceof PDFDict &&
         hasFill &&
@@ -1525,11 +1500,11 @@ export class ShapeExporter implements IAnnotationExporter {
       }
       const ref = pdfDoc.context.register(shapeAnnot);
       page.node.addAnnot(ref);
-      return;
+      return ref;
     }
 
     const absolutePoints = getShapeAbsolutePoints(annotation);
-    if (absolutePoints.length < 2) return;
+    if (absolutePoints.length < 2) return undefined;
     const pdfPoints = absolutePoints.map((point) =>
       uiPointToPdfPoint(page, point, viewport),
     );
@@ -1613,6 +1588,9 @@ export class ShapeExporter implements IAnnotationExporter {
             pdfDoc.context.obj({ N: appearanceRef }),
           );
         }
+        if (shapeAnnot instanceof PDFDict) {
+          applyPdfAnnotationCommentMetadata(shapeAnnot, annotation);
+        }
         if (
           shapeAnnot instanceof PDFDict &&
           hasAnyArrow &&
@@ -1638,7 +1616,7 @@ export class ShapeExporter implements IAnnotationExporter {
         }
         const ref = pdfDoc.context.register(shapeAnnot);
         page.node.addAnnot(ref);
-        return;
+        return ref;
       }
     }
 
@@ -1759,6 +1737,7 @@ export class ShapeExporter implements IAnnotationExporter {
     }
     const ref = pdfDoc.context.register(shapeAnnot);
     page.node.addAnnot(ref);
+    return ref;
   }
 }
 
@@ -1780,7 +1759,7 @@ export class InkExporter implements IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
-  ): void {
+  ): PDFRef | undefined {
     const { height: _pageHeight } = page.getSize();
 
     const strokes =
@@ -1797,7 +1776,7 @@ export class InkExporter implements IAnnotationExporter {
     let maxX = -Infinity;
     let maxY = -Infinity;
 
-    if (strokes.length === 0) return;
+    if (strokes.length === 0) return undefined;
 
     for (const stroke of strokes) {
       const pdfPoints: number[] = [];
@@ -1820,7 +1799,7 @@ export class InkExporter implements IAnnotationExporter {
       }
     }
 
-    if (inkList.length === 0) return;
+    if (inkList.length === 0) return undefined;
 
     // 2. Padding
     const thickness = annotation.thickness || 2;
@@ -1862,15 +1841,6 @@ export class InkExporter implements IAnnotationExporter {
             ? annotation.opacity
             : undefined,
         P: page.ref,
-        T: annotation.author
-          ? PDFHexString.fromText(annotation.author)
-          : undefined,
-        Contents: annotation.text
-          ? PDFHexString.fromText(annotation.text)
-          : undefined,
-        M: annotation.updatedAt
-          ? PDFString.fromDate(new Date(annotation.updatedAt))
-          : PDFString.fromDate(new Date()),
       });
     } else if (annotation.subtype === "line") {
       const linePoints = inkList[0] || [];
@@ -1892,15 +1862,6 @@ export class InkExporter implements IAnnotationExporter {
             ? annotation.opacity
             : undefined,
         P: page.ref,
-        T: annotation.author
-          ? PDFHexString.fromText(annotation.author)
-          : undefined,
-        Contents: annotation.text
-          ? PDFHexString.fromText(annotation.text)
-          : undefined,
-        M: annotation.updatedAt
-          ? PDFString.fromDate(new Date(annotation.updatedAt))
-          : PDFString.fromDate(new Date()),
       });
     } else {
       // Ink
@@ -1979,19 +1940,15 @@ export class InkExporter implements IAnnotationExporter {
             : undefined,
         IT: annotation.intent ? PDFName.of(annotation.intent) : undefined,
         P: page.ref,
-        T: annotation.author
-          ? PDFHexString.fromText(annotation.author)
-          : undefined,
-        Contents: annotation.text
-          ? PDFHexString.fromText(annotation.text)
-          : undefined,
-        M: annotation.updatedAt
-          ? PDFString.fromDate(new Date(annotation.updatedAt))
-          : PDFString.fromDate(new Date()),
       });
+    }
+
+    if (annotObj instanceof PDFDict) {
+      applyPdfAnnotationCommentMetadata(annotObj, annotation);
     }
 
     const ref = pdfDoc.context.register(annotObj);
     page.node.addAnnot(ref);
+    return ref;
   }
 }

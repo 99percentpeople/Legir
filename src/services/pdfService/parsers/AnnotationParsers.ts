@@ -9,8 +9,11 @@ import {
   PDFHexString,
 } from "@cantoo/pdf-lib";
 import { Annotation } from "@/types";
-import { parsePDFDate } from "@/utils/pdfUtils";
 import { IAnnotationParser, ParserContext } from "../types";
+import {
+  readPdfDictAnnotationCommentMeta,
+  readPdfJsAnnotationCommentMeta,
+} from "../lib/annotationCommentMeta";
 import { normalizePdfColorToRgb255, rgbArrayToHex } from "../lib/colors";
 import { pdfDebug } from "../lib/debug";
 import { extractInkAppearance } from "../lib/ink";
@@ -63,6 +66,23 @@ export class InkParser implements IAnnotationParser {
 
         if (annots instanceof PDFArray) {
           for (let idx = 0; idx < annots.size(); idx++) {
+            let sourcePdfRef:
+              | { objectNumber: number; generationNumber: number }
+              | undefined = undefined;
+            try {
+              const rawRef = (
+                annots as unknown as { get?: (i: number) => unknown }
+              ).get?.(idx);
+              if (rawRef instanceof PDFRef) {
+                sourcePdfRef = {
+                  objectNumber: rawRef.objectNumber,
+                  generationNumber: rawRef.generationNumber,
+                };
+              }
+            } catch {
+              // ignore
+            }
+
             const annot = annots.lookup(idx);
             if (annot instanceof PDFDict) {
               const subtype = annot.lookup(PDFName.of("Subtype"));
@@ -111,21 +131,10 @@ export class InkParser implements IAnnotationParser {
                   if (IT instanceof PDFName) intent = IT.decodeText();
                   else if (IT instanceof PDFString) intent = IT.decodeText();
 
-                  // Parse Author
-                  let author: string | undefined = undefined;
-                  const T = annot.lookup(PDFName.of("T"));
-                  author = decodePdfString(T);
-
-                  // Parse Contents
-                  let contents: string | undefined = undefined;
-                  const Contents = annot.lookup(PDFName.of("Contents"));
-                  contents = decodePdfString(Contents);
-
-                  // Parse Modified Date
-                  let updatedAt: string | undefined = undefined;
-                  const M = annot.lookup(PDFName.of("M"));
-                  const mDecoded = decodePdfString(M);
-                  if (mDecoded) updatedAt = parsePDFDate(mDecoded);
+                  const commentMeta = readPdfDictAnnotationCommentMeta(annot);
+                  const author = commentMeta.author;
+                  const contents = commentMeta.text;
+                  const updatedAt = commentMeta.updatedAt;
 
                   // Parse AP
                   const { strokePaths } = extractInkAppearance(
@@ -171,6 +180,8 @@ export class InkParser implements IAnnotationParser {
                       author: author,
                       text: contents,
                       updatedAt: updatedAt,
+                      sourcePdfRef,
+                      isEdited: false,
                       svgPath:
                         strokePaths && strokePaths.length > 0
                           ? strokePaths.join(" ")
@@ -217,9 +228,10 @@ export class HighlightParser implements IAnnotationParser {
           | { x: number; y: number; width: number; height: number }[]
           | undefined = undefined;
 
-        const author = annotation.title || undefined;
-        const contents = annotation.contents || undefined;
-        const updatedAt = parsePDFDate(annotation.modificationDate);
+        const commentMeta = readPdfJsAnnotationCommentMeta(annotation);
+        const author = commentMeta.author;
+        const contents = commentMeta.text;
+        const updatedAt = commentMeta.updatedAt;
 
         let opacity =
           typeof annotation.opacity === "number" ? annotation.opacity : 0.4;
@@ -269,6 +281,8 @@ export class HighlightParser implements IAnnotationParser {
           text: contents,
           highlightedText: annotation.highlightedText,
           updatedAt: updatedAt,
+          sourcePdfRef: annotation.sourcePdfRef,
+          isEdited: false,
         });
       }
     });
@@ -281,14 +295,13 @@ export class CommentParser implements IAnnotationParser {
     const { pageAnnotations, pageIndex, viewport } = context;
     const annotations: Annotation[] = [];
 
-    const stripRichTextToPlainText = (input: string) => {
-      const withoutTags = input.replace(/<[^>]*>/g, " ");
-      return withoutTags.replace(/\s+/g, " ").trim();
-    };
-
     for (let index = 0; index < pageAnnotations.length; index++) {
       const annotation = pageAnnotations[index];
       if (annotation.subtype === "Text") {
+        if (annotation.inReplyTo) {
+          continue;
+        }
+
         const normalizedRgb = normalizePdfColorToRgb255(annotation.color);
         const color = normalizedRgb ? rgbArrayToHex(normalizedRgb) : "#FFFF00";
         const uiRect = pdfJsRectToUiRect(annotation.rect, viewport);
@@ -300,12 +313,10 @@ export class CommentParser implements IAnnotationParser {
         if (width < 5) width = 30;
         if (height < 5) height = 30;
 
-        let contents = annotation.contents || "";
-        if ((!contents || contents.trim() === "") && annotation.richText) {
-          contents = stripRichTextToPlainText(annotation.richText);
-        }
-        const author = annotation.title || undefined;
-        const updatedAt = parsePDFDate(annotation.modificationDate);
+        const commentMeta = readPdfJsAnnotationCommentMeta(annotation);
+        const contents = commentMeta.text || "";
+        const author = commentMeta.author;
+        const updatedAt = commentMeta.updatedAt;
 
         let opacity =
           typeof annotation.opacity === "number" ? annotation.opacity : 1;
@@ -330,6 +341,8 @@ export class CommentParser implements IAnnotationParser {
           text: contents,
           author: author,
           updatedAt: updatedAt,
+          sourcePdfRef: annotation.sourcePdfRef,
+          isEdited: false,
         });
       }
     }
@@ -1162,9 +1175,10 @@ export class FreeTextParser implements IAnnotationParser {
             height,
           };
         };
-        let contents = annotation.contents || "";
-        let author = annotation.title || undefined;
-        let updatedAt = parsePDFDate(annotation.modificationDate);
+        const commentMeta = readPdfJsAnnotationCommentMeta(annotation);
+        let contents = commentMeta.text || "";
+        let author = commentMeta.author;
+        let updatedAt = commentMeta.updatedAt;
         let opacity =
           typeof annotation.opacity === "number" ? annotation.opacity : 1;
         opacity = Math.min(1, Math.max(0, opacity));
@@ -1472,17 +1486,22 @@ export class FreeTextParser implements IAnnotationParser {
                   parseDaString(daFromPdfJs);
                 }
 
-                const rawTitle = libAnnot.lookup(PDFName.of("T"));
-                const titleDecoded = decodePdfString(rawTitle);
-                if (titleDecoded && (!author || author.trim() === "")) {
-                  author = titleDecoded;
+                const libCommentMeta =
+                  readPdfDictAnnotationCommentMeta(libAnnot);
+                if (
+                  (!contents || contents.trim() === "") &&
+                  libCommentMeta.text
+                ) {
+                  contents = libCommentMeta.text;
                 }
-
-                const rawModDate = libAnnot.lookup(PDFName.of("M"));
-                const modDecoded = decodePdfString(rawModDate);
-                if (modDecoded) {
-                  const parsed = parsePDFDate(modDecoded);
-                  if (parsed && !updatedAt) updatedAt = parsed;
+                if (
+                  libCommentMeta.author &&
+                  (!author || author.trim() === "")
+                ) {
+                  author = libCommentMeta.author;
+                }
+                if (libCommentMeta.updatedAt && !updatedAt) {
+                  updatedAt = libCommentMeta.updatedAt;
                 }
 
                 // AP (appearance): prefer actual appearance color over DA when available.
@@ -1848,8 +1867,9 @@ export class ShapeParser implements IAnnotationParser {
         continue;
       }
 
-      const author = annotation.title || undefined;
-      const updatedAt = parsePDFDate(annotation.modificationDate);
+      const commentMeta = readPdfJsAnnotationCommentMeta(annotation);
+      const author = commentMeta.author;
+      const updatedAt = commentMeta.updatedAt;
       const borderEffectStyle = annotation.borderEffect?.style;
       const isCloud =
         annotation.subtype === "Square" && borderEffectStyle === "C";
@@ -1909,7 +1929,7 @@ export class ShapeParser implements IAnnotationParser {
             annotation.subtype === "Circle" || annotation.subtype === "Square"
               ? fillOpacity
               : undefined,
-          text: annotation.contents || undefined,
+          text: commentMeta.text,
           author,
           updatedAt,
           sourcePdfRef: annotation.sourcePdfRef,
@@ -1980,7 +2000,7 @@ export class ShapeParser implements IAnnotationParser {
         opacity: strokeOpacity,
         backgroundOpacity:
           annotation.subtype === "Polygon" ? fillOpacity : undefined,
-        text: annotation.contents || undefined,
+        text: commentMeta.text,
         author,
         updatedAt,
         sourcePdfRef: annotation.sourcePdfRef,

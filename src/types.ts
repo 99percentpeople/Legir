@@ -193,6 +193,17 @@ export interface Annotation {
   sourcePdfFontName?: string;
   sourcePdfFontIsSubset?: boolean;
   sourcePdfFontMissing?: boolean;
+  replies?: AnnotationReply[];
+  isEdited?: boolean;
+}
+
+export interface AnnotationReply {
+  id: string;
+  parentAnnotationId: string;
+  text?: string;
+  author?: string;
+  updatedAt?: string;
+  sourcePdfRef?: { objectNumber: number; generationNumber: number };
   isEdited?: boolean;
 }
 

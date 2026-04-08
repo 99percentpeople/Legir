@@ -5,7 +5,13 @@
  * bridge types here. Do not put editor-wide models here; those belong in
  * `src/types.ts`.
  */
-import { PDFDocument, PDFForm, PDFPage, type PDFFont } from "@cantoo/pdf-lib";
+import {
+  PDFDocument,
+  PDFForm,
+  PDFPage,
+  PDFRef,
+  type PDFFont,
+} from "@cantoo/pdf-lib";
 import { Annotation, FormField, PreservedSourceAnnotationRef } from "@/types";
 
 // [x, y, width, height]
@@ -72,6 +78,9 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   highlightedText?: string;
   richText?: string;
   modificationDate?: string;
+  inReplyTo?: string | null;
+  replyType?: string;
+  popupRef?: string | null;
   quadPoints?: number[];
   opacity?: number;
   url?: string;
@@ -124,7 +133,7 @@ export interface IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
-  ): Promise<void> | void;
+  ): Promise<PDFRef | undefined> | PDFRef | undefined;
 }
 
 export interface IControlExporter {

@@ -13,7 +13,7 @@ import {
   prepareAnnotationsForStore,
   prepareInkAnnotationForStore,
 } from "@/lib/inkGeometry";
-import type { Annotation, FormField } from "@/types";
+import type { Annotation, AnnotationReply, FormField } from "@/types";
 import { FieldType } from "@/types";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 
@@ -28,6 +28,9 @@ export const createControlSlice: EditorStoreSlice<
     | "updateField"
     | "resetFieldToDefault"
     | "updateAnnotation"
+    | "addAnnotationReply"
+    | "updateAnnotationReply"
+    | "deleteAnnotationReply"
     | "deleteAnnotation"
     | "deleteSelection"
     | "reorderControlLayer"
@@ -301,6 +304,7 @@ export const createControlSlice: EditorStoreSlice<
       const current = state.annotations.find(
         (annotation) => annotation.id === id,
       );
+      const nextAuthor = updates.author ?? state.options.userName;
 
       const shouldMarkEdited =
         !!current?.sourcePdfRef && current.isEdited !== true;
@@ -311,6 +315,7 @@ export const createControlSlice: EditorStoreSlice<
 
       const updatesWithTime = {
         ...updates,
+        author: nextAuthor,
         updatedAt: new Date().toISOString(),
         ...(shouldMarkEdited ? { isEdited: true } : null),
         ...(shouldResetFontOnFirstEdit ? { fontFamily: "Helvetica" } : null),
@@ -339,6 +344,124 @@ export const createControlSlice: EditorStoreSlice<
               )
             : annotation,
         ),
+        isDirty: true,
+      };
+    });
+  },
+
+  addAnnotationReply: (annotationId, reply) => {
+    const hasTarget = get().annotations.some(
+      (annotation) => annotation.id === annotationId,
+    );
+    if (!hasTarget) return;
+
+    const { saveCheckpoint } = get();
+    saveCheckpoint();
+
+    const now = new Date().toISOString();
+    set((state) => {
+      const author = reply.author || state.options.userName;
+
+      return {
+        annotations: state.annotations.map((annotation) => {
+          if (annotation.id !== annotationId) return annotation;
+
+          const shouldMarkEdited =
+            !!annotation.sourcePdfRef && annotation.isEdited !== true;
+          const nextReply: AnnotationReply = {
+            ...reply,
+            parentAnnotationId: annotationId,
+            author,
+            updatedAt: now,
+          };
+
+          return prepareInkAnnotationForStore({
+            ...annotation,
+            replies: [...(annotation.replies ?? []), nextReply],
+            updatedAt: now,
+            ...(shouldMarkEdited ? { isEdited: true } : null),
+          });
+        }),
+        selectedId: annotationId,
+        isDirty: true,
+      };
+    });
+  },
+
+  updateAnnotationReply: (annotationId, replyId, updates) => {
+    const targetAnnotation = get().annotations.find(
+      (annotation) => annotation.id === annotationId,
+    );
+    if (!targetAnnotation?.replies?.some((reply) => reply.id === replyId)) {
+      return;
+    }
+
+    set((state) => {
+      const now = new Date().toISOString();
+      const nextAuthor = updates.author ?? state.options.userName;
+
+      return {
+        annotations: state.annotations.map((annotation) => {
+          if (annotation.id !== annotationId) return annotation;
+
+          const shouldMarkEdited =
+            !!annotation.sourcePdfRef && annotation.isEdited !== true;
+
+          return prepareInkAnnotationForStore({
+            ...annotation,
+            replies: (annotation.replies ?? []).map((reply) =>
+              reply.id === replyId
+                ? {
+                    ...reply,
+                    ...updates,
+                    author: nextAuthor,
+                    updatedAt: now,
+                    ...(reply.sourcePdfRef && !reply.isEdited
+                      ? { isEdited: true }
+                      : null),
+                  }
+                : reply,
+            ),
+            updatedAt: now,
+            ...(shouldMarkEdited ? { isEdited: true } : null),
+          });
+        }),
+        isDirty: true,
+      };
+    });
+  },
+
+  deleteAnnotationReply: (annotationId, replyId) => {
+    const targetAnnotation = get().annotations.find(
+      (annotation) => annotation.id === annotationId,
+    );
+    if (!targetAnnotation?.replies?.some((reply) => reply.id === replyId)) {
+      return;
+    }
+
+    const { saveCheckpoint } = get();
+    saveCheckpoint();
+
+    set((state) => {
+      const now = new Date().toISOString();
+
+      return {
+        annotations: state.annotations.map((annotation) => {
+          if (annotation.id !== annotationId) return annotation;
+
+          const shouldMarkEdited =
+            !!annotation.sourcePdfRef && annotation.isEdited !== true;
+
+          return prepareInkAnnotationForStore({
+            ...annotation,
+            replies: (annotation.replies ?? []).filter(
+              (reply) => reply.id !== replyId,
+            ),
+            updatedAt: now,
+            ...(shouldMarkEdited ? { isEdited: true } : null),
+          });
+        }),
+        selectedId: annotationId,
         isDirty: true,
       };
     });

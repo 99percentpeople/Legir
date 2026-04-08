@@ -3,6 +3,7 @@ import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
 import type {
   Annotation,
+  AnnotationReply,
   AppOptions,
   ControlLayerMove,
   DialogName,
@@ -62,6 +63,13 @@ export interface EditorActions {
     opts?: { select?: boolean },
   ) => void;
   updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
+  addAnnotationReply: (annotationId: string, reply: AnnotationReply) => void;
+  updateAnnotationReply: (
+    annotationId: string,
+    replyId: string,
+    updates: Partial<AnnotationReply>,
+  ) => void;
+  deleteAnnotationReply: (annotationId: string, replyId: string) => void;
   deleteAnnotation: (id: string) => void;
   deleteSelection: () => void;
   selectControl: (id: string | null) => void;

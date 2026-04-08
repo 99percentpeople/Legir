@@ -33,13 +33,25 @@ export const duplicateFieldForDrag = (field: FormField): FormField => ({
 
 export const duplicateAnnotationForDrag = (
   annotation: Annotation,
-): Annotation => ({
-  ...annotation,
-  id: createDuplicateId(annotation.type),
-  updatedAt: undefined,
-  sourcePdfRef: undefined,
-  sourcePdfFontName: undefined,
-  sourcePdfFontIsSubset: undefined,
-  sourcePdfFontMissing: undefined,
-  isEdited: undefined,
-});
+): Annotation => {
+  const duplicatedId = createDuplicateId(annotation.type);
+
+  return {
+    ...annotation,
+    id: duplicatedId,
+    updatedAt: undefined,
+    sourcePdfRef: undefined,
+    sourcePdfFontName: undefined,
+    sourcePdfFontIsSubset: undefined,
+    sourcePdfFontMissing: undefined,
+    replies: annotation.replies?.map((reply) => ({
+      ...reply,
+      id: createDuplicateId("annotation_reply"),
+      parentAnnotationId: duplicatedId,
+      updatedAt: undefined,
+      sourcePdfRef: undefined,
+      isEdited: undefined,
+    })),
+    isEdited: undefined,
+  };
+};

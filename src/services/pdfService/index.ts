@@ -8,6 +8,7 @@ import {
   loadAndEmbedExportFonts,
   loadAndEmbedSelectedSystemFonts,
 } from "./lib/built-in-fonts";
+import { hexToPdfColor } from "./lib/colors";
 import {
   containsNonAscii,
   isSerifFamily,
@@ -33,6 +34,10 @@ import {
 import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
 import { getAppHighlightedText } from "./lib/annotationMetadata";
 import {
+  applyPdfAnnotationCommentMetadata,
+  readPdfJsAnnotationCommentMeta,
+} from "./lib/annotationCommentMeta";
+import {
   PDFDocument,
   EncryptedPDFError,
   StandardFonts,
@@ -52,6 +57,7 @@ import {
   PDFRadioGroup,
   PDFSignature,
   PDFNull,
+  PDFPage,
   ParseSpeeds,
 } from "@cantoo/pdf-lib";
 import fontkit from "pdf-fontkit";
@@ -64,6 +70,7 @@ import {
   PDFMetadata,
   PDFOutlineItem,
   Annotation,
+  AnnotationReply,
   PreservedSourceAnnotationRef,
 } from "@/types";
 import { getOrderedPageControls } from "@/lib/controlLayerOrder";
@@ -107,7 +114,7 @@ import {
   DropdownControlExporter,
   SignatureControlExporter,
 } from "./exporters/ControlExporters";
-import { createPdfLibViewport } from "./lib/coords";
+import { createPdfLibViewport, uiRectToPdfBounds } from "./lib/coords";
 
 // PDF pipeline service.
 //
@@ -237,6 +244,123 @@ const getPdfLibPasswordReason = (
   }
 
   return null;
+};
+
+const sourcePdfRefToKey = (
+  ref: { objectNumber: number; generationNumber: number } | undefined | null,
+) => {
+  if (!ref) return null;
+  return ref.generationNumber === 0
+    ? `${ref.objectNumber}R`
+    : `${ref.objectNumber}R${ref.generationNumber}`;
+};
+
+const pdfRefToKey = (ref: PDFRef | undefined | null) => {
+  if (!ref) return null;
+  return sourcePdfRefToKey({
+    objectNumber: ref.objectNumber,
+    generationNumber: ref.generationNumber,
+  });
+};
+
+const attachAnnotationReplies = (
+  annotations: Annotation[],
+  pageAnnotations: PdfJsAnnotation[],
+) => {
+  const rootsByPdfRef = new Map<string, Annotation>();
+  for (const annotation of annotations) {
+    const key = sourcePdfRefToKey(annotation.sourcePdfRef);
+    if (!key) continue;
+    rootsByPdfRef.set(key, annotation);
+  }
+
+  for (let index = 0; index < pageAnnotations.length; index++) {
+    const annotation = pageAnnotations[index];
+    if (!annotation.inReplyTo) continue;
+    if (annotation.replyType === "Group") continue;
+
+    const parent = rootsByPdfRef.get(annotation.inReplyTo);
+    if (!parent) continue;
+
+    const commentMeta = readPdfJsAnnotationCommentMeta(annotation);
+    const replyKey = sourcePdfRefToKey(annotation.sourcePdfRef);
+    const suffix = replyKey
+      ? replyKey.replace(/[^a-zA-Z0-9]+/g, "_")
+      : `${parent.pageIndex + 1}_${index}`;
+
+    const reply: AnnotationReply = {
+      id: `imported_reply_${suffix}`,
+      parentAnnotationId: parent.id,
+      text: commentMeta.text,
+      author: commentMeta.author,
+      updatedAt: commentMeta.updatedAt,
+      sourcePdfRef: annotation.sourcePdfRef,
+      isEdited: false,
+    };
+
+    parent.replies = [...(parent.replies ?? []), reply];
+  }
+};
+
+const exportAnnotationReply = (options: {
+  pdfDoc: PDFDocument;
+  page: PDFPage;
+  parentAnnotation: Annotation;
+  parentRef: PDFRef;
+  reply: AnnotationReply;
+  viewport?: ViewportLike;
+}) => {
+  const { pdfDoc, page, parentAnnotation, parentRef, reply, viewport } =
+    options;
+  const baseRect =
+    parentAnnotation.rect ??
+    (parentAnnotation.rects && parentAnnotation.rects.length > 0
+      ? parentAnnotation.rects[0]
+      : null);
+
+  const bounds = baseRect
+    ? uiRectToPdfBounds(page, baseRect, viewport)
+    : {
+        x: 12,
+        y: 12,
+        width: 24,
+        height: 24,
+      };
+
+  const colorObj = parentAnnotation.color
+    ? hexToPdfColor(parentAnnotation.color)
+    : undefined;
+  const color =
+    colorObj &&
+    typeof colorObj.red === "number" &&
+    typeof colorObj.green === "number" &&
+    typeof colorObj.blue === "number"
+      ? [colorObj.red, colorObj.green, colorObj.blue]
+      : undefined;
+
+  const replyAnnot = pdfDoc.context.obj({
+    Type: "Annot",
+    Subtype: "Text",
+    F: 4,
+    Rect: [
+      bounds.x,
+      bounds.y,
+      bounds.x + Math.max(24, bounds.width),
+      bounds.y + Math.max(24, bounds.height),
+    ],
+    C: color,
+    Name: PDFName.of("Comment"),
+    P: page.ref,
+    IRT: parentRef,
+    RT: PDFName.of("R"),
+  });
+  if (replyAnnot instanceof PDFDict) {
+    applyPdfAnnotationCommentMetadata(replyAnnot, reply);
+  }
+
+  const ref = pdfDoc.context.register(replyAnnot);
+  page.node.addAnnot(ref);
+  return ref;
 };
 
 const loadPdfLibDocumentWithPassword = async (
@@ -553,12 +677,26 @@ const buildPdfLibAnnotsByPageIndex = async (
         rectObj = undefined;
       }
       const rect = pdfRectFromObj(rectObj);
+      const rawInReplyTo = annot.get(PDFName.of("IRT"));
+      const inReplyTo =
+        rawInReplyTo instanceof PDFRef ? pdfRefToKey(rawInReplyTo) : null;
+      const replyType = pdfObjToString(annot.lookup(PDFName.of("RT")));
+      const rawPopup = annot.get(PDFName.of("Popup"));
+      const popupRef =
+        rawPopup instanceof PDFRef ? pdfRefToKey(rawPopup) : null;
+      const rectOrReplyFallback =
+        rect ??
+        (inReplyTo
+          ? ([0, 0, 0, 0] as [number, number, number, number])
+          : undefined);
 
       pdfDebug("import:annotations", "annot_raw", () => ({
         pageIndex,
         annotIndex: i,
         subtypeName,
         rect,
+        inReplyTo,
+        replyType,
         rectObj: summarizePdfObjForDebug(rectObj),
         sourcePdfRef,
         annot: summarizePdfObjForDebug(annot),
@@ -566,7 +704,7 @@ const buildPdfLibAnnotsByPageIndex = async (
 
       if (!subtypeName) continue;
 
-      if (!rect) continue;
+      if (!rectOrReplyFallback) continue;
 
       const pushForPage = (a: PdfJsAnnotation) => {
         const arr = out.get(pageIndex) || [];
@@ -988,7 +1126,7 @@ const buildPdfLibAnnotsByPageIndex = async (
 
       const base: PdfJsAnnotation = {
         subtype: subtypeName,
-        rect,
+        rect: rectOrReplyFallback,
         sourcePdfRef,
         annotationFlags,
         color,
@@ -998,6 +1136,9 @@ const buildPdfLibAnnotsByPageIndex = async (
         contents,
         highlightedText,
         modificationDate,
+        inReplyTo,
+        replyType,
+        popupRef,
         borderStyle:
           typeof borderWidth === "number" || borderStyleType
             ? { width: borderWidth, style: borderStyleType }
@@ -1369,6 +1510,7 @@ export const loadPDF = async (
             console.warn(`Annotation parser failed for page ${pageNumber}`, e);
           }
         }
+        attachAnnotationReplies(annotsForPage, pageAnnotations);
 
         const fieldsForPage: FormField[] = [];
         for (const parser of controlParsers) {
@@ -1676,6 +1818,15 @@ export const exportPDF = async (
     const setForPage =
       keepAnnotRefKeysByPage.get(a.pageIndex) || new Set<string>();
     setForPage.add(key);
+
+    for (const reply of a.replies ?? []) {
+      if (!reply.sourcePdfRef) continue;
+      if (reply.isEdited) continue;
+      setForPage.add(
+        `${reply.sourcePdfRef.objectNumber}:${reply.sourcePdfRef.generationNumber}`,
+      );
+    }
+
     keepAnnotRefKeysByPage.set(a.pageIndex, setForPage);
   }
 
@@ -1864,6 +2015,21 @@ export const exportPDF = async (
   }
 
   // 2. Export Controls In Layer Order
+  const exportedAnnotationRefById = new Map<string, PDFRef>();
+  for (const annotation of annotations) {
+    if (!annotation.sourcePdfRef || annotation.isEdited) continue;
+    if (pagesRequiringFullAnnotationReexport.has(annotation.pageIndex)) {
+      continue;
+    }
+    exportedAnnotationRefById.set(
+      annotation.id,
+      PDFRef.of(
+        annotation.sourcePdfRef.objectNumber,
+        annotation.sourcePdfRef.generationNumber,
+      ),
+    );
+  }
+
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
     if (targetPageIndexSet && !targetPageIndexSet.has(pageIndex)) continue;
     const orderedControls = getOrderedPageControls(
@@ -1879,11 +2045,26 @@ export const exportPDF = async (
     for (const entry of orderedControls) {
       if (entry.kind === "annotation") {
         const annot = entry.control;
-        if (annot?.sourcePdfRef && !annot.isEdited) continue;
+        if (
+          annot?.sourcePdfRef &&
+          !annot.isEdited &&
+          !pagesRequiringFullAnnotationReexport.has(pageIndex)
+        ) {
+          continue;
+        }
         const exporter = annotationExporters.find((e) => e.shouldExport(annot));
         if (!exporter) continue;
         try {
-          await exporter.save(pdfDoc, page, annot, fontMap, viewport);
+          const exportedRef = await exporter.save(
+            pdfDoc,
+            page,
+            annot,
+            fontMap,
+            viewport,
+          );
+          if (exportedRef) {
+            exportedAnnotationRefById.set(annot.id, exportedRef);
+          }
         } catch (e) {
           console.error(`Failed to export annotation ${annot.id}`, e);
         }
@@ -1897,6 +2078,51 @@ export const exportPDF = async (
         await exporter.save(form, field, fontMap, viewport);
       } catch (e) {
         console.error(`Failed to export field ${field.name}`, e);
+      }
+    }
+  }
+
+  for (const annotation of annotations) {
+    if (targetPageIndexSet && !targetPageIndexSet.has(annotation.pageIndex)) {
+      continue;
+    }
+    if (!annotation.replies || annotation.replies.length === 0) continue;
+
+    const parentRef =
+      exportedAnnotationRefById.get(annotation.id) ??
+      (annotation.sourcePdfRef && !annotation.isEdited
+        ? PDFRef.of(
+            annotation.sourcePdfRef.objectNumber,
+            annotation.sourcePdfRef.generationNumber,
+          )
+        : undefined);
+    if (!parentRef) continue;
+
+    const page = pdfDoc.getPage(annotation.pageIndex);
+    const viewport = await getViewportForPage(annotation.pageIndex);
+
+    for (const reply of annotation.replies) {
+      const shouldPreserveExistingReply =
+        !!reply.sourcePdfRef &&
+        !reply.isEdited &&
+        !annotation.isEdited &&
+        !pagesRequiringFullAnnotationReexport.has(annotation.pageIndex);
+      if (shouldPreserveExistingReply) continue;
+
+      try {
+        exportAnnotationReply({
+          pdfDoc,
+          page,
+          parentAnnotation: annotation,
+          parentRef,
+          reply,
+          viewport,
+        });
+      } catch (e) {
+        console.error(
+          `Failed to export reply ${reply.id} for annotation ${annotation.id}`,
+          e,
+        );
       }
     }
   }
