@@ -61,6 +61,14 @@ export const filterAnnotationsForList = (
       annotation.highlightedText || ""
     ).toLowerCase();
     const authorContent = (annotation.author || "").toLowerCase();
+    const replyTextContent = (annotation.replies ?? [])
+      .map((reply) => reply.text || "")
+      .join("\n")
+      .toLowerCase();
+    const replyAuthorContent = (annotation.replies ?? [])
+      .map((reply) => reply.author || "")
+      .join("\n")
+      .toLowerCase();
     const linkUrlContent = (annotation.linkUrl || "").toLowerCase();
     const linkDestPageContent =
       typeof annotation.linkDestPageIndex === "number"
@@ -71,6 +79,8 @@ export const filterAnnotationsForList = (
       textContent.includes(query) ||
       highlightedTextContent.includes(query) ||
       authorContent.includes(query) ||
+      replyTextContent.includes(query) ||
+      replyAuthorContent.includes(query) ||
       linkUrlContent.includes(query) ||
       linkDestPageContent.includes(query)
     );

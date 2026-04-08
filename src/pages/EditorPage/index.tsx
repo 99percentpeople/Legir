@@ -73,6 +73,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
     setUiState,
     addAnnotations,
     updateAnnotation,
+    addAnnotationReply,
+    updateAnnotationReply,
+    deleteAnnotationReply,
     deleteSelection,
     selectControl,
     setTool,
@@ -682,6 +685,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
           }}
           onDeleteAnnotation={deleteAnnotation}
           onUpdateAnnotation={updateAnnotation}
+          onAddAnnotationReply={addAnnotationReply}
+          onUpdateAnnotationReply={updateAnnotationReply}
+          onDeleteAnnotationReply={deleteAnnotationReply}
           onNavigatePage={(index) => {
             appEventBus.emit("workspace:navigatePage", {
               pageIndex: index,

@@ -5,6 +5,7 @@ import {
   PageData,
   PDFOutlineItem,
   Annotation,
+  AnnotationReply,
   ThumbnailsLayoutMode,
 } from "@/types";
 import { cn } from "@/utils/cn";
@@ -39,6 +40,13 @@ interface SidebarProps {
   ) => void;
   onDeleteAnnotation?: (id: string) => void;
   onUpdateAnnotation?: (id: string, updates: Partial<Annotation>) => void;
+  onAddAnnotationReply?: (annotationId: string, reply: AnnotationReply) => void;
+  onUpdateAnnotationReply?: (
+    annotationId: string,
+    replyId: string,
+    updates: Partial<AnnotationReply>,
+  ) => void;
+  onDeleteAnnotationReply?: (annotationId: string, replyId: string) => void;
   onNavigatePage: (pageIndex: number) => void;
   width: number;
   onResize: (width: number) => void;
@@ -65,6 +73,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectControl,
   onDeleteAnnotation = () => {},
   onUpdateAnnotation = () => {},
+  onAddAnnotationReply = () => {},
+  onUpdateAnnotationReply = () => {},
+  onDeleteAnnotationReply = () => {},
   onNavigatePage,
   width,
   onResize,
@@ -226,6 +237,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               onSelectControl={onSelectControl}
               onDeleteAnnotation={onDeleteAnnotation}
               onUpdateAnnotation={onUpdateAnnotation}
+              onAddAnnotationReply={onAddAnnotationReply}
+              onUpdateAnnotationReply={onUpdateAnnotationReply}
+              onDeleteAnnotationReply={onDeleteAnnotationReply}
               selectedId={selectedId}
             />
           </TabsContent>
