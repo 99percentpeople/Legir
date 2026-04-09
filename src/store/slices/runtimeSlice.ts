@@ -93,6 +93,7 @@ export const createRuntimeSlice: EditorStoreSlice<
               targetWidth: THUMBNAIL_TARGET_WIDTH,
               mimeType: THUMBNAIL_MIME_TYPE,
               quality: THUMBNAIL_JPEG_QUALITY,
+              renderAnnotations: true,
               priority: THUMBNAIL_WARMUP_PRIORITY,
               signal,
             }));
