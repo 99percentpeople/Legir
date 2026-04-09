@@ -5,6 +5,21 @@ export type RotationRect = {
   height: number;
 };
 
+export type RotationPoint = {
+  x: number;
+  y: number;
+};
+
+export type RotationResizeHandle =
+  | "n"
+  | "s"
+  | "e"
+  | "w"
+  | "nw"
+  | "ne"
+  | "sw"
+  | "se";
+
 export const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
   let next = deg % 360;
@@ -56,6 +71,192 @@ export const getRotatedOuterRect = (
     y: cy - outerH / 2,
     width: outerW,
     height: outerH,
+  };
+};
+
+export const getRotationAxes = (rotationDeg: number) => {
+  const theta = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+
+  return {
+    xAxis: { x: cos, y: sin },
+    yAxis: { x: -sin, y: cos },
+  };
+};
+
+const isResizeHandle = (handle: string): handle is RotationResizeHandle =>
+  handle === "n" ||
+  handle === "s" ||
+  handle === "e" ||
+  handle === "w" ||
+  handle === "nw" ||
+  handle === "ne" ||
+  handle === "sw" ||
+  handle === "se";
+
+export const getResizeCursorForHandle = (
+  handle: string,
+  rotationDeg: number,
+) => {
+  if (!isResizeHandle(handle)) {
+    return handle === "rotate" ? "grab" : "default";
+  }
+
+  const handleAngleDeg = (() => {
+    switch (handle) {
+      case "e":
+        return 0;
+      case "ne":
+        return 45;
+      case "n":
+        return 90;
+      case "nw":
+        return 135;
+      case "w":
+        return 180;
+      case "sw":
+        return 225;
+      case "s":
+        return 270;
+      case "se":
+        return 315;
+    }
+  })();
+
+  const snapped =
+    (((Math.round((handleAngleDeg + rotationDeg) / 45) * 45) % 360) + 360) %
+    360;
+
+  if (snapped === 0 || snapped === 180) return "ns-resize";
+  if (snapped === 90 || snapped === 270) return "ew-resize";
+  if (snapped === 45 || snapped === 225) return "nesw-resize";
+  return "nwse-resize";
+};
+
+export const getRotatedRectHandlePoint = (
+  rect: RotationRect,
+  rotationDeg: number,
+  handle: "nw" | "ne" | "sw" | "se",
+): RotationPoint => {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const { xAxis, yAxis } = getRotationAxes(rotationDeg);
+  const xSign = handle.includes("e") ? 1 : -1;
+  const ySign = handle.includes("s") ? 1 : -1;
+  const dx = (rect.width / 2) * xSign;
+  const dy = (rect.height / 2) * ySign;
+
+  return {
+    x: cx + dx * xAxis.x + dy * yAxis.x,
+    y: cy + dx * xAxis.y + dy * yAxis.y,
+  };
+};
+
+const clampRotatedResizeSize = (options: {
+  width: number;
+  height: number;
+  minWidth: number;
+  minHeight: number;
+  aspectRatio?: number;
+  originalWidth: number;
+  originalHeight: number;
+}) => {
+  let width = Math.max(options.minWidth, options.width);
+  let height = Math.max(options.minHeight, options.height);
+
+  if (
+    typeof options.aspectRatio === "number" &&
+    Number.isFinite(options.aspectRatio) &&
+    options.aspectRatio > 0
+  ) {
+    const widthDelta = Math.abs(width - options.originalWidth);
+    const heightDelta = Math.abs(height - options.originalHeight);
+
+    if (widthDelta > heightDelta * options.aspectRatio) {
+      height = width / options.aspectRatio;
+    } else {
+      width = height * options.aspectRatio;
+    }
+
+    if (width < options.minWidth) {
+      width = options.minWidth;
+      height = width / options.aspectRatio;
+    }
+    if (height < options.minHeight) {
+      height = options.minHeight;
+      width = height * options.aspectRatio;
+    }
+  }
+
+  return { width, height };
+};
+
+export const resizeRectFromRotatedHandle = (options: {
+  rect: RotationRect;
+  rotationDeg: number;
+  handle: "nw" | "ne" | "sw" | "se";
+  pointer: RotationPoint;
+  minWidth?: number;
+  minHeight?: number;
+  aspectRatio?: number;
+}): RotationRect => {
+  const {
+    rect,
+    rotationDeg,
+    handle,
+    pointer,
+    minWidth = 5,
+    minHeight = 5,
+    aspectRatio,
+  } = options;
+  const { xAxis, yAxis } = getRotationAxes(rotationDeg);
+  const xSign = handle.includes("e") ? 1 : -1;
+  const ySign = handle.includes("s") ? 1 : -1;
+  const oppositeHandle =
+    handle === "nw"
+      ? "se"
+      : handle === "ne"
+        ? "sw"
+        : handle === "sw"
+          ? "ne"
+          : "nw";
+  const fixedCorner = getRotatedRectHandlePoint(
+    rect,
+    rotationDeg,
+    oppositeHandle,
+  );
+  const delta = {
+    x: pointer.x - fixedCorner.x,
+    y: pointer.y - fixedCorner.y,
+  };
+  const projectedX = delta.x * xAxis.x + delta.y * xAxis.y;
+  const projectedY = delta.x * yAxis.x + delta.y * yAxis.y;
+  const nextSize = clampRotatedResizeSize({
+    width: xSign * projectedX,
+    height: ySign * projectedY,
+    minWidth,
+    minHeight,
+    aspectRatio,
+    originalWidth: rect.width,
+    originalHeight: rect.height,
+  });
+  const nextCenter = {
+    x:
+      fixedCorner.x +
+      (xSign * nextSize.width * xAxis.x + ySign * nextSize.height * yAxis.x) /
+        2,
+    y:
+      fixedCorner.y +
+      (xSign * nextSize.width * xAxis.y + ySign * nextSize.height * yAxis.y) /
+        2,
+  };
+
+  return {
+    x: nextCenter.x - nextSize.width / 2,
+    y: nextCenter.y - nextSize.height / 2,
+    width: nextSize.width,
+    height: nextSize.height,
   };
 };
 

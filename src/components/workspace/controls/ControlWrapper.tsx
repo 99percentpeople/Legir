@@ -8,6 +8,7 @@ import { useMouse } from "@/hooks/useMouse";
 import { useLanguage } from "@/components/language-provider";
 import type { Annotation, FormField, MoveDirection } from "@/types";
 import {
+  getResizeCursorForHandle,
   getInnerSizeFromOuterAabb,
   normalizeRightAngleRotationDeg,
   normalizeRotationDeg,
@@ -469,10 +470,10 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const getResizeHandleClassName = (handle: (typeof resizeHandles)[number]) =>
     cn(
       "pointer-events-auto absolute z-30 h-3 w-3 border border-blue-500 bg-white",
-      handle === "nw" && "-top-1.5 -left-1.5 cursor-nwse-resize",
-      handle === "ne" && "-top-1.5 -right-1.5 cursor-nesw-resize",
-      handle === "sw" && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
-      handle === "se" && "-right-1.5 -bottom-1.5 cursor-nwse-resize",
+      handle === "nw" && "-top-1.5 -left-1.5",
+      handle === "ne" && "-top-1.5 -right-1.5",
+      handle === "sw" && "-bottom-1.5 -left-1.5",
+      handle === "se" && "-right-1.5 -bottom-1.5",
     );
 
   const renderResizeHandles = () =>
@@ -480,6 +481,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       <div
         key={handle}
         className={getResizeHandleClassName(handle)}
+        style={{ cursor: getResizeCursorForHandle(handle, rotationDeg) }}
         onPointerDown={(e) => handleResizePointerDown(e, handle)}
         tabIndex={supportsKeyboardResizeHandles ? 0 : -1}
         data-app-keyboard-handle="control-resize"

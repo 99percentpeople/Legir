@@ -67,10 +67,12 @@ import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 import { openExternalUrl } from "@/services/platform";
 import {
+  getResizeCursorForHandle,
   getInnerSizeFromOuterAabb as getInnerSizeFromOuterAabbLib,
   getRotatedOuterRect as getRotatedOuterRectLib,
   normalizeRightAngleRotationDeg,
   rotateOuterRectKeepingCenter,
+  resizeRectFromRotatedHandle,
 } from "@/lib/controlRotation";
 import {
   getRectAndNormalizedShapePoints,
@@ -915,6 +917,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const [resizeStart, setResizeStart] = useState<{
     originalRect: Rect;
+    logicalRect?: Rect;
     mouseX: number;
     mouseY: number;
     originalRotationDeg?: number;
@@ -1384,6 +1387,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             : data.rect;
         const base = {
           originalRect: { ...interactionRect },
+          logicalRect: { ...data.rect },
           mouseX: coords.x,
           mouseY: coords.y,
         };
@@ -1413,12 +1417,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }
       }
 
-      let cursor = "default";
-      if (["nw", "se"].includes(handle)) cursor = "nwse-resize";
-      else if (["ne", "sw"].includes(handle)) cursor = "nesw-resize";
-      else if (["n", "s"].includes(handle)) cursor = "ns-resize";
-      else if (["e", "w"].includes(handle)) cursor = "ew-resize";
-      else if (handle === "rotate") cursor = "grab";
+      const cursor =
+        handle === "rotate"
+          ? "grab"
+          : getResizeCursorForHandle(
+              handle,
+              typeof data.rotationDeg === "number" &&
+                Number.isFinite(data.rotationDeg)
+                ? data.rotationDeg
+                : 0,
+            );
 
       setGlobalCursor(cursor);
     },
@@ -1594,6 +1602,53 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }
 
         onUpdateAnnotation(resizingAnnotationId, { rotationDeg: next });
+        return;
+      }
+
+      const rotationDeg =
+        isRotatableAnnotation(annot) &&
+        typeof annot.rotationDeg === "number" &&
+        Number.isFinite(annot.rotationDeg)
+          ? annot.rotationDeg
+          : 0;
+      const canUseRotatedCornerResize =
+        isRotatableAnnotation(annot) &&
+        (resizeHandle === "nw" ||
+          resizeHandle === "ne" ||
+          resizeHandle === "sw" ||
+          resizeHandle === "se");
+
+      if (canUseRotatedCornerResize) {
+        const originalLogicalRect = resizeStart.logicalRect ?? annot.rect;
+        let aspectRatio: number | undefined;
+
+        if (
+          annot.type === "shape" &&
+          (annot.shapeType === "square" ||
+            annot.shapeType === "circle" ||
+            annot.shapeType === "cloud") &&
+          editorState.keys.shift
+        ) {
+          aspectRatio = 1;
+        } else if (annot.type === "stamp" && editorState.keys.shift) {
+          const rawAspectRatio =
+            originalLogicalRect.width / originalLogicalRect.height;
+          if (Number.isFinite(rawAspectRatio) && rawAspectRatio > 0) {
+            aspectRatio = rawAspectRatio;
+          }
+        }
+
+        const nextRect = resizeRectFromRotatedHandle({
+          rect: originalLogicalRect,
+          rotationDeg,
+          handle: resizeHandle,
+          pointer: currentCoords,
+          minWidth: 5,
+          minHeight: 5,
+          aspectRatio,
+        });
+
+        onUpdateAnnotation(resizingAnnotationId, { rect: nextRect });
         return;
       }
 

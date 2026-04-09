@@ -44,6 +44,7 @@ import {
   getPolygonCloudGeometry,
   getRectAndNormalizedShapePoints,
   getShapeAbsolutePoints,
+  normalizeShapePointsToRect,
   getShapeStrokeLinecap,
   getShapeStrokeLinejoin,
   getShapeStrokeDashArray,
@@ -131,17 +132,17 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     typeof data.rotationDeg === "number" && Number.isFinite(data.rotationDeg)
       ? data.rotationDeg
       : 0;
+  const rotatedOuterRect = useMemo(
+    () =>
+      rotationDeg !== 0 ? getRotatedOuterRect(rect, rotationDeg) : undefined,
+    [rect, rotationDeg],
+  );
   const rotationCenter = useMemo(
     () => ({
       x: rect.x + rect.width / 2,
       y: rect.y + rect.height / 2,
     }),
     [rect],
-  );
-  const rotatedOuterRect = useMemo(
-    () =>
-      rotationDeg !== 0 ? getRotatedOuterRect(rect, rotationDeg) : undefined,
-    [rect, rotationDeg],
   );
   const arrowStyles = useMemo(
     () => getShapeArrowStyles(data),
@@ -313,6 +314,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     vertexIndex: null,
   });
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const interactionSurfaceRef = useRef<HTMLDivElement | null>(null);
   const {
     ref: hoverRef,
     x: hoverX,
@@ -396,37 +398,96 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     clientX: number,
     clientY: number,
   ) => {
-    const bounds =
-      svgRef.current?.parentElement?.getBoundingClientRect() ??
-      svgRef.current?.getBoundingClientRect();
-    const interactionRect = rotatedOuterRect ?? data.rect!;
-    if (!bounds) {
+    const interactionSurface = interactionSurfaceRef.current;
+    const bounds = interactionSurface?.getBoundingClientRect();
+    const renderWidth =
+      interactionSurface?.offsetWidth ?? svgRef.current?.clientWidth ?? 0;
+    const renderHeight =
+      interactionSurface?.offsetHeight ?? svgRef.current?.clientHeight ?? 0;
+    if (!bounds || renderWidth <= 0 || renderHeight <= 0) {
       return {
         x: data.rect!.x,
         y: data.rect!.y,
       };
     }
-    const localX =
-      ((clientX - bounds.left) / Math.max(1, bounds.width)) *
-      interactionRect.width;
-    const localY =
-      ((clientY - bounds.top) / Math.max(1, bounds.height)) *
-      interactionRect.height;
-    const nextPoint = {
-      x: interactionRect.x + localX,
-      y: interactionRect.y + localY,
+
+    const centerX = bounds.left + bounds.width / 2;
+    const centerY = bounds.top + bounds.height / 2;
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    const theta = (rotationDeg * Math.PI) / 180;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const localPxX = dx * cos + dy * sin + renderWidth / 2;
+    const localPxY = -dx * sin + dy * cos + renderHeight / 2;
+
+    return {
+      x: data.rect!.x + (localPxX / renderWidth) * data.rect!.width,
+      y: data.rect!.y + (localPxY / renderHeight) * data.rect!.height,
     };
-    return rotationDeg !== 0
-      ? rotateShapePoint(nextPoint, rotationCenter, -rotationDeg)
-      : nextPoint;
   };
+
+  const getRectAndNormalizedShapePointsFromDisplayPoints = useCallback(
+    (points: { x: number; y: number }[]) => {
+      if (!points.length) return null;
+
+      const theta = (rotationDeg * Math.PI) / 180;
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+      const toLocal = (point: { x: number; y: number }) => {
+        const dx = point.x - rotationCenter.x;
+        const dy = point.y - rotationCenter.y;
+        return {
+          x: dx * cos + dy * sin,
+          y: -dx * sin + dy * cos,
+        };
+      };
+      const localPoints = points.map(toLocal);
+      const minX = Math.min(...localPoints.map((point) => point.x));
+      const minY = Math.min(...localPoints.map((point) => point.y));
+      const maxX = Math.max(...localPoints.map((point) => point.x));
+      const maxY = Math.max(...localPoints.map((point) => point.y));
+      const width = Math.max(1, maxX - minX);
+      const height = Math.max(1, maxY - minY);
+      const localCenter = {
+        x: (minX + maxX) / 2,
+        y: (minY + maxY) / 2,
+      };
+      const nextCenter = {
+        x: rotationCenter.x + localCenter.x * cos - localCenter.y * sin,
+        y: rotationCenter.y + localCenter.x * sin + localCenter.y * cos,
+      };
+      const nextRect = {
+        x: nextCenter.x - width / 2,
+        y: nextCenter.y - height / 2,
+        width,
+        height,
+      };
+      const preRotatedPoints = points.map((point) =>
+        rotateShapePoint(point, nextCenter, -rotationDeg),
+      );
+
+      return {
+        rect: nextRect,
+        shapePoints: normalizeShapePointsToRect(preRotatedPoints, nextRect),
+      };
+    },
+    [rotationCenter, rotationDeg],
+  );
 
   const commitAbsolutePoints = (
     points: { x: number; y: number }[],
     nextShapeType: NonNullable<typeof data.shapeType> = shapeType,
     extraUpdates: Partial<typeof data> = {},
   ) => {
-    const normalized = getRectAndNormalizedShapePoints(points);
+    const normalized =
+      rotationDeg !== 0 && shapeSupportsVertices(nextShapeType)
+        ? (getRectAndNormalizedShapePointsFromDisplayPoints(
+            points.map((point) =>
+              rotateShapePoint(point, rotationCenter, rotationDeg),
+            ),
+          ) ?? getRectAndNormalizedShapePoints(points))
+        : getRectAndNormalizedShapePoints(points);
     if (!normalized) return;
     onUpdate(data.id, {
       shapeType: nextShapeType,
@@ -1289,6 +1350,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               </ContextMenuContent>
 
               <div
+                ref={interactionSurfaceRef}
                 className={
                   rotationDeg !== 0
                     ? "absolute top-1/2 left-1/2"
