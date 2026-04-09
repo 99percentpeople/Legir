@@ -8,12 +8,16 @@ import {
   PDFHexString,
   StandardFonts,
   PDFDict,
+  PDFArray,
+  PDFContentStream,
+  PDFStream,
   type PDFFont,
   type PDFOperator,
   PDFRef,
   drawRectangle,
   drawEllipse,
   drawSvgPath,
+  drawImage,
   LineJoinStyle,
   setLineJoin,
 } from "@cantoo/pdf-lib";
@@ -52,6 +56,165 @@ import {
   normalizeShapeBorderStyle,
   getTrimmedOpenLinePointsForArrows,
 } from "@/lib/shapeGeometry";
+import {
+  fitStampImageToRect,
+  getStampPdfName,
+  getPresetStampSvgDataUrl,
+  resolveStampLabel,
+} from "@/lib/stamps";
+import { decodeStampImageDataUrl } from "@/lib/stampImage";
+
+const loadStampImageSource = async (
+  dataUrl: string,
+): Promise<CanvasImageSource> => {
+  const { bytes, mimeType } = decodeStampImageDataUrl(dataUrl);
+  const blob = new Blob([bytes], { type: mimeType });
+
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(blob);
+    } catch {
+      // Fallback to HTMLImageElement below. Some environments expose
+      // createImageBitmap but cannot decode SVG or other browser-supported
+      // formats from blobs reliably.
+    }
+  }
+
+  if (typeof Image === "undefined" || typeof URL === "undefined") {
+    throw new Error("Image rasterization is unavailable in this environment.");
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    return await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Failed to decode stamp image."));
+      image.src = objectUrl;
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
+const rasterizeStampImageToPngBytes = async (options: {
+  dataUrl: string;
+  width?: number;
+  height?: number;
+}) => {
+  const targetWidth = Math.max(
+    1,
+    Math.round(
+      (options.width && Number.isFinite(options.width) ? options.width : 256) *
+        2,
+    ),
+  );
+  const targetHeight = Math.max(
+    1,
+    Math.round(
+      (options.height && Number.isFinite(options.height)
+        ? options.height
+        : 256) * 2,
+    ),
+  );
+  const imageSource = await loadStampImageSource(options.dataUrl);
+  try {
+    const canvas =
+      typeof OffscreenCanvas === "function"
+        ? new OffscreenCanvas(targetWidth, targetHeight)
+        : (() => {
+            if (typeof document === "undefined") {
+              throw new Error(
+                "Canvas rasterization is unavailable in this environment.",
+              );
+            }
+            const element = document.createElement("canvas");
+            element.width = targetWidth;
+            element.height = targetHeight;
+            return element;
+          })();
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Failed to initialize canvas for SVG stamp.");
+    }
+
+    context.clearRect(0, 0, targetWidth, targetHeight);
+    context.drawImage(imageSource, 0, 0, targetWidth, targetHeight);
+
+    const blob =
+      typeof OffscreenCanvas === "function" && canvas instanceof OffscreenCanvas
+        ? await canvas.convertToBlob({ type: "image/png" })
+        : await new Promise<Blob>((resolve, reject) => {
+            (canvas as HTMLCanvasElement).toBlob((value) => {
+              if (value) {
+                resolve(value);
+                return;
+              }
+              reject(new Error("Failed to encode SVG stamp image."));
+            }, "image/png");
+          });
+
+    return new Uint8Array(await blob.arrayBuffer());
+  } finally {
+    if (
+      typeof ImageBitmap !== "undefined" &&
+      imageSource instanceof ImageBitmap
+    ) {
+      imageSource.close();
+    }
+  }
+};
+
+const decodeSvgDataUrlToString = (dataUrl: string) => {
+  const { bytes, mimeType } = decodeStampImageDataUrl(dataUrl);
+  if (mimeType !== "image/svg+xml") return undefined;
+
+  try {
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return undefined;
+  }
+};
+
+const textEncoder = new TextEncoder();
+
+const concatUint8Arrays = (chunks: Uint8Array[]) => {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const out = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return out;
+};
+
+const normalizeRightAngleDeg = (value: number) => {
+  const normalized = (((Math.round(value / 90) * 90) % 360) + 360) % 360;
+  return normalized === 360 ? 0 : normalized;
+};
+
+const getStampAppearanceBoundsForPageRotation = (
+  bounds: { x: number; y: number; width: number; height: number },
+  rotationDeg: number,
+) => {
+  const normalized = normalizeRightAngleDeg(rotationDeg);
+  if (normalized !== 90 && normalized !== 270) {
+    return bounds;
+  }
+
+  const centerX = bounds.x + bounds.width / 2;
+  const centerY = bounds.y + bounds.height / 2;
+  return {
+    x: centerX - bounds.height / 2,
+    y: centerY - bounds.width / 2,
+    width: bounds.height,
+    height: bounds.width,
+  };
+};
 
 export class HighlightExporter implements IAnnotationExporter {
   shouldExport(annotation: Annotation): boolean {
@@ -953,37 +1116,79 @@ const registerAppearanceStream = (
   bbox: [number, number, number, number],
   graphicsStates?: Record<string, number>,
   matrix?: PdfTransformMatrix,
+  extraResources?: {
+    Font?: Record<string, PDFRef>;
+    XObject?: Record<string, PDFRef>;
+  },
 ) => {
   if (operators.length === 0) return undefined;
 
-  const baseResources = {
-    ProcSet: [
-      PDFName.of("PDF"),
-      PDFName.of("Text"),
-      PDFName.of("ImageB"),
-      PDFName.of("ImageC"),
-      PDFName.of("ImageI"),
-    ],
-  };
+  const createAppearanceResources = (
+    inheritedResources?: PDFDict,
+    extra?: {
+      Font?: Record<string, PDFRef>;
+      XObject?: Record<string, PDFRef>;
+    },
+  ) => {
+    const resourcesObj =
+      inheritedResources?.clone(pdfDoc.context) ?? pdfDoc.context.obj({});
+    const procSet =
+      resourcesObj.lookupMaybe(PDFName.of("ProcSet"), PDFArray) ??
+      pdfDoc.context.obj([]);
 
-  let resourcesObj = pdfDoc.context.obj(baseResources);
-  const graphicsStateEntries = Object.entries(graphicsStates ?? {}).filter(
-    ([, opacity]) => typeof opacity === "number" && opacity >= 0 && opacity < 1,
-  );
-  if (graphicsStateEntries.length > 0) {
-    const extGState = Object.fromEntries(
-      graphicsStateEntries.map(([name, opacity]) => {
+    if (!(procSet instanceof PDFArray) || procSet.size() === 0) {
+      resourcesObj.set(
+        PDFName.of("ProcSet"),
+        pdfDoc.context.obj([
+          PDFName.of("PDF"),
+          PDFName.of("Text"),
+          PDFName.of("ImageB"),
+          PDFName.of("ImageC"),
+          PDFName.of("ImageI"),
+        ]),
+      );
+    }
+
+    if (extra?.Font) {
+      const fontDict =
+        resourcesObj.lookupMaybe(PDFName.of("Font"), PDFDict) ??
+        pdfDoc.context.obj({});
+      for (const [name, ref] of Object.entries(extra.Font)) {
+        fontDict.set(PDFName.of(name), ref);
+      }
+      resourcesObj.set(PDFName.of("Font"), fontDict);
+    }
+
+    if (extra?.XObject) {
+      const xObjectDict =
+        resourcesObj.lookupMaybe(PDFName.of("XObject"), PDFDict) ??
+        pdfDoc.context.obj({});
+      for (const [name, ref] of Object.entries(extra.XObject)) {
+        xObjectDict.set(PDFName.of(name), ref);
+      }
+      resourcesObj.set(PDFName.of("XObject"), xObjectDict);
+    }
+
+    const graphicsStateEntries = Object.entries(graphicsStates ?? {}).filter(
+      ([, opacity]) =>
+        typeof opacity === "number" && opacity >= 0 && opacity < 1,
+    );
+    if (graphicsStateEntries.length > 0) {
+      const extGState =
+        resourcesObj.lookupMaybe(PDFName.of("ExtGState"), PDFDict) ??
+        pdfDoc.context.obj({});
+      for (const [name, opacity] of graphicsStateEntries) {
         const gsDict = pdfDoc.context.obj({ CA: opacity, ca: opacity });
         const gsRef = pdfDoc.context.register(gsDict);
-        return [name, gsRef];
-      }),
-    );
-    resourcesObj = pdfDoc.context.obj({
-      ...baseResources,
-      ExtGState: extGState,
-    });
-  }
+        extGState.set(PDFName.of(name), gsRef);
+      }
+      resourcesObj.set(PDFName.of("ExtGState"), extGState);
+    }
 
+    return resourcesObj;
+  };
+
+  const resourcesObj = createAppearanceResources(undefined, extraResources);
   const appearanceStream = pdfDoc.context.contentStream(operators, {
     Type: PDFName.of("XObject"),
     Subtype: PDFName.of("Form"),
@@ -994,6 +1199,130 @@ const registerAppearanceStream = (
   });
 
   return pdfDoc.context.register(appearanceStream);
+};
+
+const registerRawAppearanceStream = (
+  pdfDoc: PDFDocument,
+  contents: Uint8Array,
+  bbox: [number, number, number, number],
+  graphicsStates?: Record<string, number>,
+  matrix?: PdfTransformMatrix,
+  inheritedResources?: PDFDict,
+) => {
+  if (contents.length === 0) return undefined;
+
+  const resourcesObj =
+    inheritedResources?.clone(pdfDoc.context) ?? pdfDoc.context.obj({});
+  const procSet =
+    resourcesObj.lookupMaybe(PDFName.of("ProcSet"), PDFArray) ??
+    pdfDoc.context.obj([]);
+
+  if (!(procSet instanceof PDFArray) || procSet.size() === 0) {
+    resourcesObj.set(
+      PDFName.of("ProcSet"),
+      pdfDoc.context.obj([
+        PDFName.of("PDF"),
+        PDFName.of("Text"),
+        PDFName.of("ImageB"),
+        PDFName.of("ImageC"),
+        PDFName.of("ImageI"),
+      ]),
+    );
+  }
+
+  const graphicsStateEntries = Object.entries(graphicsStates ?? {}).filter(
+    ([, opacity]) => typeof opacity === "number" && opacity >= 0 && opacity < 1,
+  );
+  let wrappedContents = contents;
+  if (graphicsStateEntries.length > 0) {
+    const extGState =
+      resourcesObj.lookupMaybe(PDFName.of("ExtGState"), PDFDict) ??
+      pdfDoc.context.obj({});
+    for (const [name, opacity] of graphicsStateEntries) {
+      const gsDict = pdfDoc.context.obj({ CA: opacity, ca: opacity });
+      const gsRef = pdfDoc.context.register(gsDict);
+      extGState.set(PDFName.of(name), gsRef);
+    }
+    resourcesObj.set(PDFName.of("ExtGState"), extGState);
+
+    const defaultStateName = graphicsStateEntries[0]?.[0];
+    if (defaultStateName) {
+      wrappedContents = concatUint8Arrays([
+        textEncoder.encode(`q\n/${defaultStateName} gs\n`),
+        contents,
+        textEncoder.encode("Q\n"),
+      ]);
+    }
+  }
+
+  const appearanceStream = pdfDoc.context.flateStream(wrappedContents, {
+    Type: PDFName.of("XObject"),
+    Subtype: PDFName.of("Form"),
+    FormType: 1,
+    BBox: bbox,
+    Matrix: matrix,
+    Resources: resourcesObj,
+  });
+
+  return pdfDoc.context.register(appearanceStream);
+};
+
+const extractScratchPageAppearance = async (options: {
+  pdfDoc: PDFDocument;
+  page: PDFPage;
+  svg: string;
+  imageRect: { x: number; y: number; width: number; height: number };
+  fonts?: Record<string, PDFFont>;
+}) => {
+  try {
+    const embeddedSvg = await options.pdfDoc.embedSvg(options.svg);
+    const scratchPage = PDFPage.create(options.pdfDoc);
+    scratchPage.setSize(options.page.getWidth(), options.page.getHeight());
+    scratchPage.drawSvg(embeddedSvg, {
+      x: options.imageRect.x,
+      y: options.imageRect.y + options.imageRect.height,
+      width: options.imageRect.width,
+      height: options.imageRect.height,
+      fonts: options.fonts,
+    });
+
+    const contents = scratchPage.node.Contents();
+    const contentChunks: Uint8Array[] = [];
+
+    if (contents instanceof PDFArray) {
+      for (let index = 0; index < contents.size(); index += 1) {
+        const raw = contents.get(index);
+        const stream = contents.lookupMaybe(index, PDFStream) as
+          | PDFContentStream
+          | undefined;
+        if (stream) {
+          contentChunks.push(stream.getUnencodedContents());
+        }
+        if (raw instanceof PDFRef) {
+          options.pdfDoc.context.delete(raw);
+        }
+      }
+    } else if (contents instanceof PDFStream) {
+      const stream = contents as PDFContentStream;
+      contentChunks.push(stream.getUnencodedContents());
+      const streamRef = options.pdfDoc.context.getObjectRef(stream);
+      if (streamRef) {
+        options.pdfDoc.context.delete(streamRef);
+      }
+    }
+
+    const resources = scratchPage.node
+      .Resources()
+      ?.clone(options.pdfDoc.context);
+    options.pdfDoc.context.delete(scratchPage.ref);
+
+    return {
+      contents: concatUint8Arrays(contentChunks),
+      resources,
+    };
+  } catch {
+    return undefined;
+  }
 };
 
 const withPdfLineJoin = (operators: PDFOperator[], lineJoin: LineJoinStyle) => {
@@ -1384,6 +1713,345 @@ const buildShapeAppearanceOperators = (
 
   return { bbox, operators };
 };
+
+export class StampExporter implements IAnnotationExporter {
+  shouldExport(annotation: Annotation): boolean {
+    return annotation.type === "stamp";
+  }
+
+  async save(
+    pdfDoc: PDFDocument,
+    page: PDFPage,
+    annotation: Annotation,
+    fontMap?: Map<string, PDFFont>,
+    viewport?: ViewportLike,
+  ): Promise<PDFRef | undefined> {
+    if (annotation.type !== "stamp" || !annotation.rect) {
+      return undefined;
+    }
+
+    const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
+    const opacity =
+      typeof annotation.opacity === "number"
+        ? Math.min(1, Math.max(0.05, annotation.opacity))
+        : 1;
+    const pageRotationDeg =
+      viewport && typeof viewport.rotation === "number" ? viewport.rotation : 0;
+    const isImportedStamp = !!annotation.sourcePdfRef;
+    const stamp = annotation.stamp;
+    const stampKind = stamp?.kind ?? "preset";
+    const stampPresetId = stamp?.presetId;
+    const stampLabel = stamp?.label;
+    const stampImage = stamp?.image;
+    const stampAppearance = stamp?.appearance;
+    const stampImageData = stampImage?.dataUrl;
+    const stampIntrinsicSize = stampImage?.intrinsicSize;
+    const isBakedStampImage = stampAppearance?.source === "baked";
+    const needsAppearanceBoundsCompensation =
+      pageRotationDeg !== 0 &&
+      (!isImportedStamp || (stampKind === "image" && isBakedStampImage));
+    const needsPageRotationCompensation =
+      pageRotationDeg !== 0 &&
+      (!isImportedStamp || (stampKind === "image" && isBakedStampImage));
+    const rotationDeg =
+      typeof annotation.rotationDeg === "number" &&
+      Number.isFinite(annotation.rotationDeg)
+        ? annotation.rotationDeg
+        : 0;
+    const effectiveRotationDeg = needsPageRotationCompensation
+      ? rotationDeg - pageRotationDeg
+      : rotationDeg;
+    const appearanceBounds = needsAppearanceBoundsCompensation
+      ? getStampAppearanceBoundsForPageRotation(bounds, pageRotationDeg)
+      : bounds;
+    const bbox: [number, number, number, number] = [
+      appearanceBounds.x,
+      appearanceBounds.y,
+      appearanceBounds.x + appearanceBounds.width,
+      appearanceBounds.y + appearanceBounds.height,
+    ];
+    const rotationCenterPdf = uiPointToPdfPoint(
+      page,
+      {
+        x: annotation.rect.x + annotation.rect.width / 2,
+        y: annotation.rect.y + annotation.rect.height / 2,
+      },
+      viewport,
+    );
+    const appearanceMatrix =
+      effectiveRotationDeg !== 0
+        ? buildPdfRotationMatrix(-effectiveRotationDeg, rotationCenterPdf)
+        : undefined;
+    const graphicsStates = opacity < 1 ? { GS_STAMP: opacity } : undefined;
+    const rectValues = appearanceMatrix
+      ? getTransformedPdfRect(bbox, appearanceMatrix)
+      : bbox;
+
+    let operators: PDFOperator[] = [];
+    let extraResources:
+      | {
+          Font?: Record<string, PDFRef>;
+          XObject?: Record<string, PDFRef>;
+        }
+      | undefined;
+    let appearanceRef: PDFRef | undefined;
+    let stampSourceSvgData: string | undefined;
+
+    if (stampKind === "image" && stampImageData) {
+      const decodedSvg = stampImageData.startsWith("data:image/svg+xml")
+        ? decodeSvgDataUrlToString(stampImageData)
+        : undefined;
+      stampSourceSvgData = decodedSvg ? stampImageData : undefined;
+      let image:
+        | Awaited<ReturnType<typeof pdfDoc.embedPng>>
+        | Awaited<ReturnType<typeof pdfDoc.embedJpg>>
+        | undefined;
+      const { bytes, mimeType } = decodeStampImageDataUrl(stampImageData);
+
+      if (mimeType === "image/png") {
+        image = await pdfDoc.embedPng(bytes);
+      } else if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
+        image = await pdfDoc.embedJpg(bytes);
+      } else if (mimeType !== "image/svg+xml") {
+        const rasterizedBytes = await rasterizeStampImageToPngBytes({
+          dataUrl: stampImageData,
+          width: stampIntrinsicSize?.width,
+          height: stampIntrinsicSize?.height,
+        });
+        image = await pdfDoc.embedPng(rasterizedBytes);
+      }
+
+      const imageName = "Im0";
+      const isPlainImageStamp = stampAppearance?.frame === "plain";
+      const shouldTreatAsPlainImage =
+        isPlainImageStamp || mimeType === "image/svg+xml";
+      const shouldDrawCardFrame = !shouldTreatAsPlainImage;
+      const normalizedImageBox = stampAppearance?.box;
+      const imageRect = normalizedImageBox
+        ? {
+            x:
+              appearanceBounds.x +
+              normalizedImageBox.x * appearanceBounds.width,
+            y:
+              appearanceBounds.y +
+              normalizedImageBox.y * appearanceBounds.height,
+            width: Math.max(
+              1,
+              normalizedImageBox.width * appearanceBounds.width,
+            ),
+            height: Math.max(
+              1,
+              normalizedImageBox.height * appearanceBounds.height,
+            ),
+          }
+        : shouldTreatAsPlainImage
+          ? (() => {
+              const fitted = fitStampImageToRect(
+                {
+                  width: Math.max(1, appearanceBounds.width),
+                  height: Math.max(1, appearanceBounds.height),
+                },
+                stampIntrinsicSize?.width && stampIntrinsicSize?.height
+                  ? {
+                      width: stampIntrinsicSize.width,
+                      height: stampIntrinsicSize.height,
+                    }
+                  : undefined,
+              );
+              return {
+                x: appearanceBounds.x + fitted.x,
+                y: appearanceBounds.y + fitted.y,
+                width: fitted.width,
+                height: fitted.height,
+              };
+            })()
+          : (() => {
+              const inset = Math.max(
+                2,
+                Math.min(appearanceBounds.width, appearanceBounds.height) *
+                  0.03,
+              );
+              return {
+                x: appearanceBounds.x + inset,
+                y: appearanceBounds.y + inset,
+                width: Math.max(1, appearanceBounds.width - inset * 2),
+                height: Math.max(1, appearanceBounds.height - inset * 2),
+              };
+            })();
+
+      const svgAppearance =
+        mimeType === "image/svg+xml" && decodedSvg
+          ? await extractScratchPageAppearance({
+              pdfDoc,
+              page,
+              svg: decodedSvg,
+              imageRect,
+            })
+          : undefined;
+
+      if (svgAppearance && svgAppearance.contents.length > 0) {
+        const backgroundBytes = !shouldDrawCardFrame
+          ? undefined
+          : pdfDoc.context
+              .contentStream(
+                drawRectangle({
+                  x: appearanceBounds.x,
+                  y: appearanceBounds.y,
+                  width: appearanceBounds.width,
+                  height: appearanceBounds.height,
+                  color: rgb(1, 1, 1),
+                  borderColor: rgb(0.83, 0.83, 0.85),
+                  borderWidth: 1,
+                  rotate: degrees(0),
+                  xSkew: degrees(0),
+                  ySkew: degrees(0),
+                  rx: 4,
+                  ry: 4,
+                }),
+              )
+              .getUnencodedContents();
+        const svgContentChunks = backgroundBytes
+          ? [backgroundBytes, svgAppearance.contents]
+          : [svgAppearance.contents];
+
+        appearanceRef = registerRawAppearanceStream(
+          pdfDoc,
+          concatUint8Arrays(svgContentChunks),
+          bbox,
+          graphicsStates,
+          appearanceMatrix,
+          svgAppearance.resources,
+        );
+      }
+
+      if (!appearanceRef && !image && mimeType === "image/svg+xml") {
+        const rasterizedBytes = await rasterizeStampImageToPngBytes({
+          dataUrl: stampImageData,
+          width: stampIntrinsicSize?.width,
+          height: stampIntrinsicSize?.height,
+        });
+        image = await pdfDoc.embedPng(rasterizedBytes);
+      }
+
+      if (!appearanceRef && !image) return undefined;
+
+      if (!appearanceRef && image) {
+        operators = [
+          ...(shouldDrawCardFrame
+            ? drawRectangle({
+                x: appearanceBounds.x,
+                y: appearanceBounds.y,
+                width: appearanceBounds.width,
+                height: appearanceBounds.height,
+                color: rgb(1, 1, 1),
+                borderColor: rgb(0.83, 0.83, 0.85),
+                borderWidth: 1,
+                rotate: degrees(0),
+                xSkew: degrees(0),
+                ySkew: degrees(0),
+                graphicsState: opacity < 1 ? "GS_STAMP" : undefined,
+                rx: 4,
+                ry: 4,
+              })
+            : []),
+          ...drawImage(imageName, {
+            x: imageRect.x,
+            y: imageRect.y,
+            width: imageRect.width,
+            height: imageRect.height,
+            rotate: degrees(0),
+            xSkew: degrees(0),
+            ySkew: degrees(0),
+            graphicsState: opacity < 1 ? "GS_STAMP" : undefined,
+          }),
+        ];
+
+        extraResources = {
+          XObject: {
+            [imageName]: image.ref,
+          },
+        };
+      }
+    } else {
+      const label = resolveStampLabel({
+        presetId: stampPresetId,
+        label: stampLabel,
+      });
+      const helveticaBold =
+        fontMap?.get("Helvetica-Bold") ??
+        (await pdfDoc.embedFont(StandardFonts.HelveticaBold));
+      const presetSvgDataUrl = getPresetStampSvgDataUrl({
+        presetId: stampPresetId,
+        label,
+      });
+      const presetSvg = decodeSvgDataUrlToString(presetSvgDataUrl);
+      if (!presetSvg) return undefined;
+      const svgAppearance = await extractScratchPageAppearance({
+        pdfDoc,
+        page,
+        svg: presetSvg,
+        imageRect: appearanceBounds,
+        fonts: {
+          Helvetica_bold: helveticaBold,
+          Helvetica: helveticaBold,
+        },
+      });
+      if (!svgAppearance || svgAppearance.contents.length === 0) {
+        return undefined;
+      }
+      appearanceRef = registerRawAppearanceStream(
+        pdfDoc,
+        svgAppearance.contents,
+        bbox,
+        graphicsStates,
+        appearanceMatrix,
+        svgAppearance.resources,
+      );
+    }
+
+    appearanceRef ??= registerAppearanceStream(
+      pdfDoc,
+      operators,
+      bbox,
+      graphicsStates,
+      appearanceMatrix,
+      extraResources,
+    );
+
+    if (!appearanceRef) return undefined;
+
+    const stampAnnot = pdfDoc.context.obj({
+      Type: "Annot",
+      Subtype: "Stamp",
+      F: 4,
+      Rect: rectValues,
+      Name: PDFName.of(
+        stampKind === "preset" ? getStampPdfName(stampPresetId) : "Stamp",
+      ),
+      AP: { N: appearanceRef },
+      CA: opacity,
+      P: page.ref,
+    });
+
+    if (stampAnnot instanceof PDFDict) {
+      applyPdfAnnotationCommentMetadata(stampAnnot, annotation);
+      if (
+        stampKind === "image" &&
+        stampSourceSvgData &&
+        stampSourceSvgData.length > 0
+      ) {
+        stampAnnot.set(
+          PDFName.of(PDF_CUSTOM_KEYS.stampSourceSvgData),
+          PDFString.of(stampSourceSvgData),
+        );
+      }
+    }
+
+    const ref = pdfDoc.context.register(stampAnnot);
+    page.node.addAnnot(ref);
+    return ref;
+  }
+}
 
 export class ShapeExporter implements IAnnotationExporter {
   shouldExport(annotation: Annotation): boolean {

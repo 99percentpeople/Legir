@@ -397,7 +397,7 @@ export const createToolBuilder = <TName extends AiToolName>(name: TName) =>
   });
 
 export const annotationTypesSchema = z.array(
-  z.enum(["comment", "highlight", "ink", "freetext", "shape", "link"]),
+  z.enum(["comment", "highlight", "ink", "freetext", "stamp", "shape", "link"]),
 );
 export const formFieldKindsSchema = z.array(
   z.enum(["text", "checkbox", "radio", "dropdown", "signature"]),

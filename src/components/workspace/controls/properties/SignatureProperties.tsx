@@ -2,8 +2,6 @@ import React from "react";
 import { FormField } from "@/types";
 import { PropertyPanelProps } from "./types";
 import { Label } from "@/components/ui/label";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -13,9 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Database, MousePointer2, Trash2, Upload } from "lucide-react";
+import { Database, MousePointer2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { cn } from "@/utils/cn";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 
 export const SignatureProperties: React.FC<PropertyPanelProps<FormField>> = ({
   data,
@@ -24,17 +22,15 @@ export const SignatureProperties: React.FC<PropertyPanelProps<FormField>> = ({
 }) => {
   const { t } = useLanguage();
 
-  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      onTriggerHistorySave();
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target?.result) {
-          onChange({ signatureData: ev.target.result as string });
-        }
-      };
-      reader.readAsDataURL(e.target.files[0]);
-    }
+  const handleSignatureUpload = (file: File) => {
+    onTriggerHistorySave();
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (ev.target?.result) {
+        onChange({ signatureData: ev.target.result as string });
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -47,54 +43,27 @@ export const SignatureProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </h4>
         <div className="space-y-3">
           <Label>{t("properties.signature_image")}</Label>
-          <div className="border-input bg-muted/20 flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4">
-            {data.signatureData ? (
-              <div className="border-border relative flex aspect-video w-full items-center justify-center overflow-hidden rounded border bg-white">
-                <img
-                  src={data.signatureData}
-                  alt="Signature"
-                  className={cn(
-                    "max-h-full max-w-full",
-                    data.imageScaleMode === "fill"
-                      ? "h-full w-full object-fill"
-                      : "object-contain",
-                  )}
-                />
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-1 right-1 h-6 w-6"
-                  onClick={() => {
-                    onTriggerHistorySave();
-                    onChange({ signatureData: undefined });
-                  }}
-                >
-                  <Trash2 size={12} />
-                </Button>
-              </div>
-            ) : (
+          <ImageUploadField
+            imageData={data.signatureData}
+            alt={t("properties.signature_image")}
+            uploadLabel={t("properties.upload_signature")}
+            replaceLabel={t("properties.upload_signature")}
+            onUpload={handleSignatureUpload}
+            onClear={() => {
+              onTriggerHistorySave();
+              onChange({ signatureData: undefined });
+            }}
+            emptyState={
               <div className="text-muted-foreground text-center text-xs">
                 {t("properties.no_signature")}
               </div>
-            )}
-
-            <label className="cursor-pointer">
-              <Input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleSignatureUpload}
-              />
-              <div
-                className={cn(
-                  buttonVariants({ variant: "secondary", size: "sm" }),
-                )}
-              >
-                <Upload size={14} className="mr-2" />
-                {t("properties.upload_signature")}
-              </div>
-            </label>
-          </div>
+            }
+            imageClassName={
+              data.imageScaleMode === "fill"
+                ? "h-full w-full object-fill"
+                : "object-contain"
+            }
+          />
         </div>
 
         <div className="mt-3 space-y-2">

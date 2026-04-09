@@ -36,6 +36,7 @@ export const GeometryProperties: React.FC<
   const isFormField = "name" in data && "style" in data;
   const isFreeText = data.type === "freetext";
   const isShape = data.type === "shape";
+  const isStamp = data.type === "stamp";
   const rotationDeg =
     isFormField &&
     typeof data.rotationDeg === "number" &&
@@ -50,6 +51,12 @@ export const GeometryProperties: React.FC<
       : 0;
   const shapeRotationDeg =
     isShape &&
+    typeof data.rotationDeg === "number" &&
+    Number.isFinite(data.rotationDeg)
+      ? normalizeRotationDeg(data.rotationDeg)
+      : 0;
+  const stampRotationDeg =
+    isStamp &&
     typeof data.rotationDeg === "number" &&
     Number.isFinite(data.rotationDeg)
       ? normalizeRotationDeg(data.rotationDeg)
@@ -146,16 +153,29 @@ export const GeometryProperties: React.FC<
           </Select>
         </div>
       )}
-      {(isFreeText || isShape) && (
+      {(isFreeText || isShape || isStamp) && (
         <div className="mt-4 space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs">{t("properties.rotation")}</Label>
             <span className="text-muted-foreground text-xs">
-              {Math.round(isShape ? shapeRotationDeg : freeTextRotationDeg)}°
+              {Math.round(
+                isShape
+                  ? shapeRotationDeg
+                  : isStamp
+                    ? stampRotationDeg
+                    : freeTextRotationDeg,
+              )}
+              °
             </span>
           </div>
           <Slider
-            value={[isShape ? shapeRotationDeg : freeTextRotationDeg]}
+            value={[
+              isShape
+                ? shapeRotationDeg
+                : isStamp
+                  ? stampRotationDeg
+                  : freeTextRotationDeg,
+            ]}
             min={-180}
             max={180}
             step={1}

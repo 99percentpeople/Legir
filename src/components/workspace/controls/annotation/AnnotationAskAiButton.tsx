@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
+import { getReadableStampLabel } from "@/lib/stamps";
 import type { Annotation } from "@/types";
 
 const getAnnotationAskAiPreview = (
@@ -14,6 +15,13 @@ const getAnnotationAskAiPreview = (
 
   const annotationText = annotation.text?.trim();
   if (annotationText) return annotationText;
+
+  const stampLabel = getReadableStampLabel({
+    kind: annotation.stamp?.kind,
+    presetId: annotation.stamp?.presetId,
+    label: annotation.stamp?.label,
+  });
+  if (stampLabel) return stampLabel;
 
   const linkUrl = annotation.linkUrl?.trim();
   if (linkUrl) return linkUrl;
@@ -35,6 +43,8 @@ const getAnnotationAskAiPreview = (
       return t("toolbar.freetext");
     case "shape":
       return t("toolbar.shape");
+    case "stamp":
+      return t("toolbar.stamp");
     case "link":
       return t("properties.link.title");
     default:

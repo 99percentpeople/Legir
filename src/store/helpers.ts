@@ -404,6 +404,13 @@ export const initialState: EditorState = {
     cloudIntensity: ANNOTATION_STYLES.shape.cloudIntensity,
     cloudSpacing: ANNOTATION_STYLES.shape.cloudSpacing,
   },
+  stampStyle: {
+    kind: ANNOTATION_STYLES.stamp.kind,
+    presetId: ANNOTATION_STYLES.stamp.presetId,
+    image: ANNOTATION_STYLES.stamp.image,
+    imageAppearance: ANNOTATION_STYLES.stamp.imageAppearance,
+    opacity: ANNOTATION_STYLES.stamp.opacity,
+  },
   isProcessing: false,
   past: [],
   future: [],

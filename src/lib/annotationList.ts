@@ -1,3 +1,4 @@
+import { getReadableStampLabel } from "@/lib/stamps";
 import type { Annotation } from "@/types";
 
 export const ANNOTATION_LIST_TYPES = [
@@ -5,6 +6,7 @@ export const ANNOTATION_LIST_TYPES = [
   "highlight",
   "ink",
   "freetext",
+  "stamp",
   "shape",
   "link",
 ] as const;
@@ -22,6 +24,7 @@ export const getAnnotationListType = (
     annotation.type === "highlight" ||
     annotation.type === "ink" ||
     annotation.type === "freetext" ||
+    annotation.type === "stamp" ||
     annotation.type === "shape" ||
     annotation.type === "link"
   ) {
@@ -60,6 +63,13 @@ export const filterAnnotationsForList = (
     const highlightedTextContent = (
       annotation.highlightedText || ""
     ).toLowerCase();
+    const stampLabelContent = (
+      getReadableStampLabel({
+        kind: annotation.stamp?.kind,
+        presetId: annotation.stamp?.presetId,
+        label: annotation.stamp?.label,
+      }) || ""
+    ).toLowerCase();
     const authorContent = (annotation.author || "").toLowerCase();
     const replyTextContent = (annotation.replies ?? [])
       .map((reply) => reply.text || "")
@@ -78,6 +88,7 @@ export const filterAnnotationsForList = (
     return (
       textContent.includes(query) ||
       highlightedTextContent.includes(query) ||
+      stampLabelContent.includes(query) ||
       authorContent.includes(query) ||
       replyTextContent.includes(query) ||
       replyAuthorContent.includes(query) ||

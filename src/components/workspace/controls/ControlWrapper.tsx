@@ -33,6 +33,7 @@ export type ControlWrapperProps = ControlProps & {
   customElementId?: string;
   className?: string;
   contextMenuDisabled?: boolean;
+  contextMenuContent?: React.ReactNode;
   children?: React.ReactNode;
 };
 
@@ -55,6 +56,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   customElementId,
   className,
   contextMenuDisabled = false,
+  contextMenuContent,
 }) => {
   const { t } = useLanguage();
   const wrapperRef = React.useRef<HTMLDivElement>(null);
@@ -63,6 +65,8 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const contextMenuOpenRef = React.useRef(false);
   const isFreetext = data.type === "freetext";
   const isShape = data.type === "shape";
+  const isStamp = data.type === "stamp";
+  const isRotatableAnnotation = isFreetext || isShape || isStamp;
   const {
     ref: tooltipMouseRef,
     x,
@@ -94,10 +98,11 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     "ink",
     "freetext",
     "link",
+    "stamp",
     "shape",
   ].includes(data.type);
   const isFormField = !isAnnotation;
-  const supportsRotation = isFreetext || isShape || isFormField;
+  const supportsRotation = isRotatableAnnotation || isFormField;
   const tooltipText =
     !isAnnotation && "toolTip" in data && typeof data.toolTip === "string"
       ? data.toolTip.trim()
@@ -184,7 +189,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     height: number;
   }) => {
     const rotationDeg =
-      (isFreetext || isShape) &&
+      isRotatableAnnotation &&
       typeof data.rotationDeg === "number" &&
       Number.isFinite(data.rotationDeg)
         ? data.rotationDeg
@@ -233,7 +238,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     height: number;
   }) => {
     const actualRect =
-      (isFreetext || isShape) && rotationDeg !== 0
+      isRotatableAnnotation && rotationDeg !== 0
         ? getAnnotationInnerRectFromOuterAabb(nextRect)
         : nextRect;
 
@@ -364,8 +369,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     Number.isFinite(data.rotationDeg)
       ? data.rotationDeg
       : 0;
-  const shouldRenderRotatedOverlay =
-    (isFreetext || isShape) && rotationDeg !== 0;
+  const shouldRenderRotatedOverlay = isRotatableAnnotation && rotationDeg !== 0;
 
   const rotatedInnerOverlayGeometry = (() => {
     if (!shouldRenderRotatedOverlay) return null;
@@ -408,7 +412,14 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const supportsKeyboardRotateHandle = isSelected && supportsRotation;
   const canShowLayerContextMenu =
     !contextMenuDisabled && isSelectable && data.type !== "shape";
-  const hasControlContextMenu = canShowLayerContextMenu && !!onReorderLayer;
+  const hasCustomContextMenuContent =
+    React.Children.count(contextMenuContent) > 0;
+  const canResetFormControlToDefault = !isAnnotation && !!onResetToDefault;
+  const hasControlContextMenu =
+    canShowLayerContextMenu &&
+    (hasCustomContextMenuContent ||
+      canResetFormControlToDefault ||
+      !!onReorderLayer);
   const renderedChildren =
     isFormField && formFieldContentGeometry ? (
       <div
@@ -616,7 +627,6 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     </div>
   );
 
-  const canResetFormControlToDefault = !isAnnotation && !!onResetToDefault;
   const triggerElement = tooltipText ? (
     <TooltipTrigger asChild>{wrapper}</TooltipTrigger>
   ) : (
@@ -630,17 +640,24 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       }}
       content={
         <>
+          {hasCustomContextMenuContent && contextMenuContent}
+          {hasCustomContextMenuContent &&
+            (canResetFormControlToDefault || !!onReorderLayer) && (
+              <ContextMenuSeparator />
+            )}
           {canResetFormControlToDefault && (
             <>
               <ContextMenuItem onSelect={() => onResetToDefault(id)}>
                 {t("common.actions.reset_to_default")}
               </ContextMenuItem>
-              <ContextMenuSeparator />
+              {!!onReorderLayer && <ContextMenuSeparator />}
             </>
           )}
-          <ControlLayerMenuItems
-            onSelect={(move) => onReorderLayer(id, move)}
-          />
+          {!!onReorderLayer && (
+            <ControlLayerMenuItems
+              onSelect={(move) => onReorderLayer(id, move)}
+            />
+          )}
         </>
       }
     >

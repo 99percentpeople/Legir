@@ -83,6 +83,12 @@ import {
   shapeSupportsFill,
 } from "@/lib/shapeGeometry";
 import {
+  getStampRectAtPoint,
+  getReadableStampLabel,
+  normalizeStampKind,
+  normalizeStampOpacity,
+} from "@/lib/stamps";
+import {
   duplicateAnnotationForDrag,
   duplicateFieldForDrag,
 } from "./lib/duplicateControlForDrag";
@@ -233,6 +239,11 @@ const normalizeRotationDeg = (deg: number) => {
   if (d > 180) d -= 360;
   return d;
 };
+
+const isRotatableAnnotation = (annotation: FormField | Annotation) =>
+  annotation.type === "freetext" ||
+  annotation.type === "shape" ||
+  annotation.type === "stamp";
 
 const Workspace: React.FC<WorkspaceProps> = ({
   sessionRenderKey,
@@ -469,12 +480,24 @@ const Workspace: React.FC<WorkspaceProps> = ({
   ]);
 
   const handleAskAiFromAnnotation = useCallback((annotation: Annotation) => {
+    const stampLabel = getReadableStampLabel({
+      kind: annotation.stamp?.kind,
+      presetId: annotation.stamp?.presetId,
+      label: annotation.stamp?.label,
+    });
+    const stampHasImage =
+      typeof annotation.stamp?.image?.dataUrl === "string" &&
+      annotation.stamp.image.dataUrl.length > 0;
     const attachment: AiChatMessageAttachment = {
       kind: "annotation_reference",
       annotationId: annotation.id,
       annotationType: annotation.type,
       pageIndex: annotation.pageIndex,
-      ...(annotation.text?.trim() ? { text: annotation.text.trim() } : null),
+      ...(annotation.text?.trim()
+        ? { text: annotation.text.trim() }
+        : stampLabel
+          ? { text: stampLabel }
+          : null),
       ...(annotation.highlightedText?.trim()
         ? { highlightedText: annotation.highlightedText.trim() }
         : null),
@@ -483,6 +506,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
         : null),
       ...(typeof annotation.linkDestPageIndex === "number"
         ? { linkDestPageIndex: annotation.linkDestPageIndex }
+        : null),
+      ...(annotation.type === "stamp"
+        ? {
+            stampKind: annotation.stamp?.kind,
+            stampPresetId: annotation.stamp?.presetId,
+            stampLabel,
+            stampHasImage,
+          }
         : null),
     };
 
@@ -588,6 +619,62 @@ const Workspace: React.FC<WorkspaceProps> = ({
       });
     },
     [createShapeAnnotationBase, onAddAnnotation],
+  );
+
+  const addStampAtRect = useCallback(
+    (pageIndex: number, rect: Rect) => {
+      const stampStyle = editorState.stampStyle ?? ANNOTATION_STYLES.stamp;
+      const kind = normalizeStampKind(
+        stampStyle.kind,
+        ANNOTATION_STYLES.stamp.kind,
+      );
+      const opacity = normalizeStampOpacity(
+        stampStyle.opacity,
+        ANNOTATION_STYLES.stamp.opacity,
+      );
+
+      if (kind === "image" && !stampStyle.image?.dataUrl) {
+        return false;
+      }
+
+      onAddAnnotation({
+        id: `stamp_${Date.now()}`,
+        pageIndex,
+        type: "stamp",
+        rect,
+        stamp: {
+          kind,
+          presetId: stampStyle.presetId,
+          image: kind === "image" ? stampStyle.image : undefined,
+          appearance:
+            kind === "image"
+              ? {
+                  frame: stampStyle.imageAppearance?.frame ?? "plain",
+                }
+              : undefined,
+        },
+        opacity,
+      });
+
+      return true;
+    },
+    [editorState.stampStyle, onAddAnnotation],
+  );
+
+  const addStampAtPoint = useCallback(
+    (pageIndex: number, point: Point) => {
+      const stampStyle = editorState.stampStyle ?? ANNOTATION_STYLES.stamp;
+      return addStampAtRect(
+        pageIndex,
+        getStampRectAtPoint(point, {
+          kind: stampStyle.kind,
+          presetId: stampStyle.presetId,
+          imageWidth: stampStyle.image?.intrinsicSize?.width,
+          imageHeight: stampStyle.image?.intrinsicSize?.height,
+        }),
+      );
+    },
+    [addStampAtRect, editorState.stampStyle],
   );
 
   const finalizeShapeDraftSession = useCallback(
@@ -1271,9 +1358,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const coords = getRelativeCoords(e, data.pageIndex);
 
       if (
-        ["freetext", "ink", "highlight", "comment", "link", "shape"].includes(
-          data.type,
-        )
+        [
+          "freetext",
+          "ink",
+          "highlight",
+          "comment",
+          "link",
+          "stamp",
+          "shape",
+        ].includes(data.type)
       ) {
         setResizingAnnotationId(data.id);
       } else {
@@ -1283,7 +1376,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       setResizeHandle(handle);
       if (data.rect) {
         const interactionRect =
-          (data.type === "freetext" || data.type === "shape") &&
+          isRotatableAnnotation(data) &&
           typeof data.rotationDeg === "number" &&
           Number.isFinite(data.rotationDeg) &&
           data.rotationDeg !== 0
@@ -1296,8 +1389,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         };
 
         const supportsRotation =
-          data.type === "freetext" ||
-          data.type === "shape" ||
+          isRotatableAnnotation(data) ||
           !["highlight", "ink", "comment", "link"].includes(data.type);
 
         if (handle === "rotate" && supportsRotation) {
@@ -1376,7 +1468,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (!annotation.rect) return undefined;
 
     const rotationDeg =
-      (annotation.type === "freetext" || annotation.type === "shape") &&
+      isRotatableAnnotation(annotation) &&
       typeof annotation.rotationDeg === "number" &&
       Number.isFinite(annotation.rotationDeg)
         ? annotation.rotationDeg
@@ -1436,7 +1528,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const newOuterY = currentCoords.y - moveOffset.y;
 
       if (
-        (annot.type === "freetext" || annot.type === "shape") &&
+        isRotatableAnnotation(annot) &&
         typeof annot.rotationDeg === "number" &&
         Number.isFinite(annot.rotationDeg) &&
         annot.rotationDeg !== 0
@@ -1475,10 +1567,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         pageIndex,
       );
 
-      if (
-        resizeHandle === "rotate" &&
-        (annot.type === "freetext" || annot.type === "shape")
-      ) {
+      if (resizeHandle === "rotate" && isRotatableAnnotation(annot)) {
         const pivot =
           resizeStart.rotatePivot ??
           ({
@@ -1555,6 +1644,34 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }
       }
 
+      if (
+        annot.type === "stamp" &&
+        editorState.keys.shift &&
+        resizeHandle.length === 2
+      ) {
+        const aspectRatio =
+          resizeStart.originalRect.width / resizeStart.originalRect.height;
+
+        if (typeof aspectRatio === "number" && aspectRatio > 0) {
+          const absDx = Math.abs(newW - resizeStart.originalRect.width);
+          const absDy = Math.abs(newH - resizeStart.originalRect.height);
+
+          if (absDx > absDy * aspectRatio) {
+            const targetH = newW / aspectRatio;
+            if (resizeHandle.includes("n")) {
+              newY += newH - targetH;
+            }
+            newH = targetH;
+          } else {
+            const targetW = newH * aspectRatio;
+            if (resizeHandle.includes("w")) {
+              newX += newW - targetW;
+            }
+            newW = targetW;
+          }
+        }
+      }
+
       // Minimum size check
       if (newW < 5) {
         if (resizeHandle.includes("w"))
@@ -1577,7 +1694,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         height: newH,
       };
       const nextRect =
-        (annot.type === "freetext" || annot.type === "shape") &&
+        isRotatableAnnotation(annot) &&
         typeof annot.rotationDeg === "number" &&
         Number.isFinite(annot.rotationDeg) &&
         annot.rotationDeg !== 0
@@ -2519,6 +2636,21 @@ const Workspace: React.FC<WorkspaceProps> = ({
             ) {
               onToolChange("select");
             }
+          } else if (editorState.tool === "draw_stamp") {
+            const created = addStampAtRect(activePageIndex, {
+              x,
+              y,
+              width,
+              height,
+            });
+            if (
+              created &&
+              !editorState.keys.shift &&
+              !editorState.keys.ctrl &&
+              shouldSwitchToSelectAfterUse("draw_stamp")
+            ) {
+              onToolChange("select");
+            }
           } else if (editorState.tool === "draw_shape_rect") {
             addShapeFromRect("square", activePageIndex, {
               x,
@@ -2566,35 +2698,49 @@ const Workspace: React.FC<WorkspaceProps> = ({
           }
         }
       } else if (
-        editorState.tool === "draw_freetext" &&
+        (editorState.tool === "draw_freetext" ||
+          editorState.tool === "draw_stamp") &&
         editorState.mode === "annotation"
       ) {
-        // Single click creation for FreeText
-        onAddAnnotation({
-          id: `freetext_${Date.now()}`,
-          pageIndex: activePageIndex,
-          type: "freetext",
-          rect: { x: dragStart.x, y: dragStart.y, width: 150, height: 30 },
-          color:
-            editorState.freetextStyle?.color ||
-            ANNOTATION_STYLES.freetext.color,
-          size:
-            editorState.freetextStyle?.size || ANNOTATION_STYLES.freetext.size,
-          borderColor:
-            editorState.freetextStyle?.borderColor ||
-            ANNOTATION_STYLES.freetext.borderColor,
-          borderWidth:
-            editorState.freetextStyle?.borderWidth ??
-            ANNOTATION_STYLES.freetext.borderWidth,
-          text: "New Freetext",
-        });
+        if (editorState.tool === "draw_freetext") {
+          // Single click creation for FreeText
+          onAddAnnotation({
+            id: `freetext_${Date.now()}`,
+            pageIndex: activePageIndex,
+            type: "freetext",
+            rect: { x: dragStart.x, y: dragStart.y, width: 150, height: 30 },
+            color:
+              editorState.freetextStyle?.color ||
+              ANNOTATION_STYLES.freetext.color,
+            size:
+              editorState.freetextStyle?.size ||
+              ANNOTATION_STYLES.freetext.size,
+            borderColor:
+              editorState.freetextStyle?.borderColor ||
+              ANNOTATION_STYLES.freetext.borderColor,
+            borderWidth:
+              editorState.freetextStyle?.borderWidth ??
+              ANNOTATION_STYLES.freetext.borderWidth,
+            text: "New Freetext",
+          });
 
-        if (
-          !editorState.keys.shift &&
-          !editorState.keys.ctrl &&
-          shouldSwitchToSelectAfterUse("draw_freetext")
-        ) {
-          onToolChange("select");
+          if (
+            !editorState.keys.shift &&
+            !editorState.keys.ctrl &&
+            shouldSwitchToSelectAfterUse("draw_freetext")
+          ) {
+            onToolChange("select");
+          }
+        } else {
+          const created = addStampAtPoint(activePageIndex, dragStart);
+          if (
+            created &&
+            !editorState.keys.shift &&
+            !editorState.keys.ctrl &&
+            shouldSwitchToSelectAfterUse("draw_stamp")
+          ) {
+            onToolChange("select");
+          }
         }
       }
     }
@@ -2732,7 +2878,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (state.tool !== "select") return;
 
       const rotationDeg =
-        (annotation.type === "freetext" || annotation.type === "shape") &&
+        isRotatableAnnotation(annotation) &&
         typeof annotation.rotationDeg === "number" &&
         Number.isFinite(annotation.rotationDeg)
           ? annotation.rotationDeg
@@ -2792,7 +2938,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       setActivePageIndex(targetAnnotation.pageIndex);
       const coords = getRelativeCoords(e, targetAnnotation.pageIndex);
-      const moveRect = outerRect ?? targetAnnotation.rect;
+      const moveRect =
+        targetAnnotation.rect &&
+        isRotatableAnnotation(targetAnnotation) &&
+        typeof targetAnnotation.rotationDeg === "number" &&
+        Number.isFinite(targetAnnotation.rotationDeg) &&
+        targetAnnotation.rotationDeg !== 0
+          ? (getAnnotationOuterRect(targetAnnotation) ?? targetAnnotation.rect)
+          : targetAnnotation.rect;
 
       // Keep highlight stationary by default, but allow modifier-drag duplication
       // to immediately move the newly created copy.

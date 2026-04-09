@@ -11,6 +11,7 @@ import {
   sortAnnotationsForList,
   type AnnotationListType,
 } from "@/lib/annotationList";
+import { getReadableStampLabel } from "@/lib/stamps";
 import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import {
   getDefaultArrowSize,
@@ -210,6 +211,14 @@ const summarizeAnnotation = (
 ): AiAnnotationSummary | null => {
   const type = getAiAnnotationKind(annotation);
   if (!type) return null;
+  const stampLabel = getReadableStampLabel({
+    kind: annotation.stamp?.kind,
+    presetId: annotation.stamp?.presetId,
+    label: annotation.stamp?.label,
+  });
+  const stampHasImage =
+    typeof annotation.stamp?.image?.dataUrl === "string" &&
+    annotation.stamp.image.dataUrl.length > 0;
 
   return {
     id: annotation.id,
@@ -231,6 +240,11 @@ const summarizeAnnotation = (
       typeof annotation.meta?.kind === "string"
         ? annotation.meta.kind
         : undefined,
+    stampKind: annotation.type === "stamp" ? annotation.stamp?.kind : undefined,
+    stampPresetId:
+      annotation.type === "stamp" ? annotation.stamp?.presetId : undefined,
+    stampLabel: annotation.type === "stamp" ? stampLabel : undefined,
+    stampHasImage: annotation.type === "stamp" ? stampHasImage : undefined,
   };
 };
 
@@ -799,7 +813,11 @@ const normalizeAnnotationRectInput = (
     typeof x !== "number" ||
     typeof y !== "number" ||
     typeof width !== "number" ||
-    typeof height !== "number" ||
+    typeof height !== "number"
+  ) {
+    return null;
+  }
+  if (
     !Number.isFinite(x) ||
     !Number.isFinite(y) ||
     !Number.isFinite(width) ||

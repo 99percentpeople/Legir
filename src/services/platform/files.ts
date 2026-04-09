@@ -54,6 +54,8 @@ function guessMimeType(extensions: string[]): `${string}/${string}` {
   if (ext === "txt") return "text/plain";
   if (ext === "png") return "image/png";
   if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "webp") return "image/webp";
+  if (ext === "jp2") return "image/jp2";
   return "application/octet-stream";
 }
 
@@ -177,6 +179,7 @@ export const saveFileAs = async (options: {
   suggestedName: string;
   bytes: Uint8Array;
   filters?: FilePickerFilter[];
+  mimeType?: string;
 }): Promise<boolean> => {
   if (isDesktopApp()) {
     const [{ save }, { writeFile }] = await Promise.all([
@@ -217,7 +220,28 @@ export const saveFileAs = async (options: {
     }
   }
 
-  return false;
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const fallbackMimeType =
+    options.mimeType ||
+    (options.filters && options.filters.length > 0
+      ? guessMimeType(options.filters[0].extensions)
+      : "application/octet-stream");
+  const blob = new Blob([new Uint8Array(options.bytes)], {
+    type: fallbackMimeType,
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = options.suggestedName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  return true;
 };
 
 export const exportPdfBytes = async (options: {

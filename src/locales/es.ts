@@ -20,6 +20,8 @@ const es = {
       retry: "Reintentar",
       regenerate: "Regenerar",
       reset_to_default: "Restablecer al valor predeterminado",
+      restore_original_ratio: "Restaurar proporción original",
+      download_image: "Descargar imagen",
     },
   },
   status: {
@@ -43,6 +45,8 @@ const es = {
     radio: "Botón de opción",
     dropdown: "Desplegable",
     signature: "Firma",
+    stamp: "Sello",
+    stamp_properties: "Propiedades del sello",
     eraser: "Borrador",
     highlight: "Resaltar",
     highlight_text: "Resaltar",
@@ -277,6 +281,11 @@ const es = {
     signature_image: "Imagen de firma",
     no_signature: "No hay imagen de firma presente",
     upload_signature: "Subir imagen",
+    stamp_type: "Tipo de sello",
+    preset_stamp: "Sello predefinido",
+    image_stamp: "Sello de imagen",
+    replace_image: "Reemplazar imagen",
+    upload_image: "Subir imagen",
     scale_mode: {
       contain: "Contener",
       fill: "Rellenar",
@@ -366,6 +375,17 @@ const es = {
       page: "Página {page}",
       go_to_page: "Ir a la página {page}",
       not_available: "N/D",
+    },
+  },
+  stamp: {
+    upload_error: "No se pudo cargar la imagen del sello",
+    download_error: "No se pudo descargar la imagen del sello",
+    preset: {
+      approved: "APROBADO",
+      rejected: "RECHAZADO",
+      draft: "BORRADOR",
+      confidential: "CONFIDENCIAL",
+      final: "FINAL",
     },
   },
   right_panel: {

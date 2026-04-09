@@ -20,6 +20,8 @@ import {
   Search,
   MessageCircle,
   Shapes,
+  Stamp,
+  ChevronDown,
 } from "lucide-react";
 import {
   EditorState,
@@ -59,6 +61,7 @@ import {
   type ShapeTool,
 } from "./shapeTools";
 import { ShapeBorderStyleSection } from "./ShapeBorderStyleSection";
+import { StampStylePopover } from "./StampStylePopover";
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -82,6 +85,9 @@ interface ToolbarProps {
   onFreetextStyleChange?: (style: { color: string }) => void;
   onShapeStyleChange?: (
     style: Partial<NonNullable<EditorState["shapeStyle"]>>,
+  ) => void;
+  onStampStyleChange?: (
+    style: Partial<NonNullable<EditorState["stampStyle"]>>,
   ) => void;
   onExport: () => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
@@ -123,6 +129,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onCommentStyleChange: onCommentStyleChange,
   onFreetextStyleChange: onFreetextStyleChange,
   onShapeStyleChange,
+  onStampStyleChange,
   onExport,
   onSaveAs,
   onPrint,
@@ -554,6 +561,29 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     showThickness={false}
                     title={t("toolbar.freetext_properties")}
                   />
+                </div>
+                <div className="flex items-center gap-0">
+                  <ToggleGroupItem
+                    value="draw_stamp"
+                    title={t("toolbar.stamp")}
+                    className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
+                  >
+                    <Stamp size={16} />
+                  </ToggleGroupItem>
+                  <StampStylePopover
+                    value={editorState.stampStyle}
+                    onChange={(style) => onStampStyleChange?.(style)}
+                    title={t("toolbar.stamp_properties")}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-l-none p-0 sm:h-9 sm:w-5"
+                      title={t("toolbar.stamp_properties")}
+                    >
+                      <ChevronDown size={14} />
+                    </Button>
+                  </StampStylePopover>
                 </div>
                 <div className="flex items-center gap-0">
                   <Popover

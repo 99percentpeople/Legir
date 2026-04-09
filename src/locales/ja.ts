@@ -20,6 +20,8 @@ const ja = {
       retry: "再試行",
       regenerate: "再生成",
       reset_to_default: "デフォルト値にリセット",
+      restore_original_ratio: "元の比率に戻す",
+      download_image: "画像をダウンロード",
     },
   },
   status: {
@@ -43,6 +45,8 @@ const ja = {
     radio: "ラジオボタン",
     dropdown: "ドロップダウン",
     signature: "署名",
+    stamp: "スタンプ",
+    stamp_properties: "スタンプ設定",
     eraser: "消しゴム",
     highlight: "強調表示",
     highlight_text: "強調表示",
@@ -275,6 +279,11 @@ const ja = {
     signature_image: "署名画像",
     no_signature: "署名画像がありません",
     upload_signature: "画像をアップロード",
+    stamp_type: "スタンプの種類",
+    preset_stamp: "プリセットスタンプ",
+    image_stamp: "画像スタンプ",
+    replace_image: "画像を差し替え",
+    upload_image: "画像をアップロード",
     scale_mode: {
       contain: "収める",
       fill: "埋める",
@@ -364,6 +373,17 @@ const ja = {
       page: "ページ {page}",
       go_to_page: "ページ {page} に移動",
       not_available: "なし",
+    },
+  },
+  stamp: {
+    upload_error: "スタンプ画像の読み込みに失敗しました",
+    download_error: "スタンプ画像のダウンロードに失敗しました",
+    preset: {
+      approved: "承認済み",
+      rejected: "却下",
+      draft: "下書き",
+      confidential: "機密",
+      final: "最終",
     },
   },
   right_panel: {

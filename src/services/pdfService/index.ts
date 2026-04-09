@@ -37,6 +37,9 @@ import {
   getRotationDegFromPdfMatrix,
   parseRotationDegFromAppearanceContent,
 } from "./lib/appearanceRotation";
+import { extractStampImageDataFromAppearance } from "./lib/stampAppearance";
+import { extractStampSvgDataFromAppearance } from "./lib/stampVector";
+import { cropRenderedPageImageToDataUrl } from "./lib/renderedImageCrop";
 import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
 import { getAppHighlightedText } from "./lib/annotationMetadata";
 import {
@@ -65,11 +68,17 @@ import {
   PDFNull,
   PDFPage,
   ParseSpeeds,
+  rgb,
 } from "@cantoo/pdf-lib";
 import fontkit from "pdf-fontkit";
 import { pdfDebug, pdfDebugEnabled } from "./lib/debug";
 import { appEventBus } from "@/lib/eventBus";
 import { PDF_CUSTOM_KEYS } from "@/constants";
+import {
+  createStampImageAppearance,
+  createStampImageResource,
+  getStampSvgIntrinsicSize,
+} from "@/lib/stampImage";
 import {
   FormField,
   PageData,
@@ -96,6 +105,7 @@ import {
   CommentParser,
   FreeTextParser,
   LinkParser,
+  StampParser,
   ShapeParser,
 } from "./parsers/AnnotationParsers";
 import {
@@ -111,6 +121,7 @@ import {
   CommentExporter,
   FreeTextExporter,
   LinkExporter,
+  StampExporter,
   ShapeExporter,
 } from "./exporters/AnnotationExporters";
 import {
@@ -120,7 +131,15 @@ import {
   DropdownControlExporter,
   SignatureControlExporter,
 } from "./exporters/ControlExporters";
-import { createPdfLibViewport, uiRectToPdfBounds } from "./lib/coords";
+import {
+  createPdfLibViewport,
+  pdfJsRectToUiRect,
+  uiRectToPdfBounds,
+} from "./lib/coords";
+import {
+  resolveReadableStampLabel,
+  resolveStampPresetIdFromText,
+} from "@/lib/stamps";
 
 // PDF pipeline service.
 //
@@ -145,6 +164,7 @@ const annotationParsers: IAnnotationParser[] = [
   new CommentParser(),
   new FreeTextParser(),
   new LinkParser(),
+  new StampParser(),
   new ShapeParser(),
 ];
 
@@ -162,6 +182,7 @@ const annotationExporters: IAnnotationExporter[] = [
   new CommentExporter(),
   new FreeTextExporter(),
   new LinkExporter(),
+  new StampExporter(),
   new ShapeExporter(),
 ];
 
@@ -172,6 +193,116 @@ const controlExporters: IControlExporter[] = [
   new DropdownControlExporter(),
   new SignatureControlExporter(),
 ];
+
+const STAMP_RENDER_FALLBACK_SCALE = 2;
+
+const populateRenderedStampFallbacksForPage = async (options: {
+  pageAnnotations: PdfJsAnnotation[];
+  pageIndex: number;
+  viewport: ViewportLike;
+  workerService: PDFWorkerService;
+  pdfDoc: PDFDocument;
+}) => {
+  const { pageAnnotations, pageIndex, viewport, workerService, pdfDoc } =
+    options;
+
+  const candidates = pageAnnotations.filter((annotation) => {
+    if (annotation.subtype !== "Stamp") return false;
+    if (
+      typeof annotation.stamp?.image?.dataUrl === "string" &&
+      annotation.stamp.image.dataUrl.length > 0
+    ) {
+      return false;
+    }
+
+    const rawName =
+      typeof annotation.stamp?.name === "string"
+        ? annotation.stamp.name.trim()
+        : "";
+    const rawContents =
+      typeof annotation.contents === "string" ? annotation.contents.trim() : "";
+    if (resolveStampPresetIdFromText(rawName, rawContents)) return false;
+    if (resolveReadableStampLabel({ name: rawName, contents: rawContents })) {
+      return false;
+    }
+
+    return true;
+  });
+
+  if (candidates.length === 0) return;
+
+  let renderedPage: { bytes: Uint8Array; mimeType: string } | undefined;
+  try {
+    const scratchDoc = await PDFDocument.create();
+    const [copiedPage] = await scratchDoc.copyPages(pdfDoc, [pageIndex]);
+    const { width, height } = copiedPage.getSize();
+    copiedPage.drawRectangle({
+      x: 0,
+      y: 0,
+      width,
+      height,
+      color: rgb(1, 1, 1),
+      opacity: 1,
+      borderWidth: 0,
+    });
+    scratchDoc.addPage(copiedPage);
+    const scratchBytes = await scratchDoc.save();
+    const docId = `stamp-fallback-${pageIndex}-${Date.now()}`;
+    renderedPage = await workerService.renderPageImage({
+      pageIndex: 0,
+      scale: STAMP_RENDER_FALLBACK_SCALE,
+      renderAnnotations: true,
+      mimeType: "image/png",
+      docId,
+      data: scratchBytes,
+      isNewDoc: true,
+    });
+  } catch {
+    return;
+  }
+
+  if (!renderedPage || renderedPage.bytes.length === 0) return;
+
+  await Promise.all(
+    candidates.map(async (annotation) => {
+      const importedRect = pdfJsRectToUiRect(annotation.rect, viewport);
+      if (
+        !Number.isFinite(importedRect.width) ||
+        !Number.isFinite(importedRect.height) ||
+        importedRect.width <= 0 ||
+        importedRect.height <= 0
+      ) {
+        return;
+      }
+
+      try {
+        const cropped = await cropRenderedPageImageToDataUrl({
+          bytes: renderedPage.bytes,
+          mimeType: renderedPage.mimeType,
+          pageWidth: viewport.width,
+          pageHeight: viewport.height,
+          cropRect: importedRect,
+        });
+        if (!cropped?.dataUrl) return;
+
+        annotation.stamp = {
+          ...annotation.stamp,
+          image: createStampImageResource({
+            dataUrl: cropped.dataUrl,
+            width: cropped.width,
+            height: cropped.height,
+          }),
+          appearance: createStampImageAppearance({
+            frame: "plain",
+            source: "baked",
+          }),
+        };
+      } catch {
+        // ignore single-stamp fallback failures
+      }
+    }),
+  );
+};
 
 type PdfLoadSession = {
   id: string;
@@ -1023,6 +1154,7 @@ const buildPdfLibAnnotsByPageIndex = async (
         subtypeName !== "Highlight" &&
         subtypeName !== "Text" &&
         subtypeName !== "FreeText" &&
+        subtypeName !== "Stamp" &&
         subtypeName !== "Square" &&
         subtypeName !== "Circle" &&
         subtypeName !== "Line" &&
@@ -1046,6 +1178,7 @@ const buildPdfLibAnnotsByPageIndex = async (
 
       const title = pdfObjToString(annot.lookup(PDFName.of("T")));
       const contents = pdfObjToString(annot.lookup(PDFName.of("Contents")));
+      const rawStampName = pdfObjToString(annot.lookup(PDFName.of("Name")));
       const modificationDate = pdfObjToString(annot.lookup(PDFName.of("M")));
       const annotationFlagsObj = annot.lookup(PDFName.of("F"));
       const annotationFlags =
@@ -1118,7 +1251,79 @@ const buildPdfLibAnnotsByPageIndex = async (
       const endArrowStyle = pdfObjToString(
         annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.endArrowStyle)),
       );
+      const stampSourceSvgData = pdfObjToString(
+        annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.stampSourceSvgData)),
+      );
+      const stampSourceSvgSize = stampSourceSvgData
+        ? getStampSvgIntrinsicSize(stampSourceSvgData)
+        : undefined;
+      let stampImage = createStampImageResource({
+        dataUrl: stampSourceSvgData ?? undefined,
+        width: stampSourceSvgSize?.width,
+        height: stampSourceSvgSize?.height,
+      });
+      let stampAppearance = createStampImageAppearance();
       const appearance = getAppearanceStreamMetadata(annot);
+      if (subtypeName === "Stamp") {
+        try {
+          const extractedStampSvg =
+            await extractStampSvgDataFromAppearance(annot);
+          if (extractedStampSvg) {
+            if (!stampImage?.dataUrl) {
+              stampImage = createStampImageResource({
+                dataUrl: extractedStampSvg.dataUrl,
+                width: extractedStampSvg.width,
+                height: extractedStampSvg.height,
+              });
+            }
+            stampImage ??= createStampImageResource({
+              dataUrl: extractedStampSvg.dataUrl,
+              width: extractedStampSvg.width,
+              height: extractedStampSvg.height,
+            });
+            stampAppearance = createStampImageAppearance({
+              frame: stampAppearance?.frame ?? "plain",
+              box: stampAppearance?.box,
+              source: stampSourceSvgData ? "native" : "baked",
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (!stampImage?.dataUrl && subtypeName === "Stamp") {
+        try {
+          const extractedStamp =
+            await extractStampImageDataFromAppearance(annot);
+          if (extractedStamp) {
+            stampImage = createStampImageResource({
+              dataUrl: extractedStamp.dataUrl,
+              width: extractedStamp.imageWidth,
+              height: extractedStamp.imageHeight,
+            });
+            stampAppearance = createStampImageAppearance({
+              box: extractedStamp.imageBox,
+              frame: extractedStamp.imageFrame,
+              source: "native",
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (stampSourceSvgData) {
+        stampImage = createStampImageResource({
+          dataUrl: stampSourceSvgData,
+          width: stampImage?.intrinsicSize?.width ?? stampSourceSvgSize?.width,
+          height:
+            stampImage?.intrinsicSize?.height ?? stampSourceSvgSize?.height,
+        });
+        stampAppearance = createStampImageAppearance({
+          frame: stampAppearance?.frame ?? "plain",
+          box: stampAppearance?.box,
+          source: "native",
+        });
+      }
       let appearanceContent: string | undefined = undefined;
       let appearanceContentLoaded = false;
       const loadAppearanceContent = async () => {
@@ -1207,6 +1412,14 @@ const buildPdfLibAnnotsByPageIndex = async (
         opacity,
         title,
         contents,
+        stamp:
+          subtypeName === "Stamp"
+            ? {
+                name: rawStampName,
+                image: stampImage,
+                appearance: stampAppearance,
+              }
+            : undefined,
         highlightedText,
         modificationDate,
         inReplyTo,
@@ -1293,6 +1506,11 @@ const buildPdfLibAnnotsByPageIndex = async (
           textAlignment,
           rotation,
         });
+        continue;
+      }
+
+      if (subtypeName === "Stamp") {
+        pushForPage(base);
         continue;
       }
 
@@ -1562,6 +1780,18 @@ export const loadPDF = async (
         const pageAnnotations = pdfLibAnnotsByPageIndex?.get(idx) || [];
         const preservedSourceAnnotationsForPage: PreservedSourceAnnotationRef[] =
           [];
+
+        try {
+          await populateRenderedStampFallbacksForPage({
+            pageAnnotations,
+            pageIndex: idx,
+            viewport,
+            workerService,
+            pdfDoc,
+          });
+        } catch {
+          // ignore stamp preview fallback failures
+        }
 
         const context: ParserContext = {
           pageAnnotations,
@@ -2054,6 +2284,7 @@ export const exportPDF = async (
               subtype === PDFName.of("Highlight") ||
               subtype === PDFName.of("Text") ||
               subtype === PDFName.of("FreeText") ||
+              subtype === PDFName.of("Stamp") ||
               subtype === PDFName.of("Link") ||
               subtype === PDFName.of("Square") ||
               subtype === PDFName.of("Circle") ||

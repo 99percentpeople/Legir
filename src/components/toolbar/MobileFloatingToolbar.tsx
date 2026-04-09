@@ -13,6 +13,7 @@ import {
   Palette,
   PenLine,
   PenTool,
+  Stamp,
   TextSelect,
   Type,
   X,
@@ -37,12 +38,14 @@ import { Separator } from "../ui/separator";
 import { ColorPickerPopover } from "./ColorPickerPopover";
 import PageNumberDropdownControl from "./PageNumberDropdownControl";
 import { ShapeBorderStyleSection } from "./ShapeBorderStyleSection";
+import { StampStylePopover } from "./StampStylePopover";
 import {
   getShapeToolIcon,
   getShapeToolLabel,
   isShapeTool,
   SHAPE_TOOL_GROUPS,
 } from "./shapeTools";
+import { getStampPreset } from "@/lib/stamps";
 
 interface MobileFloatingToolbarProps {
   currentPageIndex: number;
@@ -57,6 +60,9 @@ interface MobileFloatingToolbarProps {
   onShapeStyleChange?: (
     style: Partial<NonNullable<EditorState["shapeStyle"]>>,
   ) => void;
+  onStampStyleChange?: (
+    style: Partial<NonNullable<EditorState["stampStyle"]>>,
+  ) => void;
 }
 
 const isMovementTool = (tool: Tool): tool is "select" | "pan" =>
@@ -70,6 +76,7 @@ const isAnnotationTool = (
   | "draw_ink"
   | "draw_comment"
   | "draw_freetext"
+  | "draw_stamp"
   | "draw_shape_rect"
   | "draw_shape_ellipse"
   | "draw_shape_line"
@@ -84,6 +91,7 @@ const isAnnotationTool = (
   tool === "draw_ink" ||
   tool === "draw_comment" ||
   tool === "draw_freetext" ||
+  tool === "draw_stamp" ||
   isShapeTool(tool) ||
   tool === "eraser";
 
@@ -114,6 +122,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   onCommentStyleChange,
   onFreetextStyleChange,
   onShapeStyleChange,
+  onStampStyleChange,
 }) => {
   const { t } = useLanguage();
   const [shapeDraftState, setShapeDraftState] = React.useState<ShapeDraftState>(
@@ -187,6 +196,8 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
         return t("toolbar.comment");
       case "draw_freetext":
         return t("toolbar.freetext");
+      case "draw_stamp":
+        return t("toolbar.stamp");
       case "eraser":
         return t("toolbar.eraser");
     }
@@ -225,6 +236,8 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
         return <MessageCircle size={16} />;
       case "draw_freetext":
         return <Type size={16} />;
+      case "draw_stamp":
+        return <Stamp size={16} />;
     }
   };
 
@@ -243,6 +256,10 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
       case "draw_freetext":
         return (
           editorState.freetextStyle?.color || ANNOTATION_STYLES.freetext.color
+        );
+      case "draw_stamp":
+        return (
+          getStampPreset(editorState.stampStyle?.presetId)?.color || "#b91c1c"
         );
       case "draw_shape_rect":
       case "draw_shape_ellipse":
@@ -363,6 +380,21 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
               freetextColor,
             )}
           </ColorPickerPopover>
+        );
+      case "draw_stamp":
+        return (
+          <StampStylePopover
+            value={editorState.stampStyle}
+            onChange={(style) => onStampStyleChange?.(style)}
+            title={t("toolbar.stamp_properties")}
+            side="top"
+          >
+            {renderStyleTrigger(
+              t("toolbar.stamp_properties"),
+              getStampPreset(editorState.stampStyle?.presetId)?.color ||
+                "#b91c1c",
+            )}
+          </StampStylePopover>
         );
       case "draw_shape_rect":
       case "draw_shape_ellipse":
@@ -558,6 +590,10 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                     <DropdownMenuRadioItem value="draw_freetext">
                       <Type size={14} />
                       {t("toolbar.freetext")}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="draw_stamp">
+                      <Stamp size={14} />
+                      {t("toolbar.stamp")}
                     </DropdownMenuRadioItem>
                     <DropdownMenuSeparator />
                     {SHAPE_TOOL_GROUPS.map((group, index) => (

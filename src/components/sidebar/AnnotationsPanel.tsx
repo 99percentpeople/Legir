@@ -12,6 +12,7 @@ import {
   Pen,
   Type,
   Shapes,
+  Stamp,
   CornerDownRight,
   Send,
   X,
@@ -68,6 +69,8 @@ const getAnnotationListTypeIcon = (
         return <Type size={12} className={iconClassName} />;
       case "shape":
         return <Shapes size={12} className={iconClassName} />;
+      case "stamp":
+        return <Stamp size={12} className={iconClassName} />;
       default:
         return <MessageCircle size={12} className={iconClassName} />;
     }
@@ -82,6 +85,8 @@ const getAnnotationListTypeIcon = (
       return <Type size={12} className={iconClassName} />;
     case "shape":
       return <Shapes size={12} className={iconClassName} />;
+    case "stamp":
+      return <Stamp size={12} className={iconClassName} />;
     default:
       return <MessageCircle size={12} className={iconClassName} />;
   }
@@ -312,7 +317,6 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   const [isEditingMain, setIsEditingMain] = useState(false);
   const [mainDraft, setMainDraft] = useState(annotation.text || "");
   const replies = annotation.replies ?? [];
-  const replyPlaceholder = t("sidebar.add_remark");
 
   const startEditingMain = React.useCallback(() => {
     setMainDraft(annotation.text || "");
@@ -538,19 +542,22 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
             </div>
           </>
         ) : (
-          <div
-            className={cn(
-              "text-foreground min-h-10 w-full py-2 text-sm leading-5 whitespace-pre-wrap",
-              annotation.text
-                ? isSelected
-                  ? null
-                  : "line-clamp-3"
-                : "text-muted-foreground/50 italic",
-            )}
-            title={annotation.text || t("sidebar.add_remark")}
-          >
-            {annotation.text || t("sidebar.add_remark")}
-          </div>
+          annotation.text &&
+          annotation.text.trim().length > 0 && (
+            <div
+              className={cn(
+                "text-foreground w-full py-2 text-sm leading-5 whitespace-pre-wrap",
+                annotation.text
+                  ? isSelected
+                    ? null
+                    : "line-clamp-3"
+                  : "text-muted-foreground/50 italic",
+              )}
+              title={annotation.text}
+            >
+              {annotation.text}
+            </div>
+          )
         )}
 
         {isSelected && replies.length > 0 ? (
@@ -567,7 +574,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
                 isSelected={isSelected}
                 reply={reply}
                 fallbackAuthor={annotation.author}
-                placeholder={replyPlaceholder}
+                placeholder={t("sidebar.add_reply")}
                 deleteLabel={t("common.actions.delete")}
                 onUpdateReply={onUpdateReply}
                 onDeleteReply={onDeleteReply}
@@ -585,7 +592,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
               rows={1}
               className="text-foreground placeholder:text-muted-foreground/50 min-h-8 flex-1 resize-none border-none bg-transparent px-0 py-1 text-sm leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent"
               value={draftReply}
-              placeholder={replyPlaceholder}
+              placeholder={t("sidebar.add_reply")}
               onChange={(event) => setDraftReply(event.target.value)}
               onKeyDown={(event) => {
                 if (!event.ctrlKey && !event.metaKey) return;
@@ -669,6 +676,7 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
     highlight: "toolbar.highlight",
     ink: "toolbar.ink",
     freetext: "toolbar.freetext",
+    stamp: "toolbar.stamp",
     shape: "toolbar.shape",
   };
 

@@ -20,6 +20,8 @@ const fr = {
       retry: "Réessayer",
       regenerate: "Régénérer",
       reset_to_default: "Réinitialiser à la valeur par défaut",
+      restore_original_ratio: "Rétablir les proportions d'origine",
+      download_image: "Télécharger l'image",
     },
   },
   status: {
@@ -43,6 +45,8 @@ const fr = {
     radio: "Bouton Radio",
     dropdown: "Menu déroulant",
     signature: "Signature",
+    stamp: "Tampon",
+    stamp_properties: "Propriétés du tampon",
     eraser: "Gomme",
     highlight: "Surligner",
     highlight_text: "Surligner",
@@ -279,6 +283,11 @@ const fr = {
     signature_image: "Image de signature",
     no_signature: "Aucune image de signature présente",
     upload_signature: "Télécharger une image",
+    stamp_type: "Type de tampon",
+    preset_stamp: "Tampon prédéfini",
+    image_stamp: "Tampon image",
+    replace_image: "Remplacer l'image",
+    upload_image: "Télécharger une image",
     scale_mode: {
       contain: "Contenir",
       fill: "Remplir",
@@ -368,6 +377,17 @@ const fr = {
       page: "Page {page}",
       go_to_page: "Aller à la page {page}",
       not_available: "N/D",
+    },
+  },
+  stamp: {
+    upload_error: "Impossible de charger l'image du tampon",
+    download_error: "Impossible de télécharger l'image du tampon",
+    preset: {
+      approved: "APPROUVÉ",
+      rejected: "REJETÉ",
+      draft: "BROUILLON",
+      confidential: "CONFIDENTIEL",
+      final: "FINAL",
     },
   },
   right_panel: {

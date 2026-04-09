@@ -68,6 +68,7 @@ export const selectEditorCanvasState = (
   penStyle: state.penStyle,
   pendingViewStateRestore: state.pendingViewStateRestore,
   shapeStyle: state.shapeStyle,
+  stampStyle: state.stampStyle,
   scale: state.scale,
   selectedId: state.selectedId,
   tool: state.tool,

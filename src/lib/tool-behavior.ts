@@ -23,6 +23,7 @@ const TOOL_BEHAVIORS: Record<Tool, ToolBehavior> = {
   draw_highlight: { isContinuous: true, textLayerSelection: "always" },
   draw_comment: { isContinuous: false },
   draw_freetext: { isContinuous: false },
+  draw_stamp: { isContinuous: false },
   draw_shape_rect: { isContinuous: false },
   draw_shape_ellipse: { isContinuous: false },
   draw_shape_line: { isContinuous: false },
@@ -72,6 +73,7 @@ export const getCursor = (tool: Tool) => {
       return undefined;
     case "draw_highlight":
     case "draw_comment":
+    case "draw_stamp":
     case "draw_shape_polyline":
     case "draw_shape_polygon":
     case "draw_shape_cloud_polygon":

@@ -266,6 +266,10 @@ const truncateMessageAttachments = (
         typeof attachment.linkUrl === "string"
           ? truncateText(attachment.linkUrl, 1_000)
           : undefined,
+      stampLabel:
+        typeof attachment.stampLabel === "string"
+          ? truncateText(attachment.stampLabel, 1_000)
+          : undefined,
     };
   });
 
@@ -299,6 +303,12 @@ const formatMessageAttachmentForConversation = (
     ...(typeof attachment.linkDestPageIndex === "number"
       ? [`link_dest_page_number: ${attachment.linkDestPageIndex + 1}`]
       : []),
+    ...(attachment.stampKind ? [`stamp_kind: ${attachment.stampKind}`] : []),
+    ...(attachment.stampPresetId
+      ? [`stamp_preset_id: ${attachment.stampPresetId}`]
+      : []),
+    ...(attachment.stampLabel ? ["stamp_label:", attachment.stampLabel] : []),
+    ...(attachment.stampHasImage ? ["stamp_has_image: true"] : []),
   ].join("\n");
 };
 

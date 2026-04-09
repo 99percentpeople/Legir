@@ -206,6 +206,13 @@ export const ANNOTATION_STYLES = {
     cloudIntensity: 2,
     cloudSpacing: 28,
   },
+  stamp: {
+    kind: "preset" as const,
+    presetId: "approved" as const,
+    image: undefined,
+    imageAppearance: undefined,
+    opacity: 0.9,
+  },
 };
 
 export const FONT_FAMILY_MAP: Record<string, string> = {
@@ -235,4 +242,5 @@ export const PDF_CUSTOM_KEYS = {
   arrowSize: "FFArrowSize",
   startArrowStyle: "FFStartArrowStyle",
   endArrowStyle: "FFEndArrowStyle",
+  stampSourceSvgData: "FFStampSourceSvgData",
 } as const;

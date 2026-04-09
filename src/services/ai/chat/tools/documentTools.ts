@@ -202,6 +202,7 @@ const LIST_ANNOTATIONS_TOOL_PROMPTS = [
   "If the user asks about comments, notes, highlights, links, or annotations, call list_annotations.",
   "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
   "When list_annotations returns link annotations, inspect linkUrl and linkDestPageNumber to understand the hyperlink target.",
+  "When list_annotations returns stamp annotations, inspect stampKind, stampPresetId, stampLabel, and stampHasImage first; if you need the actual stamp graphic content, follow up with get_pages_visual or summarize_pages_visual.",
   "If the user wants to delete one or more specific annotations and ids are not already known, call list_annotations first so you can pass the exact annotation ids to delete_annotations.",
   "When pointing the user to a known annotation, prefer a natural clickable control link instead of plain id text.",
 ];
@@ -480,7 +481,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     list_annotations: createToolBuilder("list_annotations")
       .read()
       .description(
-        "List existing annotations in the current document, including comments, highlights, free text, ink, shape, and hyperlink annotations. Shape annotations include subType. Highlight annotations include note/comment text plus highlightedText when the source text is known. Link annotations include linkUrl and linkDestPageNumber when available.",
+        "List existing annotations in the current document, including comments, highlights, free text, ink, shape, stamp, and hyperlink annotations. Shape annotations include subType. Highlight annotations include note/comment text plus highlightedText when the source text is known. Stamp annotations include stampKind, stampPresetId, stampLabel, and stampHasImage. Link annotations include linkUrl and linkDestPageNumber when available.",
       )
       .promptInstructions(LIST_ANNOTATIONS_TOOL_PROMPTS)
       .inputSchema(listAnnotationsArgsSchema)

@@ -411,6 +411,16 @@ const EditorPage: React.FC<EditorPageProps> = ({
     [setState],
   );
 
+  const handleStampStyleChange = React.useCallback(
+    (style: Partial<NonNullable<EditorState["stampStyle"]>>) => {
+      setState((prev) => ({
+        ...prev,
+        stampStyle: { ...prev.stampStyle!, ...style },
+      }));
+    },
+    [setState],
+  );
+
   const handleEditAnnotation = React.useCallback(
     (id: string) => {
       selectControl(id);
@@ -629,6 +639,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         onCommentStyleChange={handleCommentStyleChange}
         onFreetextStyleChange={handleFreetextStyleChange}
         onShapeStyleChange={handleShapeStyleChange}
+        onStampStyleChange={handleStampStyleChange}
         onExport={onExport}
         onSaveAs={onSaveAs}
         onExit={handleExitEditorPage}
@@ -757,6 +768,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
             onCommentStyleChange: handleCommentStyleChange,
             onFreetextStyleChange: handleFreetextStyleChange,
             onShapeStyleChange: handleShapeStyleChange,
+            onStampStyleChange: handleStampStyleChange,
             onUndo: undo,
             onRedo: redo,
             onOpenShortcuts: () => openDialog("shortcuts"),

@@ -12,7 +12,13 @@ import {
   PDFRef,
   type PDFFont,
 } from "@cantoo/pdf-lib";
-import { Annotation, FormField, PreservedSourceAnnotationRef } from "@/types";
+import {
+  Annotation,
+  FormField,
+  PreservedSourceAnnotationRef,
+  StampImageAppearance,
+  StampImageResource,
+} from "@/types";
 
 // [x, y, width, height]
 export type Tile = [number, number, number, number];
@@ -23,6 +29,12 @@ export type PdfJsAnnotationOption =
       display?: string;
       exportValue?: string;
     };
+
+export interface PdfJsStampPayload {
+  name?: string;
+  image?: StampImageResource;
+  appearance?: StampImageAppearance;
+}
 
 export type PdfJsAnnotation = Record<string, unknown> & {
   subtype: string;
@@ -77,6 +89,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   highlightedText?: string;
   richText?: string;
   modificationDate?: string;
+  stamp?: PdfJsStampPayload;
   inReplyTo?: string | null;
   replyType?: string;
   popupRef?: string | null;

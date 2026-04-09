@@ -11,6 +11,7 @@ export type PersistedEditorUiSession = {
   commentStyle: EditorTabSnapshot["commentStyle"];
   freetextStyle: EditorTabSnapshot["freetextStyle"];
   shapeStyle: EditorTabSnapshot["shapeStyle"];
+  stampStyle: EditorTabSnapshot["stampStyle"];
   translateOption: EditorTabSnapshot["translateOption"];
   translateTargetLanguage: EditorTabSnapshot["translateTargetLanguage"];
   pageTranslateOptions: EditorTabSnapshot["pageTranslateOptions"];
@@ -41,6 +42,7 @@ const clonePersistedSession = (
     ? { ...session.freetextStyle }
     : undefined,
   shapeStyle: session.shapeStyle ? { ...session.shapeStyle } : undefined,
+  stampStyle: session.stampStyle ? { ...session.stampStyle } : undefined,
   pageTranslateOptions: { ...session.pageTranslateOptions },
   rightPanelDockTab: [...session.rightPanelDockTab],
   pendingViewStateRestore: session.pendingViewStateRestore
@@ -65,6 +67,7 @@ const createPersistedSessionFromSnapshot = (
     ? { ...snapshot.freetextStyle }
     : undefined,
   shapeStyle: snapshot.shapeStyle ? { ...snapshot.shapeStyle } : undefined,
+  stampStyle: snapshot.stampStyle ? { ...snapshot.stampStyle } : undefined,
   translateOption: snapshot.translateOption,
   translateTargetLanguage: snapshot.translateTargetLanguage,
   pageTranslateOptions: { ...snapshot.pageTranslateOptions },
@@ -135,6 +138,7 @@ export const applyGlobalEditorUiSession = (
     ? { ...session.freetextStyle }
     : undefined,
   shapeStyle: session.shapeStyle ? { ...session.shapeStyle } : undefined,
+  stampStyle: session.stampStyle ? { ...session.stampStyle } : undefined,
   translateOption: session.translateOption,
   translateTargetLanguage: session.translateTargetLanguage,
   pageTranslateOptions: { ...session.pageTranslateOptions },

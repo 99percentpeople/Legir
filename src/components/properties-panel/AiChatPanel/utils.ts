@@ -23,6 +23,8 @@ export const getAnnotationAttachmentTypeLabel = (
       return t("toolbar.freetext");
     case "shape":
       return t("toolbar.shape");
+    case "stamp":
+      return t("toolbar.stamp");
     case "link":
       return t("properties.link.title");
     default:
@@ -68,6 +70,7 @@ export const getMessageAttachmentCopyText = (
   return [
     attachment.highlightedText?.trim(),
     attachment.text?.trim(),
+    attachment.stampLabel?.trim(),
     attachment.linkUrl?.trim(),
   ]
     .filter(Boolean)

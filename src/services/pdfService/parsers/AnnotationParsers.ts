@@ -9,6 +9,10 @@ import {
   PDFHexString,
 } from "@cantoo/pdf-lib";
 import { Annotation } from "@/types";
+import {
+  createStampImageAppearance,
+  createStampImageResource,
+} from "@/lib/stampImage";
 import { IAnnotationParser, ParserContext } from "../types";
 import {
   readPdfDictAnnotationCommentMeta,
@@ -39,6 +43,11 @@ import {
   getInnerSizeFromOuterAabb,
   getRotatedOuterRect,
 } from "@/lib/controlRotation";
+import {
+  normalizeStampOpacity,
+  resolveReadableStampLabel,
+  resolveStampPresetIdFromText,
+} from "@/lib/stamps";
 
 const normalizeRotationDeg = (deg: number) => {
   if (!Number.isFinite(deg)) return 0;
@@ -2112,6 +2121,161 @@ export class ShapeParser implements IAnnotationParser {
         cloudSpacing: isCloudPolygon ? annotation.cloudSpacing : undefined,
         isEdited: false,
         subtype: annotation.subtype.toLowerCase(),
+      });
+    }
+
+    return annotations;
+  }
+}
+
+export class StampParser implements IAnnotationParser {
+  parse(context: ParserContext): Annotation[] {
+    const { pageAnnotations, pageIndex, viewport, preservedSourceAnnotations } =
+      context;
+    const annotations: Annotation[] = [];
+
+    const preserveSourceAnnotation = (
+      annotation: (typeof pageAnnotations)[number] | undefined,
+    ) => {
+      if (!annotation?.sourcePdfRef || !preservedSourceAnnotations) return;
+      preservedSourceAnnotations.push({
+        pageIndex,
+        sourcePdfRef: annotation.sourcePdfRef,
+        subtype: annotation.subtype,
+      });
+    };
+
+    for (let index = 0; index < pageAnnotations.length; index++) {
+      const annotation = pageAnnotations[index];
+      if (annotation.subtype !== "Stamp") continue;
+
+      if (hasHiddenAnnotationFlag(annotation.annotationFlags)) {
+        preserveSourceAnnotation(annotation);
+        continue;
+      }
+
+      const importedRect = pdfJsRectToUiRect(annotation.rect, viewport);
+      const hasBakedAppearance =
+        annotation.stamp?.appearance?.source === "baked";
+      const nativeRotationSource = hasBakedAppearance
+        ? undefined
+        : typeof annotation.rotation === "number" &&
+            Number.isFinite(annotation.rotation)
+          ? annotation.rotation
+          : typeof annotation.appearanceRotation === "number" &&
+              Number.isFinite(annotation.appearanceRotation)
+            ? annotation.appearanceRotation
+            : undefined;
+      const rotationDeg =
+        typeof nativeRotationSource === "number"
+          ? normalizeRotationDeg(-nativeRotationSource)
+          : 0;
+      const rect =
+        !hasBakedAppearance && rotationDeg !== 0
+          ? (() => {
+              const innerSize = getInnerSizeFromOuterAabb(
+                importedRect,
+                rotationDeg,
+              );
+              const cx = importedRect.x + importedRect.width / 2;
+              const cy = importedRect.y + importedRect.height / 2;
+              return {
+                x: cx - innerSize.width / 2,
+                y: cy - innerSize.height / 2,
+                width: innerSize.width,
+                height: innerSize.height,
+              };
+            })()
+          : importedRect;
+      const commentMeta = readPdfJsAnnotationCommentMeta(annotation);
+      const rawName =
+        typeof annotation.stamp?.name === "string"
+          ? annotation.stamp.name.trim()
+          : "";
+      const rawContents =
+        typeof annotation.contents === "string"
+          ? annotation.contents.trim()
+          : "";
+      const presetId = resolveStampPresetIdFromText(rawName, rawContents);
+      const displayLabel = !presetId
+        ? resolveReadableStampLabel({
+            name: rawName,
+            contents: rawContents,
+          })
+        : rawContents || undefined;
+      const kind =
+        typeof annotation.stamp?.image?.dataUrl === "string" &&
+        annotation.stamp.image.dataUrl.length > 0
+          ? "image"
+          : "preset";
+      const normalizedImageBox =
+        kind === "image" &&
+        annotation.stamp?.appearance?.frame === "plain" &&
+        annotation.stamp.appearance.box
+          ? {
+              x: Math.max(0, Math.min(1, annotation.stamp.appearance.box.x)),
+              y: Math.max(0, Math.min(1, annotation.stamp.appearance.box.y)),
+              width: Math.max(
+                0,
+                Math.min(1, annotation.stamp.appearance.box.width),
+              ),
+              height: Math.max(
+                0,
+                Math.min(1, annotation.stamp.appearance.box.height),
+              ),
+            }
+          : undefined;
+      const effectiveRect =
+        normalizedImageBox &&
+        normalizedImageBox.width > 0 &&
+        normalizedImageBox.height > 0
+          ? {
+              x: rect.x + rect.width * normalizedImageBox.x,
+              y: rect.y + rect.height * normalizedImageBox.y,
+              width: rect.width * normalizedImageBox.width,
+              height: rect.height * normalizedImageBox.height,
+            }
+          : rect;
+      annotations.push({
+        id: `imported_stamp_${pageIndex + 1}_${index}`,
+        pageIndex,
+        layerOrder: index,
+        type: "stamp",
+        rect: effectiveRect,
+        stamp: {
+          kind,
+          presetId: kind === "preset" ? presetId : undefined,
+          label: displayLabel,
+          image:
+            kind === "image"
+              ? createStampImageResource({
+                  dataUrl: annotation.stamp?.image?.dataUrl,
+                  width: annotation.stamp?.image?.intrinsicSize?.width,
+                  height: annotation.stamp?.image?.intrinsicSize?.height,
+                })
+              : undefined,
+          appearance:
+            kind === "image"
+              ? createStampImageAppearance({
+                  box: !normalizedImageBox
+                    ? annotation.stamp?.appearance?.box
+                    : undefined,
+                  frame: annotation.stamp?.appearance?.frame,
+                  source: annotation.stamp?.appearance?.source,
+                })
+              : undefined,
+        },
+        opacity: normalizeStampOpacity(annotation.opacity, 1),
+        text:
+          presetId && (!rawName || rawContents === rawName)
+            ? undefined
+            : commentMeta.text,
+        author: commentMeta.author,
+        updatedAt: commentMeta.updatedAt,
+        sourcePdfRef: annotation.sourcePdfRef,
+        subtype: "stamp",
+        rotationDeg,
+        isEdited: false,
       });
     }
 

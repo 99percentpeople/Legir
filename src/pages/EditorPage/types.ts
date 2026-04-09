@@ -90,6 +90,9 @@ export interface EditorCanvasMobileToolbar {
   onShapeStyleChange: (
     style: Partial<NonNullable<EditorState["shapeStyle"]>>,
   ) => void;
+  onStampStyleChange: (
+    style: Partial<NonNullable<EditorState["stampStyle"]>>,
+  ) => void;
   onUndo: () => void;
   onRedo: () => void;
   onOpenShortcuts: () => void;

@@ -120,7 +120,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
     (data.rect?.height ?? 1) - borderWidth * 2,
   );
   const effectiveOpacity =
-    baseOpacity * (!hasText && !hasBackgroundColor ? 0.5 : 1);
+    baseOpacity * (!hasText && !hasBackgroundColor ? 0.1 : 1);
   const contentBoxStyle: React.CSSProperties = {
     backgroundColor: data.backgroundColor || undefined,
     borderStyle: hasBorder ? "solid" : "none",

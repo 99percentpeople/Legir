@@ -7,6 +7,7 @@
  * growing this file with implementation-specific details.
  */
 import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
+import type { StampKind, StampPresetId } from "@/lib/stamps";
 
 export enum FieldType {
   TEXT = "Text",
@@ -40,6 +41,7 @@ export type Tool =
   | "draw_ink"
   | "draw_comment"
   | "draw_freetext"
+  | "draw_stamp"
   | "draw_shape_rect"
   | "draw_shape_ellipse"
   | "draw_shape_line"
@@ -116,7 +118,14 @@ export interface Annotation {
   id: string;
   pageIndex: number;
   layerOrder?: number;
-  type: "highlight" | "ink" | "comment" | "freetext" | "link" | "shape";
+  type:
+    | "highlight"
+    | "ink"
+    | "comment"
+    | "freetext"
+    | "link"
+    | "shape"
+    | "stamp";
   rect?: { x: number; y: number; width: number; height: number }; // For highlight / comment bounds
   rects?: { x: number; y: number; width: number; height: number }[]; // For multi-rect highlights
   points?: { x: number; y: number }[]; // For ink
@@ -146,6 +155,7 @@ export interface Annotation {
   linkUrl?: string;
   linkDestPageIndex?: number;
   flatten?: boolean;
+  stamp?: AnnotationStampData;
   shapeType?:
     | "square"
     | "circle"
@@ -248,6 +258,41 @@ export interface PreservedSourceAnnotationRef {
   pageIndex: number;
   sourcePdfRef: { objectNumber: number; generationNumber: number };
   subtype?: string;
+}
+
+export type StampImageFrame = "plain" | "card";
+
+export type StampAppearanceSource = "native" | "baked";
+
+export interface StampIntrinsicSize {
+  width: number;
+  height: number;
+}
+
+export interface StampNormalizedBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface StampImageResource {
+  dataUrl: string;
+  intrinsicSize?: StampIntrinsicSize;
+}
+
+export interface StampImageAppearance {
+  frame?: StampImageFrame;
+  box?: StampNormalizedBox;
+  source?: StampAppearanceSource;
+}
+
+export interface AnnotationStampData {
+  kind: StampKind;
+  presetId?: StampPresetId;
+  label?: string;
+  image?: StampImageResource;
+  appearance?: StampImageAppearance;
 }
 
 export type EditorSaveTarget =
@@ -441,6 +486,13 @@ export interface EditorState {
     cloudIntensity?: number;
     cloudSpacing?: number;
   };
+  stampStyle?: {
+    kind: StampKind;
+    presetId?: StampPresetId;
+    image?: StampImageResource;
+    imageAppearance?: StampImageAppearance;
+    opacity: number;
+  };
 
   selectedId: string | null;
 
@@ -560,6 +612,7 @@ export type WorkspaceEditorState = Pick<
   | "penStyle"
   | "pendingViewStateRestore"
   | "shapeStyle"
+  | "stampStyle"
   | "scale"
   | "selectedId"
   | "tool"

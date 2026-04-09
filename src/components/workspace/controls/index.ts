@@ -192,6 +192,21 @@ const CONTROL_CONFIGS: ControlConfig[] = [
     supportsGeometrySizeEdit: false,
   },
   {
+    type: "stamp",
+    component: lazyWithPreload(() =>
+      import("./annotation/StampControl").then((module) => ({
+        default: module.StampControl,
+      })),
+    ),
+    propertiesComponent: lazyWithPreload(() =>
+      import("./properties/StampProperties").then((module) => ({
+        default: module.StampProperties,
+      })),
+    ),
+    label: "Stamp",
+    supportsGeometrySizeEdit: true,
+  },
+  {
     type: "shape",
     component: lazyWithPreload(() =>
       import("./annotation/ShapeControl").then((module) => ({

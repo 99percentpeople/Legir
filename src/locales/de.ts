@@ -20,6 +20,8 @@ const de = {
       retry: "Erneut versuchen",
       regenerate: "Neu generieren",
       reset_to_default: "Auf Standardwert zurücksetzen",
+      restore_original_ratio: "Originalproportion wiederherstellen",
+      download_image: "Bild herunterladen",
     },
   },
   status: {
@@ -43,6 +45,8 @@ const de = {
     radio: "Optionsfeld",
     dropdown: "Dropdown",
     signature: "Unterschrift",
+    stamp: "Stempel",
+    stamp_properties: "Stempel-Eigenschaften",
     eraser: "Radiergummi",
     highlight: "Hervorheben",
     highlight_text: "Hervorheben",
@@ -278,6 +282,11 @@ const de = {
     signature_image: "Unterschriftsbild",
     no_signature: "Kein Unterschriftsbild vorhanden",
     upload_signature: "Bild hochladen",
+    stamp_type: "Stempeltyp",
+    preset_stamp: "Vorlagenstempel",
+    image_stamp: "Bildstempel",
+    replace_image: "Bild ersetzen",
+    upload_image: "Bild hochladen",
     scale_mode: {
       contain: "Einpassen",
       fill: "Füllen",
@@ -367,6 +376,17 @@ const de = {
       page: "Seite {page}",
       go_to_page: "Gehe zu Seite {page}",
       not_available: "k. A.",
+    },
+  },
+  stamp: {
+    upload_error: "Stempelbild konnte nicht geladen werden",
+    download_error: "Stempelbild konnte nicht heruntergeladen werden",
+    preset: {
+      approved: "GENEHMIGT",
+      rejected: "ABGELEHNT",
+      draft: "ENTWURF",
+      confidential: "VERTRAULICH",
+      final: "FINAL",
     },
   },
   right_panel: {

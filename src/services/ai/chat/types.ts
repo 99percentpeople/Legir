@@ -226,6 +226,7 @@ export type AiAnnotationKind =
   | "highlight"
   | "ink"
   | "freetext"
+  | "stamp"
   | "shape"
   | "link";
 
@@ -253,6 +254,10 @@ export interface AiAnnotationSummary {
   linkUrl?: string;
   linkDestPageNumber?: number;
   metaKind?: string;
+  stampKind?: "preset" | "image";
+  stampPresetId?: string;
+  stampLabel?: string;
+  stampHasImage?: boolean;
 }
 
 export interface AiAnnotationListResult {
@@ -689,6 +694,10 @@ export interface AiChatAnnotationAttachment {
   highlightedText?: string;
   linkUrl?: string;
   linkDestPageIndex?: number;
+  stampKind?: "preset" | "image";
+  stampPresetId?: string;
+  stampLabel?: string;
+  stampHasImage?: boolean;
 }
 
 export type AiChatMessageAttachment =

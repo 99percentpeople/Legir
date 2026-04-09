@@ -86,6 +86,7 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
       penStyle: state.penStyle,
       pendingViewStateRestore: state.pendingViewStateRestore,
       shapeStyle: state.shapeStyle,
+      stampStyle: state.stampStyle,
       scale: state.scale,
       selectedId: state.selectedId,
       tool: state.tool,
@@ -108,6 +109,7 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
       state.penStyle,
       state.pendingViewStateRestore,
       state.shapeStyle,
+      state.stampStyle,
       state.scale,
       state.selectedId,
       state.tool,
@@ -304,6 +306,7 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
           onCommentStyleChange={mobileToolbar.onCommentStyleChange}
           onFreetextStyleChange={mobileToolbar.onFreetextStyleChange}
           onShapeStyleChange={mobileToolbar.onShapeStyleChange}
+          onStampStyleChange={mobileToolbar.onStampStyleChange}
         />
       ) : (
         <FloatingBar
