@@ -1,5 +1,7 @@
 import React from "react";
 
+import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useWorkspacePointerDownDismiss } from "@/lib/workspacePointerDownDismissContext";
 import {
   Popover,
   PopoverContent,
@@ -29,8 +31,16 @@ export const StampStylePopover: React.FC<StampStylePopoverProps> = ({
   align = "center",
   children,
 }) => {
+  const inheritedCloseOnWorkspacePointerDown = useWorkspacePointerDownDismiss();
+  const [open, setOpen] = React.useState(false);
+
+  useAppEvent("workspace:pointerDown", () => {
+    if (!inheritedCloseOnWorkspacePointerDown) return;
+    setOpen(false);
+  });
+
   return (
-    <Popover>
+    <Popover modal={false} open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
         className="w-80 p-3"
