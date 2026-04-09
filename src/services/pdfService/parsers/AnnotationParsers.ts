@@ -107,7 +107,7 @@ export class InkParser implements IAnnotationParser {
                     }
                     const normalizedRgb = normalizePdfColorToRgb255(nums);
                     color = normalizedRgb
-                      ? rgbArrayToHex(normalizedRgb)
+                      ? (rgbArrayToHex(normalizedRgb) ?? "#000000")
                       : "#000000";
                   }
 
@@ -2002,7 +2002,7 @@ export class ShapeParser implements IAnnotationParser {
         continue;
       }
 
-      const points = [];
+      const points: { x: number; y: number }[] = [];
       for (
         let pointIndex = 0;
         pointIndex < rawNumbers.length;

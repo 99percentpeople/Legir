@@ -1,4 +1,7 @@
-import { AI_PROVIDER_IDS } from "@/services/ai/sdk/providerCatalog";
+import {
+  AI_PROVIDER_IDS,
+  type AiProviderId,
+} from "@/services/ai/sdk/providerCatalog";
 import {
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
@@ -114,51 +117,41 @@ const normalizeCustomModelConfigs = (
 
 // Keep provider keys stable even when individual provider config is missing.
 export const createEmptyLlmOptions = (): LLMOptions =>
-  Object.fromEntries(
-    AI_PROVIDER_IDS.map((providerId) => [
-      providerId,
-      {
-        enabled: true,
-        apiKey: "",
-        apiUrl: "",
-        customModels: [],
-      },
-    ]),
-  ) as LLMOptions;
+  AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
+    acc[providerId as AiProviderId] = {
+      enabled: true,
+      apiKey: "",
+      apiUrl: "",
+      customModels: [],
+    };
+    return acc;
+  }, {} as LLMOptions);
 
 export const mergeLlmOptions = (
   base: LLMOptions,
   patch?: Partial<LLMOptions>,
 ): LLMOptions =>
-  Object.fromEntries(
-    AI_PROVIDER_IDS.map((providerId) => [
-      providerId,
-      {
-        ...base[providerId],
-        ...patch?.[providerId],
-      },
-    ]),
-  ) as LLMOptions;
+  AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
+    acc[providerId as AiProviderId] = {
+      ...base[providerId],
+      ...patch?.[providerId],
+    };
+    return acc;
+  }, {} as LLMOptions);
 
 export const trimLlmOptions = (options: LLMOptions): LLMOptions =>
-  Object.fromEntries(
-    AI_PROVIDER_IDS.map((providerId) => {
-      const providerOptions = options[providerId];
+  AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
+    const providerOptions = options[providerId];
 
-      return [
-        providerId,
-        {
-          ...providerOptions,
-          enabled: providerOptions.enabled !== false,
-          apiKey: (providerOptions.apiKey || "").trim(),
-          apiUrl: (providerOptions.apiUrl || "").trim(),
-          customModels: normalizeCustomModelConfigs(
-            providerOptions.customModels,
-          ),
-        },
-      ];
-    }),
-  ) as LLMOptions;
+    acc[providerId as AiProviderId] = {
+      ...providerOptions,
+      enabled: providerOptions.enabled !== false,
+      apiKey: (providerOptions.apiKey || "").trim(),
+      apiUrl: (providerOptions.apiUrl || "").trim(),
+      customModels: normalizeCustomModelConfigs(providerOptions.customModels),
+    };
+    return acc;
+  }, {} as LLMOptions);
 
 export const applyEnvLlmDefaults = (options: LLMOptions): LLMOptions => ({
   ...options,
@@ -177,15 +170,16 @@ export const normalizeLlmOptions = (options: LLMOptions): LLMOptions =>
   applyEnvLlmDefaults(trimLlmOptions(options));
 
 export const createEmptyLlmModelCache = (): EditorState["llmModelCache"] =>
-  Object.fromEntries(
-    AI_PROVIDER_IDS.map((providerId) => [
-      providerId,
-      {
+  AI_PROVIDER_IDS.reduce<EditorState["llmModelCache"]>(
+    (acc, providerId) => {
+      acc[providerId as AiProviderId] = {
         translateModels: [],
         visionModels: [],
-      },
-    ]),
-  ) as EditorState["llmModelCache"];
+      };
+      return acc;
+    },
+    {} as EditorState["llmModelCache"],
+  );
 
 export type PersistedAiChatOptions = Partial<AppOptions["aiChat"]>;
 

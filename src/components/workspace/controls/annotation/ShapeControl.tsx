@@ -95,6 +95,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
 
   if (!data.rect || data.type !== "shape" || !data.shapeType) return null;
   const { t } = useLanguage();
+  const rect = data.rect;
+  const shapeType = data.shapeType;
 
   const strokeColor = data.color || "#000000";
   const strokeWidth =
@@ -115,33 +117,31 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const hasFill = fillOpacity > 0 && fillColor !== "none";
   const borderStyle = normalizeShapeBorderStyle(data.borderStyle) ?? "solid";
   const dashDensity = normalizeShapeDashDensity(data.dashDensity);
-  const strokeLinecap = getShapeStrokeLinecap(data.shapeType);
-  const strokeLinejoin = getShapeStrokeLinejoin(data.shapeType);
+  const strokeLinecap = getShapeStrokeLinecap(shapeType);
+  const strokeLinejoin = getShapeStrokeLinejoin(shapeType);
   const strokeDasharray = getShapeStrokeDashArray(
     borderStyle,
     strokeWidth,
     dashDensity,
   );
   const segmentHitWidth = Math.max(12, strokeWidth * 4);
-  const hasVertices = shapeSupportsVertices(data.shapeType);
-  const isOpenLineShape = isOpenLineShapeType(data.shapeType);
+  const hasVertices = shapeSupportsVertices(shapeType);
+  const isOpenLineShape = isOpenLineShapeType(shapeType);
   const rotationDeg =
     typeof data.rotationDeg === "number" && Number.isFinite(data.rotationDeg)
       ? data.rotationDeg
       : 0;
   const rotationCenter = useMemo(
     () => ({
-      x: data.rect!.x + data.rect!.width / 2,
-      y: data.rect!.y + data.rect!.height / 2,
+      x: rect.x + rect.width / 2,
+      y: rect.y + rect.height / 2,
     }),
-    [data.rect],
+    [rect],
   );
   const rotatedOuterRect = useMemo(
     () =>
-      rotationDeg !== 0
-        ? getRotatedOuterRect(data.rect!, rotationDeg)
-        : undefined,
-    [data.rect, rotationDeg],
+      rotationDeg !== 0 ? getRotatedOuterRect(rect, rotationDeg) : undefined,
+    [rect, rotationDeg],
   );
   const arrowStyles = useMemo(
     () => getShapeArrowStyles(data),
@@ -150,7 +150,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       data.shapeEndArrowStyle,
       data.shapeStartArrow,
       data.shapeStartArrowStyle,
-      data.shapeType,
+      shapeType,
     ],
   );
   const arrowSize =
@@ -161,10 +161,10 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const localPoints = useMemo(
     () =>
       absolutePoints.map((point) => ({
-        x: point.x - data.rect!.x,
-        y: point.y - data.rect!.y,
+        x: point.x - rect.x,
+        y: point.y - rect.y,
       })),
-    [absolutePoints, data.rect],
+    [absolutePoints, rect],
   );
   const trimmedLocalPoints = useMemo(
     () =>
@@ -423,7 +423,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
 
   const commitAbsolutePoints = (
     points: { x: number; y: number }[],
-    nextShapeType: NonNullable<typeof data.shapeType> = data.shapeType,
+    nextShapeType: NonNullable<typeof data.shapeType> = shapeType,
     extraUpdates: Partial<typeof data> = {},
   ) => {
     const normalized = getRectAndNormalizedShapePoints(points);
@@ -440,7 +440,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const endpointVertexIndex =
     contextState.vertexIndex !== null &&
     isOpenLineEndpointIndex(
-      data.shapeType,
+      shapeType,
       absolutePoints.length,
       contextState.vertexIndex,
     )
@@ -535,11 +535,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     );
     let nextPoint = rawNextPoint;
 
-    if (
-      event.shiftKey &&
-      (isOpenLineShape || isClosedShapeType(data.shapeType))
-    ) {
-      if (isClosedShapeType(data.shapeType) && absolutePoints.length >= 3) {
+    if (event.shiftKey && (isOpenLineShape || isClosedShapeType(shapeType))) {
+      if (isClosedShapeType(shapeType) && absolutePoints.length >= 3) {
         const previousAnchor =
           vertexIndex === 0
             ? (absolutePoints[absolutePoints.length - 1] ?? null)
@@ -629,12 +626,12 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     isSelectable &&
     isAnnotationMode &&
     isSelected &&
-    shapeSupportsVertexInsertion(data.shapeType);
+    shapeSupportsVertexInsertion(shapeType);
   const canShowLayerContextMenu = isSelectable;
 
   const contextMenuContent = (
     <>
-      {shapeSupportsVertexInsertion(data.shapeType) &&
+      {shapeSupportsVertexInsertion(shapeType) &&
         contextState.segmentIndex !== null &&
         contextState.point && (
           <ContextMenuItem
@@ -647,7 +644,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
               );
               commitAbsolutePoints(
                 nextPoints,
-                getShapeTypeAfterPointInsertion(data.shapeType),
+                getShapeTypeAfterPointInsertion(shapeType),
               );
             }}
           >
@@ -702,9 +699,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
           </ContextMenuSubContent>
         </ContextMenuSub>
       )}
-      {shapeSupportsVertexInsertion(data.shapeType) &&
+      {shapeSupportsVertexInsertion(shapeType) &&
         contextState.vertexIndex !== null &&
-        absolutePoints.length > getShapeMinimumPointCount(data.shapeType) && (
+        absolutePoints.length > getShapeMinimumPointCount(shapeType) && (
           <ContextMenuItem
             onSelect={() => {
               onTriggerHistorySave?.();
@@ -727,7 +724,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                     ? "arrow"
                     : getShapeTypeWithoutArrow(nextPoints.length)
                   : getShapeTypeAfterPointDeletion(
-                      data.shapeType,
+                      shapeType,
                       nextPoints.length,
                     ),
                 {
@@ -742,7 +739,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
         )}
       {canShowLayerContextMenu && props.onReorderLayer && (
         <>
-          {shapeSupportsVertexInsertion(data.shapeType) &&
+          {shapeSupportsVertexInsertion(shapeType) &&
             (contextState.segmentIndex !== null ||
               contextState.vertexIndex !== null) && <ContextMenuSeparator />}
           <ControlLayerMenuItems
@@ -1370,10 +1367,10 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                           className="pointer-events-auto absolute h-3 w-3 cursor-move rounded-full border border-blue-500 bg-white"
                           tabIndex={0}
                           data-app-keyboard-handle="shape-vertex"
-                          aria-label={`${data.shapeType} point ${index + 1}`}
+                          aria-label={`${shapeType} point ${index + 1}`}
                           style={{
-                            left: `${(point.x / Math.max(1, data.rect.width)) * 100}%`,
-                            top: `${(point.y / Math.max(1, data.rect.height)) * 100}%`,
+                            left: `${(point.x / Math.max(1, rect.width)) * 100}%`,
+                            top: `${(point.y / Math.max(1, rect.height)) * 100}%`,
                             transform: "translate(-50%, -50%)",
                             zIndex: 60,
                           }}

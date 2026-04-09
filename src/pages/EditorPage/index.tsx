@@ -379,7 +379,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
     (style: { color: string }) => {
       setState((prev) => ({
         ...prev,
-        commentStyle: { ...prev.commentStyle, ...style },
+        commentStyle: {
+          ...(prev.commentStyle ?? {
+            color: ANNOTATION_STYLES.comment.color,
+            opacity: ANNOTATION_STYLES.comment.opacity,
+          }),
+          ...style,
+        },
       }));
     },
     [setState],

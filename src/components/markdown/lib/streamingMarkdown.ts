@@ -336,9 +336,13 @@ const buildStreamingListItemViewModel = (
   item: ParsedStreamingListItem,
   previousItem?: StreamingListItemViewModel,
 ): StreamingListItemViewModel => {
-  const children = item.children.map((child, index) =>
-    buildStreamingListViewModel(child, previousItem?.children[index]),
-  );
+  const children = item.children.flatMap((child, index) => {
+    const viewModel = buildStreamingListViewModel(
+      child,
+      previousItem?.children[index] ?? null,
+    );
+    return viewModel ? [viewModel] : [];
+  });
   const canReusePreviousItem =
     previousItem &&
     previousItem.contentSource === item.contentSource &&

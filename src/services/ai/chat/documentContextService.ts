@@ -1513,7 +1513,10 @@ export const createDocumentContextService = (options: {
             const childChunks =
               taskNode.childIds
                 ?.map((childId) => taskNodes.get(childId)?.result)
-                .filter(Boolean) ?? [];
+                .filter(
+                  (chunk): chunk is AiDocumentDigestChunk =>
+                    chunk !== undefined,
+                ) ?? [];
             const fallbackExcerpt = truncateText(
               buildDigestSummaryMergeInput(childChunks, excerptCharsPerChunk),
               excerptCharsPerChunk,

@@ -100,6 +100,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
   onPointerDown,
 }) => {
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
+  const color = data.color || "#000000";
 
   return (
     <ControlWrapper
@@ -131,10 +132,10 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
             size="icon"
             className="h-8 w-8"
             style={{
-              backgroundColor: getContrastColor(data.color),
+              backgroundColor: getContrastColor(color),
             }}
           >
-            <Palette size={16} style={{ color: data.color }} />
+            <Palette size={16} style={{ color }} />
           </Button>
         </ColorPickerPopover>
 
@@ -229,6 +230,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
   const bounds = getRectBounds(rects);
   const d = rectsToPath(rects, { x: bounds.x, y: bounds.y });
   const { ref, x, y, width, height } = useMouse<SVGPathElement>();
+  const color = data.color || "#000000";
 
   return (
     <ControlWrapper
@@ -260,10 +262,10 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
             size="icon"
             className="h-8 w-8"
             style={{
-              backgroundColor: getContrastColor(data.color),
+              backgroundColor: getContrastColor(color),
             }}
           >
-            <Palette size={16} style={{ color: data.color }} />
+            <Palette size={16} style={{ color }} />
           </Button>
         </ColorPickerPopover>
 
@@ -366,16 +368,16 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
       <HighlightPolygon
         rects={data.rects}
         data={data}
-        isSelectable={isSelectable}
+        isSelectable={!!isSelectable}
         onSelect={onSelect}
         elementId={`annotation-${data.id}`}
-        isSelected={isSelected}
-        showToolbar={isSelected}
+        isSelected={!!isSelected}
+        showToolbar={!!isSelected}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onEdit={onEdit}
         onAskAi={onAskAi}
-        isAnnotationMode={isAnnotationMode}
+        isAnnotationMode={!!isAnnotationMode}
         onPointerDown={onPointerDown}
       />
     );
@@ -384,16 +386,16 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
       <HighlightRect
         r={data.rect}
         data={data}
-        isSelectable={isSelectable}
+        isSelectable={!!isSelectable}
         onSelect={onSelect}
         elementId={`annotation-${data.id}`}
-        isSelected={isSelected}
-        showToolbar={isSelected}
+        isSelected={!!isSelected}
+        showToolbar={!!isSelected}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onEdit={onEdit}
         onAskAi={onAskAi}
-        isAnnotationMode={isAnnotationMode}
+        isAnnotationMode={!!isAnnotationMode}
         onPointerDown={onPointerDown}
       />
     );

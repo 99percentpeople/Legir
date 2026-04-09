@@ -218,7 +218,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
             size="icon"
             className="h-8 w-8"
             style={{
-              backgroundColor: getContrastColor(data.color),
+              backgroundColor: getContrastColor(data.color || "#000000"),
             }}
           >
             <Palette size={16} style={{ color: data.color }} />

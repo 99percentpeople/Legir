@@ -95,7 +95,7 @@ export const getAiChatSystemInstruction = (options?: {
                 : null,
               "Use fill_form_fields only for current field values.",
             ]
-              .filter(Boolean)
+              .filter((line): line is string => line !== null)
               .join(" ")
           : "If form tools are unavailable, only modify existing field values and do not claim to create or restyle fields.",
         canCreateFormFields
@@ -127,7 +127,7 @@ export const getAiChatSystemInstruction = (options?: {
               .join(" ")
           : null,
         "After a successful direct UI action, do not repeat it unless the user asks for another one.",
-      ].filter(Boolean),
+      ].filter((line): line is string => Boolean(line)),
     ),
   );
 

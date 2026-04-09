@@ -15,6 +15,7 @@ import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
   const { data, isSelected, onUpdate, onDelete, onEdit, onAskAi } = props;
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
+  const color = data.color || "#000000";
 
   // Ensure rect exists, otherwise default
   const rect = data.rect || { x: 0, y: 0, width: 30, height: 30 };
@@ -35,10 +36,10 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
             size="icon"
             className="h-8 w-8"
             style={{
-              backgroundColor: getContrastColor(data.color),
+              backgroundColor: getContrastColor(color),
             }}
           >
-            <Palette size={16} style={{ color: data.color }} />
+            <Palette size={16} style={{ color }} />
           </Button>
         </ColorPickerPopover>
 
@@ -82,8 +83,8 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
             <MessageCircleMore
               size={24}
               className="text-foreground opacity-80"
-              fill={data.color ? data.color : "none"}
-              color={data.color ? getContrastColor(data.color) : "currentColor"}
+              fill={data.color ? color : "none"}
+              color={data.color ? getContrastColor(color) : "currentColor"}
               style={{
                 width: `calc(${iconBaseSize}px * var(--scale, 1))`,
                 height: `calc(${iconBaseSize}px * var(--scale, 1))`,

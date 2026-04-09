@@ -104,7 +104,7 @@ const canStartViewportGestureFromTarget = (
 };
 
 export const useWorkspaceTouchPinch = (opts: {
-  containerRef: RefObject<HTMLElement>;
+  containerRef: RefObject<HTMLElement | null>;
   enabled: boolean;
   scale: number;
   tool: Tool;
@@ -495,22 +495,22 @@ export const useWorkspaceTouchPinch = (opts: {
   useEventListeners(typeof document !== "undefined" ? document : null, [
     {
       type: "touchstart",
-      handler: handleTouchStart,
+      handler: (event) => handleTouchStart(event as TouchEvent),
       options: { capture: true, passive: false },
     },
     {
       type: "touchmove",
-      handler: handleTouchMove,
+      handler: (event) => handleTouchMove(event as TouchEvent),
       options: { capture: true, passive: false },
     },
     {
       type: "touchend",
-      handler: handleTouchEnd,
+      handler: (event) => handleTouchEnd(event as TouchEvent),
       options: { capture: true, passive: false },
     },
     {
       type: "touchcancel",
-      handler: handleTouchEnd,
+      handler: (event) => handleTouchEnd(event as TouchEvent),
       options: { capture: true, passive: false },
     },
   ]);

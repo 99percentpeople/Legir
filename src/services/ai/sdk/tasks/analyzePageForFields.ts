@@ -251,7 +251,7 @@ export const analyzePageForFieldsWithAiSdk = async (options: {
     "Form detection",
   );
 
-  return parsed.fields.map((item, index) => {
+  return (parsed.fields ?? []).map((item, index) => {
     const resolvedRect = {
       x: clampAbsoluteCoordinate(item.rect.x, options.pageWidth),
       y: clampAbsoluteCoordinate(item.rect.y, options.pageHeight),

@@ -60,7 +60,7 @@ export const mapOutline = async (
       Array.isArray(item.items) && item.items.length > 0
         ? await mapOutline(pdf, item.items as PdfJsOutlineItem[])
         : [];
-    mapped.push({ title: item.title, items: children, pageIndex });
+    mapped.push({ title: item.title ?? "", items: children, pageIndex });
   }
   return mapped;
 };

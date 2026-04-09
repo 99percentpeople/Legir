@@ -16,52 +16,52 @@ type WorkerHost = {
 };
 
 const RequireWorkerPromise = (throwError = true) => {
-  return <T extends (...args: unknown[]) => Promise<unknown>>(
+  return <Args extends unknown[], Result>(
     _target: unknown,
     _propertyKey: string | symbol,
-    descriptor: TypedPropertyDescriptor<T>,
+    descriptor: TypedPropertyDescriptor<(...args: Args) => Promise<Result>>,
   ) => {
     const original = descriptor.value;
     if (!original) return;
 
-    const wrapped = function (this: WorkerHost, ...args: Parameters<T>) {
+    const wrapped = function (this: WorkerHost, ...args: Args) {
       if (!this.worker) {
         this.initWorker();
         if (!this.worker) {
           if (throwError) {
             return Promise.reject(
               new Error("Worker not initialized"),
-            ) as ReturnType<T>;
+            ) as Promise<Result>;
           } else {
-            return;
+            return Promise.resolve(undefined as Result);
           }
         }
       }
-      return original.apply(this as unknown as ThisParameterType<T>, args);
-    } as T;
+      return original.apply(this, args);
+    };
 
     descriptor.value = wrapped;
   };
 };
 
 const RequireWorkerVoid = () => {
-  return <T extends (...args: unknown[]) => void>(
+  return <Args extends unknown[]>(
     _target: unknown,
     _propertyKey: string | symbol,
-    descriptor: TypedPropertyDescriptor<T>,
+    descriptor: TypedPropertyDescriptor<(...args: Args) => void>,
   ) => {
     const original = descriptor.value;
     if (!original) return;
 
-    const wrapped = function (this: WorkerHost, ...args: Parameters<T>) {
+    const wrapped = function (this: WorkerHost, ...args: Args) {
       if (!this.worker) {
         this.initWorker();
         if (!this.worker) {
           return;
         }
       }
-      return original.apply(this as unknown as ThisParameterType<T>, args);
-    } as T;
+      return original.apply(this, args);
+    };
 
     descriptor.value = wrapped;
   };
@@ -131,6 +131,11 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
       const {
         pageIndex,
         scale,
@@ -181,7 +186,7 @@ class PDFWorkerService {
           viewportCenter,
         };
 
-        this.worker.postMessage(message);
+        worker.postMessage(message);
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);
@@ -268,6 +273,11 @@ class PDFWorkerService {
     },
   ): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
       const docId = options?.docId ?? this.defaultDocId;
       this.clearLastRenderScaleForDoc(docId);
 
@@ -323,7 +333,7 @@ class PDFWorkerService {
           password,
         };
 
-        this.worker.postMessage(message);
+        worker.postMessage(message);
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);
@@ -339,7 +349,7 @@ class PDFWorkerService {
     this.clearOutlineCacheForDoc(docId);
     const id = `unload_${docId}_${Date.now()}`;
     const message: WorkerRequest = { type: "unload", id, docId };
-    this.worker.postMessage(message);
+    this.worker?.postMessage(message);
   }
 
   @RequireWorkerPromise()
@@ -349,6 +359,11 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<TextContent | null> {
     return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
       const { pageIndex, docId: requestedDocId, signal } = options;
       const docId = requestedDocId ?? this.defaultDocId;
 
@@ -405,7 +420,7 @@ class PDFWorkerService {
           pageIndex,
         };
 
-        this.worker.postMessage(message);
+        worker.postMessage(message);
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);
@@ -419,6 +434,11 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<PDFOutlineItem[] | null> {
     return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
       const docId = options?.docId ?? this.defaultDocId;
       const cached = this.outlineCacheByDocId.get(docId);
       if (cached) {
@@ -471,7 +491,7 @@ class PDFWorkerService {
           docId,
         };
 
-        this.worker.postMessage(message);
+        worker.postMessage(message);
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);
@@ -486,6 +506,11 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<number | null> {
     return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
       const { dest, docId: requestedDocId, signal } = options;
       const docId = requestedDocId ?? this.defaultDocId;
 
@@ -533,7 +558,7 @@ class PDFWorkerService {
           dest,
         };
 
-        this.worker.postMessage(message);
+        worker.postMessage(message);
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);
@@ -557,7 +582,7 @@ class PDFWorkerService {
       pageIndex,
       scale,
     };
-    this.worker.postMessage(message);
+    this.worker?.postMessage(message);
   }
 
   @RequireWorkerPromise()
@@ -566,6 +591,11 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
       const { canvasIds, signal } = options;
       const id = `releaseCanvas_${Date.now()}`;
 
@@ -605,7 +635,7 @@ class PDFWorkerService {
           canvasIds,
         };
 
-        this.worker.postMessage(message);
+        worker.postMessage(message);
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);
@@ -629,6 +659,11 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<{ bytes: Uint8Array; mimeType: string }> {
     return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
       const {
         pageIndex,
         scale,
@@ -723,7 +758,7 @@ class PDFWorkerService {
             quality,
             priority: priority || 0,
           };
-          this.worker.postMessage(message);
+          worker.postMessage(message);
         } else {
           const message: WorkerRequest = {
             type: "renderImage",
@@ -737,7 +772,7 @@ class PDFWorkerService {
             quality,
             priority: priority || 0,
           };
-          this.worker.postMessage(message);
+          worker.postMessage(message);
         }
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
@@ -759,6 +794,11 @@ class PDFWorkerService {
     signal?: AbortSignal;
   }): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
       const {
         pageIndex,
         scale,
@@ -825,7 +865,7 @@ class PDFWorkerService {
           tile,
         };
 
-        this.worker.postMessage(message, canvas ? [canvas] : undefined);
+        worker.postMessage(message, canvas ? [canvas] : []);
       } catch (e) {
         if (signal) signal.removeEventListener("abort", onAbort);
         reject(e);

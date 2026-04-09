@@ -682,7 +682,7 @@ const buildPdfLibAnnotsByPageIndex = async (
       } catch {
         rectObj = undefined;
       }
-      const rect = pdfRectFromObj(rectObj);
+      const rawRect = pdfRectFromObj(rectObj);
       const rawInReplyTo = annot.get(PDFName.of("IRT"));
       const inReplyTo =
         rawInReplyTo instanceof PDFRef ? pdfRefToKey(rawInReplyTo) : null;
@@ -691,7 +691,7 @@ const buildPdfLibAnnotsByPageIndex = async (
       const popupRef =
         rawPopup instanceof PDFRef ? pdfRefToKey(rawPopup) : null;
       const rectOrReplyFallback =
-        rect ??
+        rawRect ??
         (inReplyTo
           ? ([0, 0, 0, 0] as [number, number, number, number])
           : undefined);
@@ -700,7 +700,7 @@ const buildPdfLibAnnotsByPageIndex = async (
         pageIndex,
         annotIndex: i,
         subtypeName,
-        rect,
+        rect: rawRect,
         inReplyTo,
         replyType,
         rectObj: summarizePdfObjForDebug(rectObj),
@@ -711,6 +711,7 @@ const buildPdfLibAnnotsByPageIndex = async (
       if (!subtypeName) continue;
 
       if (!rectOrReplyFallback) continue;
+      const rect = rectOrReplyFallback;
 
       const pushForPage = (a: PdfJsAnnotation) => {
         const arr = out.get(pageIndex) || [];
@@ -1068,7 +1069,7 @@ const buildPdfLibAnnotsByPageIndex = async (
       const lineEndings = (() => {
         const raw = annot.lookup(PDFName.of("LE"));
         if (!(raw instanceof PDFArray)) return undefined;
-        const values = [];
+        const values: string[] = [];
         for (let idx = 0; idx < raw.size(); idx++) {
           const value = pdfObjToString(raw.lookup(idx));
           if (value) values.push(value);
@@ -1985,7 +1986,7 @@ export const exportPDF = async (
             if (acroFields instanceof PDFArray) {
               if (fieldRef) {
                 const idx = acroFields.indexOf(fieldRef);
-                if (idx !== -1) {
+                if (typeof idx === "number" && idx !== -1) {
                   acroFields.remove(idx);
                 }
               }
@@ -2009,7 +2010,7 @@ export const exportPDF = async (
                   for (const widget of widgets) {
                     if (!(widget instanceof PDFRef)) continue;
                     const wIdx = annots.indexOf(widget);
-                    if (wIdx !== -1) {
+                    if (typeof wIdx === "number" && wIdx !== -1) {
                       annots.remove(wIdx);
                     }
                   }

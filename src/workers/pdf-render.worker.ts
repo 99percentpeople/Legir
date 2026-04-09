@@ -721,7 +721,7 @@ const renderToCanvas = async (
     ctx.translate(-finalTileX, -finalTileY);
 
     const renderContext = {
-      canvas: undefined,
+      canvas: null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       canvasContext: ctx as any, // Type cast for OffscreenCanvasRenderingContext2D compatibility
       viewport: viewport,
@@ -827,7 +827,7 @@ const renderToImage = async (
       ? pdfjsLib.AnnotationMode.ENABLE
       : pdfjsLib.AnnotationMode.DISABLE;
     renderTask = page.render({
-      canvas: undefined,
+      canvas: null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       canvasContext: ctx as any,
       viewport,

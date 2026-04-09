@@ -167,6 +167,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const ActiveShapeIcon = isShapeToolActive
     ? getShapeToolIcon(activeShapeTool)
     : Shapes;
+  const commentColor =
+    editorState.commentStyle?.color ?? ANNOTATION_STYLES.comment.color;
+  const freetextColor =
+    editorState.freetextStyle?.color ?? ANNOTATION_STYLES.freetext.color;
   const activeShapeLabel = getShapeToolLabel(t, activeShapeTool);
   const shapeButtonLabel = isShapeToolActive
     ? activeShapeLabel
@@ -287,7 +291,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 >
                   <DropdownMenuRadioGroup
                     value={mode}
-                    onValueChange={onModeChange}
+                    onValueChange={(nextMode) => {
+                      if (nextMode === "annotation" || nextMode === "form") {
+                        onModeChange(nextMode);
+                      }
+                    }}
                   >
                     <DropdownMenuRadioItem value="annotation">
                       <div className="flex items-center gap-2">
@@ -501,20 +509,18 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     <div
                       className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
                       style={{
-                        backgroundColor: editorState.commentStyle?.color,
+                        backgroundColor: commentColor,
                       }}
                     >
                       <MessageCircle
                         size={14}
-                        color={getContrastColor(
-                          editorState.commentStyle?.color,
-                        )}
+                        color={getContrastColor(commentColor)}
                       />
                     </div>
                   </ToggleGroupItem>
                   <ColorPickerPopover
                     paletteType="foreground"
-                    color={editorState.commentStyle?.color}
+                    color={commentColor}
                     onColorChange={(color) =>
                       onCommentStyleChange && onCommentStyleChange({ color })
                     }
@@ -532,20 +538,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     <div
                       className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
                       style={{
-                        backgroundColor: editorState.freetextStyle?.color,
+                        backgroundColor: freetextColor,
                       }}
                     >
-                      <Type
-                        size={14}
-                        color={getContrastColor(
-                          editorState.freetextStyle?.color,
-                        )}
-                      />
+                      <Type size={14} color={getContrastColor(freetextColor)} />
                     </div>
                   </ToggleGroupItem>
                   <ColorPickerPopover
                     paletteType="foreground"
-                    color={editorState.freetextStyle?.color}
+                    color={freetextColor}
                     onColorChange={(color) =>
                       onFreetextStyleChange && onFreetextStyleChange({ color })
                     }

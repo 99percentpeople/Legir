@@ -1888,9 +1888,9 @@ export class InkExporter implements IAnnotationExporter {
     const colorObj = annotation.color
       ? hexToPdfColor(annotation.color)
       : undefined;
-    const r = colorObj?.red;
-    const g = colorObj?.green;
-    const b = colorObj?.blue;
+    const r = colorObj?.red ?? 0;
+    const g = colorObj?.green ?? 0;
+    const b = colorObj?.blue ?? 0;
 
     let annotObj;
 

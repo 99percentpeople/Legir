@@ -1,5 +1,8 @@
 import type { EditorUiState, LLMOptions, PageTranslateOptions } from "./types";
-import { AI_PROVIDER_IDS } from "./services/ai/sdk/providerCatalog";
+import {
+  AI_PROVIDER_IDS,
+  type AiProviderId,
+} from "./services/ai/sdk/providerCatalog";
 
 export const DEFAULT_SCALE = 1.0;
 export const ZOOM_BASE = 1.25;
@@ -97,17 +100,15 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
     userName: "",
     thumbnailsLayout: "single",
     removeTextUnderFlattenedFreetext: true,
-    llm: Object.fromEntries(
-      AI_PROVIDER_IDS.map((providerId) => [
-        providerId,
-        {
-          enabled: true,
-          apiKey: "",
-          apiUrl: "",
-          customModels: [],
-        },
-      ]),
-    ) as LLMOptions,
+    llm: AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
+      acc[providerId as AiProviderId] = {
+        enabled: true,
+        apiKey: "",
+        apiUrl: "",
+        customModels: [],
+      };
+      return acc;
+    }, {} as LLMOptions),
     aiChat: {
       digestEnabled: true,
       digestSourceCharsPerChunk: 12000,

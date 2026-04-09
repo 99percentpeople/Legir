@@ -424,6 +424,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       const textContent = await workerService.getTextContent({
         pageIndex: selection.pageIndex,
       });
+      if (!textContent) return null;
       const geometry = getPdfSearchRangeGeometry(
         textContent,
         page,
@@ -1769,8 +1770,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
       // Helper to find snap
       const findSnap = (val: number, type: "vertical" | "horizontal") => {
         let best = Infinity;
-        let snapTo = null;
-        let guide = null;
+        let snapTo: number | null = null;
+        let guide: number | null = null;
 
         otherFields.forEach((f) => {
           const targets =
@@ -1798,8 +1799,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
           resizeStart.originalRect.width / resizeStart.originalRect.height;
         let bestSnapDist = Infinity;
         let bestSnapType: "w" | "e" | "n" | "s" | null = null;
-        let bestSnapVal = null;
-        let bestGuide = null;
+        let bestSnapVal: number | null = null;
+        let bestGuide: number | null = null;
 
         // Check all relevant sides for nearest snap
         if (resizeHandle.includes("w")) {
@@ -1863,7 +1864,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             newH = targetH;
             guides.push({
               type: "vertical",
-              pos: bestGuide as number,
+              pos: bestGuide ?? bestSnapVal,
               start: 0,
               end: 2000,
             });
@@ -1875,7 +1876,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             newH = targetH;
             guides.push({
               type: "vertical",
-              pos: bestGuide as number,
+              pos: bestGuide ?? bestSnapVal,
               start: 0,
               end: 2000,
             });
@@ -1889,7 +1890,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             newW = targetW;
             guides.push({
               type: "horizontal",
-              pos: bestGuide as number,
+              pos: bestGuide ?? bestSnapVal,
               start: 0,
               end: 2000,
             });
@@ -1901,7 +1902,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             newW = targetW;
             guides.push({
               type: "horizontal",
-              pos: bestGuide as number,
+              pos: bestGuide ?? bestSnapVal,
               start: 0,
               end: 2000,
             });
@@ -1918,7 +1919,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             newW -= diff;
             guides.push({
               type: "vertical",
-              pos: guide as number,
+              pos: guide ?? snapTo,
               start: 0,
               end: 2000,
             });
@@ -1931,7 +1932,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             newW = snapTo - newX;
             guides.push({
               type: "vertical",
-              pos: guide as number,
+              pos: guide ?? snapTo,
               start: 0,
               end: 2000,
             });
@@ -1946,7 +1947,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             newH -= diff;
             guides.push({
               type: "horizontal",
-              pos: guide as number,
+              pos: guide ?? snapTo,
               start: 0,
               end: 2000,
             });
@@ -1959,7 +1960,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             newH = snapTo - newY;
             guides.push({
               type: "horizontal",
-              pos: guide as number,
+              pos: guide ?? snapTo,
               start: 0,
               end: 2000,
             });
@@ -2791,16 +2792,17 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       setActivePageIndex(targetAnnotation.pageIndex);
       const coords = getRelativeCoords(e, targetAnnotation.pageIndex);
+      const moveRect = outerRect ?? targetAnnotation.rect;
 
       // Keep highlight stationary by default, but allow modifier-drag duplication
       // to immediately move the newly created copy.
       if (
-        targetAnnotation.rect &&
+        moveRect &&
         (targetAnnotation.type !== "highlight" || shouldForceDragMove)
       ) {
         setGlobalCursor("move");
         setMovingAnnotationId(targetAnnotation.id);
-        setMoveOffset({ x: coords.x - outerRect.x, y: coords.y - outerRect.y });
+        setMoveOffset({ x: coords.x - moveRect.x, y: coords.y - moveRect.y });
       }
     },
     [

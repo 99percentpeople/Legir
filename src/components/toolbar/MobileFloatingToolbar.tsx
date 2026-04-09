@@ -126,6 +126,10 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   const [pageMenuOpen, setPageMenuOpen] = React.useState(false);
   const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
   const [toolMenuOpen, setToolMenuOpen] = React.useState(false);
+  const commentColor =
+    editorState.commentStyle?.color ?? ANNOTATION_STYLES.comment.color;
+  const freetextColor =
+    editorState.freetextStyle?.color ?? ANNOTATION_STYLES.freetext.color;
 
   useAppEvent(
     "workspace:shapeDraftStateChange",
@@ -329,7 +333,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
         return (
           <ColorPickerPopover
             paletteType="foreground"
-            color={editorState.commentStyle?.color}
+            color={commentColor}
             onColorChange={(color) =>
               onCommentStyleChange && onCommentStyleChange({ color })
             }
@@ -338,18 +342,14 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
             side="top"
             title={t("toolbar.comment_properties")}
           >
-            {renderStyleTrigger(
-              t("toolbar.comment_properties"),
-              editorState.commentStyle?.color ||
-                ANNOTATION_STYLES.comment.color,
-            )}
+            {renderStyleTrigger(t("toolbar.comment_properties"), commentColor)}
           </ColorPickerPopover>
         );
       case "draw_freetext":
         return (
           <ColorPickerPopover
             paletteType="foreground"
-            color={editorState.freetextStyle?.color}
+            color={freetextColor}
             onColorChange={(color) =>
               onFreetextStyleChange && onFreetextStyleChange({ color })
             }
@@ -360,8 +360,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
           >
             {renderStyleTrigger(
               t("toolbar.freetext_properties"),
-              editorState.freetextStyle?.color ||
-                ANNOTATION_STYLES.freetext.color,
+              freetextColor,
             )}
           </ColorPickerPopover>
         );
@@ -484,7 +483,11 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
             >
               <DropdownMenuRadioGroup
                 value={editorState.mode}
-                onValueChange={onModeChange}
+                onValueChange={(nextMode) => {
+                  if (nextMode === "annotation" || nextMode === "form") {
+                    onModeChange(nextMode);
+                  }
+                }}
               >
                 <DropdownMenuRadioItem value="annotation">
                   <PenTool size={14} />

@@ -1,10 +1,10 @@
-import { useCallback, RefObject } from "react";
+import { useCallback, type RefObject } from "react";
 
 /**
  * Hook to manage pointer capture for an element.
  * Provides safe wrappers for setPointerCapture and releasePointerCapture.
  */
-export const usePointerCapture = (ref: RefObject<HTMLElement>) => {
+export const usePointerCapture = (ref: RefObject<HTMLElement | null>) => {
   /**
    * Captures the pointer to the referenced element.
    * Should be called in onPointerDown.

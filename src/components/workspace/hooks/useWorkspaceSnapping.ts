@@ -39,8 +39,8 @@ export const useWorkspaceSnapping = (opts: {
       );
 
       let bestDx = Infinity;
-      let snapX = null;
-      let guideX = null;
+      let snapX: number | null = null;
+      let guideX: number | null = null;
       const checkSnap = (diff: number, newPos: number, guidePos: number) => {
         if (Math.abs(diff) < Math.abs(bestDx) && Math.abs(diff) < threshold) {
           bestDx = diff;
@@ -119,8 +119,8 @@ export const useWorkspaceSnapping = (opts: {
       }
 
       let bestDy = Infinity;
-      let snapY = null;
-      let guideY = null;
+      let snapY: number | null = null;
+      let guideY: number | null = null;
       const checkSnapY = (diff: number, newPos: number, guidePos: number) => {
         if (Math.abs(diff) < Math.abs(bestDy) && Math.abs(diff) < threshold) {
           bestDy = diff;

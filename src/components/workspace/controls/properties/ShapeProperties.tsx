@@ -411,7 +411,7 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
               onClick={() => {
                 onTriggerHistorySave();
                 onChange({
-                  shapePoints: reverseShapePoints(data.shapePoints),
+                  shapePoints: reverseShapePoints(data.shapePoints ?? []),
                   appearanceStreamContent: undefined,
                 });
               }}

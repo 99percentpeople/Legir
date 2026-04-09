@@ -48,8 +48,8 @@ const clampWorkspaceScale = (scale: number) => {
 };
 
 export const useWorkspaceViewport = (opts: {
-  containerRef: RefObject<HTMLDivElement>;
-  contentRef: RefObject<HTMLDivElement>;
+  containerRef: RefObject<HTMLDivElement | null>;
+  contentRef: RefObject<HTMLDivElement | null>;
   editorState: WorkspaceEditorState;
   getPageRectByPageIndex?: (pageIndex: number) => {
     top: number;

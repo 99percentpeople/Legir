@@ -151,7 +151,7 @@ export const useInkSession = ({
 
         // If user has undone the annotation (or it was deleted), the cached session id becomes stale.
         // Reset and fall through to create a new annotation.
-        if (!currentAnnot || currentAnnot.type !== "ink") {
+        if (!sessionId || !currentAnnot || currentAnnot.type !== "ink") {
           resetSession();
         } else {
           // Sync with the current annotation strokes (important after undo/redo)

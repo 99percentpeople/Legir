@@ -269,12 +269,14 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
         annotations: args.annotations.map((item) => ({
           pageNumber: item.page_number,
           text: item.text,
-          rect: {
-            x: item.rect.x,
-            y: item.rect.y,
-            width: item.rect.width,
-            height: item.rect.height,
-          },
+          rect: item.rect
+            ? {
+                x: item.rect.x,
+                y: item.rect.y,
+                width: item.rect.width,
+                height: item.rect.height,
+              }
+            : undefined,
           style: item.style
             ? {
                 color: item.style.color,

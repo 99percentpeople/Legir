@@ -796,6 +796,10 @@ const normalizeAnnotationRectInput = (
   if (!rect) return null;
   const { x, y, width, height } = rect;
   if (
+    typeof x !== "number" ||
+    typeof y !== "number" ||
+    typeof width !== "number" ||
+    typeof height !== "number" ||
     !Number.isFinite(x) ||
     !Number.isFinite(y) ||
     !Number.isFinite(width) ||
@@ -812,7 +816,10 @@ const normalizeAnnotationPointInputs = (
   points: Array<{ x?: number; y?: number }> | undefined,
 ) =>
   (points ?? []).flatMap((point) =>
-    Number.isFinite(point.x) && Number.isFinite(point.y)
+    typeof point.x === "number" &&
+    Number.isFinite(point.x) &&
+    typeof point.y === "number" &&
+    Number.isFinite(point.y)
       ? [{ x: point.x, y: point.y }]
       : [],
   );
@@ -2750,9 +2757,10 @@ export const createAiChatToolContext = (options: {
     let rejectedCount = 0;
 
     for (const item of optionsInput.annotations) {
-      const pageNumber = Number.isFinite(item.pageNumber)
-        ? Math.trunc(item.pageNumber)
-        : Number.NaN;
+      const pageNumber =
+        typeof item.pageNumber === "number" && Number.isFinite(item.pageNumber)
+          ? Math.trunc(item.pageNumber)
+          : Number.NaN;
       const pageIndex = pageNumber - 1;
       const page = store.pages[pageIndex];
       const text = typeof item.text === "string" ? item.text.trim() : "";
@@ -2894,9 +2902,10 @@ export const createAiChatToolContext = (options: {
     let rejectedCount = 0;
 
     for (const item of optionsInput.annotations) {
-      const pageNumber = Number.isFinite(item.pageNumber)
-        ? Math.trunc(item.pageNumber)
-        : Number.NaN;
+      const pageNumber =
+        typeof item.pageNumber === "number" && Number.isFinite(item.pageNumber)
+          ? Math.trunc(item.pageNumber)
+          : Number.NaN;
       const pageIndex = pageNumber - 1;
       const page = store.pages[pageIndex];
       const shapeType = item.shapeType;

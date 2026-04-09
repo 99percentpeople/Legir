@@ -24,6 +24,8 @@ export const GeometryProperties: React.FC<
   PropertyPanelProps<FormField | Annotation>
 > = ({ data, onChange, onTriggerHistorySave }) => {
   const { t } = useLanguage();
+  if (!data.rect) return null;
+  const rect = data.rect;
   const controlConfig = registry.get(data.type);
   const supportsSizeEditing =
     typeof controlConfig?.supportsGeometrySizeEdit === "function"
@@ -64,33 +66,33 @@ export const GeometryProperties: React.FC<
           <Label className="text-xs">{t("properties.x")}</Label>
           <NumberInput
             aria-label={t("properties.x")}
-            value={Math.round(data.rect.x)}
+            value={Math.round(rect.x)}
             formatOptions={{ maximumFractionDigits: 0 }}
             onFocus={onTriggerHistorySave}
-            onChange={(val) => onChange({ rect: { ...data.rect, x: val } })}
+            onChange={(val) => onChange({ rect: { ...rect, x: val } })}
           />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">{t("properties.y")}</Label>
           <NumberInput
             aria-label={t("properties.y")}
-            value={Math.round(data.rect.y)}
+            value={Math.round(rect.y)}
             formatOptions={{ maximumFractionDigits: 0 }}
             onFocus={onTriggerHistorySave}
-            onChange={(val) => onChange({ rect: { ...data.rect, y: val } })}
+            onChange={(val) => onChange({ rect: { ...rect, y: val } })}
           />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">{t("properties.width")}</Label>
           <NumberInput
             aria-label={t("properties.width")}
-            value={Math.round(data.rect.width)}
+            value={Math.round(rect.width)}
             formatOptions={{ maximumFractionDigits: 0 }}
             isReadOnly={!supportsSizeEditing}
             onFocus={supportsSizeEditing ? onTriggerHistorySave : undefined}
             onChange={
               supportsSizeEditing
-                ? (val) => onChange({ rect: { ...data.rect, width: val } })
+                ? (val) => onChange({ rect: { ...rect, width: val } })
                 : undefined
             }
           />
@@ -99,13 +101,13 @@ export const GeometryProperties: React.FC<
           <Label className="text-xs">{t("properties.height")}</Label>
           <NumberInput
             aria-label={t("properties.height")}
-            value={Math.round(data.rect.height)}
+            value={Math.round(rect.height)}
             formatOptions={{ maximumFractionDigits: 0 }}
             isReadOnly={!supportsSizeEditing}
             onFocus={supportsSizeEditing ? onTriggerHistorySave : undefined}
             onChange={
               supportsSizeEditing
-                ? (val) => onChange({ rect: { ...data.rect, height: val } })
+                ? (val) => onChange({ rect: { ...rect, height: val } })
                 : undefined
             }
           />
@@ -123,7 +125,7 @@ export const GeometryProperties: React.FC<
               onTriggerHistorySave?.();
               onChange({
                 rect: rotateOuterRectKeepingCenter(
-                  data.rect,
+                  rect,
                   rotationDeg,
                   nextRotation,
                 ),

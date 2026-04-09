@@ -26,7 +26,7 @@ export function useEditorPageLifecycle({
   );
 
   React.useEffect(() => {
-    const appName = process.env.APP_NAME;
+    const appName = process.env.APP_NAME ?? "Legir";
 
     if (typeof document !== "undefined" && initialTitleRef.current === null) {
       initialTitleRef.current = document.title;

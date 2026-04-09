@@ -62,11 +62,12 @@ export const rememberWebRecentFile = async (options: {
     options.pdfBytes &&
     (options.forcePreviewRender || !entries[0]?.previewDataUrl)
   ) {
+    const pdfBytes = options.pdfBytes;
     scheduleBackgroundWork(() => {
       void (async () => {
         try {
           const previewDataUrl = await renderPdfPreviewDataUrl({
-            pdfBytes: options.pdfBytes,
+            pdfBytes,
             targetWidth: 240,
             renderAnnotations: true,
           });

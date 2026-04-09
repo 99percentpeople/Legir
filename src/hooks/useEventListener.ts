@@ -27,7 +27,7 @@ export const useEventListener = <TEvent extends Event>(
   }, [target, type, options]);
 };
 
-type EventListenerSpec<TEvent extends Event = Event> = {
+export type EventListenerSpec<TEvent extends Event = Event> = {
   type: string;
   handler: (event: TEvent) => void;
   options?: boolean | AddEventListenerOptions;

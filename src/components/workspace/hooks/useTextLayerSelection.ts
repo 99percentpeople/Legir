@@ -60,7 +60,7 @@ const TOUCH_TEXT_SELECTION_START_DISTANCE_PX = 8;
 
 export const useTextLayerSelection = (opts: {
   pageIndex: number;
-  textLayerRef: RefObject<HTMLDivElement>;
+  textLayerRef: RefObject<HTMLDivElement | null>;
   isSelectMode: boolean;
   scale: number;
   renderedScale: number | null;
@@ -210,7 +210,7 @@ export const useTextLayerSelection = (opts: {
       let bestSpan: HTMLSpanElement | null = null;
       let bestRect: DOMRect | null = null;
       let bestScore = Number.POSITIVE_INFINITY;
-      spans.forEach((span) => {
+      for (const span of spans) {
         if (!span.textContent) return;
         const rect = span.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
@@ -224,7 +224,7 @@ export const useTextLayerSelection = (opts: {
           bestSpan = span;
           bestRect = rect;
         }
-      });
+      }
       if (!bestSpan || !bestRect) return null;
       return { span: bestSpan, rect: bestRect };
     },

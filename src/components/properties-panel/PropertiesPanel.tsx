@@ -50,15 +50,23 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
     );
 
     if (activeTab === "properties" && selectedControl) {
+      const handleControlChange = (
+        updates: Partial<FormField | Annotation>,
+      ) => {
+        onChange({ ...selectedControl, ...updates } as FormField | Annotation);
+      };
+      const handleClose = onClose ?? onCollapse ?? (() => {});
+      const handleCollapse = onCollapse ?? handleClose;
+
       return (
         <ControlPropertiesPanel
           data={selectedControl}
-          onChange={onChange}
+          onChange={handleControlChange}
           onDelete={() => onDelete(selectedControl.id)}
-          onClose={onClose}
+          onClose={handleClose}
           isOpen={isOpen}
           onOpen={onOpen}
-          onCollapse={onCollapse}
+          onCollapse={handleCollapse}
           isFloating={isFloating}
           onTriggerHistorySave={onTriggerHistorySave}
           width={width}
@@ -81,7 +89,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         isOpen={isOpen}
         onOpen={onOpen}
         onCollapse={onCollapse}
-        onClose={onCollapse}
+        onClose={onClose ?? onCollapse}
         isFloating={isFloating}
         onTriggerHistorySave={onTriggerHistorySave}
         width={width}

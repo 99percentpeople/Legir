@@ -12,7 +12,7 @@ interface AutoScrollOptions {
  * Useful for drag-and-drop or resizing operations that need to extend beyond the current viewport.
  */
 export const useAutoScroll = (
-  containerRef: React.RefObject<HTMLElement>,
+  containerRef: React.RefObject<HTMLElement | null>,
   options: AutoScrollOptions = {},
 ) => {
   const { threshold = 50, speed = 20, enabled = false } = options;

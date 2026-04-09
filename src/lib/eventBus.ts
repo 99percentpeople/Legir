@@ -8,10 +8,7 @@ type ShapeDraftTool =
   | "draw_shape_cloud_polygon";
 
 export class EventBus<Events extends Record<string, unknown>> {
-  private listeners = new Map<
-    keyof Events,
-    Set<(payload: Events[keyof Events]) => void>
-  >();
+  private listeners = new Map<keyof Events, Set<(payload: unknown) => void>>();
   private lastPayload = new Map<keyof Events, unknown>();
 
   on<K extends keyof Events>(
@@ -19,8 +16,10 @@ export class EventBus<Events extends Record<string, unknown>> {
     handler: (payload: Events[K]) => void,
     options?: { replayLast?: boolean },
   ): Unsubscribe {
-    const set = this.listeners.get(event) ?? new Set();
-    set.add(handler);
+    const set =
+      this.listeners.get(event) ?? new Set<(payload: unknown) => void>();
+    const erasedHandler = handler as (payload: unknown) => void;
+    set.add(erasedHandler);
     this.listeners.set(event, set);
 
     if (options?.replayLast && this.lastPayload.has(event)) {
@@ -30,7 +29,7 @@ export class EventBus<Events extends Record<string, unknown>> {
     return () => {
       const cur = this.listeners.get(event);
       if (!cur) return;
-      cur.delete(handler);
+      cur.delete(erasedHandler);
       if (cur.size === 0) this.listeners.delete(event);
     };
   }

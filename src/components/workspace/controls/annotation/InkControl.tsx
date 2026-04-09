@@ -29,6 +29,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
     onAskAi,
   } = props;
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
+  const color = data.color || "#000000";
 
   const strokes = useMemo(() => {
     return getInkStrokes(data);
@@ -80,10 +81,10 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
                   size="icon"
                   className="h-8 w-8"
                   style={{
-                    backgroundColor: getContrastColor(data.color),
+                    backgroundColor: getContrastColor(color),
                   }}
                 >
-                  <Palette size={16} style={{ color: data.color }} />
+                  <Palette size={16} style={{ color }} />
                 </Button>
               </ColorPickerPopover>
 

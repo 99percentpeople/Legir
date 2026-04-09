@@ -60,7 +60,7 @@ export const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({
                     "ring-primary scale-110 ring-2 ring-offset-2",
                 )}
                 style={{ backgroundColor: c }}
-                onClick={() => onUpdate({ color: c })}
+                onClick={() => onUpdate?.({ color: c })}
                 title={c}
               />
             ))}

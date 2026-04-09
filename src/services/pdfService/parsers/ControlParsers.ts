@@ -57,6 +57,7 @@ export class TextControlParser implements IControlParser {
           globalDA,
           context.systemFontFamilies,
         );
+        const fieldFlags = annotation.fieldFlags ?? 0;
 
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
@@ -65,7 +66,7 @@ export class TextControlParser implements IControlParser {
           type: FieldType.TEXT,
           name: annotation.fieldName,
           rect: { x, y, width, height },
-          required: !!(annotation.fieldFlags & 2),
+          required: !!(fieldFlags & 2),
           style: style,
           value:
             typeof annotation.fieldValue === "string"
@@ -76,7 +77,7 @@ export class TextControlParser implements IControlParser {
               ? annotation.placeholder
               : undefined,
           alignment: alignment,
-          multiline: !!(annotation.fieldFlags & 4096),
+          multiline: !!(fieldFlags & 4096),
           toolTip: annotation.alternativeText || undefined,
           rotationDeg:
             typeof annotation.rotation === "number" &&
@@ -127,8 +128,10 @@ export class CheckboxControlParser implements IControlParser {
           globalDA,
           context.systemFontFamilies,
         );
-        const isChecked =
-          annotation.fieldValue && annotation.fieldValue !== "Off";
+        const fieldFlags = annotation.fieldFlags ?? 0;
+        const isChecked = Boolean(
+          annotation.fieldValue && annotation.fieldValue !== "Off",
+        );
 
         const exportValue =
           typeof annotation.fieldValue === "string"
@@ -142,7 +145,7 @@ export class CheckboxControlParser implements IControlParser {
           type: FieldType.CHECKBOX,
           name: annotation.fieldName,
           rect: { x, y, width, height },
-          required: !!(annotation.fieldFlags & 2),
+          required: !!(fieldFlags & 2),
           style: style,
           isChecked: isChecked,
           exportValue: exportValue, // Might need refinement
@@ -195,6 +198,7 @@ export class RadioControlParser implements IControlParser {
           globalDA,
           context.systemFontFamilies,
         );
+        const fieldFlags = annotation.fieldFlags ?? 0;
         const radioValue = annotation.buttonValue;
         const isChecked = annotation.fieldValue === radioValue;
 
@@ -205,7 +209,7 @@ export class RadioControlParser implements IControlParser {
           type: FieldType.RADIO,
           name: annotation.fieldName,
           rect: { x, y, width, height },
-          required: !!(annotation.fieldFlags & 2),
+          required: !!(fieldFlags & 2),
           style: style,
           isChecked: isChecked,
           radioValue: radioValue,
@@ -258,6 +262,7 @@ export class DropdownControlParser implements IControlParser {
           globalDA,
           context.systemFontFamilies,
         );
+        const fieldFlags = annotation.fieldFlags ?? 0;
 
         let options: string[] | undefined = undefined;
         if (Array.isArray(annotation.options)) {
@@ -277,12 +282,8 @@ export class DropdownControlParser implements IControlParser {
             );
         }
 
-        const isMultiSelect = !!(
-          annotation.fieldFlags && annotation.fieldFlags & 2097152
-        );
-        const allowCustomValue = !!(
-          annotation.fieldFlags && annotation.fieldFlags & 262144
-        );
+        const isMultiSelect = !!(fieldFlags & 2097152);
+        const allowCustomValue = !!(fieldFlags & 262144);
 
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
@@ -291,7 +292,7 @@ export class DropdownControlParser implements IControlParser {
           type: FieldType.DROPDOWN,
           name: annotation.fieldName,
           rect: { x, y, width, height },
-          required: !!(annotation.fieldFlags & 2),
+          required: !!(fieldFlags & 2),
           style: style,
           value: Array.isArray(annotation.fieldValue)
             ? annotation.fieldValue.join("\n")
@@ -350,6 +351,7 @@ export class SignatureControlParser implements IControlParser {
           globalDA,
           context.systemFontFamilies,
         );
+        const fieldFlags = annotation.fieldFlags ?? 0;
 
         fields.push({
           id: `imported_${pageIndex + 1}_${index}_${annotation.fieldName}`,
@@ -358,7 +360,7 @@ export class SignatureControlParser implements IControlParser {
           type: FieldType.SIGNATURE,
           name: annotation.fieldName,
           rect: { x, y, width, height },
-          required: !!(annotation.fieldFlags & 2),
+          required: !!(fieldFlags & 2),
           style: style,
           toolTip: annotation.alternativeText || undefined,
           rotationDeg:

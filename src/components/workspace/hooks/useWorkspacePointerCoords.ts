@@ -14,7 +14,7 @@ type PageRect = {
 
 export const useWorkspacePointerCoords = (opts: {
   editorStateRef: RefObject<Pick<WorkspaceEditorState, "scale">>;
-  contentRef?: RefObject<HTMLElement>;
+  contentRef?: RefObject<HTMLElement | null>;
   getPageRectByPageIndex?: (pageIndex: number) => PageRect | null;
 }) => {
   // Prefer DOM measurement when the page is mounted (accurate and cheap).

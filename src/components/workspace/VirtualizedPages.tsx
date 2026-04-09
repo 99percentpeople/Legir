@@ -20,7 +20,7 @@ type Range = { start: number; end: number };
 
 export function VirtualizedPages<T>(props: {
   enabled: boolean;
-  containerRef: React.RefObject<HTMLElement>;
+  containerRef: React.RefObject<HTMLElement | null>;
   axis: "vertical" | "horizontal";
   overscan?: number;
   pinIndex?: number | null;
