@@ -10,6 +10,11 @@ export type RotationPoint = {
   y: number;
 };
 
+export type PdfAnnotationRotationSource = {
+  rotation?: number;
+  appearanceRotation?: number;
+};
+
 export type RotationResizeHandle =
   | "n"
   | "s"
@@ -49,6 +54,53 @@ export const getControlRotationFromWidgetRotation = (
   normalizeRightAngleRotationDeg(
     normalizeRightAngleRotationDeg(pageRotationDeg) -
       normalizeRightAngleRotationDeg(widgetRotationDeg),
+  );
+
+export const getPdfAnnotationRotationFromControlRotation = (
+  pageRotationDeg: number,
+  controlRotationDeg: number,
+) =>
+  normalizeRotationDeg(
+    normalizeRightAngleRotationDeg(pageRotationDeg) -
+      normalizeRotationDeg(controlRotationDeg),
+  );
+
+export const getControlRotationFromPdfAnnotationRotation = (
+  pageRotationDeg: number,
+  annotationRotationDeg: number,
+) =>
+  normalizeRotationDeg(
+    normalizeRightAngleRotationDeg(pageRotationDeg) -
+      normalizeRotationDeg(annotationRotationDeg),
+  );
+
+export const getPreferredPdfAnnotationRotation = (
+  source: PdfAnnotationRotationSource,
+) => {
+  if (typeof source.rotation === "number" && Number.isFinite(source.rotation)) {
+    return source.rotation;
+  }
+
+  if (
+    typeof source.appearanceRotation === "number" &&
+    Number.isFinite(source.appearanceRotation)
+  ) {
+    return source.appearanceRotation;
+  }
+
+  return undefined;
+};
+
+export const getAppearanceRotationFromControlRotation = (options: {
+  controlRotationDeg: number;
+  pageRotationDeg?: number;
+  compensatePageRotation?: boolean;
+}) =>
+  normalizeRotationDeg(
+    options.controlRotationDeg -
+      (options.compensatePageRotation
+        ? normalizeRightAngleRotationDeg(options.pageRotationDeg ?? 0)
+        : 0),
   );
 
 export const getRotatedOuterRect = (
@@ -290,6 +342,46 @@ export const getInnerSizeFromOuterAabb = (
   }
 
   return { width, height };
+};
+
+export const getInnerRectFromRotatedOuterAabb = (
+  outerRect: RotationRect,
+  rotationDeg: number,
+): RotationRect => {
+  if (!Number.isFinite(rotationDeg) || rotationDeg === 0) {
+    return outerRect;
+  }
+
+  const innerSize = getInnerSizeFromOuterAabb(outerRect, rotationDeg);
+  const cx = outerRect.x + outerRect.width / 2;
+  const cy = outerRect.y + outerRect.height / 2;
+
+  return {
+    x: cx - innerSize.width / 2,
+    y: cy - innerSize.height / 2,
+    width: innerSize.width,
+    height: innerSize.height,
+  };
+};
+
+export const getPageRotationCompensatedRect = (
+  rect: RotationRect,
+  pageRotationDeg: number,
+): RotationRect => {
+  const normalized = normalizeRightAngleRotationDeg(pageRotationDeg);
+  if (normalized !== 90 && normalized !== 270) {
+    return rect;
+  }
+
+  const centerX = rect.x + rect.width / 2;
+  const centerY = rect.y + rect.height / 2;
+
+  return {
+    x: centerX - rect.height / 2,
+    y: centerY - rect.width / 2,
+    width: rect.height,
+    height: rect.width,
+  };
 };
 
 export const rotateOuterRectKeepingCenter = (

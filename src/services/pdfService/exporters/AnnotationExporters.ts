@@ -63,6 +63,11 @@ import {
   resolveStampLabel,
 } from "@/lib/stamps";
 import { decodeStampImageDataUrl } from "@/lib/stampImage";
+import {
+  getAppearanceRotationFromControlRotation,
+  getPageRotationCompensatedRect,
+  getPdfAnnotationRotationFromControlRotation,
+} from "@/lib/controlRotation";
 
 const loadStampImageSource = async (
   dataUrl: string,
@@ -190,30 +195,6 @@ const concatUint8Arrays = (chunks: Uint8Array[]) => {
   }
 
   return out;
-};
-
-const normalizeRightAngleDeg = (value: number) => {
-  const normalized = (((Math.round(value / 90) * 90) % 360) + 360) % 360;
-  return normalized === 360 ? 0 : normalized;
-};
-
-const getStampAppearanceBoundsForPageRotation = (
-  bounds: { x: number; y: number; width: number; height: number },
-  rotationDeg: number,
-) => {
-  const normalized = normalizeRightAngleDeg(rotationDeg);
-  if (normalized !== 90 && normalized !== 270) {
-    return bounds;
-  }
-
-  const centerX = bounds.x + bounds.width / 2;
-  const centerY = bounds.y + bounds.height / 2;
-  return {
-    x: centerX - bounds.height / 2,
-    y: centerY - bounds.width / 2,
-    width: bounds.height,
-    height: bounds.width,
-  };
 };
 
 export class HighlightExporter implements IAnnotationExporter {
@@ -407,10 +388,30 @@ export class FreeTextExporter implements IAnnotationExporter {
     if (!annotation.rect) return undefined;
 
     const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
-    const x = bounds.x;
-    const y = bounds.y;
-    const w = bounds.width;
-    const h = bounds.height;
+    const pageRotationDeg =
+      viewport && typeof viewport.rotation === "number" ? viewport.rotation : 0;
+    const rotationDeg =
+      typeof annotation.rotationDeg === "number" &&
+      Number.isFinite(annotation.rotationDeg)
+        ? annotation.rotationDeg
+        : 0;
+    const pdfRotationDeg = getPdfAnnotationRotationFromControlRotation(
+      pageRotationDeg,
+      rotationDeg,
+    );
+    const effectiveRotationDeg = getAppearanceRotationFromControlRotation({
+      controlRotationDeg: rotationDeg,
+      pageRotationDeg,
+      compensatePageRotation: true,
+    });
+    const appearanceBounds = getPageRotationCompensatedRect(
+      bounds,
+      pageRotationDeg,
+    );
+    const x = appearanceBounds.x;
+    const y = appearanceBounds.y;
+    const w = appearanceBounds.width;
+    const h = appearanceBounds.height;
 
     const colorObj = hexToPdfColor(annotation.color) || rgb(0, 0, 0);
     const r = colorObj.red;
@@ -683,12 +684,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       wrapParagraph(paragraph);
     }
 
-    const rotationDeg =
-      typeof annotation.rotationDeg === "number" &&
-      Number.isFinite(annotation.rotationDeg)
-        ? annotation.rotationDeg
-        : 0;
-    const theta = (-rotationDeg * Math.PI) / 180;
+    const theta = (-effectiveRotationDeg * Math.PI) / 180;
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
 
@@ -715,7 +711,7 @@ export class FreeTextExporter implements IAnnotationExporter {
           ? rgb(borderR, borderG, borderB)
           : undefined;
 
-      const hasRotation = rotationDeg !== 0;
+      const hasRotation = effectiveRotationDeg !== 0;
       const cx = x + w / 2;
       const cy = y + h / 2;
       const rotatePoint = (px: number, py: number) => {
@@ -737,7 +733,7 @@ export class FreeTextExporter implements IAnnotationExporter {
           height: h,
           color: bg,
           opacity,
-          rotate: hasRotation ? degrees(-rotationDeg) : undefined,
+          rotate: hasRotation ? degrees(-effectiveRotationDeg) : undefined,
         });
       }
       if (hasBorder && borderColor) {
@@ -753,7 +749,7 @@ export class FreeTextExporter implements IAnnotationExporter {
           borderColor,
           borderWidth,
           opacity,
-          rotate: hasRotation ? degrees(-rotationDeg) : undefined,
+          rotate: hasRotation ? degrees(-effectiveRotationDeg) : undefined,
         });
       }
       const textColor = rgb(r, g, bb);
@@ -840,7 +836,7 @@ export class FreeTextExporter implements IAnnotationExporter {
             font: runFont,
             color: textColor,
             opacity,
-            rotate: hasRotation ? degrees(-rotationDeg) : undefined,
+            rotate: hasRotation ? degrees(-effectiveRotationDeg) : undefined,
           });
           continue;
         }
@@ -859,7 +855,7 @@ export class FreeTextExporter implements IAnnotationExporter {
             font: runFont,
             color: textColor,
             opacity,
-            rotate: hasRotation ? degrees(-rotationDeg) : undefined,
+            rotate: hasRotation ? degrees(-effectiveRotationDeg) : undefined,
           });
           try {
             cursorX += runFont.widthOfTextAtSize(buf, fontSize);
@@ -937,7 +933,7 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     let appearanceOps = `q${typeof opacity === "number" && opacity < 1 ? " /GS0 gs" : ""}`;
 
-    if (rotationDeg !== 0) {
+    if (effectiveRotationDeg !== 0) {
       const cx = aabbW / 2;
       const cy = aabbH / 2;
       appearanceOps += ` 1 0 0 1 ${pdfNum(cx)} ${pdfNum(cy)} cm ${pdfNum(cos)} ${pdfNum(sin)} ${pdfNum(-sin)} ${pdfNum(cos)} 0 0 cm 1 0 0 1 ${pdfNum(-w / 2)} ${pdfNum(-h / 2)} cm`;
@@ -1066,9 +1062,7 @@ export class FreeTextExporter implements IAnnotationExporter {
           : 0;
 
     const pdfRotation = (() => {
-      const r = -rotationDeg;
-      if (!Number.isFinite(r)) return undefined;
-      const d = ((r % 360) + 360) % 360;
+      const d = ((pdfRotationDeg % 360) + 360) % 360;
       return d === 0 ? undefined : d;
     })();
 
@@ -1759,10 +1753,16 @@ export class StampExporter implements IAnnotationExporter {
         ? annotation.rotationDeg
         : 0;
     const effectiveRotationDeg = needsPageRotationCompensation
-      ? rotationDeg - pageRotationDeg
-      : rotationDeg;
+      ? getAppearanceRotationFromControlRotation({
+          controlRotationDeg: rotationDeg,
+          pageRotationDeg,
+          compensatePageRotation: true,
+        })
+      : getAppearanceRotationFromControlRotation({
+          controlRotationDeg: rotationDeg,
+        });
     const appearanceBounds = needsAppearanceBoundsCompensation
-      ? getStampAppearanceBoundsForPageRotation(bounds, pageRotationDeg)
+      ? getPageRotationCompensatedRect(bounds, pageRotationDeg)
       : bounds;
     const bbox: [number, number, number, number] = [
       appearanceBounds.x,
@@ -2141,9 +2141,12 @@ export class ShapeExporter implements IAnnotationExporter {
       ...(strokeGraphicsState ? { [strokeGraphicsState]: strokeOpacity } : {}),
       ...(fillGraphicsState ? { [fillGraphicsState]: fillOpacity } : {}),
     };
+    const effectiveRotationDeg = getAppearanceRotationFromControlRotation({
+      controlRotationDeg: rotationDeg,
+    });
     const appearanceMatrix =
-      rotationDeg !== 0
-        ? buildPdfRotationMatrix(-rotationDeg, rotationCenterPdf)
+      effectiveRotationDeg !== 0
+        ? buildPdfRotationMatrix(-effectiveRotationDeg, rotationCenterPdf)
         : undefined;
     const nativeStroke = stroke;
     const nativeBorderWidth = hasStroke ? thickness : 0;

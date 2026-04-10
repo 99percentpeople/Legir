@@ -40,22 +40,17 @@ import {
   rotateShapePoint,
 } from "@/lib/shapeGeometry";
 import {
-  getInnerSizeFromOuterAabb,
+  getControlRotationFromPdfAnnotationRotation,
+  getInnerRectFromRotatedOuterAabb,
+  getPreferredPdfAnnotationRotation,
   getRotatedOuterRect,
+  normalizeRotationDeg,
 } from "@/lib/controlRotation";
 import {
   normalizeStampOpacity,
   resolveReadableStampLabel,
   resolveStampPresetIdFromText,
 } from "@/lib/stamps";
-
-const normalizeRotationDeg = (deg: number) => {
-  if (!Number.isFinite(deg)) return 0;
-  let d = deg % 360;
-  if (d <= -180) d += 360;
-  if (d > 180) d -= 360;
-  return d;
-};
 
 const PDF_ANNOT_FLAG_INVISIBLE = 1 << 0;
 const PDF_ANNOT_FLAG_HIDDEN = 1 << 1;
@@ -1092,10 +1087,25 @@ export class FreeTextParser implements IAnnotationParser {
     for (let index = 0; index < pageAnnotations.length; index++) {
       const annotation = pageAnnotations[index];
       if (annotation.subtype === "FreeText") {
+        const pageRotationDeg =
+          viewport && typeof viewport.rotation === "number"
+            ? viewport.rotation
+            : 0;
         const rotationDeg = (() => {
-          const r = (annotation as { rotation?: unknown }).rotation;
-          if (typeof r !== "number" || !Number.isFinite(r)) return undefined;
-          return normalizeRotationDeg(-r);
+          const nativeRotationSource = getPreferredPdfAnnotationRotation({
+            rotation: annotation.rotation,
+            appearanceRotation: annotation.appearanceRotation,
+          });
+          if (
+            typeof nativeRotationSource !== "number" ||
+            !Number.isFinite(nativeRotationSource)
+          ) {
+            return undefined;
+          }
+          return getControlRotationFromPdfAnnotationRotation(
+            pageRotationDeg,
+            nativeRotationSource,
+          );
         })();
         const initialColorArray = annotation.color;
         const normalizedRgb = normalizePdfColorToRgb255(initialColorArray);
@@ -1898,14 +1908,10 @@ export class ShapeParser implements IAnnotationParser {
         customStyle: annotation.endArrowStyle,
       });
       const isArrow = !!startArrowStyle || !!endArrowStyle;
-      const nativeRotationSource =
-        typeof annotation.rotation === "number" &&
-        Number.isFinite(annotation.rotation)
-          ? annotation.rotation
-          : typeof annotation.appearanceRotation === "number" &&
-              Number.isFinite(annotation.appearanceRotation)
-            ? annotation.appearanceRotation
-            : undefined;
+      const nativeRotationSource = getPreferredPdfAnnotationRotation({
+        rotation: annotation.rotation,
+        appearanceRotation: annotation.appearanceRotation,
+      });
       const nativeRotationDeg =
         typeof nativeRotationSource === "number"
           ? normalizeRotationDeg(-nativeRotationSource)
@@ -1949,20 +1955,7 @@ export class ShapeParser implements IAnnotationParser {
             : importedRect;
         const rect =
           typeof shapeRotationDeg === "number" && shapeRotationDeg !== 0
-            ? (() => {
-                const innerSize = getInnerSizeFromOuterAabb(
-                  adjustedRect,
-                  shapeRotationDeg,
-                );
-                const cx = adjustedRect.x + adjustedRect.width / 2;
-                const cy = adjustedRect.y + adjustedRect.height / 2;
-                return {
-                  x: cx - innerSize.width / 2,
-                  y: cy - innerSize.height / 2,
-                  width: innerSize.width,
-                  height: innerSize.height,
-                };
-              })()
+            ? getInnerRectFromRotatedOuterAabb(adjustedRect, shapeRotationDeg)
             : adjustedRect;
         annotations.push({
           id: `imported_shape_${pageIndex + 1}_${index}`,
@@ -2159,33 +2152,17 @@ export class StampParser implements IAnnotationParser {
         annotation.stamp?.appearance?.source === "baked";
       const nativeRotationSource = hasBakedAppearance
         ? undefined
-        : typeof annotation.rotation === "number" &&
-            Number.isFinite(annotation.rotation)
-          ? annotation.rotation
-          : typeof annotation.appearanceRotation === "number" &&
-              Number.isFinite(annotation.appearanceRotation)
-            ? annotation.appearanceRotation
-            : undefined;
+        : getPreferredPdfAnnotationRotation({
+            rotation: annotation.rotation,
+            appearanceRotation: annotation.appearanceRotation,
+          });
       const rotationDeg =
         typeof nativeRotationSource === "number"
           ? normalizeRotationDeg(-nativeRotationSource)
           : 0;
       const rect =
         !hasBakedAppearance && rotationDeg !== 0
-          ? (() => {
-              const innerSize = getInnerSizeFromOuterAabb(
-                importedRect,
-                rotationDeg,
-              );
-              const cx = importedRect.x + importedRect.width / 2;
-              const cy = importedRect.y + importedRect.height / 2;
-              return {
-                x: cx - innerSize.width / 2,
-                y: cy - innerSize.height / 2,
-                width: innerSize.width,
-                height: innerSize.height,
-              };
-            })()
+          ? getInnerRectFromRotatedOuterAabb(importedRect, rotationDeg)
           : importedRect;
       const commentMeta = readPdfJsAnnotationCommentMeta(annotation);
       const rawName =
