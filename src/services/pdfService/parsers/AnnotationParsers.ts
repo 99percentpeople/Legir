@@ -23,6 +23,7 @@ import { pdfDebug } from "../lib/debug";
 import { extractInkAppearance } from "../lib/ink";
 import { pdfJsRectToUiRect } from "../lib/coords";
 import { decodePdfString } from "../lib/pdf-objects";
+import { parseBorderFromAppearanceStream } from "../lib/pdf-import-utils";
 import { ensurePdfEmbeddedFontLoaded } from "../lib/embedded-fonts";
 import {
   matchSystemFontFamily,
@@ -456,6 +457,46 @@ export class FreeTextParser implements IAnnotationParser {
           continue;
         }
 
+        if (token === "sc" && i >= 1) {
+          const nums: number[] = [];
+          for (let j = i - 1; j >= 0 && nums.length < 4; j--) {
+            const v = parseFloat(tokens[j]);
+            if (isNaN(v)) break;
+            nums.unshift(v);
+          }
+          const hex =
+            nums.length === 3
+              ? rgbHexFrom3(nums[0], nums[1], nums[2])
+              : nums.length === 1
+                ? rgbHexFrom3(nums[0], nums[0], nums[0])
+                : nums.length === 4
+                  ? cmykHexFrom4(nums[0], nums[1], nums[2], nums[3])
+                  : undefined;
+          if (hex) currentFillHex = hex;
+          continue;
+        }
+
+        if (token === "scn" && i >= 1) {
+          const nums: number[] = [];
+          for (let j = i - 1; j >= 0 && nums.length < 4; j--) {
+            const t = tokens[j];
+            if (!t || t.startsWith("/")) continue;
+            const v = parseFloat(t);
+            if (isNaN(v)) break;
+            nums.unshift(v);
+          }
+          const hex =
+            nums.length === 4
+              ? cmykHexFrom4(nums[0], nums[1], nums[2], nums[3])
+              : nums.length === 3
+                ? rgbHexFrom3(nums[0], nums[1], nums[2])
+                : nums.length === 1
+                  ? rgbHexFrom3(nums[0], nums[0], nums[0])
+                  : undefined;
+          if (hex) currentFillHex = hex;
+          continue;
+        }
+
         if (token === "re" && i >= 4) {
           const x = parseFloat(tokens[i - 4]);
           const y = parseFloat(tokens[i - 3]);
@@ -467,7 +508,15 @@ export class FreeTextParser implements IAnnotationParser {
           continue;
         }
 
-        if (token === "f" || token === "f*" || token === "F") {
+        if (
+          token === "f" ||
+          token === "f*" ||
+          token === "F" ||
+          token === "B" ||
+          token === "B*" ||
+          token === "b" ||
+          token === "b*"
+        ) {
           if (!inText && lastRect && currentFillHex) {
             const area = Math.abs(lastRect.w * lastRect.h);
             if (Number.isFinite(area) && area > 0) {
@@ -1109,18 +1158,26 @@ export class FreeTextParser implements IAnnotationParser {
         })();
         const initialColorArray = annotation.color;
         const normalizedRgb = normalizePdfColorToRgb255(initialColorArray);
-        let borderColor = normalizedRgb
+        const dictBorderColor = normalizedRgb
           ? rgbArrayToHex(normalizedRgb)
           : undefined;
-        let color = borderColor || "#000000";
+        let borderColor = dictBorderColor;
+        let color = "#000000";
         let borderWidth =
           typeof annotation.borderStyle?.width === "number" &&
           Number.isFinite(annotation.borderStyle.width)
             ? Math.max(0, annotation.borderStyle.width)
             : undefined;
+        let borderStyle = annotation.borderStyle?.style;
 
         let backgroundColor: string | undefined = undefined;
-        if (annotation.backgroundColor) {
+        if (annotation.interiorColor) {
+          const bgRgb = normalizePdfColorToRgb255(annotation.interiorColor);
+          const bgHex = bgRgb ? rgbArrayToHex(bgRgb) : undefined;
+          if (bgHex) backgroundColor = bgHex;
+        }
+
+        if (!backgroundColor && annotation.backgroundColor) {
           const bgRgb = normalizePdfColorToRgb255(annotation.backgroundColor);
           const bgHex = bgRgb ? rgbArrayToHex(bgRgb) : undefined;
           if (bgHex) backgroundColor = bgHex;
@@ -1217,7 +1274,6 @@ export class FreeTextParser implements IAnnotationParser {
         let sourcePdfFontName: string | undefined = undefined;
         let sourcePdfFontIsSubset: boolean | undefined = undefined;
         let sourcePdfFontMissing: boolean | undefined = undefined;
-
         const parseDaString = (
           daStr: string,
           options?: { parseFontFamilyFromDa?: boolean },
@@ -1357,6 +1413,11 @@ export class FreeTextParser implements IAnnotationParser {
                 const dictBorderWidth = parseBorderWidthFromAnnotDict(libAnnot);
                 if (typeof dictBorderWidth === "number") {
                   borderWidth = dictBorderWidth;
+                }
+
+                const dictBorderStyle = annotation.borderStyle?.style;
+                if (dictBorderStyle) {
+                  borderStyle = dictBorderStyle;
                 }
 
                 const rawContents = libAnnot.lookup(PDFName.of("Contents"));
@@ -1572,14 +1633,25 @@ export class FreeTextParser implements IAnnotationParser {
                       const apHex = parseTextColorFromContentStream(apContent);
                       if (apHex) color = apHex;
 
+                      const apBorder =
+                        parseBorderFromAppearanceStream(apContent);
+                      if (
+                        typeof apBorder.width === "number" &&
+                        (typeof borderWidth !== "number" || borderWidth <= 0)
+                      ) {
+                        borderWidth = apBorder.width;
+                      }
+                      if (apBorder.style) {
+                        borderStyle = apBorder.style;
+                      }
+
                       const apFillHex =
                         parseFillColorFromContentStream(apContent);
-                      if (apFillHex && !backgroundColor)
-                        backgroundColor = apFillHex;
+                      if (apFillHex) backgroundColor = apFillHex;
 
                       const apStrokeHex =
                         parseStrokeColorFromContentStream(apContent);
-                      if (apStrokeHex && !borderColor) {
+                      if (apStrokeHex) {
                         borderColor = apStrokeHex;
                       }
 
@@ -1785,17 +1857,32 @@ export class FreeTextParser implements IAnnotationParser {
           }
         }
 
-        const innerRect = computeInnerUiRect();
+        if (
+          borderStyle &&
+          (typeof borderWidth !== "number" ||
+            !Number.isFinite(borderWidth) ||
+            borderWidth <= 0)
+        ) {
+          borderWidth = 1;
+        }
+        if (
+          typeof borderWidth === "number" &&
+          borderWidth > 0 &&
+          !borderColor
+        ) {
+          borderColor = color || "#000000";
+        }
         annotations.push({
           id: `imported_freetext_${pageIndex + 1}_${index}`,
           pageIndex: pageIndex,
           layerOrder: index,
           type: "freetext",
-          rect: innerRect,
+          rect: computeInnerUiRect(),
           color: color,
           backgroundColor,
           borderColor,
           borderWidth,
+          borderStyle,
           opacity: opacity,
           rotationDeg,
           text: contents,
