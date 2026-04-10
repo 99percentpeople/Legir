@@ -78,7 +78,18 @@ jobs:
       - name: Build Tauri app
         run: bun run build:app -- --target ${{ matrix.target }}
 
-      - name: Upload build artifacts
+      - name: Upload Linux build artifacts
+        if: contains(matrix.target, 'linux')
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}-${{ env.SHORT_SHA }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*.rpm
+          if-no-files-found: error
+
+      - name: Upload non-Linux build artifacts
+        if: ${{ !contains(matrix.target, 'linux') }}
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}-${{ env.SHORT_SHA }}
@@ -113,7 +124,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p portable-out
-          source_file="src-tauri/target/${{ matrix.target }}/release/app"
+          release_dir="src-tauri/target/${{ matrix.target }}/release"
+          source_file="$release_dir/Legir"
+          if [ ! -f "$source_file" ]; then
+            source_file="$(find "$release_dir/bundle/macos" -path '*.app/Contents/MacOS/*' -type f | head -n 1)"
+          fi
+          [ -n "$source_file" ]
           [ -f "$source_file" ]
           base_name="$(basename "$source_file")"
           install -m 755 "$source_file" "portable-out/${base_name}-${SHORT_SHA}"
