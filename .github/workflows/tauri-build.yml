@@ -9,6 +9,10 @@ concurrency:
   group: tauri-build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  BUN_VERSION: "1.3.3"
+  RUST_NIGHTLY_TOOLCHAIN: nightly-2026-04-01
+
 jobs:
   build:
     strategy:
@@ -60,16 +64,35 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.3"
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Restore Bun package cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-bun-${{ env.BUN_VERSION }}-
+            ${{ runner.os }}-${{ runner.arch }}-bun-
+
+      - name: Restore Rust nightly toolchain cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.rustup/toolchains
+            ~/.rustup/update-hashes
+          key: ${{ runner.os }}-${{ runner.arch }}-rustup-${{ matrix.target }}-${{ env.RUST_NIGHTLY_TOOLCHAIN }}
 
       - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUST_NIGHTLY_TOOLCHAIN }}
           targets: ${{ matrix.target }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
+          shared-key: tauri-${{ matrix.target }}
           workspaces: "./src-tauri -> target"
 
       - name: Install frontend dependencies
