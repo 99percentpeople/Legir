@@ -330,7 +330,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             {mode === "form" ? (
               <ToggleGroup
                 type="single"
-                value={editorState.keys.space ? "pan" : toolbarTool}
+                value={toolbarTool}
                 onValueChange={(value) => {
                   if (value) onToolChange(value as Tool);
                 }}
@@ -391,7 +391,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             ) : (
               <ToggleGroup
                 type="single"
-                value={editorState.keys.space ? "pan" : toolbarTool}
+                value={toolbarTool}
                 onValueChange={(value) => {
                   if (value) onToolChange(value as Tool);
                 }}

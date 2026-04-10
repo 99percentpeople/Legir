@@ -1,3 +1,4 @@
+import React from "react";
 import { useEventListener } from "@/hooks/useEventListener";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { MoveDirection, Tool } from "@/types";
@@ -21,6 +22,22 @@ export function useEditorPageKeyboardShortcuts({
   onPrint,
   onToggleFullscreen,
 }: UseEditorPageKeyboardShortcutsOptions) {
+  const previousToolBeforeSpacePanRef = React.useRef<Tool | null>(null);
+
+  const restoreToolAfterSpacePan = React.useCallback(() => {
+    const currentState = useEditorStore.getState();
+    const previousTool = previousToolBeforeSpacePanRef.current;
+    previousToolBeforeSpacePanRef.current = null;
+
+    if (!previousTool || currentState.tool !== "pan") {
+      return;
+    }
+
+    // Temporary space-pan should only change the visible tool state.
+    // Keep the current selection intact when restoring the original tool.
+    currentState.setState({ tool: previousTool });
+  }, []);
+
   useEventListener(
     typeof window !== "undefined" ? window : null,
     "keydown",
@@ -64,6 +81,13 @@ export function useEditorPageKeyboardShortcuts({
         event.preventDefault();
         event.stopPropagation();
         if (!currentState.keys.space) {
+          previousToolBeforeSpacePanRef.current =
+            currentState.tool === "pan" ? null : currentState.tool;
+          if (currentState.tool !== "pan") {
+            // Mirror the temporary hand-tool state in the toolbar without
+            // clearing the active selection like the persistent pan tool does.
+            currentState.setState({ tool: "pan" });
+          }
           currentState.setKeys({ space: true });
         }
         return;
@@ -197,7 +221,22 @@ export function useEditorPageKeyboardShortcuts({
 
       if (event.key === " ") {
         currentState.setKeys({ space: false });
+        restoreToolAfterSpacePan();
       }
+    },
+    true,
+  );
+
+  useEventListener(
+    typeof window !== "undefined" ? window : null,
+    "blur",
+    () => {
+      const currentState = useEditorStore.getState();
+      if (!currentState.keys.space && !previousToolBeforeSpacePanRef.current) {
+        return;
+      }
+      currentState.setKeys({ space: false });
+      restoreToolAfterSpacePan();
     },
     true,
   );
