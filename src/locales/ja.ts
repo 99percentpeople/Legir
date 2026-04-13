@@ -614,7 +614,6 @@ const ja = {
   },
   settings: {
     title: "エディター設定",
-    description: "ワークスペースの動作とスナップルールを構成します。",
     tabs: {
       general: "一般",
       export: "エクスポート",

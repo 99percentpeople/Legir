@@ -603,7 +603,6 @@ const zhCN = {
   },
   settings: {
     title: "编辑器设置",
-    description: "配置工作区行为和对齐规则。",
     tabs: {
       general: "通用",
       export: "导出",

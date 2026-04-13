@@ -613,7 +613,6 @@ const en = {
   },
   settings: {
     title: "Editor Settings",
-    description: "Configure the workspace behavior and snapping rules.",
     tabs: {
       general: "General",
       export: "Export",

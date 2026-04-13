@@ -617,8 +617,6 @@ const es = {
   },
   settings: {
     title: "Configuración del editor",
-    description:
-      "Configurar comportamiento del espacio de trabajo y reglas de ajuste.",
     tabs: {
       general: "General",
       export: "Exportación",

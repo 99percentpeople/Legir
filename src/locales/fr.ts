@@ -620,8 +620,6 @@ const fr = {
   },
   settings: {
     title: "Paramètres de l'éditeur",
-    description:
-      "Configurer le comportement de l'espace de travail et les règles d'ancrage.",
     tabs: {
       general: "Général",
       export: "Export",

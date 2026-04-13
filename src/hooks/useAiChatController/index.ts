@@ -115,6 +115,49 @@ const isDetectedFieldBatchConfirmationMessage = (text: string) => {
   );
 };
 
+const isAiChatSessionStarted = (
+  session: Pick<
+    AiChatSessionData,
+    | "title"
+    | "timeline"
+    | "conversation"
+    | "searchResultsById"
+    | "highlightedResultIds"
+    | "pendingDetectedFieldBatches"
+    | "contextMemory"
+    | "tokenUsage"
+    | "contextTokens"
+    | "contextTokenOverhead"
+    | "runStatus"
+    | "lastError"
+    | "awaitingContinue"
+  >,
+) => {
+  if (session.title.trim()) return true;
+  if (session.timeline.length > 0 || session.conversation.length > 0) {
+    return true;
+  }
+  if (session.searchResultsById.size > 0) return true;
+  if (session.highlightedResultIds.length > 0) return true;
+  if (session.pendingDetectedFieldBatches.length > 0) return true;
+  if (session.contextMemory) return true;
+  if (session.contextTokens > 0 || session.contextTokenOverhead > 0) {
+    return true;
+  }
+  if (
+    session.tokenUsage.inputTokens > 0 ||
+    session.tokenUsage.outputTokens > 0 ||
+    session.tokenUsage.totalTokens > 0 ||
+    session.tokenUsage.reasoningTokens > 0 ||
+    session.tokenUsage.cachedInputTokens > 0
+  ) {
+    return true;
+  }
+  if (session.runStatus !== "idle") return true;
+  if (session.lastError) return true;
+  return session.awaitingContinue;
+};
+
 const updateDetectedFieldBatchConfirmation = (options: {
   session: AiChatSessionData;
   userMessageId: string;
@@ -2047,6 +2090,12 @@ export const useAiChatController = (
     [runStatus, sessions],
   );
 
+  const canDeleteConversation = useCallback((id: string) => {
+    const session = sessionsRef.current.get(id);
+    if (!session) return false;
+    return isAiChatSessionStarted(session);
+  }, []);
+
   const highlightedSearchResultsByPage = useMemo(() => {
     const map = new Map<number, PDFSearchResult[]>();
 
@@ -2082,6 +2131,7 @@ export const useAiChatController = (
     newConversation,
     clearConversation,
     deleteConversation,
+    canDeleteConversation,
 
     timeline,
     runStatus,

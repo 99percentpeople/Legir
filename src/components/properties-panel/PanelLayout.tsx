@@ -92,7 +92,7 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
       )}
 
       {/* Header */}
-      <div className="border-border bg-muted/30 flex items-start justify-between border-b p-4">
+      <div className="border-border bg-muted/30 flex items-center justify-between border-b px-4 py-2">
         <h3 className="text-foreground flex min-w-0 flex-1 items-center gap-2 font-semibold">
           {title}
         </h3>

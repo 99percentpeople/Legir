@@ -109,8 +109,8 @@ export function EditorRightPanel({
         activeSessionId={aiChat.activeSessionId}
         onSelectSession={aiChat.selectSession}
         onNewConversation={aiChat.newConversation}
-        onClearConversation={aiChat.clearConversation}
         onDeleteConversation={aiChat.deleteConversation}
+        canDeleteConversation={aiChat.canDeleteConversation}
         timeline={aiChat.timeline}
         runStatus={aiChat.runStatus}
         lastError={aiChat.lastError}

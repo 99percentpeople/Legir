@@ -84,6 +84,7 @@ import {
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
 } from "@/constants";
+import { cn } from "@/utils/cn";
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -91,6 +92,26 @@ interface SettingsDialogProps {
   options: AppOptions;
   onChange: (options: AppOptions) => void;
 }
+
+const SETTINGS_TABS_ROOT_CLASS =
+  "flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row";
+const SETTINGS_TABS_LIST_CLASS =
+  "shrink-0 text-foreground h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent py-1 sm:h-min sm:w-auto sm:flex-col sm:overflow-visible";
+const SETTINGS_TABS_CONTENT_CLASS =
+  "min-h-0 grow overflow-y-auto rounded-md border p-4 py-4 text-start";
+
+const SETTINGS_TAB_TRIGGER_INDICATOR_CLASS =
+  "data-[state=active]:after:bg-primary after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full sm:after:inset-y-0 sm:after:left-0 sm:after:h-full sm:after:w-0.5 sm:after:bottom-auto";
+
+const SETTINGS_TAB_TRIGGER_CLASS = cn(
+  "relative min-w-max flex-none justify-start hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none",
+  SETTINGS_TAB_TRIGGER_INDICATOR_CLASS,
+);
+const SETTINGS_CARD_BASE_CLASS =
+  "bg-muted/30 border-border flex flex-col rounded-lg border p-3";
+const SETTINGS_CARD_COMPACT_CLASS = `${SETTINGS_CARD_BASE_CLASS} space-y-2`;
+const SETTINGS_CARD_SPACIOUS_CLASS = `${SETTINGS_CARD_BASE_CLASS} space-y-4`;
+const SETTINGS_CARD_GAP_CLASS = `${SETTINGS_CARD_BASE_CLASS} gap-3`;
 
 const SettingsDialog: React.FC<SettingsDialogProps> = ({
   isOpen,
@@ -399,62 +420,46 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
             <Settings2 className="h-5 w-5" />
             {t("settings.title")}
           </DialogTitle>
-          <DialogDescription>{t("settings.description")}</DialogDescription>
         </DialogHeader>
 
         <Tabs
           orientation="vertical"
           defaultValue="general"
-          className="flex min-h-0 flex-1 flex-row overflow-hidden"
+          className={SETTINGS_TABS_ROOT_CLASS}
         >
-          <TabsList className="text-foreground h-min flex-col gap-1 rounded-none bg-transparent py-1">
-            <TabsTrigger
-              value="general"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
+          <TabsList className={SETTINGS_TABS_LIST_CLASS}>
+            <TabsTrigger value="general" className={SETTINGS_TAB_TRIGGER_CLASS}>
               <Globe className="h-4 w-4" />
               {t("settings.tabs.general")}
             </TabsTrigger>
-            <TabsTrigger
-              value="export"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
+            <TabsTrigger value="export" className={SETTINGS_TAB_TRIGGER_CLASS}>
               <FileText className="h-4 w-4" />
               {t("settings.tabs.export")}
             </TabsTrigger>
             <TabsTrigger
               value="snapping"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className={SETTINGS_TAB_TRIGGER_CLASS}
             >
               <Magnet className="h-4 w-4" />
               {t("settings.tabs.snapping")}
             </TabsTrigger>
-            <TabsTrigger
-              value="llm"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
+            <TabsTrigger value="llm" className={SETTINGS_TAB_TRIGGER_CLASS}>
               <BrainCircuit className="h-4 w-4" />
               {t("settings.tabs.llm")}
             </TabsTrigger>
-            <TabsTrigger
-              value="ai_chat"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
+            <TabsTrigger value="ai_chat" className={SETTINGS_TAB_TRIGGER_CLASS}>
               <MessageSquare className="h-4 w-4" />
               {t("settings.tabs.ai_chat")}
             </TabsTrigger>
-            <TabsTrigger
-              value="debug"
-              className="hover:bg-accent hover:text-foreground data-[state=active]:hover:bg-accent data-[state=active]:after:bg-primary relative w-full justify-start after:absolute after:inset-y-0 after:start-0 after:-ms-1 after:w-0.5 data-[state=active]:rounded-l-none data-[state=active]:border-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
+            <TabsTrigger value="debug" className={SETTINGS_TAB_TRIGGER_CLASS}>
               <Bug className="h-4 w-4" />
               {t("settings.tabs.debug")}
             </TabsTrigger>
           </TabsList>
-          <div className="min-h-0 grow overflow-y-auto rounded-md border p-4 py-4 text-start">
+          <div className={SETTINGS_TABS_CONTENT_CLASS}>
             <TabsContent value="general">
               <div className="space-y-6">
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Globe className="text-primary h-4 w-4" />
@@ -484,7 +489,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {theme === "dark" ? (
@@ -522,7 +527,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <LayoutGrid className="text-primary h-4 w-4" />
@@ -554,7 +559,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                       <User className="text-primary h-4 w-4" />
@@ -584,7 +589,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
             <TabsContent value="export">
               <div className="space-y-6">
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                       <FileText className="text-primary h-4 w-4" />
@@ -615,7 +620,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
             <TabsContent value="snapping">
               <div className="space-y-6">
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Magnet className="text-primary h-4 w-4" />
@@ -829,7 +834,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                           ) : null}
                         </div>
 
-                        <div className="bg-muted/30 border-border flex flex-col gap-3 rounded-lg border p-3">
+                        <div className={SETTINGS_CARD_GAP_CLASS}>
                           <div className="flex items-center justify-between gap-2">
                             <Label className="text-xs">
                               {t("settings.llm.fetched_models")}
@@ -870,7 +875,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                           )}
                         </div>
 
-                        <div className="bg-muted/30 border-border flex flex-col gap-3 rounded-lg border p-3">
+                        <div className={SETTINGS_CARD_GAP_CLASS}>
                           <div className="space-y-1">
                             <Label className="text-xs">
                               {t("settings.llm.custom_models")}
@@ -1013,7 +1018,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
             <TabsContent value="ai_chat">
               <div className="space-y-6">
-                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <Label
@@ -1046,7 +1051,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <Label
@@ -1216,7 +1221,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </p>
                 </div>
 
-                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <Label
@@ -1302,7 +1307,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <Label
@@ -1359,7 +1364,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-muted/30 border-border flex flex-col space-y-4 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <Label
@@ -1505,7 +1510,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
             <TabsContent value="debug">
               <div className="space-y-6">
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Bug className="text-primary h-4 w-4" />
@@ -1528,7 +1533,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     {t("settings.debug.pdf_text_layer_debug_desc")}
                   </p>
                 </div>
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Bug className="text-primary h-4 w-4" />
@@ -1551,7 +1556,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     {t("settings.debug.disable_pdf_text_layer_desc")}
                   </p>
                 </div>
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Bug className="text-primary h-4 w-4" />
@@ -1678,7 +1683,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     {t("settings.debug.pdf_zoom_render_timing_desc")}
                   </p>
                 </div>
-                <div className="bg-muted/30 border-border flex flex-col space-y-2 rounded-lg border p-3">
+                <div className={SETTINGS_CARD_COMPACT_CLASS}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Bug className="text-primary h-4 w-4" />

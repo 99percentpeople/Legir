@@ -21,8 +21,8 @@ export interface AiChatPanelProps {
   activeSessionId: string;
   onSelectSession: (id: string) => void;
   onNewConversation: () => void;
-  onClearConversation: () => void;
   onDeleteConversation: (id: string) => void;
+  canDeleteConversation: (id: string) => boolean;
 
   timeline: AiChatTimelineItem[];
   runStatus: "idle" | "running" | "cancelling" | "error";

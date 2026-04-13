@@ -602,7 +602,6 @@ const zhTW = {
   },
   settings: {
     title: "編輯器設定",
-    description: "配置工作區行為和對齊規則。",
     tabs: {
       general: "通用",
       export: "匯出",

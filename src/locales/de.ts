@@ -620,7 +620,6 @@ const de = {
   },
   settings: {
     title: "Editor-Einstellungen",
-    description: "Arbeitsbereichsverhalten und Einrastregeln konfigurieren.",
     tabs: {
       general: "Allgemein",
       export: "Export",

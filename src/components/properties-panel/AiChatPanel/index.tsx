@@ -5,14 +5,6 @@ import { ModelSelect } from "@/components/ModelSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { PanelLayout } from "../PanelLayout";
 import { appEventBus } from "@/lib/eventBus";
 import { cn } from "@/utils/cn";
@@ -45,8 +37,8 @@ export function AiChatPanel({
   activeSessionId,
   onSelectSession,
   onNewConversation,
-  onClearConversation,
   onDeleteConversation,
+  canDeleteConversation,
   timeline,
   runStatus,
   lastError,
@@ -75,7 +67,6 @@ export function AiChatPanel({
   const [inlineEditState, setInlineEditState] =
     React.useState<InlineEditState | null>(null);
   const [historyOpen, setHistoryOpen] = React.useState(false);
-  const [clearConfirmOpen, setClearConfirmOpen] = React.useState(false);
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
     null,
   );
@@ -443,9 +434,8 @@ export function AiChatPanel({
         activeSessionId={activeSessionId}
         onSelectSession={onSelectSession}
         onDeleteConversation={onDeleteConversation}
-        onRequestClear={() => setClearConfirmOpen(true)}
+        canDeleteConversation={canDeleteConversation}
         isBusy={isBusy}
-        timelineLength={timeline.length}
         t={t}
       />
 
@@ -610,36 +600,6 @@ export function AiChatPanel({
           </Card>
         ) : null}
       </div>
-
-      <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{t("ai_chat.clear_confirm.title")}</DialogTitle>
-            <DialogDescription>
-              {t("ai_chat.clear_confirm.desc")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setClearConfirmOpen(false)}
-            >
-              {t("common.actions.cancel")}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                onClearConversation();
-                setClearConfirmOpen(false);
-              }}
-            >
-              {t("ai_chat.clear_confirm.confirm")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </PanelLayout>
   );
 }

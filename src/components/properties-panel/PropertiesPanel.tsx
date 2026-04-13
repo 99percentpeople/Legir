@@ -75,6 +75,8 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
       );
     }
 
+    const handleDocumentClose = onCollapse ?? onClose;
+
     return (
       <DocumentPropertiesPanel
         metadata={metadata}
@@ -89,7 +91,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         isOpen={isOpen}
         onOpen={onOpen}
         onCollapse={onCollapse}
-        onClose={onClose ?? onCollapse}
+        onClose={handleDocumentClose}
         isFloating={isFloating}
         onTriggerHistorySave={onTriggerHistorySave}
         width={width}

@@ -26,9 +26,8 @@ interface SessionHistoryPopoverProps {
   activeSessionId: string;
   onSelectSession: (id: string) => void;
   onDeleteConversation: (id: string) => void;
-  onRequestClear: () => void;
+  canDeleteConversation: (id: string) => boolean;
   isBusy: boolean;
-  timelineLength: number;
   t: TranslateFn;
 }
 
@@ -39,9 +38,8 @@ export function SessionHistoryPopover({
   activeSessionId,
   onSelectSession,
   onDeleteConversation,
-  onRequestClear,
+  canDeleteConversation,
   isBusy,
-  timelineLength,
   t,
 }: SessionHistoryPopoverProps) {
   const [expandedSessionIds, setExpandedSessionIds] = React.useState<
@@ -191,152 +189,144 @@ export function SessionHistoryPopover({
               isExpanded,
               isLastSibling,
               ancestorHasNextSiblings,
-            }) => (
-              <div
-                key={session.id}
-                className={cn(
-                  "hover:bg-accent/50 relative grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-1.5 rounded-md px-2 py-1.5 transition-colors",
-                  session.id === activeSessionId ? "bg-accent/40" : null,
-                )}
-                style={{
-                  paddingLeft: `${SESSION_TREE_BASE_PADDING_PX + depth * SESSION_TREE_INDENT_PX}px`,
-                }}
-              >
-                {hasChildren && isExpanded ? (
-                  <span
-                    className="bg-border/70 pointer-events-none absolute w-px"
-                    style={{
-                      left: `${SESSION_TREE_BASE_PADDING_PX + depth * SESSION_TREE_INDENT_PX + SESSION_TREE_GUIDE_OFFSET_PX}px`,
-                      top: "50%",
-                      bottom: "-2px",
-                    }}
-                  />
-                ) : null}
-                {depth > 0 ? (
-                  <div className="pointer-events-none absolute inset-y-0 left-0">
-                    {ancestorHasNextSiblings.map((hasNextSibling, level) =>
-                      hasNextSibling ? (
-                        <span
-                          key={`${session.id}:guide:${level}`}
-                          className="bg-border/70 absolute top-0 bottom-0 w-px"
-                          style={{
-                            left: `${SESSION_TREE_BASE_PADDING_PX + level * SESSION_TREE_INDENT_PX + SESSION_TREE_GUIDE_OFFSET_PX}px`,
-                          }}
-                        />
-                      ) : null,
-                    )}
+            }) => {
+              const canDelete = canDeleteConversation(session.id);
+
+              return (
+                <div
+                  key={session.id}
+                  className={cn(
+                    "hover:bg-accent/50 relative grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-1.5 rounded-md px-2 py-1.5 transition-colors",
+                    session.id === activeSessionId ? "bg-accent/40" : null,
+                  )}
+                  style={{
+                    paddingLeft: `${SESSION_TREE_BASE_PADDING_PX + depth * SESSION_TREE_INDENT_PX}px`,
+                  }}
+                >
+                  {hasChildren && isExpanded ? (
                     <span
                       className="bg-border/70 absolute w-px"
                       style={{
-                        left: `${SESSION_TREE_BASE_PADDING_PX + (depth - 1) * SESSION_TREE_INDENT_PX + SESSION_TREE_GUIDE_OFFSET_PX}px`,
-                        top: 0,
-                        height: isLastSibling ? "50%" : "100%",
-                      }}
-                    />
-                    <span
-                      className="bg-border/70 absolute h-px"
-                      style={{
-                        left: `${SESSION_TREE_BASE_PADDING_PX + (depth - 1) * SESSION_TREE_INDENT_PX + SESSION_TREE_GUIDE_OFFSET_PX}px`,
+                        left: `${SESSION_TREE_BASE_PADDING_PX + depth * SESSION_TREE_INDENT_PX + SESSION_TREE_GUIDE_OFFSET_PX}px`,
                         top: "50%",
-                        width: `${SESSION_TREE_INDENT_PX}px`,
+                        bottom: "-2px",
                       }}
                     />
-                  </div>
-                ) : null}
-                {hasChildren ? (
+                  ) : null}
+                  {depth > 0 ? (
+                    <div className="pointer-events-none absolute inset-y-0 left-0">
+                      {ancestorHasNextSiblings.map((hasNextSibling, level) =>
+                        hasNextSibling ? (
+                          <span
+                            key={`${session.id}:guide:${level}`}
+                            className="bg-border/70 absolute top-0 bottom-0 w-px"
+                            style={{
+                              left: `${SESSION_TREE_BASE_PADDING_PX + level * SESSION_TREE_INDENT_PX + SESSION_TREE_GUIDE_OFFSET_PX}px`,
+                            }}
+                          />
+                        ) : null,
+                      )}
+                      <span
+                        className="bg-border/70 absolute w-px"
+                        style={{
+                          left: `${SESSION_TREE_BASE_PADDING_PX + (depth - 1) * SESSION_TREE_INDENT_PX + SESSION_TREE_GUIDE_OFFSET_PX}px`,
+                          top: 0,
+                          height: isLastSibling ? "50%" : "100%",
+                        }}
+                      />
+                      <span
+                        className="bg-border/70 absolute h-px"
+                        style={{
+                          left: `${SESSION_TREE_BASE_PADDING_PX + (depth - 1) * SESSION_TREE_INDENT_PX + SESSION_TREE_GUIDE_OFFSET_PX}px`,
+                          top: "50%",
+                          width: `${SESSION_TREE_INDENT_PX}px`,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  {hasChildren ? (
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm"
+                      aria-label={
+                        isExpanded ? t("common.collapse") : t("common.expand")
+                      }
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setExpandedSessionIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(session.id)) next.delete(session.id);
+                          else next.add(session.id);
+                          return next;
+                        });
+                      }}
+                    >
+                      <ChevronDown
+                        size={12}
+                        className={cn(
+                          "transition-transform",
+                          !isExpanded && "-rotate-90",
+                        )}
+                      />
+                    </button>
+                  ) : (
+                    <span className="h-5 w-5 shrink-0" />
+                  )}
                   <button
                     type="button"
-                    className="text-muted-foreground hover:text-foreground inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm"
-                    aria-label={
-                      isExpanded ? t("common.collapse") : t("common.expand")
-                    }
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setExpandedSessionIds((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(session.id)) next.delete(session.id);
-                        else next.add(session.id);
-                        return next;
-                      });
+                    className="grid min-w-0 overflow-hidden text-left"
+                    onClick={() => {
+                      onSelectSession(session.id);
+                      onOpenChange(false);
                     }}
                   >
-                    <ChevronDown
-                      size={12}
-                      className={cn(
-                        "transition-transform",
-                        !isExpanded && "-rotate-90",
-                      )}
-                    />
-                  </button>
-                ) : (
-                  <span className="h-5 w-5 shrink-0" />
-                )}
-                <button
-                  type="button"
-                  className="grid min-w-0 overflow-hidden text-left"
-                  onClick={() => {
-                    onSelectSession(session.id);
-                    onOpenChange(false);
-                  }}
-                >
-                  <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-1.5 overflow-hidden text-sm">
-                    {depth > 0 ? (
-                      <GitBranch
-                        size={11}
-                        className="text-muted-foreground shrink-0"
-                      />
-                    ) : null}
-                    <span className="block min-w-0 truncate">
-                      {getSessionTitle(t, session)}
+                    <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-1.5 overflow-hidden text-sm">
+                      {depth > 0 ? (
+                        <GitBranch
+                          size={11}
+                          className="text-muted-foreground shrink-0"
+                        />
+                      ) : null}
+                      <span className="block min-w-0 truncate">
+                        {getSessionTitle(t, session)}
+                      </span>
                     </span>
-                  </span>
-                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
-                    <TimeAgoText time={session.updatedAt} />
-                  </span>
-                </button>
-                {session.id === activeSessionId ? (
-                  <Badge
-                    variant="secondary"
-                    className="h-4 shrink-0 px-1 text-[10px]"
-                  >
-                    {t("ai_chat.session_active")}
-                  </Badge>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 shrink-0"
-                  aria-label={t("common.actions.delete")}
-                  disabled={isBusy}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onDeleteConversation(session.id);
-                  }}
-                >
-                  <Trash2 size={12} />
-                </Button>
-              </div>
-            ),
+                    <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                      <TimeAgoText time={session.updatedAt} />
+                    </span>
+                  </button>
+                  {session.id === activeSessionId ? (
+                    <Badge
+                      variant="secondary"
+                      className="h-4 shrink-0 px-1 text-[10px]"
+                    >
+                      {t("ai_chat.session_active")}
+                    </Badge>
+                  ) : null}
+                  {canDelete ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0"
+                      aria-label={t("common.actions.delete")}
+                      disabled={isBusy}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onDeleteConversation(session.id);
+                      }}
+                    >
+                      <Trash2 size={12} />
+                    </Button>
+                  ) : (
+                    <span className="h-6 w-6 shrink-0" />
+                  )}
+                </div>
+              );
+            },
           )}
-        </div>
-
-        <div className="mt-2 flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              onOpenChange(false);
-              onRequestClear();
-            }}
-            disabled={isBusy || timelineLength === 0}
-          >
-            <Trash2 size={14} />
-            {t("common.actions.clear")}
-          </Button>
         </div>
       </PopoverContent>
     </Popover>
