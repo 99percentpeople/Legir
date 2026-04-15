@@ -1,13 +1,12 @@
 type PwaLaunchFilesListener = (handles: FileSystemFileHandle[]) => void;
-
-const PWA_FILE_LAUNCH_QUERY_KEY = "launch";
-const PWA_FILE_LAUNCH_QUERY_VALUE = "file";
-export const PWA_LAUNCH_ROUTE_WAIT_MS = 400;
+type PwaLaunchProcessingListener = (isProcessing: boolean) => void;
 
 let hasInitializedLaunchQueue = false;
 let pendingLaunchHandles: FileSystemFileHandle[] = [];
+let activePwaLaunchProcessingCount = 0;
 
 const launchFilesListeners = new Set<PwaLaunchFilesListener>();
+const launchProcessingListeners = new Set<PwaLaunchProcessingListener>();
 
 const isFileHandle = (value: unknown): value is FileSystemFileHandle => {
   return (
@@ -33,65 +32,10 @@ const normalizeLaunchFiles = (value: unknown) => {
   return files.filter(isFileHandle);
 };
 
-const ensureLaunchEditorRoute = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const currentHash = window.location.hash.trim();
-  if (currentHash === "#/editor" || currentHash.startsWith("#/editor?")) {
-    return;
-  }
-
-  if (!currentHash || currentHash === "#" || currentHash === "#/") {
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${window.location.pathname}${window.location.search}#/editor`,
-    );
-  }
-};
-
-export const hasPwaLaunchRouteHint = () => {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  return (
-    new URL(window.location.href).searchParams.get(
-      PWA_FILE_LAUNCH_QUERY_KEY,
-    ) === PWA_FILE_LAUNCH_QUERY_VALUE
-  );
-};
-
-export const clearPwaLaunchRouteHint = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const url = new URL(window.location.href);
-  if (
-    url.searchParams.get(PWA_FILE_LAUNCH_QUERY_KEY) !==
-    PWA_FILE_LAUNCH_QUERY_VALUE
-  ) {
-    return;
-  }
-
-  url.searchParams.delete(PWA_FILE_LAUNCH_QUERY_KEY);
-  window.history.replaceState(
-    window.history.state,
-    "",
-    `${url.pathname}${url.search}${url.hash}`,
-  );
-};
-
 const dispatchLaunchFiles = (handles: FileSystemFileHandle[]) => {
   if (handles.length === 0) {
     return;
   }
-
-  ensureLaunchEditorRoute();
-  clearPwaLaunchRouteHint();
 
   if (launchFilesListeners.size === 0) {
     pendingLaunchHandles = [...pendingLaunchHandles, ...handles];
@@ -129,6 +73,30 @@ export const consumePendingPwaLaunchFiles = () => {
   return nextHandles;
 };
 
+const notifyPwaLaunchProcessingListeners = () => {
+  const isProcessing = activePwaLaunchProcessingCount > 0;
+  for (const listener of launchProcessingListeners) {
+    listener(isProcessing);
+  }
+};
+
+export const hasActivePwaLaunchProcessing = () => {
+  return activePwaLaunchProcessingCount > 0;
+};
+
+export const beginPwaLaunchProcessing = () => {
+  activePwaLaunchProcessingCount += 1;
+  notifyPwaLaunchProcessingListeners();
+};
+
+export const finishPwaLaunchProcessing = () => {
+  activePwaLaunchProcessingCount = Math.max(
+    0,
+    activePwaLaunchProcessingCount - 1,
+  );
+  notifyPwaLaunchProcessingListeners();
+};
+
 export const listenForPwaLaunchFiles = async (
   listener: PwaLaunchFilesListener,
 ) => {
@@ -136,5 +104,15 @@ export const listenForPwaLaunchFiles = async (
 
   return () => {
     launchFilesListeners.delete(listener);
+  };
+};
+
+export const listenForPwaLaunchProcessing = (
+  listener: PwaLaunchProcessingListener,
+) => {
+  launchProcessingListeners.add(listener);
+
+  return () => {
+    launchProcessingListeners.delete(listener);
   };
 };

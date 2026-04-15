@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => {
     ],
     file_handlers: [
       {
-        action: "/?launch=file",
+        action: "/#/editor",
         accept: {
           "application/pdf": [".pdf"],
         },

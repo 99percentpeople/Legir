@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
-  clearPwaLaunchRouteHint,
+  beginPwaLaunchProcessing,
   consumePendingPwaLaunchFiles,
+  finishPwaLaunchProcessing,
+  hasActivePwaLaunchProcessing,
   hasPendingPwaLaunchFiles,
-  hasPwaLaunchRouteHint,
   listenForPwaLaunchFiles,
-  PWA_LAUNCH_ROUTE_WAIT_MS,
+  listenForPwaLaunchProcessing,
 } from "@/services/platform";
 
 type OpenWebHandleFileOptions = {
@@ -28,56 +29,76 @@ export const usePwaLaunchBootstrap = ({
   loadErrorMessage,
   unsupportedFileMessage = "Only PDF files are supported.",
 }: UsePwaLaunchBootstrapOptions) => {
+  const openWebHandleFileRef = useRef(openWebHandleFile);
+  const loadErrorMessageRef = useRef(loadErrorMessage);
+  const unsupportedFileMessageRef = useRef(unsupportedFileMessage);
   const [hasPendingLaunchQueueFiles, setHasPendingLaunchQueueFiles] = useState(
-    () => hasPendingPwaLaunchFiles() || hasPwaLaunchRouteHint(),
+    () => hasPendingPwaLaunchFiles() || hasActivePwaLaunchProcessing(),
   );
 
-  const openPwaLaunchedHandle = useCallback(
-    async (handle: FileSystemFileHandle) => {
+  useEffect(() => {
+    openWebHandleFileRef.current = openWebHandleFile;
+  }, [openWebHandleFile]);
+
+  useEffect(() => {
+    loadErrorMessageRef.current = loadErrorMessage;
+  }, [loadErrorMessage]);
+
+  useEffect(() => {
+    unsupportedFileMessageRef.current = unsupportedFileMessage;
+  }, [unsupportedFileMessage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenFiles: null | (() => void) = null;
+    let unlistenProcessing: null | (() => void) = null;
+
+    const openPwaLaunchedHandle = async (handle: FileSystemFileHandle) => {
       const file = await handle.getFile();
       if (
         file.type !== "application/pdf" &&
         !file.name.trim().toLowerCase().endsWith(".pdf")
       ) {
-        toast.error(unsupportedFileMessage);
+        toast.error(unsupportedFileMessageRef.current);
         return;
       }
 
       const bytes = new Uint8Array(await file.arrayBuffer());
-      await openWebHandleFile({
+      await openWebHandleFileRef.current({
         handle,
         filename: file.name,
         bytes,
       });
-    },
-    [openWebHandleFile, unsupportedFileMessage],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    let unlisten: null | (() => void) = null;
-    let launchHintTimeoutId: number | null = null;
+    };
 
     const consumeLaunchHandles = async (handles: FileSystemFileHandle[]) => {
       if (handles.length === 0) {
-        if (!cancelled) {
-          clearPwaLaunchRouteHint();
+        if (!cancelled && !hasActivePwaLaunchProcessing()) {
           setHasPendingLaunchQueueFiles(false);
         }
         return;
       }
 
+      beginPwaLaunchProcessing();
+      if (!cancelled) {
+        setHasPendingLaunchQueueFiles(true);
+      }
+
       try {
         for (const handle of handles) {
-          if (cancelled) return;
+          if (cancelled) break;
           await openPwaLaunchedHandle(handle);
         }
       } catch (error) {
         console.error("Failed to open launched PWA files", error);
-        toast.error(loadErrorMessage);
+        toast.error(loadErrorMessageRef.current);
       } finally {
-        if (!cancelled) {
-          clearPwaLaunchRouteHint();
+        finishPwaLaunchProcessing();
+        if (
+          !cancelled &&
+          !hasActivePwaLaunchProcessing() &&
+          !hasPendingPwaLaunchFiles()
+        ) {
           setHasPendingLaunchQueueFiles(false);
         }
       }
@@ -86,52 +107,47 @@ export const usePwaLaunchBootstrap = ({
     const initialLaunchHandles = consumePendingPwaLaunchFiles();
     if (initialLaunchHandles.length > 0) {
       void consumeLaunchHandles(initialLaunchHandles);
-    } else if (hasPwaLaunchRouteHint()) {
-      launchHintTimeoutId = window.setTimeout(() => {
-        if (cancelled) {
-          return;
-        }
-
-        clearPwaLaunchRouteHint();
-        setHasPendingLaunchQueueFiles(false);
-      }, PWA_LAUNCH_ROUTE_WAIT_MS);
     } else {
-      setHasPendingLaunchQueueFiles(false);
+      setHasPendingLaunchQueueFiles(hasActivePwaLaunchProcessing());
     }
 
-    void (async () => {
-      unlisten = await listenForPwaLaunchFiles((handles) => {
-        if (launchHintTimeoutId !== null) {
-          window.clearTimeout(launchHintTimeoutId);
-          launchHintTimeoutId = null;
-        }
+    unlistenProcessing = listenForPwaLaunchProcessing((isProcessing) => {
+      if (cancelled) return;
+      setHasPendingLaunchQueueFiles(isProcessing || hasPendingPwaLaunchFiles());
+    });
 
-        setHasPendingLaunchQueueFiles(handles.length > 0);
+    void (async () => {
+      unlistenFiles = await listenForPwaLaunchFiles((handles) => {
+        setHasPendingLaunchQueueFiles(
+          handles.length > 0 || hasActivePwaLaunchProcessing(),
+        );
         void consumeLaunchHandles(handles);
       });
 
       if (cancelled) {
         try {
-          unlisten?.();
+          unlistenFiles?.();
         } catch {
           // ignore
         }
-        unlisten = null;
+        unlistenFiles = null;
       }
     })();
 
     return () => {
       cancelled = true;
-      if (launchHintTimeoutId !== null) {
-        window.clearTimeout(launchHintTimeoutId);
+      try {
+        unlistenFiles?.();
+      } catch {
+        // ignore
       }
       try {
-        unlisten?.();
+        unlistenProcessing?.();
       } catch {
         // ignore
       }
     };
-  }, [loadErrorMessage, openPwaLaunchedHandle]);
+  }, []);
 
   return hasPendingLaunchQueueFiles;
 };
