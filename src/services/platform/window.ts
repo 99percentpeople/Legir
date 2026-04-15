@@ -4,6 +4,11 @@ import {
 } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
+import {
+  getPlatformManagedWindowId,
+  syncPlatformCurrentWindowState,
+  unregisterPlatformCurrentWindow,
+} from "./multiWindow/host";
 import { isDesktopApp } from "./runtime";
 
 export type PlatformCloseRequestEvent = {
@@ -42,7 +47,9 @@ export const getPlatformWindowId = () => {
     }
   }
 
-  return "current";
+  // Keep a stable browser-side window id even before the page enters
+  // installed-PWA mode so host transitions do not require a reload.
+  return getPlatformManagedWindowId();
 };
 
 export const exitPlatformFullscreen = async () => {
@@ -75,6 +82,9 @@ export const setPlatformWindowTitle = async (title: string) => {
 
   if (typeof document !== "undefined") {
     document.title = title;
+    void syncPlatformCurrentWindowState({
+      title,
+    });
   }
 };
 
@@ -100,13 +110,31 @@ export const listenForPlatformCloseRequested = async (
 };
 
 export const closePlatformWindow = async () => {
-  if (!isDesktopApp()) return;
-  const win = getCurrentWindow();
-  await win.close();
+  if (isDesktopApp()) {
+    const win = getCurrentWindow();
+    await win.close();
+    return;
+  }
+
+  if (typeof window !== "undefined") {
+    await unregisterPlatformCurrentWindow({
+      awaitReply: true,
+    }).catch(() => false);
+    window.close();
+  }
 };
 
 export const destroyPlatformWindow = async () => {
-  if (!isDesktopApp()) return;
-  const win = getCurrentWindow();
-  await win.destroy();
+  if (isDesktopApp()) {
+    const win = getCurrentWindow();
+    await win.destroy();
+    return;
+  }
+
+  if (typeof window !== "undefined") {
+    await unregisterPlatformCurrentWindow({
+      awaitReply: true,
+    }).catch(() => false);
+    window.close();
+  }
 };

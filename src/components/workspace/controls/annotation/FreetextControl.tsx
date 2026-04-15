@@ -258,11 +258,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
       </FloatingToolbar>
 
       <div
-        className={cn(
-          "relative flex h-full w-full items-start transition-colors",
-          "overflow-hidden",
-          isSelected && !isEditing && "ring-primary ring-1 ring-inset",
-        )}
+        className="relative flex h-full w-full items-start overflow-hidden transition-colors"
         style={{
           color: data.color || "#000000",
           fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,

@@ -2,6 +2,7 @@ import path from "path";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { VitePWA, type VitePWAOptions } from "vite-plugin-pwa";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import { readFileSync } from "fs";
 
@@ -9,9 +10,55 @@ const host = process.env.TAURI_DEV_HOST;
 
 const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
 
+type ExperimentalWebManifest = NonNullable<VitePWAOptions["manifest"]> & {
+  file_handlers?: Array<{
+    action: string;
+    accept: Record<string, string[]>;
+  }>;
+  launch_handler?: {
+    client_mode: "focus-existing" | "navigate-existing" | "auto";
+  };
+};
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "");
   const isTauriEnv = mode === "tauri" || !!process.env.TAURI_ENV_PLATFORM;
+  const pwaManifest: ExperimentalWebManifest = {
+    id: "/",
+    name: packageJson.displayName,
+    short_name: packageJson.displayName,
+    description:
+      "Legir is a local-first PDF workspace for reading, annotating, and editing PDF files.",
+    start_url: "/",
+    scope: "/",
+    display: "standalone",
+    theme_color: "#ffa2a2",
+    background_color: "#ffa2a2",
+    icons: [
+      {
+        src: "pwa/icon-256.png",
+        sizes: "256x256",
+        type: "image/png",
+      },
+      {
+        src: "pwa/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+    file_handlers: [
+      {
+        action: "/?launch=file",
+        accept: {
+          "application/pdf": [".pdf"],
+        },
+      },
+    ],
+    launch_handler: {
+      client_mode: "focus-existing",
+    },
+  };
+
   return {
     // prevent vite from obscuring rust errors
     clearScreen: false,
@@ -46,6 +93,30 @@ export default defineConfig(({ mode }) => {
           },
         ],
       }),
+      ...(!isTauriEnv
+        ? [
+            VitePWA({
+              strategies: "injectManifest",
+              srcDir: "src",
+              filename: "sw.ts",
+              injectRegister: "auto",
+              registerType: "autoUpdate",
+              manifestFilename: "manifest.webmanifest",
+              includeAssets: ["icons/app-icon.svg", "icons/pdf-icon.svg"],
+              manifest: pwaManifest as NonNullable<VitePWAOptions["manifest"]>,
+              injectManifest: {
+                globIgnores: ["fonts/*.ttf"],
+                maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+                globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,ttf,json}"],
+              },
+              devOptions: {
+                enabled: true,
+                type: "module",
+                navigateFallback: "index.html",
+              },
+            }),
+          ]
+        : []),
     ],
     define: {
       "process.env.GEMINI_API_KEY": JSON.stringify(env.GEMINI_API_KEY),

@@ -46,6 +46,11 @@ export const getEditorTabSourceKey = (options: {
   }
 
   if (options.saveTarget?.kind === "web") {
+    const saveTargetId = options.saveTarget.id?.trim();
+    if (saveTargetId) {
+      return `web-file:${saveTargetId}`;
+    }
+
     const handleName = options.saveTarget.handle?.name?.trim();
     return handleName ? `web-handle:${handleName}` : null;
   }

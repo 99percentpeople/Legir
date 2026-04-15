@@ -414,7 +414,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex max-h-full min-h-3/4 flex-col sm:h-3/4 sm:max-w-[720px]">
+      <DialogContent className="mx-4 flex max-h-full min-h-3/4 flex-col sm:h-3/4 sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5" />

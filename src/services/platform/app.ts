@@ -1,9 +1,8 @@
-import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 
+import { getPlatformMultiWindowHost } from "./multiWindow/host";
+import { type PlatformFocusDocumentRequest } from "./multiWindow/types";
 import { isDesktopApp, isWindowsPlatform } from "./runtime";
-
-const FOCUS_DOCUMENT_REQUEST_EVENT = "app://platform-focus-document-request";
 
 export type PlatformDroppedPdf =
   | {
@@ -15,10 +14,6 @@ export type PlatformDroppedPdf =
       file: File;
       handle?: FileSystemFileHandle;
     };
-
-export interface PlatformFocusDocumentRequest {
-  sourceKey: string;
-}
 
 interface PlatformFileDropScopeOptions {
   getTargetElement?: () => HTMLElement | null;
@@ -313,61 +308,22 @@ export const listenForPlatformFileDrop = async (
 };
 
 export const reportPlatformWindowDocuments = async (sourceKeys: string[]) => {
-  if (!isDesktopApp()) {
-    return;
-  }
-
-  const normalizedSourceKeys = Array.from(
-    new Set(
-      sourceKeys
-        .map((sourceKey) => sourceKey.trim())
-        .filter((sourceKey) => sourceKey.length > 0),
-    ),
-  );
-
-  await invoke("report_platform_window_documents", {
-    sourceKeys: normalizedSourceKeys,
-  });
+  await getPlatformMultiWindowHost().reportWindowDocuments(sourceKeys);
 };
 
 export const requestPlatformFocusExistingDocument = async (
   sourceKey: string,
 ) => {
-  if (!isDesktopApp()) {
-    return false;
-  }
-
-  const normalizedSourceKey = sourceKey.trim();
-  if (!normalizedSourceKey) {
-    return false;
-  }
-
-  return await invoke<boolean>("focus_existing_platform_document", {
-    sourceKey: normalizedSourceKey,
-  });
+  return await getPlatformMultiWindowHost().requestFocusExistingDocument(
+    sourceKey,
+  );
 };
 
 export const listenForPlatformFocusDocumentRequest = async (
   listener: (payload: PlatformFocusDocumentRequest) => void,
 ) => {
-  if (!isDesktopApp()) {
-    return () => {};
-  }
-
-  return await listen<PlatformFocusDocumentRequest>(
-    FOCUS_DOCUMENT_REQUEST_EVENT,
-    (event) => {
-      const sourceKey =
-        typeof event.payload?.sourceKey === "string"
-          ? event.payload.sourceKey.trim()
-          : "";
-
-      if (!sourceKey) {
-        return;
-      }
-
-      listener({ sourceKey });
-    },
+  return await getPlatformMultiWindowHost().listenFocusDocumentRequest(
+    listener,
   );
 };
 

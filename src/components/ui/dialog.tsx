@@ -98,7 +98,7 @@ function DialogContent({
       <DialogOverlay />
       <div
         data-slot="dialog-positioner"
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center px-0 py-4"
       >
         <DialogPortalContainerContext.Provider value={portalContainer}>
           <DialogPrimitive.Content

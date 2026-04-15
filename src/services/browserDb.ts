@@ -1,12 +1,6 @@
 const APP_DB_NAME = "LegirAppDB";
 const APP_DB_VERSION = 1;
 
-const LEGACY_DB_NAMES = [
-  "LegirLandingDB",
-  "LegirDB",
-  "LegirEditorTransferDB",
-] as const;
-
 export const APP_DB_STORES = {
   workspace: "workspace",
   tabTransfers: "tab-transfers",
@@ -42,41 +36,13 @@ const createAppDbConnection = (): Promise<IDBDatabase> =>
     };
   });
 
-const deleteDb = (name: string): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(name);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => resolve();
-  });
-
-let legacyCleanupPromise: Promise<void> | null = null;
-
-export const cleanupLegacyAppDbs = () => {
-  if (typeof indexedDB === "undefined") return Promise.resolve();
-  if (legacyCleanupPromise) return legacyCleanupPromise;
-
-  legacyCleanupPromise = Promise.allSettled(
-    LEGACY_DB_NAMES.map(async (name) => {
-      await deleteDb(name);
-    }),
-  ).then(() => undefined);
-
-  return legacyCleanupPromise;
-};
-
 export const openAppDb = () => {
   if (appDbPromise) return appDbPromise;
 
-  appDbPromise = cleanupLegacyAppDbs()
-    .catch((error) => {
-      console.error("Failed to cleanup legacy IndexedDB databases", error);
-    })
-    .then(() => createAppDbConnection())
-    .catch((error) => {
-      appDbPromise = null;
-      throw error;
-    });
+  appDbPromise = createAppDbConnection().catch((error) => {
+    appDbPromise = null;
+    throw error;
+  });
 
   return appDbPromise;
 };

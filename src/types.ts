@@ -296,7 +296,7 @@ export interface AnnotationStampData {
 }
 
 export type EditorSaveTarget =
-  | { kind: "web"; handle: FileSystemFileHandle }
+  | { kind: "web"; handle: FileSystemFileHandle; id?: string }
   | { kind: "tauri"; path: string };
 
 export interface SnappingOptions {

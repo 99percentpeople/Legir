@@ -6,7 +6,7 @@ export type FilePickerFilter = {
 };
 
 export type SaveTarget =
-  | { kind: "web"; handle: FileSystemFileHandle }
+  | { kind: "web"; handle: FileSystemFileHandle; id?: string }
   | { kind: "tauri"; path: string };
 
 export type OpenFileResult = {

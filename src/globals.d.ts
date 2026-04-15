@@ -14,6 +14,20 @@ declare const process: {
   };
 };
 
+declare global {
+  interface LaunchParams {
+    files: FileSystemFileHandle[];
+  }
+
+  interface LaunchQueue {
+    setConsumer: (consumer: (launchParams: LaunchParams) => void) => void;
+  }
+
+  interface Window {
+    launchQueue?: LaunchQueue;
+  }
+}
+
 declare module "react" {
   interface CSSProperties {
     [key: `--${string}`]: string | number;

@@ -43,14 +43,22 @@ const createTransferId = () =>
 const cloneSaveTargetForTransfer = (
   saveTarget: EditorSaveTarget | null,
 ): EditorSaveTarget | null => {
-  if (saveTarget?.kind !== "tauri") {
-    return null;
+  if (saveTarget?.kind === "tauri") {
+    return {
+      kind: "tauri",
+      path: saveTarget.path,
+    };
   }
 
-  return {
-    kind: "tauri",
-    path: saveTarget.path,
-  };
+  if (saveTarget?.kind === "web") {
+    return {
+      kind: "web",
+      handle: saveTarget.handle,
+      ...(saveTarget.id ? { id: saveTarget.id } : {}),
+    };
+  }
+
+  return null;
 };
 
 const cloneEditorTabSnapshotForTransfer = (

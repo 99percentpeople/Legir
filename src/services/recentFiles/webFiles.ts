@@ -88,11 +88,18 @@ export const rememberWebRecentFile = async (options: {
     });
   }
 
-  return entries;
+  return {
+    entries,
+    path: persistedPath ?? null,
+  };
 };
 
 export const readWebRecentFile = async (entry: RecentFileEntry) => {
-  const handle = await getIndexedDbRecentFileHandle(entry.path);
+  return await readWebRecentFileByPath(entry.path);
+};
+
+export const readWebRecentFileByPath = async (path: string) => {
+  const handle = await getIndexedDbRecentFileHandle(path);
   if (!handle) {
     throw new Error("Missing browser file handle for this recent item.");
   }

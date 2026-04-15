@@ -17,11 +17,14 @@ import {
   createIndexedDbRecentFilesStore,
   createPlatformRecentFilesStore,
   readWebRecentFile,
+  readWebRecentFileByPath,
   rememberWebRecentFile,
   type RecentFileEntry,
 } from "@/services/recentFiles";
 import { useLanguage } from "./components/language-provider";
 import { useAppInitialization } from "./app/useAppInitialization";
+import { useEditorWindowBootstrap } from "./app/useEditorWindowBootstrap";
+import { usePwaLaunchBootstrap } from "./app/usePwaLaunchBootstrap";
 import type { HomePageAdapter } from "./pages/HomePage";
 import { useEditorStore } from "./store/useEditorStore";
 import { selectAppShellState } from "@/store/selectors";
@@ -59,21 +62,18 @@ import type {
   EditorTabSession,
 } from "@/app/editorTabs/types";
 import {
-  acquirePendingEditorWindowBootstrap,
   applyGlobalEditorUiSession,
   buildEditorWindowBootstrapRoute,
   confirmPlatformAction,
   destroyPlatformWindow,
   emitTabWorkspaceEvent,
   exportPdfBytes,
-  finishPendingEditorWindowBootstrap,
   getSavedGlobalEditorUiSession,
   getPlatformWindowId,
-  hasPendingEditorWindowBootstrap,
-  isDesktopApp,
   listenForPlatformFileDrop,
   listenForPlatformFileDragState,
   listenForPlatformFocusDocumentRequest,
+  listenForPlatformEditorWindowsChange,
   listenForTabWorkspaceEvent,
   listenForPlatformCloseRequested,
   listPlatformEditorWindows,
@@ -82,8 +82,10 @@ import {
   openPlatformEditorWindow,
   pickSaveTarget,
   reportPlatformWindowDocuments,
+  readPlatformRuntimeSnapshot,
   requestPlatformFocusExistingDocument,
   saveGlobalEditorUiSession,
+  subscribePlatformRuntimeChange,
   writeToSaveTarget,
   type PlatformDroppedPdf,
   type SaveTarget,
@@ -123,7 +125,11 @@ const normalizePlatformWindowTitle = (title: string | null | undefined) => {
 
 const App: React.FC = () => {
   const { t } = useLanguage();
-  const isDesktop = useMemo(() => isDesktopApp(), []);
+  const [platformRuntime, setPlatformRuntime] = useState(() =>
+    readPlatformRuntimeSnapshot(),
+  );
+  const isDesktop = platformRuntime.isDesktop;
+  const supportsMultiWindow = platformRuntime.supportsMultiWindow;
   const platformWindowId = useMemo(() => getPlatformWindowId(), []);
   const [, navigate] = useLocation();
   const homeRecentFilesStore = useMemo(() => {
@@ -178,9 +184,6 @@ const App: React.FC = () => {
     submit: (password: string) => void;
     cancel: () => void;
   } | null>(null);
-  const [hasPendingWindowBootstrap, setHasPendingWindowBootstrap] = useState(
-    () => hasPendingEditorWindowBootstrap(),
-  );
   const [pendingCloseRequest, setPendingCloseRequest] =
     useState<PendingCloseRequest | null>(null);
   const [mergeWindowTargets, setMergeWindowTargets] = useState<
@@ -194,6 +197,12 @@ const App: React.FC = () => {
   useAppEvent("pdf:passwordRequired", (payload) => {
     setPdfPasswordPrompt(payload);
   });
+
+  useEffect(() => {
+    return subscribePlatformRuntimeChange((nextSnapshot) => {
+      setPlatformRuntime(nextSnapshot);
+    });
+  }, []);
 
   const isTauriSaveTarget = (
     target: SaveTarget,
@@ -212,6 +221,7 @@ const App: React.FC = () => {
 
     if (snapshot.saveTarget?.kind === "web") {
       void rememberWebRecentFile({
+        path: snapshot.saveTarget.id,
         handle: snapshot.saveTarget.handle,
         filename: snapshot.filename ?? snapshot.saveTarget.handle.name,
       }).catch((error) => {
@@ -358,7 +368,7 @@ const App: React.FC = () => {
   );
 
   const refreshMergeWindowTargets = useCallback(async () => {
-    if (!isDesktopApp()) {
+    if (!supportsMultiWindow) {
       setMergeWindowTargets([]);
       return;
     }
@@ -387,7 +397,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Failed to refresh merge window targets:", error);
     }
-  }, [platformWindowId, t]);
+  }, [platformWindowId, supportsMultiWindow, t]);
 
   const importTransferredTab = useCallback(
     async (
@@ -432,7 +442,7 @@ const App: React.FC = () => {
         navigate("/editor");
 
         if (
-          isDesktopApp() &&
+          supportsMultiWindow &&
           transfer.sourceWindowId &&
           transfer.sourceWindowId !== platformWindowId
         ) {
@@ -467,6 +477,7 @@ const App: React.FC = () => {
       getTabById,
       navigate,
       platformWindowId,
+      supportsMultiWindow,
     ],
   );
 
@@ -488,7 +499,7 @@ const App: React.FC = () => {
         }
       }
 
-      if (!isDesktopApp()) {
+      if (!supportsMultiWindow) {
         return false;
       }
 
@@ -499,7 +510,7 @@ const App: React.FC = () => {
         return false;
       }
     },
-    [activateTab, findTabBySourceKey, navigate],
+    [activateTab, findTabBySourceKey, navigate, supportsMultiWindow],
   );
 
   useEffect(() => {
@@ -537,7 +548,7 @@ const App: React.FC = () => {
   }, [refreshMergeWindowTargets]);
 
   useEffect(() => {
-    if (!isDesktopApp()) return;
+    if (!supportsMultiWindow) return;
 
     let cancelled = false;
     let unlisten: null | (() => void) = null;
@@ -583,10 +594,11 @@ const App: React.FC = () => {
     navigate,
     platformWindowId,
     registerPendingIncomingTab,
+    supportsMultiWindow,
   ]);
 
   useEffect(() => {
-    if (!isDesktopApp()) return;
+    if (!supportsMultiWindow) return;
 
     let cancelled = false;
     let unlisten: null | (() => void) = null;
@@ -618,10 +630,10 @@ const App: React.FC = () => {
         // ignore
       }
     };
-  }, [activateTab, findTabBySourceKey, navigate]);
+  }, [activateTab, findTabBySourceKey, navigate, supportsMultiWindow]);
 
   useEffect(() => {
-    if (!isDesktopApp()) return;
+    if (!supportsMultiWindow) return;
 
     const sourceKeys = tabs
       .map((tab) => tab.sourceKey)
@@ -630,7 +642,7 @@ const App: React.FC = () => {
     void reportPlatformWindowDocuments(sourceKeys).catch((error) => {
       console.error("Failed to report platform window documents:", error);
     });
-  }, [tabs]);
+  }, [supportsMultiWindow, tabs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -668,7 +680,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isDesktopApp()) return;
+    if (!supportsMultiWindow) return;
 
     let cancelled = false;
     let unlisten: null | (() => void) = null;
@@ -696,7 +708,38 @@ const App: React.FC = () => {
         // ignore
       }
     };
-  }, [refreshMergeWindowTargets]);
+  }, [refreshMergeWindowTargets, supportsMultiWindow]);
+
+  useEffect(() => {
+    if (!supportsMultiWindow) return;
+
+    let cancelled = false;
+    let unlisten: null | (() => void) = null;
+
+    void (async () => {
+      unlisten = await listenForPlatformEditorWindowsChange(() => {
+        void refreshMergeWindowTargets();
+      });
+
+      if (cancelled) {
+        try {
+          unlisten?.();
+        } catch {
+          // ignore
+        }
+        unlisten = null;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try {
+        unlisten?.();
+      } catch {
+        // ignore
+      }
+    };
+  }, [refreshMergeWindowTargets, supportsMultiWindow]);
 
   useEffect(() => {
     return () => {
@@ -828,14 +871,14 @@ const App: React.FC = () => {
 
       if (!extractedTab.isLastTab) return;
 
-      if (!isDesktopApp()) {
+      if (!supportsMultiWindow) {
         navigate("/");
         return;
       }
 
       await destroyPlatformWindow();
     },
-    [destroyPlatformWindow, navigate],
+    [destroyPlatformWindow, navigate, supportsMultiWindow],
   );
 
   const enqueueLoadTask = useCallback((task: () => Promise<void>) => {
@@ -1022,19 +1065,26 @@ const App: React.FC = () => {
       bytes: Uint8Array;
       path?: string;
     }) => {
-      void rememberWebRecentFile({
-        path: options.path,
-        handle: options.handle,
-        filename: options.filename,
-        pdfBytes: options.bytes,
-      }).catch((error) => {
+      let rememberedPath = options.path ?? null;
+
+      try {
+        const remembered = await rememberWebRecentFile({
+          path: options.path,
+          handle: options.handle,
+          filename: options.filename,
+          pdfBytes: options.bytes,
+        });
+        rememberedPath = remembered.path;
+      } catch (error) {
         console.error("Failed to remember web recent file", error);
-      });
+      }
 
       const normalizedHandleName = options.handle.name.trim();
-      const sourceKey = normalizedHandleName
-        ? `web-handle:${normalizedHandleName}`
-        : null;
+      const sourceKey = rememberedPath
+        ? `web-file:${rememberedPath}`
+        : normalizedHandleName
+          ? `web-handle:${normalizedHandleName}`
+          : null;
 
       if (await focusExistingTabBySourceKey(sourceKey)) {
         return;
@@ -1044,11 +1094,33 @@ const App: React.FC = () => {
         input: options.bytes,
         pdfFile: null,
         filename: options.filename,
-        saveTarget: { kind: "web", handle: options.handle },
+        saveTarget: {
+          kind: "web",
+          handle: options.handle,
+          ...(rememberedPath ? { id: rememberedPath } : {}),
+        },
         skipInitialSourceKeyLookup: true,
       });
     },
     [focusExistingTabBySourceKey, openLoadedDocumentInTab],
+  );
+
+  const openTauriFilePathInCurrentWindow = useCallback(
+    async (
+      filePath: string,
+      options?: { skipInitialSourceKeyLookup?: boolean },
+    ) => {
+      const picked = await openFileFromPath(filePath);
+      await openLoadedDocumentInTab({
+        input: picked.bytes,
+        pdfFile: null,
+        filename: picked.filename,
+        saveTarget: { kind: "tauri", path: filePath },
+        skipInitialSourceKeyLookup:
+          options?.skipInitialSourceKeyLookup ?? false,
+      });
+    },
+    [openLoadedDocumentInTab],
   );
 
   const handleOpen = useCallback(async () => {
@@ -1066,16 +1138,15 @@ const App: React.FC = () => {
       return;
     }
 
-    await openLoadedDocumentInTab({
-      input: picked.bytes,
-      pdfFile: null,
-      filename: picked.filename,
-      saveTarget: picked.filePath
-        ? { kind: "tauri", path: picked.filePath }
-        : picked.handle
-          ? { kind: "web", handle: picked.handle }
-          : null,
-    });
+    if (picked.filePath) {
+      await openLoadedDocumentInTab({
+        input: picked.bytes,
+        pdfFile: null,
+        filename: picked.filename,
+        saveTarget: { kind: "tauri", path: picked.filePath },
+      });
+      return;
+    }
   }, [openLoadedDocumentInTab, openWebHandleFile]);
 
   const openRecentFileByPath = useCallback(
@@ -1084,16 +1155,11 @@ const App: React.FC = () => {
         return;
       }
 
-      const picked = await openFileFromPath(filePath);
-      await openLoadedDocumentInTab({
-        input: picked.bytes,
-        pdfFile: null,
-        filename: picked.filename,
-        saveTarget: { kind: "tauri", path: filePath },
+      await openTauriFilePathInCurrentWindow(filePath, {
         skipInitialSourceKeyLookup: true,
       });
     },
-    [focusExistingTabBySourceKey, openLoadedDocumentInTab],
+    [focusExistingTabBySourceKey, openTauriFilePathInCurrentWindow],
   );
 
   const openRecentWebFile = useCallback(
@@ -1138,9 +1204,11 @@ const App: React.FC = () => {
         return;
       }
 
-      await openRecentFileByPath(filePath);
+      await openTauriFilePathInCurrentWindow(filePath, {
+        skipInitialSourceKeyLookup: false,
+      });
     },
-    [openRecentFileByPath],
+    [openTauriFilePathInCurrentWindow],
   );
 
   const openDroppedPdf = useCallback(
@@ -1216,65 +1284,48 @@ const App: React.FC = () => {
         return;
       }
 
-      const picked = await openFileFromPath(filePath);
-      await openLoadedDocumentInTab({
-        input: picked.bytes,
-        pdfFile: null,
-        filename: picked.filename,
-        saveTarget: { kind: "tauri", path: filePath },
+      await openTauriFilePathInCurrentWindow(filePath, {
         skipInitialSourceKeyLookup: true,
       });
     },
-    [focusExistingTabBySourceKey, openLoadedDocumentInTab],
+    [focusExistingTabBySourceKey, openTauriFilePathInCurrentWindow],
   );
 
-  useEffect(() => {
-    if (!hasPendingWindowBootstrap) return;
-
-    let cancelled = false;
-
-    void (async () => {
-      const { bootstrap, completion } = acquirePendingEditorWindowBootstrap();
-      if (!bootstrap) {
-        await completion;
-        if (!cancelled) {
-          setHasPendingWindowBootstrap(false);
-        }
+  const importStartupOpenWebDocument = useCallback(
+    async (recentFilePath: string) => {
+      if (await focusExistingTabBySourceKey(`web-file:${recentFilePath}`)) {
         return;
       }
 
-      try {
-        if (bootstrap.kind === "startup-open") {
-          await importStartupOpenDocument(bootstrap.filePath);
-        } else if (bootstrap.kind === "tab-transfer") {
-          await importTransferredTab(bootstrap.transferId);
-        }
-      } catch (error) {
-        console.error("Failed to consume window bootstrap:", error);
-        toast.error(t("app.load_error"));
-      } finally {
-        finishPendingEditorWindowBootstrap();
-        if (!cancelled) {
-          setHasPendingWindowBootstrap(false);
-        }
-      }
-    })();
+      const { handle, file, bytes } =
+        await readWebRecentFileByPath(recentFilePath);
+      await openWebHandleFile({
+        path: recentFilePath,
+        handle,
+        filename: file.name,
+        bytes,
+      });
+    },
+    [focusExistingTabBySourceKey, openWebHandleFile],
+  );
 
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    hasPendingWindowBootstrap,
-    importStartupOpenDocument,
-    importTransferredTab,
-    t,
-  ]);
+  const hasPendingWindowBootstrap = useEditorWindowBootstrap({
+    onStartupOpenDocument: importStartupOpenDocument,
+    onStartupOpenWebDocument: importStartupOpenWebDocument,
+    onTabTransfer: importTransferredTab,
+    loadErrorMessage: t("app.load_error"),
+  });
+
+  const hasPendingLaunchQueueFiles = usePwaLaunchBootstrap({
+    openWebHandleFile,
+    loadErrorMessage: t("app.load_error"),
+  });
 
   useAppInitialization();
 
   const handleDetachTabToNewWindow = useCallback(
     async (tabId: string) => {
-      if (!isDesktopApp()) return;
+      if (!supportsMultiWindow) return;
 
       captureCurrentTabIntoState();
       const session = getTabById(tabId);
@@ -1341,12 +1392,13 @@ const App: React.FC = () => {
       extractTransferSourceTab,
       getTabById,
       restoreTransferredSourceTab,
+      supportsMultiWindow,
     ],
   );
 
   const handleMergeTabToWindow = useCallback(
     async (tabId: string, targetWindowId: string) => {
-      if (!isDesktopApp() || targetWindowId === platformWindowId) {
+      if (!supportsMultiWindow || targetWindowId === platformWindowId) {
         return;
       }
 
@@ -1405,6 +1457,12 @@ const App: React.FC = () => {
           targetWindowId,
         );
 
+        if (extractedTab.isLastTab) {
+          ackWaiter.cancel();
+          await commitTransferredSourceTab(extractedTab);
+          return;
+        }
+
         const acknowledged = await ackWaiter.promise;
         if (!acknowledged) {
           restoreTransferredSourceTab(extractedTab);
@@ -1435,6 +1493,7 @@ const App: React.FC = () => {
       platformWindowId,
       refreshMergeWindowTargets,
       restoreTransferredSourceTab,
+      supportsMultiWindow,
     ],
   );
 
@@ -1503,8 +1562,25 @@ const App: React.FC = () => {
         return snapshot.filename;
       })();
 
+      let nextSaveTarget = target;
+
+      if (target.kind === "web") {
+        const remembered = await rememberWebRecentFile({
+          path: target.id,
+          handle: target.handle,
+          filename: nextFilename || target.handle.name || "document.pdf",
+          pdfBytes: modifiedBytes,
+          forcePreviewRender: true,
+        });
+
+        nextSaveTarget = {
+          ...target,
+          ...(remembered.path ? { id: remembered.path } : {}),
+        };
+      }
+
       setState({
-        saveTarget: target as unknown as EditorState["saveTarget"],
+        saveTarget: nextSaveTarget as unknown as EditorState["saveTarget"],
         filename: nextFilename,
         lastSavedAt: new Date(),
         isDirty: false,
@@ -1517,15 +1593,6 @@ const App: React.FC = () => {
           pdfBytes: modifiedBytes,
           targetWidth: 240,
           renderAnnotations: true,
-          forcePreviewRender: true,
-        });
-      }
-
-      if (target.kind === "web") {
-        await rememberWebRecentFile({
-          handle: target.handle,
-          filename: nextFilename || target.handle.name || "document.pdf",
-          pdfBytes: modifiedBytes,
           forcePreviewRender: true,
         });
       }
@@ -1557,8 +1624,26 @@ const App: React.FC = () => {
       if (!result.ok) return false;
 
       if (result.kind === "saved") {
+        let nextExportTarget = result.target;
+
+        if (result.target.kind === "web") {
+          const remembered = await rememberWebRecentFile({
+            path: result.target.id,
+            handle: result.target.handle,
+            filename:
+              result.target.handle.name || snapshot.filename || "document.pdf",
+            pdfBytes: modifiedBytes,
+            forcePreviewRender: true,
+          });
+
+          nextExportTarget = {
+            ...result.target,
+            ...(remembered.path ? { id: remembered.path } : {}),
+          };
+        }
+
         setState({
-          saveTarget: result.target as unknown as EditorState["saveTarget"],
+          saveTarget: nextExportTarget as unknown as EditorState["saveTarget"],
           lastSavedAt: new Date(),
           isDirty: false,
         });
@@ -1573,17 +1658,6 @@ const App: React.FC = () => {
             forcePreviewRender: true,
           });
         }
-
-        if (result.target.kind === "web") {
-          await rememberWebRecentFile({
-            handle: result.target.handle,
-            filename:
-              result.target.handle.name || snapshot.filename || "document.pdf",
-            pdfBytes: modifiedBytes,
-            forcePreviewRender: true,
-          });
-        }
-
         toast.success(t("app.save_success"));
       }
 
@@ -1887,6 +1961,7 @@ const App: React.FC = () => {
         isLoading={
           isProcessing ||
           hasPendingWindowBootstrap ||
+          hasPendingLaunchQueueFiles ||
           pendingIncomingTabs.length > 0
         }
         homeProps={{
@@ -1910,8 +1985,8 @@ const App: React.FC = () => {
           onMoveTab: handleMoveTab,
           onDetachTab: handleDetachTabToNewWindow,
           onMergeTabToWindow: handleMergeTabToWindow,
-          canDetachTabs: isDesktopApp() && windowLayout.tabIds.length > 1,
-          canMergeTabs: isDesktopApp() && mergeWindowTargets.length > 0,
+          canDetachTabs: supportsMultiWindow && windowLayout.tabIds.length > 1,
+          canMergeTabs: supportsMultiWindow && mergeWindowTargets.length > 0,
           onExport: handleExport,
           onSaveAs: handleSaveAs,
           onExit: onEditorCloseCurrentTabAfterSave,

@@ -5,4 +5,8 @@ export {
   upsertIndexedDbRecentFile,
 } from "./indexedDbStore";
 export { createPlatformRecentFilesStore } from "./platformStore";
-export { readWebRecentFile, rememberWebRecentFile } from "./webFiles";
+export {
+  readWebRecentFile,
+  readWebRecentFileByPath,
+  rememberWebRecentFile,
+} from "./webFiles";

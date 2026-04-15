@@ -7,6 +7,10 @@ export type EditorWindowBootstrap =
       filePath: string;
     }
   | {
+      kind: "startup-open-web";
+      recentFilePath: string;
+    }
+  | {
       kind: "tab-transfer";
       transferId: string;
     };
@@ -41,6 +45,16 @@ const parseEditorWindowBootstrap = (
       ? {
           kind: "startup-open",
           filePath,
+        }
+      : null;
+  }
+
+  if (rawBootstrap.kind === "startup-open-web") {
+    const recentFilePath = normalizeNonEmptyString(rawBootstrap.recentFilePath);
+    return recentFilePath
+      ? {
+          kind: "startup-open-web",
+          recentFilePath,
         }
       : null;
   }
@@ -137,7 +151,7 @@ export const buildEditorWindowBootstrapRoute = (
   const search = new URLSearchParams({
     [EDITOR_WINDOW_BOOTSTRAP_QUERY_KEY]: JSON.stringify(bootstrap),
   });
-  return `/?${search.toString()}`;
+  return `/?${search.toString()}#${EDITOR_WINDOW_BOOTSTRAP_ROUTE}`;
 };
 
 export const hasPendingEditorWindowBootstrap = () => {

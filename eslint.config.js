@@ -20,6 +20,11 @@ export default tseslint.config(
   },
   {
     // Ignores specific files
-    ignores: ["**/dist/**", "**/node_modules/**", "src-tauri/**"],
+    ignores: [
+      "**/dist/**",
+      "**/dev-dist/**",
+      "**/node_modules/**",
+      "src-tauri/**",
+    ],
   },
 );
