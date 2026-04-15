@@ -13,7 +13,13 @@ const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
 type ExperimentalWebManifest = NonNullable<VitePWAOptions["manifest"]> & {
   file_handlers?: Array<{
     action: string;
+    name?: string;
     accept: Record<string, string[]>;
+    icons?: Array<{
+      src: string;
+      sizes?: string;
+      type?: string;
+    }>;
   }>;
   launch_handler?: {
     client_mode: "focus-existing" | "navigate-existing" | "auto";
@@ -36,12 +42,12 @@ export default defineConfig(({ mode }) => {
     background_color: "#ffa2a2",
     icons: [
       {
-        src: "pwa/icon-256.png",
+        src: "pwa/app/128x128@2x.png",
         sizes: "256x256",
         type: "image/png",
       },
       {
-        src: "pwa/icon-512.png",
+        src: "pwa/app/icon.png",
         sizes: "512x512",
         type: "image/png",
       },
@@ -49,9 +55,22 @@ export default defineConfig(({ mode }) => {
     file_handlers: [
       {
         action: "/#/editor",
+        name: "PDF Document",
         accept: {
           "application/pdf": [".pdf"],
         },
+        icons: [
+          {
+            src: "pwa/pdf/128x128.png",
+            sizes: "128x128",
+            type: "image/png",
+          },
+          {
+            src: "pwa/pdf/128x128@2x.png",
+            sizes: "256x256",
+            type: "image/png",
+          },
+        ],
       },
     ],
     launch_handler: {
@@ -90,6 +109,22 @@ export default defineConfig(({ mode }) => {
           {
             src: "node_modules/pdfjs-dist/standard_fonts/*",
             dest: "pdfjs/standard_fonts",
+          },
+          {
+            src: "generated-icons/app/128x128@2x.png",
+            dest: "pwa/app",
+          },
+          {
+            src: "generated-icons/app/icon.png",
+            dest: "pwa/app",
+          },
+          {
+            src: "generated-icons/pdf/128x128.png",
+            dest: "pwa/pdf",
+          },
+          {
+            src: "generated-icons/pdf/128x128@2x.png",
+            dest: "pwa/pdf",
           },
         ],
       }),

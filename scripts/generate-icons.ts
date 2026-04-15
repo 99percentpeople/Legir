@@ -20,15 +20,25 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = resolve(SCRIPT_DIR, "..");
 const APP_ICON_SOURCE = resolve(ROOT_DIR, "public/icons/app-icon.svg");
 const PDF_ICON_SOURCE = resolve(ROOT_DIR, "public/icons/pdf-icon.svg");
-const APP_ICON_OUTPUT_DIR = resolve(ROOT_DIR, "src-tauri/icons");
+const GENERATED_ICON_OUTPUT_DIR = resolve(ROOT_DIR, "generated-icons");
+const APP_ICON_OUTPUT_DIR = resolve(GENERATED_ICON_OUTPUT_DIR, "app");
+const PDF_ICON_OUTPUT_DIR = resolve(GENERATED_ICON_OUTPUT_DIR, "pdf");
 const PDF_ICON_TARGETS = [
   {
     source: "icon.ico",
-    target: resolve(ROOT_DIR, "src-tauri/icons/pdf-document.ico"),
+    target: resolve(PDF_ICON_OUTPUT_DIR, "icon.ico"),
   },
   {
     source: "icon.icns",
-    target: resolve(ROOT_DIR, "src-tauri/icons/pdf-document.icns"),
+    target: resolve(PDF_ICON_OUTPUT_DIR, "icon.icns"),
+  },
+  {
+    source: "128x128.png",
+    target: resolve(PDF_ICON_OUTPUT_DIR, "128x128.png"),
+  },
+  {
+    source: "128x128@2x.png",
+    target: resolve(PDF_ICON_OUTPUT_DIR, "128x128@2x.png"),
   },
 ] as const;
 
@@ -158,6 +168,7 @@ function generateAppIcons() {
 
 function generatePdfDocumentIcons() {
   ensureFileExists(PDF_ICON_SOURCE);
+  mkdirSync(PDF_ICON_OUTPUT_DIR, { recursive: true });
 
   const tempDir = mkdtempSync(join(tmpdir(), "legir-pdf-document-icons-"));
   const squareSvgPath = join(tempDir, "pdf-document-square.svg");
