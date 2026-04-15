@@ -4,6 +4,7 @@ const STORAGE_KEY = "app-editor-ui-session";
 
 export type PersistedEditorUiSession = {
   updatedAt: number;
+  sourceKey: string | null;
   mode: EditorTabSnapshot["mode"];
   tool: EditorTabSnapshot["tool"];
   penStyle: EditorTabSnapshot["penStyle"];
@@ -29,10 +30,34 @@ export type PersistedEditorUiSession = {
   rightPanelWidth: EditorTabSnapshot["rightPanelWidth"];
 };
 
+const getSnapshotSourceKey = (snapshot: EditorTabSnapshot) => {
+  if (snapshot.saveTarget?.kind === "tauri") {
+    return `tauri:${snapshot.saveTarget.path}`;
+  }
+
+  if (snapshot.saveTarget?.kind === "web") {
+    const saveTargetId = snapshot.saveTarget.id?.trim();
+    if (saveTargetId) {
+      return `web-file:${saveTargetId}`;
+    }
+
+    const handleName = snapshot.saveTarget.handle?.name?.trim();
+    return handleName ? `web-handle:${handleName}` : null;
+  }
+
+  const file = snapshot.pdfFile;
+  if (file) {
+    return `web-file:${file.name}:${file.size}:${file.lastModified}`;
+  }
+
+  return null;
+};
+
 const clonePersistedSession = (
   session: PersistedEditorUiSession,
 ): PersistedEditorUiSession => ({
   ...session,
+  sourceKey: typeof session.sourceKey === "string" ? session.sourceKey : null,
   penStyle: { ...session.penStyle },
   highlightStyle: session.highlightStyle
     ? { ...session.highlightStyle }
@@ -54,6 +79,7 @@ const createPersistedSessionFromSnapshot = (
   snapshot: EditorTabSnapshot,
 ): PersistedEditorUiSession => ({
   updatedAt: Date.now(),
+  sourceKey: getSnapshotSourceKey(snapshot),
   mode: snapshot.mode,
   tool: snapshot.tool,
   penStyle: { ...snapshot.penStyle },
@@ -122,9 +148,42 @@ export const getSavedGlobalEditorUiSession = () => {
   return session ? clonePersistedSession(session) : null;
 };
 
+export const resolveGlobalEditorUiSessionForDocument = (options: {
+  sourceKey: string | null;
+  pageCount: number;
+}) => {
+  const session = getSavedGlobalEditorUiSession();
+  const restoreDocumentViewport =
+    options.sourceKey !== null && session?.sourceKey === options.sourceKey;
+  const pendingViewStateRestore =
+    restoreDocumentViewport && session?.pendingViewStateRestore
+      ? { ...session.pendingViewStateRestore }
+      : null;
+  const currentPageIndex =
+    restoreDocumentViewport && typeof session?.currentPageIndex === "number"
+      ? Math.max(
+          0,
+          Math.min(
+            Math.max(0, options.pageCount - 1),
+            Math.floor(session.currentPageIndex),
+          ),
+        )
+      : 0;
+
+  return {
+    session,
+    restoreDocumentViewport,
+    currentPageIndex,
+    pendingViewStateRestore,
+  };
+};
+
 export const applyGlobalEditorUiSession = (
   snapshot: EditorTabSnapshot,
   session: PersistedEditorUiSession,
+  options?: {
+    restoreDocumentViewport?: boolean;
+  },
 ): EditorTabSnapshot => ({
   ...snapshot,
   mode: session.mode,
@@ -149,11 +208,18 @@ export const applyGlobalEditorUiSession = (
   rightPanelTab: session.rightPanelTab,
   rightPanelDockTab: [...session.rightPanelDockTab],
   sidebarTab: session.sidebarTab,
-  scale: session.scale,
-  currentPageIndex: session.currentPageIndex,
-  pendingViewStateRestore: session.pendingViewStateRestore
-    ? { ...session.pendingViewStateRestore }
-    : null,
+  scale:
+    options?.restoreDocumentViewport === false ? snapshot.scale : session.scale,
+  currentPageIndex:
+    options?.restoreDocumentViewport === false
+      ? snapshot.currentPageIndex
+      : session.currentPageIndex,
+  pendingViewStateRestore:
+    options?.restoreDocumentViewport === false
+      ? snapshot.pendingViewStateRestore
+      : session.pendingViewStateRestore
+        ? { ...session.pendingViewStateRestore }
+        : null,
   sidebarWidth: session.sidebarWidth,
   rightPanelWidth: session.rightPanelWidth,
 });

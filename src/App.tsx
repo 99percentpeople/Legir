@@ -23,7 +23,9 @@ import {
 } from "@/services/recentFiles";
 import { useLanguage } from "./components/language-provider";
 import { useAppInitialization } from "./app/useAppInitialization";
+import { useEditorCloseFlow } from "./app/useEditorCloseFlow";
 import { useEditorWindowBootstrap } from "./app/useEditorWindowBootstrap";
+import { usePlatformWindowSessionPersistence } from "./app/usePlatformWindowSessionPersistence";
 import { usePwaLaunchBootstrap } from "./app/usePwaLaunchBootstrap";
 import type { HomePageAdapter } from "./pages/HomePage";
 import { useEditorStore } from "./store/useEditorStore";
@@ -68,14 +70,12 @@ import {
   destroyPlatformWindow,
   emitTabWorkspaceEvent,
   exportPdfBytes,
-  getSavedGlobalEditorUiSession,
   getPlatformWindowId,
   listenForPlatformFileDrop,
   listenForPlatformFileDragState,
   listenForPlatformFocusDocumentRequest,
   listenForPlatformEditorWindowsChange,
   listenForTabWorkspaceEvent,
-  listenForPlatformCloseRequested,
   listPlatformEditorWindows,
   openFile,
   openFileFromPath,
@@ -83,6 +83,7 @@ import {
   pickSaveTarget,
   reportPlatformWindowDocuments,
   readPlatformRuntimeSnapshot,
+  resolveGlobalEditorUiSessionForDocument,
   requestPlatformFocusExistingDocument,
   saveGlobalEditorUiSession,
   subscribePlatformRuntimeChange,
@@ -91,14 +92,6 @@ import {
   type SaveTarget,
 } from "@/services/platform";
 import type { EditorState } from "@/types";
-
-type CloseRequestScope = "close-tab" | "close-window" | "exit-editor";
-
-type PendingCloseRequest = {
-  scope: CloseRequestScope;
-  targetTabIds: string[];
-  currentTabId: string;
-};
 
 type ExtractedTransferTab = {
   session: EditorTabSession;
@@ -184,8 +177,6 @@ const App: React.FC = () => {
     submit: (password: string) => void;
     cancel: () => void;
   } | null>(null);
-  const [pendingCloseRequest, setPendingCloseRequest] =
-    useState<PendingCloseRequest | null>(null);
   const [mergeWindowTargets, setMergeWindowTargets] = useState<
     EditorMergeWindowTarget[]
   >([]);
@@ -940,21 +931,15 @@ const App: React.FC = () => {
               dispose,
             } = await loadPDF(options.input, { workerService });
 
-            const persistedUiSession = getSavedGlobalEditorUiSession();
-            const persistedPendingViewState =
-              persistedUiSession?.pendingViewStateRestore
-                ? { ...persistedUiSession.pendingViewStateRestore }
-                : null;
-            const currentPageIndex =
-              typeof persistedUiSession?.currentPageIndex === "number"
-                ? Math.max(
-                    0,
-                    Math.min(
-                      pages.length - 1,
-                      Math.floor(persistedUiSession.currentPageIndex),
-                    ),
-                  )
-                : 0;
+            const {
+              session: persistedUiSession,
+              restoreDocumentViewport,
+              currentPageIndex,
+              pendingViewStateRestore,
+            } = resolveGlobalEditorUiSessionForDocument({
+              sourceKey,
+              pageCount: pages.length,
+            });
 
             const snapshot = createLoadedEditorTabSnapshot({
               pdfFile: options.pdfFile,
@@ -969,15 +954,21 @@ const App: React.FC = () => {
               preservedSourceAnnotations,
               outline,
               currentPageIndex,
-              pendingViewStateRestore: persistedPendingViewState,
+              pendingViewStateRestore,
             });
             const hydratedSnapshot =
               persistedUiSession !== null
-                ? applyGlobalEditorUiSession(snapshot, {
-                    ...persistedUiSession,
-                    currentPageIndex,
-                    pendingViewStateRestore: persistedPendingViewState,
-                  })
+                ? applyGlobalEditorUiSession(
+                    snapshot,
+                    {
+                      ...persistedUiSession,
+                      currentPageIndex,
+                      pendingViewStateRestore,
+                    },
+                    {
+                      restoreDocumentViewport,
+                    },
+                  )
                 : snapshot;
 
             const postLoadLocalMatch = sourceKey
@@ -1721,221 +1712,38 @@ const App: React.FC = () => {
     if (!snapshot.isDirty) return true;
     return await handleExport();
   }, [handleExport]);
+  const navigateToHome = useCallback(() => {
+    navigate("/");
+  }, [navigate]);
 
-  const startCloseFlow = useCallback(
-    async (scope: CloseRequestScope, targetTabIds: string[]) => {
-      const uniqueTargetIds = [...new Set(targetTabIds)];
-      if (uniqueTargetIds.length === 0) {
-        if (scope === "close-window") {
-          await closeAllTabsAndWindow();
-        } else if (scope === "exit-editor") {
-          closeAllTabsToLanding();
-        }
-        return;
-      }
-
-      if (activeTabId) {
-        captureCurrentTabIntoState();
-      }
-
-      const liveTabs = getTabsSnapshot().filter((tab) =>
-        uniqueTargetIds.includes(tab.id),
-      );
-      if (liveTabs.length === 0) {
-        if (scope === "close-window") {
-          await closeAllTabsAndWindow();
-        } else if (scope === "exit-editor") {
-          closeAllTabsToLanding();
-        }
-        return;
-      }
-
-      const dirtyTargetIds = liveTabs
-        .filter((tab) => tab.isDirty)
-        .map((tab) => tab.id);
-
-      if (dirtyTargetIds.length === 0) {
-        if (scope === "close-window") {
-          await closeAllTabsAndWindow();
-          return;
-        }
-
-        for (const tabId of uniqueTargetIds) {
-          if (!getTabById(tabId)) continue;
-          closeTabImmediately(tabId);
-        }
-
-        if (scope === "exit-editor") {
-          closeAllTabsToLanding();
-        } else if (getTabsSnapshot().length === 0) {
-          navigate("/");
-        }
-        return;
-      }
-
-      const firstDirtyTabId = dirtyTargetIds[0]!;
-      if (activeTabId !== firstDirtyTabId) {
-        activateTab(firstDirtyTabId, {
-          skipCaptureCurrent: true,
-        });
-      }
-
-      setPendingCloseRequest({
-        scope,
-        targetTabIds: uniqueTargetIds,
-        currentTabId: firstDirtyTabId,
-      });
-    },
-    [
-      closeAllTabsAndWindow,
-      closeAllTabsToLanding,
-      closeTabImmediately,
-      captureCurrentTabIntoState,
-      activeTabId,
-      activateTab,
-      getTabById,
-      getTabsSnapshot,
-      navigate,
-    ],
-  );
-
-  const requestCloseTab = useCallback(
-    async (tabId: string) => {
-      if (!getTabById(tabId)) return;
-      await startCloseFlow("close-tab", [tabId]);
-    },
-    [getTabById, startCloseFlow],
-  );
-
-  const closeActiveTabImmediately = useCallback(() => {
-    if (!activeTabId) {
-      navigate("/");
-      return;
-    }
-
-    const result = closeTabImmediately(activeTabId);
-    if (result.isLastTab) {
-      navigate("/");
-    }
-  }, [activeTabId, closeTabImmediately, navigate]);
-
-  const handleResolveCloseRequest = useCallback(
-    async (saveBeforeClose: boolean) => {
-      const request = pendingCloseRequest;
-      if (!request) return;
-
-      if (activeTabId !== request.currentTabId) {
-        activateTab(request.currentTabId, {
-          skipCaptureCurrent: true,
-        });
-      }
-
-      if (saveBeforeClose) {
-        const ok = await runPrimarySaveAction();
-        if (!ok) return;
-      }
-
-      setPendingCloseRequest(null);
-
-      if (request.scope === "close-window") {
-        const remainingTargetIds = request.targetTabIds.filter(
-          (tabId) => tabId !== request.currentTabId,
-        );
-
-        if (remainingTargetIds.length === 0) {
-          await closeAllTabsAndWindow();
-          return;
-        }
-      }
-
-      const { isLastTab } = closeTabImmediately(request.currentTabId);
-      const remainingTargetIds = request.targetTabIds.filter(
-        (tabId) => tabId !== request.currentTabId,
-      );
-
-      if (request.scope === "close-tab") {
-        if (isLastTab) {
-          navigate("/");
-        }
-        return;
-      }
-
-      if (request.scope === "close-window") {
-        const remainingLiveTabs = getTabsSnapshot().filter((tab) =>
-          remainingTargetIds.includes(tab.id),
-        );
-
-        if (
-          remainingLiveTabs.length === 0 ||
-          remainingLiveTabs.every((tab) => !tab.isDirty)
-        ) {
-          await closeAllTabsAndWindow();
-          return;
-        }
-      }
-
-      await startCloseFlow(request.scope, remainingTargetIds);
-    },
-    [
-      closeAllTabsAndWindow,
-      closeTabImmediately,
-      getTabsSnapshot,
-      navigate,
-      pendingCloseRequest,
-      runPrimarySaveAction,
-      startCloseFlow,
-      activeTabId,
-      activateTab,
-    ],
-  );
-
-  useEffect(() => {
-    let unlisten: null | (() => void) = null;
-    let cancelled = false;
-
-    void (async () => {
-      unlisten = await listenForPlatformCloseRequested((event) => {
-        if (activeTabId) {
-          captureCurrentTabIntoState();
-        }
-
-        const liveTabs = getTabsSnapshot();
-        if (liveTabs.length === 0) return;
-
-        const dirtyTabs = liveTabs.filter((tab) => tab.isDirty);
-        if (dirtyTabs.length === 0) return;
-
-        event.preventDefault();
-        void startCloseFlow(
-          "close-window",
-          liveTabs.map((tab) => tab.id),
-        );
-      });
-
-      if (cancelled) {
-        try {
-          unlisten?.();
-        } catch {
-          // ignore
-        }
-        unlisten = null;
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      try {
-        unlisten?.();
-      } catch {
-        // ignore
-      }
-    };
-  }, [
+  const {
+    pendingCloseRequest,
+    pendingCloseDocumentTitle,
+    requestCloseTab,
+    closeActiveTabImmediately,
+    resolveCloseRequest,
+    dismissCloseRequest,
+    onDesktopCloseRequested,
+  } = useEditorCloseFlow({
     activeTabId,
+    activateTab,
     captureCurrentTabIntoState,
+    closeAllTabsAndWindow,
+    closeAllTabsToLanding,
+    closeTabImmediately,
+    getTabById,
     getTabsSnapshot,
-    startCloseFlow,
-  ]);
+    navigateToHome,
+    runPrimarySaveAction,
+  });
+
+  usePlatformWindowSessionPersistence({
+    enabled: true,
+    isDesktop,
+    hasActiveTab: activeTabId !== null,
+    persistCurrentTabState: captureCurrentTabIntoState,
+    onDesktopCloseRequested,
+  });
 
   const onEditorCloseCurrentTab = useCallback(() => {
     if (!activeTabId) return;
@@ -1949,10 +1757,6 @@ const App: React.FC = () => {
   const onEditorPrint = useCallback(() => {
     void handlePrint();
   }, [handlePrint]);
-
-  const pendingCloseDocumentTitle = pendingCloseRequest
-    ? (getTabById(pendingCloseRequest.currentTabId)?.title ?? null)
-    : null;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -2010,12 +1814,12 @@ const App: React.FC = () => {
         open={pendingCloseRequest !== null}
         isDirty={true}
         documentTitle={pendingCloseDocumentTitle}
-        onCloseDialog={() => setPendingCloseRequest(null)}
+        onCloseDialog={dismissCloseRequest}
         onSaveAndClose={async () => {
-          await handleResolveCloseRequest(true);
+          await resolveCloseRequest(true);
         }}
         onCloseWithoutSaving={async () => {
-          await handleResolveCloseRequest(false);
+          await resolveCloseRequest(false);
         }}
         t={t}
       />
