@@ -1,5 +1,7 @@
 import {
   AI_PROVIDER_IDS,
+  getAiProviderDefaultApiOptionId,
+  getAiProviderSelectedApiOption,
   type AiProviderId,
 } from "@/services/ai/sdk/providerCatalog";
 import {
@@ -19,6 +21,7 @@ import type {
   AppOptions,
   EditorState,
   EditorUiState,
+  ApiProxyOptions,
   LLMCustomModelCapability,
   LLMCustomModelConfig,
   LLMOptions,
@@ -122,6 +125,7 @@ export const createEmptyLlmOptions = (): LLMOptions =>
       enabled: true,
       apiKey: "",
       apiUrl: "",
+      apiOptionId: getAiProviderDefaultApiOptionId(providerId),
       customModels: [],
     };
     return acc;
@@ -142,12 +146,18 @@ export const mergeLlmOptions = (
 export const trimLlmOptions = (options: LLMOptions): LLMOptions =>
   AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
     const providerOptions = options[providerId];
+    const apiOption = getAiProviderSelectedApiOption(
+      providerId,
+      providerOptions.apiOptionId,
+    );
 
     acc[providerId as AiProviderId] = {
       ...providerOptions,
       enabled: providerOptions.enabled !== false,
       apiKey: (providerOptions.apiKey || "").trim(),
       apiUrl: (providerOptions.apiUrl || "").trim(),
+      apiOptionId:
+        apiOption?.id || getAiProviderDefaultApiOptionId(providerId) || "",
       customModels: normalizeCustomModelConfigs(providerOptions.customModels),
     };
     return acc;
@@ -263,6 +273,26 @@ export const normalizeAiChatOptions = (
   };
 };
 
+const normalizeApiProxyOptions = (
+  base: ApiProxyOptions,
+  patch?: Partial<ApiProxyOptions>,
+): ApiProxyOptions => {
+  const next = {
+    ...base,
+    ...patch,
+  };
+
+  return {
+    tauriForwardEnabled:
+      typeof next.tauriForwardEnabled === "boolean"
+        ? next.tauriForwardEnabled
+        : false,
+    proxyUrlEnabled:
+      typeof next.proxyUrlEnabled === "boolean" ? next.proxyUrlEnabled : false,
+    proxyUrl: (next.proxyUrl || "").trim(),
+  };
+};
+
 export const mergeEditorOptions = (
   base: AppOptions,
   patch?: Partial<AppOptions>,
@@ -270,6 +300,7 @@ export const mergeEditorOptions = (
   if (!patch) {
     return {
       ...base,
+      apiProxy: normalizeApiProxyOptions(base.apiProxy),
       llm: normalizeLlmOptions(base.llm),
       aiChat: normalizeAiChatOptions(base.aiChat),
     };
@@ -297,6 +328,11 @@ export const mergeEditorOptions = (
             ...base.debugOptions,
             ...patch.debugOptions,
           },
+        }
+      : {}),
+    ...(patch.apiProxy
+      ? {
+          apiProxy: normalizeApiProxyOptions(base.apiProxy, patch.apiProxy),
         }
       : {}),
     ...(patch.aiChat

@@ -1,8 +1,8 @@
 import {
   stepCountIs,
   streamText,
+  type LanguageModelUsage,
   type OnFinishEvent,
-  type OnStepFinishEvent,
   type ToolSet,
 } from "ai";
 
@@ -34,6 +34,39 @@ type AiChatStreamFinishEvent = Pick<
   "finishReason" | "steps" | "totalUsage" | "response"
 >;
 type AiChatStreamFinishResolver = (result: AiChatStreamFinishEvent) => void;
+type AiChatUsageLike = LanguageModelUsage | null | undefined;
+
+const readUsageInt = (value: unknown) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(0, Math.trunc(value));
+};
+
+const getUsageInputTokens = (usage: AiChatUsageLike) =>
+  readUsageInt(usage?.inputTokens);
+
+const getUsageOutputTokens = (usage: AiChatUsageLike) =>
+  readUsageInt(usage?.outputTokens);
+
+const getUsageTotalTokens = (usage: AiChatUsageLike) => {
+  const explicitTotal = readUsageInt(usage?.totalTokens);
+  if (explicitTotal !== undefined) return explicitTotal;
+
+  const inputTokens = getUsageInputTokens(usage);
+  const outputTokens = getUsageOutputTokens(usage);
+  if (inputTokens === undefined && outputTokens === undefined) {
+    return undefined;
+  }
+
+  return (inputTokens || 0) + (outputTokens || 0);
+};
+
+const getUsageReasoningTokens = (usage: AiChatUsageLike) =>
+  readUsageInt(usage?.outputTokenDetails?.reasoningTokens) ??
+  readUsageInt(usage?.reasoningTokens);
+
+const getUsageCachedInputTokens = (usage: AiChatUsageLike) =>
+  readUsageInt(usage?.inputTokenDetails?.cacheReadTokens) ??
+  readUsageInt(usage?.cachedInputTokens);
 
 const normalizeAiChatStreamError = (
   error: unknown,
@@ -47,38 +80,17 @@ const normalizeAiChatStreamError = (
 };
 
 const toAiChatTokenUsageSummary = (
-  usage:
-    | OnFinishEvent<ToolSet>["totalUsage"]
-    | OnStepFinishEvent<ToolSet>["usage"]
-    | null
-    | undefined,
+  usage: AiChatUsageLike,
 ): AiChatTokenUsageSummary => ({
-  inputTokens: Math.max(0, Math.trunc(usage?.inputTokens ?? 0)),
-  outputTokens: Math.max(0, Math.trunc(usage?.outputTokens ?? 0)),
-  totalTokens: Math.max(0, Math.trunc(usage?.totalTokens ?? 0)),
-  reasoningTokens: Math.max(
-    0,
-    Math.trunc(
-      usage?.outputTokenDetails?.reasoningTokens ?? usage?.reasoningTokens ?? 0,
-    ),
-  ),
-  cachedInputTokens: Math.max(
-    0,
-    Math.trunc(
-      usage?.inputTokenDetails?.cacheReadTokens ??
-        usage?.cachedInputTokens ??
-        0,
-    ),
-  ),
+  inputTokens: getUsageInputTokens(usage) || 0,
+  outputTokens: getUsageOutputTokens(usage) || 0,
+  totalTokens: getUsageTotalTokens(usage) || 0,
+  reasoningTokens: getUsageReasoningTokens(usage) || 0,
+  cachedInputTokens: getUsageCachedInputTokens(usage) || 0,
 });
 
-const getAiChatContextTokens = (
-  usage:
-    | OnFinishEvent<ToolSet>["totalUsage"]
-    | OnStepFinishEvent<ToolSet>["usage"]
-    | null
-    | undefined,
-) => Math.max(0, Math.trunc(usage?.inputTokens ?? 0));
+const getAiChatContextTokens = (usage: AiChatUsageLike) =>
+  getUsageInputTokens(usage) || 0;
 
 export const aiChatService = {
   async runConversation(options: {

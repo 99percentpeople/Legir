@@ -723,6 +723,21 @@ const ja = {
       custom_model_capability_image: "画像",
       custom_model_capability_tools: "ツール",
       custom_model_add: "追加",
+      proxy_title: "API Proxy",
+      proxy_desc:
+        "Applies to all configured API requests, including model sync, chat, and translation APIs.",
+      tauri_proxy_enabled: "Backend forwarding",
+      tauri_proxy_enabled_desc:
+        "Send API requests through the app backend to bypass browser-side CORS limits.",
+      tauri_proxy_desktop_only: "Available only in the Tauri desktop app.",
+      proxy_url_enabled: "Use HTTP proxy",
+      proxy_url_enabled_desc:
+        "Forward requests through a custom HTTP proxy endpoint.",
+      proxy_url: "HTTP Proxy",
+      proxy_url_placeholder: "https://proxy.example.com/proxy?url={url}",
+      proxy_url_desc:
+        "If the URL contains {url}, the target API URL will be substituted there. Otherwise the app appends ?url=<target> automatically.",
+      api_option: "API Compatibility",
     },
     ai_chat: {
       title: "AI チャットツール",

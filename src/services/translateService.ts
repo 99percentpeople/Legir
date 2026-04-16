@@ -1,3 +1,5 @@
+import { useEditorStore } from "@/store/useEditorStore";
+import { fetchWithApiProxy } from "@/services/platform/apiProxy";
 import type { LLMModelCapabilities, TranslateOptionId } from "@/types";
 
 export interface TranslateOption {
@@ -92,7 +94,8 @@ class CloudTranslateV2 {
       throw new Error("No API Key provided for Cloud Translation API.");
     }
 
-    const res = await fetch(
+    const res = await fetchWithApiProxy(
+      useEditorStore.getState().options,
       `https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(
         apiKey,
       )}`,

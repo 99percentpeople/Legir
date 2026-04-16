@@ -4,9 +4,11 @@ import type { AiSdkModelCatalogProvider } from "@/services/ai/sdk/types";
 import { DeepSeekModelCatalogProvider } from "./deepseek";
 import { GeminiModelCatalogProvider } from "./gemini";
 import { GroqModelCatalogProvider } from "./groq";
+import { MinimaxModelCatalogProvider } from "./minimax";
 import { OpenAiModelCatalogProvider } from "./openAi";
 import { OpenRouterModelCatalogProvider } from "./openRouter";
 import { XaiModelCatalogProvider } from "./xai";
+import { ZhipuModelCatalogProvider } from "./zhipu";
 
 const modelCatalogProviders: AiSdkModelCatalogProvider[] = [
   new OpenAiModelCatalogProvider(),
@@ -14,6 +16,8 @@ const modelCatalogProviders: AiSdkModelCatalogProvider[] = [
   new GeminiModelCatalogProvider(),
   new OpenRouterModelCatalogProvider(),
   new DeepSeekModelCatalogProvider(),
+  new MinimaxModelCatalogProvider(),
+  new ZhipuModelCatalogProvider(),
   new GroqModelCatalogProvider(),
   new XaiModelCatalogProvider(),
 ];

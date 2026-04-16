@@ -18,6 +18,9 @@ export type AiSdkBackendKind =
   | "anthropic"
   | "google"
   | "deepseek"
+  | "minimax-anthropic"
+  | "minimax-openai"
+  | "zhipu"
   | "openrouter"
   | "groq"
   | "xai"
@@ -27,6 +30,7 @@ export interface AiSdkProviderConfig {
   providerId: AiSdkProviderId;
   label: string;
   backendKind: AiSdkBackendKind;
+  apiOptionId?: string;
   apiKey: string;
   baseURL?: string;
 }

@@ -74,9 +74,7 @@ export class GeminiModelCatalogProvider extends BaseAiSdkModelCatalogProvider {
         url.searchParams.set("pageToken", pageToken);
       }
 
-      const response = await fetch(url.toString(), {
-        signal: options.signal,
-      });
+      const response = await this.fetchWithProxy(options, url.toString());
       const json = await this.parseJsonOrThrow<GeminiModelsResponse>({
         response,
         errorLabel: "Gemini models request failed",

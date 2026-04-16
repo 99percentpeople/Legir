@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AnnotationControlProps } from "../types";
-import { cn } from "@/utils/cn";
 import { Trash2, Palette, Type, Pencil, MessageSquare } from "lucide-react";
 import { ControlWrapper } from "../ControlWrapper";
 import { Button } from "@/components/ui/button";

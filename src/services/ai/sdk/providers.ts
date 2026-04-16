@@ -8,11 +8,15 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createXai } from "@ai-sdk/xai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { ProviderV3 } from "@ai-sdk/provider";
+import { createMinimaxOpenAI } from "vercel-minimax-ai-provider";
+import { createZhipu } from "zhipu-ai-provider";
 
 import {
   AI_PROVIDER_SPECS,
+  getAiProviderSelectedApiOption,
   getAiProviderSpec,
 } from "@/services/ai/sdk/providerCatalog";
+import { createApiProxyFetch } from "@/services/platform/apiProxy";
 import type { AppOptions } from "@/types";
 import type {
   AiSdkProviderConfig,
@@ -60,6 +64,14 @@ const resolveBackendKind = (
   providerId: AiSdkProviderId,
   spec = getAiProviderSpec(providerId),
 ) => {
+  const selectedApiOption = getAiProviderSelectedApiOption(
+    providerId,
+    options.llm[providerId].apiOptionId,
+  );
+  if (selectedApiOption) {
+    return selectedApiOption.backendKind;
+  }
+
   if (providerId !== "openai") {
     return spec.backendKind;
   }
@@ -79,11 +91,20 @@ const getProviderConfig = (
   const apiKey = normalizeOptionalText(options.llm[providerId].apiKey);
   if (!apiKey) return null;
 
-  const baseURL = getProviderBaseUrl(options, providerId, spec);
+  const selectedApiOption = getAiProviderSelectedApiOption(
+    providerId,
+    options.llm[providerId].apiOptionId,
+  );
+  const configuredBaseUrl = normalizeBaseUrl(options.llm[providerId].apiUrl);
+  const baseURL =
+    configuredBaseUrl ||
+    normalizeBaseUrl(selectedApiOption?.defaultBaseUrl || spec.defaultBaseUrl);
+
   return {
     providerId,
     label: spec.label,
     backendKind: resolveBackendKind(options, providerId, spec),
+    apiOptionId: selectedApiOption?.id,
     apiKey,
     baseURL: baseURL || undefined,
   };
@@ -104,12 +125,14 @@ export const getConfiguredAiSdkProvider = (
 
 export const createAiSdkProviders = (options: AppOptions) => {
   const providers: Record<string, ProviderV3> = {};
+  const proxyFetch = createApiProxyFetch(options);
 
   for (const config of getConfiguredAiSdkProviders(options)) {
     if (config.backendKind === "google") {
       providers[config.providerId] = createGoogleGenerativeAI({
         name: config.providerId,
         apiKey: config.apiKey,
+        fetch: proxyFetch,
       });
       continue;
     }
@@ -118,6 +141,7 @@ export const createAiSdkProviders = (options: AppOptions) => {
       providers[config.providerId] = createDeepSeek({
         apiKey: config.apiKey,
         ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
       });
       continue;
     }
@@ -127,6 +151,35 @@ export const createAiSdkProviders = (options: AppOptions) => {
         name: config.providerId,
         apiKey: config.apiKey,
         ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
+      });
+      continue;
+    }
+
+    if (config.backendKind === "minimax-anthropic") {
+      providers[config.providerId] = createAnthropic({
+        name: config.providerId,
+        apiKey: config.apiKey,
+        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
+      });
+      continue;
+    }
+
+    if (config.backendKind === "minimax-openai") {
+      providers[config.providerId] = createMinimaxOpenAI({
+        apiKey: config.apiKey,
+        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
+      });
+      continue;
+    }
+
+    if (config.backendKind === "zhipu") {
+      providers[config.providerId] = createZhipu({
+        apiKey: config.apiKey,
+        ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
       });
       continue;
     }
@@ -136,6 +189,7 @@ export const createAiSdkProviders = (options: AppOptions) => {
         name: config.providerId,
         apiKey: config.apiKey,
         ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
       });
       continue;
     }
@@ -145,6 +199,7 @@ export const createAiSdkProviders = (options: AppOptions) => {
         apiKey: config.apiKey,
         compatibility: "strict",
         ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
       });
       continue;
     }
@@ -153,6 +208,7 @@ export const createAiSdkProviders = (options: AppOptions) => {
       providers[config.providerId] = createGroq({
         apiKey: config.apiKey,
         ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
       });
       continue;
     }
@@ -161,6 +217,7 @@ export const createAiSdkProviders = (options: AppOptions) => {
       providers[config.providerId] = createXai({
         apiKey: config.apiKey,
         ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+        fetch: proxyFetch,
       });
       continue;
     }
@@ -170,6 +227,7 @@ export const createAiSdkProviders = (options: AppOptions) => {
       apiKey: config.apiKey,
       baseURL: config.baseURL || "https://api.openai.com/v1",
       supportsStructuredOutputs: true,
+      fetch: proxyFetch,
     });
   }
 

@@ -1,3 +1,6 @@
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
+use futures_util::StreamExt;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -20,11 +23,43 @@ static SYSTEM_FONT_DB: OnceLock<Mutex<fontdb::Database>> = OnceLock::new();
 static SECONDARY_WINDOW_COUNTER: AtomicU64 = AtomicU64::new(1);
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 const FOCUS_DOCUMENT_REQUEST_EVENT: &str = "app://platform-focus-document-request";
+const API_PROXY_RESPONSE_START_EVENT: &str = "app://api-proxy-response-start";
+const API_PROXY_RESPONSE_CHUNK_EVENT: &str = "app://api-proxy-response-chunk";
+const API_PROXY_RESPONSE_END_EVENT: &str = "app://api-proxy-response-end";
+const API_PROXY_RESPONSE_ERROR_EVENT: &str = "app://api-proxy-response-error";
 
 #[derive(Default)]
 struct WindowDocumentRegistry {
     source_key_to_window: BTreeMap<String, String>,
     window_to_source_keys: BTreeMap<String, BTreeSet<String>>,
+}
+
+#[derive(Default)]
+struct ApiProxyTaskRegistry {
+    tasks: BTreeMap<String, tauri::async_runtime::JoinHandle<()>>,
+}
+
+impl ApiProxyTaskRegistry {
+    fn insert(
+        &mut self,
+        request_id: String,
+        handle: tauri::async_runtime::JoinHandle<()>,
+    ) -> Option<tauri::async_runtime::JoinHandle<()>> {
+        self.tasks.insert(request_id, handle)
+    }
+
+    fn abort(&mut self, request_id: &str) -> bool {
+        let Some(handle) = self.tasks.remove(request_id) else {
+            return false;
+        };
+
+        handle.abort();
+        true
+    }
+
+    fn remove(&mut self, request_id: &str) {
+        self.tasks.remove(request_id);
+    }
 }
 
 impl WindowDocumentRegistry {
@@ -78,6 +113,35 @@ impl WindowDocumentRegistry {
 #[serde(rename_all = "camelCase")]
 struct FocusDocumentRequestPayload {
     source_key: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiProxyResponseStartPayload {
+    request_id: String,
+    status: u16,
+    status_text: String,
+    headers: Vec<(String, String)>,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiProxyResponseChunkPayload {
+    request_id: String,
+    chunk_base64: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiProxyResponseEndPayload {
+    request_id: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiProxyResponseErrorPayload {
+    request_id: String,
+    message: String,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -187,6 +251,28 @@ fn create_configured_window<R: tauri::Runtime, M: Manager<R>>(
 
 fn create_main_window<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     create_configured_window(app, "main", get_startup_open_document_path(app))
+}
+
+fn read_api_proxy_header_map(
+    headers: BTreeMap<String, String>,
+) -> Result<reqwest::header::HeaderMap, String> {
+    let mut header_map = reqwest::header::HeaderMap::new();
+
+    for (name, value) in headers {
+        let normalized_name = name.trim();
+        if normalized_name.is_empty() {
+            continue;
+        }
+
+        let header_name = reqwest::header::HeaderName::from_bytes(normalized_name.as_bytes())
+            .map_err(|error| format!("invalid header name '{normalized_name}': {error}"))?;
+        let header_value = reqwest::header::HeaderValue::from_str(value.trim())
+            .map_err(|error| format!("invalid header value for '{normalized_name}': {error}"))?;
+
+        header_map.append(header_name, header_value);
+    }
+
+    Ok(header_map)
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -413,6 +499,175 @@ pub fn run() {
         map
     }
 
+    #[tauri::command]
+    fn cancel_api_proxy_request(
+        registry: tauri::State<'_, Mutex<ApiProxyTaskRegistry>>,
+        request_id: String,
+    ) -> Result<(), String> {
+        let normalized_request_id = request_id.trim().to_string();
+        if normalized_request_id.is_empty() {
+            return Ok(());
+        }
+
+        let mut registry = registry
+            .lock()
+            .map_err(|_| "api proxy task registry lock poisoned".to_string())?;
+        registry.abort(&normalized_request_id);
+        Ok(())
+    }
+
+    #[tauri::command]
+    fn start_api_proxy_request<R: tauri::Runtime>(
+        window: tauri::Window<R>,
+        registry: tauri::State<'_, Mutex<ApiProxyTaskRegistry>>,
+        request_id: String,
+        url: String,
+        method: String,
+        headers: BTreeMap<String, String>,
+        body_base64: Option<String>,
+    ) -> Result<(), String> {
+        let normalized_request_id = request_id.trim().to_string();
+        if normalized_request_id.is_empty() {
+            return Err("request id is required".to_string());
+        }
+
+        let normalized_url = url.trim().to_string();
+        if normalized_url.is_empty() {
+            return Err("request url is required".to_string());
+        }
+
+        let normalized_method = method.trim().to_uppercase();
+        if normalized_method.is_empty() {
+            return Err("request method is required".to_string());
+        }
+
+        let header_map = read_api_proxy_header_map(headers)?;
+        let request_body = match body_base64 {
+            Some(body) => Some(
+                BASE64_STANDARD
+                    .decode(body.trim())
+                    .map_err(|error| format!("invalid proxy request body: {error}"))?,
+            ),
+            None => None,
+        };
+
+        {
+            let mut registry = registry
+                .lock()
+                .map_err(|_| "api proxy task registry lock poisoned".to_string())?;
+            registry.abort(&normalized_request_id);
+        }
+
+        let emit_window = window.clone();
+        let app_handle = window.app_handle().clone();
+        let request_id_for_task = normalized_request_id.clone();
+        let request_id_for_registry = normalized_request_id.clone();
+
+        let task = tauri::async_runtime::spawn(async move {
+            let result: Result<(), String> = async {
+                let method =
+                    reqwest::Method::from_bytes(normalized_method.as_bytes()).map_err(|error| {
+                        format!("invalid request method '{normalized_method}': {error}")
+                    })?;
+
+                let client = reqwest::Client::builder()
+                    .build()
+                    .map_err(|error| format!("failed to create proxy http client: {error}"))?;
+
+                let mut request = client
+                    .request(method, &normalized_url)
+                    .headers(header_map);
+
+                if let Some(body) = request_body {
+                    request = request.body(body);
+                }
+
+                let response = request
+                    .send()
+                    .await
+                    .map_err(|error| format!("proxy request failed: {error}"))?;
+
+                let response_headers = response
+                    .headers()
+                    .iter()
+                    .map(|(name, value)| {
+                        (
+                            name.to_string(),
+                            value.to_str().unwrap_or_default().to_string(),
+                        )
+                    })
+                    .collect();
+
+                emit_window
+                    .emit(
+                        API_PROXY_RESPONSE_START_EVENT,
+                        ApiProxyResponseStartPayload {
+                            request_id: request_id_for_task.clone(),
+                            status: response.status().as_u16(),
+                            status_text: response
+                                .status()
+                                .canonical_reason()
+                                .unwrap_or_default()
+                                .to_string(),
+                            headers: response_headers,
+                        },
+                    )
+                    .map_err(|error| format!("failed to emit proxy response start: {error}"))?;
+
+                let mut stream = response.bytes_stream();
+                while let Some(chunk_result) = stream.next().await {
+                    let chunk =
+                        chunk_result.map_err(|error| format!("proxy stream failed: {error}"))?;
+
+                    emit_window
+                        .emit(
+                            API_PROXY_RESPONSE_CHUNK_EVENT,
+                            ApiProxyResponseChunkPayload {
+                                request_id: request_id_for_task.clone(),
+                                chunk_base64: BASE64_STANDARD.encode(chunk),
+                            },
+                        )
+                        .map_err(|error| {
+                            format!("failed to emit proxy response chunk: {error}")
+                        })?;
+                }
+
+                emit_window
+                    .emit(
+                        API_PROXY_RESPONSE_END_EVENT,
+                        ApiProxyResponseEndPayload {
+                            request_id: request_id_for_task.clone(),
+                        },
+                    )
+                    .map_err(|error| format!("failed to emit proxy response end: {error}"))?;
+
+                Ok(())
+            }
+            .await;
+
+            if let Err(message) = result {
+                let _ = emit_window.emit(
+                    API_PROXY_RESPONSE_ERROR_EVENT,
+                    ApiProxyResponseErrorPayload {
+                        request_id: request_id_for_task.clone(),
+                        message,
+                    },
+                );
+            }
+
+            if let Ok(mut registry) = app_handle.state::<Mutex<ApiProxyTaskRegistry>>().lock() {
+                registry.remove(&request_id_for_registry);
+            }
+        });
+
+        let mut registry = registry
+            .lock()
+            .map_err(|_| "api proxy task registry lock poisoned".to_string())?;
+        registry.insert(normalized_request_id, task);
+
+        Ok(())
+    }
+
     // Tauri app builder (desktop entry).
     //
     // Responsibilities:
@@ -425,6 +680,7 @@ pub fn run() {
     // - Permissions are controlled via `src-tauri/capabilities/*.json` (prefer tightening there, not in ad-hoc JS checks).
     let builder = tauri::Builder::default()
         .manage(Mutex::new(WindowDocumentRegistry::default()))
+        .manage(Mutex::new(ApiProxyTaskRegistry::default()))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init());
@@ -470,7 +726,9 @@ pub fn run() {
             get_system_username,
             get_system_font_bytes,
             list_system_font_families,
-            list_system_font_aliases_compact
+            list_system_font_aliases_compact,
+            start_api_proxy_request,
+            cancel_api_proxy_request
         ])
         .on_window_event(|window, event| {
             if !matches!(event, tauri::WindowEvent::Destroyed) {

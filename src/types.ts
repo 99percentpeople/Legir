@@ -347,10 +347,17 @@ export interface LLMProviderOptions {
   enabled: boolean;
   apiKey?: string;
   apiUrl?: string;
+  apiOptionId?: string;
   customModels: LLMCustomModelConfig[];
 }
 
 export type LLMOptions = Record<AiProviderId, LLMProviderOptions>;
+
+export interface ApiProxyOptions {
+  tauriForwardEnabled: boolean;
+  proxyUrlEnabled: boolean;
+  proxyUrl?: string;
+}
 
 export interface AiChatOptions {
   digestEnabled: boolean;
@@ -377,6 +384,7 @@ export interface AppOptions {
   thumbnailsLayout: ThumbnailsLayoutMode;
   removeTextUnderFlattenedFreetext: boolean;
 
+  apiProxy: ApiProxyOptions;
   llm: LLMOptions;
   aiChat: AiChatOptions;
 }

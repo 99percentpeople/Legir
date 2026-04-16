@@ -702,6 +702,20 @@ const zhTW = {
       custom_model_capability_image: "圖片",
       custom_model_capability_tools: "工具",
       custom_model_add: "新增",
+      proxy_title: "API 代理",
+      proxy_desc:
+        "套用到所有已設定的 API 請求，包括模型同步、聊天請求與翻譯 API。",
+      tauri_proxy_enabled: "後端轉發",
+      tauri_proxy_enabled_desc:
+        "API 請求會先經過應用後端轉發，以繞過瀏覽器端的 CORS 限制。",
+      tauri_proxy_desktop_only: "僅在 Tauri 桌面應用中可用。",
+      proxy_url_enabled: "使用 HTTP 代理",
+      proxy_url_enabled_desc: "透過自訂 HTTP 代理端點轉發請求。",
+      proxy_url: "HTTP 代理",
+      proxy_url_placeholder: "https://proxy.example.com/proxy?url={url}",
+      proxy_url_desc:
+        "如果連結中包含 {url}，應用會在該位置替換目標 API 位址；否則會自動附加 ?url=<目標位址>。",
+      api_option: "API 相容方案",
     },
     ai_chat: {
       title: "AI 問答工具",

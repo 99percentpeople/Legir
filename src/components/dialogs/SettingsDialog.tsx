@@ -18,13 +18,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "../ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { Button } from "../ui/button";
@@ -48,6 +42,7 @@ import {
 import {
   AI_PROVIDER_IDS,
   AI_PROVIDER_SPECS_SORTED_BY_LABEL,
+  getAiProviderSelectedApiOption,
   type AiProviderId,
 } from "@/services/ai/sdk/providerCatalog";
 import { useLanguage, Language, LANGUAGES } from "../language-provider";
@@ -85,6 +80,7 @@ import {
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
 } from "@/constants";
 import { cn } from "@/utils/cn";
+import { isDesktopApp } from "@/services/platform/runtime";
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -121,6 +117,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const { theme, setTheme } = useTheme();
+  const isDesktopRuntime = isDesktopApp();
 
   const llmModelCache = useEditorStore((s) => s.llmModelCache);
   type LlmProviderId = AiProviderId;
@@ -270,6 +267,26 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
         ...patch,
       },
     });
+  };
+
+  const updateApiProxyOptions = (patch: Partial<AppOptions["apiProxy"]>) => {
+    onChange({
+      ...options,
+      apiProxy: {
+        ...options.apiProxy,
+        ...patch,
+      },
+    });
+  };
+
+  const updateLlmApiOption = (provider: LlmProviderId, apiOptionId: string) => {
+    updateLlmProviderOptions(provider, { apiOptionId });
+    setLlmSyncStatus((prev) => ({
+      ...prev,
+      [provider]: { state: "idle", message: "" },
+    }));
+    clearFetchedLlmModels(provider);
+    scheduleModelRegistryUpdate(provider);
   };
 
   const aiToolModelGroups = useMemo<ModelSelectGroup[]>(() => {
@@ -767,6 +784,19 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     const syncStatus = llmSyncStatus[spec.id];
                     const showApiUrl = spec.allowCustomBaseUrl;
                     const providerEnabled = isLlmProviderEnabled(spec.id);
+                    const selectedApiOption = getAiProviderSelectedApiOption(
+                      spec.id,
+                      providerOptions.apiOptionId,
+                    );
+                    const selectedApiUrlPlaceholder =
+                      selectedApiOption?.defaultBaseUrl ||
+                      spec.defaultBaseUrl ||
+                      t("settings.llm.api_url_placeholder");
+                    const selectedApiOptionLabel = selectedApiOption
+                      ? selectedApiOption.labelKey
+                        ? t(selectedApiOption.labelKey)
+                        : selectedApiOption.label
+                      : "";
                     return (
                       <TabsContent
                         key={spec.id}
@@ -774,6 +804,46 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                         className="space-y-4"
                       >
                         <div className="bg-muted/30 border-border flex flex-col gap-2 rounded-lg border p-3">
+                          {spec.apiOptions && spec.apiOptions.length > 1 ? (
+                            <div className="space-y-1">
+                              <Label className="text-xs">
+                                {t("settings.llm.api_option")}
+                              </Label>
+                              <Select
+                                value={
+                                  selectedApiOption?.id ||
+                                  spec.defaultApiOptionId ||
+                                  spec.apiOptions[0]!.id
+                                }
+                                onValueChange={(value) =>
+                                  updateLlmApiOption(spec.id, value)
+                                }
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue placeholder={t("common.select")}>
+                                    {selectedApiOptionLabel}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {spec.apiOptions.map((apiOption) => (
+                                    <SelectItem
+                                      key={`${spec.id}:${apiOption.id}`}
+                                      value={apiOption.id}
+                                      itemText={
+                                        apiOption.labelKey
+                                          ? t(apiOption.labelKey)
+                                          : apiOption.label
+                                      }
+                                    >
+                                      {apiOption.labelKey
+                                        ? t(apiOption.labelKey)
+                                        : apiOption.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : null}
                           <Input
                             value={providerOptions.apiKey || ""}
                             onChange={(e) =>
@@ -790,10 +860,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                                 onChange={(e) =>
                                   updateLlmApiUrl(spec.id, e.target.value)
                                 }
-                                placeholder={
-                                  spec.defaultBaseUrl ||
-                                  t("settings.llm.api_url_placeholder")
-                                }
+                                placeholder={selectedApiUrlPlaceholder}
                                 className="h-8"
                               />
                             ) : null}
@@ -1013,6 +1080,76 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     );
                   })}
                 </Tabs>
+
+                <div className={SETTINGS_CARD_GAP_CLASS}>
+                  <div className="space-y-1">
+                    <Label className="text-xs">
+                      {t("settings.llm.proxy_title")}
+                    </Label>
+                    <p className="text-muted-foreground text-xs">
+                      {t("settings.llm.proxy_desc")}
+                    </p>
+                  </div>
+
+                  {isDesktopRuntime ? (
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">
+                          {t("settings.llm.tauri_proxy_enabled")}
+                        </Label>
+                        <p className="text-muted-foreground text-xs">
+                          {t("settings.llm.tauri_proxy_enabled_desc")}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={options.apiProxy.tauriForwardEnabled}
+                        onCheckedChange={(checked) =>
+                          updateApiProxyOptions({
+                            tauriForwardEnabled: checked,
+                          })
+                        }
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">
+                        {t("settings.llm.proxy_url_enabled")}
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings.llm.proxy_url_enabled_desc")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={options.apiProxy.proxyUrlEnabled}
+                      onCheckedChange={(checked) =>
+                        updateApiProxyOptions({
+                          proxyUrlEnabled: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs">
+                      {t("settings.llm.proxy_url")}
+                    </Label>
+                    <Input
+                      value={options.apiProxy.proxyUrl || ""}
+                      onChange={(event) =>
+                        updateApiProxyOptions({
+                          proxyUrl: event.target.value,
+                        })
+                      }
+                      placeholder={t("settings.llm.proxy_url_placeholder")}
+                      className="h-8"
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      {t("settings.llm.proxy_url_desc")}
+                    </p>
+                  </div>
+                </div>
               </div>
             </TabsContent>
 

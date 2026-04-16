@@ -58,6 +58,7 @@ const trimProviderOptions = () => {
         ...nextOptions.llm[providerId],
         apiKey: (nextOptions.llm[providerId].apiKey || "").trim(),
         apiUrl: (nextOptions.llm[providerId].apiUrl || "").trim(),
+        apiOptionId: (nextOptions.llm[providerId].apiOptionId || "").trim(),
       },
     ]),
   ) as typeof nextOptions.llm;
@@ -67,7 +68,8 @@ const trimProviderOptions = () => {
     const normalized = nextLlm[providerId];
     return (
       previous.apiKey !== normalized.apiKey ||
-      previous.apiUrl !== normalized.apiUrl
+      previous.apiUrl !== normalized.apiUrl ||
+      previous.apiOptionId !== normalized.apiOptionId
     );
   });
 

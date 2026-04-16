@@ -8,6 +8,7 @@ import {
   getConfiguredAiSdkProvider,
   normalizeBaseUrl,
 } from "@/services/ai/sdk/providers";
+import { fetchWithApiProxy } from "@/services/platform/apiProxy";
 import type {
   AiSdkModelCallOptions,
   AiSdkDiscoveredModel,
@@ -82,6 +83,17 @@ export abstract class BaseAiSdkModelCatalogProvider implements AiSdkModelCatalog
   }) {
     const config = this.getRequiredProviderConfig(options.appOptions);
     return normalizeBaseUrl(config.baseURL || options.fallbackBaseUrl);
+  }
+
+  protected async fetchWithProxy(
+    options: AiSdkModelCatalogProviderRequest,
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ) {
+    return await fetchWithApiProxy(options.appOptions, input, {
+      ...init,
+      signal: init?.signal || options.signal,
+    });
   }
 
   protected normalizeDiscoveredModels(models: AiSdkDiscoveredModel[]) {

@@ -1,6 +1,7 @@
 import type { EditorUiState, LLMOptions, PageTranslateOptions } from "./types";
 import {
   AI_PROVIDER_IDS,
+  getAiProviderDefaultApiOptionId,
   type AiProviderId,
 } from "./services/ai/sdk/providerCatalog";
 
@@ -100,11 +101,17 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
     userName: "",
     thumbnailsLayout: "single",
     removeTextUnderFlattenedFreetext: true,
+    apiProxy: {
+      tauriForwardEnabled: false,
+      proxyUrlEnabled: false,
+      proxyUrl: "",
+    },
     llm: AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
       acc[providerId as AiProviderId] = {
         enabled: true,
         apiKey: "",
         apiUrl: "",
+        apiOptionId: getAiProviderDefaultApiOptionId(providerId),
         customModels: [],
       };
       return acc;

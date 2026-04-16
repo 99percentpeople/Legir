@@ -44,7 +44,8 @@ export class DeepSeekModelCatalogProvider extends BaseAiSdkModelCatalogProvider 
 
   async fetchModels(options: AiSdkModelCatalogProviderRequest) {
     const config = this.getRequiredProviderConfig(options.appOptions);
-    const response = await fetch(
+    const response = await this.fetchWithProxy(
+      options,
       joinUrl(
         this.getProviderBaseUrl({
           appOptions: options.appOptions,
@@ -56,7 +57,6 @@ export class DeepSeekModelCatalogProvider extends BaseAiSdkModelCatalogProvider 
         headers: {
           Authorization: `Bearer ${config.apiKey}`,
         },
-        signal: options.signal,
       },
     );
 

@@ -73,7 +73,8 @@ export class OpenRouterModelCatalogProvider extends BaseAiSdkModelCatalogProvide
 
   async fetchModels(options: AiSdkModelCatalogProviderRequest) {
     const config = this.getRequiredProviderConfig(options.appOptions);
-    const response = await fetch(
+    const response = await this.fetchWithProxy(
+      options,
       joinUrl(
         this.getProviderBaseUrl({
           appOptions: options.appOptions,
@@ -85,7 +86,6 @@ export class OpenRouterModelCatalogProvider extends BaseAiSdkModelCatalogProvide
         headers: {
           Authorization: `Bearer ${config.apiKey}`,
         },
-        signal: options.signal,
       },
     );
 

@@ -71,12 +71,11 @@ export class AnthropicModelCatalogProvider extends BaseAiSdkModelCatalogProvider
         url.searchParams.set("after_id", afterId);
       }
 
-      const response = await fetch(url.toString(), {
+      const response = await this.fetchWithProxy(options, url.toString(), {
         headers: {
           "x-api-key": config.apiKey,
           "anthropic-version": "2023-06-01",
         },
-        signal: options.signal,
       });
 
       const json = await this.parseJsonOrThrow<AnthropicModelsResponse>({
