@@ -1,5 +1,4 @@
-import { createDeepSeek } from "@ai-sdk/deepseek";
-
+import { createDeepSeekProvider as createLegirDeepSeekProvider } from "@/services/ai/providers/deepseekProvider";
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type {
   AiProviderRuntimeProfile,
@@ -21,8 +20,8 @@ const isDeepSeekReasoningModel = (modelId: string) => {
   );
 };
 
-const createDeepSeekProvider = (config: AiSdkProviderConfig) =>
-  createDeepSeek({
+const createDeepSeekRuntimeProvider = (config: AiSdkProviderConfig) =>
+  createLegirDeepSeekProvider({
     apiKey: config.apiKey,
     ...(config.baseURL ? { baseURL: config.baseURL } : {}),
     fetch: config.fetch,
@@ -62,7 +61,7 @@ const hasReasoningPart = (message: ModelMessage) =>
 export const deepseekRuntimeProfile: AiProviderRuntimeProfile = {
   providerId: "deepseek",
 
-  createProvider: createDeepSeekProvider,
+  createProvider: createDeepSeekRuntimeProvider,
 
   getReasoningCapability: ({ modelId }) =>
     getDeepSeekReasoningCapability(modelId),
