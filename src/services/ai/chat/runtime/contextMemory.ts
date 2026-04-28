@@ -260,6 +260,152 @@ const getContextMemorySourceLines = (
   return lines;
 };
 
+const getAssistantToolCallIds = (message: AiChatMessageRecord) => {
+  if (message.role !== "assistant" || !Array.isArray(message.content)) {
+    return [] as string[];
+  }
+
+  return message.content.flatMap((part) => {
+    if (!part || typeof part !== "object" || Array.isArray(part)) return [];
+    const record = part as Record<string, unknown>;
+    if (record.type !== "tool-call" || typeof record.toolCallId !== "string") {
+      return [];
+    }
+    return [record.toolCallId];
+  });
+};
+
+const hasAssistantReasoningPart = (message: AiChatMessageRecord) =>
+  message.role === "assistant" &&
+  Array.isArray(message.content) &&
+  message.content.some((part) => {
+    if (!part || typeof part !== "object" || Array.isArray(part)) return false;
+    const record = part as Record<string, unknown>;
+    return (
+      record.type === "reasoning" &&
+      typeof record.text === "string" &&
+      !!record.text.trim()
+    );
+  });
+
+const hasAssistantToolCallWithoutReasoning = (message: AiChatMessageRecord) =>
+  getAssistantToolCallIds(message).length > 0 &&
+  !hasAssistantReasoningPart(message);
+
+const getToolResultIds = (message: AiChatMessageRecord) => {
+  if (message.role !== "tool" || !Array.isArray(message.content)) {
+    return [] as string[];
+  }
+
+  return message.content.flatMap((part) => {
+    if (!part || typeof part !== "object" || Array.isArray(part)) return [];
+    const record = part as Record<string, unknown>;
+    if (
+      record.type !== "tool-result" ||
+      typeof record.toolCallId !== "string"
+    ) {
+      return [];
+    }
+    return [record.toolCallId];
+  });
+};
+
+const extendCoveredCountThroughMatchingToolResults = (options: {
+  messages: AiChatMessageRecord[];
+  alreadyCoveredMessageCount: number;
+  assistantMessageIndex: number;
+  maxCoveredMessageCount: number;
+}) => {
+  const {
+    messages,
+    alreadyCoveredMessageCount,
+    assistantMessageIndex,
+    maxCoveredMessageCount,
+  } = options;
+  const pendingToolCallIds = new Set(
+    getAssistantToolCallIds(messages[assistantMessageIndex]!),
+  );
+  let coveredMessageCount =
+    alreadyCoveredMessageCount + assistantMessageIndex + 1;
+
+  for (
+    let index = assistantMessageIndex + 1;
+    index < messages.length &&
+    alreadyCoveredMessageCount + index < maxCoveredMessageCount;
+    index += 1
+  ) {
+    const message = messages[index];
+    if (message?.role !== "tool") break;
+
+    const resultIds = getToolResultIds(message);
+    if (!resultIds.some((id) => pendingToolCallIds.has(id))) break;
+
+    coveredMessageCount = alreadyCoveredMessageCount + index + 1;
+    for (const id of resultIds) {
+      pendingToolCallIds.delete(id);
+    }
+  }
+
+  return coveredMessageCount;
+};
+
+const getReasoningReplaySafeCoveredMessageCount = (options: {
+  messages: AiChatMessageRecord[];
+  alreadyCoveredMessageCount: number;
+  targetCoveredMessageCount: number;
+  maxCoveredMessageCount: number;
+}) => {
+  const {
+    messages,
+    alreadyCoveredMessageCount,
+    targetCoveredMessageCount,
+    maxCoveredMessageCount,
+  } = options;
+  let coveredMessageCount = targetCoveredMessageCount;
+
+  while (coveredMessageCount < maxCoveredMessageCount) {
+    const scanStartIndex = Math.max(
+      0,
+      coveredMessageCount - alreadyCoveredMessageCount,
+    );
+    let nextCoveredMessageCount = coveredMessageCount;
+
+    for (
+      let index = scanStartIndex;
+      index < messages.length &&
+      alreadyCoveredMessageCount + index < maxCoveredMessageCount;
+      index += 1
+    ) {
+      if (!hasAssistantToolCallWithoutReasoning(messages[index]!)) continue;
+
+      nextCoveredMessageCount = extendCoveredCountThroughMatchingToolResults({
+        messages,
+        alreadyCoveredMessageCount,
+        assistantMessageIndex: index,
+        maxCoveredMessageCount,
+      });
+      break;
+    }
+
+    if (nextCoveredMessageCount <= coveredMessageCount) break;
+    coveredMessageCount = nextCoveredMessageCount;
+  }
+
+  return coveredMessageCount;
+};
+
+const appendAdditionalCompressedMemoryText = (
+  memoryText: string,
+  messages: AiChatMessageRecord[],
+) => {
+  const lines = getContextMemorySourceLines(messages);
+  if (lines.length === 0) return memoryText;
+
+  return [memoryText, "", "Additional compressed context:", ...lines].join(
+    "\n",
+  );
+};
+
 export const retainAiChatContextMemoryForTimeline = (
   memory: AiChatContextMemory | undefined,
   options: {
@@ -302,11 +448,18 @@ const parseAiChatConversationMemoryMessage = (message: AiChatMessageRecord) => {
 
   const match = message.content.match(/covered_message_count:\s*(\d+)/);
   const coveredMessageCount = match ? Number.parseInt(match[1] || "0", 10) : 0;
+  const memoryHeading = "Older conversation memory summary:";
+  const memoryHeadingIndex = message.content.indexOf(memoryHeading);
+  const memoryText =
+    memoryHeadingIndex >= 0
+      ? message.content.slice(memoryHeadingIndex + memoryHeading.length).trim()
+      : "";
 
   return {
     coveredMessageCount: Number.isFinite(coveredMessageCount)
       ? Math.max(0, coveredMessageCount)
       : 0,
+    memoryText,
   };
 };
 
@@ -461,20 +614,25 @@ export const applyAiChatContextMemoryToMessages = (options: {
   messages: AiChatMessageRecord[];
   contextMemory?: AiChatContextMemory;
   turnStartMessageCount: number;
+  requiresToolCallReasoningReplay?: boolean;
 }) => {
   const sourceMessages = [...options.messages];
   let alreadyCoveredMessageCount = 0;
+  let existingMemoryText = "";
 
   if (sourceMessages[0]) {
     const parsed = parseAiChatConversationMemoryMessage(sourceMessages[0]);
     if (parsed) {
       alreadyCoveredMessageCount = parsed.coveredMessageCount;
+      existingMemoryText = parsed.memoryText;
       sourceMessages.shift();
     }
   }
 
-  const summaryText = options.contextMemory?.text?.trim();
+  const contextMemory = options.contextMemory;
+  const summaryText = existingMemoryText || contextMemory?.text?.trim();
   if (!summaryText) return sourceMessages;
+  if (!contextMemory) return options.messages;
 
   const targetCoveredMessageCount = Math.max(
     alreadyCoveredMessageCount,
@@ -491,15 +649,43 @@ export const applyAiChatContextMemoryToMessages = (options: {
     0,
     targetCoveredMessageCount - alreadyCoveredMessageCount,
   );
+  const maxCoveredMessageCount = Math.min(
+    Math.max(0, options.turnStartMessageCount),
+    sourceMessages.length + alreadyCoveredMessageCount,
+  );
+  const safeCoveredMessageCount = options.requiresToolCallReasoningReplay
+    ? getReasoningReplaySafeCoveredMessageCount({
+        messages: sourceMessages,
+        alreadyCoveredMessageCount,
+        targetCoveredMessageCount,
+        maxCoveredMessageCount,
+      })
+    : targetCoveredMessageCount;
+  const safeAdditionalCoveredMessageCount = Math.max(
+    0,
+    safeCoveredMessageCount - alreadyCoveredMessageCount,
+  );
+  const extraCompressedMessages = sourceMessages.slice(
+    additionalCoveredMessageCount,
+    safeAdditionalCoveredMessageCount,
+  );
+  const memoryText =
+    extraCompressedMessages.length > 0
+      ? appendAdditionalCompressedMemoryText(
+          summaryText,
+          extraCompressedMessages,
+        )
+      : summaryText;
   const remainingMessages =
-    additionalCoveredMessageCount > 0
-      ? sourceMessages.slice(additionalCoveredMessageCount)
+    safeAdditionalCoveredMessageCount > 0
+      ? sourceMessages.slice(safeAdditionalCoveredMessageCount)
       : sourceMessages;
 
   return [
     buildAiChatContextMemoryMessage({
-      ...options.contextMemory!,
-      coveredMessageCount: targetCoveredMessageCount,
+      ...contextMemory,
+      text: memoryText,
+      coveredMessageCount: safeCoveredMessageCount,
     }),
     ...remainingMessages,
   ];

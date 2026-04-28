@@ -30,6 +30,8 @@ export const contextMemoryMessageCompressionStrategy: AiChatMessageCompressionSt
             messages: options.messages,
             contextMemory: options.contextMemory,
             turnStartMessageCount: options.turnStartMessageCount,
+            requiresToolCallReasoningReplay:
+              options.requiresToolCallReasoningReplay,
           })
         : options.messages,
   };

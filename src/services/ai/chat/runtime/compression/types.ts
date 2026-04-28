@@ -16,6 +16,7 @@ export type AiChatMessageCompressionOptions = {
     "contextCompressionEnabled" | "visualHistoryWindow"
   >;
   contextMemory?: AiChatContextMemory;
+  requiresToolCallReasoningReplay?: boolean;
 };
 
 /**

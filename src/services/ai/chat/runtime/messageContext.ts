@@ -136,6 +136,7 @@ type PrepareAiChatMessagesOptions = {
   >;
   contextMemory?: AiChatContextMemory;
   turnStartMessageCount: number;
+  requiresToolCallReasoningReplay?: boolean;
 };
 
 export const prepareAiChatMessagesForModel = (

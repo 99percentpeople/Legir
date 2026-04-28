@@ -152,6 +152,8 @@ export const aiChatService = {
         aiChatOptions: appOptions.aiChat,
         contextMemory: getContextMemory?.(),
         turnStartMessageCount,
+        requiresToolCallReasoningReplay:
+          runtime.reasoning.replayPolicy === "tool-calls",
       });
       const preparedMessages =
         runtime.profile.prepareMessages?.(genericMessages, {
