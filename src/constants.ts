@@ -128,7 +128,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       detectFormFieldsEnabled: false,
       formToolsVisionModelKey: "",
       contextCompressionEnabled: true,
-      contextCompressionThresholdTokens: 12_000,
+      contextCompressionThresholdTokens: 100_000,
       visualHistoryWindow: 1,
       maxToolRounds: 10,
       contextCompressionMode: "ai",
