@@ -19,7 +19,7 @@ import {
 import { FONT_FAMILY_MAP } from "@/constants";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
-import { AI_PROVIDER_IDS_SORTED_BY_LABEL } from "@/services/ai/sdk/providerCatalog";
+import { AI_PROVIDER_IDS_SORTED_BY_LABEL } from "@/services/ai/providers/catalog";
 import { PanelLayout } from "./PanelLayout";
 import {
   translateService,

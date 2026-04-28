@@ -343,6 +343,9 @@ Relevant modules include:
 
 These features should be integrated through service boundaries and editor actions rather than by coupling provider-specific logic into core workspace components.
 
+Provider runtime compatibility, reasoning controls, and transcript persistence
+live under `src/services/ai/providers/` and `src/hooks/useAiChatController/`.
+
 ## Extension Points
 
 ### Add a New Form Control

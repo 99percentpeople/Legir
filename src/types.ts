@@ -6,7 +6,12 @@
  * Keep service-local or feature-local types in a nearby `types.ts` instead of
  * growing this file with implementation-specific details.
  */
-import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
+import type { AiProviderId } from "@/services/ai/providers/catalog";
+import type {
+  AiReasoningDisplayPolicy,
+  AiReasoningEffort,
+  AiReasoningMode,
+} from "@/services/ai/providers/runtimeProfiles/types";
 import type { StampKind, StampPresetId } from "@/lib/stamps";
 
 export enum FieldType {
@@ -359,6 +364,13 @@ export interface ApiProxyOptions {
   proxyUrl?: string;
 }
 
+export interface AiChatReasoningOptions {
+  mode: AiReasoningMode;
+  effort: AiReasoningEffort;
+  budgetTokens?: number;
+  displayPolicy: AiReasoningDisplayPolicy;
+}
+
 export interface AiChatOptions {
   digestEnabled: boolean;
   digestSourceCharsPerChunk: number;
@@ -375,6 +387,7 @@ export interface AiChatOptions {
   maxToolRounds: number;
   contextCompressionMode: "algorithmic" | "ai";
   contextCompressionModelKey?: string;
+  reasoning: AiChatReasoningOptions;
 }
 
 export interface AppOptions {

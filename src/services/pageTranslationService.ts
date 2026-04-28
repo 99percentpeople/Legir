@@ -29,10 +29,10 @@ import {
 import {
   parseAiSdkModelSpecifier,
   type AiSdkProviderId,
-} from "@/services/ai/sdk";
+} from "@/services/ai/providers";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
 import { useEditorStore } from "@/store/useEditorStore";
-import { translatePageBlocksStructuredWithAiSdk } from "@/services/ai/sdk";
+import { translatePageBlocksStructuredWithAiSdk } from "@/services/ai/tasks";
 import { resolveCjkFallbackFontStack, splitTextRuns } from "@/lib/fonts";
 
 export type PageTranslationTextBlock = {

@@ -122,7 +122,16 @@ const readRequestBodyAsBase64 = async (request: Request) => {
   return bytesToBase64(bodyBytes);
 };
 
-const buildFetchInitFromRequest = (request: Request): RequestInitWithDuplex => {
+const readRequestBodyAsBuffer = async (request: Request) => {
+  if (!canRequestHaveBody(request.method)) return undefined;
+
+  const bodyBytes = await request.arrayBuffer();
+  return bodyBytes.byteLength > 0 ? bodyBytes : undefined;
+};
+
+const buildFetchInitFromRequest = async (
+  request: Request,
+): Promise<RequestInitWithDuplex> => {
   const init: RequestInitWithDuplex = {
     method: request.method,
     headers: new Headers(request.headers),
@@ -138,10 +147,7 @@ const buildFetchInitFromRequest = (request: Request): RequestInitWithDuplex => {
   };
 
   if (canRequestHaveBody(request.method)) {
-    init.body = request.body;
-    if (isReadableStreamBody(request.body)) {
-      init.duplex = "half";
-    }
+    init.body = await readRequestBodyAsBuffer(request);
   }
 
   return init;
@@ -357,7 +363,7 @@ export const fetchWithApiProxy = async (
 
   const proxiedRequest = new Request(
     effectiveUrl,
-    buildFetchInitFromRequest(originalRequest),
+    await buildFetchInitFromRequest(originalRequest),
   );
 
   if (runtimeConfig.tauriForwardEnabled) {

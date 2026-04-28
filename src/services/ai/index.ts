@@ -4,7 +4,7 @@ import { translateService } from "@/services/translateService";
 import {
   AI_PROVIDER_IDS,
   type AiProviderId,
-} from "@/services/ai/sdk/providerCatalog";
+} from "@/services/ai/providers/catalog";
 import {
   checkAiSdkProviderConfig as checkAiSdkProviderConfigWithAiSdk,
   fetchAiSdkProviderModels,
@@ -12,12 +12,14 @@ import {
   getAiSdkProviderModelOptions,
   isAiSdkProviderConfigured,
   resolveAiSdkModelSpecifierForTask,
+} from "@/services/ai/providers";
+import {
+  analyzePageForFieldsWithAiSdk,
   summarizePageImagesWithAiSdk,
   summarizeTextWithAiSdk,
   translateTextStreamWithAiSdk,
   translateTextWithAiSdk,
-  analyzePageForFieldsWithAiSdk,
-} from "@/services/ai/sdk";
+} from "@/services/ai/tasks";
 import type {
   LLMAnalyzePageForFieldsOptions,
   LLMModelOption,
@@ -28,7 +30,8 @@ import type {
   AiSummaryInstructions,
 } from "@/services/ai/chat/types";
 
-export * from "@/services/ai/sdk";
+export * from "@/services/ai/providers";
+export * from "@/services/ai/tasks";
 
 type SupportedLlmProviderId = AiProviderId;
 type ModelKind = "translate" | "vision" | "chat" | "summarize";

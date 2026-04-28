@@ -7,7 +7,7 @@ import type {
 } from "./types";
 import type { AiToolContext } from "./aiToolContext";
 import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
-import { modelSupportsInputModality } from "@/services/ai/sdk/modelCapabilities";
+import { modelSupportsInputModality } from "@/services/ai/providers/modelCapabilities";
 import { aiToolModules } from "./tools";
 import {
   createErrorPayload,

@@ -48,8 +48,10 @@ import {
   persistAiChatDocumentState,
   type RestoredAiChatDocumentState,
   persistSelectedModelKey,
-  restoreConversationFromTimeline,
   restorePersistedAiChatDocumentState,
+  setAiChatRuntimeTimelineBoundaries,
+  sliceAiChatRuntimeTranscriptForTimelinePrefix,
+  syncAiChatSessionConversation,
   toTitleSnippet,
 } from "@/hooks/useAiChatController/sessionPersistence";
 import {
@@ -336,9 +338,31 @@ export const useAiChatController = (
   );
 
   const getTimelineItemCountForConversationMessageCount = useCallback(
-    (timelineItems: AiChatTimelineItem[], conversationMessageCount: number) => {
+    (
+      timelineItems: AiChatTimelineItem[],
+      conversationMessageCount: number,
+      runtimeBoundaries?: Record<string, number>,
+    ) => {
       const target = Math.max(0, Math.trunc(conversationMessageCount || 0));
       if (target <= 0) return 0;
+
+      if (runtimeBoundaries) {
+        let bestBoundaryIndex = 0;
+        let sawBoundary = false;
+        for (let index = 1; index <= timelineItems.length; index += 1) {
+          const item = timelineItems[index - 1];
+          const boundary = item ? runtimeBoundaries[item.id] : undefined;
+          if (typeof boundary === "number" && Number.isFinite(boundary)) {
+            if (boundary <= target) {
+              bestBoundaryIndex = index;
+              sawBoundary = true;
+              continue;
+            }
+            if (sawBoundary) return bestBoundaryIndex;
+          }
+        }
+        if (sawBoundary) return bestBoundaryIndex;
+      }
 
       for (let index = 1; index <= timelineItems.length; index += 1) {
         if (
@@ -381,6 +405,7 @@ export const useAiChatController = (
         AiChatSessionData,
         | "id"
         | "conversation"
+        | "runtimeTranscript"
         | "timeline"
         | "contextMemory"
         | "contextTokens"
@@ -407,7 +432,15 @@ export const useAiChatController = (
               },
               aiChatOptions,
             ),
-          getTimelineItemCountForConversationMessageCount,
+          getTimelineItemCountForConversationMessageCount: (
+            timelineItems,
+            conversationMessageCount,
+          ) =>
+            getTimelineItemCountForConversationMessageCount(
+              timelineItems,
+              conversationMessageCount,
+              session.runtimeTranscript.timelineBoundaries,
+            ),
         });
 
       session.contextMemory = nextContextMemory;
@@ -425,6 +458,7 @@ export const useAiChatController = (
         AiChatSessionData,
         | "id"
         | "conversation"
+        | "runtimeTranscript"
         | "timeline"
         | "contextMemory"
         | "contextTokens"
@@ -1248,6 +1282,7 @@ export const useAiChatController = (
     }) => {
       const { session, selected, assistantBranchAnchorId } = options;
       const sessionId = session.id;
+      const modelKey = `${selected.providerId}:${selected.modelId}`;
       const tokenUsageBeforeTurn = { ...session.tokenUsage };
       let stepTokenUsage = createEmptyAiChatTokenUsageSummary();
       let latestStepContextTokens = session.contextTokens;
@@ -1269,7 +1304,7 @@ export const useAiChatController = (
           appOptions,
           modelCache: editorState.llmModelCache,
           messages: conversationRef.current,
-          modelKey: `${selected.providerId}:${selected.modelId}`,
+          modelKey,
           getContextMemory: appOptions.aiChat.contextCompressionEnabled
             ? () => session.contextMemory
             : undefined,
@@ -1311,6 +1346,7 @@ export const useAiChatController = (
           session,
           conversationRef,
           conversation: result.conversation,
+          modelKey,
         });
         session.tokenUsage = addAiChatTokenUsageSummary(
           tokenUsageBeforeTurn,
@@ -1326,6 +1362,24 @@ export const useAiChatController = (
             contextTokens: actualTurnContextTokens,
           });
           session.timeline = next;
+          setAiChatRuntimeTimelineBoundaries({
+            session,
+            timelineItemIds: next.flatMap((item) => {
+              if (
+                item.kind === "message" &&
+                (item.turnId === result.turnId ||
+                  item.id === result.turnId ||
+                  item.id === `${result.turnId}:thinking`)
+              ) {
+                return [item.id];
+              }
+              if (item.kind === "tool" && item.turnId === result.turnId) {
+                return [item.id];
+              }
+              return [];
+            }),
+            messageCount: result.conversation.length,
+          });
           return next;
         });
         session.awaitingContinue = result.awaitingContinue;
@@ -1530,6 +1584,8 @@ export const useAiChatController = (
         session,
         conversationRef,
         conversationText,
+        timelineItemId: userItem.id,
+        modelKey: `${selected.providerId}:${selected.modelId}`,
       });
 
       const assistantBranchAnchorId = getPendingBranchAnchorId(
@@ -1621,7 +1677,12 @@ export const useAiChatController = (
     nextSession.title =
       options.sourceSession.title || toTitleSnippet(options.titleSeed);
     nextSession.timeline = nextTimeline;
-    nextSession.conversation = restoreConversationFromTimeline(nextTimeline);
+    nextSession.runtimeTranscript =
+      sliceAiChatRuntimeTranscriptForTimelinePrefix({
+        sourceSession: options.sourceSession,
+        timeline: nextTimeline,
+      });
+    nextSession.conversation = nextSession.runtimeTranscript.messages;
     nextSession.searchResultsById = new Map(
       options.sourceSession.searchResultsById,
     );
@@ -1828,10 +1889,22 @@ export const useAiChatController = (
     };
 
     const nextTimeline = session.timeline.slice(0, userIndex);
-    const nextConversation = restoreConversationFromTimeline(nextTimeline);
+    const nextRuntimeTranscript = sliceAiChatRuntimeTranscriptForTimelinePrefix(
+      {
+        sourceSession: session,
+        timeline: nextTimeline,
+      },
+    );
+    const nextConversation = nextRuntimeTranscript.messages;
     const updatedAt = new Date().toISOString();
     session.timeline = nextTimeline;
-    session.conversation = nextConversation;
+    session.runtimeTranscript = nextRuntimeTranscript;
+    syncAiChatSessionConversation({
+      session,
+      conversationRef,
+      conversation: nextConversation,
+      updatedAt,
+    });
     session.updatedAt = updatedAt;
     session.runStatus = "idle";
     session.lastError = null;
@@ -1856,12 +1929,6 @@ export const useAiChatController = (
     setAwaitingContinue(false);
     setTokenUsage(session.tokenUsage);
     setContextTokens(session.contextTokens);
-
-    restoreConversationAfterTimelineMutation({
-      session,
-      conversationRef,
-      timeline: nextTimeline,
-    });
 
     touchSessionSummary(session.id, {
       title: session.title,
@@ -1951,7 +2018,12 @@ export const useAiChatController = (
     session.updatedAt = updatedAt;
     session.title = "";
     session.timeline = [];
-    session.conversation = [];
+    syncAiChatSessionConversation({
+      session,
+      conversationRef,
+      conversation: [],
+      updatedAt,
+    });
     session.searchResultsById = new Map();
     session.highlightedResultIds = [];
     session.pendingDetectedFieldBatches = [];

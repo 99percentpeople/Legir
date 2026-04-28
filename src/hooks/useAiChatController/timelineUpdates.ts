@@ -150,6 +150,7 @@ export const applyAssistantUpdateToTimeline = (
         kind: "message",
         role: "thinking",
         text: update.delta,
+        showCollapsedPreview: update.showCollapsedPreview,
         createdAt: nowIso,
         isStreaming: true,
       };
@@ -170,6 +171,8 @@ export const applyAssistantUpdateToTimeline = (
       ...current,
       role: "thinking",
       text: `${current.text}${update.delta}`,
+      showCollapsedPreview:
+        update.showCollapsedPreview ?? current.showCollapsedPreview,
       isStreaming: true,
     };
     return { timeline: next, touchedSession: false };
@@ -273,6 +276,13 @@ export const applyAssistantUpdateToTimeline = (
         existingThinkingText,
         update.reasoningText,
       ),
+      showCollapsedPreview:
+        update.showCollapsedPreview ??
+        (thinkingIdx >= 0 &&
+        next[thinkingIdx]?.kind === "message" &&
+        next[thinkingIdx]?.role === "thinking"
+          ? next[thinkingIdx].showCollapsedPreview
+          : undefined),
       createdAt: thinkingIdx >= 0 ? next[thinkingIdx]!.createdAt : nowIso,
       durationMs:
         thinkingIdx >= 0 &&

@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import type { AiProviderId } from "@/services/ai/sdk/providerCatalog";
+import type { AiProviderId } from "@/services/ai/providers/catalog";
 import { cn } from "@/utils/cn";
 
 type ProviderLogoIconProps = {

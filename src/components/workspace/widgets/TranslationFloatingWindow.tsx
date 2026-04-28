@@ -23,7 +23,7 @@ import {
   translateService,
   type TranslateOptionGroup,
 } from "@/services/translateService";
-import { AI_PROVIDER_IDS_SORTED_BY_LABEL } from "@/services/ai/sdk/providerCatalog";
+import { AI_PROVIDER_IDS_SORTED_BY_LABEL } from "@/services/ai/providers/catalog";
 import { FloatingWindow } from "@/components/ui/floating-window";
 import { cn } from "@/utils/cn";
 import { useEditorStore } from "@/store/useEditorStore";

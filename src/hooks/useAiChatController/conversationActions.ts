@@ -11,7 +11,9 @@ import {
   buildConversationMessageContent,
   normalizeTimelineForPersist,
   normalizeUserMessageInput,
-  restoreConversationFromTimeline,
+  setAiChatRuntimeTimelineBoundary,
+  sliceAiChatRuntimeTranscriptForTimelinePrefix,
+  syncAiChatSessionConversation,
   type AiChatSessionData,
 } from "@/hooks/useAiChatController/sessionPersistence";
 
@@ -91,13 +93,24 @@ export const pushUserConversationMessage = (options: {
   session: AiChatSessionData;
   conversationRef: { current: AiChatMessageRecord[] };
   conversationText: string;
+  timelineItemId: string;
+  modelKey?: string;
 }) => {
   const nextConversation: AiChatMessageRecord[] = [
     ...options.conversationRef.current,
     { role: "user", content: options.conversationText },
   ];
-  options.conversationRef.current = nextConversation;
-  options.session.conversation = nextConversation;
+  syncAiChatSessionConversation({
+    session: options.session,
+    conversationRef: options.conversationRef,
+    conversation: nextConversation,
+    modelKey: options.modelKey,
+  });
+  setAiChatRuntimeTimelineBoundary({
+    session: options.session,
+    timelineItemId: options.timelineItemId,
+    messageCount: nextConversation.length,
+  });
   return nextConversation;
 };
 
@@ -105,9 +118,14 @@ export const applyConversationSuccess = (options: {
   session: AiChatSessionData;
   conversationRef: { current: AiChatMessageRecord[] };
   conversation: AiChatMessageRecord[];
+  modelKey?: string;
 }) => {
-  options.conversationRef.current = options.conversation;
-  options.session.conversation = options.conversation;
+  syncAiChatSessionConversation({
+    session: options.session,
+    conversationRef: options.conversationRef,
+    conversation: options.conversation,
+    modelKey: options.modelKey,
+  });
   options.session.runStatus = "idle";
   options.session.lastError = null;
   options.session.awaitingContinue = false;
@@ -119,13 +137,17 @@ export const restoreConversationAfterTimelineMutation = (options: {
   timeline: AiChatTimelineItem[];
   carriedConversation?: AiChatMessageRecord[] | null;
 }) => {
-  const nextConversation =
-    options.carriedConversation ??
-    restoreConversationFromTimeline(
-      normalizeTimelineForPersist(options.timeline),
-    );
-  options.session.conversation = nextConversation;
-  options.conversationRef.current = nextConversation;
+  const nextConversation = options.carriedConversation
+    ? options.carriedConversation
+    : sliceAiChatRuntimeTranscriptForTimelinePrefix({
+        sourceSession: options.session,
+        timeline: normalizeTimelineForPersist(options.timeline),
+      }).messages;
+  syncAiChatSessionConversation({
+    session: options.session,
+    conversationRef: options.conversationRef,
+    conversation: nextConversation,
+  });
   return nextConversation;
 };
 

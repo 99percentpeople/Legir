@@ -327,6 +327,7 @@ export function ConversationTimeline({
               <ThinkingMessageBubble
                 text={item.text}
                 isStreaming={item.isStreaming}
+                showCollapsedPreview={item.showCollapsedPreview}
                 thinkingLabel={t("ai_chat.thinking")}
                 completedLabel={formatThinkingDuration(t, item.durationMs)}
               />

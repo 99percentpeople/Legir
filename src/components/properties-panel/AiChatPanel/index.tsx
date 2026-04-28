@@ -551,14 +551,12 @@ export function AiChatPanel({
 
         {lastError ? (
           <Card className="border-destructive/40 bg-destructive/5">
-            <CardContent className="p-3">
+            <CardContent className="flex flex-col gap-2 p-3">
               <div className="text-sm font-medium">
                 {t("ai_chat.error_title")}
               </div>
-              <div className="text-muted-foreground mt-1 text-sm">
-                {lastError}
-              </div>
-              <div className="mt-3">
+              <div className="text-muted-foreground text-sm">{lastError}</div>
+              <div className="flex justify-end">
                 <Button
                   type="button"
                   size="sm"
@@ -580,7 +578,7 @@ export function AiChatPanel({
 
         {awaitingContinue ? (
           <Card className="bg-muted/15 border-dashed">
-            <CardContent className="flex items-center justify-between gap-3 p-3">
+            <CardContent className="flex items-center justify-between gap-2 p-3">
               <div className="text-sm font-medium">
                 {t("ai_chat.continue_reason_tool_limit")}
               </div>

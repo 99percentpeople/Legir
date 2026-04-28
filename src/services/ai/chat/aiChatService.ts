@@ -17,9 +17,11 @@ import {
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
 } from "@/constants";
 import {
-  resolveAiSdkLanguageModelDetailed,
+  canDisplayReasoningText,
+  canPreviewCollapsedReasoningText,
+  resolveAiSdkRuntime,
   resolveAiSdkModelSpecifierForTask,
-} from "@/services/ai/sdk";
+} from "@/services/ai/providers";
 import type { AppOptions, EditorState } from "@/types";
 import type {
   AiChatAssistantUpdate,
@@ -131,15 +133,37 @@ export const aiChatService = {
       maxToolRounds = appOptions.aiChat.maxToolRounds,
     } = options;
 
+    const modelSpecifier = resolveAiSdkModelSpecifierForTask({
+      appOptions,
+      modelCache,
+      kind: "chat",
+      modelKey,
+    });
+    const runtime = resolveAiSdkRuntime({
+      appOptions,
+      specifier: modelSpecifier,
+      kind: "chat",
+    });
     const baseConversation: AiChatMessageRecord[] = [...options.messages];
     const turnStartMessageCount = baseConversation.length;
-    const buildStepMessages = async (messages: AiChatMessageRecord[]) =>
-      await prepareAiChatMessagesForModelRuntime({
+    const buildStepMessages = async (messages: AiChatMessageRecord[]) => {
+      const genericMessages = await prepareAiChatMessagesForModelRuntime({
         messages,
         aiChatOptions: appOptions.aiChat,
         contextMemory: getContextMemory?.(),
         turnStartMessageCount,
       });
+      const preparedMessages =
+        runtime.profile.prepareMessages?.(genericMessages, {
+          ...runtime.request,
+          reasoning: runtime.reasoning,
+        }) ?? genericMessages;
+      runtime.profile.validateMessages?.(preparedMessages, {
+        ...runtime.request,
+        reasoning: runtime.reasoning,
+      });
+      return preparedMessages;
+    };
     const initialMessages = await buildStepMessages(baseConversation);
     let latestPreparedMessageTokenEstimate =
       estimateAiChatMessageTokens(initialMessages);
@@ -150,18 +174,11 @@ export const aiChatService = {
       AI_CHAT_MAX_TOOL_ROUNDS_MIN,
       Math.min(AI_CHAT_MAX_TOOL_ROUNDS_MAX, Math.trunc(maxToolRounds || 0)),
     );
-    const modelSpecifier = resolveAiSdkModelSpecifierForTask({
-      appOptions,
-      modelCache,
-      kind: "chat",
-      modelKey,
-    });
-    const resolvedModel = resolveAiSdkLanguageModelDetailed(
-      appOptions,
-      modelSpecifier,
-      "chat",
-    );
     const toolDefinitions = toolRegistry.getDefinitions();
+    const shouldDisplayReasoning = canDisplayReasoningText(runtime.reasoning);
+    const showCollapsedReasoningPreview = canPreviewCollapsedReasoningText(
+      runtime.reasoning,
+    );
     let currentBatchId = `${turnId}:step_0`;
     let stepIndex = 0;
     let assistantMessage = "";
@@ -183,8 +200,8 @@ export const aiChatService = {
 
     try {
       const result = streamText({
-        model: resolvedModel.model,
-        ...(resolvedModel.callOptions ?? null),
+        model: runtime.model,
+        ...(runtime.callOptions ?? null),
         system: getAiChatSystemInstruction({
           toolDefinitions,
         }),
@@ -240,11 +257,14 @@ export const aiChatService = {
 
         if (part.type === "reasoning-delta" && part.text) {
           reasoningText += part.text;
-          onAssistantUpdate?.({
-            phase: "reasoning_delta",
-            turnId,
-            delta: part.text,
-          });
+          if (shouldDisplayReasoning) {
+            onAssistantUpdate?.({
+              phase: "reasoning_delta",
+              turnId,
+              delta: part.text,
+              showCollapsedPreview: showCollapsedReasoningPreview,
+            });
+          }
           continue;
         }
 
@@ -310,7 +330,8 @@ export const aiChatService = {
       onAssistantUpdate?.({
         phase: "end",
         turnId,
-        reasoningText: finalReasoningText,
+        reasoningText: shouldDisplayReasoning ? finalReasoningText : "",
+        showCollapsedPreview: showCollapsedReasoningPreview,
         assistantMessage,
         toolCalls: Array.from(toolRuntime.toolCallsById.values()),
         finishReason: assistantMessage ? "stop" : "tool_calls",

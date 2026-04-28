@@ -117,16 +117,20 @@ export const MessageAttachmentChip = ({
 export const ThinkingMessageBubble = ({
   text,
   isStreaming,
+  showCollapsedPreview,
   thinkingLabel,
   completedLabel,
 }: {
   text: string;
   isStreaming?: boolean;
+  showCollapsedPreview?: boolean;
   thinkingLabel: string;
   completedLabel: string;
 }) => {
   const [open, setOpen] = React.useState(false);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const showPreview = Boolean(isStreaming && text && showCollapsedPreview);
+  const useWideLayout = open || showPreview;
   const { scrollToBottom } = useStickyBottomScroll(contentRef, {
     enabled: open,
   });
@@ -145,9 +149,9 @@ export const ThinkingMessageBubble = ({
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className={cn("max-w-[88%]", isStreaming && "w-full")}
+      className={cn("max-w-[88%] min-w-0", useWideLayout ? "w-full" : "w-fit")}
     >
-      <div className="border-border/70 bg-muted/80 text-muted-foreground w-full rounded-lg border border-dashed px-3 py-2 backdrop-blur-md">
+      <div className="border-border/70 bg-muted/80 text-muted-foreground min-w-0 rounded-lg border border-dashed px-3 py-2 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <CollapsibleTrigger asChild>
             <button
@@ -185,12 +189,12 @@ export const ThinkingMessageBubble = ({
           <CollapsibleContent className="pt-1.5">
             <div
               ref={contentRef}
-              className="max-h-64 overflow-auto pr-1 text-sm whitespace-pre-wrap"
+              className="max-h-64 overflow-auto pr-1 text-sm break-words whitespace-pre-wrap"
             >
               {text}
             </div>
           </CollapsibleContent>
-        ) : isStreaming && text ? (
+        ) : showPreview ? (
           <div className="relative mt-1.5 h-10 overflow-hidden">
             <div className="absolute right-0 bottom-0 left-0 text-sm leading-5 break-words whitespace-pre-wrap">
               {text}

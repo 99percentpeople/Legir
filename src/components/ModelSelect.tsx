@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { isAiProviderId } from "@/services/ai/sdk/providerCatalog";
+import { isAiProviderId } from "@/services/ai/providers/catalog";
 import { ModelCapabilityBadges } from "@/components/ModelCapabilityBadges";
 import { cn } from "@/utils/cn";
 

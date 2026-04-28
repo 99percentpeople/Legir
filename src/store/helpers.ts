@@ -3,7 +3,8 @@ import {
   getAiProviderDefaultApiOptionId,
   getAiProviderSelectedApiOption,
   type AiProviderId,
-} from "@/services/ai/sdk/providerCatalog";
+  normalizeReasoningPreference,
+} from "@/services/ai/providers";
 import {
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
@@ -270,6 +271,7 @@ export const normalizeAiChatOptions = (
         ? next.contextCompressionMode
         : DEFAULT_EDITOR_UI_STATE.options.aiChat.contextCompressionMode,
     contextCompressionModelKey: next.contextCompressionModelKey || "",
+    reasoning: normalizeReasoningPreference(next.reasoning),
   };
 };
 

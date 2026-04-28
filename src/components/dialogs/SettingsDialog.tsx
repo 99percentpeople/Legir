@@ -44,7 +44,7 @@ import {
   AI_PROVIDER_SPECS_SORTED_BY_LABEL,
   getAiProviderSelectedApiOption,
   type AiProviderId,
-} from "@/services/ai/sdk/providerCatalog";
+} from "@/services/ai/providers/catalog";
 import { useLanguage, Language, LANGUAGES } from "../language-provider";
 import { useTheme } from "../theme-provider";
 import { Separator } from "../ui/separator";
@@ -65,7 +65,7 @@ import {
   type ModelSelectGroup,
 } from "@/components/ModelSelect";
 import { ProviderLogo } from "@/components/ProviderLogo";
-import { createCustomModelCapabilities } from "@/services/ai/sdk/modelCapabilities";
+import { createCustomModelCapabilities } from "@/services/ai/providers/modelCapabilities";
 import {
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
@@ -78,6 +78,7 @@ import {
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
+  DEV_API_PROXY_URL,
 } from "@/constants";
 import { cn } from "@/utils/cn";
 import { isDesktopApp } from "@/services/platform/runtime";
@@ -1142,7 +1143,11 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                           proxyUrl: event.target.value,
                         })
                       }
-                      placeholder={t("settings.llm.proxy_url_placeholder")}
+                      placeholder={
+                        import.meta.env.DEV
+                          ? DEV_API_PROXY_URL
+                          : t("settings.llm.proxy_url_placeholder")
+                      }
                       className="h-8"
                     />
                     <p className="text-muted-foreground text-xs">

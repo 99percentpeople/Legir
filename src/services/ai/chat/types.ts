@@ -63,6 +63,16 @@ export interface AiChatToolDefinition {
 
 export type AiChatMessageRecord = ModelMessage;
 
+export type AiChatRuntimeTranscriptVersion = 1;
+
+export interface AiChatRuntimeTranscript {
+  version: AiChatRuntimeTranscriptVersion;
+  messages: AiChatMessageRecord[];
+  modelKey?: string;
+  updatedAt: string;
+  timelineBoundaries: Record<string, number>;
+}
+
 export interface AiChatToolCallRecord {
   id: string;
   name: string;
@@ -662,6 +672,7 @@ export interface AiChatUiMessage {
   id: string;
   role: "user" | "assistant" | "thinking";
   text: string;
+  showCollapsedPreview?: boolean;
   conversationText?: string;
   attachments?: AiChatMessageAttachment[];
   branchAnchorId?: string;
@@ -733,6 +744,7 @@ export type AiChatTimelineItem =
       turnId?: string;
       segmentIndex?: number;
       text: string;
+      showCollapsedPreview?: boolean;
       conversationText?: string;
       attachments?: AiChatMessageAttachment[];
       branchAnchorId?: string;
@@ -846,47 +858,38 @@ export interface AiToolRegistry {
   ) => Promise<AiToolExecutionResult>;
 }
 
-export type AiChatToolUpdate =
-  | {
-      phase: "start";
-      call: AiChatToolCallRecord;
-      batchId: string;
-      isParallelBatch: boolean;
-    }
-  | {
-      phase: "success";
-      call: AiChatToolCallRecord;
-      batchId: string;
-      isParallelBatch: boolean;
-      result: AiToolExecutionResult;
-    }
-  | {
-      phase: "progress";
-      call: AiChatToolCallRecord;
-      batchId: string;
-      isParallelBatch: boolean;
-      progress: AiToolExecutionProgress;
-    }
-  | {
-      phase: "error";
-      call: AiChatToolCallRecord;
-      batchId: string;
-      isParallelBatch: boolean;
-      error: Error;
-    };
+export type AiChatToolUpdate = (
+  | { phase: "start" }
+  | { phase: "success"; result: AiToolExecutionResult }
+  | { phase: "progress"; progress: AiToolExecutionProgress }
+  | { phase: "error"; error: Error }
+) & {
+  call: AiChatToolCallRecord;
+  batchId: string;
+  isParallelBatch: boolean;
+};
 
-export type AiChatAssistantUpdate =
-  | { phase: "reasoning_delta"; turnId: string; delta: string }
-  | { phase: "delta"; turnId: string; delta: string; branchAnchorId?: string }
+export type AiChatAssistantUpdate = (
+  | {
+      phase: "reasoning_delta";
+      delta: string;
+      showCollapsedPreview?: boolean;
+    }
+  | {
+      phase: "delta";
+      delta: string;
+      branchAnchorId?: string;
+    }
   | {
       phase: "end";
-      turnId: string;
       reasoningText: string;
+      showCollapsedPreview?: boolean;
       assistantMessage: string;
       branchAnchorId?: string;
       toolCalls: AiChatToolCallRecord[];
       finishReason: "stop" | "tool_calls";
-    };
+    }
+) & { turnId: string };
 
 export interface AiChatToolRuntime {
   tools: ToolSet;

@@ -1,3 +1,4 @@
+import { modelMessageSchema } from "ai";
 import {
   normalizeAiToolArgsDeep,
   toSnakeCaseKeysDeep,
@@ -8,6 +9,7 @@ import type {
   AiChatContextMemory,
   AiChatMessageAttachment,
   AiChatMessageRecord,
+  AiChatRuntimeTranscript,
   AiChatSelectionAttachment,
   AiDetectedFormFieldDraft,
   AiChatTokenUsageSummary,
@@ -24,6 +26,7 @@ export type AiChatRunStatus = "idle" | "running" | "cancelling" | "error";
 export const AI_CHAT_SELECTED_MODEL_KEY = "app-ai-chat:selected-model";
 
 const AI_CHAT_PERSIST_VERSION = 1;
+const AI_CHAT_RUNTIME_TRANSCRIPT_VERSION = 1;
 const AI_CHAT_PERSIST_KEY_PREFIX = "app-ai-chat:";
 const MAX_PERSIST_SESSIONS = 20;
 const MAX_PERSIST_TIMELINE_ITEMS = 300;
@@ -53,6 +56,7 @@ export type PersistedAiChatSession = {
   contextTokenOverhead?: number;
   lastError?: string | null;
   awaitingContinue?: boolean;
+  runtimeTranscript?: AiChatRuntimeTranscript;
 };
 
 type PersistedAiChatState = {
@@ -73,6 +77,7 @@ export type AiChatSessionData = {
   branchContextUserAnchorId?: string;
   timeline: AiChatTimelineItem[];
   conversation: AiChatMessageRecord[];
+  runtimeTranscript: AiChatRuntimeTranscript;
   searchResultsById: Map<string, AiStoredSearchResult>;
   highlightedResultIds: string[];
   pendingDetectedFieldBatches: AiDetectedFormFieldBatchState[];
@@ -136,6 +141,55 @@ export const addAiChatTokenUsageSummary = (
     base.cachedInputTokens +
     Math.max(0, Math.trunc(delta?.cachedInputTokens ?? 0)),
 });
+
+const parseRuntimeMessages = (value: unknown) => {
+  if (!Array.isArray(value)) return null;
+  const messages: AiChatMessageRecord[] = [];
+  for (const item of value) {
+    const parsed = modelMessageSchema.safeParse(item);
+    if (!parsed.success) return null;
+    messages.push(parsed.data);
+  }
+  return messages;
+};
+
+const normalizeRuntimeTimelineBoundaries = (
+  value: unknown,
+  maxMessageCount: number,
+  timelineIds?: Set<string>,
+) => {
+  const boundaries: Record<string, number> = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return boundaries;
+  }
+
+  for (const [id, count] of Object.entries(value)) {
+    if (!id || (timelineIds && !timelineIds.has(id))) continue;
+    if (typeof count !== "number" || !Number.isFinite(count)) continue;
+    boundaries[id] = Math.min(maxMessageCount, Math.max(0, Math.trunc(count)));
+  }
+
+  return boundaries;
+};
+
+export const createAiChatRuntimeTranscript = (options?: {
+  messages?: AiChatMessageRecord[];
+  modelKey?: string;
+  updatedAt?: string;
+  timelineBoundaries?: Record<string, number>;
+}): AiChatRuntimeTranscript => {
+  const messages = options?.messages ?? [];
+  return {
+    version: AI_CHAT_RUNTIME_TRANSCRIPT_VERSION,
+    messages,
+    modelKey: options?.modelKey,
+    updatedAt: options?.updatedAt ?? new Date().toISOString(),
+    timelineBoundaries: normalizeRuntimeTimelineBoundaries(
+      options?.timelineBoundaries,
+      messages.length,
+    ),
+  };
+};
 
 const INTERRUPTED_AI_CHAT_MESSAGE =
   "The previous AI response was interrupted before it finished.";
@@ -565,6 +619,175 @@ export const getConversationMessageCountForTimelinePrefix = (
     items.slice(0, Math.max(0, Math.trunc(timelineItemCount || 0))),
   ).length;
 
+const buildRuntimeTimelineBoundariesFromTimeline = (
+  items: AiChatTimelineItem[],
+) => {
+  const boundaries: Record<string, number> = {};
+  for (let index = 1; index <= items.length; index += 1) {
+    const item = items[index - 1];
+    if (!item) continue;
+    boundaries[item.id] = getConversationMessageCountForTimelinePrefix(
+      items,
+      index,
+    );
+  }
+  return boundaries;
+};
+
+const restoreAiChatRuntimeTranscript = (options: {
+  raw: unknown;
+  timeline: AiChatTimelineItem[];
+  updatedAt: string;
+}) => {
+  if (
+    options.raw &&
+    typeof options.raw === "object" &&
+    !Array.isArray(options.raw)
+  ) {
+    const record = options.raw as Partial<AiChatRuntimeTranscript>;
+    const messages = parseRuntimeMessages(record.messages);
+    if (record.version === AI_CHAT_RUNTIME_TRANSCRIPT_VERSION && messages) {
+      return createAiChatRuntimeTranscript({
+        messages,
+        modelKey:
+          typeof record.modelKey === "string" ? record.modelKey : undefined,
+        updatedAt:
+          typeof record.updatedAt === "string"
+            ? record.updatedAt
+            : options.updatedAt,
+        timelineBoundaries: normalizeRuntimeTimelineBoundaries(
+          record.timelineBoundaries,
+          messages.length,
+          new Set(options.timeline.map((item) => item.id)),
+        ),
+      });
+    }
+  }
+
+  const messages = restoreConversationFromTimeline(options.timeline);
+  return createAiChatRuntimeTranscript({
+    messages,
+    updatedAt: options.updatedAt,
+    timelineBoundaries: buildRuntimeTimelineBoundariesFromTimeline(
+      options.timeline,
+    ),
+  });
+};
+
+export const normalizeRuntimeTranscriptForPersist = (
+  transcript: AiChatRuntimeTranscript,
+  timeline: AiChatTimelineItem[],
+) => {
+  const messages = parseRuntimeMessages(transcript.messages) ?? [];
+  return createAiChatRuntimeTranscript({
+    messages,
+    modelKey: transcript.modelKey?.trim() || undefined,
+    updatedAt: transcript.updatedAt,
+    timelineBoundaries: normalizeRuntimeTimelineBoundaries(
+      transcript.timelineBoundaries,
+      messages.length,
+      new Set(timeline.map((item) => item.id)),
+    ),
+  });
+};
+
+export const syncAiChatSessionConversation = (options: {
+  session: AiChatSessionData;
+  conversationRef?: { current: AiChatMessageRecord[] };
+  conversation: AiChatMessageRecord[];
+  modelKey?: string;
+  updatedAt?: string;
+}) => {
+  const updatedAt = options.updatedAt ?? new Date().toISOString();
+  const runtimeTranscript = createAiChatRuntimeTranscript({
+    ...options.session.runtimeTranscript,
+    messages: options.conversation,
+    modelKey: options.modelKey ?? options.session.runtimeTranscript.modelKey,
+    updatedAt,
+  });
+
+  options.session.runtimeTranscript = runtimeTranscript;
+  options.session.conversation = runtimeTranscript.messages;
+  if (options.conversationRef) {
+    options.conversationRef.current = runtimeTranscript.messages;
+  }
+  return runtimeTranscript.messages;
+};
+
+export const setAiChatRuntimeTimelineBoundary = (options: {
+  session: AiChatSessionData;
+  timelineItemId: string;
+  messageCount?: number;
+}) => {
+  const id = options.timelineItemId.trim();
+  if (!id) return;
+  const maxMessageCount = options.session.runtimeTranscript.messages.length;
+  const messageCount = Math.min(
+    maxMessageCount,
+    Math.max(0, Math.trunc(options.messageCount ?? maxMessageCount)),
+  );
+  options.session.runtimeTranscript = {
+    ...options.session.runtimeTranscript,
+    updatedAt: new Date().toISOString(),
+    timelineBoundaries: {
+      ...options.session.runtimeTranscript.timelineBoundaries,
+      [id]: messageCount,
+    },
+  };
+};
+
+export const setAiChatRuntimeTimelineBoundaries = (options: {
+  session: AiChatSessionData;
+  timelineItemIds: string[];
+  messageCount?: number;
+}) => {
+  for (const timelineItemId of options.timelineItemIds) {
+    setAiChatRuntimeTimelineBoundary({
+      session: options.session,
+      timelineItemId,
+      messageCount: options.messageCount,
+    });
+  }
+};
+
+export const sliceAiChatRuntimeTranscriptForTimelinePrefix = (options: {
+  sourceSession: AiChatSessionData;
+  timeline: AiChatTimelineItem[];
+}) => {
+  const lastItem = options.timeline.at(-1);
+  const boundary =
+    lastItem &&
+    options.sourceSession.runtimeTranscript.timelineBoundaries[lastItem.id];
+
+  if (typeof boundary === "number" && Number.isFinite(boundary)) {
+    const messages = options.sourceSession.runtimeTranscript.messages.slice(
+      0,
+      Math.max(0, Math.trunc(boundary)),
+    );
+    const timelineIdSet = new Set(options.timeline.map((item) => item.id));
+    return createAiChatRuntimeTranscript({
+      messages,
+      modelKey: options.sourceSession.runtimeTranscript.modelKey,
+      updatedAt: new Date().toISOString(),
+      timelineBoundaries: normalizeRuntimeTimelineBoundaries(
+        options.sourceSession.runtimeTranscript.timelineBoundaries,
+        messages.length,
+        timelineIdSet,
+      ),
+    });
+  }
+
+  const messages = restoreConversationFromTimeline(options.timeline);
+  return createAiChatRuntimeTranscript({
+    messages,
+    modelKey: options.sourceSession.runtimeTranscript.modelKey,
+    updatedAt: new Date().toISOString(),
+    timelineBoundaries: buildRuntimeTimelineBoundariesFromTimeline(
+      options.timeline,
+    ),
+  });
+};
+
 export const getLatestUserSelectionAttachmentsFromTimeline = (
   items: AiChatTimelineItem[],
 ) => {
@@ -639,6 +862,9 @@ export const createAiChatSessionData = (
   branchContextUserAnchorId: branchMeta?.branchContextUserAnchorId,
   timeline: [],
   conversation: [],
+  runtimeTranscript: createAiChatRuntimeTranscript({
+    updatedAt: nowIso,
+  }),
   searchResultsById: new Map(),
   highlightedResultIds: [],
   pendingDetectedFieldBatches: [],
@@ -691,6 +917,11 @@ export const restorePersistedAiChatDocumentState = (
         normalizedTimeline,
         updatedAt,
       );
+      const runtimeTranscript = restoreAiChatRuntimeTranscript({
+        raw: session.runtimeTranscript,
+        timeline,
+        updatedAt,
+      });
 
       const searchResultsList = Array.isArray(session.searchResults)
         ? session.searchResults.slice(
@@ -844,7 +1075,8 @@ export const restorePersistedAiChatDocumentState = (
             ? session.branchContextUserAnchorId
             : undefined,
         timeline,
-        conversation: restoreConversationFromTimeline(timeline),
+        conversation: runtimeTranscript.messages,
+        runtimeTranscript,
         searchResultsById,
         highlightedResultIds,
         pendingDetectedFieldBatches,
@@ -971,6 +1203,9 @@ export const persistAiChatDocumentState = (options: {
           branchContextUserMessageId: summary.branchContextUserMessageId,
           branchContextUserAnchorId: summary.branchContextUserAnchorId,
           timeline: [],
+          runtimeTranscript: createAiChatRuntimeTranscript({
+            updatedAt: summary.updatedAt ?? new Date().toISOString(),
+          }),
           searchResults: [],
           highlightedResultIds: [],
         };
@@ -992,6 +1227,10 @@ export const persistAiChatDocumentState = (options: {
         branchContextUserMessageId: data.branchContextUserMessageId,
         branchContextUserAnchorId: data.branchContextUserAnchorId,
         timeline: normalizeTimelineForPersist(data.timeline),
+        runtimeTranscript: normalizeRuntimeTranscriptForPersist(
+          data.runtimeTranscript,
+          data.timeline,
+        ),
         searchResults: trimmedSearchResults,
         highlightedResultIds: data.highlightedResultIds,
         pendingDetectedFieldBatches: data.pendingDetectedFieldBatches,
@@ -1040,6 +1279,10 @@ export const persistAiChatDocumentState = (options: {
             branchContextUserMessageId: activeData.branchContextUserMessageId,
             branchContextUserAnchorId: activeData.branchContextUserAnchorId,
             timeline: normalizeTimelineForPersist(activeData.timeline),
+            runtimeTranscript: normalizeRuntimeTranscriptForPersist(
+              activeData.runtimeTranscript,
+              activeData.timeline,
+            ),
             searchResults: trimmedSearchResults,
             highlightedResultIds: activeData.highlightedResultIds,
             pendingDetectedFieldBatches: activeData.pendingDetectedFieldBatches,
