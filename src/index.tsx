@@ -22,7 +22,7 @@ const bootstrapApp = async () => {
     { LanguageProvider },
     { Toaster },
     { Router },
-    { useBootstrapAwareHashLocation },
+    { useBootstrapAwareBrowserLocation },
   ] = await Promise.all([
     import("react"),
     import("react-dom/client"),
@@ -31,7 +31,7 @@ const bootstrapApp = async () => {
     import("./components/language-provider"),
     import("./components/ui/sonner"),
     import("wouter"),
-    import("./app/useBootstrapAwareHashLocation"),
+    import("./app/useBootstrapAwareBrowserLocation"),
   ]);
 
   const root = createRoot(rootElement);
@@ -40,7 +40,7 @@ const bootstrapApp = async () => {
       <LanguageProvider defaultLanguage="system" storageKey="app-ui-language">
         <ThemeProvider defaultTheme="system" storageKey="app-ui-theme">
           <Toaster position="top-center" />
-          <Router hook={useBootstrapAwareHashLocation}>
+          <Router hook={useBootstrapAwareBrowserLocation}>
             <App />
           </Router>
         </ThemeProvider>

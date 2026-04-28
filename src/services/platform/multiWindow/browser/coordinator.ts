@@ -116,6 +116,19 @@ const getBrowserBaseUrl = () => {
 const buildBrowserWindowUrl = (route: string, windowId: EditorWindowId) => {
   const url = getBrowserBaseUrl();
   const normalizedRoute = route.trim() || "/";
+  const basePath = url.pathname.endsWith("/")
+    ? url.pathname.slice(0, -1)
+    : url.pathname;
+  const applyPathRoute = (pathRoute: string) => {
+    const routeUrl = new URL(pathRoute, window.location.origin);
+    const routePath =
+      routeUrl.pathname === "/"
+        ? basePath || "/"
+        : `${basePath}${routeUrl.pathname}`;
+    url.pathname = routePath || "/";
+    url.search = routeUrl.search;
+    url.hash = routeUrl.hash;
+  };
 
   if (normalizedRoute.startsWith("/?")) {
     const hashIndex = normalizedRoute.indexOf("#");
@@ -128,12 +141,12 @@ const buildBrowserWindowUrl = (route: string, windowId: EditorWindowId) => {
   } else if (normalizedRoute === "/") {
     url.search = "";
     url.hash = "";
-  } else if (normalizedRoute.startsWith("/editor")) {
-    url.hash = `#${normalizedRoute}`;
   } else if (normalizedRoute.startsWith("/#")) {
     url.hash = normalizedRoute.slice(1);
   } else {
-    url.hash = `#${normalizedRoute.startsWith("/") ? normalizedRoute : `/${normalizedRoute}`}`;
+    applyPathRoute(
+      normalizedRoute.startsWith("/") ? normalizedRoute : `/${normalizedRoute}`,
+    );
   }
 
   url.searchParams.set(BROWSER_WINDOW_ID_QUERY_KEY, windowId);

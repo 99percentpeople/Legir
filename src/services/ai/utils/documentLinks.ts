@@ -1,5 +1,3 @@
-export const AI_DOCUMENT_LINK_BASE_PATH = "/document";
-
 export type AiDocumentLinkTarget =
   | {
       kind: "page";
@@ -14,46 +12,31 @@ export type AiDocumentLinkTarget =
       resultId: string;
     };
 
+const AI_DOCUMENT_PAGE_HASH_KEY = "page";
+const AI_DOCUMENT_CONTROL_HASH_KEY = "control";
+const AI_DOCUMENT_RESULT_HASH_KEY = "result";
+
 export const buildAiDocumentPageLink = (pageNumber: number) =>
-  `${AI_DOCUMENT_LINK_BASE_PATH}/page/${pageNumber}`;
+  `#${AI_DOCUMENT_PAGE_HASH_KEY}=${pageNumber}`;
 
 export const buildAiDocumentControlLink = (controlId: string) =>
-  `${AI_DOCUMENT_LINK_BASE_PATH}/control/${encodeURIComponent(controlId)}`;
+  `#${AI_DOCUMENT_CONTROL_HASH_KEY}=${encodeURIComponent(controlId)}`;
 
 export const buildAiDocumentResultLink = (resultId: string) =>
-  `${AI_DOCUMENT_LINK_BASE_PATH}/result/${encodeURIComponent(resultId)}`;
+  `#${AI_DOCUMENT_RESULT_HASH_KEY}=${encodeURIComponent(resultId)}`;
 
 export const parseAiDocumentLinkHref = (
   rawHref: string | null,
 ): AiDocumentLinkTarget | null => {
   const href = rawHref?.trim();
   if (!href) return null;
+  if (!href.startsWith("#")) return null;
 
-  let url: URL;
-  try {
-    url = new URL(href, "https://legir.local");
-  } catch {
-    return null;
-  }
+  const params = new URLSearchParams(href.slice(1));
 
-  const normalizedPath = url.pathname.replace(/\/+$/, "");
-  if (
-    normalizedPath !== AI_DOCUMENT_LINK_BASE_PATH &&
-    !normalizedPath.startsWith(`${AI_DOCUMENT_LINK_BASE_PATH}/`)
-  ) {
-    return null;
-  }
-
-  const segments = normalizedPath
-    .slice(AI_DOCUMENT_LINK_BASE_PATH.length)
-    .split("/")
-    .filter(Boolean);
-  const kind = segments[0];
-  const encodedValue = segments[1];
-  if (!kind || !encodedValue) return null;
-
-  if (kind === "page") {
-    const pageNumber = Number.parseInt(encodedValue, 10);
+  const pageNumberParam = params.get(AI_DOCUMENT_PAGE_HASH_KEY);
+  if (pageNumberParam !== null) {
+    const pageNumber = Number(pageNumberParam);
     if (!Number.isInteger(pageNumber) || pageNumber < 1) return null;
     return {
       kind: "page",
@@ -61,20 +44,19 @@ export const parseAiDocumentLinkHref = (
     };
   }
 
-  const value = decodeURIComponent(encodedValue).trim();
-  if (!value) return null;
-
-  if (kind === "control") {
+  const controlId = params.get(AI_DOCUMENT_CONTROL_HASH_KEY)?.trim();
+  if (controlId) {
     return {
       kind: "control",
-      controlId: value,
+      controlId,
     };
   }
 
-  if (kind === "result") {
+  const resultId = params.get(AI_DOCUMENT_RESULT_HASH_KEY)?.trim();
+  if (resultId) {
     return {
       kind: "result",
-      resultId: value,
+      resultId,
     };
   }
 

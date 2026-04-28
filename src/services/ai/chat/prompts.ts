@@ -66,7 +66,7 @@ export const getAiChatSystemInstruction = (options?: {
       "Lead with the answer or next useful action.",
       "Be concise and specific.",
       "When a page, field, annotation, or result matters, prefer a natural clickable document link.",
-      "Do not print raw annotation_id, result_id, or /document/... paths unless the user explicitly asks.",
+      "Do not print raw annotation_id, result_id, control_id, or unlinked internal targets unless the user explicitly asks.",
       "If layout is known, add a short human location such as top left or right side.",
     ]),
   );
@@ -74,6 +74,8 @@ export const getAiChatSystemInstruction = (options?: {
   sections.push(
     buildPromptSection("Document links", [
       "Use markdown links or HTML anchors for internal document links.",
+      "Use hash targets only: page links use #page=3, field/control links use #control=<encoded_id>, and result links use #result=<encoded_id>.",
+      "For markdown, write natural link text like [page 3](#page=3), not the raw hash target.",
       "Only create a page, control, or result link after you have the exact target from tool output.",
       "Link text should read naturally in the user's language.",
     ]),

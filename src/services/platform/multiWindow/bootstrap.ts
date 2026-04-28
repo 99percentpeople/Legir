@@ -151,7 +151,7 @@ export const buildEditorWindowBootstrapRoute = (
   const search = new URLSearchParams({
     [EDITOR_WINDOW_BOOTSTRAP_QUERY_KEY]: JSON.stringify(bootstrap),
   });
-  return `/?${search.toString()}#${EDITOR_WINDOW_BOOTSTRAP_ROUTE}`;
+  return `${EDITOR_WINDOW_BOOTSTRAP_ROUTE}?${search.toString()}`;
 };
 
 export const hasPendingEditorWindowBootstrap = () => {

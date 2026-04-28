@@ -41,7 +41,7 @@ const createPwaManifest = (displayName: string): ExperimentalWebManifest => ({
   ],
   file_handlers: [
     {
-      action: "/#/editor",
+      action: "/editor",
       name: "PDF Document",
       accept: {
         "application/pdf": [".pdf"],

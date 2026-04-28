@@ -1,4 +1,4 @@
-import { useHashLocation } from "wouter/use-hash-location";
+import { useBrowserLocation } from "wouter/use-browser-location";
 import type { BaseLocationHook, Path } from "wouter";
 
 import {
@@ -6,13 +6,13 @@ import {
   hasPendingEditorWindowBootstrap,
 } from "@/services/platform";
 
-type BootstrapAwareHashLocationHook = BaseLocationHook & {
+type BootstrapAwareBrowserLocationHook = BaseLocationHook & {
   hrefs?: (href: Path) => string;
 };
 
-export const useBootstrapAwareHashLocation: BootstrapAwareHashLocationHook =
+export const useBootstrapAwareBrowserLocation: BootstrapAwareBrowserLocationHook =
   () => {
-    const [location, navigate] = useHashLocation();
+    const [location, navigate] = useBrowserLocation();
     const hasPendingWindowBootstrap = hasPendingEditorWindowBootstrap();
 
     if (location === "/" && hasPendingWindowBootstrap) {
@@ -22,4 +22,4 @@ export const useBootstrapAwareHashLocation: BootstrapAwareHashLocationHook =
     return [location, navigate];
   };
 
-useBootstrapAwareHashLocation.hrefs = (href) => `#${href}`;
+useBootstrapAwareBrowserLocation.hrefs = (href) => href;

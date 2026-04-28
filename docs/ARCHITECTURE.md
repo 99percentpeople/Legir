@@ -40,7 +40,7 @@ src/
   app/
     editorTabs/             Tab snapshots, session transfer, window layout
     useAppInitialization.ts App bootstrap
-    useBootstrapAwareHashLocation.ts
+    useBootstrapAwareBrowserLocation.ts
 
   pages/
     HomePage/               App home page and recent file entry point
@@ -85,7 +85,7 @@ The root entry mounts the React tree and wires the global providers:
 - toaster
 - `wouter` router
 
-The app currently uses a hash-based router through `useBootstrapAwareHashLocation`, which allows the desktop bootstrap flow to redirect to a special editor route without depending on server-side rewrite support.
+The app uses a browser path router through `useBootstrapAwareBrowserLocation`, with a bootstrap-aware override that can route startup document windows to `/editor`.
 
 ### `src/App.tsx`
 
