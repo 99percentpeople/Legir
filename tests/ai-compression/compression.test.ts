@@ -1,19 +1,19 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 
-import { buildAiChatCompressionSegments } from "../../src/services/ai/chat/runtime/compression/segments";
-import { createDefaultAiChatCompressionPolicy } from "../../src/services/ai/chat/runtime/compression/types";
-import { algorithmicContextCompressionStrategy } from "../../src/services/ai/chat/runtime/compression/strategies";
-import { applyAiChatContextMemoryToMessages } from "../../src/services/ai/chat/runtime/memory/apply";
-import { getAiChatContextMemoryPlan } from "../../src/services/ai/chat/runtime/memory/plan";
+import { buildAiChatCompressionSegments } from "@/services/ai/chat/runtime/compression/segments";
+import { createDefaultAiChatCompressionPolicy } from "@/services/ai/chat/runtime/compression/types";
+import { algorithmicContextCompressionStrategy } from "@/services/ai/chat/runtime/compression/strategies";
+import { applyAiChatContextMemoryToMessages } from "@/services/ai/chat/runtime/memory/apply";
+import { getAiChatContextMemoryPlan } from "@/services/ai/chat/runtime/memory/plan";
 import {
   buildAiChatContextMemoryMessage,
   getAiChatConversationMemoryCoveredMessageCount,
-} from "../../src/services/ai/chat/runtime/memory/serialization";
-import { deepseekRuntimeProfile } from "../../src/services/ai/providers/runtimeProfiles/deepseek";
+} from "@/services/ai/chat/runtime/memory/serialization";
+import { deepseekRuntimeProfile } from "@/services/ai/providers/runtimeProfiles/deepseek";
 import type {
   AiChatContextMemory,
   AiChatMessageRecord,
-} from "../../src/services/ai/chat/types";
+} from "@/services/ai/chat/types";
 
 const nowIso = "2026-04-28T00:00:00.000Z";
 
