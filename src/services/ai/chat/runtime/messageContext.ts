@@ -1,4 +1,5 @@
 import { defaultAiChatCompressionEngine } from "@/services/ai/chat/runtime/compression/engine";
+import type { AiChatCompressionPolicy } from "@/services/ai/chat/runtime/compression/types";
 import type {
   AiChatContextMemory,
   AiChatMessageRecord,
@@ -135,8 +136,7 @@ type PrepareAiChatMessagesOptions = {
     "contextCompressionEnabled" | "visualHistoryWindow"
   >;
   contextMemory?: AiChatContextMemory;
-  turnStartMessageCount: number;
-  requiresToolCallReasoningReplay?: boolean;
+  policy: AiChatCompressionPolicy;
 };
 
 export const prepareAiChatMessagesForModel = (

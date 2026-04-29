@@ -25,6 +25,7 @@
     "icons:generate:pdf": "bun scripts/generate-icons.ts pdf",
     "preview": "bun run build:turbo && vite preview",
     "preview:www": "bun run --cwd www preview",
+    "test": "bun test",
     "format": "prettier --write \"./{src,www}/**/*.{js,jsx,ts,tsx,css,html,json,md}\"",
     "typecheck": "tsc --noEmit",
     "typecheck:www": "tsc --noEmit -p www/tsconfig.json",

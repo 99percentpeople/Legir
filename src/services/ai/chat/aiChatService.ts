@@ -11,6 +11,7 @@ import {
   estimateAiChatMessageTokens,
   prepareAiChatMessagesForModelRuntime,
 } from "@/services/ai/chat/runtime/messageContext";
+import { createDefaultAiChatCompressionPolicy } from "@/services/ai/chat/runtime/compression/types";
 import { createAiChatToolRuntime } from "@/services/ai/chat/runtime/toolRuntime";
 import {
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
@@ -146,14 +147,17 @@ export const aiChatService = {
     });
     const baseConversation: AiChatMessageRecord[] = [...options.messages];
     const turnStartMessageCount = baseConversation.length;
+    const compressionPolicy = createDefaultAiChatCompressionPolicy({
+      reasoningReplayPolicy: runtime.reasoning.replayPolicy,
+      turnStartMessageCount,
+      visualHistoryWindow: appOptions.aiChat.visualHistoryWindow,
+    });
     const buildStepMessages = async (messages: AiChatMessageRecord[]) => {
       const genericMessages = await prepareAiChatMessagesForModelRuntime({
         messages,
         aiChatOptions: appOptions.aiChat,
         contextMemory: getContextMemory?.(),
-        turnStartMessageCount,
-        requiresToolCallReasoningReplay:
-          runtime.reasoning.replayPolicy === "tool-calls",
+        policy: compressionPolicy,
       });
       const preparedMessages =
         runtime.profile.prepareMessages?.(genericMessages, {

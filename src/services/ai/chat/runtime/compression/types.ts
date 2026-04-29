@@ -3,20 +3,42 @@ import type {
   AiChatMessageRecord,
   AiChatTimelineItem,
 } from "@/services/ai/chat/types";
-import type { AiChatContextMemoryPlan } from "@/services/ai/chat/runtime/contextMemory";
+import type { AiChatContextMemoryPlan } from "@/services/ai/chat/runtime/memory/plan";
+import type { AiReasoningReplayPolicy } from "@/services/ai/providers/runtimeProfiles/types";
 import type { AppOptions } from "@/types";
 
 export type AiChatCompressionPhase = "projected" | "runtime";
 
+export type AiChatCompressionPolicy = {
+  reasoningReplayPolicy: AiReasoningReplayPolicy;
+  turnStartMessageCount: number;
+  visualHistoryWindow: number;
+};
+
+export const createDefaultAiChatCompressionPolicy = (options: {
+  reasoningReplayPolicy?: AiReasoningReplayPolicy;
+  turnStartMessageCount: number;
+  visualHistoryWindow: number;
+}): AiChatCompressionPolicy => ({
+  reasoningReplayPolicy: options.reasoningReplayPolicy ?? "none",
+  turnStartMessageCount: Math.max(
+    0,
+    Math.trunc(options.turnStartMessageCount || 0),
+  ),
+  visualHistoryWindow: Math.max(
+    0,
+    Math.trunc(options.visualHistoryWindow || 0),
+  ),
+});
+
 export type AiChatMessageCompressionOptions = {
   messages: AiChatMessageRecord[];
-  turnStartMessageCount: number;
   aiChatOptions: Pick<
     AppOptions["aiChat"],
     "contextCompressionEnabled" | "visualHistoryWindow"
   >;
   contextMemory?: AiChatContextMemory;
-  requiresToolCallReasoningReplay?: boolean;
+  policy: AiChatCompressionPolicy;
 };
 
 /**

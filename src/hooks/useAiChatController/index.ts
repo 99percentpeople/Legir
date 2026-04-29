@@ -72,6 +72,7 @@ import { createAiChatToolContext } from "@/hooks/useAiChatController/toolContext
 import { applyAiChatSessionUiState } from "@/hooks/useAiChatController/uiStateSync";
 import { retainAiChatContextMemoryForTimeline } from "@/services/ai/chat/runtime/contextMemory";
 import { defaultAiChatCompressionEngine } from "@/services/ai/chat/runtime/compression/engine";
+import { createDefaultAiChatCompressionPolicy } from "@/services/ai/chat/runtime/compression/types";
 import {
   estimateAiChatMessageTokens,
   prepareAiChatMessagesForModel,
@@ -325,7 +326,11 @@ export const useAiChatController = (
         messages: session.conversation,
         aiChatOptions,
         contextMemory: session.contextMemory,
-        turnStartMessageCount: session.conversation.length,
+        policy: createDefaultAiChatCompressionPolicy({
+          reasoningReplayPolicy: "none",
+          turnStartMessageCount: session.conversation.length,
+          visualHistoryWindow: aiChatOptions.visualHistoryWindow,
+        }),
       });
       const estimatedMessageTokens =
         estimateAiChatMessageTokens(preparedMessages);
@@ -1135,6 +1140,15 @@ export const useAiChatController = (
       const plan = defaultAiChatCompressionEngine.buildAiContextMemoryPlan({
         session,
         aiChatOptions: appOptions.aiChat,
+        getTimelineItemCountForConversationMessageCount: (
+          timelineItems,
+          conversationMessageCount,
+        ) =>
+          getTimelineItemCountForConversationMessageCount(
+            timelineItems,
+            conversationMessageCount,
+            session.runtimeTranscript.timelineBoundaries,
+          ),
       });
       if (!plan) return;
 

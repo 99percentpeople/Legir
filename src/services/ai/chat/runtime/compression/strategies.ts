@@ -1,10 +1,11 @@
 import { compressVisualToolHistoryForModel } from "@/services/ai/chat/runtime/imageCompression";
+import { applyAiChatContextMemoryToMessages } from "@/services/ai/chat/runtime/memory/apply";
 import {
-  applyAiChatContextMemoryToMessages,
   buildAiChatAlgorithmicMemoryText,
   countAiChatHeavyVisualToolMessages,
-  getAiChatContextMemoryPlan,
-} from "@/services/ai/chat/runtime/contextMemory";
+} from "@/services/ai/chat/runtime/memory/source";
+import { getAiChatContextMemoryPlan } from "@/services/ai/chat/runtime/memory/plan";
+import { buildAiChatCompressionSegments } from "@/services/ai/chat/runtime/compression/segments";
 import type {
   AiChatProjectedTokenEstimator,
   AiChatMessageCompressionStrategy,
@@ -29,9 +30,7 @@ export const contextMemoryMessageCompressionStrategy: AiChatMessageCompressionSt
         ? applyAiChatContextMemoryToMessages({
             messages: options.messages,
             contextMemory: options.contextMemory,
-            turnStartMessageCount: options.turnStartMessageCount,
-            requiresToolCallReasoningReplay:
-              options.requiresToolCallReasoningReplay,
+            policy: options.policy,
           })
         : options.messages,
   };
@@ -47,7 +46,7 @@ export const visualHistoryMessageCompressionStrategy: AiChatMessageCompressionSt
     apply: async (options) =>
       await compressVisualToolHistoryForModel({
         messages: options.messages,
-        keepWindow: options.aiChatOptions.visualHistoryWindow,
+        keepWindow: options.policy.visualHistoryWindow,
       }),
   };
 
@@ -84,13 +83,18 @@ export const aiContextCompressionStrategy: AiChatTurnCompressionStrategy<
 > = {
   id: "ai-context-memory",
   mode: "ai",
-  build: ({ session, aiChatOptions }) =>
+  build: ({
+    session,
+    aiChatOptions,
+    getTimelineItemCountForConversationMessageCount,
+  }) =>
     getAiChatContextMemoryPlan({
       timeline: session.timeline,
       conversation: session.conversation,
       contextMemory: session.contextMemory,
       aiChatOptions,
       contextTokens: session.contextTokens,
+      getTimelineItemCountForConversationMessageCount,
     }),
 };
 
@@ -123,7 +127,7 @@ const buildAlgorithmicContextMemory = (options: {
   }
 
   const targetTokens = Math.max(1, Math.floor(session.contextTokens / 2));
-  const conversationLength = session.conversation.length;
+  const segments = buildAiChatCompressionSegments(session.conversation);
   const visualWindow = Math.max(
     0,
     Math.trunc(aiChatOptions.visualHistoryWindow || 0),
@@ -137,12 +141,8 @@ const buildAlgorithmicContextMemory = (options: {
       }
     | undefined;
 
-  for (
-    let keepSuffixCount = conversationLength;
-    keepSuffixCount >= 0;
-    keepSuffixCount -= 1
-  ) {
-    const coveredMessageCount = conversationLength - keepSuffixCount;
+  for (const segment of segments) {
+    const coveredMessageCount = segment.endMessageIndexExclusive;
     if (coveredMessageCount <= 0) continue;
 
     const prefixMessages = session.conversation.slice(0, coveredMessageCount);

@@ -122,11 +122,25 @@ export const createAiChatCompressionEngine = (
     buildAiContextMemoryPlan: (options: {
       session: AiChatTurnCompressionSessionSnapshot;
       aiChatOptions: AiChatTurnCompressionOptions;
+      getTimelineItemCountForConversationMessageCount?: AiChatTimelineItemCounter;
     }) =>
       strategySet.aiStrategy.build({
         ...options,
         estimateProjectedTokens: () => 0,
-        getTimelineItemCountForConversationMessageCount: () => 0,
+        getTimelineItemCountForConversationMessageCount:
+          options.getTimelineItemCountForConversationMessageCount ??
+          ((timelineItems, conversationMessageCount) => {
+            if (conversationMessageCount <= 0) return 0;
+            if (
+              conversationMessageCount >= options.session.conversation.length
+            ) {
+              return timelineItems.length;
+            }
+            return Math.min(
+              options.session.contextMemory?.coveredTimelineItemCount ?? 0,
+              timelineItems.length,
+            );
+          }),
       }),
   };
 };
