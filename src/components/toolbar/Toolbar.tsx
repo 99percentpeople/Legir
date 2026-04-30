@@ -49,7 +49,7 @@ import PageSettingsDropdownControl from "./PageSettingsDropdownControl";
 import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getContrastColor } from "@/utils/colors";
-import ExportMenu from "./ExportMenu";
+import SaveMenu from "./SaveMenu";
 import { canSaveAs } from "@/services/platform";
 import { useEditorStore } from "@/store/useEditorStore";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -89,7 +89,7 @@ interface ToolbarProps {
   onStampStyleChange?: (
     style: Partial<NonNullable<EditorState["stampStyle"]>>,
   ) => void;
-  onExport: () => Promise<boolean>;
+  onSave: () => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onPrint: () => void;
   onExit: () => void;
@@ -130,7 +130,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onFreetextStyleChange: onFreetextStyleChange,
   onShapeStyleChange,
   onStampStyleChange,
-  onExport,
+  onSave,
   onSaveAs,
   onPrint,
   onExit,
@@ -785,11 +785,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
           )}
         </div>
 
-        <ExportMenu
+        <SaveMenu
           disabled={editorState.pages.length === 0}
           isDirty={!!isDirty}
           hasSaveAs={hasSaveAs.current}
-          onPrimary={onExport}
+          onPrimary={onSave}
           onSaveAs={onSaveAs}
           onExit={onExit}
           onPrint={onPrint}

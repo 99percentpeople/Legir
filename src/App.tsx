@@ -69,7 +69,7 @@ import {
   confirmPlatformAction,
   destroyPlatformWindow,
   emitTabWorkspaceEvent,
-  exportPdfBytes,
+  canSaveWithPicker,
   getPlatformWindowId,
   listenForPlatformFileDrop,
   listenForPlatformFileDragState,
@@ -85,13 +85,13 @@ import {
   readPlatformRuntimeSnapshot,
   resolveGlobalEditorUiSessionForDocument,
   requestPlatformFocusExistingDocument,
+  savePdfBytes,
   saveGlobalEditorUiSession,
   subscribePlatformRuntimeChange,
   writeToSaveTarget,
   type PlatformDroppedPdf,
   type SaveTarget,
 } from "@/services/platform";
-import type { EditorState } from "@/types";
 
 type ExtractedTransferTab = {
   session: EditorTabSession;
@@ -194,12 +194,6 @@ const App: React.FC = () => {
       setPlatformRuntime(nextSnapshot);
     });
   }, []);
-
-  const isTauriSaveTarget = (
-    target: SaveTarget,
-  ): target is { kind: "tauri"; path: string } => {
-    return target?.kind === "tauri" && typeof target?.path === "string";
-  };
 
   const captureActiveTabState = useCallback(() => {
     const state = useEditorStore.getState();
@@ -1504,53 +1498,50 @@ const App: React.FC = () => {
     [captureCurrentTabIntoState, moveTabToWindow, platformWindowId],
   );
 
-  const generatePDF = useCallback(async () => {
-    const snapshot = useEditorStore.getState();
-    if (!snapshot.pdfBytes) return null;
+  const generatePDF = useCallback(
+    async (options?: { flattenFormFields?: boolean }) => {
+      const snapshot = useEditorStore.getState();
+      if (!snapshot.pdfBytes) return null;
 
-    return await exportPDF(
-      snapshot.pdfBytes,
-      snapshot.fields,
-      snapshot.metadata,
-      snapshot.annotations,
-      undefined,
-      {
-        openPassword: snapshot.pdfOpenPassword,
-        exportPassword: snapshot.exportPassword,
-        removeTextUnderFlattenedFreetext:
-          snapshot.options.removeTextUnderFlattenedFreetext,
-        preservedSourceAnnotations: snapshot.preservedSourceAnnotations,
-      },
-    );
-  }, []);
+      return await exportPDF(
+        snapshot.pdfBytes,
+        snapshot.fields,
+        snapshot.metadata,
+        snapshot.annotations,
+        undefined,
+        {
+          openPassword: snapshot.pdfOpenPassword,
+          exportPassword: snapshot.exportPassword,
+          removeTextUnderFlattenedFreetext:
+            snapshot.options.removeTextUnderFlattenedFreetext,
+          preservedSourceAnnotations: snapshot.preservedSourceAnnotations,
+          flattenFormFields: options?.flattenFormFields,
+        },
+      );
+    },
+    [],
+  );
 
-  const handleSaveAs = useCallback(async (): Promise<boolean> => {
-    const snapshot = useEditorStore.getState();
-    if (!snapshot.pdfBytes) return false;
-
-    return await withProcessing(t("app.generating"), async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const modifiedBytes = await generatePDF();
-      if (!modifiedBytes) return false;
-
-      const target = await pickSaveTarget({
-        suggestedName: snapshot.filename || "document.pdf",
-        filters: [{ name: "PDF Document", extensions: ["pdf"] }],
-      });
-      if (!target) return false;
-
-      await writeToSaveTarget(target, modifiedBytes);
-
+  const commitSavedPdf = useCallback(
+    async (options: {
+      target: SaveTarget;
+      pdfBytes: Uint8Array;
+      fallbackFilename?: string;
+    }) => {
+      const { target, pdfBytes } = options;
       const nextFilename = (() => {
-        if (isTauriSaveTarget(target)) {
+        if (target.kind === "tauri") {
           const normalized = target.path.replace(/\\/g, "/");
           const parts = normalized.split("/").filter(Boolean);
-          return parts.length > 0 ? parts[parts.length - 1] : snapshot.filename;
+          return (
+            parts[parts.length - 1] ||
+            options.fallbackFilename ||
+            "document.pdf"
+          );
         }
-        if (target.kind === "web") {
-          return target.handle?.name || snapshot.filename;
-        }
-        return snapshot.filename;
+        return (
+          target.handle?.name || options.fallbackFilename || "document.pdf"
+        );
       })();
 
       let nextSaveTarget = target;
@@ -1559,8 +1550,8 @@ const App: React.FC = () => {
         const remembered = await rememberWebRecentFile({
           path: target.id,
           handle: target.handle,
-          filename: nextFilename || target.handle.name || "document.pdf",
-          pdfBytes: modifiedBytes,
+          filename: nextFilename,
+          pdfBytes,
           forcePreviewRender: true,
         });
 
@@ -1571,22 +1562,57 @@ const App: React.FC = () => {
       }
 
       setState({
-        saveTarget: nextSaveTarget as unknown as EditorState["saveTarget"],
+        saveTarget: nextSaveTarget,
         filename: nextFilename,
         lastSavedAt: new Date(),
         isDirty: false,
       });
 
-      if (isTauriSaveTarget(target)) {
+      if (target.kind === "tauri") {
         recentFilesService.upsertWithBytesPreview({
           path: target.path,
-          filename: nextFilename || "document.pdf",
-          pdfBytes: modifiedBytes,
+          filename: nextFilename,
+          pdfBytes,
           targetWidth: 240,
           renderAnnotations: true,
           forcePreviewRender: true,
         });
       }
+    },
+    [setState],
+  );
+
+  const handleSaveAs = useCallback(async (): Promise<boolean> => {
+    const initialSnapshot = useEditorStore.getState();
+    if (!initialSnapshot.pdfBytes) return false;
+
+    let target: SaveTarget | null = null;
+    try {
+      target = await pickSaveTarget({
+        suggestedName: initialSnapshot.filename || "document.pdf",
+        filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+      });
+    } catch (err) {
+      if (err?.name === "AbortError") return false;
+      console.error("Save As failed:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`${t("app.save_fail")}${msg ? `: ${msg}` : ""}`);
+      return false;
+    }
+    if (!target) return false;
+
+    return await withProcessing(t("app.generating"), async () => {
+      const snapshot = useEditorStore.getState();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const modifiedBytes = await generatePDF();
+      if (!modifiedBytes) return false;
+
+      await writeToSaveTarget(target, modifiedBytes);
+      await commitSavedPdf({
+        target,
+        pdfBytes: modifiedBytes,
+        fallbackFilename: snapshot.filename,
+      });
 
       toast.success(t("app.save_success"));
       return true;
@@ -1597,73 +1623,74 @@ const App: React.FC = () => {
       toast.error(`${t("app.save_fail")}${msg ? `: ${msg}` : ""}`);
       return false;
     });
-  }, [generatePDF, setState, t, withProcessing]);
+  }, [commitSavedPdf, generatePDF, t, withProcessing]);
 
-  const handleExport = useCallback(async (): Promise<boolean> => {
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    const initialSnapshot = useEditorStore.getState();
+    if (!initialSnapshot.pdfBytes) return false;
+
+    let preselectedTarget: SaveTarget | null = null;
+
+    if (!initialSnapshot.saveTarget && canSaveWithPicker()) {
+      try {
+        preselectedTarget = await pickSaveTarget({
+          suggestedName: initialSnapshot.filename || "document.pdf",
+          filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+        });
+      } catch (error) {
+        if (error?.name === "AbortError") return false;
+        console.error("Save failed:", error);
+        const msg = error instanceof Error ? error.message : String(error);
+        toast.error(`${t("app.save_fail")}${msg ? `: ${msg}` : ""}`);
+        return false;
+      }
+      if (!preselectedTarget) return false;
+    }
+
     return await withProcessing(t("app.generating"), async () => {
       const snapshot = useEditorStore.getState();
       const modifiedBytes = await generatePDF();
       if (!modifiedBytes) return false;
 
-      const result = await exportPdfBytes({
-        bytes: modifiedBytes,
-        filename: snapshot.filename || "document.pdf",
-        existingTarget: snapshot.saveTarget,
-        filters: [{ name: "PDF Document", extensions: ["pdf"] }],
-      });
+      let result: Awaited<ReturnType<typeof savePdfBytes>>;
+      if (preselectedTarget) {
+        await writeToSaveTarget(preselectedTarget, modifiedBytes);
+        result = {
+          ok: true,
+          kind: "saved",
+          target: preselectedTarget,
+        };
+      } else {
+        result = await savePdfBytes({
+          bytes: modifiedBytes,
+          filename: snapshot.filename || "document.pdf",
+          existingTarget: snapshot.saveTarget,
+        });
+      }
 
       if (!result.ok) return false;
 
       if (result.kind === "saved") {
-        let nextExportTarget = result.target;
-
-        if (result.target.kind === "web") {
-          const remembered = await rememberWebRecentFile({
-            path: result.target.id,
-            handle: result.target.handle,
-            filename:
-              result.target.handle.name || snapshot.filename || "document.pdf",
-            pdfBytes: modifiedBytes,
-            forcePreviewRender: true,
-          });
-
-          nextExportTarget = {
-            ...result.target,
-            ...(remembered.path ? { id: remembered.path } : {}),
-          };
-        }
-
-        setState({
-          saveTarget: nextExportTarget as unknown as EditorState["saveTarget"],
-          lastSavedAt: new Date(),
-          isDirty: false,
+        await commitSavedPdf({
+          target: result.target,
+          pdfBytes: modifiedBytes,
+          fallbackFilename: snapshot.filename,
         });
-
-        if (isTauriSaveTarget(result.target)) {
-          recentFilesService.upsertWithBytesPreview({
-            path: result.target.path,
-            filename: snapshot.filename || "document.pdf",
-            pdfBytes: modifiedBytes,
-            targetWidth: 240,
-            renderAnnotations: true,
-            forcePreviewRender: true,
-          });
-        }
         toast.success(t("app.save_success"));
       }
 
       return true;
     }).catch((error) => {
-      console.error("Export failed:", error);
+      console.error("Save failed:", error);
       const msg = error instanceof Error ? error.message : String(error);
-      toast.error(`${t("app.export_fail")}${msg ? `: ${msg}` : ""}`);
+      toast.error(`${t("app.save_fail")}${msg ? `: ${msg}` : ""}`);
       return false;
     });
-  }, [generatePDF, setState, t, withProcessing]);
+  }, [commitSavedPdf, generatePDF, t, withProcessing]);
 
   const handlePrint = useCallback(async () => {
     await withProcessing(t("app.generating"), async () => {
-      const modifiedBytes = await generatePDF();
+      const modifiedBytes = await generatePDF({ flattenFormFields: true });
       if (!modifiedBytes) return;
 
       const blob = new Blob([new Uint8Array(modifiedBytes)], {
@@ -1710,8 +1737,8 @@ const App: React.FC = () => {
   const runPrimarySaveAction = useCallback(async () => {
     const snapshot = useEditorStore.getState();
     if (!snapshot.isDirty) return true;
-    return await handleExport();
-  }, [handleExport]);
+    return await handleSave();
+  }, [handleSave]);
   const navigateToHome = useCallback(() => {
     navigate("/");
   }, [navigate]);
@@ -1791,7 +1818,7 @@ const App: React.FC = () => {
           onMergeTabToWindow: handleMergeTabToWindow,
           canDetachTabs: supportsMultiWindow && windowLayout.tabIds.length > 1,
           canMergeTabs: supportsMultiWindow && mergeWindowTargets.length > 0,
-          onExport: handleExport,
+          onSave: handleSave,
           onSaveAs: handleSaveAs,
           onExit: onEditorCloseCurrentTabAfterSave,
           onPrint: onEditorPrint,

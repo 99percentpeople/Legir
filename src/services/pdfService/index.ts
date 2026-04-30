@@ -15,6 +15,16 @@ import {
   isExplicitCjkFontSelection,
 } from "./lib/text";
 import {
+  captureAcroFormXfaEntry,
+  fieldMatchesSourcePdfRef,
+  restoreAcroFormXfaEntry,
+  safeRemovePdfField,
+  setAcroFormNeedAppearances,
+  sourcePdfRefToFormKey,
+  updateExistingSourceField,
+} from "./lib/form-field-export";
+import { prepareAnnotationsForPrint } from "./lib/print-export";
+import {
   buildFullFieldNameFromChain,
   decodePdfStreamToText,
   extractBorderDashArray,
@@ -55,11 +65,11 @@ import {
   PDFName,
   PDFString,
   PDFDict,
-  PDFBool,
   PDFArray,
   PDFStream,
   PDFNumber,
   PDFTextField,
+  PDFButton,
   PDFCheckBox,
   PDFDropdown,
   PDFOptionList,
@@ -1906,6 +1916,7 @@ export const exportPDF = async (
     removeTextUnderFlattenedFreetext?: boolean;
     pageIndexes?: number[];
     preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
+    flattenFormFields?: boolean;
   },
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
@@ -2096,7 +2107,9 @@ export const exportPDF = async (
     subset: true,
   });
 
+  const xfaEntry = captureAcroFormXfaEntry(pdfDoc);
   const form = pdfDoc.getForm();
+  restoreAcroFormXfaEntry(xfaEntry);
 
   const pagesWithFields = new Set(fields.map((field) => field.pageIndex));
   const pagesWithExportableAnnotations = new Set(
@@ -2149,33 +2162,17 @@ export const exportPDF = async (
   }
 
   const hasNonFlattenFreeText = annotations.some(
-    (a) => a?.type === "freetext" && !a.flatten,
+    (annotation) => annotation?.type === "freetext" && !annotation.flatten,
   );
 
-  if (fields.length > 0 && !hasNonFlattenFreeText) {
-    try {
-      let acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
-      if (!acroForm) {
-        acroForm = pdfDoc.context.obj({});
-        pdfDoc.catalog.set(PDFName.of("AcroForm"), acroForm);
-      }
-
-      if (acroForm instanceof PDFDict) {
-        acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
-      }
-    } catch (e) {
-      console.warn("Failed to set NeedAppearances", e);
-    }
-  } else {
-    try {
-      const acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
-      if (acroForm instanceof PDFDict) {
-        acroForm.set(PDFName.of("NeedAppearances"), PDFBool.False);
-      }
-    } catch {}
-  }
-
   // 1. Cleanup Existing Fields
+  const sourceFieldRefKeys = new Set(
+    fields
+      .map((field) => sourcePdfRefToFormKey(field.sourcePdfRef))
+      .filter((key): key is string => !!key),
+  );
+  const hasCurrentFields = fields.length > 0;
+  const currentFieldNames = new Set(fields.map((field) => field.name));
   const existingFields = form.getFields();
   for (const field of existingFields) {
     let shouldRemove = false;
@@ -2195,12 +2192,24 @@ export const exportPDF = async (
         (typeof PDFSignature !== "undefined" &&
           field instanceof PDFSignature) ||
         typeName === "PDFSignature";
+      const isButton = field instanceof PDFButton || typeName === "PDFButton";
+      const isSupportedExportField =
+        isText || isCheck || isDropdown || isOptionList || isRadio || isSig;
+      const isImportedSourceField = fieldMatchesSourcePdfRef(
+        field,
+        sourceFieldRefKeys,
+      );
+      const isCurrentField = currentFieldNames.has(field.getName());
 
       shouldRemove =
-        isText || isCheck || isDropdown || isOptionList || isRadio || isSig;
+        (hasCurrentFields &&
+          isSupportedExportField &&
+          !isCurrentField &&
+          !isImportedSourceField) ||
+        (options?.flattenFormFields === true && isButton);
 
       if (shouldRemove) {
-        form.removeField(field);
+        safeRemovePdfField(form, field);
       }
     } catch {
       console.warn(
@@ -2208,49 +2217,7 @@ export const exportPDF = async (
       );
 
       if (shouldRemove) {
-        try {
-          const fieldRef = (field as unknown as { ref?: PDFRef }).ref;
-          const acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
-          if (acroForm instanceof PDFDict) {
-            const acroFields = acroForm.lookup(PDFName.of("Fields"));
-            if (acroFields instanceof PDFArray) {
-              if (fieldRef) {
-                const idx = acroFields.indexOf(fieldRef);
-                if (typeof idx === "number" && idx !== -1) {
-                  acroFields.remove(idx);
-                }
-              }
-            }
-          }
-
-          const acroField = (field as unknown as { acroField?: unknown })
-            .acroField;
-          const acroFieldWithWidgets = acroField as
-            | { getWidgets?: unknown }
-            | undefined;
-          if (typeof acroFieldWithWidgets?.getWidgets === "function") {
-            const widgets = (
-              acroFieldWithWidgets.getWidgets as () => unknown
-            )();
-            if (Array.isArray(widgets)) {
-              const pages = pdfDoc.getPages();
-              for (const page of pages) {
-                const annots = page.node.Annots();
-                if (annots instanceof PDFArray) {
-                  for (const widget of widgets) {
-                    if (!(widget instanceof PDFRef)) continue;
-                    const wIdx = annots.indexOf(widget);
-                    if (typeof wIdx === "number" && wIdx !== -1) {
-                      annots.remove(wIdx);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } catch (cleanupErr) {
-          console.error("Manual cleanup failed:", cleanupErr);
-        }
+        safeRemovePdfField(form, field);
       }
     }
   }
@@ -2379,6 +2346,13 @@ export const exportPDF = async (
       }
 
       const field = entry.control;
+      const didUpdateExistingField = updateExistingSourceField(
+        form,
+        field,
+        fontMap,
+      );
+      if (didUpdateExistingField) continue;
+
       const exporter = controlExporters.find((e) => e.shouldExport(field));
       if (!exporter) continue;
       try {
@@ -2434,6 +2408,37 @@ export const exportPDF = async (
     }
   }
 
+  setAcroFormNeedAppearances(
+    pdfDoc,
+    options?.flattenFormFields
+      ? false
+      : fields.length > 0 && !hasNonFlattenFreeText,
+  );
+  restoreAcroFormXfaEntry(xfaEntry);
+
+  if (options?.flattenFormFields && form.getFields().length > 0) {
+    try {
+      form.flatten({ updateFieldAppearances: false });
+    } catch (error) {
+      console.warn("Failed to flatten form fields", error);
+    }
+    setAcroFormNeedAppearances(pdfDoc, false);
+    restoreAcroFormXfaEntry(xfaEntry);
+  }
+
+  if (options?.flattenFormFields) {
+    try {
+      await prepareAnnotationsForPrint({
+        pages,
+        annotations,
+        getViewportForPage,
+        targetPageIndexSet,
+      });
+    } catch (error) {
+      console.warn("Failed to prepare annotations for print", error);
+    }
+  }
+
   if (targetPageIndexes.length > 0) {
     const indexesToRemove = Array.from(
       { length: pages.length },
@@ -2461,7 +2466,8 @@ export const exportPDF = async (
     pdfDoc.context.trailerInfo.ID = undefined;
   }
 
-  return await pdfDoc.save();
+  restoreAcroFormXfaEntry(xfaEntry);
+  return await pdfDoc.save({ updateFieldAppearances: false });
 };
 
 export { renderPage, renderPageBytes } from "./pdfRenderer";

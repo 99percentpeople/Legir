@@ -52,7 +52,7 @@ export interface EditorPageProps {
   ) => Promise<void>;
   canDetachTabs: boolean;
   canMergeTabs: boolean;
-  onExport: () => Promise<boolean>;
+  onSave: () => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
   onPrint: () => void;
@@ -103,7 +103,7 @@ export interface EditorCanvasMobileToolbar {
   onTogglePropertiesPanel: () => void;
   onOpenSettings: () => void;
   isSearchOpen: boolean;
-  onExport: () => Promise<boolean>;
+  onSave: () => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onPrint: () => void;
   onExit: () => void;

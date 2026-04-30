@@ -16,10 +16,10 @@ export type OpenFileResult = {
   filename: string;
 };
 
-export type ExportPdfResult =
+export type SavePdfResult =
   | { ok: true; kind: "download" }
   | { ok: true; kind: "saved"; target: SaveTarget }
-  | { ok: false; reason: "cancelled" | "unsupported" };
+  | { ok: false; reason: "unsupported" };
 
 const canUseWindowPicker = (
   apiName: "showOpenFilePicker" | "showSaveFilePicker",
@@ -244,54 +244,17 @@ export const saveFileAs = async (options: {
   return true;
 };
 
-export const exportPdfBytes = async (options: {
+export const savePdfBytes = async (options: {
   bytes: Uint8Array;
   filename: string;
   existingTarget?: SaveTarget | null;
-  filters?: FilePickerFilter[];
-}): Promise<ExportPdfResult> => {
-  if (isDesktopApp()) {
-    const target =
-      options.existingTarget ??
-      (await pickSaveTarget({
-        suggestedName: options.filename,
-        filters: options.filters,
-      }));
-    if (!target) return { ok: false, reason: "cancelled" };
-
-    await writeToSaveTarget(target, options.bytes);
-    return { ok: true, kind: "saved", target };
-  }
-
-  if (options.existingTarget?.kind === "web") {
+}): Promise<SavePdfResult> => {
+  if (options.existingTarget) {
     await writeToSaveTarget(options.existingTarget, options.bytes);
     return { ok: true, kind: "saved", target: options.existingTarget };
   }
 
-  if (canSaveWithPicker()) {
-    try {
-      const target = await pickSaveTarget({
-        suggestedName: options.filename,
-        filters: options.filters,
-      });
-      if (!target) return { ok: false, reason: "cancelled" };
-
-      await writeToSaveTarget(target, options.bytes);
-      return { ok: true, kind: "saved", target };
-    } catch (error: unknown) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "name" in error &&
-        error.name === "AbortError"
-      ) {
-        return { ok: false, reason: "cancelled" };
-      }
-      throw error;
-    }
-  }
-
-  if (typeof document === "undefined") {
+  if (isDesktopApp() || typeof document === "undefined") {
     return { ok: false, reason: "unsupported" };
   }
 

@@ -116,7 +116,7 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
             : formatShortcut("Ctrl + Y"),
           action: stripShortcutSuffix(formatShortcut(t("toolbar.redo"))),
         },
-        { key: formatShortcut("Ctrl + S"), action: t("shortcuts.export") },
+        { key: formatShortcut("Ctrl + S"), action: t("common.actions.save") },
         { key: formatShortcut("Ctrl + P"), action: t("shortcuts.print") },
         {
           key: formatShortcut("Ctrl / Cmd + F"),

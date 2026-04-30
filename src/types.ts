@@ -117,6 +117,7 @@ export interface FormField {
   maxLength?: number; // For Text
   alignment?: "left" | "center" | "right"; // For Text
   rotationDeg?: number;
+  sourcePdfRef?: { objectNumber: number; generationNumber: number };
 }
 
 export interface Annotation {

@@ -21,7 +21,7 @@ import { ButtonGroup } from "../ui/button-group";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 
-export interface ExportMenuProps {
+export interface SaveMenuProps {
   disabled: boolean;
   isDirty: boolean;
   hasSaveAs: boolean;
@@ -32,7 +32,7 @@ export interface ExportMenuProps {
   onClose: () => void;
 }
 
-const ExportMenu: React.FC<ExportMenuProps> = ({
+const SaveMenu: React.FC<SaveMenuProps> = ({
   disabled,
   isDirty,
   hasSaveAs,
@@ -140,4 +140,4 @@ const ExportMenu: React.FC<ExportMenuProps> = ({
   );
 };
 
-export default ExportMenu;
+export default SaveMenu;

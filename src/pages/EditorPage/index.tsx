@@ -59,7 +59,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
   onMergeTabToWindow,
   canDetachTabs,
   canMergeTabs,
-  onExport,
+  onSave,
   onSaveAs,
   onExit,
   onPrint,
@@ -202,8 +202,8 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const runPrimarySaveAction = React.useCallback(async () => {
     const snapshot = useEditorStore.getState();
     if (!snapshot.isDirty) return true;
-    return await onExport();
-  }, [onExport]);
+    return await onSave();
+  }, [onSave]);
 
   const { workspaceScrollContainerRef } = useEditorPageLifecycle({
     filename: state.filename,
@@ -640,7 +640,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
         onFreetextStyleChange={handleFreetextStyleChange}
         onShapeStyleChange={handleShapeStyleChange}
         onStampStyleChange={handleStampStyleChange}
-        onExport={onExport}
+        onSave={onSave}
         onSaveAs={onSaveAs}
         onExit={handleExitEditorPage}
         onClose={handleRequestCloseFromUi}
@@ -779,7 +779,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
             onTogglePropertiesPanel: toggleRightPanel,
             onOpenSettings: () => openDialog("settings"),
             isSearchOpen: pdfSearch.isPdfSearchOpen,
-            onExport,
+            onSave,
             onSaveAs,
             onPrint,
             onExit: handleExitEditorPage,
