@@ -426,7 +426,6 @@ const zhCN = {
     tool_progress_done: "{count}已完成",
     input_placeholder: "让 AI 读取、搜索、跳转或高亮 PDF 内容...",
     input_hint: "按 Enter 发送，Shift+Enter 换行。",
-    token_usage: "Tokens",
     context_compression_running: "压缩中",
     token_usage_context: "上下文",
     token_usage_input: "输入",

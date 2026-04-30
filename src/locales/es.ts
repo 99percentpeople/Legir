@@ -436,7 +436,6 @@ const es = {
     input_placeholder:
       "Pide a la IA que lea, busque, navegue o resalte contenido del PDF...",
     input_hint: "Pulsa Enter para enviar, Shift+Enter para una nueva línea.",
-    token_usage: "Tokens",
     context_compression_running: "Comprimiendo",
     token_usage_context: "Contexto",
     token_usage_input: "Entrada",

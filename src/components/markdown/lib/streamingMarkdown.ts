@@ -6,6 +6,7 @@ import type {
   MarkdownHtmlSegment,
   MarkdownListKind,
   MarkdownTableAlignment,
+  StreamingCodeBlockViewModel,
   StreamingListItemViewModel,
   StreamingListViewModel,
   StreamingSpecialBlockViewModel,
@@ -37,6 +38,11 @@ interface ParsedStreamingTableSegment {
   rowCells: string[][];
 }
 
+interface CodeFenceDescriptor {
+  marker: "`" | "~";
+  size: number;
+}
+
 interface ParsedListMarker {
   content: string;
   indent: number;
@@ -55,16 +61,28 @@ const BLOCKQUOTE_LINE_PATTERN = /^ {0,3}>\s?/;
 const LIST_MARKER_CAPTURE_PATTERN =
   /^(\s*)(?:(\d+)[.)]|([-+*]))(?:\s+(.*)|\s*)$/;
 
-const isFenceCloser = (
-  line: string,
-  fence: { marker: "`" | "~"; size: number },
-) => {
+const isFenceCloser = (line: string, fence: CodeFenceDescriptor) => {
   const trimmed = line.trim();
   if (!trimmed.startsWith(fence.marker.repeat(fence.size))) {
     return false;
   }
 
   return new RegExp(`^${fence.marker}{${fence.size},}\\s*$`).test(trimmed);
+};
+
+const isPartialFenceCloserLine = (line: string, fence: CodeFenceDescriptor) => {
+  const trimmed = line.trim();
+  return (
+    trimmed.length > 0 &&
+    trimmed.length < fence.size &&
+    Array.from(trimmed).every((char) => char === fence.marker)
+  );
+};
+
+const getFenceLanguage = (infoString: string) => {
+  const language = infoString.trim().split(/\s+/, 1)[0] ?? "";
+  const normalizedLanguage = language.replace(/[^\w-]/g, "");
+  return normalizedLanguage || null;
 };
 
 const getMarkdownLineRecords = (source: string): MarkdownLineRecord[] => {
@@ -250,6 +268,39 @@ const parseStreamingListSegment = (
   if (!parsedTree || parsedTree.nextIndex !== lines.length) return null;
 
   return parsedTree.list;
+};
+
+const parseStreamingCodeBlockSegment = (
+  source: string,
+): StreamingCodeBlockViewModel | null => {
+  if (!source.trim()) return null;
+
+  const lines = getMarkdownLineRecords(source);
+  const opener = lines[0];
+  if (!opener) return null;
+
+  const fenceMatch = opener.text.match(FENCE_PATTERN);
+  if (!fenceMatch) return null;
+
+  const fenceSequence = fenceMatch[1]!;
+  const fence: CodeFenceDescriptor = {
+    marker: fenceSequence[0] as "`" | "~",
+    size: fenceSequence.length,
+  };
+  const contentStart = opener.nextStart;
+  const lastLine = lines.at(-1);
+  const codeEnd =
+    lastLine &&
+    lastLine.start >= contentStart &&
+    !source.endsWith("\n") &&
+    isPartialFenceCloserLine(lastLine.text, fence)
+      ? lastLine.start
+      : source.length;
+
+  return {
+    code: source.slice(contentStart, codeEnd),
+    language: getFenceLanguage(fenceMatch[2] ?? ""),
+  };
 };
 
 const splitMarkdownTableCells = (line: string) => {
@@ -568,7 +619,7 @@ export const splitMarkdownStream = (
 
   const lines = getMarkdownLineRecords(source);
   let blockStart = 0;
-  let activeFence: { marker: "`" | "~"; size: number } | null = null;
+  let activeFence: CodeFenceDescriptor | null = null;
   let lineIndex = 0;
 
   while (lineIndex < lines.length) {
@@ -753,6 +804,19 @@ export const buildStreamingSpecialBlockViewModel = (
 ): StreamingSpecialBlockViewModel | null => {
   if (!streaming) {
     return null;
+  }
+
+  const streamingCode = parseStreamingCodeBlockSegment(source);
+  if (streamingCode) {
+    if (previousBlock?.kind === "code" && previousBlock.source === source) {
+      return previousBlock;
+    }
+
+    return {
+      kind: "code",
+      source,
+      viewModel: streamingCode,
+    };
   }
 
   const parsedList = parseStreamingListSegment(source);

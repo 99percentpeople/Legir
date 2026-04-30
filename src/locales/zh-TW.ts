@@ -425,7 +425,6 @@ const zhTW = {
     tool_progress_done: "{count} 個已完成",
     input_placeholder: "讓 AI 讀取、搜尋、跳轉或高亮 PDF 內容...",
     input_hint: "按 Enter 送出，Shift+Enter 換行。",
-    token_usage: "Tokens",
     context_compression_running: "壓縮中",
     token_usage_context: "上下文",
     token_usage_input: "輸入",

@@ -431,7 +431,6 @@ const en = {
     input_placeholder:
       "Ask the AI to read, search, jump, or highlight PDF content...",
     input_hint: "Press Enter to send, Shift+Enter for a new line.",
-    token_usage: "Tokens",
     context_compression_running: "Compressing",
     token_usage_context: "Context",
     token_usage_input: "In",

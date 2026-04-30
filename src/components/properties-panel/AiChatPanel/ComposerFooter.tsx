@@ -133,7 +133,6 @@ export function ComposerFooter({
       </div>
 
       <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px]">
-        <span className="font-medium">{t("ai_chat.token_usage")}</span>
         <span>
           {t("ai_chat.token_usage_context")} {formatTokenCount(contextTokens)}
         </span>

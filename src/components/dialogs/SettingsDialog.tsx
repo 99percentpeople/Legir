@@ -93,7 +93,7 @@ interface SettingsDialogProps {
 const SETTINGS_TABS_ROOT_CLASS =
   "flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row";
 const SETTINGS_TABS_LIST_CLASS =
-  "shrink-0 text-foreground h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent py-1 sm:h-min sm:w-auto sm:flex-col sm:overflow-visible";
+  "shrink-0 text-foreground h-auto w-full items-start justify-start gap-1 overflow-x-auto rounded-none bg-transparent py-1 sm:h-min sm:w-auto sm:flex-col sm:overflow-visible";
 const SETTINGS_TABS_CONTENT_CLASS =
   "min-h-0 grow overflow-y-auto rounded-md border p-4 py-4 text-start";
 

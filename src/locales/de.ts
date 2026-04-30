@@ -436,7 +436,6 @@ const de = {
     input_placeholder:
       "Bitten Sie die KI, PDF-Inhalte zu lesen, zu suchen, zu springen oder hervorzuheben...",
     input_hint: "Enter zum Senden, Shift+Enter für eine neue Zeile.",
-    token_usage: "Token",
     context_compression_running: "Komprimieren",
     token_usage_context: "Kontext",
     token_usage_input: "Eingabe",

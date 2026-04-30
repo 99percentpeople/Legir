@@ -438,7 +438,6 @@ const fr = {
       "Demandez à l'IA de lire, rechercher, naviguer ou surligner le contenu du PDF...",
     input_hint:
       "Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne.",
-    token_usage: "Tokens",
     context_compression_running: "Compression",
     token_usage_context: "Contexte",
     token_usage_input: "Entrée",

@@ -433,7 +433,6 @@ const ja = {
     input_placeholder:
       "AI に PDF の内容を読ませたり、検索、移動、ハイライトさせたりできます...",
     input_hint: "Enter で送信、Shift+Enter で改行します。",
-    token_usage: "トークン",
     context_compression_running: "圧縮中",
     token_usage_context: "コンテキスト",
     token_usage_input: "入力",

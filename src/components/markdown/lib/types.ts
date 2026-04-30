@@ -25,6 +25,11 @@ export interface StreamingListViewModel {
 
 export type MarkdownTableAlignment = "center" | "left" | "right" | null;
 
+export interface StreamingCodeBlockViewModel {
+  code: string;
+  language: string | null;
+}
+
 export interface StreamingTableCellViewModel {
   html: string;
   source: string;
@@ -41,6 +46,11 @@ export interface StreamingTableViewModel {
 }
 
 export type StreamingSpecialBlockViewModel =
+  | {
+      kind: "code";
+      source: string;
+      viewModel: StreamingCodeBlockViewModel;
+    }
   | {
       kind: "list";
       source: string;

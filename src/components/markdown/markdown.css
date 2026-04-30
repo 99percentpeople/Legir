@@ -78,7 +78,7 @@
     }
 
     pre {
-      @apply bg-background/80 my-3 max-w-full overflow-x-auto rounded-md px-3 py-2.5 font-mono text-[13px];
+      @apply bg-background/80 my-3 max-w-full overflow-x-auto overflow-y-hidden rounded-md px-3 py-2.5 font-mono text-[13px];
 
       code {
         @apply block min-w-max bg-transparent p-0 whitespace-pre text-inherit;

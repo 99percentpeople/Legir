@@ -6,6 +6,7 @@ import {
 } from "./lib/renderMarkdownHtml";
 import type {
   MarkdownTableAlignment,
+  StreamingCodeBlockViewModel,
   StreamingListItemViewModel,
   StreamingListViewModel,
   StreamingSpecialBlockViewModel,
@@ -231,6 +232,29 @@ const StreamingTableSegment = React.memo(function StreamingTableSegment({
   );
 });
 
+const StreamingCodeBlockSegment = React.memo(
+  function StreamingCodeBlockSegment({
+    codeBlock,
+    trailing,
+  }: {
+    codeBlock: StreamingCodeBlockViewModel;
+    trailing?: React.ReactNode;
+  }) {
+    return (
+      <pre>
+        <code
+          className={
+            codeBlock.language ? `language-${codeBlock.language}` : undefined
+          }
+        >
+          {codeBlock.code}
+          {trailing}
+        </code>
+      </pre>
+    );
+  },
+);
+
 export const StreamingSpecialBlockSegment = React.memo(
   function StreamingSpecialBlockSegment({
     block,
@@ -239,6 +263,15 @@ export const StreamingSpecialBlockSegment = React.memo(
     block: StreamingSpecialBlockViewModel;
     trailing?: React.ReactNode;
   }) {
+    if (block.kind === "code") {
+      return (
+        <StreamingCodeBlockSegment
+          codeBlock={block.viewModel}
+          trailing={trailing}
+        />
+      );
+    }
+
     if (block.kind === "list") {
       return (
         <StreamingListSegment list={block.viewModel} trailing={trailing} />
