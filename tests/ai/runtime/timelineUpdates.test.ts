@@ -4,9 +4,9 @@ import {
   applyAssistantUpdateToTimeline,
   applyToolUpdateToTimeline,
   applyUsageSnapshotToTurnTimeline,
-  finalizeStreamingTimeline,
   getLatestTimelineUsageSnapshot,
   getThinkingItemId,
+  settleIncompleteTimeline,
 } from "@/hooks/useAiChatController/timelineUpdates";
 import type {
   AiChatTimelineItem,
@@ -94,11 +94,82 @@ describe("AI chat timeline updates", () => {
       role: "thinking",
       text: "Final reasoning",
       isStreaming: false,
+      turnCompleted: undefined,
     });
     expect(result[1]).toMatchObject({
       role: "assistant",
       text: "Partial answer",
       isStreaming: false,
+      turnCompleted: true,
+    });
+  });
+
+  test("final assistant update can replace a mismatched streaming prefix", () => {
+    const result = applyAssistantUpdateToTimeline(
+      [
+        {
+          id: "turn_1",
+          kind: "message",
+          role: "assistant",
+          turnId: "turn_1",
+          segmentIndex: 0,
+          text: "stale streamed prefix: ",
+          createdAt: startIso,
+          isStreaming: true,
+        },
+      ],
+      {
+        phase: "end",
+        turnId: "turn_1",
+        reasoningText: "",
+        assistantMessage: "Final answer.",
+        toolCalls: [],
+        finishReason: "stop",
+      },
+      nextIso,
+    ).timeline;
+
+    expect(result[0]).toMatchObject({
+      role: "assistant",
+      text: "Final answer.",
+      isStreaming: false,
+      turnCompleted: true,
+    });
+  });
+
+  test("marks the last tool item as completed when a turn ends without assistant text", () => {
+    const started = applyToolUpdateToTimeline(
+      [],
+      {
+        phase: "start",
+        batchId: "turn_1:step_1",
+        isParallelBatch: false,
+        call: {
+          id: "call_1",
+          name: "get_pages_text",
+          args: { page_numbers: [1] },
+        },
+      },
+      startIso,
+    ).timeline;
+
+    const ended = applyAssistantUpdateToTimeline(
+      started,
+      {
+        phase: "end",
+        turnId: "turn_1",
+        reasoningText: "",
+        assistantMessage: "",
+        toolCalls: [],
+        finishReason: "tool_calls",
+      },
+      nextIso,
+    ).timeline;
+
+    expect(ended[0]).toMatchObject({
+      kind: "tool",
+      id: "call_1",
+      turnCompleted: true,
     });
   });
 
@@ -213,16 +284,12 @@ describe("AI chat timeline updates", () => {
       },
     ];
 
-    const finalized = finalizeStreamingTimeline(
-      timeline,
-      nextIso,
-      "Tool failed",
-    );
+    const finalized = settleIncompleteTimeline(timeline, nextIso);
     expect(finalized[0]).toMatchObject({ isStreaming: false });
-    expect(finalized[1]).toMatchObject({
-      status: "error",
-      error: "Tool failed",
-    });
+    expect(finalized[1]).toMatchObject({ status: "incomplete" });
+    expect(
+      finalized[1]?.kind === "tool" ? finalized[1].error : undefined,
+    ).toBeUndefined();
 
     const withUsage = applyUsageSnapshotToTurnTimeline(finalized, {
       turnId: "turn_1",

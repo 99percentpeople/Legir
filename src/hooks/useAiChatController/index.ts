@@ -38,6 +38,7 @@ import {
   addAiChatTokenUsageSummary,
   type AiChatRunStatus,
   type AiChatSessionData,
+  buildAiChatRequestRecoveryMessages,
   canUseLocalStorage,
   createEmptyAiChatTokenUsageSummary,
   createAiChatSessionData,
@@ -46,6 +47,7 @@ import {
   loadPersistedSelectedModelKey,
   normalizeMessageAttachments,
   persistAiChatDocumentState,
+  recoverAiChatRuntimeTranscript,
   type RestoredAiChatDocumentState,
   persistSelectedModelKey,
   restorePersistedAiChatDocumentState,
@@ -82,7 +84,7 @@ import {
   getLatestTimelineUsageSnapshot,
   applyUsageSnapshotToTurnTimeline,
   applyToolUpdateToTimeline,
-  finalizeStreamingTimeline,
+  settleIncompleteTimeline,
 } from "@/hooks/useAiChatController/timelineUpdates";
 import { appEventBus } from "@/lib/eventBus";
 import { exportPDF } from "@/services/pdfService";
@@ -1293,8 +1295,16 @@ export const useAiChatController = (
       session: AiChatSessionData;
       selected: AiChatFlatModel;
       assistantBranchAnchorId?: string;
+      requestConversation?: AiChatMessageRecord[];
+      persistentConversation?: AiChatMessageRecord[];
     }) => {
-      const { session, selected, assistantBranchAnchorId } = options;
+      const {
+        session,
+        selected,
+        assistantBranchAnchorId,
+        requestConversation,
+        persistentConversation,
+      } = options;
       const sessionId = session.id;
       const modelKey = `${selected.providerId}:${selected.modelId}`;
       const tokenUsageBeforeTurn = { ...session.tokenUsage };
@@ -1317,7 +1327,8 @@ export const useAiChatController = (
         const result = await aiChatService.runConversation({
           appOptions,
           modelCache: editorState.llmModelCache,
-          messages: conversationRef.current,
+          messages: requestConversation ?? conversationRef.current,
+          persistedMessages: persistentConversation ?? conversationRef.current,
           modelKey,
           getContextMemory: appOptions.aiChat.contextCompressionEnabled
             ? () => session.contextMemory
@@ -1440,10 +1451,9 @@ export const useAiChatController = (
           session.runStatus = "idle";
 
           setTimeline((prev) => {
-            const next = finalizeStreamingTimeline(
+            const next = settleIncompleteTimeline(
               prev,
               new Date().toISOString(),
-              "Cancelled",
             );
 
             session.timeline = next;
@@ -1459,11 +1469,7 @@ export const useAiChatController = (
 
         const carriedConversation = extractAiChatErrorConversation(error);
         setTimeline((prev) => {
-          const next = finalizeStreamingTimeline(
-            prev,
-            new Date().toISOString(),
-            "Failed",
-          );
+          const next = settleIncompleteTimeline(prev, new Date().toISOString());
           session.timeline = next;
           restoreConversationAfterTimelineMutation({
             session,
@@ -1561,6 +1567,19 @@ export const useAiChatController = (
           ? materializeDraftConversation()
           : sessionsRef.current.get(activeSessionIdRef.current);
       if (!session) return;
+      const recoveredRuntimeTranscript = recoverAiChatRuntimeTranscript({
+        sourceSession: session,
+        timeline: session.timeline,
+      });
+      syncAiChatSessionConversation({
+        session,
+        conversationRef,
+        conversation: recoveredRuntimeTranscript.messages,
+        modelKey: recoveredRuntimeTranscript.modelKey,
+      });
+      const requestRecoveryMessages = buildAiChatRequestRecoveryMessages({
+        timeline: session.timeline,
+      });
       const sessionId = session.id;
       const userBranchAnchorId = getPendingBranchAnchorId(session, "user");
 
@@ -1594,13 +1613,15 @@ export const useAiChatController = (
         text: displayText || text,
       });
 
-      pushUserConversationMessage({
-        session,
-        conversationRef,
-        conversationText,
-        timelineItemId: userItem.id,
-        modelKey: `${selected.providerId}:${selected.modelId}`,
-      });
+      const { persistentConversation, requestConversation } =
+        pushUserConversationMessage({
+          session,
+          conversationRef,
+          conversationText,
+          timelineItemId: userItem.id,
+          modelKey: `${selected.providerId}:${selected.modelId}`,
+          requestContextMessages: requestRecoveryMessages,
+        });
 
       const assistantBranchAnchorId = getPendingBranchAnchorId(
         session,
@@ -1610,6 +1631,8 @@ export const useAiChatController = (
         session,
         selected,
         assistantBranchAnchorId,
+        requestConversation,
+        persistentConversation,
       });
     },
     [

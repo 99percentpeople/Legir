@@ -751,6 +751,7 @@ export type AiChatTimelineItem =
       durationMs?: number;
       createdAt: string;
       isStreaming?: boolean;
+      turnCompleted?: boolean;
       tokenUsageSnapshot?: AiChatTokenUsageSummary;
       contextTokensSnapshot?: number;
     }
@@ -762,7 +763,7 @@ export type AiChatTimelineItem =
       batchId?: string;
       isParallelBatch?: boolean;
       toolName: AiToolName;
-      status: "running" | "done" | "error";
+      status: "running" | "done" | "error" | "incomplete";
       argsText: string;
       resultSummary?: string;
       progressDetails?: string[];
@@ -772,6 +773,7 @@ export type AiChatTimelineItem =
       previewImages?: AiChatToolPreviewImage[];
       error?: string;
       createdAt: string;
+      turnCompleted?: boolean;
       tokenUsageSnapshot?: AiChatTokenUsageSummary;
       contextTokensSnapshot?: number;
     };

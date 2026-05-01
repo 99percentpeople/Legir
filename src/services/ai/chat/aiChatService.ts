@@ -12,6 +12,7 @@ import {
   prepareAiChatMessagesForModelRuntime,
 } from "@/services/ai/chat/runtime/messageContext";
 import { createDefaultAiChatCompressionPolicy } from "@/services/ai/chat/runtime/compression/types";
+import { sanitizeAiChatMessagesForReasoningReplay } from "@/services/ai/chat/runtime/reasoningReplay";
 import { createAiChatToolRuntime } from "@/services/ai/chat/runtime/toolRuntime";
 import {
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
@@ -100,6 +101,7 @@ export const aiChatService = {
     appOptions: AppOptions;
     modelCache: EditorState["llmModelCache"];
     messages: AiChatMessageRecord[];
+    persistedMessages?: AiChatMessageRecord[];
     modelKey?: string;
     getContextMemory?: () =>
       | {
@@ -145,8 +147,15 @@ export const aiChatService = {
       specifier: modelSpecifier,
       kind: "chat",
     });
-    const baseConversation: AiChatMessageRecord[] = [...options.messages];
-    const turnStartMessageCount = baseConversation.length;
+    const requestBaseConversation = sanitizeAiChatMessagesForReasoningReplay({
+      messages: [...options.messages],
+      replayPolicy: runtime.reasoning.replayPolicy,
+    });
+    const persistedBaseConversation = sanitizeAiChatMessagesForReasoningReplay({
+      messages: [...(options.persistedMessages ?? options.messages)],
+      replayPolicy: runtime.reasoning.replayPolicy,
+    });
+    const turnStartMessageCount = requestBaseConversation.length;
     const compressionPolicy = createDefaultAiChatCompressionPolicy({
       reasoningReplayPolicy: runtime.reasoning.replayPolicy,
       turnStartMessageCount,
@@ -170,7 +179,7 @@ export const aiChatService = {
       });
       return preparedMessages;
     };
-    const initialMessages = await buildStepMessages(baseConversation);
+    const initialMessages = await buildStepMessages(requestBaseConversation);
     let latestPreparedMessageTokenEstimate =
       estimateAiChatMessageTokens(initialMessages);
     const turnId = `ai_turn_${Date.now()}_${Math.random()
@@ -315,10 +324,13 @@ export const aiChatService = {
         result.text,
         finishEventPromise,
       ]);
-      const conversation: AiChatMessageRecord[] = [
-        ...baseConversation,
-        ...finishEvent.response.messages,
-      ];
+      const conversation = sanitizeAiChatMessagesForReasoningReplay({
+        messages: [
+          ...persistedBaseConversation,
+          ...finishEvent.response.messages,
+        ],
+        replayPolicy: runtime.reasoning.replayPolicy,
+      });
       if (!assistantMessage && finalText) {
         assistantMessage = finalText.trim();
       } else {
@@ -362,9 +374,14 @@ export const aiChatService = {
         "AI chat request failed.",
       );
       const partialAssistantMessage = assistantMessage.trim();
+      const safeLatestResponseMessages =
+        sanitizeAiChatMessagesForReasoningReplay({
+          messages: latestResponseMessages,
+          replayPolicy: runtime.reasoning.replayPolicy,
+        });
       const carriedConversation = [
-        ...baseConversation,
-        ...latestResponseMessages,
+        ...persistedBaseConversation,
+        ...safeLatestResponseMessages,
         ...(partialAssistantMessage
           ? [
               {

@@ -104,6 +104,31 @@ const isToolTurnItem = (item: AiChatTimelineItem, turnId: string) =>
     (typeof item.batchId === "string" &&
       getTurnIdFromBatchId(item.batchId) === turnId));
 
+const isTurnItem = (item: AiChatTimelineItem, turnId: string) =>
+  (item.kind === "message" &&
+    (item.turnId === turnId ||
+      item.id === turnId ||
+      item.id === getThinkingItemId(turnId))) ||
+  isToolTurnItem(item, turnId);
+
+const markTurnCompleted = (items: AiChatTimelineItem[], turnId: string) => {
+  let lastTurnItemIndex = -1;
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (item && isTurnItem(item, turnId)) lastTurnItemIndex = index;
+  }
+  if (lastTurnItemIndex < 0) return items;
+
+  return items.map((item, index) =>
+    isTurnItem(item, turnId)
+      ? {
+          ...item,
+          turnCompleted: index === lastTurnItemIndex ? true : undefined,
+        }
+      : item,
+  );
+};
+
 const getAssistantTurnSegments = (
   items: AiChatTimelineItem[],
   turnId: string,
@@ -149,6 +174,7 @@ export const applyAssistantUpdateToTimeline = (
         id: thinkingId,
         kind: "message",
         role: "thinking",
+        turnId: update.turnId,
         text: update.delta,
         showCollapsedPreview: update.showCollapsedPreview,
         createdAt: nowIso,
@@ -238,20 +264,21 @@ export const applyAssistantUpdateToTimeline = (
 
   const thinkingId = getThinkingItemId(update.turnId);
   if (!update.assistantMessage && !update.reasoningText) {
+    const next = prev.map((item) => {
+      if (isAssistantTurnSegment(item, update.turnId)) {
+        return { ...item, isStreaming: false };
+      }
+      if (item.id === thinkingId && item.kind === "message") {
+        return {
+          ...item,
+          isStreaming: false,
+          durationMs: calculateDurationMs(item.createdAt),
+        };
+      }
+      return item;
+    });
     return {
-      timeline: prev.map((item) => {
-        if (isAssistantTurnSegment(item, update.turnId)) {
-          return { ...item, isStreaming: false };
-        }
-        if (item.id === thinkingId && item.kind === "message") {
-          return {
-            ...item,
-            isStreaming: false,
-            durationMs: calculateDurationMs(item.createdAt),
-          };
-        }
-        return item;
-      }),
+      timeline: markTurnCompleted(next, update.turnId),
       touchedSession: false,
     };
   }
@@ -272,6 +299,7 @@ export const applyAssistantUpdateToTimeline = (
       id: thinkingId,
       kind: "message",
       role: "thinking",
+      turnId: update.turnId,
       text: resolveFinalThinkingText(
         existingThinkingText,
         update.reasoningText,
@@ -314,7 +342,10 @@ export const applyAssistantUpdateToTimeline = (
   }
 
   if (!update.assistantMessage) {
-    return { timeline: next, touchedSession: true };
+    return {
+      timeline: markTurnCompleted(next, update.turnId),
+      touchedSession: true,
+    };
   }
 
   const currentSegments = getAssistantTurnSegments(next, update.turnId);
@@ -364,10 +395,16 @@ export const applyAssistantUpdateToTimeline = (
         isStreaming: false,
       });
     } else {
+      const shouldReplaceFinalText =
+        !remainder && !update.assistantMessage.startsWith(existingText);
       next[lastSegment.index] = {
         ...current,
         role: "assistant",
-        text: remainder ? `${current.text}${remainder}` : current.text,
+        text: shouldReplaceFinalText
+          ? update.assistantMessage
+          : remainder
+            ? `${current.text}${remainder}`
+            : current.text,
         branchAnchorId: current.branchAnchorId ?? update.branchAnchorId,
         isStreaming: false,
       };
@@ -384,7 +421,10 @@ export const applyAssistantUpdateToTimeline = (
     }
   }
 
-  return { timeline: next, touchedSession: false };
+  return {
+    timeline: markTurnCompleted(next, update.turnId),
+    touchedSession: false,
+  };
 };
 
 export const applyToolUpdateToTimeline = (
@@ -476,17 +516,18 @@ export const applyToolUpdateToTimeline = (
   };
 };
 
-export const finalizeStreamingTimeline = (
+export const settleIncompleteTimeline = (
   prev: AiChatTimelineItem[],
   nowIso: string,
-  toolError: string,
 ) =>
   prev.map((item) => {
     if (item.kind === "tool" && item.status === "running") {
       return {
         ...item,
-        status: "error" as const,
-        error: toolError,
+        status: "incomplete" as const,
+        progressDetails: undefined,
+        progressItems: undefined,
+        progressCounts: undefined,
       };
     }
     if (

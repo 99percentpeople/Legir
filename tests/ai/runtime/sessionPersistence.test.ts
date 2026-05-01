@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest";
 
 import {
   buildConversationMessageContent,
+  buildAiChatRequestRecoveryMessages,
   createAiChatSessionData,
   normalizeTimelineForPersist,
+  recoverAiChatRuntimeTranscript,
   restoreConversationFromTimeline,
   setAiChatRuntimeTimelineBoundary,
   sliceAiChatRuntimeTranscriptForTimelinePrefix,
@@ -187,6 +189,221 @@ describe("AI chat session persistence", () => {
 
     expect(sliced.messages).toHaveLength(3);
     expect(sliced.messages[1]).toEqual(conversation[1]);
+  });
+
+  test("recovery keeps the runtime transcript instead of slicing to a stale boundary", () => {
+    const session = createAiChatSessionData("session_1", nowIso);
+    const conversation: AiChatMessageRecord[] = [
+      { role: "user", content: "Read page 1." },
+      { role: "assistant", content: "Done." },
+    ];
+    syncAiChatSessionConversation({
+      session,
+      conversation,
+      updatedAt: nowIso,
+    });
+    setAiChatRuntimeTimelineBoundary({
+      session,
+      timelineItemId: "user_1",
+      messageCount: 1,
+    });
+
+    const recovered = recoverAiChatRuntimeTranscript({
+      sourceSession: session,
+      timeline: [
+        {
+          id: "user_1",
+          kind: "message",
+          role: "user",
+          text: "Read page 1.",
+          conversationText: "Read page 1.",
+          createdAt: nowIso,
+        },
+        {
+          id: "turn_1",
+          kind: "message",
+          role: "assistant",
+          turnId: "turn_1",
+          text: "Done.",
+          createdAt: nowIso,
+          turnCompleted: true,
+        },
+      ],
+    });
+
+    expect(recovered.messages).toEqual(conversation);
+    expect(JSON.stringify(recovered.messages)).not.toContain(
+      "Internal recovery context",
+    );
+  });
+
+  test("builds incomplete tool turns as request-only recovery context", () => {
+    const session = createAiChatSessionData("session_1", nowIso);
+    const conversation: AiChatMessageRecord[] = [
+      { role: "user", content: "Read page 1." },
+    ];
+    syncAiChatSessionConversation({
+      session,
+      conversation,
+      updatedAt: nowIso,
+    });
+    setAiChatRuntimeTimelineBoundary({
+      session,
+      timelineItemId: "user_1",
+      messageCount: conversation.length,
+    });
+
+    const timeline: AiChatTimelineItem[] = [
+      {
+        id: "user_1",
+        kind: "message",
+        role: "user",
+        text: "Read page 1.",
+        conversationText: "Read page 1.",
+        createdAt: nowIso,
+      },
+      {
+        id: "call_1",
+        kind: "tool",
+        toolCallId: "call_1",
+        turnId: "turn_1",
+        batchId: "turn_1:step_1",
+        toolName: "get_pages_text",
+        status: "incomplete",
+        argsText: JSON.stringify({ page_numbers: [1] }),
+        createdAt: nowIso,
+      },
+    ];
+
+    const recovered = recoverAiChatRuntimeTranscript({
+      sourceSession: session,
+      timeline,
+    });
+
+    expect(recovered.messages).toEqual(conversation);
+
+    const recoveryMessages = buildAiChatRequestRecoveryMessages({ timeline });
+    expect(recoveryMessages).toHaveLength(1);
+    expect(recoveryMessages[0]).toMatchObject({ role: "system" });
+    expect(recoveryMessages[0]?.content).toContain("Internal recovery context");
+    expect(recoveryMessages[0]?.content).toContain("Do not quote");
+    expect(recoveryMessages[0]?.content).toContain("Tool input get_pages_text");
+    expect(recoveryMessages[0]?.content).toContain(
+      "Tool status get_pages_text",
+    );
+    expect(recoveryMessages[0]?.content).toContain("get_pages_text");
+    expect(recoveryMessages[0]?.content).toContain("page_numbers");
+    expect(recoveryMessages[0]?.content).toContain("incomplete");
+  });
+
+  test("does not persist request-only recovery context in runtime transcript", () => {
+    const session = createAiChatSessionData("session_1", nowIso);
+    const conversation: AiChatMessageRecord[] = [
+      { role: "user", content: "Read page 1." },
+    ];
+    syncAiChatSessionConversation({
+      session,
+      conversation,
+      updatedAt: nowIso,
+    });
+    setAiChatRuntimeTimelineBoundary({
+      session,
+      timelineItemId: "user_1",
+      messageCount: conversation.length,
+    });
+
+    const timeline: AiChatTimelineItem[] = [
+      {
+        id: "user_1",
+        kind: "message",
+        role: "user",
+        text: "Read page 1.",
+        conversationText: "Read page 1.",
+        createdAt: nowIso,
+      },
+      {
+        id: "call_1",
+        kind: "tool",
+        toolCallId: "call_1",
+        turnId: "turn_1",
+        batchId: "turn_1:step_1",
+        toolName: "get_pages_text",
+        status: "incomplete",
+        argsText: JSON.stringify({ page_numbers: [1] }),
+        createdAt: nowIso,
+      },
+    ];
+
+    const recovered = recoverAiChatRuntimeTranscript({
+      sourceSession: session,
+      timeline,
+    });
+    expect(recovered.messages).toEqual(conversation);
+    expect(session.runtimeTranscript.messages).toEqual(conversation);
+    expect(JSON.stringify(recovered.messages)).not.toContain(
+      "Internal recovery context",
+    );
+  });
+
+  test("retry slicing drops incomplete context by cutting before the failed user message", () => {
+    const session = createAiChatSessionData("session_1", nowIso);
+    const conversation: AiChatMessageRecord[] = [
+      { role: "user", content: "Earlier request." },
+    ];
+    syncAiChatSessionConversation({
+      session,
+      conversation,
+      updatedAt: nowIso,
+    });
+    setAiChatRuntimeTimelineBoundary({
+      session,
+      timelineItemId: "user_1",
+      messageCount: conversation.length,
+    });
+
+    const fullTimeline: AiChatTimelineItem[] = [
+      {
+        id: "user_1",
+        kind: "message",
+        role: "user",
+        text: "Earlier request.",
+        conversationText: "Earlier request.",
+        createdAt: nowIso,
+      },
+      {
+        id: "user_2",
+        kind: "message",
+        role: "user",
+        text: "Failed request.",
+        conversationText: "Failed request.",
+        createdAt: nowIso,
+      },
+      {
+        id: "call_1",
+        kind: "tool",
+        toolCallId: "call_1",
+        turnId: "turn_1",
+        batchId: "turn_1:step_1",
+        toolName: "get_pages_text",
+        status: "incomplete",
+        argsText: JSON.stringify({ page_numbers: [1] }),
+        createdAt: nowIso,
+      },
+    ];
+
+    const failedUserIndex = fullTimeline.findIndex(
+      (item) => item.id === "user_2",
+    );
+    const retryTimeline = fullTimeline.slice(0, failedUserIndex);
+    const sliced = sliceAiChatRuntimeTranscriptForTimelinePrefix({
+      sourceSession: session,
+      timeline: retryTimeline,
+    });
+
+    expect(sliced.messages).toEqual(conversation);
+    expect(JSON.stringify(sliced.messages)).not.toContain(
+      "Internal recovery context",
+    );
   });
 
   test("normalizes timeline for persistence by trimming transient tool payloads", () => {

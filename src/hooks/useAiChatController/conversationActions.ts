@@ -11,8 +11,8 @@ import {
   buildConversationMessageContent,
   normalizeTimelineForPersist,
   normalizeUserMessageInput,
+  recoverAiChatRuntimeTranscript,
   setAiChatRuntimeTimelineBoundary,
-  sliceAiChatRuntimeTranscriptForTimelinePrefix,
   syncAiChatSessionConversation,
   type AiChatSessionData,
 } from "@/hooks/useAiChatController/sessionPersistence";
@@ -95,10 +95,16 @@ export const pushUserConversationMessage = (options: {
   conversationText: string;
   timelineItemId: string;
   modelKey?: string;
+  requestContextMessages?: AiChatMessageRecord[];
 }) => {
+  const baseConversation = [...options.conversationRef.current];
+  const userMessage = {
+    role: "user" as const,
+    content: options.conversationText,
+  };
   const nextConversation: AiChatMessageRecord[] = [
-    ...options.conversationRef.current,
-    { role: "user", content: options.conversationText },
+    ...baseConversation,
+    userMessage,
   ];
   syncAiChatSessionConversation({
     session: options.session,
@@ -111,7 +117,12 @@ export const pushUserConversationMessage = (options: {
     timelineItemId: options.timelineItemId,
     messageCount: nextConversation.length,
   });
-  return nextConversation;
+  return {
+    persistentConversation: nextConversation,
+    requestConversation: options.requestContextMessages?.length
+      ? [...baseConversation, ...options.requestContextMessages, userMessage]
+      : nextConversation,
+  };
 };
 
 export const applyConversationSuccess = (options: {
@@ -139,7 +150,7 @@ export const restoreConversationAfterTimelineMutation = (options: {
 }) => {
   const nextConversation = options.carriedConversation
     ? options.carriedConversation
-    : sliceAiChatRuntimeTranscriptForTimelinePrefix({
+    : recoverAiChatRuntimeTranscript({
         sourceSession: options.session,
         timeline: normalizeTimelineForPersist(options.timeline),
       }).messages;

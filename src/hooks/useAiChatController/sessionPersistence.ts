@@ -1,5 +1,9 @@
 import { modelMessageSchema } from "ai";
 import {
+  materializeIncompleteTimelineTail,
+  materializeUnsafeReasoningReplayToolMessages,
+} from "@/services/ai/chat/runtime/reasoningReplay";
+import {
   normalizeAiToolArgsDeep,
   toSnakeCaseKeysDeep,
 } from "@/services/ai/utils/toolCase";
@@ -191,9 +195,6 @@ export const createAiChatRuntimeTranscript = (options?: {
   };
 };
 
-const INTERRUPTED_AI_CHAT_MESSAGE =
-  "The previous AI response was interrupted before it finished.";
-
 const truncateText = (value: string, maxChars: number) => {
   const text = String(value ?? "");
   if (text.length <= maxChars) return text;
@@ -207,23 +208,18 @@ const calculateDurationMs = (createdAt: string, endedAtIso: string) => {
   return Math.max(0, ended - started);
 };
 
-const settleInterruptedTimeline = (
+const settleIncompleteTimelineForRestore = (
   items: AiChatTimelineItem[],
   nowIso: string,
 ) => {
-  let didInterrupt = false;
-
   const timeline = items.map((item) => {
     if (item.kind === "tool" && item.status === "running") {
-      didInterrupt = true;
       return {
         ...item,
-        status: "error" as const,
-        resultSummary: item.resultSummary ?? INTERRUPTED_AI_CHAT_MESSAGE,
+        status: "incomplete" as const,
         progressDetails: undefined,
         progressItems: undefined,
         progressCounts: undefined,
-        error: item.error ?? INTERRUPTED_AI_CHAT_MESSAGE,
       };
     }
 
@@ -232,7 +228,6 @@ const settleInterruptedTimeline = (
       (item.role === "assistant" || item.role === "thinking") &&
       item.isStreaming
     ) {
-      didInterrupt = true;
       return item.role === "thinking"
         ? {
             ...item,
@@ -249,10 +244,7 @@ const settleInterruptedTimeline = (
     return item;
   });
 
-  return {
-    timeline,
-    didInterrupt,
-  };
+  return { timeline };
 };
 
 export const canUseLocalStorage = () => {
@@ -493,6 +485,10 @@ export const restoreConversationFromTimeline = (
   const parseToolOutput = (
     item: Extract<AiChatTimelineItem, { kind: "tool" }>,
   ): ToolResultOutput | null => {
+    if (item.status === "running" || item.status === "incomplete") {
+      return null;
+    }
+
     const rawText =
       typeof item.resultText === "string" && item.resultText.trim()
         ? item.resultText.trim()
@@ -634,6 +630,60 @@ const buildRuntimeTimelineBoundariesFromTimeline = (
   return boundaries;
 };
 
+const findLatestCompletedTimelineIndex = (items: AiChatTimelineItem[]) => {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.turnCompleted) return index;
+  }
+  return -1;
+};
+
+const findLatestUserTimelineIndex = (items: AiChatTimelineItem[]) => {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item?.kind === "message" && item.role === "user") return index;
+  }
+  return -1;
+};
+
+const findLatestRuntimeBoundary = (options: {
+  sourceSession: AiChatSessionData;
+  timeline: AiChatTimelineItem[];
+}) => {
+  for (let index = options.timeline.length - 1; index >= 0; index -= 1) {
+    const item = options.timeline[index];
+    const messageCount =
+      item &&
+      options.sourceSession.runtimeTranscript.timelineBoundaries[item.id];
+    if (typeof messageCount === "number" && Number.isFinite(messageCount)) {
+      return { timelineIndex: index, messageCount };
+    }
+  }
+  return null;
+};
+
+const getIncompleteTimelineTail = (items: AiChatTimelineItem[]) => {
+  const stableTimelineIndex = Math.max(
+    findLatestCompletedTimelineIndex(items),
+    findLatestUserTimelineIndex(items),
+  );
+  return stableTimelineIndex >= 0
+    ? items.slice(stableTimelineIndex + 1)
+    : items;
+};
+
+const restoreRuntimeMessagesFromTimeline = (items: AiChatTimelineItem[]) => {
+  const stableTimelineIndex = Math.max(
+    findLatestCompletedTimelineIndex(items),
+    findLatestUserTimelineIndex(items),
+  );
+  const stableTimeline =
+    stableTimelineIndex >= 0 ? items.slice(0, stableTimelineIndex + 1) : [];
+
+  return materializeUnsafeReasoningReplayToolMessages(
+    restoreConversationFromTimeline(stableTimeline),
+  );
+};
+
 const restoreAiChatRuntimeTranscript = (options: {
   raw: unknown;
   timeline: AiChatTimelineItem[];
@@ -664,7 +714,7 @@ const restoreAiChatRuntimeTranscript = (options: {
     }
   }
 
-  const messages = restoreConversationFromTimeline(options.timeline);
+  const messages = restoreRuntimeMessagesFromTimeline(options.timeline);
   return createAiChatRuntimeTranscript({
     messages,
     updatedAt: options.updatedAt,
@@ -750,34 +800,56 @@ export const setAiChatRuntimeTimelineBoundaries = (options: {
   }
 };
 
+// Use this only for explicit history rewrites such as retry or branch creation.
+// Normal recovery keeps the runtime transcript intact.
 export const sliceAiChatRuntimeTranscriptForTimelinePrefix = (options: {
   sourceSession: AiChatSessionData;
   timeline: AiChatTimelineItem[];
 }) => {
-  const lastItem = options.timeline.at(-1);
-  const boundary =
-    lastItem &&
-    options.sourceSession.runtimeTranscript.timelineBoundaries[lastItem.id];
+  const boundary = findLatestRuntimeBoundary(options);
 
-  if (typeof boundary === "number" && Number.isFinite(boundary)) {
-    const messages = options.sourceSession.runtimeTranscript.messages.slice(
-      0,
-      Math.max(0, Math.trunc(boundary)),
+  if (boundary) {
+    const stableBoundary = Math.max(0, Math.trunc(boundary.messageCount));
+    const tail = options.timeline.slice(boundary.timelineIndex + 1);
+    const stableTailIndex = Math.max(
+      findLatestCompletedTimelineIndex(tail),
+      findLatestUserTimelineIndex(tail),
     );
+    const stableTailMessages =
+      stableTailIndex >= 0
+        ? materializeUnsafeReasoningReplayToolMessages(
+            restoreConversationFromTimeline(tail.slice(0, stableTailIndex + 1)),
+          )
+        : [];
+    const stableTailBoundary = stableBoundary + stableTailMessages.length;
+    const stableMessages =
+      options.sourceSession.runtimeTranscript.messages.length >=
+      stableTailBoundary
+        ? options.sourceSession.runtimeTranscript.messages.slice(
+            0,
+            stableTailBoundary,
+          )
+        : [
+            ...options.sourceSession.runtimeTranscript.messages.slice(
+              0,
+              stableBoundary,
+            ),
+            ...stableTailMessages,
+          ];
     const timelineIdSet = new Set(options.timeline.map((item) => item.id));
     return createAiChatRuntimeTranscript({
-      messages,
+      messages: stableMessages,
       modelKey: options.sourceSession.runtimeTranscript.modelKey,
       updatedAt: new Date().toISOString(),
       timelineBoundaries: normalizeRuntimeTimelineBoundaries(
         options.sourceSession.runtimeTranscript.timelineBoundaries,
-        messages.length,
+        stableMessages.length,
         timelineIdSet,
       ),
     });
   }
 
-  const messages = restoreConversationFromTimeline(options.timeline);
+  const messages = restoreRuntimeMessagesFromTimeline(options.timeline);
   return createAiChatRuntimeTranscript({
     messages,
     modelKey: options.sourceSession.runtimeTranscript.modelKey,
@@ -787,6 +859,34 @@ export const sliceAiChatRuntimeTranscriptForTimelinePrefix = (options: {
     ),
   });
 };
+
+export const recoverAiChatRuntimeTranscript = (options: {
+  sourceSession: AiChatSessionData;
+  timeline: AiChatTimelineItem[];
+}) => {
+  const messages =
+    parseRuntimeMessages(options.sourceSession.runtimeTranscript.messages) ??
+    options.sourceSession.runtimeTranscript.messages;
+  const timelineIdSet = new Set(options.timeline.map((item) => item.id));
+
+  return createAiChatRuntimeTranscript({
+    messages,
+    modelKey: options.sourceSession.runtimeTranscript.modelKey,
+    updatedAt: new Date().toISOString(),
+    timelineBoundaries: normalizeRuntimeTimelineBoundaries(
+      options.sourceSession.runtimeTranscript.timelineBoundaries,
+      messages.length,
+      timelineIdSet,
+    ),
+  });
+};
+
+export const buildAiChatRequestRecoveryMessages = (options: {
+  timeline: AiChatTimelineItem[];
+}) =>
+  materializeIncompleteTimelineTail(
+    getIncompleteTimelineTail(options.timeline),
+  );
 
 export const getLatestUserSelectionAttachmentsFromTimeline = (
   items: AiChatTimelineItem[],
@@ -913,7 +1013,7 @@ export const restorePersistedAiChatDocumentState = (
         ? session.timeline
         : [];
       const normalizedTimeline = normalizeTimelineForPersist(timelineRaw);
-      const { timeline } = settleInterruptedTimeline(
+      const { timeline } = settleIncompleteTimelineForRestore(
         normalizedTimeline,
         updatedAt,
       );
