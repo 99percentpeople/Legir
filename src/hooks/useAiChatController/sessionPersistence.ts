@@ -1,8 +1,6 @@
 import { modelMessageSchema } from "ai";
-import {
-  materializeIncompleteTimelineTail,
-  materializeUnsafeReasoningReplayToolMessages,
-} from "@/services/ai/chat/runtime/reasoningReplay";
+import { materializeIncompleteTimelineTail } from "@/services/ai/chat/runtime/requestRecovery";
+import { materializeUnsafeReasoningReplayToolMessages } from "@/services/ai/chat/runtime/reasoningReplay";
 import {
   normalizeAiToolArgsDeep,
   toSnakeCaseKeysDeep,
@@ -645,6 +643,12 @@ const findLatestUserTimelineIndex = (items: AiChatTimelineItem[]) => {
   return -1;
 };
 
+const findLatestStableTimelineIndex = (items: AiChatTimelineItem[]) =>
+  Math.max(
+    findLatestCompletedTimelineIndex(items),
+    findLatestUserTimelineIndex(items),
+  );
+
 const findLatestRuntimeBoundary = (options: {
   sourceSession: AiChatSessionData;
   timeline: AiChatTimelineItem[];
@@ -662,20 +666,14 @@ const findLatestRuntimeBoundary = (options: {
 };
 
 const getIncompleteTimelineTail = (items: AiChatTimelineItem[]) => {
-  const stableTimelineIndex = Math.max(
-    findLatestCompletedTimelineIndex(items),
-    findLatestUserTimelineIndex(items),
-  );
+  const stableTimelineIndex = findLatestStableTimelineIndex(items);
   return stableTimelineIndex >= 0
     ? items.slice(stableTimelineIndex + 1)
     : items;
 };
 
 const restoreRuntimeMessagesFromTimeline = (items: AiChatTimelineItem[]) => {
-  const stableTimelineIndex = Math.max(
-    findLatestCompletedTimelineIndex(items),
-    findLatestUserTimelineIndex(items),
-  );
+  const stableTimelineIndex = findLatestStableTimelineIndex(items);
   const stableTimeline =
     stableTimelineIndex >= 0 ? items.slice(0, stableTimelineIndex + 1) : [];
 
@@ -811,10 +809,7 @@ export const sliceAiChatRuntimeTranscriptForTimelinePrefix = (options: {
   if (boundary) {
     const stableBoundary = Math.max(0, Math.trunc(boundary.messageCount));
     const tail = options.timeline.slice(boundary.timelineIndex + 1);
-    const stableTailIndex = Math.max(
-      findLatestCompletedTimelineIndex(tail),
-      findLatestUserTimelineIndex(tail),
-    );
+    const stableTailIndex = findLatestStableTimelineIndex(tail);
     const stableTailMessages =
       stableTailIndex >= 0
         ? materializeUnsafeReasoningReplayToolMessages(
