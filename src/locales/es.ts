@@ -755,6 +755,9 @@ const es = {
       context_pruning_enabled_desc:
         "Recorta razonamiento antiguo cuando se alcanza el umbral de tokens del contexto y prioriza eliminar resultados antiguos de imágenes de página para reducir el consumo de tokens.",
       max_tool_rounds: "Máximo de rondas de herramientas",
+      get_pages_text_max_chars: "Presupuesto de texto get_pages_text",
+      get_pages_text_max_chars_desc:
+        "Máximo de caracteres de texto devueltos por cada llamada get_pages_text. Los valores mayores permiten leer más páginas a la vez, pero usan más contexto.",
       tool_history_window: "Ventana de historial general",
       visual_tool_history_window: "Ventana de historial visual",
       context_pruning_desc:

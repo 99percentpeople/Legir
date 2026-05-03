@@ -11,6 +11,8 @@ import {
   AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
@@ -264,6 +266,11 @@ export const normalizeAiChatOptions = (
       fallback: DEFAULT_EDITOR_UI_STATE.options.aiChat.maxToolRounds,
       min: AI_CHAT_MAX_TOOL_ROUNDS_MIN,
       max: AI_CHAT_MAX_TOOL_ROUNDS_MAX,
+    }),
+    getPagesTextMaxChars: clampAiChatInteger(next.getPagesTextMaxChars, {
+      fallback: DEFAULT_EDITOR_UI_STATE.options.aiChat.getPagesTextMaxChars,
+      min: AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
+      max: AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
     }),
     contextCompressionMode:
       next.contextCompressionMode === "algorithmic" ||

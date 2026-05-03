@@ -724,6 +724,9 @@ const zhTW = {
       context_pruning_enabled_desc:
         "根據上下文 token 門檻裁剪較舊的思考內容，並優先移除更早的頁面圖片結果，以降低 token 消耗。",
       max_tool_rounds: "最大工具輪數",
+      get_pages_text_max_chars: "get_pages_text 文字預算",
+      get_pages_text_max_chars_desc:
+        "每次 get_pages_text 呼叫最多返回的文字字數。數值越大，AI 一次能讀取更多頁面，但會占用更多上下文。",
       tool_history_window: "一般工具歷史視窗",
       visual_tool_history_window: "視覺工具歷史視窗",
       context_pruning_desc:

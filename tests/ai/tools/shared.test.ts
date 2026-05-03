@@ -8,6 +8,8 @@ import {
   createToolHandlerMap,
   defineToolModule,
   emptyObjectSchema,
+  expandPageNumberSelectors,
+  pageNumbersSchema,
   parseToolArgs,
   requiredPageNumbersSchema,
   summarizeListedAnnotations,
@@ -30,6 +32,43 @@ describe("AI chat tool shared helpers", () => {
         page_numbers: [1, 2],
       },
     });
+  });
+
+  test("expands page number range selectors", () => {
+    expect(expandPageNumberSelectors([1, [3, 5], 5, [7, 8]])).toEqual([
+      1, 3, 4, 5, 7, 8,
+    ]);
+
+    const result = parseToolArgs(
+      z.object({
+        page_numbers: pageNumbersSchema,
+      }),
+      {
+        page_numbers: ["1", [3, "5"], 7],
+      },
+    );
+
+    expect(result).toEqual({
+      success: true,
+      data: {
+        page_numbers: [1, 3, 4, 5, 7],
+      },
+    });
+  });
+
+  test("rejects descending page number ranges", () => {
+    const result = parseToolArgs(
+      z.object({
+        page_numbers: requiredPageNumbersSchema,
+      }),
+      {
+        page_numbers: [[5, 3]],
+      },
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toContain("page range start");
   });
 
   test("repairs invalid JSON string escapes commonly produced in regex args", () => {

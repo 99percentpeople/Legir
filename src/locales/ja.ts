@@ -746,6 +746,9 @@ const ja = {
       context_pruning_enabled_desc:
         "コンテキストのトークン閾値に達したら古い推論内容を圧縮し、古いページ画像結果を優先的に外してトークン消費を抑えます。",
       max_tool_rounds: "最大ツールラウンド数",
+      get_pages_text_max_chars: "get_pages_text テキスト予算",
+      get_pages_text_max_chars_desc:
+        "各 get_pages_text 呼び出しで返す最大文字数です。大きい値ほど一度に多くのページを読めますが、より多くのコンテキストを使用します。",
       tool_history_window: "通常ツール履歴ウィンドウ",
       visual_tool_history_window: "視覚ツール履歴ウィンドウ",
       context_pruning_desc:

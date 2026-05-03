@@ -750,6 +750,9 @@ const en = {
       context_pruning_trigger_context_tokens_desc:
         "Context pruning only starts after the current context reaches this token count.",
       max_tool_rounds: "Max tool rounds",
+      get_pages_text_max_chars: "get_pages_text text budget",
+      get_pages_text_max_chars_desc:
+        "Maximum text characters returned by each get_pages_text call. Larger values let AI read more pages at once but use more context.",
       tool_history_window: "General tool history window",
       visual_tool_history_window: "Visual tool history window",
       context_pruning_desc:

@@ -725,6 +725,9 @@ const zhCN = {
       context_pruning_enabled_desc:
         "根据上下文 token 阈值裁剪较旧的思考内容，并优先移除更早的页面图片结果，以降低 token 消耗。",
       max_tool_rounds: "最大工具轮数",
+      get_pages_text_max_chars: "get_pages_text 文本预算",
+      get_pages_text_max_chars_desc:
+        "每次 get_pages_text 调用最多返回的文本字数。数值越大，AI 一次能读取更多页面，但会占用更多上下文。",
       tool_history_window: "普通工具历史窗口",
       visual_tool_history_window: "视觉工具历史窗口",
       context_pruning_desc:

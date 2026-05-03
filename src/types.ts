@@ -386,6 +386,7 @@ export interface AiChatOptions {
   contextCompressionThresholdTokens: number;
   visualHistoryWindow: number;
   maxToolRounds: number;
+  getPagesTextMaxChars: number;
   contextCompressionMode: "algorithmic" | "ai";
   contextCompressionModelKey?: string;
   reasoning: AiChatReasoningOptions;

@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
   AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY,
-  AI_CHAT_MAX_READ_PAGES_PER_CALL,
 } from "@/constants";
 
 import {
@@ -10,17 +9,20 @@ import {
   createToolBuilder,
   defineToolModule,
   emptyObjectSchema,
+  expandPageNumberSelectors,
   getDocumentDigestArgsSchema,
   summaryInstructionsSchema,
   pageNumberSchema,
+  pageNumberSelectorSchema,
   pageRectArgsSchema,
   listAnnotationsArgsSchema,
   listFormFieldsArgsSchema,
-  readPagesArgsSchema,
+  getPagesTextArgsSchema,
   searchDocumentArgsSchema,
   summarizeListedAnnotations,
   summarizeListedFormFields,
   summarizeSearchResults,
+  type PageNumberSelector,
 } from "./shared";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 import type {
@@ -30,8 +32,27 @@ import type {
   AiRenderedPageVisualSummaryResult,
 } from "@/services/ai/chat/types";
 
+type PageVisualRequestArg = number | { page: number; rect: AiPageSpaceRect };
+type PageVisualTargetArg =
+  | PageNumberSelector
+  | Exclude<PageVisualRequestArg, number>;
+
+const expandPageVisualTargets = (
+  targets: readonly PageVisualTargetArg[],
+): PageVisualRequestArg[] => {
+  const out: PageVisualRequestArg[] = [];
+  for (const target of targets) {
+    if (Array.isArray(target)) {
+      out.push(...expandPageNumberSelectors([target]));
+      continue;
+    }
+    out.push(target);
+  }
+  return out;
+};
+
 const pageVisualTargetSchema = z.union([
-  pageNumberSchema,
+  pageNumberSelectorSchema,
   z
     .object({
       page: pageNumberSchema.describe("1-based page number to render."),
@@ -46,7 +67,7 @@ const pageVisualTargetsSchema = z.preprocess((value) => {
     return [];
   }
   return Array.isArray(value) ? value : [value];
-}, z.array(pageVisualTargetSchema));
+}, z.array(pageVisualTargetSchema).transform(expandPageVisualTargets));
 
 const getPagesVisualArgsSchemaBase = z
   .object({
@@ -54,7 +75,7 @@ const getPagesVisualArgsSchemaBase = z
       .optional()
       .default([])
       .describe(
-        "Optional page visual requests. Each item may be a 1-based page number for a full-page render or an object like { page, rect } to render a cropped page-space region. Defaults to the current page when omitted.",
+        "Optional page visual requests. Each item may be a 1-based page number, a two-item inclusive range like [1, 22], or an object like { page, rect } to render a cropped page-space region. Defaults to the current page when omitted.",
       ),
     render_annotations: z
       .boolean()
@@ -73,8 +94,6 @@ const summarizePagesVisualArgsSchemaBase = getPagesVisualArgsSchemaBase
   })
   .strict();
 const summarizePagesVisualArgsSchema = summarizePagesVisualArgsSchemaBase;
-
-type PageVisualRequestArg = number | { page: number; rect: AiPageSpaceRect };
 
 const toPagesVisualModelOutput = (output: unknown) => {
   if (!output || typeof output !== "object") {
@@ -185,6 +204,7 @@ const PAGE_VISUAL_SUMMARY_TOOL_PROMPTS = [
 
 const GET_PAGES_TEXT_TOOL_PROMPTS = [
   "get_pages_text preserves inferred spaces and line breaks from the PDF while remaining compatible with anchor highlighting.",
+  "get_pages_text may truncate at the user-configured text budget. If the result is truncated, call it again with fewer or narrower page_numbers before making claims about omitted content.",
   "For tables, forms, multi-column pages, or irregular layout, call get_pages_text with include_layout true before creating document anchors.",
   "When get_pages_text returns line data, prefer anchors that stay within one line or two adjacent lines instead of stitching distant layout regions together.",
   "If get_pages_text returns no useful text for a page and get_pages_visual is available, follow up with get_pages_visual instead of assuming the page has no usable content.",
@@ -220,6 +240,8 @@ const pageVisualLabelDensity = (pages: AiRenderedPageImage[]) => {
     ? `${unique[0]} px per page-space unit`
     : `${unique.join(", ")} px per page-space unit`;
 };
+
+const formatCharCount = (value: number) => `${value.toLocaleString()} chars`;
 
 export const documentToolModule = defineToolModule((ctx) => {
   const getDocumentDigest = ctx.getDocumentDigest;
@@ -419,12 +441,12 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_pages_text: createToolBuilder("get_pages_text")
       .read()
       .description(
-        `Read full text for one or more pages. Returned text preserves inferred spaces and line breaks from PDF layout while staying compatible with anchor highlighting. Optionally include per-line layout rectangles. Returns at most ${AI_CHAT_MAX_READ_PAGES_PER_CALL} pages per call.`,
+        "Read full text for one or more pages. Returned text preserves inferred spaces and line breaks from PDF layout while staying compatible with anchor highlighting. Optionally include per-line layout rectangles. The per-call text budget is configured in AI chat settings.",
       )
       .promptInstructions(GET_PAGES_TEXT_TOOL_PROMPTS)
-      .inputSchema(readPagesArgsSchema)
+      .inputSchema(getPagesTextArgsSchema)
       .build(async ({ args, ctx: toolCtx, signal }) => {
-        const result = await toolCtx.readPages({
+        const result = await toolCtx.getPagesText({
           pageNumbers: args.page_numbers,
           includeLayout: args.include_layout,
           signal,
@@ -433,8 +455,8 @@ export const documentToolModule = defineToolModule((ctx) => {
         return {
           payload: result,
           summary: result.truncated
-            ? `Read ${result.returnedPageCount} of ${result.requestedPageCount} requested pages (limit ${result.maxPagesPerCall})`
-            : `Read ${result.returnedPageCount} page${result.returnedPageCount === 1 ? "" : "s"}`,
+            ? `Read ${formatCharCount(result.returnedCharCount)} from ${result.returnedPageCount} of ${result.requestedPageCount} requested page${result.requestedPageCount === 1 ? "" : "s"} (truncated at ${formatCharCount(result.maxCharsPerCall)})`
+            : `Read ${formatCharCount(result.returnedCharCount)} from ${result.returnedPageCount} page${result.returnedPageCount === 1 ? "" : "s"}`,
         };
       }),
 

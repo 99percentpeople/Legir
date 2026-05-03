@@ -1,4 +1,7 @@
 import {
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT,
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
   AI_CHAT_DIGEST_MAX_PAGES_PER_LEAF_CHUNK,
   AI_CHAT_DIGEST_MERGE_BATCH_SIZE,
   AI_CHAT_DIGEST_OUTPUT_CHARS_MAX,
@@ -8,7 +11,6 @@ import {
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
   AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
-  AI_CHAT_MAX_READ_PAGES_PER_CALL,
 } from "@/constants";
 import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
@@ -32,6 +34,7 @@ import type {
   AiSummaryInstructions,
   AiDocumentSnapshot,
   AiReadablePage,
+  AiReadablePageBatch,
   AiReadablePageLine,
   AiTextSelectionContext,
   AiToolExecutionProgressItem,
@@ -39,6 +42,18 @@ import type {
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
+
+const clampGetPagesTextMaxChars = (value: unknown) => {
+  const next = Math.trunc(Number(value) || 0);
+  if (!Number.isFinite(next) || next <= 0) {
+    return AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT;
+  }
+  return clampNumber(
+    next,
+    AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
+    AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
+  );
+};
 
 const normalizeExcerptText = (text: string) => text.replace(/\s+/g, " ").trim();
 const DIGEST_LABEL_OVERHEAD_PER_PAGE = 12;
@@ -560,6 +575,9 @@ export const createDocumentContextService = (options: {
     charsPerChunk?: number;
     sourceCharsPerChunk?: number;
   };
+  getPagesTextConfig?: () => {
+    maxChars?: number;
+  };
   summarizeDigestChunk?: (options: {
     startPage: number;
     endPage: number;
@@ -582,6 +600,7 @@ export const createDocumentContextService = (options: {
     getPdfSource,
     getRenderablePdfBytes,
     getDigestConfig,
+    getPagesTextConfig,
     summarizeDigestChunk,
     summarizeRenderedPages,
     workerService = pdfWorkerService,
@@ -628,6 +647,32 @@ export const createDocumentContextService = (options: {
     }));
     pageLinesCache.set(pageIndex, normalized);
     return normalized;
+  };
+
+  const sliceLinesToCharBudget = (
+    lines: AiReadablePageLine[],
+    maxChars: number,
+  ) => {
+    if (maxChars <= 0) return [];
+    let remaining = maxChars;
+    const out: AiReadablePageLine[] = [];
+
+    for (const line of lines) {
+      if (remaining <= 0) break;
+      if (line.text.length <= remaining) {
+        out.push(line);
+        remaining -= line.text.length;
+        continue;
+      }
+
+      out.push({
+        ...line,
+        text: line.text.slice(0, remaining),
+      });
+      break;
+    }
+
+    return out;
   };
 
   const renderPageImageSourceFromCurrentDocument = async ({
@@ -1648,47 +1693,73 @@ export const createDocumentContextService = (options: {
         }
       : undefined,
 
-    readPages: async ({ pageNumbers, includeLayout = false, signal }) => {
+    getPagesText: async ({
+      pageNumbers,
+      includeLayout = false,
+      signal,
+    }: {
+      pageNumbers: number[];
+      includeLayout?: boolean;
+      signal?: AbortSignal;
+    }): Promise<AiReadablePageBatch> => {
       const snapshot = getSnapshot();
       const requestedPageNumbers = clampPageNumbers(
         pageNumbers,
         snapshot.pages.length,
         snapshot.pages.length,
       );
-      const resolvedPageNumbers = clampPageNumbers(
-        requestedPageNumbers,
-        snapshot.pages.length,
-        AI_CHAT_MAX_READ_PAGES_PER_CALL,
-      );
+      const getPagesTextOptions = getPagesTextConfig?.();
+      const maxChars = clampGetPagesTextMaxChars(getPagesTextOptions?.maxChars);
 
-      const pages = await Promise.all(
-        resolvedPageNumbers.map(async (pageNumber): Promise<AiReadablePage> => {
-          const pageIndex = pageNumber - 1;
-          const text = await readPageText(pageIndex, signal);
-          if (!includeLayout) {
-            return {
-              pageNumber,
-              text,
-              charCount: text.length,
-            };
-          }
+      const pages: AiReadablePage[] = [];
+      let returnedCharCount = 0;
+      let truncated = false;
 
+      for (const pageNumber of requestedPageNumbers) {
+        const remainingChars = maxChars - returnedCharCount;
+        if (remainingChars <= 0) {
+          truncated = true;
+          break;
+        }
+
+        const pageIndex = pageNumber - 1;
+        const fullText = await readPageText(pageIndex, signal);
+        const pageTruncated = fullText.length > remainingChars;
+        const text = pageTruncated
+          ? fullText.slice(0, remainingChars)
+          : fullText;
+
+        const page: AiReadablePage = {
+          pageNumber,
+          text,
+          charCount: text.length,
+          ...(pageTruncated ? { truncated: true } : {}),
+        };
+
+        if (includeLayout) {
           const lines = await readPageLines(pageIndex, signal);
-          return {
-            pageNumber,
-            text,
-            charCount: text.length,
-            lineCount: lines.length,
-            lines,
-          };
-        }),
-      );
+          const returnedLines = pageTruncated
+            ? sliceLinesToCharBudget(lines, text.length)
+            : lines;
+          page.lineCount = returnedLines.length;
+          page.lines = returnedLines;
+        }
+
+        pages.push(page);
+        returnedCharCount += text.length;
+
+        if (pageTruncated) {
+          truncated = true;
+          break;
+        }
+      }
 
       return {
         requestedPageCount: requestedPageNumbers.length,
         returnedPageCount: pages.length,
-        truncated: requestedPageNumbers.length > pages.length,
-        maxPagesPerCall: AI_CHAT_MAX_READ_PAGES_PER_CALL,
+        returnedCharCount,
+        truncated: truncated || requestedPageNumbers.length > pages.length,
+        maxCharsPerCall: maxChars,
         pages,
       };
     },

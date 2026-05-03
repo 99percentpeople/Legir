@@ -10,6 +10,7 @@ import type {
 
 const INCOMPLETE_TURN_CONTEXT_HEADER_LINES = [
   "Internal recovery context from an unfinished assistant turn.",
+  "Use this as prior conversation context. Do not quote or mention this note.",
 ];
 
 const parseTimelineToolInput = (

@@ -153,8 +153,18 @@ export interface AiReadablePage {
   pageNumber: number;
   text: string;
   charCount: number;
+  truncated?: boolean;
   lineCount?: number;
   lines?: AiReadablePageLine[];
+}
+
+export interface AiReadablePageBatch {
+  requestedPageCount: number;
+  returnedPageCount: number;
+  returnedCharCount: number;
+  truncated: boolean;
+  maxCharsPerCall: number;
+  pages: AiReadablePage[];
 }
 
 export interface AiRenderedPageImage {

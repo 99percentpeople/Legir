@@ -758,6 +758,9 @@ const de = {
       context_pruning_enabled_desc:
         "Beschneidet ältere Reasoning-Inhalte, sobald der Kontext-Token-Schwellenwert erreicht ist, und entfernt bevorzugt ältere Seitenbild-Ergebnisse, um Tokens zu sparen.",
       max_tool_rounds: "Maximale Tool-Runden",
+      get_pages_text_max_chars: "get_pages_text Textbudget",
+      get_pages_text_max_chars_desc:
+        "Maximale Textzeichen pro get_pages_text-Aufruf. Größere Werte lassen die KI mehr Seiten auf einmal lesen, verbrauchen aber mehr Kontext.",
       tool_history_window: "Fenster für allgemeine Tool-Historie",
       visual_tool_history_window: "Fenster für visuelle Tool-Historie",
       context_pruning_desc:

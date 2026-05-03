@@ -277,20 +277,70 @@ const pageNumberInputSchema = z.preprocess((value) => {
 }, positiveIntSchema);
 export const pageNumberSchema = pageNumberInputSchema;
 
-const pageNumbersArraySchema = z.array(pageNumberInputSchema);
+export type PageNumberRangeSelector = [number, number];
+export type PageNumberSelector = number | PageNumberRangeSelector;
 
-export const pageNumbersSchema = z.preprocess((value) => {
-  if (value === undefined || value === null || value === "") {
-    return [];
+const pageNumberRangeSelectorSchema = z
+  .tuple([pageNumberInputSchema, pageNumberInputSchema])
+  .refine(([startPage, endPage]) => startPage <= endPage, {
+    message: "page range start must be less than or equal to end.",
+  });
+
+export const pageNumberSelectorSchema = z.union([
+  pageNumberInputSchema,
+  pageNumberRangeSelectorSchema,
+]);
+
+export const expandPageNumberSelectors = (
+  selectors: readonly PageNumberSelector[],
+) => {
+  const out: number[] = [];
+  const seen = new Set<number>();
+  const appendPageNumber = (pageNumber: number) => {
+    if (seen.has(pageNumber)) return;
+    seen.add(pageNumber);
+    out.push(pageNumber);
+  };
+
+  for (const selector of selectors) {
+    if (Array.isArray(selector)) {
+      const [startPage, endPage] = selector;
+      for (let pageNumber = startPage; pageNumber <= endPage; pageNumber += 1) {
+        appendPageNumber(pageNumber);
+      }
+      continue;
+    }
+
+    appendPageNumber(selector);
   }
-  return Array.isArray(value) ? value : [value];
-}, pageNumbersArraySchema);
-export const requiredPageNumbersSchema = z.preprocess((value) => {
-  if (value === undefined || value === null || value === "") {
-    return [];
-  }
-  return Array.isArray(value) ? value : [value];
-}, pageNumbersArraySchema.min(1));
+
+  return out;
+};
+
+const PAGE_NUMBER_SELECTORS_DESCRIPTION =
+  "1-based page selectors. Each item can be a page number or a two-item inclusive range like [1, 22].";
+
+const pageNumberSelectorsArraySchema = z.array(pageNumberSelectorSchema);
+const pageNumbersArraySchema = pageNumberSelectorsArraySchema.transform(
+  expandPageNumberSelectors,
+);
+
+export const pageNumbersSchema = z
+  .preprocess((value) => {
+    if (value === undefined || value === null || value === "") {
+      return [];
+    }
+    return Array.isArray(value) ? value : [value];
+  }, pageNumbersArraySchema)
+  .describe(PAGE_NUMBER_SELECTORS_DESCRIPTION);
+export const requiredPageNumbersSchema = z
+  .preprocess((value) => {
+    if (value === undefined || value === null || value === "") {
+      return [];
+    }
+    return Array.isArray(value) ? value : [value];
+  }, pageNumberSelectorsArraySchema.min(1).transform(expandPageNumberSelectors))
+  .describe(PAGE_NUMBER_SELECTORS_DESCRIPTION);
 export const emptyObjectSchema = z.object({}).strict();
 
 const createConfiguredToolBuilder = <
@@ -459,7 +509,7 @@ export const getDocumentDigestArgsSchema = z
     }
   });
 
-export const readPagesArgsSchema = z
+export const getPagesTextArgsSchema = z
   .object({
     page_numbers: requiredPageNumbersSchema,
     include_layout: z

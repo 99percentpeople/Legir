@@ -74,6 +74,9 @@ import {
   AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
   AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
   AI_CHAT_DIGEST_SOURCE_CHARS_STEP,
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_STEP,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
@@ -339,6 +342,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const contextCompressionThresholdTokens =
     options.aiChat.contextCompressionThresholdTokens;
   const maxToolRounds = options.aiChat.maxToolRounds;
+  const getPagesTextMaxChars = options.aiChat.getPagesTextMaxChars;
   const contextCompressionMode = options.aiChat.contextCompressionMode;
   const contextCompressionModelKey = options.aiChat.contextCompressionModelKey;
 
@@ -1189,6 +1193,49 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     <div className="text-muted-foreground flex justify-between text-xs">
                       <span>{AI_CHAT_MAX_TOOL_ROUNDS_MIN}</span>
                       <span>{AI_CHAT_MAX_TOOL_ROUNDS_MAX}</span>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="ai-chat-get-pages-text-max-chars"
+                          className="font-semibold"
+                        >
+                          {t("settings.ai_chat.get_pages_text_max_chars")}
+                        </Label>
+                        <p className="text-muted-foreground text-xs">
+                          {t("settings.ai_chat.get_pages_text_max_chars_desc")}
+                        </p>
+                      </div>
+                      <span className="text-muted-foreground shrink-0 text-xs">
+                        {getPagesTextMaxChars.toLocaleString()}
+                      </span>
+                    </div>
+                    <Slider
+                      id="ai-chat-get-pages-text-max-chars"
+                      value={[getPagesTextMaxChars]}
+                      min={AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN}
+                      max={AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX}
+                      step={AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_STEP}
+                      onValueChange={(values) => {
+                        const next = values[0];
+                        if (!Number.isFinite(next)) return;
+                        updateAiChatOptions({
+                          getPagesTextMaxChars: next,
+                        });
+                      }}
+                    />
+                    <div className="text-muted-foreground flex justify-between text-xs">
+                      <span>
+                        {AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN.toLocaleString()}
+                      </span>
+                      <span>
+                        {AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX.toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </div>

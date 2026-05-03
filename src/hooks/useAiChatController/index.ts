@@ -824,6 +824,9 @@ export const useAiChatController = (
           sourceCharsPerChunk:
             editorState.options.aiChat.digestSourceCharsPerChunk,
         }),
+        getPagesTextConfig: () => ({
+          maxChars: editorState.options.aiChat.getPagesTextMaxChars,
+        }),
         summarizeDigestChunk:
           digestEnabled && digestSummaryModel
             ? summarizeDigestChunk
@@ -843,6 +846,7 @@ export const useAiChatController = (
       editorState.filename,
       editorState.metadata,
       editorState.options.aiChat.digestSourceCharsPerChunk,
+      editorState.options.aiChat.getPagesTextMaxChars,
       editorState.options.aiChat.visualSummaryEnabled,
       editorState.options.aiChat.visualSummaryModelKey,
       editorState.outline,

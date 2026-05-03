@@ -759,6 +759,9 @@ const fr = {
       context_pruning_enabled_desc:
         "Réduit l'ancien raisonnement une fois le seuil de tokens du contexte atteint, et retire en priorité les anciens résultats d'images de page pour diminuer la consommation de tokens.",
       max_tool_rounds: "Nombre maximal de tours d'outils",
+      get_pages_text_max_chars: "Budget texte get_pages_text",
+      get_pages_text_max_chars_desc:
+        "Nombre maximal de caractères retournés par chaque appel get_pages_text. Une valeur plus élevée permet à l'IA de lire plus de pages à la fois, mais consomme plus de contexte.",
       tool_history_window: "Fenêtre d'historique des outils",
       visual_tool_history_window: "Fenêtre d'historique des outils visuels",
       context_pruning_desc:
