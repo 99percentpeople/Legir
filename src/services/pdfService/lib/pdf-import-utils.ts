@@ -336,6 +336,43 @@ export const lookupInFieldChain = (
 };
 
 /**
+ * Collects field flags from a widget/field chain.
+ *
+ * Some PDFs put button classification flags on the parent field while child
+ * widget annotations carry their own empty `/Ff`. For button type detection,
+ * use the union of flags instead of letting the child widget mask the parent.
+ */
+export const collectFieldFlagsFromChain = (start: PDFDict): number => {
+  let flags = 0;
+  let cur: PDFDict | undefined = start;
+
+  for (let depth = 0; depth < 20 && cur; depth++) {
+    try {
+      const v = cur.lookup(PDFName.of("Ff"));
+      if (v instanceof PDFNumber) {
+        const raw = v.asNumber();
+        if (Number.isFinite(raw)) flags |= raw;
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      const parent = cur.lookup(PDFName.of("Parent"));
+      if (parent instanceof PDFDict) {
+        cur = parent;
+        continue;
+      }
+    } catch {
+      // ignore
+    }
+    break;
+  }
+
+  return flags;
+};
+
+/**
  * Extracts widget border style from BS/Border entries.
  */
 export const extractBorderStyle = (

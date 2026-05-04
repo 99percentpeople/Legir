@@ -26,6 +26,7 @@ import {
 import { prepareAnnotationsForPrint } from "./lib/print-export";
 import {
   buildFullFieldNameFromChain,
+  collectFieldFlagsFromChain,
   decodePdfStreamToText,
   extractBorderDashArray,
   extractBorderStyle,
@@ -868,7 +869,12 @@ const buildPdfLibAnnotsByPageIndex = async (
         if (!fieldType) continue;
 
         const rawFf = lookupInFieldChain(annot, "Ff");
-        const fieldFlags = rawFf instanceof PDFNumber ? rawFf.asNumber() : 0;
+        const inheritedFieldFlags =
+          rawFf instanceof PDFNumber ? rawFf.asNumber() : 0;
+        const fieldFlags =
+          fieldType === "Btn"
+            ? collectFieldFlagsFromChain(annot)
+            : inheritedFieldFlags;
 
         const rawDa = lookupInFieldChain(annot, "DA");
         const da = pdfObjToString(rawDa);
