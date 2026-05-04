@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { AlertCircle, CheckCircle2, Loader2, Plus, Trash2 } from "lucide-react";
 
+import { useLanguage } from "@/components/language-provider";
 import { ModelCapabilityBadges } from "@/components/ModelCapabilityBadges";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { Button } from "@/components/ui/button";
@@ -30,12 +31,10 @@ import type {
   LlmModelCache,
   LlmProviderId,
   ProviderSyncStatus,
-  SettingsTranslate,
   UpdateApiProxyOptions,
 } from "./types";
 
 interface LlmSettingsTabProps {
-  t: SettingsTranslate;
   options: AppOptions;
   llmModelCache: LlmModelCache;
   llmProviderTab: LlmProviderId;
@@ -65,7 +64,6 @@ interface LlmSettingsTabProps {
 }
 
 export const LlmSettingsTab = ({
-  t,
   options,
   llmModelCache,
   llmProviderTab,
@@ -87,6 +85,7 @@ export const LlmSettingsTab = ({
   removeCustomModel,
   updateApiProxyOptions,
 }: LlmSettingsTabProps) => {
+  const { t } = useLanguage();
   const selectedLlmProviderSpec =
     AI_PROVIDER_SPECS_SORTED_BY_LABEL.find(
       (spec) => spec.id === llmProviderTab,

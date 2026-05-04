@@ -472,26 +472,9 @@ const ja = {
       highlight: "署名の出現箇所をすべてハイライトして",
     },
     starters: {
-      forms: {
-        title: "フォーム作成",
-        current_page: "このページの入力可能フィールドを検出して作成して",
-        signature_dates: "現在のページで署名欄と日付欄だけを検出して",
-      },
-      reading: {
-        title: "読む・要約する",
-        current_page: "現在のページを要約して",
-        whole_document: "文書全体の要約を作って",
-      },
-      search: {
-        title: "検索・移動",
-        keyword: "保証に関する記述をすべて検索して",
-        jump: "免責条項を検索してその場所へ移動して",
-      },
-      actions: {
-        title: "操作",
-        highlight: "署名の出現箇所をすべてハイライトして",
-        annotations: "この PDF の注釈とハイライトを一覧表示して",
-      },
+      capabilities: "この文書をもとに、あなたに何ができるか教えて",
+      whole_document: "ファイル全体の主な内容を要約して",
+      current_page_problem: "現在のページの問題解決を手伝って",
     },
   },
   debug_overlay: {

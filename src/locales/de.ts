@@ -475,29 +475,11 @@ const de = {
       highlight: "Alle Vorkommen von Unterschrift hervorheben",
     },
     starters: {
-      forms: {
-        title: "Formulare erstellen",
-        current_page:
-          "Erkenne und erstelle die ausfüllbaren Felder auf dieser Seite",
-        signature_dates:
-          "Erkenne auf der aktuellen Seite nur Signatur- und Datumsfelder",
-      },
-      reading: {
-        title: "Lesen & Zusammenfassen",
-        current_page: "Aktuelle Seite zusammenfassen",
-        whole_document: "Das gesamte Dokument zusammenfassen",
-      },
-      search: {
-        title: "Suchen & Springen",
-        keyword: "Alle Stellen zur Garantie suchen",
-        jump: "Nach der Haftungsklausel suchen und dorthin springen",
-      },
-      actions: {
-        title: "Aktionen",
-        highlight: "Alle Vorkommen von Unterschrift hervorheben",
-        annotations:
-          "Alle Kommentare und Hervorhebungen in diesem PDF auflisten",
-      },
+      capabilities: "Sag mir anhand dieses Dokuments, was du tun kannst",
+      whole_document:
+        "Fasse die wichtigsten Inhalte der gesamten Datei zusammen",
+      current_page_problem:
+        "Hilf mir, das Problem auf der aktuellen Seite zu lösen",
     },
   },
   debug_overlay: {

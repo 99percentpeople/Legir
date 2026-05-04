@@ -461,26 +461,9 @@ const zhCN = {
       highlight: "把所有包含签名的位置高亮出来",
     },
     starters: {
-      forms: {
-        title: "制作表单",
-        current_page: "识别并创建这一页的可填写字段",
-        signature_dates: "只识别当前页的签名和日期字段",
-      },
-      reading: {
-        title: "阅读总结",
-        current_page: "总结当前页内容",
-        whole_document: "总结整份文档的主要内容",
-      },
-      search: {
-        title: "搜索定位",
-        keyword: "搜索所有和保修相关的内容",
-        jump: "搜索免责条款并跳过去",
-      },
-      actions: {
-        title: "快捷操作",
-        highlight: "把所有包含签名的位置高亮出来",
-        annotations: "列出这份 PDF 里的所有注释和高亮",
-      },
+      capabilities: "通过这份文档告诉我你可以干什么",
+      whole_document: "总结整份文件的主要内容",
+      current_page_problem: "帮我解决当前页面上的问题",
     },
   },
   debug_overlay: {

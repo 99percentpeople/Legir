@@ -460,26 +460,9 @@ const zhTW = {
       highlight: "把所有包含簽名的位置高亮出來",
     },
     starters: {
-      forms: {
-        title: "製作表單",
-        current_page: "識別並建立這一頁的可填寫欄位",
-        signature_dates: "只識別目前頁面的簽名與日期欄位",
-      },
-      reading: {
-        title: "閱讀摘要",
-        current_page: "總結目前頁面內容",
-        whole_document: "總結整份文件的主要內容",
-      },
-      search: {
-        title: "搜尋定位",
-        keyword: "搜尋所有和保固相關的內容",
-        jump: "搜尋免責條款並跳過去",
-      },
-      actions: {
-        title: "快速操作",
-        highlight: "把所有包含簽名的位置高亮出來",
-        annotations: "列出這份 PDF 裡的所有註解和高亮",
-      },
+      capabilities: "透過這份文件告訴我你可以做什麼",
+      whole_document: "總結整份文件的主要內容",
+      current_page_problem: "幫我解決目前頁面上的問題",
     },
   },
   debug_overlay: {

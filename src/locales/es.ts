@@ -475,27 +475,10 @@ const es = {
       highlight: "Resalta todas las apariciones de firma",
     },
     starters: {
-      forms: {
-        title: "Crear formularios",
-        current_page: "Detecta y crea los campos rellenables de esta página",
-        signature_dates:
-          "Detecta solo los campos de firma y fecha en la página actual",
-      },
-      reading: {
-        title: "Leer y resumir",
-        current_page: "Resume la página actual",
-        whole_document: "Resume todo el documento",
-      },
-      search: {
-        title: "Buscar e ir",
-        keyword: "Busca todo lo relacionado con la garantía",
-        jump: "Busca la cláusula de responsabilidad y ve a ella",
-      },
-      actions: {
-        title: "Acciones",
-        highlight: "Resalta todas las apariciones de firma",
-        annotations: "Lista todos los comentarios y resaltados de este PDF",
-      },
+      capabilities: "A partir de este documento, dime qué puedes hacer",
+      whole_document: "Resume los puntos principales de todo el archivo",
+      current_page_problem:
+        "Ayúdame a resolver el problema de la página actual",
     },
   },
   debug_overlay: {

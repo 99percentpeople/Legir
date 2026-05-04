@@ -2268,6 +2268,5 @@ export const useAiChatController = (
     highlightedSearchResultsByPage,
     hasAvailableModel,
     disabledReason,
-    formToolsEnabled: editorState.options.aiChat.formToolsEnabled,
   };
 };

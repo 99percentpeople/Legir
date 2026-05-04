@@ -1,4 +1,5 @@
 import { Send, Square } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -11,7 +12,6 @@ import type {
   AiChatMessageAttachment,
   AiChatTokenUsageSummary,
 } from "@/services/ai/chat/types";
-import type { TranslateFn } from "./types";
 import { MessageAttachmentChip } from "./MessagePrimitives";
 import { cn } from "@/utils/cn";
 import { getMessageAttachmentKey } from "./utils";
@@ -34,7 +34,6 @@ interface ComposerFooterProps {
   contextTokens: number;
   tokenUsage: AiChatTokenUsageSummary;
   isContextCompressionRunning: boolean;
-  t: TranslateFn;
 }
 
 export function ComposerFooter({
@@ -55,8 +54,9 @@ export function ComposerFooter({
   contextTokens,
   tokenUsage,
   isContextCompressionRunning,
-  t,
 }: ComposerFooterProps) {
+  const { t } = useLanguage();
+
   return (
     <div className="space-y-2">
       <div
@@ -73,7 +73,6 @@ export function ComposerFooter({
               {pendingAttachments.map((attachment) => (
                 <MessageAttachmentChip
                   key={getMessageAttachmentKey(attachment)}
-                  t={t}
                   attachment={attachment}
                   onActivate={(nextAttachment) => {
                     onActivateAttachment(nextAttachment);

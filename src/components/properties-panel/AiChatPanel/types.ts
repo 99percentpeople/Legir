@@ -49,7 +49,6 @@ export interface AiChatPanelProps {
   onStop: () => void;
   onOpenDocumentLink: (target: AiDocumentLinkTarget) => void;
   disabledReason: "no_document" | "no_model" | null;
-  formToolsEnabled: boolean;
 }
 
 export type TranslateFn = (

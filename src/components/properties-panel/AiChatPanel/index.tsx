@@ -57,7 +57,6 @@ export function AiChatPanel({
   onStop,
   onOpenDocumentLink,
   disabledReason,
-  formToolsEnabled,
 }: AiChatPanelProps) {
   const { t } = useLanguage();
   const [draft, setDraft] = React.useState("");
@@ -436,7 +435,6 @@ export function AiChatPanel({
         onDeleteConversation={onDeleteConversation}
         canDeleteConversation={canDeleteConversation}
         isBusy={isBusy}
-        t={t}
       />
 
       <Button
@@ -479,7 +477,6 @@ export function AiChatPanel({
       contextTokens={contextTokens}
       tokenUsage={tokenUsage}
       isContextCompressionRunning={isContextCompressionRunning}
-      t={t}
     />
   );
 
@@ -496,7 +493,7 @@ export function AiChatPanel({
       onResize={onResize}
       footer={footer}
     >
-      <div className="space-y-4">
+      <div className="flex h-full flex-col gap-4">
         {showHeaderBadges ? (
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="destructive">
@@ -508,13 +505,11 @@ export function AiChatPanel({
         {timeline.length === 0 ? (
           <ConversationEmptyState
             disabledReason={disabledReason}
-            formToolsEnabled={formToolsEnabled}
             onSelectPrompt={(prompt) => {
               setDraft(prompt);
               setInlineEditState(null);
               textareaRef.current?.focus();
             }}
-            t={t}
           />
         ) : (
           <ConversationTimeline
@@ -545,7 +540,6 @@ export function AiChatPanel({
             onInlineEditSubmit={handleInlineEditSubmit}
             onCancelInlineEdit={handleCancelInlineEdit}
             onRemoveInlineEditAttachment={handleRemoveInlineEditAttachment}
-            t={t}
           />
         )}
 

@@ -1,5 +1,6 @@
 import React from "react";
 import { Send, X } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 import { StreamMarkdown } from "@/components/markdown/StreamMarkdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,7 +17,6 @@ import {
   type InlineEditState,
   type MessageTimelineItem,
   type TimelineRenderEntry,
-  type TranslateFn,
   type UserMessageTimelineItem,
 } from "./types";
 import {
@@ -53,7 +53,6 @@ interface ConversationTimelineProps {
   onInlineEditSubmit: () => void;
   onCancelInlineEdit: () => void;
   onRemoveInlineEditAttachment: (attachment: AiChatMessageAttachment) => void;
-  t: TranslateFn;
 }
 
 export function ConversationTimeline({
@@ -75,8 +74,8 @@ export function ConversationTimeline({
   onInlineEditSubmit,
   onCancelInlineEdit,
   onRemoveInlineEditAttachment,
-  t,
 }: ConversationTimelineProps) {
+  const { t } = useLanguage();
   const sessionSummaryById = React.useMemo(
     () => new Map(sessions.map((session) => [session.id, session])),
     [sessions],
@@ -284,7 +283,7 @@ export function ConversationTimeline({
             <Card key={entry.id} className="bg-background overflow-hidden">
               <div className="divide-border/70 divide-y">
                 {entry.items.map((item) => (
-                  <ToolTimelineCall key={item.id} item={item} t={t} grouped />
+                  <ToolTimelineCall key={item.id} item={item} grouped />
                 ))}
               </div>
             </Card>
@@ -293,7 +292,7 @@ export function ConversationTimeline({
 
         const { item } = entry;
         if (item.kind !== "message") {
-          return <ToolTimelineCall key={item.id} item={item} t={t} />;
+          return <ToolTimelineCall key={item.id} item={item} />;
         }
 
         const isUser = item.role === "user";
@@ -345,7 +344,6 @@ export function ConversationTimeline({
                     {messageAttachments.map((attachment, index) => (
                       <MessageAttachmentChip
                         key={`${item.id}:attachment:${index}:${getMessageAttachmentKey(attachment)}`}
-                        t={t}
                         attachment={attachment}
                         onActivate={(nextAttachment) => {
                           onActivateAttachment(nextAttachment);
@@ -362,7 +360,6 @@ export function ConversationTimeline({
                         {inlineEditState.attachments.map((attachment) => (
                           <MessageAttachmentChip
                             key={getMessageAttachmentKey(attachment)}
-                            t={t}
                             attachment={attachment}
                             inverted
                             onActivate={(nextAttachment) => {
@@ -486,7 +483,6 @@ export function ConversationTimeline({
                             }
                           : undefined
                       }
-                      t={t}
                     />
                   </>
                 )}

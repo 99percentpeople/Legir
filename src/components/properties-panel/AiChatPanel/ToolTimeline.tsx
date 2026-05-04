@@ -1,5 +1,6 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,21 +18,16 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useStickyBottomScroll } from "../useStickyBottomScroll";
-import type {
-  ToolTimelineItem,
-  ToolTimelinePreviewImage,
-  TranslateFn,
-} from "./types";
+import type { ToolTimelineItem, ToolTimelinePreviewImage } from "./types";
 
 export const ToolTimelineCall = ({
   item,
-  t,
   grouped = false,
 }: {
   item: ToolTimelineItem;
-  t: TranslateFn;
   grouped?: boolean;
 }) => {
+  const { t } = useLanguage();
   const hasProgressSnapshot =
     item.status === "running" &&
     (Boolean(item.progressCounts) ||

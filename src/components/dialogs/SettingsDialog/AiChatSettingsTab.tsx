@@ -1,3 +1,4 @@
+import { useLanguage } from "@/components/language-provider";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,10 +31,9 @@ import {
 import type { AiChatOptions } from "@/types";
 
 import { SETTINGS_CARD_SPACIOUS_CLASS } from "./styles";
-import type { SettingsTranslate, UpdateAiChatOptions } from "./types";
+import type { UpdateAiChatOptions } from "./types";
 
 interface AiChatSettingsTabProps {
-  t: SettingsTranslate;
   options: AiChatOptions;
   aiToolModelGroups: ModelSelectGroup[];
   aiVisionModelGroups: ModelSelectGroup[];
@@ -41,12 +41,12 @@ interface AiChatSettingsTabProps {
 }
 
 export const AiChatSettingsTab = ({
-  t,
   options,
   aiToolModelGroups,
   aiVisionModelGroups,
   updateAiChatOptions,
 }: AiChatSettingsTabProps) => {
+  const { t } = useLanguage();
   const digestOutputRatioDenominator = options.digestOutputRatioDenominator;
   const digestEnabled = options.digestEnabled;
   const digestSourceCharsPerChunk = options.digestSourceCharsPerChunk;

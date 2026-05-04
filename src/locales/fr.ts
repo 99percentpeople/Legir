@@ -477,27 +477,10 @@ const fr = {
       highlight: "Surligne toutes les occurrences de signature",
     },
     starters: {
-      forms: {
-        title: "Créer des formulaires",
-        current_page: "Détecte et crée les champs remplissables sur cette page",
-        signature_dates:
-          "Détecte uniquement les champs de signature et de date sur la page actuelle",
-      },
-      reading: {
-        title: "Lire & Résumer",
-        current_page: "Résume la page actuelle",
-        whole_document: "Résume l'ensemble du document",
-      },
-      search: {
-        title: "Rechercher & Aller",
-        keyword: "Recherche tout ce qui concerne la garantie",
-        jump: "Recherche la clause de responsabilité et va à cet endroit",
-      },
-      actions: {
-        title: "Actions",
-        highlight: "Surligne toutes les occurrences de signature",
-        annotations: "Liste tous les commentaires et surlignages de ce PDF",
-      },
+      capabilities: "À partir de ce document, dis-moi ce que tu peux faire",
+      whole_document: "Résume les points principaux de tout le fichier",
+      current_page_problem:
+        "Aide-moi à résoudre le problème sur la page actuelle",
     },
   },
   debug_overlay: {

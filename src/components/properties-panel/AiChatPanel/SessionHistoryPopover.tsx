@@ -1,5 +1,6 @@
 import React from "react";
 import { ChevronDown, GitBranch, History, Trash2 } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 import { TimeAgoText } from "@/components/timeText";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/utils/cn";
-import type { TranslateFn } from "./types";
 import { getSessionTitle } from "./utils";
 import type { AiChatSessionSummary } from "@/services/ai/chat/types";
 
@@ -28,7 +28,6 @@ interface SessionHistoryPopoverProps {
   onDeleteConversation: (id: string) => void;
   canDeleteConversation: (id: string) => boolean;
   isBusy: boolean;
-  t: TranslateFn;
 }
 
 export function SessionHistoryPopover({
@@ -40,8 +39,8 @@ export function SessionHistoryPopover({
   onDeleteConversation,
   canDeleteConversation,
   isBusy,
-  t,
 }: SessionHistoryPopoverProps) {
+  const { t } = useLanguage();
   const [expandedSessionIds, setExpandedSessionIds] = React.useState<
     Set<string>
   >(() => new Set());

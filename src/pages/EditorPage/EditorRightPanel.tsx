@@ -137,7 +137,6 @@ export function EditorRightPanel({
         onStop={aiChat.stop}
         onOpenDocumentLink={aiChat.openDocumentLink}
         disabledReason={aiChat.disabledReason}
-        formToolsEnabled={aiChat.formToolsEnabled}
       />
     );
   }

@@ -1848,7 +1848,6 @@ const App: React.FC = () => {
         onCloseWithoutSaving={async () => {
           await resolveCloseRequest(false);
         }}
-        t={t}
       />
 
       <PdfPasswordDialog

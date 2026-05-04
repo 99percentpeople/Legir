@@ -1,6 +1,10 @@
 import { Globe, Laptop, LayoutGrid, Moon, Sun, User } from "lucide-react";
 
-import { LANGUAGES, type Language } from "@/components/language-provider";
+import {
+  LANGUAGES,
+  useLanguage,
+  type Language,
+} from "@/components/language-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,10 +19,8 @@ import { TabsContent } from "@/components/ui/tabs";
 import type { AppOptions, ThumbnailsLayoutMode } from "@/types";
 
 import { SETTINGS_CARD_COMPACT_CLASS } from "./styles";
-import type { SettingsTranslate } from "./types";
 
 interface GeneralSettingsTabProps {
-  t: SettingsTranslate;
   language: Language;
   setLanguage: (language: Language) => void;
   theme: "dark" | "light" | "system";
@@ -28,7 +30,6 @@ interface GeneralSettingsTabProps {
 }
 
 export const GeneralSettingsTab = ({
-  t,
   language,
   setLanguage,
   theme,
@@ -36,6 +37,8 @@ export const GeneralSettingsTab = ({
   options,
   onChange,
 }: GeneralSettingsTabProps) => {
+  const { t } = useLanguage();
+
   return (
     <TabsContent value="general">
       <div className="space-y-6">

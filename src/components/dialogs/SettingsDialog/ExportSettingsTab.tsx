@@ -1,24 +1,24 @@
 import { FileText } from "lucide-react";
 
+import { useLanguage } from "@/components/language-provider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { TabsContent } from "@/components/ui/tabs";
 import type { AppOptions } from "@/types";
 
 import { SETTINGS_CARD_COMPACT_CLASS } from "./styles";
-import type { SettingsTranslate } from "./types";
 
 interface ExportSettingsTabProps {
-  t: SettingsTranslate;
   options: AppOptions;
   onChange: (options: AppOptions) => void;
 }
 
 export const ExportSettingsTab = ({
-  t,
   options,
   onChange,
 }: ExportSettingsTabProps) => {
+  const { t } = useLanguage();
+
   return (
     <TabsContent value="export">
       <div className="space-y-6">

@@ -14,11 +14,6 @@ export interface SettingsDialogProps {
   onChange: (options: AppOptions) => void;
 }
 
-export type SettingsTranslate = (
-  key: string,
-  params?: Record<string, unknown>,
-) => string;
-
 export type LlmProviderId = AiProviderId;
 
 export type ProviderSyncStatus = {

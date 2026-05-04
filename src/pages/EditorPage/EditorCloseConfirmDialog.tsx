@@ -1,3 +1,4 @@
+import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -6,7 +7,6 @@ import {
   DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { TranslateFn } from "./types";
 
 interface EditorCloseConfirmDialogProps {
   open: boolean;
@@ -15,7 +15,6 @@ interface EditorCloseConfirmDialogProps {
   onCloseDialog: () => void;
   onSaveAndClose: () => Promise<void>;
   onCloseWithoutSaving: () => Promise<void>;
-  t: TranslateFn;
 }
 
 export function EditorCloseConfirmDialog({
@@ -25,8 +24,9 @@ export function EditorCloseConfirmDialog({
   onCloseDialog,
   onSaveAndClose,
   onCloseWithoutSaving,
-  t,
 }: EditorCloseConfirmDialogProps) {
+  const { t } = useLanguage();
+
   return (
     <Dialog
       open={open}

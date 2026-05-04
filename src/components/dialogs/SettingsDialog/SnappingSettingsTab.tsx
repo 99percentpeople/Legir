@@ -1,5 +1,6 @@
 import { Magnet } from "lucide-react";
 
+import { useLanguage } from "@/components/language-provider";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -7,19 +8,19 @@ import { TabsContent } from "@/components/ui/tabs";
 import type { SnappingOptions } from "@/types";
 
 import { SETTINGS_CARD_COMPACT_CLASS } from "./styles";
-import type { SettingsTranslate, UpdateSnappingOption } from "./types";
+import type { UpdateSnappingOption } from "./types";
 
 interface SnappingSettingsTabProps {
-  t: SettingsTranslate;
   options: SnappingOptions;
   onUpdate: UpdateSnappingOption;
 }
 
 export const SnappingSettingsTab = ({
-  t,
   options,
   onUpdate,
 }: SnappingSettingsTabProps) => {
+  const { t } = useLanguage();
+
   return (
     <TabsContent value="snapping">
       <div className="space-y-6">

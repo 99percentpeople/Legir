@@ -72,7 +72,6 @@ const HomePage: React.FC<HomePageProps> = ({ adapter }) => {
       onDeleteRecent={handleDeleteRecent}
       onClearAll={handleClearAll}
       onViewModeChange={handleRecentFilesViewModeChange}
-      t={t}
     />
   );
 };

@@ -389,7 +389,6 @@ const SettingsDialog = ({
           </TabsList>
           <div className={SETTINGS_TABS_CONTENT_CLASS}>
             <GeneralSettingsTab
-              t={t}
               language={language}
               setLanguage={setLanguage}
               theme={theme}
@@ -397,14 +396,12 @@ const SettingsDialog = ({
               options={options}
               onChange={onChange}
             />
-            <ExportSettingsTab t={t} options={options} onChange={onChange} />
+            <ExportSettingsTab options={options} onChange={onChange} />
             <SnappingSettingsTab
-              t={t}
               options={options.snappingOptions}
               onUpdate={updateSnappingOption}
             />
             <LlmSettingsTab
-              t={t}
               options={options}
               llmModelCache={llmModelCache}
               llmProviderTab={llmProviderTab}
@@ -429,14 +426,12 @@ const SettingsDialog = ({
               updateApiProxyOptions={updateApiProxyOptions}
             />
             <AiChatSettingsTab
-              t={t}
               options={options.aiChat}
               aiToolModelGroups={aiToolModelGroups}
               aiVisionModelGroups={aiVisionModelGroups}
               updateAiChatOptions={updateAiChatOptions}
             />
             <DebugSettingsTab
-              t={t}
               options={options.debugOptions}
               onUpdate={updateDebugOption}
             />

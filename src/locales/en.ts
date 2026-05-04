@@ -470,27 +470,9 @@ const en = {
       highlight: "Highlight all occurrences of signature",
     },
     starters: {
-      forms: {
-        title: "Build Forms",
-        current_page: "Detect and create the fillable fields on this page",
-        signature_dates:
-          "Detect only signature and date fields on the current page",
-      },
-      reading: {
-        title: "Read & Summarize",
-        current_page: "Summarize the current page",
-        whole_document: "Give me a summary of the whole document",
-      },
-      search: {
-        title: "Search & Jump",
-        keyword: "Find all mentions of warranty terms",
-        jump: "Search for the liability clause and jump to it",
-      },
-      actions: {
-        title: "Actions",
-        highlight: "Highlight all occurrences of signature",
-        annotations: "List all comments and highlights in this PDF",
-      },
+      capabilities: "Using this document, tell me what you can do",
+      whole_document: "Summarize the main points of the entire file",
+      current_page_problem: "Help me solve the problem on the current page",
     },
   },
   debug_overlay: {
