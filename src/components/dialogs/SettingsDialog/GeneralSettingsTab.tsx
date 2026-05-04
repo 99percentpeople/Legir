@@ -5,6 +5,7 @@ import {
   useLanguage,
   type Language,
 } from "@/components/language-provider";
+import { useTheme } from "@/components/theme-provider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,23 +22,16 @@ import type { AppOptions, ThumbnailsLayoutMode } from "@/types";
 import { SETTINGS_CARD_COMPACT_CLASS } from "./styles";
 
 interface GeneralSettingsTabProps {
-  language: Language;
-  setLanguage: (language: Language) => void;
-  theme: "dark" | "light" | "system";
-  setTheme: (theme: "dark" | "light" | "system") => void;
   options: AppOptions;
   onChange: (options: AppOptions) => void;
 }
 
 export const GeneralSettingsTab = ({
-  language,
-  setLanguage,
-  theme,
-  setTheme,
   options,
   onChange,
 }: GeneralSettingsTabProps) => {
-  const { t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
+  const { theme, setTheme } = useTheme();
 
   return (
     <TabsContent value="general">

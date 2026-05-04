@@ -79,9 +79,6 @@ export type EditorUiStateSetter = (
 export type EditorPageCloseSource = "menu" | "window";
 
 export interface EditorCanvasMobileToolbar {
-  isDirty: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
   onModeChange: (mode: EditorState["mode"]) => void;
   onPenStyleChange: (style: Partial<PenStyle>) => void;
   onHighlightStyleChange: (style: Partial<PenStyle>) => void;
@@ -93,21 +90,6 @@ export interface EditorCanvasMobileToolbar {
   onStampStyleChange: (
     style: Partial<NonNullable<EditorState["stampStyle"]>>,
   ) => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  onOpenShortcuts: () => void;
-  onOpenSearch: () => void;
-  isFieldListOpen: boolean;
-  onToggleFieldList: () => void;
-  isPropertiesPanelOpen: boolean;
-  onTogglePropertiesPanel: () => void;
-  onOpenSettings: () => void;
-  isSearchOpen: boolean;
-  onSave: () => Promise<boolean>;
-  onSaveAs: () => Promise<boolean>;
-  onPrint: () => void;
-  onExit: () => void;
-  onClose: () => void;
 }
 
 export type SelectedEditorControl = FormField | Annotation | null;

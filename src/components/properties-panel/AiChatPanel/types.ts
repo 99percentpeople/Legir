@@ -1,13 +1,11 @@
-import type { ModelSelectGroup } from "@/components/ModelSelect";
+import type { useAiChatController } from "@/hooks/useAiChatController";
 import type {
   AiChatMessageAttachment,
-  AiChatSessionSummary,
   AiChatTimelineItem,
-  AiChatTokenUsageSummary,
-  AiDocumentLinkTarget,
-  AiChatUserMessageInput,
   AiChatToolPreviewImage,
 } from "@/services/ai/chat/types";
+
+export type AiChatController = ReturnType<typeof useAiChatController>;
 
 export interface AiChatPanelProps {
   isFloating: boolean;
@@ -16,39 +14,7 @@ export interface AiChatPanelProps {
   width: number;
   onResize: (width: number) => void;
   onCollapse: () => void;
-
-  sessions: AiChatSessionSummary[];
-  activeSessionId: string;
-  onSelectSession: (id: string) => void;
-  onNewConversation: () => void;
-  onDeleteConversation: (id: string) => void;
-  canDeleteConversation: (id: string) => boolean;
-
-  timeline: AiChatTimelineItem[];
-  runStatus: "idle" | "running" | "cancelling" | "error";
-  lastError: string | null;
-  awaitingContinue: boolean;
-  isContextCompressionRunning: boolean;
-  tokenUsage: AiChatTokenUsageSummary;
-  contextTokens: number;
-
-  selectedModelKey?: string;
-  onSelectModel: (value: string) => void;
-  modelGroups: ModelSelectGroup[];
-
-  onSend: (input: AiChatUserMessageInput) => void;
-  onContinueConversation: () => Promise<void> | void;
-  onRegenerateMessage: (messageId: string) => Promise<void> | void;
-  onRetryLastError: () => Promise<void> | void;
-  onEditUserMessage: (messageId: string) => {
-    text: string;
-    attachments?: AiChatMessageAttachment[];
-    sourceSessionId: string;
-    targetMessageId: string;
-  } | null;
-  onStop: () => void;
-  onOpenDocumentLink: (target: AiDocumentLinkTarget) => void;
-  disabledReason: "no_document" | "no_model" | null;
+  aiChat: AiChatController;
 }
 
 export type TranslateFn = (

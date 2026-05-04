@@ -616,7 +616,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
       <Toolbar
         editorState={state}
-        isDirty={state.isDirty}
         hideModeSelector={isMobile}
         hideToolSection={isMobile}
         compactZoomControl={isMobile}
@@ -647,8 +646,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
         onPrint={onPrint}
         onUndo={undo}
         onRedo={redo}
-        canUndo={state.past.length > 0}
-        canRedo={state.future.length > 0}
         onOpenShortcuts={() => openDialog("shortcuts")}
         onOpenSearch={pdfSearch.openPdfSearch}
         isFieldListOpen={state.isSidebarOpen}
@@ -724,8 +721,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
             <PDFSearchHeader
               query={pdfSearch.pdfSearchQuery}
               focusToken={pdfSearch.pdfSearchFocusToken}
-              canGoPrevious={pdfSearch.pdfSearchResults.length > 0}
-              canGoNext={pdfSearch.pdfSearchResults.length > 0}
+              hasResults={pdfSearch.pdfSearchResults.length > 0}
               onQueryChange={pdfSearch.setPdfSearchQuery}
               onPrevious={pdfSearch.handleSelectPreviousPdfSearchResult}
               onNext={pdfSearch.handleSelectNextPdfSearchResult}
@@ -759,9 +755,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
             pdfSearch.isPdfSearchOpen ? pdfSearch.activePdfSearchResultId : null
           }
           mobileToolbar={{
-            isDirty: state.isDirty,
-            canUndo: state.past.length > 0,
-            canRedo: state.future.length > 0,
             onModeChange: handleModeChange,
             onPenStyleChange: handlePenStyleChange,
             onHighlightStyleChange: handleHighlightStyleChange,
@@ -769,21 +762,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
             onFreetextStyleChange: handleFreetextStyleChange,
             onShapeStyleChange: handleShapeStyleChange,
             onStampStyleChange: handleStampStyleChange,
-            onUndo: undo,
-            onRedo: redo,
-            onOpenShortcuts: () => openDialog("shortcuts"),
-            onOpenSearch: pdfSearch.openPdfSearch,
-            isFieldListOpen: state.isSidebarOpen,
-            onToggleFieldList: toggleSidebar,
-            isPropertiesPanelOpen: state.isRightPanelOpen,
-            onTogglePropertiesPanel: toggleRightPanel,
-            onOpenSettings: () => openDialog("settings"),
-            isSearchOpen: pdfSearch.isPdfSearchOpen,
-            onSave,
-            onSaveAs,
-            onPrint,
-            onExit: handleExitEditorPage,
-            onClose: handleRequestCloseFromUi,
           }}
         />
 
@@ -793,7 +771,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
               ? [state.rightPanelTab, ...state.rightPanelDockTab]
               : [...state.rightPanelDockTab]
           }
-          isRightPanelOpen={state.isRightPanelOpen}
           isFloating={state.isPanelFloating}
           rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
           canOpenProperties={!!selectedControl}

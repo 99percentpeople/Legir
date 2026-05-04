@@ -30,7 +30,6 @@ export interface RightPanelDockTab {
 export interface RightPanelTabDockProps {
   tabs?: RightPanelDockTab[];
   activeTabs: RightPanelTabId[];
-  isRightPanelOpen: boolean;
   isFloating: boolean;
   rightOffsetPx: number;
   canOpenProperties: boolean;
@@ -40,7 +39,6 @@ export interface RightPanelTabDockProps {
 export function RightPanelTabDock({
   tabs,
   activeTabs,
-  isRightPanelOpen: _isRightPanelOpen,
   isFloating,
   rightOffsetPx,
   canOpenProperties,

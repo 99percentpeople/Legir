@@ -33,32 +33,35 @@ export function AiChatPanel({
   width,
   onResize,
   onCollapse,
-  sessions,
-  activeSessionId,
-  onSelectSession,
-  onNewConversation,
-  onDeleteConversation,
-  canDeleteConversation,
-  timeline,
-  runStatus,
-  lastError,
-  awaitingContinue,
-  isContextCompressionRunning,
-  tokenUsage,
-  contextTokens,
-  selectedModelKey,
-  onSelectModel,
-  modelGroups,
-  onSend,
-  onContinueConversation,
-  onRegenerateMessage,
-  onRetryLastError,
-  onEditUserMessage,
-  onStop,
-  onOpenDocumentLink,
-  disabledReason,
+  aiChat,
 }: AiChatPanelProps) {
   const { t } = useLanguage();
+  const {
+    sessions,
+    activeSessionId,
+    selectSession: onSelectSession,
+    newConversation: onNewConversation,
+    deleteConversation: onDeleteConversation,
+    canDeleteConversation,
+    timeline,
+    runStatus,
+    lastError,
+    awaitingContinue,
+    isContextCompressionRunning,
+    tokenUsage,
+    contextTokens,
+    selectedModelKey,
+    setSelectedModelKey: onSelectModel,
+    modelSelectGroups: modelGroups,
+    sendMessage: onSend,
+    continueConversation: onContinueConversation,
+    regenerateAssistantMessage: onRegenerateMessage,
+    retryLastFailedMessage: onRetryLastError,
+    editUserMessage: onEditUserMessage,
+    stop: onStop,
+    openDocumentLink: onOpenDocumentLink,
+    disabledReason,
+  } = aiChat;
   const [draft, setDraft] = React.useState("");
   const [pendingAttachments, setPendingAttachments] = React.useState<
     AiChatMessageAttachment[]
@@ -287,7 +290,7 @@ export function AiChatPanel({
     if (!text && pendingAttachments.length === 0) return;
 
     nextTimelineScrollBehaviorRef.current = "smooth";
-    onSend({
+    void onSend({
       text: text || getAttachmentOnlyMessage(t, pendingAttachments),
       displayText: text,
       attachments:
@@ -343,7 +346,7 @@ export function AiChatPanel({
     if (!text && inlineEditState.attachments.length === 0) return;
 
     nextTimelineScrollBehaviorRef.current = "smooth";
-    onSend({
+    void onSend({
       text: text || getAttachmentOnlyMessage(t, inlineEditState.attachments),
       displayText: text,
       attachments:

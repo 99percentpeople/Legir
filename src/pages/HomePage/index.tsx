@@ -62,9 +62,9 @@ const HomePage: React.FC<HomePageProps> = ({ adapter }) => {
   return (
     <RecentFilesHomeView
       query={query}
-      recentFiles={recentFiles}
       filteredRecentFiles={filteredRecentFiles}
       viewMode={recentFilesViewMode}
+      canClearAll={recentFiles.length > 0}
       onQueryChange={setQuery}
       onClearQuery={() => setQuery("")}
       onOpen={handleOpen}

@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/components/language-provider";
-import { useTheme } from "@/components/theme-provider";
 import {
   filterModelSelectGroups,
   type ModelSelectGroup,
@@ -32,7 +31,6 @@ import {
   AI_PROVIDER_IDS,
   AI_PROVIDER_SPECS_SORTED_BY_LABEL,
 } from "@/services/ai/providers/catalog";
-import { isDesktopApp } from "@/services/platform/runtime";
 import { useEditorStore } from "@/store/useEditorStore";
 import type {
   AppOptions,
@@ -70,9 +68,7 @@ const SettingsDialog = ({
   options,
   onChange,
 }: SettingsDialogProps) => {
-  const { language, setLanguage, t } = useLanguage();
-  const { theme, setTheme } = useTheme();
-  const isDesktopRuntime = isDesktopApp();
+  const { t } = useLanguage();
   const llmModelCache = useEditorStore((s) => s.llmModelCache);
 
   const [llmProviderTab, setLlmProviderTab] = useState<LlmProviderId>(
@@ -388,14 +384,7 @@ const SettingsDialog = ({
             </TabsTrigger>
           </TabsList>
           <div className={SETTINGS_TABS_CONTENT_CLASS}>
-            <GeneralSettingsTab
-              language={language}
-              setLanguage={setLanguage}
-              theme={theme}
-              setTheme={setTheme}
-              options={options}
-              onChange={onChange}
-            />
+            <GeneralSettingsTab options={options} onChange={onChange} />
             <ExportSettingsTab options={options} onChange={onChange} />
             <SnappingSettingsTab
               options={options.snappingOptions}
@@ -413,7 +402,6 @@ const SettingsDialog = ({
               setCustomModelCapabilityByProvider={
                 setCustomModelCapabilityByProvider
               }
-              isDesktopRuntime={isDesktopRuntime}
               isLlmProviderEnabled={isLlmProviderEnabled}
               setLlmProviderEnabled={setLlmProviderEnabled}
               updateLlmApiKey={updateLlmApiKey}

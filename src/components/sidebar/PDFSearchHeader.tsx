@@ -6,8 +6,7 @@ import { Button } from "../ui/button";
 interface PDFSearchHeaderProps {
   query: string;
   focusToken: number;
-  canGoPrevious: boolean;
-  canGoNext: boolean;
+  hasResults: boolean;
   onQueryChange: (value: string) => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -16,8 +15,7 @@ interface PDFSearchHeaderProps {
 const PDFSearchHeader: React.FC<PDFSearchHeaderProps> = ({
   query,
   focusToken,
-  canGoPrevious,
-  canGoNext,
+  hasResults,
   onQueryChange,
   onPrevious,
   onNext,
@@ -55,7 +53,7 @@ const PDFSearchHeader: React.FC<PDFSearchHeaderProps> = ({
           variant="ghost"
           size="icon"
           onClick={onPrevious}
-          disabled={!canGoPrevious}
+          disabled={!hasResults}
           className="h-7 w-7 shrink-0 rounded-sm"
           title={t("sidebar.search_previous")}
         >
@@ -66,7 +64,7 @@ const PDFSearchHeader: React.FC<PDFSearchHeaderProps> = ({
           variant="ghost"
           size="icon"
           onClick={onNext}
-          disabled={!canGoNext}
+          disabled={!hasResults}
           className="h-7 w-7 shrink-0 rounded-sm"
           title={t("sidebar.search_next")}
         >

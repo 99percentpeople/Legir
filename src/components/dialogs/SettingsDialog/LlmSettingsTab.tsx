@@ -23,6 +23,7 @@ import {
   getAiProviderSelectedApiOption,
 } from "@/services/ai/providers/catalog";
 import { createCustomModelCapabilities } from "@/services/ai/providers/modelCapabilities";
+import { isDesktopApp } from "@/services/platform/runtime";
 import type { AppOptions, LLMCustomModelCapability } from "@/types";
 
 import { SETTINGS_CARD_GAP_CLASS } from "./styles";
@@ -48,7 +49,6 @@ interface LlmSettingsTabProps {
   setCustomModelCapabilityByProvider: Dispatch<
     SetStateAction<Partial<Record<LlmProviderId, LLMCustomModelCapability[]>>>
   >;
-  isDesktopRuntime: boolean;
   isLlmProviderEnabled: (provider: LlmProviderId) => boolean;
   setLlmProviderEnabled: (provider: LlmProviderId, enabled: boolean) => void;
   updateLlmApiKey: (provider: LlmProviderId, value: string) => void;
@@ -73,7 +73,6 @@ export const LlmSettingsTab = ({
   setCustomModelNameByProvider,
   customModelCapabilityOptions,
   setCustomModelCapabilityByProvider,
-  isDesktopRuntime,
   isLlmProviderEnabled,
   setLlmProviderEnabled,
   updateLlmApiKey,
@@ -86,6 +85,7 @@ export const LlmSettingsTab = ({
   updateApiProxyOptions,
 }: LlmSettingsTabProps) => {
   const { t } = useLanguage();
+  const isDesktopRuntime = isDesktopApp();
   const selectedLlmProviderSpec =
     AI_PROVIDER_SPECS_SORTED_BY_LABEL.find(
       (spec) => spec.id === llmProviderTab,

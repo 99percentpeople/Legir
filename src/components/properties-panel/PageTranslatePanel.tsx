@@ -25,10 +25,14 @@ import {
   translateService,
   type TranslateOptionGroup,
 } from "@/services/translateService";
-import type { PageTranslateContextWindow, TranslateOptionId } from "@/types";
+import type {
+  PageTranslateContextWindow,
+  PageTranslateOptions as PageTranslateUiOptions,
+  TranslateOptionId,
+} from "@/types";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 
-export type PageTranslateOptions = {
+export type PageTranslateStartOptions = {
   pageRange: string;
   targetLanguage: string;
   translateOption: TranslateOptionId;
@@ -54,30 +58,8 @@ export interface PageTranslatePanelProps {
 
   initialTranslateOption: TranslateOptionId;
   initialTargetLanguage: string;
-  fontFamily: string;
-  onFontFamilyChange: (fontFamily: string) => void;
-  freetextPadding: number;
-  onFreetextPaddingChange: (value: number) => void;
-  usePositionAwarePrompt: boolean;
-  onUsePositionAwarePromptChange: (value: boolean) => void;
-
-  aiReflowParagraphs: boolean;
-  onAiReflowParagraphsChange: (value: boolean) => void;
-
-  contextWindow: PageTranslateContextWindow;
-  onContextWindowChange: (value: PageTranslateContextWindow) => void;
-
-  flattenAllFreetext: boolean;
-  onFlattenAllFreetextChange: (value: boolean) => void;
-
-  useParagraphs: boolean;
-  onUseParagraphsChange: (value: boolean) => void;
-  paragraphXGap: number;
-  onParagraphXGapChange: (value: number) => void;
-  paragraphYGap: number;
-  onParagraphYGapChange: (value: number) => void;
-  paragraphSplitByFontSize: boolean;
-  onParagraphSplitByFontSizeChange: (value: boolean) => void;
+  options: PageTranslateUiOptions;
+  onOptionsChange: (patch: Partial<PageTranslateUiOptions>) => void;
   paragraphCandidatesCount: number;
   selectedParagraphCount: number;
   onPreviewParagraphs: (options: {
@@ -91,7 +73,7 @@ export interface PageTranslatePanelProps {
   onToggleExcludeSelectedParagraphs: () => void;
   onDeleteSelectedParagraphs: () => void;
 
-  onStart: (options: PageTranslateOptions) => void;
+  onStart: (options: PageTranslateStartOptions) => void;
   onCancel: () => void;
 }
 
@@ -186,26 +168,8 @@ export function PageTranslatePanel({
   processingStatus,
   initialTranslateOption,
   initialTargetLanguage,
-  fontFamily,
-  onFontFamilyChange,
-  freetextPadding,
-  onFreetextPaddingChange,
-  usePositionAwarePrompt,
-  onUsePositionAwarePromptChange,
-  aiReflowParagraphs,
-  onAiReflowParagraphsChange,
-  contextWindow,
-  onContextWindowChange,
-  flattenAllFreetext,
-  onFlattenAllFreetextChange,
-  useParagraphs,
-  onUseParagraphsChange,
-  paragraphXGap,
-  onParagraphXGapChange,
-  paragraphYGap,
-  onParagraphYGapChange,
-  paragraphSplitByFontSize,
-  onParagraphSplitByFontSizeChange,
+  options,
+  onOptionsChange,
   paragraphCandidatesCount,
   selectedParagraphCount,
   onPreviewParagraphs,
@@ -338,37 +302,38 @@ export function PageTranslatePanel({
     parsed.ok &&
     translateService.isOptionAvailable(translateOption) &&
     targetLanguage.trim().length > 0 &&
-    (!useParagraphs || paragraphCandidatesCount > 0);
+    (!options.useParagraphs || paragraphCandidatesCount > 0);
 
   const availableFontKeys = useMemo(() => {
     return [...Object.keys(FONT_FAMILY_MAP), ...systemFamilies];
   }, [systemFamilies]);
 
-  const currentFontValue = (fontFamily || "Helvetica").trim() || "Helvetica";
+  const currentFontValue =
+    (options.fontFamily || "Helvetica").trim() || "Helvetica";
   const isCustomFontValue =
-    !!fontFamily && !availableFontKeys.includes(fontFamily);
+    !!options.fontFamily && !availableFontKeys.includes(options.fontFamily);
 
   const currentUsePositionAwarePrompt =
-    isPositionAwareAvailable && Boolean(usePositionAwarePrompt);
+    isPositionAwareAvailable && Boolean(options.usePositionAwarePrompt);
 
   const currentAiReflowParagraphs =
-    isAiReflowAvailable && Boolean(aiReflowParagraphs);
+    isAiReflowAvailable && Boolean(options.aiReflowParagraphs);
 
   useEffect(() => {
     if (isPositionAwareAvailable) return;
-    if (!usePositionAwarePrompt) return;
-    onUsePositionAwarePromptChange(false);
+    if (!options.usePositionAwarePrompt) return;
+    onOptionsChange({ usePositionAwarePrompt: false });
   }, [
     isPositionAwareAvailable,
-    onUsePositionAwarePromptChange,
-    usePositionAwarePrompt,
+    onOptionsChange,
+    options.usePositionAwarePrompt,
   ]);
 
   useEffect(() => {
     if (isAiReflowAvailable) return;
-    if (!aiReflowParagraphs) return;
-    onAiReflowParagraphsChange(false);
-  }, [aiReflowParagraphs, isAiReflowAvailable, onAiReflowParagraphsChange]);
+    if (!options.aiReflowParagraphs) return;
+    onOptionsChange({ aiReflowParagraphs: false });
+  }, [isAiReflowAvailable, onOptionsChange, options.aiReflowParagraphs]);
 
   return (
     <PanelLayout
@@ -421,8 +386,8 @@ export function PageTranslatePanel({
                     fontFamily: currentFontValue,
                     usePositionAwarePrompt: currentUsePositionAwarePrompt,
                     aiReflowParagraphs: currentAiReflowParagraphs,
-                    useParagraphs,
-                    contextWindow,
+                    useParagraphs: options.useParagraphs,
+                    contextWindow: options.contextWindow,
                   });
                 }}
               >
@@ -507,12 +472,14 @@ export function PageTranslatePanel({
           <Input
             type="number"
             step="0.5"
-            value={String(freetextPadding)}
+            value={String(options.freetextPadding)}
             disabled={isProcessing}
             onChange={(e) => {
               const next = parseFloat(e.target.value);
               if (!Number.isFinite(next)) return;
-              onFreetextPaddingChange(Math.max(0, Math.min(50, next)));
+              onOptionsChange({
+                freetextPadding: Math.max(0, Math.min(50, next)),
+              });
             }}
           />
           <p className="text-muted-foreground text-xs">
@@ -530,8 +497,10 @@ export function PageTranslatePanel({
             </Label>
             <Switch
               id="page-translate-flatten-all"
-              checked={flattenAllFreetext}
-              onCheckedChange={onFlattenAllFreetextChange}
+              checked={options.flattenFreetext}
+              onCheckedChange={(flattenFreetext) =>
+                onOptionsChange({ flattenFreetext })
+              }
               disabled={isProcessing}
             />
           </div>
@@ -551,7 +520,9 @@ export function PageTranslatePanel({
             <Switch
               id="page-translate-position-aware"
               checked={currentUsePositionAwarePrompt}
-              onCheckedChange={onUsePositionAwarePromptChange}
+              onCheckedChange={(usePositionAwarePrompt) =>
+                onOptionsChange({ usePositionAwarePrompt })
+              }
               disabled={isProcessing || !isPositionAwareAvailable}
             />
           </div>
@@ -571,7 +542,9 @@ export function PageTranslatePanel({
             <Switch
               id="page-translate-ai-reflow"
               checked={currentAiReflowParagraphs}
-              onCheckedChange={onAiReflowParagraphsChange}
+              onCheckedChange={(aiReflowParagraphs) =>
+                onOptionsChange({ aiReflowParagraphs })
+              }
               disabled={isProcessing || !isAiReflowAvailable}
             />
           </div>
@@ -583,9 +556,11 @@ export function PageTranslatePanel({
         <div className="space-y-2">
           <Label>{t("properties.page_translate.context_window")}</Label>
           <Select
-            value={contextWindow}
+            value={options.contextWindow}
             onValueChange={(v) =>
-              onContextWindowChange(v as PageTranslateContextWindow)
+              onOptionsChange({
+                contextWindow: v as PageTranslateContextWindow,
+              })
             }
           >
             <SelectTrigger disabled={isProcessing || !isContextWindowAvailable}>
@@ -635,8 +610,10 @@ export function PageTranslatePanel({
             </Label>
             <Switch
               id="page-translate-use-paragraphs"
-              checked={useParagraphs}
-              onCheckedChange={onUseParagraphsChange}
+              checked={options.useParagraphs}
+              onCheckedChange={(useParagraphs) =>
+                onOptionsChange({ useParagraphs })
+              }
               disabled={isProcessing}
             />
           </div>
@@ -650,12 +627,12 @@ export function PageTranslatePanel({
               <Input
                 type="number"
                 step="0.1"
-                value={String(paragraphXGap)}
-                disabled={!useParagraphs || isProcessing}
+                value={String(options.paragraphXGap)}
+                disabled={!options.useParagraphs || isProcessing}
                 onChange={(e) => {
                   const next = parseFloat(e.target.value);
                   if (!Number.isFinite(next)) return;
-                  onParagraphXGapChange(next);
+                  onOptionsChange({ paragraphXGap: next });
                 }}
               />
             </div>
@@ -665,12 +642,12 @@ export function PageTranslatePanel({
               <Input
                 type="number"
                 step="0.1"
-                value={String(paragraphYGap)}
-                disabled={!useParagraphs || isProcessing}
+                value={String(options.paragraphYGap)}
+                disabled={!options.useParagraphs || isProcessing}
                 onChange={(e) => {
                   const next = parseFloat(e.target.value);
                   if (!Number.isFinite(next)) return;
-                  onParagraphYGapChange(next);
+                  onOptionsChange({ paragraphYGap: next });
                 }}
               />
             </div>
@@ -686,9 +663,11 @@ export function PageTranslatePanel({
               </Label>
               <Switch
                 id="page-translate-paragraph-split-font-size"
-                checked={paragraphSplitByFontSize}
-                onCheckedChange={onParagraphSplitByFontSizeChange}
-                disabled={!useParagraphs || isProcessing}
+                checked={options.paragraphSplitByFontSize}
+                onCheckedChange={(paragraphSplitByFontSize) =>
+                  onOptionsChange({ paragraphSplitByFontSize })
+                }
+                disabled={!options.useParagraphs || isProcessing}
               />
             </div>
             <p className="text-muted-foreground text-xs">
@@ -700,13 +679,13 @@ export function PageTranslatePanel({
             <Button
               type="button"
               variant="secondary"
-              disabled={!useParagraphs || isProcessing || !parsed.ok}
+              disabled={!options.useParagraphs || isProcessing || !parsed.ok}
               onClick={() => {
                 if (!parsed.ok) return;
                 onPreviewParagraphs({
                   pageIndices: parsed.pageIndices,
-                  xGap: paragraphXGap,
-                  yGap: paragraphYGap,
+                  xGap: options.paragraphXGap,
+                  yGap: options.paragraphYGap,
                 });
               }}
             >
@@ -717,7 +696,9 @@ export function PageTranslatePanel({
               type="button"
               variant="secondary"
               disabled={
-                !useParagraphs || isProcessing || paragraphCandidatesCount === 0
+                !options.useParagraphs ||
+                isProcessing ||
+                paragraphCandidatesCount === 0
               }
               onClick={onClearParagraphs}
             >
@@ -730,7 +711,9 @@ export function PageTranslatePanel({
               type="button"
               variant="secondary"
               disabled={
-                !useParagraphs || isProcessing || selectedParagraphCount < 2
+                !options.useParagraphs ||
+                isProcessing ||
+                selectedParagraphCount < 2
               }
               onClick={onMergeSelectedParagraphs}
             >
@@ -741,7 +724,9 @@ export function PageTranslatePanel({
               type="button"
               variant="secondary"
               disabled={
-                !useParagraphs || isProcessing || selectedParagraphCount === 0
+                !options.useParagraphs ||
+                isProcessing ||
+                selectedParagraphCount === 0
               }
               onClick={onUnmergeSelectedParagraphs}
             >
@@ -752,7 +737,9 @@ export function PageTranslatePanel({
               type="button"
               variant="secondary"
               disabled={
-                !useParagraphs || isProcessing || selectedParagraphCount === 0
+                !options.useParagraphs ||
+                isProcessing ||
+                selectedParagraphCount === 0
               }
               onClick={onToggleExcludeSelectedParagraphs}
             >
@@ -763,7 +750,9 @@ export function PageTranslatePanel({
               type="button"
               variant="secondary"
               disabled={
-                !useParagraphs || isProcessing || selectedParagraphCount === 0
+                !options.useParagraphs ||
+                isProcessing ||
+                selectedParagraphCount === 0
               }
               onClick={onDeleteSelectedParagraphs}
             >
@@ -778,7 +767,7 @@ export function PageTranslatePanel({
             })}
           </div>
 
-          {useParagraphs && paragraphCandidatesCount === 0 && (
+          {options.useParagraphs && paragraphCandidatesCount === 0 && (
             <div className="text-muted-foreground text-xs">
               {t("properties.page_translate.paragraph_preview_required")}
             </div>
@@ -787,7 +776,10 @@ export function PageTranslatePanel({
 
         <div className="space-y-2">
           <Label>{t("properties.font_family")}</Label>
-          <Select value={currentFontValue} onValueChange={onFontFamilyChange}>
+          <Select
+            value={currentFontValue}
+            onValueChange={(fontFamily) => onOptionsChange({ fontFamily })}
+          >
             <SelectTrigger className="w-full" disabled={isProcessing}>
               <SelectValue />
             </SelectTrigger>
@@ -815,7 +807,9 @@ export function PageTranslatePanel({
                   </SelectItem>
                 ))}
               {isCustomFontValue && (
-                <SelectItem value={fontFamily}>{fontFamily}</SelectItem>
+                <SelectItem value={options.fontFamily}>
+                  {options.fontFamily}
+                </SelectItem>
               )}
             </SelectContent>
           </Select>

@@ -65,7 +65,6 @@ import { StampStylePopover } from "./StampStylePopover";
 
 interface ToolbarProps {
   editorState: EditorState;
-  isDirty?: boolean;
   hideModeSelector?: boolean;
   hideToolSection?: boolean;
   compactZoomControl?: boolean;
@@ -96,8 +95,6 @@ interface ToolbarProps {
   onClose: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
   onOpenShortcuts: () => void;
   onOpenSearch: () => void;
   isFieldListOpen: boolean;
@@ -110,7 +107,6 @@ interface ToolbarProps {
 
 const Toolbar: React.FC<ToolbarProps> = ({
   editorState,
-  isDirty = false,
   hideModeSelector = false,
   hideToolSection = false,
   compactZoomControl = false,
@@ -137,8 +133,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onClose,
   onUndo,
   onRedo,
-  canUndo,
-  canRedo,
   onOpenShortcuts,
   onOpenSearch,
   isFieldListOpen,
@@ -150,6 +144,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   const { t } = useLanguage();
   const { mode, tool } = editorState;
+  const isDirty = editorState.isDirty;
+  const canUndo = editorState.past.length > 0;
+  const canRedo = editorState.future.length > 0;
   const toolbarTool = isToolMobileOnly(tool) ? "select" : tool;
   const hasSaveAs = useRef(canSaveAs());
   const liveScale = useEditorStore((state) => state.scale);

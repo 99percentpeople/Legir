@@ -27,9 +27,9 @@ import type { HomeRecentFilesViewMode } from "./types";
 
 interface RecentFilesHomeViewProps {
   query: string;
-  recentFiles: RecentFileEntry[];
   filteredRecentFiles: RecentFileEntry[];
   viewMode: HomeRecentFilesViewMode;
+  canClearAll: boolean;
   onQueryChange: (value: string) => void;
   onClearQuery: () => void;
   onOpen: () => Promise<void>;
@@ -255,9 +255,9 @@ const RecentFilesList = ({
 
 export function RecentFilesHomeView({
   query,
-  recentFiles,
   filteredRecentFiles,
   viewMode,
+  canClearAll,
   onQueryChange,
   onClearQuery,
   onOpen,
@@ -316,7 +316,7 @@ export function RecentFilesHomeView({
                   void onClearAll();
                 }}
                 className="gap-2"
-                disabled={recentFiles.length === 0}
+                disabled={!canClearAll}
               >
                 <Trash2 />
                 {t("home.desktop.clear_all")}

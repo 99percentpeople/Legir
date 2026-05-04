@@ -96,6 +96,21 @@ export function EditorRightPanel({
     });
   };
 
+  const updatePageTranslateOptions = (
+    patch: Partial<EditorUiState["pageTranslateOptions"]>,
+  ) => {
+    onSetUiState((prev) => ({
+      pageTranslateOptions: {
+        ...prev.pageTranslateOptions,
+        ...patch,
+      },
+    }));
+
+    if (typeof patch.flattenFreetext === "boolean") {
+      onSetAllFreetextFlatten(patch.flattenFreetext);
+    }
+  };
+
   if (rightPanelTab === "ai_chat") {
     return (
       <AiChatPanel
@@ -105,38 +120,7 @@ export function EditorRightPanel({
         width={rightPanelWidth}
         onResize={(width) => onSetUiState({ rightPanelWidth: width })}
         onCollapse={() => onSetUiState({ isRightPanelOpen: false })}
-        sessions={aiChat.sessions}
-        activeSessionId={aiChat.activeSessionId}
-        onSelectSession={aiChat.selectSession}
-        onNewConversation={aiChat.newConversation}
-        onDeleteConversation={aiChat.deleteConversation}
-        canDeleteConversation={aiChat.canDeleteConversation}
-        timeline={aiChat.timeline}
-        runStatus={aiChat.runStatus}
-        lastError={aiChat.lastError}
-        awaitingContinue={aiChat.awaitingContinue}
-        isContextCompressionRunning={aiChat.isContextCompressionRunning}
-        tokenUsage={aiChat.tokenUsage}
-        contextTokens={aiChat.contextTokens}
-        selectedModelKey={aiChat.selectedModelKey}
-        onSelectModel={aiChat.setSelectedModelKey}
-        modelGroups={aiChat.modelSelectGroups}
-        onSend={(input) => {
-          void aiChat.sendMessage(input);
-        }}
-        onContinueConversation={() => {
-          void aiChat.continueConversation();
-        }}
-        onRegenerateMessage={(messageId) => {
-          void aiChat.regenerateAssistantMessage(messageId);
-        }}
-        onRetryLastError={() => {
-          void aiChat.retryLastFailedMessage();
-        }}
-        onEditUserMessage={aiChat.editUserMessage}
-        onStop={aiChat.stop}
-        onOpenDocumentLink={aiChat.openDocumentLink}
-        disabledReason={aiChat.disabledReason}
+        aiChat={aiChat}
       />
     );
   }
@@ -155,97 +139,8 @@ export function EditorRightPanel({
         processingStatus={pageTranslateStatus}
         initialTranslateOption={translateOption}
         initialTargetLanguage={translateTargetLanguage || effectiveLanguage}
-        fontFamily={pageTranslateOptions.fontFamily}
-        onFontFamilyChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              fontFamily: value,
-            },
-          }))
-        }
-        freetextPadding={pageTranslateOptions.freetextPadding}
-        onFreetextPaddingChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              freetextPadding: value,
-            },
-          }))
-        }
-        usePositionAwarePrompt={pageTranslateOptions.usePositionAwarePrompt}
-        onUsePositionAwarePromptChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              usePositionAwarePrompt: value,
-            },
-          }))
-        }
-        aiReflowParagraphs={pageTranslateOptions.aiReflowParagraphs}
-        onAiReflowParagraphsChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              aiReflowParagraphs: value,
-            },
-          }))
-        }
-        contextWindow={pageTranslateOptions.contextWindow}
-        onContextWindowChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              contextWindow: value,
-            },
-          }))
-        }
-        flattenAllFreetext={pageTranslateOptions.flattenFreetext}
-        onFlattenAllFreetextChange={(value) => {
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              flattenFreetext: value,
-            },
-          }));
-          onSetAllFreetextFlatten(value);
-        }}
-        useParagraphs={pageTranslateOptions.useParagraphs}
-        onUseParagraphsChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              useParagraphs: value,
-            },
-          }))
-        }
-        paragraphXGap={pageTranslateOptions.paragraphXGap}
-        onParagraphXGapChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              paragraphXGap: value,
-            },
-          }))
-        }
-        paragraphYGap={pageTranslateOptions.paragraphYGap}
-        onParagraphYGapChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              paragraphYGap: value,
-            },
-          }))
-        }
-        paragraphSplitByFontSize={pageTranslateOptions.paragraphSplitByFontSize}
-        onParagraphSplitByFontSizeChange={(value) =>
-          onSetUiState((prev) => ({
-            pageTranslateOptions: {
-              ...prev.pageTranslateOptions,
-              paragraphSplitByFontSize: value,
-            },
-          }))
-        }
+        options={pageTranslateOptions}
+        onOptionsChange={updatePageTranslateOptions}
         paragraphCandidatesCount={pageTranslateParagraphCandidates.length}
         selectedParagraphCount={pageTranslateSelectedParagraphIds.length}
         onPreviewParagraphs={(opts) => {
