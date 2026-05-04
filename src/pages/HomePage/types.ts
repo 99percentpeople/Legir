@@ -12,4 +12,6 @@ export interface HomePageProps {
   adapter: HomePageAdapter;
 }
 
+export type HomeRecentFilesViewMode = "list" | "grid";
+
 export type HomePageTranslation = ReturnType<typeof useLanguage>["t"];

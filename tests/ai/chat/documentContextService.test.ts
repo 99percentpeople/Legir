@@ -4,6 +4,7 @@ import type { TextContent } from "pdfjs-dist/types/src/display/api";
 import {
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
+  AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
 } from "@/constants";
 import { createDocumentContextService } from "@/services/ai/chat/documentContextService";
 import type { AiDocumentSnapshot } from "@/services/ai/chat/types";
@@ -46,11 +47,11 @@ const createService = (options: { pageTexts: string[]; maxChars?: number }) =>
 
 describe("AI chat document context service", () => {
   test("getPagesText truncates by configured character budget", async () => {
-    const firstPage = "a".repeat(600);
-    const secondPage = "b".repeat(700);
+    const firstPage = "a".repeat(6_000);
+    const secondPage = "b".repeat(7_000);
     const service = createService({
       pageTexts: [firstPage, secondPage, "c"],
-      maxChars: 1_000,
+      maxChars: AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
     });
 
     const result = await service.getPagesText({
@@ -60,13 +61,13 @@ describe("AI chat document context service", () => {
     expect(result).toMatchObject({
       requestedPageCount: 3,
       returnedPageCount: 2,
-      returnedCharCount: 1_000,
+      returnedCharCount: AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
       truncated: true,
-      maxCharsPerCall: 1_000,
+      maxCharsPerCall: AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
     });
     expect(result.pages.map((page) => page.text)).toEqual([
       firstPage,
-      secondPage.slice(0, 400),
+      secondPage.slice(0, 4_000),
     ]);
     expect(result.pages[1]?.truncated).toBe(true);
   });

@@ -1,34 +1,268 @@
-import { FolderOpen, Search, Trash2, X } from "lucide-react";
+import type { SyntheticEvent } from "react";
+import {
+  FileIcon,
+  FolderOpen,
+  LayoutGrid,
+  List,
+  MoreHorizontal,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TimeAgoText } from "@/components/timeText";
 import type { RecentFileEntry } from "@/services/recentFiles";
-import type { HomePageTranslation } from "./types";
+import { cn } from "@/utils/cn";
+import type { HomePageTranslation, HomeRecentFilesViewMode } from "./types";
 
 interface RecentFilesHomeViewProps {
   query: string;
   recentFiles: RecentFileEntry[];
   filteredRecentFiles: RecentFileEntry[];
+  viewMode: HomeRecentFilesViewMode;
   onQueryChange: (value: string) => void;
   onClearQuery: () => void;
   onOpen: () => Promise<void>;
   onOpenRecent: (entry: RecentFileEntry) => Promise<void>;
   onDeleteRecent: (path: string) => void | Promise<void>;
   onClearAll: () => void | Promise<void>;
+  onViewModeChange: (viewMode: HomeRecentFilesViewMode) => void;
   t: HomePageTranslation;
 }
+
+const isRecentFilesViewMode = (
+  value: string,
+): value is HomeRecentFilesViewMode => value === "list" || value === "grid";
+
+const stopEntryActivation = (event: SyntheticEvent) => {
+  event.stopPropagation();
+};
+
+const RecentFilePreview = ({
+  entry,
+  className,
+  t,
+}: {
+  entry: RecentFileEntry;
+  className?: string;
+  t: HomePageTranslation;
+}) => (
+  <div
+    className={cn(
+      "bg-muted ring-border relative shrink-0 overflow-hidden rounded-md ring-1",
+      className,
+    )}
+  >
+    {entry.previewDataUrl ? (
+      <img
+        src={entry.previewDataUrl}
+        alt={entry.filename}
+        className="h-full w-full object-contain"
+        loading="lazy"
+      />
+    ) : (
+      <div className="text-muted-foreground flex h-full w-full items-center justify-center text-xs">
+        {t("home.desktop.pdf_badge")}
+      </div>
+    )}
+  </div>
+);
+
+const RecentFileActionsMenu = ({
+  entry,
+  onOpenRecent,
+  onDeleteRecent,
+  t,
+}: {
+  entry: RecentFileEntry;
+  onOpenRecent: (entry: RecentFileEntry) => Promise<void>;
+  onDeleteRecent: (path: string) => void | Promise<void>;
+  t: HomePageTranslation;
+}) => (
+  <DropdownMenu modal={false}>
+    <DropdownMenuTrigger asChild>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        aria-label={t("home.desktop.file_actions")}
+        title={t("home.desktop.file_actions")}
+        onClick={stopEntryActivation}
+        onDoubleClick={stopEntryActivation}
+        onKeyDown={stopEntryActivation}
+      >
+        <MoreHorizontal />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="w-36">
+      <DropdownMenuItem
+        onClick={(event) => {
+          event.stopPropagation();
+          void onOpenRecent(entry);
+        }}
+      >
+        <FolderOpen size={14} />
+        <span>{t("home.desktop.open")}</span>
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        variant="destructive"
+        onClick={(event) => {
+          event.stopPropagation();
+          void onDeleteRecent(entry.path);
+        }}
+      >
+        <Trash2 size={14} />
+        <span>{t("common.actions.delete")}</span>
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
+
+interface RecentFilesDisplayProps {
+  entries: RecentFileEntry[];
+  onOpenRecent: (entry: RecentFileEntry) => Promise<void>;
+  onDeleteRecent: (path: string) => void | Promise<void>;
+  t: HomePageTranslation;
+}
+
+const RecentFilesGrid = ({
+  entries,
+  onOpenRecent,
+  onDeleteRecent,
+  t,
+}: RecentFilesDisplayProps) => (
+  <div className="grid gap-6 p-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+    {entries.map((entry) => (
+      <div
+        key={entry.path}
+        tabIndex={0}
+        className="border-border bg-background hover:bg-accent/40 flex min-w-0 flex-col overflow-hidden rounded-lg border transition-colors outline-none"
+        onDoubleClick={() => {
+          void onOpenRecent(entry);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            void onOpenRecent(entry);
+          }
+        }}
+      >
+        <RecentFilePreview
+          entry={entry}
+          t={t}
+          className="aspect-[4/3] w-full rounded-none ring-0"
+        />
+
+        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="text-foreground truncate font-medium">
+                {entry.filename}
+              </div>
+              <div className="text-muted-foreground mt-1 truncate text-xs">
+                {entry.locationLabel}
+              </div>
+              <div className="text-muted-foreground mt-2 text-xs">
+                <TimeAgoText time={entry.lastOpenedAt} />
+              </div>
+            </div>
+
+            <RecentFileActionsMenu
+              entry={entry}
+              onOpenRecent={onOpenRecent}
+              onDeleteRecent={onDeleteRecent}
+              t={t}
+            />
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const RecentFilesList = ({
+  entries,
+  onOpenRecent,
+  onDeleteRecent,
+  t,
+}: RecentFilesDisplayProps) => (
+  <div>
+    <div className="border-border text-muted-foreground hidden grid-cols-[5rem_minmax(0,1fr)_10rem_2rem] items-center gap-4 border-b px-4 py-2 text-xs font-medium md:grid">
+      <div>
+        <FileIcon className="size-4" />
+      </div>
+      <div>{t("home.desktop.list_column_name")}</div>
+      <div>{t("home.desktop.list_column_time")}</div>
+      <div aria-hidden="true" />
+    </div>
+
+    <div className="divide-border divide-y">
+      {entries.map((entry) => (
+        <div
+          key={entry.path}
+          tabIndex={0}
+          className="hover:bg-accent/40 flex items-center justify-between gap-4 p-4 transition-colors outline-none md:grid md:grid-cols-[5rem_minmax(0,1fr)_10rem_2rem] md:items-center"
+          onDoubleClick={() => {
+            void onOpenRecent(entry);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              void onOpenRecent(entry);
+            }
+          }}
+        >
+          <RecentFilePreview entry={entry} t={t} className="h-16 w-16" />
+
+          <div className="min-w-0 flex-1 md:block">
+            <div className="text-foreground truncate font-medium">
+              {entry.filename}
+            </div>
+            <div className="text-muted-foreground truncate text-xs">
+              {entry.locationLabel}
+            </div>
+            <div className="text-muted-foreground mt-1 text-xs md:hidden">
+              <TimeAgoText time={entry.lastOpenedAt} />
+            </div>
+          </div>
+
+          <div className="text-muted-foreground hidden text-xs md:block">
+            <TimeAgoText time={entry.lastOpenedAt} />
+          </div>
+
+          <div className="flex justify-end">
+            <RecentFileActionsMenu
+              entry={entry}
+              onOpenRecent={onOpenRecent}
+              onDeleteRecent={onDeleteRecent}
+              t={t}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export function RecentFilesHomeView({
   query,
   recentFiles,
   filteredRecentFiles,
+  viewMode,
   onQueryChange,
   onClearQuery,
   onOpen,
   onOpenRecent,
   onDeleteRecent,
   onClearAll,
+  onViewModeChange,
   t,
 }: RecentFilesHomeViewProps) {
   return (
@@ -89,79 +323,65 @@ export function RecentFilesHomeView({
         </div>
 
         <div className="border-border bg-card rounded-xl border">
-          <div className="border-border flex items-center justify-between border-b p-4">
+          <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b p-4">
             <div className="text-sm font-medium">
               {t("home.desktop.file_count", {
                 count: filteredRecentFiles.length,
               })}
             </div>
-          </div>
 
-          <div className="divide-border divide-y">
-            {filteredRecentFiles.length === 0 ? (
-              <div className="text-muted-foreground p-6 text-sm">
-                {t("home.desktop.no_recent_files")}
-              </div>
-            ) : (
-              filteredRecentFiles.map((entry) => (
-                <div
-                  key={entry.path}
-                  tabIndex={0}
-                  className="group hover:bg-accent/40 flex items-center justify-between gap-4 p-4 transition-colors outline-none"
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <ToggleGroup
+                type="single"
+                value={viewMode}
+                onValueChange={(value) => {
+                  if (isRecentFilesViewMode(value)) {
+                    onViewModeChange(value);
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                aria-label={t("home.desktop.view_mode")}
+              >
+                <ToggleGroupItem
+                  value="list"
+                  title={t("home.desktop.view_list")}
+                  aria-label={t("home.desktop.view_list")}
+                  className="w-8"
                 >
-                  <div className="flex min-w-0 items-center gap-4">
-                    <div className="bg-muted ring-border relative h-16 w-16 shrink-0 overflow-hidden rounded-md ring-1">
-                      {entry.previewDataUrl ? (
-                        <img
-                          src={entry.previewDataUrl}
-                          alt={entry.filename}
-                          className="h-full w-full object-contain"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="text-muted-foreground flex h-full w-full items-center justify-center text-xs">
-                          {t("home.desktop.pdf_badge")}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="text-foreground truncate font-medium">
-                        {entry.filename}
-                      </div>
-                      <div className="text-muted-foreground truncate text-xs">
-                        {entry.locationLabel}
-                      </div>
-                      <div className="text-muted-foreground mt-1 text-xs">
-                        <TimeAgoText time={entry.lastOpenedAt} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="invisible flex shrink-0 items-center gap-2 opacity-0 transition-all duration-200 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        void onOpenRecent(entry);
-                      }}
-                    >
-                      {t("home.desktop.open")}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => {
-                        void onDeleteRecent(entry.path);
-                      }}
-                      aria-label={t("common.actions.delete")}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
+                  <List />
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="grid"
+                  title={t("home.desktop.view_grid")}
+                  aria-label={t("home.desktop.view_grid")}
+                  className="w-8"
+                >
+                  <LayoutGrid />
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </div>
+
+          {filteredRecentFiles.length === 0 ? (
+            <div className="text-muted-foreground p-6 text-sm">
+              {t("home.desktop.no_recent_files")}
+            </div>
+          ) : viewMode === "grid" ? (
+            <RecentFilesGrid
+              entries={filteredRecentFiles}
+              onOpenRecent={onOpenRecent}
+              onDeleteRecent={onDeleteRecent}
+              t={t}
+            />
+          ) : (
+            <RecentFilesList
+              entries={filteredRecentFiles}
+              onOpenRecent={onOpenRecent}
+              onDeleteRecent={onDeleteRecent}
+              t={t}
+            />
+          )}
         </div>
       </div>
     </div>
