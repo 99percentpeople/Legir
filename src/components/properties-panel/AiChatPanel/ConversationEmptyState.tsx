@@ -20,7 +20,7 @@ export function ConversationEmptyState({
   ];
 
   return (
-    <Card className="mt-auto border-none bg-transparent">
+    <Card className="mt-auto rounded-none border-none bg-transparent shadow-none">
       <CardContent className="px-3">
         <div className="mb-4 flex items-center gap-2 text-lg font-medium">
           <Sparkles className="size-5" />
