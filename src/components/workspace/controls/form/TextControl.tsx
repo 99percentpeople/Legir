@@ -2,7 +2,11 @@ import React from "react";
 import { FormControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
 import { cn } from "@/utils/cn";
-import { resolveFormControlFontFamilyCss } from "@/lib/fonts";
+import {
+  DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM,
+  resolveFormControlFontFamilyCss,
+} from "@/lib/fonts";
+import { measureCssTextVisualCenterAboveBaselineEm } from "../../lib/formTextMetrics";
 
 export const TextControl: React.FC<FormControlProps> = (props) => {
   const {
@@ -18,6 +22,49 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
   const displayedValue = isFormMode
     ? data.value || data.defaultValue || data.name
     : data.value || "";
+  const fontFamily = resolveFormControlFontFamilyCss(
+    style.fontFamily,
+    displayedValue,
+  );
+  const [visualCenterAboveBaselineEm, setVisualCenterAboveBaselineEm] =
+    React.useState(DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM);
+  const textAnchor =
+    data.alignment === "center"
+      ? "middle"
+      : data.alignment === "right"
+        ? "end"
+        : "start";
+  const textX =
+    data.alignment === "center"
+      ? "50%"
+      : data.alignment === "right"
+        ? "100%"
+        : "0";
+
+  React.useEffect(() => {
+    if (!isFormMode || data.multiline) return;
+
+    let cancelled = false;
+    const updateMetrics = () => {
+      const measured = measureCssTextVisualCenterAboveBaselineEm(
+        displayedValue,
+        fontFamily,
+      );
+      if (cancelled) return;
+      setVisualCenterAboveBaselineEm(
+        measured ?? DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM,
+      );
+    };
+
+    updateMetrics();
+    void document.fonts?.ready.then(updateMetrics).catch(() => {
+      // The initial measurement is still a valid fallback.
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [data.multiline, displayedValue, fontFamily, isFormMode]);
 
   const effectiveBorderStyle =
     style.borderStyle === "dashed"
@@ -33,10 +80,7 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
     borderStyle: effectiveBorderStyle,
     color: style.textColor,
     fontSize: `calc(${style.fontSize || 12}px * var(--scale, 1))`,
-    fontFamily: resolveFormControlFontFamilyCss(
-      style.fontFamily,
-      displayedValue,
-    ),
+    fontFamily,
     boxSizing: "border-box",
   };
 
@@ -75,17 +119,51 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
           />
         )}
 
-        {data.multiline ? (
+        {isFormMode && !data.multiline ? (
+          <div
+            className="pointer-events-none h-full w-full overflow-hidden"
+            style={{
+              boxSizing: "border-box",
+              paddingInline: "calc(1px * var(--scale, 1))",
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              className="block h-full w-full overflow-hidden"
+              focusable="false"
+              style={{
+                fontFamily: "inherit",
+                fontSize: "inherit",
+              }}
+            >
+              <text
+                x={textX}
+                y="50%"
+                dy={`${visualCenterAboveBaselineEm}em`}
+                dominantBaseline="alphabetic"
+                textAnchor={textAnchor}
+                style={{
+                  fill: "currentColor",
+                  fontFamily: "inherit",
+                  letterSpacing: 0,
+                }}
+              >
+                {displayedValue}
+              </text>
+            </svg>
+          </div>
+        ) : data.multiline ? (
           <textarea
             readOnly={isFormMode || data.readOnly}
             tabIndex={isFormMode ? -1 : undefined}
             className={cn(
-              "font-inherit block h-full w-full resize-none border-none bg-transparent leading-tight text-inherit outline-none",
+              "no-scrollbar font-inherit block h-full w-full resize-none overflow-hidden border-none bg-transparent leading-tight text-inherit outline-none",
               (isFormMode || !isSelectable) && "pointer-events-none",
             )}
             style={{
+              boxSizing: "border-box",
               textAlign: data.alignment,
-              padding: "calc(var(--spacing) * var(--scale, 1))",
+              padding: "calc(1px * var(--scale, 1))",
             }}
             value={
               isFormMode
@@ -105,12 +183,16 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
             readOnly={isFormMode || data.readOnly}
             tabIndex={isFormMode ? -1 : undefined}
             className={cn(
-              "font-inherit h-full w-full border-none bg-transparent leading-tight text-inherit outline-none",
+              "no-scrollbar font-inherit w-full overflow-hidden border-none bg-transparent leading-none text-inherit outline-none",
               (isFormMode || !isSelectable) && "pointer-events-none",
             )}
             style={{
+              boxSizing: "border-box",
+              height: "auto",
+              lineHeight: 1,
+              paddingBlock: 0,
               textAlign: data.alignment,
-              paddingInline: "calc(var(--spacing) * var(--scale, 1))",
+              paddingInline: "calc(1px * var(--scale, 1))",
             }}
             value={
               isFormMode

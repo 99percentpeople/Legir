@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { readFile } from "node:fs/promises";
+import fontkit from "pdf-fontkit";
 import {
   PDFBool,
   PDFArray,
@@ -14,6 +16,7 @@ import {
 import { decodePdfStreamToText } from "@/services/pdfService/lib/pdf-import-utils";
 import { exportPDF } from "@/services/pdfService";
 import { FieldType, type Annotation, type FormField } from "@/types";
+import { getPdfTextVisualCenterAboveBaselineEm } from "@/services/pdfService/lib/text-field-metrics";
 
 const createTextFieldPdf = async (options?: { withXfa?: boolean }) => {
   const pdfDoc = await PDFDocument.create();
@@ -142,6 +145,27 @@ const getFirstWidgetRef = (field: {
   return firstKid instanceof PDFRef ? firstKid : field.ref;
 };
 
+const createCompactSourceTextFieldPdf = async () => {
+  const sourceDoc = await PDFDocument.create();
+  const page = sourceDoc.addPage([240, 200]);
+  const font = await sourceDoc.embedFont(StandardFonts.Helvetica);
+  const textField = sourceDoc.getForm().createTextField("sourceName");
+  textField.addToPage(page, {
+    x: 40,
+    y: 130,
+    width: 120,
+    height: 18,
+    font,
+  });
+  textField.setText("Old value");
+  textField.updateAppearances(font);
+
+  return {
+    bytes: await sourceDoc.save(),
+    font,
+  };
+};
+
 describe("exportPDF form handling", () => {
   it("preserves XFA data when updating AcroForm fields", async () => {
     const sourceBytes = await createTextFieldPdf({ withXfa: true });
@@ -167,6 +191,111 @@ describe("exportPDF form handling", () => {
     const { pdfDoc } = await getAcroForm(exportedBytes);
 
     expect(pdfDoc.getForm().getFields()).toHaveLength(0);
+  });
+
+  it("keeps flattened text field baselines inside compact print boxes", async () => {
+    const { bytes: sourceBytes, font } =
+      await createCompactSourceTextFieldPdf();
+
+    const exportedBytes = await exportPDF(
+      sourceBytes,
+      [
+        {
+          id: "source-name",
+          pageIndex: 0,
+          type: FieldType.TEXT,
+          name: "sourceName",
+          rect: { x: 40, y: 52, width: 120, height: 18 },
+          value: "New value",
+          style: {
+            fontFamily: "Helvetica",
+            fontSize: 13,
+          },
+        },
+      ],
+      undefined,
+      [],
+      undefined,
+      { flattenFormFields: true },
+    );
+
+    const pdfJsPage = await getPdfJsPage(exportedBytes);
+    const textContent = await pdfJsPage.getTextContent();
+    const item = textContent.items.find(
+      (entry) => "str" in entry && entry.str === "New value",
+    );
+
+    expect(item).toBeDefined();
+    if (!item || !("transform" in item)) {
+      throw new Error("Expected flattened text item to include a transform.");
+    }
+    const centerAboveBaselineEm = getPdfTextVisualCenterAboveBaselineEm(
+      font,
+      "New value",
+    );
+    const visualCenter = item.transform[5] + centerAboveBaselineEm * 13;
+    expect(item.transform[5]).toBeGreaterThan(134);
+    expect(item.transform[5]).toBeLessThan(135);
+    expect(item.height).toBeGreaterThan(12);
+    expect(item.height).toBeLessThan(14);
+    expect(visualCenter).toBeGreaterThan(138.9);
+    expect(visualCenter).toBeLessThan(139.1);
+  });
+
+  it("centers flattened CJK text using visual glyph bounds", async () => {
+    const { bytes: sourceBytes } = await createCompactSourceTextFieldPdf();
+
+    const customFontBytes = new Uint8Array(
+      await readFile("public/fonts/NotoSansSC-Regular.ttf"),
+    );
+    const metricsDoc = await PDFDocument.create();
+    metricsDoc.registerFontkit(fontkit);
+    const metricsFont = await metricsDoc.embedFont(customFontBytes);
+    const exportedBytes = await exportPDF(
+      sourceBytes,
+      [
+        {
+          id: "source-name",
+          pageIndex: 0,
+          type: FieldType.TEXT,
+          name: "sourceName",
+          rect: { x: 40, y: 52, width: 120, height: 18 },
+          value: "中文",
+          style: {
+            fontFamily: "CustomSans",
+            fontSize: 13,
+          },
+        },
+      ],
+      undefined,
+      [],
+      { bytes: customFontBytes, name: "CustomSans" },
+      { flattenFormFields: true },
+    );
+
+    const pdfJsPage = await getPdfJsPage(exportedBytes);
+    const textContent = await pdfJsPage.getTextContent();
+    const item = textContent.items.find(
+      (entry) => "str" in entry && entry.str === "中文",
+    );
+
+    expect(item).toBeDefined();
+    if (!item || !("transform" in item)) {
+      throw new Error(
+        "Expected flattened CJK text item to include a transform.",
+      );
+    }
+    const centerAboveBaselineEm = getPdfTextVisualCenterAboveBaselineEm(
+      metricsFont,
+      "中文",
+    );
+    const visualCenter = item.transform[5] + centerAboveBaselineEm * 13;
+    expect(item.transform[5]).toBeGreaterThan(134);
+    expect(item.transform[5]).toBeLessThan(135);
+    expect(item.height).toBeGreaterThan(12);
+    expect(item.height).toBeLessThan(14);
+    expect(visualCenter).toBeGreaterThan(138.9);
+    expect(visualCenter).toBeLessThan(139.1);
   });
 
   it("does not flatten unsupported source buttons into print output", async () => {

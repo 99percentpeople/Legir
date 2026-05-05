@@ -18,9 +18,11 @@ import {
   TextAlignment,
 } from "@cantoo/pdf-lib";
 import { FieldType, type FormField } from "@/types";
+import type { ControlExportOptions } from "../types";
 import { containsNonAscii, isExplicitCjkFontSelection } from "./text";
 import { pickCjkFontFromMap } from "./font-selection";
 import { pdfDebug } from "./debug";
+import { flattenTextFieldAppearanceProvider } from "./text-field-appearance";
 
 type CapturedXfaEntry = {
   acroForm: PDFDict;
@@ -244,6 +246,7 @@ export const updateExistingSourceField = (
   form: PDFForm,
   field: FormField,
   fontMap?: Map<string, PDFFont>,
+  options?: ControlExportOptions,
 ) => {
   let existingField:
     | {
@@ -315,9 +318,14 @@ export const updateExistingSourceField = (
           textField.enableMultiline(),
         );
       }
-      runExistingFieldUpdate("updateAppearances", () =>
-        textField.updateAppearances(pickControlValueFont(field, form, fontMap)),
-      );
+      runExistingFieldUpdate("updateAppearances", () => {
+        const font = pickControlValueFont(field, form, fontMap);
+        if (options?.flattenAppearance) {
+          textField.updateAppearances(font, flattenTextFieldAppearanceProvider);
+        } else {
+          textField.updateAppearances(font);
+        }
+      });
       return true;
     }
 

@@ -11,6 +11,8 @@ export const containsNonAscii = (s: string) => {
   return false;
 };
 
+export const DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM = 0.36;
+
 const toSafeFontFamilyCss = (font: string) => {
   const trimmed = font.trim();
   if (!trimmed) return trimmed;

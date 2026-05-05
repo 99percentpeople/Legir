@@ -8,7 +8,11 @@ import {
 } from "@cantoo/pdf-lib";
 import { FormField, FieldType } from "@/types";
 import { PDF_CUSTOM_KEYS } from "@/constants";
-import { IControlExporter, ViewportLike } from "../types";
+import {
+  IControlExporter,
+  type ControlExportOptions,
+  ViewportLike,
+} from "../types";
 import { containsNonAscii, isExplicitCjkFontSelection } from "../lib/text";
 import { pickCjkFontFromMap } from "../lib/font-selection";
 import {
@@ -19,6 +23,7 @@ import {
   getInnerSizeFromOuterAabb,
   normalizeRightAngleRotationDeg,
 } from "@/lib/controlRotation";
+import { flattenTextFieldAppearanceProvider } from "../lib/text-field-appearance";
 
 export class TextControlExporter implements IControlExporter {
   shouldExport(field: FormField): boolean {
@@ -30,6 +35,7 @@ export class TextControlExporter implements IControlExporter {
     field: FormField,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
+    options?: ControlExportOptions,
   ): void {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
@@ -119,7 +125,14 @@ export class TextControlExporter implements IControlExporter {
     if (field.multiline) tf.enableMultiline();
 
     try {
-      tf.updateAppearances(appearanceFont);
+      if (options?.flattenAppearance) {
+        tf.updateAppearances(
+          appearanceFont,
+          flattenTextFieldAppearanceProvider,
+        );
+      } else {
+        tf.updateAppearances(appearanceFont);
+      }
     } catch (e) {
       console.warn("Failed to update text field appearances", e);
     }

@@ -148,6 +148,10 @@ export interface IAnnotationExporter {
   ): Promise<PDFRef | undefined> | PDFRef | undefined;
 }
 
+export type ControlExportOptions = {
+  flattenAppearance?: boolean;
+};
+
 export interface IControlExporter {
   shouldExport(field: FormField): boolean;
   save(
@@ -155,5 +159,6 @@ export interface IControlExporter {
     field: FormField,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
+    options?: ControlExportOptions,
   ): Promise<void> | void;
 }

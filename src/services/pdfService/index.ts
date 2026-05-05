@@ -2356,13 +2356,16 @@ export const exportPDF = async (
         form,
         field,
         fontMap,
+        { flattenAppearance: options?.flattenFormFields === true },
       );
       if (didUpdateExistingField) continue;
 
       const exporter = controlExporters.find((e) => e.shouldExport(field));
       if (!exporter) continue;
       try {
-        await exporter.save(form, field, fontMap, viewport);
+        await exporter.save(form, field, fontMap, viewport, {
+          flattenAppearance: options?.flattenFormFields === true,
+        });
       } catch (e) {
         console.error(`Failed to export field ${field.name}`, e);
       }
