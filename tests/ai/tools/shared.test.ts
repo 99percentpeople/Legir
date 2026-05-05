@@ -56,6 +56,40 @@ describe("AI chat tool shared helpers", () => {
     });
   });
 
+  test("keeps bare page number pairs as two page selectors", () => {
+    const barePairResult = parseToolArgs(
+      z.object({
+        page_numbers: requiredPageNumbersSchema,
+      }),
+      {
+        page_numbers: [1, 4],
+      },
+    );
+
+    expect(barePairResult).toEqual({
+      success: true,
+      data: {
+        page_numbers: [1, 4],
+      },
+    });
+
+    const nestedRangeResult = parseToolArgs(
+      z.object({
+        page_numbers: requiredPageNumbersSchema,
+      }),
+      {
+        page_numbers: [[1, 4]],
+      },
+    );
+
+    expect(nestedRangeResult).toEqual({
+      success: true,
+      data: {
+        page_numbers: [1, 2, 3, 4],
+      },
+    });
+  });
+
   test("rejects descending page number ranges", () => {
     const result = parseToolArgs(
       z.object({

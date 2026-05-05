@@ -171,7 +171,7 @@ const METADATA_TOOL_PROMPTS = [
 ];
 
 const MULTI_PAGE_SUMMARY_FALLBACK_PROMPT =
-  "If the user asks for a whole-document or many-page summary, call get_document_context first, then read the relevant page range with get_pages_text using a range tuple like [1, 10] when needed.";
+  "For whole-document or many-page summaries, call get_document_context first, then get_pages_text. Use page_numbers [[1, 10]] for pages 1-10; [1, 10] means only pages 1 and 10.";
 
 const DOCUMENT_CONTEXT_TOOL_PROMPTS = [
   "get_document_context includes per-page type breakdowns for form fields and supported annotations on pages that actually contain them, which is useful before form filling or annotation inspection.",
@@ -411,7 +411,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_pages_text: createToolBuilder("get_pages_text")
       .read()
       .description(
-        "Read full text for one or more pages. Returned text preserves inferred spaces and line breaks from PDF layout while staying compatible with anchor highlighting. For section, chapter, many-page, or whole-document requests, use page_numbers with the full relevant page range instead of only the current visible pages; narrow the range only if the result is truncated. Optionally include per-line layout rectangles. The per-call text budget is configured in AI chat settings.",
+        "Read full text for one or more pages. Text preserves PDF line breaks and inferred spaces. page_numbers is an array of selectors: use [[1, 20]] for pages 1-20; [1, 20] means only pages 1 and 20. Prefer the full relevant range, then narrow only if truncated. Optionally include per-line layout rectangles. The per-call text budget is configured in AI chat settings.",
       )
       .promptInstructions(GET_PAGES_TEXT_TOOL_PROMPTS)
       .inputSchema(getPagesTextArgsSchema)

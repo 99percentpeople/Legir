@@ -485,7 +485,7 @@ export const summaryInstructionsSchema = z
 export const getPagesTextArgsSchema = z
   .object({
     page_numbers: requiredPageNumbersSchema.describe(
-      "Required 1-based page selectors for the text to read. For section, chapter, many-page, or whole-document requests, pass the full relevant range with a two-item inclusive range like [1, 10] instead of only the current visible pages. Use fewer pages only after a truncated result.",
+      "Required 1-based page selectors. Use [[1, 20]] for a continuous range; [1, 20] means only pages 1 and 20. Mixed selectors are allowed, e.g. [1, [5, 10], 20].",
     ),
     include_layout: z
       .boolean()
