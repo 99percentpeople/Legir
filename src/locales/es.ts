@@ -733,7 +733,7 @@ const es = {
     ai_chat: {
       title: "Herramientas de chat IA",
       description:
-        "Configura las capacidades del chat IA, incluidas las herramientas para crear formularios, el resumen de documentos y el resumen visual de páginas renderizadas.",
+        "Configura las capacidades del chat IA, incluidas las herramientas para crear formularios y el resumen visual de páginas renderizadas.",
       context_pruning_enabled: "Habilitar compresión de contexto",
       context_pruning_enabled_desc:
         "Recorta razonamiento antiguo cuando se alcanza el umbral de tokens del contexto y prioriza eliminar resultados antiguos de imágenes de página para reducir el consumo de tokens.",
@@ -775,18 +775,7 @@ const es = {
       visual_summary_model_placeholder: "Selecciona un modelo de visión",
       visual_summary_model_desc:
         "Lo usa summarize_pages_visual. Si la herramienta está desactivada o no se ha seleccionado un modelo de visión, esta herramienta no estará disponible.",
-      digest_enabled: "Habilitar la herramienta de resumen",
-      digest_enabled_desc:
-        "Activa o desactiva get_document_digest para el chat IA.",
-      summary_model: "Modelo de resumen",
-      summary_model_placeholder: "Selecciona un modelo",
-      summary_model_desc:
-        "Lo usa get_document_digest. Si la herramienta de resumen está desactivada o no se ha seleccionado un modelo, esta herramienta no estará disponible.",
       no_models: "No hay modelos disponibles",
-      digest_chars_per_chunk: "Longitud de salida por capa",
-      digest_source_chars_per_chunk: "Presupuesto de entrada por capa",
-      digest_sampling_desc:
-        "El presupuesto de entrada controla cuánto material puede inspeccionar cada capa del resumen, mientras que la longitud de salida controla cuánto conserva cada capa. Aumentar el presupuesto de entrada suele mejorar más la cobertura de todo el documento que aumentar la longitud de salida.",
     },
     done: "Hecho",
   },

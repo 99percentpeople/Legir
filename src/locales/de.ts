@@ -735,7 +735,7 @@ const de = {
     ai_chat: {
       title: "AI-Chat-Werkzeuge",
       description:
-        "Konfigurieren Sie KI-Chat-Funktionen einschließlich Formularwerkzeugen, dem Dokument-Zusammenfassungswerkzeug und dem visuellen Zusammenfassungswerkzeug für gerenderte Seiten.",
+        "Konfigurieren Sie KI-Chat-Funktionen einschließlich Formularwerkzeugen und dem visuellen Zusammenfassungswerkzeug für gerenderte Seiten.",
       context_pruning_enabled: "Kontextkomprimierung aktivieren",
       context_pruning_enabled_desc:
         "Beschneidet ältere Reasoning-Inhalte, sobald der Kontext-Token-Schwellenwert erreicht ist, und entfernt bevorzugt ältere Seitenbild-Ergebnisse, um Tokens zu sparen.",
@@ -778,18 +778,7 @@ const de = {
       visual_summary_model_placeholder: "Vision-Modell auswählen",
       visual_summary_model_desc:
         "Wird von summarize_pages_visual verwendet. Wenn das Werkzeug deaktiviert ist oder kein Vision-Modell ausgewählt wurde, ist dieses Werkzeug nicht verfügbar.",
-      digest_enabled: "Digest-Werkzeug aktivieren",
-      digest_enabled_desc:
-        "Schaltet get_document_digest für den AI-Chat ein oder aus.",
-      summary_model: "Digest-Zusammenfassungsmodell",
-      summary_model_placeholder: "Modell auswählen",
-      summary_model_desc:
-        "Wird von get_document_digest verwendet. Wenn das Digest-Werkzeug deaktiviert ist oder kein Modell ausgewählt wurde, ist dieses Werkzeug nicht verfügbar.",
       no_models: "Keine verfügbaren Modelle",
-      digest_chars_per_chunk: "Ausgabelänge pro Ebene",
-      digest_source_chars_per_chunk: "Eingabebudget pro Ebene",
-      digest_sampling_desc:
-        "Das Eingabebudget bestimmt, wie viel Material jede Zusammenfassungsebene prüfen kann, während die Ausgabelänge bestimmt, wie viel jede Ebene behält. Eine Erhöhung des Eingabebudgets verbessert die Gesamtabdeckung des Dokuments in der Regel stärker als eine Erhöhung der Ausgabelänge.",
     },
     done: "Fertig",
   },

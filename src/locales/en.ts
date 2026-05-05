@@ -724,7 +724,7 @@ const en = {
     ai_chat: {
       title: "AI Chat Tools",
       description:
-        "Configure AI chat capabilities including form-building tools, the document digest tool, and the rendered-page visual summary tool.",
+        "Configure AI chat capabilities including form-building tools and the rendered-page visual summary tool.",
       context_pruning_enabled: "Enable context pruning",
       context_pruning_enabled_desc:
         "Prune older reasoning once the context token threshold is reached, and prioritize removing older page-image results to reduce token usage.",
@@ -766,17 +766,7 @@ const en = {
       visual_summary_model_placeholder: "Select a vision model",
       visual_summary_model_desc:
         "Used by summarize_pages_visual. If the tool is disabled or no vision model is selected, the visual summary tool is unavailable.",
-      digest_enabled: "Enable digest tool",
-      digest_enabled_desc: "Turns get_document_digest on or off for AI chat.",
-      summary_model: "Digest summary model",
-      summary_model_placeholder: "Select a model",
-      summary_model_desc:
-        "Used by get_document_digest. If the digest tool is disabled or no model is selected, the digest tool is unavailable.",
       no_models: "No available models",
-      digest_chars_per_chunk: "Per-layer summary output length",
-      digest_source_chars_per_chunk: "Per-layer summary input budget",
-      digest_sampling_desc:
-        "The input budget controls how much material each summary layer can inspect, while the output length controls how much each layer keeps. Increasing input budget usually improves whole-document coverage more than increasing output length.",
     },
     done: "Done",
   },

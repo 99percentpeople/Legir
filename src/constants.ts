@@ -42,17 +42,6 @@ export const AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT = 50_000;
 export const AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN = 10_000;
 export const AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX = 100_000;
 export const AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_STEP = 1_000;
-export const AI_CHAT_DIGEST_MAX_PAGES_PER_LEAF_CHUNK = 16;
-export const AI_CHAT_DIGEST_MERGE_BATCH_SIZE = 6;
-export const AI_CHAT_DIGEST_SUMMARY_CONCURRENCY = 3;
-export const AI_CHAT_DIGEST_SOURCE_CHARS_MIN = 1000;
-export const AI_CHAT_DIGEST_SOURCE_CHARS_MAX = 24000;
-export const AI_CHAT_DIGEST_SOURCE_CHARS_STEP = 1000;
-export const AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS = [
-  2, 3, 4, 5, 6, 7, 8, 9, 10,
-] as const;
-export const AI_CHAT_DIGEST_OUTPUT_CHARS_MIN = 180;
-export const AI_CHAT_DIGEST_OUTPUT_CHARS_MAX = 12000;
 export const AI_CHAT_MAX_TOOL_ROUNDS_MIN = 1;
 export const AI_CHAT_MAX_TOOL_ROUNDS_MAX = 24;
 export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN = 1;
@@ -121,10 +110,6 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       return acc;
     }, {} as LLMOptions),
     aiChat: {
-      digestEnabled: true,
-      digestSourceCharsPerChunk: 12000,
-      digestOutputRatioDenominator: 3,
-      digestSummaryModelKey: "",
       visualSummaryEnabled: true,
       visualSummaryModelKey: "",
       formToolsEnabled: false,

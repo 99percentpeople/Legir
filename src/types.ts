@@ -373,10 +373,6 @@ export interface AiChatReasoningOptions {
 }
 
 export interface AiChatOptions {
-  digestEnabled: boolean;
-  digestSourceCharsPerChunk: number;
-  digestOutputRatioDenominator: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-  digestSummaryModelKey?: string;
   visualSummaryEnabled: boolean;
   visualSummaryModelKey?: string;
   formToolsEnabled: boolean;

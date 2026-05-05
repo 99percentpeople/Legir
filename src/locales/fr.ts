@@ -737,7 +737,7 @@ const fr = {
     ai_chat: {
       title: "Outils de chat IA",
       description:
-        "Configure les capacités du chat IA, y compris les outils de création de formulaires, l'outil de résumé du document et l'outil de résumé visuel des pages rendues.",
+        "Configure les capacités du chat IA, y compris les outils de création de formulaires et l'outil de résumé visuel des pages rendues.",
       context_pruning_enabled: "Activer la compression du contexte",
       context_pruning_enabled_desc:
         "Réduit l'ancien raisonnement une fois le seuil de tokens du contexte atteint, et retire en priorité les anciens résultats d'images de page pour diminuer la consommation de tokens.",
@@ -780,18 +780,7 @@ const fr = {
       visual_summary_model_placeholder: "Sélectionner un modèle vision",
       visual_summary_model_desc:
         "Utilisé par summarize_pages_visual. Si l'outil est désactivé ou si aucun modèle vision n'est sélectionné, cet outil devient indisponible.",
-      digest_enabled: "Activer l'outil de synthèse",
-      digest_enabled_desc:
-        "Active ou désactive get_document_digest dans le chat IA.",
-      summary_model: "Modèle de synthèse",
-      summary_model_placeholder: "Sélectionner un modèle",
-      summary_model_desc:
-        "Utilisé par get_document_digest. Si l'outil de synthèse est désactivé ou si aucun modèle n'est sélectionné, cet outil devient indisponible.",
       no_models: "Aucun modèle disponible",
-      digest_chars_per_chunk: "Longueur de sortie par couche",
-      digest_source_chars_per_chunk: "Budget d'entrée par couche",
-      digest_sampling_desc:
-        "Le budget d'entrée détermine la quantité de contenu que chaque couche de synthèse peut examiner, tandis que la longueur de sortie détermine ce qu'elle conserve. Augmenter le budget d'entrée améliore généralement plus la couverture globale du document qu'augmenter la longueur de sortie.",
     },
     done: "Terminé",
   },

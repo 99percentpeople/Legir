@@ -482,33 +482,6 @@ export const summaryInstructionsSchema = z
     "Optional structured guidance for summary tools. Use known_information, remaining_uncertainties, and what_to_add_or_verify instead of a free-form string.",
   );
 
-export const getDocumentDigestArgsSchema = z
-  .object({
-    start_page: positiveIntSchema.describe(
-      "Required 1-based start page for the exact contiguous range to summarize.",
-    ),
-    end_page: positiveIntSchema.describe(
-      "Required 1-based end page for the exact contiguous range to summarize.",
-    ),
-    chars_per_chunk: positiveIntSchema.optional(),
-    source_chars_per_chunk: positiveIntSchema.optional(),
-    summary_instructions: summaryInstructionsSchema.optional(),
-  })
-  .strict()
-  .superRefine((value, ctx) => {
-    if (
-      typeof value.start_page === "number" &&
-      typeof value.end_page === "number" &&
-      value.start_page > value.end_page
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "start_page must be less than or equal to end_page.",
-        path: ["start_page"],
-      });
-    }
-  });
-
 export const getPagesTextArgsSchema = z
   .object({
     page_numbers: requiredPageNumbersSchema.describe(

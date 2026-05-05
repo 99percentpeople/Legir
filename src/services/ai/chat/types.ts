@@ -25,7 +25,6 @@ export type AiToolName =
   | "get_document_metadata"
   | "get_pages_visual"
   | "summarize_pages_visual"
-  | "get_document_digest"
   | "get_pages_text"
   | "search_document"
   | "list_annotations"
@@ -215,16 +214,6 @@ export interface AiSummaryInstructions {
   remaining_uncertainties?: string;
   what_to_add_or_verify?: string;
 }
-
-export interface AiDocumentDigestChunk {
-  startPage: number;
-  endPage: number;
-  pageCount: number;
-  charCount: number;
-  excerpt: string;
-}
-
-export type AiDocumentDigestSourceKind = "page_text" | "chunk_summaries";
 
 export interface AiStoredSearchResult {
   id: string;

@@ -702,8 +702,7 @@ const zhCN = {
     },
     ai_chat: {
       title: "AI 问答工具",
-      description:
-        "配置 AI 问答能力，包括表单制作工具、文档摘要工具以及渲染页视觉总结工具。",
+      description: "配置 AI 问答能力，包括表单制作工具以及渲染页视觉总结工具。",
       context_pruning_enabled: "启用上下文压缩",
       context_pruning_enabled_desc:
         "根据上下文 token 阈值裁剪较旧的思考内容，并优先移除更早的页面图片结果，以降低 token 消耗。",
@@ -745,17 +744,7 @@ const zhCN = {
       visual_summary_model_placeholder: "选择视觉模型",
       visual_summary_model_desc:
         "用于 summarize_pages_visual。关闭工具或未选择视觉模型时，这个工具不可用。",
-      digest_enabled: "启用摘要工具",
-      digest_enabled_desc: "控制 AI 问答里的 get_document_digest 是否可用。",
-      summary_model: "摘要模型",
-      summary_model_placeholder: "选择模型",
-      summary_model_desc:
-        "用于 get_document_digest。关闭摘要工具或未选择模型时，这个工具不可用。",
       no_models: "无可用模型",
-      digest_chars_per_chunk: "每层摘要输出长度",
-      digest_source_chars_per_chunk: "每层摘要输入预算",
-      digest_sampling_desc:
-        "输入预算决定每层摘要前会抽取多少材料；输出长度决定每层摘要保留多少信息。提高输入预算通常更能改善整文覆盖度，提高输出长度则更利于保留细节。",
     },
     done: "完成",
   },

@@ -16,10 +16,6 @@ import {
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_STEP,
-  AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
-  AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
-  AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
-  AI_CHAT_DIGEST_SOURCE_CHARS_STEP,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_STEP,
@@ -47,9 +43,6 @@ export const AiChatSettingsTab = ({
   updateAiChatOptions,
 }: AiChatSettingsTabProps) => {
   const { t } = useLanguage();
-  const digestOutputRatioDenominator = options.digestOutputRatioDenominator;
-  const digestEnabled = options.digestEnabled;
-  const digestSourceCharsPerChunk = options.digestSourceCharsPerChunk;
   const visualSummaryEnabled = options.visualSummaryEnabled;
   const contextCompressionEnabled = options.contextCompressionEnabled;
   const visualHistoryWindow = options.visualHistoryWindow;
@@ -414,131 +407,6 @@ export const AiChatSettingsTab = ({
               {t("settings.ai_chat.visual_summary_model_desc")}
             </p>
           </div>
-        </div>
-
-        <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="ai-chat-digest-enabled" className="font-semibold">
-                {t("settings.ai_chat.digest_enabled")}
-              </Label>
-              <p className="text-muted-foreground text-xs">
-                {t("settings.ai_chat.digest_enabled_desc")}
-              </p>
-            </div>
-            <Switch
-              id="ai-chat-digest-enabled"
-              checked={digestEnabled}
-              onCheckedChange={(checked) =>
-                updateAiChatOptions({ digestEnabled: checked })
-              }
-            />
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label className="font-semibold">
-              {t("settings.ai_chat.summary_model")}
-            </Label>
-            <ModelSelect
-              value={options.digestSummaryModelKey || undefined}
-              onValueChange={(value) =>
-                updateAiChatOptions({ digestSummaryModelKey: value })
-              }
-              placeholder={
-                aiToolModelGroups.length > 0
-                  ? t("settings.ai_chat.summary_model_placeholder")
-                  : t("settings.ai_chat.no_models")
-              }
-              groups={aiToolModelGroups}
-              disabled={!digestEnabled || aiToolModelGroups.length === 0}
-              showSeparators
-            />
-            <p className="text-muted-foreground text-xs">
-              {t("settings.ai_chat.summary_model_desc")}
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="ai-chat-digest-ratio">
-                  {t("settings.ai_chat.digest_chars_per_chunk")}
-                </Label>
-                <span className="text-muted-foreground text-xs">
-                  1/{digestOutputRatioDenominator}
-                </span>
-              </div>
-              <Slider
-                value={[
-                  AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.indexOf(
-                    digestOutputRatioDenominator,
-                  ),
-                ]}
-                disabled={!digestEnabled}
-                min={0}
-                max={AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.length - 1}
-                step={1}
-                onValueChange={(values) => {
-                  const nextIndex = values[0] ?? 0;
-                  const next =
-                    AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS[
-                      nextIndex
-                    ] ?? AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS[1];
-                  updateAiChatOptions({
-                    digestOutputRatioDenominator: next,
-                  });
-                }}
-              />
-              <div className="text-muted-foreground flex justify-between text-xs">
-                <span>
-                  1/{AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS[0]}
-                </span>
-                <span>
-                  1/
-                  {
-                    AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS[
-                      AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.length - 1
-                    ]
-                  }
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="ai-chat-digest-source-chars">
-                  {t("settings.ai_chat.digest_source_chars_per_chunk")}
-                </Label>
-                <span className="text-muted-foreground text-xs">
-                  {digestSourceCharsPerChunk}
-                </span>
-              </div>
-              <Slider
-                value={[digestSourceCharsPerChunk]}
-                disabled={!digestEnabled}
-                min={AI_CHAT_DIGEST_SOURCE_CHARS_MIN}
-                max={AI_CHAT_DIGEST_SOURCE_CHARS_MAX}
-                step={AI_CHAT_DIGEST_SOURCE_CHARS_STEP}
-                onValueChange={(values) => {
-                  const next = values[0];
-                  if (!Number.isFinite(next)) return;
-                  updateAiChatOptions({ digestSourceCharsPerChunk: next });
-                }}
-              />
-              <div className="text-muted-foreground flex justify-between text-xs">
-                <span>{AI_CHAT_DIGEST_SOURCE_CHARS_MIN}</span>
-                <span>{AI_CHAT_DIGEST_SOURCE_CHARS_MAX}</span>
-              </div>
-            </div>
-          </div>
-
-          <p className="text-muted-foreground text-xs">
-            {t("settings.ai_chat.digest_sampling_desc")}
-          </p>
         </div>
       </div>
     </TabsContent>

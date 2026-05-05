@@ -724,7 +724,7 @@ const ja = {
     ai_chat: {
       title: "AI チャットツール",
       description:
-        "フォーム作成ツール、ドキュメント要約ツール、レンダリング済みページの視覚要約ツールを含む AI チャット機能を設定します。",
+        "フォーム作成ツールとレンダリング済みページの視覚要約ツールを含む AI チャット機能を設定します。",
       context_pruning_enabled: "コンテキスト圧縮を有効化",
       context_pruning_enabled_desc:
         "コンテキストのトークン閾値に達したら古い推論内容を圧縮し、古いページ画像結果を優先的に外してトークン消費を抑えます。",
@@ -766,18 +766,7 @@ const ja = {
       visual_summary_model_placeholder: "ビジョンモデルを選択",
       visual_summary_model_desc:
         "summarize_pages_visual で使用します。ツールが無効、またはビジョンモデルが未選択の場合、このツールは利用できません。",
-      digest_enabled: "要約ツールを有効化",
-      digest_enabled_desc:
-        "AI チャットで get_document_digest を使えるかどうかを切り替えます。",
-      summary_model: "要約モデル",
-      summary_model_placeholder: "モデルを選択",
-      summary_model_desc:
-        "get_document_digest で使用します。要約ツールが無効、またはモデルが未選択の場合、このツールは利用できません。",
       no_models: "利用可能なモデルがありません",
-      digest_chars_per_chunk: "各レイヤーの要約出力長",
-      digest_source_chars_per_chunk: "各レイヤーの要約入力予算",
-      digest_sampling_desc:
-        "入力予算は各要約レイヤーがどれだけの内容を確認できるかを決め、出力長は各レイヤーがどれだけの情報を残すかを決めます。通常は、出力長を増やすより入力予算を増やすほうが文書全体のカバー率を改善しやすくなります。",
     },
     done: "完了",
   },

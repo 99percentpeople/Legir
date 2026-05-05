@@ -5,7 +5,6 @@ import {
   parseAiSdkModelSpecifier,
   summarizePageImages,
   summarizeConversationMemory,
-  summarizeDigestText,
   subscribeLLMModelRegistry,
 } from "@/services/ai";
 import { useEditorStore } from "@/store/useEditorStore";
@@ -14,11 +13,7 @@ import { aiChatService } from "@/services/ai/chat/aiChatService";
 import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
 import { composeAiToolContext } from "@/services/ai/chat/aiToolContext";
 import { createDocumentContextService } from "@/services/ai/chat/documentContextService";
-import {
-  buildAiChatContextMemorySystemPrompt,
-  buildDocumentDigestMergePrompt,
-  buildDocumentDigestSummaryPrompt,
-} from "@/services/ai/chat/prompts";
+import { buildAiChatContextMemorySystemPrompt } from "@/services/ai/chat/prompts";
 import type {
   AiChatAssistantUpdate,
   AiChatContextMemory,
@@ -28,7 +23,6 @@ import type {
   AiChatToolUpdate,
   AiChatUserMessageInput,
   AiChatMessageRecord,
-  AiDocumentDigestSourceKind,
   AiSummaryInstructions,
   AiStoredSearchResult,
   AiTextSelectionContext,
@@ -583,77 +577,9 @@ export const useAiChatController = (
     return fallbackModelId ? `AI · ${fallbackModelId}` : "AI";
   }, [selectedChatModel, selectedModelKey]);
 
-  const digestSummaryModel = useMemo(
-    () =>
-      flatModels.find(
-        (item) =>
-          `${item.providerId}:${item.modelId}` ===
-          editorState.options.aiChat.digestSummaryModelKey,
-      ),
-    [editorState.options.aiChat.digestSummaryModelKey, flatModels],
-  );
-  const digestEnabled = editorState.options.aiChat.digestEnabled;
   const visualSummaryEnabled = editorState.options.aiChat.visualSummaryEnabled;
   const visualSummaryModelKey =
     editorState.options.aiChat.visualSummaryModelKey?.trim() || "";
-
-  const digestCharsPerChunk = useMemo(() => {
-    const sourceChars = Math.max(
-      1,
-      editorState.options.aiChat.digestSourceCharsPerChunk,
-    );
-    return Math.max(
-      180,
-      Math.floor(
-        sourceChars / editorState.options.aiChat.digestOutputRatioDenominator,
-      ),
-    );
-  }, [
-    editorState.options.aiChat.digestOutputRatioDenominator,
-    editorState.options.aiChat.digestSourceCharsPerChunk,
-  ]);
-
-  const summarizeDigestChunk = useCallback(
-    async (options: {
-      startPage: number;
-      endPage: number;
-      sampledText: string;
-      maxChars: number;
-      sourceKind?: AiDocumentDigestSourceKind;
-      summaryInstructions?: AiSummaryInstructions;
-      signal?: AbortSignal;
-    }) => {
-      const modelKey = editorState.options.aiChat.digestSummaryModelKey?.trim();
-      if (!modelKey) return "";
-      const separatorIndex = modelKey.indexOf(":");
-      if (separatorIndex <= 0 || separatorIndex >= modelKey.length - 1) {
-        return "";
-      }
-      const providerId = modelKey.slice(0, separatorIndex);
-      const modelId = modelKey.slice(separatorIndex + 1);
-
-      return await summarizeDigestText(options.sampledText, {
-        providerId,
-        modelId,
-        prompt:
-          options.sourceKind === "chunk_summaries"
-            ? buildDocumentDigestMergePrompt({
-                startPage: options.startPage,
-                endPage: options.endPage,
-                maxChars: options.maxChars,
-                summaryInstructions: options.summaryInstructions,
-              })
-            : buildDocumentDigestSummaryPrompt({
-                startPage: options.startPage,
-                endPage: options.endPage,
-                maxChars: options.maxChars,
-                summaryInstructions: options.summaryInstructions,
-              }),
-        signal: options.signal,
-      });
-    },
-    [editorState.options.aiChat.digestSummaryModelKey],
-  );
 
   const summarizeRenderedPages = useCallback(
     async (options: {
@@ -819,18 +745,9 @@ export const useAiChatController = (
           password: editorState.pdfOpenPassword,
         }),
         getRenderablePdfBytes,
-        getDigestConfig: () => ({
-          charsPerChunk: digestCharsPerChunk,
-          sourceCharsPerChunk:
-            editorState.options.aiChat.digestSourceCharsPerChunk,
-        }),
         getPagesTextConfig: () => ({
           maxChars: editorState.options.aiChat.getPagesTextMaxChars,
         }),
-        summarizeDigestChunk:
-          digestEnabled && digestSummaryModel
-            ? summarizeDigestChunk
-            : undefined,
         summarizeRenderedPages:
           visualSummaryEnabled && visualSummaryModelKey
             ? summarizeRenderedPages
@@ -838,14 +755,10 @@ export const useAiChatController = (
         workerService,
       }),
     [
-      digestEnabled,
-      digestSummaryModel,
       documentIdentity,
-      digestCharsPerChunk,
       editorState.currentPageIndex,
       editorState.filename,
       editorState.metadata,
-      editorState.options.aiChat.digestSourceCharsPerChunk,
       editorState.options.aiChat.getPagesTextMaxChars,
       editorState.options.aiChat.visualSummaryEnabled,
       editorState.options.aiChat.visualSummaryModelKey,
@@ -858,7 +771,6 @@ export const useAiChatController = (
       editorState.scale,
       getRenderablePdfBytes,
       getSelectedTextContext,
-      summarizeDigestChunk,
       summarizeRenderedPages,
       visualSummaryEnabled,
       visualSummaryModelKey,

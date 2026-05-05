@@ -10,7 +10,6 @@ import {
   defineToolModule,
   emptyObjectSchema,
   expandPageNumberSelectors,
-  getDocumentDigestArgsSchema,
   summaryInstructionsSchema,
   pageNumberSchema,
   pageNumberSelectorSchema,
@@ -172,7 +171,7 @@ const METADATA_TOOL_PROMPTS = [
 ];
 
 const MULTI_PAGE_SUMMARY_FALLBACK_PROMPT =
-  "If the user asks for a whole-document or many-page summary and no digest tool is available, rely on get_document_context plus targeted page reads.";
+  "If the user asks for a whole-document or many-page summary, call get_document_context first, then read the relevant page range with get_pages_text using a range tuple like [1, 10] when needed.";
 
 const DOCUMENT_CONTEXT_TOOL_PROMPTS = [
   "get_document_context includes per-page type breakdowns for form fields and supported annotations on pages that actually contain them, which is useful before form filling or annotation inspection.",
@@ -244,7 +243,6 @@ const pageVisualLabelDensity = (pages: AiRenderedPageImage[]) => {
 const formatCharCount = (value: number) => `${value.toLocaleString()} chars`;
 
 export const documentToolModule = defineToolModule((ctx) => {
-  const getDocumentDigest = ctx.getDocumentDigest;
   const summarizePagesVisual = ctx.summarizePagesVisual;
 
   return {
@@ -255,7 +253,7 @@ export const documentToolModule = defineToolModule((ctx) => {
       )
       .promptInstructions([
         ...DOCUMENT_CONTEXT_TOOL_PROMPTS,
-        ...(ctx.getDocumentDigest ? [] : [MULTI_PAGE_SUMMARY_FALLBACK_PROMPT]),
+        MULTI_PAGE_SUMMARY_FALLBACK_PROMPT,
       ])
       .inputSchema(emptyObjectSchema)
       .build(async ({ ctx: toolCtx }) => {
@@ -407,34 +405,6 @@ export const documentToolModule = defineToolModule((ctx) => {
           summary: payload.truncated
             ? `Summarized ${payload.returnedPageCount} of ${payload.requestedPageCount} requested rendered pages`
             : `Summarized rendered page${payload.returnedPageCount === 1 ? "" : "s"} for ${payload.returnedPageCount} page${payload.returnedPageCount === 1 ? "" : "s"}`,
-        };
-      }),
-
-    get_document_digest: createToolBuilder("get_document_digest")
-      .enable(Boolean(getDocumentDigest))
-      .read()
-      .description(
-        "Get an AI digest for exactly one contiguous page range. start_page and end_page are required. This tool can summarize very large ranges, including a whole document, because it automatically chunks and merges long ranges internally. The payload includes overall_excerpt for the full requested range plus per-chunk excerpts for supporting detail. Optionally pass summary_instructions as a structured object to guide the digest summarizer.",
-      )
-      .promptInstructions([
-        "If the user asks for a whole-document or many-page summary, call get_document_context first and then call get_document_digest once for the full needed page range before any targeted page reads. get_document_digest already handles internal chunking for long ranges.",
-        "summary_instructions is a structured object with known_information, remaining_uncertainties, and what_to_add_or_verify.",
-      ])
-      .inputSchema(getDocumentDigestArgsSchema)
-      .build(async ({ args, signal, onProgress }) => {
-        const digest = await getDocumentDigest!({
-          startPage: args.start_page,
-          endPage: args.end_page,
-          charsPerChunk: args.chars_per_chunk,
-          sourceCharsPerChunk: args.source_chars_per_chunk,
-          summaryInstructions: args.summary_instructions,
-          signal,
-          onProgress,
-        });
-
-        return {
-          payload: digest,
-          summary: `AI digest covers ${digest.returnedPageCount} page${digest.returnedPageCount === 1 ? "" : "s"} with ${digest.chunkCount} leaf chunk${digest.chunkCount === 1 ? "" : "s"}`,
         };
       }),
 

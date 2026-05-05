@@ -701,8 +701,7 @@ const zhTW = {
     },
     ai_chat: {
       title: "AI 問答工具",
-      description:
-        "配置 AI 問答能力，包括表單製作工具、文件摘要工具以及渲染頁視覺總結工具。",
+      description: "配置 AI 問答能力，包括表單製作工具以及渲染頁視覺總結工具。",
       context_pruning_enabled: "啟用上下文壓縮",
       context_pruning_enabled_desc:
         "根據上下文 token 門檻裁剪較舊的思考內容，並優先移除更早的頁面圖片結果，以降低 token 消耗。",
@@ -744,17 +743,7 @@ const zhTW = {
       visual_summary_model_placeholder: "選擇視覺模型",
       visual_summary_model_desc:
         "供 summarize_pages_visual 使用。如果停用工具或未選擇視覺模型，這個工具將不可用。",
-      digest_enabled: "啟用摘要工具",
-      digest_enabled_desc: "控制 AI 問答中的 get_document_digest 是否可用。",
-      summary_model: "摘要總結模型",
-      summary_model_placeholder: "選擇模型",
-      summary_model_desc:
-        "供 get_document_digest 使用。如果停用摘要工具或未選擇模型，摘要工具將不可用。",
       no_models: "沒有可用模型",
-      digest_chars_per_chunk: "每層摘要輸出長度",
-      digest_source_chars_per_chunk: "每層摘要輸入預算",
-      digest_sampling_desc:
-        "輸入預算決定每層摘要可檢視多少內容，輸出長度決定每層保留多少內容。提高輸入預算通常比提高輸出長度更能改善整份文件的覆蓋率。",
     },
     done: "完成",
   },

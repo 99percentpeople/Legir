@@ -8,9 +8,6 @@ import {
 import {
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
   AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
-  AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS,
-  AI_CHAT_DIGEST_SOURCE_CHARS_MAX,
-  AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
@@ -34,17 +31,6 @@ import type {
 const envGeminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
 const envOpenAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
 const envOpenAiApiUrl = (process.env.OPENAI_API_URL || "").trim();
-
-const clampDigestSourceChars = (value: unknown) => {
-  const next = Math.trunc(Number(value) || 0);
-  if (!Number.isFinite(next) || next <= 0) {
-    return DEFAULT_EDITOR_UI_STATE.options.aiChat.digestSourceCharsPerChunk;
-  }
-  return Math.max(
-    AI_CHAT_DIGEST_SOURCE_CHARS_MIN,
-    Math.min(AI_CHAT_DIGEST_SOURCE_CHARS_MAX, next),
-  );
-};
 
 const clampAiChatInteger = (
   value: unknown,
@@ -196,20 +182,6 @@ export const createEmptyLlmModelCache = (): EditorState["llmModelCache"] =>
 
 export type PersistedAiChatOptions = Partial<AppOptions["aiChat"]>;
 
-const normalizeDigestOutputRatioDenominator = (
-  value: unknown,
-): AppOptions["aiChat"]["digestOutputRatioDenominator"] => {
-  if (
-    typeof value === "number" &&
-    AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS.includes(
-      value as (typeof AI_CHAT_DIGEST_OUTPUT_RATIO_DENOMINATOR_OPTIONS)[number],
-    )
-  ) {
-    return value as AppOptions["aiChat"]["digestOutputRatioDenominator"];
-  }
-  return 3;
-};
-
 export const normalizeAiChatOptions = (
   base: AppOptions["aiChat"],
   patch?: PersistedAiChatOptions,
@@ -220,15 +192,6 @@ export const normalizeAiChatOptions = (
   };
 
   return {
-    digestEnabled:
-      typeof next.digestEnabled === "boolean" ? next.digestEnabled : true,
-    digestSourceCharsPerChunk: clampDigestSourceChars(
-      next.digestSourceCharsPerChunk,
-    ),
-    digestOutputRatioDenominator: normalizeDigestOutputRatioDenominator(
-      next.digestOutputRatioDenominator,
-    ),
-    digestSummaryModelKey: next.digestSummaryModelKey || "",
     visualSummaryEnabled:
       typeof next.visualSummaryEnabled === "boolean"
         ? next.visualSummaryEnabled

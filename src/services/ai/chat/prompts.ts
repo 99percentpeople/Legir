@@ -2,13 +2,10 @@ import type { AiChatToolDefinition } from "@/services/ai/chat/types";
 import { AI_CHAT_CONVERSATION_SUMMARY_MAX_CHARS } from "@/constants";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 import {
-  buildPageRangeLabel,
   buildPromptSection,
   createAiChatPromptContext,
-  formatSummaryInstructionsForPrompt,
   hasTool,
 } from "@/services/ai/utils/promptHelpers";
-import type { AiSummaryInstructions } from "@/services/ai/chat/types";
 
 export const getAiChatSystemInstruction = (options?: {
   toolDefinitions?: AiChatToolDefinition[];
@@ -172,66 +169,4 @@ export const buildAiChatContextMemorySystemPrompt = (options?: {
     "Prefer the latest valid decision when the history contains revisions or corrections.",
     "Omit chatter, duplicates, filler, raw JSON, long payloads, image data, and hidden reasoning. Return plain text only.",
   ].join("\n");
-};
-
-export const buildDocumentDigestSummaryPrompt = (options: {
-  startPage: number;
-  endPage: number;
-  maxChars: number;
-  summaryInstructions?: AiSummaryInstructions;
-}) => {
-  const pageLabel = buildPageRangeLabel(options.startPage, options.endPage);
-  const summaryInstructionLines = formatSummaryInstructionsForPrompt(
-    options.summaryInstructions,
-  );
-  const lines = [
-    `You summarize sampled PDF text for ${pageLabel}.`,
-    "",
-    "Requirements:",
-    `- This is only a summary for ${pageLabel}, not for the whole document unless the requested range actually covers the whole document.`,
-    `- Never describe pages outside ${pageLabel}.`,
-    "- Cover the whole sampled range, not only the beginning.",
-    "- Preserve important section names, warnings, numbers, lists, and proper nouns when present.",
-    "- Prefer the same language as the source text when obvious.",
-    "- Follow any additional focus instructions below, but do not invent facts that are not supported by the source text.",
-    "- Return plain text only. No markdown. No preamble.",
-    `- Keep the summary within about ${options.maxChars} characters.`,
-  ];
-
-  if (summaryInstructionLines.length > 0) {
-    lines.push(...summaryInstructionLines);
-  }
-
-  return lines.join("\n");
-};
-
-export const buildDocumentDigestMergePrompt = (options: {
-  startPage: number;
-  endPage: number;
-  maxChars: number;
-  summaryInstructions?: AiSummaryInstructions;
-}) => {
-  const pageLabel = buildPageRangeLabel(options.startPage, options.endPage);
-  const summaryInstructionLines = formatSummaryInstructionsForPrompt(
-    options.summaryInstructions,
-  );
-  const lines = [
-    `You merge multiple subrange summaries for ${pageLabel} into one faithful summary.`,
-    "",
-    "Requirements:",
-    `- The input consists of summaries for smaller contiguous page ranges inside ${pageLabel}.`,
-    `- Produce one coherent summary for the whole ${pageLabel} range.`,
-    "- Cover the entire range evenly instead of over-weighting the first subrange.",
-    "- Preserve important section names, warnings, numbers, lists, and proper nouns when present.",
-    "- Prefer the same language as the source text when obvious.",
-    "- Follow any additional focus instructions below, but do not invent facts that are not supported by the input summaries.",
-    "- Return plain text only. No markdown. No preamble.",
-    `- Keep the summary within about ${options.maxChars} characters.`,
-  ];
-
-  if (summaryInstructionLines.length > 0) {
-    lines.push(...summaryInstructionLines);
-  }
-
-  return lines.join("\n");
 };

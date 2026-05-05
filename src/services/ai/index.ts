@@ -374,28 +374,6 @@ const resolveSummarizeSpecifier = (options: {
     modelId: options.modelId,
   });
 
-export type SummarizeDigestTextOptions = {
-  providerId?: string;
-  modelId?: string;
-  prompt?: string;
-  signal?: AbortSignal;
-};
-
-export const summarizeDigestText = async (
-  text: string,
-  options: SummarizeDigestTextOptions,
-) => {
-  const specifier = resolveSummarizeSpecifier(options);
-
-  return await summarizeTextWithAiSdk({
-    text,
-    appOptions: getCurrentOptions(),
-    specifier,
-    prompt: options.prompt,
-    signal: options.signal,
-  });
-};
-
 export type SummarizeConversationMemoryOptions = {
   providerId?: string;
   modelId?: string;
