@@ -511,7 +511,9 @@ export const getDocumentDigestArgsSchema = z
 
 export const getPagesTextArgsSchema = z
   .object({
-    page_numbers: requiredPageNumbersSchema,
+    page_numbers: requiredPageNumbersSchema.describe(
+      "Required 1-based page selectors for the text to read. For section, chapter, many-page, or whole-document requests, pass the full relevant range with a two-item inclusive range like [1, 10] instead of only the current visible pages. Use fewer pages only after a truncated result.",
+    ),
     include_layout: z
       .boolean()
       .optional()

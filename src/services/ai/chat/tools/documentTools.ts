@@ -441,7 +441,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_pages_text: createToolBuilder("get_pages_text")
       .read()
       .description(
-        "Read full text for one or more pages. Returned text preserves inferred spaces and line breaks from PDF layout while staying compatible with anchor highlighting. Optionally include per-line layout rectangles. The per-call text budget is configured in AI chat settings.",
+        "Read full text for one or more pages. Returned text preserves inferred spaces and line breaks from PDF layout while staying compatible with anchor highlighting. For section, chapter, many-page, or whole-document requests, use page_numbers with the full relevant page range instead of only the current visible pages; narrow the range only if the result is truncated. Optionally include per-line layout rectangles. The per-call text budget is configured in AI chat settings.",
       )
       .promptInstructions(GET_PAGES_TEXT_TOOL_PROMPTS)
       .inputSchema(getPagesTextArgsSchema)
