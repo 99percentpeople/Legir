@@ -215,7 +215,6 @@ const settleIncompleteTimelineForRestore = (
       return {
         ...item,
         status: "incomplete" as const,
-        progressDetails: undefined,
         progressItems: undefined,
         progressCounts: undefined,
       };
@@ -410,11 +409,6 @@ export const normalizeTimelineForPersist = (items: AiChatTimelineItem[]) => {
         typeof item.resultSummary === "string"
           ? truncateText(item.resultSummary, MAX_PERSIST_TOOL_SUMMARY_CHARS)
           : undefined,
-      progressDetails: Array.isArray(item.progressDetails)
-        ? item.progressDetails
-            .slice(0, 16)
-            .map((detail) => truncateText(detail, 200))
-        : undefined,
       progressItems: Array.isArray(item.progressItems)
         ? item.progressItems.slice(0, 16).map((progressItem) => ({
             ...progressItem,

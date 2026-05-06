@@ -428,11 +428,6 @@ const de = {
     tools: "Werkzeuge",
     error_title: "Anfrage fehlgeschlagen",
     continue_reason_tool_limit: "Tool-Aufruflimit erreicht",
-    tool_schedule_log: "Ausführungsprotokoll",
-    tool_progress_layer: "Ebene {count}",
-    tool_progress_pending: "{count} wartend",
-    tool_progress_running: "{count} laufend",
-    tool_progress_done: "{count} abgeschlossen",
     input_placeholder:
       "Bitten Sie die KI, PDF-Inhalte zu lesen, zu suchen, zu springen oder hervorzuheben...",
     input_hint: "Enter zum Senden, Shift+Enter für eine neue Zeile.",

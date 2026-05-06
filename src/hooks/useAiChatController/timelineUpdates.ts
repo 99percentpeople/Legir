@@ -466,7 +466,6 @@ export const applyToolUpdateToTimeline = (
               ...item,
               status: "done",
               resultSummary: update.result.summary,
-              progressDetails: undefined,
               progressItems: undefined,
               progressCounts: undefined,
               resultText: stringifyToolPayload(update.result.payload),
@@ -485,7 +484,6 @@ export const applyToolUpdateToTimeline = (
           ? {
               ...item,
               resultSummary: update.progress.summary,
-              progressDetails: update.progress.details,
               progressItems: update.progress.items,
               progressCounts: update.progress.counts,
             }
@@ -501,7 +499,6 @@ export const applyToolUpdateToTimeline = (
         ? {
             ...item,
             status: "error",
-            progressDetails: undefined,
             progressItems: undefined,
             progressCounts: undefined,
             error: update.error.message,
@@ -525,7 +522,6 @@ export const settleIncompleteTimeline = (
       return {
         ...item,
         status: "incomplete" as const,
-        progressDetails: undefined,
         progressItems: undefined,
         progressCounts: undefined,
       };

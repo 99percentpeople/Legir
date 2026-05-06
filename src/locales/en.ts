@@ -423,11 +423,6 @@ const en = {
     tools: "Tool Actions",
     error_title: "Request Failed",
     continue_reason_tool_limit: "Reached tool call limit",
-    tool_schedule_log: "Execution log",
-    tool_progress_layer: "Layer {count}",
-    tool_progress_pending: "{count} waiting",
-    tool_progress_running: "{count} running",
-    tool_progress_done: "{count} done",
     input_placeholder:
       "Ask the AI to read, search, jump, or highlight PDF content...",
     input_hint: "Press Enter to send, Shift+Enter for a new line.",

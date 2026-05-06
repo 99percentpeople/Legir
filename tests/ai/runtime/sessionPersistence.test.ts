@@ -424,10 +424,11 @@ describe("AI chat session persistence", () => {
             label: "Page 1",
           },
         ],
-        progressDetails: Array.from(
-          { length: 20 },
-          (_, index) => `detail ${index}`,
-        ),
+        progressItems: Array.from({ length: 20 }, (_, index) => ({
+          id: `item_${index}`,
+          label: `progress item ${index}`,
+          status: "pending" as const,
+        })),
         createdAt: nowIso,
       },
     ]);
@@ -436,6 +437,6 @@ describe("AI chat session persistence", () => {
     expect(item?.kind).toBe("tool");
     if (item?.kind !== "tool") return;
     expect(item.previewImages).toBeUndefined();
-    expect(item.progressDetails).toHaveLength(16);
+    expect(item.progressItems).toHaveLength(16);
   });
 });

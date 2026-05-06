@@ -2,7 +2,6 @@ import React from "react";
 import { ChevronDown } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Collapsible,
@@ -17,7 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
-import { useStickyBottomScroll } from "../useStickyBottomScroll";
 import type { ToolTimelineItem, ToolTimelinePreviewImage } from "./types";
 
 export const ToolTimelineCall = ({
@@ -28,71 +26,44 @@ export const ToolTimelineCall = ({
   grouped?: boolean;
 }) => {
   const { t } = useLanguage();
-  const hasProgressSnapshot =
-    item.status === "running" &&
-    (Boolean(item.progressCounts) ||
-      (Array.isArray(item.progressDetails) && item.progressDetails.length > 0));
   const [detailsOpen, setDetailsOpen] = React.useState(false);
-  const progressLogs = hasProgressSnapshot ? (item.progressDetails ?? []) : [];
-  const progressLogRef = React.useRef<HTMLDivElement | null>(null);
-  const { scrollToBottom: scrollProgressLogToBottom } = useStickyBottomScroll(
-    progressLogRef,
-    {
-      enabled: detailsOpen && progressLogs.length > 0,
-      settleFrames: 2,
-      threshold: 32,
-    },
-  );
   const resultText = item.resultText?.trim();
   const previewImages = item.previewImages ?? [];
 
-  React.useEffect(() => {
-    if (!detailsOpen || progressLogs.length === 0) return;
-    scrollProgressLogToBottom(false);
-  }, [detailsOpen, progressLogs, scrollProgressLogToBottom]);
-
-  React.useEffect(() => {
-    if (!detailsOpen) return;
-    scrollProgressLogToBottom(true);
-  }, [detailsOpen, scrollProgressLogToBottom]);
-
   const content = (
     <div className="space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className="text-muted-foreground font-mono text-xs">
-              {item.toolName}
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="group focus-visible:ring-ring/50 mb-0 flex w-full items-start justify-between gap-2 rounded-md p-1 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+          aria-label={t("ai_chat.tool_details")}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="text-muted-foreground font-mono text-xs">
+                {item.toolName}
+              </div>
+              {item.status !== "done" ? (
+                <Badge
+                  className="h-5 px-1.5 text-[10px]"
+                  variant={item.status === "error" ? "destructive" : "outline"}
+                >
+                  {item.status === "running" ? <Spinner size="sm" /> : null}
+                  {item.status}
+                </Badge>
+              ) : null}
             </div>
-            {item.status !== "done" ? (
-              <Badge
-                className="h-5 px-1.5 text-[10px]"
-                variant={item.status === "error" ? "destructive" : "outline"}
-              >
-                {item.status === "running" ? <Spinner size="sm" /> : null}
-                {item.status}
-              </Badge>
+            {item.resultSummary ? (
+              <div className="text-xs">{item.resultSummary}</div>
+            ) : null}
+            {item.error ? (
+              <div className="text-destructive text-sm">{item.error}</div>
             ) : null}
           </div>
-          {item.resultSummary ? (
-            <div className="text-xs">{item.resultSummary}</div>
-          ) : null}
-          {item.error ? (
-            <div className="text-destructive text-sm">{item.error}</div>
-          ) : null}
-        </div>
 
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="group h-7 w-7 shrink-0"
-            aria-label={t("ai_chat.tool_details")}
-          >
-            <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-          </Button>
-        </CollapsibleTrigger>
-      </div>
+          <ChevronDown className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+        </button>
+      </CollapsibleTrigger>
 
       <CollapsibleContent className="space-y-2">
         <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
@@ -101,27 +72,6 @@ export const ToolTimelineCall = ({
         <div className="text-muted-foreground bg-muted/40 rounded-md px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap">
           {item.argsText}
         </div>
-
-        {progressLogs.length ? (
-          <div className="space-y-2">
-            <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-              {t("ai_chat.tool_schedule_log")}
-            </div>
-            <div
-              ref={progressLogRef}
-              className="bg-muted/35 border-border/50 max-h-48 space-y-1 overflow-y-auto rounded-md border px-2.5 py-2 font-mono text-[11px]"
-            >
-              {progressLogs.map((logLine, index) => (
-                <div
-                  key={`${item.id}:progress-log:${index}`}
-                  className="text-muted-foreground break-all whitespace-pre-wrap"
-                >
-                  {logLine}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
 
         {previewImages.length ? (
           <div className="space-y-2">
@@ -157,10 +107,10 @@ export const ToolTimelineCall = ({
       onOpenChange={setDetailsOpen}
     >
       {grouped ? (
-        <div className="px-2 py-1.5">{content}</div>
+        <div className="p-1.5">{content}</div>
       ) : (
         <Card className="bg-background">
-          <CardContent className="px-2 py-1">{content}</CardContent>
+          <CardContent className="p-1.5">{content}</CardContent>
         </Card>
       )}
     </Collapsible>

@@ -759,7 +759,6 @@ export type AiChatTimelineItem =
       status: "running" | "done" | "error" | "incomplete";
       argsText: string;
       resultSummary?: string;
-      progressDetails?: string[];
       progressItems?: AiToolExecutionProgressItem[];
       progressCounts?: AiToolExecutionProgressCounts;
       resultText?: string;
@@ -829,7 +828,6 @@ export interface AiToolExecutionProgressCounts {
 
 export interface AiToolExecutionProgress {
   summary: string;
-  details?: string[];
   items?: AiToolExecutionProgressItem[];
   counts?: AiToolExecutionProgressCounts;
 }

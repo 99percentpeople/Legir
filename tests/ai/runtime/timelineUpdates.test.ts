@@ -205,7 +205,6 @@ describe("AI chat timeline updates", () => {
         phase: "progress",
         progress: {
           summary: "Rendering",
-          details: ["page 1"],
           counts: { pending: 0, running: 1, done: 0 },
         },
       },
@@ -213,7 +212,7 @@ describe("AI chat timeline updates", () => {
     ).timeline;
     expect(progressed[0]).toMatchObject({
       resultSummary: "Rendering",
-      progressDetails: ["page 1"],
+      progressCounts: { pending: 0, running: 1, done: 0 },
     });
 
     const finished = applyToolUpdateToTimeline(

@@ -39,7 +39,6 @@ describe("AI chat tool runtime", () => {
       execute: async (_name, rawArgs, _signal, onProgress) => {
         onProgress?.({
           summary: "Working",
-          details: ["step 1"],
         });
         return {
           payload: { ok: true, rawArgs },

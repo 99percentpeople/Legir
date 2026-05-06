@@ -425,11 +425,6 @@ const ja = {
     tools: "ツール実行",
     error_title: "リクエストに失敗しました",
     continue_reason_tool_limit: "ツール呼び出し上限に達しました",
-    tool_schedule_log: "実行ログ",
-    tool_progress_layer: "レイヤー {count}",
-    tool_progress_pending: "{count} 件待機中",
-    tool_progress_running: "{count} 件実行中",
-    tool_progress_done: "{count} 件完了",
     input_placeholder:
       "AI に PDF の内容を読ませたり、検索、移動、ハイライトさせたりできます...",
     input_hint: "Enter で送信、Shift+Enter で改行します。",

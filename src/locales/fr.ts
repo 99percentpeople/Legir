@@ -429,11 +429,6 @@ const fr = {
     tools: "Outils",
     error_title: "Échec de la requête",
     continue_reason_tool_limit: "Limite d'appels d'outils atteinte",
-    tool_schedule_log: "Journal d'exécution",
-    tool_progress_layer: "Couche {count}",
-    tool_progress_pending: "{count} en attente",
-    tool_progress_running: "{count} en cours",
-    tool_progress_done: "{count} terminés",
     input_placeholder:
       "Demandez à l'IA de lire, rechercher, naviguer ou surligner le contenu du PDF...",
     input_hint:

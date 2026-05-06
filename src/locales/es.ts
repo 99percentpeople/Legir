@@ -428,11 +428,6 @@ const es = {
     error_title: "La solicitud falló",
     continue_reason_tool_limit:
       "Se alcanzó el límite de llamadas a herramientas",
-    tool_schedule_log: "Registro de ejecución",
-    tool_progress_layer: "Capa {count}",
-    tool_progress_pending: "{count} en espera",
-    tool_progress_running: "{count} en ejecución",
-    tool_progress_done: "{count} completados",
     input_placeholder:
       "Pide a la IA que lea, busque, navegue o resalte contenido del PDF...",
     input_hint: "Pulsa Enter para enviar, Shift+Enter para una nueva línea.",
