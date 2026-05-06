@@ -209,12 +209,6 @@ export interface AiRenderedPageVisualSummaryResult {
   summary: string;
 }
 
-export interface AiSummaryInstructions {
-  known_information?: string;
-  remaining_uncertainties?: string;
-  what_to_add_or_verify?: string;
-}
-
 export interface AiStoredSearchResult {
   id: string;
   query: string;

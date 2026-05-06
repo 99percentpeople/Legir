@@ -22,7 +22,6 @@ import type {
   AiRenderedPageImage,
   AiRenderedPageImageBatch,
   AiRenderedPageVisualSummaryResult,
-  AiSummaryInstructions,
   AiDocumentSnapshot,
   AiReadablePage,
   AiReadablePageBatch,
@@ -352,7 +351,6 @@ export const createDocumentContextService = (options: {
   };
   summarizeRenderedPages?: (options: {
     pages: AiRenderedPageImage[];
-    summaryInstructions?: AiSummaryInstructions;
     signal?: AbortSignal;
   }) => Promise<string>;
   workerService?: PDFWorkerService;
@@ -982,12 +980,10 @@ export const createDocumentContextService = (options: {
       ? async ({
           pageNumbers,
           renderAnnotations = true,
-          summaryInstructions,
           signal,
         }: {
           pageNumbers: PageVisualRequest[];
           renderAnnotations?: boolean;
-          summaryInstructions?: AiSummaryInstructions;
           signal?: AbortSignal;
         }): Promise<AiRenderedPageVisualSummaryResult> => {
           const pageImageBatch = await renderPageImageBatch({
@@ -998,7 +994,6 @@ export const createDocumentContextService = (options: {
 
           const summary = await summarizeRenderedPages({
             pages: pageImageBatch.pages,
-            summaryInstructions,
             signal,
           });
 

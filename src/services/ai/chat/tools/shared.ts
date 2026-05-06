@@ -453,34 +453,6 @@ export const formFieldKindsSchema = z.array(
   z.enum(["text", "checkbox", "radio", "dropdown", "signature"]),
 );
 export const stringArraySchema = z.array(z.string());
-export const summaryInstructionsSchema = z
-  .object({
-    known_information: z
-      .string()
-      .optional()
-      .default("")
-      .describe(
-        "Facts, findings, or context already known from earlier tool calls.",
-      ),
-    remaining_uncertainties: z
-      .string()
-      .optional()
-      .default("")
-      .describe(
-        "Open questions, ambiguities, or missing details that still need checking.",
-      ),
-    what_to_add_or_verify: z
-      .string()
-      .optional()
-      .default("")
-      .describe(
-        "What this new summary should add, compare, confirm, or verify.",
-      ),
-  })
-  .strict()
-  .describe(
-    "Optional structured guidance for summary tools. Use known_information, remaining_uncertainties, and what_to_add_or_verify instead of a free-form string.",
-  );
 
 export const getPagesTextArgsSchema = z
   .object({

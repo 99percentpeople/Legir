@@ -2,8 +2,6 @@ import { generateText } from "ai";
 
 import { resolveAiSdkLanguageModel } from "@/services/ai/providers/modelRegistry";
 import type { AiSdkModelSpecifier } from "@/services/ai/providers/types";
-import type { AiSummaryInstructions } from "@/services/ai/chat/types";
-import { formatSummaryInstructionsForPrompt } from "@/services/ai/utils/promptHelpers";
 import type { AppOptions } from "@/types";
 
 type SummarizePageImagesInput = {
@@ -20,17 +18,11 @@ type SummarizePageImagesInput = {
   base64Data: string;
 };
 
-const buildPageImageSummaryPrompt = (options: {
-  pageNumbers: number[];
-  summaryInstructions?: AiSummaryInstructions;
-}) => {
+const buildPageImageSummaryPrompt = (options: { pageNumbers: number[] }) => {
   const pageLabel =
     options.pageNumbers.length === 1
       ? `page ${options.pageNumbers[0]}`
       : `pages ${options.pageNumbers.join(", ")}`;
-  const summaryInstructionLines = formatSummaryInstructionsForPrompt(
-    options.summaryInstructions,
-  );
 
   return [
     `You are reviewing rendered PDF ${pageLabel}.`,
@@ -42,7 +34,6 @@ const buildPageImageSummaryPrompt = (options: {
     "- Mention page numbers when distinguishing findings across multiple pages.",
     "- If some detail is blurry, cropped, or unreadable, say so instead of guessing.",
     "- Return plain text only. No markdown. No preamble.",
-    ...summaryInstructionLines,
   ].join("\n");
 };
 
@@ -50,7 +41,6 @@ export const summarizePageImagesWithAiSdk = async (options: {
   appOptions: AppOptions;
   specifier: AiSdkModelSpecifier;
   pages: SummarizePageImagesInput[];
-  summaryInstructions?: AiSummaryInstructions;
   signal?: AbortSignal;
 }) => {
   const model = resolveAiSdkLanguageModel(
@@ -70,7 +60,6 @@ export const summarizePageImagesWithAiSdk = async (options: {
             type: "text",
             text: buildPageImageSummaryPrompt({
               pageNumbers: options.pages.map((page) => page.pageNumber),
-              summaryInstructions: options.summaryInstructions,
             }),
           },
           ...options.pages.flatMap((page) => [

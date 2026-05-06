@@ -25,10 +25,7 @@ import type {
   LLMModelOption,
   LLMTranslateTextOptions,
 } from "./types";
-import type {
-  AiRenderedPageImage,
-  AiSummaryInstructions,
-} from "@/services/ai/chat/types";
+import type { AiRenderedPageImage } from "@/services/ai/chat/types";
 
 export * from "@/services/ai/providers";
 export * from "@/services/ai/tasks";
@@ -400,7 +397,6 @@ export type SummarizePageImagesOptions = {
   modelKey?: string;
   providerId?: string;
   modelId?: string;
-  summaryInstructions?: AiSummaryInstructions;
   signal?: AbortSignal;
 };
 
@@ -421,7 +417,6 @@ export const summarizePageImages = async (
     appOptions: getCurrentOptions(),
     specifier,
     pages,
-    summaryInstructions: options.summaryInstructions,
     signal: options.signal,
   });
 };

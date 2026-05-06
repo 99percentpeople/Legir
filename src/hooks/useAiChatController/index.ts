@@ -23,7 +23,6 @@ import type {
   AiChatToolUpdate,
   AiChatUserMessageInput,
   AiChatMessageRecord,
-  AiSummaryInstructions,
   AiStoredSearchResult,
   AiTextSelectionContext,
 } from "@/services/ai/chat/types";
@@ -584,14 +583,12 @@ export const useAiChatController = (
   const summarizeRenderedPages = useCallback(
     async (options: {
       pages: Parameters<typeof summarizePageImages>[0];
-      summaryInstructions?: AiSummaryInstructions;
       signal?: AbortSignal;
     }) => {
       if (!visualSummaryModelKey) return "";
 
       return await summarizePageImages(options.pages, {
         modelKey: visualSummaryModelKey,
-        summaryInstructions: options.summaryInstructions,
         signal: options.signal,
       });
     },

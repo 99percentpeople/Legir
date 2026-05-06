@@ -151,4 +151,45 @@ describe("AI chat document tools", () => {
       },
     ]);
   });
+
+  test("summarize_pages_visual rejects removed summary instructions", async () => {
+    const calls: unknown[] = [];
+    const ctx = {
+      getDocumentContext: () => ({
+        currentPageNumber: 1,
+        visiblePageNumbers: [1],
+      }),
+      summarizePagesVisual: async (input: unknown) => {
+        calls.push(input);
+        return {
+          requestedPageCount: 1,
+          returnedPageCount: 1,
+          truncated: false,
+          maxPagesPerCall: 4,
+          pages: [],
+          summary: "summary",
+        };
+      },
+    } as unknown as AiToolContext;
+    const handlers = createToolHandlerMap([documentToolModule], ctx);
+
+    const result = await handlers.summarize_pages_visual!.execute(
+      {
+        pages: [1],
+        summary_instructions: {
+          what_to_add_or_verify: "old argument",
+        },
+      },
+      ctx,
+    );
+
+    expect(calls).toEqual([]);
+    expect(result).toMatchObject({
+      payload: {
+        ok: false,
+        error: "INVALID_ARGUMENTS",
+      },
+      summary: "summarize_pages_visual failed: invalid arguments",
+    });
+  });
 });

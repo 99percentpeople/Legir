@@ -10,7 +10,6 @@ import {
   defineToolModule,
   emptyObjectSchema,
   expandPageNumberSelectors,
-  summaryInstructionsSchema,
   pageNumberSchema,
   pageNumberSelectorSchema,
   pageRectArgsSchema,
@@ -86,13 +85,7 @@ const getPagesVisualArgsSchemaBase = z
   })
   .strict();
 const getPagesVisualArgsSchema = getPagesVisualArgsSchemaBase;
-
-const summarizePagesVisualArgsSchemaBase = getPagesVisualArgsSchemaBase
-  .extend({
-    summary_instructions: summaryInstructionsSchema.optional(),
-  })
-  .strict();
-const summarizePagesVisualArgsSchema = summarizePagesVisualArgsSchemaBase;
+const summarizePagesVisualArgsSchema = getPagesVisualArgsSchemaBase;
 
 const toPagesVisualModelOutput = (output: unknown) => {
   if (!output || typeof output !== "object") {
@@ -197,8 +190,6 @@ const PAGE_VISUAL_SUMMARY_TOOL_PROMPTS = [
   `summarize_pages_visual uses the same fixed pixel density as get_pages_visual: ${AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY} px per page-space unit.`,
   AI_PAGE_COORDINATE_CONVENTION,
   "summarize_pages_visual renders requested page visuals and delegates the visual inspection to a configured vision model, then returns a plain-text summary you can reason over.",
-  "Pass summary_instructions when the user cares about specific visual details such as tables, handwriting, stamps, diagrams, signatures, highlights, or layout defects.",
-  "summary_instructions is a structured object with known_information, remaining_uncertainties, and what_to_add_or_verify.",
 ];
 
 const GET_PAGES_TEXT_TOOL_PROMPTS = [
@@ -386,7 +377,6 @@ export const documentToolModule = defineToolModule((ctx) => {
         const visualSummary = await summarizePagesVisual!({
           pageNumbers: pageRequests,
           renderAnnotations: args.render_annotations,
-          summaryInstructions: args.summary_instructions,
           signal,
         });
 
