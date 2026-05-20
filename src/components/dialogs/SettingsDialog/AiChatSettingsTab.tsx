@@ -13,9 +13,9 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { TabsContent } from "@/components/ui/tabs";
 import {
-  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
-  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
-  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_STEP,
+  AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MAX,
+  AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MIN,
+  AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_STEP,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_STEP,
@@ -24,6 +24,7 @@ import {
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
 } from "@/constants";
+import { resolveAiChatCompressionThresholdTokens } from "@/services/ai/chat/runtime/compression/threshold";
 import type { AiChatOptions } from "@/types";
 
 import { SETTINGS_CARD_SPACIOUS_CLASS } from "./styles";
@@ -46,8 +47,10 @@ export const AiChatSettingsTab = ({
   const visualSummaryEnabled = options.visualSummaryEnabled;
   const contextCompressionEnabled = options.contextCompressionEnabled;
   const visualHistoryWindow = options.visualHistoryWindow;
+  const contextCompressionThresholdPercent =
+    options.contextCompressionThresholdPercent;
   const contextCompressionThresholdTokens =
-    options.contextCompressionThresholdTokens;
+    resolveAiChatCompressionThresholdTokens({ aiChatOptions: options });
   const maxToolRounds = options.maxToolRounds;
   const getPagesTextMaxChars = options.getPagesTextMaxChars;
   const contextCompressionMode = options.contextCompressionMode;
@@ -155,37 +158,36 @@ export const AiChatSettingsTab = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <Label htmlFor="ai-chat-context-pruning-threshold">
-                {t("settings.ai_chat.context_pruning_trigger_context_tokens")}
+                {t("settings.ai_chat.context_pruning_trigger_context_percent")}
               </Label>
               <span className="text-muted-foreground text-xs">
-                {contextCompressionThresholdTokens.toLocaleString()}
+                {contextCompressionThresholdPercent}%
               </span>
             </div>
             <Slider
-              value={[contextCompressionThresholdTokens]}
+              value={[contextCompressionThresholdPercent]}
               disabled={!contextCompressionEnabled}
-              min={AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN}
-              max={AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX}
-              step={AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_STEP}
+              min={AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MIN}
+              max={AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MAX}
+              step={AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_STEP}
               onValueChange={(values) => {
                 const next = values[0];
                 if (!Number.isFinite(next)) return;
                 updateAiChatOptions({
-                  contextCompressionThresholdTokens: next,
+                  contextCompressionThresholdPercent: next,
                 });
               }}
             />
             <div className="text-muted-foreground flex justify-between text-xs">
-              <span>
-                {AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN.toLocaleString()}
-              </span>
-              <span>
-                {AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX.toLocaleString()}
-              </span>
+              <span>{AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MIN}%</span>
+              <span>{AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MAX}%</span>
             </div>
             <p className="text-muted-foreground text-xs">
               {t(
-                "settings.ai_chat.context_pruning_trigger_context_tokens_desc",
+                "settings.ai_chat.context_pruning_trigger_context_percent_desc",
+                {
+                  tokens: contextCompressionThresholdTokens.toLocaleString(),
+                },
               )}
             </p>
           </div>

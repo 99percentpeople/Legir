@@ -340,6 +340,7 @@ export interface LLMModelCapabilities {
   outputModalities: LLMModelModality[];
   supportsImageInput: boolean;
   supportsToolCalls: boolean;
+  contextWindowTokens: number;
 }
 
 export type LLMCustomModelCapability = "text" | "image" | "tools";
@@ -379,7 +380,7 @@ export interface AiChatOptions {
   detectFormFieldsEnabled: boolean;
   formToolsVisionModelKey?: string;
   contextCompressionEnabled: boolean;
-  contextCompressionThresholdTokens: number;
+  contextCompressionThresholdPercent: number;
   visualHistoryWindow: number;
   maxToolRounds: number;
   getPagesTextMaxChars: number;

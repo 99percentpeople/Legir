@@ -3,8 +3,10 @@ import type {
   AiChatMessageRecord,
   AiChatTimelineItem,
 } from "@/services/ai/chat/types";
-import type { AppOptions } from "@/types";
-import type { AiChatTimelineItemCounter } from "@/services/ai/chat/runtime/compression/types";
+import type {
+  AiChatTimelineItemCounter,
+  AiChatTurnCompressionOptions,
+} from "@/services/ai/chat/runtime/compression/types";
 import {
   buildAiChatCompressionSegments,
   getAiChatCompressionSegmentEndAtOrBefore,
@@ -51,7 +53,7 @@ export const getAiChatContextMemoryPlan = (options: {
   conversation: AiChatMessageRecord[];
   contextMemory?: AiChatContextMemory;
   aiChatOptions: Pick<
-    AppOptions["aiChat"],
+    AiChatTurnCompressionOptions,
     | "contextCompressionEnabled"
     | "contextCompressionMode"
     | "contextCompressionThresholdTokens"

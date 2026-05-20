@@ -46,9 +46,10 @@ export const AI_CHAT_MAX_TOOL_ROUNDS_MIN = 1;
 export const AI_CHAT_MAX_TOOL_ROUNDS_MAX = 24;
 export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN = 1;
 export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX = 8;
-export const AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN = 10_000;
-export const AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX = 1_000_000;
-export const AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_STEP = 10_000;
+export const AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MIN = 50;
+export const AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MAX = 95;
+export const AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_STEP = 5;
+export const AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_DEFAULT = 80;
 export const DEV_API_PROXY_URL = "/__legir_dev_proxy?url={url}";
 
 export const DEFAULT_PAGE_TRANSLATE_UI_PREFERENCES: PageTranslateOptions = {
@@ -116,7 +117,8 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       detectFormFieldsEnabled: false,
       formToolsVisionModelKey: "",
       contextCompressionEnabled: true,
-      contextCompressionThresholdTokens: 100_000,
+      contextCompressionThresholdPercent:
+        AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_DEFAULT,
       visualHistoryWindow: 1,
       maxToolRounds: 10,
       getPagesTextMaxChars: AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT,

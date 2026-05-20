@@ -6,8 +6,6 @@ import {
   normalizeReasoningPreference,
 } from "@/services/ai/providers";
 import {
-  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
-  AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
@@ -17,6 +15,7 @@ import {
   ANNOTATION_STYLES,
   DEFAULT_EDITOR_UI_STATE,
 } from "@/constants";
+import { clampAiChatCompressionThresholdPercent } from "@/services/ai/chat/runtime/compression/threshold";
 import type {
   AppOptions,
   EditorState,
@@ -210,15 +209,11 @@ export const normalizeAiChatOptions = (
       typeof next.contextCompressionEnabled === "boolean"
         ? next.contextCompressionEnabled
         : true,
-    contextCompressionThresholdTokens: clampAiChatInteger(
-      next.contextCompressionThresholdTokens,
-      {
-        fallback:
-          DEFAULT_EDITOR_UI_STATE.options.aiChat
-            .contextCompressionThresholdTokens,
-        min: AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MIN,
-        max: AI_CHAT_CONTEXT_PRUNING_TRIGGER_CONTEXT_TOKENS_MAX,
-      },
+    contextCompressionThresholdPercent: clampAiChatCompressionThresholdPercent(
+      typeof next.contextCompressionThresholdPercent === "undefined"
+        ? DEFAULT_EDITOR_UI_STATE.options.aiChat
+            .contextCompressionThresholdPercent
+        : next.contextCompressionThresholdPercent,
     ),
     visualHistoryWindow: clampAiChatInteger(next.visualHistoryWindow, {
       fallback: DEFAULT_EDITOR_UI_STATE.options.aiChat.visualHistoryWindow,

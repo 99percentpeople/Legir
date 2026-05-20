@@ -733,7 +733,7 @@ const de = {
         "Konfigurieren Sie KI-Chat-Funktionen einschließlich Formularwerkzeugen und dem visuellen Zusammenfassungswerkzeug für gerenderte Seiten.",
       context_pruning_enabled: "Kontextkomprimierung aktivieren",
       context_pruning_enabled_desc:
-        "Beschneidet ältere Reasoning-Inhalte, sobald der Kontext-Token-Schwellenwert erreicht ist, und entfernt bevorzugt ältere Seitenbild-Ergebnisse, um Tokens zu sparen.",
+        "Beschneidet ältere Reasoning-Inhalte, sobald der Kontext den konfigurierten Anteil des Modellfensters erreicht, und entfernt bevorzugt ältere Seitenbild-Ergebnisse, um Tokens zu sparen.",
       max_tool_rounds: "Maximale Tool-Runden",
       get_pages_text_max_chars: "get_pages_text Textbudget",
       get_pages_text_max_chars_desc:
@@ -741,11 +741,11 @@ const de = {
       tool_history_window: "Fenster für allgemeine Tool-Historie",
       visual_tool_history_window: "Fenster für visuelle Tool-Historie",
       context_pruning_desc:
-        "Die Komprimierung wird nur durch den Kontext-Token-Schwellenwert ausgelöst. Das Fenster für visuelle Tool-Historie steuert, wie schnell alte Seitenbild-Ergebnisse entfernt werden.",
-      context_pruning_trigger_context_tokens:
+        "Die Komprimierung wird nur durch den Anteil am Kontextfenster ausgelöst. Das Fenster für visuelle Tool-Historie steuert, wie schnell alte Seitenbild-Ergebnisse entfernt werden.",
+      context_pruning_trigger_context_percent:
         "Kontextschwelle für Komprimierung",
-      context_pruning_trigger_context_tokens_desc:
-        "Die Kontextkomprimierung beginnt erst, wenn der aktuelle Kontext diese Token-Zahl erreicht.",
+      context_pruning_trigger_context_percent_desc:
+        "Beginnt, wenn der aktuelle Kontext diesen Anteil des aktiven Modellfensters erreicht. Aktuelle Fallback-Schätzung: {tokens} Tokens.",
       context_compression_running: "Komprimieren",
       context_compression_mode: "Komprimierungsmodus",
       context_compression_mode_desc:

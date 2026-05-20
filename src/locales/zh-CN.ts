@@ -700,7 +700,7 @@ const zhCN = {
       description: "配置 AI 问答能力，包括表单制作工具以及渲染页视觉总结工具。",
       context_pruning_enabled: "启用上下文压缩",
       context_pruning_enabled_desc:
-        "根据上下文 token 阈值裁剪较旧的思考内容，并优先移除更早的页面图片结果，以降低 token 消耗。",
+        "根据模型上下文窗口占比裁剪较旧的思考内容，并优先移除更早的页面图片结果，以降低 token 消耗。",
       max_tool_rounds: "最大工具轮数",
       get_pages_text_max_chars: "get_pages_text 文本预算",
       get_pages_text_max_chars_desc:
@@ -708,10 +708,10 @@ const zhCN = {
       tool_history_window: "普通工具历史窗口",
       visual_tool_history_window: "视觉工具历史窗口",
       context_pruning_desc:
-        "压缩只由上下文 token 阈值触发；视觉工具历史窗口用于更快移除旧的页面图片结果。",
-      context_pruning_trigger_context_tokens: "压缩上下文阈值",
-      context_pruning_trigger_context_tokens_desc:
-        "只有当前上下文达到这个 token 数后，上下文压缩才会开始生效。",
+        "压缩只由上下文窗口占比触发；视觉工具历史窗口用于更快移除旧的页面图片结果。",
+      context_pruning_trigger_context_percent: "压缩上下文阈值",
+      context_pruning_trigger_context_percent_desc:
+        "当前上下文达到活动模型窗口的这个占比后才会开始压缩。当前兜底估算：{tokens} tokens。",
       context_compression_running: "压缩中",
       context_compression_mode: "压缩方式",
       context_compression_mode_desc:

@@ -16,6 +16,7 @@ import {
   getAiChatReasoningPreference,
   getAiProviderRuntimeProfile,
   mergeAiSdkModelCallOptions,
+  normalizeReasoningPreference,
 } from "@/services/ai/providers/runtimeProfiles";
 import {
   getAiSdkFallbackModelId,
@@ -126,6 +127,7 @@ export const resolveAiSdkRuntime = (options: {
   appOptions: AppOptions;
   specifier: AiSdkModelSpecifier;
   kind: AiSdkTaskModelKind;
+  reasoningMode?: "ai-chat" | "off";
 }): AiSdkResolvedRuntime => {
   const config = getConfiguredAiSdkProvider(
     options.appOptions,
@@ -149,9 +151,16 @@ export const resolveAiSdkRuntime = (options: {
     task: options.kind,
     appOptions: options.appOptions,
   };
+  const preference =
+    options.reasoningMode === "off"
+      ? normalizeReasoningPreference({
+          mode: "off",
+          displayPolicy: "hidden",
+        })
+      : getAiChatReasoningPreference(runtimeRequest);
   const reasoning = profile.resolveReasoning({
     ...runtimeRequest,
-    preference: getAiChatReasoningPreference(runtimeRequest),
+    preference,
   });
 
   return {

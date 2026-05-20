@@ -735,7 +735,7 @@ const fr = {
         "Configure les capacités du chat IA, y compris les outils de création de formulaires et l'outil de résumé visuel des pages rendues.",
       context_pruning_enabled: "Activer la compression du contexte",
       context_pruning_enabled_desc:
-        "Réduit l'ancien raisonnement une fois le seuil de tokens du contexte atteint, et retire en priorité les anciens résultats d'images de page pour diminuer la consommation de tokens.",
+        "Réduit l'ancien raisonnement lorsque le contexte atteint la part configurée de la fenêtre du modèle, et retire en priorité les anciens résultats d'images de page pour diminuer la consommation de tokens.",
       max_tool_rounds: "Nombre maximal de tours d'outils",
       get_pages_text_max_chars: "Budget texte get_pages_text",
       get_pages_text_max_chars_desc:
@@ -743,11 +743,11 @@ const fr = {
       tool_history_window: "Fenêtre d'historique des outils",
       visual_tool_history_window: "Fenêtre d'historique des outils visuels",
       context_pruning_desc:
-        "La compression n'est déclenchée que par le seuil de tokens du contexte. La fenêtre d'historique visuel contrôle à quelle vitesse les anciens résultats d'images de page sont retirés.",
-      context_pruning_trigger_context_tokens:
+        "La compression n'est déclenchée que par le pourcentage de la fenêtre de contexte. La fenêtre d'historique visuel contrôle à quelle vitesse les anciens résultats d'images de page sont retirés.",
+      context_pruning_trigger_context_percent:
         "Seuil de contexte pour l'élagage",
-      context_pruning_trigger_context_tokens_desc:
-        "L'élagage du contexte ne démarre qu'une fois ce nombre de tokens atteint dans le contexte courant.",
+      context_pruning_trigger_context_percent_desc:
+        "Démarre lorsque le contexte courant atteint cette part de la fenêtre du modèle actif. Estimation de secours actuelle : {tokens} tokens.",
       context_compression_running: "Compression",
       context_compression_mode: "Mode de compression",
       context_compression_mode_desc:

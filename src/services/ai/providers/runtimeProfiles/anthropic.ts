@@ -3,17 +3,10 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type {
   AiProviderRuntimeProfile,
-  AiReasoningCapability,
   AiReasoningEffort,
-  AiReasoningTextExposure,
 } from "@/services/ai/providers/runtimeProfiles/types";
-import {
-  createNoReasoningResolution,
-  NO_REASONING_CAPABILITY,
-} from "@/services/ai/providers/runtimeProfiles/shared";
-
-const ANTHROPIC_REASONING_MODEL_RE =
-  /(claude.*(3[.-]?7|4|sonnet|opus)|minimax.*m2|m2\.)/i;
+import { createNoReasoningResolution } from "@/services/ai/providers/runtimeProfiles/shared";
+import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/modelMetadata";
 
 const getAnthropicBudgetTokens = (
   effort: AiReasoningEffort,
@@ -25,28 +18,8 @@ const getAnthropicBudgetTokens = (
   return 4096;
 };
 
-const getAnthropicReasoningCapability = (
-  modelId: string,
-  textExposure: AiReasoningTextExposure,
-): AiReasoningCapability =>
-  ANTHROPIC_REASONING_MODEL_RE.test(modelId)
-    ? {
-        supported: true,
-        supportsModeSwitch: true,
-        supportsEffort: false,
-        supportsBudgetTokens: true,
-        textExposure,
-        requiresReasoningReplay: "all",
-      }
-    : NO_REASONING_CAPABILITY;
-
-export const createAnthropicRuntimeProfile = (
-  providerId: "anthropic" | "minimax",
-  options?: {
-    textExposure?: AiReasoningTextExposure;
-  },
-): AiProviderRuntimeProfile => ({
-  providerId,
+export const anthropicRuntimeProfile: AiProviderRuntimeProfile = {
+  providerId: "anthropic",
 
   createProvider: (config: AiSdkProviderConfig) =>
     createAnthropic({
@@ -57,15 +30,12 @@ export const createAnthropicRuntimeProfile = (
     }),
 
   getReasoningCapability: ({ modelId }) =>
-    getAnthropicReasoningCapability(
-      modelId,
-      options?.textExposure ?? "summary",
-    ),
+    getAiProviderModelReasoningMetadata("anthropic", modelId),
 
   resolveReasoning: (request) => {
-    const capability = getAnthropicReasoningCapability(
+    const capability = getAiProviderModelReasoningMetadata(
+      "anthropic",
       request.modelId,
-      options?.textExposure ?? "summary",
     );
     if (!capability.supported || request.preference.mode !== "on") {
       return createNoReasoningResolution({
@@ -100,7 +70,4 @@ export const createAnthropicRuntimeProfile = (
       replayPolicy: "all",
     };
   },
-});
-
-export const anthropicRuntimeProfile =
-  createAnthropicRuntimeProfile("anthropic");
+};

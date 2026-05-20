@@ -76,9 +76,16 @@ export function ModelSelect(props: {
   const selectedOption = visibleGroups
     .flatMap((group) => group.options)
     .find((option) => option.value === value);
+  const selectValue = selectedOption ? selectedOption.value : "";
 
   return (
-    <Select value={value} onValueChange={(v) => onValueChange(v)}>
+    <Select
+      value={selectValue}
+      onValueChange={(v) => {
+        if (!v) return;
+        onValueChange(v);
+      }}
+    >
       <SelectTrigger
         disabled={disabled}
         className={cn("max-w-full min-w-0", triggerClassName)}

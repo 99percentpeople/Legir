@@ -722,10 +722,10 @@ const en = {
         "Configure AI chat capabilities including form-building tools and the rendered-page visual summary tool.",
       context_pruning_enabled: "Enable context pruning",
       context_pruning_enabled_desc:
-        "Prune older reasoning once the context token threshold is reached, and prioritize removing older page-image results to reduce token usage.",
-      context_pruning_trigger_context_tokens: "Pruning context threshold",
-      context_pruning_trigger_context_tokens_desc:
-        "Context pruning only starts after the current context reaches this token count.",
+        "Prune older reasoning once the context reaches the configured share of the model window, and prioritize removing older page-image results to reduce token usage.",
+      context_pruning_trigger_context_percent: "Pruning context threshold",
+      context_pruning_trigger_context_percent_desc:
+        "Starts after the current context reaches this share of the active model window. Current fallback estimate: {tokens} tokens.",
       max_tool_rounds: "Max tool rounds",
       get_pages_text_max_chars: "get_pages_text text budget",
       get_pages_text_max_chars_desc:
@@ -733,7 +733,7 @@ const en = {
       tool_history_window: "General tool history window",
       visual_tool_history_window: "Visual tool history window",
       context_pruning_desc:
-        "Pruning is triggered only by the context token threshold. The visual tool history window controls how quickly old page-image results are removed.",
+        "Pruning is triggered only by the context-window percentage. The visual tool history window controls how quickly old page-image results are removed.",
       context_compression_running: "Compressing",
       context_compression_mode: "Compression mode",
       context_compression_mode_desc:

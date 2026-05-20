@@ -5,6 +5,7 @@ export * from "./definitions";
 export * from "./registry";
 export * from "./modelCatalog";
 export * from "./modelCapabilities";
+export * from "./modelMetadata";
 export * from "./modelRegistry";
 export {
   createAiSdkProviderRegistry,

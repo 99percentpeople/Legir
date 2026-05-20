@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import { z } from "zod";
 
 import { parseJsonTextWithSchema } from "@/services/ai/utils/json";
-import { resolveAiSdkLanguageModel } from "@/services/ai/providers/modelRegistry";
+import { resolveAiSdkRuntime } from "@/services/ai/providers/modelRegistry";
 import type { AiSdkModelSpecifier } from "@/services/ai/providers/types";
 import type { AppOptions } from "@/types";
 
@@ -45,10 +45,12 @@ export const translatePageBlocksStructuredWithAiSdk = async (options: {
   aiReflowParagraphs?: boolean;
   signal?: AbortSignal;
 }): Promise<AiSdkPageTranslateResponse> => {
-  const model = resolveAiSdkLanguageModel(
-    options.appOptions,
-    options.specifier,
-  );
+  const runtime = resolveAiSdkRuntime({
+    appOptions: options.appOptions,
+    specifier: options.specifier,
+    kind: "translate",
+    reasoningMode: "off",
+  });
   const extraInstructions = (options.prompt || "").trim();
   const lineBreakRule = options.aiReflowParagraphs
     ? "- You MAY reflow paragraphs within each block: treat PDF/text-layer line breaks as layout artifacts unless they are clearly intentional paragraph breaks. Prefer natural sentences and remove unnecessary mid-sentence line breaks. Do NOT add extra line breaks; only keep or add line breaks when truly necessary."
@@ -99,7 +101,8 @@ ${JSON.stringify(
 `.trim();
 
   const result = await generateText({
-    model,
+    model: runtime.model,
+    ...(runtime.callOptions ?? null),
     system:
       "Return only JSON. Do not wrap in markdown fences. Do not add commentary.",
     prompt,

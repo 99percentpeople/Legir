@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
 
 import { DEFAULT_EDITOR_UI_STATE } from "@/constants";
+import {
+  DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS,
+  mergeModelCapabilitiesWithMetadata,
+  resolveAiProviderModelMetadata,
+} from "@/services/ai/providers/modelMetadata";
+import { createOpenAiLikeModelCapabilities } from "@/services/ai/providers/modelCapabilities";
 import { anthropicRuntimeProfile } from "@/services/ai/providers/runtimeProfiles/anthropic";
 import { deepseekRuntimeProfile } from "@/services/ai/providers/runtimeProfiles/deepseek";
 import { geminiRuntimeProfile } from "@/services/ai/providers/runtimeProfiles/gemini";
@@ -52,6 +58,43 @@ const createRequest = (
   }) as AiProviderRuntimeRequest & { preference: AiReasoningPreference };
 
 describe("AI provider runtime profiles", () => {
+  test("resolves provider model metadata for context windows and known reasoning", () => {
+    expect(
+      resolveAiProviderModelMetadata("openai", "gpt-4.1").contextWindowTokens,
+    ).toBe(1_000_000);
+    expect(
+      resolveAiProviderModelMetadata("openai", "unknown-model")
+        .contextWindowTokens,
+    ).toBe(DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS);
+    expect(
+      resolveAiProviderModelMetadata("openrouter", "openai/gpt-4.1")
+        .contextWindowTokens,
+    ).toBe(1_000_000);
+    expect(
+      resolveAiProviderModelMetadata("openrouter", "openai/gpt-5.1").reasoning
+        .supported,
+    ).toBe(false);
+
+    const merged = mergeModelCapabilitiesWithMetadata(
+      "gemini",
+      "gemini-2.5-flash",
+      createOpenAiLikeModelCapabilities({ modelId: "gemini-2.5-flash" }),
+    );
+    expect(merged.contextWindowTokens).toBe(1_048_576);
+    expect(merged.supportsImageInput).toBe(true);
+    expect(merged.supportsToolCalls).toBe(true);
+
+    const prefixedGemini = mergeModelCapabilitiesWithMetadata(
+      "openrouter",
+      "google/gemini-2.5-flash",
+      createOpenAiLikeModelCapabilities({
+        modelId: "google/gemini-2.5-flash",
+      }),
+    );
+    expect(prefixedGemini.contextWindowTokens).toBe(1_048_576);
+    expect(prefixedGemini.supportsImageInput).toBe(true);
+  });
+
   test("DeepSeek enables thinking replay and validates assistant tool-call reasoning", () => {
     const resolution = deepseekRuntimeProfile.resolveReasoning(
       createRequest(deepseekRuntimeProfile, "deepseek-reasoner"),
@@ -174,6 +217,41 @@ describe("AI provider runtime profiles", () => {
     });
   });
 
+  test("explicitly disables switchable thinking for non-agent tasks", () => {
+    const offPreference = preference({
+      mode: "off",
+      displayPolicy: "hidden",
+    });
+
+    const deepseek = deepseekRuntimeProfile.resolveReasoning(
+      createRequest(deepseekRuntimeProfile, "deepseek-reasoner", offPreference),
+    );
+    expect(deepseek.effectivePreference.mode).toBe("off");
+    expect(deepseek.replayPolicy).toBe("none");
+    expect(deepseek.callOptions).toEqual({
+      providerOptions: {
+        deepseek: {
+          thinking: { type: "disabled" },
+        },
+      },
+    });
+
+    const gemini = geminiRuntimeProfile.resolveReasoning(
+      createRequest(geminiRuntimeProfile, "gemini-2.5-flash", offPreference),
+    );
+    expect(gemini.effectivePreference.mode).toBe("off");
+    expect(gemini.callOptions).toEqual({
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0,
+            includeThoughts: false,
+          },
+        },
+      },
+    });
+  });
+
   test("Anthropic summaries do not preview while MiniMax raw reasoning can preview", () => {
     const anthropic = anthropicRuntimeProfile.resolveReasoning(
       createRequest(anthropicRuntimeProfile, "claude-sonnet-4-6"),
@@ -187,6 +265,17 @@ describe("AI provider runtime profiles", () => {
       createRequest(minimaxAnthropicRuntimeProfile, "MiniMax-M2.7"),
     );
     expect(minimax.capability.textExposure).toBe("raw");
+    expect(minimax.callOptions).toMatchObject({
+      providerOptions: {
+        minimax: {
+          thinking: {
+            type: "enabled",
+          },
+          sendReasoning: true,
+        },
+      },
+    });
+    expect(minimax.callOptions?.providerOptions?.anthropic).toBeUndefined();
     expect(canPreviewCollapsedReasoningText(minimax)).toBe(true);
   });
 

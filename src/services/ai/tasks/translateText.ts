@@ -1,6 +1,6 @@
 import { generateText, streamText } from "ai";
 
-import { resolveAiSdkLanguageModel } from "@/services/ai/providers/modelRegistry";
+import { resolveAiSdkRuntime } from "@/services/ai/providers/modelRegistry";
 import type { AiSdkModelSpecifier } from "@/services/ai/providers/types";
 import type { AppOptions } from "@/types";
 
@@ -37,13 +37,16 @@ export const translateTextWithAiSdk = async (options: {
   prompt?: string;
   signal?: AbortSignal;
 }) => {
-  const model = resolveAiSdkLanguageModel(
-    options.appOptions,
-    options.specifier,
-  );
+  const runtime = resolveAiSdkRuntime({
+    appOptions: options.appOptions,
+    specifier: options.specifier,
+    kind: "translate",
+    reasoningMode: "off",
+  });
 
   const result = await generateText({
-    model,
+    model: runtime.model,
+    ...(runtime.callOptions ?? null),
     system:
       "You are a professional translator. Return only the translated text.",
     prompt: buildTranslationPrompt(options.text, options),
@@ -62,13 +65,16 @@ export async function* translateTextStreamWithAiSdk(options: {
   prompt?: string;
   signal?: AbortSignal;
 }): AsyncGenerator<string> {
-  const model = resolveAiSdkLanguageModel(
-    options.appOptions,
-    options.specifier,
-  );
+  const runtime = resolveAiSdkRuntime({
+    appOptions: options.appOptions,
+    specifier: options.specifier,
+    kind: "translate",
+    reasoningMode: "off",
+  });
 
   const result = streamText({
-    model,
+    model: runtime.model,
+    ...(runtime.callOptions ?? null),
     system:
       "You are a professional translator. Stream only the translated text.",
     prompt: buildTranslationPrompt(options.text, options),

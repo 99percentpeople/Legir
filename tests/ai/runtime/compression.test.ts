@@ -3,6 +3,8 @@ import { describe, expect, test } from "vitest";
 import { buildAiChatCompressionSegments } from "@/services/ai/chat/runtime/compression/segments";
 import { createDefaultAiChatCompressionPolicy } from "@/services/ai/chat/runtime/compression/types";
 import { algorithmicContextCompressionStrategy } from "@/services/ai/chat/runtime/compression/strategies";
+import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/services/ai/providers/modelMetadata";
+import { resolveAiChatCompressionThresholdTokens } from "@/services/ai/chat/runtime/compression/threshold";
 import { applyAiChatContextMemoryToMessages } from "@/services/ai/chat/runtime/memory/apply";
 import { getAiChatContextMemoryPlan } from "@/services/ai/chat/runtime/memory/plan";
 import {
@@ -152,6 +154,26 @@ describe("AI chat context memory application", () => {
 });
 
 describe("AI chat context memory planning", () => {
+  test("resolves compression threshold as a share of the model context window", () => {
+    expect(
+      resolveAiChatCompressionThresholdTokens({
+        aiChatOptions: { contextCompressionThresholdPercent: 80 },
+      }),
+    ).toBe(Math.trunc(DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS * 0.8));
+    expect(
+      resolveAiChatCompressionThresholdTokens({
+        aiChatOptions: { contextCompressionThresholdPercent: 50 },
+        modelCapabilities: {
+          inputModalities: ["text"],
+          outputModalities: ["text"],
+          supportsImageInput: false,
+          supportsToolCalls: true,
+          contextWindowTokens: 1_000_000,
+        },
+      }),
+    ).toBe(500_000);
+  });
+
   test("algorithmic compression chooses complete segment boundaries", () => {
     const conversation = [
       ...createToolTurnMessages(),

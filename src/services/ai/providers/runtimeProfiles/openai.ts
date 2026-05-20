@@ -3,19 +3,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type {
   AiProviderRuntimeProfile,
-  AiReasoningCapability,
   AiReasoningEffort,
 } from "@/services/ai/providers/runtimeProfiles/types";
-import {
-  createNoReasoningResolution,
-  NO_REASONING_CAPABILITY,
-} from "@/services/ai/providers/runtimeProfiles/shared";
-
-const OPENAI_REASONING_MODEL_RE =
-  /^(o\d|gpt-5|gpt-4\.5|codex|computer-use|reasoning)/i;
-
-const isOpenAiReasoningModel = (modelId: string) =>
-  OPENAI_REASONING_MODEL_RE.test(modelId.trim());
+import { createNoReasoningResolution } from "@/services/ai/providers/runtimeProfiles/shared";
+import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/modelMetadata";
 
 const toOpenAiReasoningEffort = (
   effort: AiReasoningEffort,
@@ -25,20 +16,6 @@ const toOpenAiReasoningEffort = (
   }
   return undefined;
 };
-
-const getOpenAiReasoningCapability = (
-  modelId: string,
-): AiReasoningCapability =>
-  isOpenAiReasoningModel(modelId)
-    ? {
-        supported: true,
-        supportsModeSwitch: false,
-        supportsEffort: true,
-        supportsBudgetTokens: false,
-        textExposure: "none",
-        requiresReasoningReplay: "none",
-      }
-    : NO_REASONING_CAPABILITY;
 
 export const openAiRuntimeProfile: AiProviderRuntimeProfile = {
   providerId: "openai",
@@ -52,18 +29,40 @@ export const openAiRuntimeProfile: AiProviderRuntimeProfile = {
     }),
 
   getReasoningCapability: ({ modelId }) =>
-    getOpenAiReasoningCapability(modelId),
+    getAiProviderModelReasoningMetadata("openai", modelId),
 
   resolveReasoning: (request) => {
-    const capability = getOpenAiReasoningCapability(request.modelId);
-    if (!capability.supported || request.preference.mode === "off") {
+    const capability = getAiProviderModelReasoningMetadata(
+      "openai",
+      request.modelId,
+    );
+    if (!capability.supported) {
       return createNoReasoningResolution({
         preference: request.preference,
         capability,
       });
     }
 
-    const reasoningEffort = toOpenAiReasoningEffort(request.preference.effort);
+    if (request.preference.mode === "off") {
+      return {
+        ...createNoReasoningResolution({
+          preference: request.preference,
+          capability,
+        }),
+        callOptions:
+          capability.offStrategy === "openai-reasoning-effort-none"
+            ? {
+                providerOptions: {
+                  openai: { reasoningEffort: "none" },
+                },
+              }
+            : undefined,
+      };
+    }
+
+    const reasoningEffort = capability.supportsEffort
+      ? toOpenAiReasoningEffort(request.preference.effort)
+      : undefined;
     return {
       capability,
       effectivePreference: {

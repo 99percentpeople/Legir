@@ -3,6 +3,7 @@ import {
   createCustomModelCapabilities,
   modelSupportsInputModality,
 } from "@/services/ai/providers/modelCapabilities";
+import { mergeModelCapabilitiesWithMetadata } from "@/services/ai/providers/modelMetadata";
 import {
   getAiProviderSpec,
   type AiProviderId,
@@ -29,6 +30,7 @@ const readErrorText = async (response: Response) => {
 };
 
 const normalizeModelOptions = (
+  providerId: AiProviderId,
   models: AiSdkDiscoveredModel[],
 ): LLMModelOption[] => {
   const seen = new Set<string>();
@@ -37,7 +39,11 @@ const normalizeModelOptions = (
     .map((model) => ({
       id: model.id.trim(),
       label: (model.label || model.id).trim() || model.id.trim(),
-      capabilities: model.capabilities,
+      capabilities: mergeModelCapabilitiesWithMetadata(
+        providerId,
+        model.id,
+        model.capabilities,
+      ),
     }))
     .filter((model) => !!model.id)
     .filter((model) => {
@@ -72,10 +78,8 @@ export abstract class BaseAiSdkModelCatalogProvider implements AiSdkModelCatalog
 
   getModelsForTask(options: AiSdkModelCatalogProviderTaskRequest) {
     return this.normalizeDiscoveredModels(
-      this.getCachedAndCustomModels(options).filter((model) =>
-        modelMatchesTaskKind(model.capabilities, options.kind),
-      ),
-    );
+      this.getCachedAndCustomModels(options),
+    ).filter((model) => modelMatchesTaskKind(model.capabilities, options.kind));
   }
 
   resolveCallOptions(
@@ -119,7 +123,7 @@ export abstract class BaseAiSdkModelCatalogProvider implements AiSdkModelCatalog
   }
 
   protected normalizeDiscoveredModels(models: AiSdkDiscoveredModel[]) {
-    return normalizeModelOptions(models);
+    return normalizeModelOptions(this.providerId, models);
   }
 
   protected getCachedAndCustomModels(

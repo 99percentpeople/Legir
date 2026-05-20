@@ -67,11 +67,10 @@ export type AiChatTurnCompressionSessionSnapshot = {
 
 export type AiChatTurnCompressionOptions = Pick<
   AppOptions["aiChat"],
-  | "contextCompressionEnabled"
-  | "contextCompressionThresholdTokens"
-  | "visualHistoryWindow"
-  | "contextCompressionMode"
->;
+  "contextCompressionEnabled" | "visualHistoryWindow" | "contextCompressionMode"
+> & {
+  contextCompressionThresholdTokens: number;
+};
 
 export type AiChatProjectedTokenEstimator = (
   contextMemory?: AiChatContextMemory,

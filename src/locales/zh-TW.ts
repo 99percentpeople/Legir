@@ -699,7 +699,7 @@ const zhTW = {
       description: "配置 AI 問答能力，包括表單製作工具以及渲染頁視覺總結工具。",
       context_pruning_enabled: "啟用上下文壓縮",
       context_pruning_enabled_desc:
-        "根據上下文 token 門檻裁剪較舊的思考內容，並優先移除更早的頁面圖片結果，以降低 token 消耗。",
+        "根據模型上下文視窗占比裁剪較舊的思考內容，並優先移除更早的頁面圖片結果，以降低 token 消耗。",
       max_tool_rounds: "最大工具輪數",
       get_pages_text_max_chars: "get_pages_text 文字預算",
       get_pages_text_max_chars_desc:
@@ -707,10 +707,10 @@ const zhTW = {
       tool_history_window: "一般工具歷史視窗",
       visual_tool_history_window: "視覺工具歷史視窗",
       context_pruning_desc:
-        "壓縮只由上下文 token 門檻觸發；視覺工具歷史視窗用於更快移除舊的頁面圖片結果。",
-      context_pruning_trigger_context_tokens: "壓縮上下文門檻",
-      context_pruning_trigger_context_tokens_desc:
-        "只有目前上下文達到這個 token 數後，上下文壓縮才會開始生效。",
+        "壓縮只由上下文視窗占比觸發；視覺工具歷史視窗用於更快移除舊的頁面圖片結果。",
+      context_pruning_trigger_context_percent: "壓縮上下文門檻",
+      context_pruning_trigger_context_percent_desc:
+        "目前上下文達到活動模型視窗的這個占比後才會開始壓縮。目前兜底估算：{tokens} tokens。",
       context_compression_running: "壓縮中",
       context_compression_mode: "壓縮方式",
       context_compression_mode_desc:

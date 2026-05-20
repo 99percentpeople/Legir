@@ -1,24 +1,9 @@
 import { createDeepSeekProvider as createLegirDeepSeekProvider } from "@/services/ai/providers/deepseekProvider";
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
-import type {
-  AiProviderRuntimeProfile,
-  AiReasoningCapability,
-} from "@/services/ai/providers/runtimeProfiles/types";
-import {
-  createNoReasoningResolution,
-  NO_REASONING_CAPABILITY,
-} from "@/services/ai/providers/runtimeProfiles/shared";
+import type { AiProviderRuntimeProfile } from "@/services/ai/providers/runtimeProfiles/types";
+import { createNoReasoningResolution } from "@/services/ai/providers/runtimeProfiles/shared";
 import type { ModelMessage } from "ai";
-
-const isDeepSeekReasoningModel = (modelId: string) => {
-  const normalized = modelId.toLowerCase();
-  return (
-    normalized.includes("reasoner") ||
-    normalized.includes("deepseek-r1") ||
-    normalized.includes("deepseek-v4") ||
-    normalized.includes("v4")
-  );
-};
+import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/modelMetadata";
 
 const createDeepSeekRuntimeProvider = (config: AiSdkProviderConfig) =>
   createLegirDeepSeekProvider({
@@ -27,21 +12,8 @@ const createDeepSeekRuntimeProvider = (config: AiSdkProviderConfig) =>
     fetch: config.fetch,
   });
 
-const getDeepSeekReasoningCapability = (
-  modelId: string,
-): AiReasoningCapability => {
-  const supported = isDeepSeekReasoningModel(modelId);
-  return supported
-    ? {
-        supported: true,
-        supportsModeSwitch: true,
-        supportsEffort: false,
-        supportsBudgetTokens: false,
-        textExposure: "raw",
-        requiresReasoningReplay: "tool-calls",
-      }
-    : NO_REASONING_CAPABILITY;
-};
+const getDeepSeekReasoningCapability = (modelId: string) =>
+  getAiProviderModelReasoningMetadata("deepseek", modelId);
 
 const hasToolCallPart = (message: ModelMessage) =>
   message.role === "assistant" &&

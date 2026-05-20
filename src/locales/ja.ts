@@ -722,7 +722,7 @@ const ja = {
         "フォーム作成ツールとレンダリング済みページの視覚要約ツールを含む AI チャット機能を設定します。",
       context_pruning_enabled: "コンテキスト圧縮を有効化",
       context_pruning_enabled_desc:
-        "コンテキストのトークン閾値に達したら古い推論内容を圧縮し、古いページ画像結果を優先的に外してトークン消費を抑えます。",
+        "コンテキストがモデルウィンドウの設定割合に達したら古い推論内容を圧縮し、古いページ画像結果を優先的に外してトークン消費を抑えます。",
       max_tool_rounds: "最大ツールラウンド数",
       get_pages_text_max_chars: "get_pages_text テキスト予算",
       get_pages_text_max_chars_desc:
@@ -730,10 +730,10 @@ const ja = {
       tool_history_window: "通常ツール履歴ウィンドウ",
       visual_tool_history_window: "視覚ツール履歴ウィンドウ",
       context_pruning_desc:
-        "圧縮はコンテキストのトークン閾値でのみ開始されます。視覚ツール履歴ウィンドウは、古いページ画像結果をどれだけ早く外すかを制御します。",
-      context_pruning_trigger_context_tokens: "圧縮開始コンテキスト閾値",
-      context_pruning_trigger_context_tokens_desc:
-        "現在のコンテキストがこの token 数に達した後にのみ、コンテキスト圧縮を開始します。",
+        "圧縮はコンテキストウィンドウの割合でのみ開始されます。視覚ツール履歴ウィンドウは、古いページ画像結果をどれだけ早く外すかを制御します。",
+      context_pruning_trigger_context_percent: "圧縮開始コンテキスト閾値",
+      context_pruning_trigger_context_percent_desc:
+        "現在のコンテキストがアクティブモデルウィンドウのこの割合に達した後に開始します。現在のフォールバック推定: {tokens} tokens。",
       context_compression_running: "圧縮中",
       context_compression_mode: "圧縮方式",
       context_compression_mode_desc:

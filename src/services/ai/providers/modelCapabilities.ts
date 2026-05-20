@@ -3,6 +3,7 @@ import type {
   LLMModelCapabilities,
   LLMModelModality,
 } from "@/types";
+import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/services/ai/providers/modelMetadata";
 
 const DEFAULT_OUTPUT_MODALITIES: LLMModelModality[] = ["text"];
 
@@ -58,6 +59,7 @@ export const createModelCapabilities = (options: {
   inputModalities?: readonly string[];
   outputModalities?: readonly string[];
   supportsToolCalls: boolean;
+  contextWindowTokens?: number;
 }): LLMModelCapabilities => {
   const inputModalities = normalizeModalities(options.inputModalities);
   const outputModalities = normalizeModalities(options.outputModalities);
@@ -70,6 +72,12 @@ export const createModelCapabilities = (options: {
         : DEFAULT_OUTPUT_MODALITIES,
     supportsImageInput: inputModalities.includes("image"),
     supportsToolCalls: options.supportsToolCalls,
+    contextWindowTokens: Math.max(
+      1,
+      Math.trunc(
+        options.contextWindowTokens || DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS,
+      ),
+    ),
   };
 };
 
