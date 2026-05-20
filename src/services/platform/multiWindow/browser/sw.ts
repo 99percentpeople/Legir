@@ -178,18 +178,41 @@ export const registerBrowserMultiWindowServiceWorker = (
 
   const listRegistryRecords = async () => {
     const { activeRecords, removedAny } = await pruneStaleWindowRecords();
+    const discovered = await discoverWindowRecords();
+    if (discovered.length > 0) {
+      const discoveredRecords = sortWindowRecords(discovered);
+      const discoveredWindowIds = new Set(
+        discoveredRecords.map((record) => record.windowId),
+      );
+      const staleWindowIds = activeRecords
+        .filter((record) => !discoveredWindowIds.has(record.windowId))
+        .map((record) => record.windowId);
+      const previousSignature =
+        getBrowserPlatformWindowRegistrySignature(activeRecords);
+      const nextSignature =
+        getBrowserPlatformWindowRegistrySignature(discoveredRecords);
+
+      if (staleWindowIds.length > 0) {
+        await deleteStoredBrowserPlatformWindowRecords(staleWindowIds);
+      }
+      await upsertStoredBrowserPlatformWindowRecords(discoveredRecords);
+
+      if (
+        removedAny ||
+        staleWindowIds.length > 0 ||
+        previousSignature !== nextSignature
+      ) {
+        await broadcastRegistryChanged();
+      }
+
+      return discoveredRecords;
+    }
+
     if (activeRecords.length > 0) {
       if (removedAny) {
         await broadcastRegistryChanged();
       }
       return activeRecords;
-    }
-
-    const discovered = await discoverWindowRecords();
-    if (discovered.length > 0) {
-      await upsertStoredBrowserPlatformWindowRecords(discovered);
-      await broadcastRegistryChanged();
-      return sortWindowRecords(discovered);
     }
 
     if (removedAny) {
