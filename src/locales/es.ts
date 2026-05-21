@@ -3,7 +3,6 @@ const es = {
     select: "Seleccionar...",
     expand: "Expandir",
     collapse: "Contraer",
-    loading: "Cargando...",
     processing: "Procesando...",
     actions: {
       cancel: "Cancelar",
@@ -12,7 +11,6 @@ const es = {
       save: "Guardar",
       delete: "Eliminar",
       close: "Cerrar",
-      clear: "Limpiar",
       copy: "Copiar",
       edit: "Editar",
       send: "Enviar",
@@ -23,11 +21,6 @@ const es = {
       restore_original_ratio: "Restaurar proporción original",
       download_image: "Descargar imagen",
     },
-  },
-  status: {
-    saving: "Guardando...",
-    saved: "Guardado",
-    unsaved: "Cambios sin guardar",
   },
   mode: {
     annotation: "Modo Anotación",
@@ -50,7 +43,6 @@ const es = {
     eraser: "Borrador",
     highlight: "Resaltar",
     highlight_text: "Resaltar",
-    highlight_free: "Resaltado libre",
     highlight_free_properties: "Propiedades de resaltado",
     ink: "Tinta",
     ink_properties: "Propiedades de tinta",
@@ -73,12 +65,8 @@ const es = {
     shape_polygon_tools: "Formas poligonales",
     settings: "Configuración",
     shortcuts: "Atajos de teclado (?)",
-    export: "Exportar",
     save_as: "Guardar como...",
-    save_draft: "Guardar borrador",
-    save_reopen: "Guardar y reabrir",
     save_close: "Guardar y cerrar",
-    export_close: "Exportar y cerrar",
     save_as_close: "Guardar como y cerrar",
     print: "Imprimir",
     close: "Cerrar",
@@ -93,8 +81,6 @@ const es = {
     previous_page: "Página anterior",
     next_page: "Página siguiente",
     page_layout: "Diseño de página",
-    page_layout_single: "Página única",
-    page_layout_double: "Doble página",
     page_settings: "Configuración de página",
     page_mode: "Modo de página",
     page_mode_single: "Página única",
@@ -130,8 +116,6 @@ const es = {
       desc_named:
         '¿Está seguro de que desea cerrar "{filename}"? Se perderán los cambios no guardados.',
       save_close: "Guardar y cerrar",
-      export_close: "Exportar y cerrar",
-      save_draft_close: "Guardar borrador y cerrar",
       confirm: "Cerrar sin guardar",
       cancel: "Cancelar",
     },
@@ -147,29 +131,21 @@ const es = {
       desc: "Ya hay un documento abierto. Elija qué hacer con el PDF soltado.",
       open: "Abrir",
       save_open: "Guardar y abrir",
-      save_draft_open: "Guardar borrador y abrir",
     },
   },
   properties: {
     form_detection: {
-      title: "Detección de formularios",
-      desc: "Analizar páginas para detectar y crear automáticamente campos de formulario usando el LLM configurado.",
       api_key_missing:
         "Falta la clave de API. Configure un proveedor LLM en Ajustes → LLM.",
       page_range: "Rango de páginas",
       page_range_hint: "ej., 1-5, 8, 10-12 (Predeterminado: Todo)",
-      valid_all: "Todas las páginas seleccionadas ({total} páginas)",
       err_format: "Formato inválido. Use números y rangos (ej. 1-3, 5).",
       err_bounds: "Número de página fuera de límites (1-{total}).",
-      valid_selected: "Seleccionadas {count} páginas: {pages}",
-      types: "Tipos de campos a detectar",
-      style_override: "Anular estilo predeterminado",
       prompt: "Instrucciones adicionales (Opcional)",
       prompt_ph:
         "ej., 'Solo encontrar campos en la sección superior' o 'Ignorar campos de fecha'",
       prompt_hint:
         "Proporcionar contexto o reglas específicas para el modelo IA.",
-      start: "Iniciar análisis",
     },
     page_translate: {
       position_aware: "Traducción consciente del diseño",
@@ -235,7 +211,6 @@ const es = {
     subject: "Asunto",
     keywords: {
       label: "Palabras clave",
-      desc: "Valores separados por comas",
     },
     creator: "Creador",
     producer: "Productor",
@@ -243,7 +218,6 @@ const es = {
       "Default a 'Legir' en exportación a menos que se bloquee manualmente.",
     creation_date: "Fecha de creación",
     modification_date: "Fecha de modificación",
-    mod_date_auto: "Automático (Actualiza en exportación)",
     mod_date_tooltip:
       "Default a la fecha importada. Actualiza a la hora actual en exportación a menos que se bloque manualmente.",
     annotation: {
@@ -252,7 +226,6 @@ const es = {
     field: {
       title: "Propiedades del campo",
     },
-    delete_field: "Eliminar campo",
     delete: "Eliminar",
     general: "General",
     field_name: {
@@ -287,6 +260,7 @@ const es = {
     replace_image: "Reemplazar imagen",
     upload_image: "Subir imagen",
     scale_mode: {
+      label: "Modo de escala",
       contain: "Contener",
       fill: "Rellenar",
     },
@@ -296,12 +270,9 @@ const es = {
     multiline: "Multilínea",
     checked: "Marcado",
     default_checked: "Marcado por defecto",
-    checked_default: "Marcado por defecto",
     selected: "Seleccionado",
     default_selected: "Seleccionado por defecto",
-    selected_default: "Seleccionado por defecto",
     max_length: "Longitud máxima",
-    unlimited: "Ilimitado",
     alignment: "Alineación",
     alignment_options: {
       left: "Izquierda",
@@ -309,6 +280,7 @@ const es = {
       right: "Derecha",
     },
     export_value: {
+      label: "Valor de exportación",
       desc: "Valor enviado al seleccionar.",
     },
     options: "Opciones",
@@ -344,8 +316,6 @@ const es = {
     send_backward: "Enviar hacia atrás",
     bring_to_front: "Traer al frente",
     send_to_back: "Enviar al fondo",
-    add_arrow: "Agregar flecha",
-    remove_arrow: "Quitar flecha",
     none: "Ninguno",
     start_arrow: "Flecha inicial",
     end_arrow: "Flecha final",
@@ -402,42 +372,26 @@ const es = {
     session_default: "Nuevo chat",
     session_active: "Activo",
     new_chat: "Nuevo chat",
-    delete: "Eliminar",
     tool_details: "Detalles",
     tool_args: "Argumentos",
     tool_result: "Resultado bruto",
-    responding: "Esperando respuesta",
     thinking: "Pensando",
-    thought_complete: "Pensó",
     thought_for: "Pensó durante {duration}",
     duration_seconds: "{count}s",
     duration_minutes_seconds: "{minutes}min {seconds}s",
     duration_hours_minutes: "{hours}h {minutes}min",
-    model: "Modelo",
-    clear_confirm: {
-      title: "¿Borrar este chat?",
-      desc: "Esto eliminará los mensajes actuales, el historial de herramientas y los resultados de búsqueda.",
-      confirm: "Borrar chat",
-    },
     copied: "Copiado",
     switch_branch: "Cambiar rama",
-    branch_edit: "Rama editada",
-    branch_regenerate: "Rama regenerada",
-    messages: "Mensajes",
-    tools: "Herramientas",
     error_title: "La solicitud falló",
     continue_reason_tool_limit:
       "Se alcanzó el límite de llamadas a herramientas",
     input_placeholder:
       "Pide a la IA que lea, busque, navegue o resalte contenido del PDF...",
-    input_hint: "Pulsa Enter para enviar, Shift+Enter para una nueva línea.",
     context_compression_running: "Comprimiendo",
     token_usage_context: "Contexto",
     token_usage_input: "Entrada",
     token_usage_output: "Salida",
     token_usage_total: "Total",
-    attachment_selected_text: "Texto seleccionado",
-    attachment_page_short: "P{page}",
     attachment_location: "P{page} · {start}-{end}",
     annotation_attachment_location: "{type} · P{page}",
     attachment_remove: "Quitar adjunto",
@@ -445,8 +399,6 @@ const es = {
       "Explica el texto seleccionado adjunto del PDF actual.",
     attachment_only_message:
       "Explica la anotación o referencia del documento adjunta del PDF actual.",
-    selection_prompt:
-      "Explica el siguiente texto seleccionado del PDF actual y usa el contexto del documento cuando ayude.\n\nTexto seleccionado:\n{text}",
     empty_title: "Pregunta sobre el PDF actual",
     empty_desc:
       "El asistente puede leer texto de páginas, buscar en el documento, saltar a resultados y añadir resaltados temporales.",
@@ -457,17 +409,6 @@ const es = {
     disabled: {
       no_document: "Sin documento",
       no_model: "Sin modelo",
-    },
-    status: {
-      idle: "Inactivo",
-      running: "En ejecución",
-      cancelling: "Deteniendo",
-      error: "Error",
-    },
-    examples: {
-      current_page: "Resume la página actual",
-      search_focus: "Busca la cláusula de responsabilidad y ve a ella",
-      highlight: "Resalta todas las apariciones de firma",
     },
     starters: {
       capabilities: "A partir de este documento, dime qué puedes hacer",
@@ -508,22 +449,9 @@ const es = {
     font_missing_warning:
       "Este PDF usa una fuente incrustada o de subconjunto que puede no incluir todos los glifos. Al editar este texto, se volverá a renderizar con la fuente predeterminada.",
   },
-  workspace: {
-    no_pdf: "No hay PDF cargado. Use el botón de carga para comenzar.",
-  },
-  uploader: {
-    title: "Suba su PDF",
-    desc: "Arrastre y suelte su archivo aquí, o haga clic para examinar",
-    btn: "Seleccionar archivo PDF",
-    note: "Sus archivos se procesan localmente y de forma segura.",
-  },
   shortcuts: {
     title: "Atajos de teclado",
     desc: "Atajos esenciales para una edición más rápida.",
-    header: {
-      key: "Atajo",
-      action: "Acción",
-    },
     ctrl_create: "Ctrl + Arrastrar (Crear)",
     continuous_mode: "Modo de creación continua",
     ctrl_drag: "Ctrl + Arrastrar (Seleccionar)",
@@ -545,7 +473,6 @@ const es = {
     cut: "Cortar campo seleccionado",
     delete: "Eliminar campo seleccionado",
     deselect: "Deseleccionar / Cambiar a herramienta de selección",
-    export: "Exportar PDF",
     print: "Imprimir documento",
     search_pdf: "Abrir búsqueda en PDF",
     zoom: "Acercar / Alejar",
@@ -563,7 +490,6 @@ const es = {
     fields: "Campos",
     annotations: "Anotaciones",
     outline: "Esquema",
-    document: "Documento",
     thumbnails: "Miniaturas",
     search_outline: "Buscar en esquema...",
     search_annotations: "Filtrar anotaciones...",
@@ -578,6 +504,7 @@ const es = {
     filter: "Filtrar",
     no_outline: "No se encontró esquema en este documento.",
     add_remark: "Añadir comentario...",
+    add_reply: "Añadir respuesta...",
     search_pdf_placeholder: "Buscar en este PDF...",
     search_pdf_empty: "Escribe para buscar en todo el PDF.",
     search_results_summary: "{total} coincidencias en {pages} páginas",
@@ -682,20 +609,14 @@ const es = {
     equal: "Ajuste equidistante",
     llm: {
       title: "LLM",
-      gemini: "Gemini",
-      openai: "OpenAI",
       api_key_placeholder: "Clave API",
       api_url_placeholder: "URL de API (opcional)",
       provider_enabled: "Activar este proveedor",
       provider_enable_required: "Activa primero este proveedor.",
-      check: "Comprobar",
-      check_success: "Configuración correcta.",
-      check_failed: "Fallo en la comprobación.",
       api_key_required: "Se requiere clave API.",
       fetch_models: "Obtener modelos",
       fetch_success: "Modelos obtenidos.",
       fetch_failed: "Error al obtener modelos.",
-      models: "Modelos",
       fetched_models: "Modelos obtenidos",
       fetched_models_empty: "Todavia no hay modelos obtenidos.",
       models_loaded_count: "Cargados: {count} modelo(s)",
@@ -715,7 +636,6 @@ const es = {
       tauri_proxy_enabled: "Backend forwarding",
       tauri_proxy_enabled_desc:
         "Send API requests through the app backend to bypass browser-side CORS limits.",
-      tauri_proxy_desktop_only: "Available only in the Tauri desktop app.",
       proxy_url_enabled: "Use HTTP proxy",
       proxy_url_enabled_desc:
         "Forward requests through a custom HTTP proxy endpoint.",
@@ -726,9 +646,6 @@ const es = {
       api_option: "API Compatibility",
     },
     ai_chat: {
-      title: "Herramientas de chat IA",
-      description:
-        "Configura las capacidades del chat IA, incluidas las herramientas para crear formularios y el resumen visual de páginas renderizadas.",
       context_pruning_enabled: "Habilitar compresión de contexto",
       context_pruning_enabled_desc:
         "Recorta razonamiento antiguo cuando el contexto alcanza la proporción configurada de la ventana del modelo y prioriza eliminar resultados antiguos de imágenes de página para reducir el consumo de tokens.",
@@ -736,14 +653,12 @@ const es = {
       get_pages_text_max_chars: "Presupuesto de texto get_pages_text",
       get_pages_text_max_chars_desc:
         "Máximo de caracteres de texto devueltos por cada llamada get_pages_text. Los valores mayores permiten leer más páginas a la vez, pero usan más contexto.",
-      tool_history_window: "Ventana de historial general",
       visual_tool_history_window: "Ventana de historial visual",
       context_pruning_desc:
         "La compresión solo se activa por el porcentaje de la ventana de contexto. La ventana del historial visual controla qué tan rápido se eliminan los resultados antiguos de imágenes de página.",
       context_pruning_trigger_context_percent: "Umbral de contexto para poda",
       context_pruning_trigger_context_percent_desc:
         "Empieza cuando el contexto actual alcanza esta proporción de la ventana del modelo activo. Estimación de reserva actual: {tokens} tokens.",
-      context_compression_running: "Comprimiendo",
       context_compression_mode: "Modo de compresión",
       context_compression_mode_desc:
         "La compresión algorítmica solo recorta el contexto antiguo directamente. La compresión con IA también reescribe el contexto antiguo en segundo plano como memoria compacta reutilizable.",
@@ -772,13 +687,11 @@ const es = {
         "Lo usa summarize_pages_visual. Si la herramienta está desactivada o no se ha seleccionado un modelo de visión, esta herramienta no estará disponible.",
       no_models: "No hay modelos disponibles",
     },
-    done: "Hecho",
   },
   home: {
     title: "Lector de PDF ligero con IA",
     subtitle:
       "Un lector de PDF centrado en la privacidad e impulsado por IA para leer, navegar, anotar y trabajar con formularios.",
-    resume_session: "Reanudar sesión anterior",
     feature: {
       ai: {
         title: "Impulsado por IA",
@@ -818,22 +731,11 @@ const es = {
   },
   app: {
     parsing: "Analizando PDF...",
-    analyzing: "Analizando página {current} de {total}...",
     generating: "Generando PDF...",
-    saving_draft: "Guardando borrador...",
-    loading_draft: "Cargando borrador...",
-    saving_reloading: "Guardando y recargando...",
-    saving_closing: "Guardando y cerrando...",
-    processing: "Procesando...",
-    wait: "Esto puede tardar un momento",
     load_error: "Error al cargar PDF.",
     save_success: "Guardado exitosamente",
     save_fail: "Error al guardar",
-    no_new_fields: "No se detectaron nuevos campos de formulario.",
-    auto_detect_fail: "Detección automática fallida. Error: {error}",
     export_fail: "No se pudo exportar el PDF.",
-    save_reopen_fail: "No se pudo guardar y reabrir.",
-    save_close_fail: "No se pudo guardar y cerrar.",
   },
   tabs: {
     detach_to_new_window: "Separar en una nueva ventana",

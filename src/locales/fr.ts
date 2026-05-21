@@ -3,7 +3,6 @@ const fr = {
     select: "Sélectionner...",
     expand: "Développer",
     collapse: "Réduire",
-    loading: "Chargement...",
     processing: "Traitement...",
     actions: {
       cancel: "Annuler",
@@ -12,7 +11,6 @@ const fr = {
       save: "Enregistrer",
       delete: "Supprimer",
       close: "Fermer",
-      clear: "Effacer",
       copy: "Copier",
       edit: "Modifier",
       send: "Envoyer",
@@ -23,11 +21,6 @@ const fr = {
       restore_original_ratio: "Rétablir les proportions d'origine",
       download_image: "Télécharger l'image",
     },
-  },
-  status: {
-    saving: "Enregistrement...",
-    saved: "Enregistré",
-    unsaved: "Modifications non enregistrées",
   },
   mode: {
     annotation: "Mode Annotation",
@@ -50,7 +43,6 @@ const fr = {
     eraser: "Gomme",
     highlight: "Surligner",
     highlight_text: "Surligner",
-    highlight_free: "Surlignage libre",
     highlight_free_properties: "Propriétés du surlignage",
     ink: "Encre",
     ink_properties: "Propriétés de l'encre",
@@ -73,12 +65,8 @@ const fr = {
     shape_polygon_tools: "Formes polygonales",
     settings: "Paramètres",
     shortcuts: "Raccourcis clavier (?)",
-    export: "Exporter",
     save_as: "Enregistrer sous...",
-    save_draft: "Enregistrer le brouillon",
-    save_reopen: "Enregistrer et rouvrir",
     save_close: "Enregistrer et fermer",
-    export_close: "Exporter et fermer",
     save_as_close: "Enregistrer sous et fermer",
     print: "Imprimer",
     close: "Fermer",
@@ -93,8 +81,6 @@ const fr = {
     previous_page: "Page précédente",
     next_page: "Page suivante",
     page_layout: "Mise en page",
-    page_layout_single: "Page unique",
-    page_layout_double: "Double page",
     page_settings: "Paramètres de page",
     page_mode: "Mode de page",
     page_mode_single: "Page unique",
@@ -130,8 +116,6 @@ const fr = {
       desc_named:
         'Êtes-vous sûr de vouloir fermer "{filename}" ? Toutes les modifications non enregistrées seront perdues.',
       save_close: "Enregistrer et fermer",
-      export_close: "Exporter et fermer",
-      save_draft_close: "Enregistrer le brouillon et fermer",
       confirm: "Fermer sans enregistrer",
       cancel: "Annuler",
     },
@@ -147,30 +131,22 @@ const fr = {
       desc: "Un document est déjà ouvert. Choisissez quoi faire avec le PDF déposé.",
       open: "Ouvrir",
       save_open: "Enregistrer et ouvrir",
-      save_draft_open: "Enregistrer le brouillon et ouvrir",
     },
   },
   properties: {
     form_detection: {
-      title: "Détection de formulaires",
-      desc: "Analyser les pages pour détecter et créer automatiquement des champs de formulaire avec le LLM configuré.",
       api_key_missing:
         "Clé API manquante. Configurez un fournisseur LLM dans Paramètres → LLM.",
       page_range: "Plage de pages",
       page_range_hint: "ex : 1-5, 8, 10-12 (Défaut : Tout)",
-      valid_all: "Toutes les pages sélectionnées ({total} pages)",
       err_format:
         "Format invalide. Utilisez des nombres et des plages (ex : 1-3, 5).",
       err_bounds: "Numéro de page hors limites (1-{total}).",
-      valid_selected: "{count} pages sélectionnées : {pages}",
-      types: "Types de champs à détecter",
-      style_override: "Remplacer le style par défaut",
       prompt: "Instructions supplémentaires (Facultatif)",
       prompt_ph:
         "ex : 'Trouver uniquement les champs dans la section supérieure' ou 'Ignorer les champs de date'",
       prompt_hint:
         "Fournir un contexte ou des règles spécifiques pour le modèle IA.",
-      start: "Démarrer l'analyse",
     },
     page_translate: {
       position_aware: "Traduction adaptée à la mise en page",
@@ -237,7 +213,6 @@ const fr = {
     subject: "Sujet",
     keywords: {
       label: "Mots-clés",
-      desc: "Valeurs séparées par des virgules",
     },
     creator: "Créateur",
     producer: "Producteur",
@@ -245,7 +220,6 @@ const fr = {
       "Par défaut sur 'Legir' à l'export sauf verrouillage manuel.",
     creation_date: "Date de création",
     modification_date: "Date de modification",
-    mod_date_auto: "Automatique (Mise à jour en exportation)",
     mod_date_tooltip:
       "Default a la date importée. Mise à jour à l'heure actuelle en exportation a moins que se bloque manuellement.",
     annotation: {
@@ -254,7 +228,6 @@ const fr = {
     field: {
       title: "Propriétés du champ",
     },
-    delete_field: "Supprimer le champ",
     delete: "Supprimer",
     general: "Général",
     field_name: {
@@ -289,6 +262,7 @@ const fr = {
     replace_image: "Remplacer l'image",
     upload_image: "Télécharger une image",
     scale_mode: {
+      label: "Mode de mise à l'échelle",
       contain: "Contenir",
       fill: "Remplir",
     },
@@ -298,12 +272,9 @@ const fr = {
     multiline: "Multiligne",
     checked: "Coché",
     default_checked: "Coché par défaut",
-    checked_default: "Coché par défaut",
     selected: "Sélectionné",
     default_selected: "Sélectionné par défaut",
-    selected_default: "Sélectionné par défaut",
     max_length: "Longueur max",
-    unlimited: "Illimité",
     alignment: "Alignement",
     alignment_options: {
       left: "Gauche",
@@ -311,6 +282,7 @@ const fr = {
       right: "Droite",
     },
     export_value: {
+      label: "Valeur d'export",
       desc: "Valeur envoyée lors de la sélection.",
     },
     options: "Options",
@@ -346,8 +318,6 @@ const fr = {
     send_backward: "Reculer d'un plan",
     bring_to_front: "Mettre au premier plan",
     send_to_back: "Envoyer à l'arrière-plan",
-    add_arrow: "Ajouter une flèche",
-    remove_arrow: "Retirer la flèche",
     none: "Aucun",
     start_arrow: "Flèche de départ",
     end_arrow: "Flèche d'arrivée",
@@ -404,42 +374,25 @@ const fr = {
     session_default: "Nouveau chat",
     session_active: "Actif",
     new_chat: "Nouveau chat",
-    delete: "Supprimer",
     tool_details: "Détails",
     tool_args: "Arguments",
     tool_result: "Résultat brut",
-    responding: "En attente de réponse",
     thinking: "Réflexion",
-    thought_complete: "A réfléchi",
     thought_for: "Réflexion pendant {duration}",
     duration_seconds: "{count}s",
     duration_minutes_seconds: "{minutes}min {seconds}s",
     duration_hours_minutes: "{hours}h {minutes}min",
-    model: "Modèle",
-    clear_confirm: {
-      title: "Effacer cette conversation ?",
-      desc: "Cela supprimera les messages actuels, l'historique des outils et les résultats de recherche.",
-      confirm: "Effacer la conversation",
-    },
     copied: "Copié",
     switch_branch: "Changer de branche",
-    branch_edit: "Branche modifiée",
-    branch_regenerate: "Branche régénérée",
-    messages: "Messages",
-    tools: "Outils",
     error_title: "Échec de la requête",
     continue_reason_tool_limit: "Limite d'appels d'outils atteinte",
     input_placeholder:
       "Demandez à l'IA de lire, rechercher, naviguer ou surligner le contenu du PDF...",
-    input_hint:
-      "Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne.",
     context_compression_running: "Compression",
     token_usage_context: "Contexte",
     token_usage_input: "Entrée",
     token_usage_output: "Sortie",
     token_usage_total: "Total",
-    attachment_selected_text: "Texte sélectionné",
-    attachment_page_short: "P{page}",
     attachment_location: "P{page} · {start}-{end}",
     annotation_attachment_location: "{type} · P{page}",
     attachment_remove: "Retirer la pièce jointe",
@@ -447,8 +400,6 @@ const fr = {
       "Veuillez expliquer le texte sélectionné joint depuis le PDF actuel.",
     attachment_only_message:
       "Veuillez expliquer l’annotation ou la référence de document jointe depuis le PDF actuel.",
-    selection_prompt:
-      "Explique le texte sélectionné ci-dessous en tenant compte du contexte du PDF si utile.\n\nTexte sélectionné :\n{text}",
     empty_title: "Posez une question sur le PDF actuel",
     empty_desc:
       "L'assistant peut lire le texte des pages, rechercher dans le document, naviguer vers des résultats et ajouter des surlignages temporaires.",
@@ -459,17 +410,6 @@ const fr = {
     disabled: {
       no_document: "Aucun document",
       no_model: "Aucun modèle",
-    },
-    status: {
-      idle: "Inactif",
-      running: "En cours",
-      cancelling: "Arrêt en cours",
-      error: "Erreur",
-    },
-    examples: {
-      current_page: "Résume la page actuelle",
-      search_focus: "Recherche la clause de responsabilité et va à cet endroit",
-      highlight: "Surligne toutes les occurrences de signature",
     },
     starters: {
       capabilities: "À partir de ce document, dis-moi ce que tu peux faire",
@@ -510,23 +450,9 @@ const fr = {
     font_missing_warning:
       "Ce PDF utilise une police incorporée ou en sous-ensemble qui peut manquer de glyphes. Lorsque vous modifiez ce texte, il sera rerendu avec la police par défaut.",
   },
-  workspace: {
-    no_pdf:
-      "Aucun PDF chargé. Utilisez le bouton de téléchargement pour commencer.",
-  },
-  uploader: {
-    title: "Téléchargez votre PDF",
-    desc: "Glissez et déposez votre fichier ici, ou cliquez pour parcourir",
-    btn: "Sélectionner un fichier PDF",
-    note: "Vos fichiers sont traités localement et en toute sécurité.",
-  },
   shortcuts: {
     title: "Raccourcis clavier",
     desc: "Raccourcis essentiels pour une édition plus rapide.",
-    header: {
-      key: "Raccourci",
-      action: "Action",
-    },
     ctrl_create: "Ctrl + Glisser (Créer)",
     continuous_mode: "Mode de création continue",
     ctrl_drag: "Ctrl + Glisser (Sélectionner)",
@@ -548,7 +474,6 @@ const fr = {
     cut: "Couper le champ sélectionné",
     delete: "Supprimer le champ sélectionné",
     deselect: "Désélectionner / Passer à l'outil de sélection",
-    export: "Exporter PDF",
     print: "Imprimer le document",
     search_pdf: "Ouvrir la recherche PDF",
     zoom: "Zoom Avant / Arrière",
@@ -566,7 +491,6 @@ const fr = {
     fields: "Champs",
     annotations: "Anotaciones",
     outline: "Plan",
-    document: "Document",
     thumbnails: "Miniatures",
     search_outline: "Rechercher dans le plan...",
     search_annotations: "Filtrer les anotaciones...",
@@ -581,6 +505,7 @@ const fr = {
     filter: "Filtrer",
     no_outline: "Aucun plan trouvé dans ce document.",
     add_remark: "Ajouter un commentaire...",
+    add_reply: "Ajouter une réponse...",
     search_pdf_placeholder: "Rechercher dans ce PDF...",
     search_pdf_empty: "Saisissez du texte pour rechercher dans tout le PDF.",
     search_results_summary: "{total} correspondances sur {pages} pages",
@@ -686,20 +611,14 @@ const fr = {
     equal: "Ancrage équidistant",
     llm: {
       title: "LLM",
-      gemini: "Gemini",
-      openai: "OpenAI",
       api_key_placeholder: "Clé API",
       api_url_placeholder: "URL de l'API (optionnel)",
       provider_enabled: "Activer ce fournisseur",
       provider_enable_required: "Activez d'abord ce fournisseur.",
-      check: "Vérifier",
-      check_success: "Configuration OK.",
-      check_failed: "Échec de la vérification.",
       api_key_required: "La clé API est requise.",
       fetch_models: "Récupérer les modèles",
       fetch_success: "Modèles récupérés.",
       fetch_failed: "Échec de la récupération.",
-      models: "Modèles",
       fetched_models: "Modèles récupérés",
       fetched_models_empty: "Aucun modèle récupéré pour le moment.",
       models_loaded_count: "Chargés : {count} modèle(s)",
@@ -719,7 +638,6 @@ const fr = {
       tauri_proxy_enabled: "Backend forwarding",
       tauri_proxy_enabled_desc:
         "Send API requests through the app backend to bypass browser-side CORS limits.",
-      tauri_proxy_desktop_only: "Available only in the Tauri desktop app.",
       proxy_url_enabled: "Use HTTP proxy",
       proxy_url_enabled_desc:
         "Forward requests through a custom HTTP proxy endpoint.",
@@ -730,9 +648,6 @@ const fr = {
       api_option: "API Compatibility",
     },
     ai_chat: {
-      title: "Outils de chat IA",
-      description:
-        "Configure les capacités du chat IA, y compris les outils de création de formulaires et l'outil de résumé visuel des pages rendues.",
       context_pruning_enabled: "Activer la compression du contexte",
       context_pruning_enabled_desc:
         "Réduit l'ancien raisonnement lorsque le contexte atteint la part configurée de la fenêtre du modèle, et retire en priorité les anciens résultats d'images de page pour diminuer la consommation de tokens.",
@@ -740,7 +655,6 @@ const fr = {
       get_pages_text_max_chars: "Budget texte get_pages_text",
       get_pages_text_max_chars_desc:
         "Nombre maximal de caractères retournés par chaque appel get_pages_text. Une valeur plus élevée permet à l'IA de lire plus de pages à la fois, mais consomme plus de contexte.",
-      tool_history_window: "Fenêtre d'historique des outils",
       visual_tool_history_window: "Fenêtre d'historique des outils visuels",
       context_pruning_desc:
         "La compression n'est déclenchée que par le pourcentage de la fenêtre de contexte. La fenêtre d'historique visuel contrôle à quelle vitesse les anciens résultats d'images de page sont retirés.",
@@ -748,7 +662,6 @@ const fr = {
         "Seuil de contexte pour l'élagage",
       context_pruning_trigger_context_percent_desc:
         "Démarre lorsque le contexte courant atteint cette part de la fenêtre du modèle actif. Estimation de secours actuelle : {tokens} tokens.",
-      context_compression_running: "Compression",
       context_compression_mode: "Mode de compression",
       context_compression_mode_desc:
         "La compression algorithmique retire directement l'ancien contexte. La compression IA réécrit aussi l'ancien contexte en arrière-plan dans une mémoire compacte réutilisable.",
@@ -777,13 +690,11 @@ const fr = {
         "Utilisé par summarize_pages_visual. Si l'outil est désactivé ou si aucun modèle vision n'est sélectionné, cet outil devient indisponible.",
       no_models: "Aucun modèle disponible",
     },
-    done: "Terminé",
   },
   home: {
     title: "Lecteur PDF léger alimenté par l'IA",
     subtitle:
       "Un lecteur PDF axé sur la confidentialité et alimenté par l'IA pour lire, naviguer, annoter et traiter des formulaires.",
-    resume_session: "Reprendre la session précédente",
     feature: {
       ai: {
         title: "Alimenté par l'IA",
@@ -824,22 +735,11 @@ const fr = {
   },
   app: {
     parsing: "Analyse du PDF...",
-    analyzing: "Analyse de la page {current} sur {total}...",
     generating: "Génération du PDF...",
-    saving_draft: "Enregistrement du brouillon...",
-    loading_draft: "Chargement du brouillon...",
-    saving_reloading: "Enregistrement et rechargement...",
-    saving_closing: "Enregistrement et fermeture...",
-    processing: "Traitement...",
-    wait: "Cela peut prendre un moment",
     load_error: "Échec du chargement du PDF.",
     save_success: "Enregistré avec succès",
     save_fail: "Échec de l'enregistrement",
-    no_new_fields: "Aucun nouveau champ de formulaire n'a été détecté.",
-    auto_detect_fail: "La détection automatique a échoué. Erreur : {error}",
     export_fail: "Échec de l'exportation du PDF.",
-    save_reopen_fail: "Échec de l'enregistrement et de la réouverture.",
-    save_close_fail: "Échec de l'enregistrement et de la fermeture.",
   },
   tabs: {
     detach_to_new_window: "Détacher dans une nouvelle fenêtre",

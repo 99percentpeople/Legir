@@ -3,7 +3,6 @@ const de = {
     select: "Auswählen...",
     expand: "Erweitern",
     collapse: "Einklappen",
-    loading: "Laden...",
     processing: "Verarbeitung...",
     actions: {
       cancel: "Abbrechen",
@@ -12,7 +11,6 @@ const de = {
       save: "Speichern",
       delete: "Löschen",
       close: "Schließen",
-      clear: "Löschen",
       copy: "Kopieren",
       edit: "Bearbeiten",
       send: "Senden",
@@ -23,11 +21,6 @@ const de = {
       restore_original_ratio: "Originalproportion wiederherstellen",
       download_image: "Bild herunterladen",
     },
-  },
-  status: {
-    saving: "Speichern...",
-    saved: "Gespeichert",
-    unsaved: "Ungespeicherte Änderungen",
   },
   mode: {
     annotation: "Anmerkungsmodus",
@@ -50,7 +43,6 @@ const de = {
     eraser: "Radiergummi",
     highlight: "Hervorheben",
     highlight_text: "Hervorheben",
-    highlight_free: "Freies Hervorheben",
     highlight_free_properties: "Hervorhebungseigenschaften",
     ink: "Tinte",
     ink_properties: "Tinteneigenschaften",
@@ -73,12 +65,8 @@ const de = {
     shape_polygon_tools: "Polygonformen",
     settings: "Einstellungen",
     shortcuts: "Tastenkürzel (?)",
-    export: "Exportieren",
     save_as: "Speichern unter...",
-    save_draft: "Entwurf speichern",
-    save_reopen: "Speichern und erneut öffnen",
     save_close: "Speichern und schließen",
-    export_close: "Exportieren und schließen",
     save_as_close: "Speichern unter und schließen",
     print: "Drucken",
     close: "Schließen",
@@ -93,8 +81,6 @@ const de = {
     previous_page: "Vorherige Seite",
     next_page: "Nächste Seite",
     page_layout: "Seitenlayout",
-    page_layout_single: "Einzelseite",
-    page_layout_double: "Doppelseite",
     page_settings: "Seiteneinstellungen",
     page_mode: "Seitenmodus",
     page_mode_single: "Einzelseite",
@@ -130,8 +116,6 @@ const de = {
       desc_named:
         'Sind Sie sicher, dass Sie "{filename}" schließen möchten? Alle ungespeicherten Änderungen gehen verloren.',
       save_close: "Speichern und schließen",
-      export_close: "Exportieren und schließen",
-      save_draft_close: "Entwurf speichern und schließen",
       confirm: "Schließen ohne Speichern",
       cancel: "Abbrechen",
     },
@@ -147,30 +131,22 @@ const de = {
       desc: "Ein Dokument ist bereits geöffnet. Wählen Sie aus, was mit der abgelegten PDF geschehen soll.",
       open: "Öffnen",
       save_open: "Speichern und öffnen",
-      save_draft_open: "Entwurf speichern und öffnen",
     },
   },
   properties: {
     form_detection: {
-      title: "Formularerkennung",
-      desc: "Seiten analysieren, um Formularfelder mit dem konfigurierten LLM automatisch zu erkennen und zu erstellen.",
       api_key_missing:
         "Fehlender API-Schlüssel. Konfigurieren Sie einen LLM-Anbieter unter Einstellungen → LLM.",
       page_range: "Seitenbereich",
       page_range_hint: "z.B. 1-5, 8, 10-12 (Standard: Alle)",
-      valid_all: "Alle Seiten ausgewählt ({total} Seiten)",
       err_format:
         "Ungültiges Format. Verwenden Sie Zahlen und Bereiche (z.B. 1-3, 5).",
       err_bounds: "Seitennummer außerhalb des Bereichs (1-{total}).",
-      valid_selected: "{count} Seiten ausgewählt: {pages}",
-      types: "Zu erkennende Feldtypen",
-      style_override: "Standardstil überschreiben",
       prompt: "Zusätzliche Anweisungen (Optional)",
       prompt_ph:
         "z.B. 'Nur Felder im oberen Bereich finden' oder 'Datumsfelder ignorieren'",
       prompt_hint:
         "Kontext oder spezifische Regeln für das KI-Modell bereitstellen.",
-      start: "Analyse starten",
     },
     page_translate: {
       position_aware: "Layoutbewusste Übersetzung",
@@ -236,7 +212,6 @@ const de = {
     subject: "Betreff",
     keywords: {
       label: "Schlüsselwörter",
-      desc: "Kommagetrennte Werte",
     },
     creator: "Ersteller",
     producer: "Produzent",
@@ -244,7 +219,6 @@ const de = {
       "Standardmäßig 'Legir' beim Export, sofern nicht manuell gesperrt.",
     creation_date: "Erstellungsdatum",
     modification_date: "Modifikationsdatum",
-    mod_date_auto: "Automatisch (aktualisiert bei Export)",
     mod_date_tooltip:
       "Standardmäßig auf das importierte Datum. Wird auf die aktuelle Uhrzeit aktualisiert, es wird manuell gesperrt.",
     annotation: {
@@ -253,7 +227,6 @@ const de = {
     field: {
       title: "Feldeigenschaften",
     },
-    delete_field: "Feld löschen",
     delete: "Löschen",
     general: "Allgemein",
     field_name: {
@@ -288,6 +261,7 @@ const de = {
     replace_image: "Bild ersetzen",
     upload_image: "Bild hochladen",
     scale_mode: {
+      label: "Skalierungsmodus",
       contain: "Einpassen",
       fill: "Füllen",
     },
@@ -297,12 +271,9 @@ const de = {
     multiline: "Mehrzeilig",
     checked: "Ausgewählt",
     default_checked: "Standardmäßig ausgewählt",
-    checked_default: "Standardmäßig ausgewählt",
     selected: "Ausgewählt",
     default_selected: "Standardmäßig ausgewählt",
-    selected_default: "Standardmäßig ausgewählt",
     max_length: "Max. Länge",
-    unlimited: "Unbegrenzt",
     alignment: "Ausrichtung",
     alignment_options: {
       left: "Links",
@@ -310,6 +281,7 @@ const de = {
       right: "Rechts",
     },
     export_value: {
+      label: "Exportwert",
       desc: "Wert, der bei Auswahl gesendet wird.",
     },
     options: "Optionen",
@@ -345,8 +317,6 @@ const de = {
     send_backward: "Eine Ebene nach hinten",
     bring_to_front: "In den Vordergrund",
     send_to_back: "In den Hintergrund",
-    add_arrow: "Pfeil hinzufügen",
-    remove_arrow: "Pfeil entfernen",
     none: "Keine",
     start_arrow: "Startpfeil",
     end_arrow: "Endpfeil",
@@ -403,41 +373,25 @@ const de = {
     session_default: "Neuer Chat",
     session_active: "Aktiv",
     new_chat: "Neuer Chat",
-    delete: "Löschen",
     tool_details: "Details",
     tool_args: "Argumente",
     tool_result: "Rohes Ergebnis",
-    responding: "Warte auf Antwort",
     thinking: "Denken",
-    thought_complete: "Nachgedacht",
     thought_for: "Nachgedacht für {duration}",
     duration_seconds: "{count}s",
     duration_minutes_seconds: "{minutes}m {seconds}s",
     duration_hours_minutes: "{hours}h {minutes}m",
-    model: "Modell",
-    clear_confirm: {
-      title: "Diesen Chat löschen?",
-      desc: "Dadurch werden die aktuellen Chat-Nachrichten, die Tool-Historie und die Suchergebnisse entfernt.",
-      confirm: "Chat löschen",
-    },
     copied: "Kopiert",
     switch_branch: "Branch wechseln",
-    branch_edit: "Bearbeitungs-Branch",
-    branch_regenerate: "Neu generierter Branch",
-    messages: "Nachrichten",
-    tools: "Werkzeuge",
     error_title: "Anfrage fehlgeschlagen",
     continue_reason_tool_limit: "Tool-Aufruflimit erreicht",
     input_placeholder:
       "Bitten Sie die KI, PDF-Inhalte zu lesen, zu suchen, zu springen oder hervorzuheben...",
-    input_hint: "Enter zum Senden, Shift+Enter für eine neue Zeile.",
     context_compression_running: "Komprimieren",
     token_usage_context: "Kontext",
     token_usage_input: "Eingabe",
     token_usage_output: "Ausgabe",
     token_usage_total: "Gesamt",
-    attachment_selected_text: "Ausgewählter Text",
-    attachment_page_short: "S.{page}",
     attachment_location: "S.{page} · {start}-{end}",
     annotation_attachment_location: "{type} · S.{page}",
     attachment_remove: "Anhang entfernen",
@@ -445,8 +399,6 @@ const de = {
       "Bitte erkläre den angehängten ausgewählten Text aus dem aktuellen PDF.",
     attachment_only_message:
       "Bitte erkläre die angehängte Anmerkung oder Dokumentreferenz aus dem aktuellen PDF.",
-    selection_prompt:
-      "Bitte erkläre den folgenden ausgewählten Text aus dem aktuellen PDF und nutze bei Bedarf den Dokumentkontext.\n\nAusgewählter Text:\n{text}",
     empty_title: "Fragen Sie nach dem aktuellen PDF",
     empty_desc:
       "Der Assistent kann Seitentext lesen, das Dokument durchsuchen, zu Ergebnissen springen und temporäre Hervorhebungen setzen.",
@@ -457,17 +409,6 @@ const de = {
     disabled: {
       no_document: "Kein Dokument",
       no_model: "Kein Modell",
-    },
-    status: {
-      idle: "Bereit",
-      running: "Läuft",
-      cancelling: "Wird gestoppt",
-      error: "Fehler",
-    },
-    examples: {
-      current_page: "Aktuelle Seite zusammenfassen",
-      search_focus: "Nach der Haftungsklausel suchen und dorthin springen",
-      highlight: "Alle Vorkommen von Unterschrift hervorheben",
     },
     starters: {
       capabilities: "Sag mir anhand dieses Dokuments, was du tun kannst",
@@ -509,23 +450,9 @@ const de = {
     font_missing_warning:
       "Dieses PDF verwendet eine eingebettete bzw. Subset-Schrift, bei der Zeichen fehlen können. Wenn Sie diesen Text bearbeiten, wird er mit der Standardschrift neu gerendert.",
   },
-  workspace: {
-    no_pdf:
-      "Kein PDF geladen. Verwenden Sie die Upload-Schaltfläche, um zu beginnen.",
-  },
-  uploader: {
-    title: "Laden Sie Ihr PDF hoch",
-    desc: "Ziehen Sie Ihre Datei hierher oder klicken Sie zum Durchsuchen",
-    btn: "PDF-Datei auswählen",
-    note: "Ihre Dateien werden lokal und sicher verarbeitet.",
-  },
   shortcuts: {
     title: "Tastenkürzel",
     desc: "Wichtige Tastenkürzel für schnelleres Bearbeiten.",
-    header: {
-      key: "Kürzel",
-      action: "Aktion",
-    },
     ctrl_create: "Strg + Ziehen (Erstellen)",
     continuous_mode: "Kontinuierlicher Erstellungsmodus",
     ctrl_drag: "Strg + Ziehen (Auswählen)",
@@ -547,7 +474,6 @@ const de = {
     cut: "Ausgewähltes Feld ausschneiden",
     delete: "Ausgewähltes Feld löschen",
     deselect: "Abwählen / Zum Auswahlwerkzeug wechseln",
-    export: "PDF exportieren",
     print: "Dokument drucken",
     search_pdf: "PDF-Suche öffnen",
     zoom: "Vergrößern / Verkleinern",
@@ -565,7 +491,6 @@ const de = {
     fields: "Felder",
     annotations: "Annotationen",
     outline: "Gliederung",
-    document: "Dokument",
     thumbnails: "Vorschaubilder",
     search_outline: "Gliederung durchsuchen...",
     search_annotations: "Annotationen filtern...",
@@ -580,6 +505,7 @@ const de = {
     filter: "Filtern",
     no_outline: "Keine Gliederung in diesem Dokument gefunden.",
     add_remark: "Hinweis hinzufügen...",
+    add_reply: "Antwort hinzufügen...",
     search_pdf_placeholder: "Dieses PDF durchsuchen...",
     search_pdf_empty: "Tippen, um das gesamte PDF zu durchsuchen.",
     search_results_summary: "{total} Treffer auf {pages} Seiten",
@@ -684,20 +610,14 @@ const de = {
     equal: "Äquidistantes Einrasten",
     llm: {
       title: "LLM",
-      gemini: "Gemini",
-      openai: "OpenAI",
       api_key_placeholder: "API-Schlüssel",
       api_url_placeholder: "API-URL (optional)",
       provider_enabled: "Diesen Anbieter aktivieren",
       provider_enable_required: "Aktivieren Sie zuerst diesen Anbieter.",
-      check: "Prüfen",
-      check_success: "Konfiguration OK.",
-      check_failed: "Prüfung fehlgeschlagen.",
       api_key_required: "API-Schlüssel ist erforderlich.",
       fetch_models: "Modelle abrufen",
       fetch_success: "Modelle abgerufen.",
       fetch_failed: "Abrufen fehlgeschlagen.",
-      models: "Modelle",
       fetched_models: "Abgerufene Modelle",
       fetched_models_empty: "Noch keine Modelle abgerufen.",
       models_loaded_count: "Geladen: {count} Modell(e)",
@@ -717,7 +637,6 @@ const de = {
       tauri_proxy_enabled: "Backend forwarding",
       tauri_proxy_enabled_desc:
         "Send API requests through the app backend to bypass browser-side CORS limits.",
-      tauri_proxy_desktop_only: "Available only in the Tauri desktop app.",
       proxy_url_enabled: "Use HTTP proxy",
       proxy_url_enabled_desc:
         "Forward requests through a custom HTTP proxy endpoint.",
@@ -728,9 +647,6 @@ const de = {
       api_option: "API Compatibility",
     },
     ai_chat: {
-      title: "AI-Chat-Werkzeuge",
-      description:
-        "Konfigurieren Sie KI-Chat-Funktionen einschließlich Formularwerkzeugen und dem visuellen Zusammenfassungswerkzeug für gerenderte Seiten.",
       context_pruning_enabled: "Kontextkomprimierung aktivieren",
       context_pruning_enabled_desc:
         "Beschneidet ältere Reasoning-Inhalte, sobald der Kontext den konfigurierten Anteil des Modellfensters erreicht, und entfernt bevorzugt ältere Seitenbild-Ergebnisse, um Tokens zu sparen.",
@@ -738,7 +654,6 @@ const de = {
       get_pages_text_max_chars: "get_pages_text Textbudget",
       get_pages_text_max_chars_desc:
         "Maximale Textzeichen pro get_pages_text-Aufruf. Größere Werte lassen die KI mehr Seiten auf einmal lesen, verbrauchen aber mehr Kontext.",
-      tool_history_window: "Fenster für allgemeine Tool-Historie",
       visual_tool_history_window: "Fenster für visuelle Tool-Historie",
       context_pruning_desc:
         "Die Komprimierung wird nur durch den Anteil am Kontextfenster ausgelöst. Das Fenster für visuelle Tool-Historie steuert, wie schnell alte Seitenbild-Ergebnisse entfernt werden.",
@@ -746,7 +661,6 @@ const de = {
         "Kontextschwelle für Komprimierung",
       context_pruning_trigger_context_percent_desc:
         "Beginnt, wenn der aktuelle Kontext diesen Anteil des aktiven Modellfensters erreicht. Aktuelle Fallback-Schätzung: {tokens} Tokens.",
-      context_compression_running: "Komprimieren",
       context_compression_mode: "Komprimierungsmodus",
       context_compression_mode_desc:
         "Algorithmische Komprimierung beschneidet alten Kontext nur direkt. KI-Komprimierung schreibt älteren Kontext zusätzlich im Hintergrund in wiederverwendbaren Kompaktspeicher um.",
@@ -775,13 +689,11 @@ const de = {
         "Wird von summarize_pages_visual verwendet. Wenn das Werkzeug deaktiviert ist oder kein Vision-Modell ausgewählt wurde, ist dieses Werkzeug nicht verfügbar.",
       no_models: "Keine verfügbaren Modelle",
     },
-    done: "Fertig",
   },
   home: {
     title: "Leichter KI-PDF-Reader",
     subtitle:
       "Ein datenschutzorientierter, KI-gestützter PDF-Reader zum Lesen, Navigieren, Annotieren und Arbeiten mit Formularen.",
-    resume_session: "Vorherige Sitzung fortsetzen",
     feature: {
       ai: {
         title: "KI-gestützt",
@@ -821,22 +733,11 @@ const de = {
   },
   app: {
     parsing: "PDF wird analysiert...",
-    analyzing: "Analysiere Seite {current} von {total}...",
     generating: "PDF wird generiert...",
-    saving_draft: "Entwurf wird gespeichert...",
-    loading_draft: "Entwurf wird geladen...",
-    saving_reloading: "Speichern und neu laden...",
-    saving_closing: "Speichern und schließen...",
-    processing: "Verarbeitung...",
-    wait: "Dies kann einen Moment dauern",
     load_error: "Laden des PDF fehlgeschlagen.",
     save_success: "Erfolgreich gespeichert",
     save_fail: "Speichern fehlgeschlagen",
-    no_new_fields: "Keine neuen Formularfelder erkannt.",
-    auto_detect_fail: "Automatische Erkennung fehlgeschlagen. Fehler: {error}",
     export_fail: "Exportieren des PDF fehlgeschlagen.",
-    save_reopen_fail: "Speichern und erneutes Öffnen fehlgeschlagen.",
-    save_close_fail: "Speichern und Schließen fehlgeschlagen.",
   },
   tabs: {
     detach_to_new_window: "In neues Fenster auslagern",

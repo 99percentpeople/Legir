@@ -3,7 +3,6 @@ const en = {
     select: "Select...",
     expand: "Expand",
     collapse: "Collapse",
-    loading: "Loading...",
     processing: "Processing...",
     actions: {
       cancel: "Cancel",
@@ -12,7 +11,6 @@ const en = {
       save: "Save",
       delete: "Delete",
       close: "Close",
-      clear: "Clear",
       copy: "Copy",
       edit: "Edit",
       send: "Send",
@@ -23,11 +21,6 @@ const en = {
       restore_original_ratio: "Restore Original Ratio",
       download_image: "Download Image",
     },
-  },
-  status: {
-    saving: "Saving...",
-    saved: "Saved",
-    unsaved: "Unsaved changes",
   },
   mode: {
     annotation: "Annotation Mode",
@@ -48,7 +41,6 @@ const en = {
     eraser: "Eraser",
     highlight: "Highlight",
     highlight_text: "Highlight",
-    highlight_free: "Free Highlight",
     highlight_free_properties: "Highlight Properties",
     ink: "Ink",
     ink_properties: "Ink Properties",
@@ -73,12 +65,8 @@ const en = {
     shape_polygon_tools: "Polygon Shapes",
     settings: "Settings",
     shortcuts: "Keyboard Shortcuts (?)",
-    export: "Export",
     save_as: "Save As...",
-    save_draft: "Save Draft",
-    save_reopen: "Save and Reopen",
     save_close: "Save and Close",
-    export_close: "Export and Close",
     save_as_close: "Save As and Close",
     print: "Print",
     close: "Close",
@@ -93,8 +81,6 @@ const en = {
     previous_page: "Previous Page",
     next_page: "Next Page",
     page_layout: "Page Layout",
-    page_layout_single: "Single Page",
-    page_layout_double: "Double Page",
     page_settings: "Page Settings",
     page_mode: "Page Mode",
     page_mode_single: "Single Page",
@@ -130,8 +116,6 @@ const en = {
       desc_named:
         'Are you sure you want to close "{filename}"? Any unsaved changes will be lost.',
       save_close: "Save and Close",
-      export_close: "Export and close",
-      save_draft_close: "Save draft and close",
       confirm: "Close without saving",
       cancel: "Cancel",
     },
@@ -147,28 +131,20 @@ const en = {
       desc: "A document is already open. Choose what to do with the dropped PDF.",
       open: "Open",
       save_open: "Save and open",
-      save_draft_open: "Save draft and open",
     },
   },
   properties: {
     form_detection: {
-      title: "Form Detection",
-      desc: "Analyze pages to automatically detect and create form fields using your configured LLM.",
       api_key_missing:
         "Missing API key. Configure an LLM provider in Settings → LLM.",
       page_range: "Page Range",
       page_range_hint: "e.g., 1-5, 8, 10-12 (Default: All)",
-      valid_all: "All pages selected ({total} pages)",
       err_format: "Invalid format. Use numbers and ranges (e.g. 1-3, 5).",
       err_bounds: "Page number out of bounds (1-{total}).",
-      valid_selected: "Selected {count} pages: {pages}",
-      types: "Field Types to Detect",
-      style_override: "Override Default Style",
       prompt: "Additional Instructions (Optional)",
       prompt_ph:
         "e.g., 'Only find fields in the top section' or 'Ignore date fields'",
       prompt_hint: "Provide context or specific rules for the AI model.",
-      start: "Start Analysis",
     },
     page_translate: {
       position_aware: "Layout-aware translation",
@@ -233,14 +209,12 @@ const en = {
     subject: "Subject",
     keywords: {
       label: "Keywords",
-      desc: "Comma separated values",
     },
     creator: "Creator",
     producer: "Producer",
     producer_tooltip: "Defaults to 'Legir' on export unless manually locked.",
     creation_date: "Creation Date",
     modification_date: "Modification Date",
-    mod_date_auto: "Automatic (Updates on Export)",
     mod_date_tooltip:
       "Defaults to the imported date. Updates to current time on export unless manually locked.",
     annotation: {
@@ -249,7 +223,6 @@ const en = {
     field: {
       title: "Field Properties",
     },
-    delete_field: "Delete Field",
     delete: "Delete",
     general: "General",
     field_name: {
@@ -284,6 +257,7 @@ const en = {
     replace_image: "Replace Image",
     upload_image: "Upload Image",
     scale_mode: {
+      label: "Scale Mode",
       contain: "Contain",
       fill: "Fill",
     },
@@ -293,12 +267,9 @@ const en = {
     multiline: "Multi-line",
     checked: "Checked",
     default_checked: "Checked by Default",
-    checked_default: "Checked by Default",
     selected: "Selected",
     default_selected: "Selected by Default",
-    selected_default: "Selected by Default",
     max_length: "Max Length",
-    unlimited: "Unlim.",
     alignment: "Alignment",
     alignment_options: {
       left: "Left",
@@ -306,6 +277,7 @@ const en = {
       right: "Right",
     },
     export_value: {
+      label: "Export Value",
       desc: "Value sent when selected.",
     },
     options: "Options",
@@ -341,8 +313,6 @@ const en = {
     send_backward: "Send Backward",
     bring_to_front: "Bring to Front",
     send_to_back: "Send to Back",
-    add_arrow: "Add Arrow",
-    remove_arrow: "Remove Arrow",
     none: "None",
     start_arrow: "Start Arrow",
     end_arrow: "End Arrow",
@@ -402,37 +372,22 @@ const en = {
     tool_details: "Details",
     tool_args: "Arguments",
     tool_result: "Raw result",
-    responding: "Waiting for response",
     thinking: "Thinking",
-    thought_complete: "Thought",
     thought_for: "Thought for {duration}",
     duration_seconds: "{count}s",
     duration_minutes_seconds: "{minutes}m {seconds}s",
     duration_hours_minutes: "{hours}h {minutes}m",
-    model: "Model",
-    clear_confirm: {
-      title: "Clear this chat?",
-      desc: "This will remove the current chat messages, tool history, and search results.",
-      confirm: "Clear chat",
-    },
     copied: "Copied",
     switch_branch: "Switch branch",
-    branch_edit: "Edit branch",
-    branch_regenerate: "Regenerate branch",
-    messages: "Messages",
-    tools: "Tool Actions",
     error_title: "Request Failed",
     continue_reason_tool_limit: "Reached tool call limit",
     input_placeholder:
       "Ask the AI to read, search, jump, or highlight PDF content...",
-    input_hint: "Press Enter to send, Shift+Enter for a new line.",
     context_compression_running: "Compressing",
     token_usage_context: "Context",
     token_usage_input: "In",
     token_usage_output: "Out",
     token_usage_total: "Total",
-    attachment_selected_text: "Selected text",
-    attachment_page_short: "P{page}",
     attachment_location: "P{page} · {start}-{end}",
     annotation_attachment_location: "{type} · P{page}",
     attachment_remove: "Remove attachment",
@@ -440,8 +395,6 @@ const en = {
       "Please explain the attached selected text from the current PDF.",
     attachment_only_message:
       "Please explain the attached annotation or document reference from the current PDF.",
-    selection_prompt:
-      "Please explain the following selected text from the current PDF. Use the surrounding document context when it helps.\n\nSelected text:\n{text}",
     empty_title: "Ask About The Current PDF",
     empty_desc:
       "The assistant can read page text, search the document, jump to results, and add temporary highlights.",
@@ -452,17 +405,6 @@ const en = {
     disabled: {
       no_document: "No document",
       no_model: "No model",
-    },
-    status: {
-      idle: "Idle",
-      running: "Running",
-      cancelling: "Stopping",
-      error: "Error",
-    },
-    examples: {
-      current_page: "Summarize the current page",
-      search_focus: "Search for the liability clause and jump to it",
-      highlight: "Highlight all occurrences of signature",
     },
     starters: {
       capabilities: "Using this document, tell me what you can do",
@@ -502,22 +444,9 @@ const en = {
     font_missing_warning:
       "This PDF uses a subset/embedded font that may be missing glyphs. When you edit this text, it will be re-rendered using the default font.",
   },
-  workspace: {
-    no_pdf: "No PDF loaded. Use the upload button to start.",
-  },
-  uploader: {
-    title: "Upload your PDF",
-    desc: "Drag and drop your file here, or click to browse",
-    btn: "Select PDF File",
-    note: "Your files are processed locally and securely.",
-  },
   shortcuts: {
     title: "Keyboard Shortcuts",
     desc: "Essential shortcuts for faster editing.",
-    header: {
-      key: "Shortcut",
-      action: "Action",
-    },
     ctrl_create: "Ctrl + Drag (Create)",
     continuous_mode: "Continuous Creation Mode",
     ctrl_drag: "Ctrl + Drag (Select)",
@@ -539,7 +468,6 @@ const en = {
     cut: "Cut selected field",
     delete: "Delete selected field",
     deselect: "Deselect / Switch to Select Tool",
-    export: "Export PDF",
     print: "Print Document",
     search_pdf: "Open PDF Search",
     zoom: "Zoom In / Out",
@@ -557,7 +485,6 @@ const en = {
     fields: "Fields",
     annotations: "Annotations",
     outline: "Outline",
-    document: "Document",
     thumbnails: "Thumbnails",
     search_outline: "Search outline...",
     search_annotations: "Filter annotations...",
@@ -673,20 +600,14 @@ const en = {
     equal: "Equidistant Snapping",
     llm: {
       title: "LLM",
-      gemini: "Gemini",
-      openai: "OpenAI",
       api_key_placeholder: "API Key",
       api_url_placeholder: "API URL (optional)",
       provider_enabled: "Enable provider",
       provider_enable_required: "Enable this provider first.",
-      check: "Check",
-      check_success: "Configuration looks good.",
-      check_failed: "Check failed.",
       api_key_required: "API key is required.",
       fetch_models: "Fetch Models",
       fetch_success: "Models fetched.",
       fetch_failed: "Fetch failed.",
-      models: "Models",
       fetched_models: "Fetched models",
       fetched_models_empty: "No fetched models yet.",
       models_loaded_count: "Loaded: {count} model(s)",
@@ -706,7 +627,6 @@ const en = {
       tauri_proxy_enabled: "Backend forwarding",
       tauri_proxy_enabled_desc:
         "Send API requests through the app backend to bypass browser-side CORS limits.",
-      tauri_proxy_desktop_only: "Available only in the Tauri desktop app.",
       proxy_url_enabled: "Use HTTP proxy",
       proxy_url_enabled_desc:
         "Forward requests through a custom HTTP proxy endpoint.",
@@ -717,9 +637,6 @@ const en = {
       api_option: "API Compatibility",
     },
     ai_chat: {
-      title: "AI Chat Tools",
-      description:
-        "Configure AI chat capabilities including form-building tools and the rendered-page visual summary tool.",
       context_pruning_enabled: "Enable context pruning",
       context_pruning_enabled_desc:
         "Prune older reasoning once the context reaches the configured share of the model window, and prioritize removing older page-image results to reduce token usage.",
@@ -730,11 +647,9 @@ const en = {
       get_pages_text_max_chars: "get_pages_text text budget",
       get_pages_text_max_chars_desc:
         "Maximum text characters returned by each get_pages_text call. Larger values let AI read more pages at once but use more context.",
-      tool_history_window: "General tool history window",
       visual_tool_history_window: "Visual tool history window",
       context_pruning_desc:
         "Pruning is triggered only by the context-window percentage. The visual tool history window controls how quickly old page-image results are removed.",
-      context_compression_running: "Compressing",
       context_compression_mode: "Compression mode",
       context_compression_mode_desc:
         "Algorithmic compression only prunes old context directly. AI compression also rewrites older context into reusable memory in the background.",
@@ -763,13 +678,11 @@ const en = {
         "Used by summarize_pages_visual. If the tool is disabled or no vision model is selected, the visual summary tool is unavailable.",
       no_models: "No available models",
     },
-    done: "Done",
   },
   home: {
     title: "Lightweight AI PDF Reader",
     subtitle:
       "A privacy-first, AI-powered PDF reader for focused reading, navigation, annotations, and forms.",
-    resume_session: "Resume Previous Session",
     feature: {
       ai: {
         title: "AI-Powered",
@@ -809,22 +722,11 @@ const en = {
   },
   app: {
     parsing: "Parsing PDF...",
-    analyzing: "Analyzing page {current} of {total}...",
     generating: "Generating PDF...",
-    saving_draft: "Saving draft...",
-    loading_draft: "Loading draft...",
-    saving_reloading: "Saving and Reloading...",
-    saving_closing: "Saving and Closing...",
-    processing: "Processing...",
-    wait: "This may take a moment",
     load_error: "Failed to load PDF.",
     save_success: "Saved successfully",
     save_fail: "Failed to save",
-    no_new_fields: "No new form fields were detected.",
-    auto_detect_fail: "Auto-detection failed. Error: {error}",
     export_fail: "Failed to export PDF.",
-    save_reopen_fail: "Failed to save and reopen.",
-    save_close_fail: "Failed to save and close.",
   },
   tabs: {
     detach_to_new_window: "Detach to New Window",

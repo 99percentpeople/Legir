@@ -3,7 +3,6 @@ const ja = {
     select: "選択...",
     expand: "展開",
     collapse: "折りたたむ",
-    loading: "読み込み中...",
     processing: "処理中...",
     actions: {
       cancel: "キャンセル",
@@ -12,7 +11,6 @@ const ja = {
       save: "保存",
       delete: "削除",
       close: "閉じる",
-      clear: "クリア",
       copy: "コピー",
       edit: "編集",
       send: "送信",
@@ -23,11 +21,6 @@ const ja = {
       restore_original_ratio: "元の比率に戻す",
       download_image: "画像をダウンロード",
     },
-  },
-  status: {
-    saving: "保存中...",
-    saved: "保存済み",
-    unsaved: "未保存の変更があります",
   },
   mode: {
     annotation: "注釈モード",
@@ -50,7 +43,6 @@ const ja = {
     eraser: "消しゴム",
     highlight: "強調表示",
     highlight_text: "強調表示",
-    highlight_free: "自由強調表示",
     highlight_free_properties: "強調表示の設定",
     ink: "手書き",
     ink_properties: "手書き設定",
@@ -73,12 +65,8 @@ const ja = {
     shape_polygon_tools: "多角形図形",
     settings: "設定",
     shortcuts: "ショートカット一覧 (?)",
-    export: "書き出し",
     save_as: "名前を付けて保存...",
-    save_draft: "下書きを保存",
-    save_reopen: "保存して再開",
     save_close: "保存して閉じる",
-    export_close: "書き出して閉じる",
     save_as_close: "名前を付けて保存して閉じる",
     print: "印刷",
     close: "閉じる",
@@ -93,8 +81,6 @@ const ja = {
     previous_page: "前のページ",
     next_page: "次のページ",
     page_layout: "ページ表示",
-    page_layout_single: "単一ページ表示",
-    page_layout_double: "見開き表示",
     page_settings: "ページ設定",
     page_mode: "ページモード",
     page_mode_single: "単一ページ表示",
@@ -129,8 +115,6 @@ const ja = {
       desc: "本当に閉じますか？未保存の変更は失われます。",
       desc_named: "「{filename}」を閉じますか？未保存の変更は失われます。",
       save_close: "保存して閉じる",
-      export_close: "書き出して閉じる",
-      save_draft_close: "下書きを保存して閉じる",
       confirm: "保存せずに閉じる",
       cancel: "キャンセル",
     },
@@ -146,29 +130,21 @@ const ja = {
       desc: "すでにドキュメントが開かれています。ドロップした PDF をどう処理するか選択してください。",
       open: "開く",
       save_open: "保存して開く",
-      save_draft_open: "下書きを保存して開く",
     },
   },
   properties: {
     form_detection: {
-      title: "フォーム検出",
-      desc: "設定済みの LLM を使用してページを分析し、フォームフィールドを自動的に検出して作成します。",
       api_key_missing:
         "API キーがありません。設定 → LLM でプロバイダーを設定してください。",
       page_range: "ページ範囲",
       page_range_hint: "例：1-5, 8, 10-12（デフォルト：すべて）",
-      valid_all: "すべてのページを選択しました（計 {total} ページ）",
       err_format:
         "無効な形式です。数字と範囲を使用してください（例：1-3, 5）。",
       err_bounds: "ページ番号が範囲外です（1-{total}）。",
-      valid_selected: "{count} ページを選択しました：{pages}",
-      types: "検出するフィールドタイプ",
-      style_override: "デフォルトスタイルを上書き",
       prompt: "追加の指示（オプション）",
       prompt_ph:
         "例：「上部のセクションのフィールドのみを検索」または「日付フィールドを無視」",
       prompt_hint: "AI モデルにコンテキストまたは特定のルールを提供します。",
-      start: "分析を開始",
     },
     page_translate: {
       position_aware: "レイアウト考慮の翻訳",
@@ -233,7 +209,6 @@ const ja = {
     subject: "件名",
     keywords: {
       label: "キーワード",
-      desc: "カンマ区切り",
     },
     creator: "作成者",
     producer: "作成ソフト",
@@ -241,7 +216,6 @@ const ja = {
       "エクスポート時、手動でロックしない限り 'Legir' になります。",
     creation_date: "作成日",
     modification_date: "更新日",
-    mod_date_auto: "自動 (エクスポート時に更新)",
     mod_date_tooltip:
       "インポート日時が初期値です。エクスポート時に手動でロックしない限り現在時刻に更新されます。",
     annotation: {
@@ -250,7 +224,6 @@ const ja = {
     field: {
       title: "フィールドの設定",
     },
-    delete_field: "フィールドを削除",
     delete: "削除",
     general: "一般",
     field_name: {
@@ -285,6 +258,7 @@ const ja = {
     replace_image: "画像を差し替え",
     upload_image: "画像をアップロード",
     scale_mode: {
+      label: "スケールモード",
       contain: "収める",
       fill: "埋める",
     },
@@ -294,12 +268,9 @@ const ja = {
     multiline: "複数行",
     checked: "チェック済み",
     default_checked: "初期状態で選択",
-    checked_default: "初期状態で選択",
     selected: "選択済み",
     default_selected: "初期状態で選択",
-    selected_default: "初期状態で選択",
     max_length: "最大長",
-    unlimited: "無制限",
     alignment: "配置",
     alignment_options: {
       left: "左揃え",
@@ -307,6 +278,7 @@ const ja = {
       right: "右揃え",
     },
     export_value: {
+      label: "エクスポート値",
       desc: "選択時に送信される値。",
     },
     options: "オプション",
@@ -342,8 +314,6 @@ const ja = {
     send_backward: "背面へ移動",
     bring_to_front: "最前面へ移動",
     send_to_back: "最背面へ移動",
-    add_arrow: "矢印を追加",
-    remove_arrow: "矢印を削除",
     none: "なし",
     start_arrow: "始点の矢印",
     end_arrow: "終点の矢印",
@@ -400,41 +370,25 @@ const ja = {
     session_default: "新しいチャット",
     session_active: "現在",
     new_chat: "新しいチャット",
-    delete: "削除",
     tool_details: "詳細",
     tool_args: "引数",
     tool_result: "生の結果",
-    responding: "応答を待機中",
     thinking: "思考中",
-    thought_complete: "考えました",
     thought_for: "{duration}考えました",
     duration_seconds: "{count}秒",
     duration_minutes_seconds: "{minutes}分{seconds}秒",
     duration_hours_minutes: "{hours}時間{minutes}分",
-    model: "モデル",
-    clear_confirm: {
-      title: "この会話をクリアしますか？",
-      desc: "現在の会話メッセージ、ツール履歴、検索結果が削除されます。",
-      confirm: "会話をクリア",
-    },
     copied: "コピー済み",
     switch_branch: "ブランチを切り替え",
-    branch_edit: "編集ブランチ",
-    branch_regenerate: "再生成ブランチ",
-    messages: "メッセージ",
-    tools: "ツール実行",
     error_title: "リクエストに失敗しました",
     continue_reason_tool_limit: "ツール呼び出し上限に達しました",
     input_placeholder:
       "AI に PDF の内容を読ませたり、検索、移動、ハイライトさせたりできます...",
-    input_hint: "Enter で送信、Shift+Enter で改行します。",
     context_compression_running: "圧縮中",
     token_usage_context: "コンテキスト",
     token_usage_input: "入力",
     token_usage_output: "出力",
     token_usage_total: "合計",
-    attachment_selected_text: "選択テキスト",
-    attachment_page_short: "{page}ページ",
     attachment_location: "{page}ページ · {start}-{end}",
     annotation_attachment_location: "{type} · {page}ページ",
     attachment_remove: "添付を削除",
@@ -442,8 +396,6 @@ const ja = {
       "現在の PDF に添付した選択テキストについて説明してください。",
     attachment_only_message:
       "現在の PDF に添付した注釈またはドキュメント参照について説明してください。",
-    selection_prompt:
-      "現在の PDF の文脈も踏まえて、次の選択テキストを説明してください。\n\n選択テキスト:\n{text}",
     empty_title: "現在の PDF について質問する",
     empty_desc:
       "アシスタントはページテキストの読取り、文書検索、結果への移動、一時ハイライトを行えます。",
@@ -454,17 +406,6 @@ const ja = {
     disabled: {
       no_document: "文書なし",
       no_model: "モデルなし",
-    },
-    status: {
-      idle: "待機中",
-      running: "実行中",
-      cancelling: "停止中",
-      error: "エラー",
-    },
-    examples: {
-      current_page: "現在のページを要約して",
-      search_focus: "免責条項を検索してその場所へ移動して",
-      highlight: "署名の出現箇所をすべてハイライトして",
     },
     starters: {
       capabilities: "この文書をもとに、あなたに何ができるか教えて",
@@ -504,23 +445,9 @@ const ja = {
     font_missing_warning:
       "この PDF はサブセット化または埋め込みフォントを使用しており、一部のグリフが欠けている可能性があります。このテキストを編集すると、既定のフォントで再描画されます。",
   },
-  workspace: {
-    no_pdf:
-      "PDF が読み込まれていません。アップロードボタンを使用してください。",
-  },
-  uploader: {
-    title: "PDF をアップロード",
-    desc: "ファイルをここにドラッグ＆ドロップするか、クリックして参照してください",
-    btn: "PDF ファイルを選択",
-    note: "ファイルはローカルで安全に処理されます。",
-  },
   shortcuts: {
     title: "キーボードショートカット",
     desc: "編集を高速化するための必須ショートカット。",
-    header: {
-      key: "ショートカット",
-      action: "アクション",
-    },
     ctrl_create: "Ctrl + ドラッグ (作成)",
     continuous_mode: "連続作成モード",
     ctrl_drag: "Ctrl + ドラッグ (選択)",
@@ -542,7 +469,6 @@ const ja = {
     cut: "選択したフィールドを切り取り",
     delete: "選択したフィールドを削除",
     deselect: "選択解除 / 選択ツールに切り替え",
-    export: "PDF をエクスポート",
     print: "ドキュメントを印刷",
     search_pdf: "PDF 検索を開く",
     zoom: "拡大 / 縮小",
@@ -560,7 +486,6 @@ const ja = {
     fields: "フィールド",
     annotations: "注釈",
     outline: "目次",
-    document: "ドキュメント",
     thumbnails: "サムネイル",
     search_outline: "目次を検索...",
     search_annotations: "注釈を検索...",
@@ -575,6 +500,7 @@ const ja = {
     filter: "フィルタ",
     no_outline: "このドキュメントに目次はありません。",
     add_remark: "コメントを追加...",
+    add_reply: "返信を追加...",
     search_pdf_placeholder: "この PDF を検索...",
     search_pdf_empty: "入力すると PDF 全体を検索できます。",
     search_results_summary: "{pages} ページで {total} 件一致",
@@ -674,20 +600,14 @@ const ja = {
     equal: "等間隔スナップ",
     llm: {
       title: "LLM",
-      gemini: "Gemini",
-      openai: "OpenAI",
       api_key_placeholder: "API キー",
       api_url_placeholder: "API URL（任意）",
       provider_enabled: "現在のプロバイダーを有効化",
       provider_enable_required: "先にこのプロバイダーを有効にしてください。",
-      check: "確認",
-      check_success: "設定OK。",
-      check_failed: "確認に失敗しました。",
       api_key_required: "API キーが必要です。",
       fetch_models: "モデルを取得",
       fetch_success: "モデルを取得しました。",
       fetch_failed: "モデルの取得に失敗しました。",
-      models: "モデル",
       fetched_models: "取得済みモデル",
       fetched_models_empty: "まだ取得済みモデルはありません。",
       models_loaded_count: "読み込み済み: {count} 件",
@@ -706,7 +626,6 @@ const ja = {
       tauri_proxy_enabled: "Backend forwarding",
       tauri_proxy_enabled_desc:
         "Send API requests through the app backend to bypass browser-side CORS limits.",
-      tauri_proxy_desktop_only: "Available only in the Tauri desktop app.",
       proxy_url_enabled: "Use HTTP proxy",
       proxy_url_enabled_desc:
         "Forward requests through a custom HTTP proxy endpoint.",
@@ -717,9 +636,6 @@ const ja = {
       api_option: "API Compatibility",
     },
     ai_chat: {
-      title: "AI チャットツール",
-      description:
-        "フォーム作成ツールとレンダリング済みページの視覚要約ツールを含む AI チャット機能を設定します。",
       context_pruning_enabled: "コンテキスト圧縮を有効化",
       context_pruning_enabled_desc:
         "コンテキストがモデルウィンドウの設定割合に達したら古い推論内容を圧縮し、古いページ画像結果を優先的に外してトークン消費を抑えます。",
@@ -727,14 +643,12 @@ const ja = {
       get_pages_text_max_chars: "get_pages_text テキスト予算",
       get_pages_text_max_chars_desc:
         "各 get_pages_text 呼び出しで返す最大文字数です。大きい値ほど一度に多くのページを読めますが、より多くのコンテキストを使用します。",
-      tool_history_window: "通常ツール履歴ウィンドウ",
       visual_tool_history_window: "視覚ツール履歴ウィンドウ",
       context_pruning_desc:
         "圧縮はコンテキストウィンドウの割合でのみ開始されます。視覚ツール履歴ウィンドウは、古いページ画像結果をどれだけ早く外すかを制御します。",
       context_pruning_trigger_context_percent: "圧縮開始コンテキスト閾値",
       context_pruning_trigger_context_percent_desc:
         "現在のコンテキストがアクティブモデルウィンドウのこの割合に達した後に開始します。現在のフォールバック推定: {tokens} tokens。",
-      context_compression_running: "圧縮中",
       context_compression_mode: "圧縮方式",
       context_compression_mode_desc:
         "アルゴリズム圧縮は古いコンテキストを直接削減するだけです。AI 圧縮は、古いコンテキストを再利用可能な圧縮メモリにバックグラウンドで書き換えます。",
@@ -763,13 +677,11 @@ const ja = {
         "summarize_pages_visual で使用します。ツールが無効、またはビジョンモデルが未選択の場合、このツールは利用できません。",
       no_models: "利用可能なモデルがありません",
     },
-    done: "完了",
   },
   home: {
     title: "軽量 AI PDF リーダー",
     subtitle:
       "プライバシー優先の AI 搭載 PDF リーダー。読解、ナビゲーション、注釈、フォーム処理に集中できます。",
-    resume_session: "前のセッションを再開",
     feature: {
       ai: {
         title: "AI 搭載",
@@ -809,22 +721,11 @@ const ja = {
   },
   app: {
     parsing: "PDF を解析中...",
-    analyzing: "ページ {current} / {total} を分析中...",
     generating: "PDF を生成中...",
-    saving_draft: "下書きを保存中...",
-    loading_draft: "下書きを読み込み中...",
-    saving_reloading: "保存して再読み込み中...",
-    saving_closing: "保存して閉じています...",
-    processing: "処理中...",
-    wait: "時間がかかる場合があります",
     load_error: "PDF の読み込みに失敗しました。",
     save_success: "正常に保存されました",
     save_fail: "保存に失敗しました",
-    no_new_fields: "新しいフォームフィールドは検出されませんでした。",
-    auto_detect_fail: "自動検出に失敗しました。エラー：{error}",
     export_fail: "PDF の書き出しに失敗しました。",
-    save_reopen_fail: "保存して再開に失敗しました。",
-    save_close_fail: "保存して閉じるのに失敗しました。",
   },
   tabs: {
     detach_to_new_window: "新しいウィンドウに分離",

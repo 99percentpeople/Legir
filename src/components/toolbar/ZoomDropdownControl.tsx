@@ -72,6 +72,7 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
               disabled={disabled}
               className="h-8 px-2 text-sm font-medium sm:h-9"
               title={t("toolbar.zoom")}
+              onDoubleClick={onFitWidth}
             >
               <span className="min-w-11 text-center">{percentage}</span>
             </Button>
