@@ -3,11 +3,14 @@ import { describe, expect, test } from "vitest";
 import {
   buildConversationMessageContent,
   buildAiChatRequestRecoveryMessages,
+  createAiChatRuntimeTranscript,
   createAiChatSessionData,
+  normalizeRuntimeTranscriptForPersist,
   normalizeTimelineForPersist,
   recoverAiChatRuntimeTranscript,
   restoreConversationFromTimeline,
   setAiChatRuntimeTimelineBoundary,
+  stringifyToolArgs,
   sliceAiChatRuntimeTranscriptForTimelinePrefix,
   syncAiChatSessionConversation,
 } from "@/hooks/useAiChatController/sessionPersistence";
@@ -19,6 +22,51 @@ import type {
 const nowIso = "2026-04-29T00:00:00.000Z";
 
 describe("AI chat session persistence", () => {
+  test("redacts sensitive tool arguments", () => {
+    const argsText = stringifyToolArgs({
+      password: "owner secret",
+      preserveOwnerRestrictionsOnSave: false,
+      nested: {
+        apiKey: "api secret",
+        value: "visible",
+      },
+    });
+
+    expect(argsText).not.toContain("owner secret");
+    expect(argsText).not.toContain("api secret");
+    expect(argsText).toContain("[redacted]");
+    expect(argsText).toContain("visible");
+  });
+
+  test("redacts sensitive runtime transcript tool inputs before persistence", () => {
+    const transcript = createAiChatRuntimeTranscript({
+      updatedAt: nowIso,
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              toolCallId: "call_1",
+              toolName: "unlock_pdf_permissions",
+              input: {
+                password: "owner secret",
+                preserve_owner_restrictions_on_save: true,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const normalized = normalizeRuntimeTranscriptForPersist(transcript, []);
+    const serialized = JSON.stringify(normalized);
+
+    expect(serialized).not.toContain("owner secret");
+    expect(serialized).toContain("[redacted]");
+    expect(serialized).toContain("preserve_owner_restrictions_on_save");
+  });
+
   test("builds conversation text with selection and annotation attachments", () => {
     const content = buildConversationMessageContent("Review this.", [
       {

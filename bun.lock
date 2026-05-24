@@ -25,6 +25,7 @@
         "ai": "^6.0.116",
         "class-variance-authority": "0.7.1",
         "clsx": "^2.1.1",
+        "crypto-js": "^4.2.0",
         "dayjs": "^1.11.20",
         "dompurify": "^3.3.3",
         "emblor": "^1.4.8",

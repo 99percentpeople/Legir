@@ -687,8 +687,9 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     isSelectable &&
     isAnnotationMode &&
     isSelected &&
+    props.canModify !== false &&
     shapeSupportsVertexInsertion(shapeType);
-  const canShowLayerContextMenu = isSelectable;
+  const canShowLayerContextMenu = isSelectable && props.canModify !== false;
 
   const contextMenuContent = (
     <>
@@ -1237,7 +1238,10 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
       contextMenuDisabled={true}
       className={!isSelected ? "pointer-events-none" : undefined}
     >
-      <FloatingToolbar isVisible={isSelected} sideOffset={32}>
+      <FloatingToolbar
+        isVisible={isSelected && props.canModify !== false}
+        sideOffset={32}
+      >
         <ColorPickerPopover
           paletteType="foreground"
           color={strokeColor}
@@ -1421,6 +1425,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
                   </svg>
 
                   {isSelected &&
+                    props.canModify !== false &&
                     hasVertices &&
                     localPoints.map((point, index) => {
                       return (

@@ -160,7 +160,10 @@ const toPagesVisualModelOutput = (output: unknown) => {
 };
 
 const METADATA_TOOL_PROMPTS = [
-  "If the user asks about document metadata, call get_document_metadata.",
+  "If the user asks about document metadata or PDF permissions/restrictions, call get_document_metadata.",
+  "If the user asks to change PDF document metadata, call update_document_metadata. If the PDF is restricted and the owner password is provided, unlock permissions first.",
+  "If the user explicitly provides a PDF owner password and asks to unlock permission restrictions, call unlock_pdf_permissions. Never invent or guess passwords.",
+  "Do not reveal or repeat passwords in the assistant response.",
 ];
 
 const MULTI_PAGE_SUMMARY_FALLBACK_PROMPT =
@@ -182,6 +185,185 @@ const PAGE_VISUAL_TOOL_PROMPTS = [
   "When the user asks about a page and the text layer is missing or unreliable, use get_pages_visual before concluding that the page content is unavailable.",
   "If you need several page visuals, prefer one get_pages_visual call with multiple pages over many tiny calls when possible.",
 ];
+
+const nullableStringSchema = z.string().nullable();
+
+const nullableDateStringSchema = nullableStringSchema.refine((value) => {
+  if (value === null) return true;
+  return Number.isFinite(new Date(value).getTime());
+}, "Expected a parseable date/time string.");
+
+const updateDocumentMetadataArgsSchema = z
+  .object({
+    title: nullableStringSchema
+      .optional()
+      .describe("Document title. Use null to clear it."),
+    author: nullableStringSchema
+      .optional()
+      .describe("Document author. Use null to clear it."),
+    subject: nullableStringSchema
+      .optional()
+      .describe("Document subject. Use null to clear it."),
+    keywords: z
+      .union([z.array(z.string()), z.string(), z.null()])
+      .optional()
+      .describe(
+        "Document keywords as an array, a comma/semicolon-separated string, or null to clear them.",
+      ),
+    creator: nullableStringSchema
+      .optional()
+      .describe("Document creator/application. Use null to clear it."),
+    producer: nullableStringSchema
+      .optional()
+      .describe(
+        "Document producer. Supplying this also makes producer manual unless is_producer_manual is explicitly provided.",
+      ),
+    creation_date: nullableDateStringSchema
+      .optional()
+      .describe(
+        "Creation date/time as a parseable date string. Use null to clear it.",
+      ),
+    modification_date: nullableDateStringSchema
+      .optional()
+      .describe(
+        "Modification date/time as a parseable date string. Supplying this also makes modification date manual unless is_modification_date_manual is explicitly provided. Use null to clear it.",
+      ),
+    is_producer_manual: z
+      .boolean()
+      .optional()
+      .describe("Whether the producer field should be written manually."),
+    is_modification_date_manual: z
+      .boolean()
+      .optional()
+      .describe("Whether the modification date should be written manually."),
+  })
+  .strict()
+  .refine((value) => Object.values(value).some((item) => item !== undefined), {
+    message: "At least one metadata field must be provided.",
+  });
+
+const hasOwn = <T extends object>(value: T, key: PropertyKey) =>
+  Object.prototype.hasOwnProperty.call(value, key);
+
+const normalizeMetadataString = (value: string | null | undefined) =>
+  value === null ? "" : value;
+
+const normalizeMetadataKeywords = (
+  value: string | string[] | null | undefined,
+) => {
+  if (value === undefined) return undefined;
+  if (value === null) return [];
+  if (Array.isArray(value)) {
+    return value.map((keyword) => keyword.trim()).filter(Boolean);
+  }
+  return value
+    .split(/[;,]/)
+    .map((keyword) => keyword.trim())
+    .filter(Boolean);
+};
+
+const toMetadataUpdates = (
+  args: z.output<typeof updateDocumentMetadataArgsSchema>,
+) => {
+  const updates: {
+    title?: string;
+    author?: string;
+    subject?: string;
+    keywords?: string[];
+    creator?: string;
+    producer?: string;
+    creationDate?: string;
+    modificationDate?: string;
+    isProducerManual?: boolean;
+    isModDateManual?: boolean;
+  } = {};
+
+  if (hasOwn(args, "title"))
+    updates.title = normalizeMetadataString(args.title);
+  if (hasOwn(args, "author")) {
+    updates.author = normalizeMetadataString(args.author);
+  }
+  if (hasOwn(args, "subject")) {
+    updates.subject = normalizeMetadataString(args.subject);
+  }
+  if (hasOwn(args, "keywords")) {
+    updates.keywords = normalizeMetadataKeywords(args.keywords);
+  }
+  if (hasOwn(args, "creator")) {
+    updates.creator = normalizeMetadataString(args.creator);
+  }
+  if (hasOwn(args, "producer")) {
+    updates.producer = normalizeMetadataString(args.producer);
+    if (args.is_producer_manual === undefined) {
+      updates.isProducerManual = true;
+    }
+  }
+  if (hasOwn(args, "creation_date")) {
+    updates.creationDate = args.creation_date ?? undefined;
+  }
+  if (hasOwn(args, "modification_date")) {
+    updates.modificationDate = args.modification_date ?? undefined;
+    if (args.is_modification_date_manual === undefined) {
+      updates.isModDateManual = true;
+    }
+  }
+  if (args.is_producer_manual !== undefined) {
+    updates.isProducerManual = args.is_producer_manual;
+  }
+  if (args.is_modification_date_manual !== undefined) {
+    updates.isModDateManual = args.is_modification_date_manual;
+  }
+
+  return updates;
+};
+
+const summarizeMetadataUpdate = (payload: {
+  status: "updated" | "unchanged";
+  updatedFields: string[];
+}) =>
+  payload.status === "unchanged"
+    ? "Document metadata unchanged"
+    : `Updated document metadata: ${payload.updatedFields.join(", ")}`;
+
+const unlockPdfPermissionsArgsSchema = z
+  .object({
+    password: z
+      .string()
+      .describe(
+        "The PDF owner password explicitly provided by the user for this unlock attempt.",
+      ),
+    preserve_owner_restrictions_on_save: z
+      .boolean()
+      .optional()
+      .describe(
+        "Whether to preserve the original owner restrictions when saving after a successful unlock. Defaults to true on a new unlock.",
+      ),
+  })
+  .strict();
+
+const summarizeUnlockStatus = (payload: {
+  ok: boolean;
+  status: string;
+  reason?: string;
+}) => {
+  if (payload.ok) {
+    if (payload.status === "already_unlocked") {
+      return "PDF permissions were already unlocked";
+    }
+    if (payload.status === "not_restricted") {
+      return "PDF has no owner restrictions to unlock";
+    }
+    return "PDF permissions unlocked";
+  }
+
+  if (payload.status === "incorrect_password") {
+    return "PDF permission unlock failed: incorrect owner password";
+  }
+  if (payload.status === "no_document") {
+    return "PDF permission unlock failed: no document loaded";
+  }
+  return `PDF permission unlock failed: ${payload.reason ?? payload.status}`;
+};
 
 const PAGE_VISUAL_SUMMARY_TOOL_PROMPTS = [
   "Use summarize_pages_visual when page appearance matters but the current chat model cannot inspect images directly.",
@@ -261,19 +443,63 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_document_metadata: createToolBuilder("get_document_metadata")
       .read()
       .description(
-        "Get PDF document metadata such as filename, title, author, subject, keywords, creator, producer, and creation/modification dates.",
+        "Get PDF document metadata such as filename, title, author, subject, keywords, creator, producer, creation/modification dates, current and source permission flags, whether owner restrictions are unlocked for this session, and whether original restrictions will be preserved on save.",
       )
       .promptInstructions(METADATA_TOOL_PROMPTS)
       .inputSchema(emptyObjectSchema)
       .build(async ({ ctx: toolCtx }) => {
         const payload = toolCtx.getDocumentMetadata();
-        const availableKeys = Object.entries(payload).filter(([, value]) => {
+        const availableKeys = Object.entries(payload).filter(([key, value]) => {
+          if (
+            [
+              "permissions",
+              "sourcePermissions",
+              "ownerRestrictionsUnlocked",
+              "preserveOwnerRestrictionsOnSave",
+            ].includes(key)
+          ) {
+            return false;
+          }
           if (Array.isArray(value)) return value.length > 0;
           return value !== undefined && value !== null && value !== "";
         }).length;
         return {
           payload,
-          summary: `Metadata with ${availableKeys} populated field${availableKeys === 1 ? "" : "s"}`,
+          summary: `Metadata with ${availableKeys} populated field${availableKeys === 1 ? "" : "s"}; permissions ${payload.permissions.hasOwnerRestrictions ? "restricted" : "unrestricted"}${payload.ownerRestrictionsUnlocked ? " (owner unlocked)" : ""}`,
+        };
+      }),
+
+    update_document_metadata: createToolBuilder("update_document_metadata")
+      .write()
+      .description(
+        "Update PDF document metadata fields such as title, author, subject, keywords, creator, producer, creation date, and modification date. Requires document content modification permission; use unlock_pdf_permissions first when the user provided the owner password for a restricted PDF.",
+      )
+      .promptInstructions(METADATA_TOOL_PROMPTS)
+      .inputSchema(updateDocumentMetadataArgsSchema)
+      .build(async ({ args, ctx: toolCtx }) => {
+        const payload = toolCtx.updateDocumentMetadata(toMetadataUpdates(args));
+        return {
+          payload,
+          summary: summarizeMetadataUpdate(payload),
+        };
+      }),
+
+    unlock_pdf_permissions: createToolBuilder("unlock_pdf_permissions")
+      .write()
+      .description(
+        "Verify the PDF owner password provided by the user and unlock the current document's permission restrictions for this editing session. This does not open password-protected files; it only removes owner permission restrictions after the document is already open.",
+      )
+      .promptInstructions(METADATA_TOOL_PROMPTS)
+      .inputSchema(unlockPdfPermissionsArgsSchema)
+      .build(async ({ args, ctx: toolCtx }) => {
+        const payload = await toolCtx.unlockPdfPermissions({
+          password: args.password,
+          preserveOwnerRestrictionsOnSave:
+            args.preserve_owner_restrictions_on_save,
+        });
+        return {
+          payload,
+          summary: summarizeUnlockStatus(payload),
         };
       }),
 

@@ -28,6 +28,7 @@ interface HighlightRectProps {
   onAskAi?: (id: string) => void;
   isAnnotationMode?: boolean;
   onPointerDown?: AnnotationControlProps["onPointerDown"];
+  canModify?: boolean;
 }
 
 interface HighlightPolygonProps {
@@ -44,6 +45,7 @@ interface HighlightPolygonProps {
   onAskAi?: (id: string) => void;
   isAnnotationMode?: boolean;
   onPointerDown?: AnnotationControlProps["onPointerDown"];
+  canModify?: boolean;
 }
 
 const getRectBounds = (
@@ -98,6 +100,7 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
   onAskAi,
   isAnnotationMode = true,
   onPointerDown,
+  canModify,
 }) => {
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
   const color = data.color || "#000000";
@@ -117,9 +120,10 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
       showBorder={isSelected}
       resizable={false}
       data={data}
+      canModify={canModify}
       className={isSelected ? undefined : "pointer-events-none"}
     >
-      <FloatingToolbar isVisible={!!showToolbar}>
+      <FloatingToolbar isVisible={!!showToolbar && canModify !== false}>
         <ColorPickerPopover
           paletteType="background"
           color={data.color || "#000000"}
@@ -226,6 +230,7 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
   onAskAi,
   isAnnotationMode = true,
   onPointerDown,
+  canModify,
 }) => {
   const bounds = getRectBounds(rects);
   const d = rectsToPath(rects, { x: bounds.x, y: bounds.y });
@@ -247,9 +252,10 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
       showBorder={isSelected}
       resizable={false}
       data={data}
+      canModify={canModify}
       className={isSelected ? undefined : "pointer-events-none"}
     >
-      <FloatingToolbar isVisible={!!showToolbar}>
+      <FloatingToolbar isVisible={!!showToolbar && canModify !== false}>
         <ColorPickerPopover
           paletteType="background"
           color={data.color || "#000000"}
@@ -362,6 +368,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
   onAskAi,
   isAnnotationMode,
   onPointerDown,
+  canModify,
 }) => {
   if (data.rects && data.rects.length > 0) {
     return (
@@ -379,6 +386,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
         onAskAi={onAskAi}
         isAnnotationMode={!!isAnnotationMode}
         onPointerDown={onPointerDown}
+        canModify={canModify}
       />
     );
   } else if (data.rect) {
@@ -397,6 +405,7 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
         onAskAi={onAskAi}
         isAnnotationMode={!!isAnnotationMode}
         onPointerDown={onPointerDown}
+        canModify={canModify}
       />
     );
   }

@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { PDFMetadata } from "@/types";
+import type { PDFDocumentPermissions, PDFMetadata } from "@/types";
 import { Eye, EyeOff, FileText, Lock, Unlock } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateField, DateInput } from "@/components/ui/datafield-rac";
 import { parseDateTime } from "@internationalized/date";
@@ -18,6 +20,7 @@ import { useLanguage } from "@/components/language-provider";
 import { PanelLayout } from "./PanelLayout";
 import { type Tag, TagInput } from "emblor";
 import { cn } from "@/utils/cn";
+import { getEffectivePdfPermissions } from "@/lib/pdfPermissions";
 
 export interface DocumentPropertiesPanelProps {
   metadata: PDFMetadata;
@@ -26,7 +29,13 @@ export interface DocumentPropertiesPanelProps {
   onFilenameChange: (name: string) => void;
   exportPassword: string | null;
   pdfOpenPassword: string | null;
+  pdfOwnerUnlocked: boolean;
+  preservePdfOwnerRestrictionsOnSave: boolean;
   onExportPasswordChange: (password: string | null) => void;
+  onOwnerPasswordUnlock: (password: string) => Promise<boolean>;
+  sourceDocumentPermissions: PDFDocumentPermissions | null;
+  onPreserveOwnerRestrictionsOnSaveChange: (preserve: boolean) => void;
+  canModifyContents: boolean;
   onClose?: () => void;
   onCollapse?: () => void;
   isOpen: boolean;
@@ -45,7 +54,13 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
     onFilenameChange,
     exportPassword,
     pdfOpenPassword,
+    pdfOwnerUnlocked,
+    preservePdfOwnerRestrictionsOnSave,
     onExportPasswordChange,
+    onOwnerPasswordUnlock,
+    sourceDocumentPermissions,
+    onPreserveOwnerRestrictionsOnSaveChange,
+    canModifyContents,
     onClose,
     onCollapse,
     isOpen,
@@ -104,6 +119,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Input
               type="text"
               value={filename}
+              disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onFilenameChange(e.target.value)}
               placeholder="document.pdf"
@@ -114,6 +130,19 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
           </div>
 
           <Separator />
+
+          <DocumentPermissionUnlockControls
+            metadata={metadata}
+            sourceDocumentPermissions={sourceDocumentPermissions}
+            pdfOwnerUnlocked={pdfOwnerUnlocked}
+            preservePdfOwnerRestrictionsOnSave={
+              preservePdfOwnerRestrictionsOnSave
+            }
+            onOwnerPasswordUnlock={onOwnerPasswordUnlock}
+            onPreserveOwnerRestrictionsOnSaveChange={
+              onPreserveOwnerRestrictionsOnSaveChange
+            }
+          />
 
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
@@ -129,6 +158,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               </div>
               <Switch
                 checked={exportPasswordEnabled}
+                disabled={!canModifyContents}
                 onMouseDown={onTriggerHistorySave}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -163,6 +193,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
                   }
                   type={exportPasswordVisible ? "text" : "password"}
                   value={exportPassword || ""}
+                  disabled={!canModifyContents}
                 />
                 <button
                   aria-controls="password"
@@ -189,6 +220,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Input
               type="text"
               value={metadata.title || ""}
+              disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onMetadataChange({ title: e.target.value })}
               placeholder="Untitled Document"
@@ -200,6 +232,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Input
               type="text"
               value={metadata.author || ""}
+              disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onMetadataChange({ author: e.target.value })}
             />
@@ -210,6 +243,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Textarea
               rows={2}
               value={metadata.subject || ""}
+              disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onMetadataChange({ subject: e.target.value })}
               className="resize-none"
@@ -222,6 +256,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               metadata={metadata}
               onMetadataChange={onMetadataChange}
               onTriggerHistorySave={onTriggerHistorySave}
+              disabled={!canModifyContents}
             />
           </div>
 
@@ -230,6 +265,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <Input
               type="text"
               value={metadata.creator || ""}
+              disabled={!canModifyContents}
               onFocus={onTriggerHistorySave}
               onChange={(e) => onMetadataChange({ creator: e.target.value })}
             />
@@ -257,7 +293,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               <Input
                 type="text"
                 value={metadata.producer || ""}
-                disabled={!metadata.isProducerManual}
+                disabled={!canModifyContents || !metadata.isProducerManual}
                 onFocus={onTriggerHistorySave}
                 onChange={(e) => onMetadataChange({ producer: e.target.value })}
                 className={
@@ -266,6 +302,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
               />
               <button
                 onClick={() => {
+                  if (!canModifyContents) return;
                   if (!metadata.isProducerManual) {
                     // Switch to Manual: Keep current value but mark as manual
                     onMetadataChange({
@@ -304,7 +341,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
                     onMetadataChange({ creationDate: undefined });
                   }
                 }}
-                isDisabled={!creationEditable}
+                isDisabled={!canModifyContents || !creationEditable}
                 granularity="minute"
                 hourCycle={24}
               >
@@ -317,6 +354,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
                 />
               </DateField>
               <button
+                disabled={!canModifyContents}
                 onClick={() => setCreationEditable(!creationEditable)}
                 className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 z-10 -translate-y-1/2"
               >
@@ -356,7 +394,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
                     onMetadataChange({ modificationDate: undefined });
                   }
                 }}
-                isDisabled={!metadata.isModDateManual}
+                isDisabled={!canModifyContents || !metadata.isModDateManual}
                 granularity="minute"
                 hourCycle={24}
               >
@@ -369,7 +407,9 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
                 />
               </DateField>
               <button
+                disabled={!canModifyContents}
                 onClick={() => {
+                  if (!canModifyContents) return;
                   if (!metadata.isModDateManual) {
                     // Switch to Manual
                     onMetadataChange({
@@ -398,16 +438,140 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
   },
 );
 
+function DocumentPermissionUnlockControls({
+  metadata,
+  sourceDocumentPermissions,
+  pdfOwnerUnlocked,
+  preservePdfOwnerRestrictionsOnSave,
+  onOwnerPasswordUnlock,
+  onPreserveOwnerRestrictionsOnSaveChange,
+}: {
+  metadata: PDFMetadata;
+  sourceDocumentPermissions: PDFDocumentPermissions | null;
+  pdfOwnerUnlocked: boolean;
+  preservePdfOwnerRestrictionsOnSave: boolean;
+  onOwnerPasswordUnlock: (password: string) => Promise<boolean>;
+  onPreserveOwnerRestrictionsOnSaveChange: (preserve: boolean) => void;
+}) {
+  const { t } = useLanguage();
+  const [ownerPassword, setOwnerPassword] = useState("");
+  const [ownerPasswordVisible, setOwnerPasswordVisible] = useState(false);
+  const [isVerifyingOwnerPassword, setIsVerifyingOwnerPassword] =
+    useState(false);
+  const sourcePermissions = getEffectivePdfPermissions(
+    sourceDocumentPermissions ?? metadata.documentPermissions,
+  );
+
+  if (!sourcePermissions.hasOwnerRestrictions) return null;
+
+  return (
+    <div className="space-y-3">
+      {pdfOwnerUnlocked ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1">
+              <Label
+                htmlFor="preserve-owner-restrictions"
+                className="cursor-pointer text-xs font-medium"
+              >
+                {t("properties.permissions.preserve_on_save")}
+              </Label>
+              <p className="text-muted-foreground text-xs">
+                {t("properties.permissions.preserve_on_save_desc")}
+              </p>
+            </div>
+            <Switch
+              id="preserve-owner-restrictions"
+              checked={preservePdfOwnerRestrictionsOnSave}
+              onCheckedChange={onPreserveOwnerRestrictionsOnSaveChange}
+            />
+          </div>
+        </div>
+      ) : (
+        <form
+          className="space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void (async () => {
+              setIsVerifyingOwnerPassword(true);
+              try {
+                const ok = await onOwnerPasswordUnlock(ownerPassword);
+                if (ok) {
+                  setOwnerPassword("");
+                  toast.success(t("properties.permissions.unlock_ok"));
+                  return;
+                }
+                toast.error(t("properties.permissions.unlock_failed"));
+              } finally {
+                setIsVerifyingOwnerPassword(false);
+              }
+            })();
+          }}
+        >
+          <Label htmlFor="owner-password" className="text-xs font-medium">
+            {t("properties.permissions.owner_password")}
+          </Label>
+          <div className="flex gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Input
+                id="owner-password"
+                className="pe-9"
+                type={ownerPasswordVisible ? "text" : "password"}
+                value={ownerPassword}
+                disabled={isVerifyingOwnerPassword}
+                autoComplete="current-password"
+                onChange={(event) => setOwnerPassword(event.target.value)}
+                placeholder={t(
+                  "properties.permissions.owner_password_placeholder",
+                )}
+              />
+              <button
+                aria-label={
+                  ownerPasswordVisible ? "Hide password" : "Show password"
+                }
+                aria-pressed={ownerPasswordVisible}
+                className="text-muted-foreground/80 hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 absolute inset-y-0 end-0 flex h-full w-9 items-center justify-center rounded-e-md transition-[color,box-shadow] outline-none focus:z-10 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isVerifyingOwnerPassword}
+                onClick={() => setOwnerPasswordVisible((current) => !current)}
+                type="button"
+              >
+                {ownerPasswordVisible ? (
+                  <EyeOff aria-hidden="true" size={16} />
+                ) : (
+                  <Eye aria-hidden="true" size={16} />
+                )}
+              </button>
+            </div>
+            <Button
+              type="submit"
+              variant="secondary"
+              disabled={isVerifyingOwnerPassword}
+            >
+              <Unlock size={14} />
+              {t("properties.permissions.unlock")}
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {t("properties.permissions.owner_password_desc")}
+          </p>
+        </form>
+      )}
+    </div>
+  );
+}
+
 interface KeywordsInputProps {
   metadata: PDFMetadata;
   onMetadataChange: (data: Partial<PDFMetadata>) => void;
   onTriggerHistorySave?: () => void;
+  disabled?: boolean;
 }
 
 function KeywordsInput({
   metadata,
   onMetadataChange,
   onTriggerHistorySave,
+  disabled = false,
 }: KeywordsInputProps) {
   const [activeTagIndex, setActiveTagIndex] = useState<number | null>(null);
 
@@ -422,6 +586,7 @@ function KeywordsInput({
   }, [metadata.keywords]);
 
   const handleSetTags = (newTags: Tag[] | ((prevState: Tag[]) => Tag[])) => {
+    if (disabled) return;
     let updatedTags: Tag[];
 
     if (typeof newTags === "function") {
@@ -446,6 +611,7 @@ function KeywordsInput({
       activeTagIndex={activeTagIndex}
       setActiveTagIndex={setActiveTagIndex}
       onFocus={onTriggerHistorySave}
+      disabled={disabled}
       styleClasses={{
         inlineTagsContainer:
           "border-input rounded-md bg-transparent dark:bg-input/30 shadow-xs transition-[color,box-shadow] focus-within:border-ring outline-none focus-within:ring-[3px] focus-within:ring-ring/50 p-1 gap-1",

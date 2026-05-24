@@ -10,6 +10,7 @@ import { AppearanceProperties } from "@/components/workspace/controls/properties
 import { GeometryProperties } from "@/components/workspace/controls/properties/GeometryProperties";
 import { PanelLayout } from "./PanelLayout";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
+import { cn } from "@/utils/cn";
 
 export interface ControlPropertiesPanelProps {
   data: FormField | Annotation;
@@ -21,6 +22,8 @@ export interface ControlPropertiesPanelProps {
   onCollapse: () => void;
   isFloating: boolean;
   onTriggerHistorySave: () => void;
+  canEdit: boolean;
+  restrictedTitle: string;
   width: number;
   onResize: (width: number) => void;
 }
@@ -36,6 +39,8 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
     onCollapse,
     isFloating,
     onTriggerHistorySave,
+    canEdit,
+    restrictedTitle,
     width,
     onResize,
   }) => {
@@ -62,6 +67,19 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
       void getSystemFontFamilies();
     }, [isOpen]);
 
+    const handleChange = React.useCallback(
+      (updates: Partial<FormField | Annotation>) => {
+        if (!canEdit) return;
+        onChange(updates);
+      },
+      [canEdit, onChange],
+    );
+
+    const handleTriggerHistorySave = React.useCallback(() => {
+      if (!canEdit) return;
+      onTriggerHistorySave();
+    }, [canEdit, onTriggerHistorySave]);
+
     return (
       <PanelLayout
         title={
@@ -82,65 +100,81 @@ export const ControlPropertiesPanel = React.memo<ControlPropertiesPanelProps>(
         width={width}
         onResize={onResize}
         footer={
-          <Button variant="destructive" onClick={onDelete} className="w-full">
+          <Button
+            variant="destructive"
+            onClick={onDelete}
+            className="w-full"
+            disabled={!canEdit}
+            title={!canEdit ? restrictedTitle : undefined}
+          >
             <Trash2 size={16} className="mr-2" />
             {t("properties.delete")}
           </Button>
         }
       >
-        {isField && (
-          <>
-            <CommonProperties
-              data={data as FormField}
-              onChange={onChange}
-              onTriggerHistorySave={onTriggerHistorySave}
-            />
-            <Separator />
-          </>
-        )}
+        <fieldset
+          aria-disabled={!canEdit}
+          className={cn(
+            "m-0 min-w-0 space-y-4 border-0 p-0",
+            !canEdit && "opacity-60",
+          )}
+          disabled={!canEdit}
+          title={!canEdit ? restrictedTitle : undefined}
+        >
+          {isField && (
+            <>
+              <CommonProperties
+                data={data as FormField}
+                onChange={handleChange}
+                onTriggerHistorySave={handleTriggerHistorySave}
+              />
+              <Separator />
+            </>
+          )}
 
-        {SpecificProperties && (
-          <React.Suspense
-            fallback={
-              <div className="text-muted-foreground p-4 text-center text-sm">
-                Loading properties...
-              </div>
-            }
-          >
-            <SpecificProperties
-              data={data}
-              onChange={onChange}
-              onTriggerHistorySave={onTriggerHistorySave}
-            />
-          </React.Suspense>
-        )}
+          {SpecificProperties && (
+            <React.Suspense
+              fallback={
+                <div className="text-muted-foreground p-4 text-center text-sm">
+                  Loading properties...
+                </div>
+              }
+            >
+              <SpecificProperties
+                data={data}
+                onChange={handleChange}
+                onTriggerHistorySave={handleTriggerHistorySave}
+              />
+            </React.Suspense>
+          )}
 
-        {isField && (
-          <>
-            <Separator />
-            <AppearanceProperties
-              data={data as FormField}
-              onChange={onChange}
-              onTriggerHistorySave={onTriggerHistorySave}
-            />
-          </>
-        )}
+          {isField && (
+            <>
+              <Separator />
+              <AppearanceProperties
+                data={data as FormField}
+                onChange={handleChange}
+                onTriggerHistorySave={handleTriggerHistorySave}
+              />
+            </>
+          )}
 
-        {/* Geometry is relevant for both if they have rect, but implementation expects FormField structure currently.
+          {/* Geometry is relevant for both if they have rect, but implementation expects FormField structure currently.
           We can enable it for Annotations if we ensure compatibility, but for now let's keep it for Fields
           or check if data has rect. 
           Highlight/Comment have rect. Ink has points (no rect).
       */}
-        {"rect" in data && !isHighlightAnnotation && (
-          <>
-            <Separator />
-            <GeometryProperties
-              data={data as FormField}
-              onChange={onChange}
-              onTriggerHistorySave={onTriggerHistorySave}
-            />
-          </>
-        )}
+          {"rect" in data && !isHighlightAnnotation && (
+            <>
+              <Separator />
+              <GeometryProperties
+                data={data as FormField}
+                onChange={handleChange}
+                onTriggerHistorySave={handleTriggerHistorySave}
+              />
+            </>
+          )}
+        </fieldset>
       </PanelLayout>
     );
   },

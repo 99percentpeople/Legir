@@ -6,6 +6,7 @@ import type {
   EditorState,
   EditorUiState,
   FormField,
+  PDFDocumentPermissions,
   PDFMetadata,
 } from "@/types";
 import type { EditorUiStateSetter, SelectedEditorControl } from "./types";
@@ -28,6 +29,7 @@ interface EditorRightPanelProps {
   effectiveLanguage: string;
   isPageTranslating: boolean;
   pageTranslateStatus: string | null;
+  documentPermissions?: PDFDocumentPermissions | null;
   aiChat: ReturnType<
     typeof import("@/hooks/useAiChatController").useAiChatController
   >;
@@ -67,6 +69,7 @@ export function EditorRightPanel({
   effectiveLanguage,
   isPageTranslating,
   pageTranslateStatus,
+  documentPermissions,
   aiChat,
   onSetUiState,
   onSelectControl,
@@ -137,6 +140,7 @@ export function EditorRightPanel({
         totalPages={pagesLength}
         isProcessing={isPageTranslating}
         processingStatus={pageTranslateStatus}
+        documentPermissions={documentPermissions}
         initialTranslateOption={translateOption}
         initialTargetLanguage={translateTargetLanguage || effectiveLanguage}
         options={pageTranslateOptions}

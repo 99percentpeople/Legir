@@ -15,6 +15,7 @@ import type {
   LLMModelModality,
   PageFlowDirection,
   PageLayoutMode,
+  PDFDocumentPermissions,
   PDFMetadata,
   PDFOutlineItem,
   PDFSearchResult,
@@ -23,6 +24,8 @@ import type {
 export type AiToolName =
   | "get_document_context"
   | "get_document_metadata"
+  | "update_document_metadata"
+  | "unlock_pdf_permissions"
   | "get_pages_visual"
   | "summarize_pages_visual"
   | "get_pages_text"
@@ -141,6 +144,36 @@ export interface AiDocumentMetadata {
   producer?: string;
   creationDate?: string;
   modificationDate?: string;
+  permissions: PDFDocumentPermissions;
+  sourcePermissions: PDFDocumentPermissions;
+  ownerRestrictionsUnlocked: boolean;
+  preserveOwnerRestrictionsOnSave: boolean;
+}
+
+export interface AiPdfPermissionUnlockResult {
+  ok: boolean;
+  status:
+    | "unlocked"
+    | "already_unlocked"
+    | "not_restricted"
+    | "no_document"
+    | "incorrect_password"
+    | "missing_encrypt_dictionary"
+    | "unsupported_encryption";
+  unlocked: boolean;
+  permissions: PDFDocumentPermissions;
+  sourcePermissions: PDFDocumentPermissions;
+  preserveOwnerRestrictionsOnSave: boolean;
+  error?: string;
+  message?: string;
+  reason?: string;
+}
+
+export interface AiDocumentMetadataUpdateResult {
+  ok: true;
+  status: "updated" | "unchanged";
+  updatedFields: string[];
+  metadata: PDFMetadata;
 }
 
 export interface AiReadablePageLine {
@@ -785,6 +818,10 @@ export interface AiChatSessionSummary {
 export interface AiDocumentSnapshot {
   filename: string;
   metadata: PDFMetadata;
+  documentPermissions: PDFDocumentPermissions | null;
+  sourceDocumentPermissions: PDFDocumentPermissions | null;
+  pdfOwnerUnlocked: boolean;
+  preservePdfOwnerRestrictionsOnSave: boolean;
   pages: Array<{
     pageIndex: number;
     width: number;

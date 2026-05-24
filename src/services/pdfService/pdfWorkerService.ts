@@ -1,7 +1,7 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
 import type { Tile } from "./types";
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
-import type { PDFOutlineItem } from "@/types";
+import type { PDFDocumentPermissions, PDFOutlineItem } from "@/types";
 import type {
   WorkerCommandType,
   WorkerErrorResponse,
@@ -88,6 +88,7 @@ class PDFWorkerService {
   private lastRenderScaleByDocPage = new Map<string, number>();
   private textContentCacheByDocPage = new Map<string, TextContent>();
   private outlineCacheByDocId = new Map<string, PDFOutlineItem[]>();
+  private permissionsCacheByDocId = new Map<string, PDFDocumentPermissions>();
 
   private failAllPendingRequests(error: string) {
     for (const [id, handlers] of Array.from(this.pendingRequests.entries())) {
@@ -116,6 +117,10 @@ class PDFWorkerService {
 
   private clearOutlineCacheForDoc(docId: string) {
     this.outlineCacheByDocId.delete(docId);
+  }
+
+  private clearPermissionsCacheForDoc(docId: string) {
+    this.permissionsCacheByDocId.delete(docId);
   }
 
   constructor() {
@@ -246,6 +251,7 @@ class PDFWorkerService {
     this.lastRenderScaleByDocPage.clear();
     this.textContentCacheByDocPage.clear();
     this.outlineCacheByDocId.clear();
+    this.permissionsCacheByDocId.clear();
     this.requestSeq = 0;
 
     if (!this.worker) return;
@@ -290,6 +296,7 @@ class PDFWorkerService {
       }
       this.clearTextContentCacheForDoc(docId);
       this.clearOutlineCacheForDoc(docId);
+      this.clearPermissionsCacheForDoc(docId);
 
       const id = `load_${docId}_${Date.now()}`;
       const signal = options?.signal;
@@ -347,6 +354,7 @@ class PDFWorkerService {
     this.passwordByDocId.delete(docId);
     this.clearTextContentCacheForDoc(docId);
     this.clearOutlineCacheForDoc(docId);
+    this.clearPermissionsCacheForDoc(docId);
     const id = `unload_${docId}_${Date.now()}`;
     const message: WorkerRequest = { type: "unload", id, docId };
     this.worker?.postMessage(message);
@@ -487,6 +495,78 @@ class PDFWorkerService {
 
         const message: WorkerRequest = {
           type: "getOutline",
+          id,
+          docId,
+        };
+
+        worker.postMessage(message);
+      } catch (e) {
+        if (signal) signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    });
+  }
+
+  @RequireWorkerPromise()
+  public getPermissions(options?: {
+    docId?: string;
+    signal?: AbortSignal;
+  }): Promise<PDFDocumentPermissions | null> {
+    return new Promise((resolve, reject) => {
+      const worker = this.worker;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
+      const docId = options?.docId ?? this.defaultDocId;
+      const cached = this.permissionsCacheByDocId.get(docId);
+      if (cached) {
+        resolve(cached);
+        return;
+      }
+
+      const id = `getPermissions_${docId}_${this.requestSeq++}_${Date.now()}`;
+      const signal = options?.signal;
+
+      if (signal?.aborted) {
+        const err = new DOMException("Aborted", "AbortError");
+        (err as DOMException & { phase?: string }).phase = "pre-send";
+        reject(err);
+        return;
+      }
+
+      const onAbort = () => {
+        const msg: WorkerRequest = { type: "cancel", id };
+        this.worker?.postMessage(msg);
+        this.pendingRequests.delete(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        this.pendingRequests.set(id, {
+          resolve: (msg: WorkerSuccessResponse<"getPermissions">) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            const payload = msg.payload;
+            if (!payload || typeof payload !== "object") {
+              resolve(null);
+              return;
+            }
+            const permissions = payload as PDFDocumentPermissions;
+            this.permissionsCacheByDocId.set(docId, permissions);
+            resolve(permissions);
+          },
+          reject: (msg: WorkerErrorResponse) => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            reject(new Error(msg.error));
+          },
+        });
+
+        const message: WorkerRequest = {
+          type: "getPermissions",
           id,
           docId,
         };

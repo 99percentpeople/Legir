@@ -7,6 +7,7 @@ import {
 } from "@/constants";
 import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
+import { getEffectivePdfPermissions } from "@/lib/pdfPermissions";
 import { pageTranslationService } from "@/services/pageTranslationService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import {
@@ -85,6 +86,12 @@ const normalizeDocumentMetadata = (
   producer: snapshot.metadata.producer?.trim() || undefined,
   creationDate: snapshot.metadata.creationDate || undefined,
   modificationDate: snapshot.metadata.modificationDate || undefined,
+  permissions: getEffectivePdfPermissions(snapshot.documentPermissions),
+  sourcePermissions: getEffectivePdfPermissions(
+    snapshot.sourceDocumentPermissions ?? snapshot.documentPermissions,
+  ),
+  ownerRestrictionsUnlocked: snapshot.pdfOwnerUnlocked,
+  preserveOwnerRestrictionsOnSave: snapshot.preservePdfOwnerRestrictionsOnSave,
 });
 
 const clampPageNumbers = (

@@ -43,6 +43,7 @@ import {
   FieldType,
   type Annotation,
   type FormField,
+  type PDFMetadata,
   type PDFSearchResult,
 } from "@/types";
 import type {
@@ -65,6 +66,8 @@ import type {
   AiDetectedFormFieldBatch,
   AiDetectedFormFieldDraft,
   AiDocumentPageAssetSummary,
+  AiDocumentMetadataUpdateResult,
+  AiPdfPermissionUnlockResult,
   AiFormFieldFillRequest,
   AiFormFieldFillResult,
   AiFormFieldFillResultItem,
@@ -1013,6 +1016,40 @@ const annotationSupportsRectResize = (annotation: Annotation) =>
 const annotationSupportsTextUpdate = (annotation: Annotation) =>
   annotation.type !== "link";
 
+const unlockFailureMessage = (
+  status: AiPdfPermissionUnlockResult["status"],
+) => {
+  switch (status) {
+    case "no_document":
+      return "No PDF is currently loaded.";
+    case "incorrect_password":
+      return "The owner password is incorrect.";
+    case "missing_encrypt_dictionary":
+      return "The PDF does not contain a readable encryption dictionary.";
+    case "unsupported_encryption":
+      return "This PDF encryption format is not supported for owner password verification.";
+    default:
+      return "The PDF permissions could not be unlocked.";
+  }
+};
+
+const normalizeMetadataComparableValue = (value: unknown) =>
+  Array.isArray(value) ? JSON.stringify(value) : (value ?? undefined);
+
+const getChangedMetadataFields = (
+  current: PDFMetadata,
+  updates: Partial<PDFMetadata>,
+) =>
+  Object.entries(updates)
+    .filter(([key, value]) => {
+      const typedKey = key as keyof PDFMetadata;
+      return (
+        normalizeMetadataComparableValue(current[typedKey]) !==
+        normalizeMetadataComparableValue(value)
+      );
+    })
+    .map(([key]) => key);
+
 export const createAiChatToolContext = (options: {
   searchResultsRef: MutableRefObject<Map<string, AiStoredSearchResult>>;
   searchSeqRef: MutableRefObject<number>;
@@ -1030,6 +1067,56 @@ export const createAiChatToolContext = (options: {
   const getDocumentPageAssetSummary = () => summarizeDocumentPageAssets();
   const getActiveSession = () =>
     options.sessionsRef.current.get(options.activeSessionIdRef.current) ?? null;
+
+  const updateDocumentMetadata = (
+    updates: Partial<PDFMetadata>,
+  ): AiDocumentMetadataUpdateResult => {
+    const store = useEditorStore.getState();
+    if (!store.pdfBytes) {
+      throw new Error("No PDF is currently loaded.");
+    }
+
+    const updatedFields = getChangedMetadataFields(store.metadata, updates);
+    if (updatedFields.length === 0) {
+      return {
+        ok: true,
+        status: "unchanged",
+        updatedFields: [],
+        metadata: store.metadata,
+      };
+    }
+
+    store.saveCheckpoint();
+    store.updateMetadata(updates);
+
+    return {
+      ok: true,
+      status: "updated",
+      updatedFields,
+      metadata: useEditorStore.getState().metadata,
+    };
+  };
+
+  const unlockPdfPermissions = async (input: {
+    password: string;
+    preserveOwnerRestrictionsOnSave?: boolean;
+  }): Promise<AiPdfPermissionUnlockResult> => {
+    const store = useEditorStore.getState();
+    const result = await store.unlockPdfOwnerRestrictions(input.password, {
+      preserveOwnerRestrictionsOnSave: input.preserveOwnerRestrictionsOnSave,
+    });
+
+    if (!result.ok) {
+      return {
+        ...result,
+        error: result.status.toUpperCase(),
+        message: unlockFailureMessage(result.status),
+        reason: result.reason ?? result.status,
+      };
+    }
+
+    return result;
+  };
 
   const rememberSearchResults = (
     query: string,
@@ -3873,6 +3960,8 @@ export const createAiChatToolContext = (options: {
     formToolsEnabled: options.formToolsEnabled,
     detectFormFieldsEnabled: options.detectFormFieldsEnabled,
     getDocumentPageAssetSummary,
+    updateDocumentMetadata,
+    unlockPdfPermissions,
     rememberSearchResults,
     updateAnnotationText,
     updateAnnotationTexts,

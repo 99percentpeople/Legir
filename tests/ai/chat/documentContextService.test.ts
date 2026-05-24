@@ -13,6 +13,10 @@ import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 const createSnapshot = (pageCount: number): AiDocumentSnapshot => ({
   filename: "test.pdf",
   metadata: {},
+  documentPermissions: null,
+  sourceDocumentPermissions: null,
+  pdfOwnerUnlocked: false,
+  preservePdfOwnerRestrictionsOnSave: true,
   pages: Array.from({ length: pageCount }, (_, pageIndex) => ({
     pageIndex,
     width: 0,

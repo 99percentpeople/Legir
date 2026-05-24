@@ -33,6 +33,11 @@ import { selectAppShellState } from "@/store/selectors";
 import { loadPDF, exportPDF } from "./services/pdfService";
 import { createPdfWorkerService } from "./services/pdfService/pdfWorkerService";
 import { recentFilesService } from "./services/recentFilesService";
+import {
+  canPrintPdf,
+  EMPTY_PDF_PERMISSION_DIRTY_SCOPES,
+  getPdfPermissionSaveBlockReason,
+} from "@/lib/pdfPermissions";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";
 import { EditorCloseConfirmDialog } from "./pages/EditorPage/EditorCloseConfirmDialog";
@@ -920,6 +925,7 @@ const App: React.FC = () => {
               annotations,
               preservedSourceAnnotations,
               metadata,
+              documentPermissions,
               outline,
               openPassword,
               dispose,
@@ -940,6 +946,7 @@ const App: React.FC = () => {
               pdfBytes,
               pdfOpenPassword: openPassword ?? null,
               metadata,
+              documentPermissions,
               filename: options.filename,
               saveTarget: options.saveTarget,
               pages,
@@ -1499,7 +1506,10 @@ const App: React.FC = () => {
   );
 
   const generatePDF = useCallback(
-    async (options?: { flattenFormFields?: boolean }) => {
+    async (options?: {
+      flattenFormFields?: boolean;
+      preserveOwnerRestrictions?: boolean;
+    }) => {
       const snapshot = useEditorStore.getState();
       if (!snapshot.pdfBytes) return null;
 
@@ -1516,6 +1526,12 @@ const App: React.FC = () => {
             snapshot.options.removeTextUnderFlattenedFreetext,
           preservedSourceAnnotations: snapshot.preservedSourceAnnotations,
           flattenFormFields: options?.flattenFormFields,
+          sourceDocumentPermissions:
+            snapshot.sourceDocumentPermissions ?? snapshot.documentPermissions,
+          preserveOwnerRestrictions:
+            options?.preserveOwnerRestrictions ??
+            snapshot.preservePdfOwnerRestrictionsOnSave,
+          ownerPassword: snapshot.pdfOwnerPassword,
         },
       );
     },
@@ -1566,6 +1582,7 @@ const App: React.FC = () => {
         filename: nextFilename,
         lastSavedAt: new Date(),
         isDirty: false,
+        dirtyPermissionScopes: { ...EMPTY_PDF_PERMISSION_DIRTY_SCOPES },
       });
 
       if (target.kind === "tauri") {
@@ -1585,6 +1602,14 @@ const App: React.FC = () => {
   const handleSaveAs = useCallback(async (): Promise<boolean> => {
     const initialSnapshot = useEditorStore.getState();
     if (!initialSnapshot.pdfBytes) return false;
+    const permissionBlockReason = getPdfPermissionSaveBlockReason(
+      initialSnapshot.documentPermissions,
+      initialSnapshot.dirtyPermissionScopes,
+    );
+    if (permissionBlockReason) {
+      toast.error(t(`app.save_permission_denied.${permissionBlockReason}`));
+      return false;
+    }
 
     let target: SaveTarget | null = null;
     try {
@@ -1593,7 +1618,7 @@ const App: React.FC = () => {
         filters: [{ name: "PDF Document", extensions: ["pdf"] }],
       });
     } catch (err) {
-      if (err?.name === "AbortError") return false;
+      if (err instanceof Error && err?.name === "AbortError") return false;
       console.error("Save As failed:", err);
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(`${t("app.save_fail")}${msg ? `: ${msg}` : ""}`);
@@ -1628,6 +1653,14 @@ const App: React.FC = () => {
   const handleSave = useCallback(async (): Promise<boolean> => {
     const initialSnapshot = useEditorStore.getState();
     if (!initialSnapshot.pdfBytes) return false;
+    const permissionBlockReason = getPdfPermissionSaveBlockReason(
+      initialSnapshot.documentPermissions,
+      initialSnapshot.dirtyPermissionScopes,
+    );
+    if (permissionBlockReason) {
+      toast.error(t(`app.save_permission_denied.${permissionBlockReason}`));
+      return false;
+    }
 
     let preselectedTarget: SaveTarget | null = null;
 
@@ -1638,7 +1671,9 @@ const App: React.FC = () => {
           filters: [{ name: "PDF Document", extensions: ["pdf"] }],
         });
       } catch (error) {
-        if (error?.name === "AbortError") return false;
+        if (error instanceof Error && error?.name === "AbortError")
+          return false;
+
         console.error("Save failed:", error);
         const msg = error instanceof Error ? error.message : String(error);
         toast.error(`${t("app.save_fail")}${msg ? `: ${msg}` : ""}`);
@@ -1689,8 +1724,17 @@ const App: React.FC = () => {
   }, [commitSavedPdf, generatePDF, t, withProcessing]);
 
   const handlePrint = useCallback(async () => {
+    const snapshot = useEditorStore.getState();
+    if (!canPrintPdf(snapshot.documentPermissions)) {
+      toast.error(t("app.print_permission_denied"));
+      return;
+    }
+
     await withProcessing(t("app.generating"), async () => {
-      const modifiedBytes = await generatePDF({ flattenFormFields: true });
+      const modifiedBytes = await generatePDF({
+        flattenFormFields: true,
+        preserveOwnerRestrictions: false,
+      });
       if (!modifiedBytes) return;
 
       const blob = new Blob([new Uint8Array(modifiedBytes)], {

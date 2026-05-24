@@ -6,8 +6,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Highlighter, Languages, Search, Sparkles } from "lucide-react";
+import { Copy, Highlighter, Languages, Search, Sparkles } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
+import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
+import type { PDFDocumentPermissions } from "@/types";
 
 export type WorkspaceTextSelectionPopoverState = {
   isVisible: boolean;
@@ -19,6 +21,7 @@ export type WorkspaceTextSelectionPopoverState = {
 export interface WorkspaceTextSelectionPopoverProps {
   toolbar: WorkspaceTextSelectionPopoverState;
   virtualRef: React.ComponentProps<typeof PopoverAnchor>["virtualRef"];
+  documentPermissions: PDFDocumentPermissions | null | undefined;
   onClose: () => void;
   onHighlight: () => void;
   onSearchWeb: () => void;
@@ -31,6 +34,7 @@ export const WorkspaceTextSelectionPopover: React.FC<
 > = ({
   toolbar,
   virtualRef,
+  documentPermissions,
   onClose,
   onHighlight,
   onSearchWeb,
@@ -38,6 +42,9 @@ export const WorkspaceTextSelectionPopover: React.FC<
   onAskAi,
 }) => {
   const { t } = useLanguage();
+  const permissionUi = usePdfPermissionUi(documentPermissions);
+  const selectedText = toolbar.text.trim();
+  const canCopyText = permissionUi.can("copy_text");
 
   return (
     <Popover
@@ -85,8 +92,42 @@ export const WorkspaceTextSelectionPopover: React.FC<
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            title={t("toolbar.highlight")}
-            onClick={onHighlight}
+            aria-disabled={canCopyText && selectedText ? undefined : true}
+            disabled={!canCopyText || !selectedText}
+            title={
+              canCopyText
+                ? t("common.actions.copy")
+                : permissionUi.restrictedTitle
+            }
+            onClick={() => {
+              permissionUi.guard("copy_text", () => {
+                if (!selectedText) return;
+                void (async () => {
+                  try {
+                    await navigator.clipboard.writeText(selectedText);
+                  } catch {
+                    // Ignore clipboard failures; the user can still use the selection.
+                  } finally {
+                    onClose();
+                  }
+                })();
+              });
+            }}
+          >
+            <Copy size={16} />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            {...permissionUi.disabledProps(
+              "create_annotation",
+              t("toolbar.highlight"),
+            )}
+            onClick={() => {
+              permissionUi.guard("create_annotation", onHighlight);
+            }}
           >
             <Highlighter size={16} />
           </Button>
@@ -96,7 +137,9 @@ export const WorkspaceTextSelectionPopover: React.FC<
             size="icon"
             className="h-8 w-8"
             title={t("toolbar.translate")}
-            onClick={onTranslate}
+            onClick={() => {
+              onTranslate();
+            }}
           >
             <Languages size={16} />
           </Button>
@@ -105,8 +148,10 @@ export const WorkspaceTextSelectionPopover: React.FC<
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            title={t("toolbar.ask_ai", { text: toolbar.text.trim() })}
-            onClick={onAskAi}
+            title={t("toolbar.ask_ai", { text: selectedText })}
+            onClick={() => {
+              onAskAi();
+            }}
           >
             <Sparkles size={16} />
           </Button>
@@ -115,8 +160,10 @@ export const WorkspaceTextSelectionPopover: React.FC<
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            title={t("toolbar.search_web", { text: toolbar.text.trim() })}
-            onClick={onSearchWeb}
+            title={t("toolbar.search_web", { text: selectedText })}
+            onClick={() => {
+              onSearchWeb();
+            }}
           >
             <Search size={16} />
           </Button>

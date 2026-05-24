@@ -96,6 +96,8 @@ const fr = {
     search_web: "Rechercher “{text}” sur le Web",
     translate: "Traduire",
     ask_ai: "Demander à l’IA à propos de « {text} »",
+    permission_restricted:
+      "Cette opération n’est pas autorisée par les permissions du PDF",
   },
   translate: {
     title: "Traduire",
@@ -203,6 +205,40 @@ const fr = {
       desc: "Utiliser un mot de passe lors de l’export",
       placeholder: "Mot de passe",
       placeholder_use_open: "Laissez vide pour exporter sans mot de passe",
+    },
+    permissions: {
+      title: "Permissions du document",
+      unrestricted: "Non restreint",
+      restricted: "Restreint",
+      restricted_trigger: "Permissions restreintes",
+      unlocked: "Déverrouillé",
+      restricted_desc:
+        "Ce PDF peut être consulté, mais certaines opérations de modification ou d’export sont restreintes.",
+      unlocked_desc:
+        "Les restrictions d’opération du PDF sont déverrouillées pour cette session avec le mot de passe propriétaire.",
+      owner_password: "Mot de passe propriétaire",
+      owner_password_placeholder: "Saisir le mot de passe propriétaire",
+      owner_password_desc:
+        "Utilisé uniquement pour vérifier le droit de lever les restrictions. Il n’est pas écrit dans le document et n’est conservé que temporairement pour cette session.",
+      unlock: "Déverrouiller",
+      unlock_ok: "Mot de passe propriétaire vérifié",
+      unlock_failed:
+        "Le mot de passe propriétaire est incorrect ou ce type de chiffrement n’est pas pris en charge.",
+      preserve_on_save:
+        "Conserver les restrictions d’origine à l’enregistrement",
+      preserve_on_save_desc:
+        "Si cette option est désactivée, un PDF déverrouillé sera enregistré sans réappliquer les restrictions de modification ou d’impression d’origine.",
+      allowed: "Autorisé",
+      denied: "Refusé",
+      open: "Ouvrir",
+      modify_contents: "Modifier le PDF",
+      modify_annotations: "Annoter",
+      fill_forms: "Remplir les formulaires",
+      copy: "Copier",
+      copy_accessibility: "Copier pour l’accessibilité",
+      print: "Imprimer",
+      print_high_quality: "Impression haute qualité",
+      assemble: "Assembler les pages",
     },
     remove_text_under_freetext: {
       label: "Supprimer le texte sous le texte libre",
@@ -555,6 +591,9 @@ const fr = {
       disable_pdf_text_layer: "Désactiver la couche de texte PDF",
       disable_pdf_text_layer_desc:
         "Démonte PDFTextLayer pour le profilage. La sélection de texte, le surlignage des recherches textuelles et le surlignage basé sur le texte cesseront de fonctionner tant que cette option est activée.",
+      ignore_pdf_permissions: "Ignorer les permissions PDF",
+      ignore_pdf_permissions_desc:
+        "Débogage uniquement : contourne les vérifications de permissions PDF dans l'éditeur sans modifier les permissions enregistrées dans le document.",
       pdf_zoom_render_timing: "Temps de rendu du zoom PDF",
       pdf_zoom_render_timing_desc:
         "Affiche la latence de rendu canvas/texte par page après chaque changement de zoom.",
@@ -739,6 +778,14 @@ const fr = {
     load_error: "Échec du chargement du PDF.",
     save_success: "Enregistré avec succès",
     save_fail: "Échec de l'enregistrement",
+    save_permission_denied: {
+      modify_contents:
+        "Ce PDF n’autorise pas la modification du contenu du document.",
+      modify_annotations:
+        "Ce PDF n’autorise pas la modification des annotations.",
+      fill_forms: "Ce PDF n’autorise pas le remplissage des formulaires.",
+    },
+    print_permission_denied: "Ce PDF n’autorise pas l’impression.",
     export_fail: "Échec de l'exportation du PDF.",
   },
   tabs: {

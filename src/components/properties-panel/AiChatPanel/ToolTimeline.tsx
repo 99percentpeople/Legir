@@ -57,7 +57,7 @@ export const ToolTimelineCall = ({
               <div className="text-xs">{item.resultSummary}</div>
             ) : null}
             {item.error ? (
-              <div className="text-destructive text-sm">{item.error}</div>
+              <div className="text-destructive text-xs">{item.error}</div>
             ) : null}
           </div>
 

@@ -48,6 +48,11 @@ import ZoomDropdownControl from "./ZoomDropdownControl";
 import PageSettingsDropdownControl from "./PageSettingsDropdownControl";
 import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import {
+  canPrintPdf,
+  canUseModeWithPdfPermissions,
+  canUseToolWithPdfPermissions,
+} from "@/lib/pdfPermissions";
 import { getContrastColor } from "@/utils/colors";
 import SaveMenu from "./SaveMenu";
 import { canSaveAs } from "@/services/platform";
@@ -62,6 +67,7 @@ import {
 } from "./shapeTools";
 import { ShapeBorderStyleSection } from "./ShapeBorderStyleSection";
 import { StampStylePopover } from "./StampStylePopover";
+import { DocumentPermissionsPopover } from "./DocumentPermissionsPopover";
 
 interface ToolbarProps {
   editorState: EditorState;
@@ -167,6 +173,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
   }, [tool]);
 
   const isShapeToolActive = isShapeTool(tool);
+  const isToolAllowed = React.useCallback(
+    (candidate: Tool) =>
+      canUseToolWithPdfPermissions(
+        candidate,
+        mode,
+        editorState.documentPermissions,
+      ),
+    [editorState.documentPermissions, mode],
+  );
+  const isModeAllowed = React.useCallback(
+    (candidate: EditorState["mode"]) =>
+      canUseModeWithPdfPermissions(candidate, editorState.documentPermissions),
+    [editorState.documentPermissions],
+  );
+  const restrictedTitle = t("toolbar.permission_restricted");
   const activeShapeTool = isShapeTool(tool) ? tool : lastShapeTool;
   const ActiveShapeIcon = isShapeToolActive
     ? getShapeToolIcon(activeShapeTool)
@@ -297,17 +318,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     value={mode}
                     onValueChange={(nextMode) => {
                       if (nextMode === "annotation" || nextMode === "form") {
+                        if (!isModeAllowed(nextMode)) return;
                         onModeChange(nextMode);
                       }
                     }}
                   >
-                    <DropdownMenuRadioItem value="annotation">
+                    <DropdownMenuRadioItem
+                      value="annotation"
+                      disabled={!isModeAllowed("annotation")}
+                    >
                       <div className="flex items-center gap-2">
                         <PenTool size={14} />
                         <span>{t("mode.annotation")}</span>
                       </div>
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="form">
+                    <DropdownMenuRadioItem
+                      value="form"
+                      disabled={!isModeAllowed("form")}
+                    >
                       <div className="flex items-center gap-2">
                         <Edit3 size={14} />
                         <span>{t("mode.form")}</span>
@@ -329,7 +357,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 type="single"
                 value={toolbarTool}
                 onValueChange={(value) => {
-                  if (value) onToolChange(value as Tool);
+                  if (value && isToolAllowed(value as Tool)) {
+                    onToolChange(value as Tool);
+                  }
                 }}
                 className="sm:bg-muted/20 mx-auto flex min-w-max items-center gap-1 rounded-lg p-1 sm:shadow-sm"
                 spacing={1}
@@ -352,6 +382,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <ToggleGroupItem
                   value="draw_text"
                   title={t("toolbar.text")}
+                  disabled={!isToolAllowed("draw_text")}
                   className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                 >
                   <Type size={18} />
@@ -359,6 +390,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <ToggleGroupItem
                   value="draw_checkbox"
                   title={t("toolbar.checkbox")}
+                  disabled={!isToolAllowed("draw_checkbox")}
                   className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                 >
                   <CheckSquare size={18} />
@@ -366,6 +398,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <ToggleGroupItem
                   value="draw_radio"
                   title={t("toolbar.radio")}
+                  disabled={!isToolAllowed("draw_radio")}
                   className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                 >
                   <CircleDot size={18} />
@@ -373,6 +406,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <ToggleGroupItem
                   value="draw_dropdown"
                   title={t("toolbar.dropdown")}
+                  disabled={!isToolAllowed("draw_dropdown")}
                   className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                 >
                   <List size={18} />
@@ -380,6 +414,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <ToggleGroupItem
                   value="draw_signature"
                   title={t("toolbar.signature")}
+                  disabled={!isToolAllowed("draw_signature")}
                   className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                 >
                   <PenLine size={18} />
@@ -390,7 +425,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 type="single"
                 value={toolbarTool}
                 onValueChange={(value) => {
-                  if (value) onToolChange(value as Tool);
+                  if (value && isToolAllowed(value as Tool)) {
+                    onToolChange(value as Tool);
+                  }
                 }}
                 className="sm:bg-muted/20 mx-auto flex min-w-max items-center gap-1 rounded-lg p-1 sm:shadow-sm"
                 spacing={1}
@@ -412,6 +449,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <ToggleGroupItem
                   value="eraser"
                   title={t("toolbar.eraser")}
+                  disabled={!isToolAllowed("eraser")}
                   className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                 >
                   <Eraser size={18} />
@@ -419,7 +457,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <Separator orientation="vertical" className="mx-1 h-5" />
                 <ToggleGroupItem
                   value="draw_highlight"
-                  title={t("toolbar.highlight_text")}
+                  title={
+                    isToolAllowed("draw_highlight")
+                      ? t("toolbar.highlight_text")
+                      : restrictedTitle
+                  }
+                  disabled={!isToolAllowed("draw_highlight")}
                   className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
                 >
                   <div
@@ -475,7 +518,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <div className="flex items-center gap-0">
                   <ToggleGroupItem
                     value="draw_ink"
-                    title={t("toolbar.ink")}
+                    title={
+                      isToolAllowed("draw_ink")
+                        ? t("toolbar.ink")
+                        : restrictedTitle
+                    }
+                    disabled={!isToolAllowed("draw_ink")}
                     className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
                   >
                     <div
@@ -507,7 +555,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <div className="flex items-center gap-0">
                   <ToggleGroupItem
                     value="draw_comment"
-                    title={t("toolbar.comment")}
+                    title={
+                      isToolAllowed("draw_comment")
+                        ? t("toolbar.comment")
+                        : restrictedTitle
+                    }
+                    disabled={!isToolAllowed("draw_comment")}
                     className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
                   >
                     <div
@@ -536,7 +589,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <div className="flex items-center gap-0">
                   <ToggleGroupItem
                     value="draw_freetext"
-                    title={t("toolbar.freetext")}
+                    title={
+                      isToolAllowed("draw_freetext")
+                        ? t("toolbar.freetext")
+                        : restrictedTitle
+                    }
+                    disabled={!isToolAllowed("draw_freetext")}
                     className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
                   >
                     <div
@@ -563,6 +621,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   <ToggleGroupItem
                     value="draw_stamp"
                     title={t("toolbar.stamp")}
+                    disabled={!isToolAllowed("draw_stamp")}
                     className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
                   >
                     <Stamp size={16} />
@@ -598,6 +657,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                             "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
                         )}
                         title={shapeButtonLabel}
+                        disabled={!isToolAllowed(activeShapeTool)}
                       >
                         <ActiveShapeIcon size={16} />
                       </Button>
@@ -657,9 +717,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
                                           isActive &&
                                             "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
                                         )}
-                                        onClick={() =>
-                                          handleShapeToolSelect(shapeTool)
-                                        }
+                                        onClick={() => {
+                                          if (!isToolAllowed(shapeTool)) return;
+                                          handleShapeToolSelect(shapeTool);
+                                        }}
+                                        disabled={!isToolAllowed(shapeTool)}
                                       >
                                         <ShapeIcon size={18} />
                                         <span className="leading-none">
@@ -730,6 +792,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-1">
+          <DocumentPermissionsPopover
+            documentPermissions={editorState.documentPermissions}
+            sourceDocumentPermissions={editorState.sourceDocumentPermissions}
+            pdfOwnerUnlocked={editorState.pdfOwnerUnlocked}
+          />
+
           {showPageSettingsControl && (
             <PageSettingsDropdownControl
               pageLayout={livePageLayout}
@@ -786,6 +854,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           disabled={editorState.pages.length === 0}
           isDirty={!!isDirty}
           hasSaveAs={hasSaveAs.current}
+          canPrint={canPrintPdf(editorState.documentPermissions)}
           onPrimary={onSave}
           onSaveAs={onSaveAs}
           onExit={onExit}

@@ -236,6 +236,28 @@ export interface PDFMetadata {
   modificationDate?: string;
   isModDateManual?: boolean;
   isProducerManual?: boolean;
+  documentPermissions?: PDFDocumentPermissions | null;
+}
+
+export interface PDFDocumentPermissions {
+  isEncrypted: boolean;
+  hasOwnerRestrictions: boolean;
+  canOpen: boolean;
+  canModifyContents: boolean;
+  canModifyAnnotations: boolean;
+  canFillForms: boolean;
+  canCopy: boolean;
+  canCopyForAccessibility: boolean;
+  canPrint: boolean;
+  canPrintHighQuality: boolean;
+  canAssemble: boolean;
+  rawFlags: number[] | null;
+}
+
+export interface PDFPermissionDirtyScopes {
+  modifyContents: boolean;
+  modifyAnnotations: boolean;
+  fillForms: boolean;
 }
 
 export interface PDFOutlineItem {
@@ -258,6 +280,7 @@ export interface HistorySnapshot {
   annotations: Annotation[];
   metadata: PDFMetadata;
   exportPassword: string | null;
+  dirtyPermissionScopes: PDFPermissionDirtyScopes;
 }
 
 export interface PreservedSourceAnnotationRef {
@@ -318,6 +341,7 @@ export interface DebugOptions {
   disablePdfTextLayer: boolean;
   pdfZoomRenderTiming: boolean;
   workspaceZoomJank: boolean;
+  ignorePdfPermissions: boolean;
 }
 
 export type AppLLMModelOption = {
@@ -473,6 +497,12 @@ export interface EditorState {
   pdfOpenPassword: string | null;
   exportPassword: string | null;
   metadata: PDFMetadata;
+  documentPermissions: PDFDocumentPermissions | null;
+  sourceDocumentPermissions: PDFDocumentPermissions | null;
+  pdfOwnerUnlocked: boolean;
+  pdfOwnerPassword: string | null;
+  preservePdfOwnerRestrictionsOnSave: boolean;
+  dirtyPermissionScopes: PDFPermissionDirtyScopes;
   filename: string;
   saveTarget: EditorSaveTarget | null;
   pages: PageData[];
@@ -617,6 +647,7 @@ export type WorkspaceEditorState = Pick<
   EditorState,
   | "annotations"
   | "commentStyle"
+  | "documentPermissions"
   | "fields"
   | "freetextStyle"
   | "highlightStyle"

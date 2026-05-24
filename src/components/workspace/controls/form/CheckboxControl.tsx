@@ -6,7 +6,14 @@ import { cn } from "@/utils/cn";
 import { resolveFontStackWithCjkFallback } from "@/lib/fonts";
 
 export const CheckboxControl: React.FC<FormControlProps> = (props) => {
-  const { data, isFormMode, isAnnotationMode, isSelectable, onUpdate } = props;
+  const {
+    data,
+    isFormMode,
+    isAnnotationMode,
+    isSelectable,
+    canFillFormValue = true,
+    onUpdate,
+  } = props;
   const style = data.style || {};
 
   const effectiveBorderStyle =
@@ -30,7 +37,7 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
   const showHelperBg = style.isTransparent && !props.isSelected;
 
   const handleInteraction = () => {
-    if (isAnnotationMode) {
+    if (isAnnotationMode && canFillFormValue) {
       onUpdate(data.id, { isChecked: !data.isChecked });
     }
   };
@@ -51,7 +58,10 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
               "bg-blue-500/10 dark:bg-blue-400/10",
               !isSelectable && "hover:bg-blue-500/20",
             ),
-          isAnnotationMode && isSelectable && "cursor-pointer hover:bg-black/5",
+          isAnnotationMode &&
+            isSelectable &&
+            canFillFormValue &&
+            "cursor-pointer hover:bg-black/5",
           isAnnotationMode && !isSelectable && "pointer-events-none",
           isFormMode && isSelectable && "pointer-events-none",
         )}

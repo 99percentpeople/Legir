@@ -38,6 +38,103 @@ const createVisualBatch = (
 });
 
 describe("AI chat document tools", () => {
+  test("update_document_metadata delegates normalized metadata updates", async () => {
+    const calls: unknown[] = [];
+    const ctx = {
+      updateDocumentMetadata: (input: unknown) => {
+        calls.push(input);
+        return {
+          ok: true,
+          status: "updated",
+          updatedFields: ["title", "keywords", "producer"],
+          metadata: {
+            title: "Updated title",
+            keywords: ["contract", "signed"],
+            producer: "Legir",
+            isProducerManual: true,
+          },
+        };
+      },
+    } as unknown as AiToolContext;
+    const handlers = createToolHandlerMap([documentToolModule], ctx);
+    const handler = handlers.update_document_metadata;
+
+    expect(handler).toBeDefined();
+    expect(handler!.definition.accessType).toBe("write");
+
+    const result = await handler!.execute(
+      {
+        title: "Updated title",
+        keywords: "contract; signed",
+        producer: "Legir",
+      },
+      ctx,
+    );
+
+    expect(calls).toEqual([
+      {
+        title: "Updated title",
+        keywords: ["contract", "signed"],
+        producer: "Legir",
+        isProducerManual: true,
+      },
+    ]);
+    expect(result).toMatchObject({
+      payload: {
+        ok: true,
+        status: "updated",
+        updatedFields: ["title", "keywords", "producer"],
+      },
+      summary: "Updated document metadata: title, keywords, producer",
+    });
+  });
+
+  test("unlock_pdf_permissions delegates to the shared unlock context", async () => {
+    const calls: unknown[] = [];
+    const ctx = {
+      unlockPdfPermissions: async (input: unknown) => {
+        calls.push(input);
+        return {
+          ok: true,
+          status: "unlocked",
+          unlocked: true,
+          permissions: { hasOwnerRestrictions: false },
+          sourcePermissions: { hasOwnerRestrictions: true },
+          preserveOwnerRestrictionsOnSave: false,
+        };
+      },
+    } as unknown as AiToolContext;
+    const handlers = createToolHandlerMap([documentToolModule], ctx);
+    const handler = handlers.unlock_pdf_permissions;
+
+    expect(handler).toBeDefined();
+    expect(handler!.definition.accessType).toBe("write");
+
+    const result = await handler!.execute(
+      {
+        password: "owner secret",
+        preserve_owner_restrictions_on_save: false,
+      },
+      ctx,
+    );
+
+    expect(calls).toEqual([
+      {
+        password: "owner secret",
+        preserveOwnerRestrictionsOnSave: false,
+      },
+    ]);
+    expect(result).toMatchObject({
+      payload: {
+        ok: true,
+        status: "unlocked",
+        unlocked: true,
+        preserveOwnerRestrictionsOnSave: false,
+      },
+      summary: "PDF permissions unlocked",
+    });
+  });
+
   test("get_pages_text delegates to getPagesText", async () => {
     const calls: unknown[] = [];
     const ctx = {

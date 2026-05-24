@@ -1,5 +1,12 @@
 import React from "react";
+import { toast } from "sonner";
+
+import { useLanguage } from "@/components/language-provider";
 import { useEventListener } from "@/hooks/useEventListener";
+import {
+  canPerformPdfPermissionOperation,
+  type PdfPermissionOperation,
+} from "@/lib/pdfPermissions";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { MoveDirection, Tool } from "@/types";
 
@@ -22,7 +29,27 @@ export function useEditorPageKeyboardShortcuts({
   onPrint,
   onToggleFullscreen,
 }: UseEditorPageKeyboardShortcutsOptions) {
+  const { t } = useLanguage();
   const previousToolBeforeSpacePanRef = React.useRef<Tool | null>(null);
+  const guardPdfPermission = React.useCallback(
+    (operation: PdfPermissionOperation, event: KeyboardEvent) => {
+      const currentState = useEditorStore.getState();
+      if (
+        canPerformPdfPermissionOperation(
+          operation,
+          currentState.documentPermissions,
+        )
+      ) {
+        return true;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      toast.error(t("toolbar.permission_restricted"));
+      return false;
+    },
+    [t],
+  );
 
   const restoreToolAfterSpacePan = React.useCallback(() => {
     const currentState = useEditorStore.getState();
@@ -139,6 +166,21 @@ export function useEditorPageKeyboardShortcuts({
         if (currentState.mode === "annotation" && isSelectedField) {
           return;
         }
+        const isSelectedAnnotation = currentState.annotations.some(
+          (annotation) => annotation.id === currentState.selectedId,
+        );
+        if (
+          isSelectedField &&
+          !guardPdfPermission("edit_form_structure", event)
+        ) {
+          return;
+        }
+        if (
+          isSelectedAnnotation &&
+          !guardPdfPermission("delete_annotation", event)
+        ) {
+          return;
+        }
         currentState.deleteSelection();
         return;
       }
@@ -171,6 +213,18 @@ export function useEditorPageKeyboardShortcuts({
           (currentState.mode === "annotation" && isSelectedAnnotation))
       ) {
         event.preventDefault();
+        if (
+          isSelectedField &&
+          !guardPdfPermission("edit_form_structure", event)
+        ) {
+          return;
+        }
+        if (
+          isSelectedAnnotation &&
+          !guardPdfPermission("edit_annotation", event)
+        ) {
+          return;
+        }
         const isFast = event.shiftKey;
         let direction: MoveDirection = "UP";
         if (event.key === "ArrowUp") direction = "UP";

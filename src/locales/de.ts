@@ -96,6 +96,8 @@ const de = {
     search_web: "Im Web nach „{text}“ suchen",
     translate: "Übersetzen",
     ask_ai: "KI zu „{text}“ fragen",
+    permission_restricted:
+      "Diese Aktion ist durch die PDF-Berechtigungen nicht erlaubt",
   },
   translate: {
     title: "Übersetzen",
@@ -202,6 +204,40 @@ const de = {
       desc: "Beim Export ein Passwort verwenden",
       placeholder: "Passwort",
       placeholder_use_open: "Leer lassen, um ohne Passwort zu exportieren",
+    },
+    permissions: {
+      title: "Dokumentberechtigungen",
+      unrestricted: "Nicht eingeschränkt",
+      restricted: "Eingeschränkt",
+      restricted_trigger: "Berechtigungen eingeschränkt",
+      unlocked: "Entsperrt",
+      restricted_desc:
+        "Dieses PDF kann angezeigt werden, schränkt aber einige Bearbeitungs- oder Exportvorgänge ein.",
+      unlocked_desc:
+        "Die PDF-Bedienungsbeschränkungen sind für diese Sitzung mit dem Besitzerpasswort entsperrt.",
+      owner_password: "Besitzerpasswort",
+      owner_password_placeholder: "Besitzerpasswort eingeben",
+      owner_password_desc:
+        "Wird nur verwendet, um die Berechtigung zum Aufheben der Einschränkungen zu prüfen. Es wird nicht ins Dokument geschrieben und nur vorübergehend für diese Sitzung behalten.",
+      unlock: "Entsperren",
+      unlock_ok: "Besitzerpasswort bestätigt",
+      unlock_failed:
+        "Das Besitzerpasswort ist falsch oder dieser Verschlüsselungstyp wird nicht unterstützt.",
+      preserve_on_save:
+        "Ursprüngliche Einschränkungen beim Speichern beibehalten",
+      preserve_on_save_desc:
+        "Wenn deaktiviert, wird ein entsperrtes PDF ohne erneutes Anwenden der ursprünglichen Bearbeitungs- oder Druckeinschränkungen gespeichert.",
+      allowed: "Erlaubt",
+      denied: "Verweigert",
+      open: "Öffnen",
+      modify_contents: "PDF ändern",
+      modify_annotations: "Kommentieren",
+      fill_forms: "Formulare ausfüllen",
+      copy: "Kopieren",
+      copy_accessibility: "Für Barrierefreiheit kopieren",
+      print: "Drucken",
+      print_high_quality: "Hochwertiger Druck",
+      assemble: "Seiten zusammenstellen",
     },
     remove_text_under_freetext: {
       label: "Text unter Freitext entfernen",
@@ -554,6 +590,9 @@ const de = {
       disable_pdf_text_layer: "PDF-Textlayer deaktivieren",
       disable_pdf_text_layer_desc:
         "Hängt PDFTextLayer für Profiling aus. Textauswahl, Textsuch-Hervorhebungen und textbasierte Hervorhebungen funktionieren dann nicht mehr.",
+      ignore_pdf_permissions: "PDF-Berechtigungen ignorieren",
+      ignore_pdf_permissions_desc:
+        "Nur zum Debuggen: Umgeht PDF-Berechtigungsprüfungen im Editor, ohne die im Dokument gespeicherten Berechtigungen zu ändern.",
       pdf_zoom_render_timing: "PDF-Zoom-Renderzeit",
       pdf_zoom_render_timing_desc:
         "Zeigt die Renderlatenz von Canvas/Text pro Seite nach jeder Zoom-Änderung an.",
@@ -737,6 +776,12 @@ const de = {
     load_error: "Laden des PDF fehlgeschlagen.",
     save_success: "Erfolgreich gespeichert",
     save_fail: "Speichern fehlgeschlagen",
+    save_permission_denied: {
+      modify_contents: "Dieses PDF erlaubt keine Änderung des Dokumentinhalts.",
+      modify_annotations: "Dieses PDF erlaubt keine Änderung von Kommentaren.",
+      fill_forms: "Dieses PDF erlaubt kein Ausfüllen von Formularen.",
+    },
+    print_permission_denied: "Dieses PDF erlaubt kein Drucken.",
     export_fail: "Exportieren des PDF fehlgeschlagen.",
   },
   tabs: {

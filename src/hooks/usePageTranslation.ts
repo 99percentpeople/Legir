@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
 import { pageTranslationService } from "@/services/pageTranslationService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
@@ -88,6 +89,19 @@ export const usePageTranslation = (deps: {
     }) => {
       if (state.pages.length === 0) return;
       if (pageTranslateAbortRef.current) return;
+      if (
+        !canPerformPdfPermissionOperation(
+          "extract_text",
+          state.documentPermissions,
+        ) ||
+        !canPerformPdfPermissionOperation(
+          "create_annotation",
+          state.documentPermissions,
+        )
+      ) {
+        toast.error(t("toolbar.permission_restricted"));
+        return;
+      }
 
       const parsed = pageTranslationService.parsePageRange(
         options.pageRange,
@@ -254,6 +268,7 @@ export const usePageTranslation = (deps: {
       state.pageTranslateParagraphCandidates,
       state.pageTranslateOptions.flattenFreetext,
       state.pages,
+      state.documentPermissions,
       t,
       workerService,
       withProcessing,
@@ -264,6 +279,15 @@ export const usePageTranslation = (deps: {
     async (options: { pageIndices: number[]; xGap: number; yGap: number }) => {
       if (state.pages.length === 0) return;
       if (pageTranslateAbortRef.current) return;
+      if (
+        !canPerformPdfPermissionOperation(
+          "extract_text",
+          state.documentPermissions,
+        )
+      ) {
+        toast.error(t("toolbar.permission_restricted"));
+        return;
+      }
       const controller = new AbortController();
       cancelPageTranslate();
       pageTranslateAbortRef.current = controller;
@@ -315,6 +339,7 @@ export const usePageTranslation = (deps: {
       cancelPageTranslate,
       setPageTranslateParagraphCandidates,
       setProcessingStatus,
+      state.documentPermissions,
       state.pages,
       state.pageTranslateOptions.paragraphSplitByFontSize,
       t,
@@ -326,6 +351,15 @@ export const usePageTranslation = (deps: {
   const handleUnmergeSelectedParagraphs = useCallback(async () => {
     if (state.pages.length === 0) return;
     if (pageTranslateAbortRef.current) return;
+    if (
+      !canPerformPdfPermissionOperation(
+        "extract_text",
+        state.documentPermissions,
+      )
+    ) {
+      toast.error(t("toolbar.permission_restricted"));
+      return;
+    }
     const selectedIds = state.pageTranslateSelectedParagraphIds;
     if (selectedIds.length === 0) return;
 
@@ -380,6 +414,7 @@ export const usePageTranslation = (deps: {
     setPageTranslateStatus,
     setProcessingStatus,
     setSelectedPageTranslateParagraphIds,
+    state.documentPermissions,
     state.pageTranslateParagraphCandidates,
     state.pageTranslateSelectedParagraphIds,
     state.pages,

@@ -33,6 +33,7 @@ export interface RightPanelTabDockProps {
   isFloating: boolean;
   rightOffsetPx: number;
   canOpenProperties: boolean;
+  canOpenPageTranslate?: boolean;
   onSelectTab: (tab: RightPanelTabId) => void;
 }
 
@@ -42,6 +43,7 @@ export function RightPanelTabDock({
   isFloating,
   rightOffsetPx,
   canOpenProperties,
+  canOpenPageTranslate = true,
   onSelectTab,
 }: RightPanelTabDockProps) {
   const { t, isCjk } = useLanguage();
@@ -110,6 +112,7 @@ export function RightPanelTabDock({
       id: "page_translate",
       title: t("right_panel.tabs.page_translate"),
       Icon: BookA,
+      disabled: !canOpenPageTranslate,
     },
     {
       id: "properties",
@@ -119,9 +122,16 @@ export function RightPanelTabDock({
     },
   ];
 
-  const resolvedTabs = (tabs ?? defaultTabs).map((t) =>
-    t.id === "properties" ? { ...t, disabled: !canOpenProperties } : t,
-  );
+  const resolvedTabs = (tabs ?? defaultTabs).map((t) => {
+    if (t.id === "properties") return { ...t, disabled: !canOpenProperties };
+    if (t.id === "page_translate") {
+      return {
+        ...t,
+        disabled: t.disabled || !canOpenPageTranslate,
+      };
+    }
+    return t;
+  });
 
   const visibleTabs = resolvedTabs.filter((t) => {
     if (t.id === "properties" && !canOpenProperties) return false;

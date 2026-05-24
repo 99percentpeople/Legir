@@ -4,6 +4,7 @@ import type { EditorUiState } from "../types";
 import { createEditorStoreState } from "@/store/createStoreState";
 import { editorStorePersistConfig } from "@/store/persistConfig";
 import type { EditorStore } from "@/store/store.types";
+import { setPdfPermissionPolicyProvider } from "@/lib/pdfPermissions";
 
 // Editor store = single source of truth (SSOT) for the editor.
 //
@@ -26,5 +27,10 @@ export const useEditorStore = create<EditorStore>()(
     editorStorePersistConfig,
   ),
 );
+
+setPdfPermissionPolicyProvider(() => ({
+  ignorePdfPermissions:
+    useEditorStore.getState().options.debugOptions.ignorePdfPermissions,
+}));
 
 export type { EditorActions, EditorStore } from "@/store/store.types";

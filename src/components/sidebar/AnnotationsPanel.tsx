@@ -17,7 +17,7 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { Annotation, AnnotationReply } from "@/types";
+import { Annotation, AnnotationReply, PDFDocumentPermissions } from "@/types";
 import { useLanguage } from "../language-provider";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
@@ -40,6 +40,7 @@ import {
   sortAnnotationsForList,
   type AnnotationListType,
 } from "@/lib/annotationList";
+import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
 
 type SidebarAnnotationListType = Exclude<AnnotationListType, "link">;
 
@@ -101,6 +102,8 @@ interface AnnotationReplyItemProps {
   deleteLabel: string;
   onUpdateReply: (replyId: string, updates: Partial<AnnotationReply>) => void;
   onDeleteReply: (replyId: string) => void;
+  canEdit: boolean;
+  restrictedTitle: string;
 }
 
 const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
@@ -112,6 +115,8 @@ const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
   deleteLabel,
   onUpdateReply,
   onDeleteReply,
+  canEdit,
+  restrictedTitle,
 }) => {
   const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -122,9 +127,10 @@ const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
   const [draftText, setDraftText] = useState(text);
 
   const startEditing = React.useCallback(() => {
+    if (!canEdit) return;
     setDraftText(text);
     setIsEditing(true);
-  }, [text]);
+  }, [canEdit, text]);
 
   const handleCancelEditing = React.useCallback(() => {
     setDraftText(text);
@@ -132,13 +138,14 @@ const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
   }, [text]);
 
   const handleSaveEditing = React.useCallback(() => {
+    if (!canEdit) return;
     if (draftText !== text) {
       onUpdateReply(reply.id, {
         text: draftText,
       });
     }
     setIsEditing(false);
-  }, [draftText, onUpdateReply, reply.id, text]);
+  }, [canEdit, draftText, onUpdateReply, reply.id, text]);
 
   useEffect(() => {
     setDraftText(text);
@@ -197,6 +204,8 @@ const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-32">
               <DropdownMenuItem
+                disabled={!canEdit}
+                title={!canEdit ? restrictedTitle : undefined}
                 onClick={(event) => {
                   event.stopPropagation();
                   startEditing();
@@ -207,8 +216,11 @@ const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
+                disabled={!canEdit}
+                title={!canEdit ? restrictedTitle : undefined}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (!canEdit) return;
                   onDeleteReply(reply.id);
                 }}
               >
@@ -229,6 +241,7 @@ const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
             className="text-foreground placeholder:text-muted-foreground/50 min-h-6 w-full resize-none border-none bg-transparent px-0 py-0 text-sm leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent"
             value={draftText}
             placeholder={placeholder}
+            disabled={!canEdit}
             onChange={(event) => setDraftText(event.target.value)}
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => {
@@ -262,7 +275,7 @@ const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
               size="icon-xs"
               title={t("common.actions.save")}
               aria-label={t("common.actions.save")}
-              disabled={draftText === text}
+              disabled={!canEdit || draftText === text}
               onClick={(event) => {
                 event.stopPropagation();
                 handleSaveEditing();
@@ -296,6 +309,8 @@ interface AnnotationCardProps {
   onAddReply: (reply: AnnotationReply) => void;
   onUpdateReply: (replyId: string, updates: Partial<AnnotationReply>) => void;
   onDeleteReply: (replyId: string) => void;
+  canEdit: boolean;
+  restrictedTitle: string;
 }
 
 const AnnotationCard: React.FC<AnnotationCardProps> = ({
@@ -307,6 +322,8 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   onAddReply,
   onUpdateReply,
   onDeleteReply,
+  canEdit,
+  restrictedTitle,
 }) => {
   const { t } = useLanguage();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -319,10 +336,11 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   const replies = annotation.replies ?? [];
 
   const startEditingMain = React.useCallback(() => {
+    if (!canEdit) return;
     setMainDraft(annotation.text || "");
     pendingFocusRef.current = true;
     setIsEditingMain(true);
-  }, [annotation.text]);
+  }, [annotation.text, canEdit]);
 
   const handleCancelMainEdit = React.useCallback(() => {
     setMainDraft(annotation.text || "");
@@ -331,6 +349,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   }, [annotation.text]);
 
   const handleSaveMainEdit = React.useCallback(() => {
+    if (!canEdit) return;
     if (mainDraft !== (annotation.text || "")) {
       onUpdate({
         text: mainDraft,
@@ -338,7 +357,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
     }
     pendingFocusRef.current = false;
     setIsEditingMain(false);
-  }, [annotation.text, mainDraft, onUpdate]);
+  }, [annotation.text, canEdit, mainDraft, onUpdate]);
 
   const focusTextarea = React.useCallback(() => {
     if (cardRef.current) {
@@ -366,6 +385,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
   }, []);
 
   const handleAddReply = React.useCallback(() => {
+    if (!canEdit) return;
     const nextText = draftReply.trim();
     if (!nextText) return;
 
@@ -375,7 +395,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
       text: nextText,
     });
     setDraftReply("");
-  }, [annotation.id, draftReply, onAddReply]);
+  }, [annotation.id, canEdit, draftReply, onAddReply]);
 
   useEffect(() => {
     isSelectedRef.current = isSelected;
@@ -401,6 +421,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
     "sidebar:focusAnnotation",
     (payload) => {
       if (payload.id !== annotation.id) return;
+      if (!canEdit) return;
       startEditingMain();
       if (isSelectedRef.current && focusTextarea()) {
         pendingFocusRef.current = false;
@@ -469,6 +490,8 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-32">
               <DropdownMenuItem
+                disabled={!canEdit}
+                title={!canEdit ? restrictedTitle : undefined}
                 onClick={(event) => {
                   event.stopPropagation();
                   onSelect();
@@ -480,8 +503,11 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
+                disabled={!canEdit}
+                title={!canEdit ? restrictedTitle : undefined}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (!canEdit) return;
                   onDelete();
                 }}
               >
@@ -501,6 +527,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
               className="text-foreground placeholder:text-muted-foreground/50 min-h-10 w-full resize-none border-none bg-transparent px-0 py-2 text-sm leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent"
               value={mainDraft}
               placeholder={t("sidebar.add_remark")}
+              disabled={!canEdit}
               onChange={(event) => setMainDraft(event.target.value)}
               onClick={(event) => event.stopPropagation()}
               onKeyDown={(event) => {
@@ -534,7 +561,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
                 size="icon-xs"
                 title={t("common.actions.save")}
                 aria-label={t("common.actions.save")}
-                disabled={mainDraft === (annotation.text || "")}
+                disabled={!canEdit || mainDraft === (annotation.text || "")}
                 onClick={handleSaveMainEdit}
               >
                 <Check size={12} />
@@ -578,6 +605,8 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
                 deleteLabel={t("common.actions.delete")}
                 onUpdateReply={onUpdateReply}
                 onDeleteReply={onDeleteReply}
+                canEdit={canEdit}
+                restrictedTitle={restrictedTitle}
               />
             ))}
           </div>
@@ -593,6 +622,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
               className="text-foreground placeholder:text-muted-foreground/50 min-h-8 flex-1 resize-none border-none bg-transparent px-0 py-1 text-sm leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent"
               value={draftReply}
               placeholder={t("sidebar.add_reply")}
+              disabled={!canEdit}
               onChange={(event) => setDraftReply(event.target.value)}
               onKeyDown={(event) => {
                 if (!event.ctrlKey && !event.metaKey) return;
@@ -605,8 +635,8 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
               variant="secondary"
               size="icon"
               className="mt-1 h-7 w-7 shrink-0"
-              disabled={draftReply.trim().length === 0}
-              title={t("common.actions.send")}
+              disabled={!canEdit || draftReply.trim().length === 0}
+              title={!canEdit ? restrictedTitle : t("common.actions.send")}
               onClick={handleAddReply}
             >
               <Send size={12} />
@@ -639,6 +669,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
 
 interface AnnotationsProps {
   annotations: Annotation[];
+  documentPermissions?: PDFDocumentPermissions | null;
   onSelectControl: (
     id: string,
     options?: Omit<AppEventMap["workspace:focusControl"], "id">,
@@ -657,6 +688,7 @@ interface AnnotationsProps {
 
 const AnnotationsPanel: React.FC<AnnotationsProps> = ({
   annotations,
+  documentPermissions,
   onSelectControl,
   onDeleteAnnotation,
   onUpdateAnnotation,
@@ -666,6 +698,8 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
   selectedId,
 }) => {
   const { t } = useLanguage();
+  const permissionUi = usePdfPermissionUi(documentPermissions);
+  const canEditAnnotations = permissionUi.can("edit_annotation");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<
     SidebarAnnotationListType[]
@@ -819,6 +853,8 @@ const AnnotationsPanel: React.FC<AnnotationsProps> = ({
                       onDeleteReply={(replyId) =>
                         onDeleteAnnotationReply(annot.id, replyId)
                       }
+                      canEdit={canEditAnnotations}
+                      restrictedTitle={permissionUi.restrictedTitle}
                     />
                   ))}
                 </div>

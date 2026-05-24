@@ -1,4 +1,5 @@
 import { loadPDF } from "@/services/pdfService";
+import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
 import {
   createPdfWorkerService,
   type PDFWorkerService,
@@ -67,7 +68,25 @@ const cloneEditorTabSnapshotForTransfer = (
   ...snapshot,
   pdfFile: null,
   pdfBytes: snapshot.pdfBytes ? new Uint8Array(snapshot.pdfBytes) : null,
-  metadata: { ...snapshot.metadata },
+  metadata: {
+    ...snapshot.metadata,
+    documentPermissions: snapshot.documentPermissions
+      ? { ...snapshot.documentPermissions }
+      : (snapshot.metadata.documentPermissions ?? null),
+  },
+  documentPermissions: snapshot.documentPermissions
+    ? { ...snapshot.documentPermissions }
+    : null,
+  sourceDocumentPermissions: snapshot.sourceDocumentPermissions
+    ? { ...snapshot.sourceDocumentPermissions }
+    : null,
+  pdfOwnerUnlocked: snapshot.pdfOwnerUnlocked,
+  pdfOwnerPassword: snapshot.pdfOwnerPassword,
+  preservePdfOwnerRestrictionsOnSave:
+    snapshot.preservePdfOwnerRestrictionsOnSave,
+  dirtyPermissionScopes: {
+    ...(snapshot.dirtyPermissionScopes ?? EMPTY_PDF_PERMISSION_DIRTY_SCOPES),
+  },
   saveTarget: cloneSaveTargetForTransfer(snapshot.saveTarget),
   pages: [...snapshot.pages],
   fields: [...snapshot.fields],
@@ -153,6 +172,7 @@ export const restoreEditorTabSessionTransfer = async (
       annotations,
       preservedSourceAnnotations,
       outline,
+      documentPermissions,
       openPassword,
       dispose,
     } = await loadPDF(incomingSnapshot.pdfBytes, {
@@ -165,6 +185,9 @@ export const restoreEditorTabSessionTransfer = async (
       pdfBytes,
       pdfOpenPassword: openPassword ?? incomingSnapshot.pdfOpenPassword,
       metadata: incomingSnapshot.metadata,
+      documentPermissions,
+      sourceDocumentPermissions:
+        incomingSnapshot.sourceDocumentPermissions ?? documentPermissions,
       filename: incomingSnapshot.filename,
       saveTarget: incomingSnapshot.saveTarget,
       pages,
@@ -179,6 +202,12 @@ export const restoreEditorTabSessionTransfer = async (
       pendingViewStateRestore: incomingSnapshot.pendingViewStateRestore,
     });
 
+    const effectiveDocumentPermissions = incomingSnapshot.pdfOwnerUnlocked
+      ? incomingSnapshot.documentPermissions
+      : documentPermissions;
+    const sourceDocumentPermissions =
+      incomingSnapshot.sourceDocumentPermissions ?? documentPermissions;
+
     return {
       id: transfer.sessionId,
       title:
@@ -192,7 +221,20 @@ export const restoreEditorTabSessionTransfer = async (
         pdfFile: null,
         pdfBytes,
         pdfOpenPassword: openPassword ?? incomingSnapshot.pdfOpenPassword,
-        metadata: { ...incomingSnapshot.metadata },
+        metadata: {
+          ...incomingSnapshot.metadata,
+          documentPermissions: effectiveDocumentPermissions,
+        },
+        documentPermissions: effectiveDocumentPermissions
+          ? { ...effectiveDocumentPermissions }
+          : null,
+        sourceDocumentPermissions: sourceDocumentPermissions
+          ? { ...sourceDocumentPermissions }
+          : null,
+        pdfOwnerUnlocked: incomingSnapshot.pdfOwnerUnlocked,
+        pdfOwnerPassword: incomingSnapshot.pdfOwnerPassword,
+        preservePdfOwnerRestrictionsOnSave:
+          incomingSnapshot.preservePdfOwnerRestrictionsOnSave,
         saveTarget: cloneSaveTargetForTransfer(incomingSnapshot.saveTarget),
         pages: [...pages],
         fields: [...incomingSnapshot.fields],

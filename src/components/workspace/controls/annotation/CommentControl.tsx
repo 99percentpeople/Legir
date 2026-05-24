@@ -13,7 +13,8 @@ import { getContrastColor } from "@/utils/colors";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 
 export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
-  const { data, isSelected, onUpdate, onDelete, onEdit, onAskAi } = props;
+  const { data, isSelected, onUpdate, onDelete, onEdit, onAskAi, canModify } =
+    props;
   const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
   const color = data.color || "#000000";
 
@@ -23,7 +24,7 @@ export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
 
   return (
     <ControlWrapper {...props} showBorder={false}>
-      <FloatingToolbar isVisible={isSelected}>
+      <FloatingToolbar isVisible={isSelected && canModify !== false}>
         <ColorPickerPopover
           paletteType="foreground"
           color={data.color || "#000000"}

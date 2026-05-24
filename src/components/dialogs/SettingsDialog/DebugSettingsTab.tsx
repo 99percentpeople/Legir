@@ -1,4 +1,4 @@
-import { AlertCircle, Bug } from "lucide-react";
+import { AlertCircle, Bug, ShieldOff } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
 import { Label } from "@/components/ui/label";
@@ -71,6 +71,30 @@ export const DebugSettingsTab = ({
           </div>
           <p className="text-muted-foreground px-1 text-xs">
             {t("settings.debug.disable_pdf_text_layer_desc")}
+          </p>
+        </div>
+
+        <div className={SETTINGS_CARD_COMPACT_CLASS}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldOff className="text-primary h-4 w-4" />
+              <Label
+                htmlFor="debug-ignore-pdf-permissions"
+                className="mb-0 font-semibold"
+              >
+                {t("settings.debug.ignore_pdf_permissions")}
+              </Label>
+            </div>
+            <Switch
+              id="debug-ignore-pdf-permissions"
+              checked={options.ignorePdfPermissions}
+              onCheckedChange={(checked) =>
+                onUpdate("ignorePdfPermissions", checked)
+              }
+            />
+          </div>
+          <p className="text-muted-foreground px-1 text-xs">
+            {t("settings.debug.ignore_pdf_permissions_desc")}
           </p>
         </div>
 

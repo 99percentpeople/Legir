@@ -49,6 +49,7 @@ export const selectEditorCanvasState = (
   annotations: state.annotations,
   commentStyle: state.commentStyle,
   currentPageIndex: state.currentPageIndex,
+  documentPermissions: state.documentPermissions,
   fields: state.fields,
   filename: state.filename,
   fitTrigger: state.fitTrigger,
@@ -94,6 +95,11 @@ export const selectEditorCanvasActions = (state: EditorStore) => ({
 export const selectPropertiesPanelState = (state: EditorStore) => ({
   exportPassword: state.exportPassword,
   pdfOpenPassword: state.pdfOpenPassword,
+  documentPermissions: state.documentPermissions,
+  sourceDocumentPermissions: state.sourceDocumentPermissions,
+  pdfOwnerUnlocked: state.pdfOwnerUnlocked,
+  preservePdfOwnerRestrictionsOnSave: state.preservePdfOwnerRestrictionsOnSave,
+  unlockPdfOwnerRestrictions: state.unlockPdfOwnerRestrictions,
   setEditorState: state.setState,
 });
 

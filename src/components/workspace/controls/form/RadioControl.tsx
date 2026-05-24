@@ -5,7 +5,14 @@ import { cn } from "@/utils/cn";
 import { getInnerSizeFromOuterAabb } from "@/lib/controlRotation";
 
 export const RadioControl: React.FC<FormControlProps> = (props) => {
-  const { data, isFormMode, isAnnotationMode, isSelectable, onUpdate } = props;
+  const {
+    data,
+    isFormMode,
+    isAnnotationMode,
+    isSelectable,
+    canFillFormValue = true,
+    onUpdate,
+  } = props;
   const style = data.style || {};
   const rotationDeg =
     typeof data.rotationDeg === "number" && Number.isFinite(data.rotationDeg)
@@ -24,7 +31,7 @@ export const RadioControl: React.FC<FormControlProps> = (props) => {
   // It renders a circle inside.
 
   const handleInteraction = () => {
-    if (isAnnotationMode) {
+    if (isAnnotationMode && canFillFormValue) {
       onUpdate(data.id, { isChecked: true });
     }
   };
@@ -38,7 +45,10 @@ export const RadioControl: React.FC<FormControlProps> = (props) => {
       <div
         className={cn(
           "relative flex h-full w-full items-center justify-center transition-colors",
-          isAnnotationMode && isSelectable && "cursor-pointer hover:bg-black/5",
+          isAnnotationMode &&
+            isSelectable &&
+            canFillFormValue &&
+            "cursor-pointer hover:bg-black/5",
           isAnnotationMode && !isSelectable && "pointer-events-none",
           isFormMode && isSelectable && "pointer-events-none",
         )}

@@ -78,6 +78,17 @@ export const createEditorTabSnapshotFromState = (options: {
     pdfOpenPassword: state.pdfOpenPassword,
     exportPassword: state.exportPassword,
     metadata: { ...state.metadata },
+    documentPermissions: state.documentPermissions
+      ? { ...state.documentPermissions }
+      : null,
+    sourceDocumentPermissions: state.sourceDocumentPermissions
+      ? { ...state.sourceDocumentPermissions }
+      : null,
+    pdfOwnerUnlocked: state.pdfOwnerUnlocked,
+    pdfOwnerPassword: state.pdfOwnerPassword,
+    preservePdfOwnerRestrictionsOnSave:
+      state.preservePdfOwnerRestrictionsOnSave,
+    dirtyPermissionScopes: { ...state.dirtyPermissionScopes },
     filename: state.filename,
     saveTarget: state.saveTarget,
     pages: createShallowArrayCopy(state.pages),
@@ -141,6 +152,8 @@ export const createLoadedEditorTabSnapshot = (options: {
   pdfBytes: Uint8Array;
   pdfOpenPassword: string | null;
   metadata: PDFMetadata;
+  documentPermissions: EditorState["documentPermissions"];
+  sourceDocumentPermissions?: EditorState["sourceDocumentPermissions"];
   filename: string;
   saveTarget: EditorState["saveTarget"] | null;
   pages: EditorState["pages"];
@@ -165,7 +178,25 @@ export const createLoadedEditorTabSnapshot = (options: {
     pdfBytes: options.pdfBytes,
     pdfOpenPassword: options.pdfOpenPassword,
     exportPassword: options.pdfOpenPassword,
-    metadata: { ...options.metadata },
+    metadata: {
+      ...options.metadata,
+      documentPermissions: options.documentPermissions
+        ? { ...options.documentPermissions }
+        : null,
+    },
+    documentPermissions: options.documentPermissions
+      ? { ...options.documentPermissions }
+      : null,
+    sourceDocumentPermissions: options.sourceDocumentPermissions
+      ? { ...options.sourceDocumentPermissions }
+      : options.documentPermissions
+        ? { ...options.documentPermissions }
+        : null,
+    pdfOwnerUnlocked: initialState.pdfOwnerUnlocked,
+    pdfOwnerPassword: initialState.pdfOwnerPassword,
+    preservePdfOwnerRestrictionsOnSave:
+      options.documentPermissions?.hasOwnerRestrictions ?? false,
+    dirtyPermissionScopes: { ...initialState.dirtyPermissionScopes },
     filename: options.filename,
     saveTarget: options.saveTarget,
     pages: createShallowArrayCopy(options.pages),
@@ -195,6 +226,24 @@ export const restoreEditorTabSnapshot = (
 
   store.setState({
     ...snapshot,
+    documentPermissions: snapshot.documentPermissions ?? null,
+    sourceDocumentPermissions:
+      snapshot.sourceDocumentPermissions ??
+      snapshot.documentPermissions ??
+      null,
+    pdfOwnerUnlocked: snapshot.pdfOwnerUnlocked ?? false,
+    pdfOwnerPassword: snapshot.pdfOwnerPassword ?? null,
+    preservePdfOwnerRestrictionsOnSave:
+      snapshot.preservePdfOwnerRestrictionsOnSave ?? true,
+    metadata: {
+      ...snapshot.metadata,
+      documentPermissions:
+        snapshot.metadata.documentPermissions ??
+        snapshot.documentPermissions ??
+        null,
+    },
+    dirtyPermissionScopes:
+      snapshot.dirtyPermissionScopes ?? initialState.dirtyPermissionScopes,
     thumbnailImages,
     activeDialog: null,
     actionSignal: null,

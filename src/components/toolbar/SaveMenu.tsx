@@ -25,6 +25,7 @@ export interface SaveMenuProps {
   disabled: boolean;
   isDirty: boolean;
   hasSaveAs: boolean;
+  canPrint: boolean;
   onPrimary: () => Promise<boolean>;
   onSaveAs: () => Promise<boolean>;
   onExit: () => void;
@@ -36,6 +37,7 @@ const SaveMenu: React.FC<SaveMenuProps> = ({
   disabled,
   isDirty,
   hasSaveAs,
+  canPrint,
   onPrimary,
   onSaveAs,
   onExit,
@@ -125,7 +127,7 @@ const SaveMenu: React.FC<SaveMenuProps> = ({
 
           <Separator className="my-1" />
 
-          <DropdownMenuItem onClick={onPrint}>
+          <DropdownMenuItem onClick={onPrint} disabled={!canPrint}>
             <Printer size={16} />
             {t("toolbar.print")}
           </DropdownMenuItem>

@@ -679,6 +679,7 @@ export const useAiChatController = (
           removeTextUnderFlattenedFreetext:
             snapshot.options.removeTextUnderFlattenedFreetext,
           pageIndexes,
+          preserveOwnerRestrictions: false,
           preservedSourceAnnotations:
             snapshot.preservedSourceAnnotations.filter((annotation) =>
               pageIndexSet.has(annotation.pageIndex),
@@ -774,6 +775,11 @@ export const useAiChatController = (
         getSnapshot: () => ({
           filename: editorState.filename,
           metadata: editorState.metadata,
+          documentPermissions: editorState.documentPermissions,
+          sourceDocumentPermissions: editorState.sourceDocumentPermissions,
+          pdfOwnerUnlocked: editorState.pdfOwnerUnlocked,
+          preservePdfOwnerRestrictionsOnSave:
+            editorState.preservePdfOwnerRestrictionsOnSave,
           pages: editorState.pages,
           outline: editorState.outline,
           currentPageIndex: editorState.currentPageIndex,
@@ -801,6 +807,10 @@ export const useAiChatController = (
       editorState.currentPageIndex,
       editorState.filename,
       editorState.metadata,
+      editorState.documentPermissions,
+      editorState.sourceDocumentPermissions,
+      editorState.pdfOwnerUnlocked,
+      editorState.preservePdfOwnerRestrictionsOnSave,
       editorState.options.aiChat.getPagesTextMaxChars,
       editorState.options.aiChat.visualSummaryEnabled,
       editorState.options.aiChat.visualSummaryModelKey,

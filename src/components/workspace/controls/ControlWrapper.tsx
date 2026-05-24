@@ -50,6 +50,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   onReorderLayer,
   onResetToDefault,
   data,
+  canModify = true,
   onPointerDown,
   customRect,
   showBorder = false,
@@ -409,13 +410,15 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     data.type === "ink" && "intent" in data && data.intent === "InkHighlight";
   const shouldRaiseZIndexWhenSelected =
     data.type !== "highlight" && !isInkHighlight;
-  const supportsKeyboardResizeHandles = isSelected && resizable;
-  const supportsKeyboardRotateHandle = isSelected && supportsRotation;
+  const supportsKeyboardResizeHandles = isSelected && resizable && canModify;
+  const supportsKeyboardRotateHandle =
+    isSelected && supportsRotation && canModify;
   const canShowLayerContextMenu =
-    !contextMenuDisabled && isSelectable && data.type !== "shape";
+    !contextMenuDisabled && isSelectable && canModify && data.type !== "shape";
   const hasCustomContextMenuContent =
     React.Children.count(contextMenuContent) > 0;
-  const canResetFormControlToDefault = !isAnnotation && !!onResetToDefault;
+  const canResetFormControlToDefault =
+    canModify && !isAnnotation && !!onResetToDefault;
   const hasControlContextMenu =
     canShowLayerContextMenu &&
     (hasCustomContextMenuContent ||
@@ -582,8 +585,8 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                   }}
                 >
                   <div className="absolute -inset-0.5 border-2 border-dashed border-blue-500" />
-                  {renderResizeHandles()}
-                  {renderRotateHandle()}
+                  {canModify && renderResizeHandles()}
+                  {canModify && renderRotateHandle()}
                 </div>
               </>
             ) : (
@@ -592,9 +595,9 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                 <span className="absolute -top-6 left-0 z-30 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] whitespace-nowrap shadow-sm">
                   {label}
                 </span>
-                {renderResizeHandles()}
+                {canModify && renderResizeHandles()}
 
-                {supportsRotation && (
+                {supportsRotation && canModify && (
                   <>{formFieldRotateHandle ?? renderRotateHandle()}</>
                 )}
               </>
@@ -616,12 +619,12 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                 }}
               >
                 <div className="absolute -inset-0.5 border border-dashed border-blue-500" />
-                {supportsRotation && renderRotateHandle()}
+                {supportsRotation && canModify && renderRotateHandle()}
               </div>
             ) : (
               <>
                 <div className="absolute inset-0 border border-dashed border-blue-500" />
-                {supportsRotation && renderRotateHandle()}
+                {supportsRotation && canModify && renderRotateHandle()}
               </>
             )}
           </div>

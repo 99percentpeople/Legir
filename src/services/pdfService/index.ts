@@ -86,6 +86,11 @@ import { pdfDebug, pdfDebugEnabled } from "./lib/debug";
 import { appEventBus } from "@/lib/eventBus";
 import { PDF_CUSTOM_KEYS } from "@/constants";
 import {
+  UNRESTRICTED_PDF_PERMISSIONS,
+  canModifyPdfContents,
+  getPdfPermissionPolicy,
+} from "@/lib/pdfPermissions";
+import {
   createStampImageAppearance,
   createStampImageResource,
   getStampSvgIntrinsicSize,
@@ -93,6 +98,7 @@ import {
 import {
   FormField,
   PageData,
+  PDFDocumentPermissions,
   PDFMetadata,
   PDFOutlineItem,
   Annotation,
@@ -517,7 +523,8 @@ const loadPdfLibDocumentWithPassword = async (
   initialPassword?: string | null,
 ): Promise<{ pdfDoc: PDFDocument; openPassword?: string }> => {
   let password: string | undefined =
-    typeof initialPassword === "string" ? initialPassword : undefined;
+    typeof initialPassword === "string" ? initialPassword : "";
+  let hasPromptedPassword = typeof initialPassword === "string";
 
   while (true) {
     try {
@@ -526,14 +533,39 @@ const loadPdfLibDocumentWithPassword = async (
         updateMetadata: false,
         parseSpeed: ParseSpeeds.Fastest,
       });
-      return { pdfDoc, openPassword: password };
+      return { pdfDoc, openPassword: password || undefined };
     } catch (error) {
-      const reason = getPdfLibPasswordReason(error, password !== undefined);
+      const reason = getPdfLibPasswordReason(error, hasPromptedPassword);
       if (!reason) throw error;
       password = await session.requestPassword(reason);
+      hasPromptedPassword = true;
     }
   }
 };
+
+const toPdfLibSecurityPermissions = (
+  permissions: PDFDocumentPermissions,
+): {
+  printing?: boolean | "lowResolution" | "highResolution";
+  modifying?: boolean;
+  copying?: boolean;
+  annotating?: boolean;
+  fillingForms?: boolean;
+  contentAccessibility?: boolean;
+  documentAssembly?: boolean;
+} => ({
+  printing: permissions.canPrintHighQuality
+    ? "highResolution"
+    : permissions.canPrint
+      ? "lowResolution"
+      : false,
+  modifying: permissions.canModifyContents,
+  copying: permissions.canCopy,
+  annotating: permissions.canModifyAnnotations,
+  fillingForms: permissions.canFillForms,
+  contentAccessibility: permissions.canCopyForAccessibility,
+  documentAssembly: permissions.canAssemble,
+});
 
 const buildPdfLibAnnotsByPageIndex = async (
   pdfDoc: PDFDocument,
@@ -1555,6 +1587,7 @@ export const loadPDF = async (
   annotations: Annotation[];
   preservedSourceAnnotations: PreservedSourceAnnotationRef[];
   metadata: PDFMetadata;
+  documentPermissions: PDFDocumentPermissions;
   outline: PDFOutlineItem[];
   openPassword?: string;
   dispose: () => void;
@@ -1747,6 +1780,20 @@ export const loadPDF = async (
       return {};
     })();
 
+    const permissionsPromise = (async (): Promise<PDFDocumentPermissions> => {
+      if (workerReady) {
+        try {
+          return (
+            (await workerService.getPermissions()) ??
+            UNRESTRICTED_PDF_PERMISSIONS
+          );
+        } catch (e) {
+          console.warn("Failed to extract PDF permissions via worker", e);
+        }
+      }
+      return UNRESTRICTED_PDF_PERMISSIONS;
+    })();
+
     const outlinePromise = (async (): Promise<PDFOutlineItem[]> => {
       if (workerReady) {
         try {
@@ -1887,10 +1934,15 @@ export const loadPDF = async (
       };
     });
 
-    const [metadata, outline] = await Promise.all([
+    const [metadataBase, outline, documentPermissions] = await Promise.all([
       metadataPromise,
       outlinePromise,
+      permissionsPromise,
     ]);
+    const metadata = {
+      ...metadataBase,
+      documentPermissions,
+    };
 
     const result = {
       pdfBytes,
@@ -1899,6 +1951,7 @@ export const loadPDF = async (
       annotations,
       preservedSourceAnnotations,
       metadata,
+      documentPermissions,
       outline,
       openPassword,
       dispose,
@@ -1923,6 +1976,9 @@ export const exportPDF = async (
     pageIndexes?: number[];
     preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
     flattenFormFields?: boolean;
+    sourceDocumentPermissions?: PDFDocumentPermissions | null;
+    preserveOwnerRestrictions?: boolean;
+    ownerPassword?: string | null;
   },
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
@@ -2004,10 +2060,9 @@ export const exportPDF = async (
 
   const resolvedOpenPassword = openPassword ?? undefined;
 
-  const pdfDoc = await PDFDocument.load(
-    originalBytes,
-    resolvedOpenPassword ? { password: resolvedOpenPassword } : undefined,
-  );
+  const pdfDoc = await PDFDocument.load(originalBytes, {
+    password: resolvedOpenPassword ?? "",
+  });
 
   const pdfLibPages = pdfDoc.getPages();
   const targetPageIndexes = Array.isArray(options?.pageIndexes)
@@ -2037,13 +2092,21 @@ export const exportPDF = async (
     return vp;
   };
 
+  const sourcePermissions =
+    options?.sourceDocumentPermissions ?? metadata?.documentPermissions ?? null;
+  const preserveOwnerRestrictions =
+    options?.preserveOwnerRestrictions !== false;
+  const canUpdateDocumentMetadata = canModifyPdfContents(
+    metadata?.documentPermissions ?? sourcePermissions,
+  );
+
   // Metadata update
-  if (metadata) {
-    if (metadata.title) pdfDoc.setTitle(metadata.title);
-    if (metadata.author) pdfDoc.setAuthor(metadata.author);
-    if (metadata.subject) pdfDoc.setSubject(metadata.subject);
-    if (metadata.creator) pdfDoc.setCreator(metadata.creator);
-    if (metadata.keywords && metadata.keywords.length > 0) {
+  if (metadata && canUpdateDocumentMetadata) {
+    if (metadata.title !== undefined) pdfDoc.setTitle(metadata.title);
+    if (metadata.author !== undefined) pdfDoc.setAuthor(metadata.author);
+    if (metadata.subject !== undefined) pdfDoc.setSubject(metadata.subject);
+    if (metadata.creator !== undefined) pdfDoc.setCreator(metadata.creator);
+    if (metadata.keywords !== undefined) {
       pdfDoc.setKeywords(
         Array.isArray(metadata.keywords)
           ? metadata.keywords
@@ -2052,7 +2115,7 @@ export const exportPDF = async (
     }
 
     // Producer Logic
-    if (metadata.isProducerManual && metadata.producer) {
+    if (metadata.isProducerManual && metadata.producer !== undefined) {
       pdfDoc.setProducer(metadata.producer);
     } else {
       pdfDoc.setProducer("Legir");
@@ -2070,7 +2133,7 @@ export const exportPDF = async (
 
       // Modification Date Logic
       let modDate: Date;
-      if (metadata.isModDateManual && metadata.modificationDate) {
+      if (metadata.isModDateManual && metadata.modificationDate !== undefined) {
         modDate = new Date(metadata.modificationDate);
       } else {
         modDate = new Date();
@@ -2461,10 +2524,34 @@ export const exportPDF = async (
     }
   }
 
+  const hasOwnerPassword = typeof options?.ownerPassword === "string";
+  const ownerPassword = hasOwnerPassword ? options.ownerPassword : undefined;
+  const clearsRestrictionsByIgnoringPermissions =
+    getPdfPermissionPolicy().ignorePdfPermissions && !hasOwnerPassword;
+  const shouldPreserveSourceRestrictions =
+    preserveOwnerRestrictions &&
+    !!sourcePermissions?.hasOwnerRestrictions &&
+    !clearsRestrictionsByIgnoringPermissions;
+
+  if (shouldPreserveSourceRestrictions && !hasOwnerPassword) {
+    throw new Error("Owner password is required to preserve PDF restrictions.");
+  }
+
   if (typeof exportPassword === "string" && exportPassword) {
     pdfDoc.encrypt({
       userPassword: exportPassword,
-      ownerPassword: exportPassword,
+      ownerPassword: shouldPreserveSourceRestrictions
+        ? ownerPassword!
+        : exportPassword,
+      ...(shouldPreserveSourceRestrictions
+        ? { permissions: toPdfLibSecurityPermissions(sourcePermissions!) }
+        : {}),
+    });
+  } else if (shouldPreserveSourceRestrictions) {
+    pdfDoc.encrypt({
+      userPassword: resolvedOpenPassword ?? "",
+      ownerPassword: ownerPassword!,
+      permissions: toPdfLibSecurityPermissions(sourcePermissions!),
     });
   } else {
     // If the source PDF was encrypted, pdf-lib may preserve the original

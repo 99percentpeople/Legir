@@ -96,6 +96,7 @@ const en = {
     search_web: "Search the web for “{text}”",
     translate: "Translate",
     ask_ai: "Ask AI about “{text}”",
+    permission_restricted: "Not allowed by this PDF's permissions",
   },
   translate: {
     title: "Translate",
@@ -199,6 +200,39 @@ const en = {
       desc: "Use a password during export",
       placeholder: "Password",
       placeholder_use_open: "Leave blank to export without a password",
+    },
+    permissions: {
+      title: "Document permissions",
+      unrestricted: "Unrestricted",
+      restricted: "Restricted",
+      restricted_trigger: "Permission restricted",
+      unlocked: "Unlocked",
+      restricted_desc:
+        "This PDF allows viewing, but restricts some editing or export operations.",
+      unlocked_desc:
+        "The PDF operation restrictions are unlocked for this session with the owner password.",
+      owner_password: "Owner password",
+      owner_password_placeholder: "Enter owner password",
+      owner_password_desc:
+        "Used only to verify permission to unlock restrictions. It is not written to the document and is kept only temporarily for this session.",
+      unlock: "Unlock",
+      unlock_ok: "Owner password verified",
+      unlock_failed:
+        "The owner password is incorrect or this encryption type is unsupported.",
+      preserve_on_save: "Preserve original restrictions when saving",
+      preserve_on_save_desc:
+        "When disabled, an unlocked PDF will be saved without reapplying the original editing or printing restrictions.",
+      allowed: "Allowed",
+      denied: "Denied",
+      open: "Open",
+      modify_contents: "Modify PDF",
+      modify_annotations: "Annotate",
+      fill_forms: "Fill forms",
+      copy: "Copy",
+      copy_accessibility: "Copy for accessibility",
+      print: "Print",
+      print_high_quality: "High-quality print",
+      assemble: "Assemble pages",
     },
     remove_text_under_freetext: {
       label: "Remove text under Free Text",
@@ -548,6 +582,9 @@ const en = {
       disable_pdf_text_layer: "Disable PDF Text Layer",
       disable_pdf_text_layer_desc:
         "Unmount PDFTextLayer for profiling. Text selection, text search highlighting, and text-based highlight drawing will stop working while this is enabled.",
+      ignore_pdf_permissions: "Ignore PDF permissions",
+      ignore_pdf_permissions_desc:
+        "Debug only: bypass PDF permission checks in the editor without changing the document's stored permissions.",
       pdf_zoom_render_timing: "PDF Zoom Render Timing",
       pdf_zoom_render_timing_desc:
         "Show per-page canvas/text render latency after each zoom change.",
@@ -726,6 +763,12 @@ const en = {
     load_error: "Failed to load PDF.",
     save_success: "Saved successfully",
     save_fail: "Failed to save",
+    save_permission_denied: {
+      modify_contents: "This PDF does not allow modifying document contents.",
+      modify_annotations: "This PDF does not allow modifying annotations.",
+      fill_forms: "This PDF does not allow filling forms.",
+    },
+    print_permission_denied: "This PDF does not allow printing.",
     export_fail: "Failed to export PDF.",
   },
   tabs: {

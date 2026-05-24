@@ -22,6 +22,10 @@ import {
 import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { appEventBus, type AppEventMap } from "@/lib/eventBus";
+import {
+  canUseModeWithPdfPermissions,
+  canUseToolWithPdfPermissions,
+} from "@/lib/pdfPermissions";
 import type { EditorCanvasState, EditorState, PenStyle, Tool } from "@/types";
 import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";
@@ -164,6 +168,20 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   const activeTool = isMovementTool(editorState.tool)
     ? editorState.tool
     : contentTool;
+  const isToolAllowed = React.useCallback(
+    (tool: Tool) =>
+      canUseToolWithPdfPermissions(
+        tool,
+        editorState.mode,
+        editorState.documentPermissions,
+      ),
+    [editorState.documentPermissions, editorState.mode],
+  );
+  const isModeAllowed = React.useCallback(
+    (mode: EditorState["mode"]) =>
+      canUseModeWithPdfPermissions(mode, editorState.documentPermissions),
+    [editorState.documentPermissions],
+  );
   const showShapeDraftActions = shapeDraftState.active;
 
   const getToolLabel = (tool: Tool) => {
@@ -517,15 +535,22 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                 value={editorState.mode}
                 onValueChange={(nextMode) => {
                   if (nextMode === "annotation" || nextMode === "form") {
+                    if (!isModeAllowed(nextMode)) return;
                     onModeChange(nextMode);
                   }
                 }}
               >
-                <DropdownMenuRadioItem value="annotation">
+                <DropdownMenuRadioItem
+                  value="annotation"
+                  disabled={!isModeAllowed("annotation")}
+                >
                   <PenTool size={14} />
                   {t("mode.annotation")}
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="form">
+                <DropdownMenuRadioItem
+                  value="form"
+                  disabled={!isModeAllowed("form")}
+                >
                   <Edit3 size={14} />
                   {t("mode.form")}
                 </DropdownMenuRadioItem>
@@ -558,7 +583,11 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
             >
               <DropdownMenuRadioGroup
                 value={activeTool}
-                onValueChange={(value) => onToolChange(value as Tool)}
+                onValueChange={(value) => {
+                  if (isToolAllowed(value as Tool)) {
+                    onToolChange(value as Tool);
+                  }
+                }}
               >
                 <DropdownMenuRadioItem value="select">
                   <MousePointer2 size={14} />
@@ -575,23 +604,38 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                 <DropdownMenuSeparator />
                 {editorState.mode === "annotation" ? (
                   <>
-                    <DropdownMenuRadioItem value="draw_highlight">
+                    <DropdownMenuRadioItem
+                      value="draw_highlight"
+                      disabled={!isToolAllowed("draw_highlight")}
+                    >
                       <Highlighter size={14} />
                       {t("toolbar.highlight_text")}
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draw_ink">
+                    <DropdownMenuRadioItem
+                      value="draw_ink"
+                      disabled={!isToolAllowed("draw_ink")}
+                    >
                       <PenLine size={14} />
                       {t("toolbar.ink")}
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draw_comment">
+                    <DropdownMenuRadioItem
+                      value="draw_comment"
+                      disabled={!isToolAllowed("draw_comment")}
+                    >
                       <MessageCircle size={14} />
                       {t("toolbar.comment")}
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draw_freetext">
+                    <DropdownMenuRadioItem
+                      value="draw_freetext"
+                      disabled={!isToolAllowed("draw_freetext")}
+                    >
                       <Type size={14} />
                       {t("toolbar.freetext")}
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draw_stamp">
+                    <DropdownMenuRadioItem
+                      value="draw_stamp"
+                      disabled={!isToolAllowed("draw_stamp")}
+                    >
                       <Stamp size={14} />
                       {t("toolbar.stamp")}
                     </DropdownMenuRadioItem>
@@ -608,6 +652,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                             <DropdownMenuRadioItem
                               key={shapeTool}
                               value={shapeTool}
+                              disabled={!isToolAllowed(shapeTool)}
                             >
                               <ShapeIcon size={14} />
                               {getShapeToolLabel(t, shapeTool)}
@@ -617,30 +662,48 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                       </React.Fragment>
                     ))}
                     <DropdownMenuSeparator />
-                    <DropdownMenuRadioItem value="eraser">
+                    <DropdownMenuRadioItem
+                      value="eraser"
+                      disabled={!isToolAllowed("eraser")}
+                    >
                       <Eraser size={14} />
                       {t("toolbar.eraser")}
                     </DropdownMenuRadioItem>
                   </>
                 ) : (
                   <>
-                    <DropdownMenuRadioItem value="draw_text">
+                    <DropdownMenuRadioItem
+                      value="draw_text"
+                      disabled={!isToolAllowed("draw_text")}
+                    >
                       <Type size={14} />
                       {t("toolbar.text")}
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draw_checkbox">
+                    <DropdownMenuRadioItem
+                      value="draw_checkbox"
+                      disabled={!isToolAllowed("draw_checkbox")}
+                    >
                       <CheckSquare size={14} />
                       {t("toolbar.checkbox")}
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draw_radio">
+                    <DropdownMenuRadioItem
+                      value="draw_radio"
+                      disabled={!isToolAllowed("draw_radio")}
+                    >
                       <CircleDot size={14} />
                       {t("toolbar.radio")}
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draw_dropdown">
+                    <DropdownMenuRadioItem
+                      value="draw_dropdown"
+                      disabled={!isToolAllowed("draw_dropdown")}
+                    >
                       <List size={14} />
                       {t("toolbar.dropdown")}
                     </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draw_signature">
+                    <DropdownMenuRadioItem
+                      value="draw_signature"
+                      disabled={!isToolAllowed("draw_signature")}
+                    >
                       <PenLine size={14} />
                       {t("toolbar.signature")}
                     </DropdownMenuRadioItem>

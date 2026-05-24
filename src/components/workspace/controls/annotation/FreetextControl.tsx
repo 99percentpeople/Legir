@@ -152,6 +152,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
   }, [isEditing, data.sourcePdfFontMissing, t]);
 
   const handlePointerDown = (_e: React.PointerEvent) => {
+    if (props.canModify === false) return;
     const now = Date.now();
     if (now - lastClickTimeRef.current < 300) {
       // Double click detected
@@ -172,7 +173,10 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
       showBorder={isSelected}
       resizable={true}
     >
-      <FloatingToolbar isVisible={isSelected && !isEditing} sideOffset={32}>
+      <FloatingToolbar
+        isVisible={isSelected && !isEditing && props.canModify !== false}
+        sideOffset={32}
+      >
         <Popover>
           <PopoverTrigger asChild>
             <Button

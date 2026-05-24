@@ -7,7 +7,12 @@ import type {
   WorkerSuccessResponse,
 } from "@/services/pdfService/workerProtocol";
 import { mapOutline, resolveDest } from "@/services/pdfService/lib/outline";
+import {
+  UNRESTRICTED_PDF_PERMISSIONS,
+  getEffectivePdfPermissions,
+} from "@/lib/pdfPermissions";
 import type { RenderParameters } from "pdfjs-dist/types/src/display/api";
+import type { PDFDocumentPermissions } from "@/types";
 
 const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
 const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
@@ -440,6 +445,87 @@ const getOutlineForDoc = async (
       return { payload: false } satisfies TaskResult;
     }
 
+    throw error;
+  } finally {
+    cleanup();
+  }
+};
+
+const mapPdfJsPermissions = (
+  rawFlags: number[] | null,
+): PDFDocumentPermissions => {
+  if (!Array.isArray(rawFlags)) {
+    return getEffectivePdfPermissions(null);
+  }
+
+  const has = (flag: number) => rawFlags.includes(flag);
+  const canPrint =
+    has(pdfjsLib.PermissionFlag.PRINT) ||
+    has(pdfjsLib.PermissionFlag.PRINT_HIGH_QUALITY);
+  const permissions: PDFDocumentPermissions = {
+    isEncrypted: true,
+    canOpen: true,
+    canModifyContents: has(pdfjsLib.PermissionFlag.MODIFY_CONTENTS),
+    canModifyAnnotations: has(pdfjsLib.PermissionFlag.MODIFY_ANNOTATIONS),
+    canFillForms: has(pdfjsLib.PermissionFlag.FILL_INTERACTIVE_FORMS),
+    canCopy: has(pdfjsLib.PermissionFlag.COPY),
+    canCopyForAccessibility: has(
+      pdfjsLib.PermissionFlag.COPY_FOR_ACCESSIBILITY,
+    ),
+    canPrint,
+    canPrintHighQuality: has(pdfjsLib.PermissionFlag.PRINT_HIGH_QUALITY),
+    canAssemble: has(pdfjsLib.PermissionFlag.ASSEMBLE),
+    hasOwnerRestrictions: false,
+    rawFlags: [...rawFlags],
+  };
+
+  permissions.hasOwnerRestrictions =
+    !permissions.canModifyContents ||
+    !permissions.canModifyAnnotations ||
+    !permissions.canFillForms ||
+    !permissions.canCopy ||
+    !permissions.canCopyForAccessibility ||
+    !permissions.canPrint ||
+    !permissions.canAssemble;
+
+  return permissions.hasOwnerRestrictions
+    ? permissions
+    : { ...UNRESTRICTED_PDF_PERMISSIONS, isEncrypted: true, rawFlags };
+};
+
+const getPermissionsForDoc = async (
+  params: Extract<WorkerRequest, { type: "getPermissions" }>,
+) => {
+  const { id, docId } = params;
+  const resolvedDocId = getDocId(docId);
+
+  const { throwIfCancelled, cleanup } = registerCancellableTask(
+    id,
+    resolvedDocId,
+  );
+
+  try {
+    throwIfCancelled();
+    await ensureDocumentLoaded(resolvedDocId);
+    throwIfCancelled();
+
+    const state = getDocState(resolvedDocId);
+    const pdf = state.pdfDoc;
+    if (!pdf) throw new Error("PDF Document not loaded");
+
+    const rawPermissions = await pdf.getPermissions();
+    throwIfCancelled();
+
+    return {
+      payload: mapPdfJsPermissions(rawPermissions),
+    } satisfies TaskResult;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "RenderingCancelledException"
+    ) {
+      return { payload: false } satisfies TaskResult;
+    }
     throw error;
   } finally {
     cleanup();
@@ -907,6 +993,9 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
       case "getOutline":
         result = await getOutlineForDoc(data);
         break;
+      case "getPermissions":
+        result = await getPermissionsForDoc(data);
+        break;
       case "resolveDest":
         result = await resolveDestForDoc(data);
         break;
@@ -1086,6 +1175,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     case "cancelQueuedRenders":
     case "getTextContent":
     case "getOutline":
+    case "getPermissions":
     case "resolveDest":
     case "load":
     case "unload":

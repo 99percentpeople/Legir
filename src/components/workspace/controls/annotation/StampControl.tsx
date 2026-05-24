@@ -171,7 +171,10 @@ export const StampControl: React.FC<AnnotationControlProps> = (props) => {
       resizable={true}
       contextMenuContent={contextMenuContent}
     >
-      <FloatingToolbar isVisible={isSelected} sideOffset={32}>
+      <FloatingToolbar
+        isVisible={isSelected && props.canModify !== false}
+        sideOffset={32}
+      >
         <StampStylePopover
           value={{
             kind: stampKind,

@@ -66,7 +66,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
         <TooltipTrigger asChild>
           <div ref={ref} className="h-full w-full">
             <FloatingToolbar
-              isVisible={isSelected}
+              isVisible={isSelected && props.canModify !== false}
               className="pointer-events-auto"
             >
               <ColorPickerPopover

@@ -7,6 +7,7 @@ import {
   Annotation,
   AnnotationReply,
   ThumbnailsLayoutMode,
+  PDFDocumentPermissions,
 } from "@/types";
 import { cn } from "@/utils/cn";
 import {
@@ -32,6 +33,7 @@ interface SidebarProps {
   pages: PageData[];
   fields: FormField[];
   annotations?: Annotation[];
+  documentPermissions?: PDFDocumentPermissions | null;
   outline: PDFOutlineItem[];
   selectedId: string | null;
   onSelectControl: (
@@ -68,6 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   pages,
   fields,
   annotations = [],
+  documentPermissions,
   outline,
   selectedId,
   onSelectControl,
@@ -234,6 +237,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <AnnotationsPanel
               annotations={annotations}
+              documentPermissions={documentPermissions}
               onSelectControl={onSelectControl}
               onDeleteAnnotation={onDeleteAnnotation}
               onUpdateAnnotation={onUpdateAnnotation}

@@ -12,11 +12,29 @@ import type {
   FormField,
   MoveDirection,
   PageData,
+  PDFDocumentPermissions,
   PDFMetadata,
   PDFOutlineItem,
   PreservedSourceAnnotationRef,
   Tool,
 } from "@/types";
+
+export interface PdfOwnerUnlockResult {
+  ok: boolean;
+  status:
+    | "unlocked"
+    | "already_unlocked"
+    | "not_restricted"
+    | "no_document"
+    | "incorrect_password"
+    | "missing_encrypt_dictionary"
+    | "unsupported_encryption";
+  unlocked: boolean;
+  permissions: PDFDocumentPermissions;
+  sourcePermissions: PDFDocumentPermissions;
+  preserveOwnerRestrictionsOnSave: boolean;
+  reason?: string;
+}
 
 export interface EditorActions {
   setState: (
@@ -48,10 +66,17 @@ export interface EditorActions {
     preservedSourceAnnotations: PreservedSourceAnnotationRef[];
     outline: PDFOutlineItem[];
     metadata: PDFMetadata;
+    documentPermissions: EditorState["documentPermissions"];
+    sourceDocumentPermissions?: EditorState["sourceDocumentPermissions"];
     filename: string;
     scale: number;
     saveTarget: EditorState["saveTarget"] | null;
   }) => void;
+  updateMetadata: (updates: Partial<PDFMetadata>) => void;
+  unlockPdfOwnerRestrictions: (
+    password: string,
+    options?: { preserveOwnerRestrictionsOnSave?: boolean },
+  ) => Promise<PdfOwnerUnlockResult>;
   addField: (field: FormField) => void;
   updateField: (id: string, updates: Partial<FormField>) => void;
   resetFieldToDefault: (id: string) => void;

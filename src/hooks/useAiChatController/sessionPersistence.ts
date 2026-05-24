@@ -722,7 +722,7 @@ export const normalizeRuntimeTranscriptForPersist = (
 ) => {
   const messages = parseRuntimeMessages(transcript.messages) ?? [];
   return createAiChatRuntimeTranscript({
-    messages,
+    messages: redactSensitiveToolArgsDeep(messages) as AiChatMessageRecord[],
     modelKey: transcript.modelKey?.trim() || undefined,
     updatedAt: transcript.updatedAt,
     timelineBoundaries: normalizeRuntimeTimelineBoundaries(
@@ -915,9 +915,35 @@ export const stringifyToolPayload = (payload: unknown) => {
   }
 };
 
+const SENSITIVE_TOOL_ARG_KEY_PATTERN =
+  /(password|passphrase|secret|api[_-]?key|credential|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|session[_-]?token)/i;
+
+const redactSensitiveToolArgsDeep = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(redactSensitiveToolArgsDeep);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      SENSITIVE_TOOL_ARG_KEY_PATTERN.test(key)
+        ? "[redacted]"
+        : redactSensitiveToolArgsDeep(item),
+    ]),
+  );
+};
+
 export const stringifyToolArgs = (args: Record<string, unknown>) => {
   try {
-    const json = JSON.stringify(normalizeAiToolArgsDeep(args ?? {}), null, 2);
+    const json = JSON.stringify(
+      redactSensitiveToolArgsDeep(normalizeAiToolArgsDeep(args ?? {})),
+      null,
+      2,
+    );
     if (typeof json === "string") return json;
   } catch {
     // ignore

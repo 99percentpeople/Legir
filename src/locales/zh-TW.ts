@@ -96,6 +96,7 @@ const zhTW = {
     search_web: "在網路上搜尋「{text}」",
     translate: "翻譯",
     ask_ai: "詢問 AI 關於「{text}」",
+    permission_restricted: "此 PDF 權限不允許此操作",
   },
   translate: {
     title: "翻譯",
@@ -195,6 +196,36 @@ const zhTW = {
       desc: "匯出時使用密碼",
       placeholder: "密碼",
       placeholder_use_open: "留空則匯出時不設定密碼",
+    },
+    permissions: {
+      title: "文件權限",
+      unrestricted: "不受限",
+      restricted: "受限",
+      restricted_trigger: "權限受限",
+      unlocked: "已解除",
+      restricted_desc: "此 PDF 允許檢視，但限制部分編輯或匯出操作。",
+      unlocked_desc: "已透過權限密碼解除本次工作階段中的 PDF 操作限制。",
+      owner_password: "權限密碼",
+      owner_password_placeholder: "輸入權限密碼",
+      owner_password_desc:
+        "只用於驗證是否有權解除限制，不會寫入文件，僅在本次工作階段中暫時保留。",
+      unlock: "解除限制",
+      unlock_ok: "權限密碼驗證通過",
+      unlock_failed: "權限密碼不正確或不支援此加密方式",
+      preserve_on_save: "儲存時保留原限制",
+      preserve_on_save_desc:
+        "關閉後，已解除限制的 PDF 儲存時不會重新寫入原本的編輯/列印限制。",
+      allowed: "允許",
+      denied: "禁止",
+      open: "開啟",
+      modify_contents: "修改 PDF",
+      modify_annotations: "新增註釋",
+      fill_forms: "填寫表單",
+      copy: "複製",
+      copy_accessibility: "輔助功能複製",
+      print: "列印",
+      print_high_quality: "高品質列印",
+      assemble: "頁面組裝",
     },
     remove_text_under_freetext: {
       label: "移除自由文字下方原文",
@@ -533,6 +564,9 @@ const zhTW = {
       disable_pdf_text_layer: "停用 PDF 文本層",
       disable_pdf_text_layer_desc:
         "為了效能分析卸載 PDFTextLayer。啟用後，文字選取、文字搜尋高亮，以及基於文字的高亮繪製都會失效。",
+      ignore_pdf_permissions: "忽略 PDF 權限",
+      ignore_pdf_permissions_desc:
+        "僅用於除錯：在編輯器中略過 PDF 權限檢查，不修改文件儲存的權限資訊。",
       pdf_zoom_render_timing: "PDF 縮放渲染耗時",
       pdf_zoom_render_timing_desc: "顯示每頁在縮放後的 canvas/text 渲染耗時。",
       pdf_zoom_render_timing_tooltip_label: "顯示 PDF 頁面縮放渲染指標",
@@ -704,6 +738,12 @@ const zhTW = {
     load_error: "載入 PDF 失敗。",
     save_success: "儲存成功",
     save_fail: "儲存失敗",
+    save_permission_denied: {
+      modify_contents: "此 PDF 不允許修改文件內容。",
+      modify_annotations: "此 PDF 不允許修改註釋。",
+      fill_forms: "此 PDF 不允許填寫表單。",
+    },
+    print_permission_denied: "此 PDF 不允許列印。",
     export_fail: "匯出 PDF 失敗。",
   },
   tabs: {

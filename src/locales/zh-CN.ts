@@ -96,6 +96,7 @@ const zhCN = {
     search_web: "在网络上搜索“{text}”",
     translate: "翻译",
     ask_ai: "询问 AI 关于“{text}”",
+    permission_restricted: "该 PDF 权限不允许此操作",
   },
   translate: {
     title: "翻译",
@@ -195,6 +196,36 @@ const zhCN = {
       desc: "导出时使用密码",
       placeholder: "密码",
       placeholder_use_open: "留空则导出时不设置密码",
+    },
+    permissions: {
+      title: "文档权限",
+      unrestricted: "不受限",
+      restricted: "受限",
+      restricted_trigger: "权限受限",
+      unlocked: "已解除",
+      restricted_desc: "该 PDF 允许查看，但限制部分编辑或导出操作。",
+      unlocked_desc: "已通过权限密码解除本次会话中的 PDF 操作限制。",
+      owner_password: "权限密码",
+      owner_password_placeholder: "输入权限密码",
+      owner_password_desc:
+        "只用于验证是否有权解除限制，不会写入文档，仅在本次会话中临时保留。",
+      unlock: "解除限制",
+      unlock_ok: "权限密码验证通过",
+      unlock_failed: "权限密码不正确或不支持该加密方式",
+      preserve_on_save: "保存时保留原限制",
+      preserve_on_save_desc:
+        "关闭后，已解除限制的 PDF 保存时不会重新写入原来的编辑/打印限制。",
+      allowed: "允许",
+      denied: "禁止",
+      open: "打开",
+      modify_contents: "修改 PDF",
+      modify_annotations: "添加注释",
+      fill_forms: "填写表单",
+      copy: "复制",
+      copy_accessibility: "辅助功能复制",
+      print: "打印",
+      print_high_quality: "高质量打印",
+      assemble: "页面组装",
     },
     remove_text_under_freetext: {
       label: "去除自由文本下方原文",
@@ -538,6 +569,9 @@ const zhCN = {
       disable_pdf_text_layer: "禁用 PDF 文本层",
       disable_pdf_text_layer_desc:
         "为性能分析卸载 PDFTextLayer。启用后，文本选择、文本搜索高亮以及基于文本的高亮绘制都会失效。",
+      ignore_pdf_permissions: "忽略 PDF 权限",
+      ignore_pdf_permissions_desc:
+        "仅用于调试：在编辑器中绕过 PDF 权限检查，不修改文档保存的权限信息。",
       pdf_zoom_render_timing: "PDF 缩放渲染耗时",
       pdf_zoom_render_timing_desc: "显示每页在缩放后的 canvas/text 渲染耗时。",
       pdf_zoom_render_timing_tooltip_label: "显示 PDF 页面缩放渲染指标",
@@ -705,6 +739,12 @@ const zhCN = {
     load_error: "加载 PDF 失败。",
     save_success: "保存成功",
     save_fail: "保存失败",
+    save_permission_denied: {
+      modify_contents: "该 PDF 不允许修改文档内容。",
+      modify_annotations: "该 PDF 不允许修改注释。",
+      fill_forms: "该 PDF 不允许填写表单。",
+    },
+    print_permission_denied: "该 PDF 不允许打印。",
     export_fail: "导出 PDF 失败。",
   },
   tabs: {

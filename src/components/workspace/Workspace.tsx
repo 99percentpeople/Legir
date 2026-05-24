@@ -94,6 +94,7 @@ import {
   duplicateAnnotationForDrag,
   duplicateFieldForDrag,
 } from "./lib/duplicateControlForDrag";
+import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
 
 const WorkspaceZoomJankOverlay = React.lazy(
   () => import("./debug/WorkspaceZoomJankOverlay"),
@@ -309,6 +310,18 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   // Only allow selection when tool is "select"
   const isSelectable = editorState.tool === "select" && !isPanModeActive;
+  const canModifyAnnotations = canPerformPdfPermissionOperation(
+    "edit_annotation",
+    editorState.documentPermissions,
+  );
+  const canModifyFormStructure = canPerformPdfPermissionOperation(
+    "edit_form_structure",
+    editorState.documentPermissions,
+  );
+  const canFillFormValue = canPerformPdfPermissionOperation(
+    "fill_form_value",
+    editorState.documentPermissions,
+  );
 
   const paragraphCandidatesByPage = useMemo(() => {
     const map = new Map<number, PageTranslateParagraphCandidate[]>();
@@ -1352,10 +1365,28 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       closeTextSelectionPopover();
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-      capturePointer(e);
 
       if (state.tool !== "select") return;
+      if (
+        !canPerformPdfPermissionOperation(
+          [
+            "freetext",
+            "ink",
+            "highlight",
+            "comment",
+            "link",
+            "stamp",
+            "shape",
+          ].includes(data.type)
+            ? "edit_annotation"
+            : "edit_form_structure",
+          state.documentPermissions,
+        )
+      ) {
+        return;
+      }
 
+      capturePointer(e);
       onTriggerHistorySave();
       setActivePageIndex(data.pageIndex);
       const coords = getRelativeCoords(e, data.pageIndex);
@@ -2836,9 +2867,18 @@ const Workspace: React.FC<WorkspaceProps> = ({
       e.stopPropagation();
       e.preventDefault();
       closeTextSelectionPopover();
+      onSelectControl(field.id);
+
+      if (
+        !canPerformPdfPermissionOperation(
+          "edit_form_structure",
+          state.documentPermissions,
+        )
+      ) {
+        return;
+      }
 
       if (e.pointerType === "touch") {
-        onSelectControl(field.id);
         setActivePageIndex(field.pageIndex);
         pendingTouchMoveRef.current = {
           kind: "field",
@@ -2891,7 +2931,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
         // Rect and Page are same as original
       }
 
-      onSelectControl(targetFieldId);
+      if (targetFieldId !== field.id) {
+        onSelectControl(targetFieldId);
+      }
       setActivePageIndex(targetPageIndex);
       const coords = getRelativeCoords(e, targetPageIndex);
 
@@ -2932,6 +2974,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
       closeTextSelectionPopover();
       if (state.tool !== "select") return;
 
+      onSelectControl(annotation.id);
+
       const rotationDeg =
         isRotatableAnnotation(annotation) &&
         typeof annotation.rotationDeg === "number" &&
@@ -2944,9 +2988,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
           : annotation.rect;
 
       if (e.pointerType === "touch") {
-        onSelectControl(annotation.id);
         setActivePageIndex(annotation.pageIndex);
-        if (outerRect && annotation.type !== "highlight") {
+        if (
+          outerRect &&
+          annotation.type !== "highlight" &&
+          canPerformPdfPermissionOperation(
+            "edit_annotation",
+            state.documentPermissions,
+          )
+        ) {
           pendingTouchMoveRef.current = {
             kind: "annotation",
             pointerId: e.pointerId,
@@ -2957,6 +3007,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
             rect: { ...outerRect },
           };
         }
+        return;
+      }
+
+      if (
+        !canPerformPdfPermissionOperation(
+          "edit_annotation",
+          state.documentPermissions,
+        )
+      ) {
         return;
       }
 
@@ -2988,7 +3047,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
         shouldForceDragMove = true;
       }
 
-      onSelectControl(targetAnnotation.id);
+      if (targetAnnotation.id !== annotation.id) {
+        onSelectControl(targetAnnotation.id);
+      }
       // App handles clearing the selectedId when needed.
 
       setActivePageIndex(targetAnnotation.pageIndex);
@@ -3273,6 +3334,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   isAnnotationMode={editorState.mode === "annotation"}
                   isFormMode={editorState.mode === "form"}
                   isSelectable={isSelectable}
+                  canModify={canModifyFormStructure}
+                  canFillFormValue={canFillFormValue}
                   onControlPointerDown={handleFieldPointerDown}
                   onSelect={onSelectControl}
                   onUpdate={onUpdateField}
@@ -3297,6 +3360,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 isAnnotationMode={editorState.mode === "annotation"}
                 isFormMode={editorState.mode === "form"}
                 isSelectable={isSelectable}
+                canModify={canModifyAnnotations}
                 onControlPointerDown={
                   allowSelect ? handleAnnotationPointerDown : undefined
                 }
@@ -3568,6 +3632,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         <WorkspaceTextSelectionPopover
           toolbar={textSelectionToolbar}
           virtualRef={textSelectionVirtualRef}
+          documentPermissions={editorState.documentPermissions}
           onClose={closeTextSelectionPopover}
           onHighlight={() => {
             createTextHighlightFromSelection({ force: true });

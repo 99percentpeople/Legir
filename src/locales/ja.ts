@@ -96,6 +96,7 @@ const ja = {
     search_web: "Web で「{text}」を検索",
     translate: "翻訳",
     ask_ai: "「{text}」について AI に質問",
+    permission_restricted: "この PDF の権限ではこの操作は許可されていません",
   },
   translate: {
     title: "翻訳",
@@ -199,6 +200,39 @@ const ja = {
       desc: "エクスポート時にパスワードを使用します",
       placeholder: "パスワード",
       placeholder_use_open: "空欄の場合はパスワードなしでエクスポート",
+    },
+    permissions: {
+      title: "ドキュメント権限",
+      unrestricted: "制限なし",
+      restricted: "制限あり",
+      restricted_trigger: "権限が制限されています",
+      unlocked: "解除済み",
+      restricted_desc:
+        "この PDF は表示できますが、一部の編集またはエクスポート操作が制限されています。",
+      unlocked_desc:
+        "所有者パスワードにより、このセッションの PDF 操作制限は解除されています。",
+      owner_password: "所有者パスワード",
+      owner_password_placeholder: "所有者パスワードを入力",
+      owner_password_desc:
+        "制限を解除する権限の確認にのみ使用されます。ドキュメントには書き込まれず、このセッション中だけ一時的に保持されます。",
+      unlock: "制限を解除",
+      unlock_ok: "所有者パスワードを確認しました",
+      unlock_failed:
+        "所有者パスワードが正しくないか、この暗号化方式はサポートされていません。",
+      preserve_on_save: "保存時に元の制限を保持",
+      preserve_on_save_desc:
+        "オフにすると、制限解除済みの PDF は保存時に元の編集/印刷制限を再適用しません。",
+      allowed: "許可",
+      denied: "禁止",
+      open: "開く",
+      modify_contents: "PDF を変更",
+      modify_annotations: "注釈を追加",
+      fill_forms: "フォーム入力",
+      copy: "コピー",
+      copy_accessibility: "アクセシビリティ用コピー",
+      print: "印刷",
+      print_high_quality: "高品質印刷",
+      assemble: "ページの組み立て",
     },
     remove_text_under_freetext: {
       label: "自由テキスト下の文字を削除",
@@ -549,6 +583,9 @@ const ja = {
       disable_pdf_text_layer: "PDF テキストレイヤーを無効化",
       disable_pdf_text_layer_desc:
         "性能分析のために PDFTextLayer をアンマウントします。有効にすると、テキスト選択、テキスト検索ハイライト、テキストベースのハイライト描画は使えなくなります。",
+      ignore_pdf_permissions: "PDF 権限を無視",
+      ignore_pdf_permissions_desc:
+        "デバッグ専用: ドキュメントに保存された権限情報は変更せず、エディター内の PDF 権限チェックを回避します。",
       pdf_zoom_render_timing: "PDF ズーム描画時間",
       pdf_zoom_render_timing_desc:
         "ズーム変更ごとのページ単位の canvas/text 描画遅延を表示します。",
@@ -725,6 +762,13 @@ const ja = {
     load_error: "PDF の読み込みに失敗しました。",
     save_success: "正常に保存されました",
     save_fail: "保存に失敗しました",
+    save_permission_denied: {
+      modify_contents:
+        "この PDF ではドキュメント内容の変更は許可されていません。",
+      modify_annotations: "この PDF では注釈の変更は許可されていません。",
+      fill_forms: "この PDF ではフォーム入力は許可されていません。",
+    },
+    print_permission_denied: "この PDF では印刷は許可されていません。",
     export_fail: "PDF の書き出しに失敗しました。",
   },
   tabs: {

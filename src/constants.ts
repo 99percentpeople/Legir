@@ -91,6 +91,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       disablePdfTextLayer: false,
       pdfZoomRenderTiming: false,
       workspaceZoomJank: false,
+      ignorePdfPermissions: false,
     },
     userName: "",
     thumbnailsLayout: "single",

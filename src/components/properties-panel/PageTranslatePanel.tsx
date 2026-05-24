@@ -3,6 +3,7 @@ import { Languages } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
+import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -26,6 +27,7 @@ import {
   type TranslateOptionGroup,
 } from "@/services/translateService";
 import type {
+  PDFDocumentPermissions,
   PageTranslateContextWindow,
   PageTranslateOptions as PageTranslateUiOptions,
   TranslateOptionId,
@@ -55,6 +57,7 @@ export interface PageTranslatePanelProps {
   totalPages: number;
   isProcessing: boolean;
   processingStatus?: string | null;
+  documentPermissions?: PDFDocumentPermissions | null;
 
   initialTranslateOption: TranslateOptionId;
   initialTargetLanguage: string;
@@ -166,6 +169,7 @@ export function PageTranslatePanel({
   totalPages,
   isProcessing,
   processingStatus,
+  documentPermissions,
   initialTranslateOption,
   initialTargetLanguage,
   options,
@@ -182,6 +186,7 @@ export function PageTranslatePanel({
   onCancel,
 }: PageTranslatePanelProps) {
   const { t, effectiveLanguage } = useLanguage();
+  const permissionUi = usePdfPermissionUi(documentPermissions);
 
   const [registryVersion, setRegistryVersion] = useState(0);
 
@@ -296,10 +301,14 @@ export function PageTranslatePanel({
   const parsed = useMemo(() => {
     return parsePageRange(pageRange, totalPages);
   }, [pageRange, totalPages]);
+  const canExtractText = permissionUi.can("extract_text");
+  const canCreateTranslationAnnotations = permissionUi.can("create_annotation");
+  const canTranslatePages = canExtractText && canCreateTranslationAnnotations;
 
   const canStart =
     !isProcessing &&
     parsed.ok &&
+    canTranslatePages &&
     translateService.isOptionAvailable(translateOption) &&
     targetLanguage.trim().length > 0 &&
     (!options.useParagraphs || paragraphCandidatesCount > 0);
@@ -375,20 +384,28 @@ export function PageTranslatePanel({
               <Button
                 type="button"
                 disabled={!canStart}
+                title={
+                  canTranslatePages ? undefined : permissionUi.restrictedTitle
+                }
                 className="w-full bg-purple-600 text-white hover:bg-purple-700"
                 onClick={() => {
                   if (!parsed.ok) return;
-                  onStart({
-                    pageRange,
-                    targetLanguage,
-                    translateOption,
-                    prompt,
-                    fontFamily: currentFontValue,
-                    usePositionAwarePrompt: currentUsePositionAwarePrompt,
-                    aiReflowParagraphs: currentAiReflowParagraphs,
-                    useParagraphs: options.useParagraphs,
-                    contextWindow: options.contextWindow,
-                  });
+                  permissionUi.guardAll(
+                    ["extract_text", "create_annotation"],
+                    () => {
+                      onStart({
+                        pageRange,
+                        targetLanguage,
+                        translateOption,
+                        prompt,
+                        fontFamily: currentFontValue,
+                        usePositionAwarePrompt: currentUsePositionAwarePrompt,
+                        aiReflowParagraphs: currentAiReflowParagraphs,
+                        useParagraphs: options.useParagraphs,
+                        contextWindow: options.contextWindow,
+                      });
+                    },
+                  );
                 }}
               >
                 <Languages size={16} />
@@ -501,7 +518,12 @@ export function PageTranslatePanel({
               onCheckedChange={(flattenFreetext) =>
                 onOptionsChange({ flattenFreetext })
               }
-              disabled={isProcessing}
+              disabled={isProcessing || !permissionUi.can("edit_annotation")}
+              title={
+                permissionUi.can("edit_annotation")
+                  ? undefined
+                  : permissionUi.restrictedTitle
+              }
             />
           </div>
           <p className="text-muted-foreground text-xs">
@@ -679,13 +701,21 @@ export function PageTranslatePanel({
             <Button
               type="button"
               variant="secondary"
-              disabled={!options.useParagraphs || isProcessing || !parsed.ok}
+              disabled={
+                !options.useParagraphs ||
+                isProcessing ||
+                !parsed.ok ||
+                !canExtractText
+              }
+              title={canExtractText ? undefined : permissionUi.restrictedTitle}
               onClick={() => {
                 if (!parsed.ok) return;
-                onPreviewParagraphs({
-                  pageIndices: parsed.pageIndices,
-                  xGap: options.paragraphXGap,
-                  yGap: options.paragraphYGap,
+                permissionUi.guard("extract_text", () => {
+                  onPreviewParagraphs({
+                    pageIndices: parsed.pageIndices,
+                    xGap: options.paragraphXGap,
+                    yGap: options.paragraphYGap,
+                  });
                 });
               }}
             >

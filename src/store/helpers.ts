@@ -16,6 +16,7 @@ import {
   DEFAULT_EDITOR_UI_STATE,
 } from "@/constants";
 import { clampAiChatCompressionThresholdPercent } from "@/services/ai/chat/runtime/compression/threshold";
+import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
 import type {
   AppOptions,
   EditorState,
@@ -363,6 +364,12 @@ export const initialState: EditorState = {
   pdfOpenPassword: null,
   exportPassword: null,
   metadata: {},
+  documentPermissions: null,
+  sourceDocumentPermissions: null,
+  pdfOwnerUnlocked: false,
+  pdfOwnerPassword: null,
+  preservePdfOwnerRestrictionsOnSave: true,
+  dirtyPermissionScopes: { ...EMPTY_PDF_PERMISSION_DIRTY_SCOPES },
   filename: "document.pdf",
   saveTarget: null,
   pages: [],

@@ -5,6 +5,12 @@ import { ControlPropertiesPanel } from "./ControlPropertiesPanel";
 import { useEditorStore } from "@/store/useEditorStore";
 import { useShallow } from "zustand/react/shallow";
 import { selectPropertiesPanelState } from "@/store/selectors";
+import {
+  canPerformPdfPermissionOperation,
+  canModifyPdfContents,
+  mergePdfPermissionDirtyScopes,
+} from "@/lib/pdfPermissions";
+import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
 
 // --- Main Container Component ---
 interface PropertiesPanelProps {
@@ -45,9 +51,17 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
     width,
     onResize,
   }) => {
-    const { exportPassword, pdfOpenPassword, setEditorState } = useEditorStore(
-      useShallow(selectPropertiesPanelState),
-    );
+    const {
+      exportPassword,
+      pdfOpenPassword,
+      documentPermissions,
+      sourceDocumentPermissions,
+      pdfOwnerUnlocked,
+      preservePdfOwnerRestrictionsOnSave,
+      unlockPdfOwnerRestrictions,
+      setEditorState,
+    } = useEditorStore(useShallow(selectPropertiesPanelState));
+    const permissionUi = usePdfPermissionUi(documentPermissions);
 
     if (activeTab === "properties" && selectedControl) {
       const handleControlChange = (
@@ -57,6 +71,11 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
       };
       const handleClose = onClose ?? onCollapse ?? (() => {});
       const handleCollapse = onCollapse ?? handleClose;
+      const isField = "name" in selectedControl && "style" in selectedControl;
+      const canEditControl = canPerformPdfPermissionOperation(
+        isField ? "edit_form_structure" : "edit_annotation",
+        documentPermissions,
+      );
 
       return (
         <ControlPropertiesPanel
@@ -69,6 +88,8 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
           onCollapse={handleCollapse}
           isFloating={isFloating}
           onTriggerHistorySave={onTriggerHistorySave}
+          canEdit={canEditControl}
+          restrictedTitle={permissionUi.restrictedTitle}
           width={width}
           onResize={onResize}
         />
@@ -85,9 +106,37 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         onFilenameChange={onFilenameChange}
         exportPassword={exportPassword}
         pdfOpenPassword={pdfOpenPassword}
+        pdfOwnerUnlocked={pdfOwnerUnlocked}
+        preservePdfOwnerRestrictionsOnSave={preservePdfOwnerRestrictionsOnSave}
         onExportPasswordChange={(password) => {
-          setEditorState({ exportPassword: password, isDirty: true });
+          if (!canModifyPdfContents(documentPermissions)) {
+            return;
+          }
+          setEditorState((prev) => ({
+            exportPassword: password,
+            isDirty: true,
+            dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+              prev.dirtyPermissionScopes,
+              { modifyContents: true },
+            ),
+          }));
         }}
+        onOwnerPasswordUnlock={async (password) => {
+          const result = await unlockPdfOwnerRestrictions(password);
+          return result.ok && result.unlocked;
+        }}
+        sourceDocumentPermissions={sourceDocumentPermissions}
+        onPreserveOwnerRestrictionsOnSaveChange={(preserve) => {
+          setEditorState((prev) => ({
+            preservePdfOwnerRestrictionsOnSave: preserve,
+            isDirty: true,
+            dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+              prev.dirtyPermissionScopes,
+              { modifyContents: true },
+            ),
+          }));
+        }}
+        canModifyContents={canModifyPdfContents(documentPermissions)}
         isOpen={isOpen}
         onOpen={onOpen}
         onCollapse={onCollapse}

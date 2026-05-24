@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { readFile } from "node:fs/promises";
 import fontkit from "pdf-fontkit";
@@ -15,8 +15,14 @@ import {
 } from "@cantoo/pdf-lib";
 import { decodePdfStreamToText } from "@/services/pdfService/lib/pdf-import-utils";
 import { exportPDF } from "@/services/pdfService";
-import { FieldType, type Annotation, type FormField } from "@/types";
+import {
+  FieldType,
+  type Annotation,
+  type FormField,
+  type PDFDocumentPermissions,
+} from "@/types";
 import { getPdfTextVisualCenterAboveBaselineEm } from "@/services/pdfService/lib/text-field-metrics";
+import { setPdfPermissionPolicyProvider } from "@/lib/pdfPermissions";
 
 const createTextFieldPdf = async (options?: { withXfa?: boolean }) => {
   const pdfDoc = await PDFDocument.create();
@@ -46,6 +52,43 @@ const createTextFieldPdf = async (options?: { withXfa?: boolean }) => {
 
   return await pdfDoc.save({ updateFieldAppearances: false });
 };
+
+const restrictedSourcePermissions = {
+  isEncrypted: true,
+  hasOwnerRestrictions: true,
+  canOpen: true,
+  canModifyContents: false,
+  canModifyAnnotations: false,
+  canFillForms: false,
+  canCopy: false,
+  canCopyForAccessibility: true,
+  canPrint: false,
+  canPrintHighQuality: false,
+  canAssemble: false,
+  rawFlags: null,
+} satisfies PDFDocumentPermissions;
+
+const createOwnerRestrictedPdf = async () => {
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.addPage([200, 200]);
+  pdfDoc.encrypt({
+    userPassword: "",
+    ownerPassword: "owner-pass",
+    permissions: {
+      modifying: false,
+      annotating: false,
+      fillingForms: false,
+      copying: false,
+      printing: false,
+      documentAssembly: false,
+    },
+  });
+  return await pdfDoc.save({ updateFieldAppearances: false });
+};
+
+afterEach(() => {
+  setPdfPermissionPolicyProvider(() => ({ ignorePdfPermissions: false }));
+});
 
 const createMergedWidgetTextFieldPdf = async () => {
   const pdfDoc = await PDFDocument.create();
@@ -530,6 +573,40 @@ describe("exportPDF form handling", () => {
     );
     expect(exportedDoc.getForm().getFields()).toHaveLength(1);
     expect(getPageAnnotationCount(exportedDoc)).toBe(1);
+  });
+
+  it("requires owner password when preserving source restrictions", async () => {
+    const sourceBytes = await createOwnerRestrictedPdf();
+
+    await expect(
+      exportPDF(sourceBytes, [filledNameField], undefined, [], undefined, {
+        preserveOwnerRestrictions: true,
+        sourceDocumentPermissions: restrictedSourcePermissions,
+      }),
+    ).rejects.toThrow(
+      "Owner password is required to preserve PDF restrictions.",
+    );
+  });
+
+  it("clears source restrictions without owner password when PDF permissions are ignored", async () => {
+    setPdfPermissionPolicyProvider(() => ({ ignorePdfPermissions: true }));
+    const sourceBytes = await createOwnerRestrictedPdf();
+
+    const exportedBytes = await exportPDF(
+      sourceBytes,
+      [filledNameField],
+      undefined,
+      [],
+      undefined,
+      {
+        preserveOwnerRestrictions: true,
+        sourceDocumentPermissions: restrictedSourcePermissions,
+      },
+    );
+    const exportedDoc = await PDFDocument.load(exportedBytes);
+
+    expect(exportedDoc.context.trailerInfo.Encrypt).toBeUndefined();
+    expect(exportedDoc.getForm().getTextField("name").getText()).toBe("Alice");
   });
 
   it("removes malformed source widgets without reading missing appearances", async () => {

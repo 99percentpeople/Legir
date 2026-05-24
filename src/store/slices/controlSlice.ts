@@ -13,9 +13,26 @@ import {
   prepareAnnotationsForStore,
   prepareInkAnnotationForStore,
 } from "@/lib/inkGeometry";
+import {
+  PdfPermissionDeniedError,
+  assertPdfPermissionOperation,
+  canModifyPdfAnnotations,
+  canModifyPdfContents,
+  canUpdateFormFieldWithPdfPermissions,
+  canUseToolWithPdfPermissions,
+  getFormFieldUpdateDirtyScopes,
+  isFormFieldValueUpdate,
+  mergePdfPermissionDirtyScopes,
+} from "@/lib/pdfPermissions";
 import type { Annotation, AnnotationReply, FormField } from "@/types";
 import { FieldType } from "@/types";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
+
+const throwFormFieldPermissionDenied = (updates: Partial<FormField>) => {
+  throw new PdfPermissionDeniedError(
+    isFormFieldValueUpdate(updates) ? "fill_form_value" : "edit_form_structure",
+  );
+};
 
 // Field/annotation editing and tool transitions live together because most of
 // these reducers need to coordinate selection, history, and "switch back to select".
@@ -44,6 +61,10 @@ export const createControlSlice: EditorStoreSlice<
   >
 > = (set, get) => ({
   addField: (field) => {
+    assertPdfPermissionOperation(
+      "edit_form_structure",
+      get().documentPermissions,
+    );
     const { saveCheckpoint } = get();
     saveCheckpoint();
     set((state) => {
@@ -62,11 +83,19 @@ export const createControlSlice: EditorStoreSlice<
         selectedId: nextField.id,
         tool: shouldSwitch && !isForcedContinuous ? "select" : state.tool,
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyContents: true },
+        ),
       };
     });
   },
 
   addAnnotation: (annotation, opts) => {
+    assertPdfPermissionOperation(
+      "create_annotation",
+      get().documentPermissions,
+    );
     const { saveCheckpoint } = get();
     saveCheckpoint();
     const now = new Date().toISOString();
@@ -90,12 +119,20 @@ export const createControlSlice: EditorStoreSlice<
         selectedId: shouldSelect ? annotationWithDetails.id : state.selectedId,
         tool: shouldSwitch && !isForcedContinuous ? "select" : state.tool,
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyAnnotations: true },
+        ),
       };
     });
   },
 
   addAnnotations: (annotations, opts) => {
     if (!Array.isArray(annotations) || annotations.length === 0) return;
+    assertPdfPermissionOperation(
+      "create_annotation",
+      get().documentPermissions,
+    );
     const { saveCheckpoint } = get();
     saveCheckpoint();
     const now = new Date().toISOString();
@@ -132,11 +169,26 @@ export const createControlSlice: EditorStoreSlice<
           ? (last?.id ?? state.selectedId)
           : state.selectedId,
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyAnnotations: true },
+        ),
       };
     });
   },
 
   updateField: (id, updates) => {
+    const currentState = get();
+    if (!currentState.fields.some((field) => field.id === id)) return;
+    if (
+      !canUpdateFormFieldWithPdfPermissions(
+        currentState.documentPermissions,
+        updates,
+      )
+    ) {
+      throwFormFieldPermissionDenied(updates);
+    }
+
     set((state) => {
       let nextFields = state.fields;
       const targetField = state.fields.find((field) => field.id === id);
@@ -194,7 +246,15 @@ export const createControlSlice: EditorStoreSlice<
         field.id === id ? { ...field, ...updates } : field,
       );
 
-      return { ...state, fields: nextFields, isDirty: true };
+      return {
+        ...state,
+        fields: nextFields,
+        isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          getFormFieldUpdateDirtyScopes(state.documentPermissions, updates),
+        ),
+      };
     });
   },
 
@@ -221,6 +281,14 @@ export const createControlSlice: EditorStoreSlice<
 
       if (!changed) return;
 
+      if (
+        !canUpdateFormFieldWithPdfPermissions(get().documentPermissions, {
+          isChecked: true,
+        })
+      ) {
+        throwFormFieldPermissionDenied({ isChecked: true });
+      }
+
       const { saveCheckpoint } = get();
       saveCheckpoint();
       set((state) => ({
@@ -228,6 +296,12 @@ export const createControlSlice: EditorStoreSlice<
         fields: nextFields,
         selectedId: id,
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          getFormFieldUpdateDirtyScopes(state.documentPermissions, {
+            isChecked: true,
+          }),
+        ),
       }));
       return;
     }
@@ -252,6 +326,14 @@ export const createControlSlice: EditorStoreSlice<
     });
 
     if (!changed) return;
+    if (
+      !canUpdateFormFieldWithPdfPermissions(
+        get().documentPermissions,
+        resetUpdates,
+      )
+    ) {
+      throwFormFieldPermissionDenied(resetUpdates);
+    }
 
     const { saveCheckpoint, updateField } = get();
     saveCheckpoint();
@@ -259,6 +341,22 @@ export const createControlSlice: EditorStoreSlice<
   },
 
   reorderControlLayer: (id, move) => {
+    const state = get();
+    const target =
+      state.fields.find((field) => field.id === id) ||
+      state.annotations.find((annotation) => annotation.id === id);
+    if (!target) return;
+    const isField = state.fields.some((field) => field.id === id);
+    if (
+      isField
+        ? !canModifyPdfContents(state.documentPermissions)
+        : !canModifyPdfAnnotations(state.documentPermissions)
+    ) {
+      throw new PdfPermissionDeniedError(
+        isField ? "edit_form_structure" : "edit_annotation",
+      );
+    }
+
     const { saveCheckpoint } = get();
     saveCheckpoint();
     set((state) => {
@@ -295,11 +393,16 @@ export const createControlSlice: EditorStoreSlice<
         annotations: nextAnnotations,
         selectedId: id,
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          isField ? { modifyContents: true } : { modifyAnnotations: true },
+        ),
       };
     });
   },
 
   updateAnnotation: (id, updates) => {
+    assertPdfPermissionOperation("edit_annotation", get().documentPermissions);
     set((state) => {
       const current = state.annotations.find(
         (annotation) => annotation.id === id,
@@ -345,11 +448,16 @@ export const createControlSlice: EditorStoreSlice<
             : annotation,
         ),
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyAnnotations: true },
+        ),
       };
     });
   },
 
   addAnnotationReply: (annotationId, reply) => {
+    assertPdfPermissionOperation("edit_annotation", get().documentPermissions);
     const hasTarget = get().annotations.some(
       (annotation) => annotation.id === annotationId,
     );
@@ -384,11 +492,16 @@ export const createControlSlice: EditorStoreSlice<
         }),
         selectedId: annotationId,
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyAnnotations: true },
+        ),
       };
     });
   },
 
   updateAnnotationReply: (annotationId, replyId, updates) => {
+    assertPdfPermissionOperation("edit_annotation", get().documentPermissions);
     const targetAnnotation = get().annotations.find(
       (annotation) => annotation.id === annotationId,
     );
@@ -427,11 +540,16 @@ export const createControlSlice: EditorStoreSlice<
           });
         }),
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyAnnotations: true },
+        ),
       };
     });
   },
 
   deleteAnnotationReply: (annotationId, replyId) => {
+    assertPdfPermissionOperation("edit_annotation", get().documentPermissions);
     const targetAnnotation = get().annotations.find(
       (annotation) => annotation.id === annotationId,
     );
@@ -463,11 +581,19 @@ export const createControlSlice: EditorStoreSlice<
         }),
         selectedId: annotationId,
         isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyAnnotations: true },
+        ),
       };
     });
   },
 
   deleteAnnotation: (id) => {
+    assertPdfPermissionOperation(
+      "delete_annotation",
+      get().documentPermissions,
+    );
     const { saveCheckpoint } = get();
     saveCheckpoint();
     set((state) => ({
@@ -476,10 +602,31 @@ export const createControlSlice: EditorStoreSlice<
       ),
       selectedId: state.selectedId === id ? null : state.selectedId,
       isDirty: true,
+      dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+        state.dirtyPermissionScopes,
+        { modifyAnnotations: true },
+      ),
     }));
   },
 
   deleteSelection: () => {
+    const selectedId = get().selectedId;
+    if (!selectedId) return;
+    const isField = get().fields.some((field) => field.id === selectedId);
+    const isAnnotation = get().annotations.some(
+      (annotation) => annotation.id === selectedId,
+    );
+    if (!isField && !isAnnotation) return;
+    if (
+      isField
+        ? !canModifyPdfContents(get().documentPermissions)
+        : !canModifyPdfAnnotations(get().documentPermissions)
+    ) {
+      throw new PdfPermissionDeniedError(
+        isField ? "edit_form_structure" : "delete_annotation",
+      );
+    }
+
     const { saveCheckpoint } = get();
     saveCheckpoint();
     set((state) => {
@@ -494,6 +641,10 @@ export const createControlSlice: EditorStoreSlice<
             ),
             selectedId: null,
             isDirty: true,
+            dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+              state.dirtyPermissionScopes,
+              { modifyContents: true },
+            ),
           };
         }
 
@@ -507,6 +658,10 @@ export const createControlSlice: EditorStoreSlice<
             ),
             selectedId: null,
             isDirty: true,
+            dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+              state.dirtyPermissionScopes,
+              { modifyAnnotations: true },
+            ),
           };
         }
       }
@@ -519,6 +674,19 @@ export const createControlSlice: EditorStoreSlice<
 
   setTool: (tool) =>
     set((state) => {
+      if (
+        !canUseToolWithPdfPermissions(
+          tool,
+          state.mode,
+          state.documentPermissions,
+        )
+      ) {
+        return {
+          tool: "select",
+          selectedId: state.selectedId,
+        };
+      }
+
       if (tool === "draw_highlight") {
         return {
           tool,
@@ -559,6 +727,23 @@ export const createControlSlice: EditorStoreSlice<
   setKeys: (keys) => set((state) => ({ keys: { ...state.keys, ...keys } })),
 
   moveSelectedControl: (direction, isFast) => {
+    const selectedId = get().selectedId;
+    if (!selectedId) return;
+    const isField = get().fields.some((field) => field.id === selectedId);
+    const isAnnotation = get().annotations.some(
+      (annotation) => annotation.id === selectedId,
+    );
+    if (!isField && !isAnnotation) return;
+    if (
+      isField
+        ? !canModifyPdfContents(get().documentPermissions)
+        : !canModifyPdfAnnotations(get().documentPermissions)
+    ) {
+      throw new PdfPermissionDeniedError(
+        isField ? "edit_form_structure" : "edit_annotation",
+      );
+    }
+
     set((state) => {
       if (!state.selectedId) return state;
       const { dx, dy } = getMoveDelta(direction, isFast);
@@ -574,7 +759,15 @@ export const createControlSlice: EditorStoreSlice<
           ...getMovedFieldUpdates(field, dx, dy),
         };
 
-        return { ...state, fields: nextFields, isDirty: true };
+        return {
+          ...state,
+          fields: nextFields,
+          isDirty: true,
+          dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+            state.dirtyPermissionScopes,
+            { modifyContents: true },
+          ),
+        };
       }
 
       const annotationIndex = state.annotations.findIndex(
@@ -616,11 +809,20 @@ export const createControlSlice: EditorStoreSlice<
 
       const nextAnnotations = [...state.annotations];
       nextAnnotations[annotationIndex] = nextAnnotation;
-      return { ...state, annotations: nextAnnotations, isDirty: true };
+      return {
+        ...state,
+        annotations: nextAnnotations,
+        isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyAnnotations: true },
+        ),
+      };
     });
   },
 
   setAllFreetextFlatten: (flatten) => {
+    assertPdfPermissionOperation("edit_annotation", get().documentPermissions);
     const { saveCheckpoint } = get();
     saveCheckpoint();
     const now = new Date().toISOString();
@@ -642,7 +844,15 @@ export const createControlSlice: EditorStoreSlice<
       });
 
       if (!changed) return state;
-      return { ...state, annotations: nextAnnotations, isDirty: true };
+      return {
+        ...state,
+        annotations: nextAnnotations,
+        isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          state.dirtyPermissionScopes,
+          { modifyAnnotations: true },
+        ),
+      };
     });
   },
 });

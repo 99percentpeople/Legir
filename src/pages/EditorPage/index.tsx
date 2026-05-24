@@ -8,10 +8,16 @@ import { TranslationFloatingWindow } from "@/components/workspace/widgets/Transl
 import { useLanguage } from "@/components/language-provider";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePageTranslation } from "@/hooks/usePageTranslation";
+import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
 import { useAiChatController } from "@/hooks/useAiChatController";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { appEventBus } from "@/lib/eventBus";
 import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
+import {
+  canModifyPdfContents,
+  canUseModeWithPdfPermissions,
+  mergePdfPermissionDirtyScopes,
+} from "@/lib/pdfPermissions";
 import { ANNOTATION_STYLES } from "@/constants";
 import {
   calculateWorkspaceFitScreenScale,
@@ -68,9 +74,11 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const editorStore = useEditorStore(useShallow(selectEditorPageShellState));
   const state = editorStore;
   const { t, effectiveLanguage } = useLanguage();
+  const permissionUi = usePdfPermissionUi(state.documentPermissions);
   const {
     setState,
     setUiState,
+    updateMetadata,
     addAnnotations,
     updateAnnotation,
     addAnnotationReply,
@@ -223,9 +231,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const handleModeChange = React.useCallback(
     (mode: EditorState["mode"]) => {
+      if (!canUseModeWithPdfPermissions(mode, state.documentPermissions)) {
+        setTool("select");
+        return;
+      }
       setState({ mode, tool: defaultTool });
     },
-    [defaultTool, setState],
+    [defaultTool, setState, setTool, state.documentPermissions],
   );
 
   useEditorPageKeyboardShortcuts({
@@ -491,20 +503,26 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const handleMetadataChange = React.useCallback(
     (updates: Partial<PDFMetadata>) => {
-      setState((prev) => ({
-        ...prev,
-        metadata: { ...prev.metadata, ...updates },
-        isDirty: true,
-      }));
+      updateMetadata(updates);
     },
-    [setState],
+    [updateMetadata],
   );
 
   const handleFilenameChange = React.useCallback(
     (name: string) => {
-      setState({ filename: name, isDirty: true });
+      if (!canModifyPdfContents(state.documentPermissions)) {
+        return;
+      }
+      setState((prev) => ({
+        filename: name,
+        isDirty: true,
+        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
+          prev.dirtyPermissionScopes,
+          { modifyContents: true },
+        ),
+      }));
     },
-    [setState],
+    [setState, state.documentPermissions],
   );
 
   const getWorkspaceViewport = React.useCallback(() => {
@@ -680,6 +698,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
           pages={state.pages}
           fields={state.fields}
           annotations={state.annotations}
+          documentPermissions={state.documentPermissions}
           outline={state.outline}
           selectedId={state.selectedId}
           thumbnailsLayout={state.options.thumbnailsLayout}
@@ -774,6 +793,10 @@ const EditorPage: React.FC<EditorPageProps> = ({
           isFloating={state.isPanelFloating}
           rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
           canOpenProperties={!!selectedControl}
+          canOpenPageTranslate={permissionUi.canAll([
+            "extract_text",
+            "create_annotation",
+          ])}
           onSelectTab={(tab) => {
             if (tab === "properties" && !selectedControl) return;
             setUiState((prev) => {
@@ -811,6 +834,7 @@ const EditorPage: React.FC<EditorPageProps> = ({
           effectiveLanguage={effectiveLanguage}
           isPageTranslating={isPageTranslating}
           pageTranslateStatus={pageTranslateStatus}
+          documentPermissions={state.documentPermissions}
           aiChat={aiChat}
           onSetUiState={setUiState}
           onSelectControl={selectControl}

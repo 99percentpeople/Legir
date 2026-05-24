@@ -25,6 +25,10 @@ export interface BaseControlProps<T = FormField | Annotation> {
   isFormMode: boolean;
   /** Whether the pan tool is active (should override cursor) */
   isSelectable?: boolean;
+  /** Whether this control can be structurally modified */
+  canModify?: boolean;
+  /** Whether this form control's value can be filled */
+  canFillFormValue?: boolean;
   /** Callback for pointer down event (usually for selection initiation) */
   onPointerDown: (e: React.PointerEvent) => void;
   /** Callback when the control is selected */

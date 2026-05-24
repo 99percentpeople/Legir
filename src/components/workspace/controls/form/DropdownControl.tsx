@@ -12,6 +12,7 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
     isFormMode,
     isAnnotationMode,
     isSelectable,
+    canFillFormValue = true,
     onUpdate,
     onSelect,
   } = props;
@@ -63,7 +64,10 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
               "bg-blue-500/10 dark:bg-blue-400/10",
               !isSelectable && "hover:bg-blue-500/20",
             ),
-          isAnnotationMode && isSelectable && "hover:bg-black/5",
+          isAnnotationMode &&
+            isSelectable &&
+            canFillFormValue &&
+            "hover:bg-black/5",
           isAnnotationMode && !isSelectable && "pointer-events-none",
           isFormMode && isSelectable && "pointer-events-none",
         )}
@@ -106,6 +110,7 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
                     new Set(data.value ? data.value.split("\n") : [])
                   }
                   onSelectionChange={(keys) => {
+                    if (!canFillFormValue) return;
                     const vals = Array.from(keys).map((k) => String(k));
                     onUpdate(data.id, { value: vals.join("\n") });
                   }}
@@ -141,6 +146,7 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
                 <select
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   value={data.value || ""}
+                  disabled={!canFillFormValue}
                   onChange={(e) => onUpdate(data.id, { value: e.target.value })}
                   onPointerDown={(e) => e.stopPropagation()}
                   onFocus={() => {

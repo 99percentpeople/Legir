@@ -1,5 +1,5 @@
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
-import type { PDFOutlineItem } from "@/types";
+import type { PDFDocumentPermissions, PDFOutlineItem } from "@/types";
 import type { Tile } from "./types";
 
 type CommandSpec<TRequest extends object, TResponse = never> =
@@ -105,6 +105,13 @@ export type WorkerCommandPayloadMap = {
       docId?: string;
     },
     PDFOutlineItem[] | false
+  >;
+
+  getPermissions: CommandSpec<
+    {
+      docId?: string;
+    },
+    PDFDocumentPermissions | false
   >;
 
   resolveDest: CommandSpec<

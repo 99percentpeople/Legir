@@ -13,6 +13,7 @@ export const createHistorySlice: EditorStoreSlice<
         annotations: state.annotations,
         metadata: state.metadata,
         exportPassword: state.exportPassword,
+        dirtyPermissionScopes: state.dirtyPermissionScopes,
       };
       const newPast = [...state.past, snapshot].slice(-50);
       return { ...state, past: newPast, future: [] };
@@ -29,6 +30,7 @@ export const createHistorySlice: EditorStoreSlice<
         annotations: state.annotations,
         metadata: state.metadata,
         exportPassword: state.exportPassword,
+        dirtyPermissionScopes: state.dirtyPermissionScopes,
       };
       return {
         ...state,
@@ -36,6 +38,7 @@ export const createHistorySlice: EditorStoreSlice<
         annotations: previous.annotations,
         metadata: previous.metadata,
         exportPassword: previous.exportPassword,
+        dirtyPermissionScopes: previous.dirtyPermissionScopes,
         past: newPast,
         future: [currentSnapshot, ...state.future],
         selectedId: null,
@@ -54,6 +57,7 @@ export const createHistorySlice: EditorStoreSlice<
         annotations: state.annotations,
         metadata: state.metadata,
         exportPassword: state.exportPassword,
+        dirtyPermissionScopes: state.dirtyPermissionScopes,
       };
       return {
         ...state,
@@ -61,6 +65,7 @@ export const createHistorySlice: EditorStoreSlice<
         annotations: next.annotations,
         metadata: next.metadata,
         exportPassword: next.exportPassword,
+        dirtyPermissionScopes: next.dirtyPermissionScopes,
         past: [...state.past, currentSnapshot],
         future: newFuture,
         selectedId: null,
