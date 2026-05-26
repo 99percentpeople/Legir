@@ -1,19 +1,10 @@
 export * from "./catalog";
 export * from "./types";
-export * from "./runtimeProfiles";
-export * from "./definitions";
+export * from "./runtimeAdapters";
 export * from "./registry";
-export * from "./modelCatalog";
-export * from "./modelCapabilities";
-export * from "./modelMetadata";
-export * from "./modelRegistry";
-export {
-  createAiSdkProviderRegistry,
-  createAiSdkProviders,
-  getConfiguredAiSdkProvider,
-  getConfiguredAiSdkProviders,
-  isAiSdkProviderEnabled,
-  isOfficialOpenAiBaseUrl,
-  normalizeBaseUrl,
-  normalizeOptionalText,
-} from "./config";
+export * from "./capabilities";
+export * from "./metadata";
+export * from "./models";
+export * from "./modelResolver";
+export * from "./settings";
+export { createAiSdkProviderRegistry, createAiSdkProviders } from "./config";

@@ -2,7 +2,7 @@ import {
   formatInternalContextContent,
   stringifyInternalContextValue,
 } from "@/services/ai/chat/runtime/internalContext";
-import type { AiReasoningReplayPolicy } from "@/services/ai/providers/runtimeProfiles/types";
+import type { AiReasoningReplayPolicy } from "@/services/ai/providers/runtimeAdapters/types";
 import type { AiChatMessageRecord } from "@/services/ai/chat/types";
 
 const getStructuredContentParts = (message: AiChatMessageRecord) =>

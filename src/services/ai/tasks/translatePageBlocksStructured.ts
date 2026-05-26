@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import { z } from "zod";
 
 import { parseJsonTextWithSchema } from "@/services/ai/utils/json";
-import { resolveAiSdkRuntime } from "@/services/ai/providers/modelRegistry";
+import { resolveAiSdkRuntime } from "@/services/ai/providers/modelResolver";
 import type { AiSdkModelSpecifier } from "@/services/ai/providers/types";
 import type { AppOptions } from "@/types";
 
@@ -49,7 +49,7 @@ export const translatePageBlocksStructuredWithAiSdk = async (options: {
     appOptions: options.appOptions,
     specifier: options.specifier,
     kind: "translate",
-    reasoningMode: "off",
+    reasoning: "none",
   });
   const extraInstructions = (options.prompt || "").trim();
   const lineBreakRule = options.aiReflowParagraphs

@@ -22,7 +22,7 @@ import {
   AI_PROVIDER_SPECS_SORTED_BY_LABEL,
   getAiProviderSelectedApiOption,
 } from "@/services/ai/providers/catalog";
-import { createCustomModelCapabilities } from "@/services/ai/providers/modelCapabilities";
+import { createCustomModelCapabilities } from "@/services/ai/providers/capabilities";
 import { isDesktopApp } from "@/services/platform/runtime";
 import type { AppOptions, LLMCustomModelCapability } from "@/types";
 
@@ -169,6 +169,7 @@ export const LlmSettingsTab = ({
           {AI_PROVIDER_SPECS_SORTED_BY_LABEL.map((spec) => {
             const providerOptions = options.llm[spec.id];
             const providerModelCache = llmModelCache[spec.id];
+            const fetchedModels = providerModelCache.models ?? [];
             const syncStatus = llmSyncStatus[spec.id];
             const showApiUrl = spec.allowCustomBaseUrl;
             const providerEnabled = isLlmProviderEnabled(spec.id);
@@ -291,14 +292,14 @@ export const LlmSettingsTab = ({
                     </Label>
                     <span className="text-muted-foreground text-xs">
                       {t("settings.llm.models_loaded_count", {
-                        count: providerModelCache.translateModels.length,
+                        count: fetchedModels.length,
                       })}
                     </span>
                   </div>
-                  {providerModelCache.translateModels.length > 0 ? (
+                  {fetchedModels.length > 0 ? (
                     <div className="bg-background/80 max-h-36 overflow-auto rounded-md border p-2">
                       <div className="flex flex-col gap-1.5">
-                        {providerModelCache.translateModels.map((model) => (
+                        {fetchedModels.map((model) => (
                           <span
                             key={`${spec.id}:fetched:${model.id}`}
                             className="bg-muted inline-flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-1 text-[11px]"

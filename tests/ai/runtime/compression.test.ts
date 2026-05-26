@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { buildAiChatCompressionSegments } from "@/services/ai/chat/runtime/compression/segments";
 import { createDefaultAiChatCompressionPolicy } from "@/services/ai/chat/runtime/compression/types";
 import { algorithmicContextCompressionStrategy } from "@/services/ai/chat/runtime/compression/strategies";
-import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/services/ai/providers/modelMetadata";
+import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/constants";
 import { resolveAiChatCompressionThresholdTokens } from "@/services/ai/chat/runtime/compression/threshold";
 import { applyAiChatContextMemoryToMessages } from "@/services/ai/chat/runtime/memory/apply";
 import { getAiChatContextMemoryPlan } from "@/services/ai/chat/runtime/memory/plan";
@@ -11,7 +11,7 @@ import {
   buildAiChatContextMemoryMessage,
   getAiChatConversationMemoryCoveredMessageCount,
 } from "@/services/ai/chat/runtime/memory/serialization";
-import { deepseekRuntimeProfile } from "@/services/ai/providers/runtimeProfiles/deepseek";
+import { deepseekAdapter } from "@/services/ai/providers/runtimeAdapters/deepseek";
 import type {
   AiChatContextMemory,
   AiChatMessageRecord,
@@ -122,11 +122,9 @@ describe("AI chat context memory application", () => {
     );
     expect(prepared.some(hasAssistantToolCallWithoutReasoning)).toBe(false);
     expect(() =>
-      deepseekRuntimeProfile.validateMessages?.(prepared, {
+      deepseekAdapter.validateMessages?.(prepared, {
         reasoning: { replayPolicy: "tool-calls" },
-      } as Parameters<
-        NonNullable<typeof deepseekRuntimeProfile.validateMessages>
-      >[1]),
+      } as Parameters<NonNullable<typeof deepseekAdapter.validateMessages>>[1]),
     ).not.toThrow();
   });
 
@@ -168,6 +166,7 @@ describe("AI chat context memory planning", () => {
           outputModalities: ["text"],
           supportsImageInput: false,
           supportsToolCalls: true,
+          supportsImageToolResults: false,
           contextWindowTokens: 1_000_000,
         },
       }),

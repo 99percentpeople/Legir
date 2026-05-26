@@ -1,4 +1,3 @@
-import { createModelCapabilities } from "@/services/ai/providers/modelCapabilities";
 import type { AiSdkModelCatalogProviderRequest } from "@/services/ai/providers/types";
 import { BaseAiSdkModelCatalogProvider } from "./base";
 import { joinUrl } from "./shared";
@@ -14,34 +13,9 @@ type OpenRouterModelsResponse = {
       output_modalities?: string[];
       modality?: string;
     };
+    context_length?: number;
+    supported_parameters?: string[];
   }>;
-};
-
-const normalizeApiModalities = (values: readonly string[] | undefined) =>
-  (values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
-
-const createOpenRouterModelCapabilities = (options: {
-  inputModalities?: readonly string[];
-  outputModalities?: readonly string[];
-}) => {
-  const normalizedInputModalities = normalizeApiModalities(
-    options.inputModalities,
-  );
-  const normalizedOutputModalities = normalizeApiModalities(
-    options.outputModalities,
-  );
-
-  return createModelCapabilities({
-    inputModalities:
-      normalizedInputModalities.length > 0
-        ? normalizedInputModalities
-        : ["text"],
-    outputModalities:
-      normalizedOutputModalities.length > 0
-        ? normalizedOutputModalities
-        : ["text"],
-    supportsToolCalls: true,
-  });
 };
 
 export class OpenRouterModelCatalogProvider extends BaseAiSdkModelCatalogProvider {
@@ -77,15 +51,23 @@ export class OpenRouterModelCatalogProvider extends BaseAiSdkModelCatalogProvide
             : undefined);
         const outputModalities =
           item.output_modalities || item.architecture?.output_modalities;
+        const supportedParameters = Array.isArray(item.supported_parameters)
+          ? item.supported_parameters
+          : undefined;
 
         return [
           {
             id,
             label: item.name,
-            capabilities: createOpenRouterModelCapabilities({
-              inputModalities,
-              outputModalities,
-            }),
+            inputModalities,
+            outputModalities,
+            supportsToolCalls: supportedParameters
+              ? supportedParameters.includes("tools")
+              : undefined,
+            contextWindowTokens:
+              typeof item.context_length === "number"
+                ? item.context_length
+                : undefined,
           },
         ];
       }),

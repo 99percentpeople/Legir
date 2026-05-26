@@ -1,6 +1,6 @@
 import { generateText, streamText } from "ai";
 
-import { resolveAiSdkRuntime } from "@/services/ai/providers/modelRegistry";
+import { resolveAiSdkRuntime } from "@/services/ai/providers/modelResolver";
 import type { AiSdkModelSpecifier } from "@/services/ai/providers/types";
 import type { AppOptions } from "@/types";
 
@@ -41,7 +41,7 @@ export const translateTextWithAiSdk = async (options: {
     appOptions: options.appOptions,
     specifier: options.specifier,
     kind: "translate",
-    reasoningMode: "off",
+    reasoning: "none",
   });
 
   const result = await generateText({
@@ -69,7 +69,7 @@ export async function* translateTextStreamWithAiSdk(options: {
     appOptions: options.appOptions,
     specifier: options.specifier,
     kind: "translate",
-    reasoningMode: "off",
+    reasoning: "none",
   });
 
   const result = streamText({

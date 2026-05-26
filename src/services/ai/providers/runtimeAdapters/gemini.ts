@@ -2,17 +2,21 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type {
-  AiProviderRuntimeProfile,
-  AiReasoningEffort,
-} from "@/services/ai/providers/runtimeProfiles/types";
-import { createNoReasoningResolution } from "@/services/ai/providers/runtimeProfiles/shared";
-import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/modelMetadata";
+  AiRuntimeAdapter,
+  AiReasoningLevel,
+} from "@/services/ai/providers/runtimeAdapters/types";
+import {
+  createNoReasoningResolution,
+  getReasoningBudgetTokensForLevel,
+  selectReasoningLevel,
+} from "@/services/ai/providers/runtimeAdapters/shared";
+import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/metadata";
 
 const toGeminiThinkingLevel = (
-  effort: AiReasoningEffort,
+  level: AiReasoningLevel,
 ): "low" | "medium" | "high" | undefined => {
-  if (effort === "low" || effort === "medium" || effort === "high") {
-    return effort;
+  if (level === "low" || level === "medium" || level === "high") {
+    return level;
   }
   return undefined;
 };
@@ -35,10 +39,10 @@ const getGeminiThinkingOffCallOptions = (modelId: string) => {
   };
 };
 
-export const geminiRuntimeProfile: AiProviderRuntimeProfile = {
+export const geminiAdapter: AiRuntimeAdapter = {
   providerId: "gemini",
 
-  createProvider: (config: AiSdkProviderConfig) =>
+  createSdkProvider: (config: AiSdkProviderConfig) =>
     createGoogleGenerativeAI({
       name: config.providerId,
       apiKey: config.apiKey,
@@ -60,7 +64,8 @@ export const geminiRuntimeProfile: AiProviderRuntimeProfile = {
       });
     }
 
-    if (request.preference.mode === "off") {
+    const level = selectReasoningLevel(capability, request.preference.level);
+    if (level === "none") {
       return {
         ...createNoReasoningResolution({
           preference: request.preference,
@@ -70,15 +75,13 @@ export const geminiRuntimeProfile: AiProviderRuntimeProfile = {
       };
     }
 
-    const thinkingLevel = capability.supportsEffort
-      ? toGeminiThinkingLevel(request.preference.effort)
-      : undefined;
+    const thinkingLevel = toGeminiThinkingLevel(level);
+    const budgetTokens = getReasoningBudgetTokensForLevel(capability, level);
     return {
       capability,
       effectivePreference: {
         ...request.preference,
-        mode: "on",
-        effort: thinkingLevel ?? "auto",
+        level,
       },
       callOptions: {
         providerOptions: {
@@ -88,10 +91,7 @@ export const geminiRuntimeProfile: AiProviderRuntimeProfile = {
                 request.preference.displayPolicy !== "hidden" &&
                 capability.textExposure !== "none",
               ...(thinkingLevel ? { thinkingLevel } : {}),
-              ...(capability.supportsBudgetTokens &&
-              request.preference.budgetTokens
-                ? { thinkingBudget: request.preference.budgetTokens }
-                : {}),
+              ...(budgetTokens ? { thinkingBudget: budgetTokens } : {}),
             },
           },
         },

@@ -49,6 +49,12 @@ export type AiToolName =
   | "delete_annotations"
   | "clear_highlights";
 
+export type AiChatToolRequiredModelCapability = {
+  [K in keyof LLMModelCapabilities]: LLMModelCapabilities[K] extends boolean
+    ? K
+    : never;
+}[keyof LLMModelCapabilities];
+
 export interface AiChatToolDefinition {
   name: string;
   description: string;
@@ -56,6 +62,7 @@ export interface AiChatToolDefinition {
   inputSchema: ZodTypeAny;
   promptInstructions?: string[];
   requiredInputModalities?: LLMModelModality[];
+  requiredModelCapabilities?: AiChatToolRequiredModelCapability[];
   toModelOutput?: (options: {
     toolCallId: string;
     input: unknown;

@@ -169,11 +169,11 @@ export const aiChatService = {
         policy: compressionPolicy,
       });
       const preparedMessages =
-        runtime.profile.prepareMessages?.(genericMessages, {
+        runtime.adapter.prepareMessages?.(genericMessages, {
           ...runtime.request,
           reasoning: runtime.reasoning,
         }) ?? genericMessages;
-      runtime.profile.validateMessages?.(preparedMessages, {
+      runtime.adapter.validateMessages?.(preparedMessages, {
         ...runtime.request,
         reasoning: runtime.reasoning,
       });

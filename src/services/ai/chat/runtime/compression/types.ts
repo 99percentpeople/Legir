@@ -4,7 +4,7 @@ import type {
   AiChatTimelineItem,
 } from "@/services/ai/chat/types";
 import type { AiChatContextMemoryPlan } from "@/services/ai/chat/runtime/memory/plan";
-import type { AiReasoningReplayPolicy } from "@/services/ai/providers/runtimeProfiles/types";
+import type { AiReasoningReplayPolicy } from "@/services/ai/providers/runtimeAdapters/types";
 import type { AppOptions } from "@/types";
 
 export type AiChatCompressionPhase = "projected" | "runtime";

@@ -496,7 +496,7 @@ export function AiChatPanel({
       onResize={onResize}
       footer={footer}
     >
-      <div className="flex h-full flex-col gap-4">
+      <div className="flex h-full flex-col gap-2">
         {showHeaderBadges ? (
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="destructive">

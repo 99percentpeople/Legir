@@ -1,8 +1,10 @@
-import { createModelCapabilities } from "@/services/ai/providers/modelCapabilities";
-import type { AiSdkModelCatalogProviderRequest } from "@/services/ai/providers/types";
+import type {
+  AiSdkDiscoveredModel,
+  AiSdkModelCatalogProviderRequest,
+} from "@/services/ai/providers/types";
+import type { AiProviderId } from "@/services/ai/providers/catalog";
 import { BaseAiSdkModelCatalogProvider } from "./base";
 import { joinUrl } from "./shared";
-import type { LLMModelCapabilities } from "@/types";
 
 type AnthropicModelsResponse = {
   data?: Array<{
@@ -13,23 +15,14 @@ type AnthropicModelsResponse = {
   last_id?: string;
 };
 
-const createAnthropicModelCapabilities = () =>
-  createModelCapabilities({
-    inputModalities: ["text", "image"],
-    outputModalities: ["text"],
-    supportsToolCalls: true,
-  });
-
 export class AnthropicModelCatalogProvider extends BaseAiSdkModelCatalogProvider {
-  readonly providerId = "anthropic" as const;
+  constructor(readonly providerId: AiProviderId = "anthropic") {
+    super();
+  }
 
   async fetchModels(options: AiSdkModelCatalogProviderRequest) {
     const config = this.getRequiredProviderConfig(options.appOptions);
-    const models: Array<{
-      id: string;
-      label?: string;
-      capabilities: LLMModelCapabilities;
-    }> = [];
+    const models: AiSdkDiscoveredModel[] = [];
     let afterId = "";
 
     do {
@@ -61,7 +54,9 @@ export class AnthropicModelCatalogProvider extends BaseAiSdkModelCatalogProvider
             typeof item.display_name === "string"
               ? item.display_name.trim()
               : undefined,
-          capabilities: createAnthropicModelCapabilities(),
+          inputModalities: ["text", "image"],
+          outputModalities: ["text"],
+          supportsToolCalls: true,
         });
       }
 

@@ -9,9 +9,8 @@
 import type { AiProviderId } from "@/services/ai/providers/catalog";
 import type {
   AiReasoningDisplayPolicy,
-  AiReasoningEffort,
-  AiReasoningMode,
-} from "@/services/ai/providers/runtimeProfiles/types";
+  AiReasoningLevel,
+} from "@/services/ai/providers/runtimeAdapters/types";
 import type { StampKind, StampPresetId } from "@/lib/stamps";
 
 export enum FieldType {
@@ -364,6 +363,7 @@ export interface LLMModelCapabilities {
   outputModalities: LLMModelModality[];
   supportsImageInput: boolean;
   supportsToolCalls: boolean;
+  supportsImageToolResults: boolean;
   contextWindowTokens: number;
 }
 
@@ -391,9 +391,7 @@ export interface ApiProxyOptions {
 }
 
 export interface AiChatReasoningOptions {
-  mode: AiReasoningMode;
-  effort: AiReasoningEffort;
-  budgetTokens?: number;
+  level: AiReasoningLevel;
   displayPolicy: AiReasoningDisplayPolicy;
 }
 
@@ -563,8 +561,7 @@ export interface EditorState {
   llmModelCache: Record<
     AiProviderId,
     {
-      translateModels: AppLLMModelOption[];
-      visionModels: AppLLMModelOption[];
+      models: AppLLMModelOption[];
     }
   >;
 

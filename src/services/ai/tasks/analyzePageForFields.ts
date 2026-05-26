@@ -4,7 +4,7 @@ import { z } from "zod";
 import { DEFAULT_FIELD_STYLE } from "@/constants";
 import { parseJsonTextWithSchema } from "@/services/ai/utils/json";
 import { formatAiPageCoordinateBounds } from "@/services/ai/utils/pageCoordinates";
-import { resolveAiSdkLanguageModel } from "@/services/ai/providers/modelRegistry";
+import { resolveAiSdkLanguageModel } from "@/services/ai/providers/modelResolver";
 import type { AiSdkModelSpecifier } from "@/services/ai/providers/types";
 import type { LLMAnalyzePageForFieldsOptions } from "@/services/ai/types";
 import {

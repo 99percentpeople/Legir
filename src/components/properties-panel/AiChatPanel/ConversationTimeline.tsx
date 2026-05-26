@@ -276,7 +276,7 @@ export function ConversationTimeline({
   }, [timeline]);
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-1.5">
       {renderEntries.map((entry) => {
         if (entry.kind === "tool_batch") {
           return (

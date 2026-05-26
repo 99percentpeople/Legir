@@ -511,6 +511,7 @@ export const documentToolModule = defineToolModule((ctx) => {
       )
       .promptInstructions(PAGE_VISUAL_TOOL_PROMPTS)
       .inputSchema(getPagesVisualArgsSchema)
+      .requiresModelCapabilities(["supportsImageToolResults"])
       .toModelOutput(({ output }) => toPagesVisualModelOutput(output))
       .build(async ({ args, ctx: toolCtx, signal }) => {
         const documentContext = toolCtx.getDocumentContext();

@@ -1,12 +1,14 @@
 import { describe, expect, test } from "vitest";
 
 import type { AiToolContext } from "@/services/ai/chat/aiToolContext";
+import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
 import type {
   AiReadablePageBatch,
   AiRenderedPageImageBatch,
 } from "@/services/ai/chat/types";
 import { documentToolModule } from "@/services/ai/chat/tools/documentTools";
 import { createToolHandlerMap } from "@/services/ai/chat/tools/shared";
+import type { LLMModelCapabilities } from "@/types";
 
 const createBatch = (
   overrides: Partial<AiReadablePageBatch> = {},
@@ -34,6 +36,18 @@ const createVisualBatch = (
   truncated: false,
   maxPagesPerCall: 4,
   pages: [],
+  ...overrides,
+});
+
+const createCapabilities = (
+  overrides: Partial<LLMModelCapabilities> = {},
+): LLMModelCapabilities => ({
+  inputModalities: ["text", "image"],
+  outputModalities: ["text"],
+  supportsImageInput: true,
+  supportsToolCalls: true,
+  supportsImageToolResults: false,
+  contextWindowTokens: 128_000,
   ...overrides,
 });
 
@@ -247,6 +261,31 @@ describe("AI chat document tools", () => {
         signal: undefined,
       },
     ]);
+  });
+
+  test("get_pages_visual requires image-capable tool results", () => {
+    const ctx = {} as AiToolContext;
+    const withoutImageToolResults = createAiToolRegistry(ctx, {
+      modelCapabilities: createCapabilities({
+        supportsImageToolResults: false,
+      }),
+    });
+    const withImageToolResults = createAiToolRegistry(ctx, {
+      modelCapabilities: createCapabilities({
+        supportsImageToolResults: true,
+      }),
+    });
+
+    expect(
+      withoutImageToolResults
+        .getDefinitions()
+        .some((definition) => definition.name === "get_pages_visual"),
+    ).toBe(false);
+    expect(
+      withImageToolResults
+        .getDefinitions()
+        .some((definition) => definition.name === "get_pages_visual"),
+    ).toBe(true);
   });
 
   test("summarize_pages_visual rejects removed summary instructions", async () => {

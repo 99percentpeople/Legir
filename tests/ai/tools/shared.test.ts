@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 import type { AiToolContext } from "@/services/ai/chat/aiToolContext";
 import type { AiToolHandler } from "@/services/ai/chat/tools/shared";
@@ -88,6 +89,28 @@ describe("AI chat tool shared helpers", () => {
         page_numbers: [1, 2, 3, 4],
       },
     });
+  });
+
+  test("exports page number ranges without tuple-style items schema", () => {
+    const schema = zodToJsonSchema(
+      z.object({
+        page_numbers: requiredPageNumbersSchema,
+      }),
+    ) as {
+      properties?: {
+        page_numbers?: {
+          items?: {
+            anyOf?: Array<{ items?: unknown }>;
+          };
+        };
+      };
+    };
+
+    const rangeItems =
+      schema.properties?.page_numbers?.items?.anyOf?.[1]?.items;
+
+    expect(Array.isArray(rangeItems)).toBe(false);
+    expect(rangeItems).toMatchObject({});
   });
 
   test("rejects descending page number ranges", () => {

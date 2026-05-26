@@ -3,25 +3,25 @@ import type { LanguageModel } from "ai";
 import {
   AI_PROVIDER_IDS,
   AI_PROVIDER_SPECS_SORTED_BY_LABEL,
+  getAiProviderSpec,
   isAiProviderId,
 } from "@/services/ai/providers/catalog";
-import { getAiSdkModelCatalogProvider } from "@/services/ai/providers/registry";
+import {
+  getAiRuntimeAdapter,
+  getAiSdkModelCatalogProvider,
+} from "@/services/ai/providers/registry";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { AppLLMModelOption, AppOptions, EditorState } from "@/types";
+import { createAiSdkProviderRegistry } from "@/services/ai/providers/config";
 import {
-  createAiSdkProviderRegistry,
   getConfiguredAiSdkProvider,
-} from "@/services/ai/providers/config";
+  isAiSdkProviderConfigured,
+} from "@/services/ai/providers/settings";
 import {
   getAiChatReasoningPreference,
-  getAiProviderRuntimeProfile,
   mergeAiSdkModelCallOptions,
   normalizeReasoningPreference,
-} from "@/services/ai/providers/runtimeProfiles";
-import {
-  getAiSdkFallbackModelId,
-  isAiSdkProviderConfigured,
-} from "@/services/ai/providers/modelCatalog";
+} from "@/services/ai/providers/runtimeAdapters";
 import type {
   AiSdkModelSpecifier,
   AiSdkResolvedRuntime,
@@ -66,6 +66,9 @@ const dedupeModelOptions = (
 
   return output;
 };
+
+const getFallbackModelId = (providerId: AiSdkProviderId) =>
+  getAiProviderSpec(providerId).fallbackModelId || "";
 
 export const parseAiSdkModelSpecifier = (
   value: string | null | undefined,
@@ -127,7 +130,7 @@ export const resolveAiSdkRuntime = (options: {
   appOptions: AppOptions;
   specifier: AiSdkModelSpecifier;
   kind: AiSdkTaskModelKind;
-  reasoningMode?: "ai-chat" | "off";
+  reasoning?: "chat-settings" | "none";
 }): AiSdkResolvedRuntime => {
   const config = getConfiguredAiSdkProvider(
     options.appOptions,
@@ -142,7 +145,7 @@ export const resolveAiSdkRuntime = (options: {
   const catalogProvider = getAiSdkModelCatalogProvider(
     options.specifier.providerId,
   );
-  const profile = getAiProviderRuntimeProfile(config);
+  const adapter = getAiRuntimeAdapter(config);
   const runtimeRequest = {
     providerId: config.providerId,
     backendKind: config.backendKind,
@@ -152,13 +155,13 @@ export const resolveAiSdkRuntime = (options: {
     appOptions: options.appOptions,
   };
   const preference =
-    options.reasoningMode === "off"
+    options.reasoning === "none"
       ? normalizeReasoningPreference({
-          mode: "off",
+          level: "none",
           displayPolicy: "hidden",
         })
       : getAiChatReasoningPreference(runtimeRequest);
-  const reasoning = profile.resolveReasoning({
+  const reasoning = adapter.resolveReasoning({
     ...runtimeRequest,
     preference,
   });
@@ -166,7 +169,7 @@ export const resolveAiSdkRuntime = (options: {
   return {
     specifier: options.specifier,
     model: resolveAiSdkLanguageModel(options.appOptions, options.specifier),
-    profile,
+    adapter,
     reasoning,
     request: runtimeRequest,
     callOptions: mergeAiSdkModelCallOptions(
@@ -283,8 +286,7 @@ export const resolveAiSdkModelSpecifierForTask = (options: {
     providerId,
     kind: options.kind,
   })[0]?.id;
-  const fallbackModelId =
-    firstKnownModel || getAiSdkFallbackModelId(providerId);
+  const fallbackModelId = firstKnownModel || getFallbackModelId(providerId);
 
   if (!fallbackModelId) {
     throw new Error(`No available ${providerId} ${options.kind} models.`);

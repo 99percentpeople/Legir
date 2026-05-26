@@ -18,7 +18,14 @@ const lazyProviderLogo = (
 
 const providerLogos = {
   openai: lazyProviderLogo(() => import("@lobehub/icons/es/OpenAI")),
+  "openai-compatible": lazyProviderLogo(
+    () => import("@lobehub/icons/es/OpenAI"),
+  ),
   anthropic: lazyProviderLogo(() => import("@lobehub/icons/es/Anthropic")),
+  "anthropic-compatible": lazyProviderLogo(
+    () => import("@lobehub/icons/es/Anthropic"),
+  ),
+  "xiaomi-mimo": lazyProviderLogo(() => import("@lobehub/icons/es/XiaomiMiMo")),
   gemini: lazyProviderLogo(() => import("@lobehub/icons/es/Gemini")),
   openrouter: lazyProviderLogo(() => import("@lobehub/icons/es/OpenRouter")),
   deepseek: lazyProviderLogo(() => import("@lobehub/icons/es/DeepSeek")),

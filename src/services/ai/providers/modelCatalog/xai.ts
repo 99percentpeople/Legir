@@ -1,4 +1,3 @@
-import { createModelCapabilities } from "@/services/ai/providers/modelCapabilities";
 import type { AiSdkModelCatalogProviderRequest } from "@/services/ai/providers/types";
 import { BaseAiSdkModelCatalogProvider } from "./base";
 import { joinUrl } from "./shared";
@@ -9,33 +8,6 @@ type XaiLanguageModelsResponse = {
     input_modalities?: string[];
     output_modalities?: string[];
   }>;
-};
-
-const normalizeApiModalities = (values: readonly string[] | undefined) =>
-  (values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
-
-const createXaiModelCapabilities = (options: {
-  inputModalities?: readonly string[];
-  outputModalities?: readonly string[];
-}) => {
-  const normalizedInputModalities = normalizeApiModalities(
-    options.inputModalities,
-  );
-  const normalizedOutputModalities = normalizeApiModalities(
-    options.outputModalities,
-  );
-
-  return createModelCapabilities({
-    inputModalities:
-      normalizedInputModalities.length > 0
-        ? normalizedInputModalities
-        : ["text"],
-    outputModalities:
-      normalizedOutputModalities.length > 0
-        ? normalizedOutputModalities
-        : ["text"],
-    supportsToolCalls: true,
-  });
 };
 
 export class XaiModelCatalogProvider extends BaseAiSdkModelCatalogProvider {
@@ -66,10 +38,9 @@ export class XaiModelCatalogProvider extends BaseAiSdkModelCatalogProvider {
         return [
           {
             id,
-            capabilities: createXaiModelCapabilities({
-              inputModalities: item.input_modalities,
-              outputModalities: item.output_modalities,
-            }),
+            inputModalities: item.input_modalities,
+            outputModalities: item.output_modalities,
+            supportsToolCalls: true,
           },
         ];
       }),

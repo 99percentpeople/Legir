@@ -1,6 +1,9 @@
 export const AI_PROVIDER_IDS = [
   "openai",
+  "openai-compatible",
   "anthropic",
+  "anthropic-compatible",
+  "xiaomi-mimo",
   "gemini",
   "openrouter",
   "deepseek",
@@ -15,10 +18,9 @@ export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
 export type AiProviderBackendKind =
   | "openai"
   | "anthropic"
+  | "anthropic-compatible"
   | "google"
   | "deepseek"
-  | "minimax-anthropic"
-  | "minimax-openai"
   | "zhipu"
   | "openrouter"
   | "groq"
@@ -57,6 +59,13 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
     unavailableMessageKey: "properties.form_detection.api_key_missing",
   },
   {
+    id: "openai-compatible",
+    label: "OpenAI Compatible",
+    backendKind: "openai-compatible",
+    allowCustomBaseUrl: true,
+    unavailableMessageKey: "properties.form_detection.api_key_missing",
+  },
+  {
     id: "anthropic",
     label: "Anthropic",
     backendKind: "anthropic",
@@ -66,11 +75,42 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
     unavailableMessageKey: "properties.form_detection.api_key_missing",
   },
   {
+    id: "anthropic-compatible",
+    label: "Anthropic Compatible",
+    backendKind: "anthropic-compatible",
+    allowCustomBaseUrl: true,
+    unavailableMessageKey: "properties.form_detection.api_key_missing",
+  },
+  {
+    id: "xiaomi-mimo",
+    label: "Xiaomi MiMo",
+    backendKind: "openai-compatible",
+    defaultBaseUrl: "https://api.xiaomimimo.com/v1",
+    apiOptions: [
+      {
+        id: "openai",
+        label: "OpenAI Compatible",
+        backendKind: "openai-compatible",
+        defaultBaseUrl: "https://api.xiaomimimo.com/v1",
+      },
+      {
+        id: "anthropic",
+        label: "Anthropic Compatible",
+        backendKind: "anthropic-compatible",
+        defaultBaseUrl: "https://api.xiaomimimo.com/anthropic/v1",
+      },
+    ],
+    defaultApiOptionId: "openai",
+    allowCustomBaseUrl: true,
+    fallbackModelId: "mimo-v2.5-pro",
+    unavailableMessageKey: "properties.form_detection.api_key_missing",
+  },
+  {
     id: "gemini",
     label: "Gemini",
     backendKind: "google",
     allowCustomBaseUrl: false,
-    fallbackModelId: "gemini-2.5-flash",
+    fallbackModelId: "gemini-3.5-flash",
     unavailableMessageKey: "properties.form_detection.api_key_missing",
   },
   {
@@ -93,19 +133,19 @@ export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
   {
     id: "minimax",
     label: "MiniMax",
-    backendKind: "minimax-anthropic",
+    backendKind: "anthropic-compatible",
     defaultBaseUrl: "https://api.minimax.io/anthropic/v1",
     apiOptions: [
       {
         id: "anthropic",
         label: "Anthropic Compatible",
-        backendKind: "minimax-anthropic",
+        backendKind: "anthropic-compatible",
         defaultBaseUrl: "https://api.minimax.io/anthropic/v1",
       },
       {
         id: "openai",
         label: "OpenAI Compatible",
-        backendKind: "minimax-openai",
+        backendKind: "openai-compatible",
         defaultBaseUrl: "https://api.minimax.io/v1",
       },
     ],

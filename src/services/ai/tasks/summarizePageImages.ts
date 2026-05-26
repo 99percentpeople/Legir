@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 
-import { resolveAiSdkLanguageModel } from "@/services/ai/providers/modelRegistry";
+import { resolveAiSdkLanguageModel } from "@/services/ai/providers/modelResolver";
 import type { AiSdkModelSpecifier } from "@/services/ai/providers/types";
 import type { AppOptions } from "@/types";
 

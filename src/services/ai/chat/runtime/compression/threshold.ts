@@ -4,7 +4,7 @@ import {
   AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_MIN,
   AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_STEP,
 } from "@/constants";
-import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/services/ai/providers/modelMetadata";
+import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/constants";
 import type { AppOptions, LLMModelCapabilities } from "@/types";
 
 export const clampAiChatCompressionThresholdPercent = (value: unknown) => {

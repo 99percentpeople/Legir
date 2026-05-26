@@ -1,8 +1,8 @@
-import { createModelCapabilities } from "@/services/ai/providers/modelCapabilities";
-import type { AiSdkModelCatalogProviderRequest } from "@/services/ai/providers/types";
-import { isSupportedGeminiToolCallingModelId } from "@/services/ai/utils/geminiModelSupport";
+import type {
+  AiSdkDiscoveredModel,
+  AiSdkModelCatalogProviderRequest,
+} from "@/services/ai/providers/types";
 import { BaseAiSdkModelCatalogProvider } from "./base";
-import type { LLMModelCapabilities } from "@/types";
 
 const GEMINI_MODELS_ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models";
@@ -11,6 +11,7 @@ type GeminiModelsResponse = {
   models?: Array<{
     name?: string;
     displayName?: string;
+    inputTokenLimit?: number;
     supportedGenerationMethods?: string[];
   }>;
   nextPageToken?: string;
@@ -19,23 +20,12 @@ type GeminiModelsResponse = {
 const normalizeGeminiModelId = (name: string) =>
   name.startsWith("models/") ? name.slice("models/".length) : name;
 
-const createGeminiModelCapabilities = () =>
-  createModelCapabilities({
-    inputModalities: ["text", "image"],
-    outputModalities: ["text"],
-    supportsToolCalls: true,
-  });
-
 export class GeminiModelCatalogProvider extends BaseAiSdkModelCatalogProvider {
   readonly providerId = "gemini" as const;
 
   async fetchModels(options: AiSdkModelCatalogProviderRequest) {
     const config = this.getRequiredProviderConfig(options.appOptions);
-    const models: Array<{
-      id: string;
-      label: string;
-      capabilities: LLMModelCapabilities;
-    }> = [];
+    const models: AiSdkDiscoveredModel[] = [];
     let pageToken = "";
 
     do {
@@ -64,14 +54,16 @@ export class GeminiModelCatalogProvider extends BaseAiSdkModelCatalogProvider {
         }
 
         const id = normalizeGeminiModelId(name);
-        if (!isSupportedGeminiToolCallingModelId(id)) {
-          continue;
-        }
-
         models.push({
           id,
           label: item.displayName?.trim() || id,
-          capabilities: createGeminiModelCapabilities(),
+          inputModalities: ["text"],
+          outputModalities: ["text"],
+          supportsToolCalls: false,
+          contextWindowTokens:
+            typeof item.inputTokenLimit === "number"
+              ? item.inputTokenLimit
+              : undefined,
         });
       }
 

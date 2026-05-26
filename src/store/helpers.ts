@@ -172,8 +172,7 @@ export const createEmptyLlmModelCache = (): EditorState["llmModelCache"] =>
   AI_PROVIDER_IDS.reduce<EditorState["llmModelCache"]>(
     (acc, providerId) => {
       acc[providerId as AiProviderId] = {
-        translateModels: [],
-        visionModels: [],
+        models: [],
       };
       return acc;
     },

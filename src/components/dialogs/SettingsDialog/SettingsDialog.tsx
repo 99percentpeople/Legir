@@ -212,8 +212,7 @@ const SettingsDialog = ({
         ...state.llmModelCache,
         [provider]: {
           ...state.llmModelCache[provider],
-          translateModels: [],
-          visionModels: [],
+          models: [],
         },
       },
     }));

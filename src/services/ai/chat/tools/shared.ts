@@ -73,6 +73,9 @@ type AiToolBuilderState<
   requiredInputModalities: NonNullable<
     AiChatToolDefinition["requiredInputModalities"]
   >;
+  requiredModelCapabilities: NonNullable<
+    AiChatToolDefinition["requiredModelCapabilities"]
+  >;
   toModelOutput?: AiChatToolDefinition["toModelOutput"];
 };
 
@@ -178,14 +181,27 @@ const formatIssuePath = (path: Array<string | number>) =>
     .map((segment) => (typeof segment === "number" ? `[${segment}]` : segment))
     .join(".");
 
+const formatZodIssue = (
+  issue: z.ZodIssue,
+  basePath: Array<string | number> = [],
+): string => {
+  const path = [...basePath, ...issue.path];
+  if (issue.code === "invalid_union") {
+    const nestedMessages = issue.unionErrors.flatMap((unionError) =>
+      unionError.issues.map((nestedIssue) => formatZodIssue(nestedIssue, path)),
+    );
+    if (nestedMessages.length > 0) {
+      return nestedMessages.join("; ");
+    }
+  }
+
+  const formattedPath = formatIssuePath(path);
+  return formattedPath ? `${formattedPath}: ${issue.message}` : issue.message;
+};
+
 const formatToolArgsError = (error: unknown) => {
   if (error instanceof z.ZodError) {
-    return error.issues
-      .map((issue) => {
-        const path = formatIssuePath(issue.path);
-        return path ? `${path}: ${issue.message}` : issue.message;
-      })
-      .join("; ");
+    return error.issues.map((issue) => formatZodIssue(issue)).join("; ");
   }
 
   return error instanceof Error ? error.message : "Invalid tool arguments.";
@@ -281,10 +297,14 @@ export type PageNumberRangeSelector = [number, number];
 export type PageNumberSelector = number | PageNumberRangeSelector;
 
 const pageNumberRangeSelectorSchema = z
-  .tuple([pageNumberInputSchema, pageNumberInputSchema])
+  .array(pageNumberInputSchema)
+  .length(2)
   .refine(([startPage, endPage]) => startPage <= endPage, {
     message: "page range start must be less than or equal to end.",
-  });
+  })
+  .transform(
+    ([startPage, endPage]) => [startPage, endPage] as PageNumberRangeSelector,
+  );
 
 export const pageNumberSelectorSchema = z.union([
   pageNumberInputSchema,
@@ -385,6 +405,15 @@ const createConfiguredToolBuilder = <
         modality.trim().toLowerCase(),
       ),
     }),
+  requiresModelCapabilities: (
+    requiredModelCapabilities: NonNullable<
+      AiChatToolDefinition["requiredModelCapabilities"]
+    >,
+  ) =>
+    createConfiguredToolBuilder({
+      ...state,
+      requiredModelCapabilities,
+    }),
   toModelOutput: (toModelOutput: AiChatToolDefinition["toModelOutput"]) =>
     createConfiguredToolBuilder({
       ...state,
@@ -417,6 +446,7 @@ const createConfiguredToolBuilder = <
         inputSchema: state.inputSchema,
         promptInstructions: state.promptInstructions,
         requiredInputModalities: state.requiredInputModalities,
+        requiredModelCapabilities: state.requiredModelCapabilities,
         toModelOutput: state.toModelOutput,
       }),
       execute: async (rawArgs, ctx, signal, onProgress) => {
@@ -444,6 +474,7 @@ export const createToolBuilder = <TName extends AiToolName>(name: TName) =>
     inputSchema: emptyObjectSchema,
     promptInstructions: [],
     requiredInputModalities: [],
+    requiredModelCapabilities: [],
   });
 
 export const annotationTypesSchema = z.array(

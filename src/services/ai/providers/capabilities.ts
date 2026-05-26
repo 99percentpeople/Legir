@@ -3,41 +3,9 @@ import type {
   LLMModelCapabilities,
   LLMModelModality,
 } from "@/types";
-import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/services/ai/providers/modelMetadata";
+import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/constants";
 
 const DEFAULT_OUTPUT_MODALITIES: LLMModelModality[] = ["text"];
-
-const matchAnyPattern = (value: string, patterns: readonly RegExp[]) =>
-  patterns.some((pattern) => pattern.test(value));
-
-const OPENAI_LIKE_IMAGE_PATTERNS: readonly RegExp[] = [
-  /^gpt-4o(?:[-:]|$)/,
-  /^gpt-4\.1(?:[-:]|$)/,
-  /^gpt-4\.5(?:[-:]|$)/,
-  /^gpt-5(?:[.:-]|$)/,
-  /^gemini(?:[-._:]|$)/,
-  /^claude(?:[-._:]|$)/,
-  /(?:^|[-_/])(vision|vl)(?:[-_/]|$)/,
-  /(?:^|[-_/])llama-4(?:[-_/]|$)/,
-  /(?:^|[-_/])pixtral(?:[-_/]|$)/,
-  /(?:^|[-_/])gemma-3(?:[-_/]|$)/,
-  /(?:^|[-_/])minicpm[-_]?v(?:[-_/]|$)/,
-  /(?:^|[-_/])phi-3\.5-vision(?:[-_/]|$)/,
-  /(?:^|[-_/])qwen(?:2(?:\.5)?)?[-_]?vl(?:[-_/]|$)/,
-  /(?:^|[-_/])internvl(?:[-_/]|$)/,
-  /(?:^|[-_/])glm-(?:\d+(?:\.\d+)?)v(?:[-_/]|$)/,
-  /(?:^|[-_/])kimi[-_]?vl(?:[-_/]|$)/,
-];
-
-const OPENAI_LIKE_NON_TOOL_PATTERNS: readonly RegExp[] = [
-  /(?:^|[-_/])embedding(?:[-_/]|$)/,
-  /(?:^|[-_/])moderation(?:[-_/]|$)/,
-  /(?:^|[-_/])tts(?:[-_/]|$)/,
-  /(?:^|[-_/])whisper(?:[-_/]|$)/,
-  /(?:^|[-_/])transcription(?:[-_/]|$)/,
-  /(?:^|[-_/])speech(?:[-_/]|$)/,
-  /(?:^|[-_/])image(?:[-_/]|$)/,
-];
 
 const normalizeModalities = (
   values: readonly string[] | undefined,
@@ -59,6 +27,7 @@ export const createModelCapabilities = (options: {
   inputModalities?: readonly string[];
   outputModalities?: readonly string[];
   supportsToolCalls: boolean;
+  supportsImageToolResults?: boolean;
   contextWindowTokens?: number;
 }): LLMModelCapabilities => {
   const inputModalities = normalizeModalities(options.inputModalities);
@@ -72,6 +41,7 @@ export const createModelCapabilities = (options: {
         : DEFAULT_OUTPUT_MODALITIES,
     supportsImageInput: inputModalities.includes("image"),
     supportsToolCalls: options.supportsToolCalls,
+    supportsImageToolResults: options.supportsImageToolResults === true,
     contextWindowTokens: Math.max(
       1,
       Math.trunc(
@@ -95,52 +65,20 @@ export const createCustomModelCapabilities = (
       : ["text"],
     outputModalities: DEFAULT_OUTPUT_MODALITIES,
     supportsToolCalls: normalizedCapabilities.has("tools"),
+    supportsImageToolResults: false,
   });
 };
 
-export const supportsOpenAiLikeImageInput = (
-  modelId: string,
-  extraPatterns: readonly RegExp[] = [],
-) => {
-  const normalizedModelId = modelId.trim().toLowerCase();
-  if (!normalizedModelId) return false;
-
-  return matchAnyPattern(normalizedModelId, [
-    ...OPENAI_LIKE_IMAGE_PATTERNS,
-    ...extraPatterns,
-  ]);
-};
-
-export const supportsOpenAiLikeToolCalls = (
-  modelId: string,
-  extraNonToolPatterns: readonly RegExp[] = [],
-) => {
-  const normalizedModelId = modelId.trim().toLowerCase();
-  if (!normalizedModelId) return true;
-
-  return !matchAnyPattern(normalizedModelId, [
-    ...OPENAI_LIKE_NON_TOOL_PATTERNS,
-    ...extraNonToolPatterns,
-  ]);
-};
-
 export const createOpenAiLikeModelCapabilities = (options: {
-  modelId: string;
-  extraImagePatterns?: readonly RegExp[];
-  extraNonToolPatterns?: readonly RegExp[];
+  supportsImageToolResults?: boolean;
+  contextWindowTokens?: number;
 }) =>
   createModelCapabilities({
-    inputModalities: supportsOpenAiLikeImageInput(
-      options.modelId,
-      options.extraImagePatterns,
-    )
-      ? ["text", "image"]
-      : ["text"],
+    inputModalities: ["text"],
     outputModalities: DEFAULT_OUTPUT_MODALITIES,
-    supportsToolCalls: supportsOpenAiLikeToolCalls(
-      options.modelId,
-      options.extraNonToolPatterns,
-    ),
+    supportsToolCalls: true,
+    supportsImageToolResults: options.supportsImageToolResults,
+    contextWindowTokens: options.contextWindowTokens,
   });
 
 export const modelSupportsInputModality = (

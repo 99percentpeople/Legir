@@ -10,32 +10,46 @@ import type {
   AiSdkTaskModelKind,
 } from "@/services/ai/providers/types";
 
-export type AiReasoningMode = "auto" | "off" | "on";
-export type AiReasoningEffort = "auto" | "low" | "medium" | "high";
+export type AiReasoningLevel =
+  | "none"
+  | "auto"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh";
+export type AiReasoningActiveLevel = Exclude<AiReasoningLevel, "none" | "auto">;
 export type AiReasoningReplayPolicy = "none" | "tool-calls" | "all";
 export type AiReasoningDisplayPolicy =
   | "hidden"
   | "summary"
   | "full-if-provider-exposes";
 export type AiReasoningTextExposure = "none" | "summary" | "raw";
+export type AiReasoningBudgetByLevel = Partial<
+  Record<AiReasoningLevel, number>
+>;
 
 export interface AiReasoningPreference {
-  mode: AiReasoningMode;
-  effort: AiReasoningEffort;
-  budgetTokens?: number;
+  level: AiReasoningLevel;
   displayPolicy: AiReasoningDisplayPolicy;
 }
 
 export interface AiReasoningCapability {
   supported: boolean;
-  supportsModeSwitch: boolean;
-  supportsEffort: boolean;
-  supportsBudgetTokens: boolean;
+  levels: readonly AiReasoningLevel[];
+  budgetTokensByLevel?: AiReasoningBudgetByLevel;
   textExposure: AiReasoningTextExposure;
   requiresReasoningReplay: AiReasoningReplayPolicy;
 }
 
-export interface AiProviderRuntimeRequest {
+export interface AiReasoningLevelControl {
+  supported: boolean;
+  levels: readonly AiReasoningLevel[];
+  selectedLevel: AiReasoningLevel;
+  showSelect: boolean;
+}
+
+export interface AiRuntimeRequest {
   providerId: AiSdkProviderId;
   backendKind: AiSdkBackendKind;
   apiOptionId?: string;
@@ -44,39 +58,38 @@ export interface AiProviderRuntimeRequest {
   appOptions: AppOptions;
 }
 
-export interface AiProviderReasoningResolution {
+export interface AiReasoningResolution {
   effectivePreference: AiReasoningPreference;
   capability: AiReasoningCapability;
   callOptions?: AiSdkModelCallOptions;
   replayPolicy: AiReasoningReplayPolicy;
 }
 
-export interface AiProviderRuntimeProfile {
+export interface AiRuntimeAdapter {
   providerId: AiSdkProviderId;
 
-  createProvider: (config: AiSdkProviderConfig) => ProviderV3;
+  /** Build the AI SDK provider, including provider-specific SDK wrappers. */
+  createSdkProvider: (config: AiSdkProviderConfig) => ProviderV3;
 
-  getReasoningCapability: (
-    request: AiProviderRuntimeRequest,
-  ) => AiReasoningCapability;
+  getReasoningCapability: (request: AiRuntimeRequest) => AiReasoningCapability;
 
   resolveReasoning: (
-    request: AiProviderRuntimeRequest & {
+    request: AiRuntimeRequest & {
       preference: AiReasoningPreference;
     },
-  ) => AiProviderReasoningResolution;
+  ) => AiReasoningResolution;
 
   prepareMessages?: (
     messages: ModelMessage[],
-    request: AiProviderRuntimeRequest & {
-      reasoning: AiProviderReasoningResolution;
+    request: AiRuntimeRequest & {
+      reasoning: AiReasoningResolution;
     },
   ) => ModelMessage[];
 
   validateMessages?: (
     messages: ModelMessage[],
-    request: AiProviderRuntimeRequest & {
-      reasoning: AiProviderReasoningResolution;
+    request: AiRuntimeRequest & {
+      reasoning: AiReasoningResolution;
     },
   ) => void;
 }

@@ -116,7 +116,7 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
       {/* Body */}
       <div
         data-slot="panel-body"
-        className="scrollbar-thin scrollbar-thumb-border flex-1 space-y-6 overflow-y-auto p-4"
+        className="scrollbar-thumb-border hover:scrollbar-thumb-foreground/30 flex-1 space-y-6 overflow-y-auto px-2 py-4"
       >
         {children}
       </div>

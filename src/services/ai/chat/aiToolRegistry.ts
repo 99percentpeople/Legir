@@ -7,7 +7,7 @@ import type {
 } from "./types";
 import type { AiToolContext } from "./aiToolContext";
 import { omitEmptyArrayFieldsDeep } from "@/services/ai/utils/json";
-import { modelSupportsInputModality } from "@/services/ai/providers/modelCapabilities";
+import { modelSupportsInputModality } from "@/services/ai/providers/capabilities";
 import { aiToolModules } from "./tools";
 import {
   createErrorPayload,
@@ -20,10 +20,14 @@ const supportsToolDefinition = (
   options: AiToolRegistryOptions | undefined,
 ) => {
   const requiredInputModalities = definition.requiredInputModalities ?? [];
-  if (requiredInputModalities.length === 0) return true;
-
-  return requiredInputModalities.every((modality) =>
+  const inputModalitiesSupported = requiredInputModalities.every((modality) =>
     modelSupportsInputModality(options?.modelCapabilities, modality),
+  );
+  if (!inputModalitiesSupported) return false;
+
+  const requiredModelCapabilities = definition.requiredModelCapabilities ?? [];
+  return requiredModelCapabilities.every(
+    (capability) => options?.modelCapabilities?.[capability] === true,
   );
 };
 

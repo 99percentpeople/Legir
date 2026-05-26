@@ -2,25 +2,34 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type {
-  AiProviderRuntimeProfile,
-  AiReasoningEffort,
-} from "@/services/ai/providers/runtimeProfiles/types";
-import { createNoReasoningResolution } from "@/services/ai/providers/runtimeProfiles/shared";
-import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/modelMetadata";
+  AiRuntimeAdapter,
+  AiReasoningLevel,
+} from "@/services/ai/providers/runtimeAdapters/types";
+import {
+  createNoReasoningResolution,
+  selectReasoningLevel,
+} from "@/services/ai/providers/runtimeAdapters/shared";
+import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/metadata";
 
 const toOpenAiReasoningEffort = (
-  effort: AiReasoningEffort,
-): "low" | "medium" | "high" | undefined => {
-  if (effort === "low" || effort === "medium" || effort === "high") {
-    return effort;
+  level: AiReasoningLevel,
+): "minimal" | "low" | "medium" | "high" | "xhigh" | undefined => {
+  if (
+    level === "minimal" ||
+    level === "low" ||
+    level === "medium" ||
+    level === "high" ||
+    level === "xhigh"
+  ) {
+    return level;
   }
   return undefined;
 };
 
-export const openAiRuntimeProfile: AiProviderRuntimeProfile = {
+export const openAiAdapter: AiRuntimeAdapter = {
   providerId: "openai",
 
-  createProvider: (config: AiSdkProviderConfig) =>
+  createSdkProvider: (config: AiSdkProviderConfig) =>
     createOpenAI({
       name: config.providerId,
       apiKey: config.apiKey,
@@ -43,7 +52,8 @@ export const openAiRuntimeProfile: AiProviderRuntimeProfile = {
       });
     }
 
-    if (request.preference.mode === "off") {
+    const level = selectReasoningLevel(capability, request.preference.level);
+    if (level === "none") {
       return {
         ...createNoReasoningResolution({
           preference: request.preference,
@@ -60,15 +70,12 @@ export const openAiRuntimeProfile: AiProviderRuntimeProfile = {
       };
     }
 
-    const reasoningEffort = capability.supportsEffort
-      ? toOpenAiReasoningEffort(request.preference.effort)
-      : undefined;
+    const reasoningEffort = toOpenAiReasoningEffort(level);
     return {
       capability,
       effectivePreference: {
         ...request.preference,
-        mode: "on",
-        effort: reasoningEffort ?? "auto",
+        level: reasoningEffort ?? "auto",
         displayPolicy:
           capability.textExposure !== "none"
             ? request.preference.displayPolicy

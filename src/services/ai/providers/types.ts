@@ -11,30 +11,20 @@ import type { LanguageModel } from "ai";
 
 import type { LLMModelOption } from "@/services/ai/types";
 import type {
+  AiProviderBackendKind,
   AiProviderId,
   AiProviderSpec,
 } from "@/services/ai/providers/catalog";
 import type {
-  AiProviderReasoningResolution,
-  AiProviderRuntimeProfile,
-  AiProviderRuntimeRequest,
-} from "@/services/ai/providers/runtimeProfiles/types";
+  AiReasoningResolution,
+  AiRuntimeAdapter,
+  AiRuntimeRequest,
+} from "@/services/ai/providers/runtimeAdapters/types";
 import type { AppOptions, EditorState, LLMModelCapabilities } from "@/types";
 
 export type AiSdkProviderId = AiProviderId;
 
-export type AiSdkBackendKind =
-  | "openai"
-  | "anthropic"
-  | "google"
-  | "deepseek"
-  | "minimax-anthropic"
-  | "minimax-openai"
-  | "zhipu"
-  | "openrouter"
-  | "groq"
-  | "xai"
-  | "openai-compatible";
+export type AiSdkBackendKind = AiProviderBackendKind;
 
 export interface AiSdkProviderConfig {
   providerId: AiSdkProviderId;
@@ -58,9 +48,9 @@ export interface AiSdkResolvedLanguageModel {
 }
 
 export interface AiSdkResolvedRuntime extends AiSdkResolvedLanguageModel {
-  profile: AiProviderRuntimeProfile;
-  reasoning: AiProviderReasoningResolution;
-  request: AiProviderRuntimeRequest;
+  adapter: AiRuntimeAdapter;
+  reasoning: AiReasoningResolution;
+  request: AiRuntimeRequest;
 }
 
 export type AiSdkTaskModelKind = "translate" | "vision" | "chat" | "summarize";
@@ -72,7 +62,12 @@ export interface AiSdkModelCallOptions {
 export interface AiSdkDiscoveredModel {
   id: string;
   label?: string;
-  capabilities: LLMModelCapabilities;
+  capabilities?: LLMModelCapabilities;
+  inputModalities?: readonly string[];
+  outputModalities?: readonly string[];
+  supportsToolCalls?: boolean;
+  supportsImageToolResults?: boolean;
+  contextWindowTokens?: number;
 }
 
 export interface AiSdkModelCatalogProviderRequest {
@@ -111,4 +106,5 @@ export interface AiProviderDefinition {
   readonly id: AiProviderId;
   readonly spec: AiProviderSpec;
   readonly modelCatalogProvider: AiSdkModelCatalogProvider;
+  readonly getRuntimeAdapter: (config: AiSdkProviderConfig) => AiRuntimeAdapter;
 }
