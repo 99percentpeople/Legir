@@ -109,7 +109,7 @@ export function ComposerFooter({
             disabled={
               !!disabledReason || runStatus === "cancelling" || inlineEditActive
             }
-            className="max-h-[180px] min-h-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent! px-1 py-1.5 shadow-none focus-visible:ring-0"
+            className="scrollbar-thumb-border hover:scrollbar-thumb-foreground/30 max-h-45 min-h-0 flex-1 resize-none scrollbar-thin overflow-y-auto border-0 bg-transparent! px-1 py-1.5 shadow-none focus-visible:ring-0"
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
@@ -147,8 +147,8 @@ export function ComposerFooter({
       </div>
 
       <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px]">
-        {showReasoningLevelSelect ? (
-          <div className="mr-auto flex min-w-0 items-center gap-1.5">
+        {showReasoningLevelSelect && (
+          <div className="flex min-w-0 items-center gap-1.5">
             <Brain size={12} className="shrink-0" />
             <span className="shrink-0">{t("ai_chat.reasoning_level")}</span>
             <Select
@@ -186,8 +186,8 @@ export function ComposerFooter({
               </SelectContent>
             </Select>
           </div>
-        ) : null}
-        <div className="flex gap-2">
+        )}
+        <div className="ml-auto flex gap-2">
           <span>
             {t("ai_chat.token_usage_context")} {formatTokenCount(contextTokens)}
           </span>
@@ -209,12 +209,12 @@ export function ComposerFooter({
               </div>
             </TooltipContent>
           </Tooltip>
-          {isContextCompressionRunning ? (
+          {isContextCompressionRunning && (
             <span className="flex items-center gap-1.5">
               <Spinner size="sm" />
               <span>{t("ai_chat.context_compression_running")}</span>
             </span>
-          ) : null}
+          )}
         </div>
       </div>
     </div>
