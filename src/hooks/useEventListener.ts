@@ -93,6 +93,7 @@ export const useEventListeners = (
   useEffect(() => {
     if (targetRef.current !== target) {
       detachAllFrom(targetRef.current);
+      attachedRef.current.clear();
       targetRef.current = target;
     }
 

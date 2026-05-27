@@ -39,6 +39,7 @@ import {
   getPdfPermissionSaveBlockReason,
 } from "@/lib/pdfPermissions";
 import { useAppEvent } from "@/hooks/useAppEventBus";
+import { usePlatformFileDrop } from "@/hooks/usePlatformFileDrop";
 import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";
 import { EditorCloseConfirmDialog } from "./pages/EditorPage/EditorCloseConfirmDialog";
 import type {
@@ -76,8 +77,6 @@ import {
   emitTabWorkspaceEvent,
   canSaveWithPicker,
   getPlatformWindowId,
-  listenForPlatformFileDrop,
-  listenForPlatformFileDragState,
   listenForPlatformFocusDocumentRequest,
   listenForPlatformEditorWindowsChange,
   listenForTabWorkspaceEvent,
@@ -129,7 +128,7 @@ const App: React.FC = () => {
   const isDesktop = platformRuntime.isDesktop;
   const supportsMultiWindow = platformRuntime.supportsMultiWindow;
   const platformWindowId = useMemo(() => getPlatformWindowId(), []);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const homeRecentFilesStore = useMemo(() => {
     return isDesktop
       ? createPlatformRecentFilesStore()
@@ -188,7 +187,6 @@ const App: React.FC = () => {
   const [pendingIncomingTabs, setPendingIncomingTabs] = useState<
     EditorTabDescriptor[]
   >([]);
-  const [isFileDragActive, setIsFileDragActive] = useState(false);
 
   useAppEvent("pdf:passwordRequired", (payload) => {
     setPdfPasswordPrompt(payload);
@@ -633,41 +631,6 @@ const App: React.FC = () => {
       console.error("Failed to report platform window documents:", error);
     });
   }, [supportsMultiWindow, tabs]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let unlisten: null | (() => void) = null;
-
-    void (async () => {
-      unlisten = await listenForPlatformFileDragState(
-        (nextActive) => {
-          setIsFileDragActive(nextActive);
-        },
-        {
-          getTargetElement: () => workspaceScrollContainerRef.current,
-        },
-      );
-
-      if (cancelled) {
-        try {
-          unlisten?.();
-        } catch {
-          // ignore
-        }
-        unlisten = null;
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      setIsFileDragActive(false);
-      try {
-        unlisten?.();
-      } catch {
-        // ignore
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!supportsMultiWindow) return;
@@ -1179,16 +1142,6 @@ const App: React.FC = () => {
     [isDesktop, openRecentFileByPath, openRecentWebFile],
   );
 
-  const homePageAdapter = useMemo<HomePageAdapter>(
-    () => ({
-      store: homeRecentFilesStore,
-      open: handleOpen,
-      openRecent: handleOpenRecent,
-      confirmClearAll: confirmPlatformAction,
-    }),
-    [handleOpen, handleOpenRecent, homeRecentFilesStore],
-  );
-
   const openDroppedPdfPath = useCallback(
     async (filePath: string) => {
       if (!filePath.toLowerCase().endsWith(".pdf")) {
@@ -1205,6 +1158,9 @@ const App: React.FC = () => {
 
   const openDroppedPdf = useCallback(
     async (payload: PlatformDroppedPdf) => {
+      const { isProcessing } = useEditorStore.getState();
+      if (isProcessing) return;
+
       if (payload.kind === "path") {
         await openDroppedPdfPath(payload.filePath);
         return;
@@ -1234,41 +1190,22 @@ const App: React.FC = () => {
     [handleUpload, openDroppedPdfPath, openWebHandleFile],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    let unlisten: null | (() => void) = null;
+  const isFileDragActive = usePlatformFileDrop({
+    enabled: activeTabId !== null && location.startsWith("/editor"),
+    getTargetElement: () => workspaceScrollContainerRef.current,
+    onDrop: openDroppedPdf,
+  });
 
-    void (async () => {
-      unlisten = await listenForPlatformFileDrop(
-        (payload) => {
-          const { isProcessing } = useEditorStore.getState();
-          if (isProcessing) return;
-          void openDroppedPdf(payload);
-        },
-        {
-          getTargetElement: () => workspaceScrollContainerRef.current,
-        },
-      );
-
-      if (cancelled) {
-        try {
-          unlisten?.();
-        } catch {
-          // ignore
-        }
-        unlisten = null;
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      try {
-        unlisten?.();
-      } catch {
-        // ignore
-      }
-    };
-  }, [openDroppedPdf]);
+  const homePageAdapter = useMemo<HomePageAdapter>(
+    () => ({
+      store: homeRecentFilesStore,
+      open: handleOpen,
+      openRecent: handleOpenRecent,
+      openDroppedPdf,
+      confirmClearAll: confirmPlatformAction,
+    }),
+    [handleOpen, handleOpenRecent, homeRecentFilesStore, openDroppedPdf],
+  );
 
   const importStartupOpenDocument = useCallback(
     async (filePath: string) => {

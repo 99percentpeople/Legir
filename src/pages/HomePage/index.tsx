@@ -1,5 +1,7 @@
 import React from "react";
+import FileDragOverlay from "@/components/FileDragOverlay";
 import { useLanguage } from "@/components/language-provider";
+import { usePlatformFileDrop } from "@/hooks/usePlatformFileDrop";
 import { RecentFilesHomeView } from "./RecentFilesHomeView";
 import { useHomeRecentFiles } from "./hooks/useHomeRecentFiles";
 import type { HomePageProps, HomeRecentFilesViewMode } from "./types";
@@ -27,6 +29,13 @@ const getInitialRecentFilesViewMode = (): HomeRecentFilesViewMode => {
 
 const HomePage: React.FC<HomePageProps> = ({ adapter }) => {
   const { t } = useLanguage();
+  const dropTargetRef = React.useRef<HTMLDivElement | null>(null);
+  const isFileDragActive = usePlatformFileDrop({
+    getTargetElement: () => dropTargetRef.current,
+    onDrop: (payload) => {
+      void adapter.openDroppedPdf(payload);
+    },
+  });
   const [recentFilesViewMode, setRecentFilesViewMode] =
     React.useState<HomeRecentFilesViewMode>(getInitialRecentFilesViewMode);
   const {
@@ -60,19 +69,22 @@ const HomePage: React.FC<HomePageProps> = ({ adapter }) => {
   );
 
   return (
-    <RecentFilesHomeView
-      query={query}
-      filteredRecentFiles={filteredRecentFiles}
-      viewMode={recentFilesViewMode}
-      canClearAll={recentFiles.length > 0}
-      onQueryChange={setQuery}
-      onClearQuery={() => setQuery("")}
-      onOpen={handleOpen}
-      onOpenRecent={handleOpenRecent}
-      onDeleteRecent={handleDeleteRecent}
-      onClearAll={handleClearAll}
-      onViewModeChange={handleRecentFilesViewModeChange}
-    />
+    <div ref={dropTargetRef} className="relative min-h-screen">
+      <RecentFilesHomeView
+        query={query}
+        filteredRecentFiles={filteredRecentFiles}
+        viewMode={recentFilesViewMode}
+        canClearAll={recentFiles.length > 0}
+        onQueryChange={setQuery}
+        onClearQuery={() => setQuery("")}
+        onOpen={handleOpen}
+        onOpenRecent={handleOpenRecent}
+        onDeleteRecent={handleDeleteRecent}
+        onClearAll={handleClearAll}
+        onViewModeChange={handleRecentFilesViewModeChange}
+      />
+      <FileDragOverlay open={isFileDragActive} />
+    </div>
   );
 };
 

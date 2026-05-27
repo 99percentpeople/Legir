@@ -15,7 +15,7 @@ export type PlatformDroppedPdf =
       handle?: FileSystemFileHandle;
     };
 
-interface PlatformFileDropScopeOptions {
+export interface PlatformFileDropScopeOptions {
   getTargetElement?: () => HTMLElement | null;
 }
 
@@ -72,7 +72,7 @@ const getDroppedWebPdfHandle = async (
   return null;
 };
 
-const hasFileTransfer = (event: DragEvent) => {
+export const hasPlatformFileTransfer = (event: DragEvent) => {
   const types = event.dataTransfer?.types;
   return !!types && Array.from(types).includes("Files");
 };
@@ -142,7 +142,7 @@ const isClientPointInsideElement = (
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 };
 
-const isWebDragEventInsideTarget = (
+export const isPlatformFileDropInsideScope = (
   event: DragEvent,
   options?: PlatformFileDropScopeOptions,
 ) => {
@@ -157,133 +157,43 @@ const isWebDragEventInsideTarget = (
   );
 };
 
-const listenForBrowserFileDrop = async (
-  listener: (payload: PlatformDroppedPdf) => void,
-  options?: PlatformFileDropScopeOptions,
-) => {
-  const handleDragOver = (event: DragEvent) => {
-    if (!hasFileTransfer(event)) return;
-    if (!isWebDragEventInsideTarget(event, options)) return;
-
-    event.preventDefault();
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = "copy";
-    }
-  };
-
-  const handleDrop = (event: DragEvent) => {
-    if (!hasFileTransfer(event)) return;
-    event.preventDefault();
-    const insideTarget = isWebDragEventInsideTarget(event, options);
-    if (!insideTarget) return;
-
-    const transfer = event.dataTransfer;
-
-    void (async () => {
-      if (isDesktopApp()) {
-        const filePath = getDroppedPathFromBrowserEvent(event);
-        if (filePath) {
-          listener({
-            kind: "path",
-            filePath,
-          });
-          return;
-        }
-      }
-
-      const droppedHandle = await getDroppedWebPdfHandle(transfer);
-      if (droppedHandle) {
-        listener({
-          kind: "file",
-          file: droppedHandle.file,
-          handle: droppedHandle.handle,
-        });
-        return;
-      }
-
-      const file = getFirstDroppedPdfFile(transfer);
-      if (!file) return;
-      listener({
-        kind: "file",
-        file,
-      });
-    })();
-  };
-
-  window.addEventListener("dragover", handleDragOver);
-  window.addEventListener("drop", handleDrop);
-
-  return () => {
-    window.removeEventListener("dragover", handleDragOver);
-    window.removeEventListener("drop", handleDrop);
-  };
+export const setPlatformFileDropEffect = (event: DragEvent) => {
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "copy";
+  }
 };
 
-const listenForBrowserFileDragState = async (
-  listener: (isDraggingFiles: boolean) => void,
-  options?: PlatformFileDropScopeOptions,
-) => {
-  let isActive = false;
+export const readPlatformDroppedPdf = async (
+  event: DragEvent,
+): Promise<PlatformDroppedPdf | null> => {
+  const transfer = event.dataTransfer;
+  if (!transfer) return null;
 
-  const setActive = (nextActive: boolean) => {
-    if (isActive === nextActive) return;
-    isActive = nextActive;
-    listener(nextActive);
-  };
-
-  const handleDragEnter = (event: DragEvent) => {
-    if (!hasFileTransfer(event)) return;
-
-    if (isWebDragEventInsideTarget(event, options)) {
-      event.preventDefault();
-      setActive(true);
+  if (isDesktopApp()) {
+    const filePath = getDroppedPathFromBrowserEvent(event);
+    if (filePath) {
+      return {
+        kind: "path",
+        filePath,
+      };
     }
-  };
+  }
 
-  const handleDragOver = (event: DragEvent) => {
-    if (!hasFileTransfer(event)) return;
+  const droppedHandle = await getDroppedWebPdfHandle(transfer);
+  if (droppedHandle) {
+    return {
+      kind: "file",
+      file: droppedHandle.file,
+      handle: droppedHandle.handle,
+    };
+  }
 
-    const insideTarget = isWebDragEventInsideTarget(event, options);
-    if (!insideTarget) {
-      setActive(false);
-      return;
-    }
+  const file = getFirstDroppedPdfFile(transfer);
+  if (!file) return null;
 
-    event.preventDefault();
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = "copy";
-    }
-    setActive(true);
-  };
-
-  const handleDragLeave = (event: DragEvent) => {
-    if (!hasFileTransfer(event)) return;
-
-    if (
-      event.clientX <= 0 ||
-      event.clientY <= 0 ||
-      event.clientX >= window.innerWidth ||
-      event.clientY >= window.innerHeight
-    ) {
-      setActive(false);
-    }
-  };
-
-  const handleDrop = (event: DragEvent) => {
-    if (!hasFileTransfer(event)) return;
-    setActive(false);
-  };
-
-  window.addEventListener("dragenter", handleDragEnter);
-  window.addEventListener("dragover", handleDragOver);
-  window.addEventListener("dragleave", handleDragLeave);
-  window.addEventListener("drop", handleDrop);
-
-  return () => {
-    window.removeEventListener("dragenter", handleDragEnter);
-    window.removeEventListener("dragover", handleDragOver);
-    window.removeEventListener("dragleave", handleDragLeave);
-    window.removeEventListener("drop", handleDrop);
+  return {
+    kind: "file",
+    file,
   };
 };
 
@@ -294,17 +204,6 @@ export const getPlatformUserName = async () => {
   return typeof name === "string" && name.trim().length > 0
     ? name.trim()
     : null;
-};
-
-export const listenForPlatformFileDrop = async (
-  listener: (payload: PlatformDroppedPdf) => void,
-  options?: PlatformFileDropScopeOptions,
-) => {
-  if (typeof window === "undefined") {
-    return () => {};
-  }
-
-  return listenForBrowserFileDrop(listener, options);
 };
 
 export const reportPlatformWindowDocuments = async (sourceKeys: string[]) => {
@@ -325,15 +224,4 @@ export const listenForPlatformFocusDocumentRequest = async (
   return await getPlatformMultiWindowHost().listenFocusDocumentRequest(
     listener,
   );
-};
-
-export const listenForPlatformFileDragState = async (
-  listener: (isDraggingFiles: boolean) => void,
-  options?: PlatformFileDropScopeOptions,
-) => {
-  if (typeof window === "undefined") {
-    return () => {};
-  }
-
-  return listenForBrowserFileDragState(listener, options);
 };
