@@ -25,6 +25,7 @@ export type AiReasoningDisplayPolicy =
   | "summary"
   | "full-if-provider-exposes";
 export type AiReasoningTextExposure = "none" | "summary" | "raw";
+export type AiReasoningProviderMode = "anthropic-adaptive";
 export type AiReasoningBudgetByLevel = Partial<
   Record<AiReasoningLevel, number>
 >;
@@ -38,6 +39,7 @@ export interface AiReasoningCapability {
   supported: boolean;
   levels: readonly AiReasoningLevel[];
   budgetTokensByLevel?: AiReasoningBudgetByLevel;
+  providerMode?: AiReasoningProviderMode;
   textExposure: AiReasoningTextExposure;
   requiresReasoningReplay: AiReasoningReplayPolicy;
 }

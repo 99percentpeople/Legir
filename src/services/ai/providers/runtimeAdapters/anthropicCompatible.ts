@@ -1,7 +1,10 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
-import type { AiRuntimeAdapter } from "@/services/ai/providers/runtimeAdapters/types";
+import type {
+  AiReasoningLevel,
+  AiRuntimeAdapter,
+} from "@/services/ai/providers/runtimeAdapters/types";
 import {
   createNoReasoningResolution,
   getReasoningBudgetTokensForLevel,
@@ -13,6 +16,12 @@ const DEFAULT_ANTHROPIC_BUDGET_TOKENS = 4096;
 
 type AnthropicCompatibleAdapterOptions = {
   authMode?: "api-key" | "bearer";
+};
+
+const toAnthropicAdaptiveEffort = (level: AiReasoningLevel) => {
+  if (level === "low" || level === "medium" || level === "high") return level;
+  if (level === "xhigh") return "xhigh";
+  return undefined;
 };
 
 export const createAnthropicCompatibleAdapter = (
@@ -51,6 +60,33 @@ export const createAnthropicCompatibleAdapter = (
         preference: request.preference,
         capability,
       });
+    }
+
+    if (capability.providerMode === "anthropic-adaptive") {
+      const effort = toAnthropicAdaptiveEffort(level);
+      return {
+        capability,
+        effectivePreference: {
+          ...request.preference,
+          level,
+        },
+        callOptions: {
+          providerOptions: {
+            [request.providerId]: {
+              thinking: {
+                type: "adaptive",
+                display:
+                  request.preference.displayPolicy === "hidden"
+                    ? "omitted"
+                    : "summarized",
+              },
+              ...(effort ? { effort } : {}),
+              sendReasoning: true,
+            },
+          },
+        },
+        replayPolicy: "all",
+      };
     }
 
     const budgetTokens =

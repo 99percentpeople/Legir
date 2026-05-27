@@ -425,6 +425,16 @@ const fr = {
     input_placeholder:
       "Demandez à l'IA de lire, rechercher, naviguer ou surligner le contenu du PDF...",
     context_compression_running: "Compression",
+    reasoning_level: "Raisonnement",
+    reasoning_levels: {
+      none: "Aucun",
+      auto: "Auto",
+      minimal: "Minimal",
+      low: "Faible",
+      medium: "Moyen",
+      high: "Élevé",
+      xhigh: "Très élevé",
+    },
     token_usage_context: "Contexte",
     token_usage_input: "Entrée",
     token_usage_output: "Sortie",

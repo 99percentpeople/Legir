@@ -1,4 +1,7 @@
-import type { AiRuntimeAdapter } from "@/services/ai/providers/runtimeAdapters/types";
+import type {
+  AiReasoningLevel,
+  AiRuntimeAdapter,
+} from "@/services/ai/providers/runtimeAdapters/types";
 import {
   createNoReasoningResolution,
   selectReasoningLevel,
@@ -13,6 +16,12 @@ const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
 
 const getDeepSeekReasoningCapability = (modelId: string) =>
   getAiProviderModelReasoningMetadata("deepseek", modelId);
+
+const toDeepSeekReasoningEffort = (level: AiReasoningLevel) => {
+  if (level === "high") return "high";
+  if (level === "xhigh") return "max";
+  return undefined;
+};
 
 export const deepseekAdapter: AiRuntimeAdapter = {
   providerId: "deepseek",
@@ -38,6 +47,9 @@ export const deepseekAdapter: AiRuntimeAdapter = {
 
     const level = selectReasoningLevel(capability, request.preference.level);
     const enabled = level !== "none";
+    const reasoningEffort = enabled
+      ? toDeepSeekReasoningEffort(level)
+      : undefined;
     return {
       capability,
       effectivePreference: {
@@ -48,6 +60,7 @@ export const deepseekAdapter: AiRuntimeAdapter = {
         providerOptions: {
           deepseek: {
             thinking: { type: enabled ? "enabled" : "disabled" },
+            ...(reasoningEffort ? { reasoningEffort } : {}),
           },
         },
       },

@@ -13,9 +13,16 @@ import {
 import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/metadata";
 
 const toGeminiThinkingLevel = (
+  capability: ReturnType<typeof getAiProviderModelReasoningMetadata>,
   level: AiReasoningLevel,
-): "low" | "medium" | "high" | undefined => {
-  if (level === "low" || level === "medium" || level === "high") {
+): "minimal" | "low" | "medium" | "high" | undefined => {
+  if (capability.budgetTokensByLevel) return undefined;
+  if (
+    level === "minimal" ||
+    level === "low" ||
+    level === "medium" ||
+    level === "high"
+  ) {
     return level;
   }
   return undefined;
@@ -75,7 +82,7 @@ export const geminiAdapter: AiRuntimeAdapter = {
       };
     }
 
-    const thinkingLevel = toGeminiThinkingLevel(level);
+    const thinkingLevel = toGeminiThinkingLevel(capability, level);
     const budgetTokens = getReasoningBudgetTokensForLevel(capability, level);
     return {
       capability,

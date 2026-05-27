@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
+  getAiRuntimeAdapter,
   getChatModelGroups,
+  getConfiguredAiSdkProvider,
+  getReasoningLevelControl,
   parseAiSdkModelSpecifier,
   summarizePageImages,
   summarizeConversationMemory,
@@ -13,6 +16,7 @@ import {
   type LLMModelCapabilities,
   type PDFSearchResult,
 } from "@/types";
+import type { AiReasoningLevel, AiReasoningLevelControl } from "@/services/ai";
 import { aiChatService } from "@/services/ai/chat/aiChatService";
 import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
 import { composeAiToolContext } from "@/services/ai/chat/aiToolContext";
@@ -90,6 +94,13 @@ import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
 const isAbortError = (error: unknown) =>
   error instanceof Error && error.name === "AbortError";
+
+const NO_REASONING_LEVEL_CONTROL: AiReasoningLevelControl = {
+  supported: false,
+  levels: [],
+  selectedLevel: "none",
+  showSelect: false,
+};
 
 const inMemoryAiChatScopeRegistry = new Map<
   string,
@@ -594,6 +605,46 @@ export const useAiChatController = (
       ),
     [flatModels, selectedModelKey],
   );
+
+  const reasoningLevelControl = useMemo<AiReasoningLevelControl>(() => {
+    if (!selectedChatModel?.isAvailable) return NO_REASONING_LEVEL_CONTROL;
+
+    const specifier = parseAiSdkModelSpecifier(selectedModelKey);
+    if (!specifier) return NO_REASONING_LEVEL_CONTROL;
+
+    const config = getConfiguredAiSdkProvider(
+      editorState.options,
+      specifier.providerId,
+    );
+    if (!config) return NO_REASONING_LEVEL_CONTROL;
+
+    const adapter = getAiRuntimeAdapter(config);
+    const capability = adapter.getReasoningCapability({
+      providerId: config.providerId,
+      backendKind: config.backendKind,
+      apiOptionId: config.apiOptionId,
+      modelId: specifier.modelId,
+      task: "chat",
+      appOptions: editorState.options,
+    });
+
+    return getReasoningLevelControl(
+      capability,
+      editorState.options.aiChat.reasoning,
+    );
+  }, [editorState.options, selectedChatModel?.isAvailable, selectedModelKey]);
+
+  const setReasoningLevel = useCallback((level: AiReasoningLevel) => {
+    useEditorStore.getState().setOptions((options) => ({
+      aiChat: {
+        ...options.aiChat,
+        reasoning: {
+          ...options.aiChat.reasoning,
+          level,
+        },
+      },
+    }));
+  }, []);
 
   const selectedChatModelAuthor = useMemo(() => {
     const selectedModelLabel = selectedChatModel?.modelLabel?.trim();
@@ -2222,6 +2273,8 @@ export const useAiChatController = (
     contextTokens,
     selectedModelKey,
     setSelectedModelKey,
+    reasoningLevelControl,
+    setReasoningLevel,
     modelSelectGroups,
     sendMessage,
     continueConversation,

@@ -156,7 +156,9 @@ Reasoning support is model-based, not provider-default based:
 
 - `providers/models.ts` declares whether a model supports reasoning, which
   select levels are valid, and optional `budgetTokensByLevel` mappings for
-  providers that expose thinking as token budgets.
+  providers that expose thinking as token budgets. Use `providerMode` only when
+  a model family needs a different wire mode, such as Anthropic adaptive
+  thinking.
 - `providers/metadata.ts` exposes `resolveAiProviderModelReasoning`, which
   returns the selectable levels, the clamped selected level, and whether a
   select should be shown.
@@ -165,6 +167,8 @@ Reasoning support is model-based, not provider-default based:
 - Runtime adapters translate the resolved level to provider-specific options
   such as OpenAI `reasoningEffort`, Google `thinkingConfig`, Anthropic
   `thinking.budgetTokens`, or provider thinking switches.
+- `auto` means provider default/dynamic behavior. Provider-specific adapters may
+  map app levels to provider names, for example DeepSeek `xhigh` -> `max`.
 
 UI should use the resolved levels as the only reasoning control surface. If the
 resolved model has no levels, or only one level, the UI should not show a

@@ -52,6 +52,8 @@ export function AiChatPanel({
     contextTokens,
     selectedModelKey,
     setSelectedModelKey: onSelectModel,
+    reasoningLevelControl,
+    setReasoningLevel,
     modelSelectGroups: modelGroups,
     sendMessage: onSend,
     continueConversation: onContinueConversation,
@@ -480,6 +482,8 @@ export function AiChatPanel({
       contextTokens={contextTokens}
       tokenUsage={tokenUsage}
       isContextCompressionRunning={isContextCompressionRunning}
+      reasoningLevelControl={reasoningLevelControl}
+      onReasoningLevelChange={setReasoningLevel}
     />
   );
 

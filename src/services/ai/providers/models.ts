@@ -71,10 +71,17 @@ const GEMINI_2_TEXT_MODEL_PATTERN =
   /^gemini-2\.0-flash(?:$|-001|-lite(?:$|-001))/i;
 const GEMINI_2_5_TEXT_MODEL_PATTERN =
   /^gemini-2\.5-(?:pro|flash(?:-lite)?)(?:$|-preview)/i;
+const GEMINI_2_5_PRO_MODEL_PATTERN = /^gemini-2\.5-pro(?:$|-preview)/i;
+const GEMINI_2_5_FLASH_MODEL_PATTERN =
+  /^gemini-2\.5-flash(?:-lite)?(?:$|-preview)/i;
 const GEMINI_2_5_LEGACY_PREVIEW_MODEL_PATTERN =
   /^gemini-2\.5-(?:pro|flash(?:-lite)?)-preview-\d{2}-\d{4}$/i;
 const GEMINI_3_TEXT_MODEL_PATTERN =
   /^gemini-(?:3\.5-flash|3\.1-(?:pro-preview(?:-customtools)?|flash-lite(?:-preview)?)|3-flash-preview)(?:$|-)/i;
+const GEMINI_3_PRO_MODEL_PATTERN =
+  /^gemini-3\.1-pro-preview(?:-customtools)?(?:$|-)/i;
+const GEMINI_3_FLASH_MODEL_PATTERN =
+  /^gemini-(?:3\.5-flash|3\.1-flash-lite(?:-preview)?|3-flash-preview)(?:$|-)/i;
 const GEMINI_TEXT_MODEL_PATTERN =
   /^gemini-(?:3\.5-flash|3\.1-(?:pro-preview(?:-customtools)?|flash-lite(?:-preview)?)|3-flash-preview|2\.5-(?:pro|flash(?:-lite)?)(?:$|-preview)|2\.0-flash(?:$|-001|-lite(?:$|-001)))/i;
 
@@ -177,30 +184,55 @@ const BUDGET_TOKENS_BY_LEVEL = {
   high: 8192,
 } as const;
 
-const GEMINI_2_5_REASONING: AiModelReasoningMetadata = reasoning({
+const GEMINI_2_5_BUDGET_TOKENS_BY_LEVEL = {
+  low: 1024,
+  medium: 4096,
+  high: 8192,
+} as const;
+
+// Gemini 2.5 uses token budgets, while Gemini 3 uses thinkingLevel.
+// 2.5 Pro does not expose a disable-thinking budget, but Flash variants do.
+const GEMINI_2_5_PRO_REASONING: AiModelReasoningMetadata = reasoning({
+  levels: ["auto", "low", "medium", "high"],
+  budgetTokensByLevel: GEMINI_2_5_BUDGET_TOKENS_BY_LEVEL,
+  textExposure: "summary",
+  requiresReasoningReplay: "none",
+});
+
+const GEMINI_2_5_FLASH_REASONING: AiModelReasoningMetadata = reasoning({
   levels: ["none", "auto", "low", "medium", "high"],
-  budgetTokensByLevel: BUDGET_TOKENS_BY_LEVEL,
+  budgetTokensByLevel: GEMINI_2_5_BUDGET_TOKENS_BY_LEVEL,
   offStrategy: "gemini-thinking-budget-zero",
   textExposure: "summary",
   requiresReasoningReplay: "none",
 });
 
-const GEMINI_3_REASONING: AiModelReasoningMetadata = reasoning({
+const GEMINI_3_PRO_REASONING: AiModelReasoningMetadata = reasoning({
   levels: ["auto", "low", "medium", "high"],
   textExposure: "summary",
   requiresReasoningReplay: "none",
 });
 
+const GEMINI_3_FLASH_REASONING: AiModelReasoningMetadata = reasoning({
+  levels: ["auto", "minimal", "low", "medium", "high"],
+  textExposure: "summary",
+  requiresReasoningReplay: "none",
+});
+
+// DeepSeek exposes high/max effort; xhigh is the app-level alias for max.
 const DEEPSEEK_REASONING: AiModelReasoningMetadata = reasoning({
-  levels: ["none", "auto"],
+  levels: ["none", "auto", "high", "xhigh"],
   offStrategy: "provider-switch",
   textExposure: "raw",
   requiresReasoningReplay: "tool-calls",
 });
 
-const MIMO_REASONING: AiModelReasoningMetadata = {
-  ...DEEPSEEK_REASONING,
-};
+const MIMO_REASONING: AiModelReasoningMetadata = reasoning({
+  levels: ["none", "auto"],
+  offStrategy: "provider-switch",
+  textExposure: "raw",
+  requiresReasoningReplay: "tool-calls",
+});
 
 const ZHIPU_REASONING: AiModelReasoningMetadata = reasoning({
   levels: ["none", "auto"],
@@ -212,6 +244,14 @@ const ZHIPU_REASONING: AiModelReasoningMetadata = reasoning({
 const ANTHROPIC_REASONING: AiModelReasoningMetadata = reasoning({
   levels: ["none", "auto", "low", "medium", "high"],
   budgetTokensByLevel: BUDGET_TOKENS_BY_LEVEL,
+  textExposure: "summary",
+  requiresReasoningReplay: "all",
+});
+
+const ANTHROPIC_ADAPTIVE_REASONING: AiModelReasoningMetadata = reasoning({
+  levels: ["none", "auto", "low", "medium", "high", "xhigh"],
+  budgetTokensByLevel: undefined,
+  providerMode: "anthropic-adaptive",
   textExposure: "summary",
   requiresReasoningReplay: "all",
 });
@@ -541,7 +581,7 @@ export const AI_MODELS = [
     providers: ["anthropic", "anthropic-compatible"],
     patterns: [/^claude-opus-4[-.]7/i],
     metadata: {
-      reasoning: NO_REASONING,
+      reasoning: ANTHROPIC_ADAPTIVE_REASONING,
     },
   }),
   model({
@@ -553,11 +593,20 @@ export const AI_MODELS = [
     },
   }),
   model({
-    id: "gemini:curated-3-text",
+    id: "gemini:curated-3-pro-text",
+    modelIds: ["gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools"],
+    providers: ["gemini"],
+    metadata: {
+      contextWindowTokens: 1_048_576,
+      capabilities: textImageTools,
+      reasoning: GEMINI_3_PRO_REASONING,
+    },
+    availability: [availableOn("gemini")],
+  }),
+  model({
+    id: "gemini:curated-3-flash-text",
     modelIds: [
       "gemini-3.5-flash",
-      "gemini-3.1-pro-preview",
-      "gemini-3.1-pro-preview-customtools",
       "gemini-3.1-flash-lite",
       "gemini-3-flash-preview",
     ],
@@ -565,18 +614,29 @@ export const AI_MODELS = [
     metadata: {
       contextWindowTokens: 1_048_576,
       capabilities: textImageTools,
-      reasoning: GEMINI_3_REASONING,
+      reasoning: GEMINI_3_FLASH_REASONING,
     },
     availability: [availableOn("gemini")],
   }),
   model({
-    id: "gemini:curated-2.5-text",
-    modelIds: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+    id: "gemini:curated-2.5-pro-text",
+    modelIds: ["gemini-2.5-pro"],
     providers: ["gemini"],
     metadata: {
       contextWindowTokens: 1_048_576,
       capabilities: textImageTools,
-      reasoning: GEMINI_2_5_REASONING,
+      reasoning: GEMINI_2_5_PRO_REASONING,
+    },
+    availability: [availableOn("gemini")],
+  }),
+  model({
+    id: "gemini:curated-2.5-flash-text",
+    modelIds: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+    providers: ["gemini"],
+    metadata: {
+      contextWindowTokens: 1_048_576,
+      capabilities: textImageTools,
+      reasoning: GEMINI_2_5_FLASH_REASONING,
     },
     availability: [availableOn("gemini")],
   }),
@@ -589,11 +649,19 @@ export const AI_MODELS = [
     },
   }),
   model({
-    id: "gemini:gemini-2.5-reasoning",
+    id: "gemini:gemini-2.5-pro-reasoning",
     providers: ["gemini"],
-    patterns: [GEMINI_2_5_TEXT_MODEL_PATTERN],
+    patterns: [GEMINI_2_5_PRO_MODEL_PATTERN],
     metadata: {
-      reasoning: GEMINI_2_5_REASONING,
+      reasoning: GEMINI_2_5_PRO_REASONING,
+    },
+  }),
+  model({
+    id: "gemini:gemini-2.5-flash-reasoning",
+    providers: ["gemini"],
+    patterns: [GEMINI_2_5_FLASH_MODEL_PATTERN],
+    metadata: {
+      reasoning: GEMINI_2_5_FLASH_REASONING,
     },
   }),
   model({
@@ -602,14 +670,6 @@ export const AI_MODELS = [
     metadata: {
       contextWindowTokens: 1_048_576,
       capabilities: textImageTools,
-    },
-  }),
-  model({
-    id: "gemini:gemini-2.5-legacy-preview-reasoning",
-    providers: ["gemini"],
-    patterns: [GEMINI_2_5_LEGACY_PREVIEW_MODEL_PATTERN],
-    metadata: {
-      reasoning: GEMINI_2_5_REASONING,
     },
   }),
   model({
@@ -629,11 +689,19 @@ export const AI_MODELS = [
     },
   }),
   model({
-    id: "gemini:gemini-3-reasoning",
+    id: "gemini:gemini-3-pro-reasoning",
     providers: ["gemini"],
-    patterns: [GEMINI_3_TEXT_MODEL_PATTERN],
+    patterns: [GEMINI_3_PRO_MODEL_PATTERN],
     metadata: {
-      reasoning: GEMINI_3_REASONING,
+      reasoning: GEMINI_3_PRO_REASONING,
+    },
+  }),
+  model({
+    id: "gemini:gemini-3-flash-reasoning",
+    providers: ["gemini"],
+    patterns: [GEMINI_3_FLASH_MODEL_PATTERN],
+    metadata: {
+      reasoning: GEMINI_3_FLASH_REASONING,
     },
   }),
   model({

@@ -149,8 +149,12 @@ describe("AI provider runtime adapters", () => {
     ).toBe(true);
     expect(
       resolveAiProviderModelMetadata("anthropic", "claude-opus-4-7-20260401")
-        .reasoning.supported,
-    ).toBe(false);
+        .reasoning,
+    ).toMatchObject({
+      supported: true,
+      levels: ["none", "auto", "low", "medium", "high", "xhigh"],
+      providerMode: "anthropic-adaptive",
+    });
 
     const merged = mergeModelCapabilitiesWithMetadata(
       "gemini",
@@ -217,7 +221,37 @@ describe("AI provider runtime adapters", () => {
     ).toBe(false);
     expect(
       resolveAiProviderModelReasoning("deepseek", "deepseek-reasoner").levels,
+    ).toEqual(["none", "auto", "high", "xhigh"]);
+    expect(
+      resolveAiProviderModelReasoning("xiaomi-mimo", "mimo-v2.5-pro").levels,
     ).toEqual(["none", "auto"]);
+    expect(
+      resolveAiProviderModelReasoning("gemini", "gemini-2.5-pro", {
+        level: "none",
+      }),
+    ).toMatchObject({
+      levels: ["auto", "low", "medium", "high"],
+      selectedLevel: "auto",
+      showSelect: true,
+    });
+    expect(
+      resolveAiProviderModelReasoning("gemini", "gemini-3.5-flash", {
+        level: "medium",
+      }),
+    ).toMatchObject({
+      levels: ["auto", "minimal", "low", "medium", "high"],
+      selectedLevel: "medium",
+      showSelect: true,
+    });
+    expect(
+      resolveAiProviderModelReasoning("gemini", "gemini-3.1-pro-preview", {
+        level: "minimal",
+      }),
+    ).toMatchObject({
+      levels: ["auto", "low", "medium", "high"],
+      selectedLevel: "low",
+      showSelect: true,
+    });
     expect(
       resolveAiProviderModelReasoning("anthropic", "claude-sonnet-4-6", {
         level: "xhigh",
@@ -225,6 +259,15 @@ describe("AI provider runtime adapters", () => {
     ).toMatchObject({
       levels: ["none", "auto", "low", "medium", "high"],
       selectedLevel: "high",
+      showSelect: true,
+    });
+    expect(
+      resolveAiProviderModelReasoning("anthropic", "claude-opus-4-7", {
+        level: "xhigh",
+      }),
+    ).toMatchObject({
+      levels: ["none", "auto", "low", "medium", "high", "xhigh"],
+      selectedLevel: "xhigh",
       showSelect: true,
     });
     expect(
@@ -311,10 +354,42 @@ describe("AI provider runtime adapters", () => {
       providerOptions: {
         deepseek: {
           thinking: { type: "enabled" },
+          reasoningEffort: "high",
         },
       },
     });
     expect(canPreviewCollapsedReasoningText(resolution)).toBe(true);
+
+    const auto = deepseekAdapter.resolveReasoning(
+      createRequest(
+        deepseekAdapter,
+        "deepseek-reasoner",
+        preference({ level: "auto" }),
+      ),
+    );
+    expect(auto.callOptions).toEqual({
+      providerOptions: {
+        deepseek: {
+          thinking: { type: "enabled" },
+        },
+      },
+    });
+
+    const max = deepseekAdapter.resolveReasoning(
+      createRequest(
+        deepseekAdapter,
+        "deepseek-reasoner",
+        preference({ level: "xhigh" }),
+      ),
+    );
+    expect(max.callOptions).toEqual({
+      providerOptions: {
+        deepseek: {
+          thinking: { type: "enabled" },
+          reasoningEffort: "max",
+        },
+      },
+    });
 
     expect(() =>
       deepseekAdapter.validateMessages?.(
@@ -454,11 +529,14 @@ describe("AI provider runtime adapters", () => {
         google: {
           thinkingConfig: {
             includeThoughts: true,
-            thinkingLevel: "high",
+            thinkingBudget: 8192,
           },
         },
       },
     });
+    expect(visible.callOptions?.providerOptions?.google).not.toHaveProperty(
+      "thinkingConfig.thinkingLevel",
+    );
     expect(canDisplayReasoningText(visible)).toBe(true);
     expect(canPreviewCollapsedReasoningText(visible)).toBe(false);
 
@@ -475,6 +553,40 @@ describe("AI provider runtime adapters", () => {
           thinkingConfig: {
             includeThoughts: false,
             thinkingBudget: 8192,
+          },
+        },
+      },
+    });
+
+    const gemini3 = geminiAdapter.resolveReasoning(
+      createRequest(geminiAdapter, "gemini-3.5-flash"),
+    );
+    expect(gemini3.callOptions).toMatchObject({
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: "high",
+          },
+        },
+      },
+    });
+    expect(gemini3.callOptions?.providerOptions?.google).not.toHaveProperty(
+      "thinkingConfig.thinkingBudget",
+    );
+
+    const gemini3Medium = geminiAdapter.resolveReasoning(
+      createRequest(
+        geminiAdapter,
+        "gemini-3.5-flash",
+        preference({ level: "medium" }),
+      ),
+    );
+    expect(gemini3Medium.callOptions).toMatchObject({
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingLevel: "medium",
           },
         },
       },
@@ -524,6 +636,27 @@ describe("AI provider runtime adapters", () => {
     expect(anthropic.capability.textExposure).toBe("summary");
     expect(canDisplayReasoningText(anthropic)).toBe(true);
     expect(canPreviewCollapsedReasoningText(anthropic)).toBe(false);
+
+    const adaptiveAnthropic = anthropicAdapter.resolveReasoning(
+      createRequest(
+        anthropicAdapter,
+        "claude-opus-4-7",
+        preference({ level: "xhigh" }),
+      ),
+    );
+    expect(adaptiveAnthropic.callOptions).toEqual({
+      providerOptions: {
+        anthropic: {
+          thinking: {
+            type: "adaptive",
+            display: "summarized",
+          },
+          effort: "xhigh",
+          sendReasoning: true,
+        },
+      },
+    });
+    expect(adaptiveAnthropic.replayPolicy).toBe("all");
 
     const minimax = minimaxAdapter.resolveReasoning(
       createRequest(minimaxAdapter, "MiniMax-M2.7"),

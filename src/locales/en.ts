@@ -418,6 +418,16 @@ const en = {
     input_placeholder:
       "Ask the AI to read, search, jump, or highlight PDF content...",
     context_compression_running: "Compressing",
+    reasoning_level: "Reasoning",
+    reasoning_levels: {
+      none: "None",
+      auto: "Auto",
+      minimal: "Minimal",
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+      xhigh: "X-High",
+    },
     token_usage_context: "Context",
     token_usage_input: "In",
     token_usage_output: "Out",

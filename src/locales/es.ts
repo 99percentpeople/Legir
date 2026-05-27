@@ -423,6 +423,16 @@ const es = {
     input_placeholder:
       "Pide a la IA que lea, busque, navegue o resalte contenido del PDF...",
     context_compression_running: "Comprimiendo",
+    reasoning_level: "Razonamiento",
+    reasoning_levels: {
+      none: "Ninguno",
+      auto: "Auto",
+      minimal: "Mínimo",
+      low: "Bajo",
+      medium: "Medio",
+      high: "Alto",
+      xhigh: "Muy alto",
+    },
     token_usage_context: "Contexto",
     token_usage_input: "Entrada",
     token_usage_output: "Salida",

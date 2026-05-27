@@ -419,6 +419,16 @@ const ja = {
     input_placeholder:
       "AI に PDF の内容を読ませたり、検索、移動、ハイライトさせたりできます...",
     context_compression_running: "圧縮中",
+    reasoning_level: "思考",
+    reasoning_levels: {
+      none: "オフ",
+      auto: "自動",
+      minimal: "最小",
+      low: "低",
+      medium: "中",
+      high: "高",
+      xhigh: "非常に高い",
+    },
     token_usage_context: "コンテキスト",
     token_usage_input: "入力",
     token_usage_output: "出力",

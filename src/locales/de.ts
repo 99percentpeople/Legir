@@ -424,6 +424,16 @@ const de = {
     input_placeholder:
       "Bitten Sie die KI, PDF-Inhalte zu lesen, zu suchen, zu springen oder hervorzuheben...",
     context_compression_running: "Komprimieren",
+    reasoning_level: "Denken",
+    reasoning_levels: {
+      none: "Aus",
+      auto: "Auto",
+      minimal: "Minimal",
+      low: "Niedrig",
+      medium: "Mittel",
+      high: "Hoch",
+      xhigh: "Sehr hoch",
+    },
     token_usage_context: "Kontext",
     token_usage_input: "Eingabe",
     token_usage_output: "Ausgabe",

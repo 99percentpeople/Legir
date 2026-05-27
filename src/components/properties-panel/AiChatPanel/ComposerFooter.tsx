@@ -1,6 +1,13 @@
-import { Send, Square } from "lucide-react";
+import { Brain, Send, Square } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -12,6 +19,7 @@ import type {
   AiChatMessageAttachment,
   AiChatTokenUsageSummary,
 } from "@/services/ai/chat/types";
+import type { AiReasoningLevel, AiReasoningLevelControl } from "@/services/ai";
 import { MessageAttachmentChip } from "./MessagePrimitives";
 import { cn } from "@/utils/cn";
 import { getMessageAttachmentKey } from "./utils";
@@ -34,6 +42,8 @@ interface ComposerFooterProps {
   contextTokens: number;
   tokenUsage: AiChatTokenUsageSummary;
   isContextCompressionRunning: boolean;
+  reasoningLevelControl: AiReasoningLevelControl;
+  onReasoningLevelChange: (level: AiReasoningLevel) => void;
 }
 
 export function ComposerFooter({
@@ -54,8 +64,13 @@ export function ComposerFooter({
   contextTokens,
   tokenUsage,
   isContextCompressionRunning,
+  reasoningLevelControl,
+  onReasoningLevelChange,
 }: ComposerFooterProps) {
   const { t } = useLanguage();
+  const showReasoningLevelSelect = reasoningLevelControl.showSelect;
+  const getReasoningLevelLabel = (level: AiReasoningLevel) =>
+    t(`ai_chat.reasoning_levels.${level}`);
 
   return (
     <div className="space-y-2">
@@ -132,33 +147,75 @@ export function ComposerFooter({
       </div>
 
       <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px]">
-        <span>
-          {t("ai_chat.token_usage_context")} {formatTokenCount(contextTokens)}
-        </span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help underline decoration-dotted underline-offset-2">
-              {t("ai_chat.token_usage_total")}{" "}
-              {formatTokenCount(tokenUsage.totalTokens)}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">
-            <div>
-              {t("ai_chat.token_usage_input")}{" "}
-              {formatTokenCount(tokenUsage.inputTokens)}
-            </div>
-            <div>
-              {t("ai_chat.token_usage_output")}{" "}
-              {formatTokenCount(tokenUsage.outputTokens)}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-        {isContextCompressionRunning ? (
-          <span className="flex items-center gap-1.5">
-            <Spinner size="sm" />
-            <span>{t("ai_chat.context_compression_running")}</span>
-          </span>
+        {showReasoningLevelSelect ? (
+          <div className="mr-auto flex min-w-0 items-center gap-1.5">
+            <Brain size={12} className="shrink-0" />
+            <span className="shrink-0">{t("ai_chat.reasoning_level")}</span>
+            <Select
+              value={reasoningLevelControl.selectedLevel}
+              onValueChange={(value) => {
+                const nextLevel = reasoningLevelControl.levels.find(
+                  (level) => level === value,
+                );
+                if (nextLevel) onReasoningLevelChange(nextLevel);
+              }}
+              disabled={actionIsStop || !!disabledReason}
+            >
+              <SelectTrigger
+                size="sm"
+                className={cn(
+                  "text-muted-foreground h-4! max-w-32 rounded-full border-0 bg-transparent px-1 text-[11px] shadow-none",
+                  "hover:bg-muted/60! bg-transparent! focus-visible:ring-0",
+                )}
+                title={t("ai_chat.reasoning_level")}
+              >
+                <SelectValue>
+                  {getReasoningLevelLabel(reasoningLevelControl.selectedLevel)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent align="end">
+                {reasoningLevelControl.levels.map((level) => (
+                  <SelectItem
+                    key={level}
+                    value={level}
+                    itemText={getReasoningLevelLabel(level)}
+                  >
+                    {getReasoningLevelLabel(level)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         ) : null}
+        <div className="flex gap-2">
+          <span>
+            {t("ai_chat.token_usage_context")} {formatTokenCount(contextTokens)}
+          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help underline decoration-dotted underline-offset-2">
+                {t("ai_chat.token_usage_total")}{" "}
+                {formatTokenCount(tokenUsage.totalTokens)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              <div>
+                {t("ai_chat.token_usage_input")}{" "}
+                {formatTokenCount(tokenUsage.inputTokens)}
+              </div>
+              <div>
+                {t("ai_chat.token_usage_output")}{" "}
+                {formatTokenCount(tokenUsage.outputTokens)}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+          {isContextCompressionRunning ? (
+            <span className="flex items-center gap-1.5">
+              <Spinner size="sm" />
+              <span>{t("ai_chat.context_compression_running")}</span>
+            </span>
+          ) : null}
+        </div>
       </div>
     </div>
   );
