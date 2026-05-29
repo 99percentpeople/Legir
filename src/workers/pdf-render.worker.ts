@@ -16,6 +16,7 @@ import type { PDFDocumentPermissions } from "@/types";
 
 const PDFJS_CMAP_URL = "/pdfjs/cmaps/";
 const PDFJS_STANDARD_FONT_URL = "/pdfjs/standard_fonts/";
+const PDFJS_WASM_URL = "/pdfjs/wasm/";
 
 pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker({
   name: "pdfjs-worker-render",
@@ -614,6 +615,7 @@ const loadDocument = async (
     cMapUrl: PDFJS_CMAP_URL,
     cMapPacked: true,
     standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
+    wasmUrl: PDFJS_WASM_URL,
     useSystemFonts: false,
     disableFontFace: false,
     stopAtErrors: false,

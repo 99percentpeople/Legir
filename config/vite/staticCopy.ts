@@ -12,6 +12,10 @@ export const createStaticCopyPlugin = () =>
         dest: "pdfjs/standard_fonts",
       },
       {
+        src: "node_modules/pdfjs-dist/wasm/*",
+        dest: "pdfjs/wasm",
+      },
+      {
         src: "generated-icons/app/128x128@2x.png",
         dest: "pwa/app",
       },
