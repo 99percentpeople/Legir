@@ -1,4 +1,4 @@
-import { Brain, Send, Square } from "lucide-react";
+import { Send, Square } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -149,7 +149,6 @@ export function ComposerFooter({
       <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px]">
         {showReasoningLevelSelect && (
           <div className="flex min-w-0 items-center gap-1.5">
-            <Brain size={12} className="shrink-0" />
             <span className="shrink-0">{t("ai_chat.reasoning_level")}</span>
             <Select
               value={reasoningLevelControl.selectedLevel}

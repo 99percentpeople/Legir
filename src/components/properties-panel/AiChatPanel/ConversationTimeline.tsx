@@ -42,7 +42,7 @@ interface ConversationTimelineProps {
   inlineEditTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
   copiedMessageId: string | null;
   isBusy: boolean;
-  endRef: React.RefObject<HTMLDivElement | null>;
+  endRef: React.Ref<HTMLDivElement>;
   onSelectSession: (sessionId: string) => void;
   onCopyMessage: (item: MessageTimelineItem) => void | Promise<void>;
   onEditUserMessage: (item: UserMessageTimelineItem) => void;
@@ -492,7 +492,7 @@ export function ConversationTimeline({
         );
       })}
       {isAwaitingFirstResponse ? <PendingAssistantBubble /> : null}
-      <div ref={endRef} />
+      <div ref={endRef} className="h-px shrink-0" />
     </div>
   );
 }

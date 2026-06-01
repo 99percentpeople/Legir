@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/tooltip";
 import { StreamingCursor } from "@/components/ui/streaming-cursor";
 import { cn } from "@/utils/cn";
-import { useStickyBottomScroll } from "../useStickyBottomScroll";
+import { useStickyBottomScroll } from "./useStickyBottomScroll";
 import { getMessageAttachmentLocationLabel, getSessionTitle } from "./utils";
 import type {
   AiChatMessageAttachment,
@@ -192,6 +192,7 @@ export const ThinkingMessageBubble = ({
             <div
               ref={contentRef}
               className="max-h-64 overflow-auto pr-1 text-sm break-words whitespace-pre-wrap"
+              style={{ overflowAnchor: "none" }}
             >
               {text}
             </div>

@@ -20,6 +20,7 @@ export interface PanelLayoutProps {
   footer?: React.ReactNode;
   width: number;
   onResize: (width: number) => void;
+  bodyStyle?: React.CSSProperties;
 }
 
 export const PanelLayout: React.FC<PanelLayoutProps> = ({
@@ -34,6 +35,7 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
   footer,
   width,
   onResize,
+  bodyStyle,
 }) => {
   const { isResizing, handleMouseDown } = useResizableSidePanel({
     side: "right",
@@ -117,6 +119,7 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
       <div
         data-slot="panel-body"
         className="scrollbar-thumb-border hover:scrollbar-thumb-foreground/30 flex-1 space-y-6 overflow-y-auto px-2 py-4"
+        style={bodyStyle}
       >
         {children}
       </div>

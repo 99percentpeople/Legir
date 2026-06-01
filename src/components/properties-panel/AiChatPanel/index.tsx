@@ -12,6 +12,7 @@ import { ComposerFooter } from "./ComposerFooter";
 import { ConversationEmptyState } from "./ConversationEmptyState";
 import { ConversationTimeline } from "./ConversationTimeline";
 import { SessionHistoryPopover } from "./SessionHistoryPopover";
+import { useTimelineBottomScroll } from "./useTimelineBottomScroll";
 import type {
   AiChatPanelProps,
   InlineEditState,
@@ -77,53 +78,25 @@ export function AiChatPanel({
 
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const inlineEditTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
-  const endRef = React.useRef<HTMLDivElement | null>(null);
-  const scrollContainerRef = React.useRef<HTMLElement | null>(null);
-  const isNearBottomRef = React.useRef(true);
-  const scrollRafRef = React.useRef<number | null>(null);
-  const nextTimelineScrollBehaviorRef = React.useRef<ScrollBehavior | null>(
-    null,
-  );
   const previousSessionIdRef = React.useRef<string | null>(null);
   const draftRef = React.useRef("");
   const inlineEditStateRef = React.useRef<InlineEditState | null>(null);
   const copiedTimeoutRef = React.useRef<number | null>(null);
   const tokenNumberFormatter = React.useMemo(() => new Intl.NumberFormat(), []);
+  const hasTimelineItems = timeline.length > 0;
+  const {
+    bodyStyle: timelineBodyStyle,
+    endRef,
+    scrollToBottom: scrollTimelineToBottom,
+  } = useTimelineBottomScroll({
+    hasItems: hasTimelineItems,
+    isOpen,
+  });
 
   const formatTokenCount = React.useCallback(
     (value: number) =>
       tokenNumberFormatter.format(Math.max(0, Math.trunc(value))),
     [tokenNumberFormatter],
-  );
-
-  const scheduleScrollToBottom = React.useCallback(
-    (force = false, behavior: ScrollBehavior = "auto") => {
-      if (!isOpen) return;
-      if (!force && !isNearBottomRef.current) return;
-
-      const scrollEl =
-        scrollContainerRef.current ??
-        (endRef.current?.closest?.(
-          '[data-slot="panel-body"]',
-        ) as HTMLElement | null);
-      if (!scrollEl) return;
-
-      scrollContainerRef.current = scrollEl;
-      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
-      scrollRafRef.current = requestAnimationFrame(() => {
-        if (behavior === "smooth") {
-          scrollEl.scrollTo({
-            top: scrollEl.scrollHeight,
-            behavior: "smooth",
-          });
-        } else {
-          scrollEl.scrollTop = scrollEl.scrollHeight;
-        }
-        isNearBottomRef.current = true;
-        scrollRafRef.current = null;
-      });
-    },
-    [isOpen],
   );
 
   React.useEffect(() => {
@@ -200,43 +173,9 @@ export function AiChatPanel({
       previousSessionIdRef.current = activeSessionId;
       setPendingAttachments([]);
       setInlineEditState(null);
-      scheduleScrollToBottom(true);
+      scrollTimelineToBottom(true);
     }
-  }, [activeSessionId, scheduleScrollToBottom]);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-    const endEl = endRef.current;
-    if (!endEl) return;
-    const scrollEl = endEl.closest?.(
-      '[data-slot="panel-body"]',
-    ) as HTMLElement | null;
-    if (!scrollEl) return;
-
-    scrollContainerRef.current = scrollEl;
-    const update = () => {
-      const distance =
-        scrollEl.scrollHeight - (scrollEl.scrollTop + scrollEl.clientHeight);
-      isNearBottomRef.current = distance < 96;
-    };
-
-    update();
-    scheduleScrollToBottom(true);
-    scrollEl.addEventListener("scroll", update, { passive: true });
-
-    return () => {
-      scrollEl.removeEventListener("scroll", update);
-      if (scrollContainerRef.current === scrollEl) {
-        scrollContainerRef.current = null;
-      }
-    };
-  }, [isOpen, scheduleScrollToBottom]);
-
-  React.useEffect(() => {
-    const nextBehavior = nextTimelineScrollBehaviorRef.current;
-    nextTimelineScrollBehaviorRef.current = null;
-    scheduleScrollToBottom(Boolean(nextBehavior), nextBehavior ?? "auto");
-  }, [runStatus, scheduleScrollToBottom, timeline]);
+  }, [activeSessionId, scrollTimelineToBottom]);
 
   const focusTextareaAtEnd = React.useCallback(() => {
     requestAnimationFrame(() => {
@@ -291,7 +230,7 @@ export function AiChatPanel({
     const text = draft.trim();
     if (!text && pendingAttachments.length === 0) return;
 
-    nextTimelineScrollBehaviorRef.current = "smooth";
+    scrollTimelineToBottom(true);
     void onSend({
       text: text || getAttachmentOnlyMessage(t, pendingAttachments),
       displayText: text,
@@ -300,7 +239,7 @@ export function AiChatPanel({
     });
     setDraft("");
     setPendingAttachments([]);
-  }, [draft, onSend, pendingAttachments, t]);
+  }, [draft, onSend, pendingAttachments, scrollTimelineToBottom, t]);
 
   const handleCopyMessage = React.useCallback(
     async (item: MessageTimelineItem) => {
@@ -347,7 +286,7 @@ export function AiChatPanel({
     const text = inlineEditState.text.trim();
     if (!text && inlineEditState.attachments.length === 0) return;
 
-    nextTimelineScrollBehaviorRef.current = "smooth";
+    scrollTimelineToBottom(true);
     void onSend({
       text: text || getAttachmentOnlyMessage(t, inlineEditState.attachments),
       displayText: text,
@@ -361,7 +300,7 @@ export function AiChatPanel({
       },
     });
     setInlineEditState(null);
-  }, [inlineEditState, onSend, t]);
+  }, [inlineEditState, onSend, scrollTimelineToBottom, t]);
 
   const handleCancelInlineEdit = React.useCallback(() => {
     setInlineEditState(null);
@@ -499,6 +438,7 @@ export function AiChatPanel({
       width={width}
       onResize={onResize}
       footer={footer}
+      bodyStyle={timelineBodyStyle}
     >
       <div className="flex h-full flex-col gap-2">
         {showHeaderBadges ? (
