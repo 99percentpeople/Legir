@@ -778,6 +778,12 @@ const es = {
     },
   },
   app: {
+    error_boundary: {
+      title: "Se produjo un error",
+      description:
+        "Inténtalo de nuevo. Si el problema continúa, actualiza la página.",
+      reload: "Actualizar página",
+    },
     parsing: "Analizando PDF...",
     generating: "Generando PDF...",
     load_error: "Error al cargar PDF.",

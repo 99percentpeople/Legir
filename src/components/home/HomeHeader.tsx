@@ -1,5 +1,5 @@
-import { LanguageToggle } from "@/components/toolbar/language-toggle";
-import { ModeToggle } from "@/components/toolbar/mode-toggle";
+import { LanguageDropdownToggle } from "@/components/LanguageToggle";
+import { ThemeDropdownToggle } from "@/components/ThemeToggle";
 
 type HomeHeaderProps = {
   rightSlot?: React.ReactNode;
@@ -14,8 +14,8 @@ export function HomeHeader({ rightSlot }: HomeHeaderProps) {
       <div className="flex items-center gap-2">
         {rightSlot ?? (
           <>
-            <LanguageToggle />
-            <ModeToggle />
+            <LanguageDropdownToggle />
+            <ThemeDropdownToggle />
           </>
         )}
       </div>

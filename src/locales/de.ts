@@ -781,6 +781,12 @@ const de = {
     },
   },
   app: {
+    error_boundary: {
+      title: "Es ist ein Fehler aufgetreten",
+      description:
+        "Versuche es erneut. Wenn das Problem weiterhin besteht, lade die Seite neu.",
+      reload: "Seite neu laden",
+    },
     parsing: "PDF wird analysiert...",
     generating: "PDF wird generiert...",
     load_error: "Laden des PDF fehlgeschlagen.",

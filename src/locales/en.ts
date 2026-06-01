@@ -768,6 +768,11 @@ const en = {
     },
   },
   app: {
+    error_boundary: {
+      title: "Something went wrong",
+      description: "Try again. If the problem continues, refresh the page.",
+      reload: "Refresh page",
+    },
     parsing: "Parsing PDF...",
     generating: "Generating PDF...",
     load_error: "Failed to load PDF.",

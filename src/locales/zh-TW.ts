@@ -743,6 +743,11 @@ const zhTW = {
     },
   },
   app: {
+    error_boundary: {
+      title: "應用程式發生錯誤",
+      description: "請重試。如果問題仍然存在，請重新整理頁面。",
+      reload: "重新整理頁面",
+    },
     parsing: "正在解析 PDF...",
     generating: "正在生成 PDF...",
     load_error: "載入 PDF 失敗。",

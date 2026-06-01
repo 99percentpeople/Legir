@@ -767,6 +767,12 @@ const ja = {
     },
   },
   app: {
+    error_boundary: {
+      title: "アプリでエラーが発生しました",
+      description:
+        "もう一度お試しください。問題が続く場合はページを再読み込みしてください。",
+      reload: "ページを再読み込み",
+    },
     parsing: "PDF を解析中...",
     generating: "PDF を生成中...",
     load_error: "PDF の読み込みに失敗しました。",

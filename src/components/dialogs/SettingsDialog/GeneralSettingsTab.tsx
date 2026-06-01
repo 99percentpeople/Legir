@@ -1,18 +1,14 @@
-import { Globe, Laptop, LayoutGrid, Moon, Sun, User } from "lucide-react";
+import { LayoutGrid, User } from "lucide-react";
 
-import {
-  LANGUAGES,
-  useLanguage,
-  type Language,
-} from "@/components/language-provider";
-import { useTheme } from "@/components/theme-provider";
+import { useLanguage } from "@/components/language-provider";
+import { LanguageIcon, LanguageSelect } from "@/components/LanguageToggle";
+import { CurrentThemeIcon, ThemeSelect } from "@/components/ThemeToggle";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -30,8 +26,7 @@ export const GeneralSettingsTab = ({
   options,
   onChange,
 }: GeneralSettingsTabProps) => {
-  const { language, setLanguage, t } = useLanguage();
-  const { theme, setTheme } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <TabsContent value="general">
@@ -39,68 +34,24 @@ export const GeneralSettingsTab = ({
         <div className={SETTINGS_CARD_COMPACT_CLASS}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Globe className="text-primary h-4 w-4" />
+              <LanguageIcon className="text-primary h-4 w-4" />
               <Label className="mb-0 font-semibold">
                 {t("settings.language")}
               </Label>
             </div>
-            <Select
-              value={language}
-              onValueChange={(val) => setLanguage(val as Language)}
-            >
-              <SelectTrigger className="h-8 w-[160px]">
-                <SelectValue placeholder={t("common.select")} />
-              </SelectTrigger>
-              <SelectContent>
-                {LANGUAGES.map((lang) => (
-                  <SelectItem key={lang.value} value={lang.value}>
-                    {lang.label}
-                  </SelectItem>
-                ))}
-                <SelectSeparator />
-                <SelectItem value="system">
-                  {t("settings.theme_options.system")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <LanguageSelect triggerClassName="h-8 w-[160px]" />
           </div>
         </div>
 
         <div className={SETTINGS_CARD_COMPACT_CLASS}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {theme === "dark" ? (
-                <Moon className="text-primary h-4 w-4" />
-              ) : theme === "light" ? (
-                <Sun className="text-primary h-4 w-4" />
-              ) : (
-                <Laptop className="text-primary h-4 w-4" />
-              )}
+              <CurrentThemeIcon className="text-primary h-4 w-4" />
               <Label className="mb-0 font-semibold">
                 {t("settings.theme")}
               </Label>
             </div>
-            <Select
-              value={theme}
-              onValueChange={(val) =>
-                setTheme(val as "dark" | "light" | "system")
-              }
-            >
-              <SelectTrigger className="h-8 w-[160px]">
-                <SelectValue placeholder={t("common.select")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">
-                  {t("settings.theme_options.light")}
-                </SelectItem>
-                <SelectItem value="dark">
-                  {t("settings.theme_options.dark")}
-                </SelectItem>
-                <SelectItem value="system">
-                  {t("settings.theme_options.system")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <ThemeSelect triggerClassName="h-8 w-[160px]" />
           </div>
         </div>
 

@@ -783,6 +783,11 @@ const fr = {
     },
   },
   app: {
+    error_boundary: {
+      title: "Une erreur est survenue",
+      description: "Réessayez. Si le problème persiste, actualisez la page.",
+      reload: "Actualiser la page",
+    },
     parsing: "Analyse du PDF...",
     generating: "Génération du PDF...",
     load_error: "Échec du chargement du PDF.",
