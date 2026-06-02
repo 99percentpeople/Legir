@@ -24,11 +24,6 @@ import {
 } from "@/lib/shapeGeometry";
 import { useEditorStore } from "@/store/useEditorStore";
 import {
-  analyzePageForFields,
-  isAiSdkProviderConfigured,
-  parseAiSdkModelSpecifier,
-} from "@/services/ai";
-import {
   pdfWorkerService,
   type PDFWorkerService,
 } from "@/services/pdfService/pdfWorkerService";
@@ -63,8 +58,6 @@ import type {
   AiCreateFormFieldsResult,
   AiCreateFormFieldsResultItem,
   AiCreateShapeAnnotationInput,
-  AiDetectedFormFieldBatch,
-  AiDetectedFormFieldDraft,
   AiDocumentPageAssetSummary,
   AiDocumentMetadataUpdateResult,
   AiPdfPermissionUnlockResult,
@@ -79,16 +72,11 @@ import type {
   AiHighlightAnnotationCreateResult,
   AiSearchResultSummary,
   AiStoredSearchResult,
-  AiToolExecutionProgress,
   AiTypeCount,
   AiUpdateAnnotationInput,
   AiUpdateFormFieldInput,
 } from "@/services/ai/chat/types";
-import type {
-  AiChatSessionData,
-  AiDetectedFormFieldBatchState,
-  AiDetectedFormFieldDraftState,
-} from "@/hooks/useAiChatController/sessionPersistence";
+import type { AiChatSessionData } from "@/hooks/useAiChatController/sessionPersistence";
 
 type SelectedChatModelMeta =
   | {
@@ -761,8 +749,6 @@ const buildDocumentAnchorCandidatePageIndexes = (
 const normalizeAnnotationText = (value: string) =>
   value.replace(/\s+/g, " ").trim();
 
-const MAX_PENDING_DETECTED_FIELD_BATCHES = 8;
-
 const cloneFieldRect = (rect: FormField["rect"]) => ({
   x: rect.x,
   y: rect.y,
@@ -865,59 +851,6 @@ const buildSelectedChatModelMeta = (
         modelLabel: selectedChatModel.modelLabel,
       }
     : undefined;
-
-const summarizeDetectedFormFieldDraft = (
-  draftId: string,
-  field: FormField,
-): AiDetectedFormFieldDraft => ({
-  draftId,
-  pageNumber: field.pageIndex + 1,
-  name: field.name || "",
-  type: getAiFormFieldKind(field.type),
-  rect: roundAiRect(field.rect),
-  options: field.options?.length ? [...field.options] : undefined,
-  multiline:
-    field.type === FieldType.TEXT ? field.multiline === true : undefined,
-  alignment: field.type === FieldType.TEXT ? field.alignment : undefined,
-});
-
-const cloneDetectedDraftState = (
-  draft: AiDetectedFormFieldDraftState,
-): AiDetectedFormFieldDraftState => ({
-  draftId: draft.draftId,
-  field: {
-    ...draft.field,
-    rect: cloneFieldRect(draft.field.rect),
-    style: draft.field.style ? { ...draft.field.style } : undefined,
-    options: draft.field.options ? [...draft.field.options] : undefined,
-  },
-  summary: {
-    ...draft.summary,
-    rect: { ...draft.summary.rect },
-    options: draft.summary.options ? [...draft.summary.options] : undefined,
-  },
-});
-
-const buildDetectedFieldBatchOutput = (
-  batch: AiDetectedFormFieldBatchState,
-): AiDetectedFormFieldBatch => ({
-  batchId: batch.batchId,
-  status: batch.status,
-  createdAt: batch.createdAt,
-  pageNumbers: [...batch.pageNumbers],
-  requestedPageCount: batch.pageNumbers.length,
-  detectedCount: batch.drafts.length,
-  userIntent: batch.userIntent,
-  allowedTypes: batch.allowedTypes?.length
-    ? [...batch.allowedTypes]
-    : undefined,
-  extraPrompt: batch.extraPrompt,
-  fields: batch.drafts.map((draft) => ({
-    ...draft.summary,
-    rect: { ...draft.summary.rect },
-    options: draft.summary.options ? [...draft.summary.options] : undefined,
-  })),
-});
 
 const getRectArea = (rect: FormField["rect"]) =>
   Math.max(0, rect.width) * Math.max(0, rect.height);
@@ -1057,8 +990,6 @@ export const createAiChatToolContext = (options: {
   activeSessionIdRef: MutableRefObject<string>;
   setHighlightedResultIds: (ids: string[]) => void;
   formToolsEnabled: boolean;
-  detectFormFieldsEnabled: boolean;
-  formToolsVisionModelKey?: string;
   selectedChatModel?: SelectedChatModelMeta;
   selectedChatModelAuthor: string;
   workerService?: PDFWorkerService;
@@ -1696,207 +1627,11 @@ export const createAiChatToolContext = (options: {
     };
   };
 
-  const detectFormFields = async (optionsInput: {
-    pageNumbers?: number[];
-    pageImages: Array<{
-      pageNumber: number;
-      pageWidth: number;
-      pageHeight: number;
-      base64Data: string;
-    }>;
-    allowedTypes?: AiFormFieldKind[];
-    userIntent?: string;
-    extraPrompt?: string;
-    signal?: AbortSignal;
-    onProgress?: (progress: AiToolExecutionProgress) => void;
-  }): Promise<AiDetectedFormFieldBatch> => {
-    const snapshot = useEditorStore.getState();
-    if (!snapshot.pdfBytes || snapshot.pages.length === 0) {
-      throw new Error("No PDF is currently loaded.");
-    }
-
-    const normalizedPageNumbers = Array.from(
-      new Set(
-        (optionsInput.pageNumbers ?? [])
-          .map((pageNumber) => Math.trunc(pageNumber))
-          .filter(
-            (pageNumber) =>
-              Number.isFinite(pageNumber) &&
-              pageNumber >= 1 &&
-              pageNumber <= snapshot.pages.length,
-          ),
-      ),
-    ).sort((left, right) => left - right);
-    const pageNumbers =
-      normalizedPageNumbers.length > 0
-        ? normalizedPageNumbers
-        : [snapshot.currentPageIndex + 1];
-    const pageImagesByPageNumber = new Map(
-      optionsInput.pageImages.map((pageImage) => [
-        pageImage.pageNumber,
-        pageImage,
-      ]),
-    );
-    const allowedTypes = (optionsInput.allowedTypes ?? []).length
-      ? Array.from(new Set(optionsInput.allowedTypes))
-      : ([
-          "text",
-          "checkbox",
-          "radio",
-          "dropdown",
-          "signature",
-        ] satisfies AiFormFieldKind[]);
-    const allowedFieldTypes = allowedTypes.map(getFieldTypeFromAiFormFieldKind);
-    const userIntent = optionsInput.userIntent?.trim() || undefined;
-    const extraPrompt = optionsInput.extraPrompt?.trim() || undefined;
-    const combinedPrompt = [userIntent, extraPrompt]
-      .filter(Boolean)
-      .join("\n\n");
-    const configuredVisionModelSpecifier = parseAiSdkModelSpecifier(
-      options.formToolsVisionModelKey?.trim(),
-    );
-    if (!configuredVisionModelSpecifier) {
-      throw new Error(
-        "No dedicated vision model is configured for detect_form_fields. Enable the fallback detector and choose a form-tools vision model in settings.",
-      );
-    }
-    if (
-      !isAiSdkProviderConfigured(
-        snapshot.options,
-        configuredVisionModelSpecifier.providerId,
-      )
-    ) {
-      throw new Error(
-        "The configured detect_form_fields vision provider is disabled or missing an API key. Enable that provider in settings or choose a different vision model.",
-      );
-    }
-    const progressItems = pageNumbers.map((pageNumber) => ({
-      id: `page_${pageNumber}`,
-      label: `Page ${pageNumber}`,
-      status: "pending" as const,
-    }));
-    const drafts: AiDetectedFormFieldDraftState[] = [];
-
-    for (const [pageIndexInBatch, pageNumber] of pageNumbers.entries()) {
-      optionsInput.onProgress?.({
-        summary: `Analyzing page ${pageIndexInBatch + 1} of ${pageNumbers.length}`,
-        items: progressItems.map((item, index) => ({
-          ...item,
-          status:
-            index < pageIndexInBatch
-              ? "done"
-              : index === pageIndexInBatch
-                ? "running"
-                : "pending",
-        })),
-        counts: {
-          done: pageIndexInBatch,
-          running: 1,
-          pending: Math.max(0, pageNumbers.length - pageIndexInBatch - 1),
-        },
-      });
-
-      const pageIndex = pageNumber - 1;
-      const page = snapshot.pages[pageIndex];
-      if (!page) continue;
-
-      const providedPageImage = pageImagesByPageNumber.get(pageNumber);
-      if (!providedPageImage?.base64Data) {
-        throw new Error(
-          `detect_form_fields requires a rendered page image for page ${pageNumber} from the current edited document state.`,
-        );
-      }
-
-      const detectedFields = await analyzePageForFields(
-        providedPageImage.base64Data,
-        pageIndex,
-        providedPageImage?.pageWidth ?? page.width,
-        providedPageImage?.pageHeight ?? page.height,
-        snapshot.fields.filter((field) => field.pageIndex === pageIndex),
-        {
-          allowedTypes: allowedFieldTypes,
-          extraPrompt: combinedPrompt || undefined,
-          providerId: configuredVisionModelSpecifier.providerId,
-          modelId: configuredVisionModelSpecifier.modelId,
-        },
-      );
-
-      detectedFields.forEach((field, index) => {
-        const draftId = `detected_${pageIndex}_${index}_${Date.now()}_${Math.random()
-          .toString(36)
-          .slice(2, 8)}`;
-        drafts.push({
-          draftId,
-          field: {
-            ...field,
-            rect: cloneFieldRect(field.rect),
-            style: field.style ? { ...field.style } : undefined,
-            options: field.options ? [...field.options] : undefined,
-          },
-          summary: summarizeDetectedFormFieldDraft(draftId, field),
-        });
-      });
-    }
-
-    const batchState: AiDetectedFormFieldBatchState = {
-      batchId: `field_batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      createdAt: new Date().toISOString(),
-      status: "draft",
-      pageNumbers,
-      allowedTypes,
-      userIntent,
-      extraPrompt,
-      confirmedAt: undefined,
-      confirmedByMessageId: undefined,
-      confirmedByUserText: undefined,
-      drafts,
-    };
-
-    const session = getActiveSession();
-    if (session) {
-      session.pendingDetectedFieldBatches = [
-        batchState,
-        ...session.pendingDetectedFieldBatches
-          .filter((batch) => batch.batchId !== batchState.batchId)
-          .map((batch) => ({
-            ...batch,
-            pageNumbers: [...batch.pageNumbers],
-            allowedTypes: batch.allowedTypes
-              ? [...batch.allowedTypes]
-              : undefined,
-            drafts: batch.drafts.map(cloneDetectedDraftState),
-          })),
-      ].slice(0, MAX_PENDING_DETECTED_FIELD_BATCHES);
-    }
-
-    optionsInput.onProgress?.({
-      summary:
-        drafts.length > 0
-          ? `Detected ${drafts.length} candidate field${drafts.length === 1 ? "" : "s"}`
-          : "No candidate fields detected",
-      items: progressItems.map((item) => ({
-        ...item,
-        status: "done",
-      })),
-      counts: {
-        done: pageNumbers.length,
-        running: 0,
-        pending: 0,
-      },
-    });
-
-    return buildDetectedFieldBatchOutput(batchState);
-  };
-
   const createFormFields = (optionsInput: {
-    batchId?: string;
-    draftIds?: string[];
     fields?: AiCreateFormFieldInput[];
   }): AiCreateFormFieldsResult => {
-    const session = getActiveSession();
-    if (!session) {
+    if (!getActiveSession()) {
       return {
-        batchId: optionsInput.batchId,
         status: "not_found",
         createdCount: 0,
         skippedCount: 0,
@@ -1906,302 +1641,179 @@ export const createAiChatToolContext = (options: {
       };
     }
 
-    const commitFieldCreations = (commitOptions: {
-      batchId?: string;
-      seedResults?: AiCreateFormFieldsResultItem[];
-      candidates: Array<{
-        draftId?: string;
-        field: FormField;
-        pageNumber: number;
-        name: string;
-        type: AiFormFieldKind;
-      }>;
-      emptyStatus: "not_found" | "rejected";
-      emptyReason: string;
-      onApplied?: () => void;
-    }): AiCreateFormFieldsResult => {
-      const results = [...(commitOptions.seedResults ?? [])];
-      if (commitOptions.candidates.length === 0) {
-        return {
-          batchId: commitOptions.batchId,
-          status: commitOptions.emptyStatus,
-          createdCount: 0,
-          skippedCount: 0,
-          rejectedCount: results.filter((item) => item.status === "rejected")
-            .length,
-          fields: results,
-          reason: commitOptions.emptyReason,
-        };
-      }
-
-      const store = useEditorStore.getState();
-      const createdFields: FormField[] = [];
-      const existingFields = [...store.fields];
-      const pageNextLayerOrder = new Map<number, number>();
-
-      for (const item of commitOptions.candidates) {
-        const candidate: FormField = {
-          ...item.field,
-          id: `field_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          rect: cloneFieldRect(item.field.rect),
-          style: item.field.style ? { ...item.field.style } : undefined,
-          options: item.field.options ? [...item.field.options] : undefined,
-        };
-
-        if (
-          existingFields.some((field) =>
-            isPotentialDuplicateField(field, candidate),
-          )
-        ) {
-          results.push({
-            draftId: item.draftId,
-            pageNumber: item.pageNumber,
-            name: item.name,
-            type: item.type,
-            status: "skipped",
-            reason: "Overlaps an existing field on the page.",
-          });
-          continue;
-        }
-
-        const nextLayerOrder =
-          pageNextLayerOrder.get(candidate.pageIndex) ??
-          getNextLayerOrderForPage(
-            [...existingFields, ...createdFields],
-            store.annotations,
-            candidate.pageIndex,
-          );
-        candidate.layerOrder = nextLayerOrder;
-        pageNextLayerOrder.set(candidate.pageIndex, nextLayerOrder + 1);
-        createdFields.push(candidate);
-        existingFields.push(candidate);
-        results.push({
-          draftId: item.draftId,
-          fieldId: candidate.id,
-          pageNumber: item.pageNumber,
-          name: item.name,
-          type: item.type,
-          status: "created",
-        });
-      }
-
-      if (createdFields.length > 0) {
-        store.saveCheckpoint();
-        store.setState((state) => ({
-          fields: [...state.fields, ...createdFields],
-          selectedId:
-            createdFields[createdFields.length - 1]?.id ?? state.selectedId,
-          isDirty: true,
-        }));
-      }
-
-      commitOptions.onApplied?.();
-
-      return {
-        batchId: commitOptions.batchId,
-        status: "created",
-        createdCount: results.filter((item) => item.status === "created")
-          .length,
-        skippedCount: results.filter((item) => item.status === "skipped")
-          .length,
-        rejectedCount: results.filter((item) => item.status === "rejected")
-          .length,
-        fields: results,
-      };
-    };
-
     const directFields = optionsInput.fields ?? [];
-    if (directFields.length > 0) {
-      const store = useEditorStore.getState();
-      const seedResults: AiCreateFormFieldsResultItem[] = [];
-      const candidates: Array<{
-        draftId?: string;
-        field: FormField;
-        pageNumber: number;
-        name: string;
-        type: AiFormFieldKind;
-      }> = [];
-
-      directFields.forEach((item, index) => {
-        const pageIndex = Math.trunc(item.pageNumber) - 1;
-        const page = store.pages[pageIndex];
-        const normalizedName = item.name.trim() || `Field ${index + 1}`;
-        if (!page) {
-          seedResults.push({
-            pageNumber: item.pageNumber,
-            name: normalizedName,
-            type: item.type,
-            status: "rejected",
-            reason: "Target page is out of range.",
-          });
-          return;
-        }
-
-        const fieldType = getFieldTypeFromAiFormFieldKind(item.type);
-        const trimmedOptions = (item.options ?? [])
-          .map((option) => option.trim())
-          .filter(Boolean);
-        const exportValue =
-          item.exportValue ||
-          (fieldType === FieldType.CHECKBOX
-            ? "Yes"
-            : fieldType === FieldType.RADIO
-              ? "Choice1"
-              : undefined);
-
-        candidates.push({
-          pageNumber: item.pageNumber,
-          name: normalizedName,
-          type: item.type,
-          field: {
-            id: `direct_${Date.now()}_${index}`,
-            pageIndex,
-            type: fieldType,
-            name: normalizedName,
-            rect: clampFieldRectToPage(page, item.rect),
-            required: item.required === true ? true : undefined,
-            readOnly: item.readOnly === true ? true : undefined,
-            toolTip: item.toolTip?.trim() || undefined,
-            placeholder:
-              fieldType === FieldType.TEXT
-                ? (item.placeholder ?? undefined)
-                : undefined,
-            style: {
-              ...DEFAULT_FIELD_STYLE,
-              ...(pruneUndefinedKeys(item.style) ?? {}),
-            },
-            options:
-              fieldType === FieldType.DROPDOWN
-                ? trimmedOptions.length > 0
-                  ? trimmedOptions
-                  : ["Option 1", "Option 2"]
-                : undefined,
-            isMultiSelect:
-              fieldType === FieldType.DROPDOWN
-                ? item.isMultiSelect === true
-                : undefined,
-            allowCustomValue:
-              fieldType === FieldType.DROPDOWN
-                ? item.allowCustomValue === true
-                : undefined,
-            multiline:
-              fieldType === FieldType.TEXT
-                ? item.multiline === true
-                : undefined,
-            alignment:
-              fieldType === FieldType.TEXT ? item.alignment : undefined,
-            exportValue,
-            radioValue:
-              fieldType === FieldType.RADIO
-                ? exportValue || "Choice1"
-                : undefined,
-          },
-        });
-      });
-
+    if (directFields.length === 0) {
       return {
-        ...commitFieldCreations({
-          batchId: optionsInput.batchId,
-          seedResults,
-          candidates,
-          emptyStatus: seedResults.length > 0 ? "rejected" : "not_found",
-          emptyReason:
-            seedResults.length > 0
-              ? "One or more direct field definitions were invalid."
-              : "No direct field definitions were provided.",
-        }),
-      };
-    }
-
-    const batch =
-      (optionsInput.batchId
-        ? session.pendingDetectedFieldBatches.find(
-            (item) => item.batchId === optionsInput.batchId,
-          )
-        : session.pendingDetectedFieldBatches.find(
-            (item) => item.status === "draft",
-          )) ?? null;
-    if (!batch) {
-      return {
-        batchId: optionsInput.batchId,
         status: "not_found",
         createdCount: 0,
         skippedCount: 0,
         rejectedCount: 0,
         fields: [],
-        reason: "No pending detected field batch is available.",
-      };
-    }
-    if (batch.status !== "draft") {
-      return {
-        batchId: batch.batchId,
-        status: "rejected",
-        createdCount: 0,
-        skippedCount: 0,
-        rejectedCount: 0,
-        fields: [],
-        reason:
-          "This detected field batch has already been applied or discarded.",
-      };
-    }
-    const requestedDraftIds = Array.from(
-      new Set(
-        (optionsInput.draftIds ?? [])
-          .map((draftId) => draftId.trim())
-          .filter(Boolean),
-      ),
-    );
-    const selectedDrafts =
-      requestedDraftIds.length > 0
-        ? batch.drafts.filter((draft) =>
-            requestedDraftIds.includes(draft.draftId),
-          )
-        : batch.drafts;
-    const draftById = new Map(
-      batch.drafts.map((draft) => [draft.draftId, draft]),
-    );
-    const results: AiCreateFormFieldsResultItem[] = requestedDraftIds
-      .filter((draftId) => !draftById.has(draftId))
-      .map((draftId) => ({
-        draftId,
-        status: "rejected",
-        reason: "Draft field not found in the selected batch.",
-      }));
-
-    if (selectedDrafts.length === 0) {
-      return {
-        batchId: batch.batchId,
-        status: results.length > 0 ? "rejected" : "not_found",
-        createdCount: 0,
-        skippedCount: 0,
-        rejectedCount: results.length,
-        fields: results,
-        reason:
-          results.length > 0
-            ? "One or more requested draft fields were not found."
-            : "No draft fields are available to create.",
+        reason: "No field definitions were provided.",
       };
     }
 
-    return commitFieldCreations({
-      batchId: batch.batchId,
-      seedResults: results,
-      candidates: selectedDrafts.map((draft) => ({
-        draftId: draft.draftId,
-        field: draft.field,
-        pageNumber: draft.summary.pageNumber,
-        name: draft.summary.name,
-        type: draft.summary.type,
-      })),
-      emptyStatus: results.length > 0 ? "rejected" : "not_found",
-      emptyReason:
-        results.length > 0
-          ? "One or more requested draft fields were not found."
-          : "No draft fields are available to create.",
-      onApplied: () => {
-        batch.status = "applied";
-      },
+    const store = useEditorStore.getState();
+    const results: AiCreateFormFieldsResultItem[] = [];
+    const candidates: Array<{
+      field: FormField;
+      pageNumber: number;
+      name: string;
+      type: AiFormFieldKind;
+    }> = [];
+
+    directFields.forEach((item, index) => {
+      const pageIndex = Math.trunc(item.pageNumber) - 1;
+      const page = store.pages[pageIndex];
+      const normalizedName = item.name.trim() || `Field ${index + 1}`;
+      if (!page) {
+        results.push({
+          pageNumber: item.pageNumber,
+          name: normalizedName,
+          type: item.type,
+          status: "rejected",
+          reason: "Target page is out of range.",
+        });
+        return;
+      }
+
+      const fieldType = getFieldTypeFromAiFormFieldKind(item.type);
+      const trimmedOptions = (item.options ?? [])
+        .map((option) => option.trim())
+        .filter(Boolean);
+      const exportValue =
+        item.exportValue ||
+        (fieldType === FieldType.CHECKBOX
+          ? "Yes"
+          : fieldType === FieldType.RADIO
+            ? "Choice1"
+            : undefined);
+
+      candidates.push({
+        pageNumber: item.pageNumber,
+        name: normalizedName,
+        type: item.type,
+        field: {
+          id: `direct_${Date.now()}_${index}`,
+          pageIndex,
+          type: fieldType,
+          name: normalizedName,
+          rect: clampFieldRectToPage(page, item.rect),
+          required: item.required === true ? true : undefined,
+          readOnly: item.readOnly === true ? true : undefined,
+          toolTip: item.toolTip?.trim() || undefined,
+          placeholder:
+            fieldType === FieldType.TEXT
+              ? (item.placeholder ?? undefined)
+              : undefined,
+          style: {
+            ...DEFAULT_FIELD_STYLE,
+            ...(pruneUndefinedKeys(item.style) ?? {}),
+          },
+          options:
+            fieldType === FieldType.DROPDOWN
+              ? trimmedOptions.length > 0
+                ? trimmedOptions
+                : ["Option 1", "Option 2"]
+              : undefined,
+          isMultiSelect:
+            fieldType === FieldType.DROPDOWN
+              ? item.isMultiSelect === true
+              : undefined,
+          allowCustomValue:
+            fieldType === FieldType.DROPDOWN
+              ? item.allowCustomValue === true
+              : undefined,
+          multiline:
+            fieldType === FieldType.TEXT ? item.multiline === true : undefined,
+          alignment: fieldType === FieldType.TEXT ? item.alignment : undefined,
+          exportValue,
+          radioValue:
+            fieldType === FieldType.RADIO
+              ? exportValue || "Choice1"
+              : undefined,
+        },
+      });
     });
+
+    if (candidates.length === 0) {
+      return {
+        status: "rejected",
+        createdCount: 0,
+        skippedCount: 0,
+        rejectedCount: results.filter((item) => item.status === "rejected")
+          .length,
+        fields: results,
+        reason: "One or more field definitions were invalid.",
+      };
+    }
+
+    const createdFields: FormField[] = [];
+    const existingFields = [...store.fields];
+    const pageNextLayerOrder = new Map<number, number>();
+
+    for (const item of candidates) {
+      const candidate: FormField = {
+        ...item.field,
+        id: `field_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        rect: cloneFieldRect(item.field.rect),
+        style: item.field.style ? { ...item.field.style } : undefined,
+        options: item.field.options ? [...item.field.options] : undefined,
+      };
+
+      if (
+        existingFields.some((field) =>
+          isPotentialDuplicateField(field, candidate),
+        )
+      ) {
+        results.push({
+          pageNumber: item.pageNumber,
+          name: item.name,
+          type: item.type,
+          status: "skipped",
+          reason: "Overlaps an existing field on the page.",
+        });
+        continue;
+      }
+
+      const nextLayerOrder =
+        pageNextLayerOrder.get(candidate.pageIndex) ??
+        getNextLayerOrderForPage(
+          [...existingFields, ...createdFields],
+          store.annotations,
+          candidate.pageIndex,
+        );
+      candidate.layerOrder = nextLayerOrder;
+      pageNextLayerOrder.set(candidate.pageIndex, nextLayerOrder + 1);
+      createdFields.push(candidate);
+      existingFields.push(candidate);
+      results.push({
+        fieldId: candidate.id,
+        pageNumber: item.pageNumber,
+        name: item.name,
+        type: item.type,
+        status: "created",
+      });
+    }
+
+    if (createdFields.length > 0) {
+      store.saveCheckpoint();
+      store.setState((state) => ({
+        fields: [...state.fields, ...createdFields],
+        // Creating fields from AI should not steal focus from the chat panel.
+        // The model can call focus_control when the user explicitly asks to jump.
+        isDirty: true,
+      }));
+    }
+
+    return {
+      status: "created",
+      createdCount: results.filter((item) => item.status === "created").length,
+      skippedCount: results.filter((item) => item.status === "skipped").length,
+      rejectedCount: results.filter((item) => item.status === "rejected")
+        .length,
+      fields: results,
+    };
   };
 
   const focusControl = (id: string, optionsInput?: { select?: boolean }) => {
@@ -3958,7 +3570,6 @@ export const createAiChatToolContext = (options: {
 
   return {
     formToolsEnabled: options.formToolsEnabled,
-    detectFormFieldsEnabled: options.detectFormFieldsEnabled,
     getDocumentPageAssetSummary,
     updateDocumentMetadata,
     unlockPdfPermissions,
@@ -3971,7 +3582,6 @@ export const createAiChatToolContext = (options: {
     listFormFields,
     fillFormFields,
     updateFormFields,
-    detectFormFields,
     createFormFields,
     focusControl,
     getStoredSearchResult,

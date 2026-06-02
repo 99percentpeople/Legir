@@ -723,20 +723,12 @@ const fr = {
       form_tools_enabled: "Activer les outils de formulaire IA",
       form_tools_enabled_desc:
         "Permet au chat IA de créer de nouveaux champs de formulaire à partir des demandes conversationnelles. Laissez cette option désactivée si vous ne voulez que des questions-réponses en lecture seule et le remplissage des champs.",
-      detect_form_fields_enabled: "Activer le fallback detect_form_fields",
-      detect_form_fields_enabled_desc:
-        "Permet au chat IA d'utiliser l'outil visuel dédié detect_form_fields lorsque le modèle de chat actuel ne peut pas inspecter directement les images de page.",
-      form_tools_vision_model: "Modèle vision pour les formulaires",
-      form_tools_vision_model_placeholder: "Sélectionner un modèle vision",
-      form_tools_vision_model_desc:
-        "Modèle vision dédié à detect_form_fields. Cet outil n'utilise jamais le modèle de chat actuel et ne s'exécute que lorsque la détection de secours est activée.",
-      visual_summary_enabled: "Activer l'outil de résumé visuel",
-      visual_summary_enabled_desc:
-        "Active ou désactive summarize_pages_visual dans le chat IA. Cela permet aux modèles de chat textuels de déléguer l'inspection visuelle des pages rendues à un modèle vision.",
-      visual_summary_model: "Modèle de résumé visuel",
-      visual_summary_model_placeholder: "Sélectionner un modèle vision",
-      visual_summary_model_desc:
-        "Utilisé par summarize_pages_visual. Si l'outil est désactivé ou si aucun modèle vision n'est sélectionné, cet outil devient indisponible.",
+      visual_model: "Modèle visuel",
+      visual_model_placeholder: "Sélectionner un modèle visuel",
+      visual_model_auto_group: "Automatique",
+      visual_model_auto: "Automatique",
+      visual_model_desc:
+        "Utilisé automatiquement par inspect_pages_visual lorsque le modèle de chat actif ne peut pas recevoir directement les images de page rendues, y compris pour l'inspection de la structure visuelle et la planification des champs de formulaire.",
       no_models: "Aucun modèle disponible",
     },
   },

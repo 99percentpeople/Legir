@@ -708,20 +708,12 @@ const ja = {
       form_tools_enabled: "AI フォームツールを有効化",
       form_tools_enabled_desc:
         "会話から新しいフォームフィールドを作成できるようにします。読み取り専用の Q&A と既存フィールド入力だけでよい場合は無効のままにしてください。",
-      detect_form_fields_enabled: "detect_form_fields フォールバックを有効化",
-      detect_form_fields_enabled_desc:
-        "現在のチャットモデルがページ画像を直接確認できないときに、専用の detect_form_fields ビジョンツールを使えるようにします。",
-      form_tools_vision_model: "フォームツール用ビジョンモデル",
-      form_tools_vision_model_placeholder: "ビジョンモデルを選択",
-      form_tools_vision_model_desc:
-        "detect_form_fields 専用のビジョンモデルです。このツールは現在のチャットモデルを使わず、フォールバック検出が有効なときだけ実行されます。",
-      visual_summary_enabled: "視覚要約ツールを有効化",
-      visual_summary_enabled_desc:
-        "AI チャットで summarize_pages_visual を使えるかどうかを切り替えます。これにより、テキスト専用のチャットモデルでもレンダリング済みページの視覚確認をビジョンモデルに委任できます。",
-      visual_summary_model: "視覚要約モデル",
-      visual_summary_model_placeholder: "ビジョンモデルを選択",
-      visual_summary_model_desc:
-        "summarize_pages_visual で使用します。ツールが無効、またはビジョンモデルが未選択の場合、このツールは利用できません。",
+      visual_model: "ビジュアルモデル",
+      visual_model_placeholder: "ビジュアルモデルを選択",
+      visual_model_auto_group: "自動",
+      visual_model_auto: "自動",
+      visual_model_desc:
+        "現在のチャットモデルがレンダリング済みページ画像を直接受け取れない場合、inspect_pages_visual が視覚構造の確認やフォームフィールド作成計画に自動で使用します。",
       no_models: "利用可能なモデルがありません",
     },
   },

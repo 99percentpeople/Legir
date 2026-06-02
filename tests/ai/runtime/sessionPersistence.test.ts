@@ -460,7 +460,7 @@ describe("AI chat session persistence", () => {
         id: "call_1",
         kind: "tool",
         toolCallId: "call_1",
-        toolName: "get_pages_visual",
+        toolName: "inspect_pages_visual",
         status: "running",
         argsText: "{}",
         resultSummary: "Loading",

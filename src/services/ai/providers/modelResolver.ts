@@ -48,12 +48,13 @@ const dedupeModelOptions = (
     id: string;
     label?: string;
     capabilities: AppLLMModelOption["capabilities"];
+    rank?: number;
   }>,
 ) => {
-  const output: AppLLMModelOption[] = [];
+  const output: Array<AppLLMModelOption & { order: number }> = [];
   const seen = new Set<string>();
 
-  for (const model of models) {
+  for (const [order, model] of models.entries()) {
     const id = (model.id || "").trim();
     if (!id || seen.has(id)) continue;
     seen.add(id);
@@ -61,10 +62,20 @@ const dedupeModelOptions = (
       id,
       label: (model.label || id).trim() || id,
       capabilities: model.capabilities,
+      rank:
+        typeof model.rank === "number" && Number.isFinite(model.rank)
+          ? Math.trunc(model.rank)
+          : 0,
+      order,
     });
   }
 
-  return output;
+  return output
+    .sort(
+      (left, right) =>
+        (right.rank ?? 0) - (left.rank ?? 0) || left.order - right.order,
+    )
+    .map(({ order: _order, ...model }) => model);
 };
 
 const getFallbackModelId = (providerId: AiSdkProviderId) =>
@@ -248,12 +259,57 @@ const getPreferredProviderId = (options: {
   return AI_PROVIDER_IDS[0];
 };
 
+const getPreferredProviderIdForTask = (options: {
+  appOptions: AppOptions;
+  modelCache: AiSdkModelCache;
+  kind: AiSdkTaskModelKind;
+  requestedProviderId?: string;
+  preferredProviderId?: string;
+}) => {
+  if (options.requestedProviderId) {
+    return getPreferredProviderId(options);
+  }
+
+  if (
+    options.preferredProviderId &&
+    isAiProviderId(options.preferredProviderId) &&
+    isAiSdkProviderConfigured(
+      options.appOptions,
+      options.preferredProviderId,
+    ) &&
+    getAiSdkProviderModelOptions({
+      appOptions: options.appOptions,
+      modelCache: options.modelCache,
+      providerId: options.preferredProviderId,
+      kind: options.kind,
+    }).length > 0
+  ) {
+    return options.preferredProviderId;
+  }
+
+  const configuredProviderWithTaskModel = getConfiguredAiSdkProviderIds(
+    options.appOptions,
+  ).find(
+    (providerId) =>
+      getAiSdkProviderModelOptions({
+        appOptions: options.appOptions,
+        modelCache: options.modelCache,
+        providerId,
+        kind: options.kind,
+      }).length > 0,
+  );
+  if (configuredProviderWithTaskModel) return configuredProviderWithTaskModel;
+
+  return getPreferredProviderId(options);
+};
+
 export const resolveAiSdkModelSpecifierForTask = (options: {
   appOptions: AppOptions;
   modelCache: AiSdkModelCache;
   kind: AiSdkTaskModelKind;
   modelKey?: string;
   providerId?: string;
+  preferredProviderId?: string;
   modelId?: string;
 }): AiSdkModelSpecifier => {
   const explicitSpecifier = parseAiSdkModelSpecifier(options.modelKey);
@@ -264,9 +320,12 @@ export const resolveAiSdkModelSpecifierForTask = (options: {
     return explicitSpecifier;
   }
 
-  const providerId = getPreferredProviderId({
+  const providerId = getPreferredProviderIdForTask({
     appOptions: options.appOptions,
+    modelCache: options.modelCache,
+    kind: options.kind,
     requestedProviderId: options.providerId,
+    preferredProviderId: options.preferredProviderId,
   });
 
   const requestedModelId = (options.modelId || "").trim();

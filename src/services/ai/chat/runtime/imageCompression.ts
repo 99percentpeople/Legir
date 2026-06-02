@@ -315,7 +315,7 @@ const getVisualToolResultTargets = (messages: AiChatMessageRecord[]) => {
       if (!part || typeof part !== "object" || Array.isArray(part)) continue;
       const record = part as Record<string, unknown>;
       if (record.type !== "tool-result") continue;
-      if (record.toolName !== "get_pages_visual") continue;
+      if (record.toolName !== "inspect_pages_visual") continue;
 
       const output = record.output;
       if (

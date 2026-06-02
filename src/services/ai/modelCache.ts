@@ -131,21 +131,7 @@ export const loadModels = async (options?: LoadModelsOptions) => {
 
 void loadModels();
 
-export const isFormDetectAvailable = () =>
-  AI_PROVIDER_IDS.some((providerId) =>
-    isAiSdkProviderConfigured(getCurrentOptions(), providerId),
-  );
-
-export const getFormDetectModels = (): LLMModelOption[] => {
-  const groups = getAiSdkModelGroups({
-    appOptions: getCurrentOptions(),
-    modelCache: getCurrentModelCache(),
-    kind: "vision",
-  });
-  return groups.find((group) => group.models.length > 0)?.models || [];
-};
-
-export type FormDetectModelGroup = {
+export type VisionModelGroup = {
   providerId: string;
   label: string;
   labelKey?: string;
@@ -154,15 +140,12 @@ export type FormDetectModelGroup = {
   models: LLMModelOption[];
 };
 
-export const getVisionModelGroups = (): FormDetectModelGroup[] =>
+export const getVisionModelGroups = (): VisionModelGroup[] =>
   getAiSdkModelGroups({
     appOptions: getCurrentOptions(),
     modelCache: getCurrentModelCache(),
     kind: "vision",
   });
-
-export const getFormDetectModelGroups = (): FormDetectModelGroup[] =>
-  getVisionModelGroups();
 
 export type ChatModelGroup = {
   providerId: string;

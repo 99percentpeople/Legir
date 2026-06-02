@@ -71,7 +71,7 @@ describe("AI chat reasoning replay sanitization", () => {
           {
             type: "tool-call",
             toolCallId: "call_1",
-            toolName: "get_pages_visual",
+            toolName: "inspect_pages_visual",
             input: { page_numbers: [1] },
           },
         ],
@@ -82,7 +82,7 @@ describe("AI chat reasoning replay sanitization", () => {
           {
             type: "tool-result",
             toolCallId: "call_1",
-            toolName: "get_pages_visual",
+            toolName: "inspect_pages_visual",
             output: {
               type: "json",
               value: {
@@ -105,7 +105,7 @@ describe("AI chat reasoning replay sanitization", () => {
       replayPolicy: "tool-calls",
     });
 
-    expect(sanitized[1]?.content).toContain("get_pages_visual");
+    expect(sanitized[1]?.content).toContain("inspect_pages_visual");
     expect(sanitized[1]?.content).toContain("pageNumber");
     expect(sanitized[1]?.content).toContain("[omitted large binary data]");
     expect(sanitized[1]?.content).not.toContain(payload);

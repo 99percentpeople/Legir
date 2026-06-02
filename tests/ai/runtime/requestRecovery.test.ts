@@ -58,7 +58,7 @@ describe("AI chat request recovery", () => {
         toolCallId: "call_1",
         turnId: "turn_1",
         batchId: "turn_1:step_1",
-        toolName: "get_pages_visual",
+        toolName: "inspect_pages_visual",
         status: "done",
         argsText: JSON.stringify({
           page_numbers: [1],
@@ -74,7 +74,7 @@ describe("AI chat request recovery", () => {
 
     const messages = materializeIncompleteTimelineTail(timeline);
 
-    expect(messages[0]?.content).toContain("get_pages_visual");
+    expect(messages[0]?.content).toContain("inspect_pages_visual");
     expect(messages[0]?.content).toContain("pageNumber");
     expect(messages[0]?.content).toContain("[omitted large binary data]");
     expect(messages[0]?.content).not.toContain(payload);

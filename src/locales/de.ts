@@ -722,20 +722,12 @@ const de = {
       form_tools_enabled: "KI-Formularwerkzeuge aktivieren",
       form_tools_enabled_desc:
         "Erlaubt dem AI-Chat, neue Formularfelder aus Gesprächsanfragen zu erstellen. Deaktiviert lassen, wenn nur schreibgeschützter Chat und Feldbefüllung gewünscht sind.",
-      detect_form_fields_enabled: "detect_form_fields-Fallback aktivieren",
-      detect_form_fields_enabled_desc:
-        "Erlaubt dem AI-Chat, das dedizierte Vision-Werkzeug detect_form_fields zu verwenden, wenn das aktuelle Chat-Modell Seitenbilder nicht direkt prüfen kann.",
-      form_tools_vision_model: "Vision-Modell für Formularwerkzeuge",
-      form_tools_vision_model_placeholder: "Vision-Modell auswählen",
-      form_tools_vision_model_desc:
-        "Dediziertes Vision-Modell für detect_form_fields. Dieses Werkzeug verwendet niemals das aktuelle Chat-Modell und läuft nur, wenn die Fallback-Erkennung aktiviert ist.",
-      visual_summary_enabled: "Visuelles Zusammenfassungswerkzeug aktivieren",
-      visual_summary_enabled_desc:
-        "Schaltet summarize_pages_visual für den AI-Chat ein oder aus. So können textbasierte Chat-Modelle die Prüfung gerenderter Seiten an ein Vision-Modell delegieren.",
-      visual_summary_model: "Modell für visuelle Zusammenfassung",
-      visual_summary_model_placeholder: "Vision-Modell auswählen",
-      visual_summary_model_desc:
-        "Wird von summarize_pages_visual verwendet. Wenn das Werkzeug deaktiviert ist oder kein Vision-Modell ausgewählt wurde, ist dieses Werkzeug nicht verfügbar.",
+      visual_model: "Visuelles Modell",
+      visual_model_placeholder: "Visuelles Modell auswählen",
+      visual_model_auto_group: "Automatisch",
+      visual_model_auto: "Automatisch",
+      visual_model_desc:
+        "Wird von inspect_pages_visual automatisch verwendet, wenn das aktive Chat-Modell gerenderte Seitenbilder nicht direkt empfangen kann, einschließlich visueller Strukturprüfung und Planung von Formularfeldern.",
       no_models: "Keine verfügbaren Modelle",
     },
   },

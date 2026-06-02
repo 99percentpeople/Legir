@@ -26,6 +26,8 @@ export type AiModelCapabilityMetadata = {
 
 export type AiModelMetadata = {
   contextWindowTokens?: number;
+  /** Higher values are preferred by automatic model selection. */
+  rank?: number;
   capabilities?: AiModelCapabilityMetadata;
   reasoning?: AiModelReasoningMetadata;
 };
@@ -35,6 +37,7 @@ export type AiModelAvailability = {
   /** Curated model ids to expose for this provider; defaults to entry.modelIds. */
   modelIds?: readonly string[];
   label?: string;
+  rank?: number;
   apiOptionIds?: readonly string[];
   baseUrlHosts?: readonly string[];
   inputModalities?: readonly string[];
@@ -63,6 +66,7 @@ type CreateAiDiscoveredModelOptions = {
   outputModalities?: readonly string[];
   supportsToolCalls?: boolean;
   supportsImageToolResults?: boolean;
+  rank?: number;
   contextWindowTokens?: number;
 };
 
@@ -279,6 +283,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 1_000_000,
+      rank: 410,
       capabilities: textImageTools,
     },
   }),
@@ -289,6 +294,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 400_000,
+      rank: 510,
       capabilities: textImageTools,
     },
   }),
@@ -307,6 +313,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 400_000,
+      rank: 500,
       capabilities: textImageTools,
     },
   }),
@@ -323,6 +330,7 @@ export const AI_MODELS = [
     patterns: [/^gpt-5-pro/i],
     metadata: {
       contextWindowTokens: 400_000,
+      rank: 505,
     },
   }),
   model({
@@ -340,6 +348,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 400_000,
+      rank: 520,
       capabilities: textImageTools,
     },
   }),
@@ -372,6 +381,7 @@ export const AI_MODELS = [
     patterns: [/^gpt-5\.3-codex/i],
     metadata: {
       contextWindowTokens: 400_000,
+      rank: 530,
       capabilities: textImageTools,
     },
   }),
@@ -390,6 +400,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 1_050_000,
+      rank: 540,
       capabilities: textImageTools,
     },
   }),
@@ -416,6 +427,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 400_000,
+      rank: 535,
       capabilities: textImageTools,
     },
   }),
@@ -434,6 +446,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 400_000,
+      rank: 530,
       capabilities: textImageTools,
     },
   }),
@@ -452,6 +465,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 1_050_000,
+      rank: 550,
       capabilities: textImageTools,
     },
   }),
@@ -468,6 +482,7 @@ export const AI_MODELS = [
     patterns: [/^gpt-5(?:\.\d+)?-chat-latest/i],
     metadata: {
       contextWindowTokens: 128_000,
+      rank: 515,
       capabilities: textImageTools,
       reasoning: NO_REASONING,
     },
@@ -478,6 +493,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 400_000,
+      rank: 515,
       capabilities: textImageTools,
     },
   }),
@@ -503,6 +519,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 128_000,
+      rank: 450,
       capabilities: textImageTools,
     },
   }),
@@ -513,6 +530,7 @@ export const AI_MODELS = [
     availability: [openAiImageToolResultAvailability()],
     metadata: {
       contextWindowTokens: 128_000,
+      rank: 400,
       capabilities: textImageTools,
     },
   }),
@@ -522,6 +540,7 @@ export const AI_MODELS = [
     providers: ["xiaomi-mimo"],
     metadata: {
       contextWindowTokens: 1_000_000,
+      rank: 245,
       capabilities: textTools,
       reasoning: MIMO_REASONING,
     },
@@ -533,6 +552,7 @@ export const AI_MODELS = [
     providers: ["xiaomi-mimo"],
     metadata: {
       contextWindowTokens: 1_000_000,
+      rank: 250,
       capabilities: fullModalTools,
       reasoning: MIMO_REASONING,
     },
@@ -544,6 +564,7 @@ export const AI_MODELS = [
     providers: ["xiaomi-mimo"],
     metadata: {
       contextWindowTokens: 256_000,
+      rank: 200,
       capabilities: fullModalTools,
       reasoning: MIMO_REASONING,
     },
@@ -555,6 +576,7 @@ export const AI_MODELS = [
     providers: ["xiaomi-mimo"],
     metadata: {
       contextWindowTokens: 256_000,
+      rank: 190,
       capabilities: textTools,
       reasoning: MIMO_REASONING,
     },
@@ -566,6 +588,30 @@ export const AI_MODELS = [
     metadata: {
       contextWindowTokens: 200_000,
       capabilities: textImageTools,
+    },
+  }),
+  model({
+    id: "anthropic:claude-opus-4.7-rank",
+    providers: ["anthropic", "anthropic-compatible"],
+    patterns: [/^claude-opus-4[-.]7/i],
+    metadata: {
+      rank: 470,
+    },
+  }),
+  model({
+    id: "anthropic:claude-4-rank",
+    providers: ["anthropic", "anthropic-compatible"],
+    patterns: [/^claude-(?:haiku|opus|sonnet)-4/i],
+    metadata: {
+      rank: 400,
+    },
+  }),
+  model({
+    id: "anthropic:claude-3.7-rank",
+    providers: ["anthropic", "anthropic-compatible"],
+    patterns: [/^claude-3[-.]7/i],
+    metadata: {
+      rank: 370,
     },
   }),
   model({
@@ -593,26 +639,36 @@ export const AI_MODELS = [
     },
   }),
   model({
-    id: "gemini:curated-3-pro-text",
+    id: "gemini:curated-3.5-flash-text",
+    modelIds: ["gemini-3.5-flash"],
+    providers: ["gemini"],
+    metadata: {
+      contextWindowTokens: 1_048_576,
+      rank: 350,
+      capabilities: textImageTools,
+      reasoning: GEMINI_3_FLASH_REASONING,
+    },
+    availability: [availableOn("gemini")],
+  }),
+  model({
+    id: "gemini:curated-3.1-pro-text",
     modelIds: ["gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools"],
     providers: ["gemini"],
     metadata: {
       contextWindowTokens: 1_048_576,
+      rank: 340,
       capabilities: textImageTools,
       reasoning: GEMINI_3_PRO_REASONING,
     },
     availability: [availableOn("gemini")],
   }),
   model({
-    id: "gemini:curated-3-flash-text",
-    modelIds: [
-      "gemini-3.5-flash",
-      "gemini-3.1-flash-lite",
-      "gemini-3-flash-preview",
-    ],
+    id: "gemini:curated-3.1-flash-text",
+    modelIds: ["gemini-3.1-flash-lite", "gemini-3-flash-preview"],
     providers: ["gemini"],
     metadata: {
       contextWindowTokens: 1_048_576,
+      rank: 310,
       capabilities: textImageTools,
       reasoning: GEMINI_3_FLASH_REASONING,
     },
@@ -624,6 +680,7 @@ export const AI_MODELS = [
     providers: ["gemini"],
     metadata: {
       contextWindowTokens: 1_048_576,
+      rank: 250,
       capabilities: textImageTools,
       reasoning: GEMINI_2_5_PRO_REASONING,
     },
@@ -635,6 +692,7 @@ export const AI_MODELS = [
     providers: ["gemini"],
     metadata: {
       contextWindowTokens: 1_048_576,
+      rank: 240,
       capabilities: textImageTools,
       reasoning: GEMINI_2_5_FLASH_REASONING,
     },
@@ -645,6 +703,7 @@ export const AI_MODELS = [
     patterns: [GEMINI_2_5_TEXT_MODEL_PATTERN],
     metadata: {
       contextWindowTokens: 1_048_576,
+      rank: 240,
       capabilities: textImageTools,
     },
   }),
@@ -669,6 +728,7 @@ export const AI_MODELS = [
     patterns: [GEMINI_2_5_LEGACY_PREVIEW_MODEL_PATTERN],
     metadata: {
       contextWindowTokens: 1_048_576,
+      rank: 230,
       capabilities: textImageTools,
     },
   }),
@@ -677,6 +737,7 @@ export const AI_MODELS = [
     patterns: [GEMINI_2_TEXT_MODEL_PATTERN],
     metadata: {
       contextWindowTokens: 1_048_576,
+      rank: 200,
       capabilities: textImageTools,
     },
   }),
@@ -685,6 +746,7 @@ export const AI_MODELS = [
     patterns: [GEMINI_3_TEXT_MODEL_PATTERN],
     metadata: {
       contextWindowTokens: 1_048_576,
+      rank: 300,
       capabilities: textImageTools,
     },
   }),
@@ -733,6 +795,7 @@ export const AI_MODELS = [
       /(?:^|[-_/])(?:(?:vision|vl)|llama-4|pixtral|gemma-3|minicpm[-_]?v|phi-3\.5-vision|qwen(?:2(?:\.5)?)?[-_]?vl|internvl|glm-(?:\d+(?:\.\d+)?)v|kimi[-_]?vl)(?:[-_/]|$)/i,
     ],
     metadata: {
+      rank: 100,
       capabilities: textImageTools,
     },
   }),
@@ -741,6 +804,7 @@ export const AI_MODELS = [
     providers: ["zhipu"],
     patterns: [/(?:^|[-_/])glm-(?:\d+(?:\.\d+)?)v(?:[-_/]|$)/i],
     metadata: {
+      rank: 100,
       capabilities: zhipuVisionNoTools,
     },
   }),
@@ -751,6 +815,7 @@ export const AI_MODELS = [
     patterns: [/^glm-5(?:\.1|-turbo|$)/i],
     metadata: {
       contextWindowTokens: 200_000,
+      rank: 510,
       capabilities: textTools,
       reasoning: ZHIPU_REASONING,
     },
@@ -763,6 +828,7 @@ export const AI_MODELS = [
     patterns: [/^glm-4\.7/i],
     metadata: {
       contextWindowTokens: 200_000,
+      rank: 470,
       capabilities: textTools,
       reasoning: ZHIPU_REASONING,
     },
@@ -775,6 +841,7 @@ export const AI_MODELS = [
     patterns: [/^glm-4\.6(?:$|[-_])/i],
     metadata: {
       contextWindowTokens: 200_000,
+      rank: 460,
       capabilities: textTools,
       reasoning: ZHIPU_REASONING,
     },
@@ -792,6 +859,7 @@ export const AI_MODELS = [
     providers: ["zhipu"],
     patterns: [/^glm-4\.5(?:$|[-_])/i],
     metadata: {
+      rank: 450,
       capabilities: textTools,
       reasoning: ZHIPU_REASONING,
     },
@@ -804,6 +872,7 @@ export const AI_MODELS = [
     patterns: [/^glm-5v/i],
     metadata: {
       contextWindowTokens: 200_000,
+      rank: 500,
       capabilities: zhipuVisionTools,
       reasoning: ZHIPU_REASONING,
     },
@@ -816,6 +885,7 @@ export const AI_MODELS = [
     patterns: [/^glm-4\.6v/i],
     metadata: {
       contextWindowTokens: 128_000,
+      rank: 460,
       capabilities: zhipuVisionTools,
       reasoning: ZHIPU_REASONING,
     },
@@ -828,6 +898,7 @@ export const AI_MODELS = [
     patterns: [/^glm-4\.5v/i],
     metadata: {
       contextWindowTokens: 64_000,
+      rank: 450,
       capabilities: zhipuVisionNoTools,
       reasoning: ZHIPU_REASONING,
     },
@@ -848,6 +919,7 @@ export const AI_MODELS = [
     patterns: [/(minimax.*m2|m2\.)/i],
     metadata: {
       contextWindowTokens: 128_000,
+      rank: 270,
       reasoning: MINIMAX_RAW_REASONING,
     },
     availability: [availableOn("minimax")],
@@ -899,12 +971,16 @@ const createHintedModelCapabilities = (
 export const createAiDiscoveredModel = (
   options: CreateAiDiscoveredModelOptions,
 ): Required<Pick<AiSdkDiscoveredModel, "id" | "capabilities">> &
-  Pick<AiSdkDiscoveredModel, "label"> => {
+  Pick<AiSdkDiscoveredModel, "label" | "rank"> => {
   const id = options.modelId.trim();
 
   return {
     id,
     label: options.label?.trim() || undefined,
+    rank:
+      typeof options.rank === "number" && Number.isFinite(options.rank)
+        ? Math.trunc(options.rank)
+        : undefined,
     capabilities:
       options.capabilities ||
       (hasCapabilityHints(options)
@@ -963,6 +1039,7 @@ export const getCuratedAiProviderModels = (options: {
         ? modelIds.map((modelId) => ({
             id: modelId,
             label: availability.label,
+            rank: availability.rank ?? entry.metadata?.rank,
             inputModalities: availability.inputModalities,
             outputModalities: availability.outputModalities,
             supportsToolCalls: availability.supportsToolCalls,

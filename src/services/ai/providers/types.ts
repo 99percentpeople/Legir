@@ -62,6 +62,7 @@ export interface AiSdkModelCallOptions {
 export interface AiSdkDiscoveredModel {
   id: string;
   label?: string;
+  rank?: number;
   capabilities?: LLMModelCapabilities;
   inputModalities?: readonly string[];
   outputModalities?: readonly string[];

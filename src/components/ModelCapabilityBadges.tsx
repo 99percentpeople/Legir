@@ -1,5 +1,10 @@
 import type { LLMModelCapabilities, LLMModelModality } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/utils/cn";
 
 type CapabilityToken = {
@@ -68,24 +73,50 @@ export const getModelCapabilityTitle = (
 export function ModelCapabilityBadges(props: {
   capabilities?: LLMModelCapabilities;
   className?: string;
+  maxVisible?: number;
 }) {
   const tokens = getModelCapabilityTokens(props.capabilities);
   if (tokens.length === 0) return null;
 
+  const maxVisible =
+    typeof props.maxVisible === "number" && Number.isFinite(props.maxVisible)
+      ? Math.max(1, Math.trunc(props.maxVisible))
+      : tokens.length;
+  const visibleTokens = tokens.slice(0, maxVisible);
+  const hiddenCount = Math.max(0, tokens.length - visibleTokens.length);
+  const title = getModelCapabilityTitle(props.capabilities);
+
   return (
-    <div
-      className={cn("flex flex-wrap items-center gap-1", props.className)}
-      title={getModelCapabilityTitle(props.capabilities)}
-    >
-      {tokens.map((token) => (
-        <Badge
-          key={token.key}
-          variant="outline"
-          className="text-muted-foreground bg-background/80 px-1.5 py-0 text-[10px] font-medium tracking-[0.08em]"
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={cn(
+            "flex max-w-full min-w-0 flex-wrap items-center gap-1",
+            props.className,
+          )}
         >
-          {token.label}
-        </Badge>
-      ))}
-    </div>
+          {visibleTokens.map((token) => (
+            <Badge
+              key={token.key}
+              variant="outline"
+              className="text-muted-foreground bg-background/80 px-1.5 py-0 text-[10px] font-medium tracking-[0.08em]"
+            >
+              {token.label}
+            </Badge>
+          ))}
+          {hiddenCount > 0 ? (
+            <Badge
+              variant="outline"
+              className="text-muted-foreground bg-background/80 px-1.5 py-0 text-[10px] font-medium tracking-[0.08em]"
+            >
+              +{hiddenCount}
+            </Badge>
+          ) : null}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="max-w-64">
+        {title}
+      </TooltipContent>
+    </Tooltip>
   );
 }

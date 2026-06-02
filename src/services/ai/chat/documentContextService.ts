@@ -87,9 +87,6 @@ const normalizeDocumentMetadata = (
   creationDate: snapshot.metadata.creationDate || undefined,
   modificationDate: snapshot.metadata.modificationDate || undefined,
   permissions: getEffectivePdfPermissions(snapshot.documentPermissions),
-  sourcePermissions: getEffectivePdfPermissions(
-    snapshot.sourceDocumentPermissions ?? snapshot.documentPermissions,
-  ),
   ownerRestrictionsUnlocked: snapshot.pdfOwnerUnlocked,
   preserveOwnerRestrictionsOnSave: snapshot.preservePdfOwnerRestrictionsOnSave,
 });
@@ -356,8 +353,10 @@ export const createDocumentContextService = (options: {
   getPagesTextConfig?: () => {
     maxChars?: number;
   };
-  summarizeRenderedPages?: (options: {
+  canAttachPageVisuals?: () => boolean;
+  analyzeRenderedPages?: (options: {
     pages: AiRenderedPageImage[];
+    request?: string;
     signal?: AbortSignal;
   }) => Promise<string>;
   workerService?: PDFWorkerService;
@@ -368,7 +367,8 @@ export const createDocumentContextService = (options: {
     getPdfSource,
     getRenderablePdfBytes,
     getPagesTextConfig,
-    summarizeRenderedPages,
+    canAttachPageVisuals,
+    analyzeRenderedPages,
     workerService = pdfWorkerService,
   } = options;
 
@@ -967,6 +967,8 @@ export const createDocumentContextService = (options: {
       return normalizeDocumentMetadata(snapshot);
     },
 
+    canAttachPageVisuals: () => canAttachPageVisuals?.() === true,
+
     getPagesVisual: async ({
       pageNumbers,
       renderAnnotations = true,
@@ -983,14 +985,16 @@ export const createDocumentContextService = (options: {
       });
     },
 
-    summarizePagesVisual: summarizeRenderedPages
+    inspectPagesVisual: analyzeRenderedPages
       ? async ({
           pageNumbers,
           renderAnnotations = true,
+          request,
           signal,
         }: {
           pageNumbers: PageVisualRequest[];
           renderAnnotations?: boolean;
+          request?: string;
           signal?: AbortSignal;
         }): Promise<AiRenderedPageVisualSummaryResult> => {
           const pageImageBatch = await renderPageImageBatch({
@@ -999,8 +1003,9 @@ export const createDocumentContextService = (options: {
             signal,
           });
 
-          const summary = await summarizeRenderedPages({
+          const summary = await analyzeRenderedPages({
             pages: pageImageBatch.pages,
+            request,
             signal,
           });
 
@@ -1009,6 +1014,7 @@ export const createDocumentContextService = (options: {
             returnedPageCount: pageImageBatch.returnedPageCount,
             truncated: pageImageBatch.truncated,
             maxPagesPerCall: AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
+            request,
             pages: pageImageBatch.pages.map((page) => ({
               pageNumber: page.pageNumber,
               pageWidth: page.pageWidth,

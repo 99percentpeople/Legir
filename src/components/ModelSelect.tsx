@@ -25,7 +25,7 @@ export type ModelSelectOption = {
 
 export type ModelSelectGroup = {
   id: string;
-  label: string;
+  label?: string;
   options: ModelSelectOption[];
 };
 
@@ -100,16 +100,18 @@ export function ModelSelect(props: {
         {visibleGroups.map((group, idx) => (
           <React.Fragment key={group.id}>
             <SelectGroup>
-              <SelectLabel className="flex items-center gap-1.5">
-                {isAiProviderId(group.id) ? (
-                  <ProviderLogo
-                    providerId={group.id}
-                    size={12}
-                    className="text-foreground/80"
-                  />
-                ) : null}
-                <span>{group.label}</span>
-              </SelectLabel>
+              {group.label && (
+                <SelectLabel className="flex items-center gap-1.5">
+                  {isAiProviderId(group.id) && (
+                    <ProviderLogo
+                      providerId={group.id}
+                      size={12}
+                      className="text-foreground/80"
+                    />
+                  )}
+                  <span>{group.label}</span>
+                </SelectLabel>
+              )}
               {group.options.map((opt) => (
                 <SelectItem
                   key={opt.value}
@@ -122,6 +124,7 @@ export function ModelSelect(props: {
                     <div className="min-w-0 flex-1 text-xs">{opt.label}</div>
                     <ModelCapabilityBadges
                       capabilities={opt.capabilities}
+                      maxVisible={2}
                       className="shrink-0 flex-nowrap"
                     />
                   </div>

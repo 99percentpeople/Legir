@@ -14,8 +14,7 @@ export const getAiChatSystemInstruction = (options?: {
   const sections: string[] = [];
   const canCreateFormFields = hasTool(context, "create_form_fields");
   const canUpdateFormFields = hasTool(context, "update_form_fields");
-  const canDetectFormFields = hasTool(context, "detect_form_fields");
-  const canInspectPageVisuals = hasTool(context, "get_pages_visual");
+  const canInspectPageVisuals = hasTool(context, "inspect_pages_visual");
   const canCreateFreetextAnnotations = hasTool(
     context,
     "create_freetext_annotations",
@@ -48,10 +47,7 @@ export const getAiChatSystemInstruction = (options?: {
     "All AI tool page numbers are 1-based.",
     AI_PAGE_COORDINATE_CONVENTION,
   ];
-  if (
-    hasTool(context, "get_pages_visual") ||
-    hasTool(context, "summarize_pages_visual")
-  ) {
+  if (canInspectPageVisuals) {
     groundingLines.push(
       "If text extraction is missing or unreliable, inspect rendered page visuals before saying the content cannot be checked.",
     );
@@ -99,10 +95,8 @@ export const getAiChatSystemInstruction = (options?: {
           : "If form tools are unavailable, only modify existing field values and do not claim to create or restyle fields.",
         canCreateFormFields
           ? canInspectPageVisuals
-            ? "For form-building requests, confirm requirements first. If visuals are available, inspect them yourself, summarize the plan briefly, and prefer that before create_form_fields."
-            : canDetectFormFields
-              ? "If direct visual inspection is unavailable, use detect_form_fields as the fallback visual path and summarize the candidate plan before create_form_fields."
-              : "If no visual path is available, explain briefly that AI form creation is unavailable until a visual path is enabled."
+            ? "For form-building requests, confirm requirements first. Call inspect_pages_visual with a request for form-like regions, labels, likely field types, and page-space boxes; summarize the visual plan briefly, and wait for confirmation before create_form_fields."
+            : "If no visual path is available, explain briefly that AI form creation is unavailable until a visual path is enabled."
           : "If the user asks for AI-driven form creation, explain briefly that AI form tools are disabled in settings.",
         canUpdateFormFields
           ? "For moving, resizing, restyling, or reconfiguring existing fields, prefer update_form_fields and list_fields instead of recreating fields."
@@ -119,7 +113,7 @@ export const getAiChatSystemInstruction = (options?: {
                 ? `Update existing annotations only through the matching annotation update tool: ${annotationUpdateToolNames.join(", ")}. Prefer update_annotation_texts for note/comment text only.`
                 : null,
               canInspectPageVisuals
-                ? "When annotation placement or styling depends on page appearance, inspect the page with get_pages_visual first."
+                ? "When annotation placement or styling depends on page appearance, inspect the page with inspect_pages_visual first."
                 : null,
             ]
               .filter(Boolean)
@@ -139,12 +133,9 @@ export const getAiChatSystemInstruction = (options?: {
     "Tool arguments and tool result field names use snake_case.",
     "Do not describe fake tool calls or JSON wrappers.",
   ];
-  if (
-    hasTool(context, "get_pages_visual") ||
-    hasTool(context, "summarize_pages_visual")
-  ) {
+  if (canInspectPageVisuals) {
     toolUsageLines.push(
-      "If page text is unusable, try get_pages_visual or summarize_pages_visual before saying the page cannot be inspected.",
+      "If page text is unusable, try inspect_pages_visual before saying the page cannot be inspected.",
     );
   }
   sections.push(buildPromptSection("Tool usage", toolUsageLines));

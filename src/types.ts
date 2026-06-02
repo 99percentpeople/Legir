@@ -348,6 +348,7 @@ export type AppLLMModelOption = {
   label: string;
   labelKey?: string;
   capabilities: LLMModelCapabilities;
+  rank?: number;
 };
 
 export type LLMModelModality =
@@ -396,11 +397,8 @@ export interface AiChatReasoningOptions {
 }
 
 export interface AiChatOptions {
-  visualSummaryEnabled: boolean;
-  visualSummaryModelKey?: string;
+  visualModelKey?: string;
   formToolsEnabled: boolean;
-  detectFormFieldsEnabled: boolean;
-  formToolsVisionModelKey?: string;
   contextCompressionEnabled: boolean;
   contextCompressionThresholdPercent: number;
   visualHistoryWindow: number;

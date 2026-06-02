@@ -33,8 +33,7 @@ const CONTEXT_MEMORY_PREFERRED_TOOL_COUNT_KEYS = [
 ] as const;
 
 const AI_CHAT_HEAVY_VISUAL_TOOL_NAMES = new Set<AiToolName>([
-  "get_pages_visual",
-  "summarize_pages_visual",
+  "inspect_pages_visual",
 ]);
 
 const trimText = (value: string) => value.trim();

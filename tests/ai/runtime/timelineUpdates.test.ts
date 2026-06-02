@@ -180,7 +180,7 @@ describe("AI chat timeline updates", () => {
       isParallelBatch: true,
       call: {
         id: "call_1",
-        name: "get_pages_visual",
+        name: "inspect_pages_visual",
         args: { page_numbers: [1] },
       },
     };

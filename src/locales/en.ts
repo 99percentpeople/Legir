@@ -709,20 +709,12 @@ const en = {
       form_tools_enabled: "Enable AI form tools",
       form_tools_enabled_desc:
         "Allow AI chat to create new form fields from conversation requests. Leave this off if you only want read-only Q&A and field filling.",
-      detect_form_fields_enabled: "Enable detect_form_fields fallback",
-      detect_form_fields_enabled_desc:
-        "Allow AI chat to use the dedicated detect_form_fields vision tool when the current chat model cannot inspect page images directly.",
-      form_tools_vision_model: "Form tools vision model",
-      form_tools_vision_model_placeholder: "Select a vision model",
-      form_tools_vision_model_desc:
-        "Dedicated vision model for detect_form_fields. This tool never uses the current chat model and only runs when the fallback detector is enabled.",
-      visual_summary_enabled: "Enable visual summary tool",
-      visual_summary_enabled_desc:
-        "Turns summarize_pages_visual on or off for AI chat. This lets text-only chat models delegate rendered page inspection to a configured vision model.",
-      visual_summary_model: "Visual summary model",
-      visual_summary_model_placeholder: "Select a vision model",
-      visual_summary_model_desc:
-        "Used by summarize_pages_visual. If the tool is disabled or no vision model is selected, the visual summary tool is unavailable.",
+      visual_model: "Visual model",
+      visual_model_placeholder: "Select a visual model",
+      visual_model_auto_group: "Automatic",
+      visual_model_auto: "Automatic",
+      visual_model_desc:
+        "Used automatically by inspect_pages_visual when the active chat model cannot receive rendered page images directly, including visual-structure inspection and form-field planning.",
       no_models: "No available models",
     },
   },

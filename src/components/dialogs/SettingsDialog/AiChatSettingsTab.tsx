@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useLanguage } from "@/components/language-provider";
 import { ModelSelect, type ModelSelectGroup } from "@/components/ModelSelect";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,7 @@ import {
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_STEP,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
+  AI_CHAT_VISUAL_MODEL_AUTO_KEY,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
 } from "@/constants";
@@ -44,7 +46,6 @@ export const AiChatSettingsTab = ({
   updateAiChatOptions,
 }: AiChatSettingsTabProps) => {
   const { t } = useLanguage();
-  const visualSummaryEnabled = options.visualSummaryEnabled;
   const contextCompressionEnabled = options.contextCompressionEnabled;
   const visualHistoryWindow = options.visualHistoryWindow;
   const contextCompressionThresholdPercent =
@@ -55,6 +56,22 @@ export const AiChatSettingsTab = ({
   const getPagesTextMaxChars = options.getPagesTextMaxChars;
   const contextCompressionMode = options.contextCompressionMode;
   const contextCompressionModelKey = options.contextCompressionModelKey;
+  const visualModelGroups = useMemo<ModelSelectGroup[]>(
+    () => [
+      {
+        id: "auto",
+        label: t("settings.ai_chat.visual_model_auto_group"),
+        options: [
+          {
+            value: AI_CHAT_VISUAL_MODEL_AUTO_KEY,
+            label: t("settings.ai_chat.visual_model_auto"),
+          },
+        ],
+      },
+      ...aiVisionModelGroups,
+    ],
+    [aiVisionModelGroups, t],
+  );
 
   return (
     <TabsContent value="ai_chat">
@@ -286,6 +303,26 @@ export const AiChatSettingsTab = ({
         </div>
 
         <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
+          <div className="space-y-2">
+            <Label className="font-semibold">
+              {t("settings.ai_chat.visual_model")}
+            </Label>
+            <ModelSelect
+              value={options.visualModelKey || AI_CHAT_VISUAL_MODEL_AUTO_KEY}
+              onValueChange={(value) =>
+                updateAiChatOptions({ visualModelKey: value })
+              }
+              placeholder={t("settings.ai_chat.visual_model_placeholder")}
+              groups={visualModelGroups}
+              showSeparators
+            />
+            <p className="text-muted-foreground text-xs">
+              {t("settings.ai_chat.visual_model_desc")}
+            </p>
+          </div>
+        </div>
+
+        <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <Label
@@ -305,109 +342,6 @@ export const AiChatSettingsTab = ({
                 updateAiChatOptions({ formToolsEnabled: checked })
               }
             />
-          </div>
-
-          <Separator />
-
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <Label
-                htmlFor="ai-chat-detect-form-fields-enabled"
-                className="font-semibold"
-              >
-                {t("settings.ai_chat.detect_form_fields_enabled")}
-              </Label>
-              <p className="text-muted-foreground text-xs">
-                {t("settings.ai_chat.detect_form_fields_enabled_desc")}
-              </p>
-            </div>
-            <Switch
-              id="ai-chat-detect-form-fields-enabled"
-              checked={options.detectFormFieldsEnabled}
-              onCheckedChange={(checked) =>
-                updateAiChatOptions({ detectFormFieldsEnabled: checked })
-              }
-              disabled={!options.formToolsEnabled}
-            />
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label className="font-semibold">
-              {t("settings.ai_chat.form_tools_vision_model")}
-            </Label>
-            <ModelSelect
-              value={options.formToolsVisionModelKey || undefined}
-              onValueChange={(value) =>
-                updateAiChatOptions({ formToolsVisionModelKey: value })
-              }
-              placeholder={
-                aiVisionModelGroups.length > 0
-                  ? t("settings.ai_chat.form_tools_vision_model_placeholder")
-                  : t("settings.ai_chat.no_models")
-              }
-              groups={aiVisionModelGroups}
-              disabled={
-                !options.formToolsEnabled ||
-                !options.detectFormFieldsEnabled ||
-                aiVisionModelGroups.length === 0
-              }
-              showSeparators
-            />
-            <p className="text-muted-foreground text-xs">
-              {t("settings.ai_chat.form_tools_vision_model_desc")}
-            </p>
-          </div>
-        </div>
-
-        <div className={SETTINGS_CARD_SPACIOUS_CLASS}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <Label
-                htmlFor="ai-chat-visual-summary-enabled"
-                className="font-semibold"
-              >
-                {t("settings.ai_chat.visual_summary_enabled")}
-              </Label>
-              <p className="text-muted-foreground text-xs">
-                {t("settings.ai_chat.visual_summary_enabled_desc")}
-              </p>
-            </div>
-            <Switch
-              id="ai-chat-visual-summary-enabled"
-              checked={visualSummaryEnabled}
-              onCheckedChange={(checked) =>
-                updateAiChatOptions({ visualSummaryEnabled: checked })
-              }
-            />
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label className="font-semibold">
-              {t("settings.ai_chat.visual_summary_model")}
-            </Label>
-            <ModelSelect
-              value={options.visualSummaryModelKey || undefined}
-              onValueChange={(value) =>
-                updateAiChatOptions({ visualSummaryModelKey: value })
-              }
-              placeholder={
-                aiVisionModelGroups.length > 0
-                  ? t("settings.ai_chat.visual_summary_model_placeholder")
-                  : t("settings.ai_chat.no_models")
-              }
-              groups={aiVisionModelGroups}
-              disabled={
-                !visualSummaryEnabled || aiVisionModelGroups.length === 0
-              }
-              showSeparators
-            />
-            <p className="text-muted-foreground text-xs">
-              {t("settings.ai_chat.visual_summary_model_desc")}
-            </p>
           </div>
         </div>
       </div>

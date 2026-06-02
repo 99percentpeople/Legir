@@ -719,20 +719,12 @@ const es = {
       form_tools_enabled: "Habilitar herramientas de formularios con IA",
       form_tools_enabled_desc:
         "Permite que el chat IA cree nuevos campos de formulario a partir de solicitudes conversacionales. Déjalo desactivado si solo quieres preguntas y respuestas de solo lectura y rellenado de campos.",
-      detect_form_fields_enabled: "Habilitar fallback detect_form_fields",
-      detect_form_fields_enabled_desc:
-        "Permite que el chat IA use la herramienta visual dedicada detect_form_fields cuando el modelo de chat actual no puede inspeccionar imágenes de página directamente.",
-      form_tools_vision_model: "Modelo de visión para formularios",
-      form_tools_vision_model_placeholder: "Selecciona un modelo de visión",
-      form_tools_vision_model_desc:
-        "Modelo de visión dedicado para detect_form_fields. Esta herramienta nunca usa el modelo de chat actual y solo se ejecuta cuando la detección de respaldo está habilitada.",
-      visual_summary_enabled: "Habilitar la herramienta de resumen visual",
-      visual_summary_enabled_desc:
-        "Activa o desactiva summarize_pages_visual para el chat IA. Esto permite que los modelos de chat solo de texto deleguen la inspección visual de páginas renderizadas a un modelo de visión.",
-      visual_summary_model: "Modelo de resumen visual",
-      visual_summary_model_placeholder: "Selecciona un modelo de visión",
-      visual_summary_model_desc:
-        "Lo usa summarize_pages_visual. Si la herramienta está desactivada o no se ha seleccionado un modelo de visión, esta herramienta no estará disponible.",
+      visual_model: "Modelo visual",
+      visual_model_placeholder: "Selecciona un modelo visual",
+      visual_model_auto_group: "Automático",
+      visual_model_auto: "Automático",
+      visual_model_desc:
+        "inspect_pages_visual lo usa automáticamente cuando el modelo de chat activo no puede recibir imágenes de página renderizadas directamente, incluida la inspección de estructura visual y la planificación de campos de formulario.",
       no_models: "No hay modelos disponibles",
     },
   },

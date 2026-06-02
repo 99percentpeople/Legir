@@ -67,7 +67,7 @@ const pageVisualTargetsSchema = z.preprocess((value) => {
   return Array.isArray(value) ? value : [value];
 }, z.array(pageVisualTargetSchema).transform(expandPageVisualTargets));
 
-const getPagesVisualArgsSchemaBase = z
+const inspectPagesVisualArgsSchema = z
   .object({
     pages: pageVisualTargetsSchema
       .optional()
@@ -75,19 +75,59 @@ const getPagesVisualArgsSchemaBase = z
       .describe(
         "Optional page visual requests. Each item may be a 1-based page number, a two-item inclusive range like [1, 22], or an object like { page, rect } to render a cropped page-space region. Defaults to the current page when omitted.",
       ),
-    render_annotations: z
-      .boolean()
+    request: z
+      .string()
       .optional()
-      .default(true)
       .describe(
-        "When true, include native PDF annotations in the rendered page image when supported by the PDF renderer.",
+        "Optional natural-language request describing what visual information to inspect and return. Ask for task-relevant regions, labels, field candidates, coordinates, or visual details as needed.",
       ),
   })
   .strict();
-const getPagesVisualArgsSchema = getPagesVisualArgsSchemaBase;
-const summarizePagesVisualArgsSchema = getPagesVisualArgsSchemaBase;
 
-const toPagesVisualModelOutput = (output: unknown) => {
+const getVisualInspectionRequest = (input: unknown) => {
+  const record =
+    input && typeof input === "object"
+      ? (input as Record<string, unknown>)
+      : {};
+  return typeof record.request === "string" && record.request.trim()
+    ? record.request.trim()
+    : undefined;
+};
+
+const describeVisualInspectionRequest = (input: unknown) => {
+  const request = getVisualInspectionRequest(input);
+  const lines: string[] = [];
+
+  if (request) {
+    lines.push(`Inspection request: ${request}`);
+  } else {
+    lines.push(
+      "Inspection request: inspect the task-relevant visual structure only.",
+    );
+  }
+
+  lines.push(
+    "If structure is useful, keep it compact and use only page, summary, region, text, and desc.",
+  );
+  lines.push(
+    'Use short region types: text, table, image, form, signature, stamp, annotation, or other. Use box="x,y,width,height" in editor page-space coordinates as displayed to the user.',
+  );
+
+  return lines.join(" ");
+};
+
+const toPagesVisualModelOutput = (options: {
+  input: unknown;
+  output: unknown;
+}) => {
+  const { input, output } = options;
+  if (typeof output === "string") {
+    return {
+      type: "text" as const,
+      value: output.trim() || "Page visual result is empty.",
+    };
+  }
+
   if (!output || typeof output !== "object") {
     return {
       type: "text" as const,
@@ -133,6 +173,14 @@ const toPagesVisualModelOutput = (output: unknown) => {
     },
   ];
 
+  const inspectionRequest = describeVisualInspectionRequest(input);
+  if (inspectionRequest) {
+    content.push({
+      type: "text",
+      text: inspectionRequest,
+    });
+  }
+
   for (const [index, pageVisual] of attachedPages.entries()) {
     const cropLabel = pageVisual.cropRect
       ? ` Cropped region x=${pageVisual.cropRect.x}, y=${pageVisual.cropRect.y}, width=${pageVisual.cropRect.width}, height=${pageVisual.cropRect.height}.`
@@ -174,16 +222,19 @@ const DOCUMENT_CONTEXT_TOOL_PROMPTS = [
   "get_document_context also includes the current viewport context: all visible pages intersecting the workspace viewport, page-space viewport rects for those visible pages, current zoom scale and percent, page layout mode, and page flow direction.",
 ];
 
-const PAGE_VISUAL_TOOL_PROMPTS = [
-  "If the task depends on full-page visual appearance, call get_pages_visual before making visual claims.",
-  "get_pages_visual renders the current edited document state, not just the originally opened PDF bytes.",
-  "Each get_pages_visual pages item may be a page number for a full-page image or an object like { page, rect } to render only a page-space region.",
-  `get_pages_visual uses a fixed pixel density of ${AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY} px per page-space unit. Do not try to choose image size manually.`,
+const INSPECT_PAGE_VISUAL_TOOL_PROMPTS = [
+  "If the task depends on full-page visual appearance, call inspect_pages_visual before making visual claims.",
+  "inspect_pages_visual renders the current edited document state, not just the originally opened PDF bytes.",
+  "Set request to the specific visual question or extraction target so the visual path returns only the information needed.",
+  "When the result will be used for annotations, navigation, or form fields, ask in request for the relevant regions with editor page-space boxes and short labels.",
+  "For form-building requests, ask inspect_pages_visual to identify form-like regions, labels, likely field types, and approximate boxes; then decide whether to call create_form_fields.",
+  "Each inspect_pages_visual pages item may be a page number for a full-page image, a two-item inclusive range like [1, 22], or an object like { page, rect } to render only a page-space region.",
+  `inspect_pages_visual uses a fixed pixel density of ${AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY} px per page-space unit. Do not try to choose image size manually.`,
   AI_PAGE_COORDINATE_CONVENTION,
-  "Use get_pages_visual for scanned pages, handwriting, signatures, stamps, tables, diagrams, charts, or complex layout that plain text extraction may miss.",
-  "If get_pages_text or search_document returns empty text, OCR noise, or misses the needed content on a page, do not stop there. Call get_pages_visual for that page and inspect it visually.",
-  "When the user asks about a page and the text layer is missing or unreliable, use get_pages_visual before concluding that the page content is unavailable.",
-  "If you need several page visuals, prefer one get_pages_visual call with multiple pages over many tiny calls when possible.",
+  "If get_pages_text or search_document returns empty text, OCR noise, or misses the needed content on a page, do not stop there. Call inspect_pages_visual for that page and inspect it visually.",
+  "When the user asks about a page and the text layer is missing or unreliable, use inspect_pages_visual before concluding that the page content is unavailable.",
+  "If you need several page visuals, prefer one inspect_pages_visual call with multiple pages over many tiny calls when possible.",
+  "For text-only visual results, read the compact XML-like structure: page, summary, region, text, and desc. Treat region box values as approximate editor page-space coordinates.",
 ];
 
 const nullableStringSchema = z.string().nullable();
@@ -365,21 +416,12 @@ const summarizeUnlockStatus = (payload: {
   return `PDF permission unlock failed: ${payload.reason ?? payload.status}`;
 };
 
-const PAGE_VISUAL_SUMMARY_TOOL_PROMPTS = [
-  "Use summarize_pages_visual when page appearance matters but the current chat model cannot inspect images directly.",
-  "summarize_pages_visual inspects the current edited document state, not just the originally opened PDF bytes.",
-  "summarize_pages_visual accepts the same pages format as get_pages_visual, including { page, rect } cropped region requests.",
-  `summarize_pages_visual uses the same fixed pixel density as get_pages_visual: ${AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY} px per page-space unit.`,
-  AI_PAGE_COORDINATE_CONVENTION,
-  "summarize_pages_visual renders requested page visuals and delegates the visual inspection to a configured vision model, then returns a plain-text summary you can reason over.",
-];
-
 const GET_PAGES_TEXT_TOOL_PROMPTS = [
   "get_pages_text preserves inferred spaces and line breaks from the PDF while remaining compatible with anchor highlighting.",
   "get_pages_text may truncate at the user-configured text budget. If the result is truncated, call it again with fewer or narrower page_numbers before making claims about omitted content.",
   "For tables, forms, multi-column pages, or irregular layout, call get_pages_text with include_layout true before creating document anchors.",
   "When get_pages_text returns line data, prefer anchors that stay within one line or two adjacent lines instead of stitching distant layout regions together.",
-  "If get_pages_text returns no useful text for a page and get_pages_visual is available, follow up with get_pages_visual instead of assuming the page has no usable content.",
+  "If get_pages_text returns no useful text for a page and inspect_pages_visual is available, follow up with inspect_pages_visual instead of assuming the page has no usable content.",
 ];
 
 const SEARCH_DOCUMENT_TOOL_PROMPTS = [
@@ -394,7 +436,7 @@ const LIST_ANNOTATIONS_TOOL_PROMPTS = [
   "If the user asks about comments, notes, highlights, links, or annotations, call list_annotations.",
   "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
   "When list_annotations returns link annotations, inspect linkUrl and linkDestPageNumber to understand the hyperlink target.",
-  "When list_annotations returns stamp annotations, inspect stampKind, stampPresetId, stampLabel, and stampHasImage first; if you need the actual stamp graphic content, follow up with get_pages_visual or summarize_pages_visual.",
+  "When list_annotations returns stamp annotations, inspect stampKind, stampPresetId, stampLabel, and stampHasImage first; if you need the actual stamp graphic content, follow up with inspect_pages_visual.",
   "If the user wants to delete one or more specific annotations and ids are not already known, call list_annotations first so you can pass the exact annotation ids to delete_annotations.",
   "When pointing the user to a known annotation, prefer a natural clickable control link instead of plain id text.",
 ];
@@ -413,10 +455,43 @@ const pageVisualLabelDensity = (pages: AiRenderedPageImage[]) => {
     : `${unique.join(", ")} px per page-space unit`;
 };
 
+const summarizePageVisualBatchForPayload = (
+  pageVisualBatch: AiRenderedPageImageBatch,
+) => ({
+  requestedPageCount: pageVisualBatch.requestedPageCount,
+  returnedPageCount: pageVisualBatch.returnedPageCount,
+  truncated: pageVisualBatch.truncated,
+  maxPagesPerCall: pageVisualBatch.maxPagesPerCall,
+  pages: pageVisualBatch.pages.map((pageVisual) => ({
+    pageNumber: pageVisual.pageNumber,
+    pageWidth: pageVisual.pageWidth,
+    pageHeight: pageVisual.pageHeight,
+    rotation: pageVisual.rotation,
+    cropRect: pageVisual.cropRect,
+    pixelDensity: pageVisual.pixelDensity,
+    renderedWidth: pageVisual.renderedWidth,
+    renderedHeight: pageVisual.renderedHeight,
+    mimeType: pageVisual.mimeType,
+    renderAnnotations: pageVisual.renderAnnotations,
+  })),
+});
+
+const getDefaultPageVisualRequests = (documentContext: {
+  currentPageNumber?: number | null;
+  visiblePageNumbers?: number[];
+}) =>
+  [
+    documentContext.currentPageNumber ??
+      documentContext.visiblePageNumbers?.[0],
+  ].filter(
+    (pageNumber): pageNumber is number => typeof pageNumber === "number",
+  );
+
 const formatCharCount = (value: number) => `${value.toLocaleString()} chars`;
 
 export const documentToolModule = defineToolModule((ctx) => {
-  const summarizePagesVisual = ctx.summarizePagesVisual;
+  const inspectPagesVisual = ctx.inspectPagesVisual;
+  const canAttachPageVisuals = ctx.canAttachPageVisuals?.() === true;
 
   return {
     get_document_context: createToolBuilder("get_document_context")
@@ -443,7 +518,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_document_metadata: createToolBuilder("get_document_metadata")
       .read()
       .description(
-        "Get PDF document metadata such as filename, title, author, subject, keywords, creator, producer, creation/modification dates, current and source permission flags, whether owner restrictions are unlocked for this session, and whether original restrictions will be preserved on save.",
+        "Get PDF document metadata such as filename, title, author, subject, keywords, creator, producer, creation/modification dates, current permission flags, whether owner restrictions are unlocked for this session, and whether original restrictions will be preserved on save.",
       )
       .promptInstructions(METADATA_TOOL_PROMPTS)
       .inputSchema(emptyObjectSchema)
@@ -453,7 +528,6 @@ export const documentToolModule = defineToolModule((ctx) => {
           if (
             [
               "permissions",
-              "sourcePermissions",
               "ownerRestrictionsUnlocked",
               "preserveOwnerRestrictionsOnSave",
             ].includes(key)
@@ -465,7 +539,7 @@ export const documentToolModule = defineToolModule((ctx) => {
         }).length;
         return {
           payload,
-          summary: `Metadata with ${availableKeys} populated field${availableKeys === 1 ? "" : "s"}; permissions ${payload.permissions.hasOwnerRestrictions ? "restricted" : "unrestricted"}${payload.ownerRestrictionsUnlocked ? " (owner unlocked)" : ""}`,
+          summary: `Metadata with ${availableKeys} populated field${availableKeys === 1 ? "" : "s"};${payload.permissions.hasOwnerRestrictions ? " permissions restricted" : ""}${payload.ownerRestrictionsUnlocked ? " (owner unlocked)" : ""}`,
         };
       }),
 
@@ -503,125 +577,101 @@ export const documentToolModule = defineToolModule((ctx) => {
         };
       }),
 
-    get_pages_visual: createToolBuilder("get_pages_visual")
+    inspect_pages_visual: createToolBuilder("inspect_pages_visual")
+      .enable(canAttachPageVisuals || Boolean(inspectPagesVisual))
       .read()
-      .requiresInputModalities(["image"])
       .description(
-        `Render one or more PDF page visuals from the current edited document state for multimodal inspection. Each pages item may request a full page or a cropped page-space region. The JSON payload stays lightweight for the chat UI, while the actual rendered visuals are attached to the model context for visual reasoning. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} visuals per call.`,
+        `Inspect one or more rendered PDF page visuals from the current edited document state. Use request to describe what visual information is needed, including task-relevant regions, labels, form-like areas, coordinates, or visual details. Image-capable chat models receive rendered page images directly; text-only chat models use the configured automatic visual model and get a compact XML-like visual structure. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} visuals per call.`,
       )
-      .promptInstructions(PAGE_VISUAL_TOOL_PROMPTS)
-      .inputSchema(getPagesVisualArgsSchema)
-      .requiresModelCapabilities(["supportsImageToolResults"])
-      .toModelOutput(({ output }) => toPagesVisualModelOutput(output))
+      .promptInstructions(INSPECT_PAGE_VISUAL_TOOL_PROMPTS)
+      .inputSchema(inspectPagesVisualArgsSchema)
+      .toModelOutput(({ input, output }) =>
+        toPagesVisualModelOutput({ input, output }),
+      )
       .build(async ({ args, ctx: toolCtx, signal }) => {
         const documentContext = toolCtx.getDocumentContext();
         const pageRequests: PageVisualRequestArg[] =
           args.pages.length > 0
             ? (args.pages as PageVisualRequestArg[])
-            : [
-                documentContext.currentPageNumber ??
-                  documentContext.visiblePageNumbers[0],
-              ].filter(
-                (pageNumber): pageNumber is number =>
-                  typeof pageNumber === "number",
-              );
+            : getDefaultPageVisualRequests(documentContext);
+        const request = args.request?.trim() || undefined;
 
         if (pageRequests.length === 0) {
           return {
             payload: createErrorPayload(
               "NO_PAGE_AVAILABLE",
-              "get_pages_visual requires at least one valid page request or an active page in the current document.",
+              "inspect_pages_visual requires at least one valid page request or an active page in the current document.",
             ),
-            summary: "get_pages_visual failed: no page available",
+            summary: "inspect_pages_visual failed: no page available",
           };
         }
 
-        const pageVisualBatch = await toolCtx.getPagesVisual({
-          pageNumbers: pageRequests,
-          renderAnnotations: args.render_annotations,
-          signal,
-        });
+        const canAttachVisualImages = toolCtx.canAttachPageVisuals?.() === true;
 
-        return {
-          payload: {
-            requestedPageCount: pageVisualBatch.requestedPageCount,
-            returnedPageCount: pageVisualBatch.returnedPageCount,
-            truncated: pageVisualBatch.truncated,
-            maxPagesPerCall: pageVisualBatch.maxPagesPerCall,
-            pages: pageVisualBatch.pages.map((pageVisual) => ({
-              pageNumber: pageVisual.pageNumber,
-              pageWidth: pageVisual.pageWidth,
-              pageHeight: pageVisual.pageHeight,
-              rotation: pageVisual.rotation,
-              cropRect: pageVisual.cropRect,
-              pixelDensity: pageVisual.pixelDensity,
-              renderedWidth: pageVisual.renderedWidth,
-              renderedHeight: pageVisual.renderedHeight,
-              mimeType: pageVisual.mimeType,
-              renderAnnotations: pageVisual.renderAnnotations,
+        if (canAttachVisualImages) {
+          const pageVisualBatch = await toolCtx.getPagesVisual({
+            pageNumbers: pageRequests,
+            renderAnnotations: true,
+            signal,
+          });
+          const pageVisualPayload =
+            summarizePageVisualBatchForPayload(pageVisualBatch);
+          const payload = {
+            kind: "image_attachments",
+            request,
+            ...pageVisualPayload,
+            pages: pageVisualPayload.pages.map((page) => ({
+              ...page,
               imageAttachedForModel: true,
               modelAttachmentMode: "multimodal_tool_result",
             })),
-          },
-          modelOutput: pageVisualBatch,
-          summary: pageVisualBatch.truncated
-            ? `Rendered ${pageVisualBatch.returnedPageCount} of ${pageVisualBatch.requestedPageCount} requested page visuals (limit ${pageVisualBatch.maxPagesPerCall})`
-            : `Rendered ${pageVisualBatch.returnedPageCount} page visual${pageVisualBatch.returnedPageCount === 1 ? "" : "s"}`,
-        };
-      }),
+          };
 
-    summarize_pages_visual: createToolBuilder("summarize_pages_visual")
-      .enable(Boolean(summarizePagesVisual))
-      .read()
-      .description(
-        `Render one or more PDF page visuals from the current edited document state and return a plain-text visual summary produced by a configured vision model. Each pages item may request a full page or a cropped page-space region. Use this when page appearance matters but the current chat model cannot inspect images directly. Returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} visuals per call.`,
-      )
-      .promptInstructions(PAGE_VISUAL_SUMMARY_TOOL_PROMPTS)
-      .inputSchema(summarizePagesVisualArgsSchema)
-      .build(async ({ args, ctx: toolCtx, signal }) => {
-        const documentContext = toolCtx.getDocumentContext();
-        const pageRequests: PageVisualRequestArg[] =
-          args.pages.length > 0
-            ? (args.pages as PageVisualRequestArg[])
-            : [
-                documentContext.currentPageNumber ??
-                  documentContext.visiblePageNumbers[0],
-              ].filter(
-                (pageNumber): pageNumber is number =>
-                  typeof pageNumber === "number",
-              );
-
-        if (pageRequests.length === 0) {
           return {
-            payload: createErrorPayload(
-              "NO_PAGE_AVAILABLE",
-              "summarize_pages_visual requires at least one valid page request or an active page in the current document.",
-            ),
-            summary: "summarize_pages_visual failed: no page available",
+            payload,
+            modelOutput: pageVisualBatch,
+            summary: pageVisualBatch.truncated
+              ? `Rendered ${pageVisualBatch.returnedPageCount} of ${pageVisualBatch.requestedPageCount} requested page visuals (limit ${pageVisualBatch.maxPagesPerCall})`
+              : `Rendered ${pageVisualBatch.returnedPageCount} page visual${pageVisualBatch.returnedPageCount === 1 ? "" : "s"}`,
           };
         }
 
-        const visualSummary = await summarizePagesVisual!({
+        if (!inspectPagesVisual) {
+          return {
+            payload: createErrorPayload(
+              "NO_VISUAL_MODEL_AVAILABLE",
+              "No direct image-capable chat path or configured visual model is available.",
+            ),
+            summary: "inspect_pages_visual failed: no visual model available",
+          };
+        }
+
+        const visualAnalysis = await inspectPagesVisual({
           pageNumbers: pageRequests,
-          renderAnnotations: args.render_annotations,
+          renderAnnotations: true,
+          request,
           signal,
         });
 
-        const payload: AiRenderedPageVisualSummaryResult = {
-          requestedPageCount: visualSummary.requestedPageCount,
-          returnedPageCount: visualSummary.returnedPageCount,
-          truncated: visualSummary.truncated,
-          maxPagesPerCall: visualSummary.maxPagesPerCall,
-          pages: visualSummary.pages,
-          summary: visualSummary.summary,
+        const payload: AiRenderedPageVisualSummaryResult & {
+          kind: "visual_analysis";
+        } = {
+          kind: "visual_analysis",
+          requestedPageCount: visualAnalysis.requestedPageCount,
+          returnedPageCount: visualAnalysis.returnedPageCount,
+          truncated: visualAnalysis.truncated,
+          maxPagesPerCall: visualAnalysis.maxPagesPerCall,
+          request: visualAnalysis.request ?? request,
+          pages: visualAnalysis.pages,
+          summary: visualAnalysis.summary,
         };
 
         return {
           payload,
           modelOutput: payload.summary,
           summary: payload.truncated
-            ? `Summarized ${payload.returnedPageCount} of ${payload.requestedPageCount} requested rendered pages`
-            : `Summarized rendered page${payload.returnedPageCount === 1 ? "" : "s"} for ${payload.returnedPageCount} page${payload.returnedPageCount === 1 ? "" : "s"}`,
+            ? `Analyzed ${payload.returnedPageCount} of ${payload.requestedPageCount} requested rendered pages`
+            : `Analyzed rendered page${payload.returnedPageCount === 1 ? "" : "s"} for ${payload.returnedPageCount} page${payload.returnedPageCount === 1 ? "" : "s"}`,
         };
       }),
 

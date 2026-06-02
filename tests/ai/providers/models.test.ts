@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vitest";
 
 import { DEFAULT_EDITOR_UI_STATE } from "@/constants";
-import { getAiSdkProviderModelOptions } from "@/services/ai/providers/modelResolver";
+import {
+  getAiSdkProviderModelOptions,
+  resolveAiSdkModelSpecifierForTask,
+} from "@/services/ai/providers/modelResolver";
 import { getCuratedAiProviderModels } from "@/services/ai/providers/models";
 import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
 import { getConfiguredAiSdkProvider } from "@/services/ai/providers/settings";
@@ -87,6 +90,87 @@ const getModels = (
   });
 
 describe("AI provider model definitions", () => {
+  test("orders provider models by rank before falling back to source order", () => {
+    const options = createOptions({
+      openAiApiUrl: "https://api.openai.com/v1",
+    });
+
+    const openAiVisionModelIds = getModelIds("openai", options, "vision");
+    const geminiVisionModelIds = getModelIds("gemini", options, "vision");
+    const xiaomiVisionModelIds = getModelIds("xiaomi-mimo", options, "vision");
+
+    expect(openAiVisionModelIds[0]).toBe("gpt-5.5");
+    expect(openAiVisionModelIds.indexOf("gpt-5.5")).toBeLessThan(
+      openAiVisionModelIds.indexOf("gpt-4.1"),
+    );
+    expect(geminiVisionModelIds[0]).toBe("gemini-3.5-flash");
+    expect(geminiVisionModelIds.indexOf("gemini-3.5-flash")).toBeLessThan(
+      geminiVisionModelIds.indexOf("gemini-2.5-pro"),
+    );
+    expect(xiaomiVisionModelIds[0]).toBe("mimo-v2.5");
+  });
+
+  test("auto vision task resolution skips configured text-only providers", () => {
+    const appOptions: AppOptions = {
+      ...DEFAULT_EDITOR_UI_STATE.options,
+      llm: {
+        ...DEFAULT_EDITOR_UI_STATE.options.llm,
+        "openai-compatible": {
+          ...DEFAULT_EDITOR_UI_STATE.options.llm["openai-compatible"],
+          enabled: true,
+          apiKey: "test-key",
+          apiUrl: "https://example.test/v1",
+          customModels: [
+            {
+              id: "text-only-tools",
+              capabilities: ["text", "tools"],
+            },
+          ],
+        },
+        gemini: {
+          ...DEFAULT_EDITOR_UI_STATE.options.llm.gemini,
+          enabled: true,
+          apiKey: "test-key",
+          customModels: [],
+        },
+      },
+    };
+
+    const specifier = resolveAiSdkModelSpecifierForTask({
+      appOptions,
+      modelCache: createEmptyLlmModelCache(),
+      kind: "vision",
+    });
+
+    expect(specifier.providerId).toBe("gemini");
+  });
+
+  test("auto vision task resolution prefers the current provider when it has vision models", () => {
+    const appOptions = createOptions({
+      openAiApiUrl: "https://api.openai.com/v1",
+    });
+
+    const xiaomiSpecifier = resolveAiSdkModelSpecifierForTask({
+      appOptions,
+      modelCache: createEmptyLlmModelCache(),
+      kind: "vision",
+      preferredProviderId: "xiaomi-mimo",
+    });
+    expect(xiaomiSpecifier).toEqual({
+      providerId: "xiaomi-mimo",
+      modelId: "mimo-v2.5",
+    });
+
+    const minimaxSpecifier = resolveAiSdkModelSpecifierForTask({
+      appOptions,
+      modelCache: createEmptyLlmModelCache(),
+      kind: "vision",
+      preferredProviderId: "minimax",
+    });
+    expect(minimaxSpecifier.providerId).toBe("openai");
+    expect(minimaxSpecifier.modelId).toBe("gpt-5.5");
+  });
+
   test("adds current curated Gemini chat models from central metadata", () => {
     const chatModelIds = getModelIds(
       "gemini",

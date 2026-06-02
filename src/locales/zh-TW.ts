@@ -684,20 +684,12 @@ const zhTW = {
       form_tools_enabled: "啟用 AI 表單工具",
       form_tools_enabled_desc:
         "允許 AI 問答根據對話請求建立新的表單欄位。如果你只希望它做唯讀問答與欄位填值，請保持關閉。",
-      detect_form_fields_enabled: "啟用 detect_form_fields 後備偵測",
-      detect_form_fields_enabled_desc:
-        "當目前對話模型不能直接看圖時，允許 AI 問答使用獨立的 detect_form_fields 視覺工具作為後備偵測。",
-      form_tools_vision_model: "表單工具視覺模型",
-      form_tools_vision_model_placeholder: "選擇視覺模型",
-      form_tools_vision_model_desc:
-        "detect_form_fields 專用的視覺模型。這個工具不會使用目前聊天模型，且只有在啟用後備偵測時才會運行。",
-      visual_summary_enabled: "啟用視覺總結工具",
-      visual_summary_enabled_desc:
-        "控制 AI 問答中的 summarize_pages_visual 是否可用。這讓純文字對話模型也能委派已設定的視覺模型檢查渲染後的頁面。",
-      visual_summary_model: "視覺總結模型",
-      visual_summary_model_placeholder: "選擇視覺模型",
-      visual_summary_model_desc:
-        "供 summarize_pages_visual 使用。如果停用工具或未選擇視覺模型，這個工具將不可用。",
+      visual_model: "視覺模型",
+      visual_model_placeholder: "選擇視覺模型",
+      visual_model_auto_group: "自動",
+      visual_model_auto: "自動",
+      visual_model_desc:
+        "當目前對話模型不能直接接收渲染後的頁面圖片時，inspect_pages_visual 會自動使用這個模型，包括視覺結構檢查和表單欄位規劃。",
       no_models: "沒有可用模型",
     },
   },

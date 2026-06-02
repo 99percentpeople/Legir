@@ -26,8 +26,7 @@ export type AiToolName =
   | "get_document_metadata"
   | "update_document_metadata"
   | "unlock_pdf_permissions"
-  | "get_pages_visual"
-  | "summarize_pages_visual"
+  | "inspect_pages_visual"
   | "get_pages_text"
   | "search_document"
   | "list_annotations"
@@ -40,7 +39,6 @@ export type AiToolName =
   | "list_fields"
   | "fill_form_fields"
   | "update_form_fields"
-  | "detect_form_fields"
   | "create_form_fields"
   | "focus_control"
   | "navigate_page"
@@ -152,7 +150,6 @@ export interface AiDocumentMetadata {
   creationDate?: string;
   modificationDate?: string;
   permissions: PDFDocumentPermissions;
-  sourcePermissions: PDFDocumentPermissions;
   ownerRestrictionsUnlocked: boolean;
   preserveOwnerRestrictionsOnSave: boolean;
 }
@@ -245,6 +242,7 @@ export interface AiRenderedPageVisualSummaryResult {
   returnedPageCount: number;
   truncated: boolean;
   maxPagesPerCall: number;
+  request?: string;
   pages: AiRenderedPageVisualSummaryPage[];
   summary: string;
 }
@@ -630,17 +628,6 @@ export interface AiFormFieldUpdateResult {
   updates: AiFormFieldUpdateResultItem[];
 }
 
-export interface AiDetectedFormFieldDraft {
-  draftId: string;
-  pageNumber: number;
-  name: string;
-  type: AiFormFieldKind;
-  rect: { x: number; y: number; width: number; height: number };
-  options?: string[];
-  multiline?: boolean;
-  alignment?: "left" | "center" | "right";
-}
-
 export interface AiCreateFormFieldInput {
   pageNumber: number;
   name: string;
@@ -668,21 +655,7 @@ export interface AiCreateFormFieldInput {
   };
 }
 
-export interface AiDetectedFormFieldBatch {
-  batchId: string;
-  status: "draft" | "applied" | "discarded";
-  createdAt: string;
-  pageNumbers: number[];
-  requestedPageCount: number;
-  detectedCount: number;
-  userIntent?: string;
-  allowedTypes?: AiFormFieldKind[];
-  extraPrompt?: string;
-  fields: AiDetectedFormFieldDraft[];
-}
-
 export interface AiCreateFormFieldsResultItem {
-  draftId?: string;
   fieldId?: string;
   pageNumber?: number;
   name?: string;
@@ -692,7 +665,6 @@ export interface AiCreateFormFieldsResultItem {
 }
 
 export interface AiCreateFormFieldsResult {
-  batchId?: string;
   status: "created" | "not_found" | "rejected";
   createdCount: number;
   skippedCount: number;

@@ -480,9 +480,6 @@ export const createToolBuilder = <TName extends AiToolName>(name: TName) =>
 export const annotationTypesSchema = z.array(
   z.enum(["comment", "highlight", "ink", "freetext", "stamp", "shape", "link"]),
 );
-export const formFieldKindsSchema = z.array(
-  z.enum(["text", "checkbox", "radio", "dropdown", "signature"]),
-);
 export const stringArraySchema = z.array(z.string());
 
 export const getPagesTextArgsSchema = z
@@ -993,25 +990,6 @@ export const createShapeAnnotationsArgsSchema = z
   })
   .strict();
 
-export const detectFormFieldsArgsSchema = z
-  .object({
-    page_numbers: pageNumbersSchema.optional().default([]),
-    allowed_types: formFieldKindsSchema.optional().default([]),
-    user_intent: z
-      .string()
-      .optional()
-      .describe(
-        "Optional short intent summary for what the user wants to create, for example 'create the fillable fields on this page' or 'only detect signature and date areas'.",
-      ),
-    extra_prompt: z
-      .string()
-      .optional()
-      .describe(
-        "Optional extra constraints for detection, such as ignoring instructional text or focusing on a specific section.",
-      ),
-  })
-  .strict();
-
 const createFormFieldInputSchema = z
   .object({
     page_number: pageNumberSchema,
@@ -1034,42 +1012,14 @@ const createFormFieldInputSchema = z
 
 export const createFormFieldsArgsSchema = z
   .object({
-    batch_id: z
-      .string()
-      .optional()
-      .describe(
-        "Optional detected-field batch id. If omitted, apply the most recent draft batch from this conversation.",
-      ),
-    draft_ids: z
-      .preprocess(
-        (value) => (typeof value === "string" ? [value] : value),
-        z.array(z.string().min(1)).optional().default([]),
-      )
-      .describe(
-        "Optional subset of detected draft ids to create. If omitted, create every draft field in the selected batch.",
-      ),
     fields: z
       .array(createFormFieldInputSchema)
-      .optional()
-      .default([])
+      .min(1)
       .describe(
-        "Optional direct field definitions in actual page coordinates. Use this when the current chat model has already inspected page visuals and is ready to create fields directly.",
+        "Direct field definitions in actual page coordinates. Use this after inspecting page visuals and confirming the user wants the fields created.",
       ),
   })
-  .strict()
-  .superRefine((value, ctx) => {
-    if (
-      value.fields.length > 0 &&
-      (typeof value.batch_id === "string" || value.draft_ids.length > 0)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "Pass either fields for direct creation or batch_id/draft_ids for a detected batch, not both.",
-        path: ["fields"],
-      });
-    }
-  });
+  .strict();
 
 export const focusControlArgsSchema = z
   .object({

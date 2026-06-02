@@ -31,15 +31,15 @@ const HIGHLIGHT_RESULTS_TOOL_PROMPTS = [
 ];
 
 const CREATE_FREETEXT_ANNOTATIONS_TOOL_PROMPTS = [
-  "This tool is only available to image-capable chat models.",
-  "When the user wants a visible text box, label, note, callout, or overlay placed on the PDF, inspect the relevant page with get_pages_visual first unless the user already provided exact page coordinates.",
+  "When the user wants a visible text box, label, note, callout, or overlay placed on the PDF, inspect the relevant page with inspect_pages_visual first unless the user already provided exact page coordinates.",
+  "If inspect_pages_visual is unavailable and the user did not provide exact page coordinates, ask for coordinates or a visual model before creating annotations. Do not invent placement geometry.",
   AI_PAGE_COORDINATE_CONVENTION,
   "Keep freetext content concise and place it where it clearly corresponds to the referenced visual region.",
 ];
 
 const CREATE_SHAPE_ANNOTATIONS_TOOL_PROMPTS = [
-  "This tool is only available to image-capable chat models.",
-  "When the user wants boxes, circles, arrows, lines, polygons, or other drawn callouts on the PDF, inspect the relevant page with get_pages_visual first unless the user already provided exact page coordinates.",
+  "When the user wants boxes, circles, arrows, lines, polygons, or other drawn callouts on the PDF, inspect the relevant page with inspect_pages_visual first unless the user already provided exact page coordinates.",
+  "If inspect_pages_visual is unavailable and the user did not provide exact page coordinates, ask for coordinates or a visual model before creating annotations. Do not invent placement geometry.",
   "If the created shape should also carry a PDF note/comment, set annotation_text.",
   "Use rect for square, circle, and cloud shapes. Use points for polyline, polygon, cloud_polygon, or when an arrow/line needs custom vertices.",
   AI_PAGE_COORDINATE_CONVENTION,
@@ -61,7 +61,7 @@ const createUpdateAnnotationToolPrompts = (
   `When updating one ${typeLabel} annotation, you may pass either a single object or an updates array.`,
   extraRule,
   "Call list_annotations first when annotation ids are unclear or when you need to confirm the current annotation type before editing.",
-  "When placement or styling depends on page appearance, inspect the relevant page with get_pages_visual first.",
+  "When placement or styling depends on page appearance, inspect the relevant page with inspect_pages_visual first.",
   AI_PAGE_COORDINATE_CONVENTION,
 ];
 
@@ -258,7 +258,6 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
 
   create_freetext_annotations: createToolBuilder("create_freetext_annotations")
     .write()
-    .requiresInputModalities(["image"])
     .description(
       "Create one or more free text annotations in actual page coordinates. Use this for visible notes, labels, callouts, or text overlays placed on the PDF page.",
     )
@@ -308,7 +307,6 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
 
   create_shape_annotations: createToolBuilder("create_shape_annotations")
     .write()
-    .requiresInputModalities(["image"])
     .description(
       "Create one or more shape annotations in actual page coordinates. Supports square, circle, line, polyline, polygon, cloud_polygon, arrow, and cloud shapes.",
     )

@@ -1,8 +1,6 @@
-import type { FormField } from "@/types";
 import type { AiRenderedPageImage } from "@/services/ai/chat/types";
 import { resolveAiSdkModelSpecifierForTask } from "@/services/ai/providers";
 import {
-  analyzePageForFieldsWithAiSdk,
   summarizePageImagesWithAiSdk,
   summarizeTextWithAiSdk,
   translateTextStreamWithAiSdk,
@@ -12,14 +10,10 @@ import {
   getCurrentModelCache,
   getCurrentOptions,
 } from "@/services/ai/editorState";
-import type {
-  LLMAnalyzePageForFieldsOptions,
-  LLMTranslateTextOptions,
-} from "@/services/ai/types";
+import type { LLMTranslateTextOptions } from "@/services/ai/types";
 
 export type TranslateTextOptions = LLMTranslateTextOptions;
 export type TranslateTextStreamOptions = LLMTranslateTextOptions;
-export type AIAnalysisOptions = LLMAnalyzePageForFieldsOptions;
 
 export const translateText = async (
   text: string,
@@ -63,34 +57,6 @@ export async function* translateTextStream(
   });
 }
 
-export const analyzePageForFields = async (
-  base64Image: string,
-  pageIndex: number,
-  pageWidth: number,
-  pageHeight: number,
-  existingFields: FormField[] = [],
-  options?: AIAnalysisOptions,
-) => {
-  const specifier = resolveAiSdkModelSpecifierForTask({
-    appOptions: getCurrentOptions(),
-    modelCache: getCurrentModelCache(),
-    kind: "vision",
-    providerId: options?.providerId,
-    modelId: options?.modelId,
-  });
-  return await analyzePageForFieldsWithAiSdk({
-    appOptions: getCurrentOptions(),
-    specifier,
-    base64Image,
-    pageIndex,
-    pageWidth,
-    pageHeight,
-    existingFields,
-    analyzeOptions: options,
-    signal: undefined,
-  });
-};
-
 const resolveSummarizeSpecifier = (options: {
   providerId?: string;
   modelId?: string;
@@ -132,7 +98,9 @@ export const summarizeConversationMemory = async (
 export type SummarizePageImagesOptions = {
   modelKey?: string;
   providerId?: string;
+  preferredProviderId?: string;
   modelId?: string;
+  request?: string;
   signal?: AbortSignal;
 };
 
@@ -146,6 +114,7 @@ export const summarizePageImages = async (
     kind: "vision",
     modelKey: options.modelKey,
     providerId: options.providerId,
+    preferredProviderId: options.preferredProviderId,
     modelId: options.modelId,
   });
 
@@ -153,6 +122,7 @@ export const summarizePageImages = async (
     appOptions: getCurrentOptions(),
     specifier,
     pages,
+    request: options.request,
     signal: options.signal,
   });
 };

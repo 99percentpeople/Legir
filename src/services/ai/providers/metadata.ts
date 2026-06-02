@@ -23,6 +23,7 @@ export type AiResolvedProviderModelMetadata = {
   modelId: string;
   contextWindowTokens: number;
   hasContextWindowMetadata: boolean;
+  rank: number;
   capabilities?: AiModelCapabilityMetadata;
   reasoning: AiModelReasoningMetadata;
 };
@@ -78,6 +79,7 @@ export const resolveAiProviderModelMetadata = (
 ): AiResolvedProviderModelMetadata => {
   let contextWindowTokens = DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS;
   let hasContextWindowMetadata = false;
+  let rank = 0;
   let capabilities: AiModelCapabilityMetadata | undefined;
   let modelReasoning = NO_REASONING_CAPABILITY as AiModelReasoningMetadata;
 
@@ -93,6 +95,9 @@ export const resolveAiProviderModelMetadata = (
       );
       hasContextWindowMetadata = true;
     }
+    if (typeof metadata.rank === "number" && Number.isFinite(metadata.rank)) {
+      rank = Math.max(rank, Math.trunc(metadata.rank));
+    }
     capabilities = mergeCapabilityMetadata(capabilities, metadata.capabilities);
     modelReasoning = mergeReasoning(modelReasoning, metadata.reasoning);
   }
@@ -102,6 +107,7 @@ export const resolveAiProviderModelMetadata = (
     modelId,
     contextWindowTokens,
     hasContextWindowMetadata,
+    rank,
     capabilities,
     reasoning: modelReasoning,
   };

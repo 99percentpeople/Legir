@@ -6,6 +6,7 @@ import {
   normalizeReasoningPreference,
 } from "@/services/ai/providers";
 import {
+  AI_CHAT_VISUAL_MODEL_AUTO_KEY,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
@@ -191,20 +192,14 @@ export const normalizeAiChatOptions = (
   };
 
   return {
-    visualSummaryEnabled:
-      typeof next.visualSummaryEnabled === "boolean"
-        ? next.visualSummaryEnabled
-        : true,
-    visualSummaryModelKey: next.visualSummaryModelKey || "",
+    visualModelKey:
+      typeof next.visualModelKey === "string" && next.visualModelKey.trim()
+        ? next.visualModelKey.trim()
+        : AI_CHAT_VISUAL_MODEL_AUTO_KEY,
     formToolsEnabled:
       typeof next.formToolsEnabled === "boolean"
         ? next.formToolsEnabled
         : false,
-    detectFormFieldsEnabled:
-      typeof next.detectFormFieldsEnabled === "boolean"
-        ? next.detectFormFieldsEnabled
-        : false,
-    formToolsVisionModelKey: next.formToolsVisionModelKey || "",
     contextCompressionEnabled:
       typeof next.contextCompressionEnabled === "boolean"
         ? next.contextCompressionEnabled

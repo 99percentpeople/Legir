@@ -7,7 +7,10 @@ import {
   createAiDiscoveredModel,
   getCuratedAiProviderModels,
 } from "@/services/ai/providers/models";
-import { mergeModelCapabilitiesWithMetadata } from "@/services/ai/providers/metadata";
+import {
+  mergeModelCapabilitiesWithMetadata,
+  resolveAiProviderModelMetadata,
+} from "@/services/ai/providers/metadata";
 import {
   getAiProviderSpec,
   type AiProviderId,
@@ -47,10 +50,11 @@ const normalizeModelOptions = (
   const seen = new Set<string>();
 
   return models
-    .map((model) => {
+    .map((model, index) => {
       const discoveredModel = createAiDiscoveredModel({
         modelId: model.id,
         label: model.label,
+        rank: model.rank,
         capabilities: model.capabilities,
         inputModalities: model.inputModalities,
         outputModalities: model.outputModalities,
@@ -58,16 +62,22 @@ const normalizeModelOptions = (
         supportsImageToolResults: model.supportsImageToolResults,
         contextWindowTokens: model.contextWindowTokens,
       });
+      const metadata = resolveAiProviderModelMetadata(
+        providerId,
+        discoveredModel.id,
+      );
       return {
         id: discoveredModel.id,
         label:
           (discoveredModel.label || discoveredModel.id).trim() ||
           discoveredModel.id,
+        rank: Math.max(discoveredModel.rank ?? 0, metadata.rank),
         capabilities: mergeModelCapabilitiesWithMetadata(
           providerId,
           discoveredModel.id,
           discoveredModel.capabilities,
         ),
+        order: index,
       };
     })
     .filter((model) => !!model.id)
@@ -76,7 +86,8 @@ const normalizeModelOptions = (
       seen.add(model.id);
       return true;
     })
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort((left, right) => right.rank - left.rank || left.order - right.order)
+    .map(({ order: _order, ...model }) => model);
 };
 
 export const modelMatchesTaskKind = (

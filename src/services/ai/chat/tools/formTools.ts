@@ -1,15 +1,12 @@
 import {
-  createErrorPayload,
   createFormFieldsArgsSchema,
   createToolBuilder,
-  detectFormFieldsArgsSchema,
   defineToolModule,
   fillFormFieldsArgsSchema,
   updateFormFieldsArgsSchema,
 } from "./shared";
 import type {
   AiCreateFormFieldsResult,
-  AiDetectedFormFieldBatch,
   AiFormFieldUpdateResult,
 } from "@/services/ai/chat/types";
 import { pruneUndefinedKeys } from "@/services/ai/utils/object";
@@ -20,23 +17,12 @@ const FILL_FORM_FIELDS_TOOL_PROMPTS = [
   "If the intended values come from annotations or review comments, inspect list_annotations first and map those instructions to field ids from list_fields.",
 ];
 
-const DETECT_FORM_FIELDS_TOOL_PROMPTS = [
-  "Use detect_form_fields only as the dedicated fallback detector when the user wants the AI to identify new fillable fields from the document layout and the current chat model cannot reliably inspect page visuals itself.",
-  "If page_numbers is omitted, detect_form_fields defaults to the current page.",
-  "detect_form_fields always uses the form-tools vision model configured in settings. It never uses the current chat model.",
-  "detect_form_fields inspects re-rendered page images from the current edited document state rather than the originally opened PDF.",
-  AI_PAGE_COORDINATE_CONVENTION,
-  "detect_form_fields returns page-space rectangles aligned to the actual PDF page coordinates. Use those coordinates directly for field creation instead of inventing your own geometry.",
-  "After detect_form_fields, summarize the detected plan and ask the user to confirm the requirements before any create_form_fields call.",
-];
-
 const CREATE_FORM_FIELDS_TOOL_PROMPTS = [
   "Only call create_form_fields after the user has explicitly confirmed the requirements in a follow-up message. Do not create fields in the same turn as the initial request.",
-  "If detect_form_fields produced a candidate batch in this conversation, you may apply that batch after confirmation by passing batch_id or by omitting batch_id to use the latest draft batch.",
-  "If the current chat model can inspect visuals through get_pages_visual, prefer reading the page visuals yourself and then call create_form_fields with explicit fields instead of relying on detect_form_fields.",
+  "Use inspect_pages_visual before creating fields when geometry depends on page appearance. Ask it for form-like regions, labels, likely field types, and approximate page-space boxes.",
+  "After confirmation, call create_form_fields with explicit fields derived from the visual structure or directly inspected page images.",
   AI_PAGE_COORDINATE_CONVENTION,
   "When passing fields directly, include actual page-space rects and the desired field properties. Do not convert or normalize coordinates beyond the true page coordinate space.",
-  "If draft_ids is provided, create only that subset from the selected batch.",
 ];
 
 const UPDATE_FORM_FIELDS_TOOL_PROMPTS = [
@@ -75,15 +61,6 @@ const toDefinedStylePatch = (
         }
       : undefined,
   );
-};
-
-const summarizeDetectedFieldBatch = (result: AiDetectedFormFieldBatch) => {
-  const fieldCount = result.detectedCount;
-  const pageCount = result.pageNumbers.length;
-  if (fieldCount === 0) {
-    return `Detected 0 candidate fields on ${pageCount} page${pageCount === 1 ? "" : "s"}`;
-  }
-  return `Detected ${fieldCount} candidate field${fieldCount === 1 ? "" : "s"} on ${pageCount} page${pageCount === 1 ? "" : "s"}`;
 };
 
 const summarizeCreatedFormFields = (result: AiCreateFormFieldsResult) => {
@@ -176,76 +153,16 @@ export const formToolModule = defineToolModule((ctx) => ({
       };
     }),
 
-  detect_form_fields: createToolBuilder("detect_form_fields")
-    .enable(ctx.formToolsEnabled && ctx.detectFormFieldsEnabled)
-    .write()
-    .description(
-      "Detect candidate form fields from page layout and store the result as a draft batch for this conversation. Use this before creating new fields from a PDF page.",
-    )
-    .promptInstructions(DETECT_FORM_FIELDS_TOOL_PROMPTS)
-    .inputSchema(detectFormFieldsArgsSchema)
-    .build(async ({ args, ctx: toolCtx, signal, onProgress }) => {
-      const documentContext = toolCtx.getDocumentContext();
-      const pageNumbers =
-        args.page_numbers.length > 0
-          ? args.page_numbers
-          : [
-              documentContext.currentPageNumber ??
-                documentContext.visiblePageNumbers[0],
-            ].filter(
-              (pageNumber): pageNumber is number =>
-                typeof pageNumber === "number",
-            );
-
-      if (pageNumbers.length === 0) {
-        return {
-          payload: createErrorPayload(
-            "NO_PAGE_AVAILABLE",
-            "detect_form_fields requires at least one valid page number or an active page in the current document.",
-          ),
-          summary: "detect_form_fields failed: no page available",
-        };
-      }
-
-      const pageImageBatch = await toolCtx.getPagesVisual({
-        pageNumbers,
-        renderAnnotations: true,
-        signal,
-      });
-
-      const result = await toolCtx.detectFormFields({
-        pageNumbers,
-        pageImages: pageImageBatch.pages.map((page) => ({
-          pageNumber: page.pageNumber,
-          pageWidth: page.pageWidth,
-          pageHeight: page.pageHeight,
-          base64Data: page.base64Data,
-        })),
-        allowedTypes: args.allowed_types,
-        userIntent: args.user_intent,
-        extraPrompt: args.extra_prompt,
-        signal,
-        onProgress,
-      });
-
-      return {
-        payload: result,
-        summary: summarizeDetectedFieldBatch(result),
-      };
-    }),
-
   create_form_fields: createToolBuilder("create_form_fields")
     .enable(ctx.formToolsEnabled)
     .write()
     .description(
-      "Create new PDF form fields either from a previously detected draft batch in this conversation or from explicit field definitions that already use actual page coordinates.",
+      "Create new PDF form fields from explicit field definitions that already use actual page coordinates.",
     )
     .promptInstructions(CREATE_FORM_FIELDS_TOOL_PROMPTS)
     .inputSchema(createFormFieldsArgsSchema)
     .build(async ({ args, ctx: toolCtx }) => {
       const result = toolCtx.createFormFields({
-        batchId: args.batch_id?.trim() || undefined,
-        draftIds: args.draft_ids,
         fields: args.fields.map((field) => ({
           pageNumber: field.page_number,
           name: field.name,

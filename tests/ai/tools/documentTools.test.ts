@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { AiToolContext } from "@/services/ai/chat/aiToolContext";
 import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
 import type {
+  AiDocumentMetadata,
   AiReadablePageBatch,
   AiRenderedPageImageBatch,
 } from "@/services/ai/chat/types";
@@ -52,6 +53,35 @@ const createCapabilities = (
 });
 
 describe("AI chat document tools", () => {
+  test("get_document_metadata returns a single current permissions field", async () => {
+    const metadata: AiDocumentMetadata = {
+      filename: "restricted.pdf",
+      title: "Restricted",
+      keywords: [],
+      permissions: {
+        hasOwnerRestrictions: true,
+        canModifyContents: false,
+      } as AiDocumentMetadata["permissions"],
+      ownerRestrictionsUnlocked: false,
+      preserveOwnerRestrictionsOnSave: true,
+    };
+    const ctx = {
+      getDocumentMetadata: () => metadata,
+    } as unknown as AiToolContext;
+    const handlers = createToolHandlerMap([documentToolModule], ctx);
+    const handler = handlers.get_document_metadata;
+
+    expect(handler).toBeDefined();
+
+    const result = await handler!.execute({}, ctx);
+
+    expect(result.payload).toEqual(metadata);
+    expect(result.payload).not.toHaveProperty("sourcePermissions");
+    expect(result.summary).toBe(
+      "Metadata with 2 populated fields; permissions restricted",
+    );
+  });
+
   test("update_document_metadata delegates normalized metadata updates", async () => {
     const calls: unknown[] = [];
     const ctx = {
@@ -228,13 +258,14 @@ describe("AI chat document tools", () => {
     });
   });
 
-  test("get_pages_visual expands full-page ranges and keeps crop targets", async () => {
+  test("inspect_pages_visual expands full-page ranges and keeps crop targets", async () => {
     const cropTarget = {
       page: 5,
       rect: { x: 0, y: 0, width: 10, height: 10 },
     };
     const calls: unknown[] = [];
     const ctx = {
+      canAttachPageVisuals: () => true,
       getDocumentContext: () => ({
         currentPageNumber: null,
         visiblePageNumbers: [],
@@ -246,10 +277,9 @@ describe("AI chat document tools", () => {
     } as unknown as AiToolContext;
     const handlers = createToolHandlerMap([documentToolModule], ctx);
 
-    await handlers.get_pages_visual!.execute(
+    await handlers.inspect_pages_visual!.execute(
       {
         pages: [[1, 3], cropTarget],
-        render_annotations: false,
       },
       ctx,
     );
@@ -257,45 +287,78 @@ describe("AI chat document tools", () => {
     expect(calls).toEqual([
       {
         pageNumbers: [1, 2, 3, cropTarget],
-        renderAnnotations: false,
+        renderAnnotations: true,
         signal: undefined,
       },
     ]);
   });
 
-  test("get_pages_visual requires image-capable tool results", () => {
-    const ctx = {} as AiToolContext;
-    const withoutImageToolResults = createAiToolRegistry(ctx, {
-      modelCapabilities: createCapabilities({
-        supportsImageToolResults: false,
-      }),
-    });
-    const withImageToolResults = createAiToolRegistry(ctx, {
-      modelCapabilities: createCapabilities({
-        supportsImageToolResults: true,
-      }),
-    });
+  test("inspect_pages_visual is available for direct image or visual model paths", () => {
+    const withoutVisualPath = createAiToolRegistry(
+      {
+        canAttachPageVisuals: () => false,
+      } as unknown as AiToolContext,
+      {
+        modelCapabilities: createCapabilities({
+          supportsImageToolResults: false,
+        }),
+      },
+    );
+    const withDirectImagePath = createAiToolRegistry(
+      {
+        canAttachPageVisuals: () => true,
+      } as unknown as AiToolContext,
+      {
+        modelCapabilities: createCapabilities({
+          supportsImageToolResults: true,
+        }),
+      },
+    );
+    const withVisualModelPath = createAiToolRegistry(
+      {
+        canAttachPageVisuals: () => false,
+        inspectPagesVisual: async () => ({
+          requestedPageCount: 1,
+          returnedPageCount: 1,
+          truncated: false,
+          maxPagesPerCall: 4,
+          pages: [],
+          summary: "summary",
+        }),
+      } as unknown as AiToolContext,
+      {
+        modelCapabilities: createCapabilities({
+          supportsImageToolResults: false,
+        }),
+      },
+    );
 
     expect(
-      withoutImageToolResults
+      withoutVisualPath
         .getDefinitions()
-        .some((definition) => definition.name === "get_pages_visual"),
+        .some((definition) => definition.name === "inspect_pages_visual"),
     ).toBe(false);
     expect(
-      withImageToolResults
+      withDirectImagePath
         .getDefinitions()
-        .some((definition) => definition.name === "get_pages_visual"),
+        .some((definition) => definition.name === "inspect_pages_visual"),
+    ).toBe(true);
+    expect(
+      withVisualModelPath
+        .getDefinitions()
+        .some((definition) => definition.name === "inspect_pages_visual"),
     ).toBe(true);
   });
 
-  test("summarize_pages_visual rejects removed summary instructions", async () => {
+  test("inspect_pages_visual rejects removed summary instructions", async () => {
     const calls: unknown[] = [];
     const ctx = {
+      canAttachPageVisuals: () => false,
       getDocumentContext: () => ({
         currentPageNumber: 1,
         visiblePageNumbers: [1],
       }),
-      summarizePagesVisual: async (input: unknown) => {
+      inspectPagesVisual: async (input: unknown) => {
         calls.push(input);
         return {
           requestedPageCount: 1,
@@ -309,7 +372,7 @@ describe("AI chat document tools", () => {
     } as unknown as AiToolContext;
     const handlers = createToolHandlerMap([documentToolModule], ctx);
 
-    const result = await handlers.summarize_pages_visual!.execute(
+    const result = await handlers.inspect_pages_visual!.execute(
       {
         pages: [1],
         summary_instructions: {
@@ -325,7 +388,103 @@ describe("AI chat document tools", () => {
         ok: false,
         error: "INVALID_ARGUMENTS",
       },
-      summary: "summarize_pages_visual failed: invalid arguments",
+      summary: "inspect_pages_visual failed: invalid arguments",
     });
+  });
+
+  test("inspect_pages_visual forwards visual structure request", async () => {
+    const calls: unknown[] = [];
+    const ctx = {
+      canAttachPageVisuals: () => false,
+      getDocumentContext: () => ({
+        currentPageNumber: 1,
+        visiblePageNumbers: [1],
+      }),
+      inspectPagesVisual: async (input: unknown) => {
+        calls.push(input);
+        return {
+          requestedPageCount: 1,
+          returnedPageCount: 1,
+          truncated: false,
+          maxPagesPerCall: 4,
+          request: "Locate the signature line and return a page-space box",
+          pages: [],
+          summary:
+            '<page n="1" w="100" h="200"><region id="r1" type="signature" box="70,160,20,10"><desc>Signature line</desc></region></page>',
+        };
+      },
+    } as unknown as AiToolContext;
+    const handlers = createToolHandlerMap([documentToolModule], ctx);
+
+    const result = await handlers.inspect_pages_visual!.execute(
+      {
+        pages: [1],
+        request: "  Locate the signature line and return a page-space box  ",
+      },
+      ctx,
+    );
+
+    expect(calls).toEqual([
+      {
+        pageNumbers: [1],
+        renderAnnotations: true,
+        request: "Locate the signature line and return a page-space box",
+        signal: undefined,
+      },
+    ]);
+    expect(result.payload).toMatchObject({
+      kind: "visual_analysis",
+      request: "Locate the signature line and return a page-space box",
+    });
+    expect(result.modelOutput).toContain('type="signature"');
+  });
+
+  test("inspect_pages_visual uses visual structure for form-like requests", async () => {
+    const calls: unknown[] = [];
+    const ctx = {
+      canAttachPageVisuals: () => false,
+      getDocumentContext: () => ({
+        currentPageNumber: 2,
+        visiblePageNumbers: [2],
+      }),
+      inspectPagesVisual: async (input: unknown) => {
+        calls.push(input);
+        return {
+          requestedPageCount: 1,
+          returnedPageCount: 1,
+          truncated: false,
+          maxPagesPerCall: 4,
+          request: "Find form-like regions with labels and boxes",
+          pages: [],
+          summary:
+            '<page n="2" w="100" h="200"><region id="r1" type="form" box="1,2,30,10" conf="0.8"><text>Name</text><desc>Likely text field.</desc></region></page>',
+        };
+      },
+    } as unknown as AiToolContext;
+    const handlers = createToolHandlerMap([documentToolModule], ctx);
+
+    const result = await handlers.inspect_pages_visual!.execute(
+      {
+        pages: [2],
+        request: "Find form-like regions with labels and boxes",
+      },
+      ctx,
+    );
+
+    expect(calls).toEqual([
+      {
+        pageNumbers: [2],
+        renderAnnotations: true,
+        request: "Find form-like regions with labels and boxes",
+        signal: undefined,
+      },
+    ]);
+    expect(result).toMatchObject({
+      payload: {
+        kind: "visual_analysis",
+        request: "Find form-like regions with labels and boxes",
+      },
+    });
+    expect(result.modelOutput).toContain('type="form"');
   });
 });

@@ -5,12 +5,14 @@ import {
   getChatModelGroups,
   getConfiguredAiSdkProvider,
   getReasoningLevelControl,
+  getVisionModelGroups,
   parseAiSdkModelSpecifier,
   summarizePageImages,
   summarizeConversationMemory,
   subscribeLLMModelRegistry,
 } from "@/services/ai";
 import { useEditorStore } from "@/store/useEditorStore";
+import { AI_CHAT_VISUAL_MODEL_AUTO_KEY } from "@/constants";
 import {
   type EditorState,
   type LLMModelCapabilities,
@@ -116,19 +118,6 @@ const getFirstLineTitleSnippet = (text: string) => {
   return toTitleSnippet(firstLine);
 };
 
-const FIELD_BATCH_CONFIRMATION_PATTERNS = [
-  /\b(confirm|confirmed|go ahead|proceed|apply (it|them|this)|create (it|them|these)|use this plan|looks good)\b/i,
-  /(确认|确认创建|按这个|照这个|就按这个|开始创建|开始吧|应用这个|没问题，创建|可以创建|就这样)/,
-];
-
-const isDetectedFieldBatchConfirmationMessage = (text: string) => {
-  const normalized = text.trim();
-  if (!normalized) return false;
-  return FIELD_BATCH_CONFIRMATION_PATTERNS.some((pattern) =>
-    pattern.test(normalized),
-  );
-};
-
 const isAiChatSessionStarted = (
   session: Pick<
     AiChatSessionData,
@@ -137,7 +126,6 @@ const isAiChatSessionStarted = (
     | "conversation"
     | "searchResultsById"
     | "highlightedResultIds"
-    | "pendingDetectedFieldBatches"
     | "contextMemory"
     | "tokenUsage"
     | "contextTokens"
@@ -153,7 +141,6 @@ const isAiChatSessionStarted = (
   }
   if (session.searchResultsById.size > 0) return true;
   if (session.highlightedResultIds.length > 0) return true;
-  if (session.pendingDetectedFieldBatches.length > 0) return true;
   if (session.contextMemory) return true;
   if (session.contextTokens > 0 || session.contextTokenOverhead > 0) {
     return true;
@@ -190,38 +177,6 @@ const buildAiChatTurnCompressionOptions = (
   visualHistoryWindow: aiChatOptions.visualHistoryWindow,
   contextCompressionMode: aiChatOptions.contextCompressionMode,
 });
-
-const updateDetectedFieldBatchConfirmation = (options: {
-  session: AiChatSessionData;
-  userMessageId: string;
-  text: string;
-}) => {
-  const latestDraftBatch = options.session.pendingDetectedFieldBatches.find(
-    (batch) => batch.status === "draft",
-  );
-  if (!latestDraftBatch) return;
-
-  const shouldConfirm = isDetectedFieldBatchConfirmationMessage(options.text);
-  options.session.pendingDetectedFieldBatches =
-    options.session.pendingDetectedFieldBatches.map((batch) => {
-      if (batch.status !== "draft") return batch;
-      if (!shouldConfirm || batch.batchId !== latestDraftBatch.batchId) {
-        return {
-          ...batch,
-          confirmedAt: undefined,
-          confirmedByMessageId: undefined,
-          confirmedByUserText: undefined,
-        };
-      }
-
-      return {
-        ...batch,
-        confirmedAt: new Date().toISOString(),
-        confirmedByMessageId: options.userMessageId,
-        confirmedByUserText: options.text.trim(),
-      };
-    });
-};
 
 const createInMemoryAiChatDocumentState = (options: {
   activeSessionId: string;
@@ -557,6 +512,20 @@ export const useAiChatController = (
     [registryVersion],
   );
 
+  const visionModelGroups = useMemo(
+    () => getVisionModelGroups(),
+    [editorState.options.llm, registryVersion],
+  );
+  const hasAvailableVisionModel = useMemo(
+    () =>
+      visionModelGroups.some(
+        (group) =>
+          group.isAvailable &&
+          group.models.some((model) => model.capabilities.supportsImageInput),
+      ),
+    [visionModelGroups],
+  );
+
   const toolCapableChatModelGroups = useMemo(
     () =>
       chatModelGroups
@@ -672,23 +641,44 @@ export const useAiChatController = (
     [flatModels, selectedChatModel?.capabilities, selectedModelKey],
   );
 
-  const visualSummaryEnabled = editorState.options.aiChat.visualSummaryEnabled;
-  const visualSummaryModelKey =
-    editorState.options.aiChat.visualSummaryModelKey?.trim() || "";
+  const visualModelKey =
+    editorState.options.aiChat.visualModelKey?.trim() ||
+    AI_CHAT_VISUAL_MODEL_AUTO_KEY;
+  const explicitVisualModelSpecifier = parseAiSdkModelSpecifier(visualModelKey);
+  const explicitVisualModelAvailable =
+    explicitVisualModelSpecifier &&
+    visionModelGroups.some(
+      (group) =>
+        group.isAvailable &&
+        group.providerId === explicitVisualModelSpecifier.providerId &&
+        group.models.some(
+          (model) => model.id === explicitVisualModelSpecifier.modelId,
+        ),
+    );
+  const hasVisualAnalysisModel =
+    visualModelKey === AI_CHAT_VISUAL_MODEL_AUTO_KEY
+      ? hasAvailableVisionModel
+      : Boolean(explicitVisualModelAvailable);
+  const canAttachPageVisuals =
+    selectedChatModel?.capabilities.supportsImageToolResults === true;
 
-  const summarizeRenderedPages = useCallback(
+  const analyzeRenderedPages = useCallback(
     async (options: {
       pages: Parameters<typeof summarizePageImages>[0];
+      request?: string;
       signal?: AbortSignal;
     }) => {
-      if (!visualSummaryModelKey) return "";
-
       return await summarizePageImages(options.pages, {
-        modelKey: visualSummaryModelKey,
+        modelKey: visualModelKey,
+        preferredProviderId:
+          visualModelKey === AI_CHAT_VISUAL_MODEL_AUTO_KEY
+            ? selectedChatModel?.providerId
+            : undefined,
+        request: options.request,
         signal: options.signal,
       });
     },
-    [visualSummaryModelKey],
+    [selectedChatModel?.providerId, visualModelKey],
   );
 
   const getRenderablePdfBytes = useCallback(
@@ -847,10 +837,10 @@ export const useAiChatController = (
         getPagesTextConfig: () => ({
           maxChars: editorState.options.aiChat.getPagesTextMaxChars,
         }),
-        summarizeRenderedPages:
-          visualSummaryEnabled && visualSummaryModelKey
-            ? summarizeRenderedPages
-            : undefined,
+        canAttachPageVisuals: () => canAttachPageVisuals,
+        analyzeRenderedPages: hasVisualAnalysisModel
+          ? analyzeRenderedPages
+          : undefined,
         workerService,
       }),
     [
@@ -863,8 +853,6 @@ export const useAiChatController = (
       editorState.pdfOwnerUnlocked,
       editorState.preservePdfOwnerRestrictionsOnSave,
       editorState.options.aiChat.getPagesTextMaxChars,
-      editorState.options.aiChat.visualSummaryEnabled,
-      editorState.options.aiChat.visualSummaryModelKey,
       editorState.outline,
       editorState.pageFlow,
       editorState.pageLayout,
@@ -872,11 +860,11 @@ export const useAiChatController = (
       editorState.pdfBytes,
       editorState.pdfOpenPassword,
       editorState.scale,
+      canAttachPageVisuals,
       getRenderablePdfBytes,
       getSelectedTextContext,
-      summarizeRenderedPages,
-      visualSummaryEnabled,
-      visualSummaryModelKey,
+      hasVisualAnalysisModel,
+      analyzeRenderedPages,
       workerService,
     ],
   );
@@ -1042,18 +1030,12 @@ export const useAiChatController = (
         activeSessionIdRef,
         setHighlightedResultIds,
         formToolsEnabled: editorState.options.aiChat.formToolsEnabled,
-        detectFormFieldsEnabled:
-          editorState.options.aiChat.detectFormFieldsEnabled,
-        formToolsVisionModelKey:
-          editorState.options.aiChat.formToolsVisionModelKey,
         selectedChatModel,
         selectedChatModelAuthor,
         workerService,
       }),
     [
       editorState.options.aiChat.formToolsEnabled,
-      editorState.options.aiChat.detectFormFieldsEnabled,
-      editorState.options.aiChat.formToolsVisionModelKey,
       selectedChatModel,
       selectedChatModelAuthor,
       workerService,
@@ -1626,12 +1608,6 @@ export const useAiChatController = (
       });
       appendTimelineItem(userItem);
 
-      updateDetectedFieldBatchConfirmation({
-        session,
-        userMessageId: userItem.id,
-        text: displayText || text,
-      });
-
       const { persistentConversation, requestConversation } =
         pushUserConversationMessage({
           session,
@@ -1743,28 +1719,6 @@ export const useAiChatController = (
       options.sourceSession.searchResultsById,
     );
     nextSession.highlightedResultIds = [];
-    nextSession.pendingDetectedFieldBatches =
-      options.sourceSession.pendingDetectedFieldBatches.map((batch) => ({
-        ...batch,
-        pageNumbers: [...batch.pageNumbers],
-        allowedTypes: batch.allowedTypes ? [...batch.allowedTypes] : undefined,
-        drafts: batch.drafts.map((draft) => ({
-          draftId: draft.draftId,
-          field: {
-            ...draft.field,
-            rect: { ...draft.field.rect },
-            style: draft.field.style ? { ...draft.field.style } : undefined,
-            options: draft.field.options ? [...draft.field.options] : undefined,
-          },
-          summary: {
-            ...draft.summary,
-            rect: { ...draft.summary.rect },
-            options: draft.summary.options
-              ? [...draft.summary.options]
-              : undefined,
-          },
-        })),
-      }));
     nextSession.contextMemory = retainAiChatContextMemoryForTimeline(
       options.sourceSession.contextMemory,
       {
@@ -2085,7 +2039,6 @@ export const useAiChatController = (
     });
     session.searchResultsById = new Map();
     session.highlightedResultIds = [];
-    session.pendingDetectedFieldBatches = [];
     session.contextMemory = undefined;
     session.tokenUsage = createEmptyAiChatTokenUsageSummary();
     session.contextTokens = 0;

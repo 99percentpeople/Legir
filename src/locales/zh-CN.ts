@@ -685,20 +685,12 @@ const zhCN = {
       form_tools_enabled: "启用 AI 表单工具",
       form_tools_enabled_desc:
         "允许 AI 问答根据对话请求创建新的表单字段。如果你只希望它做只读问答和字段填值，请保持关闭。",
-      detect_form_fields_enabled: "启用 detect_form_fields 后备检测",
-      detect_form_fields_enabled_desc:
-        "当当前对话模型不能直接看图时，允许 AI 问答使用独立的 detect_form_fields 视觉工具做后备检测。",
-      form_tools_vision_model: "表单工具视觉模型",
-      form_tools_vision_model_placeholder: "选择视觉模型",
-      form_tools_vision_model_desc:
-        "detect_form_fields 专用的视觉模型。这个工具不会使用当前聊天模型，且只有在开启后备检测时才会运行。",
-      visual_summary_enabled: "启用视觉总结工具",
-      visual_summary_enabled_desc:
-        "控制 AI 问答里的 summarize_pages_visual 是否可用。这样纯文本对话模型也能委托已配置的视觉模型检查渲染后的页面。",
-      visual_summary_model: "视觉总结模型",
-      visual_summary_model_placeholder: "选择视觉模型",
-      visual_summary_model_desc:
-        "用于 summarize_pages_visual。关闭工具或未选择视觉模型时，这个工具不可用。",
+      visual_model: "视觉模型",
+      visual_model_placeholder: "选择视觉模型",
+      visual_model_auto_group: "自动",
+      visual_model_auto: "自动",
+      visual_model_desc:
+        "当当前对话模型不能直接接收渲染后的页面图片时，inspect_pages_visual 会自动使用这个模型，包括视觉结构检查和表单字段规划。",
       no_models: "无可用模型",
     },
   },

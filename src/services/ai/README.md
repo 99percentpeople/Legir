@@ -95,12 +95,14 @@ It should not run document chat turns or implement document tools.
   choices, model groups, and full runtime objects.
 - `providers/models.ts` is the source of truth for model facts. Put
   model-specific context windows, modalities, tool support, image tool-result
-  support, and reasoning metadata here as ordered rules. A rule `id` is only a
-  stable maintenance/debug identifier; exact matching uses `modelIds`, family
-  matching uses `patterns`, and curated provider lists are emitted only from
-  explicit model ids. Reasoning
-  metadata exposes one unified `levels` list for UI and runtime selection:
-  `none`, `auto`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+  support, automatic-selection `rank`, and reasoning metadata here as ordered
+  rules. A rule `id` is only a stable maintenance/debug identifier; exact
+  matching uses `modelIds`, family matching uses `patterns`, and curated
+  provider lists are emitted only from explicit model ids. Higher `rank` values
+  are preferred when the app auto-selects a model, while explicit user choices
+  are kept as-is. Reasoning metadata exposes one unified `levels` list for UI
+  and runtime selection: `none`, `auto`, `minimal`, `low`, `medium`, `high`,
+  and `xhigh`.
 - `providers/metadata.ts` resolves ordered model rules for a provider/model pair
   and merges those facts with API-discovered or custom model capabilities.
 - `providers/capabilities.ts` only builds capability objects from explicit data.
@@ -121,6 +123,11 @@ base helper instead of duplicating bearer-auth request and fallback parsing.
 If a provider API returns real capability data, map it in the catalog provider.
 If it only returns ids, add or update explicit model rules in
 `providers/models.ts`.
+
+Automatic task resolution can pass a soft preferred provider. This is used by
+visual tasks so a chat model selected from a provider such as Xiaomi MiMo or
+Gemini first looks for the highest-ranked vision-capable model from the same
+provider before falling back to another configured provider.
 
 ### Runtime Adapters
 
@@ -185,7 +192,6 @@ reading UI state.
 - `translatePageBlocksStructured.ts` translates page text blocks with structure.
 - `summarizeText.ts` summarizes text, including conversation-memory input.
 - `summarizePageImages.ts` summarizes rendered page images with a vision model.
-- `analyzePageForFields.ts` analyzes page images for form field candidates.
 - `tasks/index.ts` exports task implementations.
 
 Task implementations may use `resolveAiSdkRuntime` or
@@ -195,9 +201,9 @@ should stay in `providers/runtimeAdapters/`.
 ## Shared Entry Points and Helpers
 
 - `index.ts` re-exports the supported public surface for the rest of the app.
-- `taskRunner.ts` keeps legacy task-style entry points such as `translateText`,
-  `analyzePageForFields`, and `summarizePageImages`; it bridges current editor
-  options into task implementations.
+- `taskRunner.ts` keeps legacy task-style entry points such as `translateText`
+  and `summarizePageImages`; it bridges current editor options into task
+  implementations.
 - `editorState.ts` is the narrow bridge to the editor store for legacy service
   entry points.
 - `modelCache.ts` manages cached provider model lists.
