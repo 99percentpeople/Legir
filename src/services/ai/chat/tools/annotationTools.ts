@@ -12,7 +12,10 @@ import {
   updateShapeAnnotationsArgsSchema,
   updateAnnotationTextsArgsSchema,
 } from "./shared";
-import type { AiAnnotationUpdateResult } from "@/services/ai/chat/types";
+import type {
+  AiAnnotationStyleInput,
+  AiAnnotationUpdateResult,
+} from "@/services/ai/chat/types";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 
 const UPDATE_ANNOTATION_TEXTS_TOOL_PROMPTS = [
@@ -25,6 +28,7 @@ const HIGHLIGHT_RESULTS_TOOL_PROMPTS = [
   "Do not use result_id when the user wants a whole sentence, paragraph, or range that is longer than matchText. In that case use selection_anchors or document_anchors with highlight_results.",
   "Use highlight_results for both single-target and multi-target highlight creation. It accepts singular or plural target fields.",
   "Pass annotation_text when the highlight note should differ from the source text. Use top-level annotation_text only when every created highlight should share the same note. Otherwise set annotation_text on each selection_anchor or document_anchor item.",
+  "Pass style to override the color or opacity of created highlights.",
   "end_inclusive_anchor is inclusive: the created highlight must include that text.",
   "Choose short, exact anchors from visible text. Do not infer sentence structure inside a selection attachment. Whitespace is flexible during matching. Prefer 2 to 8 words, extend only when needed for uniqueness, and shorten aggressively if a long anchor fails.",
   "If highlight_results returns missing_count > 0, retry only the missing anchors with shorter, more distinctive text.",
@@ -104,6 +108,57 @@ const toRectPatch = (
       }
     : undefined;
 
+const toAnnotationStyleInput = (
+  style:
+    | {
+        color?: string;
+        opacity?: number;
+        background_color?: string;
+        background_opacity?: number;
+        border_color?: string;
+        border_width?: number;
+        font_size?: number;
+        font_family?: string;
+        line_height?: number;
+        alignment?: "left" | "center" | "right";
+        flatten?: boolean;
+        rotation_deg?: number;
+        thickness?: number;
+        arrow_size?: number;
+        start_arrow_style?: AiAnnotationStyleInput["startArrowStyle"];
+        end_arrow_style?: AiAnnotationStyleInput["endArrowStyle"];
+        cloud_intensity?: number;
+        cloud_spacing?: number;
+      }
+    | undefined,
+): AiAnnotationStyleInput | undefined => {
+  if (!style) return undefined;
+  const mapped: AiAnnotationStyleInput = {
+    color: style.color,
+    opacity: style.opacity,
+    backgroundColor: style.background_color,
+    backgroundOpacity: style.background_opacity,
+    borderColor: style.border_color,
+    borderWidth: style.border_width,
+    fontSize: style.font_size,
+    fontFamily: style.font_family,
+    lineHeight: style.line_height,
+    alignment: style.alignment,
+    flatten: style.flatten,
+    rotationDeg: style.rotation_deg,
+    thickness: style.thickness,
+    arrowSize: style.arrow_size,
+    startArrowStyle: style.start_arrow_style,
+    endArrowStyle: style.end_arrow_style,
+    cloudIntensity: style.cloud_intensity,
+    cloudSpacing: style.cloud_spacing,
+  };
+  const compact = Object.fromEntries(
+    Object.entries(mapped).filter(([, value]) => value !== undefined),
+  ) as AiAnnotationStyleInput;
+  return Object.keys(compact).length > 0 ? compact : undefined;
+};
+
 const summarizeAnnotationUpdateResult = (
   toolName: string,
   result: AiAnnotationUpdateResult,
@@ -157,12 +212,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
           annotationType: "highlight",
           text: item.text,
           rect: toRectPatch(item.rect),
-          style: item.style
-            ? {
-                color: item.style.color,
-                opacity: item.style.opacity,
-              }
-            : undefined,
+          style: toAnnotationStyleInput(item.style),
         })),
       });
 
@@ -189,21 +239,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
           annotationType: "freetext",
           text: item.text,
           rect: toRectPatch(item.rect),
-          style: item.style
-            ? {
-                color: item.style.color,
-                opacity: item.style.opacity,
-                backgroundColor: item.style.background_color,
-                borderColor: item.style.border_color,
-                borderWidth: item.style.border_width,
-                fontSize: item.style.font_size,
-                fontFamily: item.style.font_family,
-                lineHeight: item.style.line_height,
-                alignment: item.style.alignment,
-                flatten: item.style.flatten,
-                rotationDeg: item.style.rotation_deg,
-              }
-            : undefined,
+          style: toAnnotationStyleInput(item.style),
         })),
       });
 
@@ -230,20 +266,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
           annotationType: "shape",
           text: item.text,
           rect: toRectPatch(item.rect),
-          style: item.style
-            ? {
-                color: item.style.color,
-                opacity: item.style.opacity,
-                backgroundColor: item.style.background_color,
-                backgroundOpacity: item.style.background_opacity,
-                thickness: item.style.thickness,
-                arrowSize: item.style.arrow_size,
-                startArrowStyle: item.style.start_arrow_style,
-                endArrowStyle: item.style.end_arrow_style,
-                cloudIntensity: item.style.cloud_intensity,
-                cloudSpacing: item.style.cloud_spacing,
-              }
-            : undefined,
+          style: toAnnotationStyleInput(item.style),
         })),
       });
 
@@ -276,21 +299,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
                 height: item.rect.height,
               }
             : undefined,
-          style: item.style
-            ? {
-                color: item.style.color,
-                opacity: item.style.opacity,
-                backgroundColor: item.style.background_color,
-                borderColor: item.style.border_color,
-                borderWidth: item.style.border_width,
-                fontSize: item.style.font_size,
-                fontFamily: item.style.font_family,
-                lineHeight: item.style.line_height,
-                alignment: item.style.alignment,
-                flatten: item.style.flatten,
-                rotationDeg: item.style.rotation_deg,
-              }
-            : undefined,
+          style: toAnnotationStyleInput(item.style),
         })),
       });
 
@@ -330,20 +339,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
             y: point.y,
           })),
           annotationText: item.annotation_text,
-          style: item.style
-            ? {
-                color: item.style.color,
-                opacity: item.style.opacity,
-                backgroundColor: item.style.background_color,
-                backgroundOpacity: item.style.background_opacity,
-                thickness: item.style.thickness,
-                arrowSize: item.style.arrow_size,
-                startArrowStyle: item.style.start_arrow_style,
-                endArrowStyle: item.style.end_arrow_style,
-                cloudIntensity: item.style.cloud_intensity,
-                cloudSpacing: item.style.cloud_spacing,
-              }
-            : undefined,
+          style: toAnnotationStyleInput(item.style),
         })),
       });
 
@@ -368,6 +364,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
     .build(async ({ args, ctx: toolCtx }) => {
       const resultIds = args.result_ids.map((id) => id.trim());
       const annotationText = args.annotation_text?.trim() || undefined;
+      const batchStyle = toAnnotationStyleInput(args.style);
       const selectionAnchors = args.selection_anchors.map((range) => ({
         attachmentIndex: range.attachment_index,
         startAnchor: range.start_anchor.trim(),
@@ -404,6 +401,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
       const result = await toolCtx.createSearchHighlightAnnotations({
         ...(resultIds.length > 0 ? { resultIds } : null),
         ...(annotationText ? { annotationText } : null),
+        ...(batchStyle ? { style: batchStyle } : null),
         ...(selectionAnchors.length > 0 ? { selectionAnchors } : null),
         ...(documentAnchors.length > 0 ? { documentAnchors } : null),
       });

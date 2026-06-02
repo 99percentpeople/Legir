@@ -5,6 +5,7 @@ import { createAiChatToolContext } from "@/hooks/useAiChatController/toolContext
 import type { AiChatSessionData } from "@/hooks/useAiChatController/sessionPersistence";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { AiStoredSearchResult } from "@/services/ai/chat/types";
+import type { PDFSearchResult } from "@/types";
 
 const ref = <T>(current: T): MutableRefObject<T> => ({ current });
 
@@ -38,9 +39,12 @@ const createSession = (): AiChatSessionData =>
     awaitingContinue: false,
   }) satisfies AiChatSessionData;
 
-const createToolContext = () =>
+const createToolContext = (options?: {
+  searchResultsRef?: MutableRefObject<Map<string, AiStoredSearchResult>>;
+}) =>
   createAiChatToolContext({
-    searchResultsRef: ref(new Map<string, AiStoredSearchResult>()),
+    searchResultsRef:
+      options?.searchResultsRef ?? ref(new Map<string, AiStoredSearchResult>()),
     searchSeqRef: ref(0),
     sessionsRef: ref(new Map([["session_1", createSession()]])),
     activeSessionIdRef: ref("session_1"),
@@ -94,6 +98,55 @@ describe("AI chat tool context", () => {
     const state = useEditorStore.getState();
     expect(result.createdCount).toBe(2);
     expect(state.fields).toHaveLength(2);
+    expect(state.selectedId).toBeNull();
+  });
+
+  test("createSearchHighlightAnnotations applies style overrides", async () => {
+    const searchResult = {
+      id: "result_1",
+      pageIndex: 0,
+      matchIndexOnPage: 0,
+      startOffset: 0,
+      endOffset: 5,
+      sortTop: 120,
+      sortLeft: 72,
+      rect: { x: 72, y: 120, width: 64, height: 14 },
+      rects: [{ x: 72, y: 120, width: 64, height: 14 }],
+      matchText: "Hello",
+      contextBefore: "",
+      contextAfter: " world",
+      displaySegments: [{ text: "Hello", highlighted: true }],
+    } satisfies PDFSearchResult;
+    const searchResultsRef = ref(
+      new Map<string, AiStoredSearchResult>([
+        [
+          "result_1",
+          {
+            id: "result_1",
+            query: "Hello",
+            result: searchResult,
+          },
+        ],
+      ]),
+    );
+    const toolContext = createToolContext({ searchResultsRef });
+
+    const result = await toolContext.createSearchHighlightAnnotations({
+      resultIds: ["result_1"],
+      style: {
+        color: "#ff5500",
+        opacity: 0.25,
+      },
+    });
+
+    const state = useEditorStore.getState();
+    expect(result.createdCount).toBe(1);
+    expect(state.annotations).toHaveLength(1);
+    expect(state.annotations[0]).toMatchObject({
+      type: "highlight",
+      color: "#ff5500",
+      opacity: 0.25,
+    });
     expect(state.selectedId).toBeNull();
   });
 });

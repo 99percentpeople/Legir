@@ -281,6 +281,36 @@ export type AiShapeAnnotationSubType =
   | "arrow"
   | "cloud";
 
+export type AiShapeArrowStyle =
+  | "closed_arrow"
+  | "line_arrow"
+  | "hollow_arrow"
+  | "circle"
+  | "square"
+  | "diamond"
+  | "slash";
+
+export interface AiAnnotationStyleInput {
+  color?: string;
+  opacity?: number;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
+  borderColor?: string;
+  borderWidth?: number;
+  fontSize?: number;
+  fontFamily?: string;
+  lineHeight?: number;
+  alignment?: "left" | "center" | "right";
+  flatten?: boolean;
+  rotationDeg?: number;
+  thickness?: number;
+  arrowSize?: number;
+  startArrowStyle?: AiShapeArrowStyle;
+  endArrowStyle?: AiShapeArrowStyle;
+  cloudIntensity?: number;
+  cloudSpacing?: number;
+}
+
 export interface AiAnnotationSummary {
   id: string;
   pageNumber: number;
@@ -404,19 +434,7 @@ export interface AiCreateFreetextAnnotationInput {
     width?: number;
     height?: number;
   };
-  style?: {
-    color?: string;
-    opacity?: number;
-    backgroundColor?: string;
-    borderColor?: string;
-    borderWidth?: number;
-    fontSize?: number;
-    fontFamily?: string;
-    lineHeight?: number;
-    alignment?: "left" | "center" | "right";
-    flatten?: boolean;
-    rotationDeg?: number;
-  };
+  style?: AiAnnotationStyleInput;
 }
 
 export interface AiCreateShapeAnnotationInput {
@@ -430,32 +448,7 @@ export interface AiCreateShapeAnnotationInput {
   };
   points?: Array<{ x?: number; y?: number }>;
   annotationText?: string;
-  style?: {
-    color?: string;
-    opacity?: number;
-    backgroundColor?: string;
-    backgroundOpacity?: number;
-    thickness?: number;
-    arrowSize?: number;
-    startArrowStyle?:
-      | "closed_arrow"
-      | "line_arrow"
-      | "hollow_arrow"
-      | "circle"
-      | "square"
-      | "diamond"
-      | "slash";
-    endArrowStyle?:
-      | "closed_arrow"
-      | "line_arrow"
-      | "hollow_arrow"
-      | "circle"
-      | "square"
-      | "diamond"
-      | "slash";
-    cloudIntensity?: number;
-    cloudSpacing?: number;
-  };
+  style?: AiAnnotationStyleInput;
 }
 
 export interface AiUpdateAnnotationInput {
@@ -468,40 +461,7 @@ export interface AiUpdateAnnotationInput {
     width?: number;
     height?: number;
   };
-  style?: {
-    color?: string;
-    opacity?: number;
-    backgroundColor?: string;
-    backgroundOpacity?: number;
-    borderColor?: string;
-    borderWidth?: number;
-    fontSize?: number;
-    fontFamily?: string;
-    lineHeight?: number;
-    alignment?: "left" | "center" | "right";
-    flatten?: boolean;
-    rotationDeg?: number;
-    thickness?: number;
-    arrowSize?: number;
-    startArrowStyle?:
-      | "closed_arrow"
-      | "line_arrow"
-      | "hollow_arrow"
-      | "circle"
-      | "square"
-      | "diamond"
-      | "slash";
-    endArrowStyle?:
-      | "closed_arrow"
-      | "line_arrow"
-      | "hollow_arrow"
-      | "circle"
-      | "square"
-      | "diamond"
-      | "slash";
-    cloudIntensity?: number;
-    cloudSpacing?: number;
-  };
+  style?: AiAnnotationStyleInput;
 }
 
 export interface AiAnnotationUpdateResultItem {

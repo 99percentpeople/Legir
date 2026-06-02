@@ -799,6 +799,13 @@ const sharedAnnotationStyleArgsSchema = z.object({
   opacity: unitIntervalNumberSchema.optional(),
 });
 
+const createSharedAnnotationStyleArgsSchema = z
+  .object({
+    color: optionalTrimmedStringSchema,
+    opacity: unitIntervalNumberSchema.optional().catch(undefined),
+  })
+  .passthrough();
+
 const freetextAnnotationStyleArgsSchema = sharedAnnotationStyleArgsSchema
   .extend({
     background_color: z.string().min(1).optional(),
@@ -813,6 +820,21 @@ const freetextAnnotationStyleArgsSchema = sharedAnnotationStyleArgsSchema
   })
   .strict();
 
+const createFreetextAnnotationStyleArgsSchema =
+  createSharedAnnotationStyleArgsSchema
+    .extend({
+      background_color: optionalTrimmedStringSchema,
+      border_color: optionalTrimmedStringSchema,
+      border_width: optionalNonNegativeNumberSchema,
+      font_size: optionalPositiveNumberSchema,
+      font_family: optionalTrimmedStringSchema,
+      line_height: optionalPositiveNumberSchema,
+      alignment: formFieldAlignmentSchema.optional().catch(undefined),
+      flatten: optionalBooleanSchema,
+      rotation_deg: optionalFiniteNumberSchema,
+    })
+    .passthrough();
+
 const shapeAnnotationStyleArgsSchema = sharedAnnotationStyleArgsSchema
   .extend({
     background_color: z.string().min(1).optional(),
@@ -825,6 +847,20 @@ const shapeAnnotationStyleArgsSchema = sharedAnnotationStyleArgsSchema
     cloud_spacing: positiveNumberSchema.optional(),
   })
   .strict();
+
+const createShapeAnnotationStyleArgsSchema =
+  createSharedAnnotationStyleArgsSchema
+    .extend({
+      background_color: optionalTrimmedStringSchema,
+      background_opacity: unitIntervalNumberSchema.optional().catch(undefined),
+      thickness: optionalNonNegativeNumberSchema,
+      arrow_size: optionalPositiveNumberSchema,
+      start_arrow_style: shapeArrowStyleSchema.optional().catch(undefined),
+      end_arrow_style: shapeArrowStyleSchema.optional().catch(undefined),
+      cloud_intensity: optionalPositiveNumberSchema,
+      cloud_spacing: optionalPositiveNumberSchema,
+    })
+    .passthrough();
 
 const ensureAnnotationPatchPayload = (
   value: {
@@ -920,22 +956,7 @@ const createFreetextAnnotationInputSchema = z
     page_number: optionalPageNumberSchema,
     text: optionalStringSchema,
     rect: loosePageRectArgsSchema.optional(),
-    style: z
-      .object({
-        color: optionalTrimmedStringSchema,
-        opacity: unitIntervalNumberSchema.optional().catch(undefined),
-        background_color: optionalTrimmedStringSchema,
-        border_color: optionalTrimmedStringSchema,
-        border_width: optionalNonNegativeNumberSchema,
-        font_size: optionalPositiveNumberSchema,
-        font_family: optionalTrimmedStringSchema,
-        line_height: optionalPositiveNumberSchema,
-        alignment: formFieldAlignmentSchema.optional().catch(undefined),
-        flatten: optionalBooleanSchema,
-        rotation_deg: optionalFiniteNumberSchema,
-      })
-      .passthrough()
-      .optional(),
+    style: createFreetextAnnotationStyleArgsSchema.optional(),
   })
   .passthrough();
 
@@ -964,23 +985,7 @@ const createShapeAnnotationInputSchema = z
     rect: loosePageRectArgsSchema.optional(),
     points: z.array(looseAnnotationPointArgsSchema).optional(),
     annotation_text: optionalStringSchema,
-    style: z
-      .object({
-        color: optionalTrimmedStringSchema,
-        opacity: unitIntervalNumberSchema.optional().catch(undefined),
-        background_color: optionalTrimmedStringSchema,
-        background_opacity: unitIntervalNumberSchema
-          .optional()
-          .catch(undefined),
-        thickness: optionalNonNegativeNumberSchema,
-        arrow_size: optionalPositiveNumberSchema,
-        start_arrow_style: shapeArrowStyleSchema.optional().catch(undefined),
-        end_arrow_style: shapeArrowStyleSchema.optional().catch(undefined),
-        cloud_intensity: optionalPositiveNumberSchema,
-        cloud_spacing: optionalPositiveNumberSchema,
-      })
-      .passthrough()
-      .optional(),
+    style: createShapeAnnotationStyleArgsSchema.optional(),
   })
   .passthrough();
 
@@ -1090,15 +1095,14 @@ export const highlightResultsArgsSchema = z
         return value;
       }
       const record = value as Record<string, unknown>;
+      const { result_id, selection_anchor, document_anchor, ...rest } = record;
       return {
-        ...record,
-        ...(record.result_id ? { result_ids: [record.result_id] } : null),
-        ...(record.selection_anchor
-          ? { selection_anchors: [record.selection_anchor] }
+        ...rest,
+        ...(result_id ? { result_ids: [result_id] } : null),
+        ...(selection_anchor
+          ? { selection_anchors: [selection_anchor] }
           : null),
-        ...(record.document_anchor
-          ? { document_anchors: [record.document_anchor] }
-          : null),
+        ...(document_anchor ? { document_anchors: [document_anchor] } : null),
       };
     },
     z
@@ -1109,6 +1113,11 @@ export const highlightResultsArgsSchema = z
           .optional()
           .describe(
             "Optional shared note/comment text applied to created highlights that do not provide their own item-level annotation_text.",
+          ),
+        style: createSharedAnnotationStyleArgsSchema
+          .optional()
+          .describe(
+            "Optional highlight style for created annotations. Supports color and opacity.",
           ),
         selection_anchors: z
           .array(selectionAttachmentAnchorSchema)

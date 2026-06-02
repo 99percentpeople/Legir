@@ -10,6 +10,7 @@ import {
   defineToolModule,
   emptyObjectSchema,
   expandPageNumberSelectors,
+  highlightResultsArgsSchema,
   pageNumbersSchema,
   parseToolArgs,
   requiredPageNumbersSchema,
@@ -155,6 +156,30 @@ describe("AI chat tool shared helpers", () => {
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error).toContain("page_numbers");
+  });
+
+  test("parses highlight creation style args", () => {
+    const result = parseToolArgs(highlightResultsArgsSchema, {
+      result_id: "result_1",
+      style: {
+        color: " #ff5500 ",
+        opacity: 0.5,
+      },
+    });
+
+    expect(result).toEqual({
+      success: true,
+      data: {
+        result_ids: ["result_1"],
+        annotation_text: undefined,
+        style: {
+          color: "#ff5500",
+          opacity: 0.5,
+        },
+        selection_anchors: [],
+        document_anchors: [],
+      },
+    });
   });
 
   test("rejects duplicate tool handlers", () => {

@@ -45,6 +45,7 @@ import type {
   AiAnnotationKind,
   AiAnnotationDeleteBatchResult,
   AiAnnotationSummary,
+  AiAnnotationStyleInput,
   AiAnnotationUpdateResult,
   AiAnnotationUpdateResultItem,
   AiCreateAnnotationsResult,
@@ -851,6 +852,331 @@ const buildSelectedChatModelMeta = (
         modelLabel: selectedChatModel.modelLabel,
       }
     : undefined;
+
+type AnnotationStyleUpdatePatch = {
+  patch: Partial<Annotation>;
+  updatedProperties: string[];
+};
+
+const getHighlightAnnotationStylePatch = (
+  style: AiAnnotationStyleInput | undefined,
+  defaults: {
+    color?: string;
+    opacity?: number;
+  },
+): Partial<Annotation> => ({
+  color: style?.color ?? defaults.color,
+  opacity: style?.opacity ?? defaults.opacity,
+});
+
+const getFreetextAnnotationStylePatch = (
+  style: AiAnnotationStyleInput | undefined,
+  defaults: {
+    color: string;
+    size: number;
+    borderColor?: string;
+    borderWidth?: number;
+  },
+): Partial<Annotation> => ({
+  color: style?.color ?? defaults.color,
+  opacity: style?.opacity,
+  backgroundColor: normalizeTransparentFillColor(style?.backgroundColor),
+  borderColor: style?.borderColor ?? defaults.borderColor,
+  borderWidth: style?.borderWidth ?? defaults.borderWidth,
+  size: style?.fontSize ?? defaults.size,
+  fontFamily: style?.fontFamily,
+  lineHeight: style?.lineHeight,
+  alignment: style?.alignment,
+  flatten: style?.flatten,
+  rotationDeg: style?.rotationDeg,
+});
+
+const getShapeAnnotationStylePatch = (
+  shapeType: NonNullable<Annotation["shapeType"]>,
+  style: AiAnnotationStyleInput | undefined,
+  defaults: {
+    color: string;
+    thickness: number;
+    opacity: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    arrowSize?: number;
+    cloudIntensity?: number;
+    cloudSpacing?: number;
+  },
+): Partial<Annotation> => {
+  const backgroundColor = shapeSupportsFill(shapeType)
+    ? normalizeTransparentFillColor(
+        style?.backgroundColor ?? defaults.backgroundColor,
+      )
+    : undefined;
+  const arrowStyleUpdates = getShapeArrowStyleUpdates({
+    start: style?.startArrowStyle ?? null,
+    end:
+      style?.endArrowStyle ?? (shapeType === "arrow" ? "closed_arrow" : null),
+  });
+
+  return {
+    color: style?.color ?? defaults.color,
+    thickness: style?.thickness ?? defaults.thickness,
+    opacity: style?.opacity ?? defaults.opacity,
+    backgroundColor,
+    backgroundOpacity:
+      shapeSupportsFill(shapeType) && backgroundColor
+        ? (style?.backgroundOpacity ??
+          style?.opacity ??
+          defaults.backgroundOpacity)
+        : undefined,
+    arrowSize: isOpenLineShapeType(shapeType)
+      ? (style?.arrowSize ?? defaults.arrowSize)
+      : undefined,
+    cloudIntensity:
+      shapeType === "cloud" || shapeType === "cloud_polygon"
+        ? (style?.cloudIntensity ?? defaults.cloudIntensity)
+        : undefined,
+    cloudSpacing:
+      shapeType === "cloud" || shapeType === "cloud_polygon"
+        ? (style?.cloudSpacing ?? defaults.cloudSpacing)
+        : undefined,
+    ...arrowStyleUpdates,
+  };
+};
+
+const getAnnotationStyleUpdatePatch = (
+  target: Annotation,
+  style: AiAnnotationStyleInput | undefined,
+): AnnotationStyleUpdatePatch => {
+  const patch: Partial<Annotation> = {};
+  const updatedProperties: string[] = [];
+  const markAppearanceUpdated = () => {
+    if (target.type === "shape" || target.type === "ink") {
+      patch.appearanceStreamContent = undefined;
+    }
+  };
+  const setChanged = <TKey extends keyof Annotation>(
+    key: TKey,
+    currentValue: Annotation[TKey],
+    nextValue: Annotation[TKey],
+    propertyName?: string,
+    options?: { appearance?: boolean },
+  ) => {
+    if (currentValue === nextValue) return;
+    patch[key] = nextValue;
+    updatedProperties.push(propertyName ?? String(key));
+    if (options?.appearance) markAppearanceUpdated();
+  };
+
+  if (!style) return { patch, updatedProperties };
+
+  if (style.color !== undefined && target.type !== "link") {
+    setChanged("color", target.color ?? "", style.color, "color", {
+      appearance: true,
+    });
+  }
+
+  if (style.opacity !== undefined && target.type !== "link") {
+    setChanged("opacity", target.opacity ?? 1, style.opacity, "opacity", {
+      appearance: true,
+    });
+  }
+
+  if (style.backgroundColor !== undefined) {
+    const nextBackgroundColor = normalizeTransparentFillColor(
+      style.backgroundColor,
+    );
+    if (target.type === "freetext") {
+      setChanged(
+        "backgroundColor",
+        target.backgroundColor ?? undefined,
+        nextBackgroundColor,
+        "backgroundColor",
+      );
+    } else if (target.type === "shape" && shapeSupportsFill(target.shapeType)) {
+      setChanged(
+        "backgroundColor",
+        target.backgroundColor ?? undefined,
+        nextBackgroundColor,
+        "backgroundColor",
+        { appearance: true },
+      );
+    }
+  }
+
+  if (
+    style.backgroundOpacity !== undefined &&
+    target.type === "shape" &&
+    shapeSupportsFill(target.shapeType)
+  ) {
+    setChanged(
+      "backgroundOpacity",
+      target.backgroundOpacity ?? target.opacity ?? 1,
+      style.backgroundOpacity,
+      "backgroundOpacity",
+      { appearance: true },
+    );
+  }
+
+  if (style.borderColor !== undefined && target.type === "freetext") {
+    setChanged(
+      "borderColor",
+      target.borderColor ?? "",
+      style.borderColor,
+      "borderColor",
+    );
+  }
+
+  if (style.borderWidth !== undefined && target.type === "freetext") {
+    setChanged(
+      "borderWidth",
+      target.borderWidth ?? 0,
+      style.borderWidth,
+      "borderWidth",
+    );
+  }
+
+  if (style.fontSize !== undefined && target.type === "freetext") {
+    setChanged("size", target.size ?? 12, style.fontSize, "fontSize");
+  }
+
+  if (style.fontFamily !== undefined && target.type === "freetext") {
+    setChanged(
+      "fontFamily",
+      target.fontFamily ?? "",
+      style.fontFamily,
+      "fontFamily",
+    );
+  }
+
+  if (style.lineHeight !== undefined && target.type === "freetext") {
+    setChanged(
+      "lineHeight",
+      target.lineHeight ?? 1,
+      style.lineHeight,
+      "lineHeight",
+    );
+  }
+
+  if (style.alignment !== undefined && target.type === "freetext") {
+    setChanged("alignment", target.alignment, style.alignment, "alignment");
+  }
+
+  if (style.flatten !== undefined && target.type === "freetext") {
+    setChanged("flatten", target.flatten ?? false, style.flatten, "flatten");
+  }
+
+  if (style.rotationDeg !== undefined && target.type === "freetext") {
+    setChanged(
+      "rotationDeg",
+      target.rotationDeg ?? 0,
+      style.rotationDeg,
+      "rotationDeg",
+    );
+  }
+
+  if (
+    style.thickness !== undefined &&
+    (target.type === "shape" || target.type === "ink")
+  ) {
+    setChanged(
+      "thickness",
+      target.thickness ?? 0,
+      style.thickness,
+      "thickness",
+      { appearance: true },
+    );
+  }
+
+  if (
+    style.arrowSize !== undefined &&
+    target.type === "shape" &&
+    isOpenLineShapeType(target.shapeType)
+  ) {
+    setChanged(
+      "arrowSize",
+      target.arrowSize ??
+        getDefaultArrowSize(target.thickness ?? style.thickness ?? 2),
+      style.arrowSize,
+      "arrowSize",
+      { appearance: true },
+    );
+  }
+
+  if (
+    (style.startArrowStyle !== undefined ||
+      style.endArrowStyle !== undefined) &&
+    target.type === "shape" &&
+    isOpenLineShapeType(target.shapeType)
+  ) {
+    const currentArrowStyles = getShapeArrowStyles(target);
+    const nextArrowStyles = {
+      start: style.startArrowStyle ?? currentArrowStyles.start,
+      end: style.endArrowStyle ?? currentArrowStyles.end,
+    };
+    const arrowStylePatch = getShapeArrowStyleUpdates(nextArrowStyles);
+    const nextShapeType =
+      nextArrowStyles.start || nextArrowStyles.end
+        ? "arrow"
+        : getShapeTypeWithoutArrow(target.shapePoints?.length ?? 2);
+    setChanged("shapeType", target.shapeType, nextShapeType, "shapeType");
+    setChanged(
+      "shapeStartArrowStyle",
+      target.shapeStartArrowStyle,
+      arrowStylePatch.shapeStartArrowStyle,
+      "shapeStartArrowStyle",
+    );
+    setChanged(
+      "shapeEndArrowStyle",
+      target.shapeEndArrowStyle,
+      arrowStylePatch.shapeEndArrowStyle,
+      "shapeEndArrowStyle",
+    );
+    setChanged(
+      "shapeStartArrow",
+      target.shapeStartArrow,
+      arrowStylePatch.shapeStartArrow,
+      "shapeStartArrow",
+    );
+    setChanged(
+      "shapeEndArrow",
+      target.shapeEndArrow,
+      arrowStylePatch.shapeEndArrow,
+      "shapeEndArrow",
+    );
+    if (updatedProperties.some((property) => property.startsWith("shape"))) {
+      markAppearanceUpdated();
+    }
+  }
+
+  if (
+    style.cloudIntensity !== undefined &&
+    target.type === "shape" &&
+    (target.shapeType === "cloud" || target.shapeType === "cloud_polygon")
+  ) {
+    setChanged(
+      "cloudIntensity",
+      target.cloudIntensity ?? 2,
+      style.cloudIntensity,
+      "cloudIntensity",
+      { appearance: true },
+    );
+  }
+
+  if (
+    style.cloudSpacing !== undefined &&
+    target.type === "shape" &&
+    (target.shapeType === "cloud" || target.shapeType === "cloud_polygon")
+  ) {
+    setChanged(
+      "cloudSpacing",
+      target.cloudSpacing ?? 28,
+      style.cloudSpacing,
+      "cloudSpacing",
+      { appearance: true },
+    );
+  }
+
+  return { patch, updatedProperties };
+};
 
 const getRectArea = (rect: FormField["rect"]) =>
   Math.max(0, rect.width) * Math.max(0, rect.height);
@@ -2161,243 +2487,9 @@ export const createAiChatToolContext = (options: {
         }
       }
 
-      const style = update.style;
-      if (style) {
-        if (style.color !== undefined) {
-          if (target.type !== "link" && (target.color ?? "") !== style.color) {
-            patch.color = style.color;
-            updatedProperties.push("color");
-            markAppearanceUpdated();
-          }
-        }
-
-        if (style.opacity !== undefined) {
-          if (
-            target.type !== "link" &&
-            (target.opacity ?? 1) !== style.opacity
-          ) {
-            patch.opacity = style.opacity;
-            updatedProperties.push("opacity");
-            markAppearanceUpdated();
-          }
-        }
-
-        if (style.backgroundColor !== undefined) {
-          const nextBackgroundColor = normalizeTransparentFillColor(
-            style.backgroundColor,
-          );
-          if (target.type === "freetext") {
-            if ((target.backgroundColor ?? undefined) !== nextBackgroundColor) {
-              patch.backgroundColor = nextBackgroundColor;
-              updatedProperties.push("backgroundColor");
-            }
-          } else if (
-            target.type === "shape" &&
-            shapeSupportsFill(target.shapeType)
-          ) {
-            if ((target.backgroundColor ?? undefined) !== nextBackgroundColor) {
-              patch.backgroundColor = nextBackgroundColor;
-              updatedProperties.push("backgroundColor");
-              markAppearanceUpdated();
-            }
-          }
-        }
-
-        if (style.backgroundOpacity !== undefined) {
-          if (
-            target.type === "shape" &&
-            shapeSupportsFill(target.shapeType) &&
-            (target.backgroundOpacity ?? target.opacity ?? 1) !==
-              style.backgroundOpacity
-          ) {
-            patch.backgroundOpacity = style.backgroundOpacity;
-            updatedProperties.push("backgroundOpacity");
-            markAppearanceUpdated();
-          }
-        }
-
-        if (style.borderColor !== undefined) {
-          if (
-            target.type === "freetext" &&
-            (target.borderColor ?? "") !== style.borderColor
-          ) {
-            patch.borderColor = style.borderColor;
-            updatedProperties.push("borderColor");
-          }
-        }
-
-        if (style.borderWidth !== undefined) {
-          if (
-            target.type === "freetext" &&
-            (target.borderWidth ?? 0) !== style.borderWidth
-          ) {
-            patch.borderWidth = style.borderWidth;
-            updatedProperties.push("borderWidth");
-          }
-        }
-
-        if (style.fontSize !== undefined) {
-          if (
-            target.type === "freetext" &&
-            (target.size ?? 12) !== style.fontSize
-          ) {
-            patch.size = style.fontSize;
-            updatedProperties.push("fontSize");
-          }
-        }
-
-        if (style.fontFamily !== undefined) {
-          if (
-            target.type === "freetext" &&
-            (target.fontFamily ?? "") !== style.fontFamily
-          ) {
-            patch.fontFamily = style.fontFamily;
-            updatedProperties.push("fontFamily");
-          }
-        }
-
-        if (style.lineHeight !== undefined) {
-          if (
-            target.type === "freetext" &&
-            (target.lineHeight ?? 1) !== style.lineHeight
-          ) {
-            patch.lineHeight = style.lineHeight;
-            updatedProperties.push("lineHeight");
-          }
-        }
-
-        if (style.alignment !== undefined) {
-          if (
-            target.type === "freetext" &&
-            target.alignment !== style.alignment
-          ) {
-            patch.alignment = style.alignment;
-            updatedProperties.push("alignment");
-          }
-        }
-
-        if (style.flatten !== undefined) {
-          if (
-            target.type === "freetext" &&
-            (target.flatten ?? false) !== style.flatten
-          ) {
-            patch.flatten = style.flatten;
-            updatedProperties.push("flatten");
-          }
-        }
-
-        if (style.rotationDeg !== undefined) {
-          if (
-            target.type === "freetext" &&
-            (target.rotationDeg ?? 0) !== style.rotationDeg
-          ) {
-            patch.rotationDeg = style.rotationDeg;
-            updatedProperties.push("rotationDeg");
-          }
-        }
-
-        if (style.thickness !== undefined) {
-          if (
-            (target.type === "shape" || target.type === "ink") &&
-            (target.thickness ?? 0) !== style.thickness
-          ) {
-            patch.thickness = style.thickness;
-            updatedProperties.push("thickness");
-            markAppearanceUpdated();
-          }
-        }
-
-        if (style.arrowSize !== undefined) {
-          if (
-            target.type === "shape" &&
-            isOpenLineShapeType(target.shapeType) &&
-            (target.arrowSize ??
-              getDefaultArrowSize(target.thickness ?? style.thickness ?? 2)) !==
-              style.arrowSize
-          ) {
-            patch.arrowSize = style.arrowSize;
-            updatedProperties.push("arrowSize");
-            markAppearanceUpdated();
-          }
-        }
-
-        if (
-          style.startArrowStyle !== undefined ||
-          style.endArrowStyle !== undefined
-        ) {
-          if (
-            target.type === "shape" &&
-            isOpenLineShapeType(target.shapeType)
-          ) {
-            const currentArrowStyles = getShapeArrowStyles(target);
-            const nextArrowStyles = {
-              start: style.startArrowStyle ?? currentArrowStyles.start,
-              end: style.endArrowStyle ?? currentArrowStyles.end,
-            };
-            const arrowStylePatch = getShapeArrowStyleUpdates(nextArrowStyles);
-            const nextShapeType =
-              nextArrowStyles.start || nextArrowStyles.end
-                ? "arrow"
-                : getShapeTypeWithoutArrow(target.shapePoints?.length ?? 2);
-            if (target.shapeType !== nextShapeType) {
-              patch.shapeType = nextShapeType;
-              updatedProperties.push("shapeType");
-            }
-            if (
-              target.shapeStartArrowStyle !==
-              arrowStylePatch.shapeStartArrowStyle
-            ) {
-              patch.shapeStartArrowStyle = arrowStylePatch.shapeStartArrowStyle;
-              updatedProperties.push("shapeStartArrowStyle");
-            }
-            if (
-              target.shapeEndArrowStyle !== arrowStylePatch.shapeEndArrowStyle
-            ) {
-              patch.shapeEndArrowStyle = arrowStylePatch.shapeEndArrowStyle;
-              updatedProperties.push("shapeEndArrowStyle");
-            }
-            if (target.shapeStartArrow !== arrowStylePatch.shapeStartArrow) {
-              patch.shapeStartArrow = arrowStylePatch.shapeStartArrow;
-              updatedProperties.push("shapeStartArrow");
-            }
-            if (target.shapeEndArrow !== arrowStylePatch.shapeEndArrow) {
-              patch.shapeEndArrow = arrowStylePatch.shapeEndArrow;
-              updatedProperties.push("shapeEndArrow");
-            }
-            if (
-              updatedProperties.some((property) => property.startsWith("shape"))
-            ) {
-              markAppearanceUpdated();
-            }
-          }
-        }
-
-        if (style.cloudIntensity !== undefined) {
-          if (
-            target.type === "shape" &&
-            (target.shapeType === "cloud" ||
-              target.shapeType === "cloud_polygon") &&
-            (target.cloudIntensity ?? 2) !== style.cloudIntensity
-          ) {
-            patch.cloudIntensity = style.cloudIntensity;
-            updatedProperties.push("cloudIntensity");
-            markAppearanceUpdated();
-          }
-        }
-
-        if (style.cloudSpacing !== undefined) {
-          if (
-            target.type === "shape" &&
-            (target.shapeType === "cloud" ||
-              target.shapeType === "cloud_polygon") &&
-            (target.cloudSpacing ?? 28) !== style.cloudSpacing
-          ) {
-            patch.cloudSpacing = style.cloudSpacing;
-            updatedProperties.push("cloudSpacing");
-            markAppearanceUpdated();
-          }
-        }
-      }
+      const stylePatch = getAnnotationStyleUpdatePatch(target, update.style);
+      Object.assign(patch, stylePatch.patch);
+      updatedProperties.push(...stylePatch.updatedProperties);
 
       if (reason) {
         results.push({
@@ -2536,19 +2628,7 @@ export const createAiChatToolContext = (options: {
         rect,
         text,
         author: options.selectedChatModelAuthor,
-        color: item.style?.color ?? freetextDefaults.color,
-        opacity: item.style?.opacity,
-        backgroundColor: normalizeTransparentFillColor(
-          item.style?.backgroundColor,
-        ),
-        borderColor: item.style?.borderColor ?? freetextDefaults.borderColor,
-        borderWidth: item.style?.borderWidth ?? freetextDefaults.borderWidth,
-        size: item.style?.fontSize ?? freetextDefaults.size,
-        fontFamily: item.style?.fontFamily,
-        lineHeight: item.style?.lineHeight,
-        alignment: item.style?.alignment,
-        flatten: item.style?.flatten,
-        rotationDeg: item.style?.rotationDeg,
+        ...getFreetextAnnotationStylePatch(item.style, freetextDefaults),
         meta: {
           kind: "ai_chat_freetext",
           createdAt,
@@ -2707,17 +2787,6 @@ export const createAiChatToolContext = (options: {
         continue;
       }
 
-      const backgroundColor = shapeSupportsFill(shapeType)
-        ? normalizeTransparentFillColor(
-            item.style?.backgroundColor ?? shapeDefaults.backgroundColor,
-          )
-        : undefined;
-      const arrowStyleUpdates = getShapeArrowStyleUpdates({
-        start: item.style?.startArrowStyle ?? null,
-        end:
-          item.style?.endArrowStyle ??
-          (shapeType === "arrow" ? "closed_arrow" : null),
-      });
       const candidate: Annotation = {
         id: `ai_shape_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         pageIndex,
@@ -2727,28 +2796,7 @@ export const createAiChatToolContext = (options: {
         ...(shapePoints?.length ? { shapePoints } : null),
         author: options.selectedChatModelAuthor,
         text: annotationText,
-        color: item.style?.color ?? shapeDefaults.color,
-        thickness: item.style?.thickness ?? shapeDefaults.thickness,
-        opacity: item.style?.opacity ?? shapeDefaults.opacity,
-        backgroundColor,
-        backgroundOpacity:
-          shapeSupportsFill(shapeType) && backgroundColor
-            ? (item.style?.backgroundOpacity ??
-              item.style?.opacity ??
-              shapeDefaults.backgroundOpacity)
-            : undefined,
-        arrowSize: isOpenLineShapeType(shapeType)
-          ? (item.style?.arrowSize ?? shapeDefaults.arrowSize)
-          : undefined,
-        cloudIntensity:
-          shapeType === "cloud" || shapeType === "cloud_polygon"
-            ? (item.style?.cloudIntensity ?? shapeDefaults.cloudIntensity)
-            : undefined,
-        cloudSpacing:
-          shapeType === "cloud" || shapeType === "cloud_polygon"
-            ? (item.style?.cloudSpacing ?? shapeDefaults.cloudSpacing)
-            : undefined,
-        ...arrowStyleUpdates,
+        ...getShapeAnnotationStylePatch(shapeType, item.style, shapeDefaults),
         meta: {
           kind: "ai_chat_shape",
           createdAt,
@@ -2808,6 +2856,7 @@ export const createAiChatToolContext = (options: {
   const createSearchHighlightAnnotations = async (optionsInput: {
     resultIds?: string[];
     annotationText?: string;
+    style?: AiAnnotationStyleInput;
     selectionAnchors?: Array<{
       attachmentIndex: number;
       startAnchor: string;
@@ -2844,11 +2893,13 @@ export const createAiChatToolContext = (options: {
       }),
     );
     const createdAt = new Date().toISOString();
-    const style = store.highlightStyle || {
-      color: ANNOTATION_STYLES.highlight.color,
-      thickness: ANNOTATION_STYLES.highlight.thickness,
-      opacity: ANNOTATION_STYLES.highlight.opacity,
-    };
+    const batchHighlightStyle = getHighlightAnnotationStylePatch(
+      optionsInput.style,
+      store.highlightStyle || {
+        color: ANNOTATION_STYLES.highlight.color,
+        opacity: ANNOTATION_STYLES.highlight.opacity,
+      },
+    );
     const requestedResultIds = optionsInput.resultIds ?? [];
     const annotationText = optionsInput.annotationText?.trim() || undefined;
     const requestedSelectionAnchors = optionsInput.selectionAnchors ?? [];
@@ -3064,8 +3115,7 @@ export const createAiChatToolContext = (options: {
         text: annotationText ?? stored.result.matchText,
         highlightedText: stored.result.matchText,
         author: options.selectedChatModelAuthor,
-        color: style.color,
-        opacity: style.opacity,
+        ...batchHighlightStyle,
         meta: {
           kind: "ai_search_highlight",
           resultId,
@@ -3166,7 +3216,6 @@ export const createAiChatToolContext = (options: {
       const matchText = normalizeAnnotationText(
         attachment.text.slice(localStart, localEnd),
       );
-
       batch.push({
         id: annotationId,
         pageIndex: attachment.pageIndex,
@@ -3176,8 +3225,7 @@ export const createAiChatToolContext = (options: {
         text: effectiveAnnotationText ?? matchText,
         highlightedText: matchText,
         author: options.selectedChatModelAuthor,
-        color: style.color,
-        opacity: style.opacity,
+        ...batchHighlightStyle,
         meta: {
           kind: "ai_selection_highlight",
           selectionKey,
@@ -3380,7 +3428,6 @@ export const createAiChatToolContext = (options: {
       const annotationId = `ai_highlight_${Date.now()}_${Math.random()
         .toString(36)
         .slice(2, 8)}`;
-
       batch.push({
         id: annotationId,
         pageIndex: bestCandidate.pageIndex,
@@ -3390,8 +3437,7 @@ export const createAiChatToolContext = (options: {
         text: effectiveAnnotationText ?? matchText,
         highlightedText: matchText,
         author: options.selectedChatModelAuthor,
-        color: style.color,
-        opacity: style.opacity,
+        ...batchHighlightStyle,
         meta: {
           kind: "ai_document_anchor_highlight",
           documentAnchorKey,
