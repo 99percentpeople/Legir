@@ -563,8 +563,7 @@ const ja = {
     title: "エディター設定",
     tabs: {
       general: "一般",
-      export: "エクスポート",
-      snapping: "スナップ",
+      edit: "編集",
       llm: "LLM",
       ai_chat: "AI チャット",
       debug: "デバッグ",
@@ -703,14 +702,14 @@ const ja = {
       context_compression_mode_ai: "AI 圧縮",
       context_compression_model: "AI 圧縮モデル",
       context_compression_model_placeholder: "モデルを選択",
+      context_compression_model_auto: "自動",
       context_compression_model_desc:
-        "AI 圧縮モードでのみ使用され、切り詰められた古いコンテキストをコンパクトなメモリに書き換えます。空欄の場合は現在のチャットモデルにフォールバックします。",
+        "AI 圧縮モードでのみ使用され、切り詰められた古いコンテキストをコンパクトなメモリに書き換えます。自動では現在のチャットモデルに従います。",
       form_tools_enabled: "AI フォームツールを有効化",
       form_tools_enabled_desc:
         "会話から新しいフォームフィールドを作成できるようにします。読み取り専用の Q&A と既存フィールド入力だけでよい場合は無効のままにしてください。",
       visual_model: "ビジュアルモデル",
       visual_model_placeholder: "ビジュアルモデルを選択",
-      visual_model_auto_group: "自動",
       visual_model_auto: "自動",
       visual_model_desc:
         "現在のチャットモデルがレンダリング済みページ画像を直接受け取れない場合、inspect_pages_visual が視覚構造の確認やフォームフィールド作成計画に自動で使用します。",

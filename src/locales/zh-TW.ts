@@ -549,8 +549,7 @@ const zhTW = {
     title: "編輯器設定",
     tabs: {
       general: "通用",
-      export: "匯出",
-      snapping: "對齊",
+      edit: "編輯",
       llm: "大模型",
       ai_chat: "AI 問答",
       debug: "除錯",
@@ -679,14 +678,14 @@ const zhTW = {
       context_compression_mode_ai: "AI 壓縮",
       context_compression_model: "AI 壓縮模型",
       context_compression_model_placeholder: "選擇模型",
+      context_compression_model_auto: "自動",
       context_compression_model_desc:
-        "僅在 AI 壓縮模式下使用，用於把被裁切的舊上下文改寫成緊湊記憶。留空時會回退到目前的對話模型。",
+        "僅在 AI 壓縮模式下使用，用於把被裁切的舊上下文改寫成緊湊記憶。自動時會跟隨目前的對話模型。",
       form_tools_enabled: "啟用 AI 表單工具",
       form_tools_enabled_desc:
         "允許 AI 問答根據對話請求建立新的表單欄位。如果你只希望它做唯讀問答與欄位填值，請保持關閉。",
       visual_model: "視覺模型",
       visual_model_placeholder: "選擇視覺模型",
-      visual_model_auto_group: "自動",
       visual_model_auto: "自動",
       visual_model_desc:
         "當目前對話模型不能直接接收渲染後的頁面圖片時，inspect_pages_visual 會自動使用這個模型，包括視覺結構檢查和表單欄位規劃。",

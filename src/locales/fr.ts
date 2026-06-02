@@ -570,8 +570,7 @@ const fr = {
     title: "Paramètres de l'éditeur",
     tabs: {
       general: "Général",
-      export: "Export",
-      snapping: "Ancrage",
+      edit: "Édition",
       llm: "LLM",
       ai_chat: "Chat IA",
       debug: "Débogage",
@@ -718,14 +717,14 @@ const fr = {
       context_compression_mode_ai: "Compression IA",
       context_compression_model: "Modèle de compression IA",
       context_compression_model_placeholder: "Sélectionner un modèle",
+      context_compression_model_auto: "Automatique",
       context_compression_model_desc:
-        "Utilisé uniquement en mode de compression IA pour réécrire l'ancien contexte retiré dans une mémoire compacte. Si laissé vide, le modèle de chat actif est utilisé.",
+        "Utilisé uniquement en mode de compression IA pour réécrire l'ancien contexte retiré dans une mémoire compacte. Automatique suit le modèle de chat actif.",
       form_tools_enabled: "Activer les outils de formulaire IA",
       form_tools_enabled_desc:
         "Permet au chat IA de créer de nouveaux champs de formulaire à partir des demandes conversationnelles. Laissez cette option désactivée si vous ne voulez que des questions-réponses en lecture seule et le remplissage des champs.",
       visual_model: "Modèle visuel",
       visual_model_placeholder: "Sélectionner un modèle visuel",
-      visual_model_auto_group: "Automatique",
       visual_model_auto: "Automatique",
       visual_model_desc:
         "Utilisé automatiquement par inspect_pages_visual lorsque le modèle de chat actif ne peut pas recevoir directement les images de page rendues, y compris pour l'inspection de la structure visuelle et la planification des champs de formulaire.",

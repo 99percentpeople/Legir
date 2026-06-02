@@ -568,8 +568,7 @@ const es = {
     title: "Configuración del editor",
     tabs: {
       general: "General",
-      export: "Exportación",
-      snapping: "Ajuste",
+      edit: "Editar",
       llm: "LLM",
       ai_chat: "Chat IA",
       debug: "Depuración",
@@ -714,14 +713,14 @@ const es = {
       context_compression_mode_ai: "Compresión con IA",
       context_compression_model: "Modelo de compresión con IA",
       context_compression_model_placeholder: "Selecciona un modelo",
+      context_compression_model_auto: "Automático",
       context_compression_model_desc:
-        "Se usa solo en el modo de compresión con IA para reescribir el contexto antiguo recortado como memoria compacta. Si se deja vacío, se usará el modelo de chat actual.",
+        "Se usa solo en el modo de compresión con IA para reescribir el contexto antiguo recortado como memoria compacta. Automático sigue el modelo de chat activo.",
       form_tools_enabled: "Habilitar herramientas de formularios con IA",
       form_tools_enabled_desc:
         "Permite que el chat IA cree nuevos campos de formulario a partir de solicitudes conversacionales. Déjalo desactivado si solo quieres preguntas y respuestas de solo lectura y rellenado de campos.",
       visual_model: "Modelo visual",
       visual_model_placeholder: "Selecciona un modelo visual",
-      visual_model_auto_group: "Automático",
       visual_model_auto: "Automático",
       visual_model_desc:
         "inspect_pages_visual lo usa automáticamente cuando el modelo de chat activo no puede recibir imágenes de página renderizadas directamente, incluida la inspección de estructura visual y la planificación de campos de formulario.",

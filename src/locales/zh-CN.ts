@@ -550,8 +550,7 @@ const zhCN = {
     title: "编辑器设置",
     tabs: {
       general: "通用",
-      export: "导出",
-      snapping: "对齐",
+      edit: "编辑",
       llm: "大模型",
       ai_chat: "AI 问答",
       debug: "调试",
@@ -680,14 +679,14 @@ const zhCN = {
       context_compression_mode_ai: "AI 压缩",
       context_compression_model: "AI 压缩模型",
       context_compression_model_placeholder: "选择模型",
+      context_compression_model_auto: "自动",
       context_compression_model_desc:
-        "仅在 AI 压缩模式下使用，用于把被裁剪的旧上下文改写成紧凑记忆。留空时会回退到当前对话模型。",
+        "仅在 AI 压缩模式下使用，用于把被裁剪的旧上下文改写成紧凑记忆。自动时会跟随当前对话模型。",
       form_tools_enabled: "启用 AI 表单工具",
       form_tools_enabled_desc:
         "允许 AI 问答根据对话请求创建新的表单字段。如果你只希望它做只读问答和字段填值，请保持关闭。",
       visual_model: "视觉模型",
       visual_model_placeholder: "选择视觉模型",
-      visual_model_auto_group: "自动",
       visual_model_auto: "自动",
       visual_model_desc:
         "当当前对话模型不能直接接收渲染后的页面图片时，inspect_pages_visual 会自动使用这个模型，包括视觉结构检查和表单字段规划。",

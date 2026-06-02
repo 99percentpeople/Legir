@@ -570,8 +570,7 @@ const de = {
     title: "Editor-Einstellungen",
     tabs: {
       general: "Allgemein",
-      export: "Export",
-      snapping: "Einrasten",
+      edit: "Bearbeiten",
       llm: "LLM",
       ai_chat: "AI Chat",
       debug: "Debug",
@@ -717,14 +716,14 @@ const de = {
       context_compression_mode_ai: "KI-Komprimierung",
       context_compression_model: "KI-Komprimierungsmodell",
       context_compression_model_placeholder: "Modell auswählen",
+      context_compression_model_auto: "Automatisch",
       context_compression_model_desc:
-        "Wird nur im KI-Komprimierungsmodus verwendet, um älteren beschnittenen Kontext in kompakten Speicher umzuschreiben. Leer bedeutet Rückfall auf das aktive Chat-Modell.",
+        "Wird nur im KI-Komprimierungsmodus verwendet, um älteren beschnittenen Kontext in kompakten Speicher umzuschreiben. Automatisch folgt dem aktiven Chat-Modell.",
       form_tools_enabled: "KI-Formularwerkzeuge aktivieren",
       form_tools_enabled_desc:
         "Erlaubt dem AI-Chat, neue Formularfelder aus Gesprächsanfragen zu erstellen. Deaktiviert lassen, wenn nur schreibgeschützter Chat und Feldbefüllung gewünscht sind.",
       visual_model: "Visuelles Modell",
       visual_model_placeholder: "Visuelles Modell auswählen",
-      visual_model_auto_group: "Automatisch",
       visual_model_auto: "Automatisch",
       visual_model_desc:
         "Wird von inspect_pages_visual automatisch verwendet, wenn das aktive Chat-Modell gerenderte Seitenbilder nicht direkt empfangen kann, einschließlich visueller Strukturprüfung und Planung von Formularfeldern.",

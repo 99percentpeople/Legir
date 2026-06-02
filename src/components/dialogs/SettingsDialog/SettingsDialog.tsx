@@ -4,7 +4,6 @@ import {
   Bug,
   FileText,
   Globe,
-  Magnet,
   MessageSquare,
   Settings2,
 } from "lucide-react";
@@ -41,10 +40,9 @@ import type {
 
 import { AiChatSettingsTab } from "./AiChatSettingsTab";
 import { DebugSettingsTab } from "./DebugSettingsTab";
-import { ExportSettingsTab } from "./ExportSettingsTab";
+import { EditSettingsTab } from "./EditSettingsTab";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { LlmSettingsTab } from "./LlmSettingsTab";
-import { SnappingSettingsTab } from "./SnappingSettingsTab";
 import {
   SETTINGS_TAB_TRIGGER_CLASS,
   SETTINGS_TABS_CONTENT_CLASS,
@@ -358,16 +356,9 @@ const SettingsDialog = ({
               <Globe className="h-4 w-4" />
               {t("settings.tabs.general")}
             </TabsTrigger>
-            <TabsTrigger value="export" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            <TabsTrigger value="edit" className={SETTINGS_TAB_TRIGGER_CLASS}>
               <FileText className="h-4 w-4" />
-              {t("settings.tabs.export")}
-            </TabsTrigger>
-            <TabsTrigger
-              value="snapping"
-              className={SETTINGS_TAB_TRIGGER_CLASS}
-            >
-              <Magnet className="h-4 w-4" />
-              {t("settings.tabs.snapping")}
+              {t("settings.tabs.edit")}
             </TabsTrigger>
             <TabsTrigger value="llm" className={SETTINGS_TAB_TRIGGER_CLASS}>
               <BrainCircuit className="h-4 w-4" />
@@ -384,10 +375,10 @@ const SettingsDialog = ({
           </TabsList>
           <div className={SETTINGS_TABS_CONTENT_CLASS}>
             <GeneralSettingsTab options={options} onChange={onChange} />
-            <ExportSettingsTab options={options} onChange={onChange} />
-            <SnappingSettingsTab
-              options={options.snappingOptions}
-              onUpdate={updateSnappingOption}
+            <EditSettingsTab
+              options={options}
+              onChange={onChange}
+              onUpdateSnapping={updateSnappingOption}
             />
             <LlmSettingsTab
               options={options}

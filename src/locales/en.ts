@@ -562,8 +562,7 @@ const en = {
     title: "Editor Settings",
     tabs: {
       general: "General",
-      export: "Export",
-      snapping: "Snapping",
+      edit: "Edit",
       llm: "LLM",
       ai_chat: "AI Chat",
       debug: "Debug",
@@ -704,14 +703,14 @@ const en = {
       context_compression_mode_ai: "AI compression",
       context_compression_model: "AI compression model",
       context_compression_model_placeholder: "Select a model",
+      context_compression_model_auto: "Automatic",
       context_compression_model_desc:
-        "Used only in AI compression mode to rewrite older pruned context into compact memory. Leave empty to fall back to the active chat model.",
+        "Used only in AI compression mode to rewrite older pruned context into compact memory. Automatic follows the active chat model.",
       form_tools_enabled: "Enable AI form tools",
       form_tools_enabled_desc:
         "Allow AI chat to create new form fields from conversation requests. Leave this off if you only want read-only Q&A and field filling.",
       visual_model: "Visual model",
       visual_model_placeholder: "Select a visual model",
-      visual_model_auto_group: "Automatic",
       visual_model_auto: "Automatic",
       visual_model_desc:
         "Used automatically by inspect_pages_visual when the active chat model cannot receive rendered page images directly, including visual-structure inspection and form-field planning.",

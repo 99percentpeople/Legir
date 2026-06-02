@@ -22,6 +22,7 @@ import {
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_STEP,
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
+  AI_CHAT_MODEL_AUTO_KEY,
   AI_CHAT_VISUAL_MODEL_AUTO_KEY,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX,
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
@@ -56,11 +57,25 @@ export const AiChatSettingsTab = ({
   const getPagesTextMaxChars = options.getPagesTextMaxChars;
   const contextCompressionMode = options.contextCompressionMode;
   const contextCompressionModelKey = options.contextCompressionModelKey;
+  const contextCompressionModelGroups = useMemo<ModelSelectGroup[]>(
+    () => [
+      {
+        id: "auto",
+        options: [
+          {
+            value: AI_CHAT_MODEL_AUTO_KEY,
+            label: t("settings.ai_chat.context_compression_model_auto"),
+          },
+        ],
+      },
+      ...aiToolModelGroups,
+    ],
+    [aiToolModelGroups, t],
+  );
   const visualModelGroups = useMemo<ModelSelectGroup[]>(
     () => [
       {
         id: "auto",
-        label: t("settings.ai_chat.visual_model_auto_group"),
         options: [
           {
             value: AI_CHAT_VISUAL_MODEL_AUTO_KEY,
@@ -274,21 +289,18 @@ export const AiChatSettingsTab = ({
                 {t("settings.ai_chat.context_compression_model")}
               </Label>
               <ModelSelect
-                value={contextCompressionModelKey || undefined}
+                value={contextCompressionModelKey || AI_CHAT_MODEL_AUTO_KEY}
                 onValueChange={(value) =>
-                  updateAiChatOptions({ contextCompressionModelKey: value })
+                  updateAiChatOptions({
+                    contextCompressionModelKey:
+                      value === AI_CHAT_MODEL_AUTO_KEY ? "" : value,
+                  })
                 }
-                placeholder={
-                  aiToolModelGroups.length > 0
-                    ? t(
-                        "settings.ai_chat.context_compression_model_placeholder",
-                      )
-                    : t("settings.ai_chat.no_models")
-                }
-                groups={aiToolModelGroups}
-                disabled={
-                  !contextCompressionEnabled || aiToolModelGroups.length === 0
-                }
+                placeholder={t(
+                  "settings.ai_chat.context_compression_model_placeholder",
+                )}
+                groups={contextCompressionModelGroups}
+                disabled={!contextCompressionEnabled}
                 showSeparators
               />
               <p className="text-muted-foreground text-xs">

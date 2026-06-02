@@ -43,8 +43,9 @@ export const AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MIN = 10_000;
 export const AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX = 100_000;
 export const AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_STEP = 1_000;
 export const AI_CHAT_MAX_TOOL_ROUNDS_MIN = 1;
-export const AI_CHAT_MAX_TOOL_ROUNDS_MAX = 30;
-export const AI_CHAT_VISUAL_MODEL_AUTO_KEY = "auto";
+export const AI_CHAT_MAX_TOOL_ROUNDS_MAX = 50;
+export const AI_CHAT_MODEL_AUTO_KEY = "auto";
+export const AI_CHAT_VISUAL_MODEL_AUTO_KEY = AI_CHAT_MODEL_AUTO_KEY;
 export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN = 1;
 export const AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MAX = 8;
 export const DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS = 128_000;
@@ -120,7 +121,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       contextCompressionThresholdPercent:
         AI_CHAT_CONTEXT_COMPRESSION_THRESHOLD_PERCENT_DEFAULT,
       visualHistoryWindow: 1,
-      maxToolRounds: 10,
+      maxToolRounds: 30,
       getPagesTextMaxChars: AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT,
       contextCompressionMode: "ai",
       contextCompressionModelKey: "",
