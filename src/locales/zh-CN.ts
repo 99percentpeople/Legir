@@ -384,13 +384,13 @@ const zhCN = {
   },
   right_panel: {
     tabs: {
-      ai_chat: "AI 问答",
+      ai_chat: "AI 助手",
       page_translate: "全页翻译",
       properties: "属性编辑",
     },
   },
   ai_chat: {
-    title: "AI 问答",
+    title: "AI 助手",
     history: "历史记录",
     sessions: "聊天记录",
     session_default: "新对话",
@@ -552,7 +552,7 @@ const zhCN = {
       general: "通用",
       edit: "编辑",
       llm: "大模型",
-      ai_chat: "AI 问答",
+      ai_chat: "AI 助手",
       debug: "调试",
     },
     language: "语言",
@@ -684,7 +684,7 @@ const zhCN = {
         "仅在 AI 压缩模式下使用，用于把被裁剪的旧上下文改写成紧凑记忆。自动时会跟随当前对话模型。",
       form_tools_enabled: "启用 AI 表单工具",
       form_tools_enabled_desc:
-        "允许 AI 问答根据对话请求创建新的表单字段。如果你只希望它做只读问答和字段填值，请保持关闭。",
+        "允许 AI 助手根据对话请求创建新的表单字段。如果你只希望它做只读协助和字段填值，请保持关闭。",
       visual_model: "视觉模型",
       visual_model_placeholder: "选择视觉模型",
       visual_model_auto: "自动",

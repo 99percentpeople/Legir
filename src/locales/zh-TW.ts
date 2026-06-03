@@ -383,13 +383,13 @@ const zhTW = {
   },
   right_panel: {
     tabs: {
-      ai_chat: "AI 問答",
+      ai_chat: "AI 助手",
       page_translate: "全頁翻譯",
       properties: "屬性編輯",
     },
   },
   ai_chat: {
-    title: "AI 問答",
+    title: "AI 助手",
     history: "歷史記錄",
     sessions: "聊天記錄",
     session_default: "新對話",
@@ -551,7 +551,7 @@ const zhTW = {
       general: "通用",
       edit: "編輯",
       llm: "大模型",
-      ai_chat: "AI 問答",
+      ai_chat: "AI 助手",
       debug: "除錯",
     },
     language: "語言",
@@ -683,7 +683,7 @@ const zhTW = {
         "僅在 AI 壓縮模式下使用，用於把被裁切的舊上下文改寫成緊湊記憶。自動時會跟隨目前的對話模型。",
       form_tools_enabled: "啟用 AI 表單工具",
       form_tools_enabled_desc:
-        "允許 AI 問答根據對話請求建立新的表單欄位。如果你只希望它做唯讀問答與欄位填值，請保持關閉。",
+        "允許 AI 助手根據對話請求建立新的表單欄位。如果你只希望它做唯讀協助與欄位填值，請保持關閉。",
       visual_model: "視覺模型",
       visual_model_placeholder: "選擇視覺模型",
       visual_model_auto: "自動",

@@ -392,13 +392,13 @@ const ja = {
   },
   right_panel: {
     tabs: {
-      ai_chat: "AI チャット",
+      ai_chat: "AI アシスタント",
       page_translate: "ページ翻訳",
       properties: "設定編集",
     },
   },
   ai_chat: {
-    title: "AI チャット",
+    title: "AI アシスタント",
     history: "履歴",
     sessions: "会話",
     session_default: "新しいチャット",
@@ -565,7 +565,7 @@ const ja = {
       general: "一般",
       edit: "編集",
       llm: "LLM",
-      ai_chat: "AI チャット",
+      ai_chat: "AI アシスタント",
       debug: "デバッグ",
     },
     language: "言語",
@@ -707,7 +707,7 @@ const ja = {
         "AI 圧縮モードでのみ使用され、切り詰められた古いコンテキストをコンパクトなメモリに書き換えます。自動では現在のチャットモデルに従います。",
       form_tools_enabled: "AI フォームツールを有効化",
       form_tools_enabled_desc:
-        "会話から新しいフォームフィールドを作成できるようにします。読み取り専用の Q&A と既存フィールド入力だけでよい場合は無効のままにしてください。",
+        "AI アシスタントが会話から新しいフォームフィールドを作成できるようにします。読み取り専用の支援と既存フィールド入力だけでよい場合は無効のままにしてください。",
       visual_model: "ビジュアルモデル",
       visual_model_placeholder: "ビジュアルモデルを選択",
       visual_model_auto: "自動",

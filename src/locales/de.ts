@@ -397,13 +397,13 @@ const de = {
   },
   right_panel: {
     tabs: {
-      ai_chat: "AI Chat",
+      ai_chat: "AI-Assistent",
       page_translate: "Seite übersetzen",
       properties: "Eigenschaften bearbeiten",
     },
   },
   ai_chat: {
-    title: "AI Chat",
+    title: "AI-Assistent",
     history: "Verlauf",
     sessions: "Unterhaltungen",
     session_default: "Neuer Chat",
@@ -572,7 +572,7 @@ const de = {
       general: "Allgemein",
       edit: "Bearbeiten",
       llm: "LLM",
-      ai_chat: "AI Chat",
+      ai_chat: "AI-Assistent",
       debug: "Debug",
     },
     language: "Sprache",
@@ -721,7 +721,7 @@ const de = {
         "Wird nur im KI-Komprimierungsmodus verwendet, um älteren beschnittenen Kontext in kompakten Speicher umzuschreiben. Automatisch folgt dem aktiven Chat-Modell.",
       form_tools_enabled: "KI-Formularwerkzeuge aktivieren",
       form_tools_enabled_desc:
-        "Erlaubt dem AI-Chat, neue Formularfelder aus Gesprächsanfragen zu erstellen. Deaktiviert lassen, wenn nur schreibgeschützter Chat und Feldbefüllung gewünscht sind.",
+        "Erlaubt dem AI-Assistenten, neue Formularfelder aus Gesprächsanfragen zu erstellen. Deaktiviert lassen, wenn nur schreibgeschützte Assistenz und Feldbefüllung gewünscht sind.",
       visual_model: "Visuelles Modell",
       visual_model_placeholder: "Visuelles Modell auswählen",
       visual_model_auto: "Automatisch",

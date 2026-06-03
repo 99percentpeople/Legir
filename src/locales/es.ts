@@ -395,13 +395,13 @@ const es = {
   },
   right_panel: {
     tabs: {
-      ai_chat: "Chat IA",
+      ai_chat: "Asistente IA",
       page_translate: "Traducir página",
       properties: "Edición de propiedades",
     },
   },
   ai_chat: {
-    title: "Chat IA",
+    title: "Asistente IA",
     history: "Historial",
     sessions: "Conversaciones",
     session_default: "Nuevo chat",
@@ -570,7 +570,7 @@ const es = {
       general: "General",
       edit: "Editar",
       llm: "LLM",
-      ai_chat: "Chat IA",
+      ai_chat: "Asistente IA",
       debug: "Depuración",
     },
     language: "Idioma",
@@ -718,7 +718,7 @@ const es = {
         "Se usa solo en el modo de compresión con IA para reescribir el contexto antiguo recortado como memoria compacta. Automático sigue el modelo de chat activo.",
       form_tools_enabled: "Habilitar herramientas de formularios con IA",
       form_tools_enabled_desc:
-        "Permite que el chat IA cree nuevos campos de formulario a partir de solicitudes conversacionales. Déjalo desactivado si solo quieres preguntas y respuestas de solo lectura y rellenado de campos.",
+        "Permite que el asistente IA cree nuevos campos de formulario a partir de solicitudes conversacionales. Déjalo desactivado si solo quieres asistencia de solo lectura y rellenado de campos.",
       visual_model: "Modelo visual",
       visual_model_placeholder: "Selecciona un modelo visual",
       visual_model_auto: "Automático",

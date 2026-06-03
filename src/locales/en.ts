@@ -391,13 +391,13 @@ const en = {
   },
   right_panel: {
     tabs: {
-      ai_chat: "AI Chat",
+      ai_chat: "AI Assistant",
       page_translate: "Page Translate",
       properties: "Property Editing",
     },
   },
   ai_chat: {
-    title: "AI Chat",
+    title: "AI Assistant",
     history: "History",
     sessions: "Conversations",
     session_default: "New chat",
@@ -564,7 +564,7 @@ const en = {
       general: "General",
       edit: "Edit",
       llm: "LLM",
-      ai_chat: "AI Chat",
+      ai_chat: "AI Assistant",
       debug: "Debug",
     },
     language: "Language",
@@ -708,7 +708,7 @@ const en = {
         "Used only in AI compression mode to rewrite older pruned context into compact memory. Automatic follows the active chat model.",
       form_tools_enabled: "Enable AI form tools",
       form_tools_enabled_desc:
-        "Allow AI chat to create new form fields from conversation requests. Leave this off if you only want read-only Q&A and field filling.",
+        "Allow the AI assistant to create new form fields from conversation requests. Leave this off if you only want read-only assistance and field filling.",
       visual_model: "Visual model",
       visual_model_placeholder: "Select a visual model",
       visual_model_auto: "Automatic",
