@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
+  resolvePdfSearchResultGeometry,
+  type PdfTextRangeGeometry,
+} from "@/components/workspace/lib/pdfTextRangeGeometry";
+import {
   getAiRuntimeAdapter,
   getChatModelGroups,
   getConfiguredAiSdkProvider,
@@ -236,6 +240,9 @@ export const useAiChatController = (
   const searchResultsRef = useRef<Map<string, AiStoredSearchResult>>(
     sessionsRef.current.get(initialSession.id)!.searchResultsById,
   );
+  const searchResultGeometryCacheRef = useRef(
+    new Map<string, PdfTextRangeGeometry>(),
+  );
   const abortRef = useRef<AbortController | null>(null);
   const contextMemoryJobIdsRef = useRef<Map<string, number>>(new Map());
   const contextMemoryJobSeqRef = useRef(0);
@@ -248,6 +255,10 @@ export const useAiChatController = (
   useEffect(() => {
     sessionSummariesRef.current = sessions;
   }, [sessions]);
+
+  useEffect(() => {
+    searchResultGeometryCacheRef.current.clear();
+  }, [editorState.pages, workerService]);
 
   const touchSessionSummary = useCallback(
     (sessionId: string, patch: Partial<AiChatSessionSummary>) => {
@@ -1966,6 +1977,21 @@ export const useAiChatController = (
     abortRef.current = null;
   }, []);
 
+  const resolveSearchResultGeometry = useCallback(
+    async (result: PDFSearchResult) => {
+      return resolvePdfSearchResultGeometry({
+        result,
+        pages: editorState.pages,
+        cache: searchResultGeometryCacheRef.current,
+        getTextContent: (pageIndex, signal) =>
+          workerService
+            ? workerService.getTextContent({ pageIndex, signal })
+            : Promise.resolve(null),
+      });
+    },
+    [editorState.pages, workerService],
+  );
+
   const openDocumentLink = useCallback(
     (target: AiDocumentLinkTarget) => {
       switch (target.kind) {
@@ -2007,16 +2033,29 @@ export const useAiChatController = (
           const stored = searchResultsRef.current.get(resultId);
           if (!stored) return;
 
-          appEventBus.emit("workspace:focusSearchResult", {
-            pageIndex: stored.result.pageIndex,
-            rect: stored.result.rect,
-            behavior: "smooth",
-          });
+          void (async () => {
+            const geometry = await resolveSearchResultGeometry(stored.result);
+            if (!geometry) {
+              appEventBus.emit("workspace:navigatePage", {
+                pageIndex: stored.result.pageIndex,
+                behavior: "smooth",
+              });
+              return;
+            }
+
+            appEventBus.emit("workspace:focusTextRange", {
+              pageIndex: stored.result.pageIndex,
+              startOffset: stored.result.startOffset,
+              endOffset: stored.result.endOffset,
+              rect: geometry.rect,
+              behavior: "smooth",
+            });
+          })();
           return;
         }
       }
     },
-    [editorState.pages.length],
+    [editorState.pages.length, resolveSearchResultGeometry],
   );
 
   const clearConversation = useCallback(() => {

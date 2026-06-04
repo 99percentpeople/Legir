@@ -1,5 +1,16 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { MutableRefObject } from "react";
+
+vi.mock("@/components/workspace/lib/pdfTextRangeGeometry", () => ({
+  resolvePdfSearchResultGeometry: vi.fn(async () => ({
+    rect: { x: 72, y: 120, width: 64, height: 14 },
+    rects: [{ x: 72, y: 120, width: 64, height: 14 }],
+  })),
+  resolvePdfTextRangeGeometry: vi.fn(async () => ({
+    rect: { x: 72, y: 120, width: 64, height: 14 },
+    rects: [{ x: 72, y: 120, width: 64, height: 14 }],
+  })),
+}));
 
 import { createAiChatToolContext } from "@/hooks/useAiChatController/toolContext";
 import type { AiChatSessionData } from "@/hooks/useAiChatController/sessionPersistence";
@@ -108,10 +119,6 @@ describe("AI chat tool context", () => {
       matchIndexOnPage: 0,
       startOffset: 0,
       endOffset: 5,
-      sortTop: 120,
-      sortLeft: 72,
-      rect: { x: 72, y: 120, width: 64, height: 14 },
-      rects: [{ x: 72, y: 120, width: 64, height: 14 }],
       matchText: "Hello",
       contextBefore: "",
       contextAfter: " world",

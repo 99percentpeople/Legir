@@ -12,7 +12,6 @@ import {
   type AnnotationListType,
 } from "@/lib/annotationList";
 import { getReadableStampLabel } from "@/lib/stamps";
-import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import {
   getDefaultArrowSize,
   getRectAndNormalizedShapePoints,
@@ -33,7 +32,11 @@ import {
   mapReadableRangeToFlatRange,
   serializePageTextContent,
 } from "@/services/ai/utils/pageTextSerialization";
-import { getPdfSearchRangeClientRects } from "@/components/workspace/lib/pdfSearchHighlights";
+import {
+  resolvePdfSearchResultGeometry,
+  resolvePdfTextRangeGeometry,
+  type PdfTextRangeGeometry,
+} from "@/components/workspace/lib/pdfTextRangeGeometry";
 import {
   FieldType,
   type Annotation,
@@ -1321,9 +1324,19 @@ export const createAiChatToolContext = (options: {
   workerService?: PDFWorkerService;
 }) => {
   const workerService = options.workerService ?? pdfWorkerService;
+  const searchResultGeometryCache = new Map<string, PdfTextRangeGeometry>();
   const getDocumentPageAssetSummary = () => summarizeDocumentPageAssets();
   const getActiveSession = () =>
     options.sessionsRef.current.get(options.activeSessionIdRef.current) ?? null;
+
+  const resolveSearchResultGeometry = (result: PDFSearchResult) =>
+    resolvePdfSearchResultGeometry({
+      result,
+      pages: useEditorStore.getState().pages,
+      cache: searchResultGeometryCache,
+      getTextContent: (pageIndex, signal) =>
+        workerService.getTextContent({ pageIndex, signal }),
+    });
 
   const updateDocumentMetadata = (
     updates: Partial<PDFMetadata>,
@@ -2980,103 +2993,18 @@ export const createAiChatToolContext = (options: {
       return serialized;
     };
 
-    const getRenderedRangeRects = (
-      pageIndex: number,
-      startOffset: number,
-      endOffset: number,
-    ) => {
-      if (typeof document === "undefined") return null;
-
-      const pageElement = document.getElementById(
-        `page-${pageIndex}`,
-      ) as HTMLElement | null;
-      const textLayer = pageElement?.querySelector?.(
-        ".textLayer",
-      ) as HTMLElement | null;
-      if (!pageElement || !textLayer) return null;
-
-      const clientRects = getPdfSearchRangeClientRects(
-        textLayer,
-        startOffset,
-        endOffset,
-      );
-      if (clientRects.length === 0) return null;
-
-      const pageRect = pageElement.getBoundingClientRect();
-      const scale = Math.max(store.scale || 0, 0.0001);
-      const rects = clientRects
-        .map((rect) => ({
-          x: (rect.left - pageRect.left) / scale,
-          y: (rect.top - pageRect.top) / scale,
-          width: rect.width / scale,
-          height: rect.height / scale,
-        }))
-        .filter((rect) => rect.width > 0.5 && rect.height > 0.5);
-      if (rects.length === 0) return null;
-
-      let minX = Number.POSITIVE_INFINITY;
-      let minY = Number.POSITIVE_INFINITY;
-      let maxX = Number.NEGATIVE_INFINITY;
-      let maxY = Number.NEGATIVE_INFINITY;
-
-      for (const rect of rects) {
-        minX = Math.min(minX, rect.x);
-        minY = Math.min(minY, rect.y);
-        maxX = Math.max(maxX, rect.x + rect.width);
-        maxY = Math.max(maxY, rect.y + rect.height);
-      }
-
-      if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
-
-      return {
-        rect: {
-          x: minX,
-          y: minY,
-          width: Math.max(1, maxX - minX),
-          height: Math.max(1, maxY - minY),
-        },
-        rects,
-      };
-    };
-
     const resolveAbsoluteRangeGeometry = async (
       pageIndex: number,
       startOffset: number,
       endOffset: number,
-    ) => {
-      const renderedRects = getRenderedRangeRects(
+    ) =>
+      resolvePdfTextRangeGeometry({
+        pages: store.pages,
         pageIndex,
         startOffset,
         endOffset,
-      );
-      if (renderedRects) {
-        return {
-          rect: { ...renderedRects.rect },
-          rects: renderedRects.rects.map((item) => ({ ...item })),
-        };
-      }
-
-      const page = store.pages[pageIndex];
-      if (!page) return null;
-      const textContent = await loadPageTextContent(pageIndex);
-      if (!textContent) return null;
-
-      const geometry = getPdfSearchRangeGeometry(
-        textContent,
-        page,
-        startOffset,
-        endOffset,
-      );
-      if (!geometry) return null;
-
-      return {
-        rect: { ...geometry.rect },
-        rects:
-          geometry.rects.length > 0
-            ? geometry.rects.map((item) => ({ ...item }))
-            : [{ ...geometry.rect }],
-      };
-    };
+        getTextContent: (pageIndex) => loadPageTextContent(pageIndex),
+      });
 
     for (const resultId of requestedResultIds) {
       const stored = options.searchResultsRef.current.get(resultId);
@@ -3090,14 +3018,14 @@ export const createAiChatToolContext = (options: {
         continue;
       }
 
-      const renderedRects = getRenderedRangeRects(
-        stored.result.pageIndex,
-        stored.result.startOffset,
-        stored.result.endOffset,
-      );
-      const rect = renderedRects
-        ? { ...renderedRects.rect }
-        : { ...stored.result.rect };
+      const geometry = await resolveSearchResultGeometry(stored.result);
+      if (!geometry) {
+        missingCount += 1;
+        missingResultIds.push(resultId);
+        continue;
+      }
+
+      const rect = geometry.rect;
       const annotationId = `ai_highlight_${Date.now()}_${Math.random()
         .toString(36)
         .slice(2, 8)}`;
@@ -3107,11 +3035,7 @@ export const createAiChatToolContext = (options: {
         pageIndex: stored.result.pageIndex,
         type: "highlight",
         rect,
-        rects:
-          renderedRects?.rects ??
-          (Array.isArray(stored.result.rects) && stored.result.rects.length > 0
-            ? stored.result.rects.map((item) => ({ ...item }))
-            : [rect]),
+        rects: geometry.rects,
         text: annotationText ?? stored.result.matchText,
         highlightedText: stored.result.matchText,
         author: options.selectedChatModelAuthor,
@@ -3606,10 +3530,18 @@ export const createAiChatToolContext = (options: {
     });
   };
 
-  const focusSearchResult = (result: PDFSearchResult) => {
-    appEventBus.emit("workspace:focusSearchResult", {
+  const focusSearchResult = async (result: PDFSearchResult) => {
+    const geometry = await resolveSearchResultGeometry(result);
+    if (!geometry) {
+      navigatePage(result.pageIndex);
+      return;
+    }
+
+    appEventBus.emit("workspace:focusTextRange", {
       pageIndex: result.pageIndex,
-      rect: result.rect,
+      startOffset: result.startOffset,
+      endOffset: result.endOffset,
+      rect: geometry.rect,
       behavior: "smooth",
     });
   };

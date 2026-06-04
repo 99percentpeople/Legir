@@ -90,7 +90,7 @@ export const navigationToolModule = defineToolModule((_ctx) => ({
         };
       }
 
-      toolCtx.focusSearchResult(stored.result);
+      await toolCtx.focusSearchResult(stored.result);
       return {
         payload: {
           ok: true,

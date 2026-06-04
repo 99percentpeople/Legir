@@ -1,9 +1,5 @@
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
-import {
-  DEFAULT_PDF_TEXT_STYLE,
-  isTextItem,
-  transform,
-} from "@/services/pdfService/lib/textGeometry";
+import { isTextItem } from "@/services/pdfService/lib/textGeometry";
 import type {
   PageData,
   PDFSearchDisplaySegment,
@@ -70,260 +66,6 @@ const buildRegexFlags = (caseSensitive: boolean, regexFlags?: string) => {
   ).join("");
 };
 
-type SearchTokenBoundary = {
-  start: number;
-  end: number;
-  textWidth: number;
-  fontHeight: number;
-  topLeftX: number;
-  topLeftY: number;
-  advanceX: number;
-  advanceY: number;
-  downX: number;
-  downY: number;
-};
-
-const getSearchTokenBoundaries = (
-  textContent: TextContent,
-  page: PageData,
-): SearchTokenBoundary[] => {
-  const boundaries: SearchTokenBoundary[] = [];
-  const textLayerTransform = [
-    1,
-    0,
-    0,
-    -1,
-    -page.viewBox[0],
-    page.viewBox[1] + (page.viewBox[3] - page.viewBox[1]),
-  ];
-  let currentOffset = 0;
-
-  for (const item of textContent.items) {
-    if (!isTextItem(item)) continue;
-
-    const value = item.str ?? "";
-    const start = currentOffset;
-    currentOffset += value.length;
-
-    if (!value.length) continue;
-
-    const itemTransform = Array.isArray(item.transform)
-      ? (item.transform as number[])
-      : [1, 0, 0, 1, 0, 0];
-    const tx = transform(textLayerTransform, itemTransform);
-    let angle = Math.atan2(tx[1] ?? 0, tx[0] ?? 1);
-    const style = textContent.styles[item.fontName] ?? DEFAULT_PDF_TEXT_STYLE;
-    if (style.vertical) angle += Math.PI / 2;
-
-    const fontHeight = Math.hypot(tx[2] ?? 0, tx[3] ?? 0) || item.height || 1;
-    const ascentRatio =
-      Number.isFinite(style.ascent) && typeof style.ascent === "number"
-        ? style.ascent
-        : Number.isFinite(style.descent) && typeof style.descent === "number"
-          ? 1 + style.descent
-          : 0.8;
-    const fontAscent = fontHeight * ascentRatio;
-    const textWidth = style.vertical ? (item.height ?? 0) : (item.width ?? 0);
-
-    let left: number;
-    let top: number;
-    if (angle === 0) {
-      left = tx[4] ?? 0;
-      top = (tx[5] ?? 0) - fontAscent;
-    } else {
-      left = (tx[4] ?? 0) + fontAscent * Math.sin(angle);
-      top = (tx[5] ?? 0) - fontAscent * Math.cos(angle);
-    }
-
-    const advanceX = Math.cos(angle);
-    const advanceY = Math.sin(angle);
-    const downX = -advanceY;
-    const downY = advanceX;
-
-    boundaries.push({
-      start,
-      end: currentOffset,
-      textWidth: Math.max(0, textWidth),
-      fontHeight: Math.max(1, fontHeight),
-      topLeftX: Number.isFinite(left) ? left : 0,
-      topLeftY: Number.isFinite(top) ? top : 0,
-      advanceX: Number.isFinite(advanceX) ? advanceX : 1,
-      advanceY: Number.isFinite(advanceY) ? advanceY : 0,
-      downX: Number.isFinite(downX) ? downX : 0,
-      downY: Number.isFinite(downY) ? downY : 1,
-    });
-  }
-
-  return boundaries;
-};
-
-const getMatchRectForBoundary = (
-  boundary: SearchTokenBoundary,
-  startOffset: number,
-  endOffset: number,
-) => {
-  const overlapStart = Math.max(boundary.start, startOffset);
-  const overlapEnd = Math.min(boundary.end, endOffset);
-  if (overlapEnd <= overlapStart) return null;
-
-  const textLength = Math.max(1, boundary.end - boundary.start);
-  const startRatio = (overlapStart - boundary.start) / textLength;
-  const endRatio = (overlapEnd - boundary.start) / textLength;
-  const segmentStart = boundary.textWidth * startRatio;
-  const segmentWidth = Math.max(
-    boundary.textWidth * (endRatio - startRatio),
-    boundary.textWidth > 0 ? boundary.textWidth / textLength : 1,
-  );
-
-  const topLeftX = boundary.topLeftX + boundary.advanceX * segmentStart;
-  const topLeftY = boundary.topLeftY + boundary.advanceY * segmentStart;
-  const topRightX = topLeftX + boundary.advanceX * segmentWidth;
-  const topRightY = topLeftY + boundary.advanceY * segmentWidth;
-  const bottomLeftX = topLeftX + boundary.downX * boundary.fontHeight;
-  const bottomLeftY = topLeftY + boundary.downY * boundary.fontHeight;
-  const bottomRightX = topRightX + boundary.downX * boundary.fontHeight;
-  const bottomRightY = topRightY + boundary.downY * boundary.fontHeight;
-
-  const minX = Math.min(topLeftX, topRightX, bottomLeftX, bottomRightX);
-  const minY = Math.min(topLeftY, topRightY, bottomLeftY, bottomRightY);
-  const maxX = Math.max(topLeftX, topRightX, bottomLeftX, bottomRightX);
-  const maxY = Math.max(topLeftY, topRightY, bottomLeftY, bottomRightY);
-
-  return {
-    x: minX,
-    y: minY,
-    width: Math.max(1, maxX - minX),
-    height: Math.max(1, maxY - minY),
-  };
-};
-
-const getMatchRects = (
-  boundaries: SearchTokenBoundary[],
-  startOffset: number,
-  endOffset: number,
-) =>
-  boundaries
-    .map((boundary) =>
-      getMatchRectForBoundary(boundary, startOffset, endOffset),
-    )
-    .filter((rect): rect is NonNullable<typeof rect> => !!rect);
-
-const getMatchSortPosition = (
-  boundaries: SearchTokenBoundary[],
-  startOffset: number,
-  endOffset: number,
-) => {
-  const overlapping = getMatchRects(boundaries, startOffset, endOffset);
-
-  if (overlapping.length === 0) {
-    return {
-      sortTop: Number.POSITIVE_INFINITY,
-      sortLeft: Number.POSITIVE_INFINITY,
-    };
-  }
-
-  return overlapping.reduce(
-    (best, boundary) => {
-      if (boundary.y < best.sortTop - 0.5) {
-        return {
-          sortTop: boundary.y,
-          sortLeft: boundary.x,
-        };
-      }
-      if (Math.abs(boundary.y - best.sortTop) <= 0.5) {
-        return {
-          sortTop: best.sortTop,
-          sortLeft: Math.min(best.sortLeft, boundary.x),
-        };
-      }
-      return best;
-    },
-    {
-      sortTop: overlapping[0]!.y,
-      sortLeft: overlapping[0]!.x,
-    },
-  );
-};
-
-const getMatchRect = (
-  boundaries: SearchTokenBoundary[],
-  startOffset: number,
-  endOffset: number,
-) => {
-  const overlapping = getMatchRects(boundaries, startOffset, endOffset);
-
-  if (overlapping.length === 0) {
-    return { x: 0, y: 0, width: 1, height: 1 };
-  }
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  for (const boundary of overlapping) {
-    minX = Math.min(minX, boundary.x);
-    minY = Math.min(minY, boundary.y);
-    maxX = Math.max(maxX, boundary.x + boundary.width);
-    maxY = Math.max(maxY, boundary.y + boundary.height);
-  }
-
-  return {
-    x: minX,
-    y: minY,
-    width: Math.max(1, maxX - minX),
-    height: Math.max(1, maxY - minY),
-  };
-};
-
-export const getPdfSearchRangeGeometry = (
-  textContent: TextContent,
-  page: PageData,
-  startOffset: number,
-  endOffset: number,
-) => {
-  const pageText = getPageSearchText(textContent);
-  if (!pageText) return null;
-
-  const clampedStart = Math.max(
-    0,
-    Math.min(pageText.length, Math.trunc(startOffset)),
-  );
-  const clampedEnd = Math.max(
-    0,
-    Math.min(pageText.length, Math.trunc(endOffset)),
-  );
-  if (clampedEnd <= clampedStart) return null;
-
-  const tokenBoundaries = getSearchTokenBoundaries(textContent, page);
-  const rects = getMatchRects(tokenBoundaries, clampedStart, clampedEnd);
-  const { sortTop, sortLeft } = getMatchSortPosition(
-    tokenBoundaries,
-    clampedStart,
-    clampedEnd,
-  );
-  const rect = getMatchRect(tokenBoundaries, clampedStart, clampedEnd);
-
-  return {
-    startOffset: clampedStart,
-    endOffset: clampedEnd,
-    sortTop,
-    sortLeft,
-    rect,
-    rects,
-    matchText: pageText.slice(clampedStart, clampedEnd),
-    contextBefore: pageText.slice(
-      Math.max(0, clampedStart - SEARCH_CONTEXT_CHARS),
-      clampedStart,
-    ),
-    contextAfter: pageText.slice(
-      clampedEnd,
-      Math.min(pageText.length, clampedEnd + SEARCH_CONTEXT_CHARS),
-    ),
-    displaySegments: buildDisplaySegments(pageText, clampedStart, clampedEnd),
-  };
-};
-
 export const findPdfSearchResults = (
   textContent: TextContent,
   query: string,
@@ -342,28 +84,32 @@ export const findPdfSearchResults = (
   const results: PDFSearchResult[] = [];
   let matchIndexOnPage = 0;
   const pushResult = (matchOffset: number, endOffset: number) => {
-    const geometry = getPdfSearchRangeGeometry(
-      textContent,
-      page,
-      matchOffset,
-      endOffset,
+    const clampedStart = Math.max(
+      0,
+      Math.min(pageText.length, Math.trunc(matchOffset)),
     );
-    if (!geometry) return;
+    const clampedEnd = Math.max(
+      0,
+      Math.min(pageText.length, Math.trunc(endOffset)),
+    );
+    if (clampedEnd <= clampedStart) return;
 
     results.push({
-      id: `${page.pageIndex}:${matchIndexOnPage}:${matchOffset}:${endOffset}`,
+      id: `${page.pageIndex}:${matchIndexOnPage}:${clampedStart}:${clampedEnd}`,
       pageIndex: page.pageIndex,
       matchIndexOnPage,
-      startOffset: geometry.startOffset,
-      endOffset: geometry.endOffset,
-      sortTop: geometry.sortTop,
-      sortLeft: geometry.sortLeft,
-      rect: geometry.rect,
-      rects: geometry.rects,
-      matchText: geometry.matchText,
-      contextBefore: geometry.contextBefore,
-      contextAfter: geometry.contextAfter,
-      displaySegments: geometry.displaySegments,
+      startOffset: clampedStart,
+      endOffset: clampedEnd,
+      matchText: pageText.slice(clampedStart, clampedEnd),
+      contextBefore: pageText.slice(
+        Math.max(0, clampedStart - SEARCH_CONTEXT_CHARS),
+        clampedStart,
+      ),
+      contextAfter: pageText.slice(
+        clampedEnd,
+        Math.min(pageText.length, clampedEnd + SEARCH_CONTEXT_CHARS),
+      ),
+      displaySegments: buildDisplaySegments(pageText, clampedStart, clampedEnd),
     });
     matchIndexOnPage += 1;
   };
@@ -414,8 +160,6 @@ export const findPdfSearchResults = (
   }
 
   return results.sort((a, b) => {
-    if (Math.abs(a.sortTop - b.sortTop) > 2) return a.sortTop - b.sortTop;
-    if (Math.abs(a.sortLeft - b.sortLeft) > 1) return a.sortLeft - b.sortLeft;
     return a.startOffset - b.startOffset;
   });
 };

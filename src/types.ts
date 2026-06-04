@@ -464,10 +464,6 @@ export interface PDFSearchResult {
   matchIndexOnPage: number;
   startOffset: number;
   endOffset: number;
-  sortTop: number;
-  sortLeft: number;
-  rect: { x: number; y: number; width: number; height: number };
-  rects: { x: number; y: number; width: number; height: number }[];
   matchText: string;
   contextBefore: string;
   contextAfter: string;

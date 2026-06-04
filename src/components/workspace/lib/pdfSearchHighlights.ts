@@ -1,4 +1,5 @@
 import type { PDFSearchResult } from "@/types";
+import { mergeInlineRects } from "@/utils/inlineRects";
 
 type SearchHighlightRect = {
   key: string;
@@ -32,10 +33,6 @@ type TextNodeBoundaryAffinity = "next" | "previous";
 type ScrollRestoreTarget = {
   element: HTMLElement;
 };
-
-const LINE_TOLERANCE_PX = 2;
-const MIN_GAP_TOLERANCE_PX = 3;
-const GAP_TOLERANCE_HEIGHT_RATIO = 0.45;
 
 const collectTextNodeBoundaries = (root: HTMLElement): TextNodeBoundary[] => {
   const boundaries: TextNodeBoundary[] = [];
@@ -175,58 +172,20 @@ const toLocalHighlightRect = (
   height: rect.height,
 });
 
-const sortLocalRects = (rects: LocalHighlightRect[]) =>
-  [...rects].sort((a, b) => {
-    if (Math.abs(a.top - b.top) > LINE_TOLERANCE_PX) {
-      return a.top - b.top;
-    }
-    return a.left - b.left;
-  });
-
-const canMergeLocalRects = (
-  current: LocalHighlightRect,
-  next: LocalHighlightRect,
-) => {
-  const currentCenterY = current.top + current.height / 2;
-  const nextCenterY = next.top + next.height / 2;
-  const minHeight = Math.max(1, Math.min(current.height, next.height));
-  const sameLine =
-    Math.abs(currentCenterY - nextCenterY) <=
-    Math.max(LINE_TOLERANCE_PX, minHeight * 0.35);
-  if (!sameLine) return false;
-
-  const currentRight = current.left + current.width;
-  const gap = next.left - currentRight;
-  const gapTolerance = Math.max(
-    MIN_GAP_TOLERANCE_PX,
-    minHeight * GAP_TOLERANCE_HEIGHT_RATIO,
-  );
-
-  return gap <= gapTolerance;
-};
-
 const mergeLocalRects = (rects: LocalHighlightRect[]) => {
-  if (rects.length <= 1) return rects;
-
-  const merged: LocalHighlightRect[] = [];
-
-  for (const rect of sortLocalRects(rects)) {
-    const last = merged[merged.length - 1];
-    if (!last || !canMergeLocalRects(last, rect)) {
-      merged.push({ ...rect });
-      continue;
-    }
-
-    const right = Math.max(last.left + last.width, rect.left + rect.width);
-    const bottom = Math.max(last.top + last.height, rect.top + rect.height);
-
-    last.left = Math.min(last.left, rect.left);
-    last.top = Math.min(last.top, rect.top);
-    last.width = right - last.left;
-    last.height = bottom - last.top;
-  }
-
-  return merged;
+  return mergeInlineRects(
+    rects.map((rect) => ({
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height,
+    })),
+  ).map((rect) => ({
+    left: rect.x,
+    top: rect.y,
+    width: rect.width,
+    height: rect.height,
+  }));
 };
 
 const getMergedRangeClientRects = (range: Range) =>

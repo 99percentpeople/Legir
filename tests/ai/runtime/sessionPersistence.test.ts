@@ -7,7 +7,9 @@ import {
   createAiChatSessionData,
   normalizeRuntimeTranscriptForPersist,
   normalizeTimelineForPersist,
+  persistAiChatDocumentState,
   recoverAiChatRuntimeTranscript,
+  restorePersistedAiChatDocumentState,
   restoreConversationFromTimeline,
   setAiChatRuntimeTimelineBoundary,
   stringifyToolArgs,
@@ -15,9 +17,11 @@ import {
   syncAiChatSessionConversation,
 } from "@/hooks/useAiChatController/sessionPersistence";
 import type {
+  AiStoredSearchResult,
   AiChatMessageRecord,
   AiChatTimelineItem,
 } from "@/services/ai/chat/types";
+import type { PDFSearchResult } from "@/types";
 
 const nowIso = "2026-04-29T00:00:00.000Z";
 
@@ -92,6 +96,73 @@ describe("AI chat session persistence", () => {
     expect(content).toContain("page_number: 2");
     expect(content).toContain("ANNOTATION_ATTACHMENT");
     expect(content).toContain("annotation_id: annot_1");
+  });
+
+  test("persists AI search result ids without geometry", () => {
+    const documentIdentity = "session-persistence-search-results";
+    window.localStorage.removeItem(`app-ai-chat:${documentIdentity}`);
+
+    const session = createAiChatSessionData("session_search", nowIso);
+    session.title = "Search session";
+    const searchResult = {
+      id: "0:0:0:5",
+      pageIndex: 0,
+      matchIndexOnPage: 0,
+      startOffset: 0,
+      endOffset: 5,
+      matchText: "Hello",
+      contextBefore: "",
+      contextAfter: " world",
+      displaySegments: [{ text: "Hello", highlighted: true }],
+      rect: { x: 72, y: 120, width: 64, height: 14 },
+      rects: [{ x: 72, y: 120, width: 64, height: 14 }],
+    } as unknown as PDFSearchResult;
+    const storedSearchResult: AiStoredSearchResult = {
+      id: "ai_sr_1",
+      query: "Hello",
+      result: searchResult,
+    };
+    session.searchResultsById.set(storedSearchResult.id, storedSearchResult);
+    session.highlightedResultIds = ["ai_sr_1", "missing_result"];
+
+    persistAiChatDocumentState({
+      documentIdentity,
+      activeSessionId: session.id,
+      sessions: [
+        {
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+          branchDepth: session.branchDepth,
+        },
+      ],
+      sessionsMap: new Map([[session.id, session]]),
+    });
+
+    const raw = window.localStorage.getItem(`app-ai-chat:${documentIdentity}`);
+    expect(raw).toBeTruthy();
+    expect(raw).not.toContain('"rect"');
+    expect(raw).not.toContain('"rects"');
+
+    const restored = restorePersistedAiChatDocumentState(documentIdentity);
+    const restoredSession = restored?.sessionsMap.get(session.id);
+    const restoredSearchResult =
+      restoredSession?.searchResultsById.get("ai_sr_1");
+
+    expect(restoredSearchResult?.result).toMatchObject({
+      id: "0:0:0:5",
+      pageIndex: 0,
+      startOffset: 0,
+      endOffset: 5,
+      matchText: "Hello",
+    });
+    expect(
+      (restoredSearchResult?.result as { rect?: unknown; rects?: unknown })
+        .rect,
+    ).toBeUndefined();
+    expect(restoredSession?.highlightedResultIds).toEqual(["ai_sr_1"]);
+
+    window.localStorage.removeItem(`app-ai-chat:${documentIdentity}`);
   });
 
   test("restores user, assistant, and tool messages from persisted timeline", () => {

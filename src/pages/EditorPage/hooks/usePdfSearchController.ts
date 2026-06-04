@@ -4,12 +4,11 @@ import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { EditorState, PDFSearchResult } from "@/types";
-import {
-  getDistanceSquaredBetweenPoints,
-  getPointToRectDistanceSquared,
-  getRectCenter,
-} from "@/lib/viewportMath";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
+import {
+  resolvePdfSearchResultGeometry,
+  type PdfTextRangeGeometry,
+} from "@/components/workspace/lib/pdfTextRangeGeometry";
 import type {
   EditorUiStateSetter,
   TranslateFn,
@@ -21,7 +20,6 @@ interface UsePdfSearchControllerOptions {
   workerService: PDFWorkerService | null;
   sidebarOpen: boolean;
   setUiState: EditorUiStateSetter;
-  workspaceScrollContainerRef: React.RefObject<HTMLElement | null>;
   highlightedSearchResultsByPage?: Map<number, PDFSearchResult[]>;
   t: TranslateFn;
 }
@@ -31,7 +29,6 @@ export function usePdfSearchController({
   workerService,
   sidebarOpen,
   setUiState,
-  workspaceScrollContainerRef,
   highlightedSearchResultsByPage,
   t,
 }: UsePdfSearchControllerOptions) {
@@ -54,8 +51,10 @@ export function usePdfSearchController({
   );
 
   const pdfSearchSeqRef = React.useRef(0);
+  const pdfSearchResultGeometryCacheRef = React.useRef(
+    new Map<string, PdfTextRangeGeometry>(),
+  );
   const pdfSearchViewportStateRef = React.useRef({
-    scale: useEditorStore.getState().scale,
     currentPageIndex: useEditorStore.getState().currentPageIndex,
   });
   const pendingPdfSearchPreferredSelectionRef = React.useRef<{
@@ -70,11 +69,26 @@ export function usePdfSearchController({
     () =>
       useEditorStore.subscribe((nextState) => {
         pdfSearchViewportStateRef.current = {
-          scale: nextState.scale,
           currentPageIndex: nextState.currentPageIndex,
         };
       }),
     [],
+  );
+
+  const resolveSearchResultGeometry = React.useCallback(
+    async (result: PDFSearchResult, signal?: AbortSignal) => {
+      return resolvePdfSearchResultGeometry({
+        result,
+        pages,
+        signal,
+        cache: pdfSearchResultGeometryCacheRef.current,
+        getTextContent: (pageIndex, signal) =>
+          workerService
+            ? workerService.getTextContent({ pageIndex, signal })
+            : Promise.resolve(null),
+      });
+    },
+    [pages, workerService],
   );
 
   React.useEffect(() => {
@@ -172,67 +186,17 @@ export function usePdfSearchController({
     [],
   );
 
-  const getViewportClosestPdfSearchResultId = React.useCallback(
+  const getViewportPreferredPdfSearchResultId = React.useCallback(
     (results: PDFSearchResult[]) => {
-      const container = workspaceScrollContainerRef.current;
-      if (!container || results.length === 0) return null;
+      if (results.length === 0) return null;
       const viewportState = pdfSearchViewportStateRef.current;
-
-      const containerRect = container.getBoundingClientRect();
-      const viewportCenter = getRectCenter(containerRect);
-
-      let bestResult: PDFSearchResult | null = null;
-      let bestViewportDistance = Number.POSITIVE_INFINITY;
-      let bestCenterDistance = Number.POSITIVE_INFINITY;
-
-      for (const result of results) {
-        const pageElement = document.getElementById(
-          `page-${result.pageIndex}`,
-        ) as HTMLElement | null;
-        if (!pageElement) continue;
-
-        const pageRect = pageElement.getBoundingClientRect();
-        const resultCenter = {
-          x:
-            pageRect.left +
-            (result.rect.x + result.rect.width / 2) * viewportState.scale,
-          y:
-            pageRect.top +
-            (result.rect.y + result.rect.height / 2) * viewportState.scale,
-        };
-        const viewportDistance = getPointToRectDistanceSquared(
-          resultCenter,
-          containerRect,
-        );
-        const centerDistance = getDistanceSquaredBetweenPoints(
-          resultCenter,
-          viewportCenter,
-        );
-
-        if (viewportDistance < bestViewportDistance) {
-          bestResult = result;
-          bestViewportDistance = viewportDistance;
-          bestCenterDistance = centerDistance;
-          continue;
-        }
-
-        if (
-          viewportDistance === bestViewportDistance &&
-          centerDistance < bestCenterDistance
-        ) {
-          bestResult = result;
-          bestCenterDistance = centerDistance;
-        }
-      }
-
-      if (bestResult) return bestResult.id;
 
       const currentPageResults = results.filter(
         (result) => result.pageIndex === viewportState.currentPageIndex,
       );
       return currentPageResults[0]?.id ?? results[0]?.id ?? null;
     },
-    [workspaceScrollContainerRef],
+    [],
   );
 
   const openPdfSearch = React.useCallback(() => {
@@ -292,23 +256,34 @@ export function usePdfSearchController({
     if (!activeResult) return;
 
     window.requestAnimationFrame(() => {
-      appEventBus.emit(
-        "workspace:focusTextRange",
-        {
-          pageIndex: activeResult.pageIndex,
-          startOffset: activeResult.startOffset,
-          endOffset: activeResult.endOffset,
-          rect: activeResult.rect,
-          behavior: "auto",
-        },
-        { sticky: true },
-      );
+      void (async () => {
+        const geometry = await resolveSearchResultGeometry(activeResult);
+        if (!geometry) return;
+
+        appEventBus.emit(
+          "workspace:focusTextRange",
+          {
+            pageIndex: activeResult.pageIndex,
+            startOffset: activeResult.startOffset,
+            endOffset: activeResult.endOffset,
+            rect: geometry.rect,
+            behavior: "auto",
+          },
+          { sticky: true },
+        );
+      })();
     });
-  }, [activePdfSearchResultId, pdfSearchResults, setUiState]);
+  }, [
+    activePdfSearchResultId,
+    pdfSearchResults,
+    resolveSearchResultGeometry,
+    setUiState,
+  ]);
 
   React.useEffect(() => {
     const trimmedQuery = pdfSearchQuery.trim();
     const currentSeq = ++pdfSearchSeqRef.current;
+    pdfSearchResultGeometryCacheRef.current.clear();
 
     if (!isPdfSearchOpen) {
       pendingPdfSearchPreferredSelectionRef.current = null;
@@ -371,7 +346,7 @@ export function usePdfSearchController({
           })();
           const viewportClosestResultId = preferredResultId
             ? null
-            : getViewportClosestPdfSearchResultId(nextResults);
+            : getViewportPreferredPdfSearchResultId(nextResults);
 
           setPdfSearchResults(nextResults);
           setActivePdfSearchResultId(
@@ -411,7 +386,7 @@ export function usePdfSearchController({
     };
   }, [
     getPreferredPdfSearchResultId,
-    getViewportClosestPdfSearchResultId,
+    getViewportPreferredPdfSearchResultId,
     isPdfSearchCaseSensitive,
     isPdfSearchOpen,
     pages,
@@ -467,13 +442,26 @@ export function usePdfSearchController({
   const handleSelectPdfSearchResult = React.useCallback(
     (result: PDFSearchResult) => {
       setActivePdfSearchResultId(result.id);
-      appEventBus.emit("workspace:focusSearchResult", {
-        pageIndex: result.pageIndex,
-        rect: result.rect,
-        behavior: "smooth",
-      });
+      void (async () => {
+        const geometry = await resolveSearchResultGeometry(result);
+        if (!geometry) {
+          appEventBus.emit("workspace:navigatePage", {
+            pageIndex: result.pageIndex,
+            behavior: "smooth",
+          });
+          return;
+        }
+
+        appEventBus.emit("workspace:focusTextRange", {
+          pageIndex: result.pageIndex,
+          startOffset: result.startOffset,
+          endOffset: result.endOffset,
+          rect: geometry.rect,
+          behavior: "smooth",
+        });
+      })();
     },
-    [],
+    [resolveSearchResultGeometry],
   );
 
   const handleSelectPreviousPdfSearchResult = React.useCallback(() => {

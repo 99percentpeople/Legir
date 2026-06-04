@@ -93,12 +93,6 @@ export type AppEventMap = {
     behavior?: "auto" | "smooth";
     skipScroll?: boolean;
   };
-  "workspace:focusSearchResult": {
-    pageIndex: number;
-    rect: { x: number; y: number; width: number; height: number };
-    behavior?: "auto" | "smooth";
-    skipScroll?: boolean;
-  };
   "workspace:focusTextRange": {
     pageIndex: number;
     startOffset: number;

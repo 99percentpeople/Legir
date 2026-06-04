@@ -224,7 +224,6 @@ const EditorPage: React.FC<EditorPageProps> = ({
     workerService,
     sidebarOpen: state.isSidebarOpen,
     setUiState,
-    workspaceScrollContainerRef,
     highlightedSearchResultsByPage: aiChat.highlightedSearchResultsByPage,
     t,
   });

@@ -967,6 +967,103 @@ export const createAiChatSessionData = (
   awaitingContinue: false,
 });
 
+const toNonNegativeInteger = (value: unknown) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.trunc(value));
+};
+
+const normalizePdfSearchResultForPersist = (
+  value: unknown,
+): PDFSearchResult | null => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+
+  const pageIndex = toNonNegativeInteger(raw.pageIndex);
+  const matchIndexOnPage = toNonNegativeInteger(raw.matchIndexOnPage);
+  const startOffset = toNonNegativeInteger(raw.startOffset);
+  const endOffset = toNonNegativeInteger(raw.endOffset);
+  const matchText = typeof raw.matchText === "string" ? raw.matchText : null;
+  const contextBefore =
+    typeof raw.contextBefore === "string" ? raw.contextBefore : null;
+  const contextAfter =
+    typeof raw.contextAfter === "string" ? raw.contextAfter : null;
+
+  if (
+    pageIndex === null ||
+    matchIndexOnPage === null ||
+    startOffset === null ||
+    endOffset === null ||
+    endOffset <= startOffset ||
+    matchText === null ||
+    contextBefore === null ||
+    contextAfter === null
+  ) {
+    return null;
+  }
+
+  const displaySegments = Array.isArray(raw.displaySegments)
+    ? raw.displaySegments
+        .map((segment) => {
+          if (!segment || typeof segment !== "object") return null;
+          const item = segment as Record<string, unknown>;
+          if (typeof item.text !== "string") return null;
+          return {
+            text: item.text,
+            highlighted: item.highlighted === true,
+          };
+        })
+        .filter(
+          (segment): segment is { text: string; highlighted: boolean } =>
+            !!segment,
+        )
+    : [];
+
+  return {
+    id: typeof raw.id === "string" ? raw.id : "",
+    pageIndex,
+    matchIndexOnPage,
+    startOffset,
+    endOffset,
+    matchText,
+    contextBefore,
+    contextAfter,
+    displaySegments:
+      displaySegments.length > 0
+        ? displaySegments
+        : [{ text: matchText, highlighted: true }],
+  };
+};
+
+const normalizeStoredSearchResultForPersist = (
+  value: unknown,
+): AiStoredSearchResult | null => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const id = typeof raw.id === "string" ? raw.id : "";
+  const query = typeof raw.query === "string" ? raw.query : "";
+  if (!id || !query) return null;
+
+  const result = normalizePdfSearchResultForPersist(raw.result);
+  if (!result) return null;
+
+  return {
+    id,
+    query,
+    result: {
+      ...result,
+      id: result.id || id,
+    },
+  };
+};
+
+const normalizeStoredSearchResultsForPersist = (
+  values: Iterable<AiStoredSearchResult>,
+) =>
+  Array.from(values)
+    .map(normalizeStoredSearchResultForPersist)
+    .filter((value): value is AiStoredSearchResult => !!value)
+    .slice(-MAX_PERSIST_SEARCH_RESULTS);
+
 export const restorePersistedAiChatDocumentState = (
   documentIdentity: string,
 ): RestoredAiChatDocumentState | null => {
@@ -1012,34 +1109,19 @@ export const restorePersistedAiChatDocumentState = (
         timeline,
         updatedAt,
       });
-
-      const searchResultsList = Array.isArray(session.searchResults)
-        ? session.searchResults.slice(
-            Math.max(
-              0,
-              session.searchResults.length - MAX_PERSIST_SEARCH_RESULTS,
-            ),
-          )
+      const restoredSearchResults = Array.isArray(session.searchResults)
+        ? normalizeStoredSearchResultsForPersist(session.searchResults)
         : [];
-      const searchResultsById = new Map<string, AiStoredSearchResult>();
-      for (const searchResult of searchResultsList) {
-        if (!searchResult || typeof searchResult !== "object") continue;
-        const id = (searchResult as { id?: unknown }).id;
-        const query = (searchResult as { query?: unknown }).query;
-        const result = (searchResult as { result?: unknown }).result;
-        if (typeof id !== "string" || typeof query !== "string") continue;
-        if (!result || typeof result !== "object") continue;
-        searchResultsById.set(id, {
-          id,
-          query,
-          result: result as PDFSearchResult,
-        });
-      }
-
+      const searchResultsById = new Map(
+        restoredSearchResults.map((searchResult) => [
+          searchResult.id,
+          searchResult,
+        ]),
+      );
       const highlightedResultIds = Array.isArray(session.highlightedResultIds)
         ? session.highlightedResultIds
             .map((value) => (typeof value === "string" ? value : ""))
-            .filter(Boolean)
+            .filter((id) => id && searchResultsById.has(id))
         : [];
 
       const nextSession: AiChatSessionData = {
@@ -1206,11 +1288,10 @@ export const persistAiChatDocumentState = (options: {
           highlightedResultIds: [],
         };
       }
-
-      const searchResultsList = Array.from(data.searchResultsById.values());
-      const trimmedSearchResults = searchResultsList.slice(
-        Math.max(0, searchResultsList.length - MAX_PERSIST_SEARCH_RESULTS),
+      const searchResults = normalizeStoredSearchResultsForPersist(
+        data.searchResultsById.values(),
       );
+      const searchResultIds = new Set(searchResults.map((item) => item.id));
 
       return {
         id: data.id,
@@ -1227,8 +1308,10 @@ export const persistAiChatDocumentState = (options: {
           data.runtimeTranscript,
           data.timeline,
         ),
-        searchResults: trimmedSearchResults,
-        highlightedResultIds: data.highlightedResultIds,
+        searchResults,
+        highlightedResultIds: data.highlightedResultIds.filter((id) =>
+          searchResultIds.has(id),
+        ),
         contextMemory: data.contextMemory,
         tokenUsage: data.tokenUsage,
         contextTokens: data.contextTokens,
@@ -1250,15 +1333,10 @@ export const persistAiChatDocumentState = (options: {
     try {
       const activeData = options.sessionsMap.get(options.activeSessionId);
       if (!activeData) return;
-      const searchResultsList = Array.from(
+      const searchResults = normalizeStoredSearchResultsForPersist(
         activeData.searchResultsById.values(),
-      );
-      const trimmedSearchResults = searchResultsList.slice(
-        Math.max(
-          0,
-          searchResultsList.length - Math.min(200, MAX_PERSIST_SEARCH_RESULTS),
-        ),
-      );
+      ).slice(-Math.min(200, MAX_PERSIST_SEARCH_RESULTS));
+      const searchResultIds = new Set(searchResults.map((item) => item.id));
       const minimal: PersistedAiChatState = {
         version: AI_CHAT_PERSIST_VERSION,
         activeSessionId: options.activeSessionId,
@@ -1278,8 +1356,10 @@ export const persistAiChatDocumentState = (options: {
               activeData.runtimeTranscript,
               activeData.timeline,
             ),
-            searchResults: trimmedSearchResults,
-            highlightedResultIds: activeData.highlightedResultIds,
+            searchResults,
+            highlightedResultIds: activeData.highlightedResultIds.filter((id) =>
+              searchResultIds.has(id),
+            ),
             contextMemory: activeData.contextMemory,
             tokenUsage: activeData.tokenUsage,
             contextTokens: activeData.contextTokens,

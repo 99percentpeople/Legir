@@ -60,9 +60,9 @@ import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
 import { getFocusRect } from "./lib/getFocusRect";
 import { VirtualizedPages } from "./VirtualizedPages";
 import { computeWorkspacePageRects } from "./lib/computeWorkspacePageRects";
+import { resolvePdfTextRangeGeometry } from "./lib/pdfTextRangeGeometry";
 import { appEventBus } from "@/lib/eventBus";
 import { useAppEvent } from "@/hooks/useAppEventBus";
-import { getPdfSearchRangeGeometry } from "@/lib/pdfSearch";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 import { openExternalUrl } from "@/services/platform";
@@ -442,21 +442,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const resolveSelectionAttachmentRect = useCallback(
     async (selection: TextSelectionPayload) => {
-      const page = editorState.pages[selection.pageIndex];
-      if (!page) return null;
-
-      if (!workerService) return null;
-
-      const textContent = await workerService.getTextContent({
+      const geometry = await resolvePdfTextRangeGeometry({
+        pages: editorState.pages,
         pageIndex: selection.pageIndex,
+        startOffset: selection.startOffset,
+        endOffset: selection.endOffset,
+        getTextContent: (pageIndex, signal) =>
+          workerService
+            ? workerService.getTextContent({ pageIndex, signal })
+            : Promise.resolve(null),
       });
-      if (!textContent) return null;
-      const geometry = getPdfSearchRangeGeometry(
-        textContent,
-        page,
-        selection.startOffset,
-        selection.endOffset,
-      );
       return geometry?.rect ?? null;
     },
     [editorState.pages, workerService],
@@ -886,17 +881,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
       behavior: behavior ?? "smooth",
     });
   });
-
-  useAppEvent(
-    "workspace:focusSearchResult",
-    ({ pageIndex, rect, behavior, skipScroll }) =>
-      scrollWorkspaceToPageRect({
-        pageIndex,
-        rect,
-        behavior: behavior ?? "smooth",
-        skipScroll,
-      }),
-  );
 
   useAppEvent(
     "workspace:focusTextRange",
@@ -2203,10 +2187,30 @@ const Workspace: React.FC<WorkspaceProps> = ({
   };
 
   // --- Handlers ---
+  const clearControlSelectionFromBlankPointerDown = (
+    e: React.PointerEvent,
+    options?: { allowPageSurface?: boolean },
+  ) => {
+    if (pinchGestureActiveRef.current) return;
+    if (e.button !== 0) return;
+    if (isPanModeActive) return;
+    if (!editorState.selectedId) return;
+
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target) return;
+    if (!options?.allowPageSurface && target.closest("[data-workspace-page]")) {
+      return;
+    }
+
+    closeTextSelectionPopover();
+    onSelectControl(null);
+  };
+
   const handleContainerPointerDown = (e: React.PointerEvent) => {
     if (pinchGestureActiveRef.current) return;
     if (e.button !== 0) return;
     if (startPan(e)) return;
+    clearControlSelectionFromBlankPointerDown(e);
   };
 
   const handleWorkspacePointerDownCapture = (e: React.PointerEvent) => {
@@ -2284,7 +2288,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
     capturePointer(e);
 
     if (editorState.tool === "select") {
-      onSelectControl(null);
+      clearControlSelectionFromBlankPointerDown(e, {
+        allowPageSurface: true,
+      });
       return;
     }
 
@@ -2577,11 +2583,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
     }
 
-    const shouldCreateTextHighlight =
-      editorStateRef.current.mode === "annotation" &&
-      editorStateRef.current.tool === "draw_highlight" &&
-      !isDrawing;
-
     // Release capture if held
     releasePointer(e);
 
@@ -2613,10 +2614,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
       }
       currentPathRef.current = [];
       liveInkPathRef.current?.setAttribute("d", "");
-    }
-
-    if (shouldCreateTextHighlight) {
-      createTextHighlightFromSelection();
     }
 
     // Finish Eraser
@@ -3163,6 +3160,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         data-app-text-selecting={
           textSelectingPages[page.pageIndex] ? "1" : undefined
         }
+        data-workspace-page="true"
         style={{
           cursor:
             editorState.tool === "draw_highlight" ? "crosshair" : undefined,

@@ -13,6 +13,11 @@ import {
   getPdfSearchSelectionOffsets,
   getPdfSearchTextSlice,
 } from "../lib/pdfSearchHighlights";
+import {
+  getInlineRectBounds,
+  mergeInlineRects,
+  type InlineRect,
+} from "@/utils/inlineRects";
 
 export type TextSelectionToolbarState = {
   isVisible: boolean;
@@ -28,55 +33,13 @@ export type TextSelectionToolbarState = {
   } | null;
 };
 
-type PdfSpaceRect = { x: number; y: number; width: number; height: number };
-
-const dedupeAndMergePdfRects = (rects: PdfSpaceRect[]) => {
-  const sorted = [...rects].sort((a, b) =>
-    Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y,
-  );
-
-  const deduped: PdfSpaceRect[] = [];
-  const isNearSame = (a: PdfSpaceRect, b: PdfSpaceRect) =>
-    Math.abs(a.x - b.x) < 1 &&
-    Math.abs(a.y - b.y) < 1 &&
-    Math.abs(a.width - b.width) < 1 &&
-    Math.abs(a.height - b.height) < 1;
-
-  for (const rect of sorted) {
-    const exists = deduped.some((item) => isNearSame(item, rect));
-    if (!exists) deduped.push(rect);
-  }
-
-  const merged: PdfSpaceRect[] = [];
-  for (const rect of deduped) {
-    const last = merged[merged.length - 1];
-    if (
-      last &&
-      Math.abs(last.y - rect.y) < 2 &&
-      Math.abs(last.height - rect.height) < 2 &&
-      rect.x <= last.x + last.width + 2
-    ) {
-      const newX = Math.min(last.x, rect.x);
-      const newRight = Math.max(last.x + last.width, rect.x + rect.width);
-      last.x = newX;
-      last.width = newRight - newX;
-      last.y = Math.min(last.y, rect.y);
-      last.height = Math.max(last.height, rect.height);
-    } else {
-      merged.push({ ...rect });
-    }
-  }
-
-  return merged;
-};
-
 const getPdfSelectionRects = (
   range: Range,
   pageEl: HTMLElement,
   scale: number,
 ) => {
   const pageRect = pageEl.getBoundingClientRect();
-  const uiRects = Array.from(range.getClientRects())
+  const uiRects: InlineRect[] = Array.from(range.getClientRects())
     .filter((rect) => rect.width > 1 && rect.height > 1)
     .map((rect) => ({
       x: (rect.left - pageRect.left) / scale,
@@ -88,31 +51,15 @@ const getPdfSelectionRects = (
 
   if (uiRects.length === 0) return null;
 
-  const rects = dedupeAndMergePdfRects(uiRects);
+  const rects = mergeInlineRects(uiRects);
   if (rects.length === 0) return null;
 
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-
-  for (const rect of rects) {
-    minX = Math.min(minX, rect.x);
-    minY = Math.min(minY, rect.y);
-    maxX = Math.max(maxX, rect.x + rect.width);
-    maxY = Math.max(maxY, rect.y + rect.height);
-  }
-
-  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+  const rect = getInlineRectBounds(rects);
+  if (!rect) return null;
 
   return {
     rects,
-    rect: {
-      x: minX,
-      y: minY,
-      width: Math.max(1, maxX - minX),
-      height: Math.max(1, maxY - minY),
-    },
+    rect,
   };
 };
 
@@ -554,7 +501,11 @@ export const useWorkspaceTextSelection = (opts: {
     (e) => {
       const state = editorStateRef.current;
       if (!state) return;
-      if (state.tool !== "select" && state.tool !== "select_text") return;
+      const canSelectText =
+        state.tool === "select" ||
+        state.tool === "select_text" ||
+        (state.mode === "annotation" && state.tool === "draw_highlight");
+      if (!canSelectText) return;
       const target = e.target as HTMLElement | null;
       if (
         target?.closest?.("[data-app-selection-handle='1']") ||
@@ -613,13 +564,22 @@ export const useWorkspaceTextSelection = (opts: {
     "pointerup",
     () => {
       if (!isTextSelectingRef.current) return;
+      const shouldCreateTextHighlight = (() => {
+        const state = editorStateRef.current;
+        return state?.mode === "annotation" && state.tool === "draw_highlight";
+      })();
+
       // Defer one frame so the browser has time to finalize the selection range.
       // Keep isTextSelectingRef=true during this frame to prevent selectionchange from
       // prematurely showing a toolbar with a transient (0,0) bounding rect.
       requestAnimationFrame(() => {
         isTextSelectingRef.current = false;
         setIsTextSelectionDragging(false);
-        updateTextSelectionToolbar();
+        if (shouldCreateTextHighlight) {
+          createTextHighlightFromSelection();
+        } else {
+          updateTextSelectionToolbar();
+        }
       });
     },
     true,
