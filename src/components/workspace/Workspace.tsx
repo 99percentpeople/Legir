@@ -530,6 +530,17 @@ const Workspace: React.FC<WorkspaceProps> = ({
     appEventBus.emit("workspace:askAi", attachment, { sticky: true });
   }, []);
 
+  const handleAskAiFromAnnotationId = useCallback(
+    (id: string) => {
+      const annotation = editorStateRef.current.annotations.find(
+        (item) => item.id === id,
+      );
+      if (!annotation) return;
+      handleAskAiFromAnnotation(annotation);
+    },
+    [handleAskAiFromAnnotation],
+  );
+
   const createShapeAnnotationBase = useCallback(
     (
       shapeType: NonNullable<Annotation["shapeType"]>,
@@ -3328,7 +3339,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   data={control}
                   id={control.id}
                   isSelected={editorState.selectedId === control.id}
-                  zoom={editorState.scale}
                   isAnnotationMode={editorState.mode === "annotation"}
                   isFormMode={editorState.mode === "form"}
                   isSelectable={isSelectable}
@@ -3354,7 +3364,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 data={annot}
                 id={annot.id}
                 isSelected={editorState.selectedId === annot.id}
-                zoom={editorState.scale}
                 isAnnotationMode={editorState.mode === "annotation"}
                 isFormMode={editorState.mode === "form"}
                 isSelectable={isSelectable}
@@ -3366,9 +3375,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 onUpdate={onUpdateAnnotation}
                 onDelete={onDeleteAnnotation}
                 onEdit={onEditAnnotation}
-                onAskAi={() => {
-                  handleAskAiFromAnnotation(annot);
-                }}
+                onAskAi={handleAskAiFromAnnotationId}
                 onControlResizeStart={handleResizePointerDown}
                 onTriggerHistorySave={onTriggerHistorySave}
                 onReorderLayer={onReorderControlLayer}

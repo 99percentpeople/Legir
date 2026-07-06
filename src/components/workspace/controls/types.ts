@@ -17,8 +17,6 @@ export interface BaseControlProps<T = FormField | Annotation> {
   id: string;
   /** Whether the control is currently selected */
   isSelected: boolean;
-  /** Actual zoom level for UI scaling (handles, borders) when scale is normalized */
-  zoom?: number;
   /** Whether the workspace is in annotation mode */
   isAnnotationMode: boolean;
   /** Whether the workspace is in form editing mode */
