@@ -15,7 +15,9 @@ import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 export const CommentControl: React.FC<AnnotationControlProps> = (props) => {
   const { data, isSelected, onUpdate, onDelete, onEdit, onAskAi, canModify } =
     props;
-  const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
+  const { ref, x, y, width, height } = useMouse<HTMLDivElement>({
+    enabled: !!data.text,
+  });
   const color = data.color || "#000000";
 
   // Ensure rect exists, otherwise default

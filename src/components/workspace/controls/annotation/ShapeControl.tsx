@@ -321,7 +321,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     y: hoverY,
     width: hoverWidth,
     height: hoverHeight,
-  } = useMouse<SVGSVGElement>();
+  } = useMouse<SVGSVGElement>({ enabled: !!data.text?.trim() });
   const menuTriggerRef = useRef<HTMLDivElement | null>(null);
   const vertexDragIndexRef = useRef<number | null>(null);
   const activeVertexPointerRef = useRef<{

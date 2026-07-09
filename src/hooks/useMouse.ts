@@ -8,12 +8,13 @@ interface MousePosition {
 
 interface UseMouseOptions {
   resetOnExit?: boolean;
+  enabled?: boolean;
 }
 
 export function useMouse<T extends Element = HTMLElement>(
   options: UseMouseOptions = {},
 ) {
-  const { resetOnExit = false } = options;
+  const { resetOnExit = false, enabled = true } = options;
   const [position, setPosition] = useState<MousePosition>({ x: 0, y: 0 });
   const [element, setElement] = useState<T | null>(null);
   const sizeRef = useRef<{ width: number; height: number }>({
@@ -22,13 +23,17 @@ export function useMouse<T extends Element = HTMLElement>(
   });
 
   // Callback ref to capture the element (if provided)
-  const ref = useCallback((node: T | null) => {
-    setElement(node);
-  }, []);
+  const ref = useCallback(
+    (node: T | null) => {
+      setElement(enabled ? node : null);
+    },
+    [enabled],
+  );
 
   // Handle mouse movement using native MouseEvent
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {
+      if (!enabled) return;
       if (element) {
         const rect = element.getBoundingClientRect();
         sizeRef.current = { width: rect.width, height: rect.height };
@@ -42,17 +47,18 @@ export function useMouse<T extends Element = HTMLElement>(
         setPosition({ x: event.clientX, y: event.clientY });
       }
     },
-    [element],
+    [element, enabled],
   );
 
   // Optionally reset mouse position on leaving the element
   const handleMouseLeave = useCallback(() => {
+    if (!enabled) return;
     setPosition({ x: 0, y: 0 });
     sizeRef.current = { width: 0, height: 0 };
-  }, []);
+  }, [enabled]);
 
   const target: T | Document | null =
-    typeof document !== "undefined" ? element || document : null;
+    enabled && typeof document !== "undefined" ? element || document : null;
 
   useEventListener<MouseEvent>(target, "mousemove", handleMouseMove);
 

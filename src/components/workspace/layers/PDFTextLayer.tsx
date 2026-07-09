@@ -90,6 +90,10 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   const endOfContentRef = useRef<HTMLDivElement | null>(null);
   const prevRangeRef = useRef<Range | null>(null);
 
+  const clearSearchHighlightRects = useCallback(() => {
+    setSearchHighlightRects((prev) => (prev.length === 0 ? prev : []));
+  }, []);
+
   const userUnit = useMemo(() => page.userUnit ?? 1, [page.userUnit]);
   const pageInfo = useMemo(
     () => ({
@@ -592,12 +596,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
 
   useEffect(() => {
     if (!textLayerRef.current || !isInView || renderedScale === null) {
-      setSearchHighlightRects([]);
+      clearSearchHighlightRects();
       return;
     }
 
     if (searchResults.length === 0) {
-      setSearchHighlightRects([]);
+      clearSearchHighlightRects();
       return;
     }
 
@@ -615,7 +619,13 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [activeSearchResultId, isInView, renderedScale, searchResults]);
+  }, [
+    activeSearchResultId,
+    clearSearchHighlightRects,
+    isInView,
+    renderedScale,
+    searchResults,
+  ]);
 
   return (
     <>

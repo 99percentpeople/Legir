@@ -130,4 +130,4 @@ const PDFPage: React.FC<PDFPageProps> = ({
   );
 };
 
-export default PDFPage;
+export default React.memo(PDFPage);

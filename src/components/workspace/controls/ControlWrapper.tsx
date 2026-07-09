@@ -69,13 +69,28 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const isShape = data.type === "shape";
   const isStamp = data.type === "stamp";
   const isRotatableAnnotation = isFreetext || isShape || isStamp;
+  const isAnnotation = [
+    "comment",
+    "highlight",
+    "ink",
+    "freetext",
+    "link",
+    "stamp",
+    "shape",
+  ].includes(data.type);
+  const isFormField = !isAnnotation;
+  const supportsRotation = isRotatableAnnotation || isFormField;
+  const tooltipText =
+    !isAnnotation && "toolTip" in data && typeof data.toolTip === "string"
+      ? data.toolTip.trim()
+      : "";
   const {
     ref: tooltipMouseRef,
     x,
     y,
     width,
     height,
-  } = useMouse<HTMLDivElement>();
+  } = useMouse<HTMLDivElement>({ enabled: !!tooltipText });
   const [isTooltipOpen, setIsTooltipOpen] = React.useState(false);
 
   const dismissContextMenu = React.useCallback(() => {
@@ -93,22 +108,6 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     },
     { replayLast: true },
   );
-
-  const isAnnotation = [
-    "comment",
-    "highlight",
-    "ink",
-    "freetext",
-    "link",
-    "stamp",
-    "shape",
-  ].includes(data.type);
-  const isFormField = !isAnnotation;
-  const supportsRotation = isRotatableAnnotation || isFormField;
-  const tooltipText =
-    !isAnnotation && "toolTip" in data && typeof data.toolTip === "string"
-      ? data.toolTip.trim()
-      : "";
 
   const setWrapperNode = React.useCallback(
     (node: HTMLDivElement | null) => {

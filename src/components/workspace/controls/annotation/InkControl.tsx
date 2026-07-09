@@ -28,7 +28,9 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
     onEdit,
     onAskAi,
   } = props;
-  const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
+  const { ref, x, y, width, height } = useMouse<HTMLDivElement>({
+    enabled: !!data.text,
+  });
   const color = data.color || "#000000";
 
   const strokes = useMemo(() => {

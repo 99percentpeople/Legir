@@ -100,6 +100,8 @@ const WorkspaceZoomJankOverlay = React.lazy(
   () => import("./debug/WorkspaceZoomJankOverlay"),
 );
 
+const EMPTY_PDF_SEARCH_RESULTS: PDFSearchResult[] = [];
+
 // Workspace = the editor canvas.
 //
 // Responsibilities:
@@ -3200,7 +3202,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
                 ? "text"
                 : undefined
           }
-          searchResults={pdfSearchResultsByPage?.get(page.pageIndex) ?? []}
+          searchResults={
+            pdfSearchResultsByPage?.get(page.pageIndex) ??
+            EMPTY_PDF_SEARCH_RESULTS
+          }
           activeSearchResultId={activePdfSearchResultId}
         />
 

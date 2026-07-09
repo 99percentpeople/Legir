@@ -102,7 +102,9 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
   onPointerDown,
   canModify,
 }) => {
-  const { ref, x, y, width, height } = useMouse<HTMLDivElement>();
+  const { ref, x, y, width, height } = useMouse<HTMLDivElement>({
+    enabled: !!data.text,
+  });
   const color = data.color || "#000000";
 
   return (
@@ -234,7 +236,9 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
 }) => {
   const bounds = getRectBounds(rects);
   const d = rectsToPath(rects, { x: bounds.x, y: bounds.y });
-  const { ref, x, y, width, height } = useMouse<SVGPathElement>();
+  const { ref, x, y, width, height } = useMouse<SVGPathElement>({
+    enabled: !!data.text,
+  });
   const color = data.color || "#000000";
 
   return (
