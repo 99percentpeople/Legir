@@ -34,6 +34,7 @@ export const registerTranslateOptionsFromProviders = () => {
       })),
       isLLM: true,
       isAvailable: () =>
+        getCurrentOptions().translation.aiEnabled &&
         isAiSdkProviderConfigured(getCurrentOptions(), group.providerId),
       unavailableMessageKey: group.unavailableMessageKey,
       translate: async (text, optionId, translateOptions) => {

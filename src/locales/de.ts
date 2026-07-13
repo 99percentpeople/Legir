@@ -102,8 +102,7 @@ const de = {
   translate: {
     title: "Übersetzen",
     provider: "Modell Anbieter",
-    cloud_api_key_missing:
-      "Cloud Translation API-Key fehlt. Setze GOOGLE_TRANSLATE_API_KEY in .env.local und starte die App neu.",
+    no_available_services: "Keine verfügbaren Dienste",
     model: "Modell",
     target: "Zielsprache",
     source_text: "Original",
@@ -572,8 +571,22 @@ const de = {
       general: "Allgemein",
       edit: "Bearbeiten",
       llm: "LLM",
+      translation: "Übersetzung",
       ai_chat: "AI-Assistent",
       debug: "Debug",
+    },
+    translation: {
+      google_cloud: "Google Cloud Translation",
+      api_key_placeholder: "Cloud Translation API-Key",
+      google_cloud_desc:
+        "Der manuell eingegebene Schlüssel hat Vorrang vor GOOGLE_TRANSLATE_API_KEY.",
+      test_connection: "Verbindung testen",
+      testing: "Wird getestet...",
+      test_success: "Verbindung erfolgreich.",
+      test_failed: "Verbindung fehlgeschlagen.",
+      ai_enabled: "KI-Übersetzungsdienste aktivieren",
+      ai_enabled_desc:
+        "Erlaubt konfigurierte LLM-Anbieter für Übersetzungen, ohne den KI-Assistenten zu beeinflussen.",
     },
     language: "Sprache",
     theme: "Thema",

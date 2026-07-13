@@ -101,8 +101,7 @@ const ja = {
   translate: {
     title: "翻訳",
     provider: "モデル提供者",
-    cloud_api_key_missing:
-      "Cloud Translation API のキーがありません。.env.local に GOOGLE_TRANSLATE_API_KEY を設定して再起動してください。",
+    no_available_services: "利用可能なサービスがありません",
     model: "モデル",
     target: "対象言語",
     source_text: "原文",
@@ -565,8 +564,22 @@ const ja = {
       general: "一般",
       edit: "編集",
       llm: "LLM",
+      translation: "翻訳",
       ai_chat: "AI アシスタント",
       debug: "デバッグ",
+    },
+    translation: {
+      google_cloud: "Google Cloud Translation",
+      api_key_placeholder: "Cloud Translation API Key",
+      google_cloud_desc:
+        "手動で入力したキーは GOOGLE_TRANSLATE_API_KEY より優先されます。",
+      test_connection: "接続をテスト",
+      testing: "テスト中...",
+      test_success: "接続に成功しました。",
+      test_failed: "接続に失敗しました。",
+      ai_enabled: "AI 翻訳サービスを有効にする",
+      ai_enabled_desc:
+        "設定済みの LLM プロバイダーを翻訳に使用します。AI アシスタントには影響しません。",
     },
     language: "言語",
     theme: "テーマ",

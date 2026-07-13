@@ -102,8 +102,7 @@ const es = {
   translate: {
     title: "Traducir",
     provider: "Modelo Proveedor",
-    cloud_api_key_missing:
-      "Falta la clave de Cloud Translation API. Establece GOOGLE_TRANSLATE_API_KEY en .env.local y reinicia la aplicación.",
+    no_available_services: "No hay servicios disponibles",
     model: "Modelo",
     target: "Idioma de destino",
     source_text: "Origen",
@@ -570,8 +569,22 @@ const es = {
       general: "General",
       edit: "Editar",
       llm: "LLM",
+      translation: "Traducción",
       ai_chat: "Asistente IA",
       debug: "Depuración",
+    },
+    translation: {
+      google_cloud: "Google Cloud Translation",
+      api_key_placeholder: "Clave de Cloud Translation API",
+      google_cloud_desc:
+        "La clave introducida manualmente tiene prioridad sobre GOOGLE_TRANSLATE_API_KEY.",
+      test_connection: "Probar conexión",
+      testing: "Probando...",
+      test_success: "Conexión correcta.",
+      test_failed: "Error de conexión.",
+      ai_enabled: "Activar servicios de traducción con IA",
+      ai_enabled_desc:
+        "Permite usar proveedores LLM configurados para traducir sin afectar al asistente de IA.",
     },
     language: "Idioma",
     theme: "Tema",

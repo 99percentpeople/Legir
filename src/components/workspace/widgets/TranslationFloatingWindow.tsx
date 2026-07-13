@@ -165,6 +165,11 @@ export const TranslationFloatingWindow: React.FC<
     }
     return undefined;
   }, [optionGroups]);
+  const selectedTranslateOption = translateService.isOptionAvailable(
+    translateOption,
+  )
+    ? translateOption
+    : firstAvailableOption;
   useEffect(() => {
     if (translateService.isOptionAvailable(translateOption)) return;
     if (!firstAvailableOption) return;
@@ -247,11 +252,6 @@ export const TranslationFloatingWindow: React.FC<
       input.trim().length > 0
     );
   }, [input, isLoading, translateOption]);
-
-  const unavailableMessageKey = useMemo(() => {
-    if (translateService.isOptionAvailable(translateOption)) return undefined;
-    return translateService.getOptionUnavailableMessageKey(translateOption);
-  }, [translateOption]);
 
   const handleTranslate = useCallback(
     async (overrideText?: string) => {
@@ -382,17 +382,26 @@ export const TranslationFloatingWindow: React.FC<
             )}
 
             <ModelSelect
-              value={translateOption}
+              value={selectedTranslateOption}
               onValueChange={(v) => {
                 setState({
                   translateOption: translateService.normalizeTranslateOption(v),
                 });
               }}
-              placeholder={t("translate.provider")}
+              placeholder={
+                firstAvailableOption
+                  ? t("translate.provider")
+                  : t("translate.no_available_services")
+              }
               groups={modelSelectGroups}
+              disabled={!firstAvailableOption}
               triggerClassName="h-7! border-none text-xs"
               triggerSize="sm"
-              triggerTitle={t("translate.provider")}
+              triggerTitle={
+                firstAvailableOption
+                  ? t("translate.provider")
+                  : t("translate.no_available_services")
+              }
             />
           </div>
         </div>
@@ -496,11 +505,6 @@ export const TranslationFloatingWindow: React.FC<
                   />
                 </div>
               </div>
-              {unavailableMessageKey && (
-                <div className="text-muted-foreground text-[11px] leading-4">
-                  {t(unavailableMessageKey)}
-                </div>
-              )}
             </div>
           );
         }
@@ -619,11 +623,6 @@ export const TranslationFloatingWindow: React.FC<
                 </div>
               </TabsContent>
             </Tabs>
-            {unavailableMessageKey && (
-              <div className="text-muted-foreground mb-1.5 text-[11px] leading-4">
-                {t(unavailableMessageKey)}
-              </div>
-            )}
           </div>
         );
       }}

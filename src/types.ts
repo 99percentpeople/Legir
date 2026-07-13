@@ -391,6 +391,13 @@ export interface ApiProxyOptions {
   proxyUrl?: string;
 }
 
+export interface TranslationOptions {
+  aiEnabled: boolean;
+  googleCloud: {
+    apiKey: string;
+  };
+}
+
 export interface AiChatReasoningOptions {
   level: AiReasoningLevel;
   displayPolicy: AiReasoningDisplayPolicy;
@@ -417,6 +424,7 @@ export interface AppOptions {
   removeTextUnderFlattenedFreetext: boolean;
 
   apiProxy: ApiProxyOptions;
+  translation: TranslationOptions;
   llm: LLMOptions;
   aiChat: AiChatOptions;
 }

@@ -101,8 +101,7 @@ const zhTW = {
   translate: {
     title: "翻譯",
     provider: "模型提供商",
-    cloud_api_key_missing:
-      "缺少 Cloud Translation API Key。請在 .env.local 中設定 GOOGLE_TRANSLATE_API_KEY 並重啟應用。",
+    no_available_services: "無可用服務",
     model: "模型",
     target: "目標語言",
     source_text: "原文",
@@ -551,8 +550,22 @@ const zhTW = {
       general: "通用",
       edit: "編輯",
       llm: "大模型",
+      translation: "翻譯",
       ai_chat: "AI 助手",
       debug: "除錯",
+    },
+    translation: {
+      google_cloud: "Google Cloud Translation",
+      api_key_placeholder: "Cloud Translation API Key",
+      google_cloud_desc:
+        "手動輸入的 Key 優先於 GOOGLE_TRANSLATE_API_KEY 環境變數。",
+      test_connection: "測試連線",
+      testing: "測試中...",
+      test_success: "連線成功。",
+      test_failed: "連線失敗。",
+      ai_enabled: "啟用 AI 翻譯服務",
+      ai_enabled_desc:
+        "允許使用已設定的大模型提供商進行翻譯。此開關不影響 AI 助手。",
     },
     language: "語言",
     theme: "主題",

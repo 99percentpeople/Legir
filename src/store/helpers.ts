@@ -27,6 +27,7 @@ import type {
   LLMCustomModelConfig,
   LLMOptions,
   PageData,
+  TranslationOptions,
 } from "@/types";
 
 const envGeminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
@@ -255,6 +256,30 @@ const normalizeApiProxyOptions = (
   };
 };
 
+const normalizeTranslationOptions = (
+  base: TranslationOptions | undefined,
+  patch?: Partial<TranslationOptions>,
+): TranslationOptions => {
+  const defaults = DEFAULT_EDITOR_UI_STATE.options.translation;
+  const next = {
+    ...defaults,
+    ...base,
+    ...patch,
+  };
+
+  return {
+    aiEnabled:
+      typeof next.aiEnabled === "boolean" ? next.aiEnabled : defaults.aiEnabled,
+    googleCloud: {
+      apiKey: (
+        patch?.googleCloud?.apiKey ??
+        base?.googleCloud?.apiKey ??
+        defaults.googleCloud.apiKey
+      ).trim(),
+    },
+  };
+};
+
 export const mergeEditorOptions = (
   base: AppOptions,
   patch?: Partial<AppOptions>,
@@ -263,6 +288,7 @@ export const mergeEditorOptions = (
     return {
       ...base,
       apiProxy: normalizeApiProxyOptions(base.apiProxy),
+      translation: normalizeTranslationOptions(base.translation),
       llm: normalizeLlmOptions(base.llm),
       aiChat: normalizeAiChatOptions(base.aiChat),
     };
@@ -297,6 +323,10 @@ export const mergeEditorOptions = (
           apiProxy: normalizeApiProxyOptions(base.apiProxy, patch.apiProxy),
         }
       : {}),
+    translation: normalizeTranslationOptions(
+      base.translation,
+      patch.translation,
+    ),
     ...(patch.aiChat
       ? {
           aiChat: normalizeAiChatOptions(base.aiChat, patch.aiChat),

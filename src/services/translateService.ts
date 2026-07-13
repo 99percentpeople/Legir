@@ -60,7 +60,10 @@ export interface TranslateTextOptions {
 }
 
 const getCloudTranslationApiKey = () => {
-  return process.env.GOOGLE_TRANSLATE_API_KEY;
+  const configuredKey = useEditorStore
+    .getState()
+    .options.translation.googleCloud.apiKey.trim();
+  return configuredKey || (process.env.GOOGLE_TRANSLATE_API_KEY || "").trim();
 };
 
 const decodeHtmlEntities = (text: string) => {
@@ -85,6 +88,39 @@ const throwIfAborted = (signal?: AbortSignal) => {
 class CloudTranslateV2 {
   isAvailable() {
     return !!getCloudTranslationApiKey();
+  }
+
+  async checkConfig() {
+    const apiKey = getCloudTranslationApiKey();
+    if (!apiKey) {
+      throw new Error("No API Key provided for Cloud Translation API.");
+    }
+
+    const res = await fetchWithApiProxy(
+      useEditorStore.getState().options,
+      `https://translation.googleapis.com/language/translate/v2/languages?key=${encodeURIComponent(
+        apiKey,
+      )}&target=en`,
+      { method: "GET" },
+    );
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(
+        `Cloud Translation API connection failed (${res.status}): ${errText || res.statusText}`,
+      );
+    }
+
+    type CloudTranslateLanguagesResponse = {
+      data?: {
+        languages?: unknown[];
+      };
+    };
+
+    const json = (await res.json()) as CloudTranslateLanguagesResponse;
+    if (!Array.isArray(json.data?.languages)) {
+      throw new Error("Cloud Translation API returned an unexpected response.");
+    }
   }
 
   async translate(text: string, opts: TranslateTextOptions) {
@@ -169,7 +205,6 @@ export class TranslateService {
         },
       ],
       isAvailable: () => this.cloudV2.isAvailable(),
-      unavailableMessageKey: "translate.cloud_api_key_missing",
       translate: async (text, _optionId, opts) => {
         return await this.cloudV2.translate(text, opts);
       },
@@ -228,6 +263,14 @@ export class TranslateService {
     return () => {
       this.registryListeners.delete(listener);
     };
+  }
+
+  notifyAvailabilityChanged() {
+    for (const listener of this.registryListeners) listener();
+  }
+
+  async checkCloudTranslationConfig() {
+    await this.cloudV2.checkConfig();
   }
 
   getOptionGroups(): TranslateOptionGroup[] {

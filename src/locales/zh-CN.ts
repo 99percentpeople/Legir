@@ -101,8 +101,7 @@ const zhCN = {
   translate: {
     title: "翻译",
     provider: "模型提供商",
-    cloud_api_key_missing:
-      "缺少 Cloud Translation API Key。请在 .env.local 中设置 GOOGLE_TRANSLATE_API_KEY 并重启应用。",
+    no_available_services: "无可用服务",
     model: "模型",
     target: "目标语言",
     source_text: "原文",
@@ -552,8 +551,22 @@ const zhCN = {
       general: "通用",
       edit: "编辑",
       llm: "大模型",
+      translation: "翻译",
       ai_chat: "AI 助手",
       debug: "调试",
+    },
+    translation: {
+      google_cloud: "Google Cloud Translation",
+      api_key_placeholder: "Cloud Translation API Key",
+      google_cloud_desc:
+        "手动填写的 Key 优先于 GOOGLE_TRANSLATE_API_KEY 环境变量。",
+      test_connection: "测试连接",
+      testing: "测试中...",
+      test_success: "连接成功。",
+      test_failed: "连接失败。",
+      ai_enabled: "启用 AI 翻译服务",
+      ai_enabled_desc:
+        "允许使用已配置的大模型提供商进行翻译。此开关不影响 AI 助手。",
     },
     language: "语言",
     theme: "主题",

@@ -254,6 +254,11 @@ export function PageTranslatePanel({
   const [translateOption, setTranslateOption] = useState<TranslateOptionId>(
     translateService.normalizeTranslateOption(initialTranslateOption),
   );
+  const selectedTranslateOption = translateService.isOptionAvailable(
+    translateOption,
+  )
+    ? translateOption
+    : firstAvailableOption;
   const [prompt, setPrompt] = useState<string>("");
 
   const [systemFamilies, setSystemFamilies] = useState<string[]>([]);
@@ -284,11 +289,6 @@ export function PageTranslatePanel({
       );
     }
   }, [firstAvailableOption, translateOption]);
-
-  const availabilityMessageKey = useMemo(() => {
-    if (translateService.isOptionAvailable(translateOption)) return undefined;
-    return translateService.getOptionUnavailableMessageKey(translateOption);
-  }, [translateOption]);
 
   const isPositionAwareAvailable = useMemo(() => {
     return translateService.isOptionLLM(translateOption);
@@ -360,11 +360,6 @@ export function PageTranslatePanel({
       onResize={onResize}
       footer={
         <div className="space-y-2">
-          {availabilityMessageKey && (
-            <div className="text-muted-foreground text-xs">
-              {t(availabilityMessageKey)}
-            </div>
-          )}
           {isProcessing && processingStatus && (
             <div className="text-muted-foreground text-xs">
               {processingStatus}
@@ -459,13 +454,17 @@ export function PageTranslatePanel({
         <div className="space-y-2">
           <Label>{t("translate.model")}</Label>
           <ModelSelect
-            value={translateOption}
+            value={selectedTranslateOption}
             onValueChange={(v) =>
               setTranslateOption(translateService.normalizeTranslateOption(v))
             }
-            placeholder={t("common.select")}
+            placeholder={
+              firstAvailableOption
+                ? t("common.select")
+                : t("translate.no_available_services")
+            }
             groups={modelSelectGroups}
-            disabled={isProcessing}
+            disabled={isProcessing || !firstAvailableOption}
           />
         </div>
 

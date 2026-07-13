@@ -4,6 +4,7 @@ import {
   Bug,
   FileText,
   Globe,
+  Languages,
   MessageSquare,
   Settings2,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import {
   AI_PROVIDER_IDS,
   AI_PROVIDER_SPECS_SORTED_BY_LABEL,
 } from "@/services/ai/providers/catalog";
+import { translateService } from "@/services/translateService";
 import { useEditorStore } from "@/store/useEditorStore";
 import type {
   AppOptions,
@@ -43,6 +45,7 @@ import { DebugSettingsTab } from "./DebugSettingsTab";
 import { EditSettingsTab } from "./EditSettingsTab";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { LlmSettingsTab } from "./LlmSettingsTab";
+import { TranslationSettingsTab } from "./TranslationSettingsTab";
 import {
   SETTINGS_TAB_TRIGGER_CLASS,
   SETTINGS_TABS_CONTENT_CLASS,
@@ -192,6 +195,14 @@ const SettingsDialog = ({
         ...patch,
       },
     });
+  };
+
+  const updateTranslationOptions = (translation: AppOptions["translation"]) => {
+    onChange({
+      ...options,
+      translation,
+    });
+    translateService.notifyAvailabilityChanged();
   };
 
   const updateApiProxyOptions = (patch: Partial<AppOptions["apiProxy"]>) => {
@@ -364,6 +375,13 @@ const SettingsDialog = ({
               <BrainCircuit className="h-4 w-4" />
               {t("settings.tabs.llm")}
             </TabsTrigger>
+            <TabsTrigger
+              value="translation"
+              className={SETTINGS_TAB_TRIGGER_CLASS}
+            >
+              <Languages className="h-4 w-4" />
+              {t("settings.tabs.translation")}
+            </TabsTrigger>
             <TabsTrigger value="ai_chat" className={SETTINGS_TAB_TRIGGER_CLASS}>
               <MessageSquare className="h-4 w-4" />
               {t("settings.tabs.ai_chat")}
@@ -402,6 +420,10 @@ const SettingsDialog = ({
               addCustomModel={addCustomModel}
               removeCustomModel={removeCustomModel}
               updateApiProxyOptions={updateApiProxyOptions}
+            />
+            <TranslationSettingsTab
+              options={options.translation}
+              onChange={updateTranslationOptions}
             />
             <AiChatSettingsTab
               options={options.aiChat}

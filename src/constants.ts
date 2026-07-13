@@ -104,6 +104,12 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
       proxyUrlEnabled: false,
       proxyUrl: import.meta.env.DEV ? DEV_API_PROXY_URL : "",
     },
+    translation: {
+      aiEnabled: true,
+      googleCloud: {
+        apiKey: "",
+      },
+    },
     llm: AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
       acc[providerId as AiProviderId] = {
         enabled: true,
