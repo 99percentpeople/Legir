@@ -17,11 +17,8 @@ import {
 } from "@/services/ai";
 import { useEditorStore } from "@/store/useEditorStore";
 import { AI_CHAT_VISUAL_MODEL_AUTO_KEY } from "@/constants";
-import {
-  type EditorState,
-  type LLMModelCapabilities,
-  type PDFSearchResult,
-} from "@/types";
+import { type LLMModelCapabilities, type PDFSearchResult } from "@/types";
+import type { AiChatEditorState } from "@/store/selectors";
 import type { AiReasoningLevel, AiReasoningLevelControl } from "@/services/ai";
 import { aiChatService } from "@/services/ai/chat/aiChatService";
 import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
@@ -165,7 +162,7 @@ const isAiChatSessionStarted = (
 
 const buildAiChatTurnCompressionOptions = (
   aiChatOptions: Pick<
-    EditorState["options"]["aiChat"],
+    AiChatEditorState["options"]["aiChat"],
     | "contextCompressionEnabled"
     | "contextCompressionThresholdPercent"
     | "visualHistoryWindow"
@@ -193,7 +190,7 @@ const createInMemoryAiChatDocumentState = (options: {
 });
 
 export const useAiChatController = (
-  editorState: EditorState,
+  editorState: AiChatEditorState,
   scopeId?: string,
   workerService?: PDFWorkerService,
 ) => {
@@ -309,7 +306,7 @@ export const useAiChatController = (
         "conversation" | "contextMemory" | "contextTokenOverhead"
       >,
       aiChatOptions: Pick<
-        EditorState["options"]["aiChat"],
+        AiChatEditorState["options"]["aiChat"],
         "contextCompressionEnabled" | "visualHistoryWindow"
       >,
     ) => {
@@ -410,7 +407,7 @@ export const useAiChatController = (
         | "contextTokenOverhead"
       >,
       aiChatOptions: Pick<
-        EditorState["options"]["aiChat"],
+        AiChatEditorState["options"]["aiChat"],
         | "contextCompressionEnabled"
         | "contextCompressionThresholdPercent"
         | "visualHistoryWindow"
@@ -468,7 +465,7 @@ export const useAiChatController = (
         | "contextTokenOverhead"
       >,
       aiChatOptions: Pick<
-        EditorState["options"]["aiChat"],
+        AiChatEditorState["options"]["aiChat"],
         | "contextCompressionEnabled"
         | "contextCompressionThresholdPercent"
         | "visualHistoryWindow"

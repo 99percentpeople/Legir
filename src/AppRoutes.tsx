@@ -4,14 +4,12 @@ import { Route, Switch, useLocation } from "wouter";
 import { Spinner } from "./components/ui/spinner";
 import { Skeleton } from "./components/ui/skeleton";
 import type { HomePageProps } from "./pages/HomePage";
-import type { EditorPageProps } from "./pages/EditorPage";
 
 const HomePage = React.lazy(() => import("./pages/HomePage"));
 const EditorPage = React.lazy(() => import("./pages/EditorPage"));
 
 interface AppRoutesProps {
   homeProps: HomePageProps;
-  editorProps: EditorPageProps;
   canAccessEditor: boolean;
   isLoading: boolean;
 }
@@ -65,7 +63,6 @@ function EditorRouteFallback() {
 
 const AppRoutes: React.FC<AppRoutesProps> = ({
   homeProps,
-  editorProps,
   canAccessEditor,
   isLoading,
 }) => {
@@ -89,7 +86,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({
             fallback={<HomePage {...homeProps} />}
             loadingFallback={<EditorRouteFallback />}
           >
-            <EditorPage {...editorProps} />
+            <EditorPage />
           </EditorRouteGuard>
         </Route>
         <Route path="/">

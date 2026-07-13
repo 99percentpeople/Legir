@@ -3,51 +3,38 @@ import { toast } from "sonner";
 
 import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
 import { pageTranslationService } from "@/services/pageTranslationService";
-import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
+import { useEditorStore } from "@/store/useEditorStore";
+import { useShallow } from "zustand/react/shallow";
+import { useLanguage } from "@/components/language-provider";
+import { useEditorDocumentRuntime } from "@/app/editorRuntime";
 
-import type {
-  Annotation,
-  EditorState,
-  EditorUiState,
-  PageTranslateContextWindow,
-  TranslateOptionId,
-} from "../types";
+import type { PageTranslateContextWindow, TranslateOptionId } from "../types";
 
-type TranslateFn = (key: string) => string;
-
-export const usePageTranslation = (deps: {
-  state: EditorState;
-  workerService?: PDFWorkerService | null;
-  t: TranslateFn;
-  addAnnotations: (
-    annotations: Annotation[],
-    options?: { select?: boolean },
-  ) => void;
-  setState: (
-    next: Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>),
-  ) => void;
-  setUiState: (
-    next:
-      | Partial<EditorUiState>
-      | ((prev: EditorUiState) => Partial<EditorUiState>),
-  ) => void;
-  setProcessingStatus: (status: string | null) => void;
-  withProcessing: <T>(
-    status: string | null,
-    fn: () => Promise<T>,
-  ) => Promise<T>;
-  setPageTranslateParagraphCandidates: (
-    next: EditorState["pageTranslateParagraphCandidates"],
-  ) => void;
-  setSelectedPageTranslateParagraphIds: (ids: string[]) => void;
-  removePageTranslateParagraphCandidatesByPageIndex: (
-    pageIndex: number,
-  ) => void;
-}) => {
+export const usePageTranslation = () => {
+  const { workerService, sessionRenderKey } = useEditorDocumentRuntime();
+  const { t } = useLanguage();
+  const state = useEditorStore(
+    useShallow((store) => ({
+      pages: store.pages,
+      documentPermissions: store.documentPermissions,
+      pageTranslateOptions: store.pageTranslateOptions,
+      pageTranslateParagraphCandidates: store.pageTranslateParagraphCandidates,
+      pageTranslateSelectedParagraphIds:
+        store.pageTranslateSelectedParagraphIds,
+      addAnnotations: store.addAnnotations,
+      setState: store.setState,
+      setUiState: store.setUiState,
+      setProcessingStatus: store.setProcessingStatus,
+      withProcessing: store.withProcessing,
+      setPageTranslateParagraphCandidates:
+        store.setPageTranslateParagraphCandidates,
+      setSelectedPageTranslateParagraphIds:
+        store.setSelectedPageTranslateParagraphIds,
+      removePageTranslateParagraphCandidatesByPageIndex:
+        store.removePageTranslateParagraphCandidatesByPageIndex,
+    })),
+  );
   const {
-    state,
-    workerService,
-    t,
     addAnnotations,
     setState,
     setUiState,
@@ -56,7 +43,7 @@ export const usePageTranslation = (deps: {
     setPageTranslateParagraphCandidates,
     setSelectedPageTranslateParagraphIds,
     removePageTranslateParagraphCandidatesByPageIndex,
-  } = deps;
+  } = state;
 
   const [isPageTranslating, setIsPageTranslating] = useState(false);
   const [pageTranslateStatus, setPageTranslateStatus] = useState<string | null>(
@@ -67,13 +54,22 @@ export const usePageTranslation = (deps: {
   const cancelPageTranslate = useCallback(() => {
     pageTranslateAbortRef.current?.abort();
     pageTranslateAbortRef.current = null;
+    setIsPageTranslating(false);
+    setPageTranslateStatus(null);
   }, []);
 
   useEffect(() => {
     return () => {
-      cancelPageTranslate();
+      pageTranslateAbortRef.current?.abort();
+      pageTranslateAbortRef.current = null;
     };
-  }, [cancelPageTranslate]);
+  }, []);
+
+  useEffect(() => {
+    cancelPageTranslate();
+    setIsPageTranslating(false);
+    setPageTranslateStatus(null);
+  }, [cancelPageTranslate, sessionRenderKey]);
 
   const handleStartPageTranslate = useCallback(
     async (options: {
@@ -254,8 +250,10 @@ export const usePageTranslation = (deps: {
             : String(e);
         toast.error(msg || "Page translation failed.");
       } finally {
-        setIsPageTranslating(false);
-        pageTranslateAbortRef.current = null;
+        if (pageTranslateAbortRef.current === controller) {
+          setIsPageTranslating(false);
+          pageTranslateAbortRef.current = null;
+        }
       }
     },
     [
@@ -331,8 +329,10 @@ export const usePageTranslation = (deps: {
             : String(e);
         toast.error(msg || "Preview paragraphs failed.");
       } finally {
-        setIsPageTranslating(false);
-        pageTranslateAbortRef.current = null;
+        if (pageTranslateAbortRef.current === controller) {
+          setIsPageTranslating(false);
+          pageTranslateAbortRef.current = null;
+        }
       }
     },
     [
@@ -404,9 +404,11 @@ export const usePageTranslation = (deps: {
           : String(e);
       toast.error(msg || "Unmerge selected paragraphs failed.");
     } finally {
-      setIsPageTranslating(false);
-      pageTranslateAbortRef.current = null;
-      setPageTranslateStatus(null);
+      if (pageTranslateAbortRef.current === controller) {
+        setIsPageTranslating(false);
+        pageTranslateAbortRef.current = null;
+        setPageTranslateStatus(null);
+      }
     }
   }, [
     cancelPageTranslate,

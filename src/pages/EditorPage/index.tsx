@@ -1,109 +1,56 @@
 import React from "react";
-import Toolbar from "@/components/toolbar/Toolbar";
-import Sidebar from "@/components/sidebar/Sidebar";
-import PDFSearchHeader from "@/components/sidebar/PDFSearchHeader";
-import PDFSearchPanel from "@/components/sidebar/PDFSearchPanel";
-import { RightPanelTabDock } from "@/components/properties-panel/RightPanelTabDock";
-import { TranslationFloatingWindow } from "@/components/workspace/widgets/TranslationFloatingWindow";
-import { useLanguage } from "@/components/language-provider";
-import { useIsMobile } from "@/hooks/useIsMobile";
-import { usePageTranslation } from "@/hooks/usePageTranslation";
-import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
-import { useAiChatController } from "@/hooks/useAiChatController";
-import { useAppEvent } from "@/hooks/useAppEventBus";
-import { appEventBus } from "@/lib/eventBus";
-import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
+import { useShallow } from "zustand/react/shallow";
+
 import {
-  canModifyPdfContents,
-  canUseModeWithPdfPermissions,
-  mergePdfPermissionDirtyScopes,
-} from "@/lib/pdfPermissions";
-import { ANNOTATION_STYLES } from "@/constants";
+  EditorPdfSearchProvider,
+  EditorShellCommandsProvider,
+  type EditorShellCommands,
+} from "@/app/editorShellContext";
+import {
+  useEditorDocumentRuntime,
+  useEditorTabsRuntime,
+} from "@/app/editorRuntime";
+import { useLanguage } from "@/components/language-provider";
+import { RightPanelTabDock } from "@/components/properties-panel/RightPanelTabDock";
+import Sidebar from "@/components/sidebar/Sidebar";
+import Toolbar from "@/components/toolbar/Toolbar";
 import {
   calculateWorkspaceFitScreenScale,
   calculateWorkspaceFitWidthScale,
 } from "@/components/workspace/lib/calculateWorkspaceFitScale";
-import { useEditorStore } from "@/store/useEditorStore";
-import { selectEditorPageShellState } from "@/store/selectors";
-import type {
-  Annotation,
-  EditorState,
-  EditorUiState,
-  FormField,
-  PDFMetadata,
-  Tool,
-} from "@/types";
-import { useShallow } from "zustand/react/shallow";
+import { TranslationFloatingWindow } from "@/components/workspace/widgets/TranslationFloatingWindow";
+import { ANNOTATION_STYLES } from "@/constants";
+import { useAiChatController } from "@/hooks/useAiChatController";
+import { useAppEvent } from "@/hooks/useAppEventBus";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
+import { appEventBus } from "@/lib/eventBus";
+import { canUseModeWithPdfPermissions } from "@/lib/pdfPermissions";
 import {
   exitPlatformFullscreen,
   setPlatformFullscreen,
   subscribePlatformFullscreenChange,
 } from "@/services/platform";
+import {
+  selectAiChatEditorState,
+  selectEditorPageState,
+} from "@/store/selectors";
+import { useEditorStore } from "@/store/useEditorStore";
+import type { EditorState, EditorUiState, Tool } from "@/types";
 import { EditorCanvasPane } from "./EditorCanvasPane";
 import { EditorRightPanel } from "./EditorRightPanel";
 import { EditorTabStrip } from "./components/EditorTabStrip";
 import { useEditorPageKeyboardShortcuts } from "./hooks/useEditorPageKeyboardShortcuts";
 import { useEditorPageLifecycle } from "./hooks/useEditorPageLifecycle";
 import { usePdfSearchController } from "./hooks/usePdfSearchController";
-import type { EditorPageProps } from "./types";
 
-export type { EditorPageProps } from "./types";
-
-const EditorPage: React.FC<EditorPageProps> = ({
-  windowId,
-  tabs,
-  activeTabId,
-  workerService,
-  isFileDragActive,
-  mergeWindowTargets,
-  onOpenDocument,
-  onRefreshMergeWindowTargets,
-  onSelectTab,
-  onCloseTab,
-  onMoveTab,
-  onDetachTab,
-  onMergeTabToWindow,
-  canDetachTabs,
-  canMergeTabs,
-  onSave,
-  onSaveAs,
-  onExit,
-  onPrint,
-  onRequestCloseCurrentTab,
-}) => {
-  const editorStore = useEditorStore(useShallow(selectEditorPageShellState));
-  const state = editorStore;
-  const { t, effectiveLanguage } = useLanguage();
+const EditorPage: React.FC = () => {
+  const state = useEditorStore(useShallow(selectEditorPageState));
+  const aiEditorState = useEditorStore(useShallow(selectAiChatEditorState));
+  const { tabs, activeTabId } = useEditorTabsRuntime();
+  const documentRuntime = useEditorDocumentRuntime();
+  const { t } = useLanguage();
   const permissionUi = usePdfPermissionUi(state.documentPermissions);
-  const {
-    setState,
-    setUiState,
-    updateMetadata,
-    addAnnotations,
-    updateAnnotation,
-    addAnnotationReply,
-    updateAnnotationReply,
-    deleteAnnotationReply,
-    deleteSelection,
-    selectControl,
-    setTool,
-    saveCheckpoint,
-    setProcessingStatus,
-    withProcessing,
-    undo,
-    redo,
-    deleteAnnotation,
-    openDialog,
-    setPageTranslateParagraphCandidates,
-    clearPageTranslateParagraphCandidates,
-    setSelectedPageTranslateParagraphIds,
-    mergeSelectedPageTranslateParagraphs,
-    toggleExcludeSelectedPageTranslateParagraphs,
-    deleteSelectedPageTranslateParagraphs,
-    removePageTranslateParagraphCandidatesByPageIndex,
-    setAllFreetextFlatten,
-  } = editorStore;
-
   const isMobile = useIsMobile();
   const defaultTool: Tool = isMobile ? "pan" : "select";
   const prevSelectedIdRef = React.useRef<string | null>(null);
@@ -115,62 +62,38 @@ const EditorPage: React.FC<EditorPageProps> = ({
   React.useEffect(() => {
     if (!isMobile) return;
     const currentState = useEditorStore.getState();
-    if (currentState.tool !== "select") return;
-    if (currentState.selectedId) return;
+    if (currentState.tool !== "select" || currentState.selectedId) return;
     currentState.setTool("pan");
   }, [isMobile]);
 
-  const {
-    isPageTranslating,
-    pageTranslateStatus,
-    cancelPageTranslate,
-    handleStartPageTranslate,
-    handlePreviewParagraphs,
-    handleUnmergeSelectedParagraphs,
-  } = usePageTranslation({
-    state,
-    workerService,
-    t,
-    addAnnotations,
-    setState,
-    setUiState,
-    setProcessingStatus,
-    withProcessing,
-    setPageTranslateParagraphCandidates,
-    setSelectedPageTranslateParagraphIds,
-    removePageTranslateParagraphCandidatesByPageIndex,
-  });
-
   const aiChat = useAiChatController(
-    state,
+    aiEditorState,
     activeTabId ?? undefined,
-    workerService ?? undefined,
+    documentRuntime.workerService ?? undefined,
   );
 
   const openAiChatPanel = React.useCallback(() => {
-    setUiState((prev) => {
+    state.setUiState((prev) => {
       const updates: Partial<EditorUiState> = {
         rightPanelTab: "ai_chat",
         isRightPanelOpen: true,
       };
-      if (prev.isPanelFloating) {
-        updates.isSidebarOpen = false;
-      }
+      if (prev.isPanelFloating) updates.isSidebarOpen = false;
       return updates;
     });
-  }, [setUiState]);
+  }, [state.setUiState]);
 
   const setEditorFullscreen = React.useCallback(
     async (next: boolean) => {
-      setState({ isFullscreen: next });
+      state.setState({ isFullscreen: next });
       try {
         await setPlatformFullscreen(next);
       } catch (error) {
         console.error("Failed to toggle fullscreen", error);
-        setState({ isFullscreen: !next });
+        state.setState({ isFullscreen: !next });
       }
     },
-    [setState],
+    [state.setState],
   );
 
   const exitEditorFullscreen = React.useCallback(async () => {
@@ -179,9 +102,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
     } catch (error) {
       console.error("Failed to exit fullscreen", error);
     } finally {
-      setState({ isFullscreen: false });
+      state.setState({ isFullscreen: false });
     }
-  }, [setState]);
+  }, [state.setState]);
 
   const toggleFullscreen = React.useCallback(() => {
     const next = !useEditorStore.getState().isFullscreen;
@@ -191,9 +114,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const handleExitEditorPage = React.useCallback(() => {
     void (async () => {
       await exitEditorFullscreen();
-      onExit();
+      documentRuntime.exit();
     })();
-  }, [exitEditorFullscreen, onExit]);
+  }, [documentRuntime, exitEditorFullscreen]);
 
   React.useEffect(() => {
     return () => {
@@ -201,17 +124,18 @@ const EditorPage: React.FC<EditorPageProps> = ({
     };
   }, [exitEditorFullscreen]);
 
-  React.useEffect(() => {
-    return subscribePlatformFullscreenChange((isFullscreen) => {
-      setState({ isFullscreen });
-    });
-  }, [setState]);
+  React.useEffect(
+    () =>
+      subscribePlatformFullscreenChange((isFullscreen) => {
+        state.setState({ isFullscreen });
+      }),
+    [state.setState],
+  );
 
   const runPrimarySaveAction = React.useCallback(async () => {
-    const snapshot = useEditorStore.getState();
-    if (!snapshot.isDirty) return true;
-    return await onSave();
-  }, [onSave]);
+    if (!useEditorStore.getState().isDirty) return true;
+    return await documentRuntime.save();
+  }, [documentRuntime]);
 
   const { workspaceScrollContainerRef } = useEditorPageLifecycle({
     filename: state.filename,
@@ -221,9 +145,9 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const pdfSearch = usePdfSearchController({
     pages: state.pages,
-    workerService,
+    workerService: documentRuntime.workerService,
     sidebarOpen: state.isSidebarOpen,
-    setUiState,
+    setUiState: state.setUiState,
     highlightedSearchResultsByPage: aiChat.highlightedSearchResultsByPage,
     t,
   });
@@ -231,12 +155,12 @@ const EditorPage: React.FC<EditorPageProps> = ({
   const handleModeChange = React.useCallback(
     (mode: EditorState["mode"]) => {
       if (!canUseModeWithPdfPermissions(mode, state.documentPermissions)) {
-        setTool("select");
+        state.setTool("select");
         return;
       }
-      setState({ mode, tool: defaultTool });
+      state.setState({ mode, tool: defaultTool });
     },
-    [defaultTool, setState, setTool, state.documentPermissions],
+    [defaultTool, state.documentPermissions, state.setState, state.setTool],
   );
 
   useEditorPageKeyboardShortcuts({
@@ -245,13 +169,13 @@ const EditorPage: React.FC<EditorPageProps> = ({
     openPdfSearch: pdfSearch.openPdfSearch,
     closePdfSearch: pdfSearch.closePdfSearch,
     runPrimarySaveAction,
-    onPrint,
+    onPrint: documentRuntime.print,
     onToggleFullscreen: toggleFullscreen,
   });
 
   useAppEvent("sidebar:focusAnnotation", () => {
     pdfSearch.dismissPdfSearch();
-    setUiState((prev) => ({
+    state.setUiState((prev) => ({
       isSidebarOpen: true,
       sidebarTab: "annotations",
       ...(prev.isPanelFloating ? { isRightPanelOpen: false } : {}),
@@ -260,274 +184,150 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   useAppEvent("workspace:openTranslate", ({ sourceText, autoTranslate }) => {
     const trimmed = typeof sourceText === "string" ? sourceText.trim() : "";
-
     if (isTranslateOpen) {
-      if (trimmed !== "") setTranslateSourceText(trimmed);
+      if (trimmed) setTranslateSourceText(trimmed);
     } else {
       setTranslateSourceText(trimmed);
       setIsTranslateOpen(true);
     }
-
     if (autoTranslate) setTranslateAutoToken((value) => value + 1);
   });
 
-  useAppEvent("workspace:askAi", () => {
-    openAiChatPanel();
-  });
+  useAppEvent("workspace:askAi", openAiChatPanel);
 
   React.useEffect(() => {
-    if (isTranslateOpen) {
-      setUiState((prev) => {
-        if (prev.rightPanelDockTab?.includes("translate")) return {};
-        return {
-          rightPanelDockTab: [...(prev.rightPanelDockTab ?? []), "translate"],
-        };
-      });
-      return;
-    }
-
-    setUiState((prev) => {
-      if (!prev.rightPanelDockTab?.includes("translate")) return {};
+    state.setUiState((prev) => {
+      const hasTranslateDock = prev.rightPanelDockTab?.includes("translate");
+      if (isTranslateOpen === hasTranslateDock) return {};
       return {
-        rightPanelDockTab: (prev.rightPanelDockTab ?? []).filter(
-          (tab) => tab !== "translate",
-        ),
+        rightPanelDockTab: isTranslateOpen
+          ? [...(prev.rightPanelDockTab ?? []), "translate"]
+          : (prev.rightPanelDockTab ?? []).filter((tab) => tab !== "translate"),
       };
     });
-  }, [isTranslateOpen, setUiState]);
-
-  const selectedField =
-    state.selectedId &&
-    state.fields.find((field) => field.id === state.selectedId)
-      ? state.fields.find((field) => field.id === state.selectedId) || null
-      : null;
-  const selectedAnnotation =
-    state.selectedId &&
-    state.annotations.find((annotation) => annotation.id === state.selectedId)
-      ? state.annotations.find(
-          (annotation) => annotation.id === state.selectedId,
-        ) || null
-      : null;
-  const selectedControl = selectedField || selectedAnnotation;
+  }, [isTranslateOpen, state.setUiState]);
 
   React.useEffect(() => {
-    setState({ isPanelFloating: isMobile });
-
-    if (isMobile) {
-      setUiState((prev) => {
-        if (!prev.isSidebarOpen || !prev.isRightPanelOpen) return prev;
-        return { isSidebarOpen: true, isRightPanelOpen: false };
-      });
-    }
-  }, [isMobile, setState, setUiState]);
+    state.setState({ isPanelFloating: isMobile });
+    if (!isMobile) return;
+    state.setUiState((prev) => {
+      if (!prev.isSidebarOpen || !prev.isRightPanelOpen) return prev;
+      return { isSidebarOpen: true, isRightPanelOpen: false };
+    });
+  }, [isMobile, state.setState, state.setUiState]);
 
   React.useEffect(() => {
-    if (!state.isPanelFloating) return;
-    if (state.isSidebarOpen && state.isRightPanelOpen) {
-      setUiState({ isRightPanelOpen: false });
+    if (
+      state.isPanelFloating &&
+      state.isSidebarOpen &&
+      state.isRightPanelOpen
+    ) {
+      state.setUiState({ isRightPanelOpen: false });
     }
   }, [
-    setUiState,
     state.isPanelFloating,
     state.isRightPanelOpen,
     state.isSidebarOpen,
+    state.setUiState,
   ]);
 
   React.useEffect(() => {
-    const prev = prevSelectedIdRef.current;
-    const next = state.selectedId;
-    if (!prev && next) {
-      setUiState({ rightPanelTab: "properties" });
+    const previousId = prevSelectedIdRef.current;
+    if (!previousId && state.selectedId) {
+      state.setUiState({ rightPanelTab: "properties" });
     }
-    prevSelectedIdRef.current = next;
-  }, [setUiState, state.selectedId]);
+    prevSelectedIdRef.current = state.selectedId;
+  }, [state.selectedId, state.setUiState]);
 
   React.useEffect(() => {
     if (!state.selectedId && state.rightPanelTab === "properties") {
-      setUiState({ rightPanelTab: "document" });
+      state.setUiState({ rightPanelTab: "document" });
     }
-  }, [setUiState, state.rightPanelTab, state.selectedId]);
+  }, [state.rightPanelTab, state.selectedId, state.setUiState]);
 
   React.useEffect(() => {
     appEventBus.clearSticky("workspace:focusTextRange");
   }, [state.filename, state.pages.length, state.pdfBytes]);
 
   React.useEffect(() => {
-    cancelPageTranslate();
     setIsTranslateOpen(false);
     setTranslateSourceText("");
     setTranslateAutoToken(0);
-  }, [activeTabId, cancelPageTranslate]);
+  }, [activeTabId]);
 
   const handlePenStyleChange = React.useCallback(
     (style: Partial<EditorState["penStyle"]>) => {
-      setState((prev) => ({
-        ...prev,
+      state.setState((prev) => ({
         penStyle: { ...prev.penStyle, ...style },
       }));
     },
-    [setState],
+    [state.setState],
   );
 
   const handleHighlightStyleChange = React.useCallback(
     (style: Partial<EditorState["penStyle"]>) => {
-      setState((prev) => ({
-        ...prev,
+      state.setState((prev) => ({
         highlightStyle: {
-          ...(prev.highlightStyle || {
-            color: ANNOTATION_STYLES.highlight.color,
-            thickness: ANNOTATION_STYLES.highlight.thickness,
-            opacity: ANNOTATION_STYLES.highlight.opacity,
-          }),
+          ...(prev.highlightStyle ?? ANNOTATION_STYLES.highlight),
           ...style,
         },
       }));
     },
-    [setState],
+    [state.setState],
   );
 
   const handleCommentStyleChange = React.useCallback(
     (style: { color: string }) => {
-      setState((prev) => ({
-        ...prev,
+      state.setState((prev) => ({
         commentStyle: {
-          ...(prev.commentStyle ?? {
-            color: ANNOTATION_STYLES.comment.color,
-            opacity: ANNOTATION_STYLES.comment.opacity,
-          }),
+          ...(prev.commentStyle ?? ANNOTATION_STYLES.comment),
           ...style,
         },
       }));
     },
-    [setState],
+    [state.setState],
   );
 
   const handleFreetextStyleChange = React.useCallback(
     (style: { color: string }) => {
-      setState((prev) => ({
-        ...prev,
+      state.setState((prev) => ({
         freetextStyle: { ...prev.freetextStyle!, ...style },
       }));
     },
-    [setState],
+    [state.setState],
   );
 
   const handleShapeStyleChange = React.useCallback(
     (style: Partial<NonNullable<EditorState["shapeStyle"]>>) => {
-      setState((prev) => ({
-        ...prev,
+      state.setState((prev) => ({
         shapeStyle: { ...prev.shapeStyle!, ...style },
       }));
     },
-    [setState],
+    [state.setState],
   );
 
   const handleStampStyleChange = React.useCallback(
     (style: Partial<NonNullable<EditorState["stampStyle"]>>) => {
-      setState((prev) => ({
-        ...prev,
+      state.setState((prev) => ({
         stampStyle: { ...prev.stampStyle!, ...style },
       }));
     },
-    [setState],
+    [state.setState],
   );
 
   const handleEditAnnotation = React.useCallback(
     (id: string) => {
-      selectControl(id);
-      appEventBus.emit(
-        "sidebar:focusAnnotation",
-        { id },
-        {
-          sticky: true,
-        },
-      );
+      state.selectControl(id);
+      appEventBus.emit("sidebar:focusAnnotation", { id }, { sticky: true });
     },
-    [selectControl],
-  );
-
-  const handlePropertiesChange = React.useCallback(
-    (updates: Partial<FormField | Annotation>) => {
-      const currentSelectedId = editorStore.selectedId;
-      if (!currentSelectedId) return;
-
-      const isField = editorStore.fields.some(
-        (field) => field.id === currentSelectedId,
-      );
-      if (isField) {
-        editorStore.updateField(
-          currentSelectedId,
-          updates as Partial<FormField>,
-        );
-        return;
-      }
-
-      const isAnnotation = editorStore.annotations.some(
-        (annotation) => annotation.id === currentSelectedId,
-      );
-      if (!isAnnotation) return;
-
-      const currentAnnotation = editorStore.annotations.find(
-        (annotation) => annotation.id === currentSelectedId,
-      );
-      const nextRect = updates.rect;
-      const currentRect = currentAnnotation?.rect;
-
-      if (
-        currentAnnotation &&
-        currentRect &&
-        nextRect &&
-        nextRect.width === currentRect.width &&
-        nextRect.height === currentRect.height &&
-        (nextRect.x !== currentRect.x || nextRect.y !== currentRect.y)
-      ) {
-        editorStore.updateAnnotation(currentSelectedId, {
-          ...updates,
-          ...getMovedAnnotationUpdates(
-            currentAnnotation,
-            nextRect.x - currentRect.x,
-            nextRect.y - currentRect.y,
-          ),
-        } as Partial<Annotation>);
-        return;
-      }
-
-      editorStore.updateAnnotation(
-        currentSelectedId,
-        updates as Partial<Annotation>,
-      );
-    },
-    [editorStore],
-  );
-
-  const handleMetadataChange = React.useCallback(
-    (updates: Partial<PDFMetadata>) => {
-      updateMetadata(updates);
-    },
-    [updateMetadata],
-  );
-
-  const handleFilenameChange = React.useCallback(
-    (name: string) => {
-      if (!canModifyPdfContents(state.documentPermissions)) {
-        return;
-      }
-      setState((prev) => ({
-        filename: name,
-        isDirty: true,
-        dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
-          prev.dirtyPermissionScopes,
-          { modifyContents: true },
-        ),
-      }));
-    },
-    [setState, state.documentPermissions],
+    [state.selectControl],
   );
 
   const getWorkspaceViewport = React.useCallback(() => {
     const element = workspaceScrollContainerRef.current;
-    if (element)
+    if (element) {
       return { width: element.clientWidth, height: element.clientHeight };
+    }
     if (typeof window !== "undefined") {
       return { width: window.innerWidth, height: window.innerHeight };
     }
@@ -536,17 +336,17 @@ const EditorPage: React.FC<EditorPageProps> = ({
 
   const handleZoomIn = React.useCallback(() => {
     const currentScale = useEditorStore.getState().scale;
-    setState({ scale: Math.min(5.0, currentScale * 1.25) });
-  }, [setState]);
+    state.setState({ scale: Math.min(5, currentScale * 1.25) });
+  }, [state.setState]);
 
   const handleZoomOut = React.useCallback(() => {
     const currentScale = useEditorStore.getState().scale;
-    setState({ scale: Math.max(0.25, currentScale / 1.25) });
-  }, [setState]);
+    state.setState({ scale: Math.max(0.25, currentScale / 1.25) });
+  }, [state.setState]);
 
   const handleFitWidth = React.useCallback(() => {
     const liveState = useEditorStore.getState();
-    setState({
+    state.setState({
       scale: calculateWorkspaceFitWidthScale({
         pages: liveState.pages,
         pageIndex: liveState.currentPageIndex,
@@ -556,11 +356,11 @@ const EditorPage: React.FC<EditorPageProps> = ({
       }),
       fitTrigger: Date.now(),
     });
-  }, [getWorkspaceViewport, setState]);
+  }, [getWorkspaceViewport, state.setState]);
 
   const handleFitScreen = React.useCallback(() => {
     const liveState = useEditorStore.getState();
-    setState({
+    state.setState({
       scale: calculateWorkspaceFitScreenScale({
         pages: liveState.pages,
         pageIndex: liveState.currentPageIndex,
@@ -570,311 +370,133 @@ const EditorPage: React.FC<EditorPageProps> = ({
       }),
       fitTrigger: Date.now(),
     });
-  }, [getWorkspaceViewport, setState]);
+  }, [getWorkspaceViewport, state.setState]);
 
   const openSidebar = React.useCallback(() => {
-    setUiState((prev) => {
-      if (prev.isPanelFloating) {
-        return { isSidebarOpen: true, isRightPanelOpen: false };
-      }
-      return { isSidebarOpen: true };
-    });
-  }, [setUiState]);
+    state.setUiState((prev) =>
+      prev.isPanelFloating
+        ? { isSidebarOpen: true, isRightPanelOpen: false }
+        : { isSidebarOpen: true },
+    );
+  }, [state.setUiState]);
 
   const toggleSidebar = React.useCallback(() => {
-    setUiState((prev) => {
-      const next = !prev.isSidebarOpen;
-      if (prev.isPanelFloating && next) {
-        return { isSidebarOpen: true, isRightPanelOpen: false };
-      }
-      return { isSidebarOpen: next };
+    state.setUiState((prev) => {
+      const isOpen = !prev.isSidebarOpen;
+      return prev.isPanelFloating && isOpen
+        ? { isSidebarOpen: true, isRightPanelOpen: false }
+        : { isSidebarOpen: isOpen };
     });
-  }, [setUiState]);
+  }, [state.setUiState]);
 
   const toggleRightPanel = React.useCallback(() => {
-    setUiState((prev) => {
-      const next = !prev.isRightPanelOpen;
-      if (prev.isPanelFloating && next) {
-        return { isRightPanelOpen: true, isSidebarOpen: false };
-      }
-      return { isRightPanelOpen: next };
+    state.setUiState((prev) => {
+      const isOpen = !prev.isRightPanelOpen;
+      return prev.isPanelFloating && isOpen
+        ? { isRightPanelOpen: true, isSidebarOpen: false }
+        : { isRightPanelOpen: isOpen };
     });
-  }, [setUiState]);
+  }, [state.setUiState]);
 
-  const handleRequestCloseFromUi = React.useCallback(() => {
-    onRequestCloseCurrentTab();
-  }, [onRequestCloseCurrentTab]);
-
-  const canRenderRightPanel =
-    state.mode === "form" || state.mode === "annotation" || !!selectedControl;
-  const normalizedSidebarTab =
-    state.sidebarTab === "search" ? "thumbnails" : state.sidebarTab;
-  const activeSidebarTab = pdfSearch.isPdfSearchOpen
-    ? "search"
-    : normalizedSidebarTab;
+  const shellCommands = React.useMemo<EditorShellCommands>(
+    () => ({
+      zoomIn: handleZoomIn,
+      zoomOut: handleZoomOut,
+      fitWidth: handleFitWidth,
+      fitScreen: handleFitScreen,
+      toggleFullscreen,
+      exitEditor: handleExitEditorPage,
+      changeMode: handleModeChange,
+      changePenStyle: handlePenStyleChange,
+      changeHighlightStyle: handleHighlightStyleChange,
+      changeCommentStyle: handleCommentStyleChange,
+      changeFreetextStyle: handleFreetextStyleChange,
+      changeShapeStyle: handleShapeStyleChange,
+      changeStampStyle: handleStampStyleChange,
+      editAnnotation: handleEditAnnotation,
+      openSidebar,
+      toggleSidebar,
+      toggleRightPanel,
+    }),
+    [
+      handleCommentStyleChange,
+      handleEditAnnotation,
+      handleExitEditorPage,
+      handleFitScreen,
+      handleFitWidth,
+      handleFreetextStyleChange,
+      handleHighlightStyleChange,
+      handleModeChange,
+      handlePenStyleChange,
+      handleShapeStyleChange,
+      handleStampStyleChange,
+      handleZoomIn,
+      handleZoomOut,
+      openSidebar,
+      toggleFullscreen,
+      toggleRightPanel,
+      toggleSidebar,
+    ],
+  );
 
   return (
-    <>
-      <EditorTabStrip
-        windowId={windowId}
-        tabs={tabs}
-        activeTabId={activeTabId}
-        mergeWindowTargets={mergeWindowTargets}
-        onOpenDocument={onOpenDocument}
-        onRefreshMergeWindowTargets={onRefreshMergeWindowTargets}
-        onSelectTab={onSelectTab}
-        onCloseTab={onCloseTab}
-        onMoveTab={onMoveTab}
-        onDetachTab={onDetachTab}
-        onMergeTabToWindow={onMergeTabToWindow}
-        canDetachTabs={canDetachTabs}
-        canMergeTabs={canMergeTabs}
-      />
+    <EditorShellCommandsProvider value={shellCommands}>
+      <EditorPdfSearchProvider value={pdfSearch}>
+        <EditorTabStrip />
+        <Toolbar />
 
-      <Toolbar
-        editorState={state}
-        hideModeSelector={isMobile}
-        hideToolSection={isMobile}
-        compactZoomControl={isMobile}
-        showPageSettingsControl={isMobile}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onFitWidth={handleFitWidth}
-        onFitScreen={handleFitScreen}
-        onPageLayoutChange={(layout) => {
-          setState({ pageLayout: layout, fitTrigger: Date.now() });
-        }}
-        onPageFlowChange={(flow) => {
-          setState({ pageFlow: flow, fitTrigger: Date.now() });
-        }}
-        onToggleFullscreen={toggleFullscreen}
-        onToolChange={(tool: Tool) => setTool(tool)}
-        onModeChange={handleModeChange}
-        onPenStyleChange={handlePenStyleChange}
-        onHighlightStyleChange={handleHighlightStyleChange}
-        onCommentStyleChange={handleCommentStyleChange}
-        onFreetextStyleChange={handleFreetextStyleChange}
-        onShapeStyleChange={handleShapeStyleChange}
-        onStampStyleChange={handleStampStyleChange}
-        onSave={onSave}
-        onSaveAs={onSaveAs}
-        onExit={handleExitEditorPage}
-        onClose={handleRequestCloseFromUi}
-        onPrint={onPrint}
-        onUndo={undo}
-        onRedo={redo}
-        onOpenShortcuts={() => openDialog("shortcuts")}
-        onOpenSearch={pdfSearch.openPdfSearch}
-        isFieldListOpen={state.isSidebarOpen}
-        onToggleFieldList={toggleSidebar}
-        isPropertiesPanelOpen={state.isRightPanelOpen}
-        onTogglePropertiesPanel={toggleRightPanel}
-        onOpenSettings={() => openDialog("settings")}
-        isSearchOpen={pdfSearch.isPdfSearchOpen}
-      />
+        <div className="relative flex flex-1 overflow-hidden">
+          {state.isPanelFloating &&
+            (state.isSidebarOpen || state.isRightPanelOpen) && (
+              <div
+                className="absolute inset-0 z-30 bg-black/20"
+                onMouseDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  state.setUiState({
+                    isSidebarOpen: false,
+                    isRightPanelOpen: false,
+                  });
+                }}
+              />
+            )}
 
-      <div className="relative flex flex-1 overflow-hidden">
-        {state.isPanelFloating &&
-          (state.isSidebarOpen || state.isRightPanelOpen) && (
-            <div
-              className="absolute inset-0 z-30 bg-black/20"
-              onMouseDown={(event) => {
-                if (event.target !== event.currentTarget) return;
-                setUiState({
-                  isSidebarOpen: false,
-                  isRightPanelOpen: false,
-                });
-              }}
-            />
-          )}
+          <Sidebar />
+          <EditorCanvasPane />
 
-        <Sidebar
-          isOpen={state.isSidebarOpen}
-          onOpen={openSidebar}
-          onClose={() => setUiState({ isSidebarOpen: false })}
-          onExitSearch={pdfSearch.closePdfSearch}
-          isFloating={state.isPanelFloating}
-          pages={state.pages}
-          fields={state.fields}
-          annotations={state.annotations}
-          documentPermissions={state.documentPermissions}
-          outline={state.outline}
-          selectedId={state.selectedId}
-          thumbnailsLayout={state.options.thumbnailsLayout}
-          onSelectControl={(id, options) => {
-            selectControl(id);
-            if (id) {
-              appEventBus.emit(
-                "workspace:focusControl",
-                {
-                  id,
-                  behavior: options?.behavior,
-                  skipScroll: options?.skipScroll,
-                },
-                { sticky: true },
-              );
+          <RightPanelTabDock
+            activeTabs={
+              state.isRightPanelOpen
+                ? [state.rightPanelTab, ...state.rightPanelDockTab]
+                : [...state.rightPanelDockTab]
             }
-          }}
-          onDeleteAnnotation={deleteAnnotation}
-          onUpdateAnnotation={updateAnnotation}
-          onAddAnnotationReply={addAnnotationReply}
-          onUpdateAnnotationReply={updateAnnotationReply}
-          onDeleteAnnotationReply={deleteAnnotationReply}
-          onNavigatePage={(index) => {
-            appEventBus.emit("workspace:navigatePage", {
-              pageIndex: index,
-              behavior: "smooth",
-            });
-          }}
-          currentPageIndex={state.currentPageIndex}
-          width={state.sidebarWidth}
-          onResize={(width) => setUiState({ sidebarWidth: width })}
-          activeTab={activeSidebarTab}
-          isSearchActive={pdfSearch.isPdfSearchOpen}
-          onTabChange={(tab) => {
-            pdfSearch.dismissPdfSearch();
-            setUiState({ sidebarTab: tab });
-          }}
-          searchHeaderContent={
-            <PDFSearchHeader
-              query={pdfSearch.pdfSearchQuery}
-              focusToken={pdfSearch.pdfSearchFocusToken}
-              hasResults={pdfSearch.pdfSearchResults.length > 0}
-              onQueryChange={pdfSearch.setPdfSearchQuery}
-              onPrevious={pdfSearch.handleSelectPreviousPdfSearchResult}
-              onNext={pdfSearch.handleSelectNextPdfSearchResult}
-            />
-          }
-          searchContent={
-            <PDFSearchPanel
-              query={pdfSearch.pdfSearchQuery}
-              mode={pdfSearch.pdfSearchMode}
-              caseSensitive={pdfSearch.isPdfSearchCaseSensitive}
-              results={pdfSearch.pdfSearchResults}
-              activeResultId={pdfSearch.activePdfSearchResultId}
-              activeResultIndex={pdfSearch.activePdfSearchResultIndex}
-              isSearching={pdfSearch.isPdfSearchLoading}
-              errorMessage={pdfSearch.pdfSearchError}
-              onToggleCaseSensitive={pdfSearch.togglePdfSearchCaseSensitive}
-              onToggleRegex={pdfSearch.togglePdfSearchMode}
-              onSelectResult={pdfSearch.handleSelectPdfSearchResult}
-            />
-          }
-        />
-
-        <EditorCanvasPane
-          sessionRenderKey={activeTabId}
-          workerService={workerService}
-          isFileDragActive={isFileDragActive}
-          onEditAnnotation={handleEditAnnotation}
-          onToggleFullscreen={toggleFullscreen}
-          pdfSearchResultsByPage={pdfSearch.workspaceTextHighlightsByPage}
-          activePdfSearchResultId={
-            pdfSearch.isPdfSearchOpen ? pdfSearch.activePdfSearchResultId : null
-          }
-          mobileToolbar={{
-            onModeChange: handleModeChange,
-            onPenStyleChange: handlePenStyleChange,
-            onHighlightStyleChange: handleHighlightStyleChange,
-            onCommentStyleChange: handleCommentStyleChange,
-            onFreetextStyleChange: handleFreetextStyleChange,
-            onShapeStyleChange: handleShapeStyleChange,
-            onStampStyleChange: handleStampStyleChange,
-          }}
-        />
-
-        <RightPanelTabDock
-          activeTabs={
-            state.isRightPanelOpen
-              ? [state.rightPanelTab, ...state.rightPanelDockTab]
-              : [...state.rightPanelDockTab]
-          }
-          isFloating={state.isPanelFloating}
-          rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
-          canOpenProperties={!!selectedControl}
-          canOpenPageTranslate={permissionUi.canAll([
-            "extract_text",
-            "create_annotation",
-          ])}
-          onSelectTab={(tab) => {
-            if (tab === "properties" && !selectedControl) return;
-            setUiState((prev) => {
-              const updates: Partial<EditorUiState> = {
+            isFloating={state.isPanelFloating}
+            rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
+            canOpenProperties={state.hasSelectedControl}
+            canOpenPageTranslate={permissionUi.canAll([
+              "extract_text",
+              "create_annotation",
+            ])}
+            onSelectTab={(tab) => {
+              if (tab === "properties" && !state.hasSelectedControl) return;
+              state.setUiState((prev) => ({
                 rightPanelTab: tab,
                 isRightPanelOpen: true,
-              };
-              if (prev.isPanelFloating) {
-                updates.isSidebarOpen = false;
-              }
-              return updates;
-            });
-          }}
-        />
+                ...(prev.isPanelFloating ? { isSidebarOpen: false } : {}),
+              }));
+            }}
+          />
 
-        <EditorRightPanel
-          canRenderRightPanel={canRenderRightPanel}
-          rightPanelTab={state.rightPanelTab}
-          isPanelFloating={state.isPanelFloating}
-          isRightPanelOpen={state.isRightPanelOpen}
-          rightPanelWidth={state.rightPanelWidth}
-          selectedControl={selectedControl}
-          metadata={state.metadata}
-          filename={state.filename}
-          pagesLength={state.pages.length}
-          pageTranslateOptions={state.pageTranslateOptions}
-          pageTranslateParagraphCandidates={
-            state.pageTranslateParagraphCandidates
-          }
-          pageTranslateSelectedParagraphIds={
-            state.pageTranslateSelectedParagraphIds
-          }
-          translateOption={state.translateOption}
-          translateTargetLanguage={state.translateTargetLanguage}
-          effectiveLanguage={effectiveLanguage}
-          isPageTranslating={isPageTranslating}
-          pageTranslateStatus={pageTranslateStatus}
-          documentPermissions={state.documentPermissions}
-          aiChat={aiChat}
-          onSetUiState={setUiState}
-          onSelectControl={selectControl}
-          onDeleteSelection={deleteSelection}
-          onSaveCheckpoint={saveCheckpoint}
-          onPropertiesChange={handlePropertiesChange}
-          onMetadataChange={handleMetadataChange}
-          onFilenameChange={handleFilenameChange}
-          onStartPageTranslate={(options) => {
-            void handleStartPageTranslate(options as never);
-          }}
-          onPreviewParagraphs={(options) => {
-            void handlePreviewParagraphs(options as never);
-          }}
-          onUnmergeSelectedParagraphs={() => {
-            void handleUnmergeSelectedParagraphs();
-          }}
-          onCancelPageTranslate={cancelPageTranslate}
-          onClearPageTranslateParagraphCandidates={
-            clearPageTranslateParagraphCandidates
-          }
-          onMergeSelectedPageTranslateParagraphs={
-            mergeSelectedPageTranslateParagraphs
-          }
-          onToggleExcludeSelectedPageTranslateParagraphs={
-            toggleExcludeSelectedPageTranslateParagraphs
-          }
-          onDeleteSelectedPageTranslateParagraphs={
-            deleteSelectedPageTranslateParagraphs
-          }
-          onSetAllFreetextFlatten={setAllFreetextFlatten}
-        />
+          <EditorRightPanel aiChat={aiChat} />
 
-        <TranslationFloatingWindow
-          isOpen={isTranslateOpen}
-          sourceText={translateSourceText}
-          autoTranslateToken={translateAutoToken}
-          onClose={() => setIsTranslateOpen(false)}
-        />
-      </div>
-    </>
+          <TranslationFloatingWindow
+            isOpen={isTranslateOpen}
+            sourceText={translateSourceText}
+            autoTranslateToken={translateAutoToken}
+            onClose={() => setIsTranslateOpen(false)}
+          />
+        </div>
+      </EditorPdfSearchProvider>
+    </EditorShellCommandsProvider>
   );
 };
 

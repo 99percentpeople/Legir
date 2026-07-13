@@ -47,3 +47,24 @@ export interface EditorTabDescriptor {
   isPendingTransfer?: boolean;
   pendingTransferSessionId?: string;
 }
+
+export interface EditorMergeWindowTarget {
+  windowId: EditorWindowId;
+  label: string;
+}
+
+export type EditorTabDropIntent =
+  | "reorder"
+  | "merge-to-window"
+  | "detach-to-new-window";
+
+export interface EditorTabDragPayload {
+  tabId: string;
+  sourceWindowId: EditorWindowId;
+}
+
+export interface EditorTabDropTarget {
+  intent: EditorTabDropIntent;
+  windowId: EditorWindowId;
+  targetIndex?: number;
+}

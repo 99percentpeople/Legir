@@ -23,13 +23,7 @@ import {
   Stamp,
   ChevronDown,
 } from "lucide-react";
-import {
-  EditorState,
-  PageFlowDirection,
-  PageLayoutMode,
-  PenStyle,
-  Tool,
-} from "@/types";
+import { EditorState, Tool } from "@/types";
 import { isToolMobileOnly } from "@/lib/tool-behavior";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
@@ -57,6 +51,14 @@ import { getContrastColor } from "@/utils/colors";
 import SaveMenu from "./SaveMenu";
 import { canSaveAs } from "@/services/platform";
 import { useEditorStore } from "@/store/useEditorStore";
+import { selectToolbarState } from "@/store/selectors";
+import { useShallow } from "zustand/react/shallow";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { useEditorDocumentRuntime } from "@/app/editorRuntime";
+import {
+  useEditorPdfSearch,
+  useEditorShellCommands,
+} from "@/app/editorShellContext";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   getShapeToolIcon,
@@ -69,96 +71,67 @@ import { ShapeBorderStyleSection } from "./ShapeBorderStyleSection";
 import { StampStylePopover } from "./StampStylePopover";
 import { DocumentPermissionsPopover } from "./DocumentPermissionsPopover";
 
-interface ToolbarProps {
-  editorState: EditorState;
-  hideModeSelector?: boolean;
-  hideToolSection?: boolean;
-  compactZoomControl?: boolean;
-  showPageSettingsControl?: boolean;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onFitWidth: () => void;
-  onFitScreen: () => void;
-  onPageLayoutChange: (layout: PageLayoutMode) => void;
-  onPageFlowChange: (flow: PageFlowDirection) => void;
-  onToggleFullscreen: () => void;
-  onToolChange: (tool: Tool) => void;
-  onModeChange: (mode: EditorState["mode"]) => void;
-  onPenStyleChange: (style: Partial<PenStyle>) => void;
-  onHighlightStyleChange?: (style: Partial<PenStyle>) => void;
-  onCommentStyleChange?: (style: { color: string }) => void;
-  onFreetextStyleChange?: (style: { color: string }) => void;
-  onShapeStyleChange?: (
-    style: Partial<NonNullable<EditorState["shapeStyle"]>>,
-  ) => void;
-  onStampStyleChange?: (
-    style: Partial<NonNullable<EditorState["stampStyle"]>>,
-  ) => void;
-  onSave: () => Promise<boolean>;
-  onSaveAs: () => Promise<boolean>;
-  onPrint: () => void;
-  onExit: () => void;
-  onClose: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  onOpenShortcuts: () => void;
-  onOpenSearch: () => void;
-  isFieldListOpen: boolean;
-  onToggleFieldList: () => void;
-  isPropertiesPanelOpen: boolean;
-  onTogglePropertiesPanel: () => void;
-  onOpenSettings: () => void;
-  isSearchOpen?: boolean;
-}
-
-const Toolbar: React.FC<ToolbarProps> = ({
-  editorState,
-  hideModeSelector = false,
-  hideToolSection = false,
-  compactZoomControl = false,
-  showPageSettingsControl = false,
-  onZoomIn,
-  onZoomOut,
-  onFitWidth,
-  onFitScreen,
-  onPageLayoutChange,
-  onPageFlowChange,
-  onToggleFullscreen,
-  onToolChange,
-  onModeChange,
-  onPenStyleChange,
-  onHighlightStyleChange,
-  onCommentStyleChange: onCommentStyleChange,
-  onFreetextStyleChange: onFreetextStyleChange,
-  onShapeStyleChange,
-  onStampStyleChange,
-  onSave,
-  onSaveAs,
-  onPrint,
-  onExit,
-  onClose,
-  onUndo,
-  onRedo,
-  onOpenShortcuts,
-  onOpenSearch,
-  isFieldListOpen,
-  onToggleFieldList,
-  isPropertiesPanelOpen,
-  onTogglePropertiesPanel,
-  onOpenSettings,
-  isSearchOpen = false,
-}) => {
+const Toolbar: React.FC = () => {
   const { t } = useLanguage();
-  const { mode, tool } = editorState;
-  const isDirty = editorState.isDirty;
-  const canUndo = editorState.past.length > 0;
-  const canRedo = editorState.future.length > 0;
+  const editorState = useEditorStore(useShallow(selectToolbarState));
+  const {
+    mode,
+    tool,
+    isDirty,
+    canUndo,
+    canRedo,
+    isSidebarOpen: isFieldListOpen,
+    isRightPanelOpen: isPropertiesPanelOpen,
+    setState,
+    setTool: onToolChange,
+    undo: onUndo,
+    redo: onRedo,
+    openDialog,
+  } = editorState;
+  const isMobile = useIsMobile();
+  const hideModeSelector = isMobile;
+  const hideToolSection = isMobile;
+  const compactZoomControl = isMobile;
+  const showPageSettingsControl = isMobile;
+  const {
+    zoomIn: onZoomIn,
+    zoomOut: onZoomOut,
+    fitWidth: onFitWidth,
+    fitScreen: onFitScreen,
+    toggleFullscreen: onToggleFullscreen,
+    exitEditor: onExit,
+    changeMode: onModeChange,
+    changePenStyle: onPenStyleChange,
+    changeHighlightStyle: onHighlightStyleChange,
+    changeCommentStyle: onCommentStyleChange,
+    changeFreetextStyle: onFreetextStyleChange,
+    changeShapeStyle: onShapeStyleChange,
+    changeStampStyle: onStampStyleChange,
+    toggleSidebar: onToggleFieldList,
+    toggleRightPanel: onTogglePropertiesPanel,
+  } = useEditorShellCommands();
+  const {
+    save: onSave,
+    saveAs: onSaveAs,
+    print: onPrint,
+    requestCloseCurrentTab: onClose,
+  } = useEditorDocumentRuntime();
+  const { openPdfSearch: onOpenSearch, isPdfSearchOpen: isSearchOpen } =
+    useEditorPdfSearch();
+  const onPageLayoutChange = (layout: EditorState["pageLayout"]) => {
+    setState({ pageLayout: layout, fitTrigger: Date.now() });
+  };
+  const onPageFlowChange = (flow: EditorState["pageFlow"]) => {
+    setState({ pageFlow: flow, fitTrigger: Date.now() });
+  };
+  const onOpenShortcuts = () => openDialog("shortcuts");
+  const onOpenSettings = () => openDialog("settings");
   const toolbarTool = isToolMobileOnly(tool) ? "select" : tool;
   const hasSaveAs = useRef(canSaveAs());
-  const liveScale = useEditorStore((state) => state.scale);
-  const livePageLayout = useEditorStore((state) => state.pageLayout);
-  const livePageFlow = useEditorStore((state) => state.pageFlow);
-  const liveIsFullscreen = useEditorStore((state) => state.isFullscreen);
+  const liveScale = editorState.scale;
+  const livePageLayout = editorState.pageLayout;
+  const livePageFlow = editorState.pageFlow;
+  const liveIsFullscreen = editorState.isFullscreen;
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
@@ -263,7 +236,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             variant="ghost"
             size="icon"
             onClick={onOpenSearch}
-            disabled={editorState.pages.length === 0}
+            disabled={!editorState.hasPages}
             className={cn(
               "h-8 w-8 sm:h-9 sm:w-9",
               isSearchOpen && "bg-accent text-accent-foreground",
@@ -279,7 +252,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         <div className="flex items-center gap-1">
           <ZoomDropdownControl
             scale={liveScale}
-            disabled={editorState.pages.length === 0}
+            disabled={!editorState.hasPages}
             compact={compactZoomControl}
             open={zoomMenuOpen}
             onOpenChange={setZoomMenuOpen}
@@ -851,7 +824,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </div>
 
         <SaveMenu
-          disabled={editorState.pages.length === 0}
+          disabled={!editorState.hasPages}
           isDirty={!!isDirty}
           hasSaveAs={hasSaveAs.current}
           canPrint={canPrintPdf(editorState.documentPermissions)}

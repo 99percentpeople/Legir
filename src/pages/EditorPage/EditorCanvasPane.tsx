@@ -18,38 +18,34 @@ import {
   selectEditorCanvasActions,
   selectEditorCanvasState,
 } from "@/store/selectors";
-import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import type { PDFSearchResult } from "@/types";
 import { useShallow } from "zustand/react/shallow";
-import type { EditorCanvasMobileToolbar } from "./types";
+import { useEditorDocumentRuntime } from "@/app/editorRuntime";
+import {
+  useEditorPdfSearch,
+  useEditorShellCommands,
+} from "@/app/editorShellContext";
 
 const Workspace = React.lazy(() => import("@/components/workspace/Workspace"));
 const MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX = 96;
 const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
   "[data-app-block-modifier-wheel-zoom='1']";
 
-type EditorCanvasPaneProps = {
-  sessionRenderKey: string | null;
-  workerService: PDFWorkerService | null;
-  isFileDragActive: boolean;
-  onEditAnnotation: (id: string) => void;
-  onToggleFullscreen: () => void;
-  pdfSearchResultsByPage: Map<number, PDFSearchResult[]> | undefined;
-  activePdfSearchResultId: string | null;
-  mobileToolbar: EditorCanvasMobileToolbar;
-};
-
-export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
-  sessionRenderKey,
-  workerService,
-  isFileDragActive,
-  onEditAnnotation,
-  onToggleFullscreen,
-  pdfSearchResultsByPage,
-  activePdfSearchResultId,
-  mobileToolbar,
-}) => {
+export const EditorCanvasPane: React.FC = () => {
   const isMobile = useIsMobile();
+  const { sessionRenderKey, workerService, isFileDragActive } =
+    useEditorDocumentRuntime();
+  const {
+    editAnnotation: onEditAnnotation,
+    toggleFullscreen: onToggleFullscreen,
+    changeMode: onModeChange,
+    changePenStyle: onPenStyleChange,
+    changeHighlightStyle: onHighlightStyleChange,
+    changeCommentStyle: onCommentStyleChange,
+    changeFreetextStyle: onFreetextStyleChange,
+    changeShapeStyle: onShapeStyleChange,
+    changeStampStyle: onStampStyleChange,
+  } = useEditorShellCommands();
+  const pdfSearch = useEditorPdfSearch();
   const state = useEditorStore(useShallow(selectEditorCanvasState));
   const {
     addField,
@@ -289,8 +285,10 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
           fitTrigger={state.fitTrigger}
           initialScrollPosition={initialScrollPosition}
           onInitialScrollApplied={handleInitialScrollApplied}
-          pdfSearchResultsByPage={pdfSearchResultsByPage}
-          activePdfSearchResultId={activePdfSearchResultId}
+          pdfSearchResultsByPage={pdfSearch.workspaceTextHighlightsByPage}
+          activePdfSearchResultId={
+            pdfSearch.isPdfSearchOpen ? pdfSearch.activePdfSearchResultId : null
+          }
           bottomOverlayInsetPx={
             isMobile ? MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX : undefined
           }
@@ -302,13 +300,13 @@ export const EditorCanvasPane: React.FC<EditorCanvasPaneProps> = ({
           editorState={state}
           onNavigatePage={handleNavigatePage}
           onToolChange={handleToolChange}
-          onModeChange={mobileToolbar.onModeChange}
-          onPenStyleChange={mobileToolbar.onPenStyleChange}
-          onHighlightStyleChange={mobileToolbar.onHighlightStyleChange}
-          onCommentStyleChange={mobileToolbar.onCommentStyleChange}
-          onFreetextStyleChange={mobileToolbar.onFreetextStyleChange}
-          onShapeStyleChange={mobileToolbar.onShapeStyleChange}
-          onStampStyleChange={mobileToolbar.onStampStyleChange}
+          onModeChange={onModeChange}
+          onPenStyleChange={onPenStyleChange}
+          onHighlightStyleChange={onHighlightStyleChange}
+          onCommentStyleChange={onCommentStyleChange}
+          onFreetextStyleChange={onFreetextStyleChange}
+          onShapeStyleChange={onShapeStyleChange}
+          onStampStyleChange={onStampStyleChange}
         />
       ) : (
         <FloatingBar

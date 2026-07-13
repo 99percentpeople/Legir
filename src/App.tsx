@@ -27,6 +27,7 @@ import { useEditorCloseFlow } from "./app/useEditorCloseFlow";
 import { useEditorWindowBootstrap } from "./app/useEditorWindowBootstrap";
 import { usePlatformWindowSessionPersistence } from "./app/usePlatformWindowSessionPersistence";
 import { usePwaLaunchBootstrap } from "./app/usePwaLaunchBootstrap";
+import { EditorRuntimeProvider } from "./app/editorRuntime";
 import type { HomePageAdapter } from "./pages/HomePage";
 import { useEditorStore } from "./store/useEditorStore";
 import { selectAppShellState } from "@/store/selectors";
@@ -42,10 +43,6 @@ import { useAppEvent } from "@/hooks/useAppEventBus";
 import { usePlatformFileDrop } from "@/hooks/usePlatformFileDrop";
 import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";
 import { EditorCloseConfirmDialog } from "./pages/EditorPage/EditorCloseConfirmDialog";
-import type {
-  EditorMergeWindowTarget,
-  EditorTabDropTarget,
-} from "./pages/EditorPage/types";
 import {
   cloneEditorTabThumbnailImages,
   disposeEditorTabSessionResources,
@@ -66,7 +63,9 @@ import {
 } from "@/app/editorTabs/transferStorage";
 import { useEditorTabsController } from "@/app/editorTabs/useEditorTabsController";
 import type {
+  EditorMergeWindowTarget,
   EditorTabDescriptor,
+  EditorTabDropTarget,
   EditorTabSession,
 } from "@/app/editorTabs/types";
 import {
@@ -1766,46 +1765,95 @@ const App: React.FC = () => {
     void handlePrint();
   }, [handlePrint]);
 
+  const selectEditorTab = useCallback(
+    (tabId: string) => {
+      activateTab(tabId);
+    },
+    [activateTab],
+  );
+
+  const closeEditorTab = useCallback(
+    (tabId: string) => {
+      void requestCloseTab(tabId);
+    },
+    [requestCloseTab],
+  );
+
+  const editorTabsRuntime = useMemo(
+    () => ({
+      windowId: platformWindowId,
+      tabs: editorTabDescriptors,
+      activeTabId,
+      mergeWindowTargets,
+      openDocument: handleOpen,
+      refreshMergeWindowTargets,
+      selectTab: selectEditorTab,
+      closeTab: closeEditorTab,
+      moveTab: handleMoveTab,
+      detachTab: handleDetachTabToNewWindow,
+      mergeTabToWindow: handleMergeTabToWindow,
+      canDetachTabs: supportsMultiWindow && windowLayout.tabIds.length > 1,
+      canMergeTabs: supportsMultiWindow && mergeWindowTargets.length > 0,
+    }),
+    [
+      activeTabId,
+      closeEditorTab,
+      editorTabDescriptors,
+      handleDetachTabToNewWindow,
+      handleMergeTabToWindow,
+      handleMoveTab,
+      handleOpen,
+      mergeWindowTargets,
+      platformWindowId,
+      refreshMergeWindowTargets,
+      selectEditorTab,
+      supportsMultiWindow,
+      windowLayout.tabIds.length,
+    ],
+  );
+
+  const editorDocumentRuntime = useMemo(
+    () => ({
+      sessionRenderKey: activeTabId,
+      workerService: activeTab?.workerService ?? null,
+      isFileDragActive,
+      save: handleSave,
+      saveAs: handleSaveAs,
+      exit: onEditorCloseCurrentTabAfterSave,
+      print: onEditorPrint,
+      requestCloseCurrentTab: onEditorCloseCurrentTab,
+    }),
+    [
+      activeTab?.workerService,
+      activeTabId,
+      handleSave,
+      handleSaveAs,
+      isFileDragActive,
+      onEditorCloseCurrentTab,
+      onEditorCloseCurrentTabAfterSave,
+      onEditorPrint,
+    ],
+  );
+
   return (
     <div className="flex h-full w-full flex-col">
-      <AppRoutes
-        canAccessEditor={windowLayout.tabIds.length > 0}
-        isLoading={
-          isProcessing ||
-          hasPendingWindowBootstrap ||
-          hasPendingLaunchQueueFiles ||
-          pendingIncomingTabs.length > 0
-        }
-        homeProps={{
-          adapter: homePageAdapter,
-        }}
-        editorProps={{
-          windowId: platformWindowId,
-          tabs: editorTabDescriptors,
-          activeTabId,
-          workerService: activeTab?.workerService ?? null,
-          isFileDragActive,
-          mergeWindowTargets,
-          onOpenDocument: handleOpen,
-          onRefreshMergeWindowTargets: refreshMergeWindowTargets,
-          onSelectTab: (tabId) => {
-            activateTab(tabId);
-          },
-          onCloseTab: (tabId) => {
-            void requestCloseTab(tabId);
-          },
-          onMoveTab: handleMoveTab,
-          onDetachTab: handleDetachTabToNewWindow,
-          onMergeTabToWindow: handleMergeTabToWindow,
-          canDetachTabs: supportsMultiWindow && windowLayout.tabIds.length > 1,
-          canMergeTabs: supportsMultiWindow && mergeWindowTargets.length > 0,
-          onSave: handleSave,
-          onSaveAs: handleSaveAs,
-          onExit: onEditorCloseCurrentTabAfterSave,
-          onPrint: onEditorPrint,
-          onRequestCloseCurrentTab: onEditorCloseCurrentTab,
-        }}
-      />
+      <EditorRuntimeProvider
+        tabs={editorTabsRuntime}
+        document={editorDocumentRuntime}
+      >
+        <AppRoutes
+          canAccessEditor={windowLayout.tabIds.length > 0}
+          isLoading={
+            isProcessing ||
+            hasPendingWindowBootstrap ||
+            hasPendingLaunchQueueFiles ||
+            pendingIncomingTabs.length > 0
+          }
+          homeProps={{
+            adapter: homePageAdapter,
+          }}
+        />
+      </EditorRuntimeProvider>
 
       <KeyboardShortcutsHelp
         isOpen={activeDialog === "shortcuts"}

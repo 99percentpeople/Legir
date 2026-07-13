@@ -1,16 +1,5 @@
-import type { EditorCanvasState } from "@/types";
+import type { EditorCanvasState, EditorState } from "@/types";
 import type { EditorStore } from "@/store/store.types";
-
-const EMPTY_THUMBNAIL_IMAGES: EditorStore["thumbnailImages"] = {};
-const EMPTY_PENDING_VIEW_STATE_RESTORE: EditorStore["pendingViewStateRestore"] =
-  null;
-const EMPTY_KEYS: EditorStore["keys"] = {
-  ctrl: false,
-  shift: false,
-  alt: false,
-  meta: false,
-  space: false,
-};
 
 // App shell should only observe the broad lifecycle state it actually renders.
 export const selectAppShellState = (state: EditorStore) => ({
@@ -24,21 +13,68 @@ export const selectAppShellState = (state: EditorStore) => ({
   options: state.options,
 });
 
-// EditorPage shell does not need viewport-scale hot state. Masking these fields
-// keeps zoom/pan updates scoped to the workspace subtree instead of rerendering
-// the full page chrome.
-export const selectEditorPageShellState = (
+export const selectEditorPageState = (state: EditorStore) => ({
+  filename: state.filename,
+  pages: state.pages,
+  pdfBytes: state.pdfBytes,
+  documentPermissions: state.documentPermissions,
+  selectedId: state.selectedId,
+  hasSelectedControl: state.selectedId
+    ? state.fields.some((field) => field.id === state.selectedId) ||
+      state.annotations.some((annotation) => annotation.id === state.selectedId)
+    : false,
+  isPanelFloating: state.isPanelFloating,
+  isSidebarOpen: state.isSidebarOpen,
+  isRightPanelOpen: state.isRightPanelOpen,
+  rightPanelTab: state.rightPanelTab,
+  rightPanelDockTab: state.rightPanelDockTab,
+  rightPanelWidth: state.rightPanelWidth,
+  setState: state.setState,
+  setUiState: state.setUiState,
+  setTool: state.setTool,
+  selectControl: state.selectControl,
+});
+
+export type AiChatEditorState = Pick<
+  EditorState,
+  | "currentPageIndex"
+  | "documentPermissions"
+  | "filename"
+  | "llmModelCache"
+  | "metadata"
+  | "options"
+  | "outline"
+  | "pageFlow"
+  | "pageLayout"
+  | "pages"
+  | "pdfBytes"
+  | "pdfOpenPassword"
+  | "pdfOwnerUnlocked"
+  | "preservePdfOwnerRestrictionsOnSave"
+  | "scale"
+  | "sourceDocumentPermissions"
+>;
+
+export const selectAiChatEditorState = (
   state: EditorStore,
-): EditorStore => ({
-  ...state,
-  keys: EMPTY_KEYS,
-  thumbnailImages: EMPTY_THUMBNAIL_IMAGES,
+): AiChatEditorState => ({
+  currentPageIndex: state.currentPageIndex,
+  documentPermissions: state.documentPermissions,
+  filename: state.filename,
+  llmModelCache: state.llmModelCache,
+  metadata: state.metadata,
+  options: state.options,
+  outline: state.outline,
+  pageFlow: state.pageFlow,
+  pageLayout: state.pageLayout,
+  pages: state.pages,
+  pdfBytes: state.pdfBytes,
+  pdfOpenPassword: state.pdfOpenPassword,
+  pdfOwnerUnlocked: state.pdfOwnerUnlocked,
+  preservePdfOwnerRestrictionsOnSave: state.preservePdfOwnerRestrictionsOnSave,
+  // Keep viewport zoom updates scoped to the canvas instead of the page shell.
   scale: 1,
-  pageLayout: "single",
-  pageFlow: "vertical",
-  fitTrigger: 0,
-  pendingViewStateRestore: EMPTY_PENDING_VIEW_STATE_RESTORE,
-  isFullscreen: false,
+  sourceDocumentPermissions: state.sourceDocumentPermissions,
 });
 
 // Canvas rendering and zoom controls should only observe workspace-hot fields.
@@ -90,6 +126,95 @@ export const selectEditorCanvasActions = (state: EditorStore) => ({
   setTool: state.setTool,
   updateAnnotation: state.updateAnnotation,
   updateField: state.updateField,
+});
+
+export const selectToolbarState = (state: EditorStore) => ({
+  mode: state.mode,
+  tool: state.tool,
+  isDirty: state.isDirty,
+  canUndo: state.past.length > 0,
+  canRedo: state.future.length > 0,
+  hasPages: state.pages.length > 0,
+  documentPermissions: state.documentPermissions,
+  sourceDocumentPermissions: state.sourceDocumentPermissions,
+  pdfOwnerUnlocked: state.pdfOwnerUnlocked,
+  penStyle: state.penStyle,
+  highlightStyle: state.highlightStyle,
+  commentStyle: state.commentStyle,
+  freetextStyle: state.freetextStyle,
+  shapeStyle: state.shapeStyle,
+  stampStyle: state.stampStyle,
+  isSidebarOpen: state.isSidebarOpen,
+  isRightPanelOpen: state.isRightPanelOpen,
+  isPanelFloating: state.isPanelFloating,
+  scale: state.scale,
+  pageLayout: state.pageLayout,
+  pageFlow: state.pageFlow,
+  isFullscreen: state.isFullscreen,
+  setState: state.setState,
+  setTool: state.setTool,
+  undo: state.undo,
+  redo: state.redo,
+  openDialog: state.openDialog,
+});
+
+export const selectSidebarState = (state: EditorStore) => ({
+  isOpen: state.isSidebarOpen,
+  isFloating: state.isPanelFloating,
+  pages: state.pages,
+  fields: state.fields,
+  annotations: state.annotations,
+  documentPermissions: state.documentPermissions,
+  outline: state.outline,
+  selectedId: state.selectedId,
+  currentPageIndex: state.currentPageIndex,
+  thumbnailsLayout: state.options.thumbnailsLayout,
+  sidebarTab: state.sidebarTab,
+  width: state.sidebarWidth,
+  setUiState: state.setUiState,
+  selectControl: state.selectControl,
+  deleteAnnotation: state.deleteAnnotation,
+  updateAnnotation: state.updateAnnotation,
+  addAnnotationReply: state.addAnnotationReply,
+  updateAnnotationReply: state.updateAnnotationReply,
+  deleteAnnotationReply: state.deleteAnnotationReply,
+});
+
+export const selectEditorRightPanelState = (state: EditorStore) => ({
+  mode: state.mode,
+  rightPanelTab: state.rightPanelTab,
+  isPanelFloating: state.isPanelFloating,
+  isRightPanelOpen: state.isRightPanelOpen,
+  rightPanelWidth: state.rightPanelWidth,
+  selectedId: state.selectedId,
+  fields: state.fields,
+  annotations: state.annotations,
+  metadata: state.metadata,
+  filename: state.filename,
+  pagesLength: state.pages.length,
+  pageTranslateOptions: state.pageTranslateOptions,
+  pageTranslateParagraphCandidates: state.pageTranslateParagraphCandidates,
+  pageTranslateSelectedParagraphIds: state.pageTranslateSelectedParagraphIds,
+  translateOption: state.translateOption,
+  translateTargetLanguage: state.translateTargetLanguage,
+  documentPermissions: state.documentPermissions,
+  setState: state.setState,
+  setUiState: state.setUiState,
+  selectControl: state.selectControl,
+  deleteSelection: state.deleteSelection,
+  saveCheckpoint: state.saveCheckpoint,
+  updateField: state.updateField,
+  updateAnnotation: state.updateAnnotation,
+  updateMetadata: state.updateMetadata,
+  clearPageTranslateParagraphCandidates:
+    state.clearPageTranslateParagraphCandidates,
+  mergeSelectedPageTranslateParagraphs:
+    state.mergeSelectedPageTranslateParagraphs,
+  toggleExcludeSelectedPageTranslateParagraphs:
+    state.toggleExcludeSelectedPageTranslateParagraphs,
+  deleteSelectedPageTranslateParagraphs:
+    state.deleteSelectedPageTranslateParagraphs,
+  setAllFreetextFlatten: state.setAllFreetextFlatten,
 });
 
 export const selectPropertiesPanelState = (state: EditorStore) => ({

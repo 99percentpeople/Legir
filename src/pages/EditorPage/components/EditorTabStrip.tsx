@@ -13,12 +13,11 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/utils/cn";
-import type { EditorTabDescriptor } from "@/app/editorTabs/types";
 import type {
-  EditorMergeWindowTarget,
+  EditorTabDescriptor,
   EditorTabDragPayload,
-  EditorTabDropTarget,
-} from "../types";
+} from "@/app/editorTabs/types";
+import { useEditorTabsRuntime } from "@/app/editorRuntime";
 
 const EDITOR_TAB_DRAG_MIME = "application/x-legir-editor-tab";
 const EDITOR_TAB_DIRTY_DOT_CLASS_NAME =
@@ -30,40 +29,22 @@ type TabDropIndicator = {
   position: "before" | "after";
 };
 
-interface EditorTabStripProps {
-  windowId: EditorMergeWindowTarget["windowId"];
-  tabs: EditorTabDescriptor[];
-  activeTabId: string | null;
-  mergeWindowTargets: EditorMergeWindowTarget[];
-  onOpenDocument: () => Promise<void>;
-  onRefreshMergeWindowTargets: () => Promise<void>;
-  onSelectTab: (tabId: string) => void;
-  onCloseTab: (tabId: string) => void;
-  onMoveTab: (tabId: string, target: EditorTabDropTarget) => void;
-  onDetachTab: (tabId: string) => Promise<void>;
-  onMergeTabToWindow: (
-    tabId: string,
-    targetWindowId: EditorMergeWindowTarget["windowId"],
-  ) => Promise<void>;
-  canDetachTabs: boolean;
-  canMergeTabs: boolean;
-}
-
-export function EditorTabStrip({
-  windowId,
-  tabs,
-  activeTabId,
-  mergeWindowTargets,
-  onOpenDocument,
-  onRefreshMergeWindowTargets,
-  onSelectTab,
-  onCloseTab,
-  onMoveTab,
-  onDetachTab,
-  onMergeTabToWindow,
-  canDetachTabs,
-  canMergeTabs,
-}: EditorTabStripProps) {
+export function EditorTabStrip() {
+  const {
+    windowId,
+    tabs,
+    activeTabId,
+    mergeWindowTargets,
+    openDocument,
+    refreshMergeWindowTargets,
+    selectTab,
+    closeTab,
+    moveTab,
+    detachTab,
+    mergeTabToWindow,
+    canDetachTabs,
+    canMergeTabs,
+  } = useEditorTabsRuntime();
   const { t } = useLanguage();
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<TabDropIndicator | null>(
@@ -294,7 +275,7 @@ export function EditorTabStrip({
                 clearDragState();
                 if (targetIndex === null) return;
 
-                onMoveTab(payload.tabId, {
+                moveTab(payload.tabId, {
                   intent: "reorder",
                   windowId,
                   targetIndex,
@@ -302,13 +283,13 @@ export function EditorTabStrip({
               }}
               onClick={() => {
                 if (isPendingTransfer) return;
-                onSelectTab(tab.id);
+                selectTab(tab.id);
               }}
               onKeyDown={(event) => {
                 if (isPendingTransfer) return;
                 if (event.key !== "Enter" && event.key !== " ") return;
                 event.preventDefault();
-                onSelectTab(tab.id);
+                selectTab(tab.id);
               }}
               className={cn(
                 "group border-border/80 bg-background hover:bg-muted flex min-w-0 shrink-0 items-center gap-1.5 rounded-t-lg border-x border-t px-2.5 py-1 text-sm text-nowrap transition-colors select-none hover:cursor-pointer",
@@ -343,7 +324,7 @@ export function EditorTabStrip({
                     aria-label={t("common.actions.close")}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onCloseTab(tab.id);
+                      closeTab(tab.id);
                     }}
                   >
                     <X size={12} />
@@ -375,7 +356,7 @@ export function EditorTabStrip({
               modal={false}
               onOpenChange={(open) => {
                 if (!open) return;
-                void onRefreshMergeWindowTargets();
+                void refreshMergeWindowTargets();
               }}
             >
               <ContextMenuTrigger asChild>{wrappedTabNode}</ContextMenuTrigger>
@@ -388,7 +369,7 @@ export function EditorTabStrip({
                 {showDetachAction && (
                   <ContextMenuItem
                     onSelect={() => {
-                      void onDetachTab(tab.id);
+                      void detachTab(tab.id);
                     }}
                   >
                     <ExternalLink size={14} />
@@ -406,7 +387,7 @@ export function EditorTabStrip({
                         <ContextMenuItem
                           key={target.windowId}
                           onSelect={() => {
-                            void onMergeTabToWindow(tab.id, target.windowId);
+                            void mergeTabToWindow(tab.id, target.windowId);
                           }}
                         >
                           {target.label}
@@ -421,7 +402,7 @@ export function EditorTabStrip({
                 <ContextMenuItem
                   variant="destructive"
                   onSelect={() => {
-                    onCloseTab(tab.id);
+                    closeTab(tab.id);
                   }}
                 >
                   <X size={14} />
@@ -436,7 +417,7 @@ export function EditorTabStrip({
           size="icon"
           className="shrink-0 gap-2"
           onClick={() => {
-            void onOpenDocument();
+            void openDocument();
           }}
         >
           <Plus size={16} />

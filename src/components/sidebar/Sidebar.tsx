@@ -1,14 +1,5 @@
 import React from "react";
 import { X, Layers, List, LayoutGrid, StickyNote } from "lucide-react";
-import {
-  FormField,
-  PageData,
-  PDFOutlineItem,
-  Annotation,
-  AnnotationReply,
-  ThumbnailsLayoutMode,
-  PDFDocumentPermissions,
-} from "@/types";
 import { cn } from "@/utils/cn";
 import {
   LEFT_SIDEBAR_MAX_WIDTH_PX,
@@ -22,75 +13,67 @@ import ThumbnailsPanel from "./ThumbnailsPanel";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useLanguage } from "../language-provider";
-import type { AppEventMap } from "@/lib/eventBus";
+import { appEventBus } from "@/lib/eventBus";
+import { useEditorStore } from "@/store/useEditorStore";
+import { selectSidebarState } from "@/store/selectors";
+import { useShallow } from "zustand/react/shallow";
+import {
+  useEditorPdfSearch,
+  useEditorShellCommands,
+} from "@/app/editorShellContext";
+import PDFSearchHeader from "./PDFSearchHeader";
+import PDFSearchPanel from "./PDFSearchPanel";
 
-interface SidebarProps {
-  isOpen: boolean;
-  onOpen: () => void;
-  onClose: () => void;
-  onExitSearch?: () => void;
-  isFloating?: boolean;
-  pages: PageData[];
-  fields: FormField[];
-  annotations?: Annotation[];
-  documentPermissions?: PDFDocumentPermissions | null;
-  outline: PDFOutlineItem[];
-  selectedId: string | null;
-  onSelectControl: (
-    id: string,
-    options?: Omit<AppEventMap["workspace:focusControl"], "id">,
-  ) => void;
-  onDeleteAnnotation?: (id: string) => void;
-  onUpdateAnnotation?: (id: string, updates: Partial<Annotation>) => void;
-  onAddAnnotationReply?: (annotationId: string, reply: AnnotationReply) => void;
-  onUpdateAnnotationReply?: (
-    annotationId: string,
-    replyId: string,
-    updates: Partial<AnnotationReply>,
-  ) => void;
-  onDeleteAnnotationReply?: (annotationId: string, replyId: string) => void;
-  onNavigatePage: (pageIndex: number) => void;
-  width: number;
-  onResize: (width: number) => void;
-  currentPageIndex?: number;
-  thumbnailsLayout?: ThumbnailsLayoutMode;
-  activeTab?: string;
-  onTabChange?: (tab: string) => void;
-  searchContent?: React.ReactNode;
-  searchHeaderContent?: React.ReactNode;
-  isSearchActive?: boolean;
-}
-
-const Sidebar: React.FC<SidebarProps> = ({
-  isOpen,
-  onOpen,
-  onClose,
-  onExitSearch,
-  isFloating = false,
-  pages,
-  fields,
-  annotations = [],
-  documentPermissions,
-  outline,
-  selectedId,
-  onSelectControl,
-  onDeleteAnnotation = () => {},
-  onUpdateAnnotation = () => {},
-  onAddAnnotationReply = () => {},
-  onUpdateAnnotationReply = () => {},
-  onDeleteAnnotationReply = () => {},
-  onNavigatePage,
-  width,
-  onResize,
-  currentPageIndex,
-  thumbnailsLayout,
-  activeTab,
-  onTabChange,
-  searchContent,
-  searchHeaderContent,
-  isSearchActive = false,
-}) => {
+const Sidebar: React.FC = () => {
   const { t } = useLanguage();
+  const state = useEditorStore(useShallow(selectSidebarState));
+  const {
+    isOpen,
+    isFloating,
+    pages,
+    fields,
+    annotations,
+    documentPermissions,
+    outline,
+    selectedId,
+    currentPageIndex,
+    thumbnailsLayout,
+    sidebarTab,
+    width,
+    setUiState,
+    selectControl,
+    deleteAnnotation,
+    updateAnnotation,
+    addAnnotationReply,
+    updateAnnotationReply,
+    deleteAnnotationReply,
+  } = state;
+  const { openSidebar: onOpen } = useEditorShellCommands();
+  const search = useEditorPdfSearch();
+  const onClose = () => setUiState({ isSidebarOpen: false });
+  const onResize = (nextWidth: number) =>
+    setUiState({ sidebarWidth: nextWidth });
+  const onNavigatePage = (pageIndex: number) => {
+    appEventBus.emit("workspace:navigatePage", {
+      pageIndex,
+      behavior: "smooth",
+    });
+  };
+  const onSelectControl = (
+    id: string,
+    options?: { behavior?: "auto" | "smooth"; skipScroll?: boolean },
+  ) => {
+    selectControl(id);
+    appEventBus.emit(
+      "workspace:focusControl",
+      { id, behavior: options?.behavior, skipScroll: options?.skipScroll },
+      { sticky: true },
+    );
+  };
+  const normalizedSidebarTab =
+    sidebarTab === "search" ? "thumbnails" : sidebarTab;
+  const activeTab = search.isPdfSearchOpen ? "search" : normalizedSidebarTab;
+  const isSearchActive = search.isPdfSearchOpen;
 
   const { isResizing, handleMouseDown } = useResizableSidePanel({
     side: "left",
@@ -104,12 +87,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     cursorSource: "sidebar-resize",
   });
 
-  // Local state for uncontrolled mode if activeTab is not provided
-  const [localTab, setLocalTab] = React.useState("thumbnails");
-  const currentTab = activeTab !== undefined ? activeTab : localTab;
+  const currentTab = activeTab;
   const handleTabChange = (val: string) => {
-    if (onTabChange) onTabChange(val);
-    else setLocalTab(val);
+    search.dismissPdfSearch();
+    setUiState({ sidebarTab: val });
   };
 
   if (!isOpen) {
@@ -148,8 +129,15 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Header */}
         <div className="bg-muted/30 border-border flex shrink-0 items-center justify-between gap-2 border-b p-2">
-          {isSearchActive && searchHeaderContent ? (
-            searchHeaderContent
+          {isSearchActive ? (
+            <PDFSearchHeader
+              query={search.pdfSearchQuery}
+              focusToken={search.pdfSearchFocusToken}
+              hasResults={search.pdfSearchResults.length > 0}
+              onQueryChange={search.setPdfSearchQuery}
+              onPrevious={search.handleSelectPreviousPdfSearchResult}
+              onNext={search.handleSelectNextPdfSearchResult}
+            />
           ) : (
             <TabsList className="flex h-8 flex-1 justify-end">
               <TabsTrigger
@@ -185,7 +173,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={isSearchActive ? (onExitSearch ?? onClose) : onClose}
+            onClick={isSearchActive ? search.closePdfSearch : onClose}
             className="h-8 w-8 shrink-0"
             title={
               isSearchActive
@@ -239,20 +227,32 @@ const Sidebar: React.FC<SidebarProps> = ({
               annotations={annotations}
               documentPermissions={documentPermissions}
               onSelectControl={onSelectControl}
-              onDeleteAnnotation={onDeleteAnnotation}
-              onUpdateAnnotation={onUpdateAnnotation}
-              onAddAnnotationReply={onAddAnnotationReply}
-              onUpdateAnnotationReply={onUpdateAnnotationReply}
-              onDeleteAnnotationReply={onDeleteAnnotationReply}
+              onDeleteAnnotation={deleteAnnotation}
+              onUpdateAnnotation={updateAnnotation}
+              onAddAnnotationReply={addAnnotationReply}
+              onUpdateAnnotationReply={updateAnnotationReply}
+              onDeleteAnnotationReply={deleteAnnotationReply}
               selectedId={selectedId}
             />
           </TabsContent>
-          {searchContent ? (
+          {isSearchActive ? (
             <TabsContent
               value="search"
               className="mt-0 flex h-full flex-1 flex-col data-[state=inactive]:hidden"
             >
-              {searchContent}
+              <PDFSearchPanel
+                query={search.pdfSearchQuery}
+                mode={search.pdfSearchMode}
+                caseSensitive={search.isPdfSearchCaseSensitive}
+                results={search.pdfSearchResults}
+                activeResultId={search.activePdfSearchResultId}
+                activeResultIndex={search.activePdfSearchResultIndex}
+                isSearching={search.isPdfSearchLoading}
+                errorMessage={search.pdfSearchError}
+                onToggleCaseSensitive={search.togglePdfSearchCaseSensitive}
+                onToggleRegex={search.togglePdfSearchMode}
+                onSelectResult={search.handleSelectPdfSearchResult}
+              />
             </TabsContent>
           ) : null}
         </div>
