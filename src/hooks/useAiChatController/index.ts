@@ -728,6 +728,7 @@ export const useAiChatController = (
           removeTextUnderFlattenedFreetext:
             snapshot.options.removeTextUnderFlattenedFreetext,
           pageIndexes,
+          syncFormFields: true,
           preserveOwnerRestrictions: false,
           preservedSourceAnnotations:
             snapshot.preservedSourceAnnotations.filter((annotation) =>
