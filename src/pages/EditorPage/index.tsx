@@ -155,7 +155,7 @@ const EditorPage: React.FC = () => {
   React.useEffect(() => {
     state.setUiState((prev) => {
       const hasTranslateDock = prev.rightPanelDockTab?.includes("translate");
-      if (isTranslateOpen === hasTranslateDock) return {};
+      if (isTranslateOpen === hasTranslateDock) return prev;
       return {
         rightPanelDockTab: isTranslateOpen
           ? [...(prev.rightPanelDockTab ?? []), "translate"]

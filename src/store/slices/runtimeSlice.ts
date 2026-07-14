@@ -135,7 +135,7 @@ export const createRuntimeSlice: EditorStoreSlice<
 
           set((store) => {
             if (!store.pages[pageIndex] || store.thumbnailImages[pageIndex]) {
-              return {};
+              return store;
             }
             didSet = true;
             return {

@@ -163,7 +163,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       }
 
       setState((s) => {
-        if (!s.pages[pageIndex] || s.thumbnailImages[pageIndex]) return {};
+        if (!s.pages[pageIndex] || s.thumbnailImages[pageIndex]) return s;
         return {
           thumbnailImages: {
             ...s.thumbnailImages,

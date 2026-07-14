@@ -10,7 +10,7 @@ export const createUiSlice: EditorStoreSlice<
     set((state) => {
       const nextValues =
         typeof updates === "function" ? updates(state) : updates;
-      return { ...state, ...nextValues };
+      return nextValues;
     }),
 
   resetUiState: () => set({ ...DEFAULT_EDITOR_UI_STATE }),
