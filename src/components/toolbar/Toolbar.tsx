@@ -82,7 +82,8 @@ const Toolbar: React.FC = () => {
     canRedo,
     isSidebarOpen: isFieldListOpen,
     isRightPanelOpen: isPropertiesPanelOpen,
-    setState,
+    setPageFlow,
+    setPageLayout,
     setTool: onToolChange,
     undo: onUndo,
     redo: onRedo,
@@ -118,12 +119,6 @@ const Toolbar: React.FC = () => {
   } = useEditorDocumentCommandsRuntime();
   const { openPdfSearch: onOpenSearch, isPdfSearchOpen: isSearchOpen } =
     useEditorPdfSearchToolbar();
-  const onPageLayoutChange = (layout: EditorState["pageLayout"]) => {
-    setState({ pageLayout: layout, fitTrigger: Date.now() });
-  };
-  const onPageFlowChange = (flow: EditorState["pageFlow"]) => {
-    setState({ pageFlow: flow, fitTrigger: Date.now() });
-  };
   const onOpenShortcuts = () => openDialog("shortcuts");
   const onOpenSettings = () => openDialog("settings");
   const toolbarTool = isToolMobileOnly(tool) ? "select" : tool;
@@ -779,8 +774,8 @@ const Toolbar: React.FC = () => {
               align="end"
               open={pageSettingsOpen}
               onOpenChange={setPageSettingsOpen}
-              onPageLayoutChange={onPageLayoutChange}
-              onPageFlowChange={onPageFlowChange}
+              onPageLayoutChange={setPageLayout}
+              onPageFlowChange={setPageFlow}
               onToggleFullscreen={onToggleFullscreen}
             />
           )}

@@ -22,7 +22,6 @@ import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
 import { appEventBus } from "@/lib/eventBus";
-import { canUseModeWithPdfPermissions } from "@/lib/pdfPermissions";
 import {
   exitPlatformFullscreen,
   setPlatformFullscreen,
@@ -70,15 +69,15 @@ const EditorPage: React.FC = () => {
 
   const setEditorFullscreen = React.useCallback(
     async (next: boolean) => {
-      state.setState({ isFullscreen: next });
+      state.setEditorFullscreen(next);
       try {
         await setPlatformFullscreen(next);
       } catch (error) {
         console.error("Failed to toggle fullscreen", error);
-        state.setState({ isFullscreen: !next });
+        state.setEditorFullscreen(!next);
       }
     },
-    [state.setState],
+    [state.setEditorFullscreen],
   );
 
   const exitEditorFullscreen = React.useCallback(async () => {
@@ -87,9 +86,9 @@ const EditorPage: React.FC = () => {
     } catch (error) {
       console.error("Failed to exit fullscreen", error);
     } finally {
-      state.setState({ isFullscreen: false });
+      state.setEditorFullscreen(false);
     }
-  }, [state.setState]);
+  }, [state.setEditorFullscreen]);
 
   const toggleFullscreen = React.useCallback(() => {
     const next = !useEditorStore.getState().isFullscreen;
@@ -112,9 +111,9 @@ const EditorPage: React.FC = () => {
   React.useEffect(
     () =>
       subscribePlatformFullscreenChange((isFullscreen) => {
-        state.setState({ isFullscreen });
+        state.setEditorFullscreen(isFullscreen);
       }),
-    [state.setState],
+    [state.setEditorFullscreen],
   );
 
   const runPrimarySaveAction = React.useCallback(async () => {
@@ -130,13 +129,9 @@ const EditorPage: React.FC = () => {
 
   const handleModeChange = React.useCallback(
     (mode: EditorState["mode"]) => {
-      if (!canUseModeWithPdfPermissions(mode, state.documentPermissions)) {
-        state.setTool("select");
-        return;
-      }
-      state.setState({ mode, tool: defaultTool });
+      state.setEditorMode(mode, defaultTool);
     },
-    [defaultTool, state.documentPermissions, state.setState, state.setTool],
+    [defaultTool, state.setEditorMode],
   );
 
   useAppEvent("workspace:openTranslate", ({ sourceText, autoTranslate }) => {
@@ -292,42 +287,38 @@ const EditorPage: React.FC = () => {
   }, [workspaceScrollContainerRef]);
 
   const handleZoomIn = React.useCallback(() => {
-    const currentScale = useEditorStore.getState().scale;
-    state.setState({ scale: Math.min(5, currentScale * 1.25) });
-  }, [state.setState]);
+    state.zoomBy(1.25);
+  }, [state.zoomBy]);
 
   const handleZoomOut = React.useCallback(() => {
-    const currentScale = useEditorStore.getState().scale;
-    state.setState({ scale: Math.max(0.25, currentScale / 1.25) });
-  }, [state.setState]);
+    state.zoomBy(1 / 1.25);
+  }, [state.zoomBy]);
 
   const handleFitWidth = React.useCallback(() => {
     const liveState = useEditorStore.getState();
-    state.setState({
-      scale: calculateWorkspaceFitWidthScale({
+    state.fitToScale(
+      calculateWorkspaceFitWidthScale({
         pages: liveState.pages,
         pageIndex: liveState.currentPageIndex,
         pageLayout: liveState.pageLayout,
         pageFlow: liveState.pageFlow,
         viewport: getWorkspaceViewport(),
       }),
-      fitTrigger: Date.now(),
-    });
-  }, [getWorkspaceViewport, state.setState]);
+    );
+  }, [getWorkspaceViewport, state.fitToScale]);
 
   const handleFitScreen = React.useCallback(() => {
     const liveState = useEditorStore.getState();
-    state.setState({
-      scale: calculateWorkspaceFitScreenScale({
+    state.fitToScale(
+      calculateWorkspaceFitScreenScale({
         pages: liveState.pages,
         pageIndex: liveState.currentPageIndex,
         pageLayout: liveState.pageLayout,
         pageFlow: liveState.pageFlow,
         viewport: getWorkspaceViewport(),
       }),
-      fitTrigger: Date.now(),
-    });
-  }, [getWorkspaceViewport, state.setState]);
+    );
+  }, [getWorkspaceViewport, state.fitToScale]);
 
   const openSidebar = React.useCallback(() => {
     state.setUiState((prev) =>

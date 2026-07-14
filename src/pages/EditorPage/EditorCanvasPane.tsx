@@ -62,6 +62,10 @@ export const EditorCanvasPane: React.FC = () => {
     selectControl,
     setTool,
     saveCheckpoint,
+    fitToScale,
+    setPageFlow,
+    setPageLayout,
+    setScale,
     setState,
     selectPageTranslateParagraphId,
     setSelectedPageTranslateParagraphIds,
@@ -208,10 +212,9 @@ export const EditorCanvasPane: React.FC = () => {
 
   const updateScale = useCallback(
     (newScale: number) => {
-      const clamped = Math.max(0.25, Math.min(5.0, newScale));
-      setState({ scale: clamped });
+      setScale(newScale);
     },
-    [setState],
+    [setScale],
   );
 
   useEffect(() => {
@@ -229,10 +232,10 @@ export const EditorCanvasPane: React.FC = () => {
       return;
     }
 
-    updateScale(calculateFitScreenScale(state.currentPageIndex));
-    setState({ fitTrigger: Date.now() });
+    fitToScale(calculateFitScreenScale(state.currentPageIndex));
   }, [
     calculateFitScreenScale,
+    fitToScale,
     setState,
     state.currentPageIndex,
     state.filename,
@@ -321,10 +324,10 @@ export const EditorCanvasPane: React.FC = () => {
           isFullscreen={state.isFullscreen}
           onNavigatePage={handleNavigatePage}
           onPageLayoutChange={(layout) => {
-            setState({ pageLayout: layout, fitTrigger: Date.now() });
+            setPageLayout(layout);
           }}
           onPageFlowChange={(flow) => {
-            setState({ pageFlow: flow, fitTrigger: Date.now() });
+            setPageFlow(flow);
           }}
           onToggleFullscreen={onToggleFullscreen}
         />

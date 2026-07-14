@@ -53,6 +53,13 @@ export interface EditorActions {
       | ((prev: EditorState) => Partial<EditorUiState>),
   ) => void;
   resetUiState: () => void;
+  setScale: (scale: number) => void;
+  zoomBy: (factor: number) => void;
+  fitToScale: (scale: number) => void;
+  setPageLayout: (layout: EditorState["pageLayout"]) => void;
+  setPageFlow: (flow: EditorState["pageFlow"]) => void;
+  setEditorMode: (mode: EditorState["mode"], defaultTool: Tool) => void;
+  setEditorFullscreen: (isFullscreen: boolean) => void;
   setOptions: (
     updates: Partial<AppOptions> | ((prev: AppOptions) => Partial<AppOptions>),
   ) => void;

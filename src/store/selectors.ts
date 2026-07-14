@@ -30,8 +30,11 @@ export const selectEditorPageState = (state: EditorStore) => ({
   rightPanelDockTab: state.rightPanelDockTab,
   rightPanelWidth: state.rightPanelWidth,
   setState: state.setState,
+  fitToScale: state.fitToScale,
+  setEditorFullscreen: state.setEditorFullscreen,
+  setEditorMode: state.setEditorMode,
   setUiState: state.setUiState,
-  setTool: state.setTool,
+  zoomBy: state.zoomBy,
   selectControl: state.selectControl,
 });
 
@@ -127,6 +130,10 @@ export const selectEditorCanvasActions = (state: EditorStore) => ({
   selectPageTranslateParagraphId: state.selectPageTranslateParagraphId,
   setSelectedPageTranslateParagraphIds:
     state.setSelectedPageTranslateParagraphIds,
+  fitToScale: state.fitToScale,
+  setPageFlow: state.setPageFlow,
+  setPageLayout: state.setPageLayout,
+  setScale: state.setScale,
   setState: state.setState,
   setTool: state.setTool,
   updateAnnotation: state.updateAnnotation,
@@ -156,7 +163,8 @@ export const selectToolbarState = (state: EditorStore) => ({
   pageLayout: state.pageLayout,
   pageFlow: state.pageFlow,
   isFullscreen: state.isFullscreen,
-  setState: state.setState,
+  setPageFlow: state.setPageFlow,
+  setPageLayout: state.setPageLayout,
   setTool: state.setTool,
   undo: state.undo,
   redo: state.redo,
