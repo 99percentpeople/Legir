@@ -210,6 +210,23 @@ const createCompactSourceTextFieldPdf = async () => {
 };
 
 describe("exportPDF form handling", () => {
+  it("removes all supported source fields when the editor has no fields", async () => {
+    const sourceBytes = await createTextFieldPdf();
+
+    const exportedBytes = await exportPDF(
+      sourceBytes,
+      [],
+      undefined,
+      [],
+      undefined,
+      { syncFormFields: true },
+    );
+    const exportedDoc = await PDFDocument.load(exportedBytes);
+
+    expect(exportedDoc.getForm().getFields()).toHaveLength(0);
+    expect(getPageAnnotationCount(exportedDoc)).toBe(0);
+  });
+
   it("preserves XFA data when updating AcroForm fields", async () => {
     const sourceBytes = await createTextFieldPdf({ withXfa: true });
 

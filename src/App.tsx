@@ -1462,6 +1462,7 @@ const App: React.FC = () => {
             snapshot.options.removeTextUnderFlattenedFreetext,
           preservedSourceAnnotations: snapshot.preservedSourceAnnotations,
           flattenFormFields: options?.flattenFormFields,
+          syncFormFields: true,
           sourceDocumentPermissions:
             snapshot.sourceDocumentPermissions ?? snapshot.documentPermissions,
           preserveOwnerRestrictions:

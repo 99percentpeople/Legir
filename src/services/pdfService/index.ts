@@ -1976,6 +1976,7 @@ export const exportPDF = async (
     pageIndexes?: number[];
     preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
     flattenFormFields?: boolean;
+    syncFormFields?: boolean;
     sourceDocumentPermissions?: PDFDocumentPermissions | null;
     preserveOwnerRestrictions?: boolean;
     ownerPassword?: string | null;
@@ -2240,7 +2241,7 @@ export const exportPDF = async (
       .map((field) => sourcePdfRefToFormKey(field.sourcePdfRef))
       .filter((key): key is string => !!key),
   );
-  const hasCurrentFields = fields.length > 0;
+  const shouldSyncFormFields = options?.syncFormFields ?? fields.length > 0;
   const currentFieldNames = new Set(fields.map((field) => field.name));
   const existingFields = form.getFields();
   for (const field of existingFields) {
@@ -2271,7 +2272,7 @@ export const exportPDF = async (
       const isCurrentField = currentFieldNames.has(field.getName());
 
       shouldRemove =
-        (hasCurrentFields &&
+        (shouldSyncFormFields &&
           isSupportedExportField &&
           !isCurrentField &&
           !isImportedSourceField) ||
