@@ -17,6 +17,8 @@ import {
 import {
   captureAcroFormXfaEntry,
   fieldMatchesSourcePdfRef,
+  removeMissingOrphanSourcePdfFieldWidgets,
+  removeMissingSourcePdfFieldWidgets,
   restoreAcroFormXfaEntry,
   safeRemovePdfField,
   setAcroFormNeedAppearances,
@@ -2242,7 +2244,12 @@ export const exportPDF = async (
       .filter((key): key is string => !!key),
   );
   const shouldSyncFormFields = options?.syncFormFields ?? fields.length > 0;
-  const currentFieldNames = new Set(fields.map((field) => field.name));
+  const currentFieldNamesWithoutSourceRefs = new Set(
+    fields.filter((field) => !field.sourcePdfRef).map((field) => field.name),
+  );
+  if (shouldSyncFormFields) {
+    removeMissingOrphanSourcePdfFieldWidgets(form, sourceFieldRefKeys);
+  }
   const existingFields = form.getFields();
   for (const field of existingFields) {
     let shouldRemove = false;
@@ -2269,12 +2276,22 @@ export const exportPDF = async (
         field,
         sourceFieldRefKeys,
       );
-      const isCurrentField = currentFieldNames.has(field.getName());
+      const isCurrentFieldByName = currentFieldNamesWithoutSourceRefs.has(
+        field.getName(),
+      );
+
+      if (
+        shouldSyncFormFields &&
+        isSupportedExportField &&
+        isImportedSourceField
+      ) {
+        removeMissingSourcePdfFieldWidgets(form, field, sourceFieldRefKeys);
+      }
 
       shouldRemove =
         (shouldSyncFormFields &&
           isSupportedExportField &&
-          !isCurrentField &&
+          !isCurrentFieldByName &&
           !isImportedSourceField) ||
         (options?.flattenFormFields === true && isButton);
 
@@ -2420,7 +2437,10 @@ export const exportPDF = async (
         form,
         field,
         fontMap,
-        { flattenAppearance: options?.flattenFormFields === true },
+        {
+          flattenAppearance: options?.flattenFormFields === true,
+          viewport,
+        },
       );
       if (didUpdateExistingField) continue;
 

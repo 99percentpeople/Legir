@@ -15,14 +15,24 @@ import {
   PDFRadioGroup,
   PDFRef,
   PDFTextField,
+  PDFWidgetAnnotation,
   TextAlignment,
 } from "@cantoo/pdf-lib";
 import { FieldType, type FormField } from "@/types";
-import type { ControlExportOptions } from "../types";
+import type { ControlExportOptions, ViewportLike } from "../types";
 import { containsNonAscii, isExplicitCjkFontSelection } from "./text";
 import { pickCjkFontFromMap } from "./font-selection";
 import { pdfDebug } from "./debug";
 import { flattenTextFieldAppearanceProvider } from "./text-field-appearance";
+import {
+  applyWidgetExportRotation,
+  getCommonControlExportOpts,
+} from "./control-export";
+import {
+  collectFieldFlagsFromChain,
+  lookupInFieldChain,
+  pdfObjToString,
+} from "./pdf-import-utils";
 
 type CapturedXfaEntry = {
   acroForm: PDFDict;
@@ -118,6 +128,201 @@ export const fieldMatchesSourcePdfRef = (
     const key = pdfRefToFormKey(ref);
     return !!key && sourceKeys.has(key);
   });
+};
+
+const findFieldBySourcePdfRef = (form: PDFForm, field: FormField) => {
+  const sourceKey = sourcePdfRefToFormKey(field.sourcePdfRef);
+  if (!sourceKey) return undefined;
+  const sourceKeys = new Set([sourceKey]);
+  return form
+    .getFields()
+    .find((candidate) => fieldMatchesSourcePdfRef(candidate, sourceKeys));
+};
+
+const pageContainsAnnotRef = (page: PDFPage, refKey: string) => {
+  const annots = page.node.Annots();
+  if (!(annots instanceof PDFArray)) return false;
+
+  for (let index = 0; index < annots.size(); index++) {
+    const ref = annots.get(index);
+    if (ref instanceof PDFRef && pdfRefToFormKey(ref) === refKey) return true;
+  }
+  return false;
+};
+
+const updateSourcePdfFieldWidget = (
+  form: PDFForm,
+  field: FormField,
+  viewport?: ViewportLike,
+) => {
+  const sourceKey = sourcePdfRefToFormKey(field.sourcePdfRef);
+  if (!sourceKey || !field.sourcePdfRef) return false;
+
+  const sourceRef = PDFRef.of(
+    field.sourcePdfRef.objectNumber,
+    field.sourcePdfRef.generationNumber,
+  );
+  const sourceWidgetDict = form.doc.context.lookup(sourceRef);
+  if (!(sourceWidgetDict instanceof PDFDict)) return false;
+  if (
+    pdfObjToString(sourceWidgetDict.lookup(PDFName.of("Subtype"))) !== "Widget"
+  ) {
+    return false;
+  }
+  const sourceWidget = PDFWidgetAnnotation.fromDict(sourceWidgetDict);
+
+  const targetPage = form.doc.getPage(field.pageIndex);
+  const bounds = getCommonControlExportOpts(field, targetPage, viewport);
+  sourceWidget.setRectangle({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+  });
+  applyWidgetExportRotation(sourceWidget, targetPage, field.rotationDeg);
+
+  if (!pageContainsAnnotRef(targetPage, sourceKey)) {
+    const sourceKeys = new Set([sourceKey]);
+    for (const page of form.doc.getPages()) {
+      removeRefsFromPageAnnots(page, sourceKeys);
+    }
+    targetPage.node.addAnnot(sourceRef);
+  }
+  sourceWidget.setP(targetPage.ref);
+
+  return true;
+};
+
+const isSupportedSourceWidget = (widget: PDFDict) => {
+  const fieldType = pdfObjToString(lookupInFieldChain(widget, "FT"));
+  if (fieldType === "Tx" || fieldType === "Ch" || fieldType === "Sig") {
+    return true;
+  }
+  if (fieldType !== "Btn") return false;
+
+  const fieldFlags = collectFieldFlagsFromChain(widget);
+  const isPushButton = (fieldFlags & (1 << 16)) !== 0;
+  return !isPushButton;
+};
+
+const removeRefFromPdfArray = (array: PDFArray, refKey: string) => {
+  let removed = 0;
+  for (let index = array.size() - 1; index >= 0; index--) {
+    const ref = array.get(index);
+    if (ref instanceof PDFRef && pdfRefToFormKey(ref) === refKey) {
+      array.remove(index);
+      removed += 1;
+    }
+  }
+  return removed;
+};
+
+export const removeMissingOrphanSourcePdfFieldWidgets = (
+  form: PDFForm,
+  sourceKeys: Set<string>,
+) => {
+  const registeredFieldRefKeys = new Set(
+    form
+      .getFields()
+      .flatMap((field) => collectPdfFieldRefs(field))
+      .map((ref) => pdfRefToFormKey(ref))
+      .filter((key): key is string => !!key),
+  );
+  const orphanWidgets = new Map<string, { ref: PDFRef; parentRef?: PDFRef }>();
+
+  for (const page of form.doc.getPages()) {
+    const annots = page.node.Annots();
+    if (!(annots instanceof PDFArray)) continue;
+
+    for (let index = 0; index < annots.size(); index++) {
+      const ref = annots.get(index);
+      if (!(ref instanceof PDFRef)) continue;
+      const key = pdfRefToFormKey(ref);
+      if (!key || registeredFieldRefKeys.has(key) || sourceKeys.has(key)) {
+        continue;
+      }
+
+      const widget = annots.lookup(index);
+      if (!(widget instanceof PDFDict)) continue;
+      if (
+        pdfObjToString(widget.lookup(PDFName.of("Subtype"))) !== "Widget" ||
+        !isSupportedSourceWidget(widget)
+      ) {
+        continue;
+      }
+
+      const parent = widget.get(PDFName.of("Parent"));
+      orphanWidgets.set(key, {
+        ref,
+        parentRef: parent instanceof PDFRef ? parent : undefined,
+      });
+    }
+  }
+
+  if (orphanWidgets.size === 0) return 0;
+
+  const orphanKeys = new Set(orphanWidgets.keys());
+  for (const page of form.doc.getPages()) {
+    removeRefsFromPageAnnots(page, orphanKeys);
+  }
+
+  for (const [key, { ref, parentRef }] of orphanWidgets) {
+    if (parentRef) {
+      const parent = form.doc.context.lookup(parentRef);
+      if (parent instanceof PDFDict) {
+        const kids = parent.lookup(PDFName.of("Kids"));
+        if (kids instanceof PDFArray) removeRefFromPdfArray(kids, key);
+      }
+    }
+    form.doc.context.delete(ref);
+  }
+
+  return orphanWidgets.size;
+};
+
+export const removeMissingSourcePdfFieldWidgets = (
+  form: PDFForm,
+  field: {
+    acroField?: unknown;
+  },
+  sourceKeys: Set<string>,
+) => {
+  if (sourceKeys.size === 0) return 0;
+
+  const acroField = field.acroField as
+    | { Kids?: () => PDFArray | undefined }
+    | undefined;
+  const kids = acroField?.Kids?.();
+  if (!(kids instanceof PDFArray)) return 0;
+
+  const indexedKidRefs: Array<{ index: number; ref: PDFRef; key: string }> = [];
+  for (let index = 0; index < kids.size(); index++) {
+    const kid = kids.get(index);
+    if (!(kid instanceof PDFRef)) continue;
+    const key = pdfRefToFormKey(kid);
+    if (key) indexedKidRefs.push({ index, ref: kid, key });
+  }
+
+  // Only prune a field when at least one current control explicitly points to
+  // one of its widgets. This avoids treating a parent-field ref as a widget ref.
+  if (!indexedKidRefs.some(({ key }) => sourceKeys.has(key))) return 0;
+
+  const refsToRemove = indexedKidRefs.filter(({ key }) => !sourceKeys.has(key));
+  if (refsToRemove.length === 0) return 0;
+
+  const refKeysToRemove = new Set(refsToRemove.map(({ key }) => key));
+  for (const page of form.doc.getPages()) {
+    removeRefsFromPageAnnots(page, refKeysToRemove);
+  }
+
+  for (const { index, ref } of refsToRemove.sort(
+    (left, right) => right.index - left.index,
+  )) {
+    kids.remove(index);
+    form.doc.context.delete(ref);
+  }
+
+  return refsToRemove.length;
 };
 
 const removeRefsFromPageAnnots = (page: PDFPage, refKeys: Set<string>) => {
@@ -246,16 +451,17 @@ export const updateExistingSourceField = (
   form: PDFForm,
   field: FormField,
   fontMap?: Map<string, PDFFont>,
-  options?: ControlExportOptions,
+  options?: ControlExportOptions & { viewport?: ViewportLike },
 ) => {
-  let existingField:
-    | {
-        constructor: { name: string };
-        getName?: () => string;
-      }
-    | undefined;
+  const didUpdateSourceWidget = updateSourcePdfFieldWidget(
+    form,
+    field,
+    options?.viewport,
+  );
+  let existingField: ReturnType<PDFForm["getFields"]>[number] | undefined;
   try {
-    existingField = form.getFieldMaybe(field.name);
+    existingField =
+      findFieldBySourcePdfRef(form, field) ?? form.getFieldMaybe(field.name);
   } catch (error) {
     pdfDebug("export:forms", "sourceFieldLookupFailed", () => ({
       name: field.name,
@@ -269,7 +475,7 @@ export const updateExistingSourceField = (
       name: field.name,
       type: field.type,
     }));
-    return !!field.sourcePdfRef;
+    return didUpdateSourceWidget || !!field.sourcePdfRef;
   }
 
   const runExistingFieldUpdate = (step: string, update: () => void) => {

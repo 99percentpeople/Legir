@@ -11,6 +11,7 @@ import {
   PDFRef,
   PDFStream,
   PDFString,
+  PDFWidgetAnnotation,
   StandardFonts,
 } from "@cantoo/pdf-lib";
 import { decodePdfStreamToText } from "@/services/pdfService/lib/pdf-import-utils";
@@ -225,6 +226,223 @@ describe("exportPDF form handling", () => {
 
     expect(exportedDoc.getForm().getFields()).toHaveLength(0);
     expect(getPageAnnotationCount(exportedDoc)).toBe(0);
+  });
+
+  it("removes only deleted widgets from a source field with duplicate names", async () => {
+    const sourceDoc = await PDFDocument.create();
+    const firstPage = sourceDoc.addPage([200, 200]);
+    const secondPage = sourceDoc.addPage([200, 200]);
+    const textField = sourceDoc.getForm().createTextField("duplicateName");
+    textField.addToPage(firstPage, {
+      x: 40,
+      y: 120,
+      width: 100,
+      height: 20,
+    });
+    textField.addToPage(firstPage, {
+      x: 40,
+      y: 120,
+      width: 100,
+      height: 20,
+    });
+    textField.addToPage(secondPage, {
+      x: 40,
+      y: 120,
+      width: 100,
+      height: 20,
+    });
+    const keptWidgetRef = getFirstWidgetRef(textField);
+
+    const exportedBytes = await exportPDF(
+      await sourceDoc.save(),
+      [
+        {
+          id: "kept-duplicate-name",
+          pageIndex: 0,
+          type: FieldType.TEXT,
+          name: "duplicateName",
+          rect: { x: 20, y: 30, width: 120, height: 25 },
+          value: "Kept value",
+          sourcePdfRef: toSourcePdfRef(keptWidgetRef),
+        },
+      ],
+      undefined,
+      [],
+      undefined,
+      { syncFormFields: true },
+    );
+    const exportedDoc = await PDFDocument.load(exportedBytes);
+
+    const exportedField = exportedDoc.getForm().getTextField("duplicateName");
+    expect(
+      exportedDoc
+        .getForm()
+        .getFields()
+        .map((field) => field.getName()),
+    ).toEqual(["duplicateName"]);
+    expect(exportedField.acroField.getWidgets()).toHaveLength(1);
+    expect(exportedField.acroField.getWidgets()[0].getRectangle()).toEqual({
+      x: 20,
+      y: 145,
+      width: 120,
+      height: 25,
+    });
+    expect(getPageAnnotationCount(exportedDoc, 0)).toBe(1);
+    expect(getPageAnnotationCount(exportedDoc, 1)).toBe(0);
+  });
+
+  it("removes deleted duplicate top-level fields with the same name", async () => {
+    const sourceDoc = await PDFDocument.create();
+    const firstPage = sourceDoc.addPage([200, 200]);
+    const secondPage = sourceDoc.addPage([200, 200]);
+    const context = sourceDoc.context;
+    const createMergedField = (pageRef: PDFRef) =>
+      context.obj({
+        FT: PDFName.of("Tx"),
+        T: PDFString.of("duplicateName"),
+        Type: PDFName.of("Annot"),
+        Subtype: PDFName.of("Widget"),
+        Rect: [40, 120, 140, 140],
+        P: pageRef,
+        F: 4,
+        DA: PDFString.of("/Helv 12 Tf 0 g"),
+      });
+    const keptFieldRef = context.register(createMergedField(firstPage.ref));
+    const deletedFieldRef = context.register(createMergedField(secondPage.ref));
+    firstPage.node.addAnnot(keptFieldRef);
+    secondPage.node.addAnnot(deletedFieldRef);
+    sourceDoc.catalog.set(
+      PDFName.of("AcroForm"),
+      context.obj({
+        Fields: [keptFieldRef, deletedFieldRef],
+        NeedAppearances: true,
+      }),
+    );
+
+    const exportedBytes = await exportPDF(
+      await sourceDoc.save({ updateFieldAppearances: false }),
+      [
+        {
+          id: "kept-duplicate-top-level-name",
+          pageIndex: 0,
+          type: FieldType.TEXT,
+          name: "duplicateName",
+          rect: { x: 40, y: 60, width: 100, height: 20 },
+          value: "Kept value",
+          sourcePdfRef: toSourcePdfRef(keptFieldRef),
+        },
+      ],
+      undefined,
+      [],
+      undefined,
+      { syncFormFields: true },
+    );
+    const exportedDoc = await PDFDocument.load(exportedBytes);
+
+    expect(
+      exportedDoc
+        .getForm()
+        .getFields()
+        .map((field) => field.getName()),
+    ).toEqual(["duplicateName"]);
+    expect(getPageAnnotationCount(exportedDoc, 0)).toBe(1);
+    expect(getPageAnnotationCount(exportedDoc, 1)).toBe(0);
+  });
+
+  it("updates retained orphan widgets and removes missing duplicates", async () => {
+    const sourceDoc = await PDFDocument.create();
+    const page = sourceDoc.addPage([200, 200]);
+    const form = sourceDoc.getForm();
+    const registeredField = form.createTextField("duplicateName");
+    registeredField.addToPage(page, {
+      x: 40,
+      y: 120,
+      width: 100,
+      height: 20,
+    });
+    registeredField.addToPage(page, {
+      x: 40,
+      y: 120,
+      width: 100,
+      height: 20,
+    });
+
+    const context = sourceDoc.context;
+    const orphanParent = context.obj({
+      FT: PDFName.of("Tx"),
+      T: PDFString.of("duplicateName"),
+      Kids: [],
+      V: PDFString.of(""),
+    });
+    const orphanParentRef = context.register(orphanParent);
+    const createOrphanWidget = () =>
+      context.obj({
+        Type: PDFName.of("Annot"),
+        Subtype: PDFName.of("Widget"),
+        Parent: orphanParentRef,
+        P: page.ref,
+        Rect: [40, 120, 140, 140],
+        F: 4,
+      });
+    const retainedOrphanRef = context.register(createOrphanWidget());
+    const deletedOrphanRef = context.register(createOrphanWidget());
+    orphanParent.set(
+      PDFName.of("Kids"),
+      context.obj([retainedOrphanRef, deletedOrphanRef]),
+    );
+    page.node.addAnnot(retainedOrphanRef);
+    page.node.addAnnot(deletedOrphanRef);
+
+    const exportedBytes = await exportPDF(
+      await sourceDoc.save({ updateFieldAppearances: false }),
+      [
+        {
+          id: "retained-orphan-widget",
+          pageIndex: 0,
+          type: FieldType.TEXT,
+          name: "duplicateName",
+          rect: { x: 20, y: 30, width: 120, height: 25 },
+          sourcePdfRef: toSourcePdfRef(retainedOrphanRef),
+        },
+      ],
+      undefined,
+      [],
+      undefined,
+      { syncFormFields: true },
+    );
+    const exportedDoc = await PDFDocument.load(exportedBytes);
+
+    expect(exportedDoc.getForm().getFields()).toHaveLength(0);
+    expect(getPageAnnotationCount(exportedDoc)).toBe(1);
+
+    const retainedWidgetDict = exportedDoc.context.lookup(
+      PDFRef.of(
+        retainedOrphanRef.objectNumber,
+        retainedOrphanRef.generationNumber,
+      ),
+      PDFDict,
+    );
+    expect(
+      PDFWidgetAnnotation.fromDict(retainedWidgetDict).getRectangle(),
+    ).toEqual({
+      x: 20,
+      y: 145,
+      width: 120,
+      height: 25,
+    });
+
+    const exportedParent = exportedDoc.context.lookup(
+      PDFRef.of(orphanParentRef.objectNumber, orphanParentRef.generationNumber),
+      PDFDict,
+    );
+    const exportedKids = exportedParent.lookup(PDFName.of("Kids"), PDFArray);
+    expect(exportedKids.size()).toBe(1);
+    expect(exportedKids.get(0)).toEqual(
+      PDFRef.of(
+        retainedOrphanRef.objectNumber,
+        retainedOrphanRef.generationNumber,
+      ),
+    );
   });
 
   it("preserves XFA data when updating AcroForm fields", async () => {
