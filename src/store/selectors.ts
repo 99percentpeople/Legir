@@ -72,8 +72,7 @@ export const selectAiChatEditorState = (
   pdfOpenPassword: state.pdfOpenPassword,
   pdfOwnerUnlocked: state.pdfOwnerUnlocked,
   preservePdfOwnerRestrictionsOnSave: state.preservePdfOwnerRestrictionsOnSave,
-  // Keep viewport zoom updates scoped to the canvas instead of the page shell.
-  scale: 1,
+  scale: state.scale,
   sourceDocumentPermissions: state.sourceDocumentPermissions,
 });
 

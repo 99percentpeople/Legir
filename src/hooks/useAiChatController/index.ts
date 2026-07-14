@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
   resolvePdfSearchResultGeometry,
@@ -194,6 +201,11 @@ export const useAiChatController = (
   scopeId?: string,
   workerService?: PDFWorkerService,
 ) => {
+  const editorStateRef = useRef(editorState);
+  useLayoutEffect(() => {
+    editorStateRef.current = editorState;
+  }, [editorState]);
+
   const [registryVersion, setRegistryVersion] = useState(0);
   const [selectedModelKey, setSelectedModelKey] = useState<string | undefined>(
     () => loadPersistedSelectedModelKey(),
@@ -822,29 +834,35 @@ export const useAiChatController = (
   const documentToolContext = useMemo(
     () =>
       createDocumentContextService({
-        getSnapshot: () => ({
-          filename: editorState.filename,
-          metadata: editorState.metadata,
-          documentPermissions: editorState.documentPermissions,
-          sourceDocumentPermissions: editorState.sourceDocumentPermissions,
-          pdfOwnerUnlocked: editorState.pdfOwnerUnlocked,
-          preservePdfOwnerRestrictionsOnSave:
-            editorState.preservePdfOwnerRestrictionsOnSave,
-          pages: editorState.pages,
-          outline: editorState.outline,
-          currentPageIndex: editorState.currentPageIndex,
-          scale: editorState.scale,
-          pageLayout: editorState.pageLayout,
-          pageFlow: editorState.pageFlow,
-        }),
+        getSnapshot: () => {
+          const snapshot = editorStateRef.current;
+          return {
+            filename: snapshot.filename,
+            metadata: snapshot.metadata,
+            documentPermissions: snapshot.documentPermissions,
+            sourceDocumentPermissions: snapshot.sourceDocumentPermissions,
+            pdfOwnerUnlocked: snapshot.pdfOwnerUnlocked,
+            preservePdfOwnerRestrictionsOnSave:
+              snapshot.preservePdfOwnerRestrictionsOnSave,
+            pages: snapshot.pages,
+            outline: snapshot.outline,
+            currentPageIndex: snapshot.currentPageIndex,
+            scale: snapshot.scale,
+            pageLayout: snapshot.pageLayout,
+            pageFlow: snapshot.pageFlow,
+          };
+        },
         getSelectedTextContext,
-        getPdfSource: () => ({
-          pdfBytes: editorState.pdfBytes,
-          password: editorState.pdfOpenPassword,
-        }),
+        getPdfSource: () => {
+          const snapshot = editorStateRef.current;
+          return {
+            pdfBytes: snapshot.pdfBytes,
+            password: snapshot.pdfOpenPassword,
+          };
+        },
         getRenderablePdfBytes,
         getPagesTextConfig: () => ({
-          maxChars: editorState.options.aiChat.getPagesTextMaxChars,
+          maxChars: editorStateRef.current.options.aiChat.getPagesTextMaxChars,
         }),
         canAttachPageVisuals: () => canAttachPageVisuals,
         analyzeRenderedPages: hasVisualAnalysisModel
@@ -853,22 +871,7 @@ export const useAiChatController = (
         workerService,
       }),
     [
-      documentIdentity,
-      editorState.currentPageIndex,
-      editorState.filename,
-      editorState.metadata,
-      editorState.documentPermissions,
-      editorState.sourceDocumentPermissions,
-      editorState.pdfOwnerUnlocked,
-      editorState.preservePdfOwnerRestrictionsOnSave,
-      editorState.options.aiChat.getPagesTextMaxChars,
-      editorState.outline,
-      editorState.pageFlow,
-      editorState.pageLayout,
-      editorState.pages,
-      editorState.pdfBytes,
-      editorState.pdfOpenPassword,
-      editorState.scale,
+      aiScopeId,
       canAttachPageVisuals,
       getRenderablePdfBytes,
       getSelectedTextContext,
@@ -2245,38 +2248,72 @@ export const useAiChatController = (
     );
   }, [activeSessionId, contextMemoryPendingVersion, isDraftConversation]);
 
-  return {
-    sessions,
-    activeSessionId: isDraftConversation ? "" : activeSessionId,
-    selectSession,
-    newConversation,
-    clearConversation,
-    deleteConversation,
-    canDeleteConversation,
+  return useMemo(
+    () => ({
+      sessions,
+      activeSessionId: isDraftConversation ? "" : activeSessionId,
+      selectSession,
+      newConversation,
+      clearConversation,
+      deleteConversation,
+      canDeleteConversation,
 
-    timeline,
-    runStatus,
-    lastError,
-    awaitingContinue,
-    isContextCompressionRunning,
-    tokenUsage,
-    contextTokens,
-    selectedModelKey,
-    setSelectedModelKey,
-    reasoningLevelControl,
-    setReasoningLevel,
-    modelSelectGroups,
-    sendMessage,
-    continueConversation,
-    regenerateAssistantMessage,
-    retryLastFailedMessage,
-    editUserMessage,
-    switchMessageBranch,
-    stop,
-    openDocumentLink,
+      timeline,
+      runStatus,
+      lastError,
+      awaitingContinue,
+      isContextCompressionRunning,
+      tokenUsage,
+      contextTokens,
+      selectedModelKey,
+      setSelectedModelKey,
+      reasoningLevelControl,
+      setReasoningLevel,
+      modelSelectGroups,
+      sendMessage,
+      continueConversation,
+      regenerateAssistantMessage,
+      retryLastFailedMessage,
+      editUserMessage,
+      switchMessageBranch,
+      stop,
+      openDocumentLink,
 
-    highlightedSearchResultsByPage,
-    hasAvailableModel,
-    disabledReason,
-  };
+      highlightedSearchResultsByPage,
+      hasAvailableModel,
+      disabledReason,
+    }),
+    [
+      activeSessionId,
+      awaitingContinue,
+      canDeleteConversation,
+      clearConversation,
+      contextTokens,
+      continueConversation,
+      deleteConversation,
+      disabledReason,
+      editUserMessage,
+      hasAvailableModel,
+      highlightedSearchResultsByPage,
+      isContextCompressionRunning,
+      isDraftConversation,
+      lastError,
+      modelSelectGroups,
+      newConversation,
+      openDocumentLink,
+      reasoningLevelControl,
+      regenerateAssistantMessage,
+      retryLastFailedMessage,
+      runStatus,
+      selectedModelKey,
+      selectSession,
+      sendMessage,
+      sessions,
+      setReasoningLevel,
+      stop,
+      switchMessageBranch,
+      timeline,
+      tokenUsage,
+    ],
+  );
 };
