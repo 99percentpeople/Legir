@@ -19,9 +19,12 @@ import {
   selectEditorCanvasState,
 } from "@/store/selectors";
 import { useShallow } from "zustand/react/shallow";
-import { useEditorDocumentRuntime } from "@/app/editorRuntime";
 import {
-  useEditorPdfSearch,
+  useEditorDocumentIdentityRuntime,
+  useEditorFileDragRuntime,
+} from "@/app/editorRuntime";
+import {
+  useEditorPdfSearchWorkspace,
   useEditorShellCommands,
 } from "@/app/editorShellContext";
 
@@ -32,8 +35,9 @@ const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
 
 export const EditorCanvasPane: React.FC = () => {
   const isMobile = useIsMobile();
-  const { sessionRenderKey, workerService, isFileDragActive } =
-    useEditorDocumentRuntime();
+  const { sessionRenderKey, workerService } =
+    useEditorDocumentIdentityRuntime();
+  const { isFileDragActive } = useEditorFileDragRuntime();
   const {
     editAnnotation: onEditAnnotation,
     toggleFullscreen: onToggleFullscreen,
@@ -45,7 +49,7 @@ export const EditorCanvasPane: React.FC = () => {
     changeShapeStyle: onShapeStyleChange,
     changeStampStyle: onStampStyleChange,
   } = useEditorShellCommands();
-  const pdfSearch = useEditorPdfSearch();
+  const pdfSearch = useEditorPdfSearchWorkspace();
   const state = useEditorStore(useShallow(selectEditorCanvasState));
   const {
     addField,

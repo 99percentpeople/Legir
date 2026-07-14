@@ -6,12 +6,13 @@ import { pageTranslationService } from "@/services/pageTranslationService";
 import { useEditorStore } from "@/store/useEditorStore";
 import { useShallow } from "zustand/react/shallow";
 import { useLanguage } from "@/components/language-provider";
-import { useEditorDocumentRuntime } from "@/app/editorRuntime";
+import { useEditorDocumentIdentityRuntime } from "@/app/editorRuntime";
 
 import type { PageTranslateContextWindow, TranslateOptionId } from "../types";
 
 export const usePageTranslation = () => {
-  const { workerService, sessionRenderKey } = useEditorDocumentRuntime();
+  const { workerService, sessionRenderKey } =
+    useEditorDocumentIdentityRuntime();
   const { t } = useLanguage();
   const state = useEditorStore(
     useShallow((store) => ({

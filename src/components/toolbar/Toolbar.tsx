@@ -54,9 +54,9 @@ import { useEditorStore } from "@/store/useEditorStore";
 import { selectToolbarState } from "@/store/selectors";
 import { useShallow } from "zustand/react/shallow";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useEditorDocumentRuntime } from "@/app/editorRuntime";
+import { useEditorDocumentCommandsRuntime } from "@/app/editorRuntime";
 import {
-  useEditorPdfSearch,
+  useEditorPdfSearchToolbar,
   useEditorShellCommands,
 } from "@/app/editorShellContext";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -115,9 +115,9 @@ const Toolbar: React.FC = () => {
     saveAs: onSaveAs,
     print: onPrint,
     requestCloseCurrentTab: onClose,
-  } = useEditorDocumentRuntime();
+  } = useEditorDocumentCommandsRuntime();
   const { openPdfSearch: onOpenSearch, isPdfSearchOpen: isSearchOpen } =
-    useEditorPdfSearch();
+    useEditorPdfSearchToolbar();
   const onPageLayoutChange = (layout: EditorState["pageLayout"]) => {
     setState({ pageLayout: layout, fitTrigger: Date.now() });
   };

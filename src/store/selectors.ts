@@ -76,6 +76,12 @@ export const selectAiChatEditorState = (
   sourceDocumentPermissions: state.sourceDocumentPermissions,
 });
 
+export const selectPdfSearchControllerState = (state: EditorStore) => ({
+  pages: state.pages,
+  isSidebarOpen: state.isSidebarOpen,
+  setUiState: state.setUiState,
+});
+
 // Canvas rendering and zoom controls should only observe workspace-hot fields.
 // This keeps AI/session/sidebar churn from invalidating the PDF viewport.
 export const selectEditorCanvasState = (

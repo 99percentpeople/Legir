@@ -491,6 +491,15 @@ export function usePdfSearchController({
     pdfSearchResults,
   ]);
 
+  const togglePdfSearchCaseSensitive = React.useCallback(
+    () => setIsPdfSearchCaseSensitive((value) => !value),
+    [],
+  );
+  const togglePdfSearchMode = React.useCallback(
+    () => setPdfSearchMode((value) => (value === "regex" ? "plain" : "regex")),
+    [],
+  );
+
   return {
     isPdfSearchOpen,
     pdfSearchQuery,
@@ -501,11 +510,9 @@ export function usePdfSearchController({
     isPdfSearchLoading,
     pdfSearchFocusToken,
     isPdfSearchCaseSensitive,
-    togglePdfSearchCaseSensitive: () =>
-      setIsPdfSearchCaseSensitive((value) => !value),
+    togglePdfSearchCaseSensitive,
     pdfSearchMode,
-    togglePdfSearchMode: () =>
-      setPdfSearchMode((value) => (value === "regex" ? "plain" : "regex")),
+    togglePdfSearchMode,
     pdfSearchError,
     pdfSearchResultsByPage,
     workspaceTextHighlightsByPage,

@@ -1,5 +1,6 @@
 import React from "react";
 
+import { useEditorAiChatController } from "@/app/editorShellContext";
 import { AiChatPanel } from "@/components/properties-panel/AiChatPanel";
 import { PageTranslatePanel } from "@/components/properties-panel/PageTranslatePanel";
 import { PropertiesPanel } from "@/components/properties-panel/PropertiesPanel";
@@ -15,13 +16,37 @@ import { useEditorStore } from "@/store/useEditorStore";
 import type { Annotation, EditorUiState, FormField } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 
-interface EditorRightPanelProps {
-  aiChat: ReturnType<
-    typeof import("@/hooks/useAiChatController").useAiChatController
-  >;
+function EditorAiRightPanel({
+  isFloating,
+  isOpen,
+  onOpen,
+  width,
+  onResize,
+  onCollapse,
+}: {
+  isFloating: boolean;
+  isOpen: boolean;
+  onOpen: () => void;
+  width: number;
+  onResize: (width: number) => void;
+  onCollapse: () => void;
+}) {
+  const aiChat = useEditorAiChatController();
+
+  return (
+    <AiChatPanel
+      isFloating={isFloating}
+      isOpen={isOpen}
+      onOpen={onOpen}
+      width={width}
+      onResize={onResize}
+      onCollapse={onCollapse}
+      aiChat={aiChat}
+    />
+  );
 }
 
-export function EditorRightPanel({ aiChat }: EditorRightPanelProps) {
+export function EditorRightPanel() {
   const state = useEditorStore(useShallow(selectEditorRightPanelState));
   const { effectiveLanguage } = useLanguage();
   const {
@@ -120,14 +145,13 @@ export function EditorRightPanel({ aiChat }: EditorRightPanelProps) {
 
   if (state.rightPanelTab === "ai_chat") {
     return (
-      <AiChatPanel
+      <EditorAiRightPanel
         isFloating={state.isPanelFloating}
         isOpen={state.isRightPanelOpen}
         onOpen={openPanel}
         width={state.rightPanelWidth}
         onResize={(width) => state.setUiState({ rightPanelWidth: width })}
         onCollapse={() => state.setUiState({ isRightPanelOpen: false })}
-        aiChat={aiChat}
       />
     );
   }

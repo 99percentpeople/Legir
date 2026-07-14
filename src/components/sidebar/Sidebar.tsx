@@ -18,7 +18,7 @@ import { useEditorStore } from "@/store/useEditorStore";
 import { selectSidebarState } from "@/store/selectors";
 import { useShallow } from "zustand/react/shallow";
 import {
-  useEditorPdfSearch,
+  useEditorPdfSearchSidebar,
   useEditorShellCommands,
 } from "@/app/editorShellContext";
 import PDFSearchHeader from "./PDFSearchHeader";
@@ -49,7 +49,7 @@ const Sidebar: React.FC = () => {
     deleteAnnotationReply,
   } = state;
   const { openSidebar: onOpen } = useEditorShellCommands();
-  const search = useEditorPdfSearch();
+  const search = useEditorPdfSearchSidebar();
   const onClose = () => setUiState({ isSidebarOpen: false });
   const onResize = (nextWidth: number) =>
     setUiState({ sidebarWidth: nextWidth });

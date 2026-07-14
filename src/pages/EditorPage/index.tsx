@@ -2,15 +2,13 @@ import React from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import {
-  EditorPdfSearchProvider,
   EditorShellCommandsProvider,
   type EditorShellCommands,
 } from "@/app/editorShellContext";
 import {
-  useEditorDocumentRuntime,
-  useEditorTabsRuntime,
+  useEditorDocumentCommandsRuntime,
+  useEditorPageTabsRuntime,
 } from "@/app/editorRuntime";
-import { useLanguage } from "@/components/language-provider";
 import { RightPanelTabDock } from "@/components/properties-panel/RightPanelTabDock";
 import Sidebar from "@/components/sidebar/Sidebar";
 import Toolbar from "@/components/toolbar/Toolbar";
@@ -20,7 +18,6 @@ import {
 } from "@/components/workspace/lib/calculateWorkspaceFitScale";
 import { TranslationFloatingWindow } from "@/components/workspace/widgets/TranslationFloatingWindow";
 import { ANNOTATION_STYLES } from "@/constants";
-import { useAiChatController } from "@/hooks/useAiChatController";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
@@ -31,25 +28,19 @@ import {
   setPlatformFullscreen,
   subscribePlatformFullscreenChange,
 } from "@/services/platform";
-import {
-  selectAiChatEditorState,
-  selectEditorPageState,
-} from "@/store/selectors";
+import { selectEditorPageState } from "@/store/selectors";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { EditorState, EditorUiState, Tool } from "@/types";
 import { EditorCanvasPane } from "./EditorCanvasPane";
+import { EditorControllerProviders } from "./EditorControllerProviders";
 import { EditorRightPanel } from "./EditorRightPanel";
 import { EditorTabStrip } from "./components/EditorTabStrip";
-import { useEditorPageKeyboardShortcuts } from "./hooks/useEditorPageKeyboardShortcuts";
 import { useEditorPageLifecycle } from "./hooks/useEditorPageLifecycle";
-import { usePdfSearchController } from "./hooks/usePdfSearchController";
 
 const EditorPage: React.FC = () => {
   const state = useEditorStore(useShallow(selectEditorPageState));
-  const aiEditorState = useEditorStore(useShallow(selectAiChatEditorState));
-  const { tabs, activeTabId } = useEditorTabsRuntime();
-  const documentRuntime = useEditorDocumentRuntime();
-  const { t } = useLanguage();
+  const { activeTabId, hasDirtyTabs } = useEditorPageTabsRuntime();
+  const documentCommands = useEditorDocumentCommandsRuntime();
   const permissionUi = usePdfPermissionUi(state.documentPermissions);
   const isMobile = useIsMobile();
   const defaultTool: Tool = isMobile ? "pan" : "select";
@@ -65,12 +56,6 @@ const EditorPage: React.FC = () => {
     if (currentState.tool !== "select" || currentState.selectedId) return;
     currentState.setTool("pan");
   }, [isMobile]);
-
-  const aiChat = useAiChatController(
-    aiEditorState,
-    activeTabId ?? undefined,
-    documentRuntime.workerService ?? undefined,
-  );
 
   const openAiChatPanel = React.useCallback(() => {
     state.setUiState((prev) => {
@@ -114,9 +99,9 @@ const EditorPage: React.FC = () => {
   const handleExitEditorPage = React.useCallback(() => {
     void (async () => {
       await exitEditorFullscreen();
-      documentRuntime.exit();
+      documentCommands.exit();
     })();
-  }, [documentRuntime, exitEditorFullscreen]);
+  }, [documentCommands.exit, exitEditorFullscreen]);
 
   React.useEffect(() => {
     return () => {
@@ -134,22 +119,13 @@ const EditorPage: React.FC = () => {
 
   const runPrimarySaveAction = React.useCallback(async () => {
     if (!useEditorStore.getState().isDirty) return true;
-    return await documentRuntime.save();
-  }, [documentRuntime]);
+    return await documentCommands.save();
+  }, [documentCommands.save]);
 
   const { workspaceScrollContainerRef } = useEditorPageLifecycle({
     filename: state.filename,
     pagesLength: state.pages.length,
-    hasDirtyTabs: tabs.some((tab) => tab.isDirty),
-  });
-
-  const pdfSearch = usePdfSearchController({
-    pages: state.pages,
-    workerService: documentRuntime.workerService,
-    sidebarOpen: state.isSidebarOpen,
-    setUiState: state.setUiState,
-    highlightedSearchResultsByPage: aiChat.highlightedSearchResultsByPage,
-    t,
+    hasDirtyTabs,
   });
 
   const handleModeChange = React.useCallback(
@@ -162,25 +138,6 @@ const EditorPage: React.FC = () => {
     },
     [defaultTool, state.documentPermissions, state.setState, state.setTool],
   );
-
-  useEditorPageKeyboardShortcuts({
-    defaultTool,
-    isPdfSearchOpen: pdfSearch.isPdfSearchOpen,
-    openPdfSearch: pdfSearch.openPdfSearch,
-    closePdfSearch: pdfSearch.closePdfSearch,
-    runPrimarySaveAction,
-    onPrint: documentRuntime.print,
-    onToggleFullscreen: toggleFullscreen,
-  });
-
-  useAppEvent("sidebar:focusAnnotation", () => {
-    pdfSearch.dismissPdfSearch();
-    state.setUiState((prev) => ({
-      isSidebarOpen: true,
-      sidebarTab: "annotations",
-      ...(prev.isPanelFloating ? { isRightPanelOpen: false } : {}),
-    }));
-  });
 
   useAppEvent("workspace:openTranslate", ({ sourceText, autoTranslate }) => {
     const trimmed = typeof sourceText === "string" ? sourceText.trim() : "";
@@ -440,8 +397,14 @@ const EditorPage: React.FC = () => {
   );
 
   return (
-    <EditorShellCommandsProvider value={shellCommands}>
-      <EditorPdfSearchProvider value={pdfSearch}>
+    <EditorControllerProviders
+      aiScopeId={activeTabId ?? undefined}
+      defaultTool={defaultTool}
+      runPrimarySaveAction={runPrimarySaveAction}
+      onPrint={documentCommands.print}
+      onToggleFullscreen={toggleFullscreen}
+    >
+      <EditorShellCommandsProvider value={shellCommands}>
         <EditorTabStrip />
         <Toolbar />
 
@@ -486,7 +449,7 @@ const EditorPage: React.FC = () => {
             }}
           />
 
-          <EditorRightPanel aiChat={aiChat} />
+          <EditorRightPanel />
 
           <TranslationFloatingWindow
             isOpen={isTranslateOpen}
@@ -495,8 +458,8 @@ const EditorPage: React.FC = () => {
             onClose={() => setIsTranslateOpen(false)}
           />
         </div>
-      </EditorPdfSearchProvider>
-    </EditorShellCommandsProvider>
+      </EditorShellCommandsProvider>
+    </EditorControllerProviders>
   );
 };
 
