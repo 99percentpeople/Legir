@@ -311,19 +311,27 @@ const Workspace: React.FC<WorkspaceProps> = ({
     });
 
   // Only allow selection when tool is "select"
-  const isSelectable = editorState.tool === "select" && !isPanModeActive;
-  const canModifyAnnotations = canPerformPdfPermissionOperation(
-    "edit_annotation",
-    editorState.documentPermissions,
-  );
-  const canModifyFormStructure = canPerformPdfPermissionOperation(
-    "edit_form_structure",
-    editorState.documentPermissions,
-  );
-  const canFillFormValue = canPerformPdfPermissionOperation(
-    "fill_form_value",
-    editorState.documentPermissions,
-  );
+  const isDocumentReady = editorState.documentLoadState === "ready";
+  const isSelectable =
+    isDocumentReady && editorState.tool === "select" && !isPanModeActive;
+  const canModifyAnnotations =
+    isDocumentReady &&
+    canPerformPdfPermissionOperation(
+      "edit_annotation",
+      editorState.documentPermissions,
+    );
+  const canModifyFormStructure =
+    isDocumentReady &&
+    canPerformPdfPermissionOperation(
+      "edit_form_structure",
+      editorState.documentPermissions,
+    );
+  const canFillFormValue =
+    isDocumentReady &&
+    canPerformPdfPermissionOperation(
+      "fill_form_value",
+      editorState.documentPermissions,
+    );
 
   const paragraphCandidatesByPage = useMemo(() => {
     const map = new Map<number, PageTranslateParagraphCandidate[]>();
@@ -2236,6 +2244,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (pinchGestureActiveRef.current) return;
     if (e.button !== 0) return;
     if (isPanModeActive) return;
+    if (!isDocumentReady && editorState.tool !== "select_text") return;
 
     const isTextLayerHit = (() => {
       const target = e.target as HTMLElement | null;
@@ -2446,6 +2455,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   ) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isDocumentReady) return;
 
     const draft = shapeDraftSessionRef.current;
     const isShapeDraftTool =
@@ -3207,6 +3217,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             EMPTY_PDF_SEARCH_RESULTS
           }
           activeSearchResultId={activePdfSearchResultId}
+          sessionRenderKey={sessionRenderKey}
         />
 
         {editorState.pageTranslateOptions.useParagraphs &&

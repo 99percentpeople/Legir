@@ -23,12 +23,14 @@ import {
 } from "../debug/pdfPageRenderTelemetry";
 import { useDeferredRenderScale } from "../hooks/useDeferredRenderScale";
 import PDFTileLayer from "./PDFTileLayer";
+import { appEventBus } from "@/lib/eventBus";
 
 interface PDFCanvasLayerProps {
   workerService: PDFWorkerService | null;
   page: PageData;
   scale: number;
   isInView: boolean;
+  sessionRenderKey?: string | null;
 }
 
 const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
@@ -36,6 +38,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   page,
   scale,
   isInView,
+  sessionRenderKey,
 }) => {
   const pageIndex = page.pageIndex;
   // Double buffering: Two canvases to prevent flickering during resize/re-render
@@ -367,6 +370,12 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
             scale: renderScale,
             completedAt: performance.now(),
           });
+          if (sessionRenderKey) {
+            appEventBus.emit("pdf:firstPageRendered", {
+              sessionRenderKey,
+              pageIndex,
+            });
+          }
           const targetCanvas =
             targetId === "A" ? canvasARef.current : canvasBRef.current;
           if (targetCanvas) {
@@ -408,6 +417,12 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         scale: renderScale,
         completedAt: performance.now(),
       });
+      if (sessionRenderKey) {
+        appEventBus.emit("pdf:firstPageRendered", {
+          sessionRenderKey,
+          pageIndex,
+        });
+      }
       return;
     }
 
@@ -425,6 +440,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     renderScale,
     tileState.hasAllTilesRendered,
     tileState.tileMode,
+    sessionRenderKey,
   ]);
 
   useEffect(() => {

@@ -74,6 +74,7 @@ export const EditorCanvasPane: React.FC = () => {
     () => ({
       annotations: state.annotations,
       commentStyle: state.commentStyle,
+      documentLoadState: state.documentLoadState,
       documentPermissions: state.documentPermissions,
       fields: state.fields,
       freetextStyle: state.freetextStyle,
@@ -99,6 +100,7 @@ export const EditorCanvasPane: React.FC = () => {
     [
       state.annotations,
       state.commentStyle,
+      state.documentLoadState,
       state.documentPermissions,
       state.fields,
       state.freetextStyle,

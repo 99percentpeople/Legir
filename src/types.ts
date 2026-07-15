@@ -490,6 +490,8 @@ export type PageTranslateParagraphCandidate = {
   isExcluded: boolean;
 };
 
+export type PdfDocumentLoadState = "hydrating" | "ready" | "error";
+
 export interface EditorState {
   // Document State
   pdfFile: File | null;
@@ -511,6 +513,8 @@ export interface EditorState {
   annotations: Annotation[];
   preservedSourceAnnotations: PreservedSourceAnnotationRef[];
   outline: PDFOutlineItem[];
+  documentLoadState: PdfDocumentLoadState;
+  documentLoadError: string | null;
 
   mode: EditorMode;
   tool: Tool;
@@ -646,6 +650,7 @@ export type WorkspaceEditorState = Pick<
   EditorState,
   | "annotations"
   | "commentStyle"
+  | "documentLoadState"
   | "documentPermissions"
   | "fields"
   | "freetextStyle"

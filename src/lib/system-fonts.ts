@@ -1,35 +1,29 @@
 import {
-  getPlatformSystemFontAliasToFamilyCompact,
-  getPlatformSystemFontFamilies,
+  getPlatformSystemFontCatalog,
+  type PlatformSystemFontCatalog,
 } from "@/services/platform";
 
-let cachedFamiliesPromise: Promise<string[]> | null = null;
-let cachedAliasMapPromise: Promise<Record<string, string>> | null = null;
+let cachedCatalogPromise: Promise<PlatformSystemFontCatalog> | null = null;
 
-export const getSystemFontFamilies = async (): Promise<string[]> => {
-  if (!cachedFamiliesPromise) {
-    cachedFamiliesPromise = getPlatformSystemFontFamilies();
+export const getSystemFontCatalog = async () => {
+  if (!cachedCatalogPromise) {
+    cachedCatalogPromise = getPlatformSystemFontCatalog();
   }
 
   try {
-    return await cachedFamiliesPromise;
+    return await cachedCatalogPromise;
   } catch {
-    cachedFamiliesPromise = null;
-    return [];
+    cachedCatalogPromise = null;
+    return { families: [], aliases: {} };
   }
+};
+
+export const getSystemFontFamilies = async (): Promise<string[]> => {
+  return (await getSystemFontCatalog()).families;
 };
 
 export const getSystemFontAliasToFamilyCompact = async (): Promise<
   Record<string, string>
 > => {
-  if (!cachedAliasMapPromise) {
-    cachedAliasMapPromise = getPlatformSystemFontAliasToFamilyCompact();
-  }
-
-  try {
-    return await cachedAliasMapPromise;
-  } catch {
-    cachedAliasMapPromise = null;
-    return {};
-  }
+  return (await getSystemFontCatalog()).aliases;
 };

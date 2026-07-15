@@ -9,6 +9,7 @@ import {
   hasPendingPwaLaunchFiles,
   listenForPwaLaunchFiles,
   listenForPwaLaunchProcessing,
+  readPwaLaunchFile,
 } from "@/services/platform";
 
 type OpenWebHandleFileOptions = {
@@ -54,7 +55,7 @@ export const usePwaLaunchBootstrap = ({
     let unlistenProcessing: null | (() => void) = null;
 
     const openPwaLaunchedHandle = async (handle: FileSystemFileHandle) => {
-      const file = await handle.getFile();
+      const { file, bytes } = await readPwaLaunchFile(handle);
       if (
         file.type !== "application/pdf" &&
         !file.name.trim().toLowerCase().endsWith(".pdf")
@@ -63,7 +64,6 @@ export const usePwaLaunchBootstrap = ({
         return;
       }
 
-      const bytes = new Uint8Array(await file.arrayBuffer());
       await openWebHandleFileRef.current({
         handle,
         filename: file.name,

@@ -753,6 +753,8 @@ const zhCN = {
       description: "请重试。如果问题仍然存在，请刷新页面。",
       reload: "刷新页面",
     },
+    loading_pdf: "正在读取 PDF...",
+    rendering_pdf: "正在渲染 PDF...",
     parsing: "正在解析 PDF...",
     generating: "正在生成 PDF...",
     load_error: "加载 PDF 失败。",

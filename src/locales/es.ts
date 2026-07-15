@@ -788,6 +788,8 @@ const es = {
         "Inténtalo de nuevo. Si el problema continúa, actualiza la página.",
       reload: "Actualizar página",
     },
+    loading_pdf: "Leyendo PDF...",
+    rendering_pdf: "Renderizando PDF...",
     parsing: "Analizando PDF...",
     generating: "Generando PDF...",
     load_error: "Error al cargar PDF.",

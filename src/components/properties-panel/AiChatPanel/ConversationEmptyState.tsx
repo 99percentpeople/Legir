@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PromptButton } from "./MessagePrimitives";
 
 interface ConversationEmptyStateProps {
-  disabledReason: "no_document" | "no_model" | null;
+  disabledReason: "loading_document" | "no_document" | "no_model" | null;
   onSelectPrompt: (prompt: string) => void;
 }
 
@@ -27,11 +27,13 @@ export function ConversationEmptyState({
           {t("ai_chat.empty_title")}
         </div>
         <div className="text-muted-foreground mb-6 text-sm">
-          {disabledReason === "no_document"
-            ? t("ai_chat.empty_no_document")
-            : disabledReason === "no_model"
-              ? t("ai_chat.empty_no_model")
-              : t("ai_chat.empty_desc")}
+          {disabledReason === "loading_document"
+            ? t("app.parsing")
+            : disabledReason === "no_document"
+              ? t("ai_chat.empty_no_document")
+              : disabledReason === "no_model"
+                ? t("ai_chat.empty_no_model")
+                : t("ai_chat.empty_desc")}
         </div>
         {!disabledReason ? (
           <div className="flex flex-col items-start gap-2">

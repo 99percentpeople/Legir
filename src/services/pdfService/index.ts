@@ -1,9 +1,6 @@
 import { pdfWorkerService, type PDFWorkerService } from "./pdfWorkerService";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
-import {
-  getSystemFontFamilies,
-  getSystemFontAliasToFamilyCompact,
-} from "@/lib/system-fonts";
+import { getSystemFontCatalog } from "@/lib/system-fonts";
 import {
   loadAndEmbedExportFonts,
   loadAndEmbedSelectedSystemFonts,
@@ -1576,13 +1573,7 @@ const buildPdfLibAnnotsByPageIndex = async (
   return out;
 };
 
-export const loadPDF = async (
-  input: File | Uint8Array,
-  options?: {
-    password?: string | null;
-    workerService?: PDFWorkerService;
-  },
-): Promise<{
+export type LoadedPdfDocument = {
   pdfBytes: Uint8Array;
   pages: PageData[];
   fields: FormField[];
@@ -1593,13 +1584,61 @@ export const loadPDF = async (
   outline: PDFOutlineItem[];
   openPassword?: string;
   dispose: () => void;
-}> => {
+};
+
+export type ReadablePdfDocument = Omit<
+  LoadedPdfDocument,
+  | "fields"
+  | "annotations"
+  | "preservedSourceAnnotations"
+  | "documentPermissions"
+  | "outline"
+> & {
+  fields: [];
+  annotations: [];
+  preservedSourceAnnotations: [];
+  documentPermissions: null;
+  outline: [];
+};
+
+type LoadPDFInternalOptions = {
+  password?: string | null;
+  workerService?: PDFWorkerService;
+  signal?: AbortSignal;
+  onReadable?: (document: ReadablePdfDocument) => void;
+  waitForHydrationStart?: () => Promise<void>;
+};
+
+const throwIfPdfLoadAborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) {
+    throw new DOMException("PDF loading aborted", "AbortError");
+  }
+};
+
+const yieldPdfHydrationWork = async () => {
+  const scheduler = (
+    globalThis as typeof globalThis & {
+      scheduler?: { yield?: () => Promise<void> };
+    }
+  ).scheduler;
+  if (typeof scheduler?.yield === "function") {
+    await scheduler.yield();
+    return;
+  }
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+};
+
+const loadPDFInternal = async (
+  input: File | Uint8Array,
+  options?: LoadPDFInternalOptions,
+): Promise<LoadedPdfDocument> => {
+  throwIfPdfLoadAborted(options?.signal);
   let pdfBytes: Uint8Array;
   if (input instanceof File) {
     const arrayBuffer = await input.arrayBuffer();
     pdfBytes = new Uint8Array(arrayBuffer);
   } else {
-    pdfBytes = new Uint8Array(input);
+    pdfBytes = input;
   }
 
   let fontMap = new Map<string, string>();
@@ -1624,6 +1663,7 @@ export const loadPDF = async (
       try {
         return await workerService.loadDocument(renderBuffer, {
           password,
+          signal: options?.signal,
           onProgress: (payload) => {
             const total =
               typeof payload.total === "number" && payload.total > 0
@@ -1651,22 +1691,7 @@ export const loadPDF = async (
     ]);
     pdfDoc = loaded.pdfDoc;
     openPassword = loaded.openPassword;
-
-    try {
-      const families = await getSystemFontFamilies();
-      if (families.length > 0) systemFontFamilies = families;
-    } catch {
-      systemFontFamilies = undefined;
-    }
-
-    try {
-      const aliases = await getSystemFontAliasToFamilyCompact();
-      if (aliases && Object.keys(aliases).length > 0) {
-        systemFontAliasToFamilyCompact = aliases;
-      }
-    } catch {
-      systemFontAliasToFamilyCompact = undefined;
-    }
+    throwIfPdfLoadAborted(options?.signal);
 
     try {
       fontMap = getFontMap(pdfDoc);
@@ -1687,36 +1712,28 @@ export const loadPDF = async (
 
     const pdfLibPages = pdfDoc.getPages();
     const numPages = pdfLibPages.length;
-    const pages: PageData[] = [];
+    const pages: PageData[] = pdfLibPages.map((pdfLibPage, idx) => {
+      const viewport = createPdfLibViewport(pdfLibPage, { scale: 1.0 });
+      const userUnit = viewport.userUnit ?? 1;
+      return {
+        pageIndex: idx,
+        width: viewport.width,
+        height: viewport.height,
+        viewBox:
+          viewport.viewBox ??
+          ([0, 0, viewport.width / userUnit, viewport.height / userUnit] as [
+            number,
+            number,
+            number,
+            number,
+          ]),
+        userUnit,
+        rotation: viewport.rotation,
+      };
+    });
     const fields: FormField[] = [];
     const annotations: Annotation[] = [];
     const preservedSourceAnnotations: PreservedSourceAnnotationRef[] = [];
-
-    let pdfLibAnnotsByPageIndex: Map<number, PdfJsAnnotation[]> | undefined =
-      undefined;
-    try {
-      const resolveDestWithWorker = async (
-        normalizedDest: unknown,
-      ): Promise<number | null> => {
-        if (!workerReady) return null;
-        try {
-          return await workerService.resolveDest({ dest: normalizedDest });
-        } catch {
-          return null;
-        }
-      };
-      const resolveDestPageIndex = async (
-        normalizedDest: unknown,
-      ): Promise<number | null> => {
-        return await resolveDestWithWorker(normalizedDest);
-      };
-
-      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, {
-        resolveDest: resolveDestPageIndex,
-      });
-    } catch (e) {
-      console.warn("Failed to extract annotations with pdf-lib", e);
-    }
 
     const embeddedFontCache = new Map<string, Promise<string | undefined>>();
     const embeddedFontFaces = new Set<FontFace>();
@@ -1782,11 +1799,65 @@ export const loadPDF = async (
       return {};
     })();
 
+    const metadataBase = await metadataPromise;
+    options?.onReadable?.({
+      pdfBytes,
+      pages,
+      fields: [],
+      annotations: [],
+      preservedSourceAnnotations: [],
+      metadata: metadataBase,
+      documentPermissions: null,
+      outline: [],
+      openPassword,
+      dispose,
+    });
+
+    if (options?.waitForHydrationStart) {
+      await options.waitForHydrationStart();
+    }
+    throwIfPdfLoadAborted(options?.signal);
+
+    try {
+      const { families, aliases } = await getSystemFontCatalog();
+      if (families.length > 0) systemFontFamilies = families;
+      if (Object.keys(aliases).length > 0) {
+        systemFontAliasToFamilyCompact = aliases;
+      }
+    } catch (error) {
+      console.warn("Failed to load the system font catalog", error);
+    }
+
+    let pdfLibAnnotsByPageIndex: Map<number, PdfJsAnnotation[]> | undefined =
+      undefined;
+    try {
+      const resolveDestWithWorker = async (
+        normalizedDest: unknown,
+      ): Promise<number | null> => {
+        if (!workerReady) return null;
+        try {
+          return await workerService.resolveDest({
+            dest: normalizedDest,
+            signal: options?.signal,
+          });
+        } catch {
+          return null;
+        }
+      };
+
+      pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, {
+        resolveDest: resolveDestWithWorker,
+      });
+    } catch (e) {
+      console.warn("Failed to extract annotations with pdf-lib", e);
+    }
+    throwIfPdfLoadAborted(options?.signal);
+
     const permissionsPromise = (async (): Promise<PDFDocumentPermissions> => {
       if (workerReady) {
         try {
           return (
-            (await workerService.getPermissions()) ??
+            (await workerService.getPermissions({ signal: options?.signal })) ??
             UNRESTRICTED_PDF_PERMISSIONS
           );
         } catch (e) {
@@ -1799,7 +1870,9 @@ export const loadPDF = async (
     const outlinePromise = (async (): Promise<PDFOutlineItem[]> => {
       if (workerReady) {
         try {
-          const outline = await workerService.getOutline();
+          const outline = await workerService.getOutline({
+            signal: options?.signal,
+          });
           if (outline) return outline;
         } catch (e) {
           console.warn("Failed to extract outline via worker", e);
@@ -1815,7 +1888,7 @@ export const loadPDF = async (
       preservedSourceAnnotations: PreservedSourceAnnotationRef[];
     }[] = new Array(numPages);
 
-    const maxConcurrency = Math.min(4, numPages);
+    const maxConcurrency = Math.min(options?.onReadable ? 2 : 4, numPages);
     let nextPageIndex = 0;
 
     const worker = async () => {
@@ -1824,6 +1897,10 @@ export const loadPDF = async (
         nextPageIndex += 1;
         if (idx >= numPages) return;
 
+        if (idx >= maxConcurrency) {
+          await yieldPdfHydrationWork();
+        }
+        throwIfPdfLoadAborted(options?.signal);
         const pdfLibPage = pdfLibPages[idx];
         if (!pdfLibPage) continue;
         const pageNumber = idx + 1;
@@ -1831,17 +1908,6 @@ export const loadPDF = async (
         const viewport: ViewportLike = createPdfLibViewport(pdfLibPage, {
           scale: 1.0,
         });
-        const pageWidth = viewport.width;
-        const pageHeight = viewport.height;
-        const userUnit = viewport.userUnit ?? 1;
-        const viewBox =
-          viewport.viewBox ??
-          ([0, 0, pageWidth / userUnit, pageHeight / userUnit] as [
-            number,
-            number,
-            number,
-            number,
-          ]);
         const pageAnnotations = pdfLibAnnotsByPageIndex?.get(idx) || [];
         const preservedSourceAnnotationsForPage: PreservedSourceAnnotationRef[] =
           [];
@@ -1894,14 +1960,7 @@ export const loadPDF = async (
         }
 
         pageResults[idx] = {
-          page: {
-            pageIndex: idx,
-            width: pageWidth,
-            height: pageHeight,
-            viewBox,
-            userUnit,
-            rotation: viewport.rotation,
-          },
+          page: pages[idx]!,
           fields: fieldsForPage,
           annotations: annotsForPage,
           preservedSourceAnnotations: preservedSourceAnnotationsForPage,
@@ -1914,7 +1973,6 @@ export const loadPDF = async (
     for (let i = 0; i < pageResults.length; i++) {
       const r = pageResults[i];
       if (!r) continue;
-      pages.push(r.page);
       fields.push(...r.fields);
       annotations.push(...r.annotations);
       preservedSourceAnnotations.push(...r.preservedSourceAnnotations);
@@ -1936,11 +1994,11 @@ export const loadPDF = async (
       };
     });
 
-    const [metadataBase, outline, documentPermissions] = await Promise.all([
-      metadataPromise,
+    const [outline, documentPermissions] = await Promise.all([
       outlinePromise,
       permissionsPromise,
     ]);
+    throwIfPdfLoadAborted(options?.signal);
     const metadata = {
       ...metadataBase,
       documentPermissions,
@@ -1963,6 +2021,94 @@ export const loadPDF = async (
   } finally {
     loadSession.finish(loadOk);
   }
+};
+
+export const loadPDF = async (
+  input: File | Uint8Array,
+  options?: Pick<LoadPDFInternalOptions, "password" | "workerService">,
+) => loadPDFInternal(input, options);
+
+export type PdfOpenSession = {
+  readable: Promise<ReadablePdfDocument>;
+  hydrate: () => Promise<LoadedPdfDocument>;
+  retryHydration: () => Promise<LoadedPdfDocument>;
+  abort: () => void;
+  dispose: () => void;
+};
+
+export const startPdfOpenSession = (
+  input: File | Uint8Array,
+  options?: Pick<LoadPDFInternalOptions, "password" | "workerService">,
+): PdfOpenSession => {
+  let hydrationReleased = false;
+  let releaseHydration: (() => void) | null = null;
+  let readableResolved = false;
+  let readableDispose: (() => void) | null = null;
+  let currentAbortController = new AbortController();
+  let currentRun: Promise<LoadedPdfDocument>;
+
+  let resolveReadable!: (document: ReadablePdfDocument) => void;
+  let rejectReadable!: (error: unknown) => void;
+  const readable = new Promise<ReadablePdfDocument>((resolve, reject) => {
+    resolveReadable = resolve;
+    rejectReadable = reject;
+  });
+
+  const hydrationGate = new Promise<void>((resolve) => {
+    releaseHydration = resolve;
+  });
+
+  const run = (waitForHydrationStart?: () => Promise<void>) => {
+    const abortController = currentAbortController;
+    return loadPDFInternal(input, {
+      ...options,
+      signal: abortController.signal,
+      waitForHydrationStart,
+      onReadable: (document) => {
+        readableDispose = document.dispose;
+        if (!readableResolved) {
+          readableResolved = true;
+          resolveReadable(document);
+        }
+      },
+    }).then((document) => {
+      readableDispose = document.dispose;
+      return document;
+    });
+  };
+
+  currentRun = run(() => hydrationGate);
+  void currentRun.catch((error) => {
+    if (!readableResolved) rejectReadable(error);
+  });
+
+  const hydrate = () => {
+    if (!hydrationReleased) {
+      hydrationReleased = true;
+      releaseHydration?.();
+      releaseHydration = null;
+    }
+    return currentRun;
+  };
+
+  return {
+    readable,
+    hydrate,
+    retryHydration: () => {
+      currentAbortController.abort();
+      readableDispose?.();
+      currentAbortController = new AbortController();
+      hydrationReleased = true;
+      currentRun = run();
+      return currentRun;
+    },
+    abort: () => currentAbortController.abort(),
+    dispose: () => {
+      currentAbortController.abort();
+      readableDispose?.();
+      readableDispose = null;
+    },
+  };
 };
 
 export const exportPDF = async (

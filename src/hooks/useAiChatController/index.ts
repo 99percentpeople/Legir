@@ -1518,6 +1518,9 @@ export const useAiChatController = (
 
   const sendMessage = useCallback(
     async (input: AiChatUserMessageInput) => {
+      if (editorStateRef.current.documentLoadState !== "ready") {
+        return;
+      }
       const prepared = prepareAiChatUserInput(input);
       if (!prepared || runStatus === "running" || runStatus === "cancelling") {
         return;
@@ -2235,12 +2238,14 @@ export const useAiChatController = (
   }, [highlightedResultIds]);
 
   const hasAvailableModel = flatModels.some((item) => item.isAvailable);
-  const disabledReason: "no_document" | "no_model" | null = !editorState.pages
-    .length
-    ? "no_document"
-    : !hasAvailableModel
-      ? "no_model"
-      : null;
+  const disabledReason: "loading_document" | "no_document" | "no_model" | null =
+    editorState.documentLoadState !== "ready"
+      ? "loading_document"
+      : !editorState.pages.length
+        ? "no_document"
+        : !hasAvailableModel
+          ? "no_model"
+          : null;
   const isContextCompressionRunning = useMemo(() => {
     return (
       !isDraftConversation &&

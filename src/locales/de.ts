@@ -791,6 +791,8 @@ const de = {
         "Versuche es erneut. Wenn das Problem weiterhin besteht, lade die Seite neu.",
       reload: "Seite neu laden",
     },
+    loading_pdf: "PDF wird gelesen...",
+    rendering_pdf: "PDF wird gerendert...",
     parsing: "PDF wird analysiert...",
     generating: "PDF wird generiert...",
     load_error: "Laden des PDF fehlgeschlagen.",

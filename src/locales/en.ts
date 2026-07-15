@@ -777,6 +777,8 @@ const en = {
       description: "Try again. If the problem continues, refresh the page.",
       reload: "Refresh page",
     },
+    loading_pdf: "Reading PDF...",
+    rendering_pdf: "Rendering PDF...",
     parsing: "Parsing PDF...",
     generating: "Generating PDF...",
     load_error: "Failed to load PDF.",

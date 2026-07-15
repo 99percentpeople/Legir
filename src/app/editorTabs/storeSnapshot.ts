@@ -11,6 +11,7 @@ import type {
   PDFMetadata,
   PreservedSourceAnnotationRef,
 } from "@/types";
+import type { LoadedPdfDocument } from "@/services/pdfService";
 import type { EditorTabSnapshot } from "./types";
 
 const WINDOW_ID_FALLBACK = "tab";
@@ -98,6 +99,8 @@ export const createEditorTabSnapshotFromState = (options: {
       state.preservedSourceAnnotations,
     ),
     outline: createShallowArrayCopy(state.outline),
+    documentLoadState: state.documentLoadState,
+    documentLoadError: state.documentLoadError,
     mode: state.mode,
     tool: state.tool,
     penStyle: { ...state.penStyle },
@@ -161,6 +164,8 @@ export const createLoadedEditorTabSnapshot = (options: {
   annotations: Annotation[];
   preservedSourceAnnotations: PreservedSourceAnnotationRef[];
   outline: EditorState["outline"];
+  documentLoadState?: EditorState["documentLoadState"];
+  documentLoadError?: EditorState["documentLoadError"];
   currentPageIndex?: number;
   pendingViewStateRestore?: EditorState["pendingViewStateRestore"];
 }): EditorTabSnapshot => {
@@ -206,10 +211,42 @@ export const createLoadedEditorTabSnapshot = (options: {
       options.preservedSourceAnnotations,
     ),
     outline: createShallowArrayCopy(options.outline),
+    documentLoadState: options.documentLoadState ?? "ready",
+    documentLoadError: options.documentLoadError ?? null,
     currentPageIndex: options.currentPageIndex ?? 0,
     pendingViewStateRestore: options.pendingViewStateRestore
       ? { ...options.pendingViewStateRestore }
       : null,
+  };
+};
+
+export const applyHydratedPdfDocumentToSnapshot = (
+  snapshot: EditorTabSnapshot,
+  document: LoadedPdfDocument,
+): EditorTabSnapshot => {
+  const normalized = normalizeControlLayerOrders(
+    document.fields,
+    prepareAnnotationsForStore(document.annotations),
+  );
+
+  return {
+    ...snapshot,
+    metadata: {
+      ...document.metadata,
+      documentPermissions: { ...document.documentPermissions },
+    },
+    documentPermissions: { ...document.documentPermissions },
+    sourceDocumentPermissions: { ...document.documentPermissions },
+    preservePdfOwnerRestrictionsOnSave:
+      document.documentPermissions.hasOwnerRestrictions,
+    fields: normalized.fields,
+    annotations: normalized.annotations,
+    preservedSourceAnnotations: createShallowArrayCopy(
+      document.preservedSourceAnnotations,
+    ),
+    outline: createShallowArrayCopy(document.outline),
+    documentLoadState: "ready",
+    documentLoadError: null,
   };
 };
 
@@ -227,6 +264,8 @@ export const restoreEditorTabSnapshot = (
   store.setState({
     ...snapshot,
     documentPermissions: snapshot.documentPermissions ?? null,
+    documentLoadState: snapshot.documentLoadState ?? "ready",
+    documentLoadError: snapshot.documentLoadError ?? null,
     sourceDocumentPermissions:
       snapshot.sourceDocumentPermissions ??
       snapshot.documentPermissions ??
@@ -257,7 +296,10 @@ export const restoreEditorTabSnapshot = (
     processingStatus: null,
   });
 
-  if (Object.keys(thumbnailImages).length < snapshot.pages.length) {
+  if (
+    snapshot.documentLoadState === "ready" &&
+    Object.keys(thumbnailImages).length < snapshot.pages.length
+  ) {
     store.warmupThumbnails(options?.workerService);
   }
 };

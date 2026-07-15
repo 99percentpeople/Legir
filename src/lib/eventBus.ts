@@ -128,6 +128,10 @@ export type AppEventMap = {
     id: string;
     ok: boolean;
   };
+  "pdf:firstPageRendered": {
+    sessionRenderKey: string;
+    pageIndex: number;
+  };
   "pdf:passwordRequired": {
     id: string;
     reason: "need_password" | "incorrect_password";

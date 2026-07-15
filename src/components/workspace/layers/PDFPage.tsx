@@ -20,6 +20,7 @@ interface PDFPageProps {
   highlightOpacity?: number;
   searchResults?: PDFSearchResult[];
   activeSearchResultId?: string | null;
+  sessionRenderKey?: string | null;
 }
 
 const PDFPage: React.FC<PDFPageProps> = ({
@@ -33,6 +34,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
   highlightOpacity,
   searchResults = [],
   activeSearchResultId = null,
+  sessionRenderKey,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
@@ -96,6 +98,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
         page={page}
         scale={scale}
         isInView={isInView}
+        sessionRenderKey={sessionRenderKey}
       />
 
       {!disablePdfTextLayer && (

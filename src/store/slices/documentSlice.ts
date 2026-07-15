@@ -11,7 +11,6 @@ import {
   mergePdfPermissionDirtyScopes,
   UNRESTRICTED_PDF_PERMISSIONS,
 } from "@/lib/pdfPermissions";
-import { verifyPdfOwnerPassword } from "@/services/pdfService/lib/owner-password";
 import { cancelThumbnailWarmup } from "@/store/slices/runtimeSlice";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 import type { PDFMetadata } from "@/types";
@@ -149,6 +148,8 @@ export const createDocumentSlice: EditorStoreSlice<
       };
     }
 
+    const { verifyPdfOwnerPassword } =
+      await import("@/services/pdfService/lib/owner-password");
     const result = await verifyPdfOwnerPassword(store.pdfBytes, password);
     if (!result.ok) {
       return {
@@ -228,6 +229,8 @@ export const createDocumentSlice: EditorStoreSlice<
       annotations: initialState.annotations,
       preservedSourceAnnotations: initialState.preservedSourceAnnotations,
       outline: initialState.outline,
+      documentLoadState: initialState.documentLoadState,
+      documentLoadError: initialState.documentLoadError,
       selectedId: initialState.selectedId,
       scale: initialState.scale,
       mode: initialState.mode,

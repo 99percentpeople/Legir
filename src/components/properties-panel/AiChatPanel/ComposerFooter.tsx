@@ -36,7 +36,7 @@ interface ComposerFooterProps {
   canSend: boolean;
   actionIsStop: boolean;
   runStatus: "idle" | "running" | "cancelling" | "error";
-  disabledReason: "no_document" | "no_model" | null;
+  disabledReason: "loading_document" | "no_document" | "no_model" | null;
   inlineEditActive: boolean;
   formatTokenCount: (value: number) => string;
   contextTokens: number;

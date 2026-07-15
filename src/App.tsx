@@ -9,9 +9,6 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 
-import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
-import SettingsDialog from "./components/dialogs/SettingsDialog";
-import PdfPasswordDialog from "./components/dialogs/PdfPasswordDialog";
 import AppRoutes from "./AppRoutes";
 import {
   createIndexedDbRecentFilesStore,
@@ -31,7 +28,7 @@ import { EditorRuntimeProvider } from "./app/editorRuntime";
 import type { HomePageAdapter } from "./pages/HomePage";
 import { useEditorStore } from "./store/useEditorStore";
 import { selectAppShellState } from "@/store/selectors";
-import { loadPDF, exportPDF } from "./services/pdfService";
+import type { LoadedPdfDocument, PdfOpenSession } from "./services/pdfService";
 import { createPdfWorkerService } from "./services/pdfService/pdfWorkerService";
 import { recentFilesService } from "./services/recentFilesService";
 import {
@@ -42,12 +39,12 @@ import {
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { usePlatformFileDrop } from "@/hooks/usePlatformFileDrop";
 import { useGlobalProcessingToast } from "./hooks/useGlobalProcessingToast";
-import { EditorCloseConfirmDialog } from "./pages/EditorPage/EditorCloseConfirmDialog";
 import {
   cloneEditorTabThumbnailImages,
   disposeEditorTabSessionResources,
 } from "@/app/editorTabs/sessionResources";
 import {
+  applyHydratedPdfDocumentToSnapshot,
   createEditorTabId,
   createEditorTabSnapshotFromState,
   createLoadedEditorTabSnapshot,
@@ -55,6 +52,11 @@ import {
   getEditorTabSourceKey,
   restoreEditorTabSnapshot,
 } from "@/app/editorTabs/storeSnapshot";
+import { appEventBus } from "@/lib/eventBus";
+import {
+  markAppPerformance,
+  measureAppPerformance,
+} from "@/lib/appPerformance";
 import { restoreEditorTabSessionTransfer } from "@/app/editorTabs/transfer";
 import {
   consumeEditorTabSessionTransfer,
@@ -96,6 +98,21 @@ import {
   type SaveTarget,
 } from "@/services/platform";
 
+const KeyboardShortcutsHelp = React.lazy(
+  () => import("./components/KeyboardShortcutsHelp"),
+);
+const SettingsDialog = React.lazy(
+  () => import("./components/dialogs/SettingsDialog"),
+);
+const PdfPasswordDialog = React.lazy(
+  () => import("./components/dialogs/PdfPasswordDialog"),
+);
+const EditorCloseConfirmDialog = React.lazy(() =>
+  import("./pages/EditorPage/EditorCloseConfirmDialog").then((module) => ({
+    default: module.EditorCloseConfirmDialog,
+  })),
+);
+
 type ExtractedTransferTab = {
   session: EditorTabSession;
   isLastTab: boolean;
@@ -103,7 +120,32 @@ type ExtractedTransferTab = {
   wasActive: boolean;
 };
 
+type PdfLoadToastState = {
+  token: string;
+  message: string;
+};
+
 const TAB_TRANSFER_ACK_TIMEOUT_MS = 30_000;
+const FIRST_PAGE_RENDER_FALLBACK_MS = 1_500;
+
+const waitForFirstPdfPageRender = (sessionRenderKey: string) =>
+  new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (rendered: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      unsubscribe();
+      resolve(rendered);
+    };
+    const unsubscribe = appEventBus.on("pdf:firstPageRendered", (payload) => {
+      if (payload.sessionRenderKey === sessionRenderKey) finish(true);
+    });
+    const timeoutId = window.setTimeout(
+      () => finish(false),
+      FIRST_PAGE_RENDER_FALLBACK_MS,
+    );
+  });
 const normalizePlatformWindowTitle = (title: string | null | undefined) => {
   const normalizedTitle = title?.trim();
   if (!normalizedTitle) return null;
@@ -124,6 +166,9 @@ const App: React.FC = () => {
   const [platformRuntime, setPlatformRuntime] = useState(() =>
     readPlatformRuntimeSnapshot(),
   );
+  const [pdfLoadToast, setPdfLoadToast] = useState<PdfLoadToastState | null>(
+    null,
+  );
   const isDesktop = platformRuntime.isDesktop;
   const supportsMultiWindow = platformRuntime.supportsMultiWindow;
   const platformWindowId = useMemo(() => getPlatformWindowId(), []);
@@ -137,6 +182,15 @@ const App: React.FC = () => {
   const workspaceScrollContainerRef = useRef<HTMLElement | null>(null);
   const loadQueueRef = useRef<Promise<void>>(Promise.resolve());
   const incomingTransferIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    markAppPerformance("app:shell-mounted", { once: true });
+    measureAppPerformance(
+      "app:entry-to-shell",
+      "app:entry",
+      "app:shell-mounted",
+    );
+  }, []);
 
   useAppEvent(
     "workspace:scrollContainerReady",
@@ -169,10 +223,24 @@ const App: React.FC = () => {
   );
 
   useGlobalProcessingToast({
-    isProcessing,
-    processingStatus,
+    isProcessing: isProcessing || pdfLoadToast !== null,
+    processingStatus: pdfLoadToast?.message ?? processingStatus,
     defaultMessage: t("common.processing"),
   });
+
+  const startPdfLoadToast = useCallback((token: string, message: string) => {
+    setPdfLoadToast({ token, message });
+  }, []);
+
+  const advancePdfLoadToast = useCallback((token: string, message: string) => {
+    setPdfLoadToast((current) =>
+      current?.token === token ? { token, message } : current,
+    );
+  }, []);
+
+  const clearPdfLoadToast = useCallback((token: string) => {
+    setPdfLoadToast((current) => (current?.token === token ? null : current));
+  }, []);
 
   const [pdfPasswordPrompt, setPdfPasswordPrompt] = useState<{
     id: string;
@@ -254,6 +322,75 @@ const App: React.FC = () => {
     tabDescriptors,
     windowLayout,
   } = tabsController;
+
+  const applyHydratedDocumentToTab = useCallback(
+    (tabId: string, document: LoadedPdfDocument) => {
+      const session = tabsBackend.getSession(tabId);
+      if (!session) return false;
+
+      const nextSnapshot = applyHydratedPdfDocumentToSnapshot(
+        session.editorSnapshot,
+        document,
+      );
+      const liveWindow = tabsBackend.getWindowSnapshot(platformWindowId);
+      const isActive = liveWindow.layout.activeTabId === tabId;
+
+      if (isActive) {
+        useEditorStore.setState({
+          metadata: nextSnapshot.metadata,
+          documentPermissions: nextSnapshot.documentPermissions,
+          sourceDocumentPermissions: nextSnapshot.sourceDocumentPermissions,
+          preservePdfOwnerRestrictionsOnSave:
+            nextSnapshot.preservePdfOwnerRestrictionsOnSave,
+          fields: nextSnapshot.fields,
+          annotations: nextSnapshot.annotations,
+          preservedSourceAnnotations: nextSnapshot.preservedSourceAnnotations,
+          outline: nextSnapshot.outline,
+          documentLoadState: "ready",
+          documentLoadError: null,
+        });
+
+        const liveSnapshot = createEditorTabSnapshotFromState({
+          state: useEditorStore.getState(),
+          scrollContainer: workspaceScrollContainerRef.current,
+        });
+        tabsBackend.updateSession(tabId, {
+          editorSnapshot: liveSnapshot,
+        });
+      } else {
+        tabsBackend.updateSession(tabId, {
+          editorSnapshot: nextSnapshot,
+        });
+      }
+
+      return true;
+    },
+    [platformWindowId, tabsBackend],
+  );
+
+  const markTabHydrationError = useCallback(
+    (tabId: string, error: unknown) => {
+      const session = tabsBackend.getSession(tabId);
+      if (!session) return false;
+      const message = error instanceof Error ? error.message : String(error);
+      const nextSnapshot = {
+        ...session.editorSnapshot,
+        documentLoadState: "error" as const,
+        documentLoadError: message,
+      };
+      tabsBackend.updateSession(tabId, { editorSnapshot: nextSnapshot });
+
+      const liveWindow = tabsBackend.getWindowSnapshot(platformWindowId);
+      if (liveWindow.layout.activeTabId === tabId) {
+        useEditorStore.setState({
+          documentLoadState: "error",
+          documentLoadError: message,
+        });
+      }
+      return true;
+    },
+    [platformWindowId, tabsBackend],
+  );
 
   const registerPendingIncomingTab = useCallback(
     (options: { sessionId: string; title: string; isDirty: boolean }) => {
@@ -850,6 +987,11 @@ const App: React.FC = () => {
       saveTarget: SaveTarget | null;
       skipInitialSourceKeyLookup?: boolean;
     }) => {
+      markAppPerformance("pdf:open-requested", { once: true });
+      void import("./pages/EditorPage");
+      void import("./components/workspace/Workspace");
+      const pdfServiceModulePromise = import("./services/pdfService");
+
       const sourceKey = getEditorTabSourceKey({
         saveTarget: options.saveTarget,
         pdfFile: options.pdfFile,
@@ -877,9 +1019,23 @@ const App: React.FC = () => {
         }
 
         recentFilesService.cancelPreviewTasks();
+        const loadToastToken = `pdf-load-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+        startPdfLoadToast(loadToastToken, t("app.loading_pdf"));
+        let disposeOpenSession: (() => void) | null = null;
 
         try {
-          await withProcessing(t("app.parsing"), async () => {
+          const { startPdfOpenSession } = await pdfServiceModulePromise;
+          const openSession: PdfOpenSession = startPdfOpenSession(
+            options.input,
+            {
+              workerService,
+            },
+          );
+          disposeOpenSession = openSession.dispose;
+
+          await withProcessing(t("app.loading_pdf"), async () => {
             const {
               pdfBytes,
               pages,
@@ -890,8 +1046,18 @@ const App: React.FC = () => {
               documentPermissions,
               outline,
               openPassword,
-              dispose,
-            } = await loadPDF(options.input, { workerService });
+            } = await openSession.readable;
+            markAppPerformance("pdf:readable", { once: true });
+            measureAppPerformance(
+              "pdf:request-to-readable",
+              "pdf:open-requested",
+              "pdf:readable",
+            );
+            measureAppPerformance(
+              "pdf:bootstrap-to-readable",
+              "app:bootstrap-script",
+              "pdf:readable",
+            );
 
             const {
               session: persistedUiSession,
@@ -916,6 +1082,8 @@ const App: React.FC = () => {
               annotations,
               preservedSourceAnnotations,
               outline,
+              documentLoadState: "hydrating",
+              documentLoadError: null,
               currentPageIndex,
               pendingViewStateRestore,
             });
@@ -940,8 +1108,6 @@ const App: React.FC = () => {
             if (postLoadLocalMatch) {
               activateTab(postLoadLocalMatch.id);
               navigate("/editor");
-              dispose();
-              workerService.destroy();
               return;
             }
 
@@ -950,39 +1116,112 @@ const App: React.FC = () => {
                 skipLocalCheck: true,
               })
             ) {
-              dispose();
-              workerService.destroy();
               return;
             }
 
+            const tabId = createEditorTabId();
             addTab({
-              id: createEditorTabId(),
+              id: tabId,
               title: getEditorTabDisplayTitle(options.filename),
               sourceKey,
               snapshot: hydratedSnapshot,
               thumbnailImages: {},
               workerService,
-              disposePdfResources: dispose,
+              disposePdfResources: openSession.dispose,
               activate: true,
             });
             keepWorker = true;
-
-            if (options.saveTarget?.kind === "tauri") {
-              recentFilesService.upsertWithBytesPreview({
-                path: options.saveTarget.path,
-                filename: options.filename,
-                pdfBytes,
-                targetWidth: 240,
-              });
-            }
-
             navigate("/editor");
+            advancePdfLoadToast(loadToastToken, t("app.rendering_pdf"));
+
+            const hydrateDocument = async (retry = false) => {
+              if (retry) {
+                startPdfLoadToast(loadToastToken, t("app.parsing"));
+              }
+              try {
+                if (!retry) {
+                  const firstPageRendered =
+                    await waitForFirstPdfPageRender(tabId);
+                  if (firstPageRendered) {
+                    markAppPerformance("pdf:first-page-rendered", {
+                      once: true,
+                    });
+                    measureAppPerformance(
+                      "pdf:request-to-first-page",
+                      "pdf:open-requested",
+                      "pdf:first-page-rendered",
+                    );
+                    measureAppPerformance(
+                      "pdf:bootstrap-to-first-page",
+                      "app:bootstrap-script",
+                      "pdf:first-page-rendered",
+                    );
+                  }
+                }
+                advancePdfLoadToast(loadToastToken, t("app.parsing"));
+                const hydratedDocument = retry
+                  ? await openSession.retryHydration()
+                  : await openSession.hydrate();
+                if (!applyHydratedDocumentToTab(tabId, hydratedDocument)) {
+                  return;
+                }
+                markAppPerformance("pdf:hydrated", { once: true });
+                measureAppPerformance(
+                  "pdf:request-to-hydrated",
+                  "pdf:open-requested",
+                  "pdf:hydrated",
+                );
+                measureAppPerformance(
+                  "pdf:bootstrap-to-hydrated",
+                  "app:bootstrap-script",
+                  "pdf:hydrated",
+                );
+
+                if (options.saveTarget?.kind === "tauri") {
+                  recentFilesService.upsertWithBytesPreview({
+                    path: options.saveTarget.path,
+                    filename: options.filename,
+                    pdfBytes: hydratedDocument.pdfBytes,
+                    targetWidth: 240,
+                  });
+                }
+
+                const liveWindow =
+                  tabsBackend.getWindowSnapshot(platformWindowId);
+                if (liveWindow.layout.activeTabId === tabId) {
+                  useEditorStore.getState().warmupThumbnails(workerService);
+                }
+              } catch (error) {
+                if (
+                  error instanceof DOMException &&
+                  error.name === "AbortError"
+                ) {
+                  return;
+                }
+                console.error("Error hydrating PDF:", error);
+                if (!markTabHydrationError(tabId, error)) return;
+                toast.error(t("app.load_error"), {
+                  action: {
+                    label: t("common.actions.retry"),
+                    onClick: () => {
+                      void hydrateDocument(true);
+                    },
+                  },
+                });
+              } finally {
+                clearPdfLoadToast(loadToastToken);
+              }
+            };
+
+            void hydrateDocument();
           });
         } catch (error) {
           console.error("Error loading PDF:", error);
           toast.error(t("app.load_error"));
         } finally {
           if (!keepWorker) {
+            clearPdfLoadToast(loadToastToken);
+            disposeOpenSession?.();
             workerService.destroy();
           }
         }
@@ -991,11 +1230,18 @@ const App: React.FC = () => {
     [
       activateTab,
       addTab,
+      advancePdfLoadToast,
+      applyHydratedDocumentToTab,
+      clearPdfLoadToast,
       enqueueLoadTask,
       findTabBySourceKey,
       focusExistingTabBySourceKey,
       navigate,
+      markTabHydrationError,
+      platformWindowId,
+      startPdfLoadToast,
       t,
+      tabsBackend,
       withProcessing,
     ],
   );
@@ -1258,6 +1504,10 @@ const App: React.FC = () => {
       captureCurrentTabIntoState();
       const session = getTabById(tabId);
       if (!session) return;
+      if (session.editorSnapshot.documentLoadState !== "ready") {
+        toast.error(t("common.processing"));
+        return;
+      }
 
       const transfer = await saveEditorTabSessionTransfer(session);
       const ackWaiter = createTransferAckWaiter({
@@ -1321,6 +1571,7 @@ const App: React.FC = () => {
       getTabById,
       restoreTransferredSourceTab,
       supportsMultiWindow,
+      t,
     ],
   );
 
@@ -1333,6 +1584,10 @@ const App: React.FC = () => {
       captureCurrentTabIntoState();
       const session = getTabById(tabId);
       if (!session) return;
+      if (session.editorSnapshot.documentLoadState !== "ready") {
+        toast.error(t("common.processing"));
+        return;
+      }
 
       const availableWindows = await listPlatformEditorWindows();
       if (
@@ -1422,6 +1677,7 @@ const App: React.FC = () => {
       refreshMergeWindowTargets,
       restoreTransferredSourceTab,
       supportsMultiWindow,
+      t,
     ],
   );
 
@@ -1448,7 +1704,9 @@ const App: React.FC = () => {
     }) => {
       const snapshot = useEditorStore.getState();
       if (!snapshot.pdfBytes) return null;
+      if (snapshot.documentLoadState !== "ready") return null;
 
+      const { exportPDF } = await import("./services/pdfService");
       return await exportPDF(
         snapshot.pdfBytes,
         snapshot.fields,
@@ -1539,6 +1797,10 @@ const App: React.FC = () => {
   const handleSaveAs = useCallback(async (): Promise<boolean> => {
     const initialSnapshot = useEditorStore.getState();
     if (!initialSnapshot.pdfBytes) return false;
+    if (initialSnapshot.documentLoadState !== "ready") {
+      toast.error(t("common.processing"));
+      return false;
+    }
     const permissionBlockReason = getPdfPermissionSaveBlockReason(
       initialSnapshot.documentPermissions,
       initialSnapshot.dirtyPermissionScopes,
@@ -1590,6 +1852,10 @@ const App: React.FC = () => {
   const handleSave = useCallback(async (): Promise<boolean> => {
     const initialSnapshot = useEditorStore.getState();
     if (!initialSnapshot.pdfBytes) return false;
+    if (initialSnapshot.documentLoadState !== "ready") {
+      toast.error(t("common.processing"));
+      return false;
+    }
     const permissionBlockReason = getPdfPermissionSaveBlockReason(
       initialSnapshot.documentPermissions,
       initialSnapshot.dirtyPermissionScopes,
@@ -1662,6 +1928,10 @@ const App: React.FC = () => {
 
   const handlePrint = useCallback(async () => {
     const snapshot = useEditorStore.getState();
+    if (snapshot.documentLoadState !== "ready") {
+      toast.error(t("common.processing"));
+      return;
+    }
     if (!canPrintPdf(snapshot.documentPermissions)) {
       toast.error(t("app.print_permission_denied"));
       return;
@@ -1856,47 +2126,62 @@ const App: React.FC = () => {
         />
       </EditorRuntimeProvider>
 
-      <KeyboardShortcutsHelp
-        isOpen={activeDialog === "shortcuts"}
-        onClose={() => setState({ activeDialog: null })}
-      />
-      <SettingsDialog
-        isOpen={activeDialog === "settings"}
-        onClose={() => setState({ activeDialog: null })}
-        options={options}
-        onChange={(updates) => setOptions(updates)}
-      />
+      {activeDialog === "shortcuts" && (
+        <React.Suspense fallback={null}>
+          <KeyboardShortcutsHelp
+            isOpen
+            onClose={() => setState({ activeDialog: null })}
+          />
+        </React.Suspense>
+      )}
+      {activeDialog === "settings" && (
+        <React.Suspense fallback={null}>
+          <SettingsDialog
+            isOpen
+            onClose={() => setState({ activeDialog: null })}
+            options={options}
+            onChange={(updates) => setOptions(updates)}
+          />
+        </React.Suspense>
+      )}
 
-      <EditorCloseConfirmDialog
-        open={pendingCloseRequest !== null}
-        isDirty={true}
-        documentTitle={pendingCloseDocumentTitle}
-        onCloseDialog={dismissCloseRequest}
-        onSaveAndClose={async () => {
-          await resolveCloseRequest(true);
-        }}
-        onCloseWithoutSaving={async () => {
-          await resolveCloseRequest(false);
-        }}
-      />
+      {pendingCloseRequest !== null && (
+        <React.Suspense fallback={null}>
+          <EditorCloseConfirmDialog
+            open
+            isDirty={true}
+            documentTitle={pendingCloseDocumentTitle}
+            onCloseDialog={dismissCloseRequest}
+            onSaveAndClose={async () => {
+              await resolveCloseRequest(true);
+            }}
+            onCloseWithoutSaving={async () => {
+              await resolveCloseRequest(false);
+            }}
+          />
+        </React.Suspense>
+      )}
 
-      <PdfPasswordDialog
-        prompt={
-          pdfPasswordPrompt
-            ? { id: pdfPasswordPrompt.id, reason: pdfPasswordPrompt.reason }
-            : null
-        }
-        onCancel={() => {
-          const currentPrompt = pdfPasswordPrompt;
-          setPdfPasswordPrompt(null);
-          currentPrompt?.cancel();
-        }}
-        onSubmit={(password) => {
-          const currentPrompt = pdfPasswordPrompt;
-          setPdfPasswordPrompt(null);
-          currentPrompt?.submit(password);
-        }}
-      />
+      {pdfPasswordPrompt && (
+        <React.Suspense fallback={null}>
+          <PdfPasswordDialog
+            prompt={{
+              id: pdfPasswordPrompt.id,
+              reason: pdfPasswordPrompt.reason,
+            }}
+            onCancel={() => {
+              const currentPrompt = pdfPasswordPrompt;
+              setPdfPasswordPrompt(null);
+              currentPrompt.cancel();
+            }}
+            onSubmit={(password) => {
+              const currentPrompt = pdfPasswordPrompt;
+              setPdfPasswordPrompt(null);
+              currentPrompt.submit(password);
+            }}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 };

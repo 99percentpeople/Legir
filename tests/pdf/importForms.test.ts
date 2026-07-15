@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument, PDFName, PDFString } from "@cantoo/pdf-lib";
-import { loadPDF } from "@/services/pdfService";
+import { loadPDF, startPdfOpenSession } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { FieldType } from "@/types";
 
@@ -125,6 +125,39 @@ const loadFields = async (bytes: Uint8Array) => {
 };
 
 describe("PDF form import", () => {
+  it("exposes readable pages before full form hydration", async () => {
+    const bytes = await createCheckboxPdf();
+    const session = startPdfOpenSession(bytes, {
+      workerService: createMockWorkerService(),
+    });
+
+    const readable = await session.readable;
+    expect(readable.pages).toHaveLength(1);
+    expect(readable.fields).toEqual([]);
+    expect(readable.annotations).toEqual([]);
+
+    const hydrated = await session.hydrate();
+    expect(hydrated.fields).toHaveLength(1);
+    expect(hydrated.fields[0]).toMatchObject({
+      name: "agree",
+      type: FieldType.CHECKBOX,
+    });
+    session.dispose();
+  });
+
+  it("cancels deferred hydration after the readable document is available", async () => {
+    const session = startPdfOpenSession(await createCheckboxPdf(), {
+      workerService: createMockWorkerService(),
+    });
+
+    await session.readable;
+    session.abort();
+    await expect(session.hydrate()).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    session.dispose();
+  });
+
   it("imports radio widgets as radio controls when child widget flags mask the parent field flags", async () => {
     const fields = await loadFields(await createRadioPdfWithWidgetFlags());
 

@@ -4,6 +4,10 @@ type PwaLaunchProcessingListener = (isProcessing: boolean) => void;
 let hasInitializedLaunchQueue = false;
 let pendingLaunchHandles: FileSystemFileHandle[] = [];
 let activePwaLaunchProcessingCount = 0;
+const primedLaunchFiles = new WeakMap<
+  FileSystemFileHandle,
+  Promise<{ file: File; bytes: Uint8Array }>
+>();
 
 const launchFilesListeners = new Set<PwaLaunchFilesListener>();
 const launchProcessingListeners = new Set<PwaLaunchProcessingListener>();
@@ -37,6 +41,20 @@ const dispatchLaunchFiles = (handles: FileSystemFileHandle[]) => {
     return;
   }
 
+  for (const handle of handles) {
+    if (!primedLaunchFiles.has(handle)) {
+      const pending = handle.getFile().then(async (file) => ({
+        file,
+        bytes: new Uint8Array(await file.arrayBuffer()),
+      }));
+      // The launch listener may not be mounted yet. Keep the original promise
+      // rejectable for its eventual consumer while avoiding a transient
+      // unhandled-rejection report during bootstrap.
+      void pending.catch(() => undefined);
+      primedLaunchFiles.set(handle, pending);
+    }
+  }
+
   if (launchFilesListeners.size === 0) {
     pendingLaunchHandles = [...pendingLaunchHandles, ...handles];
     return;
@@ -45,6 +63,19 @@ const dispatchLaunchFiles = (handles: FileSystemFileHandle[]) => {
   for (const listener of launchFilesListeners) {
     listener(handles);
   }
+};
+
+export const readPwaLaunchFile = async (handle: FileSystemFileHandle) => {
+  const primed = primedLaunchFiles.get(handle);
+  if (primed) {
+    primedLaunchFiles.delete(handle);
+    return await primed;
+  }
+  const file = await handle.getFile();
+  return {
+    file,
+    bytes: new Uint8Array(await file.arrayBuffer()),
+  };
 };
 
 export const initializePwaLaunchQueue = () => {

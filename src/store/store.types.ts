@@ -72,6 +72,8 @@ export interface EditorActions {
     annotations: Annotation[];
     preservedSourceAnnotations: PreservedSourceAnnotationRef[];
     outline: PDFOutlineItem[];
+    documentLoadState?: EditorState["documentLoadState"];
+    documentLoadError?: EditorState["documentLoadError"];
     metadata: PDFMetadata;
     documentPermissions: EditorState["documentPermissions"];
     sourceDocumentPermissions?: EditorState["sourceDocumentPermissions"];

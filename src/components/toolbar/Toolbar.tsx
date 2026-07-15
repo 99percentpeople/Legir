@@ -90,6 +90,7 @@ const Toolbar: React.FC = () => {
     openDialog,
   } = editorState;
   const isMobile = useIsMobile();
+  const isDocumentReady = editorState.documentLoadState === "ready";
   const hideModeSelector = isMobile;
   const hideToolSection = isMobile;
   const compactZoomControl = isMobile;
@@ -143,17 +144,19 @@ const Toolbar: React.FC = () => {
   const isShapeToolActive = isShapeTool(tool);
   const isToolAllowed = React.useCallback(
     (candidate: Tool) =>
+      (isDocumentReady || candidate === "pan" || candidate === "select_text") &&
       canUseToolWithPdfPermissions(
         candidate,
         mode,
         editorState.documentPermissions,
       ),
-    [editorState.documentPermissions, mode],
+    [editorState.documentPermissions, isDocumentReady, mode],
   );
   const isModeAllowed = React.useCallback(
     (candidate: EditorState["mode"]) =>
+      isDocumentReady &&
       canUseModeWithPdfPermissions(candidate, editorState.documentPermissions),
-    [editorState.documentPermissions],
+    [editorState.documentPermissions, isDocumentReady],
   );
   const restrictedTitle = t("toolbar.permission_restricted");
   const activeShapeTool = isShapeTool(tool) ? tool : lastShapeTool;
@@ -819,10 +822,12 @@ const Toolbar: React.FC = () => {
         </div>
 
         <SaveMenu
-          disabled={!editorState.hasPages}
+          disabled={!editorState.hasPages || !isDocumentReady}
           isDirty={!!isDirty}
           hasSaveAs={hasSaveAs.current}
-          canPrint={canPrintPdf(editorState.documentPermissions)}
+          canPrint={
+            isDocumentReady && canPrintPdf(editorState.documentPermissions)
+          }
           onPrimary={onSave}
           onSaveAs={onSaveAs}
           onExit={onExit}

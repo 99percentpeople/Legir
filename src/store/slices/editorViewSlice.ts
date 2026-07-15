@@ -57,6 +57,12 @@ export const createEditorViewSlice: EditorStoreSlice<
 
   setEditorMode: (mode, defaultTool) =>
     set((state) => {
+      if (
+        state.documentLoadState !== undefined &&
+        state.documentLoadState !== "ready"
+      ) {
+        return state.tool === "select_text" ? state : { tool: "select_text" };
+      }
       if (!canUseModeWithPdfPermissions(mode, state.documentPermissions)) {
         return state.tool === "select" ? state : { tool: "select" };
       }

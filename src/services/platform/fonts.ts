@@ -9,6 +9,40 @@ const normalizeFontBytes = (value: Uint8Array | number[] | null) => {
   return undefined;
 };
 
+export type PlatformSystemFontCatalog = {
+  families: string[];
+  aliases: Record<string, string>;
+};
+
+export const getPlatformSystemFontCatalog =
+  async (): Promise<PlatformSystemFontCatalog> => {
+    if (!isDesktopApp()) return { families: [], aliases: {} };
+
+    const raw = await invoke<unknown>("get_system_font_catalog");
+    if (!raw || typeof raw !== "object") {
+      return { families: [], aliases: {} };
+    }
+
+    const value = raw as { families?: unknown; aliases?: unknown };
+    const families = Array.isArray(value.families)
+      ? value.families
+          .filter((family): family is string => typeof family === "string")
+          .map((family) => family.trim())
+          .filter(Boolean)
+      : [];
+    const aliases: Record<string, string> = {};
+    if (value.aliases && typeof value.aliases === "object") {
+      for (const [key, family] of Object.entries(
+        value.aliases as Record<string, unknown>,
+      )) {
+        if (typeof family === "string" && key.trim() && family.trim()) {
+          aliases[key.trim()] = family.trim();
+        }
+      }
+    }
+    return { families, aliases };
+  };
+
 export const getPlatformSystemFontFamilies = async (): Promise<string[]> => {
   if (!isDesktopApp()) return [];
 

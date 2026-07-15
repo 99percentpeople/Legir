@@ -17,6 +17,7 @@ export const selectEditorPageState = (state: EditorStore) => ({
   filename: state.filename,
   pages: state.pages,
   pdfBytes: state.pdfBytes,
+  documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   selectedId: state.selectedId,
   hasSelectedControl: state.selectedId
@@ -41,6 +42,7 @@ export const selectEditorPageState = (state: EditorStore) => ({
 export type AiChatEditorState = Pick<
   EditorState,
   | "currentPageIndex"
+  | "documentLoadState"
   | "documentPermissions"
   | "filename"
   | "llmModelCache"
@@ -62,6 +64,7 @@ export const selectAiChatEditorState = (
   state: EditorStore,
 ): AiChatEditorState => ({
   currentPageIndex: state.currentPageIndex,
+  documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   filename: state.filename,
   llmModelCache: state.llmModelCache,
@@ -93,6 +96,7 @@ export const selectEditorCanvasState = (
   annotations: state.annotations,
   commentStyle: state.commentStyle,
   currentPageIndex: state.currentPageIndex,
+  documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   fields: state.fields,
   filename: state.filename,
@@ -147,6 +151,7 @@ export const selectToolbarState = (state: EditorStore) => ({
   canUndo: state.past.length > 0,
   canRedo: state.future.length > 0,
   hasPages: state.pages.length > 0,
+  documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   sourceDocumentPermissions: state.sourceDocumentPermissions,
   pdfOwnerUnlocked: state.pdfOwnerUnlocked,
@@ -210,6 +215,7 @@ export const selectEditorRightPanelState = (state: EditorStore) => ({
   pageTranslateSelectedParagraphIds: state.pageTranslateSelectedParagraphIds,
   translateOption: state.translateOption,
   translateTargetLanguage: state.translateTargetLanguage,
+  documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   setState: state.setState,
   setUiState: state.setUiState,
@@ -233,6 +239,7 @@ export const selectEditorRightPanelState = (state: EditorStore) => ({
 export const selectPropertiesPanelState = (state: EditorStore) => ({
   exportPassword: state.exportPassword,
   pdfOpenPassword: state.pdfOpenPassword,
+  documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   sourceDocumentPermissions: state.sourceDocumentPermissions,
   pdfOwnerUnlocked: state.pdfOwnerUnlocked,

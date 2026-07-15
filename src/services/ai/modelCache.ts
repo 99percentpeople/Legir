@@ -129,8 +129,6 @@ export const loadModels = async (options?: LoadModelsOptions) => {
   }
 };
 
-void loadModels();
-
 export type VisionModelGroup = {
   providerId: string;
   label: string;

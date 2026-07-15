@@ -3,8 +3,8 @@ import {
   getAiProviderDefaultApiOptionId,
   getAiProviderSelectedApiOption,
   type AiProviderId,
-  normalizeReasoningPreference,
-} from "@/services/ai/providers";
+} from "@/services/ai/providers/catalog";
+import { normalizeReasoningPreference } from "@/services/ai/providers/runtimeAdapters/shared";
 import {
   AI_CHAT_VISUAL_MODEL_AUTO_KEY,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
@@ -402,6 +402,8 @@ export const initialState: EditorState = {
   annotations: [],
   preservedSourceAnnotations: [],
   outline: [],
+  documentLoadState: "ready",
+  documentLoadError: null,
   selectedId: null,
   scale: 1.0,
   mode: "annotation",

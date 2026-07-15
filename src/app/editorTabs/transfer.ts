@@ -1,4 +1,3 @@
-import { loadPDF } from "@/services/pdfService";
 import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
 import {
   createPdfWorkerService,
@@ -166,6 +165,7 @@ export const restoreEditorTabSessionTransfer = async (
 
   const workerService = createPdfWorkerService();
   try {
+    const { loadPDF } = await import("@/services/pdfService");
     const {
       pdfBytes,
       pages,

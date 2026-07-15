@@ -6,6 +6,9 @@ import {
   ErrorBoundary,
   type ErrorBoundaryFallbackProps,
 } from "./components/ErrorBoundary";
+import { markAppPerformance } from "./lib/appPerformance";
+
+markAppPerformance("app:entry", { once: true });
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -17,6 +20,22 @@ const getErrorMessage = (error: Error) => {
 };
 
 initializePwaLaunchQueue();
+
+const injectedBootstrap = window.__APP_WINDOW_BOOTSTRAP__ as
+  | { kind?: unknown; filePath?: unknown }
+  | undefined;
+if (
+  isDesktopApp() &&
+  injectedBootstrap?.kind === "startup-open" &&
+  typeof injectedBootstrap.filePath === "string"
+) {
+  void import("./services/platform/files").then(({ primeOpenFileFromPath }) => {
+    primeOpenFileFromPath(injectedBootstrap.filePath as string);
+  });
+  void import("./services/pdfService");
+  void import("./pages/EditorPage");
+  void import("./components/workspace/Workspace");
+}
 
 if (!isDesktopApp()) {
   void import("./styles/font-faces.css");

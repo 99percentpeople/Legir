@@ -54,6 +54,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
     const {
       exportPassword,
       pdfOpenPassword,
+      documentLoadState,
       documentPermissions,
       sourceDocumentPermissions,
       pdfOwnerUnlocked,
@@ -72,10 +73,11 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
       const handleClose = onClose ?? onCollapse ?? (() => {});
       const handleCollapse = onCollapse ?? handleClose;
       const isField = "name" in selectedControl && "style" in selectedControl;
-      const canEditControl = canPerformPdfPermissionOperation(
-        isField ? "edit_form_structure" : "edit_annotation",
-        documentPermissions,
-      );
+      const canEditControl =
+        canPerformPdfPermissionOperation(
+          isField ? "edit_form_structure" : "edit_annotation",
+          documentPermissions,
+        ) && documentLoadState === "ready";
 
       return (
         <ControlPropertiesPanel
@@ -136,7 +138,10 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
             ),
           }));
         }}
-        canModifyContents={canModifyPdfContents(documentPermissions)}
+        canModifyContents={
+          documentLoadState === "ready" &&
+          canModifyPdfContents(documentPermissions)
+        }
         isOpen={isOpen}
         onOpen={onOpen}
         onCollapse={onCollapse}

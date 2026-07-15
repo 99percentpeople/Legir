@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useEditorStore } from "../store/useEditorStore";
-import { loadModels } from "@/services/ai";
 import { getPlatformUserName } from "@/services/platform";
 
 export function useAppInitialization() {
@@ -13,7 +12,11 @@ export function useAppInitialization() {
         if (cancelled) throw CANCELLED;
       };
 
-      void loadModels();
+      void import("@/services/ai/modelCache")
+        .then(({ loadModels }) => loadModels())
+        .catch((error) => {
+          console.warn("Failed to initialize AI models", error);
+        });
 
       try {
         const snapshot = useEditorStore.getState();

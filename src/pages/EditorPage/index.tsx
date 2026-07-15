@@ -29,12 +29,25 @@ import {
 } from "@/services/platform";
 import { selectEditorPageState } from "@/store/selectors";
 import { useEditorStore } from "@/store/useEditorStore";
-import type { EditorState, EditorUiState, Tool } from "@/types";
+import type {
+  EditorState,
+  EditorUiState,
+  PDFSearchResult,
+  Tool,
+} from "@/types";
 import { EditorCanvasPane } from "./EditorCanvasPane";
 import { EditorControllerProviders } from "./EditorControllerProviders";
-import { EditorRightPanel } from "./EditorRightPanel";
+import { EditorRightPanelSkeleton } from "./components/EditorRightPanelSkeleton";
 import { EditorTabStrip } from "./components/EditorTabStrip";
 import { useEditorPageLifecycle } from "./hooks/useEditorPageLifecycle";
+
+const loadEditorRightPanel = () => import("./EditorRightPanel");
+
+const EditorRightPanel = React.lazy(() =>
+  loadEditorRightPanel().then((module) => ({
+    default: module.EditorRightPanel,
+  })),
+);
 
 const EditorPage: React.FC = () => {
   const state = useEditorStore(useShallow(selectEditorPageState));
@@ -48,6 +61,17 @@ const EditorPage: React.FC = () => {
   const [isTranslateOpen, setIsTranslateOpen] = React.useState(false);
   const [translateSourceText, setTranslateSourceText] = React.useState("");
   const [translateAutoToken, setTranslateAutoToken] = React.useState(0);
+  const [aiSearchHighlights, setAiSearchHighlights] = React.useState<
+    Map<number, PDFSearchResult[]>
+  >(() => new Map());
+  const [hasInitializedRightPanel, setHasInitializedRightPanel] =
+    React.useState(false);
+
+  React.useEffect(() => {
+    if (state.pages.length === 0) return;
+    void loadEditorRightPanel();
+    setHasInitializedRightPanel(true);
+  }, [state.pages.length]);
 
   React.useEffect(() => {
     if (!isMobile) return;
@@ -205,6 +229,7 @@ const EditorPage: React.FC = () => {
     setIsTranslateOpen(false);
     setTranslateSourceText("");
     setTranslateAutoToken(0);
+    setAiSearchHighlights(new Map());
   }, [activeTabId]);
 
   const handlePenStyleChange = React.useCallback(
@@ -389,7 +414,7 @@ const EditorPage: React.FC = () => {
 
   return (
     <EditorControllerProviders
-      aiScopeId={activeTabId ?? undefined}
+      highlightedSearchResultsByPage={aiSearchHighlights}
       defaultTool={defaultTool}
       runPrimarySaveAction={runPrimarySaveAction}
       onPrint={documentCommands.print}
@@ -440,7 +465,30 @@ const EditorPage: React.FC = () => {
             }}
           />
 
-          <EditorRightPanel />
+          {state.isRightPanelOpen && !hasInitializedRightPanel && (
+            <EditorRightPanelSkeleton
+              isFloating={state.isPanelFloating}
+              width={state.rightPanelWidth}
+            />
+          )}
+
+          {hasInitializedRightPanel && (
+            <React.Suspense
+              fallback={
+                state.isRightPanelOpen ? (
+                  <EditorRightPanelSkeleton
+                    isFloating={state.isPanelFloating}
+                    width={state.rightPanelWidth}
+                  />
+                ) : null
+              }
+            >
+              <EditorRightPanel
+                aiScopeId={activeTabId ?? undefined}
+                onAiSearchHighlightsChange={setAiSearchHighlights}
+              />
+            </React.Suspense>
+          )}
 
           <TranslationFloatingWindow
             isOpen={isTranslateOpen}

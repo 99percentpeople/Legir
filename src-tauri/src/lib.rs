@@ -202,6 +202,7 @@ fn build_startup_init_script(startup_open_document_path: Option<String>) -> Stri
     format!(
         r#"
 const __APP_WINDOW_BOOTSTRAP__ = {serialized_payload};
+globalThis.performance?.mark?.("app:bootstrap-script");
 Object.defineProperty(window, "__APP_WINDOW_BOOTSTRAP__", {{
   configurable: false,
   enumerable: false,
@@ -499,6 +500,58 @@ pub fn run() {
         map
     }
 
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SystemFontCatalog {
+        families: Vec<String>,
+        aliases: BTreeMap<String, String>,
+    }
+
+    #[tauri::command]
+    fn get_system_font_catalog() -> SystemFontCatalog {
+        let db_lock = SYSTEM_FONT_DB.get_or_init(|| {
+            let mut db = fontdb::Database::new();
+            db.load_system_fonts();
+            Mutex::new(db)
+        });
+
+        let Ok(db_guard) = db_lock.lock() else {
+            return SystemFontCatalog {
+                families: Vec::new(),
+                aliases: BTreeMap::new(),
+            };
+        };
+
+        let mut families = BTreeSet::new();
+        let mut aliases = BTreeMap::new();
+        for face in db_guard.faces() {
+            for (family, _lang) in face.families.iter() {
+                let name = family.trim();
+                if !name.is_empty() {
+                    families.insert(name.to_string());
+                }
+            }
+
+            let family = face
+                .families
+                .first()
+                .map(|(name, _lang)| name.trim())
+                .unwrap_or("");
+            let post_script_name = face.post_script_name.trim();
+            if !family.is_empty() && !post_script_name.is_empty() {
+                let key = compact_ascii_alnum_upper(post_script_name);
+                if !key.is_empty() {
+                    aliases.entry(key).or_insert_with(|| family.to_string());
+                }
+            }
+        }
+
+        SystemFontCatalog {
+            families: families.into_iter().collect(),
+            aliases,
+        }
+    }
+
     #[tauri::command]
     fn cancel_api_proxy_request(
         registry: tauri::State<'_, Mutex<ApiProxyTaskRegistry>>,
@@ -727,6 +780,7 @@ pub fn run() {
             get_system_font_bytes,
             list_system_font_families,
             list_system_font_aliases_compact,
+            get_system_font_catalog,
             start_api_proxy_request,
             cancel_api_proxy_request
         ])

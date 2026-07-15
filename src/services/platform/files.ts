@@ -1,4 +1,8 @@
 import { isDesktopApp } from "./runtime";
+import {
+  markAppPerformance,
+  measureAppPerformance,
+} from "@/lib/appPerformance";
 
 export type FilePickerFilter = {
   name: string;
@@ -20,6 +24,8 @@ export type SavePdfResult =
   | { ok: true; kind: "download" }
   | { ok: true; kind: "saved"; target: SaveTarget }
   | { ok: false; reason: "unsupported" };
+
+const primedDesktopOpenFiles = new Map<string, Promise<OpenFileResult>>();
 
 const canUseWindowPicker = (
   apiName: "showOpenFilePicker" | "showSaveFilePicker",
@@ -124,13 +130,44 @@ export const openFileFromPath = async (
     throw new Error("openFileFromPath is only available in desktop app");
   }
 
+  const primed = primedDesktopOpenFiles.get(filePath);
+  if (primed) {
+    primedDesktopOpenFiles.delete(filePath);
+    return await primed;
+  }
+
+  return await readDesktopFileFromPath(filePath);
+};
+
+const readDesktopFileFromPath = async (
+  filePath: string,
+): Promise<OpenFileResult> => {
+  markAppPerformance("pdf:file-read-start", { once: true });
   const { readFile } = await import("@tauri-apps/plugin-fs");
   const bytes = await readFile(filePath);
+  markAppPerformance("pdf:file-read-end", { once: true });
+  measureAppPerformance(
+    "pdf:bootstrap-to-file-read",
+    "app:bootstrap-script",
+    "pdf:file-read-end",
+  );
   return {
     bytes,
     filePath,
     filename: basename(filePath),
   };
+};
+
+export const primeOpenFileFromPath = (filePath: string) => {
+  if (!isDesktopApp() || primedDesktopOpenFiles.has(filePath)) return;
+  const pending = readDesktopFileFromPath(filePath).catch((error) => {
+    primedDesktopOpenFiles.delete(filePath);
+    throw error;
+  });
+  // The consumer mounts shortly after bootstrap. Mark an early read failure as
+  // observed in the meantime; awaiting `pending` still surfaces the error.
+  void pending.catch(() => undefined);
+  primedDesktopOpenFiles.set(filePath, pending);
 };
 
 export const openFile = async (options: {

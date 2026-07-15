@@ -675,6 +675,14 @@ export const createControlSlice: EditorStoreSlice<
   setTool: (tool) =>
     set((state) => {
       if (
+        state.documentLoadState !== undefined &&
+        state.documentLoadState !== "ready" &&
+        tool !== "pan" &&
+        tool !== "select_text"
+      ) {
+        return { tool: "select_text", selectedId: null };
+      }
+      if (
         !canUseToolWithPdfPermissions(
           tool,
           state.mode,

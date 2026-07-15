@@ -1,27 +1,18 @@
 import React from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import {
-  EditorAiChatControllerProvider,
-  EditorAiSearchHighlightsProvider,
-  EditorPdfSearchProviders,
-  useEditorAiSearchHighlights,
-} from "@/app/editorShellContext";
+import { EditorPdfSearchProviders } from "@/app/editorShellContext";
 import { useEditorDocumentIdentityRuntime } from "@/app/editorRuntime";
 import { useLanguage } from "@/components/language-provider";
-import { useAiChatController } from "@/hooks/useAiChatController";
 import { useAppEvent } from "@/hooks/useAppEventBus";
-import {
-  selectAiChatEditorState,
-  selectPdfSearchControllerState,
-} from "@/store/selectors";
+import { selectPdfSearchControllerState } from "@/store/selectors";
 import { useEditorStore } from "@/store/useEditorStore";
-import type { Tool } from "@/types";
+import type { PDFSearchResult, Tool } from "@/types";
 import { useEditorPageKeyboardShortcuts } from "./hooks/useEditorPageKeyboardShortcuts";
 import { usePdfSearchController } from "./hooks/usePdfSearchController";
 
 interface EditorControllerProvidersProps {
-  aiScopeId?: string;
+  highlightedSearchResultsByPage: Map<number, PDFSearchResult[]>;
   defaultTool: Tool;
   runPrimarySaveAction: () => Promise<boolean>;
   onPrint: () => void;
@@ -29,39 +20,16 @@ interface EditorControllerProvidersProps {
   children: React.ReactNode;
 }
 
-function EditorAiControllerProvider({
-  aiScopeId,
-  children,
-}: Pick<EditorControllerProvidersProps, "aiScopeId" | "children">) {
-  const editorState = useEditorStore(useShallow(selectAiChatEditorState));
-  const { workerService } = useEditorDocumentIdentityRuntime();
-  const aiChat = useAiChatController(
-    editorState,
-    aiScopeId,
-    workerService ?? undefined,
-  );
-
-  return (
-    <EditorAiChatControllerProvider value={aiChat}>
-      <EditorAiSearchHighlightsProvider
-        value={aiChat.highlightedSearchResultsByPage}
-      >
-        {children}
-      </EditorAiSearchHighlightsProvider>
-    </EditorAiChatControllerProvider>
-  );
-}
-
 function EditorPdfSearchControllerProvider({
+  highlightedSearchResultsByPage,
   defaultTool,
   runPrimarySaveAction,
   onPrint,
   onToggleFullscreen,
   children,
-}: Omit<EditorControllerProvidersProps, "aiScopeId">) {
+}: EditorControllerProvidersProps) {
   const { t } = useLanguage();
   const { workerService } = useEditorDocumentIdentityRuntime();
-  const highlightedSearchResultsByPage = useEditorAiSearchHighlights();
   const { pages, isSidebarOpen, setUiState } = useEditorStore(
     useShallow(selectPdfSearchControllerState),
   );
@@ -101,7 +69,7 @@ function EditorPdfSearchControllerProvider({
 }
 
 export function EditorControllerProviders({
-  aiScopeId,
+  highlightedSearchResultsByPage,
   defaultTool,
   runPrimarySaveAction,
   onPrint,
@@ -109,15 +77,14 @@ export function EditorControllerProviders({
   children,
 }: EditorControllerProvidersProps) {
   return (
-    <EditorAiControllerProvider aiScopeId={aiScopeId}>
-      <EditorPdfSearchControllerProvider
-        defaultTool={defaultTool}
-        runPrimarySaveAction={runPrimarySaveAction}
-        onPrint={onPrint}
-        onToggleFullscreen={onToggleFullscreen}
-      >
-        {children}
-      </EditorPdfSearchControllerProvider>
-    </EditorAiControllerProvider>
+    <EditorPdfSearchControllerProvider
+      highlightedSearchResultsByPage={highlightedSearchResultsByPage}
+      defaultTool={defaultTool}
+      runPrimarySaveAction={runPrimarySaveAction}
+      onPrint={onPrint}
+      onToggleFullscreen={onToggleFullscreen}
+    >
+      {children}
+    </EditorPdfSearchControllerProvider>
   );
 }

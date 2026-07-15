@@ -168,19 +168,22 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   const activeTool = isMovementTool(editorState.tool)
     ? editorState.tool
     : contentTool;
+  const isDocumentReady = editorState.documentLoadState === "ready";
   const isToolAllowed = React.useCallback(
     (tool: Tool) =>
+      (isDocumentReady || tool === "pan" || tool === "select_text") &&
       canUseToolWithPdfPermissions(
         tool,
         editorState.mode,
         editorState.documentPermissions,
       ),
-    [editorState.documentPermissions, editorState.mode],
+    [editorState.documentPermissions, editorState.mode, isDocumentReady],
   );
   const isModeAllowed = React.useCallback(
     (mode: EditorState["mode"]) =>
+      isDocumentReady &&
       canUseModeWithPdfPermissions(mode, editorState.documentPermissions),
-    [editorState.documentPermissions],
+    [editorState.documentPermissions, isDocumentReady],
   );
   const showShapeDraftActions = shapeDraftState.active;
 
@@ -589,7 +592,10 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
                   }
                 }}
               >
-                <DropdownMenuRadioItem value="select">
+                <DropdownMenuRadioItem
+                  value="select"
+                  disabled={!isToolAllowed("select")}
+                >
                   <MousePointer2 size={14} />
                   {t("toolbar.select")}
                 </DropdownMenuRadioItem>
