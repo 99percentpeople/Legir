@@ -78,6 +78,22 @@ export const readPwaLaunchFile = async (handle: FileSystemFileHandle) => {
   };
 };
 
+export const processPwaLaunchFiles = async (options: {
+  handles: FileSystemFileHandle[];
+  open: (handle: FileSystemFileHandle) => Promise<void>;
+  onError: (error: unknown, handle: FileSystemFileHandle) => void;
+  shouldStop?: () => boolean;
+}) => {
+  for (const handle of options.handles) {
+    if (options.shouldStop?.()) break;
+    try {
+      await options.open(handle);
+    } catch (error) {
+      options.onError(error, handle);
+    }
+  }
+};
+
 export const initializePwaLaunchQueue = () => {
   if (hasInitializedLaunchQueue || typeof window === "undefined") {
     return;

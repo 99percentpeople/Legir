@@ -41,7 +41,15 @@ export const useEditorWindowBootstrap = ({
 
       try {
         if (bootstrap.kind === "startup-open") {
-          await onStartupOpenDocument(bootstrap.filePath);
+          for (const filePath of bootstrap.filePaths) {
+            if (cancelled) break;
+            try {
+              await onStartupOpenDocument(filePath);
+            } catch (error) {
+              console.error(`Failed to open startup PDF: ${filePath}`, error);
+              toast.error(loadErrorMessage);
+            }
+          }
         } else if (bootstrap.kind === "startup-open-web") {
           await onStartupOpenWebDocument(bootstrap.recentFilePath);
         } else if (bootstrap.kind === "tab-transfer") {

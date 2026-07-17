@@ -145,54 +145,59 @@ struct ApiProxyResponseErrorPayload {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-fn normalize_cli_source_value(source: &Value) -> Option<String> {
-    match source {
-        Value::String(value) => {
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
+fn normalize_cli_source_values(source: &Value) -> Vec<String> {
+    let values = match source {
+        Value::String(value) => vec![value.as_str()],
+        Value::Array(values) => values.iter().filter_map(Value::as_str).collect(),
+        _ => Vec::new(),
+    };
+
+    let mut normalized = Vec::new();
+    for value in values {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() && !normalized.iter().any(|path| path == trimmed) {
+            normalized.push(trimmed.to_string());
         }
-        Value::Array(values) => values
-            .iter()
-            .find_map(|value| value.as_str())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string),
-        _ => None,
     }
+    normalized
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-fn get_startup_open_document_path<R: tauri::Runtime>(app: &tauri::App<R>) -> Option<String> {
-    let matches = app.cli().matches().ok()?;
-    let source = matches.args.get("source")?;
+fn get_startup_open_document_paths<R: tauri::Runtime>(app: &tauri::App<R>) -> Vec<String> {
+    let Ok(matches) = app.cli().matches() else {
+        return Vec::new();
+    };
+    let Some(source) = matches.args.get("source") else {
+        return Vec::new();
+    };
 
-    normalize_cli_source_value(&source.value)
+    normalize_cli_source_values(&source.value)
 }
 
 #[cfg(any(target_os = "android", target_os = "ios"))]
-fn get_startup_open_document_path<R: tauri::Runtime>(_app: &tauri::App<R>) -> Option<String> {
-    None
+fn get_startup_open_document_paths<R: tauri::Runtime>(_app: &tauri::App<R>) -> Vec<String> {
+    Vec::new()
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-fn get_secondary_instance_open_document_path<R: tauri::Runtime>(
+fn get_secondary_instance_open_document_paths<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     args: Vec<String>,
-) -> Option<String> {
-    let matches = app.cli().matches_from(args).ok()?;
-    let source = matches.args.get("source")?;
-    normalize_cli_source_value(&source.value)
+) -> Vec<String> {
+    let Ok(matches) = app.cli().matches_from(args) else {
+        return Vec::new();
+    };
+    let Some(source) = matches.args.get("source") else {
+        return Vec::new();
+    };
+    normalize_cli_source_values(&source.value)
 }
 
-fn build_startup_init_script(startup_open_document_path: Option<String>) -> String {
-    let payload = startup_open_document_path.map(|file_path| {
+fn build_startup_init_script(startup_open_document_paths: Vec<String>) -> String {
+    let payload = (!startup_open_document_paths.is_empty()).then(|| {
         json!({
             "kind": "startup-open",
-            "filePath": file_path,
+            "filePaths": startup_open_document_paths,
         })
     });
 
@@ -229,7 +234,7 @@ fn create_secondary_window_label() -> String {
 fn create_configured_window<R: tauri::Runtime, M: Manager<R>>(
     manager: &M,
     label: &str,
-    startup_open_document_path: Option<String>,
+    startup_open_document_paths: Vec<String>,
 ) -> tauri::Result<()> {
     let Some(mut window_config) = manager.config().app.windows.first().cloned() else {
         return Ok(());
@@ -237,7 +242,7 @@ fn create_configured_window<R: tauri::Runtime, M: Manager<R>>(
 
     window_config.label = label.to_string();
     window_config.create = false;
-    let startup_init_script = build_startup_init_script(startup_open_document_path);
+    let startup_init_script = build_startup_init_script(startup_open_document_paths);
 
     let builder = tauri::WebviewWindowBuilder::from_config(manager, &window_config)?
         .initialization_script(startup_init_script);
@@ -251,7 +256,7 @@ fn create_configured_window<R: tauri::Runtime, M: Manager<R>>(
 }
 
 fn create_main_window<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
-    create_configured_window(app, "main", get_startup_open_document_path(app))
+    create_configured_window(app, "main", get_startup_open_document_paths(app))
 }
 
 fn read_api_proxy_header_map(
@@ -279,10 +284,10 @@ fn read_api_proxy_header_map(
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn create_secondary_window<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    startup_open_document_path: Option<String>,
+    startup_open_document_paths: Vec<String>,
 ) -> tauri::Result<()> {
     let label = create_secondary_window_label();
-    create_configured_window(app, &label, startup_open_document_path)
+    create_configured_window(app, &label, startup_open_document_paths)
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -745,23 +750,33 @@ pub fn run() {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let single_instance_builder =
         tauri_plugin_single_instance::Builder::new().callback(|app, argv, _cwd| {
-            let startup_open_document_path = get_secondary_instance_open_document_path(app, argv);
+            let startup_open_document_paths = get_secondary_instance_open_document_paths(app, argv);
 
-            let result: Result<(), String> = if let Some(file_path) = startup_open_document_path {
-                let source_key = format!("tauri:{file_path}");
-                match focus_existing_document_by_source_key(
-                    app,
-                    app.state::<Mutex<WindowDocumentRegistry>>().inner(),
-                    &source_key,
-                ) {
-                    Ok(true) => Ok(()),
-                    Ok(false) => {
-                        create_secondary_window(app, Some(file_path)).map_err(|error| error.to_string())
-                    }
-                    Err(error) => Err(error),
-                }
+            let result: Result<(), String> = if startup_open_document_paths.is_empty() {
+                create_secondary_window(app, Vec::new()).map_err(|error| error.to_string())
             } else {
-                create_secondary_window(app, None).map_err(|error| error.to_string())
+                let mut pending_paths = Vec::new();
+                for file_path in startup_open_document_paths {
+                    let source_key = format!("tauri:{file_path}");
+                    match focus_existing_document_by_source_key(
+                        app,
+                        app.state::<Mutex<WindowDocumentRegistry>>().inner(),
+                        &source_key,
+                    ) {
+                        Ok(true) => {}
+                        Ok(false) => pending_paths.push(file_path),
+                        Err(error) => {
+                            log::error!("failed to focus existing document: {error}");
+                            pending_paths.push(file_path);
+                        }
+                    }
+                }
+
+                if pending_paths.is_empty() {
+                    Ok(())
+                } else {
+                    create_secondary_window(app, pending_paths).map_err(|error| error.to_string())
+                }
             };
 
             if let Err(error) = result {
@@ -809,4 +824,28 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
+mod tests {
+    use super::normalize_cli_source_values;
+    use serde_json::json;
+
+    #[test]
+    fn normalizes_all_unique_cli_document_paths() {
+        let value = json!([" /tmp/one.pdf ", "/tmp/two.pdf", "/tmp/one.pdf", null]);
+
+        assert_eq!(
+            normalize_cli_source_values(&value),
+            vec!["/tmp/one.pdf".to_string(), "/tmp/two.pdf".to_string()]
+        );
+    }
+
+    #[test]
+    fn preserves_a_singular_cli_document_path() {
+        assert_eq!(
+            normalize_cli_source_values(&json!("/tmp/one.pdf")),
+            vec!["/tmp/one.pdf".to_string()]
+        );
+    }
 }

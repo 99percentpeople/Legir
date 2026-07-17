@@ -23,28 +23,29 @@ const isPdfFilename = (name: string | null | undefined) => {
   return typeof name === "string" && name.trim().toLowerCase().endsWith(".pdf");
 };
 
-const getFirstDroppedPdfFile = (transfer: DataTransfer | null | undefined) => {
+const getDroppedPdfFiles = (transfer: DataTransfer | null | undefined) => {
   const files = transfer?.files;
-  if (!files || files.length === 0) return null;
+  if (!files || files.length === 0) return [];
 
-  for (const file of Array.from(files)) {
-    if (file.type === "application/pdf" || isPdfFilename(file.name)) {
-      return file;
-    }
-  }
-
-  return null;
+  return Array.from(files).filter(
+    (file) => file.type === "application/pdf" || isPdfFilename(file.name),
+  );
 };
 
 type DataTransferItemWithFileSystemHandle = DataTransferItem & {
   getAsFileSystemHandle?: () => Promise<FileSystemHandle | null>;
 };
 
-const getDroppedWebPdfHandle = async (
+const getDroppedWebPdfHandles = async (
   transfer: DataTransfer | null | undefined,
-): Promise<{ handle: FileSystemFileHandle; file: File } | null> => {
+): Promise<Array<{ handle: FileSystemFileHandle; file: File }>> => {
   const items = transfer?.items;
-  if (!items || items.length === 0) return null;
+  if (!items || items.length === 0) return [];
+
+  const droppedHandles: Array<{
+    handle: FileSystemFileHandle;
+    file: File;
+  }> = [];
 
   for (const item of Array.from(items)) {
     if (item.kind !== "file") continue;
@@ -59,17 +60,17 @@ const getDroppedWebPdfHandle = async (
       const fileHandle = handle as FileSystemFileHandle;
       const file = await fileHandle.getFile();
       if (file.type === "application/pdf" || isPdfFilename(file.name)) {
-        return {
+        droppedHandles.push({
           handle: fileHandle,
           file,
-        };
+        });
       }
     } catch (error) {
       console.error("Failed to read dropped file handle", error);
     }
   }
 
-  return null;
+  return droppedHandles;
 };
 
 export const hasPlatformFileTransfer = (event: DragEvent) => {
@@ -95,23 +96,23 @@ const decodeDroppedFileUrl = (raw: string) => {
   }
 };
 
-const getDroppedPathFromBrowserEvent = (event: DragEvent) => {
+const getDroppedPathsFromBrowserEvent = (event: DragEvent) => {
   const transfer = event.dataTransfer;
-  if (!transfer) return null;
+  if (!transfer) return [];
 
-  const uriListPath = transfer
+  const paths = transfer
     .getData("text/uri-list")
     .split(/\r?\n/)
     .map((entry) => entry.trim())
     .filter((entry) => entry && !entry.startsWith("#"))
     .map(decodeDroppedFileUrl)
-    .find((entry) => typeof entry === "string" && isPdfFilename(entry));
+    .filter((entry): entry is string => !!entry && isPdfFilename(entry));
 
-  if (uriListPath) return uriListPath;
-
-  const plainTextPath = decodeDroppedFileUrl(transfer.getData("text/plain"));
-  if (plainTextPath && isPdfFilename(plainTextPath)) {
-    return plainTextPath;
+  for (const entry of transfer.getData("text/plain").split(/\r?\n/)) {
+    const plainTextPath = decodeDroppedFileUrl(entry);
+    if (plainTextPath && isPdfFilename(plainTextPath)) {
+      paths.push(plainTextPath);
+    }
   }
 
   const downloadUrl = transfer.getData("DownloadURL");
@@ -120,11 +121,11 @@ const getDroppedPathFromBrowserEvent = (event: DragEvent) => {
     const maybeUrl = parts.length >= 3 ? parts.slice(2).join(":") : "";
     const downloadPath = decodeDroppedFileUrl(maybeUrl);
     if (downloadPath && isPdfFilename(downloadPath)) {
-      return downloadPath;
+      paths.push(downloadPath);
     }
   }
 
-  return null;
+  return Array.from(new Set(paths));
 };
 
 const resolveTargetElement = (
@@ -163,38 +164,42 @@ export const setPlatformFileDropEffect = (event: DragEvent) => {
   }
 };
 
-export const readPlatformDroppedPdf = async (
+export const readPlatformDroppedPdfs = async (
   event: DragEvent,
-): Promise<PlatformDroppedPdf | null> => {
+): Promise<PlatformDroppedPdf[]> => {
   const transfer = event.dataTransfer;
-  if (!transfer) return null;
+  if (!transfer) return [];
+  const droppedFiles = getDroppedPdfFiles(transfer);
 
   if (isDesktopApp()) {
-    const filePath = getDroppedPathFromBrowserEvent(event);
-    if (filePath) {
-      return {
+    const filePaths = getDroppedPathsFromBrowserEvent(event);
+    if (
+      filePaths.length > 0 &&
+      (droppedFiles.length === 0 || filePaths.length >= droppedFiles.length)
+    ) {
+      return filePaths.map((filePath) => ({
         kind: "path",
         filePath,
-      };
+      }));
     }
   }
 
-  const droppedHandle = await getDroppedWebPdfHandle(transfer);
-  if (droppedHandle) {
-    return {
+  const droppedHandles = await getDroppedWebPdfHandles(transfer);
+  if (
+    droppedHandles.length > 0 &&
+    (droppedFiles.length === 0 || droppedHandles.length >= droppedFiles.length)
+  ) {
+    return droppedHandles.map((droppedHandle) => ({
       kind: "file",
       file: droppedHandle.file,
       handle: droppedHandle.handle,
-    };
+    }));
   }
 
-  const file = getFirstDroppedPdfFile(transfer);
-  if (!file) return null;
-
-  return {
+  return droppedFiles.map((file) => ({
     kind: "file",
     file,
-  };
+  }));
 };
 
 export const getPlatformUserName = async () => {

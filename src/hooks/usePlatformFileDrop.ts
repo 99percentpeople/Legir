@@ -4,7 +4,7 @@ import { useEventListeners } from "@/hooks/useEventListener";
 import {
   hasPlatformFileTransfer,
   isPlatformFileDropInsideScope,
-  readPlatformDroppedPdf,
+  readPlatformDroppedPdfs,
   setPlatformFileDropEffect,
   type PlatformDroppedPdf,
   type PlatformFileDropScopeOptions,
@@ -13,7 +13,7 @@ import {
 interface UsePlatformFileDropOptions {
   enabled?: boolean;
   getTargetElement?: () => HTMLElement | null;
-  onDrop: (payload: PlatformDroppedPdf) => void;
+  onDrop: (payloads: PlatformDroppedPdf[]) => void | Promise<void>;
 }
 
 export const usePlatformFileDrop = ({
@@ -119,10 +119,10 @@ export const usePlatformFileDrop = ({
 
       if (!isInsideScope(event)) return;
 
-      void readPlatformDroppedPdf(event)
-        .then((payload) => {
-          if (payload) {
-            onDropRef.current(payload);
+      void readPlatformDroppedPdfs(event)
+        .then((payloads) => {
+          if (payloads.length > 0) {
+            return onDropRef.current(payloads);
           }
         })
         .catch((error) => {

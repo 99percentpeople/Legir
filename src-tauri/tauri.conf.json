@@ -78,7 +78,8 @@
         {
           "name": "source",
           "index": 1,
-          "takesValue": true
+          "takesValue": true,
+          "multiple": true
         }
       ]
     }

@@ -82,7 +82,7 @@ import {
   listenForPlatformEditorWindowsChange,
   listenForTabWorkspaceEvent,
   listPlatformEditorWindows,
-  openFile,
+  openFiles,
   openFileFromPath,
   openPlatformEditorWindow,
   pickSaveTarget,
@@ -1213,6 +1213,8 @@ const App: React.FC = () => {
               }
             };
 
+            // Hydration updates its own tab snapshot, so later selections can
+            // create their tabs as soon as this document becomes readable.
             void hydrateDocument();
           });
         } catch (error) {
@@ -1324,30 +1326,28 @@ const App: React.FC = () => {
   );
 
   const handleOpen = useCallback(async () => {
-    const picked = await openFile({
+    const selections = await openFiles({
       filters: [{ name: "PDF Document", extensions: ["pdf"] }],
     });
-    if (!picked) return;
+    for (const selection of selections) {
+      try {
+        if (selection.kind === "tauri") {
+          await openTauriFilePathInCurrentWindow(selection.filePath);
+          continue;
+        }
 
-    if (picked.handle) {
-      await openWebHandleFile({
-        handle: picked.handle,
-        filename: picked.filename,
-        bytes: picked.bytes,
-      });
-      return;
+        const file = await selection.handle.getFile();
+        await openWebHandleFile({
+          handle: selection.handle,
+          filename: file.name,
+          bytes: new Uint8Array(await file.arrayBuffer()),
+        });
+      } catch (error) {
+        console.error(`Failed to open PDF: ${selection.filename}`, error);
+        toast.error(t("app.load_error"));
+      }
     }
-
-    if (picked.filePath) {
-      await openLoadedDocumentInTab({
-        input: picked.bytes,
-        pdfFile: null,
-        filename: picked.filename,
-        saveTarget: { kind: "tauri", path: picked.filePath },
-      });
-      return;
-    }
-  }, [openLoadedDocumentInTab, openWebHandleFile]);
+  }, [openTauriFilePathInCurrentWindow, openWebHandleFile, t]);
 
   const openRecentFileByPath = useCallback(
     async (filePath: string) => {
@@ -1403,9 +1403,6 @@ const App: React.FC = () => {
 
   const openDroppedPdf = useCallback(
     async (payload: PlatformDroppedPdf) => {
-      const { isProcessing } = useEditorStore.getState();
-      if (isProcessing) return;
-
       if (payload.kind === "path") {
         await openDroppedPdfPath(payload.filePath);
         return;
@@ -1435,10 +1432,27 @@ const App: React.FC = () => {
     [handleUpload, openDroppedPdfPath, openWebHandleFile],
   );
 
+  const openDroppedPdfs = useCallback(
+    async (payloads: PlatformDroppedPdf[]) => {
+      const { isProcessing } = useEditorStore.getState();
+      if (isProcessing) return;
+
+      for (const payload of payloads) {
+        try {
+          await openDroppedPdf(payload);
+        } catch (error) {
+          console.error("Failed to open dropped PDF", error);
+          toast.error(t("app.load_error"));
+        }
+      }
+    },
+    [openDroppedPdf, t],
+  );
+
   const isFileDragActive = usePlatformFileDrop({
     enabled: activeTabId !== null && location.startsWith("/editor"),
     getTargetElement: () => workspaceScrollContainerRef.current,
-    onDrop: openDroppedPdf,
+    onDrop: openDroppedPdfs,
   });
 
   const homePageAdapter = useMemo<HomePageAdapter>(
@@ -1446,10 +1460,10 @@ const App: React.FC = () => {
       store: homeRecentFilesStore,
       open: handleOpen,
       openRecent: handleOpenRecent,
-      openDroppedPdf,
+      openDroppedPdfs,
       confirmClearAll: confirmPlatformAction,
     }),
-    [handleOpen, handleOpenRecent, homeRecentFilesStore, openDroppedPdf],
+    [handleOpen, handleOpenRecent, homeRecentFilesStore, openDroppedPdfs],
   );
 
   const importStartupOpenDocument = useCallback(

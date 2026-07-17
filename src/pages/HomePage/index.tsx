@@ -32,8 +32,8 @@ const HomePage: React.FC<HomePageProps> = ({ adapter }) => {
   const dropTargetRef = React.useRef<HTMLDivElement | null>(null);
   const isFileDragActive = usePlatformFileDrop({
     getTargetElement: () => dropTargetRef.current,
-    onDrop: (payload) => {
-      void adapter.openDroppedPdf(payload);
+    onDrop: (payloads) => {
+      void adapter.openDroppedPdfs(payloads);
     },
   });
   const [recentFilesViewMode, setRecentFilesViewMode] =

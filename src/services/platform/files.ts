@@ -20,6 +20,18 @@ export type OpenFileResult = {
   filename: string;
 };
 
+export type OpenFileSelection =
+  | {
+      kind: "tauri";
+      filePath: string;
+      filename: string;
+    }
+  | {
+      kind: "web";
+      handle: FileSystemFileHandle;
+      filename: string;
+    };
+
 export type SavePdfResult =
   | { ok: true; kind: "download" }
   | { ok: true; kind: "saved"; target: SaveTarget }
@@ -170,46 +182,40 @@ export const primeOpenFileFromPath = (filePath: string) => {
   primedDesktopOpenFiles.set(filePath, pending);
 };
 
-export const openFile = async (options: {
+export const openFiles = async (options: {
   filters?: FilePickerFilter[];
-}): Promise<OpenFileResult | null> => {
+}): Promise<OpenFileSelection[]> => {
   if (isDesktopApp()) {
-    const [{ open }, { readFile }] = await Promise.all([
-      import("@tauri-apps/plugin-dialog"),
-      import("@tauri-apps/plugin-fs"),
-    ]);
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({
-      multiple: false,
+      multiple: true,
       directory: false,
       filters: options.filters,
     });
 
-    if (!selected || Array.isArray(selected)) return null;
-
-    const bytes = await readFile(selected);
-    return {
-      bytes,
-      filePath: selected,
-      filename: basename(selected),
-    };
+    if (!selected) return [];
+    const filePaths = Array.isArray(selected) ? selected : [selected];
+    return filePaths.map((filePath) => ({
+      kind: "tauri" as const,
+      filePath,
+      filename: basename(filePath),
+    }));
   }
 
   if (canUseWindowPicker("showOpenFilePicker")) {
-    const [handle] = await window.showOpenFilePicker({
-      multiple: false,
+    const handles = await window.showOpenFilePicker({
+      multiple: true,
       types: toWindowPickerTypes(options.filters),
     });
 
-    const file = await handle.getFile();
-    const arrayBuffer = await file.arrayBuffer();
-    return {
-      bytes: new Uint8Array(arrayBuffer),
+    return handles.map((handle) => ({
+      kind: "web" as const,
       handle,
-      filename: file.name,
-    };
+      filename: handle.name,
+    }));
   }
 
-  return null;
+  return [];
 };
 
 export const saveFileAs = async (options: {

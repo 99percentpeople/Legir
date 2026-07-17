@@ -6,7 +6,7 @@ export interface HomePageAdapter {
   store: RecentFilesStore;
   open: () => Promise<void>;
   openRecent: (entry: RecentFileEntry) => Promise<void>;
-  openDroppedPdf: (payload: PlatformDroppedPdf) => Promise<void>;
+  openDroppedPdfs: (payloads: PlatformDroppedPdf[]) => Promise<void>;
   confirmClearAll: (message: string) => Promise<boolean>;
 }
 

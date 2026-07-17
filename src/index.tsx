@@ -1,6 +1,7 @@
 import "./globals.css";
 
 import { initializePwaLaunchQueue } from "./services/platform/browser/launch";
+import { parseEditorWindowBootstrap } from "./services/platform/multiWindow/bootstrap";
 import { isDesktopApp } from "./services/platform/runtime";
 import {
   ErrorBoundary,
@@ -21,16 +22,14 @@ const getErrorMessage = (error: Error) => {
 
 initializePwaLaunchQueue();
 
-const injectedBootstrap = window.__APP_WINDOW_BOOTSTRAP__ as
-  | { kind?: unknown; filePath?: unknown }
-  | undefined;
-if (
-  isDesktopApp() &&
-  injectedBootstrap?.kind === "startup-open" &&
-  typeof injectedBootstrap.filePath === "string"
-) {
+const injectedBootstrap = parseEditorWindowBootstrap(
+  window.__APP_WINDOW_BOOTSTRAP__,
+);
+if (isDesktopApp() && injectedBootstrap?.kind === "startup-open") {
   void import("./services/platform/files").then(({ primeOpenFileFromPath }) => {
-    primeOpenFileFromPath(injectedBootstrap.filePath as string);
+    for (const filePath of injectedBootstrap.filePaths) {
+      primeOpenFileFromPath(filePath);
+    }
   });
   void import("./services/pdfService");
   void import("./pages/EditorPage");

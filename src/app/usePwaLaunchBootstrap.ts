@@ -9,6 +9,7 @@ import {
   hasPendingPwaLaunchFiles,
   listenForPwaLaunchFiles,
   listenForPwaLaunchProcessing,
+  processPwaLaunchFiles,
   readPwaLaunchFile,
 } from "@/services/platform";
 
@@ -85,13 +86,15 @@ export const usePwaLaunchBootstrap = ({
       }
 
       try {
-        for (const handle of handles) {
-          if (cancelled) break;
-          await openPwaLaunchedHandle(handle);
-        }
-      } catch (error) {
-        console.error("Failed to open launched PWA files", error);
-        toast.error(loadErrorMessageRef.current);
+        await processPwaLaunchFiles({
+          handles,
+          open: openPwaLaunchedHandle,
+          onError: (error) => {
+            console.error("Failed to open launched PWA file", error);
+            toast.error(loadErrorMessageRef.current);
+          },
+          shouldStop: () => cancelled,
+        });
       } finally {
         finishPwaLaunchProcessing();
         if (

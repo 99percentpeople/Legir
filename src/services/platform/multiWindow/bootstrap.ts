@@ -4,7 +4,7 @@ export const EDITOR_WINDOW_BOOTSTRAP_ROUTE = "/editor";
 export type EditorWindowBootstrap =
   | {
       kind: "startup-open";
-      filePath: string;
+      filePaths: string[];
     }
   | {
       kind: "startup-open-web";
@@ -33,18 +33,33 @@ const normalizeNonEmptyString = (value: unknown) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-const parseEditorWindowBootstrap = (
+const normalizeNonEmptyStrings = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map(normalizeNonEmptyString)
+        .filter((entry): entry is string => entry !== null),
+    ),
+  );
+};
+
+export const parseEditorWindowBootstrap = (
   value: unknown,
 ): EditorWindowBootstrap | null => {
   if (!value || typeof value !== "object") return null;
 
   const rawBootstrap = value as Record<string, unknown>;
   if (rawBootstrap.kind === "startup-open") {
-    const filePath = normalizeNonEmptyString(rawBootstrap.filePath);
-    return filePath
+    const legacyFilePath = normalizeNonEmptyString(rawBootstrap.filePath);
+    const filePaths = normalizeNonEmptyStrings(rawBootstrap.filePaths);
+    const normalizedFilePaths = Array.from(
+      new Set(legacyFilePath ? [legacyFilePath, ...filePaths] : filePaths),
+    );
+    return normalizedFilePaths.length > 0
       ? {
           kind: "startup-open",
-          filePath,
+          filePaths: normalizedFilePaths,
         }
       : null;
   }
