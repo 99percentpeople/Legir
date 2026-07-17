@@ -86,3 +86,7 @@ export const calculateWorkspaceFitScreenScale = ({
 
   return clampWorkspaceScale(Math.min(widthScale, heightScale));
 };
+
+export const calculateWorkspaceInitialScale = (
+  options: WorkspaceFitScaleOptions,
+) => Math.max(1, calculateWorkspaceFitScreenScale(options));

@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { calculateWorkspaceFitScreenScale } from "@/components/workspace/lib/calculateWorkspaceFitScale";
+import { calculateWorkspaceInitialScale } from "@/components/workspace/lib/calculateWorkspaceFitScale";
 import { appEventBus } from "@/lib/eventBus";
 import { useEditorStore } from "@/store/useEditorStore";
 import {
@@ -199,9 +199,9 @@ export const EditorCanvasPane: React.FC = () => {
     return { width: 0, height: 0 };
   }, []);
 
-  const calculateFitScreenScale = useCallback(
+  const calculateInitialScale = useCallback(
     (pageIndex: number = 0) => {
-      return calculateWorkspaceFitScreenScale({
+      return calculateWorkspaceInitialScale({
         pages: state.pages,
         pageIndex,
         pageLayout: state.pageLayout,
@@ -234,9 +234,9 @@ export const EditorCanvasPane: React.FC = () => {
       return;
     }
 
-    fitToScale(calculateFitScreenScale(state.currentPageIndex));
+    fitToScale(calculateInitialScale(state.currentPageIndex));
   }, [
-    calculateFitScreenScale,
+    calculateInitialScale,
     fitToScale,
     setState,
     state.currentPageIndex,
