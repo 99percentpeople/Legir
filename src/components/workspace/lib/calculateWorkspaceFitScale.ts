@@ -87,6 +87,10 @@ export const calculateWorkspaceFitScreenScale = ({
   return clampWorkspaceScale(Math.min(widthScale, heightScale));
 };
 
-export const calculateWorkspaceInitialScale = (
-  options: WorkspaceFitScaleOptions,
-) => Math.max(1, calculateWorkspaceFitScreenScale(options));
+export const calculateWorkspaceInitialScale = ({
+  isMobile = false,
+  ...options
+}: WorkspaceFitScaleOptions & { isMobile?: boolean }) =>
+  isMobile
+    ? calculateWorkspaceFitWidthScale(options)
+    : Math.max(1, calculateWorkspaceFitScreenScale(options));

@@ -207,9 +207,16 @@ export const EditorCanvasPane: React.FC = () => {
         pageLayout: state.pageLayout,
         pageFlow: state.pageFlow,
         viewport: getWorkspaceViewport(),
+        isMobile,
       });
     },
-    [getWorkspaceViewport, state.pageFlow, state.pageLayout, state.pages],
+    [
+      getWorkspaceViewport,
+      isMobile,
+      state.pageFlow,
+      state.pageLayout,
+      state.pages,
+    ],
   );
 
   const updateScale = useCallback(

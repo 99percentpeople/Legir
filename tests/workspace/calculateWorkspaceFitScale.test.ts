@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateWorkspaceFitScreenScale,
+  calculateWorkspaceFitWidthScale,
   calculateWorkspaceInitialScale,
 } from "@/components/workspace/lib/calculateWorkspaceFitScale";
 import type { PageData } from "@/types";
@@ -24,11 +25,21 @@ const createOptions = (viewport: { width: number; height: number }) => ({
 });
 
 describe("workspace initial scale", () => {
-  it("does not shrink a newly opened PDF below 100%", () => {
+  it("does not shrink a newly opened desktop PDF below 100%", () => {
     const options = createOptions({ width: 500, height: 500 });
 
     expect(calculateWorkspaceFitScreenScale(options)).toBeLessThan(1);
     expect(calculateWorkspaceInitialScale(options)).toBe(1);
+  });
+
+  it("fits a newly opened mobile PDF to the viewport width", () => {
+    const options = createOptions({ width: 500, height: 500 });
+    const fitWidthScale = calculateWorkspaceFitWidthScale(options);
+
+    expect(fitWidthScale).toBeLessThan(1);
+    expect(calculateWorkspaceInitialScale({ ...options, isMobile: true })).toBe(
+      fitWidthScale,
+    );
   });
 
   it("uses the fit-screen scale when the PDF can display above 100%", () => {
