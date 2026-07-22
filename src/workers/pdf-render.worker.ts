@@ -775,14 +775,15 @@ const renderToCanvas = async (
     const page = await getPageForDoc(resolvedDocId, pageIndex);
     throwIfCancelled();
 
-    // Calculate viewport
-    const viewport = page.getViewport({ scale: scale, rotation: page.rotate });
+    const viewport = page.getViewport({ scale, rotation: page.rotate });
+    const rasterWidth = Math.max(1, Math.floor(viewport.width));
+    const rasterHeight = Math.max(1, Math.floor(viewport.height));
 
-    // Determine tile parameters with defaults
+    // Tile coordinates and dimensions are expressed in backing-store pixels.
     const finalTileX = tile ? tile[0] : 0;
     const finalTileY = tile ? tile[1] : 0;
-    const finalTileWidth = tile ? tile[2] : viewport.width;
-    const finalTileHeight = tile ? tile[3] : viewport.height;
+    const finalTileWidth = tile ? tile[2] : rasterWidth;
+    const finalTileHeight = tile ? tile[3] : rasterHeight;
 
     // Resize canvas to match tile size (crucial for OffscreenCanvas)
     if (
@@ -804,7 +805,7 @@ const renderToCanvas = async (
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, finalTileWidth, finalTileHeight);
 
-    // Transform context to draw the correct tile
+    // Transform context to draw the correct tile.
     ctx.save();
     ctx.translate(-finalTileX, -finalTileY);
 

@@ -14,9 +14,8 @@ import {
   THUMBNAIL_TARGET_WIDTH,
 } from "@/constants";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { useEditorStore } from "@/store/useEditorStore";
-import { getWorkspaceRenderDpr } from "../lib/renderPerformance";
+import { getWorkspaceRenderMetrics } from "../lib/renderPerformance";
 import {
   reportPDFPageRenderLayerReady,
   reportPDFPageRenderLayerState,
@@ -232,18 +231,14 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       return;
     }
 
-    const dpr = getWorkspaceRenderDpr(
+    const renderMetrics = getWorkspaceRenderMetrics(
       pageInfo,
       renderScale,
       Math.min(window.devicePixelRatio || 1, 2),
     );
+    const dpr = renderMetrics.dpr;
     dprRef.current = dpr;
-    const viewportCheck = createViewportFromPageInfo(pageInfo, {
-      scale: renderScale * dpr,
-      rotation: pageInfo.rotation,
-    });
-    const pixelsCheck =
-      Math.ceil(viewportCheck.width) * Math.ceil(viewportCheck.height);
+    const pixelsCheck = renderMetrics.pixelWidth * renderMetrics.pixelHeight;
     if (pixelsCheck > MAX_PIXELS_PER_PAGE) {
       return;
     }
@@ -279,19 +274,14 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         // but we set it on the placeholder to ensure layout is correct.
         // The worker handles the actual bitmap size.
 
-        const viewport = createViewportFromPageInfo(pageInfo, {
-          scale: renderScale * dpr,
-          rotation: pageInfo.rotation,
-        });
-
         if (!isTransferredRef.current) {
           if (detachedCanvasRef.current) {
             // Use cached canvas if available
             offscreenCanvas = detachedCanvasRef.current;
           } else {
             // Transfer control
-            targetCanvas.width = viewport.width;
-            targetCanvas.height = viewport.height;
+            targetCanvas.width = renderMetrics.pixelWidth;
+            targetCanvas.height = renderMetrics.pixelHeight;
             offscreenCanvas = targetCanvas.transferControlToOffscreen();
             // Cache it immediately
             detachedCanvasRef.current = offscreenCanvas;

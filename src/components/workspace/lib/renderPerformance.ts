@@ -45,6 +45,31 @@ export const getWorkspaceRenderDpr = (
   return requestedDpr;
 };
 
+export const getWorkspaceRenderMetrics = (
+  pageInfo: PageViewportInfo,
+  scale: number,
+  requestedDpr: number,
+) => {
+  const dpr = getWorkspaceRenderDpr(pageInfo, scale, requestedDpr);
+  const viewport = createViewportFromPageInfo(pageInfo, {
+    scale,
+    rotation: pageInfo.rotation,
+  });
+  // Keep the CSS page size and integer backing store at an exact DPR ratio.
+  // Without this alignment, a fractional PDF page dimension makes the browser
+  // resample the completed canvas and softens small text and thin lines.
+  const pixelWidth = Math.max(1, Math.floor(viewport.width * dpr));
+  const pixelHeight = Math.max(1, Math.floor(viewport.height * dpr));
+
+  return {
+    dpr,
+    pixelWidth,
+    pixelHeight,
+    cssWidth: pixelWidth / dpr,
+    cssHeight: pixelHeight / dpr,
+  };
+};
+
 const WORKSPACE_TILE_MEDIUM_DIM = 1536;
 const WORKSPACE_TILE_SMALL_DIM = 1024;
 const WORKSPACE_TILE_MEDIUM_EDGE_THRESHOLD = 8000;

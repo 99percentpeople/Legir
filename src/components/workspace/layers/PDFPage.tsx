@@ -1,7 +1,8 @@
-import React, { Suspense, useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { PageData, PDFSearchResult } from "@/types";
 import { useEditorStore } from "@/store/useEditorStore";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
+import { getWorkspaceRenderMetrics } from "../lib/renderPerformance";
 import PDFCanvasLayer from "./PDFCanvasLayer";
 import PDFTextLayer from "./PDFTextLayer";
 
@@ -49,8 +50,21 @@ const PDFPage: React.FC<PDFPageProps> = ({
   );
   const wasDebugEnabledRef = useRef(pdfZoomRenderTimingDebug);
 
-  const containerWidth = page.width;
-  const containerHeight = page.height;
+  const renderMetrics = useMemo(
+    () =>
+      getWorkspaceRenderMetrics(
+        {
+          viewBox: page.viewBox,
+          userUnit: page.userUnit,
+          rotation: page.rotation,
+        },
+        scale,
+        typeof window === "undefined"
+          ? 1
+          : Math.min(window.devicePixelRatio || 1, 2),
+      ),
+    [page.rotation, page.userUnit, page.viewBox, scale],
+  );
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -89,8 +103,8 @@ const PDFPage: React.FC<PDFPageProps> = ({
       ref={containerRef}
       className="relative isolate origin-top overflow-hidden bg-white shadow-lg transition-shadow hover:shadow-xl"
       style={{
-        width: containerWidth * scale,
-        height: containerHeight * scale,
+        width: renderMetrics.cssWidth,
+        height: renderMetrics.cssHeight,
       }}
     >
       <PDFCanvasLayer

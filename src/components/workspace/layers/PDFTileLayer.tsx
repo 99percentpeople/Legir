@@ -2,14 +2,13 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PageData } from "@/types";
 import { MAX_PIXELS_PER_PAGE, TILE_MAX_DIM } from "@/constants";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   getDistanceBetweenPoints,
   getDistanceSquaredBetweenPoints,
 } from "@/lib/viewportMath";
 import {
-  getWorkspaceRenderDpr,
+  getWorkspaceRenderMetrics,
   getWorkspaceTileMaxDim,
 } from "../lib/renderPerformance";
 
@@ -354,7 +353,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     // Tile layout must be derived from the restored scale/viewport and remain
     // intact through the first render pass. Regressions here tend to break only
     // session restore/tab switch in tile mode while page-mode still works.
-    const dpr = getWorkspaceRenderDpr(
+    const renderMetrics = getWorkspaceRenderMetrics(
       {
         viewBox: page.viewBox,
         userUnit: page.userUnit,
@@ -363,17 +362,10 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       scale,
       Math.min(window.devicePixelRatio || 1, 2),
     );
+    const dpr = renderMetrics.dpr;
     dprRef.current = dpr;
-    const viewport = createViewportFromPageInfo(
-      {
-        viewBox: page.viewBox,
-        userUnit: page.userUnit,
-        rotation: page.rotation,
-      },
-      { scale: scale * dpr, rotation: page.rotation },
-    );
-    const pageW = Math.ceil(viewport.width);
-    const pageH = Math.ceil(viewport.height);
+    const pageW = renderMetrics.pixelWidth;
+    const pageH = renderMetrics.pixelHeight;
     const pixels = pageW * pageH;
 
     if (pixels <= MAX_PIXELS_PER_PAGE) {
