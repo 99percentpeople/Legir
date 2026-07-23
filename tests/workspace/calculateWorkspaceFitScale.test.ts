@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { DEFAULT_SCALE } from "@/constants";
 import {
   calculateWorkspaceFitScreenScale,
   calculateWorkspaceFitWidthScale,
@@ -28,8 +29,10 @@ describe("workspace initial scale", () => {
   it("does not shrink a newly opened desktop PDF below 100%", () => {
     const options = createOptions({ width: 500, height: 500 });
 
-    expect(calculateWorkspaceFitScreenScale(options)).toBeLessThan(1);
-    expect(calculateWorkspaceInitialScale(options)).toBe(1);
+    expect(calculateWorkspaceFitScreenScale(options)).toBeLessThan(
+      DEFAULT_SCALE,
+    );
+    expect(calculateWorkspaceInitialScale(options)).toBe(DEFAULT_SCALE);
   });
 
   it("fits a newly opened mobile PDF to the viewport width", () => {
@@ -46,7 +49,7 @@ describe("workspace initial scale", () => {
     const options = createOptions({ width: 1400, height: 1600 });
     const fitScreenScale = calculateWorkspaceFitScreenScale(options);
 
-    expect(fitScreenScale).toBeGreaterThan(1);
+    expect(fitScreenScale).toBeGreaterThan(DEFAULT_SCALE);
     expect(calculateWorkspaceInitialScale(options)).toBe(fitScreenScale);
   });
 });

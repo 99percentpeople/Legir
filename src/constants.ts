@@ -4,8 +4,11 @@ import {
   getAiProviderDefaultApiOptionId,
   type AiProviderId,
 } from "./services/ai/providers/catalog";
+import { pdfViewerScaleToWorkspaceScale } from "./lib/pdfScale";
 
-export const DEFAULT_SCALE = 1.0;
+export const DEFAULT_SCALE = pdfViewerScaleToWorkspaceScale(1);
+export const MIN_EDITOR_SCALE = pdfViewerScaleToWorkspaceScale(0.25);
+export const MAX_EDITOR_SCALE = pdfViewerScaleToWorkspaceScale(5);
 export const ZOOM_BASE = 1.25;
 export const MIN_FIELD_SIZE = 10;
 export const PAGE_PADDING = 24; // px

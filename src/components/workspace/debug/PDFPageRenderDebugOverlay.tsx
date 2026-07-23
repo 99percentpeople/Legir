@@ -1,6 +1,7 @@
 import React, { useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { useLanguage } from "@/components/language-provider";
+import { workspaceScaleToZoomPercent } from "@/lib/pdfScale";
 import {
   connectPDFPageRenderDebug,
   syncPDFPageRenderDebugView,
@@ -94,7 +95,9 @@ const PDFPageRenderDebugOverlay: React.FC<PDFPageRenderDebugOverlayProps> = ({
         <div>{renderStatusLabel}</div>
         <div>
           {`${t("debug_overlay.zoom")} ${
-            displayScale === null ? "--" : `${Math.round(displayScale * 100)}%`
+            displayScale === null
+              ? "--"
+              : `${workspaceScaleToZoomPercent(displayScale)}%`
           }`}
         </div>
         <div>{`${t("debug_overlay.canvas")} ${renderTiming.canvasReadyMs ?? "--"} ms`}</div>

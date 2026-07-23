@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SCALE } from "@/constants";
 import {
   getWorkspaceRenderDpr,
   getWorkspaceRenderMetrics,
@@ -28,6 +29,21 @@ describe("workspace render metrics", () => {
       pixelHeight: 1683,
       cssWidth: 595,
       cssHeight: 841.5,
+    });
+  });
+
+  it("matches PDF.js 100% dimensions at the default scale", () => {
+    const a4Page = {
+      ...standardPage,
+      viewBox: [0, 0, 595.28, 841.89] as [number, number, number, number],
+    };
+
+    expect(getWorkspaceRenderMetrics(a4Page, DEFAULT_SCALE, 2)).toEqual({
+      dpr: 2,
+      pixelWidth: 1587,
+      pixelHeight: 2245,
+      cssWidth: 793.5,
+      cssHeight: 1122.5,
     });
   });
 

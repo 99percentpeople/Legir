@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { MAX_EDITOR_SCALE, MIN_EDITOR_SCALE } from "@/constants";
 import { useEventListeners } from "@/hooks/useEventListener";
 import type { Tool } from "@/types";
 
@@ -28,7 +29,7 @@ const TOUCH_PAN_INERTIA_STOP_SPEED_PX_PER_MS = 0.015;
 const TOUCH_PAN_INERTIA_DECAY_PER_FRAME = 0.94;
 
 const clampWorkspaceScale = (scale: number) => {
-  return Math.max(0.25, Math.min(5.0, scale));
+  return Math.max(MIN_EDITOR_SCALE, Math.min(MAX_EDITOR_SCALE, scale));
 };
 
 const touchListToArray = (touches: TouchList) => {

@@ -1,7 +1,10 @@
 import {
+  DEFAULT_SCALE,
   FIT_SCREEN_PADDING_X,
   FIT_SCREEN_PADDING_Y,
   FIT_WIDTH_PADDING_X,
+  MAX_EDITOR_SCALE,
+  MIN_EDITOR_SCALE,
   WORKSPACE_BASE_PAGE_GAP_PX,
 } from "@/constants";
 import type { PageData, PageFlowDirection, PageLayoutMode } from "@/types";
@@ -20,7 +23,10 @@ type WorkspaceFitScaleOptions = {
 };
 
 const clampWorkspaceScale = (scale: number) => {
-  return Math.max(0.25, Math.min(5.0, Number(scale.toFixed(2))));
+  return Math.max(
+    MIN_EDITOR_SCALE,
+    Math.min(MAX_EDITOR_SCALE, Number(scale.toFixed(2))),
+  );
 };
 
 const getTargetPage = (pages: PageData[], pageIndex: number = 0) => {
@@ -93,4 +99,4 @@ export const calculateWorkspaceInitialScale = ({
 }: WorkspaceFitScaleOptions & { isMobile?: boolean }) =>
   isMobile
     ? calculateWorkspaceFitWidthScale(options)
-    : Math.max(1, calculateWorkspaceFitScreenScale(options));
+    : Math.max(DEFAULT_SCALE, calculateWorkspaceFitScreenScale(options));

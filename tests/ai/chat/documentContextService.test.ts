@@ -50,6 +50,15 @@ const createService = (options: { pageTexts: string[]; maxChars?: number }) =>
   });
 
 describe("AI chat document context service", () => {
+  test("reports zoom using PDF.js percentage semantics", () => {
+    const service = createService({ pageTexts: [""] });
+
+    expect(service.getDocumentContext()).toMatchObject({
+      scale: 0.75,
+      zoomPercent: 75,
+    });
+  });
+
   test("getPagesText truncates by configured character budget", async () => {
     const firstPage = "a".repeat(6_000);
     const secondPage = "b".repeat(7_000);

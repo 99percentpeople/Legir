@@ -1,8 +1,6 @@
+import { MAX_EDITOR_SCALE, MIN_EDITOR_SCALE } from "@/constants";
 import { canUseModeWithPdfPermissions } from "@/lib/pdfPermissions";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
-
-const MIN_EDITOR_SCALE = 0.25;
-const MAX_EDITOR_SCALE = 5;
 
 const clampEditorScale = (scale: number) =>
   Math.max(MIN_EDITOR_SCALE, Math.min(MAX_EDITOR_SCALE, scale));

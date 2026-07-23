@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createStore } from "zustand/vanilla";
 
+import { MAX_EDITOR_SCALE, MIN_EDITOR_SCALE } from "@/constants";
 import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
 import { createEditorViewSlice } from "@/store/slices/editorViewSlice";
 import type { EditorStore } from "@/store/store.types";
@@ -26,13 +27,13 @@ describe("editor view actions", () => {
     const store = createTestStore();
 
     store.getState().setScale(10);
-    expect(store.getState().scale).toBe(5);
+    expect(store.getState().scale).toBe(MAX_EDITOR_SCALE);
 
     store.getState().zoomBy(0.01);
-    expect(store.getState().scale).toBe(0.25);
+    expect(store.getState().scale).toBe(MIN_EDITOR_SCALE);
 
     store.getState().zoomBy(2);
-    expect(store.getState().scale).toBe(0.5);
+    expect(store.getState().scale).toBe(MIN_EDITOR_SCALE * 2);
   });
 
   it("signals a fit when applying fit scale or changing layout", () => {

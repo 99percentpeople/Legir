@@ -7,6 +7,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 
+import { workspaceScaleToZoomPercent } from "@/lib/pdfScale";
 import { cn } from "@/utils/cn";
 import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";
@@ -49,7 +50,7 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
   onFitScreen,
 }) => {
   const { t } = useLanguage();
-  const percentage = `${Math.round(scale * 100)}%`;
+  const percentage = `${workspaceScaleToZoomPercent(scale)}%`;
 
   if (!compact) {
     return (

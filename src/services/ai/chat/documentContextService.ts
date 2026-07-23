@@ -8,6 +8,10 @@ import {
 import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
 import { getEffectivePdfPermissions } from "@/lib/pdfPermissions";
+import {
+  workspaceScaleToPdfViewerScale,
+  workspaceScaleToZoomPercent,
+} from "@/lib/pdfScale";
 import { pageTranslationService } from "@/services/pageTranslationService";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import {
@@ -949,8 +953,10 @@ export const createDocumentContextService = (options: {
         visiblePageNumbers,
         currentViewportRect,
         viewportPageRects,
-        scale: Number(snapshot.scale.toFixed(3)),
-        zoomPercent: Math.round(snapshot.scale * 100),
+        scale: Number(
+          workspaceScaleToPdfViewerScale(snapshot.scale).toFixed(3),
+        ),
+        zoomPercent: workspaceScaleToZoomPercent(snapshot.scale),
         pageLayout: snapshot.pageLayout,
         pageFlow: snapshot.pageFlow,
         selectedText: selected?.text ?? "",

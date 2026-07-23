@@ -6,6 +6,8 @@ import {
   type RefObject,
 } from "react";
 import {
+  MAX_EDITOR_SCALE,
+  MIN_EDITOR_SCALE,
   WORKSPACE_BASE_PAGE_GAP_PX,
   WORKSPACE_BASE_PADDING_PX,
   ZOOM_BASE,
@@ -44,7 +46,7 @@ type PendingZoomCommit = {
 };
 
 const clampWorkspaceScale = (scale: number) => {
-  return Math.max(0.25, Math.min(5.0, scale));
+  return Math.max(MIN_EDITOR_SCALE, Math.min(MAX_EDITOR_SCALE, scale));
 };
 
 export const useWorkspaceViewport = (opts: {

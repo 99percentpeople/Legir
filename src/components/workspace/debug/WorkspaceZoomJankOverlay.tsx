@@ -1,5 +1,6 @@
 import React from "react";
 import { useLanguage } from "@/components/language-provider";
+import { workspaceScaleToZoomPercent } from "@/lib/pdfScale";
 import { useWorkspaceZoomJankDebug } from "../hooks/useWorkspaceZoomJankDebug";
 
 interface WorkspaceZoomJankOverlayProps {
@@ -28,12 +29,12 @@ const WorkspaceZoomJankOverlay: React.FC<WorkspaceZoomJankOverlayProps> = ({
             workspaceZoomJank?.startScale === null ||
             workspaceZoomJank?.startScale === undefined
               ? "--"
-              : `${Math.round(workspaceZoomJank.startScale * 100)}%`
+              : `${workspaceScaleToZoomPercent(workspaceZoomJank.startScale)}%`
           } -> ${
             workspaceZoomJank?.targetScale === null ||
             workspaceZoomJank?.targetScale === undefined
               ? "--"
-              : `${Math.round(workspaceZoomJank.targetScale * 100)}%`
+              : `${workspaceScaleToZoomPercent(workspaceZoomJank.targetScale)}%`
           }`}
         </div>
         <div>{`${t("debug_overlay.duration")} ${workspaceZoomJank?.durationMs ?? "--"} ms`}</div>

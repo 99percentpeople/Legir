@@ -15,6 +15,7 @@ import {
   AI_CHAT_VISUAL_TOOL_HISTORY_WINDOW_MIN,
   ANNOTATION_STYLES,
   DEFAULT_EDITOR_UI_STATE,
+  DEFAULT_SCALE,
 } from "@/constants";
 import { clampAiChatCompressionThresholdPercent } from "@/services/ai/chat/runtime/compression/threshold";
 import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
@@ -405,7 +406,7 @@ export const initialState: EditorState = {
   documentLoadState: "ready",
   documentLoadError: null,
   selectedId: null,
-  scale: 1.0,
+  scale: DEFAULT_SCALE,
   mode: "annotation",
   tool: "select",
   penStyle: {
