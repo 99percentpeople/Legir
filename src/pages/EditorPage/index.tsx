@@ -55,6 +55,8 @@ const EditorPage: React.FC = () => {
   const documentCommands = useEditorDocumentCommandsRuntime();
   const permissionUi = usePdfPermissionUi(state.documentPermissions);
   const isMobile = useIsMobile();
+  // Keep the responsive default for explicit mode changes and resets, but do
+  // not synchronize it to the active tool when the viewport width changes.
   const defaultTool: Tool = isMobile ? "pan" : "select";
   const prevSelectedIdRef = React.useRef<string | null>(null);
 
@@ -72,13 +74,6 @@ const EditorPage: React.FC = () => {
     void loadEditorRightPanel();
     setHasInitializedRightPanel(true);
   }, [state.pages.length]);
-
-  React.useEffect(() => {
-    if (!isMobile) return;
-    const currentState = useEditorStore.getState();
-    if (currentState.tool !== "select" || currentState.selectedId) return;
-    currentState.setTool("pan");
-  }, [isMobile]);
 
   const openAiChatPanel = React.useCallback(() => {
     state.setUiState((prev) => {
