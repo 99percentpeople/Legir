@@ -37,7 +37,7 @@ export const translateTextWithAiSdk = async (options: {
   prompt?: string;
   signal?: AbortSignal;
 }) => {
-  const runtime = resolveAiSdkRuntime({
+  const runtime = await resolveAiSdkRuntime({
     appOptions: options.appOptions,
     specifier: options.specifier,
     kind: "translate",
@@ -65,7 +65,7 @@ export async function* translateTextStreamWithAiSdk(options: {
   prompt?: string;
   signal?: AbortSignal;
 }): AsyncGenerator<string> {
-  const runtime = resolveAiSdkRuntime({
+  const runtime = await resolveAiSdkRuntime({
     appOptions: options.appOptions,
     specifier: options.specifier,
     kind: "translate",

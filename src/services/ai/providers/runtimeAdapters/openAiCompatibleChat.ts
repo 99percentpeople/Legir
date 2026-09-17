@@ -1,14 +1,8 @@
-import {
-  NoSuchModelError,
-  type EmbeddingModelV3,
-  type ImageModelV3,
-  type LanguageModelV3,
+import type {
+  EmbeddingModelV3,
+  ImageModelV3,
+  LanguageModelV3,
 } from "@ai-sdk/provider";
-import { OpenAICompatibleChatLanguageModel } from "@ai-sdk/openai-compatible";
-import {
-  withoutTrailingSlash,
-  withUserAgentSuffix,
-} from "@ai-sdk/provider-utils";
 import type { ModelMessage } from "ai";
 
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
@@ -22,10 +16,19 @@ type OpenAiCompatibleChatOnlyOptions = {
   supportsStructuredOutputs?: boolean;
 };
 
-export const createOpenAiCompatibleChatOnlyProvider = (
+export const createOpenAiCompatibleChatOnlyProvider = async (
   config: AiSdkProviderConfig,
   options: OpenAiCompatibleChatOnlyOptions,
 ) => {
+  const [providerModule, compatibleModule, providerUtilsModule] =
+    await Promise.all([
+      import("@ai-sdk/provider"),
+      import("@ai-sdk/openai-compatible"),
+      import("@ai-sdk/provider-utils"),
+    ]);
+  const { NoSuchModelError } = providerModule;
+  const { OpenAICompatibleChatLanguageModel } = compatibleModule;
+  const { withoutTrailingSlash, withUserAgentSuffix } = providerUtilsModule;
   const baseURL = withoutTrailingSlash(
     config.baseURL ?? options.defaultBaseUrl,
   );

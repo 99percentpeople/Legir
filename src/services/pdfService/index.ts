@@ -80,7 +80,6 @@ import {
   ParseSpeeds,
   rgb,
 } from "@cantoo/pdf-lib";
-import fontkit from "pdf-fontkit";
 import { pdfDebug, pdfDebugEnabled } from "./lib/debug";
 import { appEventBus } from "@/lib/eventBus";
 import { PDF_CUSTOM_KEYS } from "@/constants";
@@ -2304,26 +2303,33 @@ export const exportPDF = async (
 
   const { includeFontIds, needsCustomFont, usedFontFamilies } =
     resolveExportFontNeeds();
+  const needsExternalFonts =
+    includeFontIds.size > 0 || needsCustomFont || usedFontFamilies.size > 0;
+  const fontkit = needsExternalFonts
+    ? (await import("pdf-fontkit")).default
+    : null;
 
-  await loadAndEmbedExportFonts({
-    pdfDoc,
-    fontMap,
-    fontkit,
-    customFont:
-      needsCustomFont && customFont?.bytes
-        ? { bytes: customFont.bytes, name: customFont.name }
-        : undefined,
-    includeFontIds,
-    subset: true,
-  });
+  if (fontkit) {
+    await loadAndEmbedExportFonts({
+      pdfDoc,
+      fontMap,
+      fontkit,
+      customFont:
+        needsCustomFont && customFont?.bytes
+          ? { bytes: customFont.bytes, name: customFont.name }
+          : undefined,
+      includeFontIds,
+      subset: true,
+    });
 
-  await loadAndEmbedSelectedSystemFonts({
-    pdfDoc,
-    fontMap,
-    fontkit,
-    families: Array.from(usedFontFamilies),
-    subset: true,
-  });
+    await loadAndEmbedSelectedSystemFonts({
+      pdfDoc,
+      fontMap,
+      fontkit,
+      families: Array.from(usedFontFamilies),
+      subset: true,
+    });
+  }
 
   const xfaEntry = captureAcroFormXfaEntry(pdfDoc);
   const form = pdfDoc.getForm();

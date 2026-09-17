@@ -4,10 +4,10 @@ import {
 } from "@/services/ai/providers/catalog";
 import {
   getAiSdkModelGroups,
-  getAiSdkModelCatalogProvider,
   getAiSdkProviderModelOptions,
-  isAiSdkProviderConfigured,
-} from "@/services/ai/providers";
+} from "@/services/ai/providers/modelSelection";
+import { getAiSdkModelCatalogProvider } from "@/services/ai/providers/modelCatalogRegistry";
+import { isAiSdkProviderConfigured } from "@/services/ai/providers/settings";
 import {
   getCurrentModelCache,
   getCurrentOptions,

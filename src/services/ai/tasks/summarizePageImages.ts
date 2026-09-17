@@ -67,7 +67,7 @@ export const summarizePageImagesWithAiSdk = async (options: {
   request?: string;
   signal?: AbortSignal;
 }) => {
-  const model = resolveAiSdkLanguageModel(
+  const model = await resolveAiSdkLanguageModel(
     options.appOptions,
     options.specifier,
   );

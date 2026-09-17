@@ -558,7 +558,7 @@ const zhTW = {
       google_cloud: "Google Cloud Translation",
       api_key_placeholder: "Cloud Translation API Key",
       google_cloud_desc:
-        "手動輸入的 Key 優先於 GOOGLE_TRANSLATE_API_KEY 環境變數。",
+        "在此填寫 Google Cloud Translation API Key。Key 僅從應用程式設定中讀取。",
       test_connection: "測試連線",
       testing: "測試中...",
       test_success: "連線成功。",

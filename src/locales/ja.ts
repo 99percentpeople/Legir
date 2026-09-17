@@ -572,7 +572,7 @@ const ja = {
       google_cloud: "Google Cloud Translation",
       api_key_placeholder: "Cloud Translation API Key",
       google_cloud_desc:
-        "手動で入力したキーは GOOGLE_TRANSLATE_API_KEY より優先されます。",
+        "Google Cloud Translation API キーをここに入力します。キーはアプリ設定からのみ読み込まれます。",
       test_connection: "接続をテスト",
       testing: "テスト中...",
       test_success: "接続に成功しました。",

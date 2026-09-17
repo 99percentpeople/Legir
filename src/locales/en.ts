@@ -571,7 +571,7 @@ const en = {
       google_cloud: "Google Cloud Translation",
       api_key_placeholder: "Cloud Translation API Key",
       google_cloud_desc:
-        "A manually entered key takes precedence over GOOGLE_TRANSLATE_API_KEY.",
+        "Enter your Google Cloud Translation API key here. The key is read only from App Settings.",
       test_connection: "Test connection",
       testing: "Testing...",
       test_success: "Connection successful.",

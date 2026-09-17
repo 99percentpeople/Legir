@@ -31,10 +31,6 @@ import type {
   TranslationOptions,
 } from "@/types";
 
-const envGeminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
-const envOpenAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
-const envOpenAiApiUrl = (process.env.OPENAI_API_URL || "").trim();
-
 const clampAiChatInteger = (
   value: unknown,
   options: {
@@ -155,21 +151,8 @@ export const trimLlmOptions = (options: LLMOptions): LLMOptions =>
     return acc;
   }, {} as LLMOptions);
 
-export const applyEnvLlmDefaults = (options: LLMOptions): LLMOptions => ({
-  ...options,
-  gemini: {
-    ...options.gemini,
-    apiKey: (options.gemini.apiKey || envGeminiApiKey).trim(),
-  },
-  openai: {
-    ...options.openai,
-    apiKey: (options.openai.apiKey || envOpenAiApiKey).trim(),
-    apiUrl: (options.openai.apiUrl || envOpenAiApiUrl).trim(),
-  },
-});
-
 export const normalizeLlmOptions = (options: LLMOptions): LLMOptions =>
-  applyEnvLlmDefaults(trimLlmOptions(options));
+  trimLlmOptions(options);
 
 export const createEmptyLlmModelCache = (): EditorState["llmModelCache"] =>
   AI_PROVIDER_IDS.reduce<EditorState["llmModelCache"]>(

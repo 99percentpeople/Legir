@@ -39,5 +39,5 @@
 
 ## Security & Configuration Tips
 
-- Put secrets in `.env.local` (example `GEMINI_API_KEY=...`) and never commit them.
+- Configure AI and translation API credentials in the app Settings UI. Do not inject API keys through Vite/build-time environment variables, and never commit credentials.
 - Desktop permissions live in `src-tauri/capabilities/`; keep scopes minimal when adjusting access.

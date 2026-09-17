@@ -59,12 +59,8 @@ export interface TranslateTextOptions {
   signal?: AbortSignal;
 }
 
-const getCloudTranslationApiKey = () => {
-  const configuredKey = useEditorStore
-    .getState()
-    .options.translation.googleCloud.apiKey.trim();
-  return configuredKey || (process.env.GOOGLE_TRANSLATE_API_KEY || "").trim();
-};
+const getCloudTranslationApiKey = () =>
+  useEditorStore.getState().options.translation.googleCloud.apiKey.trim();
 
 const decodeHtmlEntities = (text: string) => {
   if (typeof document === "undefined") return text;

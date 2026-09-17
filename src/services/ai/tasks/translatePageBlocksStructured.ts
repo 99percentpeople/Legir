@@ -45,7 +45,7 @@ export const translatePageBlocksStructuredWithAiSdk = async (options: {
   aiReflowParagraphs?: boolean;
   signal?: AbortSignal;
 }): Promise<AiSdkPageTranslateResponse> => {
-  const runtime = resolveAiSdkRuntime({
+  const runtime = await resolveAiSdkRuntime({
     appOptions: options.appOptions,
     specifier: options.specifier,
     kind: "translate",

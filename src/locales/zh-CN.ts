@@ -559,7 +559,7 @@ const zhCN = {
       google_cloud: "Google Cloud Translation",
       api_key_placeholder: "Cloud Translation API Key",
       google_cloud_desc:
-        "手动填写的 Key 优先于 GOOGLE_TRANSLATE_API_KEY 环境变量。",
+        "在此填写 Google Cloud Translation API Key。Key 仅从应用设置中读取。",
       test_connection: "测试连接",
       testing: "测试中...",
       test_success: "连接成功。",

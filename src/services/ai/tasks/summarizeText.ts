@@ -12,7 +12,7 @@ export const summarizeTextWithAiSdk = async (options: {
   system?: string;
   signal?: AbortSignal;
 }) => {
-  const model = resolveAiSdkLanguageModel(
+  const model = await resolveAiSdkLanguageModel(
     options.appOptions,
     options.specifier,
   );

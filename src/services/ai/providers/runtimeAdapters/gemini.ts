@@ -1,5 +1,3 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type {
   AiRuntimeAdapter,
@@ -49,12 +47,14 @@ const getGeminiThinkingOffCallOptions = (modelId: string) => {
 export const geminiAdapter: AiRuntimeAdapter = {
   providerId: "gemini",
 
-  createSdkProvider: (config: AiSdkProviderConfig) =>
-    createGoogleGenerativeAI({
+  createSdkProvider: async (config: AiSdkProviderConfig) => {
+    const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
+    return createGoogleGenerativeAI({
       name: config.providerId,
       apiKey: config.apiKey,
       fetch: config.fetch,
-    }),
+    });
+  },
 
   getReasoningCapability: ({ modelId }) =>
     getAiProviderModelReasoningMetadata("gemini", modelId),

@@ -1,1 +1,1 @@
-export { getAiSdkModelCatalogProvider } from "@/services/ai/providers/registry";
+export { getAiSdkModelCatalogProvider } from "@/services/ai/providers/modelCatalogRegistry";

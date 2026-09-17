@@ -1,6 +1,6 @@
 import path from "path";
 import { readFileSync } from "fs";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -11,8 +11,35 @@ import { createStaticCopyPlugin } from "./config/vite/staticCopy";
 const host = process.env.TAURI_DEV_HOST;
 const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
 
+const getManualChunk = (id: string) => {
+  const normalized = id.replaceAll("\\", "/");
+  if (normalized.includes("/node_modules/pdf-fontkit/")) return "pdf-fontkit";
+  if (normalized.includes("/node_modules/@ai-sdk/openai/")) {
+    return "ai-provider-openai";
+  }
+  if (normalized.includes("/node_modules/@ai-sdk/google/")) {
+    return "ai-provider-google";
+  }
+  if (normalized.includes("/node_modules/@ai-sdk/anthropic/")) {
+    return "ai-provider-anthropic";
+  }
+  if (normalized.includes("/node_modules/@ai-sdk/xai/")) {
+    return "ai-provider-xai";
+  }
+  if (normalized.includes("/node_modules/@ai-sdk/groq/")) {
+    return "ai-provider-groq";
+  }
+  if (normalized.includes("/node_modules/@openrouter/ai-sdk-provider/")) {
+    return "ai-provider-openrouter";
+  }
+  if (normalized.includes("/node_modules/zhipu-ai-provider/")) {
+    return "ai-provider-zhipu";
+  }
+  if (normalized.includes("/node_modules/ai/")) return "ai-runtime-core";
+  return undefined;
+};
+
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, ".", "");
   const isTauriEnv = mode === "tauri" || !!process.env.TAURI_ENV_PLATFORM;
 
   return {
@@ -42,13 +69,9 @@ export default defineConfig(({ mode }) => {
       ...(!isTauriEnv ? createPwaPlugin(packageJson.displayName) : []),
     ],
     define: {
-      "process.env.GEMINI_API_KEY": JSON.stringify(env.GEMINI_API_KEY),
-      "process.env.OPENAI_API_KEY": JSON.stringify(env.OPENAI_API_KEY),
-      "process.env.OPENAI_API_URL": JSON.stringify(env.OPENAI_API_URL),
-      "process.env.GOOGLE_TRANSLATE_API_KEY": JSON.stringify(
-        env.GOOGLE_TRANSLATE_API_KEY,
-      ),
-      // Add package.json displayName to global scope
+      // Add package.json displayName to global scope.
+      // API credentials are intentionally configured only inside the app and
+      // must never be embedded into browser/Tauri frontend bundles at build time.
       "process.env.APP_NAME": JSON.stringify(packageJson.displayName),
     },
     resolve: {
@@ -66,6 +89,11 @@ export default defineConfig(({ mode }) => {
       minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
       // produce sourcemaps for debug builds
       sourcemap: !!process.env.TAURI_ENV_DEBUG,
+      rollupOptions: {
+        output: {
+          manualChunks: getManualChunk,
+        },
+      },
     },
   };
 });

@@ -1,12 +1,6 @@
 import { translateService } from "@/services/translateService";
-import {
-  getAiSdkModelGroups,
-  isAiSdkProviderConfigured,
-} from "@/services/ai/providers";
-import {
-  translateTextStreamWithAiSdk,
-  translateTextWithAiSdk,
-} from "@/services/ai/tasks";
+import { getAiSdkModelGroups } from "@/services/ai/providers/modelSelection";
+import { isAiSdkProviderConfigured } from "@/services/ai/providers/settings";
 import {
   getCurrentModelCache,
   getCurrentOptions,
@@ -38,6 +32,7 @@ export const registerTranslateOptionsFromProviders = () => {
         isAiSdkProviderConfigured(getCurrentOptions(), group.providerId),
       unavailableMessageKey: group.unavailableMessageKey,
       translate: async (text, optionId, translateOptions) => {
+        const { translateTextWithAiSdk } = await import("@/services/ai/tasks");
         return await translateTextWithAiSdk({
           text,
           appOptions: getCurrentOptions(),
@@ -51,8 +46,10 @@ export const registerTranslateOptionsFromProviders = () => {
           signal: translateOptions.signal,
         });
       },
-      translateStream: (text, optionId, translateOptions) => {
-        return translateTextStreamWithAiSdk({
+      translateStream: async function* (text, optionId, translateOptions) {
+        const { translateTextStreamWithAiSdk } =
+          await import("@/services/ai/tasks");
+        yield* translateTextStreamWithAiSdk({
           text,
           appOptions: getCurrentOptions(),
           specifier: {

@@ -1,9 +1,4 @@
-import type { ProviderV3 } from "@ai-sdk/provider";
-
-import type {
-  AiSdkModelCallOptions,
-  AiSdkProviderConfig,
-} from "@/services/ai/providers/types";
+import type { AiSdkModelCallOptions } from "@/services/ai/providers/types";
 import type {
   AiReasoningResolution,
   AiRuntimeAdapter,
@@ -214,7 +209,7 @@ export const mergeAiSdkModelCallOptions = (
  */
 export const createBasicRuntimeAdapter = (options: {
   providerId: AiRuntimeAdapter["providerId"];
-  createSdkProvider: (config: AiSdkProviderConfig) => ProviderV3;
+  createSdkProvider: AiRuntimeAdapter["createSdkProvider"];
 }): AiRuntimeAdapter => ({
   providerId: options.providerId,
   createSdkProvider: options.createSdkProvider,

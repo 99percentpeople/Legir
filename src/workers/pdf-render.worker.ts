@@ -453,13 +453,14 @@ const getOutlineForDoc = async (
 };
 
 const mapPdfJsPermissions = (
-  rawFlags: number[] | null,
+  rawFlags: ReadonlySet<number> | readonly number[] | null,
 ): PDFDocumentPermissions => {
-  if (!Array.isArray(rawFlags)) {
+  if (!rawFlags) {
     return getEffectivePdfPermissions(null);
   }
 
-  const has = (flag: number) => rawFlags.includes(flag);
+  const normalizedFlags = [...rawFlags];
+  const has = (flag: number) => normalizedFlags.includes(flag);
   const canPrint =
     has(pdfjsLib.PermissionFlag.PRINT) ||
     has(pdfjsLib.PermissionFlag.PRINT_HIGH_QUALITY);
@@ -477,7 +478,7 @@ const mapPdfJsPermissions = (
     canPrintHighQuality: has(pdfjsLib.PermissionFlag.PRINT_HIGH_QUALITY),
     canAssemble: has(pdfjsLib.PermissionFlag.ASSEMBLE),
     hasOwnerRestrictions: false,
-    rawFlags: [...rawFlags],
+    rawFlags: normalizedFlags,
   };
 
   permissions.hasOwnerRestrictions =
@@ -491,7 +492,11 @@ const mapPdfJsPermissions = (
 
   return permissions.hasOwnerRestrictions
     ? permissions
-    : { ...UNRESTRICTED_PDF_PERMISSIONS, isEncrypted: true, rawFlags };
+    : {
+        ...UNRESTRICTED_PDF_PERMISSIONS,
+        isEncrypted: true,
+        rawFlags: normalizedFlags,
+      };
 };
 
 const getPermissionsForDoc = async (
@@ -603,11 +608,7 @@ const loadDocument = async (
     }
   }
 
-  try {
-    await state.pdfDoc?.destroy();
-  } finally {
-    state.pdfDoc = null;
-  }
+  state.pdfDoc = null;
   state.pageCache.clear();
   const loadingTask = pdfjsLib.getDocument({
     data: data,
@@ -619,7 +620,6 @@ const loadDocument = async (
     useSystemFonts: false,
     disableFontFace: false,
     stopAtErrors: false,
-    length: data.length,
   });
 
   if (typeof password === "string") {
@@ -668,12 +668,7 @@ const disposeDocument = async (docId: string) => {
     state.loadingTask = null;
   }
 
-  try {
-    await state.pdfDoc?.destroy();
-  } finally {
-    state.pdfDoc = null;
-  }
-
+  state.pdfDoc = null;
   state.pageCache.clear();
 };
 

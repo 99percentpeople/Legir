@@ -76,7 +76,14 @@ export const createPwaPlugin = (displayName: string) =>
     includeAssets: ["icons/app-icon.svg", "icons/pdf-icon.svg"],
     manifest: createPwaManifest(displayName),
     injectManifest: {
-      globIgnores: ["fonts/*.ttf"],
+      globIgnores: [
+        "fonts/*.ttf",
+        // AI provider/runtime chunks require network-backed APIs anyway. Keep
+        // them lazy instead of spending PWA install bandwidth precaching every
+        // provider the user may never configure.
+        "assets/ai-provider-*.js",
+        "assets/ai-runtime-*.js",
+      ],
       maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,ttf,json}"],
     },

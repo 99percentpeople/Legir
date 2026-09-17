@@ -579,7 +579,7 @@ const fr = {
       google_cloud: "Google Cloud Translation",
       api_key_placeholder: "Clé API Cloud Translation",
       google_cloud_desc:
-        "La clé saisie manuellement est prioritaire sur GOOGLE_TRANSLATE_API_KEY.",
+        "Saisissez ici la clé API Google Cloud Translation. La clé est lue uniquement depuis les paramètres de l’application.",
       test_connection: "Tester la connexion",
       testing: "Test en cours...",
       test_success: "Connexion réussie.",

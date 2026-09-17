@@ -209,12 +209,6 @@ export const selectEditorRightPanelState = (state: EditorStore) => ({
   annotations: state.annotations,
   metadata: state.metadata,
   filename: state.filename,
-  pagesLength: state.pages.length,
-  pageTranslateOptions: state.pageTranslateOptions,
-  pageTranslateParagraphCandidates: state.pageTranslateParagraphCandidates,
-  pageTranslateSelectedParagraphIds: state.pageTranslateSelectedParagraphIds,
-  translateOption: state.translateOption,
-  translateTargetLanguage: state.translateTargetLanguage,
   documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   setState: state.setState,
@@ -225,6 +219,21 @@ export const selectEditorRightPanelState = (state: EditorStore) => ({
   updateField: state.updateField,
   updateAnnotation: state.updateAnnotation,
   updateMetadata: state.updateMetadata,
+});
+
+export const selectPageTranslateRightPanelState = (state: EditorStore) => ({
+  isPanelFloating: state.isPanelFloating,
+  isRightPanelOpen: state.isRightPanelOpen,
+  rightPanelWidth: state.rightPanelWidth,
+  pagesLength: state.pages.length,
+  pageTranslateOptions: state.pageTranslateOptions,
+  pageTranslateParagraphCandidates: state.pageTranslateParagraphCandidates,
+  pageTranslateSelectedParagraphIds: state.pageTranslateSelectedParagraphIds,
+  translateOption: state.translateOption,
+  translateTargetLanguage: state.translateTargetLanguage,
+  documentLoadState: state.documentLoadState,
+  documentPermissions: state.documentPermissions,
+  setUiState: state.setUiState,
   clearPageTranslateParagraphCandidates:
     state.clearPageTranslateParagraphCandidates,
   mergeSelectedPageTranslateParagraphs:

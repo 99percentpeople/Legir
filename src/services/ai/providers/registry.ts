@@ -164,5 +164,7 @@ export const getAiSdkModelCatalogProvider = (providerId: AiProviderId) =>
 export const getAiRuntimeAdapter = (config: AiSdkProviderConfig) =>
   getAiProviderDefinition(config.providerId).getRuntimeAdapter(config);
 
-export const createAiSdkProvider = (config: AiSdkProviderConfig): ProviderV3 =>
-  getAiRuntimeAdapter(config).createSdkProvider(config);
+export const createAiSdkProvider = async (
+  config: AiSdkProviderConfig,
+): Promise<ProviderV3> =>
+  await getAiRuntimeAdapter(config).createSdkProvider(config);

@@ -16,12 +16,12 @@ export {
   normalizeOptionalText,
 } from "@/services/ai/providers/settings";
 
-export const createAiSdkProviders = (options: AppOptions) => {
+export const createAiSdkProviders = async (options: AppOptions) => {
   const providers: Record<string, ProviderV3> = {};
   const proxyFetch = createApiProxyFetch(options);
 
   for (const config of getConfiguredAiSdkProviders(options)) {
-    providers[config.providerId] = createAiSdkProvider({
+    providers[config.providerId] = await createAiSdkProvider({
       ...config,
       fetch: proxyFetch,
     });
@@ -30,8 +30,8 @@ export const createAiSdkProviders = (options: AppOptions) => {
   return providers;
 };
 
-export const createAiSdkProviderRegistry = (options: AppOptions) => {
+export const createAiSdkProviderRegistry = async (options: AppOptions) => {
   return createProviderRegistry(
-    createAiSdkProviders(options),
+    await createAiSdkProviders(options),
   ) as ProviderRegistryProvider<Record<string, ProviderV3>>;
 };

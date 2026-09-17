@@ -1,5 +1,3 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
-
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type {
   AiReasoningLevel,
@@ -29,15 +27,17 @@ export const createAnthropicCompatibleAdapter = (
   options: AnthropicCompatibleAdapterOptions = {},
 ): AiRuntimeAdapter => ({
   providerId,
-  createSdkProvider: (config: AiSdkProviderConfig) =>
-    createAnthropic({
+  createSdkProvider: async (config: AiSdkProviderConfig) => {
+    const { createAnthropic } = await import("@ai-sdk/anthropic");
+    return createAnthropic({
       name: config.providerId,
       ...(options.authMode === "bearer"
         ? { authToken: config.apiKey }
         : { apiKey: config.apiKey }),
       ...(config.baseURL ? { baseURL: config.baseURL } : {}),
       fetch: config.fetch,
-    }),
+    });
+  },
 
   getReasoningCapability: ({ providerId, modelId }) =>
     getAiProviderModelReasoningMetadata(providerId, modelId),

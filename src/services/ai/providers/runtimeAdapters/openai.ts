@@ -1,5 +1,3 @@
-import { createOpenAI } from "@ai-sdk/openai";
-
 import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
 import type {
   AiRuntimeAdapter,
@@ -29,13 +27,15 @@ const toOpenAiReasoningEffort = (
 export const openAiAdapter: AiRuntimeAdapter = {
   providerId: "openai",
 
-  createSdkProvider: (config: AiSdkProviderConfig) =>
-    createOpenAI({
+  createSdkProvider: async (config: AiSdkProviderConfig) => {
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    return createOpenAI({
       name: config.providerId,
       apiKey: config.apiKey,
       ...(config.baseURL ? { baseURL: config.baseURL } : {}),
       fetch: config.fetch,
-    }),
+    });
+  },
 
   getReasoningCapability: ({ modelId }) =>
     getAiProviderModelReasoningMetadata("openai", modelId),

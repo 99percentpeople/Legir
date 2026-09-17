@@ -71,7 +71,9 @@ export interface AiRuntimeAdapter {
   providerId: AiSdkProviderId;
 
   /** Build the AI SDK provider, including provider-specific SDK wrappers. */
-  createSdkProvider: (config: AiSdkProviderConfig) => ProviderV3;
+  createSdkProvider: (
+    config: AiSdkProviderConfig,
+  ) => ProviderV3 | Promise<ProviderV3>;
 
   getReasoningCapability: (request: AiRuntimeRequest) => AiReasoningCapability;
 

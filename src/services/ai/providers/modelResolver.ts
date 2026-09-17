@@ -2,17 +2,15 @@ import type { LanguageModel } from "ai";
 
 import {
   AI_PROVIDER_IDS,
-  AI_PROVIDER_SPECS_SORTED_BY_LABEL,
   getAiProviderSpec,
   isAiProviderId,
 } from "@/services/ai/providers/catalog";
-import {
-  getAiRuntimeAdapter,
-  getAiSdkModelCatalogProvider,
-} from "@/services/ai/providers/registry";
+import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
+import { getAiSdkModelCatalogProvider } from "@/services/ai/providers/modelCatalogRegistry";
+import { getAiSdkProviderModelOptions } from "@/services/ai/providers/modelSelection";
 import { useEditorStore } from "@/store/useEditorStore";
-import type { AppLLMModelOption, AppOptions, EditorState } from "@/types";
-import { createAiSdkProviderRegistry } from "@/services/ai/providers/config";
+import type { AppOptions, EditorState } from "@/types";
+import { createApiProxyFetch } from "@/services/platform/apiProxy";
 import {
   getConfiguredAiSdkProvider,
   isAiSdkProviderConfigured,
@@ -34,49 +32,11 @@ const MODEL_SPECIFIER_SEPARATOR = ":";
 
 type AiSdkModelCache = EditorState["llmModelCache"];
 
-export type AiSdkModelGroup = {
-  providerId: AiSdkProviderId;
-  label: string;
-  labelKey?: string;
-  isAvailable: boolean;
-  unavailableMessageKey?: string;
-  models: AppLLMModelOption[];
-};
-
-const dedupeModelOptions = (
-  models: Array<{
-    id: string;
-    label?: string;
-    capabilities: AppLLMModelOption["capabilities"];
-    rank?: number;
-  }>,
-) => {
-  const output: Array<AppLLMModelOption & { order: number }> = [];
-  const seen = new Set<string>();
-
-  for (const [order, model] of models.entries()) {
-    const id = (model.id || "").trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    output.push({
-      id,
-      label: (model.label || id).trim() || id,
-      capabilities: model.capabilities,
-      rank:
-        typeof model.rank === "number" && Number.isFinite(model.rank)
-          ? Math.trunc(model.rank)
-          : 0,
-      order,
-    });
-  }
-
-  return output
-    .sort(
-      (left, right) =>
-        (right.rank ?? 0) - (left.rank ?? 0) || left.order - right.order,
-    )
-    .map(({ order: _order, ...model }) => model);
-};
+export type { AiSdkModelGroup } from "@/services/ai/providers/modelSelection";
+export {
+  getAiSdkModelGroups,
+  getAiSdkProviderModelOptions,
+} from "@/services/ai/providers/modelSelection";
 
 const getFallbackModelId = (providerId: AiSdkProviderId) =>
   getAiProviderSpec(providerId).fallbackModelId || "";
@@ -111,25 +71,47 @@ export const getConfiguredAiSdkProviderIds = (options: AppOptions) =>
     isAiSdkProviderConfigured(options, providerId),
   );
 
-export const resolveAiSdkLanguageModel = (
-  options: AppOptions,
-  specifier: AiSdkModelSpecifier,
-): LanguageModel => {
-  const registry = createAiSdkProviderRegistry(options);
-  return registry.languageModel(
-    stringifyAiSdkModelSpecifier(specifier) as `${string}:${string}`,
-  );
+const createLanguageModel = async (options: {
+  appOptions: AppOptions;
+  config: NonNullable<ReturnType<typeof getConfiguredAiSdkProvider>>;
+  adapter: ReturnType<typeof getAiRuntimeAdapter>;
+  modelId: string;
+}): Promise<LanguageModel> => {
+  const provider = await options.adapter.createSdkProvider({
+    ...options.config,
+    fetch: createApiProxyFetch(options.appOptions),
+  });
+  return provider.languageModel(options.modelId);
 };
 
-export const resolveAiSdkLanguageModelDetailed = (
+export const resolveAiSdkLanguageModel = async (
+  options: AppOptions,
+  specifier: AiSdkModelSpecifier,
+): Promise<LanguageModel> => {
+  const config = getConfiguredAiSdkProvider(options, specifier.providerId);
+  if (!config) {
+    throw new Error(
+      `${specifier.providerId} is not configured for AI SDK runtime.`,
+    );
+  }
+  const adapter = getAiRuntimeAdapter(config);
+  return await createLanguageModel({
+    appOptions: options,
+    config,
+    adapter,
+    modelId: specifier.modelId,
+  });
+};
+
+export const resolveAiSdkLanguageModelDetailed = async (
   options: AppOptions,
   specifier: AiSdkModelSpecifier,
   kind: AiSdkTaskModelKind,
-): AiSdkResolvedLanguageModel => {
+): Promise<AiSdkResolvedLanguageModel> => {
   const provider = getAiSdkModelCatalogProvider(specifier.providerId);
   return {
     specifier,
-    model: resolveAiSdkLanguageModel(options, specifier),
+    model: await resolveAiSdkLanguageModel(options, specifier),
     callOptions: provider.resolveCallOptions?.({
       modelId: specifier.modelId,
       kind,
@@ -137,12 +119,12 @@ export const resolveAiSdkLanguageModelDetailed = (
   };
 };
 
-export const resolveAiSdkRuntime = (options: {
+export const resolveAiSdkRuntime = async (options: {
   appOptions: AppOptions;
   specifier: AiSdkModelSpecifier;
   kind: AiSdkTaskModelKind;
   reasoning?: "chat-settings" | "none";
-}): AiSdkResolvedRuntime => {
+}): Promise<AiSdkResolvedRuntime> => {
   const config = getConfiguredAiSdkProvider(
     options.appOptions,
     options.specifier.providerId,
@@ -179,7 +161,12 @@ export const resolveAiSdkRuntime = (options: {
 
   return {
     specifier: options.specifier,
-    model: resolveAiSdkLanguageModel(options.appOptions, options.specifier),
+    model: await createLanguageModel({
+      appOptions: options.appOptions,
+      config,
+      adapter,
+      modelId: options.specifier.modelId,
+    }),
     adapter,
     reasoning,
     request: runtimeRequest,
@@ -196,41 +183,6 @@ export const resolveAiSdkRuntime = (options: {
 export const resolveAiSdkLanguageModelFromCurrentOptions = (
   specifier: AiSdkModelSpecifier,
 ) => resolveAiSdkLanguageModel(useEditorStore.getState().options, specifier);
-
-export const getAiSdkProviderModelOptions = (options: {
-  appOptions: AppOptions;
-  modelCache: AiSdkModelCache;
-  providerId: AiSdkProviderId;
-  kind: AiSdkTaskModelKind;
-}) =>
-  dedupeModelOptions(
-    getAiSdkModelCatalogProvider(options.providerId).getModelsForTask({
-      appOptions: options.appOptions,
-      modelCache: options.modelCache,
-      kind: options.kind,
-    }),
-  );
-
-export const getAiSdkModelGroups = (options: {
-  appOptions: AppOptions;
-  modelCache: AiSdkModelCache;
-  kind: AiSdkTaskModelKind;
-}) =>
-  AI_PROVIDER_SPECS_SORTED_BY_LABEL.map(
-    (spec): AiSdkModelGroup => ({
-      providerId: spec.id,
-      label: spec.label,
-      labelKey: spec.labelKey,
-      isAvailable: isAiSdkProviderConfigured(options.appOptions, spec.id),
-      unavailableMessageKey: spec.unavailableMessageKey,
-      models: getAiSdkProviderModelOptions({
-        appOptions: options.appOptions,
-        modelCache: options.modelCache,
-        providerId: spec.id,
-        kind: options.kind,
-      }),
-    }),
-  );
 
 const getPreferredProviderId = (options: {
   appOptions: AppOptions;

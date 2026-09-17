@@ -1,75 +1,20 @@
 import React from "react";
 
-import { useEditorDocumentIdentityRuntime } from "@/app/editorRuntime";
-import { AiChatPanel } from "@/components/properties-panel/AiChatPanel";
-import { PageTranslatePanel } from "@/components/properties-panel/PageTranslatePanel";
 import { PropertiesPanel } from "@/components/properties-panel/PropertiesPanel";
-import { useLanguage } from "@/components/language-provider";
-import { useAiChatController } from "@/hooks/useAiChatController";
-import { usePageTranslation } from "@/hooks/usePageTranslation";
 import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
 import {
   canModifyPdfContents,
   mergePdfPermissionDirtyScopes,
 } from "@/lib/pdfPermissions";
-import {
-  selectAiChatEditorState,
-  selectEditorRightPanelState,
-} from "@/store/selectors";
+import { selectEditorRightPanelState } from "@/store/selectors";
 import { useEditorStore } from "@/store/useEditorStore";
-import type {
-  Annotation,
-  EditorUiState,
-  FormField,
-  PDFSearchResult,
-} from "@/types";
+import type { Annotation, FormField, PDFSearchResult } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 
-function EditorAiRightPanel({
-  aiScopeId,
-  onSearchHighlightsChange,
-  isFloating,
-  isOpen,
-  onOpen,
-  width,
-  onResize,
-  onCollapse,
-}: {
-  aiScopeId?: string;
-  onSearchHighlightsChange: (
-    highlights: Map<number, PDFSearchResult[]>,
-  ) => void;
-  isFloating: boolean;
-  isOpen: boolean;
-  onOpen: () => void;
-  width: number;
-  onResize: (width: number) => void;
-  onCollapse: () => void;
-}) {
-  const editorState = useEditorStore(useShallow(selectAiChatEditorState));
-  const { workerService } = useEditorDocumentIdentityRuntime();
-  const aiChat = useAiChatController(
-    editorState,
-    aiScopeId,
-    workerService ?? undefined,
-  );
-
-  React.useEffect(() => {
-    onSearchHighlightsChange(aiChat.highlightedSearchResultsByPage);
-  }, [aiChat.highlightedSearchResultsByPage, onSearchHighlightsChange]);
-
-  return (
-    <AiChatPanel
-      isFloating={isFloating}
-      isOpen={isOpen}
-      onOpen={onOpen}
-      width={width}
-      onResize={onResize}
-      onCollapse={onCollapse}
-      aiChat={aiChat}
-    />
-  );
-}
+const EditorAiRightPanel = React.lazy(() => import("./EditorAiRightPanel"));
+const EditorPageTranslateRightPanel = React.lazy(
+  () => import("./EditorPageTranslateRightPanel"),
+);
 
 export function EditorRightPanel({
   aiScopeId,
@@ -81,16 +26,7 @@ export function EditorRightPanel({
   ) => void;
 }) {
   const state = useEditorStore(useShallow(selectEditorRightPanelState));
-  const { effectiveLanguage } = useLanguage();
   const isDocumentReady = state.documentLoadState === "ready";
-  const {
-    isPageTranslating,
-    pageTranslateStatus,
-    cancelPageTranslate,
-    handleStartPageTranslate,
-    handlePreviewParagraphs,
-    handleUnmergeSelectedParagraphs,
-  } = usePageTranslation();
 
   const selectedField = state.selectedId
     ? (state.fields.find((field) => field.id === state.selectedId) ?? null)
@@ -103,6 +39,10 @@ export function EditorRightPanel({
   const selectedControl = selectedField ?? selectedAnnotation;
   const canRenderRightPanel =
     state.mode === "form" || state.mode === "annotation" || !!selectedControl;
+  const hasMountedAiRef = React.useRef(false);
+  if (state.rightPanelTab === "ai_chat") {
+    hasMountedAiRef.current = true;
+  }
 
   const openPanel = () => {
     state.setUiState((prev) => {
@@ -111,21 +51,6 @@ export function EditorRightPanel({
       }
       return { isRightPanelOpen: true };
     });
-  };
-
-  const updatePageTranslateOptions = (
-    patch: Partial<EditorUiState["pageTranslateOptions"]>,
-  ) => {
-    state.setUiState((prev) => ({
-      pageTranslateOptions: {
-        ...prev.pageTranslateOptions,
-        ...patch,
-      },
-    }));
-
-    if (typeof patch.flattenFreetext === "boolean") {
-      state.setAllFreetextFlatten(patch.flattenFreetext);
-    }
   };
 
   const handlePropertiesChange = (updates: Partial<FormField | Annotation>) => {
@@ -179,69 +104,30 @@ export function EditorRightPanel({
 
   if (!canRenderRightPanel) return null;
 
-  const aiPanel = (
+  const aiPanel = hasMountedAiRef.current ? (
     <div className={state.rightPanelTab === "ai_chat" ? "contents" : "hidden"}>
-      <EditorAiRightPanel
-        aiScopeId={aiScopeId}
-        onSearchHighlightsChange={onAiSearchHighlightsChange}
-        isFloating={state.isPanelFloating}
-        isOpen={state.isRightPanelOpen && state.rightPanelTab === "ai_chat"}
-        onOpen={openPanel}
-        width={state.rightPanelWidth}
-        onResize={(width) => state.setUiState({ rightPanelWidth: width })}
-        onCollapse={() => state.setUiState({ isRightPanelOpen: false })}
-      />
+      <React.Suspense fallback={null}>
+        <EditorAiRightPanel
+          aiScopeId={aiScopeId}
+          onSearchHighlightsChange={onAiSearchHighlightsChange}
+          isFloating={state.isPanelFloating}
+          isOpen={state.isRightPanelOpen && state.rightPanelTab === "ai_chat"}
+          onOpen={openPanel}
+          width={state.rightPanelWidth}
+          onResize={(width) => state.setUiState({ rightPanelWidth: width })}
+          onCollapse={() => state.setUiState({ isRightPanelOpen: false })}
+        />
+      </React.Suspense>
     </div>
-  );
+  ) : null;
 
   if (state.rightPanelTab === "page_translate") {
     return (
       <>
         {aiPanel}
-        <PageTranslatePanel
-          isFloating={state.isPanelFloating}
-          isOpen={state.isRightPanelOpen}
-          onOpen={openPanel}
-          width={state.rightPanelWidth}
-          onResize={(width) => state.setUiState({ rightPanelWidth: width })}
-          onCollapse={() => state.setUiState({ isRightPanelOpen: false })}
-          totalPages={state.pagesLength}
-          isProcessing={isPageTranslating || !isDocumentReady}
-          processingStatus={pageTranslateStatus}
-          documentPermissions={state.documentPermissions}
-          initialTranslateOption={state.translateOption}
-          initialTargetLanguage={
-            state.translateTargetLanguage || effectiveLanguage
-          }
-          options={state.pageTranslateOptions}
-          onOptionsChange={updatePageTranslateOptions}
-          paragraphCandidatesCount={
-            state.pageTranslateParagraphCandidates.length
-          }
-          selectedParagraphCount={
-            state.pageTranslateSelectedParagraphIds.length
-          }
-          onPreviewParagraphs={(options) => {
-            if (!isDocumentReady) return;
-            void handlePreviewParagraphs(options);
-          }}
-          onClearParagraphs={state.clearPageTranslateParagraphCandidates}
-          onMergeSelectedParagraphs={state.mergeSelectedPageTranslateParagraphs}
-          onUnmergeSelectedParagraphs={() => {
-            void handleUnmergeSelectedParagraphs();
-          }}
-          onToggleExcludeSelectedParagraphs={
-            state.toggleExcludeSelectedPageTranslateParagraphs
-          }
-          onDeleteSelectedParagraphs={
-            state.deleteSelectedPageTranslateParagraphs
-          }
-          onStart={(options) => {
-            if (!isDocumentReady) return;
-            void handleStartPageTranslate(options);
-          }}
-          onCancel={cancelPageTranslate}
-        />
+        <React.Suspense fallback={null}>
+          <EditorPageTranslateRightPanel />
+        </React.Suspense>
       </>
     );
   }

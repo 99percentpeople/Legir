@@ -1,5 +1,3 @@
-import { createZhipu } from "zhipu-ai-provider";
-
 import {
   createNoReasoningResolution,
   selectReasoningLevel,
@@ -9,12 +7,14 @@ import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/met
 
 export const zhipuAdapter: AiRuntimeAdapter = {
   providerId: "zhipu",
-  createSdkProvider: (config) =>
-    createZhipu({
+  createSdkProvider: async (config) => {
+    const { createZhipu } = await import("zhipu-ai-provider");
+    return createZhipu({
       apiKey: config.apiKey,
       ...(config.baseURL ? { baseURL: config.baseURL } : {}),
       fetch: config.fetch,
-    }),
+    });
+  },
 
   getReasoningCapability: ({ modelId }) =>
     getAiProviderModelReasoningMetadata("zhipu", modelId),

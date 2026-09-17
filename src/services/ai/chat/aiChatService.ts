@@ -142,7 +142,7 @@ export const aiChatService = {
       kind: "chat",
       modelKey,
     });
-    const runtime = resolveAiSdkRuntime({
+    const runtime = await resolveAiSdkRuntime({
       appOptions,
       specifier: modelSpecifier,
       kind: "chat",

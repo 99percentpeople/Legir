@@ -5,11 +5,6 @@ import "react";
 
 declare const process: {
   env: {
-    API_KEY?: string;
-    GEMINI_API_KEY?: string;
-    OPENAI_API_KEY?: string;
-    OPENAI_API_URL?: string;
-    GOOGLE_TRANSLATE_API_KEY?: string;
     APP_NAME?: string;
   };
 };
