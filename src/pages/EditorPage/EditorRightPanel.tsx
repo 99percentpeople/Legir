@@ -1,20 +1,15 @@
 import React from "react";
 
-import { PropertiesPanel } from "@/components/properties-panel/PropertiesPanel";
-import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
-import {
-  canModifyPdfContents,
-  mergePdfPermissionDirtyScopes,
-} from "@/lib/pdfPermissions";
-import { selectEditorRightPanelState } from "@/store/selectors";
+import { selectRightPanelShellState } from "@/store/selectors";
+import { EditorPropertiesRightPanel } from "./EditorPropertiesRightPanel";
+import { EditorRightPanelSkeleton } from "./components/EditorRightPanelSkeleton";
 import { useEditorStore } from "@/store/useEditorStore";
-import type { Annotation, FormField, PDFSearchResult } from "@/types";
+import type { PDFSearchResult } from "@/types";
 import { useShallow } from "zustand/react/shallow";
-
-const EditorAiRightPanel = React.lazy(() => import("./EditorAiRightPanel"));
-const EditorPageTranslateRightPanel = React.lazy(
-  () => import("./EditorPageTranslateRightPanel"),
-);
+import {
+  EditorAiRightPanel,
+  EditorPageTranslateRightPanel,
+} from "./rightPanelModules";
 
 export function EditorRightPanel({
   aiScopeId,
@@ -25,88 +20,39 @@ export function EditorRightPanel({
     highlights: Map<number, PDFSearchResult[]>,
   ) => void;
 }) {
-  const state = useEditorStore(useShallow(selectEditorRightPanelState));
-  const isDocumentReady = state.documentLoadState === "ready";
-
-  const selectedField = state.selectedId
-    ? (state.fields.find((field) => field.id === state.selectedId) ?? null)
-    : null;
-  const selectedAnnotation = state.selectedId
-    ? (state.annotations.find(
-        (annotation) => annotation.id === state.selectedId,
-      ) ?? null)
-    : null;
-  const selectedControl = selectedField ?? selectedAnnotation;
+  const state = useEditorStore(useShallow(selectRightPanelShellState));
   const canRenderRightPanel =
-    state.mode === "form" || state.mode === "annotation" || !!selectedControl;
+    state.mode === "form" ||
+    state.mode === "annotation" ||
+    state.hasSelectedControl;
   const hasMountedAiRef = React.useRef(false);
-  if (state.rightPanelTab === "ai_chat") {
-    hasMountedAiRef.current = true;
-  }
+  if (state.rightPanelTab === "ai_chat") hasMountedAiRef.current = true;
 
-  const openPanel = () => {
-    state.setUiState((prev) => {
-      if (prev.isPanelFloating) {
-        return { isRightPanelOpen: true, isSidebarOpen: false };
-      }
-      return { isRightPanelOpen: true };
-    });
-  };
-
-  const handlePropertiesChange = (updates: Partial<FormField | Annotation>) => {
-    if (!isDocumentReady) return;
-    const selectedId = state.selectedId;
-    if (!selectedId) return;
-
-    if (state.fields.some((field) => field.id === selectedId)) {
-      state.updateField(selectedId, updates as Partial<FormField>);
-      return;
-    }
-
-    const annotation = state.annotations.find((item) => item.id === selectedId);
-    if (!annotation) return;
-
-    const nextRect = updates.rect;
-    const currentRect = annotation.rect;
-    if (
-      currentRect &&
-      nextRect &&
-      nextRect.width === currentRect.width &&
-      nextRect.height === currentRect.height &&
-      (nextRect.x !== currentRect.x || nextRect.y !== currentRect.y)
-    ) {
-      state.updateAnnotation(selectedId, {
-        ...updates,
-        ...getMovedAnnotationUpdates(
-          annotation,
-          nextRect.x - currentRect.x,
-          nextRect.y - currentRect.y,
-        ),
-      } as Partial<Annotation>);
-      return;
-    }
-
-    state.updateAnnotation(selectedId, updates as Partial<Annotation>);
-  };
-
-  const handleFilenameChange = (name: string) => {
-    if (!isDocumentReady) return;
-    if (!canModifyPdfContents(state.documentPermissions)) return;
-    state.setState((prev) => ({
-      filename: name,
-      isDirty: true,
-      dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
-        prev.dirtyPermissionScopes,
-        { modifyContents: true },
-      ),
-    }));
-  };
+  const openPanel = React.useCallback(
+    () => state.openRightPanel(),
+    [state.openRightPanel],
+  );
+  const resizePanel = React.useCallback(
+    (width: number) => state.setUiState({ rightPanelWidth: width }),
+    [state.setUiState],
+  );
 
   if (!canRenderRightPanel) return null;
 
+  // EditorRightPanel itself is lazy-loaded by EditorPage, while AI and page
+  // translation are split into a second lazy layer. Keep the same shell-sized
+  // fallback across both layers so resolving the outer chunk cannot create a
+  // blank frame before the active branch finishes loading.
+  const loadingFallback = state.isRightPanelOpen ? (
+    <EditorRightPanelSkeleton
+      isFloating={state.isPanelFloating}
+      width={state.rightPanelWidth}
+    />
+  ) : null;
+
   const aiPanel = hasMountedAiRef.current ? (
     <div className={state.rightPanelTab === "ai_chat" ? "contents" : "hidden"}>
-      <React.Suspense fallback={null}>
+      <React.Suspense fallback={loadingFallback}>
         <EditorAiRightPanel
           aiScopeId={aiScopeId}
           onSearchHighlightsChange={onAiSearchHighlightsChange}
@@ -114,8 +60,8 @@ export function EditorRightPanel({
           isOpen={state.isRightPanelOpen && state.rightPanelTab === "ai_chat"}
           onOpen={openPanel}
           width={state.rightPanelWidth}
-          onResize={(width) => state.setUiState({ rightPanelWidth: width })}
-          onCollapse={() => state.setUiState({ isRightPanelOpen: false })}
+          onResize={resizePanel}
+          onCollapse={state.closeRightPanel}
         />
       </React.Suspense>
     </div>
@@ -125,7 +71,7 @@ export function EditorRightPanel({
     return (
       <>
         {aiPanel}
-        <React.Suspense fallback={null}>
+        <React.Suspense fallback={loadingFallback}>
           <EditorPageTranslateRightPanel />
         </React.Suspense>
       </>
@@ -136,30 +82,16 @@ export function EditorRightPanel({
     <>
       {aiPanel}
       {state.rightPanelTab !== "ai_chat" && (
-        <PropertiesPanel
-          selectedControl={selectedControl}
+        <EditorPropertiesRightPanel
           activeTab={
             state.rightPanelTab === "properties" ? "properties" : "document"
           }
-          metadata={state.metadata}
-          filename={state.filename}
-          onChange={handlePropertiesChange}
-          onMetadataChange={(updates) => {
-            if (isDocumentReady) state.updateMetadata(updates);
-          }}
-          onFilenameChange={handleFilenameChange}
-          onDelete={state.deleteSelection}
-          onClose={() => {
-            state.setUiState({ rightPanelTab: "document" });
-            state.selectControl(null);
-          }}
-          onCollapse={() => state.setUiState({ isRightPanelOpen: false })}
+          onCollapse={state.closeRightPanel}
           isOpen={state.isRightPanelOpen}
           onOpen={openPanel}
           isFloating={state.isPanelFloating}
-          onTriggerHistorySave={state.saveCheckpoint}
           width={state.rightPanelWidth}
-          onResize={(width) => state.setUiState({ rightPanelWidth: width })}
+          onResize={resizePanel}
         />
       )}
     </>

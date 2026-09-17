@@ -17,7 +17,6 @@ import {
   calculateWorkspaceFitWidthScale,
 } from "@/components/workspace/lib/calculateWorkspaceFitScale";
 import { TranslationFloatingWindow } from "@/components/workspace/widgets/TranslationFloatingWindow";
-import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
@@ -27,30 +26,25 @@ import {
   setPlatformFullscreen,
   subscribePlatformFullscreenChange,
 } from "@/services/platform";
-import { selectEditorPageState } from "@/store/selectors";
+import {
+  selectEditorPageState,
+  selectHasSelectedControl,
+} from "@/store/selectors";
 import { useEditorStore } from "@/store/useEditorStore";
-import type {
-  EditorState,
-  EditorUiState,
-  PDFSearchResult,
-  Tool,
-} from "@/types";
+import type { EditorState, PDFSearchResult, Tool } from "@/types";
 import { EditorCanvasPane } from "./EditorCanvasPane";
 import { EditorControllerProviders } from "./EditorControllerProviders";
 import { EditorRightPanelSkeleton } from "./components/EditorRightPanelSkeleton";
 import { EditorTabStrip } from "./components/EditorTabStrip";
 import { useEditorPageLifecycle } from "./hooks/useEditorPageLifecycle";
-
-const loadEditorRightPanel = () => import("./EditorRightPanel");
-
-const EditorRightPanel = React.lazy(() =>
-  loadEditorRightPanel().then((module) => ({
-    default: module.EditorRightPanel,
-  })),
-);
+import {
+  EditorRightPanel,
+  scheduleEditorRightPanelBranchPreload,
+} from "./rightPanelModules";
 
 const EditorPage: React.FC = () => {
   const state = useEditorStore(useShallow(selectEditorPageState));
+  const hasSelectedControl = useEditorStore(selectHasSelectedControl);
   const { activeTabId, hasDirtyTabs } = useEditorPageTabsRuntime();
   const documentCommands = useEditorDocumentCommandsRuntime();
   const permissionUi = usePdfPermissionUi(state.documentPermissions);
@@ -71,20 +65,14 @@ const EditorPage: React.FC = () => {
 
   React.useEffect(() => {
     if (state.pages.length === 0) return;
-    void loadEditorRightPanel();
+    void EditorRightPanel.preload();
     setHasInitializedRightPanel(true);
+    return scheduleEditorRightPanelBranchPreload();
   }, [state.pages.length]);
 
   const openAiChatPanel = React.useCallback(() => {
-    state.setUiState((prev) => {
-      const updates: Partial<EditorUiState> = {
-        rightPanelTab: "ai_chat",
-        isRightPanelOpen: true,
-      };
-      if (prev.isPanelFloating) updates.isSidebarOpen = false;
-      return updates;
-    });
-  }, [state.setUiState]);
+    state.openRightPanel("ai_chat");
+  }, [state.openRightPanel]);
 
   const setEditorFullscreen = React.useCallback(
     async (next: boolean) => {
@@ -179,42 +167,23 @@ const EditorPage: React.FC = () => {
   }, [isTranslateOpen, state.setUiState]);
 
   React.useEffect(() => {
-    state.setState({ isPanelFloating: isMobile });
-    if (!isMobile) return;
-    state.setUiState((prev) => {
-      if (!prev.isSidebarOpen || !prev.isRightPanelOpen) return prev;
-      return { isSidebarOpen: true, isRightPanelOpen: false };
-    });
-  }, [isMobile, state.setState, state.setUiState]);
-
-  React.useEffect(() => {
-    if (
-      state.isPanelFloating &&
-      state.isSidebarOpen &&
-      state.isRightPanelOpen
-    ) {
-      state.setUiState({ isRightPanelOpen: false });
-    }
+    state.setPanelFloating(isMobile);
   }, [
-    state.isPanelFloating,
-    state.isRightPanelOpen,
+    isMobile,
     state.isSidebarOpen,
-    state.setUiState,
+    state.isRightPanelOpen,
+    state.setPanelFloating,
   ]);
 
   React.useEffect(() => {
-    const previousId = prevSelectedIdRef.current;
-    if (!previousId && state.selectedId) {
-      state.setUiState({ rightPanelTab: "properties" });
-    }
+    state.syncPanelSelection(prevSelectedIdRef.current);
     prevSelectedIdRef.current = state.selectedId;
-  }, [state.selectedId, state.setUiState]);
-
-  React.useEffect(() => {
-    if (!state.selectedId && state.rightPanelTab === "properties") {
-      state.setUiState({ rightPanelTab: "document" });
-    }
-  }, [state.rightPanelTab, state.selectedId, state.setUiState]);
+  }, [
+    state.selectedId,
+    hasSelectedControl,
+    state.rightPanelTab,
+    state.syncPanelSelection,
+  ]);
 
   React.useEffect(() => {
     appEventBus.clearSticky("workspace:focusTextRange");
@@ -228,63 +197,32 @@ const EditorPage: React.FC = () => {
   }, [activeTabId]);
 
   const handlePenStyleChange = React.useCallback(
-    (style: Partial<EditorState["penStyle"]>) => {
-      state.setState((prev) => ({
-        penStyle: { ...prev.penStyle, ...style },
-      }));
-    },
-    [state.setState],
+    (style: Partial<EditorState["penStyle"]>) =>
+      state.updateToolStyle("penStyle", style),
+    [state.updateToolStyle],
   );
-
   const handleHighlightStyleChange = React.useCallback(
-    (style: Partial<EditorState["penStyle"]>) => {
-      state.setState((prev) => ({
-        highlightStyle: {
-          ...(prev.highlightStyle ?? ANNOTATION_STYLES.highlight),
-          ...style,
-        },
-      }));
-    },
-    [state.setState],
+    (style: Partial<EditorState["penStyle"]>) =>
+      state.updateToolStyle("highlightStyle", style),
+    [state.updateToolStyle],
   );
-
   const handleCommentStyleChange = React.useCallback(
-    (style: { color: string }) => {
-      state.setState((prev) => ({
-        commentStyle: {
-          ...(prev.commentStyle ?? ANNOTATION_STYLES.comment),
-          ...style,
-        },
-      }));
-    },
-    [state.setState],
+    (style: { color: string }) => state.updateToolStyle("commentStyle", style),
+    [state.updateToolStyle],
   );
-
   const handleFreetextStyleChange = React.useCallback(
-    (style: { color: string }) => {
-      state.setState((prev) => ({
-        freetextStyle: { ...prev.freetextStyle!, ...style },
-      }));
-    },
-    [state.setState],
+    (style: { color: string }) => state.updateToolStyle("freetextStyle", style),
+    [state.updateToolStyle],
   );
-
   const handleShapeStyleChange = React.useCallback(
-    (style: Partial<NonNullable<EditorState["shapeStyle"]>>) => {
-      state.setState((prev) => ({
-        shapeStyle: { ...prev.shapeStyle!, ...style },
-      }));
-    },
-    [state.setState],
+    (style: Partial<NonNullable<EditorState["shapeStyle"]>>) =>
+      state.updateToolStyle("shapeStyle", style),
+    [state.updateToolStyle],
   );
-
   const handleStampStyleChange = React.useCallback(
-    (style: Partial<NonNullable<EditorState["stampStyle"]>>) => {
-      state.setState((prev) => ({
-        stampStyle: { ...prev.stampStyle!, ...style },
-      }));
-    },
-    [state.setState],
+    (style: Partial<NonNullable<EditorState["stampStyle"]>>) =>
+      state.updateToolStyle("stampStyle", style),
+    [state.updateToolStyle],
   );
 
   const handleEditAnnotation = React.useCallback(
@@ -340,31 +278,12 @@ const EditorPage: React.FC = () => {
     );
   }, [getWorkspaceViewport, state.fitToScale]);
 
-  const openSidebar = React.useCallback(() => {
-    state.setUiState((prev) =>
-      prev.isPanelFloating
-        ? { isSidebarOpen: true, isRightPanelOpen: false }
-        : { isSidebarOpen: true },
-    );
-  }, [state.setUiState]);
-
-  const toggleSidebar = React.useCallback(() => {
-    state.setUiState((prev) => {
-      const isOpen = !prev.isSidebarOpen;
-      return prev.isPanelFloating && isOpen
-        ? { isSidebarOpen: true, isRightPanelOpen: false }
-        : { isSidebarOpen: isOpen };
-    });
-  }, [state.setUiState]);
-
-  const toggleRightPanel = React.useCallback(() => {
-    state.setUiState((prev) => {
-      const isOpen = !prev.isRightPanelOpen;
-      return prev.isPanelFloating && isOpen
-        ? { isRightPanelOpen: true, isSidebarOpen: false }
-        : { isRightPanelOpen: isOpen };
-    });
-  }, [state.setUiState]);
+  const openSidebar = React.useCallback(
+    () => state.openSidebar(),
+    [state.openSidebar],
+  );
+  const toggleSidebar = state.toggleSidebar;
+  const toggleRightPanel = state.toggleRightPanel;
 
   const shellCommands = React.useMemo<EditorShellCommands>(
     () => ({
@@ -426,10 +345,7 @@ const EditorPage: React.FC = () => {
                 className="absolute inset-0 z-30 bg-black/20"
                 onMouseDown={(event) => {
                   if (event.target !== event.currentTarget) return;
-                  state.setUiState({
-                    isSidebarOpen: false,
-                    isRightPanelOpen: false,
-                  });
+                  state.closeFloatingPanels();
                 }}
               />
             )}
@@ -445,18 +361,13 @@ const EditorPage: React.FC = () => {
             }
             isFloating={state.isPanelFloating}
             rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
-            canOpenProperties={state.hasSelectedControl}
+            canOpenProperties={hasSelectedControl}
             canOpenPageTranslate={permissionUi.canAll([
               "extract_text",
               "create_annotation",
             ])}
             onSelectTab={(tab) => {
-              if (tab === "properties" && !state.hasSelectedControl) return;
-              state.setUiState((prev) => ({
-                rightPanelTab: tab,
-                isRightPanelOpen: true,
-                ...(prev.isPanelFloating ? { isSidebarOpen: false } : {}),
-              }));
+              state.openRightPanel(tab);
             }}
           />
 

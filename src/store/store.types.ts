@@ -36,6 +36,18 @@ export interface PdfOwnerUnlockResult {
   reason?: string;
 }
 
+export type EditorToolStyleKey =
+  | "penStyle"
+  | "highlightStyle"
+  | "commentStyle"
+  | "freetextStyle"
+  | "shapeStyle"
+  | "stampStyle";
+
+export type EditorToolStyles = {
+  [K in EditorToolStyleKey]: NonNullable<EditorState[K]>;
+};
+
 export interface EditorActions {
   setState: (
     updates:
@@ -53,6 +65,19 @@ export interface EditorActions {
       | ((prev: EditorState) => Partial<EditorUiState>),
   ) => void;
   resetUiState: () => void;
+  openSidebar: (tab?: string) => void;
+  closeSidebar: () => void;
+  toggleSidebar: () => void;
+  openRightPanel: (tab?: string) => void;
+  closeRightPanel: () => void;
+  toggleRightPanel: () => void;
+  closeFloatingPanels: () => void;
+  setPanelFloating: (isFloating: boolean) => void;
+  syncPanelSelection: (previousSelectedId: string | null) => void;
+  updateToolStyle: <K extends EditorToolStyleKey>(
+    kind: K,
+    patch: Partial<EditorToolStyles[K]>,
+  ) => void;
   setScale: (scale: number) => void;
   zoomBy: (factor: number) => void;
   fitToScale: (scale: number) => void;
@@ -60,6 +85,8 @@ export interface EditorActions {
   setPageFlow: (flow: EditorState["pageFlow"]) => void;
   setEditorMode: (mode: EditorState["mode"], defaultTool: Tool) => void;
   setEditorFullscreen: (isFullscreen: boolean) => void;
+  beginTemporaryPan: () => Tool | null;
+  endTemporaryPan: (previousTool: Tool | null) => void;
   setOptions: (
     updates: Partial<AppOptions> | ((prev: AppOptions) => Partial<AppOptions>),
   ) => void;

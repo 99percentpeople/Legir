@@ -30,14 +30,15 @@ function EditorPdfSearchControllerProvider({
 }: EditorControllerProvidersProps) {
   const { t } = useLanguage();
   const { workerService } = useEditorDocumentIdentityRuntime();
-  const { pages, isSidebarOpen, setUiState } = useEditorStore(
+  const { pages, isSidebarOpen, openSidebar, closeSidebar } = useEditorStore(
     useShallow(selectPdfSearchControllerState),
   );
   const pdfSearch = usePdfSearchController({
     pages,
     workerService,
     sidebarOpen: isSidebarOpen,
-    setUiState,
+    openSidebar,
+    closeSidebar,
     highlightedSearchResultsByPage,
     t,
   });
@@ -54,11 +55,7 @@ function EditorPdfSearchControllerProvider({
 
   useAppEvent("sidebar:focusAnnotation", () => {
     pdfSearch.dismissPdfSearch();
-    setUiState((prev) => ({
-      isSidebarOpen: true,
-      sidebarTab: "annotations",
-      ...(prev.isPanelFloating ? { isRightPanelOpen: false } : {}),
-    }));
+    openSidebar("annotations");
   });
 
   return (

@@ -6,6 +6,7 @@ export { createHistorySlice } from "@/store/slices/historySlice";
 export { createPageTranslateSlice } from "@/store/slices/pageTranslateSlice";
 export { createSettingsSlice } from "@/store/slices/settingsSlice";
 export { createUiSlice } from "@/store/slices/uiSlice";
+export { createToolStyleSlice } from "@/store/slices/toolStyleSlice";
 export {
   cancelThumbnailWarmup,
   createRuntimeSlice,

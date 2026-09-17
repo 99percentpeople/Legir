@@ -9,17 +9,15 @@ import {
   resolvePdfSearchResultGeometry,
   type PdfTextRangeGeometry,
 } from "@/components/workspace/lib/pdfTextRangeGeometry";
-import type {
-  EditorUiStateSetter,
-  TranslateFn,
-  WorkspaceTextHighlightsByPage,
-} from "../types";
+import type { EditorActions } from "@/store/store.types";
+import type { TranslateFn, WorkspaceTextHighlightsByPage } from "../types";
 
 interface UsePdfSearchControllerOptions {
   pages: EditorState["pages"];
   workerService: PDFWorkerService | null;
   sidebarOpen: boolean;
-  setUiState: EditorUiStateSetter;
+  openSidebar: EditorActions["openSidebar"];
+  closeSidebar: EditorActions["closeSidebar"];
   highlightedSearchResultsByPage?: Map<number, PDFSearchResult[]>;
   t: TranslateFn;
 }
@@ -28,7 +26,8 @@ export function usePdfSearchController({
   pages,
   workerService,
   sidebarOpen,
-  setUiState,
+  openSidebar,
+  closeSidebar,
   highlightedSearchResultsByPage,
   t,
 }: UsePdfSearchControllerOptions) {
@@ -51,6 +50,23 @@ export function usePdfSearchController({
   );
 
   const pdfSearchSeqRef = React.useRef(0);
+  const focusSeqRef = React.useRef(0);
+  const documentScope = React.useMemo(() => ({}), [pages, workerService]);
+  const activeScopeRef = React.useRef<{
+    identity: object;
+    signal: AbortSignal;
+  } | null>(null);
+  React.useLayoutEffect(() => {
+    const controller = new AbortController();
+    activeScopeRef.current = {
+      identity: documentScope,
+      signal: controller.signal,
+    };
+    return () => {
+      controller.abort();
+      activeScopeRef.current = null;
+    };
+  }, [documentScope]);
   const pdfSearchResultGeometryCacheRef = React.useRef(
     new Map<string, PdfTextRangeGeometry>(),
   );
@@ -67,11 +83,13 @@ export function usePdfSearchController({
 
   React.useEffect(
     () =>
-      useEditorStore.subscribe((nextState) => {
-        pdfSearchViewportStateRef.current = {
-          currentPageIndex: nextState.currentPageIndex,
-        };
-      }),
+      useEditorStore.subscribe(
+        (state) => state.currentPageIndex,
+        (currentPageIndex) => {
+          pdfSearchViewportStateRef.current.currentPageIndex = currentPageIndex;
+        },
+        { fireImmediately: true },
+      ),
     [],
   );
 
@@ -221,16 +239,11 @@ export function usePdfSearchController({
     }
     setIsPdfSearchOpen(true);
     setPdfSearchFocusToken((value) => value + 1);
-    setUiState((prev) => {
-      if (prev.isPanelFloating) {
-        return { isSidebarOpen: true, isRightPanelOpen: false };
-      }
-      return { isSidebarOpen: true };
-    });
+    openSidebar();
   }, [
     getWorkspaceSelectedSearchText,
     isPdfSearchOpen,
-    setUiState,
+    openSidebar,
     sidebarOpen,
   ]);
 
@@ -238,6 +251,49 @@ export function usePdfSearchController({
     setIsPdfSearchOpen(false);
     pdfSearchOpenedWithSidebarRef.current = false;
   }, []);
+
+  const focusSearchResult = React.useCallback(
+    async (
+      result: PDFSearchResult,
+      behavior: "auto" | "smooth",
+      sticky = false,
+    ) => {
+      const scope = activeScopeRef.current;
+      if (!scope || scope.identity !== documentScope || scope.signal.aborted)
+        return;
+      const focusSeq = ++focusSeqRef.current;
+      try {
+        const geometry = await resolveSearchResultGeometry(
+          result,
+          scope.signal,
+        );
+        if (scope.signal.aborted || focusSeq !== focusSeqRef.current) return;
+        if (!geometry) {
+          if (!sticky)
+            appEventBus.emit("workspace:navigatePage", {
+              pageIndex: result.pageIndex,
+              behavior,
+            });
+          return;
+        }
+        appEventBus.emit(
+          "workspace:focusTextRange",
+          {
+            pageIndex: result.pageIndex,
+            startOffset: result.startOffset,
+            endOffset: result.endOffset,
+            rect: geometry.rect,
+            behavior,
+          },
+          { sticky },
+        );
+      } catch (error) {
+        if (!scope.signal.aborted)
+          console.error("Failed to focus PDF search result", error);
+      }
+    },
+    [documentScope, resolveSearchResultGeometry],
+  );
 
   const closePdfSearch = React.useCallback(() => {
     const activeResult =
@@ -250,34 +306,19 @@ export function usePdfSearchController({
     pdfSearchOpenedWithSidebarRef.current = false;
 
     if (!shouldKeepSidebarOpen) {
-      setUiState({ isSidebarOpen: false });
+      closeSidebar();
     }
 
     if (!activeResult) return;
 
     window.requestAnimationFrame(() => {
-      void (async () => {
-        const geometry = await resolveSearchResultGeometry(activeResult);
-        if (!geometry) return;
-
-        appEventBus.emit(
-          "workspace:focusTextRange",
-          {
-            pageIndex: activeResult.pageIndex,
-            startOffset: activeResult.startOffset,
-            endOffset: activeResult.endOffset,
-            rect: geometry.rect,
-            behavior: "auto",
-          },
-          { sticky: true },
-        );
-      })();
+      void focusSearchResult(activeResult, "auto", true);
     });
   }, [
     activePdfSearchResultId,
     pdfSearchResults,
-    resolveSearchResultGeometry,
-    setUiState,
+    focusSearchResult,
+    closeSidebar,
   ]);
 
   React.useEffect(() => {
@@ -358,6 +399,11 @@ export function usePdfSearchController({
                 : (nextResults[0]?.id ?? null)),
           );
         } catch (error) {
+          if (
+            abortController.signal.aborted ||
+            pdfSearchSeqRef.current !== currentSeq
+          )
+            return;
           if ((error as Error)?.name !== "AbortError") {
             console.error("Failed to search PDF text", error);
             const message = error instanceof Error ? error.message : "";
@@ -441,27 +487,11 @@ export function usePdfSearchController({
 
   const handleSelectPdfSearchResult = React.useCallback(
     (result: PDFSearchResult) => {
+      if (activeScopeRef.current?.identity !== documentScope) return;
       setActivePdfSearchResultId(result.id);
-      void (async () => {
-        const geometry = await resolveSearchResultGeometry(result);
-        if (!geometry) {
-          appEventBus.emit("workspace:navigatePage", {
-            pageIndex: result.pageIndex,
-            behavior: "smooth",
-          });
-          return;
-        }
-
-        appEventBus.emit("workspace:focusTextRange", {
-          pageIndex: result.pageIndex,
-          startOffset: result.startOffset,
-          endOffset: result.endOffset,
-          rect: geometry.rect,
-          behavior: "smooth",
-        });
-      })();
+      void focusSearchResult(result, "smooth");
     },
-    [resolveSearchResultGeometry],
+    [documentScope, focusSearchResult],
   );
 
   const handleSelectPreviousPdfSearchResult = React.useCallback(() => {

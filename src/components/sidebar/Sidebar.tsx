@@ -50,7 +50,7 @@ const Sidebar: React.FC = () => {
   } = state;
   const { openSidebar: onOpen } = useEditorShellCommands();
   const search = useEditorPdfSearchSidebar();
-  const onClose = () => setUiState({ isSidebarOpen: false });
+  const onClose = state.closeSidebar;
   const onResize = (nextWidth: number) =>
     setUiState({ sidebarWidth: nextWidth });
   const onNavigatePage = (pageIndex: number) => {

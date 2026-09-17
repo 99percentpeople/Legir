@@ -10,9 +10,6 @@ export const createSettingsSlice: EditorStoreSlice<
     set((state) => {
       const patch =
         typeof updates === "function" ? updates(state.options) : updates;
-      return {
-        ...state,
-        options: mergeEditorOptions(state.options, patch),
-      };
+      return { options: mergeEditorOptions(state.options, patch) };
     }),
 });

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, subscribeWithSelector } from "zustand/middleware";
 import type { EditorUiState } from "../types";
 import { createEditorStoreState } from "@/store/createStoreState";
 import { editorStorePersistConfig } from "@/store/persistConfig";
@@ -22,9 +22,13 @@ import { setPdfPermissionPolicyProvider } from "@/lib/pdfPermissions";
 // - If you add new editor UI state, decide whether it should be persisted in `pickEditorUiState()`.
 
 export const useEditorStore = create<EditorStore>()(
-  persist<EditorStore, [], [], Partial<EditorUiState>>(
-    createEditorStoreState,
-    editorStorePersistConfig,
+  subscribeWithSelector(
+    persist<
+      EditorStore,
+      [["zustand/subscribeWithSelector", never]],
+      [],
+      Partial<EditorUiState>
+    >(createEditorStoreState, editorStorePersistConfig),
   ),
 );
 

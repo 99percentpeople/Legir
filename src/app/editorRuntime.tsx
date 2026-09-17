@@ -120,12 +120,10 @@ export function EditorRuntimeProvider({
   document: EditorDocumentRuntime;
   children: React.ReactNode;
 }) {
+  const hasDirtyTabs = tabs.tabs.some((tab) => tab.isDirty);
   const pageTabs = useMemo<EditorPageTabsRuntime>(
-    () => ({
-      activeTabId: tabs.activeTabId,
-      hasDirtyTabs: tabs.tabs.some((tab) => tab.isDirty),
-    }),
-    [tabs.activeTabId, tabs.tabs],
+    () => ({ activeTabId: tabs.activeTabId, hasDirtyTabs }),
+    [tabs.activeTabId, hasDirtyTabs],
   );
   const documentIdentity = useMemo<EditorDocumentIdentityRuntime>(
     () => ({

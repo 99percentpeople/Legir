@@ -1,4 +1,5 @@
-import React from "react";
+import type React from "react";
+import { preload, type PreloadableLazyComponent } from "@/utils/preload";
 import { registry } from "./registry/ControlRegistry";
 import { Annotation, FieldType, FormField } from "@/types";
 
@@ -17,23 +18,10 @@ import { Annotation, FieldType, FormField } from "@/types";
 
 type UnsafeComponent = React.ComponentType<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-type LazyWithPreload<T extends UnsafeComponent> =
-  React.LazyExoticComponent<T> & {
-    preload?: () => Promise<{ default: T }>;
-  };
-
-const lazyWithPreload = <T extends UnsafeComponent>(
-  loader: () => Promise<{ default: T }>,
-) => {
-  const Comp = React.lazy(loader) as LazyWithPreload<T>;
-  Comp.preload = loader;
-  return Comp;
-};
-
 type ControlConfig = {
   type: FieldType | string;
-  component: LazyWithPreload<UnsafeComponent>;
-  propertiesComponent: LazyWithPreload<UnsafeComponent>;
+  component: PreloadableLazyComponent<UnsafeComponent>;
+  propertiesComponent: PreloadableLazyComponent<UnsafeComponent>;
   label: string;
   supportsGeometrySizeEdit?:
     | boolean
@@ -43,12 +31,12 @@ type ControlConfig = {
 const CONTROL_CONFIGS: ControlConfig[] = [
   {
     type: FieldType.TEXT,
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./form/TextControl").then((module) => ({
         default: module.TextControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/TextProperties").then((module) => ({
         default: module.TextProperties,
       })),
@@ -58,12 +46,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: FieldType.CHECKBOX,
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./form/CheckboxControl").then((module) => ({
         default: module.CheckboxControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/CheckboxProperties").then((module) => ({
         default: module.CheckboxProperties,
       })),
@@ -73,12 +61,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: FieldType.RADIO,
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./form/RadioControl").then((module) => ({
         default: module.RadioControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/RadioProperties").then((module) => ({
         default: module.RadioProperties,
       })),
@@ -88,12 +76,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: FieldType.DROPDOWN,
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./form/DropdownControl").then((module) => ({
         default: module.DropdownControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/DropdownProperties").then((module) => ({
         default: module.DropdownProperties,
       })),
@@ -103,12 +91,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: FieldType.SIGNATURE,
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./form/SignatureControl").then((module) => ({
         default: module.SignatureControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/SignatureProperties").then((module) => ({
         default: module.SignatureProperties,
       })),
@@ -118,12 +106,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: "highlight",
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./annotation/HighlightControl").then((module) => ({
         default: module.HighlightControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/HighlightProperties").then((module) => ({
         default: module.HighlightProperties,
       })),
@@ -133,12 +121,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: "comment",
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./annotation/CommentControl").then((module) => ({
         default: module.CommentControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/CommentProperties").then((module) => ({
         default: module.CommentProperties,
       })),
@@ -148,12 +136,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: "link",
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./annotation/LinkControl").then((module) => ({
         default: module.LinkControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/LinkProperties").then((module) => ({
         default: module.LinkProperties,
       })),
@@ -163,12 +151,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: "freetext",
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./annotation/FreetextControl").then((module) => ({
         default: module.FreetextControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/FreetextProperties").then((module) => ({
         default: module.FreetextProperties,
       })),
@@ -178,12 +166,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: "ink",
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./annotation/InkControl").then((module) => ({
         default: module.InkControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/InkProperties").then((module) => ({
         default: module.InkProperties,
       })),
@@ -193,12 +181,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: "stamp",
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./annotation/StampControl").then((module) => ({
         default: module.StampControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/StampProperties").then((module) => ({
         default: module.StampProperties,
       })),
@@ -208,12 +196,12 @@ const CONTROL_CONFIGS: ControlConfig[] = [
   },
   {
     type: "shape",
-    component: lazyWithPreload(() =>
+    component: preload(() =>
       import("./annotation/ShapeControl").then((module) => ({
         default: module.ShapeControl,
       })),
     ),
-    propertiesComponent: lazyWithPreload(() =>
+    propertiesComponent: preload(() =>
       import("./properties/ShapeProperties").then((module) => ({
         default: module.ShapeProperties,
       })),
@@ -229,50 +217,16 @@ const CONTROL_CONFIGS: ControlConfig[] = [
 
 let controlsPreloaded = false;
 
-type PreloadableLazyComponent = {
-  _init?: (payload: unknown) => void;
-  _payload?: unknown;
-};
-
-const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
-  typeof value === "object" &&
-  value !== null &&
-  "then" in value &&
-  typeof value.then === "function";
-
-const warmLazy = async (lazyComp: unknown) => {
-  if (!lazyComp || typeof lazyComp !== "object") return;
-  const preloadableLazy = lazyComp as PreloadableLazyComponent;
-  if (typeof preloadableLazy._init !== "function") return;
-  try {
-    preloadableLazy._init(preloadableLazy._payload);
-  } catch (thrown: unknown) {
-    if (isPromiseLike(thrown)) {
-      try {
-        await thrown;
-      } catch {
-        return;
-      }
-      try {
-        preloadableLazy._init(preloadableLazy._payload);
-      } catch {
-        return;
-      }
-    }
-  }
-};
-
 export const preloadControls = () => {
   if (controlsPreloaded) return;
   controlsPreloaded = true;
 
-  const lazyList = CONTROL_CONFIGS.flatMap((c) => [
-    c.component,
-    c.propertiesComponent,
-  ]);
-
-  for (const c of lazyList) void c.preload?.();
-  void Promise.all(lazyList.map((c) => warmLazy(c)));
+  for (const component of CONTROL_CONFIGS.flatMap((config) => [
+    config.component,
+    config.propertiesComponent,
+  ])) {
+    void component.preload();
+  }
 };
 
 let controlsRegistered = false;

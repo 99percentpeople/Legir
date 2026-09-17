@@ -56,14 +56,13 @@ export function useEditorPageKeyboardShortcuts({
     const previousTool = previousToolBeforeSpacePanRef.current;
     previousToolBeforeSpacePanRef.current = null;
 
-    if (!previousTool || currentState.tool !== "pan") {
-      return;
-    }
-
-    // Temporary space-pan should only change the visible tool state.
-    // Keep the current selection intact when restoring the original tool.
-    currentState.setState({ tool: previousTool });
+    currentState.endTemporaryPan(previousTool);
   }, []);
+
+  React.useEffect(
+    () => () => restoreToolAfterSpacePan(),
+    [restoreToolAfterSpacePan],
+  );
 
   useEventListener(
     typeof window !== "undefined" ? window : null,
@@ -109,13 +108,7 @@ export function useEditorPageKeyboardShortcuts({
         event.stopPropagation();
         if (!currentState.keys.space) {
           previousToolBeforeSpacePanRef.current =
-            currentState.tool === "pan" ? null : currentState.tool;
-          if (currentState.tool !== "pan") {
-            // Mirror the temporary hand-tool state in the toolbar without
-            // clearing the active selection like the persistent pan tool does.
-            currentState.setState({ tool: "pan" });
-          }
-          currentState.setKeys({ space: true });
+            currentState.beginTemporaryPan();
         }
         return;
       }
@@ -274,7 +267,6 @@ export function useEditorPageKeyboardShortcuts({
       }
 
       if (event.key === " ") {
-        currentState.setKeys({ space: false });
         restoreToolAfterSpacePan();
       }
     },
@@ -289,7 +281,6 @@ export function useEditorPageKeyboardShortcuts({
       if (!currentState.keys.space && !previousToolBeforeSpacePanRef.current) {
         return;
       }
-      currentState.setKeys({ space: false });
       restoreToolAfterSpacePan();
     },
     true,

@@ -9,6 +9,7 @@ import {
   createRuntimeSlice,
   createSettingsSlice,
   createUiSlice,
+  createToolStyleSlice,
 } from "@/store/slices";
 import type { EditorStoreStateCreator } from "@/store/store.types";
 
@@ -21,6 +22,7 @@ export const createEditorStoreState: EditorStoreStateCreator = (set, get) => ({
   ...createDocumentSlice(set, get),
   ...createEditorViewSlice(set, get),
   ...createUiSlice(set, get),
+  ...createToolStyleSlice(set, get),
   ...createSettingsSlice(set, get),
   ...createRuntimeSlice(set, get),
   ...createHistorySlice(set, get),

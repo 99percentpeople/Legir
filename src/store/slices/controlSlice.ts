@@ -247,7 +247,6 @@ export const createControlSlice: EditorStoreSlice<
       );
 
       return {
-        ...state,
         fields: nextFields,
         isDirty: true,
         dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
@@ -292,7 +291,6 @@ export const createControlSlice: EditorStoreSlice<
       const { saveCheckpoint } = get();
       saveCheckpoint();
       set((state) => ({
-        ...state,
         fields: nextFields,
         selectedId: id,
         isDirty: true,
@@ -388,7 +386,6 @@ export const createControlSlice: EditorStoreSlice<
       });
 
       return {
-        ...state,
         fields: reordered.fields,
         annotations: nextAnnotations,
         selectedId: id,
@@ -768,7 +765,6 @@ export const createControlSlice: EditorStoreSlice<
         };
 
         return {
-          ...state,
           fields: nextFields,
           isDirty: true,
           dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
@@ -818,7 +814,6 @@ export const createControlSlice: EditorStoreSlice<
       const nextAnnotations = [...state.annotations];
       nextAnnotations[annotationIndex] = nextAnnotation;
       return {
-        ...state,
         annotations: nextAnnotations,
         isDirty: true,
         dirtyPermissionScopes: mergePdfPermissionDirtyScopes(
@@ -853,7 +848,6 @@ export const createControlSlice: EditorStoreSlice<
 
       if (!changed) return state;
       return {
-        ...state,
         annotations: nextAnnotations,
         isDirty: true,
         dirtyPermissionScopes: mergePdfPermissionDirtyScopes(

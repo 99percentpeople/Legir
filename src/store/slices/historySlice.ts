@@ -16,7 +16,7 @@ export const createHistorySlice: EditorStoreSlice<
         dirtyPermissionScopes: state.dirtyPermissionScopes,
       };
       const newPast = [...state.past, snapshot].slice(-50);
-      return { ...state, past: newPast, future: [] };
+      return { past: newPast, future: [] };
     });
   },
 
@@ -33,7 +33,6 @@ export const createHistorySlice: EditorStoreSlice<
         dirtyPermissionScopes: state.dirtyPermissionScopes,
       };
       return {
-        ...state,
         fields: previous.fields,
         annotations: previous.annotations,
         metadata: previous.metadata,
@@ -60,7 +59,6 @@ export const createHistorySlice: EditorStoreSlice<
         dirtyPermissionScopes: state.dirtyPermissionScopes,
       };
       return {
-        ...state,
         fields: next.fields,
         annotations: next.annotations,
         metadata: next.metadata,

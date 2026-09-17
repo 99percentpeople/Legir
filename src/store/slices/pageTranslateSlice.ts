@@ -37,7 +37,6 @@ export const createPageTranslateSlice: EditorStoreSlice<
       );
       if (removedIds.size === 0) return state;
       return {
-        ...state,
         pageTranslateParagraphCandidates:
           state.pageTranslateParagraphCandidates.filter(
             (candidate) => candidate.pageIndex !== pageIndex,
@@ -74,7 +73,7 @@ export const createPageTranslateSlice: EditorStoreSlice<
           return { ...candidate, isExcluded: !candidate.isExcluded };
         },
       );
-      return { ...state, pageTranslateParagraphCandidates: nextCandidates };
+      return { pageTranslateParagraphCandidates: nextCandidates };
     }),
 
   deleteSelectedPageTranslateParagraphs: () =>
@@ -85,7 +84,6 @@ export const createPageTranslateSlice: EditorStoreSlice<
         (candidate) => !selected.has(candidate.id),
       );
       return {
-        ...state,
         pageTranslateParagraphCandidates: nextCandidates,
         pageTranslateSelectedParagraphIds: [],
       };
@@ -178,7 +176,6 @@ export const createPageTranslateSlice: EditorStoreSlice<
       );
 
       return {
-        ...state,
         pageTranslateParagraphCandidates: [
           ...remainingCandidates,
           mergedCandidate,

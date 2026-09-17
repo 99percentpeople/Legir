@@ -21,14 +21,7 @@ export default function EditorPageTranslateRightPanel() {
     handleUnmergeSelectedParagraphs,
   } = usePageTranslation();
 
-  const openPanel = () => {
-    state.setUiState((prev) => {
-      if (prev.isPanelFloating) {
-        return { isRightPanelOpen: true, isSidebarOpen: false };
-      }
-      return { isRightPanelOpen: true };
-    });
-  };
+  const openPanel = () => state.openRightPanel("page_translate");
 
   const updatePageTranslateOptions = (
     patch: Partial<EditorUiState["pageTranslateOptions"]>,
@@ -52,7 +45,7 @@ export default function EditorPageTranslateRightPanel() {
       onOpen={openPanel}
       width={state.rightPanelWidth}
       onResize={(width) => state.setUiState({ rightPanelWidth: width })}
-      onCollapse={() => state.setUiState({ isRightPanelOpen: false })}
+      onCollapse={state.closeRightPanel}
       totalPages={state.pagesLength}
       isProcessing={isPageTranslating || !isDocumentReady}
       processingStatus={pageTranslateStatus}

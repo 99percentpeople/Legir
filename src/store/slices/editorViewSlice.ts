@@ -1,5 +1,8 @@
 import { MAX_EDITOR_SCALE, MIN_EDITOR_SCALE } from "@/constants";
-import { canUseModeWithPdfPermissions } from "@/lib/pdfPermissions";
+import {
+  canUseModeWithPdfPermissions,
+  canUseToolWithPdfPermissions,
+} from "@/lib/pdfPermissions";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 
 const clampEditorScale = (scale: number) =>
@@ -19,8 +22,10 @@ export const createEditorViewSlice: EditorStoreSlice<
     | "setPageFlow"
     | "setEditorMode"
     | "setEditorFullscreen"
+    | "beginTemporaryPan"
+    | "endTemporaryPan"
   >
-> = (set) => ({
+> = (set, get) => ({
   setScale: (scale) =>
     set((state) => {
       const nextScale = clampEditorScale(scale);
@@ -73,4 +78,34 @@ export const createEditorViewSlice: EditorStoreSlice<
     set((state) =>
       state.isFullscreen === isFullscreen ? state : { isFullscreen },
     ),
+
+  beginTemporaryPan: () => {
+    const state = get();
+    if (state.keys.space) return null;
+    const previousTool = state.tool === "pan" ? null : state.tool;
+    // Unlike persistent setTool('pan'), the temporary hand tool keeps selection.
+    set({ tool: "pan", keys: { ...state.keys, space: true } });
+    return previousTool;
+  },
+
+  endTemporaryPan: (previousTool) =>
+    set((state) => {
+      // Tab restoration resets transient keys; do not restore an old tab's tool.
+      if (!state.keys.space) return state;
+      let tool = state.tool;
+      if (previousTool && tool === "pan") {
+        tool =
+          state.documentLoadState !== undefined &&
+          state.documentLoadState !== "ready"
+            ? "select_text"
+            : canUseToolWithPdfPermissions(
+                  previousTool,
+                  state.mode,
+                  state.documentPermissions,
+                )
+              ? previousTool
+              : "select";
+      }
+      return { tool, keys: { ...state.keys, space: false } };
+    }),
 });

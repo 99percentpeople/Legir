@@ -20,17 +20,20 @@ export const selectEditorPageState = (state: EditorStore) => ({
   documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   selectedId: state.selectedId,
-  hasSelectedControl: state.selectedId
-    ? state.fields.some((field) => field.id === state.selectedId) ||
-      state.annotations.some((annotation) => annotation.id === state.selectedId)
-    : false,
   isPanelFloating: state.isPanelFloating,
   isSidebarOpen: state.isSidebarOpen,
   isRightPanelOpen: state.isRightPanelOpen,
   rightPanelTab: state.rightPanelTab,
   rightPanelDockTab: state.rightPanelDockTab,
   rightPanelWidth: state.rightPanelWidth,
-  setState: state.setState,
+  updateToolStyle: state.updateToolStyle,
+  openSidebar: state.openSidebar,
+  toggleSidebar: state.toggleSidebar,
+  openRightPanel: state.openRightPanel,
+  toggleRightPanel: state.toggleRightPanel,
+  closeFloatingPanels: state.closeFloatingPanels,
+  setPanelFloating: state.setPanelFloating,
+  syncPanelSelection: state.syncPanelSelection,
   fitToScale: state.fitToScale,
   setEditorFullscreen: state.setEditorFullscreen,
   setEditorMode: state.setEditorMode,
@@ -39,9 +42,17 @@ export const selectEditorPageState = (state: EditorStore) => ({
   selectControl: state.selectControl,
 });
 
+export const selectHasSelectedControl = (state: EditorStore) =>
+  !!state.selectedId &&
+  (state.fields.some((field) => field.id === state.selectedId) ||
+    state.annotations.some((annotation) => annotation.id === state.selectedId));
+
 export type AiChatEditorState = Pick<
   EditorState,
   | "currentPageIndex"
+  | "fields"
+  | "annotations"
+  | "preservedSourceAnnotations"
   | "documentLoadState"
   | "documentPermissions"
   | "filename"
@@ -64,6 +75,9 @@ export const selectAiChatEditorState = (
   state: EditorStore,
 ): AiChatEditorState => ({
   currentPageIndex: state.currentPageIndex,
+  fields: state.fields,
+  annotations: state.annotations,
+  preservedSourceAnnotations: state.preservedSourceAnnotations,
   documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   filename: state.filename,
@@ -82,10 +96,24 @@ export const selectAiChatEditorState = (
   sourceDocumentPermissions: state.sourceDocumentPermissions,
 });
 
+// Only fields used by AI UI/lifecycle are reactive. Tools read the complete,
+// truthful snapshot at execution time (including scale, metadata and layout).
+export const selectAiChatReactiveState = (state: EditorStore) => ({
+  filename: state.filename,
+  pages: state.pages,
+  pdfBytes: state.pdfBytes,
+  documentLoadState: state.documentLoadState,
+  options: state.options,
+  llmModelCache: state.llmModelCache,
+});
+
+export type AiChatReactiveState = ReturnType<typeof selectAiChatReactiveState>;
+
 export const selectPdfSearchControllerState = (state: EditorStore) => ({
   pages: state.pages,
   isSidebarOpen: state.isSidebarOpen,
-  setUiState: state.setUiState,
+  openSidebar: state.openSidebar,
+  closeSidebar: state.closeSidebar,
 });
 
 // Canvas rendering and zoom controls should only observe workspace-hot fields.
@@ -189,6 +217,7 @@ export const selectSidebarState = (state: EditorStore) => ({
   thumbnailsLayout: state.options.thumbnailsLayout,
   sidebarTab: state.sidebarTab,
   width: state.sidebarWidth,
+  closeSidebar: state.closeSidebar,
   setUiState: state.setUiState,
   selectControl: state.selectControl,
   deleteAnnotation: state.deleteAnnotation,
@@ -198,28 +227,49 @@ export const selectSidebarState = (state: EditorStore) => ({
   deleteAnnotationReply: state.deleteAnnotationReply,
 });
 
-export const selectEditorRightPanelState = (state: EditorStore) => ({
+export const selectRightPanelShellState = (state: EditorStore) => ({
   mode: state.mode,
   rightPanelTab: state.rightPanelTab,
   isPanelFloating: state.isPanelFloating,
   isRightPanelOpen: state.isRightPanelOpen,
   rightPanelWidth: state.rightPanelWidth,
-  selectedId: state.selectedId,
-  fields: state.fields,
-  annotations: state.annotations,
-  metadata: state.metadata,
-  filename: state.filename,
-  documentLoadState: state.documentLoadState,
-  documentPermissions: state.documentPermissions,
-  setState: state.setState,
+  hasSelectedControl:
+    !!state.selectedId &&
+    (state.fields.some((field) => field.id === state.selectedId) ||
+      state.annotations.some(
+        (annotation) => annotation.id === state.selectedId,
+      )),
+  openRightPanel: state.openRightPanel,
+  closeRightPanel: state.closeRightPanel,
   setUiState: state.setUiState,
-  selectControl: state.selectControl,
-  deleteSelection: state.deleteSelection,
-  saveCheckpoint: state.saveCheckpoint,
-  updateField: state.updateField,
-  updateAnnotation: state.updateAnnotation,
-  updateMetadata: state.updateMetadata,
 });
+
+export const selectPropertiesRightPanelState = (state: EditorStore) => {
+  const selectedField = state.fields.find(
+    (field) => field.id === state.selectedId,
+  );
+  const selectedControl =
+    selectedField ??
+    state.annotations.find(
+      (annotation) => annotation.id === state.selectedId,
+    ) ??
+    null;
+  return {
+    selectedControl,
+    isSelectedField: !!selectedField,
+    metadata: state.metadata,
+    filename: state.filename,
+    documentLoadState: state.documentLoadState,
+    documentPermissions: state.documentPermissions,
+    setState: state.setState,
+    selectControl: state.selectControl,
+    deleteSelection: state.deleteSelection,
+    saveCheckpoint: state.saveCheckpoint,
+    updateField: state.updateField,
+    updateAnnotation: state.updateAnnotation,
+    updateMetadata: state.updateMetadata,
+  };
+};
 
 export const selectPageTranslateRightPanelState = (state: EditorStore) => ({
   isPanelFloating: state.isPanelFloating,
@@ -231,6 +281,8 @@ export const selectPageTranslateRightPanelState = (state: EditorStore) => ({
   pageTranslateSelectedParagraphIds: state.pageTranslateSelectedParagraphIds,
   translateOption: state.translateOption,
   translateTargetLanguage: state.translateTargetLanguage,
+  openRightPanel: state.openRightPanel,
+  closeRightPanel: state.closeRightPanel,
   documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   setUiState: state.setUiState,

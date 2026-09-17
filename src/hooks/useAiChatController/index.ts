@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
   resolvePdfSearchResultGeometry,
@@ -25,7 +18,7 @@ import {
 import { useEditorStore } from "@/store/useEditorStore";
 import { AI_CHAT_VISUAL_MODEL_AUTO_KEY } from "@/constants";
 import { type LLMModelCapabilities, type PDFSearchResult } from "@/types";
-import type { AiChatEditorState } from "@/store/selectors";
+import type { AiChatEditorState, AiChatReactiveState } from "@/store/selectors";
 import type { AiReasoningLevel, AiReasoningLevelControl } from "@/services/ai";
 import { aiChatService } from "@/services/ai/chat/aiChatService";
 import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
@@ -197,15 +190,11 @@ const createInMemoryAiChatDocumentState = (options: {
 });
 
 export const useAiChatController = (
-  editorState: AiChatEditorState,
-  scopeId?: string,
-  workerService?: PDFWorkerService,
+  editorState: AiChatReactiveState,
+  scopeId: string | undefined,
+  workerService: PDFWorkerService | undefined,
+  getEditorSnapshot: () => AiChatEditorState,
 ) => {
-  const editorStateRef = useRef(editorState);
-  useLayoutEffect(() => {
-    editorStateRef.current = editorState;
-  }, [editorState]);
-
   const [registryVersion, setRegistryVersion] = useState(0);
   const [selectedModelKey, setSelectedModelKey] = useState<string | undefined>(
     () => loadPersistedSelectedModelKey(),
@@ -256,6 +245,29 @@ export const useAiChatController = (
   const contextMemoryJobIdsRef = useRef<Map<string, number>>(new Map());
   const contextMemoryJobSeqRef = useRef(0);
   const searchSeqRef = useRef(0);
+
+  // Settle the outgoing session before replacing its refs. A late transport
+  // callback must not touch the incoming session, and returning to this tab
+  // must not restore a permanently "running" conversation.
+  const abortActiveRun = useCallback(() => {
+    if (!abortRef.current) return;
+    abortRef.current.abort();
+    abortRef.current = null;
+    const session = sessionsRef.current.get(activeSessionIdRef.current);
+    if (!session) return;
+    session.runStatus = "idle";
+    session.awaitingContinue = false;
+    const settled = settleIncompleteTimeline(
+      session.timeline,
+      new Date().toISOString(),
+    );
+    session.timeline = settled;
+    restoreConversationAfterTimelineMutation({
+      session,
+      conversationRef,
+      timeline: settled,
+    });
+  }, []);
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
@@ -703,7 +715,8 @@ export const useAiChatController = (
 
   const getRenderablePdfBytes = useCallback(
     async (options: { pageNumbers: number[]; signal?: AbortSignal }) => {
-      const snapshot = useEditorStore.getState();
+      options.signal?.throwIfAborted();
+      const snapshot = getEditorSnapshot();
       if (!snapshot.pdfBytes) {
         throw new Error("No PDF is currently loaded.");
       }
@@ -727,7 +740,7 @@ export const useAiChatController = (
 
       const pageIndexSet = new Set(pageIndexes);
 
-      return await exportPDF(
+      const bytes = await exportPDF(
         snapshot.pdfBytes,
         snapshot.fields.filter((field) => pageIndexSet.has(field.pageIndex)),
         snapshot.metadata,
@@ -748,8 +761,11 @@ export const useAiChatController = (
             ),
         },
       );
+      options.signal?.throwIfAborted();
+      getEditorSnapshot(); // Reject a document switch during asynchronous export.
+      return bytes;
     },
-    [],
+    [getEditorSnapshot],
   );
 
   const getDefaultModelKey = useCallback(() => {
@@ -835,7 +851,7 @@ export const useAiChatController = (
     () =>
       createDocumentContextService({
         getSnapshot: () => {
-          const snapshot = editorStateRef.current;
+          const snapshot = getEditorSnapshot();
           return {
             filename: snapshot.filename,
             metadata: snapshot.metadata,
@@ -854,7 +870,7 @@ export const useAiChatController = (
         },
         getSelectedTextContext,
         getPdfSource: () => {
-          const snapshot = editorStateRef.current;
+          const snapshot = getEditorSnapshot();
           return {
             pdfBytes: snapshot.pdfBytes,
             password: snapshot.pdfOpenPassword,
@@ -862,7 +878,7 @@ export const useAiChatController = (
         },
         getRenderablePdfBytes,
         getPagesTextConfig: () => ({
-          maxChars: editorStateRef.current.options.aiChat.getPagesTextMaxChars,
+          maxChars: getEditorSnapshot().options.aiChat.getPagesTextMaxChars,
         }),
         canAttachPageVisuals: () => canAttachPageVisuals,
         analyzeRenderedPages: hasVisualAnalysisModel
@@ -872,6 +888,7 @@ export const useAiChatController = (
       }),
     [
       aiScopeId,
+      getEditorSnapshot,
       canAttachPageVisuals,
       getRenderablePdfBytes,
       getSelectedTextContext,
@@ -882,8 +899,7 @@ export const useAiChatController = (
   );
 
   useEffect(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
+    abortActiveRun();
     contextMemoryJobIdsRef.current.clear();
     notifyContextMemoryPendingChanged();
     searchSeqRef.current = 0;
@@ -963,6 +979,8 @@ export const useAiChatController = (
   }, [
     aiScopeId,
     documentIdentity,
+    getEditorSnapshot,
+    abortActiveRun,
     notifyContextMemoryPendingChanged,
     resetDraftConversationUi,
   ]);
@@ -1027,11 +1045,7 @@ export const useAiChatController = (
     tokenUsage,
   ]);
 
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  useEffect(() => abortActiveRun, [abortActiveRun]);
 
   const interactionToolContext = useMemo(
     () =>
@@ -1343,9 +1357,25 @@ export const useAiChatController = (
 
       const controller = new AbortController();
       abortRef.current = controller;
+      const isCurrentRun = () => {
+        if (
+          abortRef.current !== controller ||
+          activeSessionIdRef.current !== sessionId ||
+          sessionsRef.current.get(sessionId) !== session
+        ) {
+          return false;
+        }
+        try {
+          getEditorSnapshot();
+          return true;
+        } catch {
+          return false;
+        }
+      };
 
       try {
-        const appOptions = useEditorStore.getState().options;
+        if (!isCurrentRun()) return;
+        const appOptions = getEditorSnapshot().options;
         const result = await aiChatService.runConversation({
           appOptions,
           modelCache: editorState.llmModelCache,
@@ -1358,6 +1388,7 @@ export const useAiChatController = (
           toolRegistry,
           signal: controller.signal,
           onAssistantUpdate: (update) => {
+            if (!isCurrentRun() || controller.signal.aborted) return;
             if (
               assistantBranchAnchorId &&
               (update.phase === "delta" || update.phase === "end")
@@ -1370,8 +1401,12 @@ export const useAiChatController = (
             }
             applyAssistantUpdate(update);
           },
-          onToolUpdate: applyToolUpdate,
+          onToolUpdate: (update) => {
+            if (!isCurrentRun() || controller.signal.aborted) return;
+            applyToolUpdate(update);
+          },
           onUsageUpdate: (update) => {
+            if (!isCurrentRun() || controller.signal.aborted) return;
             stepTokenUsage = addAiChatTokenUsageSummary(
               stepTokenUsage,
               update.tokenUsage,
@@ -1389,6 +1424,8 @@ export const useAiChatController = (
           },
         });
 
+        if (!isCurrentRun()) return;
+        controller.signal.throwIfAborted();
         applyConversationSuccess({
           session,
           conversationRef,
@@ -1457,9 +1494,10 @@ export const useAiChatController = (
           scheduleContextMemory(session, selected);
         }
       } catch (error) {
+        if (!isCurrentRun()) return;
         session.awaitingContinue = false;
 
-        if (isAbortError(error)) {
+        if (controller.signal.aborted || isAbortError(error)) {
           setAwaitingContinue(false);
           setRunStatus("idle");
           session.runStatus = "idle";
@@ -1502,13 +1540,14 @@ export const useAiChatController = (
         session.lastError = message;
         session.runStatus = "error";
       } finally {
-        abortRef.current = null;
+        if (abortRef.current === controller) abortRef.current = null;
       }
     },
     [
       applyAssistantUpdate,
       applyToolUpdate,
       editorState.llmModelCache,
+      getEditorSnapshot,
       refreshSessionProjectedContext,
       toolRegistry,
       touchSessionSummary,
@@ -1518,7 +1557,7 @@ export const useAiChatController = (
 
   const sendMessage = useCallback(
     async (input: AiChatUserMessageInput) => {
-      if (editorStateRef.current.documentLoadState !== "ready") {
+      if (getEditorSnapshot().documentLoadState !== "ready") {
         return;
       }
       const prepared = prepareAiChatUserInput(input);
@@ -1652,6 +1691,7 @@ export const useAiChatController = (
       getPendingBranchAnchorId,
       isDraftConversation,
       materializeDraftConversation,
+      getEditorSnapshot,
       runAssistantTurn,
       runStatus,
       selectedModelKey,
@@ -1977,8 +2017,9 @@ export const useAiChatController = (
     setRunStatus("cancelling");
     const session = sessionsRef.current.get(activeSessionIdRef.current);
     if (session) session.runStatus = "cancelling";
+    // Keep ownership until this run settles so its AbortError can reset the UI.
+    // Superseded runs must not clear a newer run's cancellation handle.
     abortRef.current.abort();
-    abortRef.current = null;
   }, []);
 
   const resolveSearchResultGeometry = useCallback(
