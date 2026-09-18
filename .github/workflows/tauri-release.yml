@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing stable version tag to publish, e.g. v0.1.0"
+        description: "Existing stable version tag to publish, e.g. v0.1.1"
         required: true
         type: string
   push:
@@ -81,7 +81,7 @@ jobs:
           else
             gh release create "$RELEASE_TAG" --verify-tag --draft \
               --title "Legir $RELEASE_TAG" --generate-notes \
-              --notes "Windows: EXE installer or portable ZIP (requires WebView2). Linux: DEB installer or no-install AppImage. macOS: DMG or the complete app in a portable TAR.GZ archive. Choose the matching architecture. No-install packages still use the normal per-user app data location. SHA256SUMS.txt contains file checksums. Early builds are not Windows code-signed or Apple-notarized; macOS builds use ad-hoc signing. See docs/DESKTOP_RELEASE.md for usage notes."
+              --notes "Windows: EXE installer or portable ZIP (requires WebView2). Linux: DEB installer or the extensionless native ELF executable (x64/ARM64), not an AppImage or archive. The executable needs system WebKitGTK 4.1, GTK 3 and compatible glibc; grant execute permission with chmod +x before running. macOS: DMG or the complete app in a portable TAR.GZ archive. Choose the matching architecture. No-install packages still use the normal per-user app data location. SHA256SUMS.txt contains file checksums. Early builds are not Windows code-signed or Apple-notarized; macOS builds use ad-hoc signing. See docs/DESKTOP_RELEASE.md for usage notes."
           fi
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
           gh release edit "$RELEASE_TAG" --draft=false --latest

@@ -38,18 +38,18 @@ bun run build:app --target aarch64-apple-darwin --bundles app,dmg --ci -- --lock
 bun run build:app --target x86_64-apple-darwin --bundles app,dmg --ci -- --locked
 
 # Linux (native architecture)
-bun run build:app --bundles deb,appimage --ci -- --locked
+bun run build:app --bundles deb --ci -- --locked
 ```
 
 `--target` selects a Rust target; it does not install another OS's SDK. The CI matrix builds on the corresponding operating systems. Add Rust targets with `rustup target add <target>` before using them locally.
 
 Without `--target`, bundles are written to `src-tauri/target/release/bundle/`. With it, the path is `src-tauri/target/<target>/release/bundle/`.
 
-The platform-specific `tauri.windows.conf.json`, `tauri.linux.conf.json` and `tauri.macos.conf.json` set these same bundle targets for local builds without `--bundles`. Windows no longer defaults to MSI, and Linux no longer defaults to RPM.
+The platform-specific `tauri.windows.conf.json`, `tauri.linux.conf.json` and `tauri.macos.conf.json` set these same bundle targets for local builds without `--bundles`. Windows defaults to NSIS only; Linux defaults to DEB only. MSI, RPM and AppImage are not built.
 
 ### Package the no-install editions
 
-Linux's no-install edition is the `.AppImage` already produced by the build. On Windows and macOS, archive the built application with:
+Linux's no-install edition is the original `release/Legir` native ELF executable, copied without an archive or runtime wrapper. Stage it, or create Windows/macOS archives, with:
 
 ```bash
 # Run on Windows, after the Windows build above:
@@ -58,19 +58,25 @@ bun scripts/desktop-portable.ts x86_64-pc-windows-msvc src-tauri/target/x86_64-p
 # Run on Apple Silicon macOS, after the macOS build above:
 bun scripts/desktop-portable.ts aarch64-apple-darwin src-tauri/target/aarch64-apple-darwin/release desktop-dist
 
+# Run on Linux after a native build without --target (choose the matching target):
+bun scripts/desktop-portable.ts x86_64-unknown-linux-gnu src-tauri/target/release desktop-dist
+# For ARM64 use aarch64-unknown-linux-gnu instead.
+
 # For Intel macOS, replace aarch64-apple-darwin with x86_64-apple-darwin.
 # For builds without --target, pass src-tauri/target/release as the release directory.
 ```
 
 The Windows ZIP contains `Legir.exe`, adjacent runtime DLLs when present, the configured PDF icon resource, a license and usage notes. The macOS TAR.GZ contains the **complete signed `Legir.app` bundle**, its resources, executable permissions and symbolic links, plus a license and usage notes. It is not a bare Mach-O executable. Both scripts read the checked project version rather than using a hardcoded release number.
 
-To collect the built native bundles alongside the ZIP/TAR.GZ for inspection:
+`scripts/desktop-linux.ts` copies exactly `release/Legir` into an extensionless `Legir_<version>_linux_<x64|arm64>_portable` file. It checks the ELF64 header and machine architecture, rejects renamed AppImages, and fails if Linux configuration introduces external resources or sidecars that a single file would omit. It does not bundle GTK/WebKit or make the executable statically linked.
+
+To collect the built native bundles alongside the no-install files for inspection:
 
 ```bash
 bun scripts/desktop-release.ts stage src-tauri/target/<target>/release/bundle desktop-dist
 ```
 
-Staging excludes old MSI/RPM files even when they remain in the build directory. The CI workflow performs both steps automatically.
+Staging excludes old MSI/RPM/AppImage files even when they remain in the build directory. The CI workflow performs both steps automatically.
 
 The build chain is:
 
@@ -95,7 +101,7 @@ PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$NODE_BIN_DIR:/usr/bin:/bin:$PATH" \
   bun run build:app --bundles deb --ci -- --locked
 ```
 
-This does not change the project's compiler flags or global shell configuration. After an app is built, generate another installer format without recompiling using `bun x tauri bundle --bundles appimage --ci` in the same tool environment.
+This does not change the project's compiler flags or global shell configuration. After building, stage the native executable with the command above; no second build or AppImage tooling is needed.
 
 ## Build and release workflows
 
@@ -106,10 +112,10 @@ This does not change the project's compiler flags or global shell configuration.
 | Windows | x64                 | NSIS `-setup.exe` | `_windows_x64_portable.zip`                           |
 | macOS   | Intel x64           | `.dmg`            | `_macos_x64_portable.tar.gz` containing `Legir.app`   |
 | macOS   | Apple Silicon ARM64 | `.dmg`            | `_macos_arm64_portable.tar.gz` containing `Legir.app` |
-| Linux   | x64                 | `.deb`            | `.AppImage`                                           |
-| Linux   | ARM64               | `.deb`            | `.AppImage`                                           |
+| Linux   | x64                 | `.deb`            | `_linux_x64_portable` (native ELF, no extension)      |
+| Linux   | ARM64               | `.deb`            | `_linux_arm64_portable` (native ELF, no extension)    |
 
-Only one installer and one no-install edition per architecture are published. MSI and RPM are not built, staged, accepted by the publication gate or shown on the website.
+Only one installer and one no-install edition per architecture are published. MSI, RPM and AppImage are not built, staged, accepted by the publication gate or shown on the website. The historical v0.1.0 release retains its original files; v0.1.1 switches Linux no-install downloads to native ELF without rewriting previously published assets.
 
 The Linux ARM64 job uses GitHub's public-repository ARM runner. Private repositories need an available runner with the same architecture.
 
@@ -121,17 +127,17 @@ The Linux ARM64 job uses GitHub's public-repository ARM runner. Private reposito
 - `src-tauri/tauri.conf.json` → `version`
 - `src-tauri/Cargo.toml` → `[package].version`
 
-The first configured version is `0.1.0`. After reviewing, committing and pushing the release changes:
+The native Linux distribution change uses `0.1.1`. After reviewing, committing and pushing the release changes:
 
 ```bash
-bun run check:desktop v0.1.0
-git tag -a v0.1.0 -m "Legir v0.1.0"
-git push origin v0.1.0
+bun run check:desktop v0.1.1
+git tag -a v0.1.1 -m "Legir v0.1.1"
+git push origin v0.1.1
 ```
 
 For later releases, update all three version fields and run `bun install --lockfile-only` plus `cargo check --manifest-path src-tauri/Cargo.toml` to refresh lockfiles as needed. Commit the version and lockfile changes before tagging.
 
-The release pipeline builds every target first. Only after all jobs succeed does it collect the five installers and five no-install packages, validate their names/versions/architecture coverage, generate `SHA256SUMS.txt`, upload everything to a draft, and publish it as the latest stable release. An incomplete build never becomes a new public release.
+The release pipeline builds every target first. Only after all jobs succeed does it collect the five installers and five no-install packages, validate their names/versions/architecture coverage, generate `SHA256SUMS.txt`, upload everything to a draft, and publish it as the latest stable release. An incomplete build never becomes a new public release. The publication step revalidates the actual Linux ELF headers and restores execute permissions after Actions artifact download; HTTP/browser downloads still require the user to run `chmod +x` locally.
 
 The release job checks out the requested tag in every stage, including manually dispatched builds. It refuses to overwrite a release that is already public. Failed uploads can be retried while the release is still a draft. The current website/release contract intentionally supports stable `vX.Y.Z` releases only, not beta/RC channels.
 
@@ -149,7 +155,8 @@ Relevant files:
 - `www/src/content/downloads.ts`: all seven supported languages.
 - `www/src/lib/downloads.ts`: release parsing, platform detection and repository URLs.
 - `scripts/desktop-release.ts`: version validation, flat native-bundle staging and checksum generation. It uses the same asset parser as the website to validate the publication contract.
-- `scripts/desktop-portable.ts`: Windows ZIP and complete macOS `.app` archive packaging. Linux uses Tauri's existing AppImage output.
+- `scripts/desktop-portable.ts`: shared no-install entry point, Windows ZIP and complete macOS `.app` archives.
+- `scripts/desktop-linux.ts`: native Linux executable staging, architecture and file-format verification.
 
 The website queries the public GitHub API:
 
@@ -157,7 +164,7 @@ The website queries the public GitHub API:
 https://api.github.com/repos/99percentpeople/Legir/releases/latest
 ```
 
-Only verified metadata for this repository's published stable releases is displayed. Actual `browser_download_url` values become download links; the website never invents versioned asset URLs. It displays version, architecture, installer/no-install labels, format and file size. Generic ZIPs, updater archives, loose executables, MSI/RPM and mismatched-version asset names are not shown as downloads. macOS always offers the actual available Intel and Apple Silicon builds instead of guessing the processor from the browser user agent.
+Only verified metadata for this repository's published stable releases is displayed. Actual `browser_download_url` values become download links; the website never invents versioned asset URLs. It displays version, architecture, installer/no-install labels, format and file size. Only explicitly named Linux native executables are accepted. Generic ZIPs, updater archives, arbitrary executables, MSI/RPM/AppImage and mismatched-version asset names are not shown as downloads. Linux ELF links include an accessible note about GTK/WebKit dependencies and execute permission. macOS always offers the actual available Intel and Apple Silicon builds instead of guessing the processor from the browser user agent.
 
 With no release, the website explicitly shows that the first desktop release is being prepared. On timeout, network errors or rate limiting it shows an error with retry and a permanent GitHub Releases link. Missing platform assets are not represented by broken buttons. No GitHub token, additional backend, hardcoded release version or website redeployment is required for a new published version to be picked up on a subsequent page load (subject to GitHub/browser HTTP caching).
 
@@ -172,12 +179,21 @@ Tauri builds the frontend directly, not through Turbo, so `TAURI_ENV_*` settings
 ### No-install does not mean dependency-free or a portable user profile
 
 - **Windows ZIP:** extract the whole folder and run `Legir.exe`. Microsoft Edge WebView2 Runtime must already be installed; use the EXE installer when it is missing. The ZIP does not run an installer or register shortcuts/PDF associations. Keeping the ZIP small intentionally avoids bundling a fixed WebView2 runtime.
-- **Linux AppImage:** grant execute permission (`chmod +x Legir_*.AppImage`) and run it. It avoids installing Legir through the package manager, but is not a promise of compatibility with every distribution. FUSE or an extract-and-run option and a compatible system-library baseline may still be needed; test on supported distributions. CI uses Ubuntu 22.04 to avoid unnecessarily raising the baseline. A loose ELF binary is not published as a substitute.
+- **Linux ELF:** download the matching native executable, grant execute permission and run it directly (commands below). There is no archive to extract, runtime wrapper or FUSE requirement. WebKitGTK 4.1, GTK 3 and a compatible glibc must already exist on the target system. CI builds on Ubuntu 22.04, but this does not promise compatibility with every Linux distribution. Use DEB through your package manager to resolve dependencies on a supported Debian-based system.
 - **macOS TAR.GZ:** extract and open the complete `Legir.app`, without a package installer. Do not separate the executable from the bundle's resources, metadata or signature files. Signing/notarization restrictions apply just as for the DMG.
 
 All no-install editions still use the application's normal per-user data locations. Settings, configured API credentials and recent-file history do **not** travel with the extracted folder. This change does not introduce a separate portable-profile mode.
 
-References: [WebView2 requirements](https://v2.tauri.app/distribute/windows-installer/#webview2-installation-options), [AppImage constraints](https://v2.tauri.app/distribute/appimage/), [macOS application bundles](https://v2.tauri.app/distribute/macos-application-bundle/).
+For the native Linux x64 file downloaded into the current directory:
+
+```bash
+chmod +x ./Legir_0.1.1_linux_x64_portable
+./Legir_0.1.1_linux_x64_portable
+```
+
+For ARM64 use `Legir_0.1.1_linux_arm64_portable` in both commands. Run as your normal user, not with `sudo`. `ldd ./Legir_0.1.1_linux_x64_portable` can inspect missing libraries on a trusted, checksum-verified download. Refer to `SHA256SUMS.txt` in the same release for file verification.
+
+References: [WebView2 requirements](https://v2.tauri.app/distribute/windows-installer/#webview2-installation-options), [Tauri Linux dependencies and baseline](https://v2.tauri.app/distribute/debian/), [macOS application bundles](https://v2.tauri.app/distribute/macos-application-bundle/).
 
 ### Signing
 

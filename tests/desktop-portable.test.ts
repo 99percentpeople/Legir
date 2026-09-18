@@ -120,7 +120,7 @@ describe("portable package naming and contents", () => {
   it("rejects unsupported targets and versions", () => {
     expect(() =>
       portableArchiveName("aarch64-unknown-linux-gnu", "0.1.0"),
-    ).toThrow("AppImage");
+    ).toThrow("unarchived native executable");
     expect(() => portableArchiveName("__proto__", "0.1.0")).toThrow(
       "Unsupported",
     );

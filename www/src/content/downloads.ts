@@ -21,6 +21,7 @@ export interface DownloadCopy {
   windowsNote: string;
   macosNote: string;
   linuxNote: string;
+  linuxPortableNote: string;
   signingNote: string;
 }
 
@@ -50,7 +51,9 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
       "No-install packages still store settings in your normal per-user app data directory.",
     windowsNote: "x64 · EXE or portable ZIP. The ZIP requires WebView2.",
     macosNote: "Apple Silicon or Intel · DMG or a complete .app archive",
-    linuxNote: "x64 or ARM64 · DEB installer or no-install AppImage",
+    linuxNote: "x64 or ARM64 · DEB installer / native ELF executable",
+    linuxPortableNote:
+      "ELF requires system WebKitGTK 4.1 and GTK 3. Grant execute permission with chmod +x before running.",
     signingNote:
       "Early builds may not be code-signed or notarized. Your system may show a security warning; check the release notes before installing.",
   },
@@ -76,7 +79,9 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
       "免安装版的设置仍保存在当前用户的数据目录，不随程序文件夹移动。",
     windowsNote: "x64 · EXE 安装版 / ZIP 免安装版，后者需已安装 WebView2",
     macosNote: "Apple Silicon 或 Intel · DMG / 完整 .app 压缩包",
-    linuxNote: "x64 或 ARM64 · DEB 安装版 / AppImage 免安装版",
+    linuxNote: "x64 或 ARM64 · DEB 安装版 / 原生 ELF 可执行文件",
+    linuxPortableNote:
+      "ELF 需系统已安装 WebKitGTK 4.1 和 GTK 3，运行前请用 chmod +x 赋予执行权限。",
     signingNote:
       "早期版本可能尚未完成代码签名或公证，安装时可能出现系统安全提示，请先阅读版本说明。",
   },
@@ -102,7 +107,9 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
       "免安裝版的設定仍儲存在目前使用者的資料目錄，不隨程式資料夾移動。",
     windowsNote: "x64 · EXE 安裝版 / ZIP 免安裝版，後者需已安裝 WebView2",
     macosNote: "Apple Silicon 或 Intel · DMG / 完整 .app 壓縮檔",
-    linuxNote: "x64 或 ARM64 · DEB 安裝版 / AppImage 免安裝版",
+    linuxNote: "x64 或 ARM64 · DEB 安裝版 / 原生 ELF 執行檔",
+    linuxPortableNote:
+      "ELF 需系統已安裝 WebKitGTK 4.1 和 GTK 3，執行前請用 chmod +x 賦予執行權限。",
     signingNote:
       "早期版本可能尚未完成程式碼簽章或公證，安裝時可能出現系統安全提示，請先閱讀版本說明。",
   },
@@ -129,7 +136,9 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
       "インストール不要版も、設定は通常のユーザーデータフォルダーに保存されます。",
     windowsNote: "x64 · EXE / インストール不要の ZIP（WebView2 が必要）",
     macosNote: "Apple Silicon / Intel · DMG / 完全な .app アーカイブ",
-    linuxNote: "x64 / ARM64 · DEB / インストール不要の AppImage",
+    linuxNote: "x64 / ARM64 · DEB / ネイティブ ELF 実行ファイル",
+    linuxPortableNote:
+      "ELF にはシステムの WebKitGTK 4.1 と GTK 3 が必要です。実行前に chmod +x で実行権限を付与してください。",
     signingNote:
       "初期リリースはコード署名や公証が未完了の場合があります。セキュリティ警告が表示されることがあるため、インストール前にリリースノートをご確認ください。",
   },
@@ -157,7 +166,9 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
       "Les versions sans installation conservent les réglages dans le dossier habituel de données de l’utilisateur.",
     windowsNote: "x64 · EXE ou ZIP sans installation (WebView2 requis)",
     macosNote: "Apple Silicon ou Intel · DMG ou archive .app complète",
-    linuxNote: "x64 ou ARM64 · DEB ou AppImage sans installation",
+    linuxNote: "x64 ou ARM64 · DEB / exécutable ELF natif",
+    linuxPortableNote:
+      "ELF nécessite WebKitGTK 4.1 et GTK 3 sur le système. Accordez le droit d’exécution avec chmod +x avant de lancer le fichier.",
     signingNote:
       "Les premières versions peuvent ne pas être signées ou notariées. Une alerte de sécurité peut apparaître ; consultez les notes de version avant l’installation.",
   },
@@ -186,7 +197,9 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
       "Auch die Versionen ohne Installation speichern Einstellungen im üblichen Benutzerdatenverzeichnis.",
     windowsNote: "x64 · EXE oder ZIP ohne Installation (WebView2 erforderlich)",
     macosNote: "Apple Silicon oder Intel · DMG oder vollständiges .app-Archiv",
-    linuxNote: "x64 oder ARM64 · DEB oder AppImage ohne Installation",
+    linuxNote: "x64 oder ARM64 · DEB / native ELF-Datei",
+    linuxPortableNote:
+      "ELF benötigt WebKitGTK 4.1 und GTK 3 auf dem System. Erteile vor dem Start mit chmod +x die Ausführungsberechtigung.",
     signingNote:
       "Frühe Versionen sind möglicherweise noch nicht signiert oder notarisiert. Das System kann eine Sicherheitswarnung anzeigen. Lies vor der Installation die Versionshinweise.",
   },
@@ -214,7 +227,9 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
       "Las versiones sin instalación también guardan los ajustes en la carpeta habitual de datos del usuario.",
     windowsNote: "x64 · EXE o ZIP sin instalación (requiere WebView2)",
     macosNote: "Apple Silicon o Intel · DMG o archivo .app completo",
-    linuxNote: "x64 o ARM64 · DEB o AppImage sin instalación",
+    linuxNote: "x64 o ARM64 · DEB / ejecutable ELF nativo",
+    linuxPortableNote:
+      "ELF requiere WebKitGTK 4.1 y GTK 3 en el sistema. Concede permiso de ejecución con chmod +x antes de abrir el archivo.",
     signingNote:
       "Las primeras versiones pueden no estar firmadas o notarizadas. El sistema podría mostrar una advertencia de seguridad; lee las notas de la versión antes de instalar.",
   },

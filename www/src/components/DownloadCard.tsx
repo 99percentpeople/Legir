@@ -29,6 +29,7 @@ export function DownloadCard({
   copy,
 }: DownloadCardProps) {
   const titleId = `download-${platform}-title`;
+  const linuxNoteId = `download-${platform}-portable-note`;
   // Do not infer processor architecture from the OS. Keep every published choice.
   const architectures =
     platform === "macos" ? ["arm64", "x64"] : ["x64", "arm64"];
@@ -75,10 +76,7 @@ export function DownloadCard({
                 <div className="download-file-links">
                   {files.map((item) => {
                     const installer = item.kind === "installer";
-                    const format =
-                      item.format === "AppImage"
-                        ? item.format
-                        : item.format.toUpperCase();
+                    const format = item.format.toUpperCase();
                     return (
                       <a
                         key={item.name}
@@ -88,6 +86,9 @@ export function DownloadCard({
                         href={item.url}
                         aria-label={`${installer ? copy.downloadInstaller : copy.portable} · ${name} · ${item.arch} · ${format}`}
                         data-kind={item.kind}
+                        aria-describedby={
+                          item.format === "elf" ? linuxNoteId : undefined
+                        }
                       >
                         {installer ? (
                           <>
@@ -118,6 +119,11 @@ export function DownloadCard({
       ) : hasRelease ? (
         <p className="download-missing">{copy.missing}</p>
       ) : null}
+      {downloads.some((item) => item.format === "elf") && (
+        <p id={linuxNoteId} className="download-platform-note">
+          {copy.linuxPortableNote}
+        </p>
+      )}
     </article>
   );
 }

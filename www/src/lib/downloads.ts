@@ -5,13 +5,7 @@ export const LATEST_RELEASE_API =
   "https://api.github.com/repos/99percentpeople/Legir/releases/latest";
 
 export type DesktopPlatform = "windows" | "macos" | "linux";
-export type DownloadFormat =
-  | "exe"
-  | "dmg"
-  | "deb"
-  | "AppImage"
-  | "zip"
-  | "tar.gz";
+export type DownloadFormat = "exe" | "dmg" | "deb" | "elf" | "zip" | "tar.gz";
 export type DownloadKind = "installer" | "portable";
 export interface DesktopDownload {
   name: string;
@@ -70,13 +64,15 @@ export function parseDesktopRelease(value: unknown): DesktopRelease | null {
         : null;
     const version = value.tag_name.slice(1).replaceAll(".", "\\.");
     if (!arch || !new RegExp(`^legir_${version}_`, "i").test(name)) continue;
-    const extension = name.match(/\.(exe|dmg|deb|AppImage|zip|tar\.gz)$/i)?.[1];
+    const nativeLinux = new RegExp(
+      `^Legir_${version}_linux_(x64|arm64)_portable$`,
+      "i",
+    ).test(name);
+    const extension = nativeLinux
+      ? "elf"
+      : name.match(/\.(exe|dmg|deb|zip|tar\.gz)$/i)?.[1];
     if (!extension) continue;
-    const format = (
-      extension.toLowerCase() === "appimage"
-        ? "AppImage"
-        : extension.toLowerCase()
-    ) as DownloadFormat;
+    const format = extension.toLowerCase() as DownloadFormat;
     let platform: DesktopPlatform;
     if (format === "zip") {
       // A generic ZIP might be source code or updater data, not a portable app.
@@ -105,7 +101,7 @@ export function parseDesktopRelease(value: unknown): DesktopRelease | null {
       platform = format === "dmg" ? "macos" : "linux";
     }
     const kind: DownloadKind =
-      format === "AppImage" || format === "zip" || format === "tar.gz"
+      format === "elf" || format === "zip" || format === "tar.gz"
         ? "portable"
         : "installer";
     if (

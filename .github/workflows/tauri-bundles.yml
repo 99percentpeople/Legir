@@ -40,10 +40,10 @@ jobs:
             bundles: nsis
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            bundles: deb,appimage
+            bundles: deb
           - platform: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            bundles: deb,appimage
+            bundles: deb
           - platform: macos-15-intel
             target: x86_64-apple-darwin
             bundles: app,dmg
@@ -99,8 +99,6 @@ jobs:
 
       - name: Build selected native bundles
         env:
-          # AppImage tools can extract themselves on runners without FUSE.
-          APPIMAGE_EXTRACT_AND_RUN: "1"
           # Avoid embedding the checkout path, without nightly-only trim-paths.
           RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/legir
         run: bun run build:app --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --ci -- --locked
@@ -108,8 +106,7 @@ jobs:
       - name: Stage installers with a flat layout
         run: bun scripts/desktop-release.ts stage src-tauri/target/${{ matrix.target }}/release/bundle desktop-dist
 
-      - name: Package Windows and macOS no-install editions
-        if: runner.os != 'Linux'
+      - name: Stage no-install editions (Linux ships the native executable)
         run: bun scripts/desktop-portable.ts ${{ matrix.target }} src-tauri/target/${{ matrix.target }}/release desktop-dist
 
       - name: Upload installers and no-install packages

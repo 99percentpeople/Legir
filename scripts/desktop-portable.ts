@@ -15,6 +15,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { readDesktopVersion } from "./desktop-release";
+import { stageLinuxExecutable } from "./desktop-linux";
 
 const execFileAsync = promisify(execFile);
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -31,7 +32,7 @@ const portableTargets = {
 export function portableArchiveName(target: string, version: string): string {
   if (!Object.hasOwn(portableTargets, target)) {
     throw new Error(
-      `Unsupported portable target: ${target}. Linux uses the Tauri AppImage bundle.`,
+      `Unsupported archive target: ${target}. Linux uses an unarchived native executable.`,
     );
   }
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
@@ -215,7 +216,10 @@ if (
         "Usage: bun scripts/desktop-portable.ts <target> <release-directory> <destination>",
       );
     }
-    await createPortableArchive(
+    const packageNoInstall = target.endsWith("-unknown-linux-gnu")
+      ? stageLinuxExecutable
+      : createPortableArchive;
+    await packageNoInstall(
       target,
       resolve(releaseDirectory),
       resolve(destination),

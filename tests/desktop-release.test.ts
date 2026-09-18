@@ -6,6 +6,7 @@ import {
   readFile,
   readdir,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -17,6 +18,7 @@ import {
   validateDesktopVersions,
   validateReleaseAssets,
 } from "../scripts/desktop-release";
+import { linuxExecutableFixture } from "./helpers/linuxExecutable";
 
 const names = [
   "Legir_0.1.0_x64-setup.exe",
@@ -27,10 +29,17 @@ const names = [
   "Legir_0.1.0_arm64.deb",
   "Legir_0.1.0_macos_x64_portable.tar.gz",
   "Legir_0.1.0_macos_arm64_portable.tar.gz",
-  "Legir_0.1.0_amd64.AppImage",
-  "Legir_0.1.0_aarch64.AppImage",
+  "Legir_0.1.0_linux_x64_portable",
+  "Legir_0.1.0_linux_arm64_portable",
 ];
 const files = names.map((name) => ({ name, size: 123 }));
+function fileContent(name: string) {
+  if (name.endsWith("_linux_x64_portable"))
+    return linuxExecutableFixture("x64");
+  if (name.endsWith("_linux_arm64_portable"))
+    return linuxExecutableFixture("arm64");
+  return Buffer.from(`fixture:${name}`);
+}
 const manifest =
   '[package]\nname = "Legir"\nversion = "0.1.0"\n\n[dependencies]\nversion = "9.9.9"\n';
 
@@ -86,7 +95,8 @@ describe("desktop release publication gates", () => {
   it.each([
     "Legir_0.1.0_windows_x64_portable.zip",
     "Legir_0.1.0_macos_arm64_portable.tar.gz",
-    "Legir_0.1.0_amd64.AppImage",
+    "Legir_0.1.0_linux_x64_portable",
+    "Legir_0.1.0_linux_arm64_portable",
   ])("blocks a release missing the no-install package %s", (name) => {
     expect(() =>
       validateReleaseAssets(
@@ -95,7 +105,12 @@ describe("desktop release publication gates", () => {
       ),
     ).toThrow("Missing downloads");
   });
-  it.each(["Legir_0.1.0_x64_en-US.msi", "Legir-0.1.0-1.x86_64.rpm"])(
+  it.each([
+    "Legir_0.1.0_x64_en-US.msi",
+    "Legir-0.1.0-1.x86_64.rpm",
+    "Legir_0.1.0_amd64.AppImage",
+    "Legir_0.1.0_aarch64.AppImage",
+  ])(
     "rejects removed format %s even when all supported packages exist",
     (name) => {
       expect(() =>
@@ -145,6 +160,11 @@ describe("installer staging and checksums", () => {
     await writeFile(join(bundles, "dmg", "background.png"), "not an installer");
     await mkdir(join(bundles, "msi"));
     await mkdir(join(bundles, "rpm"));
+    await mkdir(join(bundles, "appimage"));
+    await writeFile(
+      join(bundles, "appimage", "Legir_0.1.0_amd64.AppImage"),
+      "old runtime",
+    );
     await writeFile(
       join(bundles, "msi", "Legir_0.1.0_x64_en-US.msi"),
       "stale installer",
@@ -166,17 +186,45 @@ describe("installer staging and checksums", () => {
       stageInstallers(join(directory, "missing"), join(directory, "staged")),
     ).rejects.toThrow("No installers");
   });
+  it.each(["wrong architecture", "renamed AppImage"])(
+    "blocks %s before generating checksums",
+    async (kind) => {
+      const directory = await temporaryDirectory();
+      await Promise.all(
+        names.map((name) =>
+          writeFile(join(directory, name), fileContent(name)),
+        ),
+      );
+      const invalid = linuxExecutableFixture(
+        kind === "wrong architecture" ? "arm64" : "x64",
+      );
+      if (kind === "renamed AppImage") invalid.set([0x41, 0x49, 2], 8);
+      await writeFile(
+        join(directory, "Legir_0.1.0_linux_x64_portable"),
+        invalid,
+      );
+      await expect(prepareRelease(directory, "0.1.0")).rejects.toThrow();
+      expect(await readdir(directory)).not.toContain("SHA256SUMS.txt");
+    },
+  );
   it("writes deterministic SHA-256 checksums only for a complete release", async () => {
     const directory = await temporaryDirectory();
     await Promise.all(
-      names.map((name) => writeFile(join(directory, name), `fixture:${name}`)),
+      names.map((name) =>
+        writeFile(join(directory, name), fileContent(name), { mode: 0o644 }),
+      ),
     );
     await prepareRelease(directory, "0.1.0");
+    if (process.platform !== "win32") {
+      for (const name of names.filter((name) => name.includes("_linux_"))) {
+        expect((await stat(join(directory, name))).mode & 0o777).toBe(0o755);
+      }
+    }
     const first = await readFile(join(directory, "SHA256SUMS.txt"), "utf8");
     expect(first.trim().split("\n")).toHaveLength(10);
     for (const name of names) {
       expect(first).toContain(
-        `${createHash("sha256").update(`fixture:${name}`).digest("hex")}  ${name}`,
+        `${createHash("sha256").update(fileContent(name)).digest("hex")}  ${name}`,
       );
     }
     await prepareRelease(directory, "0.1.0");

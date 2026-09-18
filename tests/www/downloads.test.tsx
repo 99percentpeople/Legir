@@ -20,8 +20,8 @@ const installerNames = [
   "Legir_0.1.0_arm64.deb",
   "Legir_0.1.0_macos_x64_portable.tar.gz",
   "Legir_0.1.0_macos_arm64_portable.tar.gz",
-  "Legir_0.1.0_amd64.AppImage",
-  "Legir_0.1.0_aarch64.AppImage",
+  "Legir_0.1.0_linux_x64_portable",
+  "Legir_0.1.0_linux_arm64_portable",
 ];
 const fixture = {
   tag_name: "v0.1.0",
@@ -99,6 +99,16 @@ describe("desktop installer metadata", () => {
     ).toEqual([]);
   });
   it.each([
+    "Legir_0.1.0_amd64.AppImage",
+    "Legir_0.1.0_aarch64.AppImage",
+    "Legir_0.1.0_linux_x64_portable.AppImage",
+    "Legir_0.1.0_linux_x64_portable.elf",
+    "Legir_0.1.0_linux_x64_portable.zip",
+    "Legir_0.1.0_linux_amd64_portable",
+    "Legir_0.1.0_linux_i686_portable",
+    "Legir_0.1.0_windows_x64_portable",
+    "Legir_0.2.0_linux_x64_portable",
+    "Legir_0.1.0_linux_x64_portable.sig",
     "Legir_0.1.0_x64_en-US.msi",
     "Legir-0.1.0-1.x86_64.rpm",
     "Legir_0.1.0_x64.exe",
@@ -151,6 +161,10 @@ describe("desktop installer metadata", () => {
       expect(Object.keys(copy)).toEqual(Object.keys(downloadCopy.en));
       for (const value of Object.values(copy))
         expect(value.trim()).not.toBe("");
+      expect(copy.linuxNote).toContain("ELF");
+      expect(copy.linuxPortableNote).toContain("WebKitGTK 4.1");
+      expect(copy.linuxPortableNote).toContain("chmod +x");
+      expect(JSON.stringify(copy)).not.toMatch(/AppImage/i);
     }
     expect(Object.keys(downloadCopy)).toHaveLength(7);
     for (const value of ["system", "unknown", "__proto__", "constructor"]) {
@@ -199,7 +213,18 @@ describe("desktop downloads UI", () => {
     expect(container.querySelectorAll('a[data-kind="portable"]')).toHaveLength(
       5,
     );
-    expect(container.textContent).not.toMatch(/MSI|RPM/);
+    expect(container.textContent).not.toMatch(/MSI|RPM|AppImage/i);
+    const linux = container.querySelector('[data-platform="linux"]')!;
+    const elfLinks = linux.querySelectorAll('a[data-kind="portable"]');
+    expect(elfLinks).toHaveLength(2);
+    for (const link of elfLinks) {
+      expect(link.textContent).toContain("ELF");
+      expect(link.getAttribute("href")).toMatch(/_linux_(x64|arm64)_portable$/);
+      expect(link.getAttribute("aria-describedby")).toBe(
+        "download-linux-portable-note",
+      );
+    }
+    expect(linux.textContent).toContain(downloadCopy.en.linuxPortableNote);
     expect(container.textContent).toContain("WebView2");
     expect(container.textContent).toContain(downloadCopy.en.portableNote);
     const windowsPortable = container.querySelector(

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import {
+  chmod,
   copyFile,
   mkdir,
   readFile,
@@ -11,6 +12,7 @@ import {
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseDesktopRelease, RELEASES_URL } from "../www/src/lib/downloads";
+import { validateLinuxExecutable, type LinuxArch } from "./desktop-linux";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const stableVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -64,9 +66,9 @@ export const REQUIRED_DOWNLOADS = [
   "macos/arm64/dmg",
   "macos/arm64/tar.gz",
   "linux/x64/deb",
-  "linux/x64/AppImage",
+  "linux/x64/elf",
   "linux/arm64/deb",
-  "linux/arm64/AppImage",
+  "linux/arm64/elf",
 ] as const;
 
 export function validateReleaseAssets(
@@ -113,8 +115,8 @@ export async function stageInstallers(
 ): Promise<void> {
   await mkdir(destination, { recursive: true });
   const names = new Set<string>();
-  // Ignore stale MSI/RPM outputs left in a local or cached build directory.
-  for (const kind of ["nsis", "dmg", "deb", "appimage"]) {
+  // Ignore stale MSI/RPM/AppImage outputs in local or cached build directories.
+  for (const kind of ["nsis", "dmg", "deb"]) {
     const source = resolve(bundleDirectory, kind);
     const entries = await readdir(source, { withFileTypes: true }).catch(
       (error: NodeJS.ErrnoException) => {
@@ -123,8 +125,7 @@ export async function stageInstallers(
       },
     );
     for (const entry of entries) {
-      if (!entry.isFile() || !/\.(exe|dmg|deb|AppImage)$/.test(entry.name))
-        continue;
+      if (!entry.isFile() || !/\.(exe|dmg|deb)$/.test(entry.name)) continue;
       if (names.has(entry.name))
         throw new Error(`Duplicate installer: ${entry.name}`);
       names.add(entry.name);
@@ -153,6 +154,18 @@ export async function prepareRelease(
   );
   files.sort((a, b) => a.name.localeCompare(b.name));
   validateReleaseAssets(version, files);
+  // Recheck binary identity after the per-platform Actions artifacts are merged.
+  // Actions downloads do not retain executable mode; restore it only after validation.
+  for (const file of files) {
+    const arch = file.name
+      .match(/_linux_(x64|arm64)_portable$/i)?.[1]
+      .toLowerCase() as LinuxArch | undefined;
+    if (arch) {
+      const path = resolve(directory, file.name);
+      await validateLinuxExecutable(path, arch);
+      await chmod(path, 0o755);
+    }
+  }
   const checksums: string[] = [];
   for (const file of files) {
     const hash = createHash("sha256");
