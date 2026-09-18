@@ -141,9 +141,11 @@ The workflow uses the built-in `GITHUB_TOKEN` with write permission only in the 
 
 The website has a `#downloads` section, linked from the header, hero and footer. The browser app remains the primary hero action.
 
+When a supported desktop OS is detected, its card is larger and centered on wide screens, with an accent-colored installer button. It is first in the DOM and appears above the other systems on narrow screens. Other systems remain available, and every no-install download is a secondary text link rather than an equal-weight button. Phones, tablets reporting a mobile OS, ChromeOS and unrecognized clients get a neutral layout without a misleading current-system badge. OS detection never chooses a processor architecture or hides a published package.
+
 Relevant files:
 
-- `www/src/components/DownloadSection.tsx` and `downloads.css`: responsive download UI.
+- `www/src/components/DownloadSection.tsx`, `DownloadCard.tsx` and `downloads.css`: responsive download UI.
 - `www/src/content/downloads.ts`: all seven supported languages.
 - `www/src/lib/downloads.ts`: release parsing, platform detection and repository URLs.
 - `scripts/desktop-release.ts`: version validation, flat native-bundle staging and checksum generation. It uses the same asset parser as the website to validate the publication contract.

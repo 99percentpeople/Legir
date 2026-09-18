@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Download } from "lucide-react";
-import { SystemIcon } from "./SystemIcon";
+import { ArrowUpRight } from "lucide-react";
+import { DownloadCard } from "./DownloadCard";
 import type { DownloadCopy } from "../content/downloads";
 import {
   detectDesktopPlatform,
-  formatDownloadSize,
   LATEST_RELEASE_API,
   parseDesktopRelease,
   RELEASES_URL,
@@ -16,8 +15,6 @@ import "./downloads.css";
 type ReleaseState =
   | { status: "loading" | "unpublished" | "error"; release?: never }
   | { status: "ready"; release: DesktopRelease };
-
-const formatOrder = ["exe", "dmg", "deb", "zip", "tar.gz", "AppImage"];
 
 const platforms = [
   { id: "windows", name: "Windows", note: "windowsNote" },
@@ -75,6 +72,14 @@ export function DownloadSection({ copy }: { copy: DownloadCopy }) {
   }, [attempt]);
 
   const release = state.release;
+  // Put the current system first in the DOM for keyboard and mobile users.
+  // CSS places that same card in the center column on wide screens.
+  const orderedPlatforms = currentPlatform
+    ? [
+        ...platforms.filter((platform) => platform.id === currentPlatform),
+        ...platforms.filter((platform) => platform.id !== currentPlatform),
+      ]
+    : platforms;
   const statusText =
     state.status === "loading"
       ? copy.loading
@@ -111,78 +116,34 @@ export function DownloadSection({ copy }: { copy: DownloadCopy }) {
           </button>
         )}
       </div>
-      <div className="download-grid" aria-busy={state.status === "loading"}>
-        {platforms.map(({ id, name, note }) => {
-          const downloads =
-            release?.downloads.filter((item) => item.platform === id) ?? [];
-          return (
-            <article
-              className="download-card"
-              data-current={currentPlatform === id}
-              key={id}
-            >
-              <div className="download-card-heading">
-                <SystemIcon platform={id} className="download-platform-icon" />
-                <h3>{name}</h3>
-                {currentPlatform === id && <span>{copy.current}</span>}
-              </div>
-              <p className="download-platform-note">{copy[note]}</p>
-              {downloads.length > 0 ? (
-                <ul className="download-options">
-                  {(id === "macos" ? ["arm64", "x64"] : ["x64", "arm64"]).map(
-                    (arch) => {
-                      const installers = downloads
-                        .filter((item) => item.arch === arch)
-                        .sort(
-                          (a, b) =>
-                            formatOrder.indexOf(a.format) -
-                            formatOrder.indexOf(b.format),
-                        );
-                      if (!installers.length) return null;
-                      return (
-                        <li key={arch}>
-                          <p className="download-architecture">
-                            {id === "macos"
-                              ? arch === "arm64"
-                                ? "Apple Silicon"
-                                : "Intel"
-                              : arch === "arm64"
-                                ? "ARM64"
-                                : "x64"}
-                          </p>
-                          <div className="download-format-grid">
-                            {installers.map((item) => (
-                              <a
-                                key={item.name}
-                                href={item.url}
-                                aria-label={`${copy.cta} · ${name} · ${item.arch} · ${copy[item.kind]} · ${item.format}`}
-                                data-kind={item.kind}
-                              >
-                                <Download size={13} aria-hidden="true" />
-                                <span>
-                                  {copy[item.kind]}
-                                  <small>
-                                    {item.format === "AppImage"
-                                      ? item.format
-                                      : item.format.toUpperCase()}
-                                    {" · "}
-                                    {formatDownloadSize(item.size)}
-                                  </small>
-                                </span>
-                              </a>
-                            ))}
-                          </div>
-                        </li>
-                      );
-                    },
-                  )}
-                </ul>
-              ) : release ? (
-                <p className="download-missing">{copy.missing}</p>
-              ) : null}
-            </article>
-          );
-        })}
+      <div
+        className="download-grid"
+        data-has-current={currentPlatform !== null}
+        aria-busy={state.status === "loading"}
+      >
+        {orderedPlatforms.map(({ id, name, note }, index) => (
+          <DownloadCard
+            key={id}
+            platform={id}
+            name={name}
+            note={copy[note]}
+            current={currentPlatform === id}
+            position={
+              currentPlatform
+                ? index === 0
+                  ? "center"
+                  : index === 1
+                    ? "left"
+                    : "right"
+                : undefined
+            }
+            downloads={
+              release?.downloads.filter((item) => item.platform === id) ?? []
+            }
+            hasRelease={Boolean(release)}
+            copy={copy}
+          />
+        ))}
       </div>
       <div className="downloads-footer">
         <p>

@@ -1,4 +1,4 @@
-/* Reuse the landing page's light/dark palette rather than editor styles. */
+/* Reuse the landing palette. Only the current system gets the accent CTA. */
 .downloads-section {
   padding-block: 12px 76px;
   scroll-margin-top: 96px;
@@ -40,23 +40,81 @@
 .download-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  align-items: stretch;
+  gap: 22px;
+  padding-top: 20px;
+}
+.download-grid[data-has-current="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.28fr) minmax(0, 1fr);
+}
+/* Layout, not scaling: glyphs stay crisp and links keep real hit areas. */
+.download-card[data-position="center"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+.download-card[data-position="left"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+.download-card[data-position="right"] {
+  grid-column: 3;
+  grid-row: 1;
 }
 .download-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   min-width: 0;
-  padding: 24px;
+  padding: 26px 24px 20px;
   border: 1px solid var(--site-line);
-  border-radius: 12px;
-  background: var(--site-surface);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--site-soft) 24%, var(--site-surface));
+}
+.download-grid[data-has-current="true"] .download-card[data-current="false"] {
+  margin-block: 24px;
 }
 .download-card[data-current="true"] {
-  border-color: var(--site-accent);
+  min-height: 440px;
+  padding: 38px 30px 26px;
+  border-color: color-mix(in srgb, var(--site-accent) 60%, var(--site-line));
+  background: var(--site-surface);
+  box-shadow: 0 14px 36px -20px
+    color-mix(in srgb, var(--site-ink) 24%, transparent);
+}
+.download-current-badge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, var(--site-accent) 60%, var(--site-line));
+  border-radius: 50px;
+  background: var(--site-surface);
+  color: var(--site-accent);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+.download-current-badge::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
 }
 .download-card-heading {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 11px;
 }
 .download-card-heading > .download-platform-icon {
   display: block;
@@ -64,69 +122,137 @@
   color: var(--site-ink);
 }
 .download-card-heading h3 {
-  font-size: 18px;
+  color: var(--site-ink);
+  font-size: 20px;
   font-weight: 550;
+  line-height: 1.4;
 }
-.download-card-heading > span {
-  margin-left: auto;
-  padding: 3px 7px;
-  border-radius: 5px;
-  background: var(--site-soft);
-  color: var(--site-muted);
-  font-size: 10px;
+.download-card[data-current="true"] .download-card-heading {
+  flex-direction: column;
+  gap: 10px;
+}
+.download-card[data-current="true"] h3 {
+  font-size: 28px;
+  letter-spacing: -0.7px;
 }
 .download-platform-note,
 .download-missing {
   margin-top: 14px;
   color: var(--site-muted);
   font-size: 11px;
-  line-height: 1.8;
+  line-height: 1.85;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.download-card[data-current="true"] .download-platform-note {
+  max-width: 280px;
+  margin-inline: auto;
+  font-size: 12px;
 }
 .download-options {
   display: grid;
-  gap: 18px;
-  margin: 20px 0 0;
+  gap: 16px;
+  margin: 24px 0 0;
   padding: 0;
   list-style: none;
 }
+.download-card[data-current="true"] .download-options {
+  margin-top: 0;
+  padding-top: 26px;
+  gap: 18px;
+}
 .download-architecture {
-  margin-bottom: 7px;
+  margin-bottom: 8px;
   color: var(--site-muted);
-  font-size: 11px;
-}
-.download-format-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-  gap: 8px;
-}
-.download-options a {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 54px;
-  padding: 10px 8px;
-  border: 1px solid var(--site-line);
-  border-radius: 7px;
-  color: var(--site-ink);
-  transition: background 150ms;
-}
-.download-options a:hover {
-  background: var(--site-soft);
-}
-.download-options a > span {
-  flex: 1;
-  min-width: 0;
   font-size: 11px;
   font-weight: 500;
   line-height: 1.5;
+}
+.download-file-links {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.download-installer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 54px;
+  padding: 10px 14px;
+  border: 1px solid var(--site-line);
+  border-radius: 8px;
+  background: var(--site-surface);
+  color: var(--site-ink);
+  transition:
+    background 150ms,
+    border-color 150ms;
+}
+.download-installer:hover {
+  border-color: color-mix(in srgb, var(--site-ink) 35%, var(--site-line));
+  background: var(--site-soft);
+}
+.download-installer > span {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
-.download-options small {
+.download-installer small {
   display: block;
-  margin-top: 3px;
+  margin-top: 2px;
   color: var(--site-muted);
   font-size: 10px;
   font-weight: 400;
+}
+.download-card[data-current="true"] .download-installer {
+  min-height: 62px;
+  padding: 12px 17px;
+  border-color: transparent;
+  background: var(--site-button);
+  color: #fff;
+}
+.download-card[data-current="true"] .download-installer:hover {
+  background: color-mix(in srgb, var(--site-button) 90%, #000);
+}
+.download-card[data-current="true"] .download-installer > span {
+  font-size: 14px;
+}
+.download-card[data-current="true"] .download-installer small {
+  color: inherit;
+  font-size: 11px;
+}
+.download-portable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 8px;
+  row-gap: 2px;
+  align-self: center;
+  max-width: 100%;
+  min-height: 36px;
+  padding-block: 6px;
+  color: var(--site-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.download-portable > span {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--site-muted) 40%, transparent);
+  text-underline-offset: 3px;
+}
+.download-portable small {
+  font-size: 10px;
+}
+.download-portable:hover {
+  color: var(--site-ink);
+}
+.download-portable:hover > span {
+  text-decoration-color: currentColor;
 }
 .downloads-footer {
   display: flex;
@@ -134,13 +260,13 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px 30px;
-  margin-top: 22px;
+  margin-top: 30px;
   color: var(--site-muted);
   font-size: 11px;
   line-height: 1.9;
 }
 .downloads-footer p {
-  max-width: 640px;
+  max-width: 660px;
   flex: 1 1 380px;
 }
 .downloads-footer a {
@@ -149,14 +275,51 @@
   gap: 7px;
   color: var(--site-ink);
 }
-@media (max-width: 760px) {
-  .download-grid {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 960px) {
+  .download-grid[data-has-current="true"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 24px;
   }
-  .download-card {
-    padding: 22px;
+  .download-card[data-position] {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .download-card[data-current="true"] {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(100%, 500px);
+    min-height: 0;
+  }
+  .download-grid[data-has-current="true"] .download-card[data-current="false"] {
+    margin-block: 0;
+  }
+}
+@media (max-width: 760px) {
+  .download-grid,
+  .download-grid[data-has-current="true"] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .download-card,
+  .download-card[data-current="true"] {
+    width: 100%;
+    padding: 24px 22px 18px;
+  }
+  .download-card[data-current="true"] {
+    padding-top: 32px;
   }
   .downloads-section {
     padding-bottom: 52px;
+  }
+}
+/* A secondary text link should still be easy to tap on a touch screen. */
+@media (pointer: coarse), (max-width: 760px) {
+  .download-portable {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .download-installer {
+    transition: none;
   }
 }

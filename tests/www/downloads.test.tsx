@@ -164,6 +164,7 @@ describe("desktop downloads UI", () => {
   let root: Root;
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("navigator", { userAgent: "Unknown", maxTouchPoints: 0 });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -228,8 +229,8 @@ describe("desktop downloads UI", () => {
       );
       expect(icon?.classList.contains("download-platform-icon")).toBe(true);
       expect(icon?.getAttribute("viewBox")).toBe(viewBox);
-      expect(icon?.getAttribute("width")).toBe("24");
-      expect(icon?.getAttribute("height")).toBe("24");
+      expect(icon?.getAttribute("width")).toBe("28");
+      expect(icon?.getAttribute("height")).toBe("28");
       expect(icon?.getAttribute("fill")).toBe("currentColor");
       expect(icon?.getAttribute("stroke")).toBe("none");
       expect(icon?.getAttribute("aria-hidden")).toBe("true");
@@ -246,6 +247,174 @@ describe("desktop downloads UI", () => {
       expect(icon?.querySelector("image, use")).toBeNull();
     },
   );
+  it.each([
+    ["windows", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"],
+    ["macos", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"],
+    ["linux", "Mozilla/5.0 (X11; Linux x86_64)"],
+  ])(
+    "features %s in the center and first in the keyboard/mobile order",
+    async (platform, userAgent) => {
+      vi.stubGlobal("navigator", { userAgent, maxTouchPoints: 0 });
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(fixture)));
+      await render();
+      const cards = Array.from(
+        container.querySelectorAll<HTMLElement>(".download-card"),
+      );
+      expect(cards.map((card) => card.dataset.position)).toEqual([
+        "center",
+        "left",
+        "right",
+      ]);
+      expect(cards[0].dataset.platform).toBe(platform);
+      expect(cards[0].dataset.current).toBe("true");
+      expect(container.querySelectorAll('[data-current="true"]')).toHaveLength(
+        1,
+      );
+      expect(
+        container.querySelectorAll(".download-current-badge"),
+      ).toHaveLength(1);
+      expect(
+        cards[0].querySelector(".download-current-badge")?.textContent,
+      ).toBe(downloadCopy.en.current);
+      expect(cards[0].querySelector("svg")?.getAttribute("width")).toBe("44");
+      for (const card of cards.slice(1)) {
+        expect(card.dataset.current).toBe("false");
+        expect(card.querySelector("svg")?.getAttribute("width")).toBe("28");
+      }
+      const firstLink = container.querySelector(".download-options a");
+      expect(firstLink?.closest("article")).toBe(cards[0]);
+      expect(firstLink?.getAttribute("data-kind")).toBe("installer");
+      expect(container.querySelectorAll(".download-options a")).toHaveLength(
+        10,
+      );
+    },
+  );
+  it.each([
+    ["Unknown", 0],
+    ["Mozilla/5.0 (Linux; Android 15)", 5],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS)", 5],
+    ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", 5],
+    ["Mozilla/5.0 (X11; CrOS x86_64)", 0],
+  ])(
+    "does not label a desktop download as the current system for %s",
+    async (userAgent, maxTouchPoints) => {
+      vi.stubGlobal("navigator", { userAgent, maxTouchPoints });
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(fixture)));
+      await render();
+      expect(
+        container
+          .querySelector(".download-grid")
+          ?.getAttribute("data-has-current"),
+      ).toBe("false");
+      expect(
+        container.querySelectorAll(
+          '[data-current="true"], .download-current-badge',
+        ),
+      ).toHaveLength(0);
+      expect(
+        Array.from(
+          container.querySelectorAll<HTMLElement>(".download-card"),
+        ).map((card) => card.dataset.platform),
+      ).toEqual(["windows", "macos", "linux"]);
+      expect(container.querySelectorAll(".download-options a")).toHaveLength(
+        10,
+      );
+    },
+  );
+  it("keeps installers as primary links and portable packages as secondary text links for every architecture", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(fixture)));
+    await render();
+    const groups = container.querySelectorAll(".download-options > li");
+    expect(groups).toHaveLength(5);
+    for (const group of groups) {
+      const links = group.querySelectorAll("a");
+      expect(links[0].className).toBe("download-installer");
+      expect(links[0].textContent).toContain(downloadCopy.en.downloadInstaller);
+      expect(links[0].getAttribute("aria-label")).toContain(
+        downloadCopy.en.downloadInstaller,
+      );
+      expect(links[1].className).toBe("download-portable");
+      expect(links[1].textContent).toContain(downloadCopy.en.portable);
+      expect(links[1].getAttribute("aria-label")).toContain(
+        downloadCopy.en.portable,
+      );
+    }
+    expect(
+      Array.from(
+        container.querySelectorAll<HTMLAnchorElement>(".download-options a"),
+      )
+        .map((link) => link.href)
+        .sort(),
+    ).toEqual(fixture.assets.map((asset) => asset.browser_download_url).sort());
+  });
+  it("keeps the featured system and download URLs stable when the language changes", async () => {
+    vi.stubGlobal("navigator", { userAgent: "Macintosh", maxTouchPoints: 0 });
+    const fetchMock = vi.fn().mockResolvedValue(response(fixture));
+    vi.stubGlobal("fetch", fetchMock);
+    await render();
+    const current = container.querySelector('[data-current="true"]');
+    const linksBefore = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>(".download-options a"),
+    ).map((link) => link.href);
+
+    await act(async () =>
+      root.render(<DownloadSection copy={downloadCopy["zh-CN"]} />),
+    );
+
+    expect(container.querySelector('[data-current="true"]')).toBe(current);
+    expect(current?.getAttribute("data-platform")).toBe("macos");
+    expect(current?.querySelector(".download-current-badge")?.textContent).toBe(
+      downloadCopy["zh-CN"].current,
+    );
+    expect(
+      current?.querySelector(".download-installer")?.textContent,
+    ).toContain(downloadCopy["zh-CN"].downloadInstaller);
+    expect(current?.querySelector(".download-portable")?.textContent).toContain(
+      downloadCopy["zh-CN"].portable,
+    );
+    expect(
+      Array.from(
+        container.querySelectorAll<HTMLAnchorElement>(".download-options a"),
+      ).map((link) => link.href),
+    ).toEqual(linksBefore);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it("keeps a portable-only release secondary and does not invent an installer for the current system", async () => {
+    vi.stubGlobal("navigator", {
+      userAgent: "Windows NT 10.0",
+      maxTouchPoints: 0,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          response({ ...fixture, assets: [fixture.assets[1]] }),
+        ),
+    );
+    await render();
+    const current = container.querySelector('[data-current="true"]');
+    expect(current?.querySelectorAll("a")).toHaveLength(1);
+    expect(current?.querySelector(".download-installer")).toBeNull();
+    expect(current?.querySelector("a")?.className).toBe("download-portable");
+  });
+  it("does not substitute another system's installer when the current system has no published package", async () => {
+    vi.stubGlobal("navigator", { userAgent: "Macintosh", maxTouchPoints: 0 });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          response({ ...fixture, assets: [fixture.assets[0]] }),
+        ),
+    );
+    await render();
+    const current = container.querySelector('[data-current="true"]');
+    expect(current?.getAttribute("data-platform")).toBe("macos");
+    expect(current?.querySelector("a")).toBeNull();
+    expect(current?.textContent).toContain(downloadCopy.en.missing);
+    expect(container.querySelectorAll(".download-options a")).toHaveLength(1);
+  });
   it("never fabricates installer URLs before a first release exists", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({}, 404)));
     await render();

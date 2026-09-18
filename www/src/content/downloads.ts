@@ -15,6 +15,7 @@ export interface DownloadCopy {
   current: string;
   chooseArch: string;
   installer: string;
+  downloadInstaller: string;
   portable: string;
   portableNote: string;
   windowsNote: string;
@@ -43,6 +44,7 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
     current: "Your system",
     chooseArch: "Choose the architecture that matches your computer.",
     installer: "Installer",
+    downloadInstaller: "Download installer",
     portable: "No-install",
     portableNote:
       "No-install packages still store settings in your normal per-user app data directory.",
@@ -68,6 +70,7 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
     current: "当前系统",
     chooseArch: "请选择与你的电脑匹配的处理器架构。",
     installer: "安装版",
+    downloadInstaller: "下载安装版",
     portable: "免安装版",
     portableNote:
       "免安装版的设置仍保存在当前用户的数据目录，不随程序文件夹移动。",
@@ -93,6 +96,7 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
     current: "目前系統",
     chooseArch: "請選擇與你的電腦相符的處理器架構。",
     installer: "安裝版",
+    downloadInstaller: "下載安裝版",
     portable: "免安裝版",
     portableNote:
       "免安裝版的設定仍儲存在目前使用者的資料目錄，不隨程式資料夾移動。",
@@ -119,6 +123,7 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
     current: "お使いの OS",
     chooseArch: "パソコンに合ったプロセッサーの種類を選んでください。",
     installer: "インストール版",
+    downloadInstaller: "インストール版を入手",
     portable: "インストール不要",
     portableNote:
       "インストール不要版も、設定は通常のユーザーデータフォルダーに保存されます。",
@@ -146,6 +151,7 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
     current: "Votre système",
     chooseArch: "Choisissez l’architecture de votre ordinateur.",
     installer: "Installation",
+    downloadInstaller: "Télécharger l’installateur",
     portable: "Sans installation",
     portableNote:
       "Les versions sans installation conservent les réglages dans le dossier habituel de données de l’utilisateur.",
@@ -174,6 +180,7 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
     current: "Dein System",
     chooseArch: "Wähle die passende Prozessorarchitektur für deinen Computer.",
     installer: "Installation",
+    downloadInstaller: "Installer herunterladen",
     portable: "Ohne Installation",
     portableNote:
       "Auch die Versionen ohne Installation speichern Einstellungen im üblichen Benutzerdatenverzeichnis.",
@@ -201,6 +208,7 @@ export const downloadCopy: Record<Exclude<Language, "system">, DownloadCopy> = {
     current: "Tu sistema",
     chooseArch: "Elige la arquitectura de tu ordenador.",
     installer: "Instalador",
+    downloadInstaller: "Descargar instalador",
     portable: "Sin instalación",
     portableNote:
       "Las versiones sin instalación también guardan los ajustes en la carpeta habitual de datos del usuario.",
