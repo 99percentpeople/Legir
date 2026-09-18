@@ -16,15 +16,18 @@ export function Brand({ label }: { label: string }) {
 export function SiteHeader({
   copy,
   appUrl,
+  downloadLabel,
 }: {
   copy: LandingCopy;
   appUrl: string;
+  downloadLabel: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const links = [
     { href: "#features", label: copy.nav.features },
     { href: "#workflow", label: copy.nav.workflow },
+    { href: "#downloads", label: downloadLabel },
     { href: "#faq", label: copy.nav.faq },
   ];
 

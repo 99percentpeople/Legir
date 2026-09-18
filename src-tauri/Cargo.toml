@@ -1,5 +1,3 @@
-cargo-features = ["profile-rustflags", "trim-paths"]
-
 [package]
 name = "Legir"
 version = "0.1.0"
@@ -8,7 +6,7 @@ authors = ["Zach Yuen <yuenzach99@gmail.com>"]
 repository = "https://github.com/99percentpeople/Legir"
 license = "AGPL-3.0-or-later"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.94"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -40,7 +38,6 @@ tauri-plugin-single-instance = "2.4.3"
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
-rustflags = ["-Zthreads=8"] # Better compile performance.
 
 [profile.release]
 codegen-units = 1 # Allows LLVM to perform better optimization.
@@ -48,5 +45,4 @@ lto = true # Enables link-time-optimizations.
 opt-level = "s" # Prioritizes small binary size. Use `3` if you prefer speed.
 panic = "abort" # Higher performance by disabling panic handlers.
 strip = true # Ensures debug symbols are removed.
-trim-paths = "all" # Removes potentially privileged information from your binaries.
-rustflags = ["-Cdebuginfo=0", "-Zthreads=8"] # Better compile performance.
+debug = 0 # Keep release artifacts small without unstable compiler flags.

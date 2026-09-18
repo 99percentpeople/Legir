@@ -2,169 +2,86 @@ name: publish-tauri
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing stable version tag to publish, e.g. v0.1.0"
+        required: true
+        type: string
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
 
-env:
-  BUN_VERSION: "1.3.3"
-  RUST_NIGHTLY_TOOLCHAIN: nightly-2026-04-01
+permissions:
+  contents: read
+
+concurrency:
+  group: tauri-release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  preflight:
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.3"
+      - name: Verify tag and app versions
+        id: version
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          bun run check:desktop "$RELEASE_TAG"
+          git show-ref --verify "refs/tags/$RELEASE_TAG"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: preflight
+    uses: ./.github/workflows/tauri-bundles.yml
+    with:
+      ref: ${{ needs.preflight.outputs.tag }}
+
+  publish:
+    needs: [preflight, build]
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-            target: x86_64-pc-windows-msvc
-            args: "--target x86_64-pc-windows-msvc"
-            portable_artifact_name: tauri-windows-x64-portable
-          - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            args: "--target x86_64-unknown-linux-gnu"
-            portable_artifact_name: tauri-linux-x64-portable
-          - platform: ubuntu-22.04-arm
-            target: aarch64-unknown-linux-gnu
-            args: "--target aarch64-unknown-linux-gnu"
-            portable_artifact_name: tauri-linux-arm64-portable
-          - platform: macos-15-intel
-            target: x86_64-apple-darwin
-            args: "--target x86_64-apple-darwin"
-            portable_artifact_name: tauri-macos-x64-portable
-          - platform: macos-15
-            target: aarch64-apple-darwin
-            args: "--target aarch64-apple-darwin"
-            portable_artifact_name: tauri-macos-arm64-portable
-
-    runs-on: ${{ matrix.platform }}
-
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install Linux dependencies (Ubuntu only)
-        if: startsWith(matrix.platform, 'ubuntu-')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            xdg-utils
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v5
         with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Restore Bun package cache
-        uses: actions/cache@v4
+          ref: ${{ needs.preflight.outputs.tag }}
+      - uses: oven-sh/setup-bun@v2
         with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-bun-${{ env.BUN_VERSION }}-
-            ${{ runner.os }}-${{ runner.arch }}-bun-
-
-      - name: Restore Rust nightly toolchain cache
-        uses: actions/cache@v4
+          bun-version: "1.3.3"
+      - name: Download all platform packages
+        uses: actions/download-artifact@v5
         with:
-          path: |
-            ~/.rustup/toolchains
-            ~/.rustup/update-hashes
-          key: ${{ runner.os }}-${{ runner.arch }}-rustup-${{ matrix.target }}-${{ env.RUST_NIGHTLY_TOOLCHAIN }}
-
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.RUST_NIGHTLY_TOOLCHAIN }}
-          targets: ${{ matrix.target }}
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          shared-key: tauri-${{ matrix.target }}
-          workspaces: "./src-tauri -> target"
-
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build & publish release
-        uses: tauri-apps/tauri-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Legir PDF Editor ${{ github.ref_name }}"
-          releaseBody: "See the assets to download and install this version."
-          generateReleaseNotes: true
-          prerelease: false
-          releaseDraft: false
-          args: ${{ matrix.args }}
-
-      - name: Prepare Windows portable
-        if: contains(matrix.target, 'windows')
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path portable-out | Out-Null
-          $source = Get-ChildItem "src-tauri/target/${{ matrix.target }}/release" -File -Filter *.exe | Select-Object -First 1
-          if (-not $source) { throw "Windows executable not found." }
-          $destination = Join-Path "portable-out" ("{0}-${{ github.ref_name }}{1}" -f $source.BaseName, $source.Extension)
-          Copy-Item $source.FullName $destination
-
-      - name: Prepare Linux portable
-        if: contains(matrix.target, 'linux')
-        shell: bash
+          pattern: desktop-*
+          merge-multiple: true
+          path: release-assets
+      - name: Verify selected installers and no-install packages and generate checksums
+        run: bun scripts/desktop-release.ts prepare release-assets
+      - name: Publish only after every package has been uploaded
         run: |
           set -euo pipefail
-          mkdir -p portable-out
-          release_dir="src-tauri/target/${{ matrix.target }}/release"
-          source_file="$(find "$release_dir" -maxdepth 1 -type f -executable | head -n 1)"
-          [ -n "$source_file" ]
-          base_name="$(basename "$source_file")"
-          install -m 755 "$source_file" "portable-out/${base_name}-${{ github.ref_name }}"
-
-      - name: Prepare macOS portable
-        if: contains(matrix.target, 'apple-darwin')
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p portable-out
-          release_dir="src-tauri/target/${{ matrix.target }}/release"
-          source_file="$release_dir/Legir"
-          if [ ! -f "$source_file" ]; then
-            source_file="$(find "$release_dir/bundle/macos" -path '*.app/Contents/MacOS/*' -type f | head -n 1)"
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > /tmp/release-is-draft; then
+            if [ "$(< /tmp/release-is-draft)" != "true" ]; then
+              echo "Refusing to overwrite an already published release. Use a new version tag." >&2
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "Legir $RELEASE_TAG" --generate-notes \
+              --notes "Windows: EXE installer or portable ZIP (requires WebView2). Linux: DEB installer or no-install AppImage. macOS: DMG or the complete app in a portable TAR.GZ archive. Choose the matching architecture. No-install packages still use the normal per-user app data location. SHA256SUMS.txt contains file checksums. Early builds are not Windows code-signed or Apple-notarized; macOS builds use ad-hoc signing. See docs/DESKTOP_RELEASE.md for usage notes."
           fi
-          [ -n "$source_file" ]
-          [ -f "$source_file" ]
-          base_name="$(basename "$source_file")"
-          install -m 755 "$source_file" "portable-out/${base_name}-${{ github.ref_name }}"
-
-      - name: Upload Windows portable
-        if: contains(matrix.target, 'windows')
-        uses: actions/upload-artifact@v6
-        with:
-          name: ${{ matrix.portable_artifact_name }}-${{ github.ref_name }}
-          path: portable-out/*.exe
-          if-no-files-found: error
-
-      - name: Upload Linux portable
-        if: contains(matrix.target, 'linux')
-        uses: actions/upload-artifact@v6
-        with:
-          name: ${{ matrix.portable_artifact_name }}-${{ github.ref_name }}
-          path: portable-out/*
-          if-no-files-found: error
-
-      - name: Upload macOS portable
-        if: contains(matrix.target, 'apple-darwin')
-        uses: actions/upload-artifact@v6
-        with:
-          name: ${{ matrix.portable_artifact_name }}-${{ github.ref_name }}
-          path: portable-out/*
-          if-no-files-found: error
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest

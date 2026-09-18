@@ -1,7 +1,7 @@
 {
   "name": "legir-pdf-reader",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "AGPL-3.0-or-later",
   "author": "Zach Yuen <yuenzach99@gmail.com>",
   "repository": "https://github.com/99percentpeople/Legir",
@@ -19,7 +19,8 @@
     "build:www": "bun run --cwd www build",
     "build:turbo": "turbo run build",
     "build:app": "tauri build",
-    "build:web:tauri": "turbo run build -- --mode tauri",
+    "build:web:tauri": "tsc --noEmit && vite build --mode tauri",
+    "check:desktop": "bun scripts/desktop-release.ts check",
     "icons:generate": "bun scripts/generate-icons.ts",
     "icons:generate:app": "bun scripts/generate-icons.ts app",
     "icons:generate:pdf": "bun scripts/generate-icons.ts pdf",

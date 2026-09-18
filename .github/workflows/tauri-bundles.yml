@@ -1,0 +1,122 @@
+name: tauri-bundles
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to build; empty uses the caller's ref.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.3.3"
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run check:desktop
+      - run: bun run lint
+      - run: bun run test
+
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+          - platform: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            bundles: deb,appimage
+          - platform: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+          - platform: macos-15
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install Linux build dependencies
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf xdg-utils libssl-dev libxdo-dev file
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Restore Bun package cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-bun-${{ env.BUN_VERSION }}-
+
+      - name: Read the pinned Rust toolchain
+        id: rust
+        shell: bash
+        run: |
+          echo "toolchain=$(bun -e 'console.log(Bun.TOML.parse(await Bun.file("rust-toolchain.toml").text()).toolchain.channel)')" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust.outputs.toolchain }}
+          targets: ${{ matrix.target }}
+
+      - name: Restore Rust build cache
+        uses: swatinem/rust-cache@v2
+        with:
+          shared-key: tauri-${{ matrix.target }}
+          workspaces: "./src-tauri -> target"
+          cache-on-failure: true
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build selected native bundles
+        env:
+          # AppImage tools can extract themselves on runners without FUSE.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          # Avoid embedding the checkout path, without nightly-only trim-paths.
+          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/legir
+        run: bun run build:app --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --ci -- --locked
+
+      - name: Stage installers with a flat layout
+        run: bun scripts/desktop-release.ts stage src-tauri/target/${{ matrix.target }}/release/bundle desktop-dist
+
+      - name: Package Windows and macOS no-install editions
+        if: runner.os != 'Linux'
+        run: bun scripts/desktop-portable.ts ${{ matrix.target }} src-tauri/target/${{ matrix.target }}/release desktop-dist
+
+      - name: Upload installers and no-install packages
+        uses: actions/upload-artifact@v6
+        with:
+          name: desktop-${{ matrix.target }}
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+          path: desktop-dist/*

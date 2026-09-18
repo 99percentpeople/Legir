@@ -36,9 +36,13 @@ bun run dev
 Desktop: `bun run dev:app`  
 Landing site: `bun run dev:www`
 
+To build native installers, run `bun run build:app --ci -- --locked` after installing the platform prerequisites. Rust is pinned in `rust-toolchain.toml` and does not require nightly. See [Desktop builds and releases](docs/DESKTOP_RELEASE.md) for OS-specific commands, signing requirements, and the tag-driven release pipeline.
+
 ## Deployment
 
 Deploy the repository root as the app project, and deploy `www/` as a separate Vercel project with `Root Directory = www`.
+
+The landing page's download section reads the latest stable GitHub Release and links directly to its actual installers. Before the first release, it shows an explicit preparation notice instead of broken download links.
 
 If the landing site needs to link to the app, set:
 

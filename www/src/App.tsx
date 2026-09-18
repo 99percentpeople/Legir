@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   Check,
   ChevronDown,
+  Download,
   FileText,
   Github,
   LockKeyhole,
@@ -11,6 +12,8 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { FeatureSection } from "./components/FeatureSection";
+import { DownloadSection } from "./components/DownloadSection";
+import { getDownloadCopy } from "./content/downloads";
 import { Brand, SiteHeader } from "./components/SiteHeader";
 import { WorkspacePreview } from "./components/WorkspacePreview";
 import { HeroTidalBackground } from "./components/hero-background/HeroTidalBackground";
@@ -20,6 +23,7 @@ import { resolveAppUrl, SOURCE_URL } from "./lib/app-url";
 export default function App() {
   const { effectiveLanguage } = useLanguage();
   const copy = getLandingCopy(effectiveLanguage);
+  const downloadCopy = getDownloadCopy(effectiveLanguage);
   const appUrl = resolveAppUrl(import.meta.env.VITE_APP_URL, window.location);
 
   useEffect(() => {
@@ -41,7 +45,11 @@ export default function App() {
       <a className="skip-link" href="#main-content">
         {copy.nav.skip}
       </a>
-      <SiteHeader copy={copy} appUrl={appUrl} />
+      <SiteHeader
+        copy={copy}
+        appUrl={appUrl}
+        downloadLabel={downloadCopy.nav}
+      />
       <main id="main-content" tabIndex={-1}>
         <div className="hero-scene">
           <HeroTidalBackground />
@@ -60,15 +68,9 @@ export default function App() {
                 {copy.hero.cta}
                 <ArrowRight size={18} aria-hidden="true" />
               </a>
-              <a
-                className="site-button button-secondary"
-                href={SOURCE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Github size={18} aria-hidden="true" />
-                {copy.hero.source}
-                <ArrowUpRight size={14} aria-hidden="true" />
+              <a className="site-button button-secondary" href="#downloads">
+                <Download size={18} aria-hidden="true" />
+                {downloadCopy.cta}
               </a>
             </div>
             <p className="hero-note">{copy.hero.note}</p>
@@ -136,6 +138,8 @@ export default function App() {
           </ol>
         </section>
 
+        <DownloadSection copy={downloadCopy} />
+
         <section
           className="faq-section site-container"
           id="faq"
@@ -183,6 +187,7 @@ export default function App() {
           <p>{copy.footer.tagline}</p>
         </div>
         <div className="footer-meta">
+          <a href="#downloads">{downloadCopy.nav}</a>
           <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
             <Github size={15} aria-hidden="true" />
             GitHub
