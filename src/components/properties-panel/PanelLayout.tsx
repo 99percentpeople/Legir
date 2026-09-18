@@ -7,6 +7,7 @@ import {
   RIGHT_PANEL_MIN_WIDTH_PX,
 } from "@/constants";
 import { useResizableSidePanel } from "@/hooks/useResizableSidePanel";
+import { useLanguage } from "@/components/language-provider";
 
 export interface PanelLayoutProps {
   isFloating: boolean;
@@ -37,6 +38,7 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
   onResize,
   bodyStyle,
 }) => {
+  const { t } = useLanguage();
   const { isResizing, handleMouseDown } = useResizableSidePanel({
     side: "right",
     isOpen,
@@ -105,6 +107,8 @@ export const PanelLayout: React.FC<PanelLayoutProps> = ({
               variant="ghost"
               size="icon"
               className="h-8 w-8"
+              aria-label={t("common.actions.close")}
+              title={t("common.actions.close")}
               onClick={onClose}
             >
               <X size={18} />

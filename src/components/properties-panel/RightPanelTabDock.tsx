@@ -35,6 +35,9 @@ export interface RightPanelTabDockProps {
   canOpenProperties: boolean;
   canOpenPageTranslate?: boolean;
   onSelectTab: (tab: RightPanelTabId) => void;
+  /** Optional host adapters; the editor keeps its event-bus defaults. */
+  onOpenTranslate?: () => void;
+  scrollContainer?: HTMLElement | null;
 }
 
 export function RightPanelTabDock({
@@ -45,6 +48,8 @@ export function RightPanelTabDock({
   canOpenProperties,
   canOpenPageTranslate = true,
   onSelectTab,
+  onOpenTranslate,
+  scrollContainer,
 }: RightPanelTabDockProps) {
   const { t, isCjk } = useLanguage();
   const [isSwitching, setIsSwitching] = React.useState(false);
@@ -62,7 +67,7 @@ export function RightPanelTabDock({
   );
 
   const { scrollbarWidthPx } = useScrollbarWidthOffset({
-    scrollElement,
+    scrollElement: scrollContainer ?? scrollElement,
     enabled: !isFloating,
   });
 
@@ -78,10 +83,12 @@ export function RightPanelTabDock({
   const handleSelectTab = React.useCallback(
     (tab: RightPanelTabId) => {
       if (tab === "translate") {
-        appEventBus.emit("workspace:openTranslate", {
-          sourceText: "",
-          autoTranslate: false,
-        });
+        if (onOpenTranslate) onOpenTranslate();
+        else
+          appEventBus.emit("workspace:openTranslate", {
+            sourceText: "",
+            autoTranslate: false,
+          });
         return;
       }
 
@@ -97,7 +104,7 @@ export function RightPanelTabDock({
         switchingTimerRef.current = null;
       }, 150);
     },
-    [onSelectTab],
+    [onOpenTranslate, onSelectTab],
   );
 
   const defaultTabs: RightPanelDockTab[] = [

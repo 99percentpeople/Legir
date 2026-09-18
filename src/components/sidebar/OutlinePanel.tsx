@@ -6,8 +6,12 @@ import { Input } from "../ui/input";
 import { cn } from "../../utils/cn";
 import { useLanguage } from "../language-provider";
 
+const defaultScrollIntoView = (element: HTMLElement) =>
+  element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
 // --- Outline Item ---
 interface OutlineItemProps {
+  scrollIntoView: (element: HTMLElement) => void;
   item: PDFOutlineItem;
   onNavigate: (pageIndex: number) => void;
   depth?: number;
@@ -17,6 +21,7 @@ interface OutlineItemProps {
 }
 
 const OutlineItem: React.FC<OutlineItemProps> = ({
+  scrollIntoView,
   item,
   onNavigate,
   depth = 0,
@@ -30,11 +35,9 @@ const OutlineItem: React.FC<OutlineItemProps> = ({
 
   useEffect(() => {
     if (isActive && ref.current) {
-      // Scroll into view, but maybe only if not already visible?
-      // 'nearest' tries to minimize scrolling.
-      ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      scrollIntoView(ref.current);
     }
-  }, [isActive]);
+  }, [isActive, scrollIntoView]);
 
   // Auto-expand if matches search or children match search
   // Also expand if a child is active!
@@ -138,6 +141,7 @@ const OutlineItem: React.FC<OutlineItemProps> = ({
               item={child}
               onNavigate={onNavigate}
               depth={depth + 1}
+              scrollIntoView={scrollIntoView}
               searchQuery={searchQuery}
               isActive={child === activeOutlineItem}
               activeOutlineItem={activeOutlineItem}
@@ -175,12 +179,14 @@ interface DocumentOutlinePanelProps {
   outline: PDFOutlineItem[];
   onNavigate: (pageIndex: number) => void;
   currentPageIndex?: number;
+  scrollIntoView?: (element: HTMLElement) => void;
 }
 
 const DocumentOutlinePanel: React.FC<DocumentOutlinePanelProps> = ({
   outline,
   onNavigate,
   currentPageIndex,
+  scrollIntoView = defaultScrollIntoView,
 }) => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
@@ -231,6 +237,7 @@ const DocumentOutlinePanel: React.FC<DocumentOutlinePanelProps> = ({
             <OutlineItem
               key={idx}
               item={item}
+              scrollIntoView={scrollIntoView}
               onNavigate={onNavigate}
               searchQuery={searchQuery}
               isActive={item === activeOutlineItem}

@@ -4,7 +4,6 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { LanguageProvider } from "@/components/language-provider";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
 import { shouldLoadPlatformFontFaces } from "@/services/platform";
 
 const rootElement = document.getElementById("root");
@@ -21,7 +20,6 @@ root.render(
   <React.StrictMode>
     <LanguageProvider defaultLanguage="system" storageKey="www-ui-language">
       <ThemeProvider defaultTheme="system" storageKey="www-ui-theme">
-        <Toaster position="top-center" />
         <App />
       </ThemeProvider>
     </LanguageProvider>

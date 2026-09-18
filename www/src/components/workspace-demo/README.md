@@ -1,0 +1,49 @@
+# Source-backed interactive workspace demo
+
+The public site uses an HTML sample document and a local controller, not screenshots, an iframe, or the PDF editing runtime. UI structure is based on the checked-in application source, rather than a visual approximation of an older deployed build.
+
+## Application components reused
+
+| Demo area                                                          | Application source                                                                                         |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Right panel frame, header, resize handle and footer                | `src/components/properties-panel/PanelLayout.tsx`                                                          |
+| Model picker, chat history, messages and message actions, composer | `ModelSelect`, `SessionHistoryPopover`, `ConversationTimeline`, `ConversationEmptyState`, `ComposerFooter` |
+| Vertical document / AI / translation dock                          | `RightPanelTabDock`                                                                                        |
+| Desktop page navigation and layout controls                        | `FloatingBar`, `PageNumberDropdownControl`, `PageSettingsDropdownControl`                                  |
+| Mobile bottom toolbar                                              | `MobileFloatingToolbar`                                                                                    |
+| Toolbar zoom and annotation color menus                            | `ZoomDropdownControl`, `ColorPickerPopover`                                                                |
+| Document information form                                          | `DocumentPropertiesPanel` (loaded on demand)                                                               |
+| Fixed sample selection and five-action bar                         | App selection CSS and handle constants; `Button` layout follows `WorkspaceTextSelectionPopoverView`        |
+| Fixed, contained translation card                                  | `TranslationWindowContent`, with a local frame following the app window header                             |
+| Searchable outline and field tree                                  | `src/components/sidebar/OutlinePanel.tsx`, `FieldTreePanel.tsx`                                            |
+| Annotation filtering, cards, editing, replies and deletion         | `src/components/sidebar/AnnotationsPanelView.tsx`                                                          |
+
+`DemoToolbar` follows `Toolbar.tsx` and uses the same controls with local command handlers. `DemoSidebar` follows `Sidebar.tsx` and uses its tabs, input styles, width limits and resize hook. The main toolbar and sidebar containers cannot be mounted directly because they subscribe to the real editor store and PDF services.
+
+The shared translation content and annotation views are also used by the application runtime wrappers. PDF permission checks and network translation remain in those wrappers. `AnnotationsPanel` still applies the application's PDF permission policy; the demo mounts `AnnotationsPanelView` with local data and callbacks, without importing the editor store or initializing a PDF worker. Outline and annotation views accept an optional scroll callback so their selection/focus logic scrolls only the embedded sidebar rather than moving the surrounding website. The dock's optional callback and scroll-container adapters let the demo handle translation locally without emitting application commands. Existing application callers retain their event-bus behavior.
+
+## Geometry and state
+
+`geometry.ts` uses the application's PDF-point/CSS conversion and fit-screen/fit-width functions. The A4 sample has fixed 595 × 842 PDF-point geometry. All presets default to **fit width**, not fit screen: the sheet fills the canvas horizontally instead of shrinking to show its entire height. Fit screen remains an explicit toolbar option. Zoom scales the whole HTML page; it does not reflow its text. Spreads, page direction, toolbar height and initial side-panel widths follow application source. The display uses a compact 16px canvas inset instead of the full editor's 96px fit-width allowance, including on phones. Responsive decisions use the embedded editor's width.
+
+`DemoDocumentContent` supplies both the reading surface and live HTML thumbnails. Thumbnail fields are inert text representations, not duplicate inputs or document IDs; highlights and form values stay synchronized. `DemoThumbnails` scales the same fixed document geometry to the actual thumbnail width.
+
+`types.ts` owns local document state, undo/redo snapshots (including annotation text and replies), form values, active tools and navigation. `useDemoNavigation` separates explicit page commands from scroll feedback: manual scrolling updates the page indicator without snapping back, clicking the current thumbnail still navigates to its top, and zoom preserves the reading position. `WorkspaceDemo` connects these to the UI. Translation is an independent card, not a mutually exclusive right-panel tab; it can remain open alongside AI. It is absolutely positioned **inside `.demo-editor-body`**, above the bottom toolbar, with container-relative size limits. It has no body portal, drag state, resize handles or viewport-level position. Opening it stages the fixed sample quote above the card by scrolling only the inner canvas, with the translation scene's page indicator pinned to its source page. The right dock's first button opens document information, not the outline. On small screens, the sidebar and right panel float over the document and are mutually exclusive, with the application's dimmed backdrop and Escape/outside-click dismissal. Resizing across the mobile breakpoint does not replay a preset or discard the current page, tool, or translation window.
+
+The synthetic PDF in `www/src/assets/workspace/reading-notes.pdf` is a reference used to compare the real app in a browser. It is not rendered or downloaded by the website.
+
+## Deliberate demo limits
+
+- `DemoTextSelection` displays one fixed quote. It uses the application's blue selection fill, selection-handle CSS and size constants, but the handles are inert decoration. Demo-scoped overrides align the end circle's **top** with the lower stem endpoint, and the start circle's **bottom** with the upper endpoint; neither circle is centered on an endpoint. Their 12px screen size stays constant through page scaling. Clicking the quote reveals an in-document action bar; there are no native selection ranges, selection-change listeners or handle-drag logic. Native selection is disabled on the sample paper, except in form inputs. The real application's selection and draggable translation window are unchanged.
+- No editor store updates, real PDF writes, provider calls, or persistence of document/chat inputs. The public demo must not contain credentials.
+- `copy.ts` contains authored responses and translations, explicitly labelled as local examples, **not verified DeepSeek API responses**. Unsupported questions and selections receive an explanation, not an unrelated response.
+- `useDemoPlayback` simulates cancellable streaming and honors reduced motion. Chat editing, regeneration and session switching operate on local examples.
+- `demoTokenUsage.ts` feeds the existing `ComposerFooter` context / total counters and input / output tooltip with deterministic **simulated** usage, not provider telemetry, billing or an exact tokenizer. A sample prompt/document allowance seeds each new request. Input is counted once; output follows only the visible playback text and freezes on stop. Context tracks retained conversation separately from cumulative request usage; simulated reasoning, when enabled, is included in output rather than added to total twice. Timeline snapshots restore session statistics and replace usage when an edited/regenerated local branch discards later messages. New chat starts at zero; Reset restores the seeded example. Drafts are not counted as sent requests. No additional stats bar, per-message widgets or model-capacity claims are added.
+- The sample supports navigation, page zoom/layout, highlight toggling, annotation search/filtering, remark editing, replies, removal, undo/redo and form input. Tool selection is not a complete drawing or form-design engine. Save changes only the local demo's dirty indicator; it does not export a PDF. Full-page translation is disabled and control-property editing is not exposed.
+- Changing presets retains form values; Reset or a language change remounts local state. Theme changes use application tokens without resetting document state.
+
+## Verification
+
+Run `bun run test tests/www`, `bun run lint`, `bun run build:www`, and `bun run build` after shared-view changes. The integration tests mount the actual panel, composer, selectors, message components and sidebar views. The third-party decorative logo is stubbed for Node ESM compatibility; a fail-fast editor-store mock also ensures the public demo never imports the PDF editing runtime.
+
+Browser verification should check the default sheet width, fixed selection and inert handles (circle edge meets stem endpoint, including at mobile scales), and translation-card containment during outer-page scrolling, viewport changes and attempted dragging/resizing. Check token tooltip values, streaming/stop behavior, session restore and localized number formatting as well. Also inspect the shared menus, chat actions, side-panel resize, mobile bottom toolbar, theme colors and absence of provider/worker requests. The demo intentionally keeps translation in the compact tabbed layout rather than reproducing the application's resizable-window breakpoint.

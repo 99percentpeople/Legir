@@ -1,0 +1,91 @@
+/* Kept inside the hero; no overrides of application/editor theme variables. */
+.hero-scene {
+  position: relative;
+  isolation: isolate;
+}
+.hero-scene > .hero {
+  position: relative;
+  z-index: 1;
+}
+.hero-tidal-background {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hero-tidal-visual {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  contain: layout paint style;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 14%,
+    #000 77%,
+    transparent
+  );
+}
+.hero-tidal-visual::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(var(--site-muted) 0.7px, transparent 0.7px);
+  background-size: 15px 20px;
+  opacity: 0.16;
+  transition: opacity 500ms ease;
+}
+.hero-tidal-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* Typography and CTAs stay on clear paper; texture lives in the margins. */
+  background: radial-gradient(
+    ellipse 42% 95% at 50% 46%,
+    var(--site-bg) 25%,
+    transparent 100%
+  );
+}
+.hero-tidal-canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+.hero-tidal-background[data-ready="true"] .hero-tidal-canvas {
+  opacity: 1;
+}
+.hero-tidal-background[data-ready="true"] .hero-tidal-visual::before {
+  opacity: 0;
+}
+@media (max-width: 600px) {
+  .hero-tidal-visual {
+    opacity: 0.65;
+  }
+  .hero-tidal-visual::after {
+    background: radial-gradient(
+      ellipse 70% 85% at 50% 46%,
+      var(--site-bg) 28%,
+      transparent 100%
+    );
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-tidal-canvas,
+  .hero-tidal-visual::before {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .hero-tidal-background {
+    display: none;
+  }
+}
+@media print {
+  .hero-tidal-background {
+    display: none;
+  }
+}

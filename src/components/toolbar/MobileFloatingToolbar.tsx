@@ -53,7 +53,20 @@ import { getStampPreset } from "@/lib/stamps";
 
 interface MobileFloatingToolbarProps {
   currentPageIndex: number;
-  editorState: EditorCanvasState;
+  editorState: Pick<
+    EditorCanvasState,
+    | "commentStyle"
+    | "documentLoadState"
+    | "documentPermissions"
+    | "freetextStyle"
+    | "highlightStyle"
+    | "mode"
+    | "pages"
+    | "penStyle"
+    | "shapeStyle"
+    | "stampStyle"
+    | "tool"
+  >;
   onNavigatePage: (pageIndex: number) => void;
   onToolChange: (tool: Tool) => void;
   onModeChange: (mode: EditorState["mode"]) => void;
