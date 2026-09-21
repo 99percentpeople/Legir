@@ -28,8 +28,8 @@
 
 ## Testing Guidelines
 
-- No automated test runner is configured yet.
-- If you add tests, use `*.test.ts(x)` or a nearby `__tests__/` folder and add a `test` script to `package.json`.
+- Vitest is the automated test runner. Run the full suite with `bun run test`, or use `bun run test:watch` while developing.
+- Add tests as `*.test.ts(x)` or `*.spec.ts(x)` under `src/` or `tests/`; the configured test environment is jsdom.
 
 ## Commit & Pull Request Guidelines
 

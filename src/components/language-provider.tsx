@@ -83,8 +83,13 @@ const dayjsLocales: Record<string, () => Promise<unknown>> = {
   es: () => import("dayjs/locale/es"),
 };
 
-// Use import.meta.glob to lazy load locales
-const localeModules = import.meta.glob("../locales/*.ts", { eager: false });
+// Use import.meta.glob to lazy load non-English locales.
+// English is imported eagerly above as the fallback dictionary, so excluding it
+// avoids bundling the same module through both static and dynamic imports.
+const localeModules = import.meta.glob(
+  ["../locales/*.ts", "!../locales/en.ts"],
+  { eager: false },
+);
 
 const LanguageProviderContext =
   createContext<LanguageProviderState>(initialState);

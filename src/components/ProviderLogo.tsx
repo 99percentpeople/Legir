@@ -16,23 +16,40 @@ const lazyProviderLogo = (
   }>,
 ) => React.lazy(loader);
 
+const OpenAiLogo = lazyProviderLogo(
+  () => import("@lobehub/icons/es/OpenAI/components/Mono"),
+);
+const AnthropicLogo = lazyProviderLogo(
+  () => import("@lobehub/icons/es/Anthropic/components/Mono"),
+);
+
 const providerLogos = {
-  openai: lazyProviderLogo(() => import("@lobehub/icons/es/OpenAI")),
-  "openai-compatible": lazyProviderLogo(
-    () => import("@lobehub/icons/es/OpenAI"),
+  openai: OpenAiLogo,
+  "openai-compatible": OpenAiLogo,
+  anthropic: AnthropicLogo,
+  "anthropic-compatible": AnthropicLogo,
+  "xiaomi-mimo": lazyProviderLogo(
+    () => import("@lobehub/icons/es/XiaomiMiMo/components/Mono"),
   ),
-  anthropic: lazyProviderLogo(() => import("@lobehub/icons/es/Anthropic")),
-  "anthropic-compatible": lazyProviderLogo(
-    () => import("@lobehub/icons/es/Anthropic"),
+  gemini: lazyProviderLogo(
+    () => import("@lobehub/icons/es/Gemini/components/Mono"),
   ),
-  "xiaomi-mimo": lazyProviderLogo(() => import("@lobehub/icons/es/XiaomiMiMo")),
-  gemini: lazyProviderLogo(() => import("@lobehub/icons/es/Gemini")),
-  openrouter: lazyProviderLogo(() => import("@lobehub/icons/es/OpenRouter")),
-  deepseek: lazyProviderLogo(() => import("@lobehub/icons/es/DeepSeek")),
-  minimax: lazyProviderLogo(() => import("@lobehub/icons/es/Minimax")),
-  zhipu: lazyProviderLogo(() => import("@lobehub/icons/es/Zhipu")),
-  groq: lazyProviderLogo(() => import("@lobehub/icons/es/Groq")),
-  xai: lazyProviderLogo(() => import("@lobehub/icons/es/XAI")),
+  openrouter: lazyProviderLogo(
+    () => import("@lobehub/icons/es/OpenRouter/components/Mono"),
+  ),
+  deepseek: lazyProviderLogo(
+    () => import("@lobehub/icons/es/DeepSeek/components/Mono"),
+  ),
+  minimax: lazyProviderLogo(
+    () => import("@lobehub/icons/es/Minimax/components/Mono"),
+  ),
+  zhipu: lazyProviderLogo(
+    () => import("@lobehub/icons/es/Zhipu/components/Mono"),
+  ),
+  groq: lazyProviderLogo(
+    () => import("@lobehub/icons/es/Groq/components/Mono"),
+  ),
+  xai: lazyProviderLogo(() => import("@lobehub/icons/es/XAI/components/Mono")),
 } satisfies Record<
   AiProviderId,
   React.LazyExoticComponent<React.ComponentType<ProviderLogoIconProps>>

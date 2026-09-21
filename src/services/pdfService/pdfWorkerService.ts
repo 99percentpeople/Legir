@@ -200,6 +200,8 @@ class PDFWorkerService {
   }
 
   private initWorker() {
+    if (typeof Worker === "undefined") return;
+
     try {
       this.worker = new PDFRenderWorker();
       if (this.worker) {

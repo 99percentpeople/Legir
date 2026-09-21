@@ -9,6 +9,7 @@ const createMockWorkerService = () =>
     loadDocument: async () => true,
     resolveDest: async () => null,
     getOutline: async () => [],
+    getPermissions: async () => null,
     renderPageImage: async () => undefined,
   }) as unknown as PDFWorkerService;
 
