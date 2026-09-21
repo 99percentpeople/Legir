@@ -29,6 +29,7 @@ import { setAppHighlightedText } from "../lib/annotationMetadata";
 import { hexToPdfColor } from "../lib/colors";
 import { generateInkAppearanceOps } from "../lib/ink";
 import { containsNonAscii, isSerifFamily } from "../lib/text";
+import { canFontEncodeText } from "../lib/font-selection";
 import { uiPointToPdfPoint, uiRectToPdfBounds } from "../lib/coords";
 import {
   buildPdfRotationMatrix,
@@ -457,9 +458,18 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     const text = annotation.text || "";
 
-    const customFont = isSerifFamily(annotation.fontFamily)
+    const preferredFallback = isSerifFamily(annotation.fontFamily)
       ? fontMap?.get("CustomSerif") || fontMap?.get("Custom")
       : fontMap?.get("CustomSans") || fontMap?.get("Custom");
+    const builtInFallback = fontMap?.get(
+      isSerifFamily(annotation.fontFamily)
+        ? "Source Han Serif SC"
+        : "Noto Sans SC",
+    );
+    const customFont =
+      preferredFallback && canFontEncodeText(preferredFallback, text)
+        ? preferredFallback
+        : (builtInFallback ?? preferredFallback);
     const hasNonAscii = containsNonAscii(text);
     const userSelectedFont =
       annotation.fontFamily && fontMap?.has(annotation.fontFamily)
@@ -480,31 +490,8 @@ export class FreeTextExporter implements IAnnotationExporter {
       isUserSelectedNonStandardEmbedded ||
       (customFont && userSelectedFont && userSelectedFont === customFont);
 
-    const createCanEncodeChar = (font: PDFFont) => {
-      const questionEncoded = (() => {
-        try {
-          return font.encodeText("?").toString();
-        } catch {
-          return null;
-        }
-      })();
-
-      const cache = new Map<string, boolean>();
-      return (ch: string) => {
-        const cached = cache.get(ch);
-        if (typeof cached === "boolean") return cached;
-        try {
-          const encoded = font.encodeText(ch).toString();
-          const ok =
-            ch === "?" || !questionEncoded || encoded !== questionEncoded;
-          cache.set(ch, ok);
-          return ok;
-        } catch {
-          cache.set(ch, false);
-          return false;
-        }
-      };
-    };
+    const createCanEncodeChar = (font: PDFFont) => (ch: string) =>
+      canFontEncodeText(font, ch);
 
     // Base (ASCII) font selection
     let baseFont: PDFFont | undefined;

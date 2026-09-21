@@ -13,8 +13,7 @@ import {
   type ControlExportOptions,
   ViewportLike,
 } from "../types";
-import { containsNonAscii, isExplicitCjkFontSelection } from "../lib/text";
-import { pickCjkFontFromMap } from "../lib/font-selection";
+import { pickControlValueFont } from "../lib/font-selection";
 import {
   applyWidgetExportRotation,
   getCommonControlExportOpts,
@@ -24,6 +23,10 @@ import {
   normalizeRightAngleRotationDeg,
 } from "@/lib/controlRotation";
 import { flattenTextFieldAppearanceProvider } from "../lib/text-field-appearance";
+import {
+  getOrCreateExportField,
+  updateExportFieldAppearance,
+} from "../lib/form-export-context";
 
 export class TextControlExporter implements IControlExporter {
   shouldExport(field: FormField): boolean {
@@ -40,56 +43,14 @@ export class TextControlExporter implements IControlExporter {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
-    // Resolve font
-    let fieldFont = fontMap?.get("Helvetica"); // Default
-    if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
-      fieldFont = fontMap.get(field.style.fontFamily);
-    }
+    const fieldFont = pickControlValueFont(field, form, fontMap);
 
-    const selectedFamily = field.style?.fontFamily;
-    const isSelectedNonStandardEmbedded =
-      !!selectedFamily &&
-      !!fontMap?.has(selectedFamily) &&
-      selectedFamily !== "Helvetica" &&
-      selectedFamily !== "Times Roman" &&
-      selectedFamily !== "Courier";
-
-    const selectedCanEncodeValue = (() => {
-      if (!isSelectedNonStandardEmbedded) return false;
-      if (!fieldFont) return false;
-      try {
-        if (typeof field.value !== "string") return false;
-        const original = field.value;
-        let sanitized = "";
-        for (let i = 0; i < original.length; i++) {
-          const ch = original[i];
-          sanitized += ch.charCodeAt(0) <= 0x7f ? ch : "?";
-        }
-
-        const rawEncoded = fieldFont.encodeText(original).toString();
-        const sanitizedEncoded = fieldFont.encodeText(sanitized).toString();
-        return rawEncoded !== sanitizedEncoded;
-      } catch {
-        return false;
-      }
-    })();
-
-    if (
-      field.value &&
-      containsNonAscii(field.value) &&
-      !isExplicitCjkFontSelection(field.style?.fontFamily) &&
-      !(isSelectedNonStandardEmbedded && selectedCanEncodeValue)
-    ) {
-      const cjk = pickCjkFontFromMap(fontMap, field.style?.fontFamily);
-      if (cjk) fieldFont = cjk;
-    }
-
-    let tf;
-    try {
-      tf = form.getTextField(field.name);
-    } catch {
-      tf = form.createTextField(field.name);
-    }
+    const tf = getOrCreateExportField(
+      field.name,
+      () => form.getTextField(field.name),
+      () => form.createTextField(field.name),
+      options?.context,
+    );
 
     tf.addToPage(page, { ...commonOpts, font: fieldFont });
     applyWidgetExportRotation(
@@ -124,18 +85,24 @@ export class TextControlExporter implements IControlExporter {
 
     if (field.multiline) tf.enableMultiline();
 
-    try {
-      if (options?.flattenAppearance) {
-        tf.updateAppearances(
-          appearanceFont,
-          flattenTextFieldAppearanceProvider,
-        );
-      } else {
-        tf.updateAppearances(appearanceFont);
-      }
-    } catch (e) {
-      console.warn("Failed to update text field appearances", e);
-    }
+    updateExportFieldAppearance(
+      tf,
+      () => {
+        try {
+          if (options?.flattenAppearance) {
+            tf.updateAppearances(
+              appearanceFont,
+              flattenTextFieldAppearanceProvider,
+            );
+          } else {
+            tf.updateAppearances(appearanceFont);
+          }
+        } catch (e) {
+          console.warn("Failed to update text field appearances", e);
+        }
+      },
+      options?.context,
+    );
   }
 }
 
@@ -149,16 +116,17 @@ export class CheckboxControlExporter implements IControlExporter {
     field: FormField,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
+    options?: ControlExportOptions,
   ): void {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
-    let cb;
-    try {
-      cb = form.getCheckBox(field.name);
-    } catch {
-      cb = form.createCheckBox(field.name);
-    }
+    const cb = getOrCreateExportField(
+      field.name,
+      () => form.getCheckBox(field.name),
+      () => form.createCheckBox(field.name),
+      options?.context,
+    );
 
     cb.addToPage(page, commonOpts);
     applyWidgetExportRotation(
@@ -173,11 +141,17 @@ export class CheckboxControlExporter implements IControlExporter {
       cb.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
     }
 
-    try {
-      cb.updateAppearances();
-    } catch (e) {
-      console.warn("Failed to update checkbox appearances", e);
-    }
+    updateExportFieldAppearance(
+      cb,
+      () => {
+        try {
+          cb.updateAppearances();
+        } catch (e) {
+          console.warn("Failed to update checkbox appearances", e);
+        }
+      },
+      options?.context,
+    );
   }
 }
 
@@ -191,60 +165,20 @@ export class DropdownControlExporter implements IControlExporter {
     field: FormField,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
+    options?: ControlExportOptions,
   ): void {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
-    // Resolve font
-    let fieldFont = fontMap?.get("Helvetica");
-    if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
-      fieldFont = fontMap.get(field.style.fontFamily);
-    }
-
-    const selectedFamily = field.style?.fontFamily;
-    const isSelectedNonStandardEmbedded =
-      !!selectedFamily &&
-      !!fontMap?.has(selectedFamily) &&
-      selectedFamily !== "Helvetica" &&
-      selectedFamily !== "Times Roman" &&
-      selectedFamily !== "Courier";
-
-    const selectedCanEncodeValue = (() => {
-      if (!isSelectedNonStandardEmbedded) return false;
-      if (!fieldFont) return false;
-      try {
-        if (typeof field.value !== "string") return false;
-        const original = field.value;
-        let sanitized = "";
-        for (let i = 0; i < original.length; i++) {
-          const ch = original[i];
-          sanitized += ch.charCodeAt(0) <= 0x7f ? ch : "?";
-        }
-
-        const rawEncoded = fieldFont.encodeText(original).toString();
-        const sanitizedEncoded = fieldFont.encodeText(sanitized).toString();
-        return rawEncoded !== sanitizedEncoded;
-      } catch {
-        return false;
-      }
-    })();
-    if (
-      field.value &&
-      containsNonAscii(field.value) &&
-      !isExplicitCjkFontSelection(field.style?.fontFamily) &&
-      !selectedCanEncodeValue
-    ) {
-      const cjk = pickCjkFontFromMap(fontMap, field.style?.fontFamily);
-      if (cjk) fieldFont = cjk;
-    }
+    const fieldFont = pickControlValueFont(field, form, fontMap);
 
     if (field.isMultiSelect) {
-      let ol;
-      try {
-        ol = form.getOptionList(field.name);
-      } catch {
-        ol = form.createOptionList(field.name);
-      }
+      const ol = getOrCreateExportField(
+        field.name,
+        () => form.getOptionList(field.name),
+        () => form.createOptionList(field.name),
+        options?.context,
+      );
 
       ol.addToPage(page, { ...commonOpts, font: fieldFont });
       applyWidgetExportRotation(
@@ -271,18 +205,24 @@ export class DropdownControlExporter implements IControlExporter {
       }
 
       if (field.style?.fontSize) ol.setFontSize(field.style.fontSize);
-      try {
-        ol.updateAppearances(appearanceFont);
-      } catch (e) {
-        console.warn("Failed to update option list appearances", e);
-      }
+      updateExportFieldAppearance(
+        ol,
+        () => {
+          try {
+            ol.updateAppearances(appearanceFont);
+          } catch (e) {
+            console.warn("Failed to update option list appearances", e);
+          }
+        },
+        options?.context,
+      );
     } else {
-      let dd;
-      try {
-        dd = form.getDropdown(field.name);
-      } catch {
-        dd = form.createDropdown(field.name);
-      }
+      const dd = getOrCreateExportField(
+        field.name,
+        () => form.getDropdown(field.name),
+        () => form.createDropdown(field.name),
+        options?.context,
+      );
 
       dd.addToPage(page, { ...commonOpts, font: fieldFont });
       applyWidgetExportRotation(
@@ -307,11 +247,17 @@ export class DropdownControlExporter implements IControlExporter {
       }
 
       if (field.style?.fontSize) dd.setFontSize(field.style.fontSize);
-      try {
-        dd.updateAppearances(appearanceFont);
-      } catch (e) {
-        console.warn("Failed to update dropdown appearances", e);
-      }
+      updateExportFieldAppearance(
+        dd,
+        () => {
+          try {
+            dd.updateAppearances(appearanceFont);
+          } catch (e) {
+            console.warn("Failed to update dropdown appearances", e);
+          }
+        },
+        options?.context,
+      );
     }
   }
 }
@@ -326,19 +272,26 @@ export class RadioControlExporter implements IControlExporter {
     field: FormField,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
+    options?: ControlExportOptions,
   ): void {
     const page = form.doc.getPage(field.pageIndex);
     const commonOpts = getCommonControlExportOpts(field, page, viewport);
 
-    let rg;
-    try {
-      rg = form.getRadioGroup(field.name);
-    } catch {
-      rg = form.createRadioGroup(field.name);
-      if (field.toolTip) {
-        rg.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
-      }
-    }
+    const rg = getOrCreateExportField(
+      field.name,
+      () => form.getRadioGroup(field.name),
+      () => {
+        const group = form.createRadioGroup(field.name);
+        if (field.toolTip) {
+          group.acroField.dict.set(
+            PDFName.of("TU"),
+            PDFString.of(field.toolTip),
+          );
+        }
+        return group;
+      },
+      options?.context,
+    );
 
     const val = field.radioValue || field.exportValue || `Choice_${field.id}`;
     rg.addOptionToPage(val, page, commonOpts);
@@ -352,11 +305,17 @@ export class RadioControlExporter implements IControlExporter {
       rg.select(val);
     }
 
-    try {
-      rg.updateAppearances();
-    } catch (e) {
-      console.warn("Failed to update radio appearances", e);
-    }
+    updateExportFieldAppearance(
+      rg,
+      () => {
+        try {
+          rg.updateAppearances();
+        } catch (e) {
+          console.warn("Failed to update radio appearances", e);
+        }
+      },
+      options?.context,
+    );
   }
 }
 
@@ -370,6 +329,7 @@ export class SignatureControlExporter implements IControlExporter {
     field: FormField,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
+    options?: ControlExportOptions,
   ): Promise<void> {
     const page = form.doc.getPage(field.pageIndex);
 
@@ -450,12 +410,12 @@ export class SignatureControlExporter implements IControlExporter {
       fieldFont = fontMap.get(field.style.fontFamily);
     }
 
-    let tf;
-    try {
-      tf = form.getTextField(field.name);
-    } catch {
-      tf = form.createTextField(field.name);
-    }
+    const tf = getOrCreateExportField(
+      field.name,
+      () => form.getTextField(field.name),
+      () => form.createTextField(field.name),
+      options?.context,
+    );
 
     tf.addToPage(page, { ...commonOpts, font: fieldFont });
     applyWidgetExportRotation(
@@ -469,10 +429,16 @@ export class SignatureControlExporter implements IControlExporter {
       tf.acroField.dict.set(PDFName.of("TU"), PDFString.of(field.toolTip));
     }
 
-    try {
-      tf.updateAppearances(appearanceFont);
-    } catch (e) {
-      console.warn("Failed to update signature appearances", e);
-    }
+    updateExportFieldAppearance(
+      tf,
+      () => {
+        try {
+          tf.updateAppearances(appearanceFont);
+        } catch (e) {
+          console.warn("Failed to update signature appearances", e);
+        }
+      },
+      options?.context,
+    );
   }
 }

@@ -23,7 +23,10 @@ import { pdfDebug } from "../lib/debug";
 import { extractInkAppearance } from "../lib/ink";
 import { pdfJsRectToUiRect } from "../lib/coords";
 import { decodePdfString } from "../lib/pdf-objects";
-import { parseBorderFromAppearanceStream } from "../lib/pdf-import-utils";
+import {
+  decodePdfStreamToText,
+  parseBorderFromAppearanceStream,
+} from "../lib/pdf-import-utils";
 import { ensurePdfEmbeddedFontLoaded } from "../lib/embedded-fonts";
 import {
   matchSystemFontFamily,
@@ -1050,73 +1053,7 @@ export class FreeTextParser implements IAnnotationParser {
     };
 
     const decodeAppearanceStreamToText = async (n: PDFStream) => {
-      const bytes = n.getContents();
-      // Ensure we have a Uint8Array backed by ArrayBuffer (not SharedArrayBuffer) so Blob/streams work in TS/DOM types.
-      const safeBytes = new Uint8Array(bytes);
-      let decodedBytes: Uint8Array = safeBytes;
-
-      const filters: string[] = [];
-      try {
-        const f = n.dict.lookup(PDFName.of("Filter"));
-        if (f instanceof PDFName) {
-          filters.push(f.decodeText().replace(/^\//, ""));
-        } else if (f instanceof PDFArray) {
-          for (let i = 0; i < f.size(); i++) {
-            const item = f.lookup(i);
-            if (item instanceof PDFName) {
-              filters.push(item.decodeText().replace(/^\//, ""));
-            }
-          }
-        }
-      } catch {
-        // ignore
-      }
-
-      pdfDebug("import:freetext", "ap_filters", () => ({
-        pageIndex,
-        filters,
-        byteLength: bytes.length,
-      }));
-
-      if (
-        filters.includes("ASCII85Decode") ||
-        filters.includes("ASCIIHexDecode")
-      ) {
-        pdfDebug("import:freetext", "ap_filters_unsupported", () => ({
-          pageIndex,
-          filters,
-        }));
-      }
-
-      // Common case: FlateDecode
-      const g = globalThis as unknown as { DecompressionStream?: unknown };
-      if (
-        filters.includes("FlateDecode") &&
-        typeof g.DecompressionStream !== "undefined"
-      ) {
-        try {
-          const DS = g.DecompressionStream as unknown as new (
-            format: string,
-          ) => DecompressionStream;
-          const ds = new DS("deflate");
-          const decompressed = await new Response(
-            new Blob([safeBytes]).stream().pipeThrough(ds),
-          ).arrayBuffer();
-          decodedBytes = new Uint8Array(decompressed);
-          pdfDebug("import:freetext", "ap_decompressed", () => ({
-            pageIndex,
-            inBytes: safeBytes.length,
-            outBytes: decodedBytes.length,
-          }));
-        } catch (e) {
-          pdfDebug("import:freetext", "ap_decompression_failed", () => ({
-            pageIndex,
-            error: e,
-          }));
-        }
-      }
-
-      const text = new TextDecoder().decode(decodedBytes);
+      const text = await (context.readStreamText ?? decodePdfStreamToText)(n);
       pdfDebug("import:freetext", "ap_decoded_sample", () => ({
         pageIndex,
         length: text.length,

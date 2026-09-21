@@ -11,6 +11,8 @@ import {
   PDFPage,
   PDFRef,
   type PDFFont,
+  type PDFField,
+  type PDFStream,
 } from "@cantoo/pdf-lib";
 import {
   Annotation,
@@ -127,6 +129,7 @@ export interface ParserContext {
   systemFontAliasToFamilyCompact?: Record<string, string>;
   embeddedFontCache?: Map<string, Promise<string | undefined>>;
   embeddedFontFaces?: Set<FontFace>;
+  readStreamText?: (stream: PDFStream) => Promise<string>;
 }
 
 export interface IAnnotationParser {
@@ -148,8 +151,19 @@ export interface IAnnotationExporter {
   ): Promise<PDFRef | undefined> | PDFRef | undefined;
 }
 
+export type FormExportContext = {
+  findField: (
+    field: Pick<FormField, "name" | "sourcePdfRef">,
+  ) => PDFField | undefined;
+  registerField: (field: PDFField) => void;
+  widgetRefsByPage: Map<PDFPage, Set<string>>;
+  scheduleAppearanceUpdate: (field: PDFField, update: () => void) => void;
+  flushAppearanceUpdates: () => void;
+};
+
 export type ControlExportOptions = {
   flattenAppearance?: boolean;
+  context?: FormExportContext;
 };
 
 export interface IControlExporter {

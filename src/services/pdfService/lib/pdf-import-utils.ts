@@ -5,7 +5,9 @@ import {
   PDFHexString,
   PDFName,
   PDFNumber,
+  PDFRawStream,
   PDFStream,
+  decodePDFRawStream,
   PDFString,
 } from "@cantoo/pdf-lib";
 import type { PdfJsAnnotationOption } from "../types";
@@ -103,54 +105,42 @@ export const extractPdfStreamFilters = (stream: PDFStream): string[] => {
   return [];
 };
 
-/**
- * Best-effort decoding of a PDF appearance/content stream into text.
- *
- * Notes:
- * - We only attempt decompression for FlateDecode and only if
- *   `DecompressionStream` is available in the runtime.
+/** Decode the declared PDF filter chain (and source encryption) exactly once.
+ * Unsupported/corrupt streams are unavailable, not compressed bytes to parse
+ * as text or pass to FontFace. Image codecs use their own decoding path.
  */
+export const decodePdfStreamBytes = (
+  stream: PDFStream,
+): Uint8Array | undefined => {
+  try {
+    const raw =
+      stream instanceof PDFRawStream
+        ? stream
+        : PDFRawStream.of(stream.dict, stream.getContents());
+    return decodePDFRawStream(raw).decode();
+  } catch {
+    return undefined;
+  }
+};
+
 export const decodePdfStreamToText = async (
   stream: PDFStream,
 ): Promise<string> => {
-  const bytes = stream.getContents();
-  const safeBytes = new Uint8Array(bytes);
-  const filters = extractPdfStreamFilters(stream);
+  const bytes = decodePdfStreamBytes(stream);
+  return bytes ? new TextDecoder().decode(bytes) : "";
+};
 
-  let decodedBytes: Uint8Array = safeBytes;
-
-  const g = globalThis as unknown as { DecompressionStream?: unknown };
-  if (
-    filters.includes("FlateDecode") &&
-    typeof g.DecompressionStream !== "undefined"
-  ) {
-    const tryInflate = async (format: "deflate" | "deflate-raw") => {
-      const DS = g.DecompressionStream as unknown as new (
-        fmt: string,
-      ) => DecompressionStream;
-      const ds = new DS(format);
-      const decompressed = await new Response(
-        new Blob([safeBytes]).stream().pipeThrough(ds),
-      ).arrayBuffer();
-      return new Uint8Array(decompressed);
-    };
-
-    try {
-      decodedBytes = await tryInflate("deflate");
-    } catch {
-      try {
-        decodedBytes = await tryInflate("deflate-raw");
-      } catch {
-        decodedBytes = safeBytes;
-      }
+/** One reader per import; never reuse this cache for mutable export streams. */
+export const createPdfStreamTextReader = () => {
+  const cache = new WeakMap<PDFStream, Promise<string>>();
+  return (stream: PDFStream): Promise<string> => {
+    let result = cache.get(stream);
+    if (!result) {
+      result = decodePdfStreamToText(stream);
+      cache.set(stream, result);
     }
-  }
-
-  try {
-    return new TextDecoder().decode(decodedBytes);
-  } catch {
-    return "";
-  }
+    return result;
+  };
 };
 
 /**

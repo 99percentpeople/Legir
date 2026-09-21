@@ -19,9 +19,13 @@ import {
   TextAlignment,
 } from "@cantoo/pdf-lib";
 import { FieldType, type FormField } from "@/types";
-import type { ControlExportOptions, ViewportLike } from "../types";
-import { containsNonAscii, isExplicitCjkFontSelection } from "./text";
-import { pickCjkFontFromMap } from "./font-selection";
+import type {
+  ControlExportOptions,
+  FormExportContext,
+  ViewportLike,
+} from "../types";
+import { updateExportFieldAppearance } from "./form-export-context";
+import { pickControlValueFont } from "./font-selection";
 import { pdfDebug } from "./debug";
 import { flattenTextFieldAppearanceProvider } from "./text-field-appearance";
 import {
@@ -154,6 +158,7 @@ const updateSourcePdfFieldWidget = (
   form: PDFForm,
   field: FormField,
   viewport?: ViewportLike,
+  context?: FormExportContext,
 ) => {
   const sourceKey = sourcePdfRefToFormKey(field.sourcePdfRef);
   if (!sourceKey || !field.sourcePdfRef) return false;
@@ -181,12 +186,17 @@ const updateSourcePdfFieldWidget = (
   });
   applyWidgetExportRotation(sourceWidget, targetPage, field.rotationDeg);
 
-  if (!pageContainsAnnotRef(targetPage, sourceKey)) {
+  const isOnTargetPage = context
+    ? context.widgetRefsByPage.get(targetPage)?.has(sourceKey)
+    : pageContainsAnnotRef(targetPage, sourceKey);
+  if (!isOnTargetPage) {
     const sourceKeys = new Set([sourceKey]);
     for (const page of form.doc.getPages()) {
       removeRefsFromPageAnnots(page, sourceKeys);
+      context?.widgetRefsByPage.get(page)?.delete(sourceKey);
     }
     targetPage.node.addAnnot(sourceRef);
+    context?.widgetRefsByPage.get(targetPage)?.add(sourceKey);
   }
   sourceWidget.setP(targetPage.ref);
 
@@ -397,56 +407,6 @@ export const safeRemovePdfField = (
   }
 };
 
-const pickControlValueFont = (
-  field: FormField,
-  form: { getDefaultFont: () => PDFFont },
-  fontMap?: Map<string, PDFFont>,
-) => {
-  let fieldFont = fontMap?.get("Helvetica");
-  if (field.style?.fontFamily && fontMap?.has(field.style.fontFamily)) {
-    fieldFont = fontMap.get(field.style.fontFamily);
-  }
-
-  const selectedFamily = field.style?.fontFamily;
-  const isSelectedNonStandardEmbedded =
-    !!selectedFamily &&
-    !!fontMap?.has(selectedFamily) &&
-    selectedFamily !== "Helvetica" &&
-    selectedFamily !== "Times Roman" &&
-    selectedFamily !== "Courier";
-
-  const selectedCanEncodeValue = (() => {
-    if (!isSelectedNonStandardEmbedded || !fieldFont) return false;
-    if (typeof field.value !== "string") return false;
-    try {
-      const original = field.value;
-      let sanitized = "";
-      for (let index = 0; index < original.length; index++) {
-        const ch = original[index];
-        sanitized += ch.charCodeAt(0) <= 0x7f ? ch : "?";
-      }
-      return (
-        fieldFont.encodeText(original).toString() !==
-        fieldFont.encodeText(sanitized).toString()
-      );
-    } catch {
-      return false;
-    }
-  })();
-
-  if (
-    field.value &&
-    containsNonAscii(field.value) &&
-    !isExplicitCjkFontSelection(field.style?.fontFamily) &&
-    !(isSelectedNonStandardEmbedded && selectedCanEncodeValue)
-  ) {
-    const cjk = pickCjkFontFromMap(fontMap, field.style?.fontFamily);
-    if (cjk) fieldFont = cjk;
-  }
-
-  return fieldFont ?? form.getDefaultFont();
-};
-
 export const updateExistingSourceField = (
   form: PDFForm,
   field: FormField,
@@ -457,11 +417,14 @@ export const updateExistingSourceField = (
     form,
     field,
     options?.viewport,
+    options?.context,
   );
   let existingField: ReturnType<PDFForm["getFields"]>[number] | undefined;
   try {
-    existingField =
-      findFieldBySourcePdfRef(form, field) ?? form.getFieldMaybe(field.name);
+    existingField = options?.context
+      ? options.context.findField(field)
+      : (findFieldBySourcePdfRef(form, field) ??
+        form.getFieldMaybe(field.name));
   } catch (error) {
     pdfDebug("export:forms", "sourceFieldLookupFailed", () => ({
       name: field.name,
@@ -491,6 +454,13 @@ export const updateExistingSourceField = (
     }
   };
 
+  const updateAppearances = (update: () => void) => {
+    updateExportFieldAppearance(
+      existingField,
+      () => runExistingFieldUpdate("updateAppearances", update),
+      options?.context,
+    );
+  };
   const existingTypeName = existingField.constructor.name;
 
   try {
@@ -524,7 +494,7 @@ export const updateExistingSourceField = (
           textField.enableMultiline(),
         );
       }
-      runExistingFieldUpdate("updateAppearances", () => {
+      updateAppearances(() => {
         const font = pickControlValueFont(field, form, fontMap);
         if (options?.flattenAppearance) {
           textField.updateAppearances(font, flattenTextFieldAppearanceProvider);
@@ -547,9 +517,7 @@ export const updateExistingSourceField = (
         if (field.isChecked) checkbox.check();
         else checkbox.uncheck();
       });
-      runExistingFieldUpdate("updateAppearances", () =>
-        checkbox.updateAppearances(),
-      );
+      updateAppearances(() => checkbox.updateAppearances());
       return true;
     }
 
@@ -565,9 +533,7 @@ export const updateExistingSourceField = (
       if (field.isChecked && value) {
         runExistingFieldUpdate("select", () => radio.select(value));
       }
-      runExistingFieldUpdate("updateAppearances", () =>
-        radio.updateAppearances(),
-      );
+      updateAppearances(() => radio.updateAppearances());
       return true;
     }
 
@@ -590,7 +556,7 @@ export const updateExistingSourceField = (
             optionList.select(field.value!.split("\n").filter(Boolean)),
           );
         }
-        runExistingFieldUpdate("updateAppearances", () =>
+        updateAppearances(() =>
           optionList.updateAppearances(
             pickControlValueFont(field, form, fontMap),
           ),
@@ -611,7 +577,7 @@ export const updateExistingSourceField = (
         if (field.value) {
           runExistingFieldUpdate("select", () => dropdown.select(field.value!));
         }
-        runExistingFieldUpdate("updateAppearances", () =>
+        updateAppearances(() =>
           dropdown.updateAppearances(
             pickControlValueFont(field, form, fontMap),
           ),

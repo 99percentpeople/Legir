@@ -1,16 +1,8 @@
 import { pdfWorkerService, type PDFWorkerService } from "./pdfWorkerService";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
 import { getSystemFontCatalog } from "@/lib/system-fonts";
-import {
-  loadAndEmbedExportFonts,
-  loadAndEmbedSelectedSystemFonts,
-} from "./lib/built-in-fonts";
+import { prepareExportFonts } from "./lib/export-fonts";
 import { hexToPdfColor } from "./lib/colors";
-import {
-  containsNonAscii,
-  isSerifFamily,
-  isExplicitCjkFontSelection,
-} from "./lib/text";
 import {
   captureAcroFormXfaEntry,
   fieldMatchesSourcePdfRef,
@@ -22,11 +14,12 @@ import {
   sourcePdfRefToFormKey,
   updateExistingSourceField,
 } from "./lib/form-field-export";
+import { createFormExportContext } from "./lib/form-export-context";
 import { prepareAnnotationsForPrint } from "./lib/print-export";
 import {
   buildFullFieldNameFromChain,
   collectFieldFlagsFromChain,
-  decodePdfStreamToText,
+  createPdfStreamTextReader,
   extractBorderDashArray,
   extractBorderStyle,
   extractBorderWidth,
@@ -569,8 +562,11 @@ const buildPdfLibAnnotsByPageIndex = async (
   pdfDoc: PDFDocument,
   options?: {
     resolveDest?: (dest: unknown) => Promise<number | null>;
+    readStreamText?: (stream: PDFStream) => Promise<string>;
   },
 ) => {
+  const readStreamText = options?.readStreamText ?? createPdfStreamTextReader();
+  const resolvedDestinations = new Map<string, Promise<number | null>>();
   const out = new Map<number, PdfJsAnnotation[]>();
   const pages = pdfDoc.getPages();
   const pageIndexByRefKey = new Map<string, number>();
@@ -581,13 +577,10 @@ const buildPdfLibAnnotsByPageIndex = async (
     const pageNode = page.node;
     if (pageNode instanceof PDFDict) {
       pageIndexByNode.set(pageNode, pageIndex);
-      const ref = pdfDoc.context.getObjectRef(pageNode);
-      if (ref) {
-        pageIndexByRefKey.set(
-          `${ref.objectNumber}:${ref.generationNumber}`,
-          pageIndex,
-        );
-      }
+      pageIndexByRefKey.set(
+        `${page.ref.objectNumber}:${page.ref.generationNumber}`,
+        pageIndex,
+      );
     }
   }
 
@@ -748,10 +741,9 @@ const buildPdfLibAnnotsByPageIndex = async (
     value: unknown,
   ): number | undefined => {
     const resolveFromNumber = (num: number): number | undefined => {
-      if (!Number.isFinite(num)) return undefined;
-      if (num >= 0 && num < pages.length) return num;
-      if (num >= 1 && num <= pages.length) return num - 1;
-      return undefined;
+      return Number.isInteger(num) && num >= 0 && num < pages.length
+        ? num
+        : undefined;
     };
 
     const resolveFromRef = (ref: PDFRef): number | undefined => {
@@ -927,27 +919,6 @@ const buildPdfLibAnnotsByPageIndex = async (
         const optObj = lookupInFieldChain(annot, "Opt");
         const options = extractChoiceOptions(optObj);
 
-        const bsDirect = (() => {
-          try {
-            return annot.lookup(PDFName.of("BS"));
-          } catch {
-            return undefined;
-          }
-        })();
-        const borderDirect = (() => {
-          try {
-            return annot.lookup(PDFName.of("Border"));
-          } catch {
-            return undefined;
-          }
-        })();
-        const mkDirect = (() => {
-          try {
-            return annot.lookup(PDFName.of("MK"));
-          } catch {
-            return undefined;
-          }
-        })();
         const apDirect = (() => {
           try {
             return annot.lookup(PDFName.of("AP"));
@@ -955,20 +926,6 @@ const buildPdfLibAnnotsByPageIndex = async (
             return undefined;
           }
         })();
-
-        const bsChain = lookupInFieldChain(annot, "BS");
-        const borderChain = lookupInFieldChain(annot, "Border");
-        const mkChain = lookupInFieldChain(annot, "MK");
-
-        const debugRaw = {
-          bsDirect: summarizePdfObjForDebug(bsDirect),
-          bsChain: summarizePdfObjForDebug(bsChain),
-          borderDirect: summarizePdfObjForDebug(borderDirect),
-          borderChain: summarizePdfObjForDebug(borderChain),
-          mkDirect: summarizePdfObjForDebug(mkDirect),
-          mkChain: summarizePdfObjForDebug(mkChain),
-          apDirect: summarizePdfObjForDebug(apDirect),
-        };
 
         const color = extractMkColor(annot, "BC");
         const backgroundColor = extractMkColor(annot, "BG");
@@ -1005,7 +962,7 @@ const buildPdfLibAnnotsByPageIndex = async (
               }
 
               if (stream) {
-                const apContent = await decodePdfStreamToText(stream);
+                const apContent = await readStreamText(stream);
                 const parsed = parseBorderFromAppearanceStream(apContent);
                 if (typeof parsed.width === "number")
                   finalBorderWidth = parsed.width;
@@ -1040,7 +997,7 @@ const buildPdfLibAnnotsByPageIndex = async (
 
               if (stream) {
                 const filters = extractPdfStreamFilters(stream);
-                const content = await decodePdfStreamToText(stream);
+                const content = await readStreamText(stream);
                 apInfo = {
                   state,
                   filters,
@@ -1055,7 +1012,19 @@ const buildPdfLibAnnotsByPageIndex = async (
 
           pdfDebug("import:controls", "widget_border_debug", () => ({
             fieldName,
-            raw: debugRaw,
+            raw: {
+              bsDirect: summarizePdfObjForDebug(readDictValue(annot, "BS")),
+              bsChain: summarizePdfObjForDebug(lookupInFieldChain(annot, "BS")),
+              borderDirect: summarizePdfObjForDebug(
+                readDictValue(annot, "Border"),
+              ),
+              borderChain: summarizePdfObjForDebug(
+                lookupInFieldChain(annot, "Border"),
+              ),
+              mkDirect: summarizePdfObjForDebug(readDictValue(annot, "MK")),
+              mkChain: summarizePdfObjForDebug(lookupInFieldChain(annot, "MK")),
+              apDirect: summarizePdfObjForDebug(apDirect),
+            },
             ap: apInfo,
             borderWidth: finalBorderWidth,
             borderStyle: finalBorderStyle,
@@ -1158,15 +1127,23 @@ const buildPdfLibAnnotsByPageIndex = async (
           }
         }
 
-        let destPageIndex: number | null | undefined = undefined;
-        const normalizedDest = normalizeDestForResolve(dest);
+        // Explicit page references are already indexed locally. Only named or
+        // otherwise unresolved destinations need a worker round trip.
+        let destPageIndex: number | null | undefined =
+          resolveDestPageIndexFromPdfLib(dest);
+        const normalizedDest =
+          destPageIndex === undefined
+            ? normalizeDestForResolve(dest)
+            : undefined;
         const resolveDestPageIndex = options?.resolveDest;
         if (normalizedDest !== undefined && resolveDestPageIndex) {
-          destPageIndex = await resolveDestPageIndex(normalizedDest);
-        }
-        if (typeof destPageIndex !== "number") {
-          const fallbackIndex = resolveDestPageIndexFromPdfLib(dest);
-          if (typeof fallbackIndex === "number") destPageIndex = fallbackIndex;
+          const key = JSON.stringify(normalizedDest);
+          let pending = resolvedDestinations.get(key);
+          if (!pending) {
+            pending = resolveDestPageIndex(normalizedDest);
+            resolvedDestinations.set(key, pending);
+          }
+          destPageIndex = await pending;
         }
 
         pdfDebug("import:annotations", "link_extracted", () => ({
@@ -1310,7 +1287,7 @@ const buildPdfLibAnnotsByPageIndex = async (
       });
       let stampAppearance = createStampImageAppearance();
       const appearance = getAppearanceStreamMetadata(annot);
-      if (subtypeName === "Stamp") {
+      if (subtypeName === "Stamp" && !stampImage?.dataUrl) {
         try {
           const extractedStampSvg =
             await extractStampSvgDataFromAppearance(annot);
@@ -1376,7 +1353,7 @@ const buildPdfLibAnnotsByPageIndex = async (
         if (appearanceContentLoaded) return appearanceContent;
         appearanceContentLoaded = true;
         if (!appearance.stream) return undefined;
-        appearanceContent = await decodePdfStreamToText(appearance.stream);
+        appearanceContent = await readStreamText(appearance.stream);
         return appearanceContent;
       };
 
@@ -1827,6 +1804,7 @@ const loadPDFInternal = async (
       console.warn("Failed to load the system font catalog", error);
     }
 
+    const readStreamText = createPdfStreamTextReader();
     let pdfLibAnnotsByPageIndex: Map<number, PdfJsAnnotation[]> | undefined =
       undefined;
     try {
@@ -1846,6 +1824,7 @@ const loadPDFInternal = async (
 
       pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, {
         resolveDest: resolveDestWithWorker,
+        readStreamText,
       });
     } catch (e) {
       console.warn("Failed to extract annotations with pdf-lib", e);
@@ -1935,6 +1914,7 @@ const loadPDFInternal = async (
           systemFontAliasToFamilyCompact,
           embeddedFontCache,
           embeddedFontFaces,
+          readStreamText,
         };
 
         const annotsForPage: Annotation[] = [];
@@ -2146,66 +2126,6 @@ export const exportPDF = async (
       ? options.removeTextUnderFlattenedFreetext
       : true;
 
-  const resolveExportFontNeeds = () => {
-    const includeFontIds = new Set<"cjk_sans" | "cjk_serif">();
-    let needsCustomFont = false;
-    const usedFontFamilies = new Set<string>();
-
-    const consider = (
-      text: string | undefined,
-      fontFamily: string | undefined,
-    ) => {
-      if (typeof fontFamily === "string") {
-        const trimmed = fontFamily.trim();
-        if (trimmed) usedFontFamilies.add(trimmed);
-      }
-      const hasText = typeof text === "string" && text.length > 0;
-      const hasNonAscii = hasText ? containsNonAscii(text) : false;
-      const explicitCjk = isExplicitCjkFontSelection(fontFamily);
-
-      if (explicitCjk) {
-        if (
-          fontFamily === "Source Han Serif SC" ||
-          fontFamily === "CustomSerif"
-        ) {
-          includeFontIds.add("cjk_serif");
-        } else {
-          includeFontIds.add("cjk_sans");
-        }
-        if (
-          fontFamily === "Custom" ||
-          fontFamily === "CustomSans" ||
-          fontFamily === "CustomSerif"
-        ) {
-          needsCustomFont = true;
-        }
-      }
-
-      if (hasNonAscii) {
-        if (isSerifFamily(fontFamily)) includeFontIds.add("cjk_serif");
-        else includeFontIds.add("cjk_sans");
-      }
-    };
-
-    for (const f of fields || []) {
-      const fontFamily = f.style?.fontFamily;
-      consider(f.value, fontFamily);
-      consider(f.toolTip, fontFamily);
-    }
-
-    for (const a of annotations || []) {
-      const fontFamily = a.fontFamily;
-      consider(a.text, fontFamily);
-      consider(a.author, fontFamily);
-    }
-
-    if (!customFont?.bytes || customFont.bytes.byteLength === 0) {
-      needsCustomFont = false;
-    }
-
-    return { includeFontIds, needsCustomFont, usedFontFamilies };
-  };
-
   const resolvedOpenPassword = openPassword ?? undefined;
 
   const pdfDoc = await PDFDocument.load(originalBytes, {
@@ -2301,36 +2221,6 @@ export const exportPDF = async (
   fontMap.set("Times Roman", timesRoman);
   fontMap.set("Courier", courier);
 
-  const { includeFontIds, needsCustomFont, usedFontFamilies } =
-    resolveExportFontNeeds();
-  const needsExternalFonts =
-    includeFontIds.size > 0 || needsCustomFont || usedFontFamilies.size > 0;
-  const fontkit = needsExternalFonts
-    ? (await import("pdf-fontkit")).default
-    : null;
-
-  if (fontkit) {
-    await loadAndEmbedExportFonts({
-      pdfDoc,
-      fontMap,
-      fontkit,
-      customFont:
-        needsCustomFont && customFont?.bytes
-          ? { bytes: customFont.bytes, name: customFont.name }
-          : undefined,
-      includeFontIds,
-      subset: true,
-    });
-
-    await loadAndEmbedSelectedSystemFonts({
-      pdfDoc,
-      fontMap,
-      fontkit,
-      families: Array.from(usedFontFamilies),
-      subset: true,
-    });
-  }
-
   const xfaEntry = captureAcroFormXfaEntry(pdfDoc);
   const form = pdfDoc.getForm();
   restoreAcroFormXfaEntry(xfaEntry);
@@ -2351,6 +2241,27 @@ export const exportPDF = async (
       pagesRequiringFullAnnotationReexport.add(pageIndex);
     }
   }
+
+  await prepareExportFonts({
+    pdfDoc,
+    fontMap,
+    fields: fields.filter(
+      (field) =>
+        field.pageIndex >= 0 &&
+        field.pageIndex < pdfLibPages.length &&
+        (!targetPageIndexSet || targetPageIndexSet.has(field.pageIndex)),
+    ),
+    annotations: annotations.filter(
+      (annotation) =>
+        annotation.pageIndex >= 0 &&
+        annotation.pageIndex < pdfLibPages.length &&
+        (!targetPageIndexSet || targetPageIndexSet.has(annotation.pageIndex)) &&
+        (!annotation.sourcePdfRef ||
+          annotation.isEdited ||
+          pagesRequiringFullAnnotationReexport.has(annotation.pageIndex)),
+    ),
+    customFont,
+  });
 
   const keepAnnotRefKeysByPage = new Map<number, Set<string>>();
   for (const a of annotations) {
@@ -2528,6 +2439,8 @@ export const exportPDF = async (
   }
 
   // 2. Export Controls In Layer Order
+  const formExportContext =
+    fields.length > 0 ? createFormExportContext(form) : undefined;
   const exportedAnnotationRefById = new Map<string, PDFRef>();
   for (const annotation of annotations) {
     if (!annotation.sourcePdfRef || annotation.isEdited) continue;
@@ -2592,6 +2505,7 @@ export const exportPDF = async (
         {
           flattenAppearance: options?.flattenFormFields === true,
           viewport,
+          context: formExportContext,
         },
       );
       if (didUpdateExistingField) continue;
@@ -2601,12 +2515,17 @@ export const exportPDF = async (
       try {
         await exporter.save(form, field, fontMap, viewport, {
           flattenAppearance: options?.flattenFormFields === true,
+          context: formExportContext,
         });
       } catch (e) {
         console.error(`Failed to export field ${field.name}`, e);
       }
     }
   }
+
+  // Updating a field regenerates every widget it owns. Do this only once per
+  // field, after all controls have supplied their final values and geometry.
+  formExportContext?.flushAppearanceUpdates();
 
   for (const annotation of annotations) {
     if (targetPageIndexSet && !targetPageIndexSet.has(annotation.pageIndex)) {

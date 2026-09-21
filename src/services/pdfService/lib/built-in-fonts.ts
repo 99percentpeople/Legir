@@ -76,19 +76,31 @@ const toPublicUrl = (path: string) => {
   return `${normalizedBase}${normalizedPath}`;
 };
 
-const fetchFontBytes = async (
-  path: string,
-): Promise<Uint8Array | undefined> => {
-  if (typeof fetch === "undefined") return undefined;
-  try {
-    const res = await fetch(toPublicUrl(path));
-    if (!res.ok) return undefined;
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength === 0) return undefined;
-    return new Uint8Array(buf);
-  } catch {
-    return undefined;
-  }
+// Only the two bundled, immutable font assets enter this cache. Cache bytes,
+// never PDFFont objects (which belong to a particular PDFDocument).
+const fontBytesByUrl = new Map<string, Promise<Uint8Array | undefined>>();
+
+const fetchFontBytes = (path: string): Promise<Uint8Array | undefined> => {
+  if (typeof fetch === "undefined") return Promise.resolve(undefined);
+  const url = toPublicUrl(path);
+  const cached = fontBytesByUrl.get(url);
+  if (cached) return cached;
+  const pending = (async () => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return undefined;
+      const buf = await res.arrayBuffer();
+      return buf.byteLength > 0 ? new Uint8Array(buf) : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+  fontBytesByUrl.set(url, pending);
+  void pending.then((bytes) => {
+    // A temporary network failure must not disable fonts for future exports.
+    if (!bytes) fontBytesByUrl.delete(url);
+  });
+  return pending;
 };
 
 const setFontMapIfMissing = (
