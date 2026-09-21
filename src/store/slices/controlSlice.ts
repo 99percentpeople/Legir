@@ -372,22 +372,11 @@ export const createControlSlice: EditorStoreSlice<
 
       if (!reordered.changed) return state;
 
-      const updatedAt = new Date().toISOString();
-      const nextAnnotations = reordered.annotations.map((annotation) => {
-        if (annotation.pageIndex !== target.pageIndex) return annotation;
-        if (!annotation.sourcePdfRef || annotation.isEdited === true) {
-          return annotation;
-        }
-        return {
-          ...annotation,
-          isEdited: true,
-          updatedAt,
-        } satisfies Annotation;
-      });
-
+      // Layer-only changes are written by reordering /Annots references during
+      // export. Do not mark unchanged appearances (or their replies) for rebuild.
       return {
         fields: reordered.fields,
-        annotations: nextAnnotations,
+        annotations: reordered.annotations,
         selectedId: id,
         isDirty: true,
         dirtyPermissionScopes: mergePdfPermissionDirtyScopes(

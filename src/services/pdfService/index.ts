@@ -42,7 +42,7 @@ import {
 } from "./lib/appearanceRotation";
 import { extractStampImageDataFromAppearance } from "./lib/stampAppearance";
 import { extractStampSvgDataFromAppearance } from "./lib/stampVector";
-import { cropRenderedPageImageToDataUrl } from "./lib/renderedImageCrop";
+import { createRenderedPageImageCropper } from "./lib/renderedImageCrop";
 import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
 import { getAppHighlightedText } from "./lib/annotationMetadata";
 import {
@@ -96,7 +96,12 @@ import {
   AnnotationReply,
   PreservedSourceAnnotationRef,
 } from "@/types";
-import { getOrderedPageControls } from "@/lib/controlLayerOrder";
+import {
+  applyImportedControlLayerOrders,
+  canPreserveSourceAnnotation,
+  getOrderedExportControlsByPage,
+  reorderExportedPageAnnotations,
+} from "./lib/annotation-layer-order";
 import { getControlRotationFromWidgetRotation } from "@/lib/controlRotation";
 import {
   IAnnotationParser,
@@ -203,6 +208,7 @@ const controlExporters: IControlExporter[] = [
 ];
 
 const STAMP_RENDER_FALLBACK_SCALE = 2;
+let nextStampFallbackId = 0;
 
 const populateRenderedStampFallbacksForPage = async (options: {
   pageAnnotations: PdfJsAnnotation[];
@@ -210,9 +216,17 @@ const populateRenderedStampFallbacksForPage = async (options: {
   viewport: ViewportLike;
   workerService: PDFWorkerService;
   pdfDoc: PDFDocument;
+  signal?: AbortSignal;
 }) => {
-  const { pageAnnotations, pageIndex, viewport, workerService, pdfDoc } =
-    options;
+  const {
+    pageAnnotations,
+    pageIndex,
+    viewport,
+    workerService,
+    pdfDoc,
+    signal,
+  } = options;
+  if (signal?.aborted) return;
 
   const candidates = pageAnnotations.filter((annotation) => {
     if (annotation.subtype !== "Stamp") return false;
@@ -234,7 +248,16 @@ const populateRenderedStampFallbacksForPage = async (options: {
       return false;
     }
 
-    return true;
+    const rect = pdfJsRectToUiRect(annotation.rect, viewport);
+    return (
+      [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) &&
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.x < viewport.width &&
+      rect.y < viewport.height &&
+      rect.x + rect.width > 0 &&
+      rect.y + rect.height > 0
+    );
   });
 
   if (candidates.length === 0) return;
@@ -254,44 +277,46 @@ const populateRenderedStampFallbacksForPage = async (options: {
       borderWidth: 0,
     });
     scratchDoc.addPage(copiedPage);
-    const scratchBytes = await scratchDoc.save();
-    const docId = `stamp-fallback-${pageIndex}-${Date.now()}`;
-    renderedPage = await workerService.renderPageImage({
-      pageIndex: 0,
-      scale: STAMP_RENDER_FALLBACK_SCALE,
-      renderAnnotations: true,
-      mimeType: "image/png",
-      docId,
-      data: scratchBytes,
-      isNewDoc: true,
+    const scratchBytes = await scratchDoc.save({
+      updateFieldAppearances: false,
     });
+    const docId = `stamp-fallback-${pageIndex}-${Date.now()}-${nextStampFallbackId++}`;
+    try {
+      renderedPage = await workerService.renderPageImage({
+        pageIndex: 0,
+        scale: STAMP_RENDER_FALLBACK_SCALE,
+        renderAnnotations: true,
+        mimeType: "image/png",
+        docId,
+        data: scratchBytes,
+        isNewDoc: true,
+        signal,
+      });
+    } finally {
+      workerService.unloadDocument(docId);
+    }
   } catch {
     return;
   }
 
-  if (!renderedPage || renderedPage.bytes.length === 0) return;
+  if (!renderedPage || renderedPage.bytes.length === 0 || signal?.aborted)
+    return;
 
-  await Promise.all(
-    candidates.map(async (annotation) => {
+  const cropper = await createRenderedPageImageCropper({
+    bytes: renderedPage.bytes,
+    mimeType: renderedPage.mimeType,
+    pageWidth: viewport.width,
+    pageHeight: viewport.height,
+  });
+  try {
+    // Crop serially so a page with many stamps owns only one temporary canvas
+    // at a time, while sharing the decoded page bitmap for the entire batch.
+    for (const annotation of candidates) {
+      if (signal?.aborted) break;
       const importedRect = pdfJsRectToUiRect(annotation.rect, viewport);
-      if (
-        !Number.isFinite(importedRect.width) ||
-        !Number.isFinite(importedRect.height) ||
-        importedRect.width <= 0 ||
-        importedRect.height <= 0
-      ) {
-        return;
-      }
-
       try {
-        const cropped = await cropRenderedPageImageToDataUrl({
-          bytes: renderedPage.bytes,
-          mimeType: renderedPage.mimeType,
-          pageWidth: viewport.width,
-          pageHeight: viewport.height,
-          cropRect: importedRect,
-        });
-        if (!cropped?.dataUrl) return;
+        const cropped = await cropper.crop(importedRect);
+        if (!cropped?.dataUrl) continue;
 
         annotation.stamp = {
           ...annotation.stamp,
@@ -306,10 +331,12 @@ const populateRenderedStampFallbacksForPage = async (options: {
           }),
         };
       } catch {
-        // ignore single-stamp fallback failures
+        // One failed crop must not prevent other stamps from being recovered.
       }
-    }),
-  );
+    }
+  } finally {
+    cropper.dispose();
+  }
 };
 
 type PdfLoadSession = {
@@ -1897,6 +1924,7 @@ const loadPDFInternal = async (
             viewport,
             workerService,
             pdfDoc,
+            signal: options?.signal,
           });
         } catch {
           // ignore stamp preview fallback failures
@@ -1937,6 +1965,12 @@ const loadPDFInternal = async (
             console.warn(`Control parser failed for page ${pageNumber}`, e);
           }
         }
+
+        applyImportedControlLayerOrders(
+          pdfLibPage,
+          fieldsForPage,
+          annotsForPage,
+        );
 
         pageResults[idx] = {
           page: pages[idx]!,
@@ -2225,22 +2259,10 @@ export const exportPDF = async (
   const form = pdfDoc.getForm();
   restoreAcroFormXfaEntry(xfaEntry);
 
-  const pagesWithFields = new Set(fields.map((field) => field.pageIndex));
-  const pagesWithExportableAnnotations = new Set(
-    annotations
-      .filter((annotation) =>
-        annotationExporters.some((exporter) =>
-          exporter.shouldExport(annotation),
-        ),
-      )
-      .map((annotation) => annotation.pageIndex),
+  const orderedControlsByPage = getOrderedExportControlsByPage(
+    fields,
+    annotations,
   );
-  const pagesRequiringFullAnnotationReexport = new Set<number>();
-  for (const pageIndex of pagesWithFields) {
-    if (pagesWithExportableAnnotations.has(pageIndex)) {
-      pagesRequiringFullAnnotationReexport.add(pageIndex);
-    }
-  }
 
   await prepareExportFonts({
     pdfDoc,
@@ -2256,18 +2278,14 @@ export const exportPDF = async (
         annotation.pageIndex >= 0 &&
         annotation.pageIndex < pdfLibPages.length &&
         (!targetPageIndexSet || targetPageIndexSet.has(annotation.pageIndex)) &&
-        (!annotation.sourcePdfRef ||
-          annotation.isEdited ||
-          pagesRequiringFullAnnotationReexport.has(annotation.pageIndex)),
+        !canPreserveSourceAnnotation(annotation),
     ),
     customFont,
   });
 
   const keepAnnotRefKeysByPage = new Map<number, Set<string>>();
   for (const a of annotations) {
-    if (!a?.sourcePdfRef) continue;
-    if (a.isEdited) continue;
-    if (pagesRequiringFullAnnotationReexport.has(a.pageIndex)) continue;
+    if (!a.sourcePdfRef || !canPreserveSourceAnnotation(a)) continue;
     const key = `${a.sourcePdfRef.objectNumber}:${a.sourcePdfRef.generationNumber}`;
     const setForPage =
       keepAnnotRefKeysByPage.get(a.pageIndex) || new Set<string>();
@@ -2443,10 +2461,8 @@ export const exportPDF = async (
     fields.length > 0 ? createFormExportContext(form) : undefined;
   const exportedAnnotationRefById = new Map<string, PDFRef>();
   for (const annotation of annotations) {
-    if (!annotation.sourcePdfRef || annotation.isEdited) continue;
-    if (pagesRequiringFullAnnotationReexport.has(annotation.pageIndex)) {
+    if (!annotation.sourcePdfRef || !canPreserveSourceAnnotation(annotation))
       continue;
-    }
     exportedAnnotationRefById.set(
       annotation.id,
       PDFRef.of(
@@ -2458,11 +2474,7 @@ export const exportPDF = async (
 
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
     if (targetPageIndexSet && !targetPageIndexSet.has(pageIndex)) continue;
-    const orderedControls = getOrderedPageControls(
-      fields,
-      annotations,
-      pageIndex,
-    );
+    const orderedControls = orderedControlsByPage.get(pageIndex) ?? [];
     if (orderedControls.length === 0) continue;
 
     const page = pdfDoc.getPage(pageIndex);
@@ -2471,13 +2483,7 @@ export const exportPDF = async (
     for (const entry of orderedControls) {
       if (entry.kind === "annotation") {
         const annot = entry.control;
-        if (
-          annot?.sourcePdfRef &&
-          !annot.isEdited &&
-          !pagesRequiringFullAnnotationReexport.has(pageIndex)
-        ) {
-          continue;
-        }
+        if (canPreserveSourceAnnotation(annot)) continue;
         const exporter = annotationExporters.find((e) => e.shouldExport(annot));
         if (!exporter) continue;
         try {
@@ -2533,14 +2539,7 @@ export const exportPDF = async (
     }
     if (!annotation.replies || annotation.replies.length === 0) continue;
 
-    const parentRef =
-      exportedAnnotationRefById.get(annotation.id) ??
-      (annotation.sourcePdfRef && !annotation.isEdited
-        ? PDFRef.of(
-            annotation.sourcePdfRef.objectNumber,
-            annotation.sourcePdfRef.generationNumber,
-          )
-        : undefined);
+    const parentRef = exportedAnnotationRefById.get(annotation.id);
     if (!parentRef) continue;
 
     const page = pdfDoc.getPage(annotation.pageIndex);
@@ -2550,8 +2549,7 @@ export const exportPDF = async (
       const shouldPreserveExistingReply =
         !!reply.sourcePdfRef &&
         !reply.isEdited &&
-        !annotation.isEdited &&
-        !pagesRequiringFullAnnotationReexport.has(annotation.pageIndex);
+        canPreserveSourceAnnotation(annotation);
       if (shouldPreserveExistingReply) continue;
 
       try {
@@ -2569,6 +2567,22 @@ export const exportPDF = async (
           e,
         );
       }
+    }
+  }
+
+  for (const [pageIndex, controls] of orderedControlsByPage) {
+    if (targetPageIndexSet && !targetPageIndexSet.has(pageIndex)) continue;
+    const page = pages[pageIndex];
+    if (!page) continue;
+    try {
+      reorderExportedPageAnnotations(
+        page,
+        controls,
+        exportedAnnotationRefById,
+        formExportContext,
+      );
+    } catch (error) {
+      console.warn("Failed to reorder annotations on page", error);
     }
   }
 

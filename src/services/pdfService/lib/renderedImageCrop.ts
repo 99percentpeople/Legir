@@ -5,12 +5,11 @@ type PageSpaceRect = {
   height: number;
 };
 
-const bytesToDataUrl = async (bytes: Uint8Array, mimeType: string) => {
+const blobToDataUrl = async (blob: Blob) => {
   if (typeof FileReader === "undefined") {
     throw new Error("Data URL conversion is unavailable in this environment.");
   }
 
-  const blob = new Blob([bytes.slice()], { type: mimeType || "image/png" });
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () =>
@@ -124,7 +123,9 @@ const canvasToPngDataUrl = async (
           }, "image/png");
         });
 
-  return bytesToDataUrl(new Uint8Array(await blob.arrayBuffer()), "image/png");
+  // FileReader accepts the encoded Blob directly; avoid copying it through
+  // ArrayBuffer -> Uint8Array -> another Blob for every cropped stamp.
+  return blobToDataUrl(blob);
 };
 
 const clampPageSpaceRectToBounds = (
@@ -132,6 +133,17 @@ const clampPageSpaceRectToBounds = (
   pageHeight: number,
   rect: PageSpaceRect,
 ) => {
+  if (
+    ![pageWidth, pageHeight, rect.x, rect.y, rect.width, rect.height].every(
+      Number.isFinite,
+    ) ||
+    pageWidth <= 0 ||
+    pageHeight <= 0 ||
+    rect.width <= 0 ||
+    rect.height <= 0
+  )
+    return undefined;
+
   const left = Math.max(0, Math.min(pageWidth, rect.x));
   const top = Math.max(0, Math.min(pageHeight, rect.y));
   const right = Math.max(left, Math.min(pageWidth, rect.x + rect.width));
@@ -147,34 +159,38 @@ const clampPageSpaceRectToBounds = (
   };
 };
 
-export const cropRenderedPageImageToDataUrl = async (options: {
+type RenderedPageImageOptions = {
   bytes: Uint8Array;
   mimeType: string;
   pageWidth: number;
   pageHeight: number;
-  cropRect: PageSpaceRect;
-}) => {
-  const clampedRect = clampPageSpaceRectToBounds(
-    options.pageWidth,
-    options.pageHeight,
-    options.cropRect,
-  );
-  if (!clampedRect) return undefined;
+};
 
+/** One decoded page per batch; callers must dispose after all crops settle. */
+export const createRenderedPageImageCropper = async (
+  options: RenderedPageImageOptions,
+) => {
   const imageSource = await loadCanvasImageSource(
     options.bytes,
     options.mimeType,
   );
-  try {
-    const decodedSize = getCanvasImageSourceDimensions(imageSource);
-    const sourceImageWidth = Math.max(
-      1,
-      decodedSize?.width ?? options.pageWidth,
+  const decodedSize = getCanvasImageSourceDimensions(imageSource);
+  const sourceImageWidth = Math.max(1, decodedSize?.width ?? options.pageWidth);
+  const sourceImageHeight = Math.max(
+    1,
+    decodedSize?.height ?? options.pageHeight,
+  );
+  let disposed = false;
+
+  const crop = async (rect: PageSpaceRect) => {
+    if (disposed)
+      throw new Error("Rendered page image has already been disposed.");
+    const clampedRect = clampPageSpaceRectToBounds(
+      options.pageWidth,
+      options.pageHeight,
+      rect,
     );
-    const sourceImageHeight = Math.max(
-      1,
-      decodedSize?.height ?? options.pageHeight,
-    );
+    if (!clampedRect) return undefined;
     const sourceX = Math.max(
       0,
       Math.min(
@@ -215,28 +231,56 @@ export const cropRenderedPageImageToDataUrl = async (options: {
       croppedWidth,
       croppedHeight,
     );
-    if (!context) {
-      throw new Error("Failed to initialize canvas for stamp crop.");
+    try {
+      if (!context)
+        throw new Error("Failed to initialize canvas for stamp crop.");
+      context.drawImage(
+        imageSource,
+        sourceX,
+        sourceY,
+        croppedWidth,
+        croppedHeight,
+        0,
+        0,
+        croppedWidth,
+        croppedHeight,
+      );
+      return {
+        dataUrl: await canvasToPngDataUrl(canvas),
+        width: croppedWidth,
+        height: croppedHeight,
+      };
+    } finally {
+      canvas.width = 0;
+      canvas.height = 0;
     }
+  };
 
-    context.drawImage(
-      imageSource,
-      sourceX,
-      sourceY,
-      croppedWidth,
-      croppedHeight,
-      0,
-      0,
-      croppedWidth,
-      croppedHeight,
-    );
+  return {
+    crop,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      releaseCanvasImageSource(imageSource);
+    },
+  };
+};
 
-    return {
-      dataUrl: await canvasToPngDataUrl(canvas),
-      width: croppedWidth,
-      height: croppedHeight,
-    };
+export const cropRenderedPageImageToDataUrl = async (
+  options: RenderedPageImageOptions & { cropRect: PageSpaceRect },
+) => {
+  if (
+    !clampPageSpaceRectToBounds(
+      options.pageWidth,
+      options.pageHeight,
+      options.cropRect,
+    )
+  )
+    return undefined;
+  const cropper = await createRenderedPageImageCropper(options);
+  try {
+    return await cropper.crop(options.cropRect);
   } finally {
-    releaseCanvasImageSource(imageSource);
+    cropper.dispose();
   }
 };
