@@ -1,24 +1,13 @@
 import { revokeThumbnailObjectUrls } from "@/store/helpers";
 import type { EditorTabSession } from "./types";
 
-export const cloneEditorTabThumbnailImages = (
-  thumbnailImages: Record<number, string>,
-) => ({
-  ...thumbnailImages,
-});
-
 export const disposeEditorTabSessionResources = (
-  session:
-    | Pick<
-        EditorTabSession,
-        "disposePdfResources" | "workerService" | "thumbnailImages"
-      >
-    | null
-    | undefined,
+  session: EditorTabSession | null | undefined,
 ) => {
-  if (!session) return;
-
+  if (!session || session.runtime.disposed) return;
+  const thumbnails = session.runtime.store.resources.getState().thumbnailImages;
+  session.runtime.dispose();
   session.disposePdfResources?.();
-  revokeThumbnailObjectUrls(session.thumbnailImages);
+  revokeThumbnailObjectUrls(thumbnails);
   session.workerService.destroy();
 };

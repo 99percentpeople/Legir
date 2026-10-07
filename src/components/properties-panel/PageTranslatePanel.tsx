@@ -247,6 +247,7 @@ export function PageTranslatePanel({
     return undefined;
   }, [optionGroups]);
 
+  const idPrefix = React.useId();
   const [pageRange, setPageRange] = useState<string>("All");
   const [targetLanguage, setTargetLanguage] = useState<string>(
     initialTargetLanguage || effectiveLanguage,
@@ -506,13 +507,13 @@ export function PageTranslatePanel({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label
-              htmlFor="page-translate-flatten-all"
+              htmlFor={`${idPrefix}-page-translate-flatten-all`}
               className="cursor-pointer"
             >
               {t("properties.page_translate.flatten_all_freetext")}
             </Label>
             <Switch
-              id="page-translate-flatten-all"
+              id={`${idPrefix}-page-translate-flatten-all`}
               checked={options.flattenFreetext}
               onCheckedChange={(flattenFreetext) =>
                 onOptionsChange({ flattenFreetext })
@@ -533,13 +534,13 @@ export function PageTranslatePanel({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label
-              htmlFor="page-translate-position-aware"
+              htmlFor={`${idPrefix}-page-translate-position-aware`}
               className="cursor-pointer"
             >
               {t("properties.page_translate.position_aware")}
             </Label>
             <Switch
-              id="page-translate-position-aware"
+              id={`${idPrefix}-page-translate-position-aware`}
               checked={currentUsePositionAwarePrompt}
               onCheckedChange={(usePositionAwarePrompt) =>
                 onOptionsChange({ usePositionAwarePrompt })
@@ -555,13 +556,13 @@ export function PageTranslatePanel({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label
-              htmlFor="page-translate-ai-reflow"
+              htmlFor={`${idPrefix}-page-translate-ai-reflow`}
               className="cursor-pointer"
             >
               {t("properties.page_translate.ai_reflow_paragraphs")}
             </Label>
             <Switch
-              id="page-translate-ai-reflow"
+              id={`${idPrefix}-page-translate-ai-reflow`}
               checked={currentAiReflowParagraphs}
               onCheckedChange={(aiReflowParagraphs) =>
                 onOptionsChange({ aiReflowParagraphs })
@@ -624,13 +625,13 @@ export function PageTranslatePanel({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label
-              htmlFor="page-translate-use-paragraphs"
+              htmlFor={`${idPrefix}-page-translate-use-paragraphs`}
               className="cursor-pointer"
             >
               {t("properties.page_translate.use_paragraphs")}
             </Label>
             <Switch
-              id="page-translate-use-paragraphs"
+              id={`${idPrefix}-page-translate-use-paragraphs`}
               checked={options.useParagraphs}
               onCheckedChange={(useParagraphs) =>
                 onOptionsChange({ useParagraphs })
@@ -677,13 +678,13 @@ export function PageTranslatePanel({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label
-                htmlFor="page-translate-paragraph-split-font-size"
+                htmlFor={`${idPrefix}-page-translate-paragraph-split-font-size`}
                 className="cursor-pointer"
               >
                 {t("properties.page_translate.paragraph_split_by_font_size")}
               </Label>
               <Switch
-                id="page-translate-paragraph-split-font-size"
+                id={`${idPrefix}-page-translate-paragraph-split-font-size`}
                 checked={options.paragraphSplitByFontSize}
                 onCheckedChange={(paragraphSplitByFontSize) =>
                   onOptionsChange({ paragraphSplitByFontSize })

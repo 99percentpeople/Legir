@@ -1,8 +1,4 @@
-import {
-  initialState,
-  revokeLegacyPageThumbnailObjectUrls,
-  revokeThumbnailObjectUrls,
-} from "@/store/helpers";
+import { initialState, revokeThumbnailObjectUrls } from "@/store/helpers";
 import { prepareAnnotationsForStore } from "@/lib/inkGeometry";
 import { normalizeControlLayerOrders } from "@/lib/controlLayerOrder";
 import {
@@ -11,7 +7,6 @@ import {
   mergePdfPermissionDirtyScopes,
   UNRESTRICTED_PDF_PERMISSIONS,
 } from "@/lib/pdfPermissions";
-import { cancelThumbnailWarmup } from "@/store/slices/runtimeSlice";
 import type { EditorActions, EditorStoreSlice } from "@/store/store.types";
 import type { PDFMetadata } from "@/types";
 
@@ -29,7 +24,6 @@ export const createDocumentSlice: EditorStoreSlice<
   loadDocument: (data) => {
     // Replacing a document invalidates thumbnail caches and edit history.
     revokeThumbnailObjectUrls(get().thumbnailImages);
-    revokeLegacyPageThumbnailObjectUrls(get().pages);
     const normalized = normalizeControlLayerOrders(
       data.fields,
       prepareAnnotationsForStore(data.annotations),
@@ -204,9 +198,8 @@ export const createDocumentSlice: EditorStoreSlice<
   },
 
   resetDocument: () => {
-    cancelThumbnailWarmup();
+    get().cancelThumbnailWarmup();
     revokeThumbnailObjectUrls(get().thumbnailImages);
-    revokeLegacyPageThumbnailObjectUrls(get().pages);
 
     set(() => ({
       pdfFile: initialState.pdfFile,
@@ -247,8 +240,6 @@ export const createDocumentSlice: EditorStoreSlice<
       pendingViewStateRestore: initialState.pendingViewStateRestore,
       fitTrigger: initialState.fitTrigger,
       keys: { ...initialState.keys },
-      activeDialog: initialState.activeDialog,
-      closeConfirmSource: initialState.closeConfirmSource,
       pageTranslateParagraphCandidates:
         initialState.pageTranslateParagraphCandidates,
       pageTranslateSelectedParagraphIds:

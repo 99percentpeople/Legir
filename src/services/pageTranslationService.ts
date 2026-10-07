@@ -31,7 +31,7 @@ import {
   type AiSdkProviderId,
 } from "@/services/ai/providers";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
-import { useEditorStore } from "@/store/useEditorStore";
+import { preferencesStore } from "@/store/preferencesStore";
 import { translatePageBlocksStructuredWithAiSdk } from "@/services/ai/tasks";
 import { resolveCjkFallbackFontStack, splitTextRuns } from "@/lib/fonts";
 
@@ -573,7 +573,7 @@ const translatePageLinesStructured = async (args: {
   });
 
   const res = await translatePageBlocksStructuredWithAiSdk({
-    appOptions: useEditorStore.getState().options,
+    appOptions: preferencesStore.getState().options,
     specifier: {
       providerId,
       modelId: translateOpt.modelId,
@@ -671,7 +671,7 @@ const translateParagraphCandidatesStructured = async (args: {
   });
 
   const res = await translatePageBlocksStructuredWithAiSdk({
-    appOptions: useEditorStore.getState().options,
+    appOptions: preferencesStore.getState().options,
     specifier: {
       providerId,
       modelId: translateOpt.modelId,

@@ -4,12 +4,12 @@ import { useLanguage } from "@/components/language-provider";
 import { PageTranslatePanel } from "@/components/properties-panel/PageTranslatePanel";
 import { usePageTranslation } from "@/hooks/usePageTranslation";
 import { selectPageTranslateRightPanelState } from "@/store/selectors";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import type { EditorUiState } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 
 export default function EditorPageTranslateRightPanel() {
-  const state = useEditorStore(useShallow(selectPageTranslateRightPanelState));
+  const state = useEditorView(useShallow(selectPageTranslateRightPanelState));
   const { effectiveLanguage } = useLanguage();
   const isDocumentReady = state.documentLoadState === "ready";
   const {

@@ -3,6 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 
 import { cn } from "../../utils/cn";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 
 const DialogPortalContainerContext = React.createContext<HTMLElement | null>(
   null,
@@ -50,6 +51,8 @@ function DialogTrigger({
 function DialogPortal({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
+  const isActive = useEditorTabIsActive();
+  if (!isActive) return null;
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 

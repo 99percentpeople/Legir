@@ -1,7 +1,6 @@
-import { createStore } from "zustand/vanilla";
-import { subscribeWithSelector } from "zustand/middleware";
-import { createEditorStoreState } from "@/store/createStoreState";
-import type { EditorStore } from "@/store/store.types";
+import { createEditorView } from "@/store/editorView";
+import { createPreferencesStore } from "@/store/preferencesStore";
+import { createWorkspaceStore } from "@/store/workspaceStore";
 import {
   FieldType,
   type EditorState,
@@ -45,16 +44,18 @@ export const candidate = (
   ...patch,
 });
 
-export const createTestEditorStore = (overrides: Partial<EditorState> = {}) =>
-  createStore<EditorStore>()(
-    subscribeWithSelector((set, get, api) => ({
-      ...createEditorStoreState(set, get, api),
-      documentLoadState: "ready",
-      pages: [page()],
-      pdfBytes: new Uint8Array([1]),
-      isPanelFloating: false,
-      isSidebarOpen: false,
-      isRightPanelOpen: false,
-      ...overrides,
-    })),
-  );
+export const createTestEditorStore = (overrides: Partial<EditorState> = {}) => {
+  const preferences = createPreferencesStore(false);
+  const workspace = createWorkspaceStore(false);
+  const view = createEditorView({ preferences, workspace });
+  view.setState({
+    documentLoadState: "ready",
+    pages: [page()],
+    pdfBytes: new Uint8Array([1]),
+    isPanelFloating: false,
+    isSidebarOpen: false,
+    isRightPanelOpen: false,
+    ...overrides,
+  });
+  return view;
+};

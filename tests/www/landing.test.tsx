@@ -34,7 +34,7 @@ import { workspaceScaleToPdfViewerScale } from "@/lib/pdfScale";
 import { FIT_WIDTH_PADDING_X } from "@/constants";
 
 // Importing the editing runtime from a public demo would initialize PDF workers.
-vi.mock("@/store/useEditorStore", () => {
+vi.mock("@/store/useEditorView", () => {
   throw new Error("The www demo must not import the application editor store");
 });
 

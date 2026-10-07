@@ -67,7 +67,7 @@ export const getAiChatSystemInstruction = (options?: {
   sections.push(
     buildPromptSection("Document links", [
       "Use markdown links or HTML anchors for internal document links.",
-      "Use hash targets only: page links use #page=3, field/control links use #control=<encoded_id>, and result links use #result=<encoded_id>.",
+      "Use hash targets only: page links use #page=3, field/control links use #control=<encoded_id>, and result links use #result=<encoded_id>. When list_open_documents is available, always append &document=<encoded_document_id> to every document link so it remains attached to the correct document after tab switches.",
       "For markdown, write natural link text like [page 3](#page=3), not the raw hash target.",
       "Only create a page, control, or result link after you have the exact target from tool output.",
       "Link text should read naturally in the user's language.",

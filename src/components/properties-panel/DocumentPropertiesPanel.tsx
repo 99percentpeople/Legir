@@ -71,6 +71,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
     onResize,
   }) => {
     const { t } = useLanguage();
+    const idPrefix = React.useId();
     const [creationEditable, setCreationEditable] = useState(false);
 
     const exportPasswordEnabled = exportPassword !== null;
@@ -152,7 +153,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             <div className="flex items-center justify-between gap-3">
               <div
                 className="text-muted-foreground text-xs"
-                id="export-password-description"
+                id={`${idPrefix}-export-password-description`}
               >
                 {t("properties.export_password.desc")}
               </div>
@@ -182,9 +183,9 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
             {exportPasswordEnabled && (
               <div className="relative">
                 <Input
-                  aria-describedby="export-password-description"
+                  aria-describedby={`${idPrefix}-export-password-description`}
                   className="pe-9"
-                  id="export-password"
+                  id={`${idPrefix}-export-password`}
                   onChange={(e) => onExportPasswordChange(e.target.value)}
                   placeholder={
                     typeof pdfOpenPassword === "string" && pdfOpenPassword
@@ -196,7 +197,7 @@ export const DocumentPropertiesPanel = React.memo<DocumentPropertiesPanelProps>(
                   disabled={!canModifyContents}
                 />
                 <button
-                  aria-controls="password"
+                  aria-controls={`${idPrefix}-export-password`}
                   aria-label={
                     exportPasswordVisible ? "Hide password" : "Show password"
                   }
@@ -454,6 +455,7 @@ function DocumentPermissionUnlockControls({
   onPreserveOwnerRestrictionsOnSaveChange: (preserve: boolean) => void;
 }) {
   const { t } = useLanguage();
+  const idPrefix = React.useId();
   const [ownerPassword, setOwnerPassword] = useState("");
   const [ownerPasswordVisible, setOwnerPasswordVisible] = useState(false);
   const [isVerifyingOwnerPassword, setIsVerifyingOwnerPassword] =
@@ -471,7 +473,7 @@ function DocumentPermissionUnlockControls({
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-1">
               <Label
-                htmlFor="preserve-owner-restrictions"
+                htmlFor={`${idPrefix}-preserve-owner-restrictions`}
                 className="cursor-pointer text-xs font-medium"
               >
                 {t("properties.permissions.preserve_on_save")}
@@ -481,7 +483,7 @@ function DocumentPermissionUnlockControls({
               </p>
             </div>
             <Switch
-              id="preserve-owner-restrictions"
+              id={`${idPrefix}-preserve-owner-restrictions`}
               checked={preservePdfOwnerRestrictionsOnSave}
               onCheckedChange={onPreserveOwnerRestrictionsOnSaveChange}
             />
@@ -508,13 +510,16 @@ function DocumentPermissionUnlockControls({
             })();
           }}
         >
-          <Label htmlFor="owner-password" className="text-xs font-medium">
+          <Label
+            htmlFor={`${idPrefix}-owner-password`}
+            className="text-xs font-medium"
+          >
             {t("properties.permissions.owner_password")}
           </Label>
           <div className="flex gap-2">
             <div className="relative min-w-0 flex-1">
               <Input
-                id="owner-password"
+                id={`${idPrefix}-owner-password`}
                 className="pe-9"
                 type={ownerPasswordVisible ? "text" : "password"}
                 value={ownerPassword}
@@ -573,6 +578,7 @@ function KeywordsInput({
   onTriggerHistorySave,
   disabled = false,
 }: KeywordsInputProps) {
+  const id = React.useId();
   const [activeTagIndex, setActiveTagIndex] = useState<number | null>(null);
 
   const tags: Tag[] = useMemo(() => {
@@ -604,7 +610,7 @@ function KeywordsInput({
 
   return (
     <TagInput
-      id="keywords-input"
+      id={id}
       placeholder="(e.g. invoice)"
       tags={tags}
       setTags={handleSetTags}

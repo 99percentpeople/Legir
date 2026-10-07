@@ -20,7 +20,9 @@ export const useDesktopCloseRequestHandler = ({
       const liveTabs = getTabsSnapshot();
       if (liveTabs.length === 0) return;
 
-      const hasDirtyTabs = liveTabs.some((tab) => tab.isDirty);
+      const hasDirtyTabs = liveTabs.some(
+        (tab) => tab.runtime.store.document.getState().isDirty,
+      );
       if (!hasDirtyTabs) return;
 
       event.preventDefault();

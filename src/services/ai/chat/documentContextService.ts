@@ -122,10 +122,13 @@ const parseWorkspacePageNumber = (value: string) => {
   return pageIndex + 1;
 };
 
-const getVisibleWorkspacePageNumbers = (totalPages: number) => {
+const getVisibleWorkspacePageNumbers = (
+  totalPages: number,
+  root?: ParentNode | null,
+) => {
   if (typeof document === "undefined" || totalPages <= 0) return [];
 
-  const scrollContainer = document.querySelector(
+  const scrollContainer = (root === undefined ? document : root)?.querySelector(
     '[data-workspace-scroll-container="true"]',
   );
   if (!(scrollContainer instanceof HTMLElement)) return [];
@@ -274,12 +277,13 @@ const resolvePageVisualRequests = (
 
 const getWorkspaceViewportPageRects = (
   snapshot: AiDocumentSnapshot,
+  root?: ParentNode | null,
 ): AiDocumentViewportPageRect[] => {
   if (typeof document === "undefined" || snapshot.pages.length === 0) {
     return [];
   }
 
-  const scrollContainer = document.querySelector(
+  const scrollContainer = (root === undefined ? document : root)?.querySelector(
     '[data-workspace-scroll-container="true"]',
   );
   if (!(scrollContainer instanceof HTMLElement)) return [];
@@ -344,6 +348,7 @@ const getWorkspaceViewportPageRects = (
 };
 
 export const createDocumentContextService = (options: {
+  getWorkspaceRoot?: () => HTMLElement | null;
   getSnapshot: () => AiDocumentSnapshot;
   getSelectedTextContext: () => AiTextSelectionContext | null;
   getPdfSource?: () => {
@@ -931,6 +936,7 @@ export const createDocumentContextService = (options: {
       const selected = getSelectedTextContext();
       const computedVisiblePageNumbers = getVisibleWorkspacePageNumbers(
         snapshot.pages.length,
+        options.getWorkspaceRoot?.(),
       );
       const fallbackVisiblePageNumbers =
         snapshot.pages.length > 0 ? [snapshot.currentPageIndex + 1] : [];
@@ -938,7 +944,10 @@ export const createDocumentContextService = (options: {
         computedVisiblePageNumbers.length > 0
           ? computedVisiblePageNumbers
           : fallbackVisiblePageNumbers;
-      const viewportPageRects = getWorkspaceViewportPageRects(snapshot);
+      const viewportPageRects = getWorkspaceViewportPageRects(
+        snapshot,
+        options.getWorkspaceRoot?.(),
+      );
       const currentViewportRect =
         viewportPageRects.find(
           (item) => item.pageNumber === snapshot.currentPageIndex + 1,

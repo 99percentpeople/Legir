@@ -22,6 +22,7 @@ import type {
 } from "@/types";
 
 export type AiToolName =
+  | "list_open_documents"
   | "get_document_context"
   | "get_document_metadata"
   | "update_document_metadata"
@@ -248,6 +249,7 @@ export interface AiRenderedPageVisualSummaryResult {
 }
 
 export interface AiStoredSearchResult {
+  documentId?: string;
   id: string;
   query: string;
   result: PDFSearchResult;
@@ -653,6 +655,7 @@ export interface AiChatContextMemory {
 }
 
 export interface AiChatSelectionAttachment {
+  documentId?: string;
   kind: "workspace_selection";
   text: string;
   pageIndex: number;
@@ -662,6 +665,7 @@ export interface AiChatSelectionAttachment {
 }
 
 export interface AiChatAnnotationAttachment {
+  documentId?: string;
   kind: "annotation_reference";
   annotationId: string;
   annotationType: AiAnnotationKind;

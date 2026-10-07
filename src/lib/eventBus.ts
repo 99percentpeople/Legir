@@ -54,6 +54,11 @@ export class EventBus<Events extends Record<string, unknown>> {
     }
   }
 
+  clear() {
+    this.listeners.clear();
+    this.lastPayload.clear();
+  }
+
   // Removes the last emitted payload tracking for a given event in the EventBus.
   clearSticky<K extends keyof Events>(event: K) {
     this.lastPayload.delete(event);

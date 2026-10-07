@@ -54,10 +54,10 @@ export const getMessageAttachmentKey = (
   attachment: AiChatMessageAttachment,
 ) => {
   if (attachment.kind === "workspace_selection") {
-    return `${attachment.pageIndex}:${attachment.startOffset}:${attachment.endOffset}`;
+    return `${attachment.documentId ?? ""}:${attachment.pageIndex}:${attachment.startOffset}:${attachment.endOffset}`;
   }
 
-  return `annotation:${attachment.annotationId}`;
+  return `annotation:${attachment.documentId ?? ""}:${attachment.annotationId}`;
 };
 
 export const getMessageAttachmentCopyText = (

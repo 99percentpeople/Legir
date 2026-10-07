@@ -14,7 +14,10 @@ import {
   THUMBNAIL_TARGET_WIDTH,
 } from "@/constants";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { useEditorStore } from "@/store/useEditorStore";
+import {
+  useEditorView as useDocumentState,
+  useEditorViewApi,
+} from "@/store/useEditorView";
 import { getWorkspaceRenderMetrics } from "../lib/renderPerformance";
 import {
   reportPDFPageRenderLayerReady,
@@ -22,7 +25,7 @@ import {
 } from "../debug/pdfPageRenderTelemetry";
 import { useDeferredRenderScale } from "../hooks/useDeferredRenderScale";
 import PDFTileLayer from "./PDFTileLayer";
-import { appEventBus } from "@/lib/eventBus";
+import { useEditorEventBus } from "@/app/editorTabs/context";
 
 interface PDFCanvasLayerProps {
   workerService: PDFWorkerService | null;
@@ -39,6 +42,8 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   isInView,
   sessionRenderKey,
 }) => {
+  const appEventBus = useEditorEventBus();
+  const useEditorView = useEditorViewApi();
   const pageIndex = page.pageIndex;
   // Double buffering: Two canvases to prevent flickering during resize/re-render
   const canvasARef = useRef<HTMLCanvasElement>(null);
@@ -61,8 +66,8 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   const renderedScaleRef = useRef<number | null>(null);
   const renderEpochRef = useRef(0);
   const dprRef = useRef<number>(1);
-  const setState = useEditorStore.setState;
-  const placeholderImage = useEditorStore(
+  const setState = useEditorView.setState;
+  const placeholderImage = useDocumentState(
     (state) => state.thumbnailImages[pageIndex],
   );
   const pageInfo = useMemo(
@@ -107,7 +112,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         return;
       }
 
-      const current = useEditorStore.getState();
+      const current = useEditorView.getState();
       if (!current.pages[pageIndex] || current.thumbnailImages[pageIndex]) {
         return;
       }
@@ -152,7 +157,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
       if (!imageData) return;
 
-      const latest = useEditorStore.getState();
+      const latest = useEditorView.getState();
       if (!latest.pages[pageIndex] || latest.thumbnailImages[pageIndex]) {
         if (imageData.startsWith("blob:")) {
           try {

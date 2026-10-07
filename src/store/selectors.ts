@@ -1,4 +1,5 @@
-import type { EditorCanvasState, EditorState } from "@/types";
+import type { WorkspaceState } from "./workspaceStore";
+import type { EditorPreferencesState, EditorState } from "@/types";
 import type { EditorStore } from "@/store/store.types";
 
 // App shell should only observe the broad lifecycle state it actually renders.
@@ -24,7 +25,6 @@ export const selectEditorPageState = (state: EditorStore) => ({
   isSidebarOpen: state.isSidebarOpen,
   isRightPanelOpen: state.isRightPanelOpen,
   rightPanelTab: state.rightPanelTab,
-  rightPanelDockTab: state.rightPanelDockTab,
   rightPanelWidth: state.rightPanelWidth,
   updateToolStyle: state.updateToolStyle,
   openSidebar: state.openSidebar,
@@ -118,34 +118,21 @@ export const selectPdfSearchControllerState = (state: EditorStore) => ({
 
 // Canvas rendering and zoom controls should only observe workspace-hot fields.
 // This keeps AI/session/sidebar churn from invalidating the PDF viewport.
-export const selectEditorCanvasState = (
-  state: EditorStore,
-): EditorCanvasState => ({
+export const selectEditorCanvasState = (state: EditorStore) => ({
   annotations: state.annotations,
-  commentStyle: state.commentStyle,
   currentPageIndex: state.currentPageIndex,
   documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
   fields: state.fields,
   filename: state.filename,
   fitTrigger: state.fitTrigger,
-  freetextStyle: state.freetextStyle,
-  highlightStyle: state.highlightStyle,
-  isFullscreen: state.isFullscreen,
   keys: state.keys,
   mode: state.mode,
-  options: state.options,
-  pageFlow: state.pageFlow,
-  pageLayout: state.pageLayout,
   pages: state.pages,
-  pageTranslateOptions: state.pageTranslateOptions,
   pageTranslateParagraphCandidates: state.pageTranslateParagraphCandidates,
   pageTranslateSelectedParagraphIds: state.pageTranslateSelectedParagraphIds,
   pdfBytes: state.pdfBytes,
-  penStyle: state.penStyle,
   pendingViewStateRestore: state.pendingViewStateRestore,
-  shapeStyle: state.shapeStyle,
-  stampStyle: state.stampStyle,
   scale: state.scale,
   selectedId: state.selectedId,
   tool: state.tool,
@@ -205,8 +192,6 @@ export const selectToolbarState = (state: EditorStore) => ({
 });
 
 export const selectSidebarState = (state: EditorStore) => ({
-  isOpen: state.isSidebarOpen,
-  isFloating: state.isPanelFloating,
   pages: state.pages,
   fields: state.fields,
   annotations: state.annotations,
@@ -214,9 +199,6 @@ export const selectSidebarState = (state: EditorStore) => ({
   outline: state.outline,
   selectedId: state.selectedId,
   currentPageIndex: state.currentPageIndex,
-  thumbnailsLayout: state.options.thumbnailsLayout,
-  sidebarTab: state.sidebarTab,
-  width: state.sidebarWidth,
   closeSidebar: state.closeSidebar,
   setUiState: state.setUiState,
   selectControl: state.selectControl,
@@ -229,10 +211,6 @@ export const selectSidebarState = (state: EditorStore) => ({
 
 export const selectRightPanelShellState = (state: EditorStore) => ({
   mode: state.mode,
-  rightPanelTab: state.rightPanelTab,
-  isPanelFloating: state.isPanelFloating,
-  isRightPanelOpen: state.isRightPanelOpen,
-  rightPanelWidth: state.rightPanelWidth,
   hasSelectedControl:
     !!state.selectedId &&
     (state.fields.some((field) => field.id === state.selectedId) ||
@@ -313,4 +291,21 @@ export const selectTranslationFloatingWindowState = (state: EditorStore) => ({
   translateOptionRaw: state.translateOption,
   translateTargetLanguage: state.translateTargetLanguage,
   setState: state.setState,
+});
+
+export const selectCanvasPreferences = (state: EditorPreferencesState) => ({
+  commentStyle: state.commentStyle,
+  freetextStyle: state.freetextStyle,
+  highlightStyle: state.highlightStyle,
+  options: state.options,
+  pageTranslateOptions: state.pageTranslateOptions,
+  penStyle: state.penStyle,
+  shapeStyle: state.shapeStyle,
+  stampStyle: state.stampStyle,
+});
+
+export const selectCanvasLayout = (state: WorkspaceState) => ({
+  isFullscreen: state.isFullscreen,
+  pageFlow: state.layout.pageFlow,
+  pageLayout: state.layout.pageLayout,
 });

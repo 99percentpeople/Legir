@@ -299,6 +299,9 @@ const formatMessageAttachmentForConversation = (
   if (attachment.kind === "workspace_selection") {
     return [
       "SELECTION_ATTACHMENT",
+      ...(attachment.documentId
+        ? [`document_id: ${attachment.documentId}`]
+        : []),
       `attachment_index: ${attachmentIndex + 1}`,
       `page_number: ${attachment.pageIndex + 1}`,
       `start_offset: ${attachment.startOffset}`,
@@ -310,6 +313,7 @@ const formatMessageAttachmentForConversation = (
 
   return [
     "ANNOTATION_ATTACHMENT",
+    ...(attachment.documentId ? [`document_id: ${attachment.documentId}`] : []),
     `attachment_index: ${attachmentIndex + 1}`,
     `annotation_id: ${attachment.annotationId}`,
     `annotation_type: ${attachment.annotationType}`,
@@ -1049,6 +1053,9 @@ const normalizeStoredSearchResultForPersist = (
   return {
     id,
     query,
+    ...(typeof raw.documentId === "string"
+      ? { documentId: raw.documentId }
+      : {}),
     result: {
       ...result,
       id: result.id || id,
@@ -1087,7 +1094,11 @@ export const restorePersistedAiChatDocumentState = (
     const sessionsMap = new Map<string, AiChatSessionData>();
     const sessionSummaries: AiChatSessionSummary[] = [];
 
-    for (const session of parsed.sessions.slice(0, MAX_PERSIST_SESSIONS)) {
+    const sessionLimit =
+      documentIdentity === "workspace"
+        ? parsed.sessions.length
+        : MAX_PERSIST_SESSIONS;
+    for (const session of parsed.sessions.slice(0, sessionLimit)) {
       if (!session || typeof session !== "object") continue;
       if (typeof session.id !== "string") continue;
 
@@ -1266,7 +1277,12 @@ export const persistAiChatDocumentState = (options: {
 
   const key = buildPersistKey(options.documentIdentity);
   const persistedSessions: PersistedAiChatSession[] = options.sessions
-    .slice(0, MAX_PERSIST_SESSIONS)
+    .slice(
+      0,
+      options.documentIdentity === "workspace"
+        ? options.sessions.length
+        : MAX_PERSIST_SESSIONS,
+    )
     .map((summary) => {
       const data = options.sessionsMap.get(summary.id);
       if (!data) {
@@ -1330,6 +1346,9 @@ export const persistAiChatDocumentState = (options: {
   try {
     window.localStorage.setItem(key, JSON.stringify(payload));
   } catch {
+    // Do not replace a unified multi-document history with just the active
+    // conversation on quota failure. Keep the last durable copy intact.
+    if (options.documentIdentity === "workspace") return;
     try {
       const activeData = options.sessionsMap.get(options.activeSessionId);
       if (!activeData) return;

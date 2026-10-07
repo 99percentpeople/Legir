@@ -32,7 +32,10 @@ import {
   AI_PROVIDER_SPECS_SORTED_BY_LABEL,
 } from "@/services/ai/providers/catalog";
 import { translateService } from "@/services/translateService";
-import { useEditorStore } from "@/store/useEditorStore";
+import {
+  preferencesStore,
+  usePreferencesStore,
+} from "@/store/preferencesStore";
 import type {
   AppOptions,
   DebugOptions,
@@ -70,7 +73,7 @@ const SettingsDialog = ({
   onChange,
 }: SettingsDialogProps) => {
   const { t } = useLanguage();
-  const llmModelCache = useEditorStore((s) => s.llmModelCache);
+  const llmModelCache = usePreferencesStore((s) => s.llmModelCache);
 
   const [llmProviderTab, setLlmProviderTab] = useState<LlmProviderId>(
     AI_PROVIDER_SPECS_SORTED_BY_LABEL[0]?.id ?? AI_PROVIDER_IDS[0],
@@ -216,7 +219,7 @@ const SettingsDialog = ({
   };
 
   const clearFetchedLlmModels = (provider: LlmProviderId) => {
-    useEditorStore.getState().setState((state) => ({
+    preferencesStore.setState((state) => ({
       llmModelCache: {
         ...state.llmModelCache,
         [provider]: {

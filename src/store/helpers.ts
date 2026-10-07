@@ -22,12 +22,10 @@ import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
 import type {
   AppOptions,
   EditorState,
-  EditorUiState,
   ApiProxyOptions,
   LLMCustomModelCapability,
   LLMCustomModelConfig,
   LLMOptions,
-  PageData,
   TranslationOptions,
 } from "@/types";
 
@@ -340,32 +338,6 @@ export const revokeThumbnailObjectUrls = (
   }
 };
 
-export const revokeLegacyPageThumbnailObjectUrls = (pages: PageData[]) => {
-  for (const page of pages as Array<PageData & { imageData?: string }>) {
-    revokeObjectUrlIfNeeded(page.imageData);
-  }
-};
-
-export function pickEditorUiState(
-  state: Partial<EditorState>,
-): Partial<EditorUiState> {
-  return {
-    isSidebarOpen: state.isSidebarOpen,
-    isRightPanelOpen: state.isRightPanelOpen,
-    rightPanelTab: state.rightPanelTab,
-    sidebarTab: state.sidebarTab,
-    pageLayout: state.pageLayout,
-    pageFlow: state.pageFlow,
-    sidebarWidth: state.sidebarWidth,
-    rightPanelWidth: state.rightPanelWidth,
-    translateOption: state.translateOption,
-    translateTargetLanguage: state.translateTargetLanguage,
-    pageTranslateOptions: state.pageTranslateOptions,
-    options: state.options,
-    rightPanelDockTab: state.rightPanelDockTab,
-  };
-}
-
 export const initialState: EditorState = {
   pdfFile: null,
   pdfBytes: null,
@@ -455,7 +427,6 @@ export const initialState: EditorState = {
     space: false,
   },
   activeDialog: null,
-  closeConfirmSource: null,
   actionSignal: null,
   llmModelCache: createEmptyLlmModelCache(),
 };

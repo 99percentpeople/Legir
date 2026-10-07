@@ -2,6 +2,7 @@ import * as React from "react";
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui";
 
 import { cn } from "@/utils/cn";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import { ChevronRightIcon, CheckIcon } from "lucide-react";
 
 function ContextMenu({
@@ -62,6 +63,8 @@ function ContextMenuContent({
 }: React.ComponentProps<typeof ContextMenuPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left";
 }) {
+  const isActive = useEditorTabIsActive();
+  if (!isActive) return null;
   return (
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Content

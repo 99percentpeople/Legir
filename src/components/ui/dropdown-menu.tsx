@@ -2,6 +2,7 @@ import * as React from "react";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 
 import { cn } from "@/utils/cn";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import { CheckIcon, ChevronRightIcon } from "lucide-react";
 
 function DropdownMenu({
@@ -35,6 +36,8 @@ function DropdownMenuContent({
   sideOffset = 4,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  const isActive = useEditorTabIsActive();
+  if (!isActive) return null;
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content

@@ -23,6 +23,7 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
   onTriggerHistorySave,
 }) => {
   const { t } = useLanguage();
+  const idPrefix = React.useId();
 
   return (
     <>
@@ -91,11 +92,14 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="required-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-required-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.required")}
             </Label>
             <Switch
-              id="required-switch"
+              id={`${idPrefix}-required-switch`}
               checked={data.required || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ required: checked })}
@@ -103,11 +107,14 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="readonly-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-readonly-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.readonly")}
             </Label>
             <Switch
-              id="readonly-switch"
+              id={`${idPrefix}-readonly-switch`}
               checked={data.readOnly || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ readOnly: checked })}
@@ -115,11 +122,14 @@ export const TextProperties: React.FC<PropertyPanelProps<FormField>> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="multiline-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-multiline-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.multiline")}
             </Label>
             <Switch
-              id="multiline-switch"
+              id={`${idPrefix}-multiline-switch`}
               checked={data.multiline || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ multiline: checked })}

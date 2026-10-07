@@ -25,6 +25,7 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   onTriggerHistorySave,
 }) => {
   const { t } = useLanguage();
+  const idPrefix = React.useId();
 
   const [systemFamilies, setSystemFamilies] = React.useState<string[]>([]);
 
@@ -75,7 +76,7 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             <Label>{t("properties.flatten")}</Label>
             <div className="flex items-center gap-2">
               <Switch
-                id="freetextFlatten"
+                id={`${idPrefix}-freetextFlatten`}
                 checked={isFlatten}
                 onMouseDown={onTriggerHistorySave}
                 onCheckedChange={(checked) => onChange({ flatten: checked })}
@@ -104,7 +105,7 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
             <Label>{t("properties.background")}</Label>
             <div className="flex items-center gap-2">
               <Switch
-                id="freetextTransparent"
+                id={`${idPrefix}-freetextTransparent`}
                 checked={isTransparent}
                 onMouseDown={onTriggerHistorySave}
                 onCheckedChange={(checked) =>
@@ -112,7 +113,7 @@ export const FreetextProperties: React.FC<PropertyPanelProps<Annotation>> = ({
                 }
               />
               <Label
-                htmlFor="freetextTransparent"
+                htmlFor={`${idPrefix}-freetextTransparent`}
                 className="text-xs font-normal"
               >
                 {t("properties.transparent")}

@@ -1,3 +1,7 @@
+import {
+  preferencesStore,
+  setPreferenceOptions,
+} from "@/store/preferencesStore";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
@@ -15,7 +19,10 @@ import {
   summarizeConversationMemory,
   subscribeLLMModelRegistry,
 } from "@/services/ai";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
+import type { AiWorkspace } from "@/services/ai/chat/workspace";
+import { createWorkspaceAiToolRegistry } from "@/services/ai/chat/workspaceToolRegistry";
+import { restoreUnifiedAiChatState } from "./unifiedHistory";
 import { AI_CHAT_VISUAL_MODEL_AUTO_KEY } from "@/constants";
 import { type LLMModelCapabilities, type PDFSearchResult } from "@/types";
 import type { AiChatEditorState, AiChatReactiveState } from "@/store/selectors";
@@ -194,6 +201,7 @@ export const useAiChatController = (
   scopeId: string | undefined,
   workerService: PDFWorkerService | undefined,
   getEditorSnapshot: () => AiChatEditorState,
+  workspace?: AiWorkspace,
 ) => {
   const [registryVersion, setRegistryVersion] = useState(0);
   const [selectedModelKey, setSelectedModelKey] = useState<string | undefined>(
@@ -636,7 +644,7 @@ export const useAiChatController = (
   }, [editorState.options, selectedChatModel?.isAvailable, selectedModelKey]);
 
   const setReasoningLevel = useCallback((level: AiReasoningLevel) => {
-    useEditorStore.getState().setOptions((options) => ({
+    setPreferenceOptions((options) => ({
       aiChat: {
         ...options.aiChat,
         reasoning: {
@@ -714,9 +722,12 @@ export const useAiChatController = (
   );
 
   const getRenderablePdfBytes = useCallback(
-    async (options: { pageNumbers: number[]; signal?: AbortSignal }) => {
+    async (
+      options: { pageNumbers: number[]; signal?: AbortSignal },
+      readSnapshot = getEditorSnapshot,
+    ) => {
       options.signal?.throwIfAborted();
-      const snapshot = getEditorSnapshot();
+      const snapshot = readSnapshot();
       if (!snapshot.pdfBytes) {
         throw new Error("No PDF is currently loaded.");
       }
@@ -762,7 +773,7 @@ export const useAiChatController = (
         },
       );
       options.signal?.throwIfAborted();
-      getEditorSnapshot(); // Reject a document switch during asynchronous export.
+      readSnapshot(); // Reject a closed/replaced source, never an unrelated tab switch.
       return bytes;
     },
     [getEditorSnapshot],
@@ -838,14 +849,16 @@ export const useAiChatController = (
       };
     }, []);
 
-  const documentIdentity = [
-    editorState.filename,
-    editorState.pages.length,
-    editorState.pdfBytes?.byteLength ?? 0,
-  ].join(":");
+  const documentIdentity = workspace
+    ? "workspace"
+    : [
+        editorState.filename,
+        editorState.pages.length,
+        editorState.pdfBytes?.byteLength ?? 0,
+      ].join(":");
   const aiScopeId = scopeId?.trim() || documentIdentity;
 
-  const isDocumentLoaded = editorState.pages.length > 0;
+  const isDocumentLoaded = !!workspace || editorState.pages.length > 0;
 
   const documentToolContext = useMemo(
     () =>
@@ -932,7 +945,9 @@ export const useAiChatController = (
     }
 
     if (isDocumentLoaded) {
-      const restored = restorePersistedAiChatDocumentState(documentIdentity);
+      const restored = workspace
+        ? restoreUnifiedAiChatState()
+        : restorePersistedAiChatDocumentState(documentIdentity);
       if (restored) {
         sessionsRef.current = restored.sessionsMap;
         setSessions(restored.sessionSummaries);
@@ -1081,6 +1096,73 @@ export const useAiChatController = (
     [selectedChatModel?.capabilities, toolContext],
   );
 
+  const createDocumentRegistry = useCallback(
+    (documentId: string) => {
+      const document = workspace?.getDocument(documentId);
+      if (!document)
+        throw new Error(`Document ${documentId} is no longer open.`);
+      const readSnapshot = () => {
+        if (
+          document.signal.aborted ||
+          workspace?.getDocument(documentId)?.store !== document.store
+        ) {
+          throw new Error(`Document ${documentId} is no longer open.`);
+        }
+        return document.store.getState();
+      };
+      const documentContext = createDocumentContextService({
+        getSnapshot: readSnapshot,
+        getWorkspaceRoot: document.getRoot,
+        getSelectedTextContext: () =>
+          workspace?.getActiveDocumentId() === documentId
+            ? getSelectedTextContext()
+            : null,
+        getPdfSource: () => ({
+          pdfBytes: readSnapshot().pdfBytes,
+          password: readSnapshot().pdfOpenPassword,
+        }),
+        getRenderablePdfBytes: (options) =>
+          getRenderablePdfBytes(options, readSnapshot),
+        getPagesTextConfig: () => ({
+          maxChars: readSnapshot().options.aiChat.getPagesTextMaxChars,
+        }),
+        canAttachPageVisuals: () => canAttachPageVisuals,
+        analyzeRenderedPages: hasVisualAnalysisModel
+          ? analyzeRenderedPages
+          : undefined,
+        workerService: document.workerService,
+      });
+      const interactions = createAiChatToolContext({
+        searchResultsRef,
+        searchSeqRef,
+        sessionsRef,
+        activeSessionIdRef,
+        setHighlightedResultIds,
+        formToolsEnabled: readSnapshot().options.aiChat.formToolsEnabled,
+        selectedChatModel,
+        selectedChatModelAuthor,
+        workerService: document.workerService,
+        store: { ...document.store, getState: readSnapshot },
+        events: document.events,
+        documentId,
+      });
+      return createAiToolRegistry(
+        composeAiToolContext(documentContext, interactions),
+        { modelCapabilities: selectedChatModel?.capabilities },
+      );
+    },
+    [
+      workspace,
+      getSelectedTextContext,
+      getRenderablePdfBytes,
+      canAttachPageVisuals,
+      hasVisualAnalysisModel,
+      analyzeRenderedPages,
+      selectedChatModel,
+      selectedChatModelAuthor,
+    ],
+  );
+
   const appendTimelineItem = useCallback(
     (item: AiChatTimelineItem) => {
       const sessionId = activeSessionIdRef.current;
@@ -1164,7 +1246,7 @@ export const useAiChatController = (
     (session: AiChatSessionData, selected: AiChatFlatModel) => {
       if (contextMemoryJobIdsRef.current.has(session.id)) return;
 
-      const appOptions = useEditorStore.getState().options;
+      const appOptions = preferencesStore.getState().options;
       if (appOptions.aiChat.contextCompressionMode !== "ai") return;
       const compressionOptions = buildAiChatTurnCompressionOptions(
         appOptions.aiChat,
@@ -1219,8 +1301,8 @@ export const useAiChatController = (
           const normalized = text.trim();
           if (!normalized) return;
           if (
-            useEditorStore.getState().options.aiChat.contextCompressionMode !==
-            "ai"
+            preferencesStore.getState().options.aiChat
+              .contextCompressionMode !== "ai"
           ) {
             return;
           }
@@ -1245,7 +1327,7 @@ export const useAiChatController = (
             updatedAt: new Date().toISOString(),
           } satisfies AiChatContextMemory;
 
-          const aiChatOptions = useEditorStore.getState().options.aiChat;
+          const aiChatOptions = preferencesStore.getState().options.aiChat;
           refreshSessionProjectedContext(
             activeSession,
             aiChatOptions,
@@ -1385,7 +1467,14 @@ export const useAiChatController = (
           getContextMemory: appOptions.aiChat.contextCompressionEnabled
             ? () => session.contextMemory
             : undefined,
-          toolRegistry,
+          toolRegistry: workspace
+            ? createWorkspaceAiToolRegistry({
+                workspace,
+                defaultDocumentId: workspace.getActiveDocumentId(),
+                definitions: toolRegistry.getDefinitions(),
+                createRegistry: createDocumentRegistry,
+              })
+            : toolRegistry,
           signal: controller.signal,
           onAssistantUpdate: (update) => {
             if (!isCurrentRun() || controller.signal.aborted) return;
@@ -1550,6 +1639,8 @@ export const useAiChatController = (
       getEditorSnapshot,
       refreshSessionProjectedContext,
       toolRegistry,
+      workspace,
+      createDocumentRegistry,
       touchSessionSummary,
       scheduleContextMemory,
     ],
@@ -1787,7 +1878,7 @@ export const useAiChatController = (
     applyLatestTimelineUsageSnapshot(nextSession);
     refreshSessionProjectedContext(
       nextSession,
-      useEditorStore.getState().options.aiChat,
+      preferencesStore.getState().options.aiChat,
       getSessionModelCapabilities(nextSession),
     );
     nextSession.runStatus = "idle";
@@ -1938,10 +2029,10 @@ export const useAiChatController = (
 
     const retryAttachments = normalizeMessageAttachments(userItem.attachments);
     const conversationText = userItem.conversationText?.trim() ?? "";
-    const attachmentMarker = "\n\nSELECTION_ATTACHMENT\nattachment_index: 1\n";
+    const attachmentMarker = /(?:^|\n\n)(?:SELECTION|ANNOTATION)_ATTACHMENT\n/;
     const retryText = retryAttachments?.length
       ? (() => {
-          const markerIndex = conversationText.indexOf(attachmentMarker);
+          const markerIndex = conversationText.search(attachmentMarker);
           if (markerIndex >= 0) {
             return conversationText.slice(0, markerIndex).trim();
           }
@@ -1986,7 +2077,7 @@ export const useAiChatController = (
     applyLatestTimelineUsageSnapshot(session);
     refreshSessionProjectedContext(
       session,
-      useEditorStore.getState().options.aiChat,
+      preferencesStore.getState().options.aiChat,
       getSessionModelCapabilities(session),
     );
 
@@ -2039,6 +2130,72 @@ export const useAiChatController = (
 
   const openDocumentLink = useCallback(
     (target: AiDocumentLinkTarget) => {
+      if (workspace) {
+        const stored =
+          target.kind === "result"
+            ? searchResultsRef.current.get(target.resultId)
+            : null;
+        const documentId = target.documentId ?? stored?.documentId;
+        if (!documentId) return; // Never retarget an old unscoped link to the active tab.
+        const document = workspace.getDocument(documentId);
+        if (!document || document.signal.aborted) return;
+        if (stored && stored.documentId !== documentId) return;
+        const state = document.store.getState();
+        if (target.kind === "page") {
+          if (
+            !Number.isInteger(target.pageNumber) ||
+            target.pageNumber < 1 ||
+            target.pageNumber > state.pages.length
+          )
+            return;
+          workspace.activateDocument(documentId);
+          document.events.emit("workspace:navigatePage", {
+            pageIndex: target.pageNumber - 1,
+            behavior: "smooth",
+          });
+        } else if (target.kind === "control") {
+          if (
+            !state.fields.some((field) => field.id === target.controlId) &&
+            !state.annotations.some(
+              (annotation) => annotation.id === target.controlId,
+            )
+          )
+            return;
+          workspace.activateDocument(documentId);
+          document.events.emit("workspace:focusControl", {
+            id: target.controlId,
+            behavior: "smooth",
+          });
+        } else if (stored) {
+          workspace.activateDocument(documentId);
+          void resolvePdfSearchResultGeometry({
+            result: stored.result,
+            pages: state.pages,
+            cache: new Map(),
+            signal: document.signal,
+            getTextContent: (pageIndex, signal) =>
+              document.workerService.getTextContent({ pageIndex, signal }),
+          })
+            .then((geometry) => {
+              if (document.signal.aborted) return;
+              if (geometry)
+                document.events.emit("workspace:focusTextRange", {
+                  ...stored.result,
+                  rect: geometry.rect,
+                  behavior: "smooth",
+                });
+              else
+                document.events.emit("workspace:navigatePage", {
+                  pageIndex: stored.result.pageIndex,
+                  behavior: "smooth",
+                });
+            })
+            .catch(() => {
+              /* Closing a document cancels its navigation. */
+            });
+        }
+        return;
+      }
       switch (target.kind) {
         case "page": {
           const pageIndex = target.pageNumber - 1;
@@ -2059,7 +2216,7 @@ export const useAiChatController = (
           const controlId = target.controlId.trim();
           if (!controlId) return;
 
-          const store = useEditorStore.getState();
+          const store = useEditorView.getState();
           const exists =
             store.fields.some((field) => field.id === controlId) ||
             store.annotations.some((annotation) => annotation.id === controlId);
@@ -2100,7 +2257,7 @@ export const useAiChatController = (
         }
       }
     },
-    [editorState.pages.length, resolveSearchResultGeometry],
+    [editorState.pages.length, resolveSearchResultGeometry, workspace],
   );
 
   const clearConversation = useCallback(() => {
@@ -2264,6 +2421,23 @@ export const useAiChatController = (
     return isAiChatSessionStarted(session);
   }, []);
 
+  const highlightedSearchResultsByDocument = useMemo(() => {
+    const documents = new Map<string, Map<number, PDFSearchResult[]>>();
+    for (const id of highlightedResultIds) {
+      const stored = searchResultsRef.current.get(id);
+      if (!stored?.documentId) continue;
+      const pages =
+        documents.get(stored.documentId) ??
+        new Map<number, PDFSearchResult[]>();
+      pages.set(stored.result.pageIndex, [
+        ...(pages.get(stored.result.pageIndex) ?? []),
+        stored.result,
+      ]);
+      documents.set(stored.documentId, pages);
+    }
+    return documents;
+  }, [highlightedResultIds]);
+
   const highlightedSearchResultsByPage = useMemo(() => {
     const map = new Map<number, PDFSearchResult[]>();
 
@@ -2326,6 +2500,7 @@ export const useAiChatController = (
       openDocumentLink,
 
       highlightedSearchResultsByPage,
+      highlightedSearchResultsByDocument,
       hasAvailableModel,
       disabledReason,
     }),
@@ -2341,6 +2516,7 @@ export const useAiChatController = (
       editUserMessage,
       hasAvailableModel,
       highlightedSearchResultsByPage,
+      highlightedSearchResultsByDocument,
       isContextCompressionRunning,
       isDraftConversation,
       lastError,

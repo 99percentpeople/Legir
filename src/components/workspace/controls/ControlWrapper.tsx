@@ -1,7 +1,7 @@
 import React from "react";
 import { cn } from "@/utils/cn";
 import { ControlProps } from "./types";
-import { appEventBus } from "@/lib/eventBus";
+import { useEditorEventBus } from "@/app/editorTabs/context";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { getMoveDelta } from "@/lib/controlMovement";
 import { useMouse } from "@/hooks/useMouse";
@@ -60,6 +60,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   contextMenuDisabled = false,
   contextMenuContent,
 }) => {
+  const appEventBus = useEditorEventBus();
   const { t } = useLanguage();
   const wrapperRef = React.useRef<HTMLDivElement>(null);
   const pendingFocusRef = React.useRef(false);

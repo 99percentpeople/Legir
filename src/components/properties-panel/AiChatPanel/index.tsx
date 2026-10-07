@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PanelLayout } from "../PanelLayout";
-import { appEventBus } from "@/lib/eventBus";
+import { useEditorEventBus } from "@/app/editorTabs/context";
+import { useGlobalAi } from "@/app/ai/GlobalAiContext";
+import { useEditorDocumentIdentityRuntime } from "@/app/editorRuntime";
 import { cn } from "@/utils/cn";
 import { ComposerFooter } from "./ComposerFooter";
 import { ConversationEmptyState } from "./ConversationEmptyState";
@@ -36,6 +38,11 @@ export function AiChatPanel({
   onCollapse,
   aiChat,
 }: AiChatPanelProps) {
+  const appEventBus = useEditorEventBus();
+  const { sessionRenderKey: documentId } = useEditorDocumentIdentityRuntime();
+  const shared = useGlobalAi();
+  const sharedRef = React.useRef(shared);
+  sharedRef.current = shared;
   const { t } = useLanguage();
   const {
     sessions,
@@ -65,10 +72,14 @@ export function AiChatPanel({
     openDocumentLink: onOpenDocumentLink,
     disabledReason,
   } = aiChat;
-  const [draft, setDraft] = React.useState("");
-  const [pendingAttachments, setPendingAttachments] = React.useState<
+  const [localDraft, setLocalDraft] = React.useState("");
+  const [localAttachments, setLocalAttachments] = React.useState<
     AiChatMessageAttachment[]
   >([]);
+  const draft = shared?.draft ?? localDraft;
+  const setDraft = shared?.setDraft ?? setLocalDraft;
+  const pendingAttachments = shared?.attachments ?? localAttachments;
+  const setPendingAttachments = shared?.setAttachments ?? setLocalAttachments;
   const [inlineEditState, setInlineEditState] =
     React.useState<InlineEditState | null>(null);
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -118,7 +129,13 @@ export function AiChatPanel({
   React.useEffect(() => {
     return appEventBus.on(
       "workspace:askAi",
-      (attachment) => {
+      (incomingAttachment) => {
+        const attachment = {
+          ...incomingAttachment,
+          documentId:
+            incomingAttachment.documentId ??
+            (sharedRef.current ? (documentId ?? undefined) : undefined),
+        };
         appEventBus.clearSticky("workspace:askAi");
         const nextFocusTarget =
           inlineEditStateRef.current !== null
@@ -161,7 +178,7 @@ export function AiChatPanel({
       },
       { replayLast: true },
     );
-  }, []);
+  }, [appEventBus, documentId, setPendingAttachments]);
 
   React.useEffect(() => {
     if (previousSessionIdRef.current === null) {
@@ -199,8 +216,16 @@ export function AiChatPanel({
 
   const handleActivateAttachment = React.useCallback(
     (attachment: AiChatMessageAttachment) => {
+      const workspace = sharedRef.current?.workspace;
+      const target =
+        workspace && attachment.documentId
+          ? workspace.getDocument(attachment.documentId)
+          : null;
+      if (workspace && !target) return;
+      if (target) workspace?.activateDocument(target.id);
+      const events = target?.events ?? appEventBus;
       if (attachment.kind === "workspace_selection") {
-        appEventBus.emit(
+        events.emit(
           "workspace:focusTextRange",
           {
             pageIndex: attachment.pageIndex,
@@ -214,7 +239,7 @@ export function AiChatPanel({
         return;
       }
 
-      appEventBus.emit(
+      events.emit(
         "workspace:focusControl",
         {
           id: attachment.annotationId,

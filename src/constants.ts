@@ -25,7 +25,7 @@ export const WORKSPACE_HEAVY_PAGE_DPR_CAP = 1;
 
 // Thumbnail warmup (generate page preview images once per document).
 // Primary usage:
-// - `src/store/useEditorStore.ts` -> `warmupThumbnails()` (calls `pdfWorkerService.renderPageImage`)
+// - `src/store/useEditorView.ts` -> `warmupThumbnails()` (calls `pdfWorkerService.renderPageImage`)
 // - Cached value stored in `EditorState.thumbnailImages` and displayed by `src/components/sidebar/ThumbnailsPanel.tsx`
 export const THUMBNAIL_TARGET_WIDTH = 500;
 export const THUMBNAIL_MIME_TYPE = "image/jpeg";
@@ -75,7 +75,6 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
   isSidebarOpen: !(typeof window !== "undefined" && window.innerWidth < 768),
   isRightPanelOpen: false,
   rightPanelTab: "document",
-  rightPanelDockTab: [],
   sidebarTab: "thumbnails",
   pageLayout: "single",
   pageFlow: "vertical",

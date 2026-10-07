@@ -1,4 +1,3 @@
-import { initialState } from "@/store/helpers";
 import {
   createAppStateSlice,
   createControlSlice,
@@ -13,10 +12,11 @@ import {
 } from "@/store/slices";
 import type { EditorStoreStateCreator } from "@/store/store.types";
 
-// Compose a single editor store out of domain-focused slices.
-// The runtime model remains "one store", but the implementation stays modular.
-export const createEditorStoreState: EditorStoreStateCreator = (set, get) => ({
-  ...initialState,
+// Commands read a composed editor view and write through its domain owners.
+export const createEditorActions = (
+  set: Parameters<EditorStoreStateCreator>[0],
+  get: Parameters<EditorStoreStateCreator>[1],
+) => ({
   ...createAppStateSlice(set, get),
   ...createControlSlice(set, get),
   ...createDocumentSlice(set, get),

@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PageData } from "@/types";
+import { useEditorElementById } from "@/app/editorTabs/context";
 import { MAX_PIXELS_PER_PAGE, TILE_MAX_DIM } from "@/constants";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { useAppEvent } from "@/hooks/useAppEventBus";
@@ -93,6 +94,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   isRendered,
   onStateChange,
 }) => {
+  const getElementById = useEditorElementById();
   const pageIndex = page.pageIndex;
   const [hasAnyTileRendered, setHasAnyTileRendered] = useState(false);
   const [tileProgressVersion, setTileProgressVersion] = useState(0);
@@ -216,7 +218,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         reprioritizeRafRef.current = null;
 
         const scrollContainer = scrollContainerEl;
-        const pageEl = document.getElementById(`page-${pageIndex}`);
+        const pageEl = getElementById(`page-${pageIndex}`);
         if (!scrollContainer || !pageEl) return;
 
         const dpr = dprRef.current;
@@ -414,9 +416,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     let centerX = pageW / 2;
     let centerY = pageH / 2;
     const scrollContainer = scrollContainerRef.current;
-    const pageEl = scrollContainer
-      ? document.getElementById(`page-${pageIndex}`)
-      : null;
+    const pageEl = scrollContainer ? getElementById(`page-${pageIndex}`) : null;
     if (scrollContainer && pageEl) {
       const cRect = scrollContainer.getBoundingClientRect();
       const pRect = pageEl.getBoundingClientRect();

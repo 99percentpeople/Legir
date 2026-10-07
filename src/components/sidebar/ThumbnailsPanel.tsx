@@ -3,7 +3,7 @@ import type { PageData, ThumbnailsLayoutMode } from "@/types";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useLanguage } from "../language-provider";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 
 interface ThumbnailItemProps {
   page: PageData;
@@ -24,7 +24,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
 }) => {
   const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
-  const thumbnailImage = useEditorStore(
+  const thumbnailImage = useEditorView(
     (state) => state.thumbnailImages[pageIndex],
   );
 
@@ -90,7 +90,7 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
   thumbnailsLayout,
 }) => {
   const { t } = useLanguage();
-  const isRestoringViewState = useEditorStore(
+  const isRestoringViewState = useEditorView(
     (state) => !!state.pendingViewStateRestore,
   );
   const scrollBehaviorRef = useRef<ScrollBehavior>("auto");

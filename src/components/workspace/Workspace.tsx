@@ -61,7 +61,11 @@ import { getFocusRect } from "./lib/getFocusRect";
 import { VirtualizedPages } from "./VirtualizedPages";
 import { computeWorkspacePageRects } from "./lib/computeWorkspacePageRects";
 import { resolvePdfTextRangeGeometry } from "./lib/pdfTextRangeGeometry";
-import { appEventBus } from "@/lib/eventBus";
+import {
+  useEditorEventBus,
+  useEditorElementById,
+  useEditorTabRuntime,
+} from "@/app/editorTabs/context";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
@@ -277,6 +281,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
   activePdfSearchResultId,
   bottomOverlayInsetPx = 0,
 }) => {
+  const appEventBus = useEditorEventBus();
+  const getElementById = useEditorElementById();
+  const tabRuntime = useEditorTabRuntime();
   const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -483,6 +490,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         "workspace:askAi",
         {
           kind: "workspace_selection",
+          documentId: sessionRenderKey ?? undefined,
           text: selection.exactText,
           pageIndex: selection.pageIndex,
           startOffset: selection.startOffset,
@@ -497,48 +505,54 @@ const Workspace: React.FC<WorkspaceProps> = ({
     resolveSelectionAttachmentRect,
     textSelectionToolbar.selection,
     textSelectionToolbar.text,
+    sessionRenderKey,
+    appEventBus,
   ]);
 
-  const handleAskAiFromAnnotation = useCallback((annotation: Annotation) => {
-    const stampLabel = getReadableStampLabel({
-      kind: annotation.stamp?.kind,
-      presetId: annotation.stamp?.presetId,
-      label: annotation.stamp?.label,
-    });
-    const stampHasImage =
-      typeof annotation.stamp?.image?.dataUrl === "string" &&
-      annotation.stamp.image.dataUrl.length > 0;
-    const attachment: AiChatMessageAttachment = {
-      kind: "annotation_reference",
-      annotationId: annotation.id,
-      annotationType: annotation.type,
-      pageIndex: annotation.pageIndex,
-      ...(annotation.text?.trim()
-        ? { text: annotation.text.trim() }
-        : stampLabel
-          ? { text: stampLabel }
+  const handleAskAiFromAnnotation = useCallback(
+    (annotation: Annotation) => {
+      const stampLabel = getReadableStampLabel({
+        kind: annotation.stamp?.kind,
+        presetId: annotation.stamp?.presetId,
+        label: annotation.stamp?.label,
+      });
+      const stampHasImage =
+        typeof annotation.stamp?.image?.dataUrl === "string" &&
+        annotation.stamp.image.dataUrl.length > 0;
+      const attachment: AiChatMessageAttachment = {
+        kind: "annotation_reference",
+        documentId: sessionRenderKey ?? undefined,
+        annotationId: annotation.id,
+        annotationType: annotation.type,
+        pageIndex: annotation.pageIndex,
+        ...(annotation.text?.trim()
+          ? { text: annotation.text.trim() }
+          : stampLabel
+            ? { text: stampLabel }
+            : null),
+        ...(annotation.highlightedText?.trim()
+          ? { highlightedText: annotation.highlightedText.trim() }
           : null),
-      ...(annotation.highlightedText?.trim()
-        ? { highlightedText: annotation.highlightedText.trim() }
-        : null),
-      ...(annotation.linkUrl?.trim()
-        ? { linkUrl: annotation.linkUrl.trim() }
-        : null),
-      ...(typeof annotation.linkDestPageIndex === "number"
-        ? { linkDestPageIndex: annotation.linkDestPageIndex }
-        : null),
-      ...(annotation.type === "stamp"
-        ? {
-            stampKind: annotation.stamp?.kind,
-            stampPresetId: annotation.stamp?.presetId,
-            stampLabel,
-            stampHasImage,
-          }
-        : null),
-    };
+        ...(annotation.linkUrl?.trim()
+          ? { linkUrl: annotation.linkUrl.trim() }
+          : null),
+        ...(typeof annotation.linkDestPageIndex === "number"
+          ? { linkDestPageIndex: annotation.linkDestPageIndex }
+          : null),
+        ...(annotation.type === "stamp"
+          ? {
+              stampKind: annotation.stamp?.kind,
+              stampPresetId: annotation.stamp?.presetId,
+              stampLabel,
+              stampHasImage,
+            }
+          : null),
+      };
 
-    appEventBus.emit("workspace:askAi", attachment, { sticky: true });
-  }, []);
+      appEventBus.emit("workspace:askAi", attachment, { sticky: true });
+    },
+    [appEventBus, sessionRenderKey],
+  );
 
   const handleAskAiFromAnnotationId = useCallback(
     (id: string) => {
@@ -769,6 +783,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (!shapeDraftSession) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (tabRuntime && !tabRuntime.active) return;
       if (event.key === "Escape") {
         if (!event.isTrusted) return;
         event.preventDefault();
@@ -853,7 +868,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         return;
       }
 
-      document.getElementById(`page-${pageIndex}`)?.scrollIntoView({
+      getElementById(`page-${pageIndex}`)?.scrollIntoView({
         behavior: behavior ?? "auto",
         block: "start",
       });
@@ -1032,7 +1047,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         kind === "annotation"
           ? `annotation-${controlId}`
           : `field-element-${controlId}`;
-      const wrapper = document.getElementById(wrapperId);
+      const wrapper = getElementById(wrapperId);
       return !!wrapper && wrapper.contains(handleElement);
     },
     [],

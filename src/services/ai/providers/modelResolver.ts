@@ -8,7 +8,7 @@ import {
 import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
 import { getAiSdkModelCatalogProvider } from "@/services/ai/providers/modelCatalogRegistry";
 import { getAiSdkProviderModelOptions } from "@/services/ai/providers/modelSelection";
-import { useEditorStore } from "@/store/useEditorStore";
+import { preferencesStore } from "@/store/preferencesStore";
 import type { AppOptions, EditorState } from "@/types";
 import { createApiProxyFetch } from "@/services/platform/apiProxy";
 import {
@@ -182,7 +182,7 @@ export const resolveAiSdkRuntime = async (options: {
 
 export const resolveAiSdkLanguageModelFromCurrentOptions = (
   specifier: AiSdkModelSpecifier,
-) => resolveAiSdkLanguageModel(useEditorStore.getState().options, specifier);
+) => resolveAiSdkLanguageModel(preferencesStore.getState().options, specifier);
 
 const getPreferredProviderId = (options: {
   appOptions: AppOptions;

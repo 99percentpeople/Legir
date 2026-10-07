@@ -10,7 +10,7 @@ import {
 import { usePdfSearchController } from "@/pages/EditorPage/hooks/usePdfSearchController";
 import { resolvePdfSearchResultGeometry } from "@/components/workspace/lib/pdfTextRangeGeometry";
 import { appEventBus } from "@/lib/eventBus";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { PageData, PDFSearchResult } from "@/types";
 import { page } from "./helpers/editorStore";
@@ -85,8 +85,8 @@ function Harness({
   worker: PDFWorkerService;
   children: React.ReactNode;
 }) {
-  const sidebarOpen = useEditorStore((state) => state.isSidebarOpen);
-  const { openSidebar, closeSidebar } = useEditorStore.getState();
+  const sidebarOpen = useEditorView((state) => state.isSidebarOpen);
+  const { openSidebar, closeSidebar } = useEditorView.getState();
   controller = usePdfSearchController({
     pages,
     workerService: worker,
@@ -134,9 +134,9 @@ beforeEach(async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.useFakeTimers();
   vi.mocked(resolvePdfSearchResultGeometry).mockResolvedValue(null);
-  useEditorStore.setState(
+  useEditorView.setState(
     {
-      ...useEditorStore.getInitialState(),
+      ...useEditorView.getInitialState(),
       isSidebarOpen: false,
       isRightPanelOpen: true,
       isPanelFloating: true,
@@ -196,9 +196,9 @@ describe("PDF search subscriptions, context boundaries and cancellation", () => 
     });
     resetCounts();
     await act(async () => {
-      useEditorStore.setState({ currentPageIndex: 1 });
-      useEditorStore.getState().setScale(2);
-      useEditorStore.getState().setUiState({ rightPanelWidth: 450 });
+      useEditorView.setState({ currentPageIndex: 1 });
+      useEditorView.getState().setScale(2);
+      useEditorView.getState().setUiState({ rightPanelWidth: 450 });
     });
     expect(renders).toEqual({ toolbar: 0, sidebar: 0, workspace: 0, shell: 0 });
     await act(async () => {
@@ -209,16 +209,16 @@ describe("PDF search subscriptions, context boundaries and cancellation", () => 
 
   it("uses panel actions and restores the sidebar's pre-search open state", async () => {
     await search();
-    expect(useEditorStore.getState()).toMatchObject({
+    expect(useEditorView.getState()).toMatchObject({
       isSidebarOpen: true,
       isRightPanelOpen: false,
     });
     await act(async () => controller.closePdfSearch());
-    expect(useEditorStore.getState().isSidebarOpen).toBe(false);
-    await act(async () => useEditorStore.getState().openSidebar());
+    expect(useEditorView.getState().isSidebarOpen).toBe(false);
+    await act(async () => useEditorView.getState().openSidebar());
     await search();
     await act(async () => controller.closePdfSearch());
-    expect(useEditorStore.getState().isSidebarOpen).toBe(true);
+    expect(useEditorView.getState().isSidebarOpen).toBe(true);
   });
 
   it("ignores a stale worker rejection after a document switch", async () => {

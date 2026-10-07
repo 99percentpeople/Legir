@@ -3,6 +3,7 @@ import { Select as SelectPrimitive } from "radix-ui";
 
 import { useDialogPortalContainer } from "@/components/ui/dialog";
 import { cn } from "@/utils/cn";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react";
 
 function Select({
@@ -77,6 +78,8 @@ function SelectContent({
 }) {
   const dialogPortalContainer = useDialogPortalContainer();
   const portalContainer = container ?? dialogPortalContainer ?? undefined;
+  const isActive = useEditorTabIsActive();
+  if (!isActive) return null;
 
   return (
     <SelectPrimitive.Portal container={portalContainer}>

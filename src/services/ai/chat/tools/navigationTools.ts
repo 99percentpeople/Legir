@@ -77,7 +77,7 @@ export const navigationToolModule = defineToolModule((_ctx) => ({
     )
     .promptInstructions(FOCUS_RESULT_TOOL_PROMPTS)
     .inputSchema(focusResultArgsSchema)
-    .build(async ({ args, ctx: toolCtx }) => {
+    .build(async ({ args, ctx: toolCtx, signal }) => {
       const resultId = args.result_id.trim();
       const stored = resultId ? toolCtx.getStoredSearchResult(resultId) : null;
       if (!stored) {
@@ -90,7 +90,7 @@ export const navigationToolModule = defineToolModule((_ctx) => ({
         };
       }
 
-      await toolCtx.focusSearchResult(stored.result);
+      await toolCtx.focusSearchResult(stored.result, signal);
       return {
         payload: {
           ok: true,

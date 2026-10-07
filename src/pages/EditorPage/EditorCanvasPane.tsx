@@ -1,3 +1,5 @@
+import { useWorkspaceStore } from "@/store/workspaceStore";
+import { usePreferencesStore } from "@/store/preferencesStore";
 import React, {
   Suspense,
   useCallback,
@@ -12,9 +14,11 @@ import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { calculateWorkspaceInitialScale } from "@/components/workspace/lib/calculateWorkspaceFitScale";
-import { appEventBus } from "@/lib/eventBus";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorEventBus } from "@/app/editorTabs/context";
+import { useEditorView } from "@/store/useEditorView";
 import {
+  selectCanvasPreferences,
+  selectCanvasLayout,
   selectEditorCanvasActions,
   selectEditorCanvasState,
 } from "@/store/selectors";
@@ -34,6 +38,7 @@ const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
   "[data-app-block-modifier-wheel-zoom='1']";
 
 export const EditorCanvasPane: React.FC = () => {
+  const appEventBus = useEditorEventBus();
   const isMobile = useIsMobile();
   const { sessionRenderKey, workerService } =
     useEditorDocumentIdentityRuntime();
@@ -50,7 +55,10 @@ export const EditorCanvasPane: React.FC = () => {
     changeStampStyle: onStampStyleChange,
   } = useEditorShellCommands();
   const pdfSearch = useEditorPdfSearchWorkspace();
-  const state = useEditorStore(useShallow(selectEditorCanvasState));
+  const documentState = useEditorView(useShallow(selectEditorCanvasState));
+  const preferences = usePreferencesStore(useShallow(selectCanvasPreferences));
+  const layout = useWorkspaceStore(useShallow(selectCanvasLayout));
+  const state = { ...documentState, ...preferences, ...layout };
   const {
     addField,
     addAnnotation,
@@ -69,7 +77,7 @@ export const EditorCanvasPane: React.FC = () => {
     setState,
     selectPageTranslateParagraphId,
     setSelectedPageTranslateParagraphIds,
-  } = useEditorStore(useShallow(selectEditorCanvasActions));
+  } = useEditorView(useShallow(selectEditorCanvasActions));
   const workspaceState = useMemo(
     () => ({
       annotations: state.annotations,

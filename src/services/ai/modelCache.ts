@@ -15,7 +15,7 @@ import {
   type SupportedLlmProviderId,
 } from "@/services/ai/editorState";
 import { registerTranslateOptionsFromProviders } from "@/services/ai/translation";
-import { useEditorStore } from "@/store/useEditorStore";
+import { preferencesStore } from "@/store/preferencesStore";
 import type { LLMModelOption } from "@/services/ai/types";
 import type { AppOptions } from "@/types";
 
@@ -118,7 +118,7 @@ export const loadModels = async (options?: LoadModelsOptions) => {
     }
   }
 
-  useEditorStore.getState().setState({
+  preferencesStore.setState({
     llmModelCache: nextCache,
   });
 

@@ -32,7 +32,7 @@ import { TimeText } from "../timeText";
 import { Textarea } from "../ui/textarea";
 import { cn } from "@/utils/cn";
 import type { AppEventMap } from "@/lib/eventBus";
-import { appEventBus } from "@/lib/eventBus";
+import { useEditorEventBus } from "@/app/editorTabs/context";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   ANNOTATION_LIST_TYPES,
@@ -331,6 +331,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
 }) => {
   const { t } = useLanguage();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const appEventBus = useEditorEventBus();
   const cardRef = useRef<HTMLDivElement>(null);
   const pendingFocusRef = useRef(false);
   const isSelectedRef = useRef(isSelected);

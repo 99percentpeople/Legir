@@ -50,7 +50,7 @@ import {
 import { getContrastColor } from "@/utils/colors";
 import SaveMenu from "./SaveMenu";
 import { canSaveAs } from "@/services/platform";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import { selectToolbarState } from "@/store/selectors";
 import { useShallow } from "zustand/react/shallow";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -73,7 +73,7 @@ import { DocumentPermissionsPopover } from "./DocumentPermissionsPopover";
 
 const Toolbar: React.FC = () => {
   const { t } = useLanguage();
-  const editorState = useEditorStore(useShallow(selectToolbarState));
+  const editorState = useEditorView(useShallow(selectToolbarState));
   const {
     mode,
     tool,

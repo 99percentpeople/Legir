@@ -17,6 +17,8 @@ import type {
   PDFOutlineItem,
   PreservedSourceAnnotationRef,
   Tool,
+  SidebarTab,
+  RightPanelTab,
 } from "@/types";
 
 export interface PdfOwnerUnlockResult {
@@ -65,10 +67,10 @@ export interface EditorActions {
       | ((prev: EditorState) => Partial<EditorUiState>),
   ) => void;
   resetUiState: () => void;
-  openSidebar: (tab?: string) => void;
+  openSidebar: (tab?: SidebarTab) => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
-  openRightPanel: (tab?: string) => void;
+  openRightPanel: (tab?: RightPanelTab) => void;
   closeRightPanel: () => void;
   toggleRightPanel: () => void;
   closeFloatingPanels: () => void;
@@ -91,6 +93,7 @@ export interface EditorActions {
     updates: Partial<AppOptions> | ((prev: AppOptions) => Partial<AppOptions>),
   ) => void;
   warmupThumbnails: (workerService?: PDFWorkerService) => void;
+  cancelThumbnailWarmup: () => void;
   loadDocument: (data: {
     pdfFile: File | null;
     pdfBytes: Uint8Array;

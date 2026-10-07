@@ -14,7 +14,7 @@ vi.mock("@/components/workspace/lib/pdfTextRangeGeometry", () => ({
 
 import { createAiChatToolContext } from "@/hooks/useAiChatController/toolContext";
 import type { AiChatSessionData } from "@/hooks/useAiChatController/sessionPersistence";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import type { AiStoredSearchResult } from "@/services/ai/chat/types";
 import type { PDFSearchResult } from "@/types";
 
@@ -66,7 +66,7 @@ const createToolContext = (options?: {
 
 describe("AI chat tool context", () => {
   beforeEach(() => {
-    useEditorStore.setState({
+    useEditorView.setState({
       pages: [
         {
           pageIndex: 0,
@@ -106,7 +106,7 @@ describe("AI chat tool context", () => {
       ],
     });
 
-    const state = useEditorStore.getState();
+    const state = useEditorView.getState();
     expect(result.createdCount).toBe(2);
     expect(state.fields).toHaveLength(2);
     expect(state.selectedId).toBeNull();
@@ -146,7 +146,7 @@ describe("AI chat tool context", () => {
       },
     });
 
-    const state = useEditorStore.getState();
+    const state = useEditorView.getState();
     expect(result.createdCount).toBe(1);
     expect(state.annotations).toHaveLength(1);
     expect(state.annotations[0]).toMatchObject({

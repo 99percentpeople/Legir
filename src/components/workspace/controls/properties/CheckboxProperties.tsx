@@ -14,6 +14,7 @@ export const CheckboxProperties: React.FC<PropertyPanelProps<FormField>> = ({
   onTriggerHistorySave,
 }) => {
   const { t } = useLanguage();
+  const idPrefix = React.useId();
 
   return (
     <>
@@ -25,9 +26,11 @@ export const CheckboxProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="check-val">{t("properties.checked")}</Label>
+            <Label htmlFor={`${idPrefix}-check-val`}>
+              {t("properties.checked")}
+            </Label>
             <Switch
-              id="check-val"
+              id={`${idPrefix}-check-val`}
               checked={data.isChecked || false}
               onCheckedChange={(checked) => {
                 onTriggerHistorySave();
@@ -36,9 +39,11 @@ export const CheckboxProperties: React.FC<PropertyPanelProps<FormField>> = ({
             />
           </div>
           <div className="flex items-center justify-between">
-            <Label htmlFor="check-def">{t("properties.default_checked")}</Label>
+            <Label htmlFor={`${idPrefix}-check-def`}>
+              {t("properties.default_checked")}
+            </Label>
             <Switch
-              id="check-def"
+              id={`${idPrefix}-check-def`}
               checked={data.isDefaultChecked || false}
               onCheckedChange={(checked) => {
                 onTriggerHistorySave();
@@ -72,11 +77,14 @@ export const CheckboxProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="required-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-required-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.required")}
             </Label>
             <Switch
-              id="required-switch"
+              id={`${idPrefix}-required-switch`}
               checked={data.required || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ required: checked })}
@@ -84,11 +92,14 @@ export const CheckboxProperties: React.FC<PropertyPanelProps<FormField>> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="readonly-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-readonly-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.readonly")}
             </Label>
             <Switch
-              id="readonly-switch"
+              id={`${idPrefix}-readonly-switch`}
               checked={data.readOnly || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ readOnly: checked })}

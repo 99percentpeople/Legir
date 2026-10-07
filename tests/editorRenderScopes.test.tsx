@@ -6,11 +6,18 @@ import {
   type EditorTabsRuntime,
   type EditorDocumentRuntime,
 } from "@/app/editorRuntime";
-import { useEditorStore } from "@/store/useEditorStore";
+import {
+  createDocumentEditorView,
+  EditorViewContext,
+  useEditorView,
+} from "@/store/useEditorView";
+import { EditorTabActiveContext } from "@/app/editorTabs/context";
+import { createEditorTabSnapshotFromState } from "@/app/editorTabs/storeSnapshot";
 import type { AiChatEditorState } from "@/store/selectors";
-import type { PDFSearchResult } from "@/types";
+import type { PDFSearchResult, RightPanelTab } from "@/types";
 import { candidate, field, page } from "./helpers/editorStore";
 import EditorPage from "@/pages/EditorPage";
+import { EditorTabStrip } from "@/pages/EditorPage/components/EditorTabStrip";
 
 const metrics = vi.hoisted(() => ({
   renders: {} as Record<string, number>,
@@ -74,7 +81,7 @@ vi.mock("@/components/toolbar/Toolbar", async () => {
   const { useShallow } = await import("zustand/react/shallow");
   return {
     default: () => {
-      useEditorStore(useShallow(selectToolbarState));
+      useEditorView(useShallow(selectToolbarState));
       useEditorPdfSearchToolbar();
       return null;
     },
@@ -98,7 +105,7 @@ vi.mock("@/pages/EditorPage/EditorCanvasPane", async () => {
   const { useShallow } = await import("zustand/react/shallow");
   return {
     EditorCanvasPane: () => {
-      useEditorStore(useShallow(selectEditorCanvasState));
+      useEditorView(useShallow(selectEditorCanvasState));
       useEditorPdfSearchWorkspace();
       useEditorFileDragRuntime();
       return null;
@@ -168,18 +175,20 @@ let container: HTMLDivElement;
 let tabs: EditorTabsRuntime;
 let documentRuntime: EditorDocumentRuntime;
 let pageElement: React.ReactElement;
+const disposeDocuments: (() => void)[] = [];
 const renderPage = async () => {
   await act(async () =>
     root.render(
       <EditorRuntimeProvider tabs={tabs} document={documentRuntime}>
+        <EditorTabStrip />
         {pageElement}
       </EditorRuntimeProvider>,
     ),
   );
   await settleImports();
 };
-const openPanel = async (tab: string) => {
-  await act(async () => useEditorStore.getState().openRightPanel(tab));
+const openPanel = async (tab: RightPanelTab) => {
+  await act(async () => useEditorView.getState().openRightPanel(tab));
   await settleImports();
 };
 
@@ -188,9 +197,9 @@ beforeEach(async () => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  useEditorStore.setState(
+  useEditorView.setState(
     {
-      ...useEditorStore.getInitialState(),
+      ...useEditorView.getInitialState(),
       documentLoadState: "ready",
       pages: [page()],
       pdfBytes: new Uint8Array([1]),
@@ -242,15 +251,60 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  disposeDocuments.splice(0).forEach((dispose) => dispose());
   container.remove();
   vi.unstubAllGlobals();
 });
 
 describe("editor connector render scope", () => {
+  it("changes the shared panel only for foreground selection changes, not tab activation", async () => {
+    const snapshot = createEditorTabSnapshotFromState({
+      state: useEditorView.getState(),
+      scrollContainer: null,
+    });
+    const a = createDocumentEditorView(snapshot);
+    const b = createDocumentEditorView(snapshot);
+    disposeDocuments.push(a.dispose, b.dispose);
+    const show = async (active: "a" | "b") => {
+      pageElement = (
+        <>
+          {[a, b].map((document, index) => (
+            <EditorViewContext.Provider key={index} value={document.store}>
+              <EditorTabActiveContext.Provider
+                value={active === (index === 0 ? "a" : "b")}
+              >
+                <EditorPage />
+              </EditorTabActiveContext.Provider>
+            </EditorViewContext.Provider>
+          ))}
+        </>
+      );
+      await renderPage();
+    };
+    await show("a");
+    await act(async () => a.store.getState().selectControl("selected"));
+    expect(a.store.getState().rightPanelTab).toBe("properties");
+    expect(b.store.getState().rightPanelTab).toBe("properties");
+    await show("b");
+    expect(a.store.getState().rightPanelTab).toBe("properties");
+    await act(async () => b.store.getState().openRightPanel("ai_chat"));
+    await show("a");
+    expect(a.store.getState().rightPanelTab).toBe("ai_chat");
+    await act(async () => b.store.getState().selectControl("other"));
+    expect(a.store.getState().rightPanelTab).toBe("ai_chat");
+    await show("b");
+    expect(b.store.getState().rightPanelTab).toBe("ai_chat");
+    await act(async () => b.store.getState().selectControl(null));
+    await act(async () => b.store.getState().selectControl("selected"));
+    expect(b.store.getState().rightPanelTab).toBe("properties");
+    await act(async () => b.store.getState().selectControl(null));
+    expect(a.store.getState().rightPanelTab).toBe("document");
+  });
+
   it("separates cold mount from 20 warm-visible and warm-hidden zoom updates", async () => {
     expect(metrics.stream).toBeUndefined();
     resetCounts();
-    await act(async () => useEditorStore.getState().setScale(1.25));
+    await act(async () => useEditorView.getState().setScale(1.25));
     expectQuiet(
       "selectEditorPageState",
       "selectRightPanelShellState",
@@ -259,15 +313,15 @@ describe("editor connector render scope", () => {
     await openPanel("ai_chat");
     expect(metrics.stream).toBeDefined();
     expect(count("selectAiChatReactiveState")).toBeGreaterThan(0);
-    for (const tab of ["ai_chat", "document"]) {
+    for (const tab of ["ai_chat", "document"] as const) {
       await openPanel(tab);
       resetCounts();
       for (let index = 0; index < 20; index++) {
         await act(async () =>
-          useEditorStore.getState().setScale(1 + (index + 1) / 10),
+          useEditorView.getState().setScale(1 + (index + 1) / 10),
         );
         expect(metrics.readSnapshot?.().scale).toBe(
-          useEditorStore.getState().scale,
+          useEditorView.getState().scale,
         );
       }
       expectQuiet(
@@ -325,7 +379,7 @@ describe("editor connector render scope", () => {
     await openPanel("ai_chat");
     const reader = metrics.readSnapshot!;
     expect(() => reader()).not.toThrow();
-    await act(async () => useEditorStore.getState().setScale(2));
+    await act(async () => useEditorView.getState().setScale(2));
     expect(reader().scale).toBe(2);
   });
 
@@ -333,9 +387,9 @@ describe("editor connector render scope", () => {
     await openPanel("ai_chat");
     resetCounts();
     await act(async () => {
-      useEditorStore.getState().updateField("other", { value: "updated" });
-      useEditorStore.getState().updateMetadata({ title: "Updated metadata" });
-      useEditorStore.setState({
+      useEditorView.getState().updateField("other", { value: "updated" });
+      useEditorView.getState().updateMetadata({ title: "Updated metadata" });
+      useEditorView.setState({
         annotations: [{ id: "note", type: "comment", pageIndex: 0 }],
       });
     });
@@ -353,7 +407,7 @@ describe("editor connector render scope", () => {
     await openPanel("page_translate");
     resetCounts();
     await act(async () =>
-      useEditorStore
+      useEditorView
         .getState()
         .setPageTranslateParagraphCandidates([candidate("a")]),
     );
@@ -367,7 +421,7 @@ describe("editor connector render scope", () => {
     );
     resetCounts();
     await act(async () =>
-      useEditorStore.getState().updateMetadata({ title: "Unrelated" }),
+      useEditorView.getState().updateMetadata({ title: "Unrelated" }),
     );
     expectQuiet(
       "selectPageTranslateRightPanelState",
@@ -377,18 +431,18 @@ describe("editor connector render scope", () => {
   });
 
   it("subscribes the properties connector only to the selected control", async () => {
-    await act(async () => useEditorStore.getState().selectControl("selected"));
+    await act(async () => useEditorView.getState().selectControl("selected"));
     await openPanel("properties");
     resetCounts();
     await act(async () =>
-      useEditorStore.getState().updateField("other", { value: "other" }),
+      useEditorView.getState().updateField("other", { value: "other" }),
     );
     expectQuiet(
       "selectPropertiesRightPanelState",
       "selectRightPanelShellState",
     );
     await act(async () =>
-      useEditorStore.getState().updateField("selected", { value: "selected" }),
+      useEditorView.getState().updateField("selected", { value: "selected" }),
     );
     expect(count("selectPropertiesRightPanelState")).toBeGreaterThan(0);
     expectQuiet("selectRightPanelShellState");

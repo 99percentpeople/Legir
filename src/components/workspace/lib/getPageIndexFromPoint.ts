@@ -24,7 +24,11 @@ export const getPageIndexFromPoint = (
 ) => {
   // DOM fast-path: check current active page first for performance.
   if (activePageIndex !== null) {
-    const pageEl = document.getElementById(`page-${activePageIndex}`);
+    const pageEl = options?.contentEl
+      ? options.contentEl.querySelector<HTMLElement>(
+          `[id="page-${activePageIndex}"]`,
+        )
+      : document.getElementById(`page-${activePageIndex}`);
     if (pageEl) {
       const rect = pageEl.getBoundingClientRect();
       if (
@@ -126,7 +130,9 @@ export const getPageIndexFromPoint = (
   // DOM fallback: check other pages (O(N) in page count).
   for (let i = 0; i < pageCount; i++) {
     if (i === activePageIndex) continue;
-    const pageEl = document.getElementById(`page-${i}`);
+    const pageEl = contentEl
+      ? contentEl.querySelector<HTMLElement>(`[id="page-${i}"]`)
+      : document.getElementById(`page-${i}`);
     if (pageEl) {
       const rect = pageEl.getBoundingClientRect();
       if (

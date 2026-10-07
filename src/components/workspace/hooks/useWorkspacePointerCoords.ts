@@ -4,6 +4,7 @@ import {
   type RefObject,
 } from "react";
 import type { WorkspaceEditorState } from "@/types";
+import { useEditorElementById } from "@/app/editorTabs/context";
 
 type PageRect = {
   top: number;
@@ -17,11 +18,12 @@ export const useWorkspacePointerCoords = (opts: {
   contentRef?: RefObject<HTMLElement | null>;
   getPageRectByPageIndex?: (pageIndex: number) => PageRect | null;
 }) => {
+  const getElementById = useEditorElementById();
   // Prefer DOM measurement when the page is mounted (accurate and cheap).
   // Fallback to rect-based math when virtualization means the page element is missing.
   const getRelativeCoordsFromPointDom = useCallback(
     (clientX: number, clientY: number, pageIndex: number) => {
-      const pageEl = document.getElementById(`page-${pageIndex}`);
+      const pageEl = getElementById(`page-${pageIndex}`);
       if (!pageEl) return null;
       const rect = pageEl.getBoundingClientRect();
       const scale = opts.editorStateRef.current?.scale ?? 1;

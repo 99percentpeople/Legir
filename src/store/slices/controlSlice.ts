@@ -709,13 +709,11 @@ export const createControlSlice: EditorStoreSlice<
   openDialog: (name) =>
     set({
       activeDialog: name,
-      closeConfirmSource: null,
     }),
 
   closeDialog: () =>
     set({
       activeDialog: null,
-      closeConfirmSource: null,
     }),
 
   setKeys: (keys) => set((state) => ({ keys: { ...state.keys, ...keys } })),

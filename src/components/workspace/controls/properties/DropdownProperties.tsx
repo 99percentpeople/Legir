@@ -31,6 +31,7 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
   onTriggerHistorySave,
 }) => {
   const { t } = useLanguage();
+  const idPrefix = React.useId();
   const [newOption, setNewOption] = useState("");
   const [isBulkEdit, setIsBulkEdit] = useState(false);
   const [bulkText, setBulkText] = useState("");
@@ -92,11 +93,14 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="multiselect-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-multiselect-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.multiselect")}
             </Label>
             <Switch
-              id="multiselect-switch"
+              id={`${idPrefix}-multiselect-switch`}
               checked={data.isMultiSelect || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) =>
@@ -263,7 +267,7 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
           </div>
         ) : (
           <>
-            <div className="scrollbar-thin scrollbar-thumb-border mb-2 max-h-40 space-y-2 overflow-y-auto pr-1">
+            <div className="scrollbar-thumb-border mb-2 max-h-40 scrollbar-thin space-y-2 overflow-y-auto pr-1">
               {(data.options || []).map((opt, idx) => (
                 <div key={idx} className="group flex items-center gap-1">
                   <div className="text-muted-foreground flex flex-col gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
@@ -326,11 +330,14 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="required-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-required-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.required")}
             </Label>
             <Switch
-              id="required-switch"
+              id={`${idPrefix}-required-switch`}
               checked={data.required || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ required: checked })}
@@ -338,11 +345,14 @@ export const DropdownProperties: React.FC<PropertyPanelProps<FormField>> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="readonly-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-readonly-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.readonly")}
             </Label>
             <Switch
-              id="readonly-switch"
+              id={`${idPrefix}-readonly-switch`}
               checked={data.readOnly || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ readOnly: checked })}

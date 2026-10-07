@@ -1,34 +1,56 @@
-import type { EditorState } from "@/types";
+import type { DocumentState } from "@/types";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
 export const CURRENT_EDITOR_WINDOW_ID = "current";
 
 export type EditorWindowId = string;
 
-export type EditorTabSnapshot = Omit<
-  EditorState,
-  | "activeDialog"
-  | "actionSignal"
-  | "closeConfirmSource"
-  | "isFullscreen"
-  | "isProcessing"
-  | "isSaving"
-  | "keys"
-  | "llmModelCache"
-  | "options"
-  | "processingStatus"
-  | "thumbnailImages"
+// Explicit transfer fields: application preferences, window UI and resources
+// cannot enter a document snapshot when new state fields are added.
+export type EditorTabSnapshot = Pick<
+  DocumentState,
+  | "pdfFile"
+  | "pdfBytes"
+  | "pdfOpenPassword"
+  | "exportPassword"
+  | "metadata"
+  | "documentPermissions"
+  | "sourceDocumentPermissions"
+  | "pdfOwnerUnlocked"
+  | "pdfOwnerPassword"
+  | "preservePdfOwnerRestrictionsOnSave"
+  | "dirtyPermissionScopes"
+  | "filename"
+  | "saveTarget"
+  | "pages"
+  | "fields"
+  | "annotations"
+  | "preservedSourceAnnotations"
+  | "outline"
+  | "documentLoadState"
+  | "documentLoadError"
+  | "mode"
+  | "tool"
+  | "selectedId"
+  | "scale"
+  | "past"
+  | "future"
+  | "clipboard"
+  | "pageTranslateParagraphCandidates"
+  | "pageTranslateSelectedParagraphIds"
+  | "lastSavedAt"
+  | "isDirty"
+  | "currentPageIndex"
+  | "pendingViewStateRestore"
+  | "fitTrigger"
 >;
 
 export interface EditorTabSession {
+  runtime: import("./runtime").EditorTabRuntime;
   id: string;
   windowId: EditorWindowId;
-  title: string;
   sourceKey: string | null;
   lastActiveAt: string;
-  isDirty: boolean;
-  editorSnapshot: EditorTabSnapshot;
-  thumbnailImages: Record<number, string>;
   workerService: PDFWorkerService;
   disposePdfResources: (() => void) | null;
 }

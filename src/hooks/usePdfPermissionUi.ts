@@ -6,14 +6,14 @@ import {
   canPerformPdfPermissionOperation,
   type PdfPermissionOperation,
 } from "@/lib/pdfPermissions";
-import { useEditorStore } from "@/store/useEditorStore";
+import { usePreferencesStore } from "@/store/preferencesStore";
 import type { PDFDocumentPermissions } from "@/types";
 
 export const usePdfPermissionUi = (
   permissions: PDFDocumentPermissions | null | undefined,
 ) => {
   const { t } = useLanguage();
-  const permissionPolicySource = useEditorStore(
+  const permissionPolicySource = usePreferencesStore(
     (state) => state.options.debugOptions,
   );
   const restrictedTitle = t("toolbar.permission_restricted");

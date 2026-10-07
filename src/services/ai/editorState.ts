@@ -2,17 +2,20 @@ import {
   AI_PROVIDER_IDS,
   type AiProviderId,
 } from "@/services/ai/providers/catalog";
-import { useEditorStore } from "@/store/useEditorStore";
+import {
+  preferencesStore,
+  setPreferenceOptions,
+} from "@/store/preferencesStore";
 
 export type SupportedLlmProviderId = AiProviderId;
 
-export const getCurrentOptions = () => useEditorStore.getState().options;
+export const getCurrentOptions = () => preferencesStore.getState().options;
 
 export const getCurrentModelCache = () =>
-  useEditorStore.getState().llmModelCache;
+  preferencesStore.getState().llmModelCache;
 
 export const trimProviderOptions = () => {
-  const snapshot = useEditorStore.getState();
+  const snapshot = preferencesStore.getState();
   const nextOptions = snapshot.options;
   const nextLlm = Object.fromEntries(
     AI_PROVIDER_IDS.map((providerId) => [
@@ -40,10 +43,10 @@ export const trimProviderOptions = () => {
     return snapshot.options;
   }
 
-  snapshot.setOptions((options) => ({
+  setPreferenceOptions((options) => ({
     ...options,
     llm: nextLlm,
   }));
 
-  return useEditorStore.getState().options;
+  return preferencesStore.getState().options;
 };

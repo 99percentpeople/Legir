@@ -8,8 +8,8 @@ import React, {
 import { createPortal } from "react-dom";
 import type { PageData, PDFSearchResult } from "@/types";
 import { cn } from "@/utils/cn";
-import { useEditorStore } from "@/store/useEditorStore";
-import { appEventBus } from "@/lib/eventBus";
+import { usePreferencesStore } from "@/store/preferencesStore";
+import { useEditorEventBus } from "@/app/editorTabs/context";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX,
@@ -57,11 +57,12 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
   searchResults = [],
   activeSearchResultId = null,
 }) => {
+  const appEventBus = useEditorEventBus();
   const pageIndex = page.pageIndex;
   const textLayerRef = useRef<HTMLDivElement>(null);
 
   // Store options for debugging (optional)
-  const pdfTextLayerDebug = useEditorStore(
+  const pdfTextLayerDebug = usePreferencesStore(
     (s) => s.options.debugOptions.pdfTextLayer,
   );
   const [renderedScale, setRenderedScale] = useState<number | null>(null);

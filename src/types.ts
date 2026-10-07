@@ -435,7 +435,7 @@ export interface PenStyle {
   opacity: number;
 }
 
-export type DialogName = "shortcuts" | "settings" | "close_confirm" | null;
+export type DialogName = "shortcuts" | "settings" | null;
 
 export type TranslateOptionId = `${string}:${string}`;
 
@@ -492,8 +492,9 @@ export type PageTranslateParagraphCandidate = {
 
 export type PdfDocumentLoadState = "hydrating" | "ready" | "error";
 
-export interface EditorState {
-  // Document State
+// Each state has one owner. EditorState is a composed read model for rendering
+// and document commands; it is never persisted or stored as a whole.
+export interface DocumentState {
   pdfFile: File | null;
   pdfBytes: Uint8Array | null;
   pdfOpenPassword: string | null;
@@ -508,17 +509,67 @@ export interface EditorState {
   filename: string;
   saveTarget: EditorSaveTarget | null;
   pages: PageData[];
-  thumbnailImages: Record<number, string>;
   fields: FormField[];
   annotations: Annotation[];
   preservedSourceAnnotations: PreservedSourceAnnotationRef[];
   outline: PDFOutlineItem[];
   documentLoadState: PdfDocumentLoadState;
   documentLoadError: string | null;
-
   mode: EditorMode;
   tool: Tool;
+  selectedId: string | null;
+  scale: number;
+  isProcessing: boolean;
+  past: HistorySnapshot[];
+  future: HistorySnapshot[];
+  clipboard: {
+    type: "field" | "annotation";
+    data: FormField | Annotation;
+  } | null;
+  pageTranslateParagraphCandidates: PageTranslateParagraphCandidate[];
+  pageTranslateSelectedParagraphIds: string[];
+  lastSavedAt: Date | null;
+  processingStatus: string | null;
+  isSaving: boolean;
+  isDirty: boolean;
+  currentPageIndex: number;
+  pendingViewStateRestore: {
+    scale: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null;
+  fitTrigger: number;
+  keys: {
+    ctrl: boolean;
+    shift: boolean;
+    alt: boolean;
+    meta: boolean;
+    space: boolean;
+  };
+  actionSignal: {
+    type:
+      | "UNDO"
+      | "REDO"
+      | "SAVE"
+      | "PRINT"
+      | "DELETE"
+      | "ESCAPE"
+      | "COPY"
+      | "PASTE"
+      | "CUT"
+      | "MOVE_UP"
+      | "MOVE_DOWN"
+      | "MOVE_LEFT"
+      | "MOVE_RIGHT"
+      | "MOVE_UP_FAST"
+      | "MOVE_DOWN_FAST"
+      | "MOVE_LEFT_FAST"
+      | "MOVE_RIGHT_FAST";
+    id: number;
+  } | null;
+}
 
+export interface EditorPreferencesState {
   penStyle: PenStyle;
   highlightStyle?: PenStyle;
   commentStyle?: { color: string; opacity: number };
@@ -547,101 +598,47 @@ export interface EditorState {
     imageAppearance?: StampImageAppearance;
     opacity: number;
   };
-
-  selectedId: string | null;
-
-  scale: number;
-  isProcessing: boolean;
-
-  // History Stacks
-  past: HistorySnapshot[];
-  future: HistorySnapshot[];
-  // Clipboard
-  clipboard: {
-    type: "field" | "annotation";
-    data: FormField | Annotation;
-  } | null;
-  // Settings
   options: AppOptions;
-
   llmModelCache: Record<
     AiProviderId,
     {
       models: AppLLMModelOption[];
     }
   >;
-
-  // Translate (UI preference)
   translateOption: TranslateOptionId;
   translateTargetLanguage: string | null;
-
   pageTranslateOptions: PageTranslateOptions;
+}
 
-  pageTranslateParagraphCandidates: PageTranslateParagraphCandidate[];
-  pageTranslateSelectedParagraphIds: string[];
+export type SidebarTab = "thumbnails" | "outline" | "fields" | "annotations";
+export type RightPanelTab =
+  | "document"
+  | "properties"
+  | "ai_chat"
+  | "page_translate";
 
-  // Dialog State
-  activeDialog: "shortcuts" | "settings" | "close_confirm" | null;
-  closeConfirmSource: "menu" | "window" | null;
-
-  // Status
-  lastSavedAt: Date | null;
-
-  // UI State
-  processingStatus: string | null;
+export interface EditorUiViewState {
+  activeDialog: "shortcuts" | "settings" | null;
   isPanelFloating: boolean;
-  isSaving: boolean;
   pageLayout: PageLayoutMode;
   pageFlow: PageFlowDirection;
   isFullscreen: boolean;
   isSidebarOpen: boolean;
   isRightPanelOpen: boolean;
-  rightPanelTab: string;
-  rightPanelDockTab: string[];
-  sidebarTab: string;
-  isDirty: boolean;
-  currentPageIndex: number;
-  pendingViewStateRestore: {
-    scale: number;
-    scrollLeft: number;
-    scrollTop: number;
-  } | null;
+  rightPanelTab: RightPanelTab;
+  sidebarTab: SidebarTab;
   sidebarWidth: number;
   rightPanelWidth: number;
-  fitTrigger: number;
-
-  // Keyboard State
-  keys: {
-    ctrl: boolean;
-    shift: boolean;
-    alt: boolean;
-    meta: boolean;
-    space: boolean;
-  };
-
-  // Command Signal
-  actionSignal: {
-    type:
-      | "UNDO"
-      | "REDO"
-      | "SAVE"
-      | "PRINT"
-      | "DELETE"
-      | "ESCAPE"
-      | "COPY"
-      | "PASTE"
-      | "CUT"
-      | "MOVE_UP"
-      | "MOVE_DOWN"
-      | "MOVE_LEFT"
-      | "MOVE_RIGHT"
-      | "MOVE_UP_FAST"
-      | "MOVE_DOWN_FAST"
-      | "MOVE_LEFT_FAST"
-      | "MOVE_RIGHT_FAST";
-    id: number;
-  } | null;
 }
+
+export interface DocumentResourceState {
+  thumbnailImages: Record<number, string>;
+}
+
+export type EditorState = DocumentState &
+  EditorPreferencesState &
+  EditorUiViewState &
+  DocumentResourceState;
 
 // Workspace rendering only needs a focused subset of the editor state.
 // Keeping this hot-path contract explicit helps us avoid subscribing the
@@ -695,5 +692,4 @@ export type EditorUiState = Pick<
   | "translateTargetLanguage"
   | "pageTranslateOptions"
   | "options"
-  | "rightPanelDockTab"
 >;

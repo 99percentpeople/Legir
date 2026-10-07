@@ -361,7 +361,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
     )
     .promptInstructions(HIGHLIGHT_RESULTS_TOOL_PROMPTS)
     .inputSchema(highlightResultsArgsSchema)
-    .build(async ({ args, ctx: toolCtx }) => {
+    .build(async ({ args, ctx: toolCtx, signal }) => {
       const resultIds = args.result_ids.map((id) => id.trim());
       const annotationText = args.annotation_text?.trim() || undefined;
       const batchStyle = toAnnotationStyleInput(args.style);
@@ -399,6 +399,7 @@ export const annotationToolModule = defineToolModule((_ctx) => ({
       }
 
       const result = await toolCtx.createSearchHighlightAnnotations({
+        signal,
         ...(resultIds.length > 0 ? { resultIds } : null),
         ...(annotationText ? { annotationText } : null),
         ...(batchStyle ? { style: batchStyle } : null),

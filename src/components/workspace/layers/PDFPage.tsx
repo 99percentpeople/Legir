@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { PageData, PDFSearchResult } from "@/types";
-import { useEditorStore } from "@/store/useEditorStore";
+import { usePreferencesStore } from "@/store/preferencesStore";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { getWorkspaceRenderMetrics } from "../lib/renderPerformance";
 import PDFCanvasLayer from "./PDFCanvasLayer";
@@ -42,10 +42,10 @@ const PDFPage: React.FC<PDFPageProps> = ({
   const [debugOverlayHost, setDebugOverlayHost] = useState<HTMLElement | null>(
     null,
   );
-  const pdfZoomRenderTimingDebug = useEditorStore(
+  const pdfZoomRenderTimingDebug = usePreferencesStore(
     (s) => s.options.debugOptions.pdfZoomRenderTiming,
   );
-  const disablePdfTextLayer = useEditorStore(
+  const disablePdfTextLayer = usePreferencesStore(
     (s) => s.options.debugOptions.disablePdfTextLayer,
   );
   const wasDebugEnabledRef = useRef(pdfZoomRenderTimingDebug);

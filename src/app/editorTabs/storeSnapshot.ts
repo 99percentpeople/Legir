@@ -1,25 +1,24 @@
 import { normalizeControlLayerOrders } from "@/lib/controlLayerOrder";
 import { prepareAnnotationsForStore } from "@/lib/inkGeometry";
 import { initialState } from "@/store/helpers";
-import { useEditorStore } from "@/store/useEditorStore";
-import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type {
   Annotation,
   EditorSaveTarget,
   EditorState,
+  DocumentState,
   FormField,
   PDFMetadata,
   PreservedSourceAnnotationRef,
 } from "@/types";
 import type { LoadedPdfDocument } from "@/services/pdfService";
-import type { EditorTabSnapshot } from "./types";
+import type { EditorTabSnapshot, EditorTabSession } from "./types";
 
 const WINDOW_ID_FALLBACK = "tab";
 
 const createShallowArrayCopy = <T>(value: T[]) => [...value];
 
 const createPendingViewStateSnapshot = (
-  state: EditorState,
+  state: DocumentState,
   scrollContainer: HTMLElement | null,
 ) => {
   if (state.pages.length === 0) return null;
@@ -68,7 +67,7 @@ export const createEditorTabId = () =>
   `${WINDOW_ID_FALLBACK}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 export const createEditorTabSnapshotFromState = (options: {
-  state: EditorState;
+  state: DocumentState;
   scrollContainer: HTMLElement | null;
 }): EditorTabSnapshot => {
   const { state } = options;
@@ -103,13 +102,7 @@ export const createEditorTabSnapshotFromState = (options: {
     documentLoadError: state.documentLoadError,
     mode: state.mode,
     tool: state.tool,
-    penStyle: { ...state.penStyle },
-    highlightStyle: state.highlightStyle
-      ? { ...state.highlightStyle }
-      : undefined,
-    commentStyle: state.commentStyle ? { ...state.commentStyle } : undefined,
-    freetextStyle: state.freetextStyle ? { ...state.freetextStyle } : undefined,
-    shapeStyle: state.shapeStyle ? { ...state.shapeStyle } : undefined,
+
     selectedId: state.selectedId,
     scale: state.scale,
     past: createShallowArrayCopy(state.past),
@@ -120,9 +113,7 @@ export const createEditorTabSnapshotFromState = (options: {
           data: state.clipboard.data,
         }
       : null,
-    translateOption: state.translateOption,
-    translateTargetLanguage: state.translateTargetLanguage,
-    pageTranslateOptions: { ...state.pageTranslateOptions },
+
     pageTranslateParagraphCandidates: createShallowArrayCopy(
       state.pageTranslateParagraphCandidates,
     ),
@@ -130,22 +121,14 @@ export const createEditorTabSnapshotFromState = (options: {
       state.pageTranslateSelectedParagraphIds,
     ),
     lastSavedAt: state.lastSavedAt ? new Date(state.lastSavedAt) : null,
-    isPanelFloating: state.isPanelFloating,
-    pageLayout: state.pageLayout,
-    pageFlow: state.pageFlow,
-    isSidebarOpen: state.isSidebarOpen,
-    isRightPanelOpen: state.isRightPanelOpen,
-    rightPanelTab: state.rightPanelTab,
-    rightPanelDockTab: createShallowArrayCopy(state.rightPanelDockTab),
-    sidebarTab: state.sidebarTab,
+
     isDirty: state.isDirty,
     currentPageIndex: state.currentPageIndex,
     pendingViewStateRestore: createPendingViewStateSnapshot(
       state,
       options.scrollContainer,
     ),
-    sidebarWidth: state.sidebarWidth,
-    rightPanelWidth: state.rightPanelWidth,
+
     fitTrigger: state.fitTrigger,
   };
 };
@@ -220,17 +203,15 @@ export const createLoadedEditorTabSnapshot = (options: {
   };
 };
 
-export const applyHydratedPdfDocumentToSnapshot = (
-  snapshot: EditorTabSnapshot,
+export const hydratedPdfDocumentPatch = (
   document: LoadedPdfDocument,
-): EditorTabSnapshot => {
+): Partial<DocumentState> => {
   const normalized = normalizeControlLayerOrders(
     document.fields,
     prepareAnnotationsForStore(document.annotations),
   );
 
   return {
-    ...snapshot,
     metadata: {
       ...document.metadata,
       documentPermissions: { ...document.documentPermissions },
@@ -250,56 +231,10 @@ export const applyHydratedPdfDocumentToSnapshot = (
   };
 };
 
-export const restoreEditorTabSnapshot = (
-  snapshot: EditorTabSnapshot,
-  options?: {
-    isFullscreen?: boolean;
-    thumbnailImages?: Record<number, string>;
-    workerService?: PDFWorkerService;
-  },
-) => {
-  const store = useEditorStore.getState();
-  const thumbnailImages = options?.thumbnailImages ?? {};
-
-  store.setState({
-    ...snapshot,
-    documentPermissions: snapshot.documentPermissions ?? null,
-    documentLoadState: snapshot.documentLoadState ?? "ready",
-    documentLoadError: snapshot.documentLoadError ?? null,
-    sourceDocumentPermissions:
-      snapshot.sourceDocumentPermissions ??
-      snapshot.documentPermissions ??
-      null,
-    pdfOwnerUnlocked: snapshot.pdfOwnerUnlocked ?? false,
-    pdfOwnerPassword: snapshot.pdfOwnerPassword ?? null,
-    preservePdfOwnerRestrictionsOnSave:
-      snapshot.preservePdfOwnerRestrictionsOnSave ?? true,
-    metadata: {
-      ...snapshot.metadata,
-      documentPermissions:
-        snapshot.metadata.documentPermissions ??
-        snapshot.documentPermissions ??
-        null,
-    },
-    dirtyPermissionScopes:
-      snapshot.dirtyPermissionScopes ?? initialState.dirtyPermissionScopes,
-    thumbnailImages,
-    activeDialog: null,
-    actionSignal: null,
-    closeConfirmSource: null,
-    isFullscreen: options?.isFullscreen ?? store.isFullscreen,
-    isProcessing: false,
-    isSaving: false,
-    keys: { ...initialState.keys },
-    llmModelCache: store.llmModelCache,
-    options: store.options,
-    processingStatus: null,
+export const getEditorTabTitle = (session: EditorTabSession) =>
+  getEditorTabDisplayTitle(session.runtime.store.document.getState().filename);
+export const getEditorTabSnapshot = (session: EditorTabSession) =>
+  createEditorTabSnapshotFromState({
+    state: session.runtime.store.document.getState(),
+    scrollContainer: session.runtime.scrollContainer,
   });
-
-  if (
-    snapshot.documentLoadState === "ready" &&
-    Object.keys(thumbnailImages).length < snapshot.pages.length
-  ) {
-    store.warmupThumbnails(options?.workerService);
-  }
-};

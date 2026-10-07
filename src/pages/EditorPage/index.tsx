@@ -20,7 +20,10 @@ import { TranslationFloatingWindow } from "@/components/workspace/widgets/Transl
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
-import { appEventBus } from "@/lib/eventBus";
+import {
+  useEditorEventBus,
+  useEditorTabIsActive,
+} from "@/app/editorTabs/context";
 import {
   exitPlatformFullscreen,
   setPlatformFullscreen,
@@ -30,12 +33,14 @@ import {
   selectEditorPageState,
   selectHasSelectedControl,
 } from "@/store/selectors";
-import { useEditorStore } from "@/store/useEditorStore";
+import {
+  useEditorView as useDocumentState,
+  useEditorViewApi,
+} from "@/store/useEditorView";
 import type { EditorState, PDFSearchResult, Tool } from "@/types";
 import { EditorCanvasPane } from "./EditorCanvasPane";
 import { EditorControllerProviders } from "./EditorControllerProviders";
 import { EditorRightPanelSkeleton } from "./components/EditorRightPanelSkeleton";
-import { EditorTabStrip } from "./components/EditorTabStrip";
 import { useEditorPageLifecycle } from "./hooks/useEditorPageLifecycle";
 import {
   EditorRightPanel,
@@ -43,8 +48,11 @@ import {
 } from "./rightPanelModules";
 
 const EditorPage: React.FC = () => {
-  const state = useEditorStore(useShallow(selectEditorPageState));
-  const hasSelectedControl = useEditorStore(selectHasSelectedControl);
+  const appEventBus = useEditorEventBus();
+  const isActive = useEditorTabIsActive();
+  const useEditorView = useEditorViewApi();
+  const state = useDocumentState(useShallow(selectEditorPageState));
+  const hasSelectedControl = useDocumentState(selectHasSelectedControl);
   const { activeTabId, hasDirtyTabs } = useEditorPageTabsRuntime();
   const documentCommands = useEditorDocumentCommandsRuntime();
   const permissionUi = usePdfPermissionUi(state.documentPermissions);
@@ -52,7 +60,10 @@ const EditorPage: React.FC = () => {
   // Keep the responsive default for explicit mode changes and resets, but do
   // not synchronize it to the active tool when the viewport width changes.
   const defaultTool: Tool = isMobile ? "pan" : "select";
-  const prevSelectedIdRef = React.useRef<string | null>(null);
+  const previousSelectionRef = React.useRef({
+    selectedId: state.selectedId,
+    hasSelectedControl,
+  });
 
   const [isTranslateOpen, setIsTranslateOpen] = React.useState(false);
   const [translateSourceText, setTranslateSourceText] = React.useState("");
@@ -98,7 +109,7 @@ const EditorPage: React.FC = () => {
   }, [state.setEditorFullscreen]);
 
   const toggleFullscreen = React.useCallback(() => {
-    const next = !useEditorStore.getState().isFullscreen;
+    const next = !useEditorView.getState().isFullscreen;
     void setEditorFullscreen(next);
   }, [setEditorFullscreen]);
 
@@ -109,12 +120,6 @@ const EditorPage: React.FC = () => {
     })();
   }, [documentCommands.exit, exitEditorFullscreen]);
 
-  React.useEffect(() => {
-    return () => {
-      void exitEditorFullscreen();
-    };
-  }, [exitEditorFullscreen]);
-
   React.useEffect(
     () =>
       subscribePlatformFullscreenChange((isFullscreen) => {
@@ -124,7 +129,7 @@ const EditorPage: React.FC = () => {
   );
 
   const runPrimarySaveAction = React.useCallback(async () => {
-    if (!useEditorStore.getState().isDirty) return true;
+    if (!useEditorView.getState().isDirty) return true;
     return await documentCommands.save();
   }, [documentCommands.save]);
 
@@ -155,20 +160,9 @@ const EditorPage: React.FC = () => {
   useAppEvent("workspace:askAi", openAiChatPanel);
 
   React.useEffect(() => {
-    state.setUiState((prev) => {
-      const hasTranslateDock = prev.rightPanelDockTab?.includes("translate");
-      if (isTranslateOpen === hasTranslateDock) return prev;
-      return {
-        rightPanelDockTab: isTranslateOpen
-          ? [...(prev.rightPanelDockTab ?? []), "translate"]
-          : (prev.rightPanelDockTab ?? []).filter((tab) => tab !== "translate"),
-      };
-    });
-  }, [isTranslateOpen, state.setUiState]);
-
-  React.useEffect(() => {
-    state.setPanelFloating(isMobile);
+    if (isActive) state.setPanelFloating(isMobile);
   }, [
+    isActive,
     isMobile,
     state.isSidebarOpen,
     state.isRightPanelOpen,
@@ -176,12 +170,24 @@ const EditorPage: React.FC = () => {
   ]);
 
   React.useEffect(() => {
-    state.syncPanelSelection(prevSelectedIdRef.current);
-    prevSelectedIdRef.current = state.selectedId;
+    const previous = previousSelectionRef.current;
+    previousSelectionRef.current = {
+      selectedId: state.selectedId,
+      hasSelectedControl,
+    };
+    // Only a selection change in the foreground document may change the
+    // shared panel. Mounting/activating a tab must preserve the chosen panel.
+    if (
+      isActive &&
+      (previous.selectedId !== state.selectedId ||
+        previous.hasSelectedControl !== hasSelectedControl)
+    ) {
+      state.syncPanelSelection(previous.selectedId);
+    }
   }, [
+    isActive,
     state.selectedId,
     hasSelectedControl,
-    state.rightPanelTab,
     state.syncPanelSelection,
   ]);
 
@@ -253,7 +259,7 @@ const EditorPage: React.FC = () => {
   }, [state.zoomBy]);
 
   const handleFitWidth = React.useCallback(() => {
-    const liveState = useEditorStore.getState();
+    const liveState = useEditorView.getState();
     state.fitToScale(
       calculateWorkspaceFitWidthScale({
         pages: liveState.pages,
@@ -266,7 +272,7 @@ const EditorPage: React.FC = () => {
   }, [getWorkspaceViewport, state.fitToScale]);
 
   const handleFitScreen = React.useCallback(() => {
-    const liveState = useEditorStore.getState();
+    const liveState = useEditorView.getState();
     state.fitToScale(
       calculateWorkspaceFitScreenScale({
         pages: liveState.pages,
@@ -335,7 +341,6 @@ const EditorPage: React.FC = () => {
       onToggleFullscreen={toggleFullscreen}
     >
       <EditorShellCommandsProvider value={shellCommands}>
-        <EditorTabStrip />
         <Toolbar />
 
         <div className="relative flex flex-1 overflow-hidden">
@@ -356,8 +361,13 @@ const EditorPage: React.FC = () => {
           <RightPanelTabDock
             activeTabs={
               state.isRightPanelOpen
-                ? [state.rightPanelTab, ...state.rightPanelDockTab]
-                : [...state.rightPanelDockTab]
+                ? [
+                    state.rightPanelTab,
+                    ...(isTranslateOpen ? ["translate" as const] : []),
+                  ]
+                : isTranslateOpen
+                  ? ["translate"]
+                  : []
             }
             isFloating={state.isPanelFloating}
             rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
@@ -367,7 +377,7 @@ const EditorPage: React.FC = () => {
               "create_annotation",
             ])}
             onSelectTab={(tab) => {
-              state.openRightPanel(tab);
+              if (tab !== "translate") state.openRightPanel(tab);
             }}
           />
 

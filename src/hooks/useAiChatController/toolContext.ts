@@ -1,6 +1,10 @@
 import type { MutableRefObject } from "react";
 
-import { appEventBus } from "@/lib/eventBus";
+import {
+  appEventBus as defaultEventBus,
+  type EventBus,
+  type AppEventMap,
+} from "@/lib/eventBus";
 import { ANNOTATION_STYLES, DEFAULT_FIELD_STYLE } from "@/constants";
 import { getNextLayerOrderForPage } from "@/lib/controlLayerOrder";
 import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
@@ -21,7 +25,10 @@ import {
   isOpenLineShapeType,
   shapeSupportsFill,
 } from "@/lib/shapeGeometry";
-import { useEditorStore } from "@/store/useEditorStore";
+import {
+  useEditorView as defaultEditorStore,
+  type EditorViewApi,
+} from "@/store/useEditorView";
 import {
   pdfWorkerService,
   type PDFWorkerService,
@@ -257,10 +264,12 @@ const serializeTypeCounts = <TType extends string>(
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([type, count]) => ({ type, count }));
 
-const summarizeDocumentPageAssets = (): {
+const summarizeDocumentPageAssets = (
+  useEditorView: EditorViewApi,
+): {
   pageAssetSummary: AiDocumentPageAssetSummary[];
 } => {
-  const store = useEditorStore.getState();
+  const store = useEditorView.getState();
   const pageAssetSummary = Array.from(
     { length: store.pages.length },
     (_, index) => ({
@@ -1322,17 +1331,27 @@ export const createAiChatToolContext = (options: {
   selectedChatModel?: SelectedChatModelMeta;
   selectedChatModelAuthor: string;
   workerService?: PDFWorkerService;
+  store?: EditorViewApi;
+  events?: EventBus<AppEventMap>;
+  documentId?: string;
 }) => {
+  const useEditorView = options.store ?? defaultEditorStore;
+  const appEventBus = options.events ?? defaultEventBus;
   const workerService = options.workerService ?? pdfWorkerService;
   const searchResultGeometryCache = new Map<string, PdfTextRangeGeometry>();
-  const getDocumentPageAssetSummary = () => summarizeDocumentPageAssets();
+  const getDocumentPageAssetSummary = () =>
+    summarizeDocumentPageAssets(useEditorView);
   const getActiveSession = () =>
     options.sessionsRef.current.get(options.activeSessionIdRef.current) ?? null;
 
-  const resolveSearchResultGeometry = (result: PDFSearchResult) =>
+  const resolveSearchResultGeometry = (
+    result: PDFSearchResult,
+    signal?: AbortSignal,
+  ) =>
     resolvePdfSearchResultGeometry({
       result,
-      pages: useEditorStore.getState().pages,
+      signal,
+      pages: useEditorView.getState().pages,
       cache: searchResultGeometryCache,
       getTextContent: (pageIndex, signal) =>
         workerService.getTextContent({ pageIndex, signal }),
@@ -1341,7 +1360,7 @@ export const createAiChatToolContext = (options: {
   const updateDocumentMetadata = (
     updates: Partial<PDFMetadata>,
   ): AiDocumentMetadataUpdateResult => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     if (!store.pdfBytes) {
       throw new Error("No PDF is currently loaded.");
     }
@@ -1363,7 +1382,7 @@ export const createAiChatToolContext = (options: {
       ok: true,
       status: "updated",
       updatedFields,
-      metadata: useEditorStore.getState().metadata,
+      metadata: useEditorView.getState().metadata,
     };
   };
 
@@ -1371,7 +1390,7 @@ export const createAiChatToolContext = (options: {
     password: string;
     preserveOwnerRestrictionsOnSave?: boolean;
   }): Promise<AiPdfPermissionUnlockResult> => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const result = await store.unlockPdfOwnerRestrictions(input.password, {
       preserveOwnerRestrictionsOnSave: input.preserveOwnerRestrictionsOnSave,
     });
@@ -1396,6 +1415,7 @@ export const createAiChatToolContext = (options: {
     return results.map((result, index) => {
       const id = `ai_sr_${batch}_${result.pageIndex}_${index}`;
       options.searchResultsRef.current.set(id, {
+        documentId: options.documentId,
         id,
         query,
         result,
@@ -1428,7 +1448,7 @@ export const createAiChatToolContext = (options: {
       Math.max(1, Math.trunc(optionsInput.maxResults ?? 100) || 100),
     );
 
-    const fields = [...useEditorStore.getState().fields]
+    const fields = [...useEditorView.getState().fields]
       .sort((a, b) => {
         if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex;
         if (a.rect.y !== b.rect.y) return a.rect.y - b.rect.y;
@@ -1458,7 +1478,7 @@ export const createAiChatToolContext = (options: {
   const fillFormFields = (optionsInput: {
     updates: AiFormFieldFillRequest[];
   }): AiFormFieldFillResult => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const fields = store.fields;
     const fieldById = new Map(fields.map((field) => [field.id, field]));
     const reservedFieldIds = new Set<string>();
@@ -1700,7 +1720,7 @@ export const createAiChatToolContext = (options: {
   const updateFormFields = (optionsInput: {
     updates: AiUpdateFormFieldInput[];
   }): AiFormFieldUpdateResult => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const fields = store.fields;
     const fieldById = new Map(fields.map((field) => [field.id, field]));
     const reservedFieldIds = new Set<string>();
@@ -1992,7 +2012,7 @@ export const createAiChatToolContext = (options: {
       };
     }
 
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const results: AiCreateFormFieldsResultItem[] = [];
     const candidates: Array<{
       field: FormField;
@@ -2156,12 +2176,12 @@ export const createAiChatToolContext = (options: {
   };
 
   const focusControl = (id: string, optionsInput?: { select?: boolean }) => {
-    const field = useEditorStore
+    const field = useEditorView
       .getState()
       .fields.find((item) => item.id === id);
     if (field) {
       if (optionsInput?.select) {
-        useEditorStore.getState().selectControl(id);
+        useEditorView.getState().selectControl(id);
       }
       appEventBus.emit("workspace:focusControl", {
         id,
@@ -2174,7 +2194,7 @@ export const createAiChatToolContext = (options: {
       };
     }
 
-    const annotation = useEditorStore
+    const annotation = useEditorView
       .getState()
       .annotations.find((item) => item.id === id);
     if (!annotation) return null;
@@ -2183,7 +2203,7 @@ export const createAiChatToolContext = (options: {
     if (!summary) return null;
 
     if (optionsInput?.select) {
-      useEditorStore.getState().selectControl(id);
+      useEditorView.getState().selectControl(id);
     }
     appEventBus.emit("workspace:focusControl", {
       id,
@@ -2197,7 +2217,13 @@ export const createAiChatToolContext = (options: {
   };
 
   const getStoredSearchResult = (id: string) =>
-    options.searchResultsRef.current.get(id) ?? null;
+    (() => {
+      const result = options.searchResultsRef.current.get(id);
+      return result &&
+        (!options.documentId || result.documentId === options.documentId)
+        ? result
+        : null;
+    })();
 
   const setActiveHighlightedResultIds = (ids: string[]) => {
     const unique = Array.from(new Set(ids));
@@ -2222,7 +2248,7 @@ export const createAiChatToolContext = (options: {
     types?: AiAnnotationKind[];
     maxResults?: number;
   }): AiAnnotationListResult => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const selectedTypes = (optionsInput.types ?? []).filter(
       (type): type is AnnotationListType =>
         ANNOTATION_LIST_TYPES.includes(type as AnnotationListType),
@@ -2250,7 +2276,7 @@ export const createAiChatToolContext = (options: {
     annotationId: string;
     text: string;
   }): AiAnnotationTextUpdateResult => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const annotation = store.annotations.find(
       (item) => item.id === optionsInput.annotationId,
     );
@@ -2318,7 +2344,7 @@ export const createAiChatToolContext = (options: {
 
     let savedCheckpoint = false;
     for (const item of pendingUpdates) {
-      const currentStore = useEditorStore.getState();
+      const currentStore = useEditorView.getState();
       const annotation = currentStore.annotations.find(
         (candidate) => candidate.id === item.annotationId,
       );
@@ -2379,7 +2405,7 @@ export const createAiChatToolContext = (options: {
   const updateAnnotations = (optionsInput: {
     updates: AiUpdateAnnotationInput[];
   }): AiAnnotationUpdateResult => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const annotationById = new Map(
       store.annotations.map((annotation) => [annotation.id, annotation]),
     );
@@ -2566,7 +2592,7 @@ export const createAiChatToolContext = (options: {
   const createFreetextAnnotations = (optionsInput: {
     annotations: AiCreateFreetextAnnotationInput[];
   }): AiCreateAnnotationsResult => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const freetextDefaults = store.freetextStyle || ANNOTATION_STYLES.freetext;
     const modelMeta = buildSelectedChatModelMeta(options.selectedChatModel);
     const createdAt = new Date().toISOString();
@@ -2699,7 +2725,7 @@ export const createAiChatToolContext = (options: {
   const createShapeAnnotations = (optionsInput: {
     annotations: AiCreateShapeAnnotationInput[];
   }): AiCreateAnnotationsResult => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const shapeDefaults = store.shapeStyle || ANNOTATION_STYLES.shape;
     const modelMeta = buildSelectedChatModelMeta(options.selectedChatModel);
     const createdAt = new Date().toISOString();
@@ -2867,6 +2893,7 @@ export const createAiChatToolContext = (options: {
   };
 
   const createSearchHighlightAnnotations = async (optionsInput: {
+    signal?: AbortSignal;
     resultIds?: string[];
     annotationText?: string;
     style?: AiAnnotationStyleInput;
@@ -2883,7 +2910,8 @@ export const createAiChatToolContext = (options: {
       annotationText?: string;
     }>;
   }): Promise<AiHighlightAnnotationCreateResult> => {
-    const store = useEditorStore.getState();
+    optionsInput.signal?.throwIfAborted();
+    const store = useEditorView.getState();
     const existingResultIds = new Set(
       store.annotations.flatMap((annotation) => {
         if (annotation.meta?.kind !== "ai_search_highlight") return [];
@@ -2945,31 +2973,40 @@ export const createAiChatToolContext = (options: {
       number,
       ReturnType<typeof serializePageTextContent> | null
     >();
-    const latestSelectionAttachments = (
-      options.sessionsRef.current.get(options.activeSessionIdRef.current)
-        ?.timeline ?? []
-    )
-      .flatMap((item) =>
-        item.kind === "message" && item.role === "user"
-          ? (item.attachments ?? [])
-          : [],
-      )
-      .filter(
-        (attachment): attachment is AiChatSelectionAttachment =>
-          attachment.kind === "workspace_selection",
+    // Attachment indices are per message, including non-selection attachments.
+    // Never resolve index 1 against an earlier document's message in global chat.
+    const latestAttachmentMessage = [
+      ...(options.sessionsRef.current.get(options.activeSessionIdRef.current)
+        ?.timeline ?? []),
+    ]
+      .reverse()
+      .find(
+        (item) =>
+          item.kind === "message" &&
+          item.role === "user" &&
+          item.attachments?.length,
       );
     const selectionAttachmentByIndex = new Map(
-      latestSelectionAttachments.map((attachment, index) => [
-        index + 1,
-        attachment,
-      ]),
+      (latestAttachmentMessage?.kind === "message"
+        ? (latestAttachmentMessage.attachments ?? [])
+        : []
+      ).flatMap((attachment, index) =>
+        attachment.kind === "workspace_selection"
+          ? [[index + 1, attachment] as const]
+          : [],
+      ),
     );
 
     const loadPageTextContent = async (pageIndex: number) => {
       if (pageTextContentCache.has(pageIndex)) {
         return pageTextContentCache.get(pageIndex) ?? null;
       }
-      const textContent = await workerService.getTextContent({ pageIndex });
+      const textContent = await workerService.getTextContent({
+        pageIndex,
+        signal: optionsInput.signal,
+      });
+      optionsInput.signal?.throwIfAborted();
+      useEditorView.getState(); // Revalidate ownership after worker I/O.
       pageTextContentCache.set(pageIndex, textContent);
       return textContent;
     };
@@ -3007,7 +3044,7 @@ export const createAiChatToolContext = (options: {
       });
 
     for (const resultId of requestedResultIds) {
-      const stored = options.searchResultsRef.current.get(resultId);
+      const stored = getStoredSearchResult(resultId);
       if (!stored) {
         missingCount += 1;
         missingResultIds.push(resultId);
@@ -3018,7 +3055,10 @@ export const createAiChatToolContext = (options: {
         continue;
       }
 
-      const geometry = await resolveSearchResultGeometry(stored.result);
+      const geometry = await resolveSearchResultGeometry(
+        stored.result,
+        optionsInput.signal,
+      );
       if (!geometry) {
         missingCount += 1;
         missingResultIds.push(resultId);
@@ -3066,7 +3106,10 @@ export const createAiChatToolContext = (options: {
       );
       const effectiveAnnotationText =
         requestedSelectionAnchor.annotationText?.trim() || annotationText;
-      if (!attachment) {
+      if (
+        !attachment ||
+        (options.documentId && attachment.documentId !== options.documentId)
+      ) {
         missingCount += 1;
         missingSelectionAnchors.push({
           attachmentIndex: requestedSelectionAnchor.attachmentIndex,
@@ -3385,8 +3428,10 @@ export const createAiChatToolContext = (options: {
       existingDocumentAnchorKeys.add(documentAnchorKey);
     }
 
+    optionsInput.signal?.throwIfAborted();
+    const currentStore = useEditorView.getState();
     if (batch.length > 0) {
-      store.addAnnotations(batch, { select: false });
+      currentStore.addAnnotations(batch, { select: false });
     }
 
     clearActiveHighlightedResultIds();
@@ -3413,7 +3458,7 @@ export const createAiChatToolContext = (options: {
   const deleteAnnotations = (optionsInput: {
     annotationIds: string[];
   }): AiAnnotationDeleteBatchResult => {
-    const currentStore = useEditorStore.getState();
+    const currentStore = useEditorView.getState();
     const requestedAnnotationIds = Array.from(
       new Set(
         optionsInput.annotationIds
@@ -3491,7 +3536,7 @@ export const createAiChatToolContext = (options: {
   };
 
   const clearSearchHighlights = () => {
-    const store = useEditorStore.getState();
+    const store = useEditorView.getState();
     const aiHighlightIds = store.annotations
       .filter(
         (annotation) =>
@@ -3530,8 +3575,13 @@ export const createAiChatToolContext = (options: {
     });
   };
 
-  const focusSearchResult = async (result: PDFSearchResult) => {
-    const geometry = await resolveSearchResultGeometry(result);
+  const focusSearchResult = async (
+    result: PDFSearchResult,
+    signal?: AbortSignal,
+  ) => {
+    const geometry = await resolveSearchResultGeometry(result, signal);
+    signal?.throwIfAborted();
+    useEditorView.getState(); // The tab may have closed while geometry was resolving.
     if (!geometry) {
       navigatePage(result.pageIndex);
       return;

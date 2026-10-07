@@ -1,4 +1,4 @@
-import { useEditorStore } from "@/store/useEditorStore";
+import { preferencesStore } from "@/store/preferencesStore";
 import { fetchWithApiProxy } from "@/services/platform/apiProxy";
 import type { LLMModelCapabilities, TranslateOptionId } from "@/types";
 
@@ -60,7 +60,7 @@ export interface TranslateTextOptions {
 }
 
 const getCloudTranslationApiKey = () =>
-  useEditorStore.getState().options.translation.googleCloud.apiKey.trim();
+  preferencesStore.getState().options.translation.googleCloud.apiKey.trim();
 
 const decodeHtmlEntities = (text: string) => {
   if (typeof document === "undefined") return text;
@@ -93,7 +93,7 @@ class CloudTranslateV2 {
     }
 
     const res = await fetchWithApiProxy(
-      useEditorStore.getState().options,
+      preferencesStore.getState().options,
       `https://translation.googleapis.com/language/translate/v2/languages?key=${encodeURIComponent(
         apiKey,
       )}&target=en`,
@@ -127,7 +127,7 @@ class CloudTranslateV2 {
     }
 
     const res = await fetchWithApiProxy(
-      useEditorStore.getState().options,
+      preferencesStore.getState().options,
       `https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(
         apiKey,
       )}`,

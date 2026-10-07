@@ -1,9 +1,10 @@
+import { useWorkspaceStore } from "@/store/workspaceStore";
 import React from "react";
 
 import { selectRightPanelShellState } from "@/store/selectors";
 import { EditorPropertiesRightPanel } from "./EditorPropertiesRightPanel";
 import { EditorRightPanelSkeleton } from "./components/EditorRightPanelSkeleton";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import type { PDFSearchResult } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -20,7 +21,16 @@ export function EditorRightPanel({
     highlights: Map<number, PDFSearchResult[]>,
   ) => void;
 }) {
-  const state = useEditorStore(useShallow(selectRightPanelShellState));
+  const documentState = useEditorView(useShallow(selectRightPanelShellState));
+  const panel = useWorkspaceStore((state) => state.layout.rightPanel);
+  const isPanelFloating = useWorkspaceStore((state) => state.isPanelFloating);
+  const state = {
+    ...documentState,
+    rightPanelTab: panel.tab,
+    isRightPanelOpen: panel.open,
+    rightPanelWidth: panel.width,
+    isPanelFloating,
+  };
   const canRenderRightPanel =
     state.mode === "form" ||
     state.mode === "annotation" ||

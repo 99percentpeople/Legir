@@ -1,8 +1,8 @@
 import React from "react";
-import { appEventBus } from "@/lib/eventBus";
+import { useEditorEventBus } from "@/app/editorTabs/context";
 import { findPdfSearchResults, type PDFSearchMode } from "@/lib/pdfSearch";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorViewApi } from "@/store/useEditorView";
 import type { EditorState, PDFSearchResult } from "@/types";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
 import {
@@ -31,6 +31,8 @@ export function usePdfSearchController({
   highlightedSearchResultsByPage,
   t,
 }: UsePdfSearchControllerOptions) {
+  const useEditorView = useEditorViewApi();
+  const appEventBus = useEditorEventBus();
   const [isPdfSearchOpen, setIsPdfSearchOpen] = React.useState(false);
   const [pdfSearchQuery, setPdfSearchQuery] = React.useState("");
   const [pdfSearchResults, setPdfSearchResults] = React.useState<
@@ -71,7 +73,7 @@ export function usePdfSearchController({
     new Map<string, PdfTextRangeGeometry>(),
   );
   const pdfSearchViewportStateRef = React.useRef({
-    currentPageIndex: useEditorStore.getState().currentPageIndex,
+    currentPageIndex: useEditorView.getState().currentPageIndex,
   });
   const pendingPdfSearchPreferredSelectionRef = React.useRef<{
     query: string;
@@ -83,7 +85,7 @@ export function usePdfSearchController({
 
   React.useEffect(
     () =>
-      useEditorStore.subscribe(
+      useEditorView.subscribe(
         (state) => state.currentPageIndex,
         (currentPageIndex) => {
           pdfSearchViewportStateRef.current.currentPageIndex = currentPageIndex;

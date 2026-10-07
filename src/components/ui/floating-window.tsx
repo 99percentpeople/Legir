@@ -12,6 +12,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 import { resetGlobalCursor, setGlobalCursor } from "@/lib/cursor";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 
 export interface FloatingWindowRenderContext {
   width: number;
@@ -59,6 +60,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   defaultPosition = "center",
   className,
 }) => {
+  const isTabActive = useEditorTabIsActive();
   const windowRef = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(
     null,
@@ -440,6 +442,8 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   return createPortal(
     <div
       ref={setWindowEl}
+      inert={!isTabActive}
+      aria-hidden={!isTabActive}
       className={cn(
         "bg-background fixed z-40 flex flex-col overflow-visible rounded-lg border shadow-xl",
         className,
@@ -449,6 +453,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
         top: pos.top,
         width: size.width,
         height: size.height,
+        visibility: isTabActive ? "visible" : "hidden",
       }}
       onPointerDown={(e) => {
         e.stopPropagation();

@@ -7,7 +7,10 @@ import {
   type RefObject,
 } from "react";
 import { useEventListener } from "@/hooks/useEventListener";
-import { appEventBus } from "@/lib/eventBus";
+import {
+  useEditorEventBus,
+  useEditorElementById,
+} from "@/app/editorTabs/context";
 import { resetGlobalCursor, setGlobalCursor } from "@/lib/cursor";
 import {
   PDF_TEXT_SELECTION_HANDLE_DOT_SIZE_PX,
@@ -66,6 +69,8 @@ export const useTextLayerSelection = (opts: {
   renderedScale: number | null;
   isInView: boolean;
 }) => {
+  const appEventBus = useEditorEventBus();
+  const getElementById = useEditorElementById();
   const {
     pageIndex,
     textLayerRef,
@@ -104,7 +109,7 @@ export const useTextLayerSelection = (opts: {
   useEffect(() => {
     setPagePortalEl(
       (typeof document !== "undefined"
-        ? (document.getElementById(`page-${pageIndex}`) as HTMLElement | null)
+        ? (getElementById(`page-${pageIndex}`) as HTMLElement | null)
         : null) ?? null,
     );
   }, [pageIndex]);
@@ -304,11 +309,7 @@ export const useTextLayerSelection = (opts: {
       if (target?.closest?.("[data-app-selection-handle='1']")) return;
       if (target?.closest?.("[data-app-text-selection-popover='1']")) return;
 
-      const pageEl =
-        pagePortalEl ??
-        ((typeof document !== "undefined"
-          ? document.getElementById(`page-${pageIndex}`)
-          : null) as HTMLElement | null);
+      const pageEl = pagePortalEl ?? getElementById(`page-${pageIndex}`);
       if (!pageEl) return;
       if (!pageEl.contains(rawTarget)) return;
 
@@ -1300,11 +1301,7 @@ export const useTextLayerSelection = (opts: {
       if (target?.closest?.("[data-app-selection-handle='1']")) return;
       const activeLayer = textLayerRef.current;
       if (!activeLayer) return;
-      const pageEl =
-        pagePortalEl ??
-        ((typeof document !== "undefined"
-          ? document.getElementById(`page-${pageIndex}`)
-          : null) as HTMLElement | null);
+      const pageEl = pagePortalEl ?? getElementById(`page-${pageIndex}`);
       const isWithinCurrentPage = !!pageEl && pageEl.contains(target);
       if (!isWithinCurrentPage) return;
       const isTouchPointer = e.pointerType === "touch";

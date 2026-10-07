@@ -1,4 +1,3 @@
-import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
 import {
   createPdfWorkerService,
   type PDFWorkerService,
@@ -7,6 +6,8 @@ import type { EditorSaveTarget } from "@/types";
 import {
   createLoadedEditorTabSnapshot,
   getEditorTabDisplayTitle,
+  getEditorTabTitle,
+  getEditorTabSnapshot,
 } from "./storeSnapshot";
 import type {
   EditorTabSession,
@@ -84,7 +85,7 @@ const cloneEditorTabSnapshotForTransfer = (
   preservePdfOwnerRestrictionsOnSave:
     snapshot.preservePdfOwnerRestrictionsOnSave,
   dirtyPermissionScopes: {
-    ...(snapshot.dirtyPermissionScopes ?? EMPTY_PDF_PERMISSION_DIRTY_SCOPES),
+    ...snapshot.dirtyPermissionScopes,
   },
   saveTarget: cloneSaveTargetForTransfer(snapshot.saveTarget),
   pages: [...snapshot.pages],
@@ -92,17 +93,7 @@ const cloneEditorTabSnapshotForTransfer = (
   annotations: [...snapshot.annotations],
   preservedSourceAnnotations: [...snapshot.preservedSourceAnnotations],
   outline: [...snapshot.outline],
-  penStyle: { ...snapshot.penStyle },
-  highlightStyle: snapshot.highlightStyle
-    ? { ...snapshot.highlightStyle }
-    : undefined,
-  commentStyle: snapshot.commentStyle
-    ? { ...snapshot.commentStyle }
-    : undefined,
-  freetextStyle: snapshot.freetextStyle
-    ? { ...snapshot.freetextStyle }
-    : undefined,
-  shapeStyle: snapshot.shapeStyle ? { ...snapshot.shapeStyle } : undefined,
+
   past: [...snapshot.past],
   future: [...snapshot.future],
   clipboard: snapshot.clipboard
@@ -111,7 +102,7 @@ const cloneEditorTabSnapshotForTransfer = (
         data: snapshot.clipboard.data,
       }
     : null,
-  pageTranslateOptions: { ...snapshot.pageTranslateOptions },
+
   pageTranslateParagraphCandidates: [
     ...snapshot.pageTranslateParagraphCandidates,
   ],
@@ -119,7 +110,7 @@ const cloneEditorTabSnapshotForTransfer = (
     ...snapshot.pageTranslateSelectedParagraphIds,
   ],
   lastSavedAt: snapshot.lastSavedAt ? new Date(snapshot.lastSavedAt) : null,
-  rightPanelDockTab: [...snapshot.rightPanelDockTab],
+
   pendingViewStateRestore: snapshot.pendingViewStateRestore
     ? { ...snapshot.pendingViewStateRestore }
     : null,
@@ -145,11 +136,13 @@ export const createEditorTabSessionTransfer = (
   createdAt: Date.now(),
   sessionId: session.id,
   sourceWindowId: session.windowId,
-  title: session.title,
+  title: getEditorTabTitle(session),
   sourceKey: session.sourceKey,
   lastActiveAt: session.lastActiveAt,
-  isDirty: session.isDirty,
-  editorSnapshot: cloneEditorTabSnapshotForTransfer(session.editorSnapshot),
+  isDirty: session.runtime.store.document.getState().isDirty,
+  editorSnapshot: cloneEditorTabSnapshotForTransfer(
+    getEditorTabSnapshot(session),
+  ),
 });
 
 export const restoreEditorTabSessionTransfer = async (
@@ -252,7 +245,7 @@ export const restoreEditorTabSessionTransfer = async (
               data: incomingSnapshot.clipboard.data,
             }
           : null,
-        pageTranslateOptions: { ...incomingSnapshot.pageTranslateOptions },
+
         pageTranslateParagraphCandidates: [
           ...incomingSnapshot.pageTranslateParagraphCandidates,
         ],
@@ -262,7 +255,7 @@ export const restoreEditorTabSessionTransfer = async (
         lastSavedAt: incomingSnapshot.lastSavedAt
           ? new Date(incomingSnapshot.lastSavedAt)
           : null,
-        rightPanelDockTab: [...incomingSnapshot.rightPanelDockTab],
+
         pendingViewStateRestore: incomingSnapshot.pendingViewStateRestore
           ? { ...incomingSnapshot.pendingViewStateRestore }
           : null,

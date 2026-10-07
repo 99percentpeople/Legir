@@ -1,10 +1,7 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createEditorTabSnapshotFromState,
-  restoreEditorTabSnapshot,
-} from "@/app/editorTabs/storeSnapshot";
+import { createEditorTabSnapshotFromState } from "@/app/editorTabs/storeSnapshot";
 import {
   EditorRuntimeProvider,
   useEditorDocumentIdentityRuntime,
@@ -14,12 +11,17 @@ import {
 } from "@/app/editorRuntime";
 import { createAiChatSnapshotReader } from "@/hooks/useAiChatController/editorSnapshot";
 import { selectAiChatEditorState } from "@/store/selectors";
-import { useEditorStore } from "@/store/useEditorStore";
+import {
+  useEditorView,
+  activateEditorView,
+  createDocumentEditorView,
+} from "@/store/useEditorView";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createTestEditorStore, field, page } from "./helpers/editorStore";
 
 afterEach(() => {
-  useEditorStore.setState(useEditorStore.getInitialState(), true);
+  activateEditorView();
+  useEditorView.setState(useEditorView.getInitialState(), true);
   vi.unstubAllGlobals();
 });
 
@@ -48,28 +50,24 @@ describe("multi-document state boundaries", () => {
       state: b.getState(),
       scrollContainer: null,
     });
-    const warmup = vi.fn();
-    useEditorStore.setState(
-      { ...useEditorStore.getInitialState(), warmupThumbnails: warmup },
-      true,
-    );
-    useEditorStore.getState().setOptions({ userName: "Global preference" });
-    const options = useEditorStore.getState().options;
-    const action = useEditorStore.getState().openRightPanel;
+    useEditorView.getState().setOptions({ userName: "Global preference" });
+    const options = useEditorView.getState().options;
+    const importedA = createDocumentEditorView(snapshotA);
+    const importedB = createDocumentEditorView(snapshotB);
     const listener = vi.fn();
-    const unsubscribe = useEditorStore.subscribe(
+    const unsubscribe = useEditorView.subscribe(
       (state) => state.currentPageIndex,
       listener,
     );
     try {
-      restoreEditorTabSnapshot(snapshotA);
+      activateEditorView(importedA.store);
       const readA = createAiChatSnapshotReader(
-        () => selectAiChatEditorState(useEditorStore.getState()),
+        () => selectAiChatEditorState(useEditorView.getState()),
         snapshotA.pdfBytes,
       );
-      const previousTool = useEditorStore.getState().beginTemporaryPan();
-      restoreEditorTabSnapshot(snapshotB);
-      const stateB = useEditorStore.getState();
+      const previousTool = useEditorView.getState().beginTemporaryPan();
+      activateEditorView(importedB.store);
+      const stateB = useEditorView.getState();
       expect(stateB).toMatchObject({
         filename: "B.pdf",
         currentPageIndex: 1,
@@ -77,26 +75,31 @@ describe("multi-document state boundaries", () => {
         keys: { space: false },
       });
       expect(stateB.fields[0].id).toBe("B");
-      useEditorStore.getState().endTemporaryPan(previousTool);
-      expect(useEditorStore.getState()).toBe(stateB);
+      useEditorView.getState().endTemporaryPan(previousTool);
+      expect(useEditorView.getState()).toBe(stateB);
       expect(readA).toThrow("no longer active");
-      restoreEditorTabSnapshot(snapshotA);
-      expect(useEditorStore.getState().pdfBytes).toBe(snapshotA.pdfBytes);
-      expect(useEditorStore.getState().fields[0].value).toBe("edited A");
-      expect(useEditorStore.getState().past).toHaveLength(1);
-      expect(useEditorStore.getState().dirtyPermissionScopes).toEqual(
+      activateEditorView(importedA.store);
+      expect(useEditorView.getState().pdfBytes).toBe(snapshotA.pdfBytes);
+      expect(useEditorView.getState().fields[0].value).toBe("edited A");
+      expect(useEditorView.getState().past).toHaveLength(1);
+      expect(useEditorView.getState().dirtyPermissionScopes).toEqual(
         snapshotA.dirtyPermissionScopes,
       );
-      expect(useEditorStore.getState().options).toBe(options);
-      expect(useEditorStore.getState().openRightPanel).toBe(action);
-      useEditorStore.getState().undo();
-      expect(useEditorStore.getState().fields[0].value).toBeUndefined();
+      expect(useEditorView.getState().options).toBe(options);
+      expect(useEditorView.getState().openRightPanel).toBe(
+        importedA.store.getState().openRightPanel,
+      );
+      useEditorView.getState().undo();
+      expect(useEditorView.getState().fields[0].value).toBeUndefined();
       expect(listener.mock.calls).toEqual([
         [1, 0],
         [0, 1],
       ]);
     } finally {
       unsubscribe();
+      activateEditorView();
+      importedA.dispose();
+      importedB.dispose();
     }
   });
 

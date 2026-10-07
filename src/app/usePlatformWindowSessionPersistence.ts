@@ -44,7 +44,7 @@ export const usePlatformWindowSessionPersistence = ({
     onDesktopCloseRequestedRef.current = onDesktopCloseRequested;
   }, [onDesktopCloseRequested]);
 
-  const captureSessionState = useCallback(() => {
+  const persistDocumentView = useCallback(() => {
     if (!hasActiveTabRef.current) {
       return;
     }
@@ -58,11 +58,11 @@ export const usePlatformWindowSessionPersistence = ({
     persistCurrentTabStateRef.current();
   }, []);
 
-  useEventListener(browserWindow, "pagehide", captureSessionState);
-  useEventListener(browserWindow, "beforeunload", captureSessionState);
+  useEventListener(browserWindow, "pagehide", persistDocumentView);
+  useEventListener(browserWindow, "beforeunload", persistDocumentView);
   useEventListener(browserDocument, "visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-      captureSessionState();
+      persistDocumentView();
     }
   });
 
@@ -76,7 +76,7 @@ export const usePlatformWindowSessionPersistence = ({
 
     void (async () => {
       unlisten = await listenForPlatformCloseRequested((event) => {
-        captureSessionState();
+        persistDocumentView();
         onDesktopCloseRequestedRef.current?.(event);
       });
 
@@ -98,5 +98,5 @@ export const usePlatformWindowSessionPersistence = ({
         // ignore
       }
     };
-  }, [captureSessionState, enabled, isDesktop]);
+  }, [persistDocumentView, enabled, isDesktop]);
 };

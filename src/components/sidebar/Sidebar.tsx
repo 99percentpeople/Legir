@@ -1,3 +1,5 @@
+import { useWorkspaceStore } from "@/store/workspaceStore";
+import { usePreferencesStore } from "@/store/preferencesStore";
 import React from "react";
 import { X, Layers, List, LayoutGrid, StickyNote } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -13,8 +15,8 @@ import ThumbnailsPanel from "./ThumbnailsPanel";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useLanguage } from "../language-provider";
-import { appEventBus } from "@/lib/eventBus";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorEventBus } from "@/app/editorTabs/context";
+import { useEditorView } from "@/store/useEditorView";
 import { selectSidebarState } from "@/store/selectors";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -25,8 +27,21 @@ import PDFSearchHeader from "./PDFSearchHeader";
 import PDFSearchPanel from "./PDFSearchPanel";
 
 const Sidebar: React.FC = () => {
+  const appEventBus = useEditorEventBus();
   const { t } = useLanguage();
-  const state = useEditorStore(useShallow(selectSidebarState));
+  const documentState = useEditorView(useShallow(selectSidebarState));
+  const sidebar = useWorkspaceStore((state) => state.layout.sidebar);
+  const isPanelFloating = useWorkspaceStore((state) => state.isPanelFloating);
+  const thumbnailsLayout = usePreferencesStore(
+    (state) => state.options.thumbnailsLayout,
+  );
+  const state = {
+    ...documentState,
+    isOpen: sidebar.open,
+    isFloating: isPanelFloating,
+    sidebarTab: sidebar.tab,
+    width: sidebar.width,
+  };
   const {
     isOpen,
     isFloating,
@@ -37,7 +52,6 @@ const Sidebar: React.FC = () => {
     outline,
     selectedId,
     currentPageIndex,
-    thumbnailsLayout,
     sidebarTab,
     width,
     setUiState,
@@ -70,9 +84,7 @@ const Sidebar: React.FC = () => {
       { sticky: true },
     );
   };
-  const normalizedSidebarTab =
-    sidebarTab === "search" ? "thumbnails" : sidebarTab;
-  const activeTab = search.isPdfSearchOpen ? "search" : normalizedSidebarTab;
+  const activeTab = search.isPdfSearchOpen ? "search" : sidebarTab;
   const isSearchActive = search.isPdfSearchOpen;
 
   const { isResizing, handleMouseDown } = useResizableSidePanel({
@@ -90,7 +102,13 @@ const Sidebar: React.FC = () => {
   const currentTab = activeTab;
   const handleTabChange = (val: string) => {
     search.dismissPdfSearch();
-    setUiState({ sidebarTab: val });
+    if (
+      val === "thumbnails" ||
+      val === "outline" ||
+      val === "fields" ||
+      val === "annotations"
+    )
+      setUiState({ sidebarTab: val });
   };
 
   if (!isOpen) {

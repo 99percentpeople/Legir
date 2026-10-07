@@ -30,6 +30,27 @@ assistant output. It should not know provider API request shapes directly.
 - `chat/prompts.ts` owns the chat system instruction and prompt fragments.
 - `chat/types.ts` owns chat-specific records, tool contracts, and stream update
   types.
+- `chat/workspace.ts` defines the current-window document access boundary.
+- `chat/workspaceToolRegistry.ts` wraps document tools with `{ document_id, args }`
+  targeting and adds `list_open_documents`. Default targets are fixed per turn;
+  explicit targets can be any open tab. Each execution uses that document's
+  store, worker, event bus and lifetime signal. Never route a missing/closed ID
+  to the currently active tab.
+
+### Conversation Ownership
+
+The application mounts one lazy `GlobalAiControllerHost` under
+`src/app/ai/GlobalAiContext.tsx`, outside document-tab trees. All panels share
+its controller, history and composer. Hiding or switching a tab does not abort
+AI; closing a document cancels operations targeting that document, while the
+conversation remains available.
+
+History is unified under `app-ai-chat:workspace`. `unifiedHistory.ts` imports
+legacy per-document histories once, retaining their original storage entries as
+backups. Search results, message attachments and navigation links carry document
+IDs to prevent collisions between PDFs. IDs refer to live tabs; stale history
+links do not silently point to a newly opened document. This is a current-window
+workspace, not a cross-window document/AI coordinator.
 
 ### Runtime Helpers
 

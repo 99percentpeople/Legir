@@ -17,7 +17,7 @@ import {
 import { AI_PROVIDER_IDS_SORTED_BY_LABEL } from "@/services/ai/providers/catalog";
 import { FloatingWindow } from "@/components/ui/floating-window";
 import { cn } from "@/utils/cn";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import type { TranslateOptionId } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 import { selectTranslationFloatingWindowState } from "@/store/selectors";
@@ -34,7 +34,7 @@ export const TranslationFloatingWindow: React.FC<
 > = ({ isOpen, sourceText, autoTranslateToken, onClose }) => {
   const { t, effectiveLanguage } = useLanguage();
   const { translateOptionRaw, translateTargetLanguage, setState } =
-    useEditorStore(useShallow(selectTranslationFloatingWindowState));
+    useEditorView(useShallow(selectTranslationFloatingWindowState));
 
   const [registryVersion, setRegistryVersion] = useState(0);
 

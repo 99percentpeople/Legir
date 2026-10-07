@@ -15,7 +15,10 @@ import {
 import type { WorkspaceEditorState } from "@/types";
 import { useEventListener } from "@/hooks/useEventListener";
 import { pickClosestRectCandidate } from "@/lib/viewportMath";
-import { appEventBus } from "@/lib/eventBus";
+import {
+  useEditorEventBus,
+  useEditorElementById,
+} from "@/app/editorTabs/context";
 
 type WorkspaceContentZoomAnchor = {
   kind: "content";
@@ -68,6 +71,8 @@ export const useWorkspaceViewport = (opts: {
   textSelectionToolbarVisible: boolean;
   updateTextSelectionToolbar: () => void;
 }) => {
+  const appEventBus = useEditorEventBus();
+  const getElementById = useEditorElementById();
   const zoomAnchorRef = useRef<WorkspaceZoomAnchor | null>(null);
 
   const viewportAnchorRef = useRef<{
@@ -114,7 +119,7 @@ export const useWorkspaceViewport = (opts: {
       const container = opts.containerRef.current;
       if (!container) return false;
 
-      const pageEl = document.getElementById(`page-${anchor.pageIndex}`);
+      const pageEl = getElementById(`page-${anchor.pageIndex}`);
       if (!pageEl) return false;
 
       const containerRect = container.getBoundingClientRect();

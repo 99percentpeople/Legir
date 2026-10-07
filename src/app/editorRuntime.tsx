@@ -9,6 +9,7 @@ import type {
 } from "@/app/editorTabs/types";
 
 export interface EditorTabsRuntime {
+  sessions?: import("./editorTabs/types").EditorTabSession[];
   windowId: EditorWindowId;
   tabs: EditorTabDescriptor[];
   activeTabId: string | null;

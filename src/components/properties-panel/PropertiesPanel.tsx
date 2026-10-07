@@ -2,7 +2,7 @@ import React from "react";
 import { FormField, Annotation, PDFMetadata } from "@/types";
 import { DocumentPropertiesPanel } from "./DocumentPropertiesPanel";
 import { ControlPropertiesPanel } from "./ControlPropertiesPanel";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import { useShallow } from "zustand/react/shallow";
 import { selectPropertiesPanelState } from "@/store/selectors";
 import {
@@ -61,7 +61,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
       preservePdfOwnerRestrictionsOnSave,
       unlockPdfOwnerRestrictions,
       setEditorState,
-    } = useEditorStore(useShallow(selectPropertiesPanelState));
+    } = useEditorView(useShallow(selectPropertiesPanelState));
     const permissionUi = usePdfPermissionUi(documentPermissions);
 
     if (activeTab === "properties" && selectedControl) {

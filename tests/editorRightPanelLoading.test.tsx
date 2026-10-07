@@ -2,7 +2,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorRightPanel } from "@/pages/EditorPage/EditorRightPanel";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 
 const suspended = vi.hoisted(() => ({
   forever: new Promise<never>(() => {}),
@@ -29,9 +29,9 @@ describe("EditorRightPanel lazy loading fallback", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    useEditorStore.setState(
+    useEditorView.setState(
       {
-        ...useEditorStore.getInitialState(),
+        ...useEditorView.getInitialState(),
         mode: "form",
         isRightPanelOpen: true,
         isPanelFloating: false,
@@ -44,12 +44,12 @@ describe("EditorRightPanel lazy loading fallback", () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
-    useEditorStore.setState(useEditorStore.getInitialState(), true);
+    useEditorView.setState(useEditorView.getInitialState(), true);
     vi.unstubAllGlobals();
   });
 
   const renderPanel = async (tab: "ai_chat" | "page_translate") => {
-    useEditorStore.setState({ rightPanelTab: tab });
+    useEditorView.setState({ rightPanelTab: tab });
     await act(async () => {
       root.render(
         <EditorRightPanel
@@ -81,7 +81,7 @@ describe("EditorRightPanel lazy loading fallback", () => {
     await renderPanel("ai_chat");
     expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
 
-    await act(async () => useEditorStore.getState().closeRightPanel());
+    await act(async () => useEditorView.getState().closeRightPanel());
 
     expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
   });

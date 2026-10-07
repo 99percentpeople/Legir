@@ -10,15 +10,14 @@ import { cn } from "@/utils/cn";
 import { useScrollbarWidthOffset } from "@/hooks/useScrollbarWidthOffset";
 import { useLanguage } from "@/components/language-provider";
 import { useAppEvent } from "@/hooks/useAppEventBus";
-import { appEventBus } from "@/lib/eventBus";
+import { useEditorEventBus } from "@/app/editorTabs/context";
 
 export type RightPanelTabId =
   | "document"
   | "properties"
   | "ai_chat"
   | "translate"
-  | "page_translate"
-  | (string & {});
+  | "page_translate";
 
 export interface RightPanelDockTab {
   id: RightPanelTabId;
@@ -51,6 +50,7 @@ export function RightPanelTabDock({
   onOpenTranslate,
   scrollContainer,
 }: RightPanelTabDockProps) {
+  const appEventBus = useEditorEventBus();
   const { t, isCjk } = useLanguage();
   const [isSwitching, setIsSwitching] = React.useState(false);
   const switchingTimerRef = React.useRef<number | null>(null);

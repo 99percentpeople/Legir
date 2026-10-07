@@ -40,6 +40,7 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
   onTriggerHistorySave,
 }) => {
   const { t } = useLanguage();
+  const idPrefix = React.useId();
 
   const strokeColor = data.color || "#000000";
   const thickness =
@@ -359,7 +360,7 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
               <Label>{t("properties.background")}</Label>
               <div className="flex items-center gap-2">
                 <Switch
-                  id="shapeTransparent"
+                  id={`${idPrefix}-shapeTransparent`}
                   checked={isTransparent}
                   onMouseDown={onTriggerHistorySave}
                   onCheckedChange={(checked) =>
@@ -370,7 +371,7 @@ export const ShapeProperties: React.FC<PropertyPanelProps<Annotation>> = ({
                   }
                 />
                 <Label
-                  htmlFor="shapeTransparent"
+                  htmlFor={`${idPrefix}-shapeTransparent`}
                   className="text-xs font-normal"
                 >
                   {t("properties.transparent")}

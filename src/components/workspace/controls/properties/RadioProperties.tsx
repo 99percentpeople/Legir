@@ -14,6 +14,7 @@ export const RadioProperties: React.FC<PropertyPanelProps<FormField>> = ({
   onTriggerHistorySave,
 }) => {
   const { t } = useLanguage();
+  const idPrefix = React.useId();
 
   return (
     <>
@@ -25,9 +26,11 @@ export const RadioProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="radio-val">{t("properties.selected")}</Label>
+            <Label htmlFor={`${idPrefix}-radio-val`}>
+              {t("properties.selected")}
+            </Label>
             <Switch
-              id="radio-val"
+              id={`${idPrefix}-radio-val`}
               checked={data.isChecked || false}
               onCheckedChange={(checked) => {
                 onTriggerHistorySave();
@@ -36,11 +39,11 @@ export const RadioProperties: React.FC<PropertyPanelProps<FormField>> = ({
             />
           </div>
           <div className="flex items-center justify-between">
-            <Label htmlFor="radio-def">
+            <Label htmlFor={`${idPrefix}-radio-def`}>
               {t("properties.default_selected")}
             </Label>
             <Switch
-              id="radio-def"
+              id={`${idPrefix}-radio-def`}
               checked={data.isDefaultChecked || false}
               onCheckedChange={(checked) => {
                 onTriggerHistorySave();
@@ -78,11 +81,14 @@ export const RadioProperties: React.FC<PropertyPanelProps<FormField>> = ({
         </h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="required-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-required-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.required")}
             </Label>
             <Switch
-              id="required-switch"
+              id={`${idPrefix}-required-switch`}
               checked={data.required || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ required: checked })}
@@ -90,11 +96,14 @@ export const RadioProperties: React.FC<PropertyPanelProps<FormField>> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="readonly-switch" className="cursor-pointer">
+            <Label
+              htmlFor={`${idPrefix}-readonly-switch`}
+              className="cursor-pointer"
+            >
               {t("properties.readonly")}
             </Label>
             <Switch
-              id="readonly-switch"
+              id={`${idPrefix}-readonly-switch`}
               checked={data.readOnly || false}
               onMouseDown={onTriggerHistorySave}
               onCheckedChange={(checked) => onChange({ readOnly: checked })}

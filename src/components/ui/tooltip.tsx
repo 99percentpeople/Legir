@@ -2,6 +2,7 @@ import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 import { cn } from "@/utils/cn";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 
 function TooltipProvider({
   delayDuration = 0,
@@ -17,11 +18,24 @@ function TooltipProvider({
 }
 
 function Tooltip({
+  open,
+  defaultOpen = false,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+  const isActive = useEditorTabIsActive();
+  const [localOpen, setLocalOpen] = React.useState(defaultOpen);
   return (
     <TooltipProvider>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+      <TooltipPrimitive.Root
+        data-slot="tooltip"
+        {...props}
+        open={isActive && (open ?? localOpen)}
+        onOpenChange={(next) => {
+          setLocalOpen(next);
+          onOpenChange?.(next);
+        }}
+      />
     </TooltipProvider>
   );
 }
@@ -38,6 +52,8 @@ function TooltipContent({
   children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+  const isActive = useEditorTabIsActive();
+  if (!isActive) return null;
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content

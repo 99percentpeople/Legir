@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useEditorTabRuntime } from "@/app/editorTabs/context";
 
 export const useEventListener = <TEvent extends Event>(
   target: EventTarget | null | undefined,
@@ -6,6 +7,7 @@ export const useEventListener = <TEvent extends Event>(
   handler: (event: TEvent) => void,
   options?: boolean | AddEventListenerOptions,
 ) => {
+  const tabRuntime = useEditorTabRuntime();
   const handlerRef = useRef(handler);
 
   useEffect(() => {
@@ -16,6 +18,7 @@ export const useEventListener = <TEvent extends Event>(
     if (!target) return;
 
     const listener: EventListener = (event) => {
+      if (tabRuntime && !tabRuntime.active) return;
       handlerRef.current(event as TEvent);
     };
 
@@ -24,7 +27,7 @@ export const useEventListener = <TEvent extends Event>(
     return () => {
       target.removeEventListener(type, listener, options);
     };
-  }, [target, type, options]);
+  }, [target, type, options, tabRuntime]);
 };
 
 export type EventListenerSpec<TEvent extends Event = Event> = {
@@ -70,6 +73,7 @@ export const useEventListeners = (
   target: EventTarget | null | undefined,
   listeners: EventListenersInput,
 ) => {
+  const tabRuntime = useEditorTabRuntime();
   const attachedRef = useRef(
     new Map<
       string,
@@ -115,6 +119,7 @@ export const useEventListeners = (
 
       const handlerRef = { current: spec.handler };
       const listener: EventListener = (event) => {
+        if (tabRuntime && !tabRuntime.active) return;
         handlerRef.current(event);
       };
 

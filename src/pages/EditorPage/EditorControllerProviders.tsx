@@ -6,7 +6,7 @@ import { useEditorDocumentIdentityRuntime } from "@/app/editorRuntime";
 import { useLanguage } from "@/components/language-provider";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { selectPdfSearchControllerState } from "@/store/selectors";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import type { PDFSearchResult, Tool } from "@/types";
 import { useEditorPageKeyboardShortcuts } from "./hooks/useEditorPageKeyboardShortcuts";
 import { usePdfSearchController } from "./hooks/usePdfSearchController";
@@ -30,7 +30,7 @@ function EditorPdfSearchControllerProvider({
 }: EditorControllerProvidersProps) {
   const { t } = useLanguage();
   const { workerService } = useEditorDocumentIdentityRuntime();
-  const { pages, isSidebarOpen, openSidebar, closeSidebar } = useEditorStore(
+  const { pages, isSidebarOpen, openSidebar, closeSidebar } = useEditorView(
     useShallow(selectPdfSearchControllerState),
   );
   const pdfSearch = usePdfSearchController({

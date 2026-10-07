@@ -64,7 +64,10 @@ src/
     browserDb.ts            Shared IndexedDB setup for browser persistence
 
   store/
-    useEditorStore.ts       Editor single source of truth
+    useEditorView.ts        Active and document-scoped read models
+    editorView.ts           Composes state owners and document commands
+    preferencesStore.ts     Shared settings and tool defaults
+    workspaceStore.ts       Window layout and tab ordering
     helpers.ts
     selectors.ts
 
@@ -135,16 +138,14 @@ There are two concrete storage strategies:
 
 ### Current Persistence Model
 
-Recent files and editor UI state are intentionally separate:
+Persistence follows state ownership:
 
-- Recent files store lightweight metadata and previews
-- Editor UI state is stored globally, not per file
+- Recent files store lightweight metadata and previews.
+- `legir.preferences` stores app options, annotation style defaults and translation defaults through `src/store/preferencesStore.ts`. Fetched model caches are transient.
+- `legir.workspace-layout` stores panel visibility, selected sections, widths and page arrangement through `src/store/workspaceStore.ts`. Active tabs, dialogs, floating mode and fullscreen are transient.
+- `legir.document-views` stores each document's zoom, page and scroll position under its source key, through `src/services/platform/documentSession.ts`.
 
-That global UI session is implemented in:
-
-- `src/services/platform/documentSession.ts`
-
-This means reopening a document restores the last editor layout and reading position as a global editor preference rather than a per-document session.
+The previous `app-editor-ui-dev` and `app-editor-ui-session` formats are not read or migrated. Layout and preferences have one persistence owner; document updates do not write these preferences.
 
 ## Document Open Flow
 
@@ -158,7 +159,7 @@ The current open flow is:
 2. `src/services/platform/files.ts` and `src/services/platform/app.ts` normalize the source
 3. `src/App.tsx` loads the PDF through `loadPDF(...)`
 4. A fresh `EditorTabSnapshot` is created
-5. The persisted global UI session is applied
+5. The matching document viewport is restored; shared UI is read from its existing owners
 6. The tab is inserted into the current editor window
 7. The route switches to `/editor`
 
@@ -169,7 +170,9 @@ The file-open abstractions deliberately hide the platform differences:
 
 ## Editor Tab and Window Model
 
-Legir treats each open document as a tab session rather than a single monolithic editor instance.
+Legir treats each open document as a live tab session. Every tab owns an independent Zustand store, React editor tree, PDF worker, canvas buffers, scroll position, search state and undo/redo history. Switching tabs changes visibility and the active editor-view reference; it does not restore a snapshot into another document's store.
+
+Window layout is held once by `workspaceStore`, and app preferences are held once by `preferencesStore`. Document stores do not contain copies of either. Existing and newly opened tabs read these shared owners directly. Only foreground selection changes may automatically switch the properties panel. Zoom, reading position, selection, search results and document-attached translation windows remain scoped to their document.
 
 The core types live in:
 
@@ -180,7 +183,9 @@ Important concepts:
 - `EditorTabSnapshot`
   - a serializable view of editor state for one document
 - `EditorTabSession`
-  - snapshot + worker/service/resource ownership
+  - live runtime + worker/service/resource ownership; titles and dirty flags come from document state, thumbnails from the resource store, and snapshots are created on demand for window transfer
+- `EditorTabRuntime` (`src/app/editorTabs/runtime.ts`)
+  - independent store, private workspace event bus, DOM root, scroll container and lifetime cancellation signal
 - `EditorWindowLayout`
   - tab ordering and active-tab selection for a window
 
@@ -195,7 +200,13 @@ This module handles:
 - creating a snapshot from the live editor store
 - creating the initial snapshot after loading a PDF
 - deriving stable source keys for deduplication
-- restoring a snapshot back into the Zustand store
+- constructing a new document owner from an imported snapshot, using the target window's existing preferences and layout
+
+`src/pages/EditorPage/KeepAliveEditor.tsx` mounts every open tab with a stable key. Inactive tabs use `visibility: hidden` and `inert`, retaining layout dimensions, scroll offsets and transferred OffscreenCanvas buffers. Only the active tab handles global keyboard/pointer shortcuts. Body-portaled menus, popovers, tooltips and dialogs also honor tab activity and release focus/pointer locks while hidden. Workspace events and DOM queries are scoped through `src/app/editorTabs/context.ts`; identical page/control IDs in separate PDFs must not resolve into another tab.
+
+There is currently no LRU eviction: closing a tab releases its worker, canvas resources, thumbnails, subscriptions and cancellation signal. Memory therefore grows with open documents. Page virtualization still bounds each document's mounted pages.
+
+Save operations capture the originating store and exported revision before awaiting I/O. Completion updates only that store; edits made during a save remain dirty.
 
 ### Multi-Window Support
 
@@ -211,33 +222,20 @@ The important architectural point is that cross-window movement is based on tran
 
 ## Editor State
 
-The editor single source of truth is:
+State is divided into independent owners:
 
-- `src/store/useEditorStore.ts`
+- `src/store/preferencesStore.ts`: app options, tool styles, translation defaults and transient model caches.
+- `src/store/workspaceStore.ts`: structured `layout.sidebar` / `layout.rightPanel`, page arrangement, window tab layouts, typed dialogs and fullscreen/floating state.
+- The document store created in `src/store/editorView.ts`: PDF data, permissions, edits, selection, tools, viewport, history and document job status.
+- A separate resource store per document: thumbnail URLs, never persisted or transferred.
 
-This store holds both:
+`EditorState` / `EditorStore` describe a composed read model. `EditorView` caches a projection of owner references and exposes document-bound commands; it owns no writable data and has no bidirectional synchronization. Commands dispatch patches to the appropriate owner. `EditorViewContext` binds the editor tree to its document view. Sidebars read `useWorkspaceStore()` directly, and the canvas subscribes separately to document, preference and layout selections.
 
-- document model state
-- editor UI state
+`src/store/useEditorView.ts` exposes the document-bound hook and the window's active view reference. Imperative document work receives an explicit `EditorViewApi` or uses `useEditorViewApi()`. Global configuration services read `preferencesStore` directly. Changing the active document never replaces preferences or layout.
 
-Examples:
+`EditorTabSnapshot` is an explicit whitelist of document fields, excluding UI, preferences, jobs and resource caches. `EditorTabSession` contains identity and live resource ownership, with no duplicate document snapshot, title, dirty flag or thumbnail map. Tab descriptors are derived for rendering; hydration patches the originating document directly. Normal activation persists only the small viewport record.
 
-- pages, fields, annotations
-- current tool and annotation styles
-- selected object
-- zoom/page position
-- sidebar and right-panel state
-- undo/redo history
-
-State helpers and selectors are split out to:
-
-- `src/store/helpers.ts`
-- `src/store/selectors.ts`
-
-The general rule is:
-
-- persistent, user-visible editor state belongs in the store
-- heavyweight runtime resources do not
+State defaults and selectors are in `src/store/helpers.ts` and `src/store/selectors.ts`. Processing queues and thumbnail cancellation remain local to the originating document view.
 
 Examples of non-store runtime resources:
 
@@ -334,6 +332,12 @@ It provides the IndexedDB setup used by browser recent-files storage. The browse
 
 AI is optional and should be treated as an enhancement layer, not as the primary architecture.
 
+`src/app/ai/GlobalAiContext.tsx` owns one lazily initialized AI controller per window. Panels share its conversation, history, composer draft and attachments. The controller remains mounted independently of tab/panel visibility, so switching tabs does not abort a turn. Translation tasks remain owned by their originating document.
+
+History uses the unified `app-ai-chat:workspace` storage key. Legacy per-document histories are merged once without deleting their source keys. Workspace history does not apply the legacy 20-conversation cap; per-conversation size limits and browser storage quotas still apply. Quota failure retains the last durable history instead of replacing it with one conversation. Concurrent cross-window history synchronization is not implemented.
+
+`src/services/ai/chat/workspaceToolRegistry.ts` exposes `list_open_documents` and routes document tools using `{ document_id, args }`. IDs cover the documents in the current window. An omitted ID is pinned to the document active at the start of that turn, not whichever tab happens to be active later. Explicit IDs allow reading/editing other open documents with their own workers, stores and permission checks. Closing a document cancels its tool operations; missing IDs never fall back to a different document. Document links and attachments retain their document IDs.
+
 Relevant modules include:
 
 - `src/services/ai/`
@@ -398,7 +402,7 @@ The Tauri layer should remain thin. Most product logic should stay in the TypeSc
 
 Current conventions worth preserving:
 
-- Keep the editor store as the single source of truth for active document/editor state
+- Keep each document's store as the single source of truth for that document/editor state
 - Use services for file, platform, and persistence boundaries
 - Keep browser and desktop recent-file backends behind a shared interface
 - Restore editor UI state through one global session path instead of multiple competing persistence systems

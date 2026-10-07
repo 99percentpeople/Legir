@@ -1,4 +1,5 @@
 import React from "react";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
 import { setPlatformWindowTitle } from "@/services/platform";
@@ -14,6 +15,7 @@ export function useEditorPageLifecycle({
   pagesLength,
   hasDirtyTabs,
 }: UseEditorPageLifecycleOptions) {
+  const isActive = useEditorTabIsActive();
   const workspaceScrollContainerRef = React.useRef<HTMLElement | null>(null);
   const initialTitleRef = React.useRef<string | null>(null);
 
@@ -26,6 +28,7 @@ export function useEditorPageLifecycle({
   );
 
   React.useEffect(() => {
+    if (!isActive) return;
     const appName = process.env.APP_NAME ?? "Legir";
 
     if (typeof document !== "undefined" && initialTitleRef.current === null) {
@@ -46,7 +49,7 @@ export function useEditorPageLifecycle({
         },
       );
     };
-  }, [filename, pagesLength]);
+  }, [filename, pagesLength, isActive]);
 
   useEventListener<BeforeUnloadEvent>(
     typeof window !== "undefined" ? window : null,

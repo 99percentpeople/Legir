@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo } from "react";
 import { AnnotationControlProps } from "../types";
 import { ControlWrapper } from "../ControlWrapper";
-import { appEventBus } from "@/lib/eventBus";
+import { useEditorEventBus } from "@/app/editorTabs/context";
 import { useLanguage } from "@/components/language-provider";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import { openExternalUrl } from "@/services/platform";
 
 const getSafeUrl = (raw: string) => {
@@ -27,9 +27,10 @@ const getSafeUrl = (raw: string) => {
 };
 
 export const LinkControl: React.FC<AnnotationControlProps> = (props) => {
+  const appEventBus = useEditorEventBus();
   const { data, id, isSelected, onSelect } = props;
   const { t } = useLanguage();
-  const isModifierPressed = useEditorStore(
+  const isModifierPressed = useEditorView(
     (state) => state.keys.ctrl || state.keys.meta,
   );
 

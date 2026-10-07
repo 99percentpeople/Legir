@@ -7,7 +7,8 @@ import {
   canPerformPdfPermissionOperation,
   type PdfPermissionOperation,
 } from "@/lib/pdfPermissions";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorViewApi } from "@/store/useEditorView";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import type { MoveDirection, Tool } from "@/types";
 
 interface UseEditorPageKeyboardShortcutsOptions {
@@ -29,11 +30,13 @@ export function useEditorPageKeyboardShortcuts({
   onPrint,
   onToggleFullscreen,
 }: UseEditorPageKeyboardShortcutsOptions) {
+  const useEditorView = useEditorViewApi();
+  const isActive = useEditorTabIsActive();
   const { t } = useLanguage();
   const previousToolBeforeSpacePanRef = React.useRef<Tool | null>(null);
   const guardPdfPermission = React.useCallback(
     (operation: PdfPermissionOperation, event: KeyboardEvent) => {
-      const currentState = useEditorStore.getState();
+      const currentState = useEditorView.getState();
       if (
         canPerformPdfPermissionOperation(
           operation,
@@ -52,17 +55,26 @@ export function useEditorPageKeyboardShortcuts({
   );
 
   const restoreToolAfterSpacePan = React.useCallback(() => {
-    const currentState = useEditorStore.getState();
+    const currentState = useEditorView.getState();
     const previousTool = previousToolBeforeSpacePanRef.current;
     previousToolBeforeSpacePanRef.current = null;
 
     currentState.endTemporaryPan(previousTool);
   }, []);
 
-  React.useEffect(
-    () => () => restoreToolAfterSpacePan(),
-    [restoreToolAfterSpacePan],
-  );
+  React.useEffect(() => {
+    if (!isActive) {
+      restoreToolAfterSpacePan();
+      useEditorView.getState().setKeys({
+        ctrl: false,
+        shift: false,
+        alt: false,
+        meta: false,
+        space: false,
+      });
+    }
+    return () => restoreToolAfterSpacePan();
+  }, [isActive, restoreToolAfterSpacePan, useEditorView]);
 
   useEventListener(
     typeof window !== "undefined" ? window : null,
@@ -79,7 +91,7 @@ export function useEditorPageKeyboardShortcuts({
     typeof window !== "undefined" ? window : null,
     "keydown",
     (event) => {
-      const currentState = useEditorStore.getState();
+      const currentState = useEditorView.getState();
 
       if (
         event.key === "Control" ||
@@ -250,7 +262,7 @@ export function useEditorPageKeyboardShortcuts({
     typeof window !== "undefined" ? window : null,
     "keyup",
     (event) => {
-      const currentState = useEditorStore.getState();
+      const currentState = useEditorView.getState();
       if (
         event.key === "Control" ||
         event.key === "Shift" ||
@@ -277,7 +289,7 @@ export function useEditorPageKeyboardShortcuts({
     typeof window !== "undefined" ? window : null,
     "blur",
     () => {
-      const currentState = useEditorStore.getState();
+      const currentState = useEditorView.getState();
       if (!currentState.keys.space && !previousToolBeforeSpacePanRef.current) {
         return;
       }

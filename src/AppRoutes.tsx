@@ -6,7 +6,9 @@ import { Skeleton } from "./components/ui/skeleton";
 import type { HomePageProps } from "./pages/HomePage";
 
 const HomePage = React.lazy(() => import("./pages/HomePage"));
-const EditorPage = React.lazy(() => import("./pages/EditorPage"));
+const EditorPage = React.lazy(
+  () => import("./pages/EditorPage/KeepAliveEditor"),
+);
 
 interface AppRoutesProps {
   homeProps: HomePageProps;

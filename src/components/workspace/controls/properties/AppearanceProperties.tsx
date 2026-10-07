@@ -24,6 +24,7 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
   onTriggerHistorySave,
 }) => {
   const { t } = useLanguage();
+  const idPrefix = React.useId();
   const style = data.style || {};
 
   const [systemFamilies, setSystemFamilies] = React.useState<string[]>([]);
@@ -69,14 +70,17 @@ export const AppearanceProperties: React.FC<PropertyPanelProps<FormField>> = ({
             <Label>{t("properties.background")}</Label>
             <div className="flex items-center gap-2">
               <Switch
-                id="transparent"
+                id={`${idPrefix}-transparent`}
                 checked={style.isTransparent || false}
                 onMouseDown={onTriggerHistorySave}
                 onCheckedChange={(checked) =>
                   handleStyleChange("isTransparent", checked)
                 }
               />
-              <Label htmlFor="transparent" className="text-xs font-normal">
+              <Label
+                htmlFor={`${idPrefix}-transparent`}
+                className="text-xs font-normal"
+              >
                 {t("properties.transparent")}
               </Label>
             </div>

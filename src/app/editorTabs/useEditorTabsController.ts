@@ -1,16 +1,18 @@
+import { workspaceStore } from "@/store/workspaceStore";
+import { getEditorTabTitle } from "./storeSnapshot";
 import React from "react";
+import { createEditorTabRuntime } from "./runtime";
+import { activateEditorView, getActiveEditorView } from "@/store/useEditorView";
 import {
   createLocalSingleWindowTabBackend,
   type EditorTabWorkspaceBackend,
 } from "./backend";
-import {
-  cloneEditorTabThumbnailImages,
-  disposeEditorTabSessionResources,
-} from "./sessionResources";
+import { disposeEditorTabSessionResources } from "./sessionResources";
 import {
   CURRENT_EDITOR_WINDOW_ID,
   type EditorTabDescriptor,
   type EditorTabSession,
+  type EditorTabSnapshot,
   type EditorWindowLayout,
   type EditorWindowId,
 } from "./types";
@@ -18,56 +20,31 @@ import {
 interface UseEditorTabsControllerOptions {
   backend?: EditorTabWorkspaceBackend;
   windowId?: EditorWindowId;
-  captureSessionState: () => {
-    snapshot: EditorTabSession["editorSnapshot"];
-    thumbnailImages: EditorTabSession["thumbnailImages"];
-  };
-  restoreSnapshot: (session: EditorTabSession) => void;
+  persistDocumentView: () => void;
+  activateSession: (session: EditorTabSession) => void;
 }
 
 interface AddEditorTabOptions {
   id?: string;
   title: string;
   sourceKey: string | null;
-  snapshot: EditorTabSession["editorSnapshot"];
+  snapshot: EditorTabSnapshot;
   workerService: EditorTabSession["workerService"];
-  thumbnailImages?: EditorTabSession["thumbnailImages"];
+  thumbnailImages?: Record<number, string>;
   disposePdfResources?: (() => void) | null;
   activate?: boolean;
 }
 
-type TabMetaPatch = Partial<
-  Pick<
-    EditorTabSession,
-    | "disposePdfResources"
-    | "isDirty"
-    | "sourceKey"
-    | "thumbnailImages"
-    | "title"
-  >
-> & {
-  editorSnapshot?: EditorTabSession["editorSnapshot"];
-};
-
 const nowIso = () => new Date().toISOString();
-
-const patchSession = (
-  session: EditorTabSession,
-  patch: TabMetaPatch,
-): EditorTabSession => ({
-  ...session,
-  ...patch,
-  editorSnapshot: patch.editorSnapshot ?? session.editorSnapshot,
-});
 
 export function useEditorTabsController({
   backend,
   windowId = CURRENT_EDITOR_WINDOW_ID,
-  captureSessionState,
-  restoreSnapshot,
+  persistDocumentView,
+  activateSession,
 }: UseEditorTabsControllerOptions) {
   const [workspaceBackend] = React.useState<EditorTabWorkspaceBackend>(
-    () => backend ?? createLocalSingleWindowTabBackend(),
+    () => backend ?? createLocalSingleWindowTabBackend(workspaceStore),
   );
 
   const [workspaceSnapshot, setWorkspaceSnapshot] = React.useState(() =>
@@ -115,38 +92,14 @@ export function useEditorTabsController({
     return workspaceBackend.getWindowSnapshot(windowId).sessions;
   }, [windowId, workspaceBackend]);
 
-  const captureCurrentTabIntoState = React.useCallback(() => {
+  const persistActiveTabView = React.useCallback(() => {
     const currentTabId = activeTabIdRef.current;
     if (!currentTabId) return;
 
     const currentSession = workspaceBackend.getSession(currentTabId);
     if (!currentSession) return;
-
-    const { snapshot, thumbnailImages } = captureSessionState();
-    workspaceBackend.updateSession(
-      currentTabId,
-      patchSession(currentSession, {
-        editorSnapshot: snapshot,
-        isDirty: snapshot.isDirty,
-        thumbnailImages,
-        title: snapshot.filename?.trim() || currentSession.title,
-      }),
-    );
-  }, [captureSessionState, workspaceBackend]);
-
-  const syncActiveTabMeta = React.useCallback(
-    (patch: TabMetaPatch) => {
-      const currentTabId = activeTabIdRef.current;
-      if (!currentTabId) return;
-      const currentSession = workspaceBackend.getSession(currentTabId);
-      if (!currentSession) return;
-      workspaceBackend.updateSession(
-        currentTabId,
-        patchSession(currentSession, patch),
-      );
-    },
-    [workspaceBackend],
-  );
+    persistDocumentView();
+  }, [persistDocumentView, workspaceBackend]);
 
   const activateTab = React.useCallback(
     (
@@ -162,7 +115,11 @@ export function useEditorTabsController({
       // Clicking the already-active tab must be a no-op.
       // Re-restoring the snapshot rewinds live editor state, which can
       // invalidate follow-page behavior and re-trigger thumbnail warmup.
-      if (currentTabId === tabId) {
+      // A same-tick transfer rollback can retain the ID after deactivation.
+      if (
+        currentTabId === tabId &&
+        nextTab.runtime.store === getActiveEditorView()
+      ) {
         return true;
       }
 
@@ -172,19 +129,7 @@ export function useEditorTabsController({
         !options?.skipCaptureCurrent
       ) {
         const currentSession = workspaceBackend.getSession(currentTabId);
-        if (currentSession) {
-          const { snapshot: currentSnapshot, thumbnailImages } =
-            captureSessionState();
-          workspaceBackend.updateSession(
-            currentTabId,
-            patchSession(currentSession, {
-              editorSnapshot: currentSnapshot,
-              isDirty: currentSnapshot.isDirty,
-              thumbnailImages,
-              title: currentSnapshot.filename?.trim() || currentSession.title,
-            }),
-          );
-        }
+        if (currentSession) persistDocumentView();
       }
 
       workspaceBackend.updateSession(tabId, {
@@ -196,13 +141,13 @@ export function useEditorTabsController({
       // If this ref still points at the previous tab, the new document snapshot can
       // be captured into the wrong session and corrupt that tab's title/render state.
       activeTabIdRef.current = tabId;
-      restoreSnapshot(nextTab);
+      activateSession(nextTab);
       return true;
     },
     [
-      captureSessionState,
+      persistDocumentView,
       getTabById,
-      restoreSnapshot,
+      activateSession,
       windowId,
       workspaceBackend,
     ],
@@ -211,18 +156,16 @@ export function useEditorTabsController({
   const addTab = React.useCallback(
     (options: AddEditorTabOptions) => {
       const session: EditorTabSession = {
+        runtime: createEditorTabRuntime(
+          options.snapshot,
+          options.thumbnailImages ?? {},
+        ),
         id:
           options.id ??
           `${windowId}_${Date.now()}_${tabsRef.current.length + 1}`,
         windowId,
-        title: options.title,
         sourceKey: options.sourceKey,
         lastActiveAt: nowIso(),
-        isDirty: options.snapshot.isDirty,
-        editorSnapshot: options.snapshot,
-        thumbnailImages: cloneEditorTabThumbnailImages(
-          options.thumbnailImages ?? {},
-        ),
         workerService: options.workerService,
         disposePdfResources: options.disposePdfResources ?? null,
       };
@@ -230,19 +173,7 @@ export function useEditorTabsController({
       const currentTabId = activeTabIdRef.current;
       if (options.activate && currentTabId) {
         const currentSession = workspaceBackend.getSession(currentTabId);
-        if (currentSession) {
-          const { snapshot: currentSnapshot, thumbnailImages } =
-            captureSessionState();
-          workspaceBackend.updateSession(
-            currentTabId,
-            patchSession(currentSession, {
-              editorSnapshot: currentSnapshot,
-              isDirty: currentSnapshot.isDirty,
-              thumbnailImages,
-              title: currentSnapshot.filename?.trim() || currentSession.title,
-            }),
-          );
-        }
+        if (currentSession) persistDocumentView();
       }
 
       workspaceBackend.addSession(windowId, session, {
@@ -253,16 +184,18 @@ export function useEditorTabsController({
         // `activateTab`: follow-up capture/persist work may run before the
         // subscription/effect cycle updates `activeTabId`.
         activeTabIdRef.current = session.id;
-        restoreSnapshot(session);
+        activateSession(session);
       }
       return session;
     },
-    [captureSessionState, restoreSnapshot, windowId, workspaceBackend],
+    [persistDocumentView, activateSession, windowId, workspaceBackend],
   );
 
   const removeTab = React.useCallback(
     (tabId: string) => {
       const target = workspaceBackend.removeSession(windowId, tabId);
+      if (target?.runtime?.store === getActiveEditorView())
+        activateEditorView();
       disposeEditorTabSessionResources(target);
       return target;
     },
@@ -270,6 +203,8 @@ export function useEditorTabsController({
   );
 
   const disposeAllTabs = React.useCallback(() => {
+    activateEditorView();
+    activeTabIdRef.current = null;
     const removedSessions = workspaceBackend.clearWindow(windowId);
     removedSessions.forEach((session) => {
       disposeEditorTabSessionResources(session);
@@ -311,8 +246,8 @@ export function useEditorTabsController({
     () =>
       tabs.map((tab) => ({
         id: tab.id,
-        title: tab.title,
-        isDirty: tab.isDirty,
+        title: getEditorTabTitle(tab),
+        isDirty: tab.runtime.store.document.getState().isDirty,
         isActive: tab.id === activeTabId,
       })),
     [activeTabId, tabs],
@@ -337,7 +272,7 @@ export function useEditorTabsController({
       windowLayout,
       addTab,
       activateTab,
-      captureCurrentTabIntoState,
+      persistActiveTabView,
       detachTabToNewWindow,
       disposeAllTabs,
       findTabBySourceKey,
@@ -346,7 +281,6 @@ export function useEditorTabsController({
       getTabById,
       moveTabToWindow,
       removeTab,
-      syncActiveTabMeta,
     }),
     [
       workspaceBackend,
@@ -357,7 +291,7 @@ export function useEditorTabsController({
       windowLayout,
       addTab,
       activateTab,
-      captureCurrentTabIntoState,
+      persistActiveTabView,
       detachTabToNewWindow,
       disposeAllTabs,
       findTabBySourceKey,
@@ -365,7 +299,6 @@ export function useEditorTabsController({
       getAdjacentTabId,
       moveTabToWindow,
       removeTab,
-      syncActiveTabMeta,
     ],
   );
 }

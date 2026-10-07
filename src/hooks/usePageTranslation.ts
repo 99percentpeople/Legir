@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
 import { pageTranslationService } from "@/services/pageTranslationService";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import { useShallow } from "zustand/react/shallow";
 import { useLanguage } from "@/components/language-provider";
 import { useEditorDocumentIdentityRuntime } from "@/app/editorRuntime";
@@ -14,7 +14,7 @@ export const usePageTranslation = () => {
   const { workerService, sessionRenderKey } =
     useEditorDocumentIdentityRuntime();
   const { t } = useLanguage();
-  const state = useEditorStore(
+  const state = useEditorView(
     useShallow((store) => ({
       pages: store.pages,
       documentPermissions: store.documentPermissions,

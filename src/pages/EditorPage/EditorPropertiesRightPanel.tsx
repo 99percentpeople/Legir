@@ -8,7 +8,7 @@ import {
   mergePdfPermissionDirtyScopes,
 } from "@/lib/pdfPermissions";
 import { selectPropertiesRightPanelState } from "@/store/selectors";
-import { useEditorStore } from "@/store/useEditorStore";
+import { useEditorView } from "@/store/useEditorView";
 import type { Annotation, FormField } from "@/types";
 
 type Props = Pick<
@@ -25,7 +25,7 @@ type Props = Pick<
 // This branch is mounted only for properties/document tabs. Unrelated control
 // updates retain the selected object's identity and do not wake this connector.
 export function EditorPropertiesRightPanel(props: Props) {
-  const state = useEditorStore(useShallow(selectPropertiesRightPanelState));
+  const state = useEditorView(useShallow(selectPropertiesRightPanelState));
   const isDocumentReady = state.documentLoadState === "ready";
 
   const handlePropertiesChange = (updates: Partial<FormField | Annotation>) => {

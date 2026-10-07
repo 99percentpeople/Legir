@@ -2,6 +2,7 @@ import * as React from "react";
 import { Popover as PopoverPrimitive } from "radix-ui";
 
 import { cn } from "@/utils/cn";
+import { useEditorTabIsActive } from "@/app/editorTabs/context";
 
 function Popover({
   ...props
@@ -21,6 +22,9 @@ function PopoverContent({
   sideOffset = 4,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  const isActive = useEditorTabIsActive();
+  // Portals live outside the hidden editor DOM, so inherit tab activity explicitly.
+  if (!isActive) return null;
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content

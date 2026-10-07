@@ -1,3 +1,4 @@
+import { getEditorTabTitle } from "./editorTabs/storeSnapshot";
 import { useCallback, useMemo, useState } from "react";
 
 import { useDesktopCloseRequestHandler } from "./useDesktopCloseRequestHandler";
@@ -19,7 +20,7 @@ interface UseEditorCloseFlowOptions {
       skipCaptureCurrent?: boolean;
     },
   ) => boolean;
-  captureCurrentTabIntoState: () => void;
+  persistActiveTabView: () => void;
   closeAllTabsAndWindow: () => Promise<void>;
   closeAllTabsToLanding: () => void;
   closeTabImmediately: (tabId: string) => { isLastTab: boolean };
@@ -32,7 +33,7 @@ interface UseEditorCloseFlowOptions {
 export const useEditorCloseFlow = ({
   activeTabId,
   activateTab,
-  captureCurrentTabIntoState,
+  persistActiveTabView,
   closeAllTabsAndWindow,
   closeAllTabsToLanding,
   closeTabImmediately,
@@ -57,7 +58,7 @@ export const useEditorCloseFlow = ({
       }
 
       if (activeTabId) {
-        captureCurrentTabIntoState();
+        persistActiveTabView();
       }
 
       const liveTabs = getTabsSnapshot().filter((tab) =>
@@ -73,7 +74,7 @@ export const useEditorCloseFlow = ({
       }
 
       const dirtyTargetIds = liveTabs
-        .filter((tab) => tab.isDirty)
+        .filter((tab) => tab.runtime.store.document.getState().isDirty)
         .map((tab) => tab.id);
 
       if (dirtyTargetIds.length === 0) {
@@ -111,7 +112,7 @@ export const useEditorCloseFlow = ({
     [
       activeTabId,
       activateTab,
-      captureCurrentTabIntoState,
+      persistActiveTabView,
       closeAllTabsAndWindow,
       closeAllTabsToLanding,
       closeTabImmediately,
@@ -194,7 +195,9 @@ export const useEditorCloseFlow = ({
 
         if (
           remainingLiveTabs.length === 0 ||
-          remainingLiveTabs.every((tab) => !tab.isDirty)
+          remainingLiveTabs.every(
+            (tab) => !tab.runtime.store.document.getState().isDirty,
+          )
         ) {
           await closeAllTabsAndWindow();
           return;
@@ -221,9 +224,10 @@ export const useEditorCloseFlow = ({
   }, []);
 
   const pendingCloseDocumentTitle = useMemo(() => {
-    return pendingCloseRequest
-      ? (getTabById(pendingCloseRequest.currentTabId)?.title ?? null)
+    const session = pendingCloseRequest
+      ? getTabById(pendingCloseRequest.currentTabId)
       : null;
+    return session ? getEditorTabTitle(session) : null;
   }, [getTabById, pendingCloseRequest]);
 
   return {

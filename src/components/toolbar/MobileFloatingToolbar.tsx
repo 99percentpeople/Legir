@@ -21,7 +21,8 @@ import {
 
 import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
-import { appEventBus, type AppEventMap } from "@/lib/eventBus";
+import { type AppEventMap } from "@/lib/eventBus";
+import { useEditorEventBus } from "@/app/editorTabs/context";
 import {
   canUseModeWithPdfPermissions,
   canUseToolWithPdfPermissions,
@@ -141,6 +142,7 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
   onShapeStyleChange,
   onStampStyleChange,
 }) => {
+  const appEventBus = useEditorEventBus();
   const { t } = useLanguage();
   const [shapeDraftState, setShapeDraftState] = React.useState<ShapeDraftState>(
     {
