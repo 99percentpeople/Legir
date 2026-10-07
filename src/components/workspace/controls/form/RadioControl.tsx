@@ -12,8 +12,10 @@ export const RadioControl: React.FC<FormControlProps> = (props) => {
     isSelectable,
     canFillFormValue = true,
     onUpdate,
+    onSelect,
   } = props;
   const style = data.style || {};
+  const canFill = isAnnotationMode && canFillFormValue && !data.readOnly;
   const rotationDeg =
     typeof data.rotationDeg === "number" && Number.isFinite(data.rotationDeg)
       ? data.rotationDeg
@@ -31,7 +33,7 @@ export const RadioControl: React.FC<FormControlProps> = (props) => {
   // It renders a circle inside.
 
   const handleInteraction = () => {
-    if (isAnnotationMode && canFillFormValue) {
+    if (canFill && isSelectable) {
       onUpdate(data.id, { isChecked: true });
     }
   };
@@ -42,13 +44,16 @@ export const RadioControl: React.FC<FormControlProps> = (props) => {
       showBorder={props.isSelected && isFormMode}
       resizable={true}
     >
-      <div
+      <button
+        type="button"
+        role="radio"
+        aria-label={data.toolTip || data.name}
+        aria-checked={!!data.isChecked}
+        disabled={!canFill || !isSelectable}
+        onFocus={() => onSelect(data.id)}
         className={cn(
           "relative flex h-full w-full items-center justify-center transition-colors",
-          isAnnotationMode &&
-            isSelectable &&
-            canFillFormValue &&
-            "cursor-pointer hover:bg-black/5",
+          canFill && isSelectable && "cursor-pointer hover:bg-black/5",
           isAnnotationMode && !isSelectable && "pointer-events-none",
           isFormMode && isSelectable && "pointer-events-none",
         )}
@@ -68,7 +73,7 @@ export const RadioControl: React.FC<FormControlProps> = (props) => {
             <div className="h-1/2 w-1/2 rounded-full bg-black"></div>
           )}
         </div>
-      </div>
+      </button>
     </ControlWrapper>
   );
 };

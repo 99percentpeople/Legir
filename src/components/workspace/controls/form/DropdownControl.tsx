@@ -17,6 +17,7 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
     onSelect,
   } = props;
   const style = data.style || {};
+  const canFill = canFillFormValue && !data.readOnly;
 
   const displayedValue = data.isMultiSelect
     ? data.value
@@ -64,10 +65,7 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
               "bg-blue-500/10 dark:bg-blue-400/10",
               !isSelectable && "hover:bg-blue-500/20",
             ),
-          isAnnotationMode &&
-            isSelectable &&
-            canFillFormValue &&
-            "hover:bg-black/5",
+          isAnnotationMode && isSelectable && canFill && "hover:bg-black/5",
           isAnnotationMode && !isSelectable && "pointer-events-none",
           isFormMode && isSelectable && "pointer-events-none",
         )}
@@ -106,15 +104,17 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
                   aria-describedby={data.toolTip || ""}
                   className="font-inherit h-full w-full space-y-0.5 overflow-auto bg-transparent p-1 text-inherit outline-none"
                   selectionMode="multiple"
+                  disabledKeys={canFill ? [] : (data.options ?? [])}
                   selectedKeys={
                     new Set(data.value ? data.value.split("\n") : [])
                   }
                   onSelectionChange={(keys) => {
-                    if (!canFillFormValue) return;
+                    if (!canFill) return;
                     const vals = Array.from(keys).map((k) => String(k));
                     onUpdate(data.id, { value: vals.join("\n") });
                   }}
                   aria-label={data.toolTip || "Multi-select dropdown"}
+                  onFocus={() => onSelect(data.id)}
                 >
                   {(data.options || []).map((opt, i) => (
                     <ListBoxItem
@@ -124,7 +124,7 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
                       textValue={opt}
                       className={({ isSelected }) =>
                         cn(
-                          "data-focus-visible:border-ring data-focus-visible:ring-ring/50 flex w-full cursor-pointer items-center justify-between rounded px-1 outline-none hover:bg-black/5 data-focus-visible:ring-[3px]",
+                          "data-focus-visible:border-ring data-focus-visible:ring-ring/50 flex w-full cursor-pointer items-center justify-between rounded px-1 outline-none hover:bg-black/5 data-disabled:cursor-default data-disabled:hover:bg-transparent data-focus-visible:ring-[3px]",
                           isSelected ? "bg-black/10 font-medium" : "",
                         )
                       }
@@ -146,8 +146,10 @@ export const DropdownControl: React.FC<FormControlProps> = (props) => {
                 <select
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   value={data.value || ""}
-                  disabled={!canFillFormValue}
-                  onChange={(e) => onUpdate(data.id, { value: e.target.value })}
+                  disabled={!canFill}
+                  onChange={(e) => {
+                    if (canFill) onUpdate(data.id, { value: e.target.value });
+                  }}
                   onPointerDown={(e) => e.stopPropagation()}
                   onFocus={() => {
                     if (isAnnotationMode) onSelect(data.id);

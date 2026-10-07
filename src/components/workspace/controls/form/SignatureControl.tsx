@@ -16,6 +16,7 @@ export const SignatureControl: React.FC<FormControlProps> = (props) => {
   } = props;
   const { t } = useLanguage();
   const style = data.style || {};
+  const canFill = canFillFormValue && !data.readOnly;
 
   const effectiveBorderStyle =
     style.borderStyle === "dashed"
@@ -36,7 +37,7 @@ export const SignatureControl: React.FC<FormControlProps> = (props) => {
   const showHelperBg = style.isTransparent && !props.isSelected;
 
   const handleInteraction = () => {
-    if (isAnnotationMode && canFillFormValue) {
+    if (isAnnotationMode && isSelectable && canFill) {
       // Open File Dialog
       const input = document.createElement("input");
       input.type = "file";
@@ -74,10 +75,7 @@ export const SignatureControl: React.FC<FormControlProps> = (props) => {
               "bg-blue-500/10 dark:bg-blue-400/10",
               !isSelectable && "hover:bg-blue-500/20",
             ),
-          isAnnotationMode &&
-            isSelectable &&
-            canFillFormValue &&
-            "hover:bg-black/5",
+          isAnnotationMode && isSelectable && canFill && "hover:bg-black/5",
           isAnnotationMode && !isSelectable && "pointer-events-none",
           isFormMode && isSelectable && "pointer-events-none",
         )}
@@ -104,7 +102,7 @@ export const SignatureControl: React.FC<FormControlProps> = (props) => {
                   : "object-contain",
               )}
             />
-            {isAnnotationMode && canFillFormValue && (
+            {isAnnotationMode && canFill && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -124,11 +122,11 @@ export const SignatureControl: React.FC<FormControlProps> = (props) => {
           <div
             className={cn(
               "text-muted-foreground/50 flex flex-col items-center justify-center",
-              isAnnotationMode && canFillFormValue ? "cursor-pointer" : "",
+              isAnnotationMode && canFill ? "cursor-pointer" : "",
             )}
           >
             {isAnnotationMode ? <ImageIcon size={16} /> : <PenLine size={16} />}
-            {isAnnotationMode && canFillFormValue && (
+            {isAnnotationMode && canFill && (
               <span className="text-[10px] opacity-70">Click to Sign</span>
             )}
           </div>

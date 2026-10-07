@@ -14,10 +14,14 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
     isFormMode,
     isAnnotationMode,
     isSelectable,
+    canFillFormValue = true,
     onUpdate,
     onSelect,
   } = props;
   const style = data.style || {};
+  const canFill = isAnnotationMode && canFillFormValue && !data.readOnly;
+  const maxLength =
+    data.maxLength && data.maxLength > 0 ? data.maxLength : undefined;
 
   const displayedValue = isFormMode
     ? data.value || data.defaultValue || data.name
@@ -82,6 +86,8 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
     fontSize: `calc(${style.fontSize || 12}px * var(--scale, 1))`,
     fontFamily,
     boxSizing: "border-box",
+    cursor:
+      isAnnotationMode && isSelectable && props.isSelected ? "text" : "inherit",
   };
 
   const showHelperBorder = (style.borderWidth ?? 1) === 0 && !props.isSelected;
@@ -104,11 +110,19 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
           isAnnotationMode && !isSelectable && "pointer-events-none",
         )}
         style={containerStyle}
-        onPointerDown={(_e) => {
-          // Forward event to parent handler (which we need to wire up in Workspace)
-          // For now, just stop propagation if we are selecting
-          // Note: We need to call the passed in onPointerDown from props if we add it
-          // props.onPointerDown?.(e);
+        onPointerDown={(e) => {
+          if (e.button !== 0 || !isAnnotationMode || !isSelectable) return;
+
+          const input = e.currentTarget.querySelector<
+            HTMLInputElement | HTMLTextAreaElement
+          >("input, textarea");
+          if (!input) return;
+
+          // Treat the border and unused field height as part of the input.
+          // Prevent the default pointer action from blurring it again.
+          e.preventDefault();
+          e.stopPropagation();
+          input.focus({ preventScroll: true });
         }}
       >
         {/* Helper Border Overlay */}
@@ -154,10 +168,11 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
           </div>
         ) : data.multiline ? (
           <textarea
-            readOnly={isFormMode || data.readOnly}
+            readOnly={!canFill}
+            maxLength={maxLength}
             tabIndex={isFormMode ? -1 : undefined}
             className={cn(
-              "no-scrollbar font-inherit block h-full w-full resize-none overflow-hidden border-none bg-transparent leading-tight text-inherit outline-none",
+              "no-scrollbar font-inherit block h-full w-full cursor-[inherit] resize-none overflow-hidden border-none bg-transparent leading-tight text-inherit outline-none",
               (isFormMode || !isSelectable) && "pointer-events-none",
             )}
             style={{
@@ -171,7 +186,9 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
                 : data.value || ""
             }
             placeholder={isAnnotationMode ? data.placeholder : undefined}
-            onChange={(e) => onUpdate(data.id, { value: e.target.value })}
+            onChange={(e) => {
+              if (canFill) onUpdate(data.id, { value: e.target.value });
+            }}
             onPointerDown={(e) => e.stopPropagation()}
             onFocus={() => {
               if (isAnnotationMode) onSelect(data.id);
@@ -180,10 +197,11 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
         ) : (
           <input
             type="text"
-            readOnly={isFormMode || data.readOnly}
+            readOnly={!canFill}
+            maxLength={maxLength}
             tabIndex={isFormMode ? -1 : undefined}
             className={cn(
-              "no-scrollbar font-inherit w-full overflow-hidden border-none bg-transparent leading-none text-inherit outline-none",
+              "no-scrollbar font-inherit w-full cursor-[inherit] overflow-hidden border-none bg-transparent leading-none text-inherit outline-none",
               (isFormMode || !isSelectable) && "pointer-events-none",
             )}
             style={{
@@ -200,7 +218,9 @@ export const TextControl: React.FC<FormControlProps> = (props) => {
                 : data.value || ""
             }
             placeholder={isAnnotationMode ? data.placeholder : undefined}
-            onChange={(e) => onUpdate(data.id, { value: e.target.value })}
+            onChange={(e) => {
+              if (canFill) onUpdate(data.id, { value: e.target.value });
+            }}
             onPointerDown={(e) => e.stopPropagation()}
             onFocus={() => {
               if (isAnnotationMode) onSelect(data.id);

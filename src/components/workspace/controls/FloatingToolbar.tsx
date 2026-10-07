@@ -15,15 +15,16 @@ export interface FloatingToolbarProps {
   sideOffset?: number;
 }
 
-export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
+export const FloatingToolbar: React.FC<FloatingToolbarProps> = (props) =>
+  props.isVisible ? <VisibleFloatingToolbar {...props} /> : null;
+
+const VisibleFloatingToolbar: React.FC<FloatingToolbarProps> = ({
   isVisible,
   children,
   className,
   style,
   sideOffset,
 }) => {
-  if (!isVisible) return null;
-
   const [isTransforming, setIsTransforming] = useState(() => {
     if (typeof document === "undefined") return false;
     return document.body.dataset.appControlTransforming === "1";
@@ -70,6 +71,10 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
         )}
         style={style}
         onPointerDown={(e) => e.stopPropagation()}
+        // This toolbar follows a canvas selection; opening or closing it must
+        // not take focus from a form input or an annotation's text editor.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         {/* Keep nested style popovers open while interacting inside a selected control. */}
         <WorkspacePointerDownDismissProvider value={false}>

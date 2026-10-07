@@ -114,8 +114,14 @@ export function useEditorPageKeyboardShortcuts({
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable;
+      const handlesSpace =
+        isInput ||
+        (target instanceof Element &&
+          !!target.closest(
+            "button, select, [role='button'], [role='checkbox'], [role='radio'], [role='switch'], [role='listbox'], [role='option'], [role^='menuitem'], [role='tab'], [role='slider'], [role='combobox']",
+          ));
 
-      if (event.key === " " && !isInput) {
+      if (event.key === " " && !handlesSpace) {
         event.preventDefault();
         event.stopPropagation();
         if (!currentState.keys.space) {

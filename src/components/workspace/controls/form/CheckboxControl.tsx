@@ -13,8 +13,10 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
     isSelectable,
     canFillFormValue = true,
     onUpdate,
+    onSelect,
   } = props;
   const style = data.style || {};
+  const canFill = isAnnotationMode && canFillFormValue && !data.readOnly;
 
   const effectiveBorderStyle =
     style.borderStyle === "dashed"
@@ -37,7 +39,7 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
   const showHelperBg = style.isTransparent && !props.isSelected;
 
   const handleInteraction = () => {
-    if (isAnnotationMode && canFillFormValue) {
+    if (canFill && isSelectable) {
       onUpdate(data.id, { isChecked: !data.isChecked });
     }
   };
@@ -48,7 +50,13 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
       showBorder={props.isSelected && isFormMode}
       resizable={true}
     >
-      <div
+      <button
+        type="button"
+        role="checkbox"
+        aria-label={data.toolTip || data.name}
+        aria-checked={!!data.isChecked}
+        disabled={!canFill || !isSelectable}
+        onFocus={() => onSelect(data.id)}
         className={cn(
           "relative flex h-full w-full items-center justify-center transition-colors",
           "overflow-hidden",
@@ -58,10 +66,7 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
               "bg-blue-500/10 dark:bg-blue-400/10",
               !isSelectable && "hover:bg-blue-500/20",
             ),
-          isAnnotationMode &&
-            isSelectable &&
-            canFillFormValue &&
-            "cursor-pointer hover:bg-black/5",
+          canFill && isSelectable && "cursor-pointer hover:bg-black/5",
           isAnnotationMode && !isSelectable && "pointer-events-none",
           isFormMode && isSelectable && "pointer-events-none",
         )}
@@ -77,7 +82,7 @@ export const CheckboxControl: React.FC<FormControlProps> = (props) => {
         )}
 
         {data.isChecked && <Check size="80%" className="text-blue-800" />}
-      </div>
+      </button>
     </ControlWrapper>
   );
 };
