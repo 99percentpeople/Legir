@@ -94,6 +94,7 @@ export interface EditorActions {
   ) => void;
   warmupThumbnails: (workerService?: PDFWorkerService) => void;
   cancelThumbnailWarmup: () => void;
+  deferThumbnailWarmup: () => void;
   loadDocument: (data: {
     pdfFile: File | null;
     pdfBytes: Uint8Array;

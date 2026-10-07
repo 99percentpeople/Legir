@@ -47,6 +47,7 @@ import {
   type TextSelectionToolbarState,
 } from "./hooks/useWorkspaceTextSelection";
 import { useWorkspaceViewport } from "./hooks/useWorkspaceViewport";
+import { useWorkspaceRenderActivity } from "./hooks/useWorkspaceRenderActivity";
 import { useWorkspaceTouchPinch } from "./hooks/useWorkspaceTouchPinch";
 import { useWorkspacePointerCoords } from "./hooks/useWorkspacePointerCoords";
 import { useWorkspaceStampDrop } from "./hooks/useWorkspaceStampDrop";
@@ -293,6 +294,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinchGestureActiveRef = useRef(false);
+
+  useWorkspaceRenderActivity(containerRef, editorState.scale);
 
   useEffect(() => {
     if (!containerRef.current) return;

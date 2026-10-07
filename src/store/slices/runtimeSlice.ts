@@ -9,6 +9,8 @@ import { revokeObjectUrlIfNeeded } from "@/store/helpers";
 import type { EditorStoreSlice } from "@/store/store.types";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
+const THUMBNAIL_INTERACTION_IDLE_MS = 600;
+
 export const createRuntimeSlice: EditorStoreSlice<
   Pick<
     import("@/store/store.types").EditorActions,
@@ -16,18 +18,45 @@ export const createRuntimeSlice: EditorStoreSlice<
     | "setProcessingStatus"
     | "warmupThumbnails"
     | "cancelThumbnailWarmup"
+    | "deferThumbnailWarmup"
   >
 > = (set, get) => {
   let thumbnailWarmupEpoch = 0;
   let thumbnailWarmupAbort: AbortController | null = null;
+  let thumbnailWarmupWorker: PDFWorkerService | null = null;
+  let thumbnailResumeTimer: ReturnType<typeof setTimeout> | null = null;
+  let thumbnailNotBefore = 0;
   const processingTasks = new Map<symbol, string | null>();
-  const cancelThumbnailWarmup = () => {
+  const stopThumbnailWarmup = () => {
     thumbnailWarmupEpoch += 1;
     thumbnailWarmupAbort?.abort();
     thumbnailWarmupAbort = null;
+    if (thumbnailResumeTimer !== null) clearTimeout(thumbnailResumeTimer);
+    thumbnailResumeTimer = null;
+  };
+  const cancelThumbnailWarmup = () => {
+    stopThumbnailWarmup();
+    thumbnailWarmupWorker = null;
+    thumbnailNotBefore = 0;
+  };
+  const scheduleThumbnailResume = () => {
+    if (!thumbnailWarmupWorker) return;
+    thumbnailResumeTimer = setTimeout(
+      () => {
+        thumbnailResumeTimer = null;
+        if (thumbnailWarmupWorker)
+          get().warmupThumbnails(thumbnailWarmupWorker);
+      },
+      Math.max(0, thumbnailNotBefore - Date.now()),
+    );
   };
   return {
     cancelThumbnailWarmup,
+    deferThumbnailWarmup: () => {
+      stopThumbnailWarmup();
+      thumbnailNotBefore = Date.now() + THUMBNAIL_INTERACTION_IDLE_MS;
+      scheduleThumbnailResume();
+    },
     withProcessing: async (status, fn) => {
       const token = Symbol();
       processingTasks.set(token, status ?? null);
@@ -55,7 +84,12 @@ export const createRuntimeSlice: EditorStoreSlice<
       if (!pdfBytes || pdfBytes.byteLength === 0) return;
       const runtimeWorkerService = workerService ?? pdfWorkerService;
 
-      cancelThumbnailWarmup();
+      stopThumbnailWarmup();
+      thumbnailWarmupWorker = runtimeWorkerService;
+      if (Date.now() < thumbnailNotBefore) {
+        scheduleThumbnailResume();
+        return;
+      }
       const epoch = thumbnailWarmupEpoch;
       thumbnailWarmupAbort = new AbortController();
       const { signal } = thumbnailWarmupAbort;
@@ -153,7 +187,12 @@ export const createRuntimeSlice: EditorStoreSlice<
 
           await new Promise<void>((resolve) => setTimeout(resolve, 0));
         }
-      })();
+      })().finally(() => {
+        if (thumbnailWarmupEpoch === epoch) {
+          thumbnailWarmupAbort = null;
+          thumbnailWarmupWorker = null;
+        }
+      });
     },
   };
 };

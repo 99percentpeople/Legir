@@ -9,6 +9,7 @@ import type {
   WorkerSuccessResponse,
 } from "@/services/pdfService/workerProtocol";
 import { mapOutline, resolveDest } from "@/services/pdfService/lib/outline";
+import { PdfRenderImageCache } from "@/services/pdfService/lib/renderImageCache";
 import {
   UNRESTRICTED_PDF_PERMISSIONS,
   getEffectivePdfPermissions,
@@ -181,6 +182,7 @@ type DocState = {
   loadingTask: pdfjsLib.PDFDocumentLoadingTask | null;
   pdfDoc: pdfjsLib.PDFDocumentProxy | null;
   pageCache: Map<number, MaybePromise<pdfjsLib.PDFPageProxy>>;
+  imageCache: PdfRenderImageCache;
 };
 
 const docs = new Map<string, DocState>();
@@ -195,6 +197,7 @@ const getDocState = (docId?: string): DocState => {
     pdfDoc: null,
     loadingTask: null,
     pageCache: new Map<number, MaybePromise<pdfjsLib.PDFPageProxy>>(),
+    imageCache: new PdfRenderImageCache(),
   };
   docs.set(id, created);
   return created;
@@ -601,6 +604,7 @@ const loadDocument = async (
   progressId?: string,
 ) => {
   const state = getDocState(docId);
+  state.imageCache.clear();
 
   if (state.loadingTask) {
     try {
@@ -663,6 +667,7 @@ const disposeDocument = async (docId: string) => {
   const state = docs.get(docId);
   if (!state) return;
   docs.delete(docId);
+  state.imageCache.clear();
 
   try {
     state.loadingTask?.destroy();
@@ -734,6 +739,7 @@ const renderToCanvas = async (
   const resolvedDocId = getDocId(docId);
 
   let renderTask: pdfjsLib.RenderTask | null = null;
+  let restoreImages: (() => void) | undefined;
 
   const { throwIfCancelled, cleanup } = registerCancellableTask(
     id,
@@ -770,6 +776,11 @@ const renderToCanvas = async (
     }
 
     const page = await getPageForDoc(resolvedDocId, pageIndex);
+    throwIfCancelled();
+
+    restoreImages = await getDocState(resolvedDocId).imageCache.prepare(
+      page.objs,
+    );
     throwIfCancelled();
 
     const viewport = page.getViewport({ scale, rotation: page.rotate });
@@ -840,6 +851,7 @@ const renderToCanvas = async (
 
     throw error;
   } finally {
+    restoreImages?.();
     cleanup();
   }
 };
