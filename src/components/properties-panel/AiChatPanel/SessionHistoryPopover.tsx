@@ -195,7 +195,7 @@ export function SessionHistoryPopover({
                 <div
                   key={session.id}
                   className={cn(
-                    "hover:bg-accent/50 relative grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-1.5 rounded-md px-2 py-1.5 transition-colors",
+                    "hover:bg-accent/50 relative flex items-center gap-1.5 rounded-md px-2 py-1.5 transition-colors",
                     session.id === activeSessionId ? "bg-accent/40" : null,
                   )}
                   style={{
@@ -269,18 +269,18 @@ export function SessionHistoryPopover({
                         )}
                       />
                     </button>
-                  ) : (
+                  ) : depth > 0 ? (
                     <span className="h-5 w-5 shrink-0" />
-                  )}
+                  ) : null}
                   <button
                     type="button"
-                    className="grid min-w-0 overflow-hidden text-left"
+                    className="grid min-w-0 flex-1 overflow-hidden text-left"
                     onClick={() => {
                       onSelectSession(session.id);
                       onOpenChange(false);
                     }}
                   >
-                    <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-1.5 overflow-hidden text-sm">
+                    <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-sm">
                       {depth > 0 ? (
                         <GitBranch
                           size={11}
@@ -319,9 +319,7 @@ export function SessionHistoryPopover({
                     >
                       <Trash2 size={12} />
                     </Button>
-                  ) : (
-                    <span className="h-6 w-6 shrink-0" />
-                  )}
+                  ) : null}
                 </div>
               );
             },
