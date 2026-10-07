@@ -625,6 +625,9 @@ const loadDocument = async (
     wasmUrl: PDFJS_WASM_URL,
     useSystemFonts: false,
     disableFontFace: false,
+    // Keep PDF.js's intermediate downsampling canvases on the GPU. Software
+    // canvases force large image readbacks during low-zoom and thumbnail renders.
+    enableHWA: true,
     stopAtErrors: false,
   });
 
@@ -739,7 +742,7 @@ const renderToCanvas = async (
   const resolvedDocId = getDocId(docId);
 
   let renderTask: pdfjsLib.RenderTask | null = null;
-  let restoreImages: (() => void) | undefined;
+  let restoreImages: (() => Promise<void>) | undefined;
 
   const { throwIfCancelled, cleanup } = registerCancellableTask(
     id,
@@ -776,11 +779,6 @@ const renderToCanvas = async (
     }
 
     const page = await getPageForDoc(resolvedDocId, pageIndex);
-    throwIfCancelled();
-
-    restoreImages = await getDocState(resolvedDocId).imageCache.prepare(
-      page.objs,
-    );
     throwIfCancelled();
 
     const viewport = page.getViewport({ scale, rotation: page.rotate });
@@ -830,6 +828,11 @@ const renderToCanvas = async (
     throwIfCancelled();
 
     renderTask = page.render(renderContext);
+    restoreImages = getDocState(resolvedDocId).imageCache.bindRenderTask(
+      renderTask,
+      page.objs,
+      pdfjsLib.OPS.dependency,
+    );
 
     await renderTask.promise;
 
@@ -851,7 +854,7 @@ const renderToCanvas = async (
 
     throw error;
   } finally {
-    restoreImages?.();
+    await restoreImages?.();
     cleanup();
   }
 };
@@ -873,6 +876,7 @@ const renderToImage = async (
   const resolvedDocId = getDocId(docId);
 
   let renderTask: pdfjsLib.RenderTask | null = null;
+  let restoreImages: (() => Promise<void>) | undefined;
 
   const { throwIfCancelled, cleanup } = registerCancellableTask(
     id,
@@ -931,6 +935,11 @@ const renderToImage = async (
       viewport,
       annotationMode,
     });
+    restoreImages = getDocState(resolvedDocId).imageCache.bindRenderTask(
+      renderTask,
+      page.objs,
+      pdfjsLib.OPS.dependency,
+    );
 
     await renderTask.promise;
     throwIfCancelled();
@@ -971,6 +980,7 @@ const renderToImage = async (
 
     throw error;
   } finally {
+    await restoreImages?.();
     cleanup();
   }
 };

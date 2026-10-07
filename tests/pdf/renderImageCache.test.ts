@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PdfRenderImageCache } from "@/services/pdfService/lib/renderImageCache";
+import type { RenderTask } from "pdfjs-dist";
 
 class Frame {
   close = vi.fn();
@@ -116,4 +117,85 @@ it("falls back for small, over-budget, unsupported, and failed image conversions
   vi.stubGlobal("VideoFrame", undefined);
   (await cache.prepare(page))();
   expect(createBitmap).toHaveBeenCalledOnce();
+});
+
+it("converts a late image dependency before its first paint and reuses it in later chunks", async () => {
+  const cache = new PdfRenderImageCache();
+  const originalOnContinue = vi.fn();
+  const operatorList = { fnArray: [] as number[], argsArray: [] as unknown[] };
+  const task = {
+    onContinue: originalOnContinue,
+    _internalRenderTask: { operatorList },
+  };
+  const source = new Frame();
+  const page = new Map<string, { bitmap: Frame }>();
+  const finish = cache.bindRenderTask(task, page, 1);
+  const runChunk = () =>
+    new Promise<void>((resolve) => task.onContinue!(resolve));
+  await runChunk();
+  expect(createBitmap).not.toHaveBeenCalled();
+  page.set("late-image", { bitmap: source });
+  operatorList.fnArray.push(1);
+  operatorList.argsArray.push(["late-image"]);
+  await runChunk();
+  const converted = page.get("late-image")!.bitmap;
+  expect(converted).not.toBe(source);
+  await runChunk();
+  expect(page.get("late-image")!.bitmap).toBe(converted);
+  expect(createBitmap).toHaveBeenCalledOnce();
+  await finish();
+  expect(task.onContinue).toBe(originalOnContinue);
+  expect(page.get("late-image")!.bitmap).toBe(source);
+  cache.clear();
+});
+
+it("does not resume a cancelled render when an image conversion finishes later", async () => {
+  const cache = new PdfRenderImageCache();
+  const task: Pick<RenderTask, "onContinue"> = { onContinue: vi.fn() };
+  const source = new Frame();
+  const page = objects(source);
+  const converted = bitmap();
+  let resolve!: (value: ReturnType<typeof bitmap>) => void;
+  const pending = new Promise<ReturnType<typeof bitmap>>((r) => {
+    resolve = r;
+  });
+  createBitmap.mockReturnValueOnce(pending);
+  const finish = cache.bindRenderTask(task, page);
+  const resume = vi.fn();
+  task.onContinue!(resume);
+  let drained = false;
+  const cleanup = finish().then(() => {
+    drained = true;
+  });
+  await Promise.resolve();
+  expect(drained).toBe(false);
+  resolve(converted);
+  await cleanup;
+  expect(resume).not.toHaveBeenCalled();
+  expect(page.get("image")!.bitmap).toBe(source);
+  cache.clear();
+  expect(converted.close).toHaveBeenCalledOnce();
+});
+
+it("does not let images from cancelled streams exhaust the current render's cache budget", async () => {
+  const cache = new PdfRenderImageCache(4_000_000);
+  const stale = new Frame();
+  const current = new Frame();
+  const page = new Map([
+    ["stale", { bitmap: stale }],
+    ["current", { bitmap: current }],
+  ]);
+  const task = {
+    onContinue: vi.fn() as RenderTask["onContinue"],
+    _internalRenderTask: {
+      operatorList: { fnArray: [1], argsArray: [["current"]] },
+    },
+  };
+  const finish = cache.bindRenderTask(task, page, 1);
+  await new Promise<void>((resolve) => task.onContinue(resolve));
+  expect(page.get("stale")!.bitmap).toBe(stale);
+  expect(page.get("current")!.bitmap).not.toBe(current);
+  expect(createBitmap).toHaveBeenCalledExactlyOnceWith(current);
+  await finish();
+  cache.clear();
 });

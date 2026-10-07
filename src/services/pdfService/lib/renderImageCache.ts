@@ -1,3 +1,5 @@
+import type { RenderTask } from "pdfjs-dist";
+
 // PDF.js can decode a large JPEG into a YUV VideoFrame. Drawing that frame
 // into every tile repeats conversion/upload work on the browser's GPU thread.
 // Keep an RGB bitmap for repeated renders without changing image resolution.
@@ -6,6 +8,50 @@ const DEFAULT_PIXEL_BUDGET = 64 * 1024 * 1024;
 
 type CachedImage = { bitmap: ImageBitmap; pixels: number };
 type ImageObject = { bitmap: VideoFrame | ImageBitmap };
+type RenderImageTask = Pick<RenderTask, "onContinue"> & {
+  _internalRenderTask?: unknown;
+};
+
+const createRenderObjectSelector = (
+  task: RenderImageTask,
+  objects: Iterable<readonly unknown[]>,
+  dependencyOperation?: number,
+) => {
+  // PDF.js retains resolved resources from cancelled streams/other annotation
+  // intents in page.objs. Only protect images used by this render's operators.
+  // This guarded adapter targets the pinned PDF.js version; fall back to all
+  // objects if a future version no longer exposes its current operator list.
+  type OperatorList = { fnArray: number[]; argsArray: unknown[] };
+  let previousList: OperatorList | undefined;
+  let scanned = 0;
+  const dependencies = new Set<unknown>();
+  return () => {
+    const internal = task._internalRenderTask as {
+      operatorList?: OperatorList;
+    } | null;
+    const list = internal?.operatorList;
+    if (
+      dependencyOperation === undefined ||
+      !list ||
+      !Array.isArray(list?.fnArray) ||
+      !Array.isArray(list?.argsArray)
+    )
+      return objects;
+    if (list !== previousList || list.fnArray.length < scanned) {
+      dependencies.clear();
+      scanned = 0;
+      previousList = list;
+    }
+    // Operator lists arrive in chunks. Scan each operation once, including
+    // vector-heavy pages that yield many times during a single render.
+    for (; scanned < list.fnArray.length; scanned++) {
+      if (list.fnArray[scanned] !== dependencyOperation) continue;
+      const ids = list.argsArray[scanned];
+      if (Array.isArray(ids)) ids.forEach((id) => dependencies.add(id));
+    }
+    return Array.from(objects).filter(([id]) => dependencies.has(id));
+  };
+};
 
 export class PdfRenderImageCache {
   private readonly images = new Map<VideoFrame, CachedImage>();
@@ -14,6 +60,50 @@ export class PdfRenderImageCache {
   private generation = 0;
 
   constructor(private readonly pixelBudget = DEFAULT_PIXEL_BUDGET) {}
+
+  bindRenderTask(
+    task: RenderImageTask,
+    objects: Iterable<readonly unknown[]>,
+    dependencyOperation?: number,
+  ) {
+    let finished = false;
+    let restore: (() => void) | undefined;
+    let pending = Promise.resolve();
+    const originalOnContinue = task.onContinue;
+    const getObjects = createRenderObjectSelector(
+      task,
+      objects,
+      dependencyOperation,
+    );
+    // Images can arrive after render() starts. PDF.js calls onContinue again
+    // when an image dependency resolves, before painting the next chunk.
+    task.onContinue = (resume: () => void) => {
+      restore?.();
+      restore = undefined;
+      pending = this.prepare(getObjects()).then(
+        (release) => {
+          if (finished) {
+            release();
+            return;
+          }
+          restore = release;
+          resume();
+        },
+        () => {
+          if (!finished) resume();
+        },
+      );
+    };
+    return async () => {
+      finished = true;
+      task.onContinue = originalOnContinue;
+      restore?.();
+      // cancel() can settle the render promise before createImageBitmap does.
+      // Drain that conversion before the worker starts another render, keeping
+      // temporary replacements and pixel-budget accounting serialized.
+      await pending;
+    };
+  }
 
   clear() {
     this.generation += 1;
