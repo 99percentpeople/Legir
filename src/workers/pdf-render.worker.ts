@@ -1,5 +1,7 @@
 import * as pdfjsLib from "pdfjs-dist";
-import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
+// WebView2 can leave nested worker script requests pending under Tauri's asset
+// protocol. Embed the parser worker so it starts from a Blob in both builds.
+import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker&inline";
 import type {
   WorkerErrorResponse,
   WorkerProgressResponse,

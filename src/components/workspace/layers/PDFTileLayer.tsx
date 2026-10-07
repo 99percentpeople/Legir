@@ -82,7 +82,7 @@ interface PDFTileLayerProps {
     tileMode: boolean;
     hasUsableTileBuffer: boolean;
     hasAnyTileRendered: boolean;
-    hasAllTilesRendered: boolean;
+    hasVisibleTilesRendered: boolean;
   }) => void;
 }
 
@@ -137,6 +137,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   const tileTransferredRef = useRef(new Set<string>());
   const tileRenderedRef = useRef(new Set<string>());
   const activeTileIdsRef = useRef<Set<string>>(new Set());
+  const updateTileQueueRef = useRef<(() => void) | null>(null);
 
   // NOTE: Canvas lifecycle invariants (important for preventing regressions):
   // - A tile canvas starts hidden and becomes visible only after a successful worker render.
@@ -261,10 +262,10 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         const prev = lastViewportRectNormRef.current;
         if (
           !prev ||
-          Math.abs(prev[0] - rectNorm[0]) > 0.01 ||
-          Math.abs(prev[1] - rectNorm[1]) > 0.01 ||
-          Math.abs(prev[2] - rectNorm[2]) > 0.01 ||
-          Math.abs(prev[3] - rectNorm[3]) > 0.01
+          Math.abs(prev[0] - rectNorm[0]) * w >= 1 ||
+          Math.abs(prev[1] - rectNorm[1]) * h >= 1 ||
+          Math.abs(prev[2] - rectNorm[2]) * w >= 1 ||
+          Math.abs(prev[3] - rectNorm[3]) * h >= 1
         ) {
           lastViewportRectNormRef.current = rectNorm;
           setViewportVersion((v) => v + 1);
@@ -613,7 +614,9 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     if (!workerService) return;
 
     const epoch = renderEpochRef.current;
-    let abortController: AbortController | null = null;
+    let disposed = false;
+    const inFlight = new Map<string, AbortController>();
+    const attempts = new Map<string, number>();
     let rafId: number | null = null;
 
     const renderTile = async (
@@ -687,13 +690,12 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
             el.style.visibility = "visible";
           }
 
-          if (!hasAnyTileRendered) {
+          if (tileRenderedRef.current.size === 1) {
             setHasAnyTileRendered(true);
           }
 
-          // Used to trigger React re-renders while tiles are progressively completing.
-          // This allows the parent to keep a full-page fallback visible until all tiles
-          // for the current epoch are rendered.
+          // Keep the fallback until the visible region is ready. Offscreen tiles
+          // are deliberately not rendered and must not delay first paint.
           if (tileProgressRafRef.current === null) {
             tileProgressRafRef.current = requestAnimationFrame(() => {
               tileProgressRafRef.current = null;
@@ -742,122 +744,98 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
       }
     };
 
-    rafId = requestAnimationFrame(() => {
-      abortController = new AbortController();
-      const signal = abortController.signal;
-
-      const MAX_IN_FLIGHT = 2;
-      let inFlight = 0;
-      let completed = 0;
-
-      const allPendingTiles = backTiles.filter(
-        (t) => !tileRenderedRef.current.has(t.canvasId),
+    const intersectsViewport = (tile: TileInfo, margin: number) => {
+      const rect = viewportRectNormRef.current;
+      return (
+        !!rect &&
+        tileIntersectsViewportRect(
+          tile,
+          backTilesPageW,
+          backTilesPageH,
+          rect,
+          backTilesMaxDim,
+          margin,
+        )
       );
-      const pendingTiles = allPendingTiles.slice();
-      const totalToRender = pendingTiles.length;
+    };
 
-      const attemptCount = new Map<string, number>();
+    const launchMore = () => {
+      if (disposed || renderEpochRef.current !== epoch) return;
 
-      const renderWithRetry = async (tile: TileInfo): Promise<boolean> => {
-        const count = attemptCount.get(tile.canvasId) ?? 0;
-        const ok = await renderTile(tile, signal);
-        if (
-          ok ||
-          signal.aborted ||
-          renderEpochRef.current !== epoch ||
-          count >= 1
-        ) {
-          return ok;
-        }
-        attemptCount.set(tile.canvasId, count + 1);
-        return renderTile(tile, signal);
-      };
+      // Keep useful work alive while panning. Cancel only requests that have
+      // left the retained neighborhood, or all requests when this scale ends.
+      for (const [canvasId, controller] of inFlight) {
+        if (!activeTileIdsRef.current.has(canvasId)) controller.abort();
+      }
 
-      const takeBestTile = (source: TileInfo[]): TileInfo | null => {
-        if (source.length === 0) return null;
-        const vc = viewportCenterRef.current;
+      const candidates = backTiles.filter(
+        (tile) =>
+          activeTileIdsRef.current.has(tile.canvasId) &&
+          !tileRenderedRef.current.has(tile.canvasId) &&
+          !inFlight.has(tile.canvasId) &&
+          (attempts.get(tile.canvasId) ?? 0) < 2 &&
+          intersectsViewport(tile, 0.5),
+      );
+      const center = viewportCenterRef.current;
+      const distance = (tile: TileInfo) =>
+        center
+          ? getDistanceSquaredBetweenPoints(
+              { x: tile.x + tile.w / 2, y: tile.y + tile.h / 2 },
+              { x: center[0], y: center[1] },
+            )
+          : tile.priority * tile.priority;
+      candidates.sort(
+        (a, b) =>
+          Number(intersectsViewport(b, 0)) - Number(intersectsViewport(a, 0)) ||
+          distance(a) - distance(b),
+      );
 
-        let bestIdx = 0;
-        if (vc) {
-          let bestP = Infinity;
-          for (let i = 0; i < source.length; i++) {
-            const t = source[i];
-            const p = getDistanceBetweenPoints(
-              { x: t.x + t.w / 2, y: t.y + t.h / 2 },
-              { x: vc[0], y: vc[1] },
-            );
-            if (p < bestP) {
-              bestP = p;
-              bestIdx = i;
+      // The worker rasterizes serially; a second request keeps its queue fed
+      // without flooding it with stale work during a gesture.
+      while (inFlight.size < 2 && candidates.length > 0) {
+        const tile = candidates.shift()!;
+        const controller = new AbortController();
+        inFlight.set(tile.canvasId, controller);
+        void renderTile(tile, controller.signal)
+          .then((ok) => {
+            if (ok) {
+              attempts.delete(tile.canvasId);
+            } else if (!controller.signal.aborted) {
+              attempts.set(
+                tile.canvasId,
+                (attempts.get(tile.canvasId) ?? 0) + 1,
+              );
             }
-          }
-        } else {
-          let bestP = source[0].priority;
-          for (let i = 1; i < source.length; i++) {
-            const p = source[i].priority;
-            if (p < bestP) {
-              bestP = p;
-              bestIdx = i;
-            }
-          }
-        }
+          })
+          .finally(() => {
+            inFlight.delete(tile.canvasId);
+            launchMore();
+          });
+      }
+    };
 
-        const [tile] = source.splice(bestIdx, 1);
-        return tile ?? null;
-      };
-
-      const takeNextTile = (): TileInfo | null => takeBestTile(pendingTiles);
-
-      const launchMore = () => {
-        if (signal.aborted) return;
-        if (renderEpochRef.current !== epoch) return;
-
-        while (inFlight < MAX_IN_FLIGHT) {
-          const tile = takeNextTile();
-          if (!tile) break;
-          inFlight += 1;
-
-          void renderWithRetry(tile)
-            .then(() => {
-              if (signal.aborted) return;
-              if (renderEpochRef.current !== epoch) return;
-            })
-            .finally(() => {
-              inFlight -= 1;
-              completed += 1;
-
-              if (signal.aborted) return;
-              if (renderEpochRef.current !== epoch) return;
-
-              if (completed >= totalToRender) {
-                return;
-              }
-
-              launchMore();
-            });
-        }
-      };
-
-      launchMore();
-    });
+    updateTileQueueRef.current = launchMore;
+    rafId = requestAnimationFrame(launchMore);
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      if (abortController) {
-        abortController.abort();
+      disposed = true;
+      if (updateTileQueueRef.current === launchMore) {
+        updateTileQueueRef.current = null;
       }
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      for (const controller of inFlight.values()) controller.abort();
     };
   }, [
     backTiles,
     backTilesKey,
     backTilesPageH,
     backTilesPageW,
+    backTilesMaxDim,
     isInView,
     page,
     pageIndex,
     scale,
     tileMode,
-    viewportVersion,
     workerService,
   ]);
 
@@ -875,35 +853,66 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     midTilesPageH > 0;
 
   const hasUsableTileBuffer =
-    hasUsableFrontTileBuffer || hasUsableMidTileBuffer;
+    hasUsableFrontTileBuffer ||
+    hasUsableMidTileBuffer ||
+    backTiles.some((tile) => tileRenderedRef.current.has(tile.canvasId));
   const showTileCanvases =
     tileMode || (!tileMode && hasUsableTileBuffer && !isRendered);
 
-  const hasAllTilesRendered =
+  const viewportRect = viewportRectNormRef.current;
+  const visibleTiles = viewportRect
+    ? backTiles.filter((tile) =>
+        tileIntersectsViewportRect(
+          tile,
+          backTilesPageW,
+          backTilesPageH,
+          viewportRect,
+          backTilesMaxDim,
+          0,
+        ),
+      )
+    : [];
+  const hasVisibleTilesRendered =
     tileProgressVersion >= 0 &&
     tileMode &&
-    backTilesKey !== "" &&
-    backTiles.length > 0 &&
-    backTiles.every((t) => tileRenderedRef.current.has(t.canvasId));
+    visibleTiles.length > 0 &&
+    visibleTiles.every((tile) => tileRenderedRef.current.has(tile.canvasId));
+
+  useEffect(() => {
+    if (!hasVisibleTilesRendered) return;
+    // Once the new viewport is covered, previous zoom levels no longer need
+    // to retain GPU buffers. Panning retains a neighborhood at the current scale.
+    if (frontTilesKey) {
+      setFrontTiles([]);
+      setFrontTilesKey("");
+      setFrontHasAnyRendered(false);
+    }
+    if (midTilesKey) {
+      setMidTiles([]);
+      setMidTilesKey("");
+    }
+  }, [
+    hasVisibleTilesRendered,
+    frontTilesKey,
+    midTilesKey,
+    tileProgressVersion,
+  ]);
 
   useEffect(() => {
     onStateChange?.({
       tileMode,
       hasUsableTileBuffer,
       hasAnyTileRendered,
-      hasAllTilesRendered,
+      hasVisibleTilesRendered,
     });
   }, [
-    hasAllTilesRendered,
+    hasVisibleTilesRendered,
     hasAnyTileRendered,
     hasUsableTileBuffer,
     onStateChange,
     tileMode,
+    tileProgressVersion,
   ]);
-
-  activeTileIdsRef.current = new Set(
-    [...frontTiles, ...midTiles, ...backTiles].map((t) => t.canvasId),
-  );
 
   const midTileIdSet = new Set(midTiles.map((t) => t.canvasId));
   const backTileIdSet = new Set(backTiles.map((t) => t.canvasId));
@@ -919,13 +928,35 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   pushTiles(frontTiles);
   pushTiles(midTiles);
   pushTiles(backTiles);
-  const allTiles = Array.from(tileByIdInPaintOrder.values());
+  const allTiles = Array.from(tileByIdInPaintOrder.values()).filter((tile) => {
+    if (!tileMode) return true;
+    const rect = viewportRectNormRef.current;
+    if (!rect) return false;
+    const isBack = backTileIdSet.has(tile.canvasId);
+    const isMid = midTileIdSet.has(tile.canvasId);
+    return tileIntersectsViewportRect(
+      tile,
+      isBack ? backTilesPageW : isMid ? midTilesPageW : frontTilesPageW,
+      isBack ? backTilesPageH : isMid ? midTilesPageH : frontTilesPageH,
+      rect,
+      (isBack ? backTilesMaxDim : isMid ? midTilesMaxDim : frontTilesMaxDim) ||
+        TILE_MAX_DIM,
+      1.5,
+    );
+  });
+  activeTileIdsRef.current = new Set(allTiles.map((tile) => tile.canvasId));
 
-  if (!showTileCanvases) {
-    return null;
-  }
+  useEffect(() => {
+    // Unmounting is necessary: a transferred HTML canvas cannot be transferred
+    // again. Returning to an evicted tile creates a fresh DOM canvas.
+    const evicted = Array.from(tileTransferredRef.current).filter(
+      (id) => !activeTileIdsRef.current.has(id),
+    );
+    releaseAndForgetCanvases(evicted);
+    updateTileQueueRef.current?.();
+  }, [viewportVersion, backTilesKey, frontTilesKey, midTilesKey, tileMode]);
 
-  void viewportVersion;
+  if (!showTileCanvases) return null;
 
   return (
     <>

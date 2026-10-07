@@ -55,12 +55,12 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     tileMode: boolean;
     hasUsableTileBuffer: boolean;
     hasAnyTileRendered: boolean;
-    hasAllTilesRendered: boolean;
+    hasVisibleTilesRendered: boolean;
   }>({
     tileMode: false,
     hasUsableTileBuffer: false,
     hasAnyTileRendered: false,
-    hasAllTilesRendered: false,
+    hasVisibleTilesRendered: false,
   });
 
   const renderedScaleRef = useRef<number | null>(null);
@@ -88,7 +88,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   const renderScale = useDeferredRenderScale({
     identity: pageRenderIdentity,
     scale,
-    immediate: !isRendered,
+    immediate: !isRendered && !tileState.hasUsableTileBuffer,
   });
 
   const updateImageData = useCallback(
@@ -405,7 +405,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     }
 
     if (tileState.tileMode) {
-      if (!tileState.hasAllTilesRendered) return;
+      if (!tileState.hasVisibleTilesRendered) return;
       reportPDFPageRenderLayerReady({
         pageIndex,
         layer: "canvas",
@@ -433,7 +433,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     isRendered,
     pageIndex,
     renderScale,
-    tileState.hasAllTilesRendered,
+    tileState.hasVisibleTilesRendered,
     tileState.tileMode,
     sessionRenderKey,
   ]);
@@ -444,7 +444,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     }
 
     const ready = tileState.tileMode
-      ? tileState.hasAllTilesRendered
+      ? tileState.hasVisibleTilesRendered
       : isRendered && renderedScaleRef.current === renderScale;
 
     reportPDFPageRenderLayerState({
@@ -458,17 +458,18 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     isRendered,
     pageIndex,
     renderScale,
-    tileState.hasAllTilesRendered,
+    tileState.hasVisibleTilesRendered,
     tileState.tileMode,
   ]);
 
   const hasUsableTileBuffer = tileState.hasUsableTileBuffer;
   const shouldHidePageCanvasForTiles =
-    tileState.tileMode && tileState.hasAllTilesRendered;
+    tileState.tileMode && tileState.hasVisibleTilesRendered;
   const showPlaceholderImage =
     !!placeholderImage &&
-    !hasUsableTileBuffer &&
-    (tileState.tileMode || (!tileState.tileMode && !isRendered));
+    (tileState.tileMode
+      ? !tileState.hasVisibleTilesRendered
+      : !isRendered && !hasUsableTileBuffer);
   const showSpinner = !hasUsableTileBuffer && !isRendered && !placeholderImage;
   const canvasADisplay =
     activeCanvas === "B" || !isInView || shouldHidePageCanvasForTiles

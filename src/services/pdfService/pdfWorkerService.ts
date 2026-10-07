@@ -679,7 +679,7 @@ class PDFWorkerService {
         return;
       }
       const { canvasIds, signal } = options;
-      const id = `releaseCanvas_${Date.now()}`;
+      const id = `releaseCanvas_${this.requestSeq++}_${Date.now()}`;
 
       if (signal?.aborted) {
         const err = new DOMException("Aborted", "AbortError");
