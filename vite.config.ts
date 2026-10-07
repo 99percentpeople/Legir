@@ -47,8 +47,6 @@ export default defineConfig(({ mode }) => {
     clearScreen: false,
     publicDir: isTauriEnv ? false : "public",
     server: {
-      port: 5172,
-      strictPort: true,
       host: host || false,
       hmr: host
         ? {

@@ -12,7 +12,6 @@ import {
   STAMP_LIBRARY_DRAG_TYPE,
 } from "@/lib/stampImage";
 import type { StampImageResource } from "@/types";
-import type { StampLibraryEntry } from "@/services/stampLibrary/types";
 import { cn } from "@/utils/cn";
 
 interface StampImageLibraryProps {
@@ -25,7 +24,7 @@ export const StampImageLibrary = ({
   onSelect,
 }: StampImageLibraryProps) => {
   const { t } = useLanguage();
-  const { entries, refresh, add, remove, markUsed } = useStampLibraryStore();
+  const { entries, refresh, add, remove } = useStampLibraryStore();
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [busy, setBusy] = React.useState(false);
   const [dragging, setDragging] = React.useState(false);
@@ -34,30 +33,23 @@ export const StampImageLibrary = ({
     void refresh().catch(() => toast.error(t("stamp.library_load_error")));
   }, [refresh, t]);
 
-  const selectImage = (entry: StampLibraryEntry) => {
-    onSelect(entry.image);
-    void markUsed(entry.id).catch(() =>
-      toast.error(t("stamp.library_save_error")),
-    );
-  };
-
   const importFiles = async (files: File[]) => {
     if (busy) return;
     setBusy(true);
     try {
-      let selected: StampLibraryEntry | undefined;
+      let selected: StampImageResource | undefined;
       for (const file of files) {
         if (!isStampImageFile(file)) continue;
         try {
           const asset = await loadStampImageFile(file);
           const resource = createStampImageResource(asset)!;
-          const entry = await add(file.name, resource, file);
-          selected ??= entry;
+          await add(file.name, resource, file);
+          selected ??= resource;
         } catch {
           toast.error(t("stamp.import_error", { name: file.name }));
         }
       }
-      if (selected) selectImage(selected);
+      if (selected) onSelect(selected);
     } finally {
       setBusy(false);
     }
@@ -95,7 +87,7 @@ export const StampImageLibrary = ({
         <button
           type="button"
           disabled={busy}
-          className="border-input text-muted-foreground hover:bg-accent focus-visible:ring-ring flex h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed p-2 text-xs focus-visible:ring-2 disabled:cursor-default disabled:opacity-50"
+          className="border-input text-muted-foreground hover:bg-accent focus-visible:ring-ring flex h-20 flex-col items-center justify-center gap-1 rounded-md border border-dashed p-2 text-xs focus-visible:ring-2 disabled:opacity-50"
           onClick={() => inputRef.current?.click()}
         >
           <ImagePlus size={20} />
@@ -110,11 +102,11 @@ export const StampImageLibrary = ({
               aria-label={entry.name}
               aria-pressed={image?.dataUrl === entry.image.dataUrl}
               className={cn(
-                "border-input bg-muted/20 focus-visible:ring-ring flex h-20 w-full cursor-pointer items-center justify-center rounded-md border p-2 focus-visible:ring-2",
+                "border-input bg-muted/20 focus-visible:ring-ring flex h-20 w-full items-center justify-center rounded-md border p-2 focus-visible:ring-2",
                 image?.dataUrl === entry.image.dataUrl &&
                   "border-primary ring-primary ring-1",
               )}
-              onClick={() => selectImage(entry)}
+              onClick={() => onSelect(entry.image)}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "copy";
                 event.dataTransfer.setData(STAMP_LIBRARY_DRAG_TYPE, entry.id);
@@ -132,7 +124,7 @@ export const StampImageLibrary = ({
               type="button"
               title={t("stamp.remove_image")}
               aria-label={t("stamp.remove_named_image", { name: entry.name })}
-              className="bg-background text-muted-foreground hover:text-destructive focus-visible:ring-ring absolute top-0 right-0 cursor-pointer rounded p-1 opacity-70 shadow-sm group-hover:opacity-100 focus-visible:ring-2"
+              className="bg-background text-muted-foreground hover:text-destructive focus-visible:ring-ring absolute top-0 right-0 rounded p-1 opacity-70 shadow-sm group-hover:opacity-100 focus-visible:ring-2"
               onClick={() =>
                 void remove(entry.id).catch(() =>
                   toast.error(t("stamp.library_save_error")),
@@ -161,7 +153,6 @@ export const StampImageLibrary = ({
             type="button"
             variant="outline"
             size="sm"
-            className="cursor-pointer"
             onClick={() =>
               void add(t("properties.image_stamp"), image).catch(() =>
                 toast.error(t("stamp.library_save_error")),

@@ -94,7 +94,7 @@ export const GeometryProperties: React.FC<
                   type="button"
                   variant="ghost"
                   size="icon-xs"
-                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="text-muted-foreground hover:text-foreground"
                   aria-label={t("common.actions.restore_original_ratio")}
                   disabled={!canRestoreRatio}
                   onClick={() => {
