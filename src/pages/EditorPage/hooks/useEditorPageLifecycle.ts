@@ -33,9 +33,7 @@ export function useEditorPageLifecycle({
     }
 
     const hasOpenDocument = pagesLength > 0;
-    const nextTitle = hasOpenDocument
-      ? `${filename || appName} - ${appName}`
-      : appName;
+    const nextTitle = hasOpenDocument ? filename || appName : appName;
 
     void setPlatformWindowTitle(nextTitle).catch(() => {
       // ignore
