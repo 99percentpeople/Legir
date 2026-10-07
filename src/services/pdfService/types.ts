@@ -20,6 +20,7 @@ import {
   PreservedSourceAnnotationRef,
   StampImageAppearance,
   StampImageResource,
+  ImageCompressionOptions,
 } from "@/types";
 
 // [x, y, width, height]
@@ -140,6 +141,10 @@ export interface IControlParser {
   parse(context: ParserContext): Promise<FormField[]> | FormField[];
 }
 
+export interface AnnotationExportOptions {
+  imageCompression?: ImageCompressionOptions;
+}
+
 export interface IAnnotationExporter {
   shouldExport(annotation: Annotation): boolean;
   save(
@@ -148,6 +153,7 @@ export interface IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
+    options?: AnnotationExportOptions,
   ): Promise<PDFRef | undefined> | PDFRef | undefined;
 }
 

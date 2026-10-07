@@ -2,6 +2,7 @@ import type React from "react";
 import { preload, type PreloadableLazyComponent } from "@/utils/preload";
 import { registry } from "./registry/ControlRegistry";
 import { Annotation, FieldType, FormField } from "@/types";
+import { getStampAspectRatio, restoreStampRectAspectRatio } from "@/lib/stamps";
 
 // Workspace control system.
 //
@@ -26,6 +27,9 @@ type ControlConfig = {
   supportsGeometrySizeEdit?:
     | boolean
     | ((data: FormField | Annotation) => boolean);
+  getAspectRatioRestoreUpdates?: (
+    data: FormField | Annotation,
+  ) => Partial<FormField | Annotation> | undefined;
 };
 
 const CONTROL_CONFIGS: ControlConfig[] = [
@@ -193,6 +197,22 @@ const CONTROL_CONFIGS: ControlConfig[] = [
     ),
     label: "Stamp",
     supportsGeometrySizeEdit: true,
+    getAspectRatioRestoreUpdates: (data) => {
+      if (data.type !== "stamp" || data.stamp?.kind !== "image" || !data.rect)
+        return undefined;
+      const size = data.stamp.image?.intrinsicSize;
+      if (
+        !getStampAspectRatio({
+          imageWidth: size?.width,
+          imageHeight: size?.height,
+        })
+      )
+        return undefined;
+      return {
+        rect: restoreStampRectAspectRatio(data.rect, size),
+        appearanceStreamContent: undefined,
+      };
+    },
   },
   {
     type: "shape",

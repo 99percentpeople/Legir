@@ -142,6 +142,9 @@ Persistence follows state ownership:
 
 - Recent files store lightweight metadata and previews.
 - `legir.preferences` stores app options, annotation style defaults and translation defaults through `src/store/preferencesStore.ts`. Fetched model caches are transient.
+- Custom stamp images live in IndexedDB under `stamp-image:` keys in the workspace store, through `src/services/stampLibrary/`. `src/store/stampLibraryStore.ts` shares the list across editor tabs and sorts it by last use, falling back to creation time for older entries. Placed annotations retain their own image resource, so removing a library entry does not change a document.
+- Image stamp `appearance.scaleMode` selects `contain` (default) or `fill` for both workspace display and PDF appearances. `FFStampImageScaleMode` preserves the choice and full annotation bounds across PDF saves; restoring the original ratio changes the rectangle around its center without changing the source image or display mode.
+- `options.imageCompression` selects original resolution or a target DPI for newly exported image stamps. Export downsamples according to physical image dimensions in PDF points (including page `UserUnit`), independently of viewer zoom. Image resources in the editor and library remain original; unchanged imported annotation appearances and SVG vectors retain their existing preservation path.
 - `legir.workspace-layout` stores panel visibility, selected sections, widths and page arrangement through `src/store/workspaceStore.ts`. Active tabs, dialogs, floating mode and fullscreen are transient.
 - `legir.document-views` stores each document's zoom, page and scroll position under its source key, through `src/services/platform/documentSession.ts`.
 

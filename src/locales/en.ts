@@ -378,6 +378,19 @@ const en = {
     },
   },
   stamp: {
+    display_mode: "Display mode",
+    keep_ratio: "Keep aspect ratio",
+    stretch: "Stretch",
+    custom_images: "Custom images",
+    library_hint:
+      "Click to select, or drag an image onto a page. Drop files here to add them.",
+    add_images: "Add images",
+    remove_image: "Remove from list",
+    remove_named_image: "Remove {name} from list",
+    save_image: "Save to list",
+    library_load_error: "Could not load saved images",
+    library_save_error: "Could not save the image list",
+    import_error: "Could not add {name}",
     upload_error: "Failed to load stamp image",
     download_error: "Failed to download stamp image",
     preset: {
@@ -558,6 +571,14 @@ const en = {
     exit_search: "Exit search",
   },
   settings: {
+    image_compression: {
+      title: "Image stamp compression",
+      original: "Keep original resolution",
+      by_dpi: "Compress by page DPI",
+      dpi: "Target DPI",
+      description:
+        "When saving a PDF, downsample new or edited image stamps to their actual size on the page. Images are never upscaled; transparency and vectors are preserved. The image library keeps the originals.",
+    },
     title: "Editor Settings",
     tabs: {
       general: "General",

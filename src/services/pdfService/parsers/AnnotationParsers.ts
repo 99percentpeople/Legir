@@ -2211,6 +2211,7 @@ export class StampParser implements IAnnotationParser {
           : "preset";
       const normalizedImageBox =
         kind === "image" &&
+        !annotation.stamp?.appearance?.scaleMode &&
         annotation.stamp?.appearance?.frame === "plain" &&
         annotation.stamp.appearance.box
           ? {
@@ -2263,6 +2264,7 @@ export class StampParser implements IAnnotationParser {
                     : undefined,
                   frame: annotation.stamp?.appearance?.frame,
                   source: annotation.stamp?.appearance?.source,
+                  scaleMode: annotation.stamp?.appearance?.scaleMode,
                 })
               : undefined,
         },

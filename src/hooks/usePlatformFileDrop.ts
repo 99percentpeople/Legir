@@ -13,18 +13,22 @@ import {
 interface UsePlatformFileDropOptions {
   enabled?: boolean;
   getTargetElement?: () => HTMLElement | null;
+  showOverlayFor?: (event: DragEvent) => boolean;
   onDrop: (payloads: PlatformDroppedPdf[]) => void | Promise<void>;
 }
 
 export const usePlatformFileDrop = ({
   enabled = true,
   getTargetElement,
+  showOverlayFor,
   onDrop,
 }: UsePlatformFileDropOptions) => {
   const [isFileDragActive, setIsFileDragActive] = useState(false);
   const isActiveRef = useRef(false);
   const getTargetElementRef = useRef(getTargetElement);
   const onDropRef = useRef(onDrop);
+  const showOverlayForRef = useRef(showOverlayFor);
+  showOverlayForRef.current = showOverlayFor;
 
   useEffect(() => {
     getTargetElementRef.current = getTargetElement;
@@ -70,6 +74,10 @@ export const usePlatformFileDrop = ({
   const handleDragEnter = useCallback(
     (event: DragEvent) => {
       if (!hasPlatformFileTransfer(event)) return;
+      if (showOverlayForRef.current && !showOverlayForRef.current(event)) {
+        setActive(false);
+        return;
+      }
       if (!isInsideScope(event)) return;
 
       event.preventDefault();
@@ -81,6 +89,10 @@ export const usePlatformFileDrop = ({
   const handleDragOver = useCallback(
     (event: DragEvent) => {
       if (!hasPlatformFileTransfer(event)) return;
+      if (showOverlayForRef.current && !showOverlayForRef.current(event)) {
+        setActive(false);
+        return;
+      }
 
       if (!isInsideScope(event)) {
         setActive(false);

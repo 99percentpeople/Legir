@@ -95,6 +95,7 @@ import {
   Annotation,
   AnnotationReply,
   PreservedSourceAnnotationRef,
+  ImageCompressionOptions,
 } from "@/types";
 import {
   applyImportedControlLayerOrders,
@@ -1307,6 +1308,9 @@ const buildPdfLibAnnotsByPageIndex = async (
       const stampSourceSvgSize = stampSourceSvgData
         ? getStampSvgIntrinsicSize(stampSourceSvgData)
         : undefined;
+      const stampImageScaleMode = pdfObjToString(
+        annot.lookup(PDFName.of(PDF_CUSTOM_KEYS.stampImageScaleMode)),
+      );
       let stampImage = createStampImageResource({
         dataUrl: stampSourceSvgData ?? undefined,
         width: stampSourceSvgSize?.width,
@@ -1372,6 +1376,18 @@ const buildPdfLibAnnotsByPageIndex = async (
           frame: stampAppearance?.frame ?? "plain",
           box: stampAppearance?.box,
           source: "native",
+        });
+      }
+      if (
+        stampAppearance?.source === "native" &&
+        (stampImageScaleMode === "contain" || stampImageScaleMode === "fill")
+      ) {
+        stampAppearance = createStampImageAppearance({
+          ...stampAppearance,
+          // The image box in the AP includes any contain-mode margins. Keep the
+          // full annotation rectangle so changing mode or resizing stays editable.
+          box: undefined,
+          scaleMode: stampImageScaleMode,
         });
       }
       let appearanceContent: string | undefined = undefined;
@@ -2134,6 +2150,7 @@ export const exportPDF = async (
     openPassword?: string | null;
     exportPassword?: string | null;
     removeTextUnderFlattenedFreetext?: boolean;
+    imageCompression?: ImageCompressionOptions;
     pageIndexes?: number[];
     preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
     flattenFormFields?: boolean;
@@ -2493,6 +2510,7 @@ export const exportPDF = async (
             annot,
             fontMap,
             viewport,
+            { imageCompression: options?.imageCompression },
           );
           if (exportedRef) {
             exportedAnnotationRefById.set(annot.id, exportedRef);

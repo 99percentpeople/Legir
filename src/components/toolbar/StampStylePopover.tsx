@@ -16,6 +16,7 @@ interface StampStylePopoverProps {
   value: StampStyleEditorValue | undefined;
   onChange: (updates: Partial<StampStyleEditorValue>) => void;
   onInteractionStart?: () => void;
+  showDisplayMode?: boolean;
   title: string;
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
@@ -26,6 +27,7 @@ export const StampStylePopover: React.FC<StampStylePopoverProps> = ({
   value,
   onChange,
   onInteractionStart,
+  showDisplayMode,
   title,
   side = "bottom",
   align = "center",
@@ -53,6 +55,7 @@ export const StampStylePopover: React.FC<StampStylePopoverProps> = ({
           value={value}
           onChange={onChange}
           onInteractionStart={onInteractionStart}
+          showDisplayMode={showDisplayMode}
         />
       </PopoverContent>
     </Popover>

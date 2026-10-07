@@ -20,17 +20,29 @@ import {
   drawImage,
   LineJoinStyle,
   setLineJoin,
+  pushGraphicsState,
+  popGraphicsState,
+  concatTransformationMatrix,
 } from "@cantoo/pdf-lib";
 import { Annotation } from "@/types";
 import { PDF_CUSTOM_KEYS } from "@/constants";
-import { IAnnotationExporter, ViewportLike } from "../types";
+import {
+  IAnnotationExporter,
+  ViewportLike,
+  type AnnotationExportOptions,
+} from "../types";
 import { applyPdfAnnotationCommentMetadata } from "../lib/annotationCommentMeta";
 import { setAppHighlightedText } from "../lib/annotationMetadata";
 import { hexToPdfColor } from "../lib/colors";
 import { generateInkAppearanceOps } from "../lib/ink";
 import { containsNonAscii, isSerifFamily } from "../lib/text";
 import { canFontEncodeText } from "../lib/font-selection";
-import { uiPointToPdfPoint, uiRectToPdfBounds } from "../lib/coords";
+import {
+  getPdfLibPageInfo,
+  uiPointToPdfPoint,
+  uiRectToPdfBounds,
+} from "../lib/coords";
+import { prepareStampImageForPdf } from "../lib/image-export";
 import {
   buildPdfRotationMatrix,
   getTransformedPdfRect,
@@ -69,111 +81,6 @@ import {
   getPageRotationCompensatedRect,
   getPdfAnnotationRotationFromControlRotation,
 } from "@/lib/controlRotation";
-
-const loadStampImageSource = async (
-  dataUrl: string,
-): Promise<CanvasImageSource> => {
-  const { bytes, mimeType } = decodeStampImageDataUrl(dataUrl);
-  const blob = new Blob([bytes], { type: mimeType });
-
-  if (typeof createImageBitmap === "function") {
-    try {
-      return await createImageBitmap(blob);
-    } catch {
-      // Fallback to HTMLImageElement below. Some environments expose
-      // createImageBitmap but cannot decode SVG or other browser-supported
-      // formats from blobs reliably.
-    }
-  }
-
-  if (typeof Image === "undefined" || typeof URL === "undefined") {
-    throw new Error("Image rasterization is unavailable in this environment.");
-  }
-
-  const objectUrl = URL.createObjectURL(blob);
-  try {
-    return await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("Failed to decode stamp image."));
-      image.src = objectUrl;
-    });
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-};
-
-const rasterizeStampImageToPngBytes = async (options: {
-  dataUrl: string;
-  width?: number;
-  height?: number;
-}) => {
-  const targetWidth = Math.max(
-    1,
-    Math.round(
-      (options.width && Number.isFinite(options.width) ? options.width : 256) *
-        2,
-    ),
-  );
-  const targetHeight = Math.max(
-    1,
-    Math.round(
-      (options.height && Number.isFinite(options.height)
-        ? options.height
-        : 256) * 2,
-    ),
-  );
-  const imageSource = await loadStampImageSource(options.dataUrl);
-  try {
-    const canvas =
-      typeof OffscreenCanvas === "function"
-        ? new OffscreenCanvas(targetWidth, targetHeight)
-        : (() => {
-            if (typeof document === "undefined") {
-              throw new Error(
-                "Canvas rasterization is unavailable in this environment.",
-              );
-            }
-            const element = document.createElement("canvas");
-            element.width = targetWidth;
-            element.height = targetHeight;
-            return element;
-          })();
-
-    const context =
-      typeof OffscreenCanvas === "function" && canvas instanceof OffscreenCanvas
-        ? canvas.getContext("2d")
-        : (canvas as HTMLCanvasElement).getContext("2d");
-    if (!context) {
-      throw new Error("Failed to initialize canvas for SVG stamp.");
-    }
-
-    context.clearRect(0, 0, targetWidth, targetHeight);
-    context.drawImage(imageSource, 0, 0, targetWidth, targetHeight);
-
-    const blob =
-      typeof OffscreenCanvas === "function" && canvas instanceof OffscreenCanvas
-        ? await canvas.convertToBlob({ type: "image/png" })
-        : await new Promise<Blob>((resolve, reject) => {
-            (canvas as HTMLCanvasElement).toBlob((value) => {
-              if (value) {
-                resolve(value);
-                return;
-              }
-              reject(new Error("Failed to encode SVG stamp image."));
-            }, "image/png");
-          });
-
-    return new Uint8Array(await blob.arrayBuffer());
-  } finally {
-    if (
-      typeof ImageBitmap !== "undefined" &&
-      imageSource instanceof ImageBitmap
-    ) {
-      imageSource.close();
-    }
-  }
-};
 
 const decodeSvgDataUrlToString = (dataUrl: string) => {
   const { bytes, mimeType } = decodeStampImageDataUrl(dataUrl);
@@ -1256,19 +1163,42 @@ const extractScratchPageAppearance = async (options: {
   page: PDFPage;
   svg: string;
   imageRect: { x: number; y: number; width: number; height: number };
+  intrinsicSize?: { width: number; height: number };
   fonts?: Record<string, PDFFont>;
 }) => {
   try {
     const embeddedSvg = await options.pdfDoc.embedSvg(options.svg);
     const scratchPage = PDFPage.create(options.pdfDoc);
     scratchPage.setSize(options.page.getWidth(), options.page.getHeight());
+    const intrinsic = options.intrinsicSize;
+    const hasIntrinsicSize =
+      intrinsic &&
+      Number.isFinite(intrinsic.width) &&
+      intrinsic.width > 0 &&
+      Number.isFinite(intrinsic.height) &&
+      intrinsic.height > 0;
+    if (hasIntrinsicSize) {
+      // Scale the rendered SVG, including its own viewBox alignment, like an <img>.
+      scratchPage.pushOperators(
+        pushGraphicsState(),
+        concatTransformationMatrix(
+          options.imageRect.width / intrinsic.width,
+          0,
+          0,
+          options.imageRect.height / intrinsic.height,
+          options.imageRect.x,
+          options.imageRect.y + options.imageRect.height,
+        ),
+      );
+    }
     scratchPage.drawSvg(embeddedSvg, {
-      x: options.imageRect.x,
-      y: options.imageRect.y + options.imageRect.height,
-      width: options.imageRect.width,
-      height: options.imageRect.height,
+      x: hasIntrinsicSize ? 0 : options.imageRect.x,
+      y: hasIntrinsicSize ? 0 : options.imageRect.y + options.imageRect.height,
+      width: hasIntrinsicSize ? intrinsic.width : options.imageRect.width,
+      height: hasIntrinsicSize ? intrinsic.height : options.imageRect.height,
       fonts: options.fonts,
     });
+    if (hasIntrinsicSize) scratchPage.pushOperators(popGraphicsState());
 
     const contents = scratchPage.node.Contents();
     const contentChunks: Uint8Array[] = [];
@@ -1709,6 +1639,7 @@ export class StampExporter implements IAnnotationExporter {
     annotation: Annotation,
     fontMap?: Map<string, PDFFont>,
     viewport?: ViewportLike,
+    options?: AnnotationExportOptions,
   ): Promise<PDFRef | undefined> {
     if (annotation.type !== "stamp" || !annotation.rect) {
       return undefined;
@@ -1796,20 +1727,9 @@ export class StampExporter implements IAnnotationExporter {
         | Awaited<ReturnType<typeof pdfDoc.embedPng>>
         | Awaited<ReturnType<typeof pdfDoc.embedJpg>>
         | undefined;
-      const { bytes, mimeType } = decodeStampImageDataUrl(stampImageData);
-
-      if (mimeType === "image/png") {
-        image = await pdfDoc.embedPng(bytes);
-      } else if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
-        image = await pdfDoc.embedJpg(bytes);
-      } else if (mimeType !== "image/svg+xml") {
-        const rasterizedBytes = await rasterizeStampImageToPngBytes({
-          dataUrl: stampImageData,
-          width: stampIntrinsicSize?.width,
-          height: stampIntrinsicSize?.height,
-        });
-        image = await pdfDoc.embedPng(rasterizedBytes);
-      }
+      const mimeType = stampImageData
+        .match(/^data:([^;,]+)/i)?.[1]
+        ?.toLowerCase();
 
       const imageName = "Im0";
       const isPlainImageStamp = stampAppearance?.frame === "plain";
@@ -1817,7 +1737,7 @@ export class StampExporter implements IAnnotationExporter {
         isPlainImageStamp || mimeType === "image/svg+xml";
       const shouldDrawCardFrame = !shouldTreatAsPlainImage;
       const normalizedImageBox = stampAppearance?.box;
-      const imageRect = normalizedImageBox
+      const imageBounds = normalizedImageBox
         ? {
             x:
               appearanceBounds.x +
@@ -1835,26 +1755,7 @@ export class StampExporter implements IAnnotationExporter {
             ),
           }
         : shouldTreatAsPlainImage
-          ? (() => {
-              const fitted = fitStampImageToRect(
-                {
-                  width: Math.max(1, appearanceBounds.width),
-                  height: Math.max(1, appearanceBounds.height),
-                },
-                stampIntrinsicSize?.width && stampIntrinsicSize?.height
-                  ? {
-                      width: stampIntrinsicSize.width,
-                      height: stampIntrinsicSize.height,
-                    }
-                  : undefined,
-              );
-              return {
-                x: appearanceBounds.x + fitted.x,
-                y: appearanceBounds.y + fitted.y,
-                width: fitted.width,
-                height: fitted.height,
-              };
-            })()
+          ? appearanceBounds
           : (() => {
               const inset = Math.max(
                 2,
@@ -1868,6 +1769,19 @@ export class StampExporter implements IAnnotationExporter {
                 height: Math.max(1, appearanceBounds.height - inset * 2),
               };
             })();
+      const fitted = fitStampImageToRect(
+        imageBounds,
+        stampAppearance?.scaleMode === "fill" ||
+          (normalizedImageBox && !stampAppearance?.scaleMode)
+          ? undefined
+          : stampIntrinsicSize,
+      );
+      const imageRect = {
+        x: imageBounds.x + fitted.x,
+        y: imageBounds.y + fitted.y,
+        width: fitted.width,
+        height: fitted.height,
+      };
 
       const svgAppearance =
         mimeType === "image/svg+xml" && decodedSvg
@@ -1876,6 +1790,7 @@ export class StampExporter implements IAnnotationExporter {
               page,
               svg: decodedSvg,
               imageRect,
+              intrinsicSize: stampIntrinsicSize,
             })
           : undefined;
 
@@ -1914,13 +1829,21 @@ export class StampExporter implements IAnnotationExporter {
         );
       }
 
-      if (!appearanceRef && !image && mimeType === "image/svg+xml") {
-        const rasterizedBytes = await rasterizeStampImageToPngBytes({
+      if (!appearanceRef) {
+        const userUnit = getPdfLibPageInfo(page).userUnit ?? 1;
+        const prepared = await prepareStampImageForPdf({
           dataUrl: stampImageData,
-          width: stampIntrinsicSize?.width,
-          height: stampIntrinsicSize?.height,
+          placement: {
+            width: imageRect.width * userUnit,
+            height: imageRect.height * userUnit,
+          },
+          compression: options?.imageCompression,
         });
-        image = await pdfDoc.embedPng(rasterizedBytes);
+        image =
+          prepared.mimeType === "image/jpeg" ||
+          prepared.mimeType === "image/jpg"
+            ? await pdfDoc.embedJpg(prepared.bytes)
+            : await pdfDoc.embedPng(prepared.bytes);
       }
 
       if (!appearanceRef && !image) return undefined;
@@ -2025,6 +1948,15 @@ export class StampExporter implements IAnnotationExporter {
 
     if (stampAnnot instanceof PDFDict) {
       applyPdfAnnotationCommentMetadata(stampAnnot, annotation);
+      if (
+        stampKind === "image" &&
+        (!stampAppearance?.box || stampAppearance.scaleMode)
+      ) {
+        stampAnnot.set(
+          PDFName.of(PDF_CUSTOM_KEYS.stampImageScaleMode),
+          PDFName.of(stampAppearance?.scaleMode ?? "contain"),
+        );
+      }
       if (
         stampKind === "image" &&
         stampSourceSvgData &&

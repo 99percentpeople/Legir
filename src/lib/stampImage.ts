@@ -13,6 +13,23 @@ export interface StampImageAsset {
   name: string;
 }
 
+export const STAMP_IMAGE_ACCEPT =
+  "image/png,image/jpeg,image/webp,image/svg+xml";
+export const STAMP_LIBRARY_DRAG_TYPE = "application/x-legir-stamp-image";
+
+export const isStampImageFile = (file: Pick<File, "type" | "name">) =>
+  /^(image\/(png|jpeg|jpg|webp|svg\+xml))$/i.test(file.type) ||
+  /\.(png|jpe?g|webp|svg)$/i.test(file.name);
+
+export const hasStampImageTransfer = (transfer: DataTransfer | null) =>
+  !!transfer &&
+  (Array.from(transfer.types).includes(STAMP_LIBRARY_DRAG_TYPE) ||
+    Array.from(transfer.items).some(
+      (item) =>
+        item.kind === "file" && isStampImageFile({ type: item.type, name: "" }),
+    ) ||
+    Array.from(transfer.files).some(isStampImageFile));
+
 export const createStampImageResource = (options: {
   dataUrl?: string;
   width?: number;
@@ -41,13 +58,21 @@ export const createStampImageResource = (options: {
 
 export const createStampImageAppearance = (options?: {
   frame?: StampImageFrame;
+  scaleMode?: StampImageAppearance["scaleMode"];
   box?: StampNormalizedBox;
   source?: StampAppearanceSource;
 }): StampImageAppearance | undefined => {
-  if (!options?.frame && !options?.box && !options?.source) return undefined;
+  if (
+    !options?.frame &&
+    !options?.box &&
+    !options?.source &&
+    !options?.scaleMode
+  )
+    return undefined;
 
   return {
     frame: options?.frame,
+    scaleMode: options?.scaleMode,
     box: options?.box,
     source: options?.source,
   };

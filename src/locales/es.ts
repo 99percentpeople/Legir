@@ -382,6 +382,19 @@ const es = {
     },
   },
   stamp: {
+    display_mode: "Modo de visualización",
+    keep_ratio: "Mantener proporciones",
+    stretch: "Estirar",
+    custom_images: "Imágenes personalizadas",
+    library_hint:
+      "Haz clic para seleccionar o arrastra una imagen a una página. Suelta archivos aquí para añadirlos.",
+    add_images: "Añadir imágenes",
+    remove_image: "Quitar de la lista",
+    remove_named_image: "Quitar {name} de la lista",
+    save_image: "Guardar en la lista",
+    library_load_error: "No se pudieron cargar las imágenes",
+    library_save_error: "No se pudo guardar la lista",
+    import_error: "No se pudo añadir {name}",
     upload_error: "No se pudo cargar la imagen del sello",
     download_error: "No se pudo descargar la imagen del sello",
     preset: {
@@ -564,6 +577,14 @@ const es = {
     exit_search: "Salir de la búsqueda",
   },
   settings: {
+    image_compression: {
+      title: "Compresión de sellos de imagen",
+      original: "Resolución original",
+      by_dpi: "Comprimir según DPI",
+      dpi: "DPI objetivo",
+      description:
+        "Al guardar el PDF, reduce la resolución de los sellos de imagen nuevos o editados según su tamaño en la página, sin ampliar. Conserva transparencias, vectores y los originales de la biblioteca.",
+    },
     title: "Configuración del editor",
     tabs: {
       general: "General",

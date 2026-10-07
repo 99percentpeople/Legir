@@ -55,22 +55,31 @@ export const StampFace: React.FC<StampFaceProps> = ({
       );
     }
 
+    const inset = Math.max(2, Math.min(viewBoxWidth, viewBoxHeight) * 0.03);
     const normalizedImageBox = imageBox ?? {
-      x: imageFrame === "plain" ? 0 : 2 / viewBoxWidth,
-      y: imageFrame === "plain" ? 0 : 2 / viewBoxHeight,
+      x: imageFrame === "plain" ? 0 : inset / viewBoxWidth,
+      y: imageFrame === "plain" ? 0 : inset / viewBoxHeight,
       width:
         imageFrame === "plain"
           ? 1
-          : Math.max(0, (viewBoxWidth - 4) / viewBoxWidth),
+          : Math.max(0, (viewBoxWidth - inset * 2) / viewBoxWidth),
       height:
         imageFrame === "plain"
           ? 1
-          : Math.max(0, (viewBoxHeight - 4) / viewBoxHeight),
+          : Math.max(0, (viewBoxHeight - inset * 2) / viewBoxHeight),
     };
     const imageX = normalizedImageBox.x * viewBoxWidth;
     const imageY = normalizedImageBox.y * viewBoxHeight;
     const imageWidth = normalizedImageBox.width * viewBoxWidth;
     const imageHeight = normalizedImageBox.height * viewBoxHeight;
+    const intrinsic = image?.intrinsicSize;
+    const useSvgViewport =
+      imageData.startsWith("data:image/svg+xml") &&
+      intrinsic &&
+      Number.isFinite(intrinsic.width) &&
+      intrinsic.width > 0 &&
+      Number.isFinite(intrinsic.height) &&
+      intrinsic.height > 0;
 
     return (
       <div
@@ -97,12 +106,35 @@ export const StampFace: React.FC<StampFaceProps> = ({
             height: `${(imageHeight / viewBoxHeight) * 100}%`,
           }}
         >
-          <img
-            src={imageData}
-            alt=""
-            draggable={false}
-            className="h-full w-full object-contain object-center"
-          />
+          {useSvgViewport ? (
+            <svg
+              className="h-full w-full"
+              viewBox={`0 0 ${intrinsic.width} ${intrinsic.height}`}
+              preserveAspectRatio={
+                imageAppearance?.scaleMode === "fill" ? "none" : "xMidYMid meet"
+              }
+              aria-hidden="true"
+            >
+              {/* Scale the intrinsic SVG image, preserving its internal alignment. */}
+              <image
+                href={imageData}
+                width={intrinsic.width}
+                height={intrinsic.height}
+              />
+            </svg>
+          ) : (
+            <img
+              src={imageData}
+              alt=""
+              draggable={false}
+              className={cn(
+                "h-full w-full object-center",
+                imageAppearance?.scaleMode === "fill"
+                  ? "object-fill"
+                  : "object-contain",
+              )}
+            />
+          )}
         </div>
       </div>
     );

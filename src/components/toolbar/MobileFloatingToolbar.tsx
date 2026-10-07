@@ -421,7 +421,10 @@ const MobileFloatingToolbar: React.FC<MobileFloatingToolbarProps> = ({
         return (
           <StampStylePopover
             value={editorState.stampStyle}
-            onChange={(style) => onStampStyleChange?.(style)}
+            onChange={(style) => {
+              onStampStyleChange?.(style);
+              if (style.image || style.presetId) onToolChange("draw_stamp");
+            }}
             title={t("toolbar.stamp_properties")}
             side="top"
           >

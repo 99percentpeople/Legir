@@ -385,6 +385,19 @@ const fr = {
     },
   },
   stamp: {
+    display_mode: "Mode d’affichage",
+    keep_ratio: "Conserver les proportions",
+    stretch: "Étirer",
+    custom_images: "Images personnalisées",
+    library_hint:
+      "Cliquez pour sélectionner ou faites glisser une image sur une page. Déposez des fichiers ici pour les ajouter.",
+    add_images: "Ajouter des images",
+    remove_image: "Retirer de la liste",
+    remove_named_image: "Retirer {name} de la liste",
+    save_image: "Enregistrer dans la liste",
+    library_load_error: "Impossible de charger les images",
+    library_save_error: "Impossible d’enregistrer la liste",
+    import_error: "Impossible d’ajouter {name}",
     upload_error: "Impossible de charger l'image du tampon",
     download_error: "Impossible de télécharger l'image du tampon",
     preset: {
@@ -566,6 +579,14 @@ const fr = {
     exit_search: "Quitter la recherche",
   },
   settings: {
+    image_compression: {
+      title: "Compression des tampons image",
+      original: "Résolution d’origine",
+      by_dpi: "Compresser selon le DPI",
+      dpi: "DPI cible",
+      description:
+        "À l’enregistrement du PDF, réduit la résolution des tampons image ajoutés ou modifiés selon leur taille sur la page, sans agrandissement. Transparence, vecteurs et originaux de la bibliothèque sont conservés.",
+    },
     title: "Paramètres de l'éditeur",
     tabs: {
       general: "Général",

@@ -19,6 +19,7 @@ import {
 } from "@/constants";
 import { clampAiChatCompressionThresholdPercent } from "@/services/ai/chat/runtime/compression/threshold";
 import { EMPTY_PDF_PERMISSION_DIRTY_SCOPES } from "@/lib/pdfPermissions";
+import { normalizeImageCompression } from "@/lib/imageCompression";
 import type {
   AppOptions,
   EditorState,
@@ -269,6 +270,7 @@ export const mergeEditorOptions = (
   if (!patch) {
     return {
       ...base,
+      imageCompression: normalizeImageCompression(base.imageCompression),
       apiProxy: normalizeApiProxyOptions(base.apiProxy),
       translation: normalizeTranslationOptions(base.translation),
       llm: normalizeLlmOptions(base.llm),
@@ -279,6 +281,10 @@ export const mergeEditorOptions = (
   return {
     ...base,
     ...patch,
+    imageCompression: normalizeImageCompression({
+      ...base.imageCompression,
+      ...patch.imageCompression,
+    }),
     ...(patch.llm
       ? {
           llm: normalizeLlmOptions(mergeLlmOptions(base.llm, patch.llm)),

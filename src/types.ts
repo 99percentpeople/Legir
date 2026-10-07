@@ -311,6 +311,7 @@ export interface StampImageResource {
 
 export interface StampImageAppearance {
   frame?: StampImageFrame;
+  scaleMode?: "contain" | "fill";
   box?: StampNormalizedBox;
   source?: StampAppearanceSource;
 }
@@ -416,12 +417,18 @@ export interface AiChatOptions {
   reasoning: AiChatReasoningOptions;
 }
 
+export interface ImageCompressionOptions {
+  mode: "original" | "dpi";
+  dpi: number;
+}
+
 export interface AppOptions {
   snappingOptions: SnappingOptions;
   debugOptions: DebugOptions;
   userName: string;
   thumbnailsLayout: ThumbnailsLayoutMode;
   removeTextUnderFlattenedFreetext: boolean;
+  imageCompression: ImageCompressionOptions;
 
   apiProxy: ApiProxyOptions;
   translation: TranslationOptions;

@@ -1,14 +1,19 @@
 import React from "react";
-import { toast } from "sonner";
 
 import { useLanguage } from "@/components/language-provider";
-import { ImageUploadField } from "@/components/ui/image-upload-field";
+import { StampImageLibrary } from "./StampImageLibrary";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { StampImageAppearance, StampImageResource } from "@/types";
 import { cn } from "@/utils/cn";
-import { loadStampImageFile } from "@/lib/stampImage";
 import {
   DEFAULT_STAMP_OPACITY,
   DEFAULT_STAMP_PRESET_ID,
@@ -32,6 +37,7 @@ interface StampStyleEditorProps {
   value: StampStyleEditorValue | undefined;
   onChange: (updates: Partial<StampStyleEditorValue>) => void;
   onInteractionStart?: () => void;
+  showDisplayMode?: boolean;
   className?: string;
 }
 
@@ -39,37 +45,14 @@ export const StampStyleEditor: React.FC<StampStyleEditorProps> = ({
   value,
   onChange,
   onInteractionStart,
+  showDisplayMode = false,
   className,
 }) => {
   const { t } = useLanguage();
+  const scaleModeId = React.useId();
   const kind = normalizeStampKind(value?.kind);
   const presetId = value?.presetId ?? DEFAULT_STAMP_PRESET_ID;
   const opacity = normalizeStampOpacity(value?.opacity, DEFAULT_STAMP_OPACITY);
-
-  const handleImageUpload = async (file: File) => {
-    onInteractionStart?.();
-
-    try {
-      const image = await loadStampImageFile(file);
-      onChange({
-        kind: "image",
-        image: {
-          dataUrl: image.dataUrl,
-          intrinsicSize: {
-            width: image.width,
-            height: image.height,
-          },
-        },
-        imageAppearance: {
-          frame: "plain",
-        },
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : t("stamp.upload_error");
-      toast.error(message);
-    }
-  };
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -126,24 +109,51 @@ export const StampStyleEditor: React.FC<StampStyleEditorProps> = ({
           </div>
         </TabsContent>
 
-        <TabsContent value="image" className="space-y-2">
-          <ImageUploadField
-            imageData={value?.image?.dataUrl}
-            alt={t("properties.image_stamp")}
-            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-            uploadLabel={t("properties.upload_image")}
-            replaceLabel={t("properties.replace_image")}
-            onUpload={handleImageUpload}
-            preview={
-              <StampFace
-                kind="image"
-                image={value?.image}
-                imageAppearance={value?.imageAppearance ?? { frame: "plain" }}
-                opacity={1}
-                className="overflow-hidden rounded"
-              />
-            }
+        <TabsContent value="image" className="space-y-4">
+          <StampImageLibrary
+            image={value?.image}
+            onSelect={(image) => {
+              onInteractionStart?.();
+              onChange({
+                kind: "image",
+                image,
+                imageAppearance: {
+                  frame: "plain",
+                  scaleMode: value?.imageAppearance?.scaleMode ?? "contain",
+                },
+              });
+            }}
           />
+          {showDisplayMode && (
+            <div className="space-y-2">
+              <Label htmlFor={scaleModeId}>{t("stamp.display_mode")}</Label>
+              <Select
+                value={value?.imageAppearance?.scaleMode ?? "contain"}
+                onValueChange={(scaleMode) => {
+                  if (scaleMode !== "contain" && scaleMode !== "fill") return;
+                  onInteractionStart?.();
+                  onChange({
+                    imageAppearance: {
+                      ...value?.imageAppearance,
+                      frame: value?.imageAppearance?.frame ?? "plain",
+                      box: undefined,
+                      scaleMode,
+                    },
+                  });
+                }}
+              >
+                <SelectTrigger id={scaleModeId} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contain">
+                    {t("stamp.keep_ratio")}
+                  </SelectItem>
+                  <SelectItem value="fill">{t("stamp.stretch")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

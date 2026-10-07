@@ -176,6 +176,8 @@ export const StampControl: React.FC<AnnotationControlProps> = (props) => {
         sideOffset={32}
       >
         <StampStylePopover
+          showDisplayMode
+          onInteractionStart={onTriggerHistorySave}
           value={{
             kind: stampKind,
             presetId: stampPresetId,
@@ -260,6 +262,8 @@ export const StampControl: React.FC<AnnotationControlProps> = (props) => {
             label={stampLabel}
             image={stampImage}
             imageAppearance={stampAppearance ?? { frame: "plain" }}
+            viewBoxWidth={data.rect.width}
+            viewBoxHeight={data.rect.height}
             opacity={opacity}
           />
         </div>

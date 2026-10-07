@@ -319,13 +319,20 @@ export const getStampAspectRatio = (options?: {
   return undefined;
 };
 
-export const getDefaultStampDimensions = (options?: {
+interface StampPlacementOptions {
   kind?: StampKind;
   presetId?: StampPresetId;
   label?: string | null;
   imageWidth?: number;
   imageHeight?: number;
-}) => {
+  scale?: number;
+  viewportWidth?: number;
+  viewportHeight?: number;
+  pageWidth?: number;
+  pageHeight?: number;
+}
+
+export const getDefaultStampDimensions = (options?: StampPlacementOptions) => {
   if (options?.kind !== "image") {
     return getPresetStampDimensions({
       presetId: options?.presetId,
@@ -333,41 +340,58 @@ export const getDefaultStampDimensions = (options?: {
     });
   }
 
-  if (
-    options?.kind === "image" &&
-    typeof options.imageWidth === "number" &&
-    Number.isFinite(options.imageWidth) &&
-    options.imageWidth > 0 &&
-    typeof options.imageHeight === "number" &&
-    Number.isFinite(options.imageHeight) &&
-    options.imageHeight > 0
-  ) {
-    return {
-      width: Math.max(1, Math.round(options.imageWidth)),
-      height: Math.max(1, Math.round(options.imageHeight)),
-    };
-  }
-
+  const scale = isPositiveFiniteNumber(options.scale) ? options.scale : 1;
+  const width = isPositiveFiniteNumber(options.imageWidth)
+    ? options.imageWidth
+    : DEFAULT_STAMP_WIDTH;
+  const height = isPositiveFiniteNumber(options.imageHeight)
+    ? options.imageHeight
+    : DEFAULT_STAMP_HEIGHT;
+  // Size new images in CSS pixels, then convert to PDF space. Keep both large
+  // source images and stamps on small pages/windows comfortably in view.
+  const maxWidth = Math.min(
+    240,
+    isPositiveFiniteNumber(options.viewportWidth)
+      ? options.viewportWidth * 0.4
+      : Infinity,
+    isPositiveFiniteNumber(options.pageWidth)
+      ? options.pageWidth * scale * 0.5
+      : Infinity,
+  );
+  const maxHeight = Math.min(
+    180,
+    isPositiveFiniteNumber(options.viewportHeight)
+      ? options.viewportHeight * 0.4
+      : Infinity,
+    isPositiveFiniteNumber(options.pageHeight)
+      ? options.pageHeight * scale * 0.5
+      : Infinity,
+  );
+  const fit = Math.min(1, maxWidth / width, maxHeight / height);
   return {
-    width: DEFAULT_STAMP_WIDTH,
-    height: DEFAULT_STAMP_HEIGHT,
+    width: (width * fit) / scale,
+    height: (height * fit) / scale,
   };
 };
 
 export const getStampRectAtPoint = (
   point: { x: number; y: number },
-  options?: {
-    kind?: StampKind;
-    presetId?: StampPresetId;
-    label?: string | null;
-    imageWidth?: number;
-    imageHeight?: number;
-  },
+  options?: StampPlacementOptions,
 ) => {
   const size = getDefaultStampDimensions(options);
   return {
-    x: point.x - size.width / 2,
-    y: point.y - size.height / 2,
+    x: isPositiveFiniteNumber(options?.pageWidth)
+      ? Math.max(
+          0,
+          Math.min(options.pageWidth - size.width, point.x - size.width / 2),
+        )
+      : point.x - size.width / 2,
+    y: isPositiveFiniteNumber(options?.pageHeight)
+      ? Math.max(
+          0,
+          Math.min(options.pageHeight - size.height, point.y - size.height / 2),
+        )
+      : point.y - size.height / 2,
     width: size.width,
     height: size.height,
   };

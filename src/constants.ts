@@ -5,6 +5,7 @@ import {
   type AiProviderId,
 } from "./services/ai/providers/catalog";
 import { pdfViewerScaleToWorkspaceScale } from "./lib/pdfScale";
+import { DEFAULT_IMAGE_COMPRESSION } from "./lib/imageCompression";
 
 export const DEFAULT_SCALE = pdfViewerScaleToWorkspaceScale(1);
 export const MIN_EDITOR_SCALE = pdfViewerScaleToWorkspaceScale(0.25);
@@ -101,6 +102,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
     userName: "",
     thumbnailsLayout: "single",
     removeTextUnderFlattenedFreetext: true,
+    imageCompression: { ...DEFAULT_IMAGE_COMPRESSION },
     apiProxy: {
       tauriForwardEnabled: false,
       proxyUrlEnabled: false,
@@ -255,4 +257,5 @@ export const PDF_CUSTOM_KEYS = {
   startArrowStyle: "FFStartArrowStyle",
   endArrowStyle: "FFEndArrowStyle",
   stampSourceSvgData: "FFStampSourceSvgData",
+  stampImageScaleMode: "FFStampImageScaleMode",
 } as const;

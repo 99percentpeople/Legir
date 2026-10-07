@@ -370,6 +370,18 @@ const zhTW = {
     },
   },
   stamp: {
+    display_mode: "顯示方式",
+    keep_ratio: "保持比例",
+    stretch: "拉伸",
+    custom_images: "自訂圖片",
+    library_hint: "點擊選擇，或將圖片拖到頁面。也可拖入檔案新增至清單。",
+    add_images: "新增圖片",
+    remove_image: "從清單移除",
+    remove_named_image: "從清單移除 {name}",
+    save_image: "儲存至清單",
+    library_load_error: "載入圖片清單失敗",
+    library_save_error: "儲存圖片清單失敗",
+    import_error: "無法新增 {name}",
     upload_error: "載入圖章圖片失敗",
     download_error: "下載圖章圖片失敗",
     preset: {
@@ -545,6 +557,14 @@ const zhTW = {
     exit_search: "退出搜尋",
   },
   settings: {
+    image_compression: {
+      title: "圖片圖章壓縮",
+      original: "保留原始解析度",
+      by_dpi: "依頁面 DPI 壓縮",
+      dpi: "目標 DPI",
+      description:
+        "儲存 PDF 時，依圖片在頁面上的實際大小縮小新增或修改的圖片圖章。僅降低解析度，保留透明背景與向量圖；圖片清單保留原圖。",
+    },
     title: "編輯器設定",
     tabs: {
       general: "通用",

@@ -379,6 +379,19 @@ const ja = {
     },
   },
   stamp: {
+    display_mode: "表示方法",
+    keep_ratio: "縦横比を維持",
+    stretch: "引き伸ばす",
+    custom_images: "カスタム画像",
+    library_hint:
+      "クリックして選択するか、ページにドラッグします。ここにファイルをドロップして追加できます。",
+    add_images: "画像を追加",
+    remove_image: "一覧から削除",
+    remove_named_image: "{name} を一覧から削除",
+    save_image: "一覧に保存",
+    library_load_error: "画像一覧を読み込めませんでした",
+    library_save_error: "画像一覧を保存できませんでした",
+    import_error: "{name} を追加できませんでした",
     upload_error: "スタンプ画像の読み込みに失敗しました",
     download_error: "スタンプ画像のダウンロードに失敗しました",
     preset: {
@@ -559,6 +572,14 @@ const ja = {
     exit_search: "検索を終了",
   },
   settings: {
+    image_compression: {
+      title: "画像スタンプの圧縮",
+      original: "元の解像度を保持",
+      by_dpi: "ページの DPI で圧縮",
+      dpi: "目標 DPI",
+      description:
+        "PDF 保存時に、新規または編集した画像スタンプをページ上の実寸に合わせて縮小します。拡大はせず、透過とベクターを保持します。画像一覧には元画像を保存します。",
+    },
     title: "エディター設定",
     tabs: {
       general: "一般",

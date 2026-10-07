@@ -384,6 +384,19 @@ const de = {
     },
   },
   stamp: {
+    display_mode: "Darstellung",
+    keep_ratio: "Seitenverhältnis beibehalten",
+    stretch: "Strecken",
+    custom_images: "Eigene Bilder",
+    library_hint:
+      "Zum Auswählen klicken oder ein Bild auf eine Seite ziehen. Dateien hier ablegen, um sie hinzuzufügen.",
+    add_images: "Bilder hinzufügen",
+    remove_image: "Aus Liste entfernen",
+    remove_named_image: "{name} aus Liste entfernen",
+    save_image: "In Liste speichern",
+    library_load_error: "Bilder konnten nicht geladen werden",
+    library_save_error: "Liste konnte nicht gespeichert werden",
+    import_error: "{name} konnte nicht hinzugefügt werden",
     upload_error: "Stempelbild konnte nicht geladen werden",
     download_error: "Stempelbild konnte nicht heruntergeladen werden",
     preset: {
@@ -566,6 +579,14 @@ const de = {
     exit_search: "Suche beenden",
   },
   settings: {
+    image_compression: {
+      title: "Bildstempel komprimieren",
+      original: "Originalauflösung behalten",
+      by_dpi: "Nach Seiten-DPI komprimieren",
+      dpi: "Ziel-DPI",
+      description:
+        "Beim Speichern werden neue oder bearbeitete Bildstempel entsprechend ihrer Größe auf der Seite verkleinert, nie hochskaliert. Transparenz, Vektoren und die Originale in der Bildliste bleiben erhalten.",
+    },
     title: "Editor-Einstellungen",
     tabs: {
       general: "Allgemein",

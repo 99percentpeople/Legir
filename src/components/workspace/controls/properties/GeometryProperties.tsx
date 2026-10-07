@@ -4,7 +4,13 @@ import { PropertyPanelProps } from "./types";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/ui/number-input";
 import { Slider } from "@/components/ui/slider";
-import { Type } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { RotateCcw, Type } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { registry } from "@/components/workspace/controls/registry/ControlRegistry";
 import {
@@ -33,6 +39,17 @@ export const GeometryProperties: React.FC<
       : controlConfig?.supportsGeometrySizeEdit !== undefined
         ? controlConfig.supportsGeometrySizeEdit
         : true;
+  const restoreUpdates = supportsSizeEditing
+    ? controlConfig?.getAspectRatioRestoreUpdates?.(data)
+    : undefined;
+  const restoredRect = restoreUpdates?.rect;
+  const canRestoreRatio = !!(
+    restoredRect &&
+    (Math.abs(restoredRect.x - rect.x) > 0.01 ||
+      Math.abs(restoredRect.y - rect.y) > 0.01 ||
+      Math.abs(restoredRect.width - rect.width) > 0.01 ||
+      Math.abs(restoredRect.height - rect.height) > 0.01)
+  );
   const isFormField = "name" in data && "style" in data;
   const isFreeText = data.type === "freetext";
   const isShape = data.type === "shape";
@@ -64,10 +81,38 @@ export const GeometryProperties: React.FC<
 
   return (
     <div>
-      <h4 className="text-muted-foreground mb-3 flex items-center text-xs font-semibold tracking-wider uppercase">
-        <Type size={12} className="mr-1.5" />
-        {t("properties.geometry")}
-      </h4>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h4 className="text-muted-foreground flex items-center text-xs font-semibold tracking-wider uppercase">
+          <Type size={12} className="mr-1.5" />
+          {t("properties.geometry")}
+        </h4>
+        {restoredRect && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                  aria-label={t("common.actions.restore_original_ratio")}
+                  disabled={!canRestoreRatio}
+                  onClick={() => {
+                    if (!canRestoreRatio || !restoreUpdates) return;
+                    onTriggerHistorySave();
+                    onChange(restoreUpdates);
+                  }}
+                >
+                  <RotateCcw className="size-3.5" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {t("common.actions.restore_original_ratio")}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label className="text-xs">{t("properties.x")}</Label>

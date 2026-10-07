@@ -1,3 +1,4 @@
+import { hasStampImageTransfer } from "@/lib/stampImage";
 import React, {
   useCallback,
   useEffect,
@@ -1436,6 +1437,7 @@ const App: React.FC = () => {
   const isFileDragActive = usePlatformFileDrop({
     enabled: activeTabId !== null && location.startsWith("/editor"),
     getTargetElement: getWorkspaceScrollContainer,
+    showOverlayFor: (event) => !hasStampImageTransfer(event.dataTransfer),
     onDrop: openDroppedPdfs,
   });
 
@@ -1722,6 +1724,7 @@ const App: React.FC = () => {
           exportPassword: snapshot.exportPassword,
           removeTextUnderFlattenedFreetext:
             snapshot.options.removeTextUnderFlattenedFreetext,
+          imageCompression: snapshot.options.imageCompression,
           preservedSourceAnnotations: snapshot.preservedSourceAnnotations,
           flattenFormFields: options?.flattenFormFields,
           syncFormFields: true,

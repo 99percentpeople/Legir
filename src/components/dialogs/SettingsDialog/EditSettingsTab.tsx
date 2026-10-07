@@ -1,10 +1,18 @@
-import { FileText, Magnet } from "lucide-react";
+import { FileText, ImageDown, Magnet } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { TabsContent } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { IMAGE_COMPRESSION_DPI_PRESETS } from "@/lib/imageCompression";
 import type { AppOptions } from "@/types";
 
 import { SETTINGS_CARD_COMPACT_CLASS } from "./styles";
@@ -27,6 +35,81 @@ export const EditSettingsTab = ({
   return (
     <TabsContent value="edit">
       <div className="space-y-6">
+        <div className={SETTINGS_CARD_COMPACT_CLASS}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ImageDown className="text-primary h-4 w-4" />
+              <Label
+                htmlFor="image-compression-mode"
+                className="mb-0 font-semibold"
+              >
+                {t("settings.image_compression.title")}
+              </Label>
+            </div>
+            <Select
+              value={options.imageCompression.mode}
+              onValueChange={(mode) => {
+                if (mode !== "original" && mode !== "dpi") return;
+                onChange({
+                  ...options,
+                  imageCompression: { ...options.imageCompression, mode },
+                });
+              }}
+            >
+              <SelectTrigger
+                id="image-compression-mode"
+                className="h-8 w-[200px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="original">
+                  {t("settings.image_compression.original")}
+                </SelectItem>
+                <SelectItem value="dpi">
+                  {t("settings.image_compression.by_dpi")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-muted-foreground px-1 text-xs">
+            {t("settings.image_compression.description")}
+          </p>
+          {options.imageCompression.mode === "dpi" && (
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="image-compression-dpi" className="mb-0">
+                {t("settings.image_compression.dpi")}
+              </Label>
+              <Select
+                value={String(options.imageCompression.dpi)}
+                onValueChange={(dpi) =>
+                  onChange({
+                    ...options,
+                    imageCompression: {
+                      ...options.imageCompression,
+                      dpi: Number(dpi),
+                    },
+                  })
+                }
+              >
+                <SelectTrigger
+                  id="image-compression-dpi"
+                  className="h-8 w-[200px]"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {IMAGE_COMPRESSION_DPI_PRESETS.map((dpi) => (
+                    <SelectItem key={dpi} value={String(dpi)}>
+                      {dpi} DPI
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
         <div className={SETTINGS_CARD_COMPACT_CLASS}>
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">

@@ -49,6 +49,7 @@ import {
 import { useWorkspaceViewport } from "./hooks/useWorkspaceViewport";
 import { useWorkspaceTouchPinch } from "./hooks/useWorkspaceTouchPinch";
 import { useWorkspacePointerCoords } from "./hooks/useWorkspacePointerCoords";
+import { useWorkspaceStampDrop } from "./hooks/useWorkspaceStampDrop";
 import { useWorkspaceEraser } from "./hooks/useWorkspaceEraser";
 import { useWorkspaceInitialScroll } from "./hooks/useWorkspaceInitialScroll";
 import {
@@ -99,6 +100,9 @@ import {
   duplicateFieldForDrag,
 } from "./lib/duplicateControlForDrag";
 import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
+import { useStampLibraryStore } from "@/store/stampLibraryStore";
+import { useLanguage } from "@/components/language-provider";
+import { toast } from "sonner";
 
 const WorkspaceZoomJankOverlay = React.lazy(
   () => import("./debug/WorkspaceZoomJankOverlay"),
@@ -281,6 +285,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   activePdfSearchResultId,
   bottomOverlayInsetPx = 0,
 }) => {
+  const { t } = useLanguage();
   const appEventBus = useEditorEventBus();
   const getElementById = useEditorElementById();
   const tabRuntime = useEditorTabRuntime();
@@ -695,20 +700,36 @@ const Workspace: React.FC<WorkspaceProps> = ({
             kind === "image"
               ? {
                   frame: stampStyle.imageAppearance?.frame ?? "plain",
+                  scaleMode: stampStyle.imageAppearance?.scaleMode ?? "contain",
                 }
               : undefined,
         },
         opacity,
       });
 
+      if (kind === "image") {
+        const library = useStampLibraryStore.getState();
+        const entry = library.entries.find(
+          (item) => item.image.dataUrl === stampStyle.image?.dataUrl,
+        );
+        if (entry) {
+          void library
+            .markUsed(entry.id)
+            .catch(() => toast.error(t("stamp.library_save_error")));
+        }
+      }
+
       return true;
     },
-    [editorState.stampStyle, onAddAnnotation],
+    [editorState.stampStyle, onAddAnnotation, t],
   );
 
   const addStampAtPoint = useCallback(
     (pageIndex: number, point: Point) => {
       const stampStyle = editorState.stampStyle ?? ANNOTATION_STYLES.stamp;
+      const page = editorState.pages.find(
+        (item) => item.pageIndex === pageIndex,
+      );
       return addStampAtRect(
         pageIndex,
         getStampRectAtPoint(point, {
@@ -716,10 +737,20 @@ const Workspace: React.FC<WorkspaceProps> = ({
           presetId: stampStyle.presetId,
           imageWidth: stampStyle.image?.intrinsicSize?.width,
           imageHeight: stampStyle.image?.intrinsicSize?.height,
+          scale: editorState.scale,
+          viewportWidth: containerRef.current?.clientWidth,
+          viewportHeight: containerRef.current?.clientHeight,
+          pageWidth: page?.width,
+          pageHeight: page?.height,
         }),
       );
     },
-    [addStampAtRect, editorState.stampStyle],
+    [
+      addStampAtRect,
+      editorState.stampStyle,
+      editorState.pages,
+      editorState.scale,
+    ],
   );
 
   const finalizeShapeDraftSession = useCallback(
@@ -1522,6 +1553,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
       },
     );
   };
+
+  const stampDrop = useWorkspaceStampDrop({
+    containerRef,
+    editorStateRef,
+    getPageIndexFromPoint,
+    getRelativeCoordsFromPoint,
+    onAddAnnotation,
+  });
 
   const getAnnotationOuterRect = React.useCallback((annotation: Annotation) => {
     if (!annotation.rect) return undefined;
@@ -3194,7 +3233,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
     return (
       <div
         id={`page-${page.pageIndex}`}
-        className="relative w-fit flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl"
+        className={cn(
+          "relative w-fit flex-none origin-top bg-white shadow-lg transition-shadow hover:shadow-xl",
+          stampDrop.dropPageIndex === page.pageIndex && "ring-primary ring-2",
+        )}
         data-app-text-selecting={
           textSelectingPages[page.pageIndex] ? "1" : undefined
         }
@@ -3647,6 +3689,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       <FileDragOverlay open={isFileDragActive} />
       <div
         ref={containerRef}
+        {...stampDrop.handlers}
         data-workspace-scroll-container="true"
         className="relative h-full overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
         style={{

@@ -17,6 +17,8 @@ export interface ControlConfig<T = FormField | Annotation> {
   label: string;
   /** Whether width/height can be edited from the shared geometry panel */
   supportsGeometrySizeEdit?: boolean | ((data: T) => boolean);
+  /** Restore the source aspect ratio; undefined means this control cannot restore it. */
+  getAspectRatioRestoreUpdates?: (data: T) => Partial<T> | undefined;
   /** Optional custom serializer for control data */
   serialize?: (data: T) => unknown;
   /** Optional custom deserializer for control data */
