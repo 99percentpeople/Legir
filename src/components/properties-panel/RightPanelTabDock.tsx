@@ -162,7 +162,7 @@ export function RightPanelTabDock({
             title={title}
             onClick={() => handleSelectTab(id)}
             className={cn(
-              "group grid w-8 grid-rows-[auto_auto] place-items-center rounded-l-md rounded-r-none py-2 transition-all duration-300",
+              "group grid w-8 grid-rows-[auto_auto] place-items-center rounded-l-md rounded-r-none py-2 transition-[color,background-color,box-shadow,opacity] duration-300",
               "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
               disabled
                 ? "cursor-not-allowed opacity-40"

@@ -452,7 +452,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
       ref={cardRef}
       id={`annotation-card-${annotation.id}`}
       className={cn(
-        "group relative rounded-l-lg rounded-r-lg border-none transition-all",
+        "group relative rounded-l-lg rounded-r-lg border-none transition-[background-color,box-shadow]",
         isSelected
           ? "ring-primary/80 shadow-md ring-1"
           : "hover:ring-primary/50 hover:shadow-sm hover:ring-1",

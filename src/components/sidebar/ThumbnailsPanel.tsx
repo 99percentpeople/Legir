@@ -51,7 +51,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
     >
       <div
         className={cn(
-          "group-hover:ring-primary/20 relative w-full overflow-hidden rounded-sm border bg-white shadow-sm transition-all group-hover:shadow-md group-hover:ring-2",
+          "group-hover:ring-primary/20 relative w-full overflow-hidden rounded-sm border bg-white shadow-sm transition-shadow group-hover:shadow-md group-hover:ring-2",
           isActive && "ring-primary shadow-md ring-2",
         )}
         style={{ aspectRatio: aspectRatio }}
