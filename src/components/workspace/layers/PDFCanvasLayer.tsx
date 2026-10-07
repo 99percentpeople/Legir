@@ -467,9 +467,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
     tileState.tileMode && tileState.hasVisibleTilesRendered;
   const showPlaceholderImage =
     !!placeholderImage &&
-    (tileState.tileMode
-      ? !tileState.hasVisibleTilesRendered
-      : !isRendered && !hasUsableTileBuffer);
+    (tileState.tileMode ? !tileState.hasVisibleTilesRendered : !isRendered);
   const showSpinner = !hasUsableTileBuffer && !isRendered && !placeholderImage;
   const canvasADisplay =
     activeCanvas === "B" || !isInView || shouldHidePageCanvasForTiles
@@ -518,6 +516,9 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         scale={renderScale}
         isInView={isInView}
         isRendered={isRendered}
+        isPageCanvasReady={
+          isRendered && renderedScaleRef.current === renderScale
+        }
         onStateChange={setTileState}
       />
     </>

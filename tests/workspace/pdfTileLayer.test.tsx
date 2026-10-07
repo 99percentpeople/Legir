@@ -334,3 +334,52 @@ it("keeps the thumbnail behind partial tiles until the viewport is covered", asy
   await frames(2);
   expect(pageEl.querySelector("img")).toBeNull();
 });
+
+it.each([false, true])(
+  "keeps tiles until the zoomed-out page is ready (previous page buffer: %s)",
+  async (hasPreviousPage) => {
+    const w = worker();
+    const draw = async (scale: number) => {
+      pageScale = scale;
+      await act(async () =>
+        root.render(
+          <PDFCanvasLayer
+            workerService={w as unknown as PDFWorkerService}
+            page={page}
+            scale={scale}
+            isInView
+          />,
+        ),
+      );
+    };
+    if (hasPreviousPage) {
+      await draw(0.3);
+      await frames();
+    }
+    await draw(1);
+    await frames(15);
+    const renderedTiles = Array.from(
+      pageEl.querySelectorAll<HTMLCanvasElement>('canvas[data-rendered="1"]'),
+    );
+    expect(renderedTiles.length).toBeGreaterThan(0);
+    let completePage!: (ok: boolean) => void;
+    w.renderPage.mockImplementation(
+      () => new Promise<boolean>((resolve) => (completePage = resolve)),
+    );
+    await draw(0.4);
+    await frames(12);
+    expect(completePage).toBeTypeOf("function");
+    expect(
+      renderedTiles.some(
+        (tile) => tile.isConnected && tile.style.display !== "none",
+      ),
+    ).toBe(true);
+    // Zooming out reveals areas outside the retained tiles. Keep a full-page
+    // fallback behind them until the new page raster is ready.
+    if (!hasPreviousPage) expect(pageEl.querySelector("img")).not.toBeNull();
+    await act(async () => completePage(true));
+    await frames();
+    expect(renderedTiles.every((tile) => !tile.isConnected)).toBe(true);
+    expect(pageEl.querySelector("img")).toBeNull();
+  },
+);

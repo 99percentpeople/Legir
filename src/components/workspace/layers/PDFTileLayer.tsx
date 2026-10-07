@@ -78,6 +78,7 @@ interface PDFTileLayerProps {
   scale: number;
   isInView: boolean;
   isRendered: boolean;
+  isPageCanvasReady?: boolean;
   onStateChange?: (state: {
     tileMode: boolean;
     hasUsableTileBuffer: boolean;
@@ -92,6 +93,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   scale,
   isInView,
   isRendered,
+  isPageCanvasReady = isRendered,
   onStateChange,
 }) => {
   const getElementById = useEditorElementById();
@@ -373,12 +375,8 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
     if (pixels <= MAX_PIXELS_PER_PAGE) {
       setTileMode(false);
-
-      setBackTiles([]);
-      setBackTilesKey("");
-      setBackTilesPageW(0);
-      setBackTilesPageH(0);
-      setBackTilesMaxDim(0);
+      // Keep the last good tile buffer until the replacement page canvas has
+      // finished. Clearing it here leaves a blank/thumbnail frame on zoom-out.
       return;
     }
 
@@ -558,7 +556,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
 
   useEffect(() => {
     if (tileMode) return;
-    if (!isRendered) return;
+    if (!isPageCanvasReady) return;
 
     const allCanvasIds = [...frontTiles, ...midTiles, ...backTiles].map(
       (t) => t.canvasId,
@@ -600,7 +598,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     backTilesKey,
     frontTiles,
     frontTilesKey,
-    isRendered,
+    isPageCanvasReady,
     midTiles,
     midTilesKey,
     tileMode,
@@ -857,7 +855,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     hasUsableMidTileBuffer ||
     backTiles.some((tile) => tileRenderedRef.current.has(tile.canvasId));
   const showTileCanvases =
-    tileMode || (!tileMode && hasUsableTileBuffer && !isRendered);
+    tileMode || (hasUsableTileBuffer && !isPageCanvasReady);
 
   const viewportRect = viewportRectNormRef.current;
   const visibleTiles = viewportRect
@@ -929,7 +927,6 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
   pushTiles(midTiles);
   pushTiles(backTiles);
   const allTiles = Array.from(tileByIdInPaintOrder.values()).filter((tile) => {
-    if (!tileMode) return true;
     const rect = viewportRectNormRef.current;
     if (!rect) return false;
     const isBack = backTileIdSet.has(tile.canvasId);
