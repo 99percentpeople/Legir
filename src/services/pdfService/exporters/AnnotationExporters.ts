@@ -140,7 +140,10 @@ const rasterizeStampImageToPngBytes = async (options: {
             return element;
           })();
 
-    const context = canvas.getContext("2d");
+    const context =
+      typeof OffscreenCanvas === "function" && canvas instanceof OffscreenCanvas
+        ? canvas.getContext("2d")
+        : (canvas as HTMLCanvasElement).getContext("2d");
     if (!context) {
       throw new Error("Failed to initialize canvas for SVG stamp.");
     }
