@@ -826,6 +826,7 @@ const es = {
     export_fail: "No se pudo exportar el PDF.",
   },
   tabs: {
+    home: "Inicio",
     detach_to_new_window: "Separar en una nueva ventana",
     merge_to_window: "Combinar en una ventana",
     window_n: "Ventana {index}",

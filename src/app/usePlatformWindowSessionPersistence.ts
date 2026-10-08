@@ -10,6 +10,7 @@ interface UsePlatformWindowSessionPersistenceOptions {
   enabled: boolean;
   isDesktop: boolean;
   hasActiveTab: boolean;
+  hasDirtyTabs: boolean;
   persistCurrentTabState: () => void;
   onDesktopCloseRequested?: (event: PlatformCloseRequestEvent) => void;
 }
@@ -20,6 +21,7 @@ export const usePlatformWindowSessionPersistence = ({
   enabled,
   isDesktop,
   hasActiveTab,
+  hasDirtyTabs,
   persistCurrentTabState,
   onDesktopCloseRequested,
 }: UsePlatformWindowSessionPersistenceOptions) => {
@@ -59,7 +61,17 @@ export const usePlatformWindowSessionPersistence = ({
   }, []);
 
   useEventListener(browserWindow, "pagehide", persistDocumentView);
-  useEventListener(browserWindow, "beforeunload", persistDocumentView);
+  useEventListener<BeforeUnloadEvent>(
+    browserWindow,
+    "beforeunload",
+    (event) => {
+      persistDocumentView();
+      if (hasDirtyTabs) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    },
+  );
   useEventListener(browserDocument, "visibilitychange", () => {
     if (document.visibilityState === "hidden") {
       persistDocumentView();

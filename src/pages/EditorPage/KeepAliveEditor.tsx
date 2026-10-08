@@ -10,7 +10,6 @@ import {
   EditorTabContext,
   EditorTabActiveContext,
 } from "@/app/editorTabs/context";
-import { EditorTabStrip } from "./components/EditorTabStrip";
 import EditorPage from "./index";
 
 /** Retain DOM, local React state and transferred canvases until a tab closes.
@@ -22,11 +21,21 @@ export default function KeepAliveEditor() {
   const tabs = useEditorTabsRuntime();
   const commands = useEditorDocumentCommandsRuntime();
   const drag = useEditorFileDragRuntime();
+  // Keys preserve identity, but reordering keyed hosts still moves their DOM:
+  // browsers reset scroll offsets and StrictMode can replay canvas effects.
+  // Immutable IDs keep retained hosts in the same relative order, independent
+  // of the tab strip. Adding/removing a session only inserts/removes its host.
+  const hostSessions = React.useMemo(
+    () =>
+      [...(tabs.sessions ?? [])].sort((left, right) =>
+        left.id === right.id ? 0 : left.id < right.id ? -1 : 1,
+      ),
+    [tabs.sessions],
+  );
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <EditorTabStrip />
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {tabs.sessions?.map((session) => {
+        {hostSessions.map((session) => {
           const runtime = session.runtime;
           const active = session.id === tabs.activeTabId;
           runtime.active = active;

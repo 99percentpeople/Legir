@@ -12,6 +12,7 @@ export interface HomePageAdapter {
 
 export interface HomePageProps {
   adapter: HomePageAdapter;
+  isActive?: boolean;
 }
 
 export type HomeRecentFilesViewMode = "list" | "grid";

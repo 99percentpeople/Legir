@@ -828,6 +828,7 @@ const de = {
     export_fail: "Exportieren des PDF fehlgeschlagen.",
   },
   tabs: {
+    home: "Startseite",
     detach_to_new_window: "In neues Fenster auslagern",
     merge_to_window: "In Fenster zusammenführen",
     window_n: "Fenster {index}",

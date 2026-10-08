@@ -2,15 +2,17 @@ import { hasStampImageTransfer } from "@/lib/stampImage";
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 
 import AppRoutes from "./AppRoutes";
+import { useWorkspaceNavigation } from "./app/workspaceNavigation/useWorkspaceNavigation";
+import type { WorkspacePage } from "./app/workspaceNavigation/types";
 import { GlobalAiProvider } from "./app/ai/GlobalAiContext";
 import type { AiWorkspace } from "./services/ai/chat/workspace";
 import {
@@ -104,6 +106,7 @@ import {
   saveDocumentViewState,
   subscribePlatformRuntimeChange,
   writeToSaveTarget,
+  setPlatformWindowTitle,
   type PlatformDroppedPdf,
   type SaveTarget,
 } from "@/services/platform";
@@ -127,7 +130,7 @@ type ExtractedTransferTab = {
   session: EditorTabSession;
   isLastTab: boolean;
   previousIndex: number;
-  wasActive: boolean;
+  previousPage: WorkspacePage | null;
 };
 
 type PdfLoadToastState = {
@@ -182,7 +185,6 @@ const App: React.FC = () => {
   const isDesktop = platformRuntime.isDesktop;
   const supportsMultiWindow = platformRuntime.supportsMultiWindow;
   const platformWindowId = useMemo(() => getPlatformWindowId(), []);
-  const [location, navigate] = useLocation();
   const homeRecentFilesStore = useMemo(() => {
     return isDesktop
       ? createPlatformRecentFilesStore()
@@ -203,6 +205,8 @@ const App: React.FC = () => {
   );
 
   const resetDocument = useCallback(() => {
+    if (!activeRuntimeRef.current && !workspaceScrollContainerRef.current)
+      return;
     deactivateEditorTabRuntime(activeRuntimeRef.current);
     activeRuntimeRef.current = null;
     workspaceScrollContainerRef.current = null;
@@ -317,25 +321,46 @@ const App: React.FC = () => {
     windowId: platformWindowId,
     persistDocumentView: captureActiveTabState,
     activateSession: activateTabRuntime,
+    deactivateSession: resetDocument,
   });
   const {
     backend: tabsBackend,
-    activeTab,
-    activeTabId,
     addTab,
-    activateTab,
     persistActiveTabView,
     disposeAllTabs,
     findTabBySourceKey,
-    getAdjacentTabId,
     getTabById,
     getTabsSnapshot,
     moveTabToWindow,
-    removeTab,
     tabs,
     tabDescriptors,
     windowLayout,
   } = tabsController;
+
+  const {
+    location,
+    page: workspacePage,
+    getPage: getWorkspacePage,
+    openTab: activateTab,
+    showHome,
+    showPendingEditor,
+    closeTabImmediately,
+    reconcile: reconcileWorkspaceRoute,
+  } = useWorkspaceNavigation({ ...tabsController, windowId: platformWindowId });
+  const activeTabId =
+    workspacePage?.kind === "document" ? workspacePage.tabId : null;
+  const activeTab = getTabById(activeTabId);
+  const navigateToHome = useCallback(
+    () => showHome({ replace: true }),
+    [showHome],
+  );
+  const windowTitle =
+    activeTab?.runtime.store.getState().filename ||
+    process.env.APP_NAME ||
+    "Legir";
+  useEffect(() => {
+    void setPlatformWindowTitle(windowTitle).catch(() => {});
+  }, [windowTitle]);
 
   const aiWorkspace = useMemo<AiWorkspace>(
     () => ({
@@ -376,12 +401,10 @@ const App: React.FC = () => {
       activateDocument: (documentId) => {
         if (tabsBackend.getSession(documentId)?.windowId !== platformWindowId)
           return false;
-        const activated = activateTab(documentId);
-        if (activated) navigate("/editor");
-        return activated;
+        return activateTab(documentId);
       },
     }),
-    [tabsBackend, platformWindowId, activateTab, navigate],
+    [tabsBackend, platformWindowId, activateTab],
   );
 
   const applyHydratedDocumentToTab = useCallback(
@@ -582,11 +605,10 @@ const App: React.FC = () => {
             thumbnailImages: {},
             workerService: restored.workerService,
             disposePdfResources: restored.disposePdfResources,
-            activate: true,
+            activate: false,
           });
+          activateTab(restored.id);
         }
-
-        navigate("/editor");
 
         if (
           supportsMultiWindow &&
@@ -622,7 +644,6 @@ const App: React.FC = () => {
       addTab,
       clearPendingIncomingTab,
       getTabById,
-      navigate,
       platformWindowId,
       supportsMultiWindow,
     ],
@@ -641,7 +662,6 @@ const App: React.FC = () => {
         const localMatch = findTabBySourceKey(sourceKey);
         if (localMatch) {
           activateTab(localMatch.id);
-          navigate("/editor");
           return true;
         }
       }
@@ -657,7 +677,7 @@ const App: React.FC = () => {
         return false;
       }
     },
-    [activateTab, findTabBySourceKey, navigate, supportsMultiWindow],
+    [activateTab, findTabBySourceKey, supportsMultiWindow],
   );
 
   useEffect(() => {
@@ -685,7 +705,7 @@ const App: React.FC = () => {
         if (payload.kind !== "session-moved") return;
         if (payload.targetWindowId !== platformWindowId) return;
         if (getTabsSnapshot().length === 0) {
-          navigate("/editor");
+          showPendingEditor();
         }
         registerPendingIncomingTab({
           sessionId: payload.sessionId,
@@ -718,7 +738,7 @@ const App: React.FC = () => {
   }, [
     getTabsSnapshot,
     importTransferredTab,
-    navigate,
+    showPendingEditor,
     platformWindowId,
     registerPendingIncomingTab,
     supportsMultiWindow,
@@ -736,7 +756,6 @@ const App: React.FC = () => {
         if (!existingTab) return;
 
         activateTab(existingTab.id);
-        navigate("/editor");
       });
 
       if (cancelled) {
@@ -757,7 +776,7 @@ const App: React.FC = () => {
         // ignore
       }
     };
-  }, [activateTab, findTabBySourceKey, navigate, supportsMultiWindow]);
+  }, [activateTab, findTabBySourceKey, supportsMultiWindow]);
 
   useEffect(() => {
     if (!supportsMultiWindow) return;
@@ -843,57 +862,13 @@ const App: React.FC = () => {
     recentFilesService.cancelPreviewTasks();
     disposeAllTabs();
     resetDocument();
-    navigate("/");
-  }, [disposeAllTabs, navigate, resetDocument]);
+    navigateToHome();
+  }, [disposeAllTabs, navigateToHome, resetDocument]);
 
   const closeAllTabsAndWindow = useCallback(async () => {
     recentFilesService.cancelPreviewTasks();
     await destroyPlatformWindow();
   }, [destroyPlatformWindow]);
-
-  const closeTabImmediately = useCallback(
-    (tabId: string) => {
-      const nextTabId = getAdjacentTabId(tabId);
-      const removingActiveTab = activeTabId === tabId;
-
-      if (removingActiveTab) {
-        captureActiveTabState();
-      }
-
-      removeTab(tabId);
-
-      const remainingTabs = getTabsSnapshot();
-      if (removingActiveTab) {
-        const nextActiveTabId =
-          (nextTabId &&
-            remainingTabs.some((tab) => tab.id === nextTabId) &&
-            nextTabId) ||
-          remainingTabs[0]?.id ||
-          null;
-
-        if (nextActiveTabId) {
-          activateTab(nextActiveTabId, {
-            skipCaptureCurrent: true,
-          });
-        } else {
-          resetDocument();
-        }
-      }
-
-      return {
-        isLastTab: remainingTabs.length === 0,
-      };
-    },
-    [
-      activateTab,
-      activeTabId,
-      captureActiveTabState,
-      getAdjacentTabId,
-      getTabsSnapshot,
-      removeTab,
-      resetDocument,
-    ],
-  );
 
   const extractTransferSourceTab = useCallback(
     (tabId: string): ExtractedTransferTab | null => {
@@ -903,7 +878,9 @@ const App: React.FC = () => {
       );
       if (previousIndex < 0) return null;
 
-      const wasActive = activeTabId === tabId;
+      const previousPage = getWorkspacePage();
+      const wasActive =
+        previousPage?.kind === "document" && previousPage.tabId === tabId;
       const nextTabId =
         tabsBeforeRemoval[previousIndex + 1]?.id ??
         tabsBeforeRemoval[previousIndex - 1]?.id ??
@@ -917,9 +894,11 @@ const App: React.FC = () => {
         if (nextTabId && remainingTabs.some((tab) => tab.id === nextTabId)) {
           activateTab(nextTabId, {
             skipCaptureCurrent: true,
+            replace: true,
           });
         } else {
           resetDocument();
+          navigateToHome();
         }
       }
 
@@ -927,15 +906,16 @@ const App: React.FC = () => {
         session: extracted,
         isLastTab: remainingTabs.length === 0,
         previousIndex,
-        wasActive,
+        previousPage,
       };
     },
     [
-      activeTabId,
+      getWorkspacePage,
       activateTab,
       getTabsSnapshot,
       platformWindowId,
       resetDocument,
+      navigateToHome,
       tabsBackend,
     ],
   );
@@ -947,14 +927,16 @@ const App: React.FC = () => {
         targetIndex: extractedTab.previousIndex,
       });
 
-      if (extractedTab.wasActive || activeTabId === null) {
-        activateTab(extractedTab.session.id, {
+      if (extractedTab.previousPage?.kind === "home") {
+        navigateToHome();
+      } else if (extractedTab.previousPage?.kind === "document") {
+        activateTab(extractedTab.previousPage.tabId, {
           skipCaptureCurrent: true,
+          replace: true,
         });
-        navigate("/editor");
       }
     },
-    [activeTabId, activateTab, navigate, platformWindowId, tabsBackend],
+    [activateTab, navigateToHome, platformWindowId, tabsBackend],
   );
 
   const commitTransferredSourceTab = useCallback(
@@ -964,13 +946,13 @@ const App: React.FC = () => {
       if (!extractedTab.isLastTab) return;
 
       if (!supportsMultiWindow) {
-        navigate("/");
+        navigateToHome();
         return;
       }
 
       await destroyPlatformWindow();
     },
-    [destroyPlatformWindow, navigate, supportsMultiWindow],
+    [destroyPlatformWindow, navigateToHome, supportsMultiWindow],
   );
 
   const enqueueLoadTask = useCallback((task: () => Promise<void>) => {
@@ -1016,7 +998,6 @@ const App: React.FC = () => {
           : null;
         if (queuedLocalMatch) {
           activateTab(queuedLocalMatch.id);
-          navigate("/editor");
           workerService.destroy();
           return;
         }
@@ -1092,7 +1073,6 @@ const App: React.FC = () => {
               : null;
             if (postLoadLocalMatch) {
               activateTab(postLoadLocalMatch.id);
-              navigate("/editor");
               return;
             }
 
@@ -1113,10 +1093,10 @@ const App: React.FC = () => {
               thumbnailImages: {},
               workerService,
               disposePdfResources: openSession.dispose,
-              activate: true,
+              activate: false,
             });
             keepWorker = true;
-            navigate("/editor");
+            activateTab(tabId);
             advancePdfLoadToast(loadToastToken, t("app.rendering_pdf"));
 
             const hydrateDocument = async (retry = false) => {
@@ -1223,7 +1203,6 @@ const App: React.FC = () => {
       enqueueLoadTask,
       findTabBySourceKey,
       focusExistingTabBySourceKey,
-      navigate,
       markTabHydrationError,
       platformWindowId,
       startPdfLoadToast,
@@ -1494,6 +1473,15 @@ const App: React.FC = () => {
     openWebHandleFile,
     loadErrorMessage: t("app.load_error"),
   });
+
+  const isWorkspaceLoading =
+    isProcessing ||
+    hasPendingWindowBootstrap ||
+    hasPendingLaunchQueueFiles ||
+    pendingIncomingTabs.length > 0;
+  useLayoutEffect(() => {
+    reconcileWorkspaceRoute(isWorkspaceLoading);
+  }, [location, tabs, isWorkspaceLoading, reconcileWorkspaceRoute]);
 
   useAppInitialization();
 
@@ -2014,9 +2002,6 @@ const App: React.FC = () => {
       saved && (!current.isDirty || isSavedDocumentRevision(current, snapshot))
     );
   }, [handleSave]);
-  const navigateToHome = useCallback(() => {
-    navigate("/");
-  }, [navigate]);
 
   const {
     pendingCloseRequest,
@@ -2043,6 +2028,9 @@ const App: React.FC = () => {
     enabled: true,
     isDesktop,
     hasActiveTab: activeTabId !== null,
+    hasDirtyTabs: tabs.some(
+      (tab) => tab.runtime.store.document.getState().isDirty,
+    ),
     persistCurrentTabState: persistActiveTabView,
     onDesktopCloseRequested,
   });
@@ -2081,7 +2069,6 @@ const App: React.FC = () => {
       tabs: editorTabDescriptors,
       activeTabId,
       mergeWindowTargets,
-      openDocument: handleOpen,
       refreshMergeWindowTargets,
       selectTab: selectEditorTab,
       closeTab: closeEditorTab,
@@ -2099,7 +2086,6 @@ const App: React.FC = () => {
       handleDetachTabToNewWindow,
       handleMergeTabToWindow,
       handleMoveTab,
-      handleOpen,
       mergeWindowTargets,
       platformWindowId,
       refreshMergeWindowTargets,
@@ -2140,13 +2126,8 @@ const App: React.FC = () => {
           document={editorDocumentRuntime}
         >
           <AppRoutes
-            canAccessEditor={windowLayout.tabIds.length > 0}
-            isLoading={
-              isProcessing ||
-              hasPendingWindowBootstrap ||
-              hasPendingLaunchQueueFiles ||
-              pendingIncomingTabs.length > 0
-            }
+            page={workspacePage}
+            showHome={showHome}
             homeProps={{
               adapter: homePageAdapter,
             }}

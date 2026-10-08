@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState, type DragEvent } from "react";
-import { ArrowLeft, ExternalLink, LoaderCircle, Plus, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, Home, LoaderCircle, X } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -18,8 +17,12 @@ import type {
   EditorTabDragPayload,
 } from "@/app/editorTabs/types";
 import { useEditorTabsRuntime } from "@/app/editorRuntime";
+import "./EditorTabStrip.css";
 
 const EDITOR_TAB_DRAG_MIME = "application/x-legir-editor-tab";
+const TAB_CLASS_NAME =
+  "editor-tab group text-muted-foreground relative isolate flex h-[34px] min-w-0 shrink-0 items-center gap-2 bg-transparent text-[13px] leading-5 text-nowrap transition-colors select-none hover:cursor-pointer";
+const ACTIVE_TAB_CLASS_NAME = "editor-tab--active text-foreground";
 const EDITOR_TAB_DIRTY_DOT_CLASS_NAME =
   "absolute left-1/2 top-1/2 block h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/60";
 
@@ -29,13 +32,18 @@ type TabDropIndicator = {
   position: "before" | "after";
 };
 
-export function EditorTabStrip() {
+export function EditorTabStrip({
+  isHomeActive,
+  onHome,
+}: {
+  isHomeActive: boolean;
+  onHome: () => void;
+}) {
   const {
     windowId,
     tabs,
     activeTabId,
     mergeWindowTargets,
-    openDocument,
     refreshMergeWindowTargets,
     selectTab,
     closeTab,
@@ -177,9 +185,19 @@ export function EditorTabStrip() {
   };
 
   return (
-    <div className="border-border bg-background/95 flex items-center gap-2 border-b px-2 backdrop-blur sm:px-4">
+    <div className="editor-tab-strip flex h-10 shrink-0 items-end pt-1.5 sm:px-1">
+      <button
+        type="button"
+        draggable={false}
+        className={cn(TAB_CLASS_NAME, isHomeActive && ACTIVE_TAB_CLASS_NAME)}
+        aria-current={isHomeActive ? "page" : undefined}
+        onClick={onHome}
+      >
+        <Home size={16} className="shrink-0" />
+        <span>{t("tabs.home")}</span>
+      </button>
       <div
-        className="flex min-w-0 flex-1 items-center overflow-x-auto pt-1 pb-0"
+        className="editor-tab-scroller no-scrollbar flex min-w-0 flex-1 items-end overflow-x-auto"
         onDragEnter={(event) => {
           allowMoveDrop(event);
         }}
@@ -212,6 +230,7 @@ export function EditorTabStrip() {
               role={isPendingTransfer ? undefined : "button"}
               tabIndex={isPendingTransfer ? -1 : 0}
               aria-disabled={isPendingTransfer || undefined}
+              aria-current={active ? "page" : undefined}
               data-editor-tab-id={tab.id}
               draggable={!isPendingTransfer}
               onDragStart={(event) => {
@@ -292,11 +311,9 @@ export function EditorTabStrip() {
                 selectTab(tab.id);
               }}
               className={cn(
-                "group border-border/80 bg-background hover:bg-muted flex min-w-0 shrink-0 items-center gap-1.5 rounded-t-lg border-x border-t px-2.5 py-1 text-sm text-nowrap transition-colors select-none hover:cursor-pointer",
-                active &&
-                  "bg-muted/60 text-foreground border-border border-b-foreground border-b shadow-sm",
-                isPendingTransfer &&
-                  "text-muted-foreground hover:bg-background hover:cursor-default",
+                TAB_CLASS_NAME,
+                active && ACTIVE_TAB_CLASS_NAME,
+                isPendingTransfer && "hover:cursor-default",
                 draggedTabId === tab.id && "opacity-60",
               )}
             >
@@ -306,9 +323,9 @@ export function EditorTabStrip() {
               {isPendingTransfer ? (
                 <LoaderCircle size={14} className="shrink-0 animate-spin" />
               ) : (
-                <span className="relative block h-4 w-4 shrink-0">
+                <span className="relative block h-5 w-5 shrink-0">
                   {tab.isDirty && (
-                    <span className="pointer-events-none absolute inset-0 transition-opacity duration-150 group-hover:opacity-0">
+                    <span className="pointer-events-none absolute inset-0 transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0">
                       <span className={EDITOR_TAB_DIRTY_DOT_CLASS_NAME} />
                     </span>
                   )}
@@ -316,9 +333,9 @@ export function EditorTabStrip() {
                     type="button"
                     draggable={false}
                     className={cn(
-                      "text-muted-foreground hover:text-foreground absolute inset-0 flex items-center justify-center rounded-full transition-opacity duration-150",
+                      "text-muted-foreground hover:text-foreground hover:bg-foreground/10 focus-visible:ring-ring absolute inset-0 flex items-center justify-center rounded-full transition-colors duration-150 outline-none focus-visible:ring-2",
                       tab.isDirty
-                        ? "opacity-0 group-hover:opacity-100"
+                        ? "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
                         : "opacity-100",
                     )}
                     aria-label={t("common.actions.close")}
@@ -327,7 +344,7 @@ export function EditorTabStrip() {
                       closeTab(tab.id);
                     }}
                   >
-                    <X size={12} />
+                    <X size={14} />
                   </button>
                 </span>
               )}
@@ -335,11 +352,15 @@ export function EditorTabStrip() {
           );
 
           if (isPendingTransfer) {
-            return <div key={tab.id}>{tabNode}</div>;
+            return (
+              <div key={tab.id} className="editor-tab-slot relative shrink-0">
+                {tabNode}
+              </div>
+            );
           }
 
           const wrappedTabNode = (
-            <div className="relative shrink-0">
+            <div className="editor-tab-slot relative shrink-0">
               {showDropBefore && (
                 <div className="bg-primary pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 -translate-x-1/2 rounded-full" />
               )}
@@ -412,16 +433,6 @@ export function EditorTabStrip() {
             </ContextMenu>
           );
         })}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 gap-2"
-          onClick={() => {
-            void openDocument();
-          }}
-        >
-          <Plus size={16} />
-        </Button>
       </div>
     </div>
   );

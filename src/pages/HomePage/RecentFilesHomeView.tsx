@@ -269,10 +269,10 @@ export function RecentFilesHomeView({
   const { t } = useLanguage();
 
   return (
-    <div className="bg-background flex min-h-screen flex-col transition-colors duration-200">
+    <div className="bg-background flex flex-1 flex-col transition-colors duration-200">
       <HomeHeader />
 
-      <div className="flex flex-1 flex-col gap-6 p-6 pt-24">
+      <div className="flex flex-1 flex-col gap-6 p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <h1 className="text-foreground text-2xl font-bold tracking-tight">

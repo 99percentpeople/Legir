@@ -814,6 +814,7 @@ const en = {
     export_fail: "Failed to export PDF.",
   },
   tabs: {
+    home: "Home",
     detach_to_new_window: "Detach to New Window",
     merge_to_window: "Merge into Window",
     window_n: "Window {index}",

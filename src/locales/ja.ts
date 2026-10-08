@@ -815,6 +815,7 @@ const ja = {
     export_fail: "PDF の書き出しに失敗しました。",
   },
   tabs: {
+    home: "ホーム",
     detach_to_new_window: "新しいウィンドウに分離",
     merge_to_window: "ウィンドウに統合",
     window_n: "ウィンドウ {index}",

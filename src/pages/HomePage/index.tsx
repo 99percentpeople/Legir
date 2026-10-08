@@ -27,10 +27,11 @@ const getInitialRecentFilesViewMode = (): HomeRecentFilesViewMode => {
   }
 };
 
-const HomePage: React.FC<HomePageProps> = ({ adapter }) => {
+const HomePage: React.FC<HomePageProps> = ({ adapter, isActive = true }) => {
   const { t } = useLanguage();
   const dropTargetRef = React.useRef<HTMLDivElement | null>(null);
   const isFileDragActive = usePlatformFileDrop({
+    enabled: isActive,
     getTargetElement: () => dropTargetRef.current,
     onDrop: (payloads) => {
       void adapter.openDroppedPdfs(payloads);
@@ -69,7 +70,7 @@ const HomePage: React.FC<HomePageProps> = ({ adapter }) => {
   );
 
   return (
-    <div ref={dropTargetRef} className="relative min-h-screen">
+    <div ref={dropTargetRef} className="relative flex min-h-full flex-col">
       <RecentFilesHomeView
         query={query}
         filteredRecentFiles={filteredRecentFiles}

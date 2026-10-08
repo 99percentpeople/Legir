@@ -788,6 +788,7 @@ const zhTW = {
     export_fail: "匯出 PDF 失敗。",
   },
   tabs: {
+    home: "首頁",
     detach_to_new_window: "分離到新視窗",
     merge_to_window: "合併到視窗",
     window_n: "視窗 {index}",

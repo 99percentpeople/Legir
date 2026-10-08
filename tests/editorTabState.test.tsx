@@ -127,7 +127,6 @@ describe("multi-document state boundaries", () => {
       mergeWindowTargets: [],
       canDetachTabs: true,
       canMergeTabs: true,
-      openDocument: asyncNoop,
       refreshMergeWindowTargets: asyncNoop,
       selectTab: noop,
       closeTab: noop,

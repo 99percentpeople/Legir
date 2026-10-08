@@ -1,8 +1,9 @@
-import React, { Suspense, useEffect } from "react";
-import { Route, Switch, useLocation } from "wouter";
-
+import React, { Suspense, useEffect, useState } from "react";
+import { useEditorTabsRuntime } from "./app/editorRuntime";
+import { EditorTabActiveContext } from "./app/editorTabs/context";
+import type { WorkspacePage } from "./app/workspaceNavigation/types";
+import { EditorTabStrip } from "./pages/EditorPage/components/EditorTabStrip";
 import { Spinner } from "./components/ui/spinner";
-import { Skeleton } from "./components/ui/skeleton";
 import type { HomePageProps } from "./pages/HomePage";
 
 const HomePage = React.lazy(() => import("./pages/HomePage"));
@@ -12,31 +13,11 @@ const EditorPage = React.lazy(
 
 interface AppRoutesProps {
   homeProps: HomePageProps;
-  canAccessEditor: boolean;
-  isLoading: boolean;
+  page: WorkspacePage | null;
+  showHome: () => void;
 }
 
-const EditorRouteGuard: React.FC<{
-  canAccessEditor: boolean;
-  isLoading: boolean;
-  fallback: React.ReactNode;
-  loadingFallback: React.ReactNode;
-  children: React.ReactNode;
-}> = ({ canAccessEditor, isLoading, fallback, loadingFallback, children }) => {
-  const [, navigate] = useLocation();
-
-  useEffect(() => {
-    if (!canAccessEditor && !isLoading) {
-      navigate("/");
-    }
-  }, [canAccessEditor, isLoading, navigate]);
-
-  if (!canAccessEditor && !isLoading) return <>{fallback}</>;
-  if (!canAccessEditor && isLoading) return <>{loadingFallback}</>;
-  return <>{children}</>;
-};
-
-function HomeRouteFallback() {
+function PageFallback() {
   return (
     <div className="flex flex-1 items-center justify-center">
       <Spinner size="xl" />
@@ -44,62 +25,59 @@ function HomeRouteFallback() {
   );
 }
 
-function EditorRouteFallback() {
+/** Routes select visibility, not ownership. Document trees live until closed. */
+export default function AppRoutes({
+  homeProps,
+  page,
+  showHome,
+}: AppRoutesProps) {
+  const { sessions } = useEditorTabsRuntime();
+  const isHomeActive = page?.kind === "home";
+  const [hasVisitedHome, setHasVisitedHome] = useState(isHomeActive);
+  useEffect(() => {
+    if (isHomeActive) setHasVisitedHome(true);
+  }, [isHomeActive]);
+
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4">
-      <div className="flex items-center gap-2">
-        <Skeleton className="h-9 w-32" />
-        <Skeleton className="h-9 w-20" />
-        <Skeleton className="h-9 w-24" />
-      </div>
-      <div className="flex min-h-0 flex-1 gap-4">
-        <Skeleton className="hidden h-full w-72 shrink-0 lg:block" />
-        <div className="flex min-h-0 flex-1 items-center justify-center">
-          <div className="flex gap-6"></div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <EditorTabStrip isHomeActive={isHomeActive} onHome={showHome} />
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div
+          className="absolute inset-0 flex min-h-0 flex-col"
+          data-workspace-editor
+        >
+          {!!sessions?.length && (
+            <Suspense
+              fallback={page?.kind === "document" ? <PageFallback /> : null}
+            >
+              <EditorPage />
+            </Suspense>
+          )}
         </div>
-        <Skeleton className="hidden h-full w-80 shrink-0 xl:block" />
+        {(hasVisitedHome || isHomeActive) && (
+          <div
+            data-workspace-home
+            className="absolute inset-0 overflow-auto"
+            style={{
+              visibility: isHomeActive ? "visible" : "hidden",
+              pointerEvents: isHomeActive ? undefined : "none",
+            }}
+            inert={!isHomeActive}
+            aria-hidden={!isHomeActive}
+          >
+            <EditorTabActiveContext.Provider value={isHomeActive}>
+              <Suspense fallback={<PageFallback />}>
+                <HomePage {...homeProps} isActive={isHomeActive} />
+              </Suspense>
+            </EditorTabActiveContext.Provider>
+          </div>
+        )}
+        {page === null && (
+          <div className="absolute inset-0 flex">
+            <PageFallback />
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
-const AppRoutes: React.FC<AppRoutesProps> = ({
-  homeProps,
-  canAccessEditor,
-  isLoading,
-}) => {
-  const [location] = useLocation();
-
-  return (
-    <Suspense
-      fallback={
-        location.startsWith("/editor") ? (
-          <EditorRouteFallback />
-        ) : (
-          <HomeRouteFallback />
-        )
-      }
-    >
-      <Switch>
-        <Route path="/editor">
-          <EditorRouteGuard
-            canAccessEditor={canAccessEditor}
-            isLoading={isLoading}
-            fallback={<HomePage {...homeProps} />}
-            loadingFallback={<EditorRouteFallback />}
-          >
-            <EditorPage />
-          </EditorRouteGuard>
-        </Route>
-        <Route path="/">
-          <HomePage {...homeProps} />
-        </Route>
-        <Route>
-          <HomePage {...homeProps} />
-        </Route>
-      </Switch>
-    </Suspense>
-  );
-};
-
-export default AppRoutes;

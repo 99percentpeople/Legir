@@ -180,7 +180,7 @@ const renderPage = async () => {
   await act(async () =>
     root.render(
       <EditorRuntimeProvider tabs={tabs} document={documentRuntime}>
-        <EditorTabStrip />
+        <EditorTabStrip isHomeActive={false} onHome={() => {}} />
         {pageElement}
       </EditorRuntimeProvider>,
     ),
@@ -224,7 +224,6 @@ beforeEach(async () => {
     mergeWindowTargets: [],
     canDetachTabs: false,
     canMergeTabs: false,
-    openDocument: asyncNoop,
     refreshMergeWindowTargets: asyncNoop,
     selectTab: noop,
     closeTab: noop,

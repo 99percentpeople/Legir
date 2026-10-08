@@ -7,7 +7,7 @@ type HomeHeaderProps = {
 
 export function HomeHeader({ rightSlot }: HomeHeaderProps) {
   return (
-    <div className="border-border bg-card/50 fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b px-6 backdrop-blur-sm">
+    <div className="border-border bg-workspace-header flex h-16 w-full shrink-0 items-center justify-between border-b px-6 backdrop-blur-sm">
       <div className="text-foreground flex items-center">
         <BrandBanner className="h-9 w-auto" />
       </div>

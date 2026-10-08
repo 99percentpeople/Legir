@@ -126,7 +126,6 @@ describe("live document tabs", () => {
       mergeWindowTargets: [],
       canDetachTabs: false,
       canMergeTabs: false,
-      openDocument: async () => {},
       refreshMergeWindowTargets: async () => {},
       selectTab: noop,
       closeTab: noop,

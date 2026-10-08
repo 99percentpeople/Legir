@@ -831,6 +831,7 @@ const fr = {
     export_fail: "Échec de l'exportation du PDF.",
   },
   tabs: {
+    home: "Accueil",
     detach_to_new_window: "Détacher dans une nouvelle fenêtre",
     merge_to_window: "Fusionner dans une fenêtre",
     window_n: "Fenêtre {index}",

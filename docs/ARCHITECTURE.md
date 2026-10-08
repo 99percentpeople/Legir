@@ -105,12 +105,30 @@ This file is intentionally operational rather than purely presentational.
 
 ### `src/AppRoutes.tsx`
 
-Routing is simple:
+The app has one persistent workspace shell and tab strip. Home is a pinned,
+non-closeable entry before the document tabs. Routing selects the visible page,
+not whether the workspace is mounted:
 
-- `/` renders `HomePage`
-- `/editor` renders `EditorPage`
+- `/` selects Home with no active document.
+- `/editor/:tabId` selects a live document session in this window.
+- `/editor` remains a bootstrap/legacy entry. It waits for pending opening or
+  transfer work, then resolves to a document route (or Home if none exists).
+- Unknown, expired and foreign-window session routes are replaced with `/`.
 
-The editor route is guarded. If there is no active document/tab session, navigation falls back to the home page.
+`src/app/workspaceNavigation/` owns URL parsing and navigation commands. Explicit
+page selection pushes history; selecting the same page is a no-op. Closing the
+active document replaces the current entry with its right neighbor, then its left
+neighbor, then Home. Browser history is projected back into the document runtime
+and workspace layout without pushing another history entry. Window layout
+`activeTabId` is null on Home even when documents remain open. These addresses
+identify transient sessions, not persistent file links; refresh does not restore
+tabs or unsaved edits.
+
+Home is lazily mounted on its first visit and retained afterward, preserving its
+query and scroll state. Document trees stay mounted until closed. Inactive Home
+and document views are inert; file-drop handlers and document shortcuts only run
+for the visible page. Window titles and browser unload protection are app-owned,
+so dirty background documents remain protected while Home is selected.
 
 ## Home Page and Recent Files
 
@@ -164,7 +182,8 @@ The current open flow is:
 4. A fresh `EditorTabSnapshot` is created
 5. The matching document viewport is restored; shared UI is read from its existing owners
 6. The tab is inserted into the current editor window
-7. The route switches to `/editor`
+7. Unified navigation selects `/editor/:tabId`; re-opening the same source selects
+   the existing session instead of creating another tab
 
 The file-open abstractions deliberately hide the platform differences:
 
@@ -205,7 +224,7 @@ This module handles:
 - deriving stable source keys for deduplication
 - constructing a new document owner from an imported snapshot, using the target window's existing preferences and layout
 
-`src/pages/EditorPage/KeepAliveEditor.tsx` mounts every open tab with a stable key. Inactive tabs use `visibility: hidden` and `inert`, retaining layout dimensions, scroll offsets and transferred OffscreenCanvas buffers. Only the active tab handles global keyboard/pointer shortcuts. Body-portaled menus, popovers, tooltips and dialogs also honor tab activity and release focus/pointer locks while hidden. Workspace events and DOM queries are scoped through `src/app/editorTabs/context.ts`; identical page/control IDs in separate PDFs must not resolve into another tab.
+`src/pages/EditorPage/KeepAliveEditor.tsx` mounts every open tab with a stable key. Document hosts are ordered by immutable session ID, independently of the user-visible tab order. Reordering the tab strip must not move existing document DOM: even keyed DOM moves can reset browser scroll offsets and replay canvas lifecycle effects in development StrictMode. Adding or closing a session only inserts or removes that session's host. Inactive tabs use `visibility: hidden` and `inert`, retaining layout dimensions, scroll offsets and transferred OffscreenCanvas buffers. Only the active tab handles global keyboard/pointer shortcuts. Body-portaled menus, popovers, tooltips and dialogs also honor tab activity and release focus/pointer locks while hidden. Workspace events and DOM queries are scoped through `src/app/editorTabs/context.ts`; identical page/control IDs in separate PDFs must not resolve into another tab.
 
 There is currently no LRU eviction: closing a tab releases its worker, canvas resources, thumbnails, subscriptions and cancellation signal. Memory therefore grows with open documents. Page virtualization still bounds each document's mounted pages.
 
@@ -221,7 +240,7 @@ Tab and window transfer support lives in:
 - `src/services/platform/windowBootstrap.ts`
 - `src/services/platform/tabWorkspace.ts`
 
-The important architectural point is that cross-window movement is based on transferable tab session state rather than reopening the document from scratch whenever possible.
+The important architectural point is that cross-window movement is based on transferable tab session state rather than reopening the document from scratch whenever possible. Home is never transferred or counted as a document. Transfer rollback restores the previous workspace page (including Home), without disposing the retained runtime.
 
 ## Editor State
 

@@ -188,7 +188,7 @@ const Toolbar: React.FC = () => {
   return (
     <div
       className={cn(
-        "bg-background border-border text-foreground relative z-30 flex h-12 items-center gap-2 border-b px-2 sm:px-4",
+        "bg-workspace-header border-border text-foreground relative z-30 flex h-12 items-center gap-2 border-b px-2 sm:px-4",
         hideToolSection ? "justify-between" : "lg:justify-between",
       )}
       data-app-block-modifier-wheel-zoom="1"

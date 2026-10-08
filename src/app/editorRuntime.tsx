@@ -16,7 +16,6 @@ export interface EditorTabsRuntime {
   mergeWindowTargets: EditorMergeWindowTarget[];
   canDetachTabs: boolean;
   canMergeTabs: boolean;
-  openDocument: () => Promise<void>;
   refreshMergeWindowTargets: () => Promise<void>;
   selectTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
@@ -41,7 +40,6 @@ export interface EditorDocumentRuntime {
 
 export interface EditorPageTabsRuntime {
   activeTabId: string | null;
-  hasDirtyTabs: boolean;
 }
 
 export type EditorDocumentIdentityRuntime = Pick<
@@ -121,10 +119,9 @@ export function EditorRuntimeProvider({
   document: EditorDocumentRuntime;
   children: React.ReactNode;
 }) {
-  const hasDirtyTabs = tabs.tabs.some((tab) => tab.isDirty);
   const pageTabs = useMemo<EditorPageTabsRuntime>(
-    () => ({ activeTabId: tabs.activeTabId, hasDirtyTabs }),
-    [tabs.activeTabId, hasDirtyTabs],
+    () => ({ activeTabId: tabs.activeTabId }),
+    [tabs.activeTabId],
   );
   const documentIdentity = useMemo<EditorDocumentIdentityRuntime>(
     () => ({

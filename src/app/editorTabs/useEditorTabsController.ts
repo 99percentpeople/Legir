@@ -22,6 +22,7 @@ interface UseEditorTabsControllerOptions {
   windowId?: EditorWindowId;
   persistDocumentView: () => void;
   activateSession: (session: EditorTabSession) => void;
+  deactivateSession?: () => void;
 }
 
 interface AddEditorTabOptions {
@@ -42,6 +43,7 @@ export function useEditorTabsController({
   windowId = CURRENT_EDITOR_WINDOW_ID,
   persistDocumentView,
   activateSession,
+  deactivateSession,
 }: UseEditorTabsControllerOptions) {
   const [workspaceBackend] = React.useState<EditorTabWorkspaceBackend>(
     () => backend ?? createLocalSingleWindowTabBackend(workspaceStore),
@@ -58,21 +60,12 @@ export function useEditorTabsController({
   const activeTabIdRef = React.useRef(activeTabId);
 
   React.useEffect(() => {
-    return workspaceBackend.subscribe(windowId, setWorkspaceSnapshot);
+    return workspaceBackend.subscribe(windowId, (snapshot) => {
+      tabsRef.current = snapshot.sessions;
+      activeTabIdRef.current = snapshot.layout.activeTabId;
+      setWorkspaceSnapshot(snapshot);
+    });
   }, [windowId, workspaceBackend]);
-
-  React.useEffect(() => {
-    const snapshot = workspaceBackend.getWindowSnapshot(windowId);
-    setWorkspaceSnapshot(snapshot);
-  }, [windowId, workspaceBackend]);
-
-  React.useEffect(() => {
-    tabsRef.current = tabs;
-  }, [tabs]);
-
-  React.useEffect(() => {
-    activeTabIdRef.current = activeTabId;
-  }, [activeTabId]);
 
   const getTabById = React.useCallback(
     (tabId: string | null | undefined) => {
@@ -109,7 +102,7 @@ export function useEditorTabsController({
       },
     ) => {
       const nextTab = getTabById(tabId);
-      if (!nextTab) return false;
+      if (!nextTab || nextTab.windowId !== windowId) return false;
 
       const currentTabId = activeTabIdRef.current;
       // Clicking the already-active tab must be a no-op.
@@ -152,6 +145,24 @@ export function useEditorTabsController({
       workspaceBackend,
     ],
   );
+
+  const deactivateTab = React.useCallback(() => {
+    const current = getTabById(activeTabIdRef.current);
+    if (current) {
+      persistDocumentView();
+      current.runtime.active = false;
+    }
+    activeTabIdRef.current = null;
+    workspaceBackend.activateSession(windowId, null);
+    activateEditorView();
+    deactivateSession?.();
+  }, [
+    getTabById,
+    persistDocumentView,
+    workspaceBackend,
+    windowId,
+    deactivateSession,
+  ]);
 
   const addTab = React.useCallback(
     (options: AddEditorTabOptions) => {
@@ -272,6 +283,7 @@ export function useEditorTabsController({
       windowLayout,
       addTab,
       activateTab,
+      deactivateTab,
       persistActiveTabView,
       detachTabToNewWindow,
       disposeAllTabs,
@@ -291,6 +303,7 @@ export function useEditorTabsController({
       windowLayout,
       addTab,
       activateTab,
+      deactivateTab,
       persistActiveTabView,
       detachTabToNewWindow,
       disposeAllTabs,

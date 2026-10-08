@@ -1,0 +1,95 @@
+.editor-tab-strip {
+  --tab-radius: 12px;
+  --tab-active-surface: var(--workspace-header);
+  --tab-active-edge: none;
+  --tab-hover-surface: color-mix(in oklch, var(--background) 55%, transparent);
+  background: color-mix(in oklch, var(--muted) 50%, var(--border));
+}
+
+.dark .editor-tab-strip {
+  --tab-active-edge: inset 0 1px 0 rgb(255 255 255 / 8%);
+  --tab-hover-surface: color-mix(in oklch, var(--muted) 65%, transparent);
+  background: color-mix(in oklch, var(--background) 75%, black);
+}
+
+/* Share the two shoulder gutters so tab bodies touch. The scroller overlaps
+   Home by the same amount, keeping its first tab's left curve inside the clip. */
+.editor-tab-scroller,
+.editor-tab-slot + .editor-tab-slot {
+  margin-left: calc(-2 * var(--tab-radius));
+}
+
+.editor-tab {
+  padding-inline: calc(var(--tab-radius) + 12px);
+}
+
+/* Paint the selected shoulders above neighbouring hover backgrounds. */
+.editor-tab--active {
+  z-index: 2;
+}
+
+.editor-tab::before,
+.editor-tab::after {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+}
+
+.editor-tab::before {
+  inset: 0 var(--tab-radius);
+  border-radius: var(--tab-radius);
+  background: transparent;
+  transition: background-color 150ms;
+}
+
+.editor-tab:not(.editor-tab--active):not([aria-disabled="true"]):hover {
+  color: var(--foreground);
+}
+
+.editor-tab:not(.editor-tab--active):not([aria-disabled="true"]):hover::before {
+  background: var(--tab-hover-surface);
+}
+
+.editor-tab--active::before {
+  bottom: 0;
+  border-radius: var(--tab-radius) var(--tab-radius) 0 0;
+  background: var(--tab-active-surface);
+  box-shadow: var(--tab-active-edge);
+  transition: none;
+}
+
+.editor-tab--active::after {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--tab-radius);
+  background:
+    radial-gradient(
+        circle at 0 0,
+        transparent calc(var(--tab-radius) - 0.5px),
+        var(--tab-active-surface) var(--tab-radius)
+      )
+      left bottom / var(--tab-radius) var(--tab-radius) no-repeat,
+    radial-gradient(
+        circle at 100% 0,
+        transparent calc(var(--tab-radius) - 0.5px),
+        var(--tab-active-surface) var(--tab-radius)
+      )
+      right bottom / var(--tab-radius) var(--tab-radius) no-repeat;
+}
+
+.editor-tab:focus-visible {
+  outline: none;
+}
+
+.editor-tab:focus-visible::before {
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-tab,
+  .editor-tab::before {
+    transition: none;
+  }
+}

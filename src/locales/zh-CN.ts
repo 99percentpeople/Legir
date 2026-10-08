@@ -789,6 +789,7 @@ const zhCN = {
     export_fail: "导出 PDF 失败。",
   },
   tabs: {
+    home: "首页",
     detach_to_new_window: "分离到新窗口",
     merge_to_window: "合并到窗口",
     window_n: "窗口 {index}",

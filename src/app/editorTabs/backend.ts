@@ -52,7 +52,7 @@ export interface EditorTabWorkspaceBackend {
     session: EditorTabSession,
     options?: AddEditorTabSessionOptions,
   ) => void;
-  activateSession: (windowId: EditorWindowId, sessionId: string) => void;
+  activateSession: (windowId: EditorWindowId, sessionId: string | null) => void;
   clearWindow: (windowId: EditorWindowId) => EditorTabSession[];
   detachSessionToNewWindow: (
     options: DetachEditorTabSessionOptions,
@@ -212,7 +212,10 @@ export const createLocalSingleWindowTabBackend = (
         }),
       );
       layout.tabIds = insertAt(layout.tabIds, session.id, options?.targetIndex);
-      if (options?.activate || !layout.activeTabId) {
+      if (
+        options?.activate ||
+        (options?.activate !== false && !layout.activeTabId)
+      ) {
         layout.activeTabId = session.id;
       }
       setLayout(windowId, layout);
@@ -237,7 +240,8 @@ export const createLocalSingleWindowTabBackend = (
 
     activateSession(windowId, sessionId) {
       const layout = ensureLayout(windowId);
-      if (!layout.tabIds.includes(sessionId)) return;
+      if (sessionId !== null && !layout.tabIds.includes(sessionId)) return;
+      if (layout.activeTabId === sessionId) return;
       layout.activeTabId = sessionId;
       setLayout(windowId, layout);
       emit(windowId);
@@ -283,6 +287,21 @@ export const createLocalSingleWindowTabBackend = (
       if (!session || session.windowId !== options.fromWindowId) return null;
 
       const fromLayout = ensureLayout(options.fromWindowId);
+      if (options.fromWindowId === options.toWindowId) {
+        setLayout(options.fromWindowId, {
+          ...fromLayout,
+          tabIds: insertAt(
+            fromLayout.tabIds.filter((id) => id !== options.sessionId),
+            options.sessionId,
+            options.targetIndex,
+          ),
+          activeTabId: options.activate
+            ? options.sessionId
+            : fromLayout.activeTabId,
+        });
+        emit(options.fromWindowId);
+        return session;
+      }
       const toLayout = ensureLayout(options.toWindowId);
       const nextFromTabIds = fromLayout.tabIds.filter(
         (tabId) => tabId !== options.sessionId,
@@ -306,7 +325,8 @@ export const createLocalSingleWindowTabBackend = (
         ...toLayout,
         tabIds: nextToTabIds,
         activeTabId:
-          options.activate || !toLayout.activeTabId
+          options.activate ||
+          (options.activate !== false && !toLayout.activeTabId)
             ? options.sessionId
             : toLayout.activeTabId,
       });

@@ -53,7 +53,7 @@ const EditorPage: React.FC = () => {
   const useEditorView = useEditorViewApi();
   const state = useDocumentState(useShallow(selectEditorPageState));
   const hasSelectedControl = useDocumentState(selectHasSelectedControl);
-  const { activeTabId, hasDirtyTabs } = useEditorPageTabsRuntime();
+  const { activeTabId } = useEditorPageTabsRuntime();
   const documentCommands = useEditorDocumentCommandsRuntime();
   const permissionUi = usePdfPermissionUi(state.documentPermissions);
   const isMobile = useIsMobile();
@@ -133,11 +133,7 @@ const EditorPage: React.FC = () => {
     return await documentCommands.save();
   }, [documentCommands.save]);
 
-  const { workspaceScrollContainerRef } = useEditorPageLifecycle({
-    filename: state.filename,
-    pagesLength: state.pages.length,
-    hasDirtyTabs,
-  });
+  const { workspaceScrollContainerRef } = useEditorPageLifecycle();
 
   const handleModeChange = React.useCallback(
     (mode: EditorState["mode"]) => {
