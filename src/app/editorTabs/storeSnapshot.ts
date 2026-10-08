@@ -105,6 +105,7 @@ export const createEditorTabSnapshotFromState = (options: {
 
     selectedId: state.selectedId,
     scale: state.scale,
+    viewRotation: state.viewRotation,
     past: createShallowArrayCopy(state.past),
     future: createShallowArrayCopy(state.future),
     clipboard: state.clipboard

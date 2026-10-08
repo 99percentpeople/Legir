@@ -67,8 +67,10 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   const renderEpochRef = useRef(0);
   const dprRef = useRef<number>(1);
   const setState = useEditorView.setState;
-  const placeholderImage = useDocumentState(
-    (state) => state.thumbnailImages[pageIndex],
+  const placeholderImage = useDocumentState((state) =>
+    state.pages[pageIndex]?.rotation === page.rotation
+      ? state.thumbnailImages[pageIndex]
+      : undefined,
   );
   const pageInfo = useMemo(
     () => ({
@@ -113,7 +115,11 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       }
 
       const current = useEditorView.getState();
-      if (!current.pages[pageIndex] || current.thumbnailImages[pageIndex]) {
+      if (
+        !current.pages[pageIndex] ||
+        current.pages[pageIndex].rotation !== page.rotation ||
+        current.thumbnailImages[pageIndex]
+      ) {
         return;
       }
 
@@ -158,7 +164,11 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       if (!imageData) return;
 
       const latest = useEditorView.getState();
-      if (!latest.pages[pageIndex] || latest.thumbnailImages[pageIndex]) {
+      if (
+        !latest.pages[pageIndex] ||
+        latest.pages[pageIndex].rotation !== page.rotation ||
+        latest.thumbnailImages[pageIndex]
+      ) {
         if (imageData.startsWith("blob:")) {
           try {
             URL.revokeObjectURL(imageData);
@@ -179,7 +189,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         };
       });
     },
-    [pageIndex, setState],
+    [pageIndex, page.rotation, setState],
   );
 
   useLayoutEffect(() => {
@@ -301,6 +311,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         const success = await workerService.renderPage({
           pageIndex,
           scale: renderScale * dpr,
+          rotation: page.rotation,
           canvas: offscreenCanvas,
           canvasId: targetId,
           priority: isInView ? -1 : 0,

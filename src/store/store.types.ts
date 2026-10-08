@@ -81,6 +81,8 @@ export interface EditorActions {
     patch: Partial<EditorToolStyles[K]>,
   ) => void;
   setScale: (scale: number) => void;
+  rotateView: (direction: "clockwise" | "counterclockwise") => void;
+  resetViewRotation: () => void;
   zoomBy: (factor: number) => void;
   fitToScale: (scale: number) => void;
   setPageLayout: (layout: EditorState["pageLayout"]) => void;

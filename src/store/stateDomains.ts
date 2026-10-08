@@ -50,6 +50,7 @@ export const documentKeys = [
   "tool",
   "selectedId",
   "scale",
+  "viewRotation",
   "isProcessing",
   "past",
   "future",

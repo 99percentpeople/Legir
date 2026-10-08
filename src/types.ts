@@ -526,6 +526,8 @@ export interface DocumentState {
   tool: Tool;
   selectedId: string | null;
   scale: number;
+  /** Temporary reading direction; never changes source pages or PDF export. */
+  viewRotation: number;
   isProcessing: boolean;
   past: HistorySnapshot[];
   future: HistorySnapshot[];
@@ -673,6 +675,7 @@ export type WorkspaceEditorState = Pick<
   | "shapeStyle"
   | "stampStyle"
   | "scale"
+  | "viewRotation"
   | "selectedId"
   | "tool"
 >;

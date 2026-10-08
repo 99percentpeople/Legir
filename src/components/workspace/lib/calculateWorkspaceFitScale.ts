@@ -8,6 +8,7 @@ import {
   WORKSPACE_BASE_PAGE_GAP_PX,
 } from "@/constants";
 import type { PageData, PageFlowDirection, PageLayoutMode } from "@/types";
+import { getPageView } from "./pageViewRotation";
 
 type WorkspaceViewport = {
   width: number;
@@ -19,6 +20,7 @@ type WorkspaceFitScaleOptions = {
   pageIndex?: number;
   pageLayout: PageLayoutMode;
   pages: PageData[];
+  viewRotation?: number;
   viewport: WorkspaceViewport;
 };
 
@@ -41,8 +43,10 @@ export const calculateWorkspaceFitWidthScale = ({
   pageLayout,
   pages,
   viewport,
+  viewRotation = 0,
 }: WorkspaceFitScaleOptions) => {
-  const page = getTargetPage(pages, pageIndex);
+  const sourcePage = getTargetPage(pages, pageIndex);
+  const page = sourcePage ? getPageView(sourcePage, viewRotation) : null;
   if (!page?.width) return 1.0;
 
   const availableWidth = viewport.width - FIT_WIDTH_PADDING_X;
@@ -66,8 +70,10 @@ export const calculateWorkspaceFitScreenScale = ({
   pageLayout,
   pages,
   viewport,
+  viewRotation = 0,
 }: WorkspaceFitScaleOptions) => {
-  const page = getTargetPage(pages, pageIndex);
+  const sourcePage = getTargetPage(pages, pageIndex);
+  const page = sourcePage ? getPageView(sourcePage, viewRotation) : null;
   if (!page?.width || !page.height) return 1.0;
 
   const availableWidth = viewport.width - FIT_SCREEN_PADDING_X;

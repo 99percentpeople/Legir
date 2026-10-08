@@ -415,7 +415,11 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
     const centerY = bounds.top + bounds.height / 2;
     const dx = clientX - centerX;
     const dy = clientY - centerY;
-    const theta = (rotationDeg * Math.PI) / 180;
+    const viewRotation = Number(
+      interactionSurface?.closest<HTMLElement>("[data-page-view-rotation]")
+        ?.dataset.pageViewRotation ?? 0,
+    );
+    const theta = ((rotationDeg + viewRotation) * Math.PI) / 180;
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
     const localPxX = dx * cos + dy * sin + renderWidth / 2;

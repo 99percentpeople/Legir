@@ -781,7 +781,10 @@ const renderToCanvas = async (
     const page = await getPageForDoc(resolvedDocId, pageIndex);
     throwIfCancelled();
 
-    const viewport = page.getViewport({ scale, rotation: page.rotate });
+    const viewport = page.getViewport({
+      scale,
+      rotation: params.rotation ?? page.rotate,
+    });
     const rasterWidth = Math.max(1, Math.floor(viewport.width));
     const rasterHeight = Math.max(1, Math.floor(viewport.height));
 

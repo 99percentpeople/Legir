@@ -142,6 +142,37 @@ it("retains in-flight work while panning within the same neighborhood", async ()
   expect(oldSignals.some((s) => s.aborted)).toBe(false);
   expect(w.renderPage.mock.calls.length).toBe(before);
 });
+it("rerenders tiles at a new rotation even when the page dimensions stay the same", async () => {
+  const w = worker();
+  const draw = async (rotation: number) => {
+    await act(async () =>
+      root.render(
+        <PDFTileLayer
+          workerService={w as unknown as PDFWorkerService}
+          page={{ ...page, rotation }}
+          scale={1}
+          isInView
+          isRendered={false}
+        />,
+      ),
+    );
+    await frames();
+  };
+  await draw(0);
+  const firstCalls = w.renderPage.mock.calls.map(
+    ([call]) => call as unknown as { canvasId: string; rotation: number },
+  );
+  expect(firstCalls.length).toBeGreaterThan(0);
+  const firstIds = new Set(firstCalls.map((call) => call.canvasId));
+  w.renderPage.mockClear();
+  await draw(180);
+  const rotatedCalls = w.renderPage.mock.calls.map(
+    ([call]) => call as unknown as { canvasId: string; rotation: number },
+  );
+  expect(rotatedCalls.length).toBeGreaterThan(0);
+  expect(rotatedCalls.every((call) => call.rotation === 180)).toBe(true);
+  expect(rotatedCalls.every((call) => !firstIds.has(call.canvasId))).toBe(true);
+});
 it("debounces rapid zoom after an initial tile-only render", async () => {
   const w = worker();
   const draw = async (scale: number) => {

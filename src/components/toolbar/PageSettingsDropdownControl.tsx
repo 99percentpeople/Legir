@@ -6,7 +6,10 @@ import {
   Minimize2,
   MoveHorizontal,
   MoveVertical,
+  RotateCcw,
+  RotateCw,
   Square,
+  Undo2,
 } from "lucide-react";
 
 import { cn } from "@/utils/cn";
@@ -17,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -37,6 +41,10 @@ type PageSettingsDropdownControlProps = {
   onPageLayoutChange: (layout: PageLayoutMode) => void;
   onPageFlowChange: (flow: PageFlowDirection) => void;
   onToggleFullscreen: () => void;
+  onRotateView?: (direction: "clockwise" | "counterclockwise") => void;
+  viewRotation?: number;
+  onResetViewRotation?: () => void;
+  rotationDisabled?: boolean;
 };
 
 const PageSettingsDropdownControl: React.FC<
@@ -54,6 +62,10 @@ const PageSettingsDropdownControl: React.FC<
   onPageLayoutChange,
   onPageFlowChange,
   onToggleFullscreen,
+  onRotateView,
+  viewRotation = 0,
+  onResetViewRotation,
+  rotationDisabled = false,
 }) => {
   const { t } = useLanguage();
 
@@ -63,7 +75,8 @@ const PageSettingsDropdownControl: React.FC<
         <Button
           variant="ghost"
           size="icon"
-          title={t("toolbar.page_layout")}
+          title={t("toolbar.page_settings")}
+          aria-label={t("toolbar.page_settings")}
           className={cn("h-8 w-8 sm:h-9 sm:w-9", triggerClassName)}
         >
           <FileCog2 size={16} />
@@ -76,9 +89,6 @@ const PageSettingsDropdownControl: React.FC<
         className="min-w-48"
         data-app-block-modifier-wheel-zoom="1"
       >
-        <DropdownMenuLabel>{t("toolbar.page_settings")}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-
         <DropdownMenuLabel className="text-muted-foreground px-2 py-1.5 text-xs font-medium data-inset:pl-8">
           {t("toolbar.page_mode")}
         </DropdownMenuLabel>
@@ -122,6 +132,35 @@ const PageSettingsDropdownControl: React.FC<
         </DropdownMenuRadioGroup>
 
         <DropdownMenuSeparator />
+
+        {onRotateView && (
+          <>
+            <DropdownMenuLabel className="text-muted-foreground px-2 py-1.5 text-xs font-medium data-inset:pl-8">
+              {t("toolbar.rotate_view")}
+            </DropdownMenuLabel>
+            <DropdownMenuItem
+              disabled={rotationDisabled}
+              onSelect={() => onRotateView("counterclockwise")}
+            >
+              <RotateCcw size={14} />
+              {t("toolbar.rotate_counterclockwise")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={rotationDisabled}
+              onSelect={() => onRotateView("clockwise")}
+            >
+              <RotateCw size={14} />
+              {t("toolbar.rotate_clockwise")}
+            </DropdownMenuItem>
+            {viewRotation !== 0 && onResetViewRotation && (
+              <DropdownMenuItem onSelect={onResetViewRotation}>
+                <Undo2 size={14} />
+                {t("toolbar.reset_rotation")}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+          </>
+        )}
 
         <DropdownMenuLabel className="text-muted-foreground px-2 py-1.5 text-xs font-medium data-inset:pl-8">
           {t("toolbar.view")}

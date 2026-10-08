@@ -68,6 +68,8 @@ export const EditorCanvasPane: React.FC = () => {
     setPageFlow,
     setPageLayout,
     setScale,
+    rotateView,
+    resetViewRotation,
     setState,
     selectPageTranslateParagraphId,
     setSelectedPageTranslateParagraphIds,
@@ -96,6 +98,7 @@ export const EditorCanvasPane: React.FC = () => {
       shapeStyle: state.shapeStyle,
       stampStyle: state.stampStyle,
       scale: state.scale,
+      viewRotation: state.viewRotation,
       selectedId: state.selectedId,
       tool: state.tool,
     }),
@@ -121,6 +124,7 @@ export const EditorCanvasPane: React.FC = () => {
       state.shapeStyle,
       state.stampStyle,
       state.scale,
+      state.viewRotation,
       state.selectedId,
       state.tool,
     ],
@@ -181,6 +185,37 @@ export const EditorCanvasPane: React.FC = () => {
     [setState],
   );
 
+  const handleRotateView = useCallback(
+    (direction: "clockwise" | "counterclockwise") => {
+      appEventBus.emit("workspace:cancelToolInteraction", {
+        draftsOnly: false,
+        handled: false,
+      });
+      window.getSelection()?.removeAllRanges();
+      rotateView(direction);
+    },
+    [appEventBus, rotateView],
+  );
+
+  const previousRotationRef = useRef(state.viewRotation);
+  const handleResetViewRotation = useCallback(() => {
+    appEventBus.emit("workspace:cancelToolInteraction", {
+      draftsOnly: false,
+      handled: false,
+    });
+    window.getSelection()?.removeAllRanges();
+    resetViewRotation();
+  }, [appEventBus, resetViewRotation]);
+
+  useEffect(() => {
+    if (previousRotationRef.current === state.viewRotation) return;
+    previousRotationRef.current = state.viewRotation;
+    appEventBus.emit("workspace:navigatePage", {
+      pageIndex: state.currentPageIndex,
+      behavior: "auto",
+    });
+  }, [appEventBus, state.currentPageIndex, state.viewRotation]);
+
   const handleClearPageTranslateParagraphSelection = useCallback(() => {
     setSelectedPageTranslateParagraphIds([]);
   }, [setSelectedPageTranslateParagraphIds]);
@@ -198,6 +233,7 @@ export const EditorCanvasPane: React.FC = () => {
     (pageIndex: number = 0) => {
       return calculateWorkspaceInitialScale({
         pages: state.pages,
+        viewRotation: state.viewRotation,
         pageIndex,
         pageLayout: state.pageLayout,
         pageFlow: state.pageFlow,
@@ -211,6 +247,7 @@ export const EditorCanvasPane: React.FC = () => {
       state.pageFlow,
       state.pageLayout,
       state.pages,
+      state.viewRotation,
     ],
   );
 
@@ -314,6 +351,9 @@ export const EditorCanvasPane: React.FC = () => {
         pageFlow={state.pageFlow}
         isFullscreen={state.isFullscreen}
         onNavigatePage={handleNavigatePage}
+        onRotateView={handleRotateView}
+        viewRotation={state.viewRotation}
+        onResetViewRotation={handleResetViewRotation}
         onPageLayoutChange={(layout) => {
           setPageLayout(layout);
         }}

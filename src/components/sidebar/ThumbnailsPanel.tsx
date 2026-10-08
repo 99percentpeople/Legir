@@ -3,6 +3,7 @@ import type { PageData, ThumbnailsLayoutMode } from "@/types";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useLanguage } from "../language-provider";
+import { getPageView } from "@/components/workspace/lib/pageViewRotation";
 import { useEditorView } from "@/store/useEditorView";
 
 interface ThumbnailItemProps {
@@ -24,6 +25,8 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
 }) => {
   const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
+  const viewRotation = useEditorView((state) => state.viewRotation);
+  const viewPage = getPageView(page, viewRotation);
   const thumbnailImage = useEditorView(
     (state) => state.thumbnailImages[pageIndex],
   );
@@ -38,7 +41,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
   }, [isActive, isRestoringViewState, scrollBehaviorRef]);
 
   const aspectRatio =
-    page.width && page.height ? page.width / page.height : 0.75;
+    viewPage.width && viewPage.height ? viewPage.width / viewPage.height : 0.75;
 
   return (
     <div
@@ -60,7 +63,12 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
           <img
             src={thumbnailImage}
             alt={`Page ${pageIndex + 1}`}
-            className="h-full w-full object-contain"
+            className="absolute top-1/2 left-1/2 max-w-none object-contain"
+            style={{
+              width: `${(page.width / viewPage.width) * 100}%`,
+              height: `${(page.height / viewPage.height) * 100}%`,
+              transform: `translate(-50%, -50%) rotate(${viewRotation}deg)`,
+            }}
           />
         ) : (
           <div className="bg-muted text-muted-foreground flex h-full w-full items-center justify-center">

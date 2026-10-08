@@ -16,6 +16,8 @@ export const createEditorViewSlice: EditorStoreSlice<
   Pick<
     EditorActions,
     | "setScale"
+    | "rotateView"
+    | "resetViewRotation"
     | "zoomBy"
     | "fitToScale"
     | "setPageLayout"
@@ -26,6 +28,20 @@ export const createEditorViewSlice: EditorStoreSlice<
     | "endTemporaryPan"
   >
 > = (set, get) => ({
+  rotateView: (direction) =>
+    set((state) =>
+      state.pages.length === 0
+        ? state
+        : {
+            viewRotation:
+              (state.viewRotation + (direction === "clockwise" ? 90 : 270)) %
+              360,
+          },
+    ),
+
+  resetViewRotation: () =>
+    set((state) => (state.viewRotation === 0 ? state : { viewRotation: 0 })),
+
   setScale: (scale) =>
     set((state) => {
       const nextScale = clampEditorScale(scale);

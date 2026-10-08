@@ -386,7 +386,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
     setBackTilesPageH(pageH);
     setBackTilesMaxDim(tileMaxDim);
 
-    const epoch = `${pageIndex}_${scale}_${dpr}_${pageW}x${pageH}_${tileMaxDim}`;
+    const epoch = `${pageIndex}_${page.rotation}_${scale}_${dpr}_${pageW}x${pageH}_${tileMaxDim}`;
 
     if (backTilesKey && backTilesKey !== epoch) {
       const backHasAnyRendered = backTiles.some((t) =>
@@ -662,6 +662,7 @@ const PDFTileLayer: React.FC<PDFTileLayerProps> = ({
         const ok = await workerService.renderPage({
           pageIndex,
           scale: scale * dprRef.current,
+          rotation: page.rotation,
           canvas: alreadyTransferred ? undefined : offscreenCanvas,
           canvasId: tile.canvasId,
           tile: [tile.x, tile.y, tile.w, tile.h],

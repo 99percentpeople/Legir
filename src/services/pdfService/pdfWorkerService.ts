@@ -867,6 +867,7 @@ class PDFWorkerService {
   public renderPage(options: {
     pageIndex: number;
     scale: number;
+    rotation?: number;
     canvas?: OffscreenCanvas;
     canvasId: string;
     priority?: number;
@@ -884,6 +885,7 @@ class PDFWorkerService {
       const {
         pageIndex,
         scale,
+        rotation,
         canvas,
         canvasId,
         priority,
@@ -941,6 +943,7 @@ class PDFWorkerService {
           docId,
           pageIndex,
           scale,
+          rotation,
           canvas,
           canvasId,
           priority: priority || 0,

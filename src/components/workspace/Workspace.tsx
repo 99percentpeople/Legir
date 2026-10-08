@@ -60,6 +60,11 @@ import {
 import { getPageIndexFromPoint as getPageIndexFromPointLib } from "./lib/getPageIndexFromPoint";
 import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
 import { getFocusRect } from "./lib/getFocusRect";
+import {
+  getPageView,
+  getPageOverlayTransform,
+  pagePointToView,
+} from "./lib/pageViewRotation";
 import { VirtualizedPages } from "./VirtualizedPages";
 import { computeWorkspacePageRects } from "./lib/computeWorkspacePageRects";
 import { resolvePdfTextRangeGeometry } from "./lib/pdfTextRangeGeometry";
@@ -294,6 +299,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinchGestureActiveRef = useRef(false);
+  const viewPages = useMemo(
+    () =>
+      editorState.pages.map((page) =>
+        getPageView(page, editorState.viewRotation),
+      ),
+    [editorState.pages, editorState.viewRotation],
+  );
 
   useWorkspaceRenderActivity(containerRef, editorState.scale);
 
@@ -933,8 +945,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
     let targetTop = pageRect.top;
 
     if (rect) {
-      const rectCenterX = rect.x + rect.width / 2;
-      const rectCenterY = rect.y + rect.height / 2;
+      const center = pagePointToView(
+        { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
+        editorState.pages[pageIndex],
+        editorState.viewRotation,
+      );
+      const rectCenterX = center.x;
+      const rectCenterY = center.y;
       targetLeft =
         pageRect.left +
         rectCenterX * editorState.scale -
@@ -1130,7 +1147,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return [] as Array<Array<(typeof editorState.pages)[number]>>;
     }
 
-    const pages = editorState.pages;
+    const pages = viewPages;
     const rows: Array<Array<(typeof editorState.pages)[number]>> = [];
     if (pages.length === 0) return rows;
 
@@ -1148,7 +1165,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     }
 
     return rows;
-  }, [editorState.pageLayout, editorState.pages]);
+  }, [editorState.pageLayout, viewPages]);
 
   const pagePlacementByIndex = useMemo(() => {
     const map = new Map<
@@ -1226,7 +1243,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const pageLayoutRects = useMemo(() => {
     return computeWorkspacePageRects({
-      pages: editorState.pages,
+      pages: viewPages,
       pageRows: pageRowsForLayout,
       pageLayout: editorState.pageLayout,
       pageFlow: editorState.pageFlow,
@@ -1236,7 +1253,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   }, [
     editorState.pageFlow,
     editorState.pageLayout,
-    editorState.pages,
+    viewPages,
     editorState.scale,
     pageRowsForLayout,
     workspaceBottomPaddingPx,
@@ -1279,8 +1296,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
       if (!pageRect) return;
 
       const containerRect = container.getBoundingClientRect();
-      const rectCenterX = rect.x + rect.width / 2;
-      const rectCenterY = rect.y + rect.height / 2;
+      const center = pagePointToView(
+        { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
+        editorState.pages[pageIndex],
+        editorState.viewRotation,
+      );
+      const rectCenterX = center.x;
+      const rectCenterY = center.y;
       const targetLeft =
         pageRect.left +
         rectCenterX * editorState.scale -
@@ -1296,7 +1318,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
         behavior: behavior ?? "auto",
       });
     },
-    [editorState.scale, getPageRectByPageIndex],
+    [
+      editorState.scale,
+      editorState.pages,
+      editorState.viewRotation,
+      getPageRectByPageIndex,
+    ],
   );
 
   const allowPageIndexChange = !editorState.pendingViewStateRestore;
@@ -1316,7 +1343,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   } = useWorkspaceViewport({
     containerRef,
     contentRef,
-    editorState,
+    editorState: { ...editorState, pages: viewPages },
     getPageRectByPageIndex,
     onScaleChange,
     isPanning,
@@ -3199,6 +3226,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   // --- Render Helpers ---
 
   const renderPage = (page: (typeof pagesWithControls)[number]) => {
+    const viewPage = viewPages[page.pageIndex];
     const textLayerSelectable = toolUsesTextLayerSelection(editorState.tool, {
       isMobile,
     });
@@ -3261,8 +3289,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
         onContextMenu={(e) => handlePageContextMenu(e, page.pageIndex)}
       >
         <PDFPage
+          key={viewPage.rotation}
           workerService={workerService}
-          page={page}
+          page={viewPage}
           scale={editorState.scale}
           isSelectMode={textLayerSelectable}
           isHighlighting={editorState.tool === "draw_highlight"}
@@ -3289,305 +3318,295 @@ const Workspace: React.FC<WorkspaceProps> = ({
           sessionRenderKey={sessionRenderKey}
         />
 
-        {editorState.pageTranslateOptions.useParagraphs &&
-          (paragraphCandidatesByPage.get(page.pageIndex)?.length ?? 0) > 0 && (
-            <svg
-              className="absolute inset-0 z-10"
-              viewBox={`0 0 ${page.width} ${page.height}`}
-              preserveAspectRatio="none"
-              style={{ pointerEvents: isSelectable ? "auto" : "none" }}
-              onPointerDown={(e) => {
-                if (!isSelectable) return;
-                if (e.target !== e.currentTarget) return;
-                e.stopPropagation();
-                onSelectControl(null);
-                onClearPageTranslateParagraphSelection?.();
-              }}
-            >
-              {(paragraphCandidatesByPage.get(page.pageIndex) ?? []).map(
-                (c) => {
-                  const isSelected = selectedParagraphIds.has(c.id);
-                  const stroke = c.isExcluded ? "#9ca3af" : "#a855f7";
-                  const fill = isSelected
-                    ? c.isExcluded
-                      ? "rgba(156, 163, 175, 0.18)"
-                      : "rgba(168, 85, 247, 0.18)"
-                    : "transparent";
+        <div
+          className="pointer-events-none absolute top-0 left-0 origin-top-left"
+          data-page-overlay="true"
+          data-page-view-rotation={editorState.viewRotation}
+          style={{
+            width: page.width * editorState.scale,
+            height: page.height * editorState.scale,
+            transform: getPageOverlayTransform(
+              page,
+              editorState.viewRotation,
+              editorState.scale,
+            ),
+          }}
+        >
+          {editorState.pageTranslateOptions.useParagraphs &&
+            (paragraphCandidatesByPage.get(page.pageIndex)?.length ?? 0) >
+              0 && (
+              <svg
+                className="absolute inset-0 z-10"
+                viewBox={`0 0 ${page.width} ${page.height}`}
+                preserveAspectRatio="none"
+                style={{ pointerEvents: isSelectable ? "auto" : "none" }}
+                onPointerDown={(e) => {
+                  if (!isSelectable) return;
+                  if (e.target !== e.currentTarget) return;
+                  e.stopPropagation();
+                  onSelectControl(null);
+                  onClearPageTranslateParagraphSelection?.();
+                }}
+              >
+                {(paragraphCandidatesByPage.get(page.pageIndex) ?? []).map(
+                  (c) => {
+                    const isSelected = selectedParagraphIds.has(c.id);
+                    const stroke = c.isExcluded ? "#9ca3af" : "#a855f7";
+                    const fill = isSelected
+                      ? c.isExcluded
+                        ? "rgba(156, 163, 175, 0.18)"
+                        : "rgba(168, 85, 247, 0.18)"
+                      : "transparent";
 
-                  const rotationDeg =
-                    typeof c.rotationDeg === "number" &&
-                    Number.isFinite(c.rotationDeg)
-                      ? c.rotationDeg
-                      : 0;
+                    const rotationDeg =
+                      typeof c.rotationDeg === "number" &&
+                      Number.isFinite(c.rotationDeg)
+                        ? c.rotationDeg
+                        : 0;
 
-                  if (rotationDeg !== 0) {
-                    const ir = c.innerRect;
-                    const inner =
-                      ir &&
-                      Number.isFinite(ir.width) &&
-                      Number.isFinite(ir.height)
-                        ? { width: ir.width, height: ir.height }
-                        : getInnerSizeFromOuterAabb(c.rect, rotationDeg);
-                    const cx =
-                      ir && Number.isFinite(ir.x) && Number.isFinite(ir.width)
-                        ? ir.x + ir.width / 2
-                        : c.rect.x + c.rect.width / 2;
-                    const cy =
-                      ir && Number.isFinite(ir.y) && Number.isFinite(ir.height)
-                        ? ir.y + ir.height / 2
-                        : c.rect.y + c.rect.height / 2;
+                    if (rotationDeg !== 0) {
+                      const ir = c.innerRect;
+                      const inner =
+                        ir &&
+                        Number.isFinite(ir.width) &&
+                        Number.isFinite(ir.height)
+                          ? { width: ir.width, height: ir.height }
+                          : getInnerSizeFromOuterAabb(c.rect, rotationDeg);
+                      const cx =
+                        ir && Number.isFinite(ir.x) && Number.isFinite(ir.width)
+                          ? ir.x + ir.width / 2
+                          : c.rect.x + c.rect.width / 2;
+                      const cy =
+                        ir &&
+                        Number.isFinite(ir.y) &&
+                        Number.isFinite(ir.height)
+                          ? ir.y + ir.height / 2
+                          : c.rect.y + c.rect.height / 2;
+
+                      return (
+                        <g key={c.id}>
+                          <rect
+                            x={c.rect.x}
+                            y={c.rect.y}
+                            width={c.rect.width}
+                            height={c.rect.height}
+                            fill="transparent"
+                            stroke="transparent"
+                            vectorEffect="non-scaling-stroke"
+                            onPointerDown={(e) => {
+                              if (!isSelectable) return;
+                              e.stopPropagation();
+                              e.preventDefault();
+                              onSelectControl(null);
+                              onSelectPageTranslateParagraphId?.(c.id, {
+                                additive: e.ctrlKey || e.metaKey || e.shiftKey,
+                              });
+                            }}
+                          />
+                          <rect
+                            x={cx - inner.width / 2}
+                            y={cy - inner.height / 2}
+                            width={inner.width}
+                            height={inner.height}
+                            fill={fill}
+                            stroke={stroke}
+                            strokeWidth={isSelected ? 2 : 1}
+                            strokeDasharray={c.isExcluded ? "4 2" : undefined}
+                            vectorEffect="non-scaling-stroke"
+                            transform={`rotate(${rotationDeg}, ${cx}, ${cy})`}
+                            style={{ pointerEvents: "none" }}
+                          />
+                        </g>
+                      );
+                    }
 
                     return (
-                      <g key={c.id}>
-                        <rect
-                          x={c.rect.x}
-                          y={c.rect.y}
-                          width={c.rect.width}
-                          height={c.rect.height}
-                          fill="transparent"
-                          stroke="transparent"
-                          vectorEffect="non-scaling-stroke"
-                          onPointerDown={(e) => {
-                            if (!isSelectable) return;
-                            e.stopPropagation();
-                            e.preventDefault();
-                            onSelectControl(null);
-                            onSelectPageTranslateParagraphId?.(c.id, {
-                              additive: e.ctrlKey || e.metaKey || e.shiftKey,
-                            });
-                          }}
-                        />
-                        <rect
-                          x={cx - inner.width / 2}
-                          y={cy - inner.height / 2}
-                          width={inner.width}
-                          height={inner.height}
-                          fill={fill}
-                          stroke={stroke}
-                          strokeWidth={isSelected ? 2 : 1}
-                          strokeDasharray={c.isExcluded ? "4 2" : undefined}
-                          vectorEffect="non-scaling-stroke"
-                          transform={`rotate(${rotationDeg}, ${cx}, ${cy})`}
-                          style={{ pointerEvents: "none" }}
-                        />
-                      </g>
+                      <rect
+                        key={c.id}
+                        x={c.rect.x}
+                        y={c.rect.y}
+                        width={c.rect.width}
+                        height={c.rect.height}
+                        fill={fill}
+                        stroke={stroke}
+                        strokeWidth={isSelected ? 2 : 1}
+                        strokeDasharray={c.isExcluded ? "4 2" : undefined}
+                        vectorEffect="non-scaling-stroke"
+                        onPointerDown={(e) => {
+                          if (!isSelectable) return;
+                          e.stopPropagation();
+                          e.preventDefault();
+                          onSelectControl(null);
+                          onSelectPageTranslateParagraphId?.(c.id, {
+                            additive: e.ctrlKey || e.metaKey || e.shiftKey,
+                          });
+                        }}
+                      />
                     );
-                  }
+                  },
+                )}
+              </svg>
+            )}
 
-                  return (
-                    <rect
-                      key={c.id}
-                      x={c.rect.x}
-                      y={c.rect.y}
-                      width={c.rect.width}
-                      height={c.rect.height}
-                      fill={fill}
-                      stroke={stroke}
-                      strokeWidth={isSelected ? 2 : 1}
-                      strokeDasharray={c.isExcluded ? "4 2" : undefined}
-                      vectorEffect="non-scaling-stroke"
-                      onPointerDown={(e) => {
-                        if (!isSelectable) return;
-                        e.stopPropagation();
-                        e.preventDefault();
-                        onSelectControl(null);
-                        onSelectPageTranslateParagraphId?.(c.id, {
-                          additive: e.ctrlKey || e.metaKey || e.shiftKey,
-                        });
-                      }}
-                    />
-                  );
-                },
-              )}
-            </svg>
-          )}
+          <div
+            className={cn("absolute inset-0 scheme-light")}
+            style={{
+              cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
+              pointerEvents: isPanModeActive
+                ? "auto"
+                : editorState.tool === "select" ||
+                    editorState.tool === "select_text" ||
+                    editorState.tool === "draw_highlight"
+                  ? "none"
+                  : undefined,
+            }}
+            onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
+          >
+            {page.pageControls.map(({ kind, control }) => {
+              if (kind === "field") {
+                return (
+                  <ControlRenderer
+                    key={control.id}
+                    data={control}
+                    id={control.id}
+                    isSelected={editorState.selectedId === control.id}
+                    isAnnotationMode={editorState.mode === "annotation"}
+                    isFormMode={editorState.mode === "form"}
+                    isSelectable={isSelectable}
+                    canModify={canModifyFormStructure}
+                    canFillFormValue={canFillFormValue}
+                    onControlPointerDown={handleFieldPointerDown}
+                    onSelect={onSelectControl}
+                    onUpdate={onUpdateField}
+                    onResetToDefault={onResetFieldToDefault}
+                    onControlResizeStart={handleResizePointerDown}
+                    onTriggerHistorySave={onTriggerHistorySave}
+                    onReorderLayer={onReorderControlLayer}
+                  />
+                );
+              }
 
-        <div
-          className={cn("absolute inset-0 scheme-light")}
-          style={{
-            cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
-            pointerEvents: isPanModeActive
-              ? "auto"
-              : editorState.tool === "select" ||
-                  editorState.tool === "select_text" ||
-                  editorState.tool === "draw_highlight"
-                ? "none"
-                : undefined,
-          }}
-          onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
-        >
-          {page.pageControls.map(({ kind, control }) => {
-            if (kind === "field") {
+              const annot = control;
+              const allowSelect = annot.type !== "link";
+
               return (
                 <ControlRenderer
-                  key={control.id}
-                  data={control}
-                  id={control.id}
-                  isSelected={editorState.selectedId === control.id}
+                  key={annot.id}
+                  data={annot}
+                  id={annot.id}
+                  isSelected={editorState.selectedId === annot.id}
                   isAnnotationMode={editorState.mode === "annotation"}
                   isFormMode={editorState.mode === "form"}
                   isSelectable={isSelectable}
-                  canModify={canModifyFormStructure}
-                  canFillFormValue={canFillFormValue}
-                  onControlPointerDown={handleFieldPointerDown}
+                  canModify={canModifyAnnotations}
+                  onControlPointerDown={
+                    allowSelect ? handleAnnotationPointerDown : undefined
+                  }
                   onSelect={onSelectControl}
-                  onUpdate={onUpdateField}
-                  onResetToDefault={onResetFieldToDefault}
+                  onUpdate={onUpdateAnnotation}
+                  onDelete={onDeleteAnnotation}
+                  onEdit={onEditAnnotation}
+                  onAskAi={handleAskAiFromAnnotationId}
                   onControlResizeStart={handleResizePointerDown}
                   onTriggerHistorySave={onTriggerHistorySave}
                   onReorderLayer={onReorderControlLayer}
                 />
               );
-            }
+            })}
 
-            const annot = control;
-            const allowSelect = annot.type !== "link";
-
-            return (
-              <ControlRenderer
-                key={annot.id}
-                data={annot}
-                id={annot.id}
-                isSelected={editorState.selectedId === annot.id}
-                isAnnotationMode={editorState.mode === "annotation"}
-                isFormMode={editorState.mode === "form"}
-                isSelectable={isSelectable}
-                canModify={canModifyAnnotations}
-                onControlPointerDown={
-                  allowSelect ? handleAnnotationPointerDown : undefined
-                }
-                onSelect={onSelectControl}
-                onUpdate={onUpdateAnnotation}
-                onDelete={onDeleteAnnotation}
-                onEdit={onEditAnnotation}
-                onAskAi={handleAskAiFromAnnotationId}
-                onControlResizeStart={handleResizePointerDown}
-                onTriggerHistorySave={onTriggerHistorySave}
-                onReorderLayer={onReorderControlLayer}
-              />
-            );
-          })}
-
-          {dragStart && dragCurrent && activePageIndex === page.pageIndex && (
-            <>
-              {editorState.mode === "annotation" &&
-              (editorState.tool === "draw_shape_line" ||
-                editorState.tool === "draw_shape_arrow") ? (
-                <svg
-                  className="pointer-events-none absolute inset-0"
-                  viewBox={`0 0 ${page.width} ${page.height}`}
-                  preserveAspectRatio="none"
-                >
-                  <line
-                    x1={dragStart.x}
-                    y1={dragStart.y}
-                    x2={dragCurrent.x}
-                    y2={dragCurrent.y}
-                    stroke={
-                      editorState.shapeStyle?.color ||
-                      ANNOTATION_STYLES.shape.color
-                    }
-                    strokeWidth={
-                      editorState.shapeStyle?.thickness ??
-                      ANNOTATION_STYLES.shape.thickness
-                    }
-                    opacity={
-                      editorState.shapeStyle?.opacity ??
-                      ANNOTATION_STYLES.shape.opacity
-                    }
-                    strokeDasharray={getShapeStrokeDashArray(
-                      editorState.shapeStyle?.borderStyle,
-                      editorState.shapeStyle?.thickness ??
-                        ANNOTATION_STYLES.shape.thickness,
-                      editorState.shapeStyle?.dashDensity ??
-                        ANNOTATION_STYLES.shape.dashDensity,
+            {dragStart && dragCurrent && activePageIndex === page.pageIndex && (
+              <>
+                {editorState.mode === "annotation" &&
+                (editorState.tool === "draw_shape_line" ||
+                  editorState.tool === "draw_shape_arrow") ? (
+                  <svg
+                    className="pointer-events-none absolute inset-0"
+                    viewBox={`0 0 ${page.width} ${page.height}`}
+                    preserveAspectRatio="none"
+                  >
+                    <line
+                      x1={dragStart.x}
+                      y1={dragStart.y}
+                      x2={dragCurrent.x}
+                      y2={dragCurrent.y}
+                      stroke={
+                        editorState.shapeStyle?.color ||
+                        ANNOTATION_STYLES.shape.color
+                      }
+                      strokeWidth={
+                        editorState.shapeStyle?.thickness ??
+                        ANNOTATION_STYLES.shape.thickness
+                      }
+                      opacity={
+                        editorState.shapeStyle?.opacity ??
+                        ANNOTATION_STYLES.shape.opacity
+                      }
+                      strokeDasharray={getShapeStrokeDashArray(
+                        editorState.shapeStyle?.borderStyle,
+                        editorState.shapeStyle?.thickness ??
+                          ANNOTATION_STYLES.shape.thickness,
+                        editorState.shapeStyle?.dashDensity ??
+                          ANNOTATION_STYLES.shape.dashDensity,
+                      )}
+                      strokeLinecap={getShapeStrokeLinecap(
+                        getShapeTypeFromTool(editorState.tool),
+                      )}
+                      strokeLinejoin={getShapeStrokeLinejoin(
+                        getShapeTypeFromTool(editorState.tool),
+                      )}
+                    />
+                  </svg>
+                ) : (
+                  <div
+                    className={cn(
+                      "pointer-events-none absolute border-2",
+                      editorState.mode === "form"
+                        ? "border-blue-500 bg-blue-500/20"
+                        : "border-yellow-500 bg-yellow-500/20",
                     )}
-                    strokeLinecap={getShapeStrokeLinecap(
-                      getShapeTypeFromTool(editorState.tool),
-                    )}
-                    strokeLinejoin={getShapeStrokeLinejoin(
-                      getShapeTypeFromTool(editorState.tool),
-                    )}
+                    style={{
+                      left:
+                        Math.min(dragStart.x, dragCurrent.x) *
+                        editorState.scale,
+                      top:
+                        Math.min(dragStart.y, dragCurrent.y) *
+                        editorState.scale,
+                      width:
+                        Math.abs(dragCurrent.x - dragStart.x) *
+                        editorState.scale,
+                      height:
+                        Math.abs(dragCurrent.y - dragStart.y) *
+                        editorState.scale,
+                    }}
                   />
-                </svg>
-              ) : (
-                <div
-                  className={cn(
-                    "pointer-events-none absolute border-2",
-                    editorState.mode === "form"
-                      ? "border-blue-500 bg-blue-500/20"
-                      : "border-yellow-500 bg-yellow-500/20",
-                  )}
-                  style={{
-                    left:
-                      Math.min(dragStart.x, dragCurrent.x) * editorState.scale,
-                    top:
-                      Math.min(dragStart.y, dragCurrent.y) * editorState.scale,
-                    width:
-                      Math.abs(dragCurrent.x - dragStart.x) * editorState.scale,
-                    height:
-                      Math.abs(dragCurrent.y - dragStart.y) * editorState.scale,
-                  }}
-                />
-              )}
-            </>
-          )}
-        </div>
+                )}
+              </>
+            )}
+          </div>
 
-        <svg
-          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-          viewBox={`0 0 ${page.width} ${page.height}`}
-          preserveAspectRatio="none"
-        >
-          {shapeDraftBasePoints &&
-            shapeDraftBasePoints.map((point, index) => (
-              <circle
-                key={`shape-draft-point-${index}`}
-                cx={point.x}
-                cy={point.y}
-                r={4 / editorState.scale}
-                fill={
-                  editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
-                }
-                opacity={0.9}
-              />
-            ))}
-          {shapeDraftPreviewPoints && shapeDraftPreviewPoints.length > 1 && (
-            <>
-              <path
-                d={getShapePointsPathData(shapeDraftPreviewPoints)}
-                stroke={
-                  editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
-                }
-                strokeWidth={
-                  editorState.shapeStyle?.thickness ??
-                  ANNOTATION_STYLES.shape.thickness
-                }
-                opacity={
-                  editorState.shapeStyle?.opacity ??
-                  ANNOTATION_STYLES.shape.opacity
-                }
-                strokeDasharray={getShapeStrokeDashArray(
-                  editorState.shapeStyle?.borderStyle,
-                  editorState.shapeStyle?.thickness ??
-                    ANNOTATION_STYLES.shape.thickness,
-                  editorState.shapeStyle?.dashDensity ??
-                    ANNOTATION_STYLES.shape.dashDensity,
-                )}
-                fill="none"
-                strokeLinecap={getShapeStrokeLinecap(
-                  getShapeTypeFromTool(editorState.tool),
-                )}
-                strokeLinejoin={getShapeStrokeLinejoin(
-                  getShapeTypeFromTool(editorState.tool),
-                )}
-              />
-              {shapeDraftClosingPreview && (
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+            viewBox={`0 0 ${page.width} ${page.height}`}
+            preserveAspectRatio="none"
+          >
+            {shapeDraftBasePoints &&
+              shapeDraftBasePoints.map((point, index) => (
+                <circle
+                  key={`shape-draft-point-${index}`}
+                  cx={point.x}
+                  cy={point.y}
+                  r={4 / editorState.scale}
+                  fill={
+                    editorState.shapeStyle?.color ||
+                    ANNOTATION_STYLES.shape.color
+                  }
+                  opacity={0.9}
+                />
+              ))}
+            {shapeDraftPreviewPoints && shapeDraftPreviewPoints.length > 1 && (
+              <>
                 <path
-                  d={getShapePointsPathData([
-                    shapeDraftClosingPreview.start,
-                    shapeDraftClosingPreview.end,
-                  ])}
+                  d={getShapePointsPathData(shapeDraftPreviewPoints)}
                   stroke={
                     editorState.shapeStyle?.color ||
                     ANNOTATION_STYLES.shape.color
@@ -3597,9 +3616,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     ANNOTATION_STYLES.shape.thickness
                   }
                   opacity={
-                    (editorState.shapeStyle?.opacity ??
-                      ANNOTATION_STYLES.shape.opacity) * 0.8
+                    editorState.shapeStyle?.opacity ??
+                    ANNOTATION_STYLES.shape.opacity
                   }
+                  strokeDasharray={getShapeStrokeDashArray(
+                    editorState.shapeStyle?.borderStyle,
+                    editorState.shapeStyle?.thickness ??
+                      ANNOTATION_STYLES.shape.thickness,
+                    editorState.shapeStyle?.dashDensity ??
+                      ANNOTATION_STYLES.shape.dashDensity,
+                  )}
                   fill="none"
                   strokeLinecap={getShapeStrokeLinecap(
                     getShapeTypeFromTool(editorState.tool),
@@ -3607,91 +3633,122 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   strokeLinejoin={getShapeStrokeLinejoin(
                     getShapeTypeFromTool(editorState.tool),
                   )}
-                  strokeDasharray="6 4"
                 />
-              )}
-            </>
-          )}
-          {shapeDraftFinishPoint && (
-            <>
-              <circle
-                cx={shapeDraftFinishPoint.x}
-                cy={shapeDraftFinishPoint.y}
-                r={10 / editorState.scale}
-                fill="rgba(255, 255, 255, 0.2)"
+                {shapeDraftClosingPreview && (
+                  <path
+                    d={getShapePointsPathData([
+                      shapeDraftClosingPreview.start,
+                      shapeDraftClosingPreview.end,
+                    ])}
+                    stroke={
+                      editorState.shapeStyle?.color ||
+                      ANNOTATION_STYLES.shape.color
+                    }
+                    strokeWidth={
+                      editorState.shapeStyle?.thickness ??
+                      ANNOTATION_STYLES.shape.thickness
+                    }
+                    opacity={
+                      (editorState.shapeStyle?.opacity ??
+                        ANNOTATION_STYLES.shape.opacity) * 0.8
+                    }
+                    fill="none"
+                    strokeLinecap={getShapeStrokeLinecap(
+                      getShapeTypeFromTool(editorState.tool),
+                    )}
+                    strokeLinejoin={getShapeStrokeLinejoin(
+                      getShapeTypeFromTool(editorState.tool),
+                    )}
+                    strokeDasharray="6 4"
+                  />
+                )}
+              </>
+            )}
+            {shapeDraftFinishPoint && (
+              <>
+                <circle
+                  cx={shapeDraftFinishPoint.x}
+                  cy={shapeDraftFinishPoint.y}
+                  r={10 / editorState.scale}
+                  fill="rgba(255, 255, 255, 0.2)"
+                  stroke={
+                    editorState.shapeStyle?.color ||
+                    ANNOTATION_STYLES.shape.color
+                  }
+                  strokeWidth={2 / editorState.scale}
+                  strokeDasharray={`${4 / editorState.scale} ${3 / editorState.scale}`}
+                  opacity={0.95}
+                />
+                <circle
+                  cx={shapeDraftFinishPoint.x}
+                  cy={shapeDraftFinishPoint.y}
+                  r={4 / editorState.scale}
+                  fill={
+                    editorState.shapeStyle?.color ||
+                    ANNOTATION_STYLES.shape.color
+                  }
+                  opacity={1}
+                />
+              </>
+            )}
+            {isDrawing && activePageIndex === page.pageIndex && (
+              <path
+                ref={liveInkPathRef}
+                d={pointsToPathLib(currentPathRef.current)}
                 stroke={
-                  editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
+                  editorState.tool === "draw_highlight"
+                    ? editorState.highlightStyle?.color ||
+                      ANNOTATION_STYLES.highlight.color
+                    : editorState.penStyle.color
                 }
-                strokeWidth={2 / editorState.scale}
-                strokeDasharray={`${4 / editorState.scale} ${3 / editorState.scale}`}
-                opacity={0.95}
-              />
-              <circle
-                cx={shapeDraftFinishPoint.x}
-                cy={shapeDraftFinishPoint.y}
-                r={4 / editorState.scale}
-                fill={
-                  editorState.shapeStyle?.color || ANNOTATION_STYLES.shape.color
+                strokeWidth={
+                  editorState.tool === "draw_highlight"
+                    ? editorState.highlightStyle?.thickness ||
+                      ANNOTATION_STYLES.highlight.thickness
+                    : editorState.penStyle.thickness
                 }
-                opacity={1}
+                fill="none"
+                strokeLinecap={
+                  editorState.tool === "draw_highlight" ? "butt" : "round"
+                }
+                strokeLinejoin="round"
+                opacity={
+                  editorState.tool === "draw_highlight"
+                    ? (editorState.highlightStyle?.opacity ??
+                      ANNOTATION_STYLES.highlight.opacity)
+                    : editorState.penStyle.opacity
+                }
               />
-            </>
-          )}
-          {isDrawing && activePageIndex === page.pageIndex && (
-            <path
-              ref={liveInkPathRef}
-              d={pointsToPathLib(currentPathRef.current)}
-              stroke={
-                editorState.tool === "draw_highlight"
-                  ? editorState.highlightStyle?.color ||
-                    ANNOTATION_STYLES.highlight.color
-                  : editorState.penStyle.color
-              }
-              strokeWidth={
-                editorState.tool === "draw_highlight"
-                  ? editorState.highlightStyle?.thickness ||
-                    ANNOTATION_STYLES.highlight.thickness
-                  : editorState.penStyle.thickness
-              }
-              fill="none"
-              strokeLinecap={
-                editorState.tool === "draw_highlight" ? "butt" : "round"
-              }
-              strokeLinejoin="round"
-              opacity={
-                editorState.tool === "draw_highlight"
-                  ? (editorState.highlightStyle?.opacity ??
-                    ANNOTATION_STYLES.highlight.opacity)
-                  : editorState.penStyle.opacity
-              }
-            />
-          )}
-        </svg>
+            )}
+          </svg>
 
-        {activePageIndex === page.pageIndex && snapLines.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-50">
-            {snapLines.map((line, idx) => (
-              <div
-                key={idx}
-                className="absolute border-dashed border-red-500 opacity-70"
-                style={{
-                  borderWidth: 0,
-                  [line.type === "vertical"
-                    ? "borderLeftWidth"
-                    : "borderTopWidth"]: "1px",
-                  left:
-                    line.type === "vertical" ? line.pos * editorState.scale : 0,
-                  top:
-                    line.type === "horizontal"
-                      ? line.pos * editorState.scale
-                      : 0,
-                  width: line.type === "vertical" ? "1px" : "100%",
-                  height: line.type === "horizontal" ? "1px" : "100%",
-                }}
-              />
-            ))}
-          </div>
-        )}
+          {activePageIndex === page.pageIndex && snapLines.length > 0 && (
+            <div className="pointer-events-none absolute inset-0 z-50">
+              {snapLines.map((line, idx) => (
+                <div
+                  key={idx}
+                  className="absolute border-dashed border-red-500 opacity-70"
+                  style={{
+                    borderWidth: 0,
+                    [line.type === "vertical"
+                      ? "borderLeftWidth"
+                      : "borderTopWidth"]: "1px",
+                    left:
+                      line.type === "vertical"
+                        ? line.pos * editorState.scale
+                        : 0,
+                    top:
+                      line.type === "horizontal"
+                        ? line.pos * editorState.scale
+                        : 0,
+                    width: line.type === "vertical" ? "1px" : "100%",
+                    height: line.type === "horizontal" ? "1px" : "100%",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   };

@@ -6,6 +6,7 @@ import {
   type RefObject,
 } from "react";
 import type { Annotation, WorkspaceEditorState } from "@/types";
+import { viewRectToPage } from "../lib/pageViewRotation";
 import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
@@ -36,8 +37,10 @@ export type TextSelectionToolbarState = {
 const getPdfSelectionRects = (
   range: Range,
   pageEl: HTMLElement,
-  scale: number,
+  state: WorkspaceEditorState,
 ) => {
+  const { scale, viewRotation } = state;
+  const page = state.pages[Number(pageEl.id.replace(/^page-/, ""))];
   const pageRect = pageEl.getBoundingClientRect();
   const uiRects: InlineRect[] = Array.from(range.getClientRects())
     .filter((rect) => rect.width > 1 && rect.height > 1)
@@ -47,7 +50,8 @@ const getPdfSelectionRects = (
       width: rect.width / scale,
       height: rect.height / scale,
     }))
-    .filter((rect) => rect.width > 0.5 && rect.height > 0.5);
+    .filter((rect) => rect.width > 0.5 && rect.height > 0.5)
+    .map((rect) => (page ? viewRectToPage(rect, page, viewRotation) : rect));
 
   if (uiRects.length === 0) return null;
 
@@ -118,11 +122,7 @@ export const useWorkspaceTextSelection = (opts: {
       const pageIndex = Number.parseInt(pageIndexStr, 10);
       if (!Number.isFinite(pageIndex)) return;
 
-      const selectionGeometry = getPdfSelectionRects(
-        range,
-        pageEl,
-        state.scale,
-      );
+      const selectionGeometry = getPdfSelectionRects(range, pageEl, state);
       if (!selectionGeometry) {
         sel.removeAllRanges();
         return;
@@ -281,7 +281,7 @@ export const useWorkspaceTextSelection = (opts: {
       : null;
     const selectionGeometry =
       pageElement && Number.isFinite(pageIndex)
-        ? getPdfSelectionRects(range, pageElement, editorState.scale)
+        ? getPdfSelectionRects(range, pageElement, editorState)
         : null;
     const selection =
       Number.isFinite(pageIndex) &&

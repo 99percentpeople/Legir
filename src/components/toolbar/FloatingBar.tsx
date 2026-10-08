@@ -45,6 +45,9 @@ interface FloatingBarProps {
   pageFlow: PageFlowDirection;
   isFullscreen: boolean;
   onNavigatePage: (pageIndex: number) => void;
+  onRotateView?: (direction: "clockwise" | "counterclockwise") => void;
+  viewRotation?: number;
+  onResetViewRotation?: () => void;
   onPageLayoutChange: (layout: PageLayoutMode) => void;
   onPageFlowChange: (flow: PageFlowDirection) => void;
   onToggleFullscreen: () => void;
@@ -61,6 +64,9 @@ function ActiveFloatingBar({
   pageFlow,
   isFullscreen,
   onNavigatePage,
+  onRotateView,
+  viewRotation,
+  onResetViewRotation,
   onPageLayoutChange,
   onPageFlowChange,
   onToggleFullscreen,
@@ -149,6 +155,10 @@ function ActiveFloatingBar({
           onPageLayoutChange={onPageLayoutChange}
           onPageFlowChange={onPageFlowChange}
           onToggleFullscreen={onToggleFullscreen}
+          onRotateView={onRotateView}
+          viewRotation={viewRotation}
+          onResetViewRotation={onResetViewRotation}
+          rotationDisabled={pageCount === 0}
         />
       ),
     },

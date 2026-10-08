@@ -119,6 +119,7 @@ export const selectPdfSearchControllerState = (state: EditorStore) => ({
 // Canvas rendering and zoom controls should only observe workspace-hot fields.
 // This keeps AI/session/sidebar churn from invalidating the PDF viewport.
 export const selectEditorCanvasState = (state: EditorStore) => ({
+  viewRotation: state.viewRotation,
   annotations: state.annotations,
   currentPageIndex: state.currentPageIndex,
   documentLoadState: state.documentLoadState,
@@ -139,6 +140,8 @@ export const selectEditorCanvasState = (state: EditorStore) => ({
 });
 
 export const selectEditorCanvasActions = (state: EditorStore) => ({
+  rotateView: state.rotateView,
+  resetViewRotation: state.resetViewRotation,
   addAnnotation: state.addAnnotation,
   addField: state.addField,
   deleteAnnotation: state.deleteAnnotation,

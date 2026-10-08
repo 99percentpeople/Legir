@@ -46,6 +46,8 @@ afterEach(async () => {
 function setup() {
   const store = createTestEditorStore();
   const commands = {
+    rotateView: vi.fn(),
+    resetViewRotation: vi.fn(() => store.getState().resetViewRotation()),
     changeTool: vi.fn(),
     exitTool: vi.fn(),
     changeMode: vi.fn(),
@@ -70,6 +72,9 @@ function setup() {
             pageFlow="vertical"
             isFullscreen={false}
             onNavigatePage={vi.fn()}
+            onRotateView={commands.rotateView}
+            viewRotation={store.getState().viewRotation}
+            onResetViewRotation={commands.resetViewRotation}
             onPageLayoutChange={vi.fn()}
             onPageFlowChange={vi.fn()}
             onToggleFullscreen={vi.fn()}
@@ -118,6 +123,52 @@ function expectTopPreview() {
 }
 
 describe("unified floating toolbar", () => {
+  it("shows reset only while the reading view is rotated", async () => {
+    const test = setup();
+    test.store.getState().rotateView("counterclockwise");
+    await test.render("select");
+    await openMenu("toolbar.page_settings");
+    const reset = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((item) => item.textContent === "toolbar.reset_rotation");
+    expect(reset).toBeDefined();
+    await act(async () => reset!.click());
+    expect(test.commands.resetViewRotation).toHaveBeenCalledOnce();
+    expect(test.store.getState().viewRotation).toBe(0);
+    await test.render("select");
+    await vi.waitFor(() => {
+      expect(document.querySelector('[role="menu"]')).toBeNull();
+      expect(document.activeElement).toBe(button("toolbar.page_settings"));
+    });
+    await openMenu("toolbar.page_settings");
+    expect(
+      Array.from(document.querySelectorAll('[role="menuitem"]')).some(
+        (item) => item.textContent === "toolbar.reset_rotation",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps document rotation inside the page settings dropdown", async () => {
+    const test = setup();
+    await test.render("select");
+    expect(button("toolbar.rotate_clockwise")).toBeNull();
+    expect(button("toolbar.rotate_counterclockwise")).toBeNull();
+    for (const direction of ["clockwise", "counterclockwise"] as const) {
+      await openMenu("toolbar.page_settings");
+      const item = Array.from(
+        document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+      ).find(
+        (element) => element.textContent === `toolbar.rotate_${direction}`,
+      )!;
+      await act(async () => item.click());
+      expect(test.commands.rotateView).toHaveBeenLastCalledWith(direction);
+      await vi.waitFor(() => {
+        expect(document.querySelector('[role="menu"]')).toBeNull();
+        expect(document.activeElement).toBe(button("toolbar.page_settings"));
+      });
+    }
+  });
+
   it.each([true, false])(
     "keeps separators between groups without a leading separator (shapesOnly=%s)",
     async (shapesOnly) => {

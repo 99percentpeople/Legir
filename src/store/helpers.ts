@@ -368,6 +368,7 @@ export const initialState: EditorState = {
   documentLoadError: null,
   selectedId: null,
   scale: DEFAULT_SCALE,
+  viewRotation: 0,
   mode: "annotation",
   tool: "select",
   penStyle: {

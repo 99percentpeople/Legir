@@ -15,6 +15,7 @@ export type WorkerCommandPayloadMap = {
       docId?: string;
       pageIndex: number;
       scale: number;
+      rotation?: number;
       canvas?: OffscreenCanvas;
       canvasId: string;
       priority?: number;

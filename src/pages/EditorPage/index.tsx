@@ -265,6 +265,7 @@ const EditorPage: React.FC = () => {
     state.fitToScale(
       calculateWorkspaceFitWidthScale({
         pages: liveState.pages,
+        viewRotation: liveState.viewRotation,
         pageIndex: liveState.currentPageIndex,
         pageLayout: liveState.pageLayout,
         pageFlow: liveState.pageFlow,
@@ -278,6 +279,7 @@ const EditorPage: React.FC = () => {
     state.fitToScale(
       calculateWorkspaceFitScreenScale({
         pages: liveState.pages,
+        viewRotation: liveState.viewRotation,
         pageIndex: liveState.currentPageIndex,
         pageLayout: liveState.pageLayout,
         pageFlow: liveState.pageFlow,

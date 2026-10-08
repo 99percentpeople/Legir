@@ -5,6 +5,7 @@ import {
 } from "react";
 import type { WorkspaceEditorState } from "@/types";
 import { useEditorElementById } from "@/app/editorTabs/context";
+import { viewPointToPage } from "../lib/pageViewRotation";
 
 type PageRect = {
   top: number;
@@ -14,7 +15,9 @@ type PageRect = {
 };
 
 export const useWorkspacePointerCoords = (opts: {
-  editorStateRef: RefObject<Pick<WorkspaceEditorState, "scale">>;
+  editorStateRef: RefObject<
+    Pick<WorkspaceEditorState, "scale" | "pages" | "viewRotation">
+  >;
   contentRef?: RefObject<HTMLElement | null>;
   getPageRectByPageIndex?: (pageIndex: number) => PageRect | null;
 }) => {
@@ -56,15 +59,24 @@ export const useWorkspacePointerCoords = (opts: {
 
   const getRelativeCoordsFromPoint = useCallback(
     (clientX: number, clientY: number, pageIndex: number) => {
-      return (
-        getRelativeCoordsFromPointDom(clientX, clientY, pageIndex) ??
+      const point = getRelativeCoordsFromPointDom(
+        clientX,
+        clientY,
+        pageIndex,
+      ) ??
         getRelativeCoordsFromPointVirtual(clientX, clientY, pageIndex) ?? {
           x: 0,
           y: 0,
-        }
-      );
+        };
+      const state = opts.editorStateRef.current;
+      const page = state.pages[pageIndex];
+      return page ? viewPointToPage(point, page, state.viewRotation) : point;
     },
-    [getRelativeCoordsFromPointDom, getRelativeCoordsFromPointVirtual],
+    [
+      getRelativeCoordsFromPointDom,
+      getRelativeCoordsFromPointVirtual,
+      opts.editorStateRef,
+    ],
   );
 
   const getRelativeCoords = useCallback(

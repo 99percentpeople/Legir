@@ -313,6 +313,14 @@ The workspace combines:
 - hit-testing and selection
 - dragging/resizing/editing interactions
 
+The floating toolbar's page settings menu rotates the whole document's reading
+view in 90-degree steps. Document-owned `viewRotation` is temporary, travels with a live tab during
+window transfer, and resets when a document is reopened. It does not modify
+`PageData`, dirty state, undo history or PDF export. Rendered viewports and page
+layout use the combined source/view angle; overlays and pointer/text-selection
+coordinates convert between that view and the original page coordinates. Future
+saved page editing should use a separate document mutation path.
+
 Important supporting areas:
 
 - `src/components/workspace/layers/`
