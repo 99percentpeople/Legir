@@ -34,6 +34,10 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
+  if (vi.isFakeTimers()) {
+    await act(async () => vi.runOnlyPendingTimersAsync());
+    vi.useRealTimers();
+  }
   host.remove();
   appEventBus.clear();
   vi.unstubAllGlobals();
@@ -84,13 +88,21 @@ const openMenu = async (label: string) =>
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
     ),
   );
-const chooseBorder = async (style: "solid" | "dashed") =>
-  act(async () => {
+const chooseBorder = async (style: "solid" | "dashed") => {
+  const trigger = button("properties.border_style");
+  await act(async () => {
     const item = Array.from(
       document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
     ).find((el) => el.textContent === `properties.${style}`)!;
     item.click();
   });
+  // The menu unmounts before Radix restores focus on a timer. Reopening it
+  // earlier lets that stale focus event dismiss the newly opened menu.
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+};
 function expectTopPreview() {
   const popup = document.querySelector('[data-slot="popover-content"]')!;
   const previews = popup.querySelectorAll('[role="img"][data-stroke-preview]');
@@ -446,6 +458,7 @@ describe("unified floating toolbar", () => {
   });
 
   it("uses the same border dropdown in annotation properties and checkpoints before changing", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const onStart = vi.fn();
     const onChange = vi.fn();
     await act(async () =>
@@ -463,6 +476,8 @@ describe("unified floating toolbar", () => {
     expect(onStart).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
     await openMenu("properties.border_style");
+    // Force any deferred focus restoration to run before the next selection.
+    await act(async () => vi.runOnlyPendingTimersAsync());
     await chooseBorder("dashed");
     expect(onChange).toHaveBeenCalledWith("dashed");
     expect(onStart.mock.invocationCallOrder[0]).toBeLessThan(
