@@ -117,6 +117,7 @@ export type AppEventMap = {
   "workspace:pointerDown": Record<string, never>;
   "workspace:finishShapeDraft": Record<string, never>;
   "workspace:cancelShapeDraft": Record<string, never>;
+  "workspace:cancelToolInteraction": { draftsOnly: boolean; handled: boolean };
   "sidebar:focusAnnotation": {
     id: string;
   };

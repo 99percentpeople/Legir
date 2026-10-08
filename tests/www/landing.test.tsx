@@ -262,6 +262,14 @@ describe("source-backed interactive workspace", () => {
   beforeEach(async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    vi.stubGlobal(
       "matchMedia",
       vi.fn(() => ({
         matches: true,

@@ -9,6 +9,7 @@ import {
 } from "@/lib/pdfPermissions";
 import { useEditorViewApi } from "@/store/useEditorView";
 import { useEditorTabIsActive } from "@/app/editorTabs/context";
+import { useEditorToolActions } from "@/hooks/useEditorToolActions";
 import type { MoveDirection, Tool } from "@/types";
 
 interface UseEditorPageKeyboardShortcutsOptions {
@@ -33,6 +34,7 @@ export function useEditorPageKeyboardShortcuts({
   const useEditorView = useEditorViewApi();
   const isActive = useEditorTabIsActive();
   const { t } = useLanguage();
+  const { exitTool, cancelToolDraft } = useEditorToolActions(defaultTool);
   const previousToolBeforeSpacePanRef = React.useRef<Tool | null>(null);
   const guardPdfPermission = React.useCallback(
     (operation: PdfPermissionOperation, event: KeyboardEvent) => {
@@ -91,6 +93,37 @@ export function useEditorPageKeyboardShortcuts({
     typeof window !== "undefined" ? window : null,
     "keydown",
     (event) => {
+      // Bubble phase lets menus/popovers consume Escape before the workspace.
+      if (event.key !== "Escape" || !event.isTrusted || event.defaultPrevented)
+        return;
+      const currentState = useEditorView.getState();
+      if (currentState.activeDialog) return;
+      const target = event.target;
+      const input =
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (isPdfSearchOpen) {
+        event.preventDefault();
+        if (input) target.blur();
+        closePdfSearch();
+        return;
+      }
+      if (cancelToolDraft()) {
+        event.preventDefault();
+        return;
+      }
+      if (input) target.blur();
+      if (currentState.selectedId) currentState.selectControl(null);
+      else if (currentState.tool !== defaultTool) exitTool();
+    },
+  );
+
+  useEventListener<KeyboardEvent>(
+    typeof window !== "undefined" ? window : null,
+    "keydown",
+    (event) => {
       const currentState = useEditorView.getState();
 
       if (
@@ -131,23 +164,7 @@ export function useEditorPageKeyboardShortcuts({
         return;
       }
 
-      if (event.key === "Escape") {
-        if (!event.isTrusted) return;
-        if (currentState.activeDialog) return;
-        if (isPdfSearchOpen) {
-          event.preventDefault();
-          if (isInput) target.blur();
-          closePdfSearch();
-          return;
-        }
-        if (isInput) target.blur();
-        if (currentState.selectedId) {
-          currentState.selectControl(null);
-        } else if (currentState.tool !== defaultTool) {
-          currentState.setTool(defaultTool);
-        }
-        return;
-      }
+      if (event.key === "Escape") return;
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();

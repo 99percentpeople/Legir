@@ -28,6 +28,9 @@ const zhCN = {
     select: "选择模式",
   },
   toolbar: {
+    exit_tool: "退出工具",
+    more_options: "更多选项",
+    cancel_drawing: "取消本次绘制",
     undo: "撤销 (Ctrl+Z)",
     redo: "重做 (Ctrl+Y)",
     select: "选择",
@@ -133,6 +136,7 @@ const zhCN = {
     },
   },
   properties: {
+    stroke_preview: "笔迹预览",
     form_detection: {
       api_key_missing: "缺少 API Key。请在 设置 → 大模型 中配置并重试。",
       page_range: "页面范围",

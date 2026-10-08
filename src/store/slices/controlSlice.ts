@@ -688,11 +688,9 @@ export const createControlSlice: EditorStoreSlice<
           highlightStyle: {
             color:
               state.highlightStyle?.color || ANNOTATION_STYLES.highlight.color,
-            thickness: Math.max(
-              state.highlightStyle?.thickness ||
-                ANNOTATION_STYLES.highlight.thickness,
+            thickness:
+              state.highlightStyle?.thickness ??
               ANNOTATION_STYLES.highlight.thickness,
-            ),
             opacity:
               state.highlightStyle?.opacity ??
               ANNOTATION_STYLES.highlight.opacity,

@@ -28,6 +28,9 @@ const de = {
     select: "Auswahlmodus",
   },
   toolbar: {
+    exit_tool: "Werkzeug verlassen",
+    more_options: "Weitere Optionen",
+    cancel_drawing: "Aktuelle Zeichnung abbrechen",
     undo: "Rückgängig (Ctrl+Z)",
     redo: "Wiederholen (Ctrl+Y)",
     select: "Auswählen",
@@ -135,6 +138,7 @@ const de = {
     },
   },
   properties: {
+    stroke_preview: "Strichvorschau",
     form_detection: {
       api_key_missing:
         "Fehlender API-Schlüssel. Konfigurieren Sie einen LLM-Anbieter unter Einstellungen → LLM.",

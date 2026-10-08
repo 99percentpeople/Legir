@@ -28,6 +28,9 @@ const es = {
     select: "Modo Selección",
   },
   toolbar: {
+    exit_tool: "Salir de la herramienta",
+    more_options: "Más opciones",
+    cancel_drawing: "Cancelar el dibujo actual",
     undo: "Deshacer (Ctrl+Z)",
     redo: "Rehacer (Ctrl+Y)",
     select: "Seleccionar",
@@ -135,6 +138,7 @@ const es = {
     },
   },
   properties: {
+    stroke_preview: "Vista previa del trazo",
     form_detection: {
       api_key_missing:
         "Falta la clave de API. Configure un proveedor LLM en Ajustes → LLM.",

@@ -28,6 +28,9 @@ const zhTW = {
     select: "選擇模式",
   },
   toolbar: {
+    exit_tool: "退出工具",
+    more_options: "更多選項",
+    cancel_drawing: "取消本次繪製",
     undo: "復原 (Ctrl+Z)",
     redo: "重做 (Ctrl+Y)",
     select: "選擇",
@@ -133,6 +136,7 @@ const zhTW = {
     },
   },
   properties: {
+    stroke_preview: "筆跡預覽",
     form_detection: {
       api_key_missing: "缺少 API Key。請在 設定 → 大模型 中設定並重試。",
       page_range: "頁面範圍",

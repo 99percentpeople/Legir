@@ -28,6 +28,9 @@ const ja = {
     select: "選択モード",
   },
   toolbar: {
+    exit_tool: "ツールを終了",
+    more_options: "その他のオプション",
+    cancel_drawing: "現在の描画をキャンセル",
     undo: "元に戻す (Ctrl+Z)",
     redo: "やり直し (Ctrl+Y)",
     select: "選択",
@@ -133,6 +136,7 @@ const ja = {
     },
   },
   properties: {
+    stroke_preview: "ストロークのプレビュー",
     form_detection: {
       api_key_missing:
         "API キーがありません。設定 → LLM でプロバイダーを設定してください。",

@@ -1247,6 +1247,8 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
           color={strokeColor}
           thickness={strokeWidth}
           minThickness={0}
+          previewBorderStyle={borderStyle}
+          previewDashDensity={dashDensity}
           opacity={strokeOpacity}
           onInteractionStart={onTriggerHistorySave}
           onColorChange={(color) =>

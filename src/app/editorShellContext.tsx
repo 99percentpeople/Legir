@@ -1,9 +1,11 @@
 import React, { createContext, useContext } from "react";
 
-import type { EditorState, PDFSearchResult, PenStyle } from "@/types";
+import type { EditorState, PDFSearchResult, PenStyle, Tool } from "@/types";
 import type { PDFSearchMode } from "@/lib/pdfSearch";
 
 export interface EditorShellCommands {
+  changeTool: (tool: Tool) => void;
+  exitTool: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
   fitWidth: () => void;

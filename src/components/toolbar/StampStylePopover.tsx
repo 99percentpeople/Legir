@@ -45,7 +45,7 @@ export const StampStylePopover: React.FC<StampStylePopoverProps> = ({
     <Popover modal={false} open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
-        className="w-80 p-3"
+        className="w-80 max-w-[calc(100vw-2rem)] p-3"
         side={side}
         align={align}
         data-app-block-modifier-wheel-zoom="1"

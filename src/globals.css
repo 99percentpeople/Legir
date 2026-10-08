@@ -140,6 +140,13 @@
   scrollbar-width: none;
 }
 
+@media (pointer: coarse) {
+  .editor-floating-toolbar button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

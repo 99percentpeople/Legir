@@ -18,7 +18,6 @@ import {
   type RightPanelTabId,
 } from "@/components/properties-panel/RightPanelTabDock";
 import FloatingBar from "@/components/toolbar/FloatingBar";
-import MobileFloatingToolbar from "@/components/toolbar/MobileFloatingToolbar";
 import {
   ANNOTATION_STYLES,
   DEFAULT_EDITOR_UI_STATE,
@@ -324,51 +323,57 @@ export function WorkspaceDemo({ mode, language, appLabel }: Props) {
               ))}
             </div>
           </div>
-          {compact ? (
-            <MobileFloatingToolbar
-              currentPageIndex={state.page - 1}
-              editorState={{
-                mode: state.editorMode,
-                tool: state.tool,
-                pages: DEMO_PAGES,
-                documentLoadState: "ready",
-                documentPermissions: null,
-                penStyle: ANNOTATION_STYLES.ink,
-                highlightStyle: {
-                  ...ANNOTATION_STYLES.highlight,
-                  color: state.highlightColor,
-                },
-                commentStyle: ANNOTATION_STYLES.comment,
-                freetextStyle: ANNOTATION_STYLES.freetext,
-                shapeStyle: ANNOTATION_STYLES.shape,
-                stampStyle: ANNOTATION_STYLES.stamp,
-              }}
-              onNavigatePage={navigate}
-              onToolChange={(tool) => dispatch({ type: "tool", tool })}
-              onModeChange={(next) =>
-                dispatch({ type: "editor-mode", mode: next })
-              }
-              onPenStyleChange={() => {}}
-              onHighlightStyleChange={(style) => {
+          <FloatingBar
+            isMobile={compact}
+            state={{
+              mode: state.editorMode,
+              tool: state.tool,
+              keys: {
+                ctrl: false,
+                shift: false,
+                alt: false,
+                meta: false,
+                space: false,
+              },
+              documentLoadState: "ready",
+              documentPermissions: null,
+              penStyle: ANNOTATION_STYLES.ink,
+              highlightStyle: {
+                ...ANNOTATION_STYLES.highlight,
+                color: state.highlightColor,
+              },
+              commentStyle: ANNOTATION_STYLES.comment,
+              freetextStyle: ANNOTATION_STYLES.freetext,
+              shapeStyle: ANNOTATION_STYLES.shape,
+              stampStyle: ANNOTATION_STYLES.stamp,
+            }}
+            commands={{
+              changeTool: (tool) => dispatch({ type: "tool", tool }),
+              exitTool: () =>
+                dispatch({ type: "tool", tool: compact ? "pan" : "select" }),
+              changeMode: (mode) => dispatch({ type: "editor-mode", mode }),
+              changePenStyle: () => {},
+              changeHighlightStyle: (style) => {
                 if (style.color)
                   dispatch({ type: "highlight-color", color: style.color });
-              }}
-            />
-          ) : (
-            <FloatingBar
-              currentPageIndex={state.page - 1}
-              pageCount={3}
-              pageLayout={state.layout}
-              pageFlow={state.flow}
-              isFullscreen={fullscreen}
-              onNavigatePage={navigate}
-              onPageLayoutChange={(layout) =>
-                dispatch({ type: "layout", layout })
-              }
-              onPageFlowChange={(flow) => dispatch({ type: "flow", flow })}
-              onToggleFullscreen={() => void toggleFullscreen()}
-            />
-          )}
+              },
+              changeCommentStyle: () => {},
+              changeFreetextStyle: () => {},
+              changeShapeStyle: () => {},
+              changeStampStyle: () => {},
+            }}
+            currentPageIndex={state.page - 1}
+            pageCount={DEMO_PAGES.length}
+            pageLayout={state.layout}
+            pageFlow={state.flow}
+            isFullscreen={fullscreen}
+            onNavigatePage={navigate}
+            onPageLayoutChange={(layout) =>
+              dispatch({ type: "layout", layout })
+            }
+            onPageFlowChange={(flow) => dispatch({ type: "flow", flow })}
+            onToggleFullscreen={() => void toggleFullscreen()}
+          />
         </div>
         <DemoAiPanel {...commonPanel} selectionRequest={selectionRequest} />
         {state.panel === "document" && (

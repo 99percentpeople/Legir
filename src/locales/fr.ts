@@ -28,6 +28,9 @@ const fr = {
     select: "Mode Sélection",
   },
   toolbar: {
+    exit_tool: "Quitter l’outil",
+    more_options: "Plus d’options",
+    cancel_drawing: "Annuler le tracé en cours",
     undo: "Annuler (Ctrl+Z)",
     redo: "Rétablir (Ctrl+Y)",
     select: "Sélectionner",
@@ -135,6 +138,7 @@ const fr = {
     },
   },
   properties: {
+    stroke_preview: "Aperçu du tracé",
     form_detection: {
       api_key_missing:
         "Clé API manquante. Configurez un fournisseur LLM dans Paramètres → LLM.",

@@ -1,12 +1,14 @@
 import React from "react";
 import { cn } from "../../utils/cn";
-import { Slider } from "../ui/slider";
+import { StrokeWidthControl } from "./StrokeWidthControl";
+import { StrokePreview } from "./StrokePreview";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Button } from "../ui/button";
 import { ChevronDown } from "lucide-react";
-import { useLanguage } from "../language-provider";
 import { ColorPaletteControl } from "../ui/color-palette";
 import type { ColorPaletteType } from "@/lib/colorPalette";
+import type { ShapeBorderStyle } from "@/lib/shapeGeometry";
+import type { StrokePreviewProps } from "./types";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useWorkspacePointerDownDismiss } from "@/lib/workspacePointerDownDismissContext";
 
@@ -22,7 +24,10 @@ interface ColorPickerPopoverProps {
   minThickness?: number;
   showOpacity?: boolean;
   paletteType?: ColorPaletteType;
+  previewVariant?: StrokePreviewProps["variant"];
   previewStrokeLinecap?: "round" | "butt" | "square";
+  previewBorderStyle?: ShapeBorderStyle;
+  previewDashDensity?: number;
   side?: React.ComponentProps<typeof PopoverContent>["side"];
   align?: React.ComponentProps<typeof PopoverContent>["align"];
   title?: string;
@@ -44,7 +49,10 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   minThickness = 1,
   showOpacity = true,
   paletteType = "foreground",
+  previewVariant,
   previewStrokeLinecap = "round",
+  previewBorderStyle,
+  previewDashDensity,
   side = "bottom",
   align = "center",
   title = "Properties",
@@ -53,7 +61,6 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   onInteractionStart,
   closeOnWorkspacePointerDown,
 }) => {
-  const { t } = useLanguage();
   // Most toolbar popovers should close when the user clicks back into the
   // workspace; floating control toolbars override this via context.
   const inheritedCloseOnWorkspacePointerDown = useWorkspacePointerDownDismiss();
@@ -104,12 +111,23 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
         )}
       </PopoverTrigger>
       <PopoverContent
-        className="w-72 p-4"
+        className="w-72 max-w-[calc(100vw-2rem)] p-4"
         side={side}
         align={align}
         data-app-block-modifier-wheel-zoom="1"
       >
         <div className="space-y-4">
+          {thickness !== undefined && (
+            <StrokePreview
+              variant={previewVariant}
+              color={color}
+              thickness={thickness}
+              opacity={opacity}
+              linecap={previewStrokeLinecap}
+              borderStyle={previewBorderStyle}
+              dashDensity={previewDashDensity}
+            />
+          )}
           <ColorPaletteControl
             color={color}
             opacity={opacity}
@@ -131,52 +149,20 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
           />
 
           {showThickness && thickness !== undefined && onThicknessChange && (
-            <>
-              <div className="bg-muted/30 border-border flex h-16 items-center justify-center overflow-hidden rounded-md border">
-                <svg
-                  width="100%"
-                  height="100%"
-                  viewBox="0 0 200 60"
-                  className="pointer-events-none"
-                >
-                  <path
-                    d="M 20 30 Q 60 10, 100 30 T 180 30"
-                    fill="none"
-                    stroke={color}
-                    strokeWidth={thickness}
-                    opacity={opacity}
-                    strokeLinecap={previewStrokeLinecap}
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-medium">
-                    {t("properties.thickness")}
-                  </label>
-                  <span className="text-muted-foreground text-xs">
-                    {thickness}px
-                  </span>
-                </div>
-                <Slider
-                  defaultValue={[thickness]}
-                  value={[thickness]}
-                  max={20}
-                  min={minThickness}
-                  step={1}
-                  onValueChange={(val) => {
-                    ensureInteractionStarted();
-                    onThicknessChange(val[0]);
-                  }}
-                />
-                <div className="text-muted-foreground mt-1 flex justify-between text-xs">
-                  <span>Thin</span>
-                  <span>Thick</span>
-                </div>
-              </div>
-            </>
+            <StrokeWidthControl
+              variant={previewVariant}
+              color={color}
+              thickness={thickness}
+              opacity={opacity}
+              linecap={previewStrokeLinecap}
+              min={minThickness}
+              borderStyle={previewBorderStyle}
+              dashDensity={previewDashDensity}
+              onChange={(nextThickness) => {
+                ensureInteractionStarted();
+                onThicknessChange(nextThickness);
+              }}
+            />
           )}
 
           {extraContent}

@@ -10,7 +10,7 @@ The public site uses an HTML sample document and a local controller, not screens
 | Model picker, chat history, messages and message actions, composer | `ModelSelect`, `SessionHistoryPopover`, `ConversationTimeline`, `ConversationEmptyState`, `ComposerFooter` |
 | Vertical document / AI / translation dock                          | `RightPanelTabDock`                                                                                        |
 | Desktop page navigation and layout controls                        | `FloatingBar`, `PageNumberDropdownControl`, `PageSettingsDropdownControl`                                  |
-| Mobile bottom toolbar                                              | `MobileFloatingToolbar`                                                                                    |
+| Mobile bottom toolbar                                              | Shared `FloatingBar`, `ResponsiveToolbar`, `ToolPicker`, `useToolOptions` with local command callbacks     |
 | Toolbar zoom and annotation color menus                            | `ZoomDropdownControl`, `ColorPickerPopover`                                                                |
 | Document information form                                          | `DocumentPropertiesPanel` (loaded on demand)                                                               |
 | Fixed sample selection and five-action bar                         | App selection CSS and handle constants; `Button` layout follows `WorkspaceTextSelectionPopoverView`        |

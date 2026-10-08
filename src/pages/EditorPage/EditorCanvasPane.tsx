@@ -6,9 +6,9 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import FloatingBar from "@/components/toolbar/FloatingBar";
-import MobileFloatingToolbar from "@/components/toolbar/MobileFloatingToolbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useEventListener } from "@/hooks/useEventListener";
@@ -33,27 +33,22 @@ import {
 } from "@/app/editorShellContext";
 
 const Workspace = React.lazy(() => import("@/components/workspace/Workspace"));
-const MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX = 96;
 const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
   "[data-app-block-modifier-wheel-zoom='1']";
 
 export const EditorCanvasPane: React.FC = () => {
   const appEventBus = useEditorEventBus();
   const isMobile = useIsMobile();
+  const [toolbarOverlayInset, setToolbarOverlayInset] = useState(96);
   const { sessionRenderKey, workerService } =
     useEditorDocumentIdentityRuntime();
   const { isFileDragActive } = useEditorFileDragRuntime();
+  const commands = useEditorShellCommands();
   const {
     editAnnotation: onEditAnnotation,
     toggleFullscreen: onToggleFullscreen,
-    changeMode: onModeChange,
-    changePenStyle: onPenStyleChange,
-    changeHighlightStyle: onHighlightStyleChange,
-    changeCommentStyle: onCommentStyleChange,
-    changeFreetextStyle: onFreetextStyleChange,
-    changeShapeStyle: onShapeStyleChange,
-    changeStampStyle: onStampStyleChange,
-  } = useEditorShellCommands();
+    changeTool: handleToolChange,
+  } = commands;
   const pdfSearch = useEditorPdfSearchWorkspace();
   const documentState = useEditorView(useShallow(selectEditorCanvasState));
   const preferences = usePreferencesStore(useShallow(selectCanvasPreferences));
@@ -68,7 +63,6 @@ export const EditorCanvasPane: React.FC = () => {
     deleteAnnotation,
     reorderControlLayer,
     selectControl,
-    setTool,
     saveCheckpoint,
     fitToScale,
     setPageFlow,
@@ -174,13 +168,6 @@ export const EditorCanvasPane: React.FC = () => {
       setState({ currentPageIndex: idx });
     },
     [setState],
-  );
-
-  const handleToolChange = useCallback(
-    (tool: typeof state.tool) => {
-      setTool(tool);
-    },
-    [setTool],
   );
 
   const handleNavigatePage = useCallback(
@@ -313,42 +300,28 @@ export const EditorCanvasPane: React.FC = () => {
           activePdfSearchResultId={
             pdfSearch.isPdfSearchOpen ? pdfSearch.activePdfSearchResultId : null
           }
-          bottomOverlayInsetPx={
-            isMobile ? MOBILE_FLOATING_TOOLBAR_OVERLAY_INSET_PX : undefined
-          }
+          bottomOverlayInsetPx={toolbarOverlayInset}
         />
       </Suspense>
-      {isMobile ? (
-        <MobileFloatingToolbar
-          currentPageIndex={state.currentPageIndex}
-          editorState={state}
-          onNavigatePage={handleNavigatePage}
-          onToolChange={handleToolChange}
-          onModeChange={onModeChange}
-          onPenStyleChange={onPenStyleChange}
-          onHighlightStyleChange={onHighlightStyleChange}
-          onCommentStyleChange={onCommentStyleChange}
-          onFreetextStyleChange={onFreetextStyleChange}
-          onShapeStyleChange={onShapeStyleChange}
-          onStampStyleChange={onStampStyleChange}
-        />
-      ) : (
-        <FloatingBar
-          currentPageIndex={state.currentPageIndex}
-          pageCount={state.pages.length}
-          pageLayout={state.pageLayout}
-          pageFlow={state.pageFlow}
-          isFullscreen={state.isFullscreen}
-          onNavigatePage={handleNavigatePage}
-          onPageLayoutChange={(layout) => {
-            setPageLayout(layout);
-          }}
-          onPageFlowChange={(flow) => {
-            setPageFlow(flow);
-          }}
-          onToggleFullscreen={onToggleFullscreen}
-        />
-      )}
+      <FloatingBar
+        commands={commands}
+        onOverlayInsetChange={setToolbarOverlayInset}
+        state={state}
+        isMobile={isMobile}
+        currentPageIndex={state.currentPageIndex}
+        pageCount={state.pages.length}
+        pageLayout={state.pageLayout}
+        pageFlow={state.pageFlow}
+        isFullscreen={state.isFullscreen}
+        onNavigatePage={handleNavigatePage}
+        onPageLayoutChange={(layout) => {
+          setPageLayout(layout);
+        }}
+        onPageFlowChange={(flow) => {
+          setPageFlow(flow);
+        }}
+        onToggleFullscreen={onToggleFullscreen}
+      />
     </div>
   );
 };

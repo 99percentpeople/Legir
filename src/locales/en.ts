@@ -28,6 +28,9 @@ const en = {
     select: "Select Mode",
   },
   toolbar: {
+    exit_tool: "Exit tool",
+    more_options: "More options",
+    cancel_drawing: "Cancel current drawing",
     undo: "Undo (Ctrl+Z)",
     redo: "Redo (Ctrl+Y)",
     select: "Select",
@@ -134,6 +137,7 @@ const en = {
     },
   },
   properties: {
+    stroke_preview: "Stroke preview",
     form_detection: {
       api_key_missing:
         "Missing API key. Configure an LLM provider in Settings → LLM.",

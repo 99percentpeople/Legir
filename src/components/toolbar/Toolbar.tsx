@@ -1,30 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
-  MousePointer2,
-  Type,
-  CheckSquare,
   Undo2,
   Redo2,
   Keyboard,
   PanelLeft,
   PanelRight,
-  List,
-  CircleDot,
   Settings,
-  PenLine,
-  Highlighter,
   PenTool,
   Edit3,
-  Eraser,
-  Hand,
   Search,
-  MessageCircle,
-  Shapes,
-  Stamp,
-  ChevronDown,
 } from "lucide-react";
-import { EditorState, Tool } from "@/types";
-import { isToolMobileOnly } from "@/lib/tool-behavior";
+import { EditorState } from "@/types";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { cn } from "@/utils/cn";
@@ -35,19 +21,13 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { useLanguage } from "../language-provider";
-import { ColorPickerPopover } from "./ColorPickerPopover";
 import ZoomDropdownControl from "./ZoomDropdownControl";
-import PageSettingsDropdownControl from "./PageSettingsDropdownControl";
-import { ANNOTATION_STYLES } from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   canPrintPdf,
   canUseModeWithPdfPermissions,
-  canUseToolWithPdfPermissions,
 } from "@/lib/pdfPermissions";
-import { getContrastColor } from "@/utils/colors";
 import SaveMenu from "./SaveMenu";
 import { canSaveAs } from "@/services/platform";
 import { useEditorView } from "@/store/useEditorView";
@@ -59,16 +39,7 @@ import {
   useEditorPdfSearchToolbar,
   useEditorShellCommands,
 } from "@/app/editorShellContext";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import {
-  getShapeToolIcon,
-  getShapeToolLabel,
-  isShapeTool,
-  SHAPE_TOOL_GROUPS,
-  type ShapeTool,
-} from "./shapeTools";
-import { ShapeBorderStyleSection } from "./ShapeBorderStyleSection";
-import { StampStylePopover } from "./StampStylePopover";
+import { EditorToolSelector } from "./EditorToolSelector";
 import { DocumentPermissionsPopover } from "./DocumentPermissionsPopover";
 
 const Toolbar: React.FC = () => {
@@ -76,15 +47,11 @@ const Toolbar: React.FC = () => {
   const editorState = useEditorView(useShallow(selectToolbarState));
   const {
     mode,
-    tool,
     isDirty,
     canUndo,
     canRedo,
     isSidebarOpen: isFieldListOpen,
     isRightPanelOpen: isPropertiesPanelOpen,
-    setPageFlow,
-    setPageLayout,
-    setTool: onToolChange,
     undo: onUndo,
     redo: onRedo,
     openDialog,
@@ -94,21 +61,14 @@ const Toolbar: React.FC = () => {
   const hideModeSelector = isMobile;
   const hideToolSection = isMobile;
   const compactZoomControl = isMobile;
-  const showPageSettingsControl = isMobile;
   const {
     zoomIn: onZoomIn,
     zoomOut: onZoomOut,
     fitWidth: onFitWidth,
     fitScreen: onFitScreen,
-    toggleFullscreen: onToggleFullscreen,
     exitEditor: onExit,
     changeMode: onModeChange,
-    changePenStyle: onPenStyleChange,
-    changeHighlightStyle: onHighlightStyleChange,
-    changeCommentStyle: onCommentStyleChange,
-    changeFreetextStyle: onFreetextStyleChange,
-    changeShapeStyle: onShapeStyleChange,
-    changeStampStyle: onStampStyleChange,
+    changeTool: onToolChange,
     toggleSidebar: onToggleFieldList,
     toggleRightPanel: onTogglePropertiesPanel,
   } = useEditorShellCommands();
@@ -122,67 +82,19 @@ const Toolbar: React.FC = () => {
     useEditorPdfSearchToolbar();
   const onOpenShortcuts = () => openDialog("shortcuts");
   const onOpenSettings = () => openDialog("settings");
-  const toolbarTool = isToolMobileOnly(tool) ? "select" : tool;
   const hasSaveAs = useRef(canSaveAs());
   const liveScale = editorState.scale;
-  const livePageLayout = editorState.pageLayout;
-  const livePageFlow = editorState.pageFlow;
-  const liveIsFullscreen = editorState.isFullscreen;
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
-  const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
-  const [shapePopoverOpen, setShapePopoverOpen] = useState(false);
-  const [lastShapeTool, setLastShapeTool] = useState<ShapeTool>(() =>
-    isShapeTool(tool) ? tool : "draw_shape_rect",
-  );
-
-  useEffect(() => {
-    if (!isShapeTool(tool)) return;
-    setLastShapeTool(tool);
-  }, [tool]);
-
-  const isShapeToolActive = isShapeTool(tool);
-  const isToolAllowed = React.useCallback(
-    (candidate: Tool) =>
-      (isDocumentReady || candidate === "pan" || candidate === "select_text") &&
-      canUseToolWithPdfPermissions(
-        candidate,
-        mode,
-        editorState.documentPermissions,
-      ),
-    [editorState.documentPermissions, isDocumentReady, mode],
-  );
   const isModeAllowed = React.useCallback(
     (candidate: EditorState["mode"]) =>
       isDocumentReady &&
       canUseModeWithPdfPermissions(candidate, editorState.documentPermissions),
     [editorState.documentPermissions, isDocumentReady],
   );
-  const restrictedTitle = t("toolbar.permission_restricted");
-  const activeShapeTool = isShapeTool(tool) ? tool : lastShapeTool;
-  const ActiveShapeIcon = isShapeToolActive
-    ? getShapeToolIcon(activeShapeTool)
-    : Shapes;
-  const commentColor =
-    editorState.commentStyle?.color ?? ANNOTATION_STYLES.comment.color;
-  const freetextColor =
-    editorState.freetextStyle?.color ?? ANNOTATION_STYLES.freetext.color;
-  const activeShapeLabel = getShapeToolLabel(t, activeShapeTool);
-  const shapeButtonLabel = isShapeToolActive
-    ? activeShapeLabel
-    : t("toolbar.shape");
-
-  const handleShapeToolSelect = (shapeTool: ShapeTool) => {
-    setLastShapeTool(shapeTool);
-    setShapePopoverOpen(false);
-    onToolChange(shapeTool);
-  };
-
   useAppEvent("workspace:pointerDown", () => {
     setZoomMenuOpen(false);
     setModeMenuOpen(false);
-    setPageSettingsOpen(false);
-    setShapePopoverOpen(false);
   });
 
   return (
@@ -323,444 +235,10 @@ const Toolbar: React.FC = () => {
       {!hideToolSection && (
         <div className="flex min-w-0 flex-1 items-center justify-center xl:absolute xl:top-0 xl:left-1/2 xl:h-full xl:flex-none xl:-translate-x-1/2">
           <div className="no-scrollbar flex w-full overflow-x-auto px-1 xl:w-auto">
-            {mode === "form" ? (
-              <ToggleGroup
-                type="single"
-                value={toolbarTool}
-                onValueChange={(value) => {
-                  if (value && isToolAllowed(value as Tool)) {
-                    onToolChange(value as Tool);
-                  }
-                }}
-                className="sm:bg-muted/20 mx-auto flex min-w-max items-center gap-1 rounded-lg p-1 sm:shadow-sm"
-                spacing={1}
-              >
-                <ToggleGroupItem
-                  value="pan"
-                  title={t("toolbar.pan")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <Hand size={18} />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="select"
-                  title={t("toolbar.select")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <MousePointer2 size={18} />
-                </ToggleGroupItem>
-                <Separator orientation="vertical" className="mx-1 h-5" />
-                <ToggleGroupItem
-                  value="draw_text"
-                  title={t("toolbar.text")}
-                  disabled={!isToolAllowed("draw_text")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <Type size={18} />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="draw_checkbox"
-                  title={t("toolbar.checkbox")}
-                  disabled={!isToolAllowed("draw_checkbox")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <CheckSquare size={18} />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="draw_radio"
-                  title={t("toolbar.radio")}
-                  disabled={!isToolAllowed("draw_radio")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <CircleDot size={18} />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="draw_dropdown"
-                  title={t("toolbar.dropdown")}
-                  disabled={!isToolAllowed("draw_dropdown")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <List size={18} />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="draw_signature"
-                  title={t("toolbar.signature")}
-                  disabled={!isToolAllowed("draw_signature")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <PenLine size={18} />
-                </ToggleGroupItem>
-              </ToggleGroup>
-            ) : (
-              <ToggleGroup
-                type="single"
-                value={toolbarTool}
-                onValueChange={(value) => {
-                  if (value && isToolAllowed(value as Tool)) {
-                    onToolChange(value as Tool);
-                  }
-                }}
-                className="sm:bg-muted/20 mx-auto flex min-w-max items-center gap-1 rounded-lg p-1 sm:shadow-sm"
-                spacing={1}
-              >
-                <ToggleGroupItem
-                  value="pan"
-                  title={t("toolbar.pan")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <Hand size={18} />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="select"
-                  title={t("toolbar.select")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <MousePointer2 size={18} />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="eraser"
-                  title={t("toolbar.eraser")}
-                  disabled={!isToolAllowed("eraser")}
-                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                >
-                  <Eraser size={18} />
-                </ToggleGroupItem>
-                <Separator orientation="vertical" className="mx-1 h-5" />
-                <ToggleGroupItem
-                  value="draw_highlight"
-                  title={
-                    isToolAllowed("draw_highlight")
-                      ? t("toolbar.highlight_text")
-                      : restrictedTitle
-                  }
-                  disabled={!isToolAllowed("draw_highlight")}
-                  className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
-                >
-                  <div
-                    className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
-                    style={{
-                      backgroundColor:
-                        editorState.highlightStyle?.color ||
-                        ANNOTATION_STYLES.highlight.color,
-                    }}
-                  >
-                    <Highlighter
-                      size={14}
-                      color={getContrastColor(
-                        editorState.highlightStyle?.color ||
-                          ANNOTATION_STYLES.highlight.color,
-                      )}
-                    />
-                  </div>
-                </ToggleGroupItem>
-                <ColorPickerPopover
-                  paletteType="background"
-                  color={
-                    editorState.highlightStyle?.color ||
-                    ANNOTATION_STYLES.highlight.color
-                  }
-                  thickness={
-                    editorState.highlightStyle?.thickness ||
-                    ANNOTATION_STYLES.highlight.thickness
-                  }
-                  opacity={
-                    editorState.highlightStyle?.opacity ??
-                    ANNOTATION_STYLES.highlight.opacity
-                  }
-                  previewStrokeLinecap="butt"
-                  onColorChange={(color) =>
-                    onHighlightStyleChange
-                      ? onHighlightStyleChange({ color })
-                      : onPenStyleChange({ color })
-                  }
-                  onThicknessChange={(thickness) =>
-                    onHighlightStyleChange
-                      ? onHighlightStyleChange({ thickness })
-                      : onPenStyleChange({ thickness })
-                  }
-                  onOpacityChange={(opacity) =>
-                    onHighlightStyleChange
-                      ? onHighlightStyleChange({ opacity })
-                      : onPenStyleChange({ opacity })
-                  }
-                  isActive={tool === "draw_highlight"}
-                  title={t("toolbar.highlight_free_properties")}
-                />
-                <div className="flex items-center gap-0">
-                  <ToggleGroupItem
-                    value="draw_ink"
-                    title={
-                      isToolAllowed("draw_ink")
-                        ? t("toolbar.ink")
-                        : restrictedTitle
-                    }
-                    disabled={!isToolAllowed("draw_ink")}
-                    className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
-                  >
-                    <div
-                      className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
-                      style={{
-                        backgroundColor: editorState.penStyle.color,
-                      }}
-                    >
-                      <PenLine
-                        size={14}
-                        color={getContrastColor(editorState.penStyle.color)}
-                      />
-                    </div>
-                  </ToggleGroupItem>
-                  <ColorPickerPopover
-                    paletteType="foreground"
-                    color={editorState.penStyle.color}
-                    thickness={editorState.penStyle.thickness}
-                    opacity={editorState.penStyle.opacity}
-                    onColorChange={(color) => onPenStyleChange({ color })}
-                    onThicknessChange={(thickness) =>
-                      onPenStyleChange({ thickness })
-                    }
-                    onOpacityChange={(opacity) => onPenStyleChange({ opacity })}
-                    isActive={tool === "draw_ink"}
-                    title={t("toolbar.ink_properties")}
-                  />
-                </div>
-                <div className="flex items-center gap-0">
-                  <ToggleGroupItem
-                    value="draw_comment"
-                    title={
-                      isToolAllowed("draw_comment")
-                        ? t("toolbar.comment")
-                        : restrictedTitle
-                    }
-                    disabled={!isToolAllowed("draw_comment")}
-                    className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
-                  >
-                    <div
-                      className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
-                      style={{
-                        backgroundColor: commentColor,
-                      }}
-                    >
-                      <MessageCircle
-                        size={14}
-                        color={getContrastColor(commentColor)}
-                      />
-                    </div>
-                  </ToggleGroupItem>
-                  <ColorPickerPopover
-                    paletteType="foreground"
-                    color={commentColor}
-                    onColorChange={(color) =>
-                      onCommentStyleChange && onCommentStyleChange({ color })
-                    }
-                    isActive={tool === "draw_comment"}
-                    showThickness={false}
-                    title={t("toolbar.comment_properties")}
-                  />
-                </div>
-                <div className="flex items-center gap-0">
-                  <ToggleGroupItem
-                    value="draw_freetext"
-                    title={
-                      isToolAllowed("draw_freetext")
-                        ? t("toolbar.freetext")
-                        : restrictedTitle
-                    }
-                    disabled={!isToolAllowed("draw_freetext")}
-                    className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
-                  >
-                    <div
-                      className="flex h-6 w-6 items-center justify-center rounded-sm border border-black/10 shadow-sm dark:border-white/10"
-                      style={{
-                        backgroundColor: freetextColor,
-                      }}
-                    >
-                      <Type size={14} color={getContrastColor(freetextColor)} />
-                    </div>
-                  </ToggleGroupItem>
-                  <ColorPickerPopover
-                    paletteType="foreground"
-                    color={freetextColor}
-                    onColorChange={(color) =>
-                      onFreetextStyleChange && onFreetextStyleChange({ color })
-                    }
-                    isActive={tool === "draw_freetext"}
-                    showThickness={false}
-                    title={t("toolbar.freetext_properties")}
-                  />
-                </div>
-                <div className="flex items-center gap-0">
-                  <ToggleGroupItem
-                    value="draw_stamp"
-                    title={t("toolbar.stamp")}
-                    disabled={!isToolAllowed("draw_stamp")}
-                    className="data-[state=on]:bg-accent data-[state=on]:text-accent-foreground h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9"
-                  >
-                    <Stamp size={16} />
-                  </ToggleGroupItem>
-                  <StampStylePopover
-                    value={editorState.stampStyle}
-                    onChange={(style) => {
-                      onStampStyleChange?.(style);
-                      if (style.image || style.presetId)
-                        onToolChange("draw_stamp");
-                    }}
-                    title={t("toolbar.stamp_properties")}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-l-none p-0 sm:h-9 sm:w-5"
-                      title={t("toolbar.stamp_properties")}
-                    >
-                      <ChevronDown size={14} />
-                    </Button>
-                  </StampStylePopover>
-                </div>
-                <div className="flex items-center gap-0">
-                  <Popover
-                    modal={false}
-                    open={shapePopoverOpen}
-                    onOpenChange={setShapePopoverOpen}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          "h-8 w-8 rounded-r-none p-0 sm:h-9 sm:w-9",
-                          isShapeToolActive &&
-                            "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
-                        )}
-                        title={shapeButtonLabel}
-                        disabled={!isToolAllowed(activeShapeTool)}
-                      >
-                        <ActiveShapeIcon size={16} />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="start"
-                      className="w-72 p-3"
-                      data-app-block-modifier-wheel-zoom="1"
-                    >
-                      <div className="space-y-3">
-                        {SHAPE_TOOL_GROUPS.map((group, index) => (
-                          <div key={group.id} className="space-y-2">
-                            {index > 0 ? <Separator /> : null}
-                            <div className="text-muted-foreground px-1 text-xs font-medium">
-                              {t(group.labelKey)}
-                            </div>
-                            {(() => {
-                              const paddedTools: Array<ShapeTool | null> = [
-                                ...group.tools,
-                              ];
-                              const slotCount =
-                                group.slotCount ?? group.tools.length;
-
-                              while (paddedTools.length < slotCount) {
-                                paddedTools.push(null);
-                              }
-
-                              return (
-                                <div
-                                  className="grid gap-1"
-                                  style={{
-                                    gridTemplateColumns: `repeat(${group.columns}, minmax(0, 1fr))`,
-                                  }}
-                                >
-                                  {paddedTools.map((shapeTool, itemIndex) => {
-                                    if (!shapeTool) {
-                                      return (
-                                        <div
-                                          key={`${group.id}-empty-${itemIndex}`}
-                                          aria-hidden="true"
-                                          className="min-h-16"
-                                        />
-                                      );
-                                    }
-
-                                    const ShapeIcon =
-                                      getShapeToolIcon(shapeTool);
-                                    const isActive =
-                                      activeShapeTool === shapeTool;
-
-                                    return (
-                                      <Button
-                                        key={shapeTool}
-                                        variant="ghost"
-                                        className={cn(
-                                          "h-auto min-h-16 flex-col gap-2 px-2 py-2 text-xs",
-                                          isActive &&
-                                            "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
-                                        )}
-                                        onClick={() => {
-                                          if (!isToolAllowed(shapeTool)) return;
-                                          handleShapeToolSelect(shapeTool);
-                                        }}
-                                        disabled={!isToolAllowed(shapeTool)}
-                                      >
-                                        <ShapeIcon size={18} />
-                                        <span className="leading-none">
-                                          {getShapeToolLabel(t, shapeTool)}
-                                        </span>
-                                      </Button>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  <ColorPickerPopover
-                    paletteType="foreground"
-                    color={
-                      editorState.shapeStyle?.color ||
-                      ANNOTATION_STYLES.shape.color
-                    }
-                    thickness={
-                      editorState.shapeStyle?.thickness ??
-                      ANNOTATION_STYLES.shape.thickness
-                    }
-                    minThickness={0}
-                    opacity={
-                      editorState.shapeStyle?.opacity ??
-                      ANNOTATION_STYLES.shape.opacity
-                    }
-                    onColorChange={(color) =>
-                      onShapeStyleChange && onShapeStyleChange({ color })
-                    }
-                    onThicknessChange={(thickness) =>
-                      onShapeStyleChange && onShapeStyleChange({ thickness })
-                    }
-                    onOpacityChange={(opacity) =>
-                      onShapeStyleChange && onShapeStyleChange({ opacity })
-                    }
-                    extraContent={
-                      <ShapeBorderStyleSection
-                        value={
-                          editorState.shapeStyle?.borderStyle ??
-                          ANNOTATION_STYLES.shape.borderStyle
-                        }
-                        dashDensity={
-                          editorState.shapeStyle?.dashDensity ??
-                          ANNOTATION_STYLES.shape.dashDensity
-                        }
-                        onChange={(borderStyle) =>
-                          onShapeStyleChange?.({ borderStyle })
-                        }
-                        onDashDensityChange={(dashDensity) =>
-                          onShapeStyleChange?.({ dashDensity })
-                        }
-                      />
-                    }
-                    isActive={isShapeTool(tool)}
-                    title={t("toolbar.shape_properties")}
-                  />
-                </div>
-              </ToggleGroup>
-            )}
+            <EditorToolSelector
+              state={editorState}
+              onToolChange={onToolChange}
+            />
           </div>
         </div>
       )}
@@ -772,20 +250,6 @@ const Toolbar: React.FC = () => {
             sourceDocumentPermissions={editorState.sourceDocumentPermissions}
             pdfOwnerUnlocked={editorState.pdfOwnerUnlocked}
           />
-
-          {showPageSettingsControl && (
-            <PageSettingsDropdownControl
-              pageLayout={livePageLayout}
-              pageFlow={livePageFlow}
-              isFullscreen={liveIsFullscreen}
-              align="end"
-              open={pageSettingsOpen}
-              onOpenChange={setPageSettingsOpen}
-              onPageLayoutChange={setPageLayout}
-              onPageFlowChange={setPageFlow}
-              onToggleFullscreen={onToggleFullscreen}
-            />
-          )}
 
           <Button
             variant="ghost"

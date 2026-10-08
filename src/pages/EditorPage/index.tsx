@@ -19,6 +19,7 @@ import {
 import { TranslationFloatingWindow } from "@/components/workspace/widgets/TranslationFloatingWindow";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useEditorToolActions } from "@/hooks/useEditorToolActions";
 import { usePdfPermissionUi } from "@/hooks/usePdfPermissionUi";
 import {
   useEditorEventBus,
@@ -60,6 +61,7 @@ const EditorPage: React.FC = () => {
   // Keep the responsive default for explicit mode changes and resets, but do
   // not synchronize it to the active tool when the viewport width changes.
   const defaultTool: Tool = isMobile ? "pan" : "select";
+  const { changeTool, exitTool } = useEditorToolActions(defaultTool);
   const previousSelectionRef = React.useRef({
     selectedId: state.selectedId,
     hasSelectedControl,
@@ -137,9 +139,13 @@ const EditorPage: React.FC = () => {
 
   const handleModeChange = React.useCallback(
     (mode: EditorState["mode"]) => {
+      appEventBus.emit("workspace:cancelToolInteraction", {
+        draftsOnly: false,
+        handled: false,
+      });
       state.setEditorMode(mode, defaultTool);
     },
-    [defaultTool, state.setEditorMode],
+    [appEventBus, defaultTool, state.setEditorMode],
   );
 
   useAppEvent("workspace:openTranslate", ({ sourceText, autoTranslate }) => {
@@ -289,6 +295,8 @@ const EditorPage: React.FC = () => {
 
   const shellCommands = React.useMemo<EditorShellCommands>(
     () => ({
+      changeTool,
+      exitTool,
       zoomIn: handleZoomIn,
       zoomOut: handleZoomOut,
       fitWidth: handleFitWidth,
@@ -308,6 +316,8 @@ const EditorPage: React.FC = () => {
       toggleRightPanel,
     }),
     [
+      changeTool,
+      exitTool,
       handleCommentStyleChange,
       handleEditAnnotation,
       handleExitEditorPage,

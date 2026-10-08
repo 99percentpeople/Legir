@@ -818,15 +818,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (tabRuntime && !tabRuntime.active) return;
-      if (event.key === "Escape") {
-        if (!event.isTrusted) return;
-        event.preventDefault();
-        shapeDraftSessionRef.current = null;
-        setShapeDraftSession(null);
-        setActivePageIndex(null);
-        return;
-      }
       if (event.key === "Enter") {
+        if (
+          event.defaultPrevented ||
+          (event.target instanceof Element &&
+            event.target.closest(
+              "input, textarea, button, [contenteditable='true'], [role='menu'], [role='dialog']",
+            ))
+        )
+          return;
         event.preventDefault();
         finalizeShapeDraftSession(shapeDraftSession);
       }
@@ -1099,6 +1099,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
     closeTextSelectionPopover,
     endPan,
   ]);
+
+  useAppEvent("workspace:cancelToolInteraction", (request) => {
+    const hasDraft = !!shapeDraftSessionRef.current || isDrawing || !!dragStart;
+    if (request.draftsOnly && !hasDraft) return;
+    request.handled = hasDraft;
+    shapeDraftSessionRef.current = null;
+    setShapeDraftSession(null);
+    abortActiveInteractions();
+  });
 
   // Track if any interactive operation is in progress
   // NOTE: Definition moved up to be used by useAutoScroll hook

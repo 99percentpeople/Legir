@@ -321,6 +321,16 @@ Important supporting areas:
 
 The control system is registry-driven. New form controls or annotation-like tools should be added through the existing control registration flow instead of introducing special-case rendering paths.
 
+### Tool selection and options
+
+`src/components/toolbar/toolDefinitions.ts` exhaustively maps every `Tool` to its identity and supported style options. `EditorToolSelector` is the desktop selection-only strip; `ToolPicker` serves mobile selection and shape variants. Both use the same permission checks. The shared `FloatingBar` keeps pagination visible and adds options from `useToolOptions` plus an icon-only exit button for a non-default tool. Tools without configurable defaults still use the same context and exit control. Existing-object editing toolbars remain separate.
+
+`ResponsiveToolbar` measures the available container and natural item widths with `ResizeObserver`. The toolbar stays on one line: trailing optional controls move into a More popover and return when space grows, while pagination, the current tool and exit stay pinned. Narrow layouts use compact navigation/tool triggers. Overflow controls reuse the same settings components and commands; inert, inaccessible measurement copies cannot open portals. Resizing or leaving the document dismisses transient menus without changing tool preferences.
+
+Stroke options share `StrokePreview` and `StrokeWidthControl` across new-tool defaults and existing-annotation properties: one live preview at the top of each settings popover reflects color, width, opacity and dashes; width uses visual presets plus numeric entry. Shape border styles use a single visual solid/dashed dropdown, with density available only for dashed strokes. Opacity and dash density retain continuous sliders.
+
+`useEditorToolActions` is the common selection/exit controller for the top strip, floating toolbar, canvas and Escape. Exiting synchronously cancels only in-progress interactions through the document-scoped event bus, clears selection/temporary pan, and returns to desktop selection or mobile pan without deleting committed edits or clearing style preferences. Escape is handled after popovers: close a popup, cancel an unfinished draft, then clear selection/exit. Shape draft completion and draft cancellation are separate commands. The floating toolbar unmounts its transient popovers when the tab is inactive, while the document remains alive; its measured height reserves bottom scrolling space on narrow/touch layouts.
+
 ## Platform Abstraction Layer
 
 Platform-specific concerns are isolated in:
