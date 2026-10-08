@@ -216,8 +216,13 @@ describe("workspace navigation", () => {
     expect(
       documentTab.parentElement?.classList.contains("editor-tab-slot"),
     ).toBe(true);
-    expect(documentTab.closest(".editor-tab-scroller")).not.toBeNull();
-    expect(home.closest(".editor-tab-scroller")).toBeNull();
+    const scroller = documentTab.closest(".editor-tab-scroller");
+    expect(scroller).not.toBeNull();
+    expect(home.closest(".editor-tab-scroller")).toBe(scroller);
+    expect(scroller?.firstElementChild).toBe(home.parentElement);
+    expect(home.parentElement?.classList.contains("editor-tab-slot")).toBe(
+      true,
+    );
     expect(home.draggable).toBe(false);
     expect(home.querySelector("button")).toBeNull();
     expect(home.getAttribute("aria-current")).toBe("page");
@@ -234,6 +239,70 @@ describe("workspace navigation", () => {
     expect(documentTab.className).toBe(inactiveClassName);
     expect(navigation.page).toEqual({ kind: "home" });
   });
+
+  it.each([
+    [{ deltaY: 80 }, 80],
+    [{ deltaY: -80 }, -80],
+    [{ deltaX: 60 }, 60],
+    [{ deltaX: 60, deltaY: 20 }, 60],
+    [{ deltaX: 20, deltaY: 60 }, 60],
+    [{ deltaY: 80, shiftKey: true }, 80],
+    [{ deltaY: 3, deltaMode: WheelEvent.DOM_DELTA_LINE }, 60],
+    [{ deltaY: 1, deltaMode: WheelEvent.DOM_DELTA_PAGE }, 300],
+  ])(
+    "scrolls the shared tab strip horizontally for %j",
+    async (input, delta) => {
+      await mount();
+      await add("A");
+      const scroller = host.querySelector<HTMLDivElement>(
+        ".editor-tab-scroller",
+      )!;
+      Object.defineProperties(scroller, {
+        scrollWidth: { value: 1200 },
+        clientWidth: { value: 300 },
+      });
+      scroller.style.lineHeight = "20px";
+      scroller.scrollLeft = 200;
+      const home = scroller.querySelector("button")!;
+      const event = new WheelEvent("wheel", {
+        ...input,
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => home.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(true);
+      expect(scroller.scrollLeft).toBe(200 + delta);
+      expect(navigation.page).toEqual({ kind: "home" });
+      expect(location.history).toEqual(["/"]);
+    },
+  );
+
+  it.each([
+    [{ deltaY: 80, ctrlKey: true }, 1200],
+    [{ deltaY: 80, metaKey: true }, 1200],
+    [{ deltaY: 0 }, 1200],
+    [{ deltaY: 80 }, 300],
+  ])(
+    "preserves native wheel behavior for %j with scroll width %i",
+    async (input, width) => {
+      await mount();
+      const scroller = host.querySelector<HTMLDivElement>(
+        ".editor-tab-scroller",
+      )!;
+      Object.defineProperties(scroller, {
+        scrollWidth: { value: width },
+        clientWidth: { value: 300 },
+      });
+      const event = new WheelEvent("wheel", {
+        ...input,
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => scroller.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(false);
+      expect(scroller.scrollLeft).toBe(0);
+    },
+  );
 
   it("round-trips IDs without exposing file paths and rejects malformed routes", () => {
     expect(parseWorkspacePage(documentTabPath("tab /?#%"))).toEqual({

@@ -12,9 +12,7 @@
   background: color-mix(in oklch, var(--background) 75%, black);
 }
 
-/* Share the two shoulder gutters so tab bodies touch. The scroller overlaps
-   Home by the same amount, keeping its first tab's left curve inside the clip. */
-.editor-tab-scroller,
+/* Home and documents share one scrollport and overlapping shoulder gutters. */
 .editor-tab-slot + .editor-tab-slot {
   margin-left: calc(-2 * var(--tab-radius));
 }

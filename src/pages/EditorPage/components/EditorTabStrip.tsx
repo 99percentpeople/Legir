@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { ArrowLeft, ExternalLink, Home, LoaderCircle, X } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import {
@@ -60,10 +60,43 @@ export function EditorTabStrip({
   );
   const draggedTabPayloadRef = useRef<EditorTabDragPayload | null>(null);
   const dragImageElementRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const draggableTabs = useMemo(
     () => tabs.filter((tab) => !tab.isPendingTransfer),
     [tabs],
   );
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const onWheel = (event: WheelEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        scroller.scrollWidth <= scroller.clientWidth
+      )
+        return;
+
+      // Use one axis so diagonal trackpad gestures are not counted twice.
+      const delta =
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.deltaY;
+      if (!delta) return;
+      const unit =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? parseFloat(getComputedStyle(scroller).lineHeight) || 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? scroller.clientWidth
+            : 1;
+      event.preventDefault();
+      scroller.scrollLeft += delta * unit;
+    };
+    // React's delegated wheel listener is passive; cancel native vertical scrolling here.
+    scroller.addEventListener("wheel", onWheel, { passive: false });
+    return () => scroller.removeEventListener("wheel", onWheel);
+  }, []);
 
   const clearDragImage = () => {
     dragImageElementRef.current?.remove();
@@ -186,17 +219,8 @@ export function EditorTabStrip({
 
   return (
     <div className="editor-tab-strip flex h-10 shrink-0 items-end pt-1.5 sm:px-1">
-      <button
-        type="button"
-        draggable={false}
-        className={cn(TAB_CLASS_NAME, isHomeActive && ACTIVE_TAB_CLASS_NAME)}
-        aria-current={isHomeActive ? "page" : undefined}
-        onClick={onHome}
-      >
-        <Home size={16} className="shrink-0" />
-        <span>{t("tabs.home")}</span>
-      </button>
       <div
+        ref={scrollerRef}
         className="editor-tab-scroller no-scrollbar flex min-w-0 flex-1 items-end overflow-x-auto"
         onDragEnter={(event) => {
           allowMoveDrop(event);
@@ -213,6 +237,21 @@ export function EditorTabStrip({
           setDropIndicator(null);
         }}
       >
+        <div className="editor-tab-slot relative shrink-0">
+          <button
+            type="button"
+            draggable={false}
+            className={cn(
+              TAB_CLASS_NAME,
+              isHomeActive && ACTIVE_TAB_CLASS_NAME,
+            )}
+            aria-current={isHomeActive ? "page" : undefined}
+            onClick={onHome}
+          >
+            <Home size={16} className="shrink-0" />
+            <span>{t("tabs.home")}</span>
+          </button>
+        </div>
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
           const showDetachAction = canDetachTabs;

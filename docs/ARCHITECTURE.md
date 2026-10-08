@@ -105,9 +105,11 @@ This file is intentionally operational rather than purely presentational.
 
 ### `src/AppRoutes.tsx`
 
-The app has one persistent workspace shell and tab strip. Home is a pinned,
-non-closeable entry before the document tabs. Routing selects the visible page,
-not whether the workspace is mounted:
+The app has one persistent workspace shell and tab strip. Home is a permanent,
+non-closeable, non-draggable entry before the document tabs. All tabs share one
+horizontal scrollport, including Home; mouse-wheel input scrolls the strip
+horizontally while modifier-based zoom gestures retain their native behavior.
+Routing selects the visible page, not whether the workspace is mounted:
 
 - `/` selects Home with no active document.
 - `/editor/:tabId` selects a live document session in this window.
