@@ -941,6 +941,14 @@ const buildPdfLibAnnotsByPageIndex = async (
         );
         const placeholder = pdfObjToString(rawPlaceholder);
 
+        const rawMaxLen = lookupInFieldChain(annot, "MaxLen");
+        const maxLen =
+          rawMaxLen instanceof PDFNumber &&
+          Number.isInteger(rawMaxLen.asNumber()) &&
+          rawMaxLen.asNumber() > 0
+            ? rawMaxLen.asNumber()
+            : undefined;
+
         const rawV = lookupInFieldChain(annot, "V");
         const fieldValue = extractFieldValue(rawV);
 
@@ -1106,6 +1114,7 @@ const buildPdfLibAnnotsByPageIndex = async (
           fieldType,
           fieldFlags,
           fieldValue,
+          maxLen,
           alternativeText: tu,
           placeholder,
           options,

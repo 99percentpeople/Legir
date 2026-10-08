@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument, PDFName, PDFString } from "@cantoo/pdf-lib";
-import { loadPDF, startPdfOpenSession } from "@/services/pdfService";
+import { exportPDF, loadPDF, startPdfOpenSession } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { FieldType } from "@/types";
 
@@ -126,6 +126,70 @@ const loadFields = async (bytes: Uint8Array) => {
 };
 
 describe("PDF form import", () => {
+  it.each([
+    ["A", "B"],
+    ["1", "0"],
+  ])(
+    "round-trips radio appearance states with export options %s / %s",
+    async (first, second) => {
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([300, 300]);
+      const radio = doc.getForm().createRadioGroup("choice");
+      radio.addOptionToPage(first, page, { x: 40, y: 80 });
+      radio.addOptionToPage(second, page, { x: 80, y: 80 });
+      radio.select(first);
+      const bytes = await doc.save();
+      const fields = await loadFields(bytes);
+      expect(fields.map((field) => field.isChecked)).toEqual([true, false]);
+      const output = await exportPDF(
+        bytes,
+        fields.map((field, index) => ({ ...field, isChecked: index === 1 })),
+        undefined,
+        [],
+        undefined,
+        { syncFormFields: true },
+      );
+      const reopened = await PDFDocument.load(output);
+      expect(reopened.getForm().getRadioGroup("choice").getSelected()).toBe(
+        second,
+      );
+      expect(
+        (await loadFields(output)).map((field) => field.isChecked),
+      ).toEqual([false, true]);
+    },
+  );
+
+  it("preserves inherited read-only flags and text length limits", async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([600, 800]);
+    const form = doc.getForm();
+    const text = form.createTextField("lockedText");
+    text.setText("Original");
+    text.setMaxLength(20);
+    text.addToPage(page);
+    const checkbox = form.createCheckBox("lockedCheckbox");
+    checkbox.addToPage(page);
+    const radio = form.createRadioGroup("lockedRadio");
+    radio.addOptionToPage("A", page);
+    const dropdown = form.createDropdown("lockedDropdown");
+    dropdown.addOptions(["One", "Two"]);
+    dropdown.addToPage(page);
+    for (const field of [text, checkbox, radio, dropdown]) {
+      field.enableReadOnly();
+      field.enableRequired();
+    }
+
+    const fields = await loadFields(await doc.save());
+    expect(fields).toHaveLength(4);
+    for (const field of fields) {
+      expect(field).toMatchObject({ readOnly: true, required: true });
+    }
+    expect(fields.find((field) => field.name === "lockedText")).toMatchObject({
+      value: "Original",
+      maxLength: 20,
+    });
+  });
+
   it("exposes readable pages before full form hydration", async () => {
     const bytes = await createCheckboxPdf();
     const session = startPdfOpenSession(bytes, {

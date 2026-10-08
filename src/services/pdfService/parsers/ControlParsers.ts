@@ -68,6 +68,7 @@ export class TextControlParser implements IControlParser {
           sourcePdfRef: annotation.sourcePdfRef,
           rect: { x, y, width, height },
           required: !!(fieldFlags & 2),
+          readOnly: !!(fieldFlags & 1),
           style: style,
           value:
             typeof annotation.fieldValue === "string"
@@ -79,6 +80,7 @@ export class TextControlParser implements IControlParser {
               : undefined,
           alignment: alignment,
           multiline: !!(fieldFlags & 4096),
+          maxLength: annotation.maxLen,
           toolTip: annotation.alternativeText || undefined,
           rotationDeg:
             typeof annotation.rotation === "number" &&
@@ -148,6 +150,7 @@ export class CheckboxControlParser implements IControlParser {
           sourcePdfRef: annotation.sourcePdfRef,
           rect: { x, y, width, height },
           required: !!(fieldFlags & 2),
+          readOnly: !!(fieldFlags & 1),
           style: style,
           isChecked: isChecked,
           exportValue: exportValue, // Might need refinement
@@ -213,6 +216,7 @@ export class RadioControlParser implements IControlParser {
           sourcePdfRef: annotation.sourcePdfRef,
           rect: { x, y, width, height },
           required: !!(fieldFlags & 2),
+          readOnly: !!(fieldFlags & 1),
           style: style,
           isChecked: isChecked,
           radioValue: radioValue,
@@ -297,6 +301,7 @@ export class DropdownControlParser implements IControlParser {
           sourcePdfRef: annotation.sourcePdfRef,
           rect: { x, y, width, height },
           required: !!(fieldFlags & 2),
+          readOnly: !!(fieldFlags & 1),
           style: style,
           value: Array.isArray(annotation.fieldValue)
             ? annotation.fieldValue.join("\n")
@@ -366,6 +371,7 @@ export class SignatureControlParser implements IControlParser {
           sourcePdfRef: annotation.sourcePdfRef,
           rect: { x, y, width, height },
           required: !!(fieldFlags & 2),
+          readOnly: !!(fieldFlags & 1),
           style: style,
           toolTip: annotation.alternativeText || undefined,
           rotationDeg:

@@ -50,6 +50,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   fieldType?: string;
   fieldFlags?: number;
   fieldValue?: unknown;
+  maxLen?: number;
   alternativeText?: string;
   placeholder?: string;
   options?: PdfJsAnnotationOption[];

@@ -531,7 +531,19 @@ export const updateExistingSourceField = (
       const radio = existingField as PDFRadioGroup;
       const value = field.radioValue || field.exportValue;
       if (field.isChecked && value) {
-        runExistingFieldUpdate("select", () => radio.select(value));
+        runExistingFieldUpdate("select", () => {
+          // Imported controls carry the widget's appearance state (/AP), which
+          // can differ from the export option (/Opt) accepted by select().
+          const onValue = radio.acroField
+            .getOnValues()
+            .find((candidate) => candidate.decodeText() === value);
+          if (onValue) {
+            radio.acroField.setValue(onValue);
+            form.markFieldAsDirty(radio.ref);
+          } else {
+            radio.select(value);
+          }
+        });
       }
       updateAppearances(() => radio.updateAppearances());
       return true;
