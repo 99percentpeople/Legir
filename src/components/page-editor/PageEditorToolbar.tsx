@@ -110,7 +110,7 @@ export const PageEditorToolbar = memo(function PageEditorToolbar({
       data-page-editor-toolbar
     >
       <div
-        className="text-muted-foreground flex h-8 min-w-0 items-center gap-1 text-xs whitespace-nowrap tabular-nums sm:h-9 sm:gap-2"
+        className="text-muted-foreground flex h-8 shrink-0 items-center gap-1 text-xs whitespace-nowrap tabular-nums sm:h-9 sm:gap-2"
         title={t("page_editor.hint")}
         data-page-selection
       >
@@ -128,12 +128,17 @@ export const PageEditorToolbar = memo(function PageEditorToolbar({
           }
         />
         <span
-          className="truncate"
           aria-live="polite"
           aria-label={selectionLabel}
           title={selectionLabel}
         >
-          {count ? `${count} / ${total}` : total}
+          <span
+            className="inline-block text-right"
+            style={{ width: `${String(total).length}ch` }}
+          >
+            {count || "-"}
+          </span>
+          {` / ${total}`}
         </span>
       </div>
       <div

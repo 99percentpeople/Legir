@@ -24,17 +24,17 @@ describe("page drag previews in the public demo", () => {
   }
   const ids = () => drag.displayed.map((page) => page.id);
   const initial = initialDemoState.pages.map((page) => page.id);
-  const over = (target: string) =>
+  const over = (target: string | null) =>
     act(() =>
       drag.onDragOver({
-        operation: { target: { id: target } },
+        operation: { target: target ? { id: target } : null },
       } as DragOverEvent),
     );
-  const end = (canceled: boolean) =>
+  const end = (canceled: boolean, target: string | null = "sample-3") =>
     act(() =>
       drag.onDragEnd({
         canceled,
-        operation: { target: { id: "sample-3" } },
+        operation: { target: target ? { id: target } : null },
       } as DragEndEvent),
     );
   beforeEach(async () => {
@@ -68,10 +68,37 @@ describe("page drag previews in the public demo", () => {
     await act(async () => dispatch({ type: "undo" }));
     expect(ids()).toEqual(initial);
   });
-  it("restores the original order without history when cancelled", async () => {
+  it("drops into the last preview position after leaving all cards", async () => {
+    await over("sample-2");
     await over("sample-3");
-    expect(ids()).not.toEqual(initial);
-    await end(true);
+    const preview = ids();
+    await over(null);
+    expect(ids()).toEqual(preview);
+    expect(state.past).toHaveLength(0);
+    await end(false, null);
+    expect(ids()).toEqual(preview);
+    expect(state.pages.map((page) => page.id)).toEqual(preview);
+    expect(state.past).toHaveLength(1);
+    await act(async () => dispatch({ type: "undo" }));
+    expect(ids()).toEqual(initial);
+    await act(async () => dispatch({ type: "redo" }));
+    expect(ids()).toEqual(preview);
+  });
+  it.each(["sample-3", null])(
+    "restores the original order without history when cancelled over %s",
+    async (target) => {
+      await over("sample-3");
+      await over(target);
+      expect(ids()).not.toEqual(initial);
+      await end(true, target);
+      expect(ids()).toEqual(initial);
+      expect(state.pages).toBe(initialDemoState.pages);
+      expect(state.past).toHaveLength(0);
+    },
+  );
+  it("does not create a move when released outside before any insertion", async () => {
+    await over(null);
+    await end(false, null);
     expect(ids()).toEqual(initial);
     expect(state.pages).toBe(initialDemoState.pages);
     expect(state.past).toHaveLength(0);
@@ -83,13 +110,68 @@ describe("page drag previews in the public demo", () => {
     await end(false);
     expect(state.past).toHaveLength(0);
   });
-  it("does not overwrite page edits made during the drag", async () => {
-    await over("sample-3");
-    await act(async () => dispatch({ type: "blank-page" }));
-    const editedPages = state.pages;
-    await end(false);
-    expect(state.pages).toBe(editedPages);
-    expect(ids()).toEqual([...initial, "sample-4"]);
-    expect(state.past).toHaveLength(1);
-  });
+  it.each(["sample-3", null])(
+    "does not overwrite page edits when released over %s",
+    async (target) => {
+      await over("sample-3");
+      await act(async () => dispatch({ type: "blank-page" }));
+      const editedPages = state.pages;
+      await end(false, target);
+      expect(state.pages).toBe(editedPages);
+      expect(ids()).toEqual([...initial, "sample-4"]);
+      expect(state.past).toHaveLength(1);
+    },
+  );
+  it.each(["window", "ancestor"])(
+    "reveals the committed slot when %s scrolls during the drop animation",
+    async (scrollTarget) => {
+      await over("sample-3");
+      await end(false, null);
+      const grid = container.firstElementChild!;
+      grid.innerHTML =
+        '<div data-page-card="sample-1"><button class="demo-page-handle"></button></div>';
+      const feedback = document.createElement("div");
+      const preview = document.createElement("div");
+      preview.dataset.demoPageDragPreview = "sample-1";
+      feedback.append(preview);
+      vi.spyOn(preview, "getBoundingClientRect").mockReturnValue(
+        new DOMRect(400, 400, 100, 150),
+      );
+      vi.spyOn(
+        grid.querySelector("button")!,
+        "getBoundingClientRect",
+      ).mockReturnValue(new DOMRect(100, 100, 100, 150));
+      let finish!: () => void;
+      const finished = new Promise<void>((resolve) => (finish = resolve));
+      const cancel = vi.fn(() => finish());
+      preview.animate = vi.fn(
+        () => ({ finished, cancel }) as unknown as Animation,
+      );
+      await act(async () => {
+        const pending = drag.dropAnimation({
+          source: { id: "sample-1" } as unknown as Parameters<
+            typeof drag.dropAnimation
+          >[0]["source"],
+          element: grid.querySelector("button")!,
+          feedbackElement: feedback,
+          placeholder: undefined,
+          translate: { x: 0, y: 0 },
+          moved: true,
+        });
+        try {
+          (scrollTarget === "window" ? window : container).dispatchEvent(
+            new Event("scroll"),
+          );
+          expect(cancel).toHaveBeenCalledOnce();
+        } finally {
+          finish();
+          await pending;
+        }
+      });
+      expect(preview.style.visibility).toBe("hidden");
+      expect(drag.moving).toEqual([]);
+      expect(ids()).toEqual(["sample-2", "sample-3", "sample-1"]);
+      expect(state.past).toHaveLength(1);
+    },
+  );
 });

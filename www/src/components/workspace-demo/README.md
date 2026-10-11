@@ -39,6 +39,22 @@ removing a sample page before returning to reading. Import opens the application
 local sample edits do not load or write PDF files. Thumbnails share the reader's
 inert HTML content, page order and rotation.
 
+The shared grid uses square paper areas so rotation preserves thumbnail size.
+Paper size, padding and minimum gaps scale continuously, independently of column
+counts. Columns use `space-around` to distribute spare width and preserve empty
+tracks when pages do not fill a row, with matching file drop and wheel coordinates
+in the application. Page action buttons retain their usable size at the smallest
+zoom levels.
+
+`PageGridTransitions` is shared with the application for manual and automatic
+insertion, duplication, deletion, undo and redo. It captures only visible cards
+before React updates the grid, fades removed content in an inert clipped layer,
+and slides surviving content without moving sortable targets. State and history
+update immediately. Scrolling, zoom, drag pickup and reduced motion cancel or
+skip transitions; unmounting removes every temporary copy and animation.
+Pickup freezes the painted content until drag feedback is captured, then clears
+the transition, so dnd-kit's measurement cannot jump to the animation endpoint.
+
 `useDemoAutoplay` plays all six presets in sequence using local actions and a
 decorative pointer. It demonstrates navigation, highlighting, form entry,
 scripted AI output, translation and page organization. It starts only while the
@@ -54,10 +70,13 @@ Steps wait for the pointer to arrive before pressing a control; clicks release
 before typing, whose cadence pauses at punctuation. Automatic page sorting drives
 the same drag manager as the pointer and keyboard sensors. `useDemoPageDrag`
 previews insertion order while neighboring cards slide into place, matching the
-application's page grid. A drop commits one history entry; cancellation restores
+application's page grid. A drop commits the last preview position as one history
+entry, even when the pointer has left the cards; explicit cancellation restores
 the original order. Preview and drop animations account for the editor's display
-scale. Collision targets stay at their layout slots while only card contents
-animate, preventing an outgoing neighbor from reversing the insertion. A press
+scale. Scrolling during a drop reveals the committed slot immediately instead of
+animating toward stale viewport coordinates. Collision targets stay at their
+layout slots while only card contents animate, preventing an outgoing neighbor
+from reversing the insertion. A press
 during automatic dragging hands the same pointer gesture to manual control after
 cancellation. Stale gestures cannot overwrite subsequent page edits. Rotation,
 insertion and deletion have short transitions. Each scene is prepared

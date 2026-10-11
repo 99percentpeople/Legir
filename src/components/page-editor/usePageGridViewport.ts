@@ -125,7 +125,13 @@ export function usePageGridViewport(dragRef: RefObject<unknown>) {
         next.scale === next.base
       )
         return;
-      const { columns, rowHeight } = layoutRef.current;
+      const {
+        columns,
+        rowHeight,
+        offset: gridOffset,
+        cardWidth,
+        columnGap,
+      } = layoutRef.current;
       const rect = el.getBoundingClientRect();
       const offset = Math.max(0, Math.min(el.clientHeight, next.y - rect.top));
       const row = Math.floor((el.scrollTop + offset) / rowHeight);
@@ -134,7 +140,7 @@ export function usePageGridViewport(dragRef: RefObject<unknown>) {
         Math.min(
           columns - 1,
           Math.floor(
-            (next.x - rect.left - 16) / ((el.clientWidth - 16) / columns),
+            (next.x - rect.left - gridOffset) / (cardWidth + columnGap),
           ),
         ),
       );

@@ -5,7 +5,11 @@ import type {
   PageFlowDirection,
   AnnotationReply,
 } from "@/types";
-import { ANNOTATION_STYLES } from "@/constants";
+import {
+  ANNOTATION_STYLES,
+  MIN_PAGE_THUMBNAIL_SCALE,
+  MAX_PAGE_THUMBNAIL_SCALE,
+} from "@/constants";
 import type { AiChatTokenUsageSummary } from "@/services/ai/chat/types";
 
 export const DOCUMENT_TITLE = "reading-notes.pdf";
@@ -303,7 +307,10 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
     case "thumbnail-scale":
       return {
         ...state,
-        thumbnailScale: Math.min(2, Math.max(0.75, action.scale)),
+        thumbnailScale: Math.min(
+          MAX_PAGE_THUMBNAIL_SCALE,
+          Math.max(MIN_PAGE_THUMBNAIL_SCALE, action.scale),
+        ),
       };
     case "scene": {
       const scene = demoReducer(

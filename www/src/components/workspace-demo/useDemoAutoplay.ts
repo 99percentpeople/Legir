@@ -212,7 +212,6 @@ export function useDemoAutoplay(options: Options) {
       await motion.frame();
       await motion.frame();
     };
-    const cards = () => [...root.querySelectorAll<HTMLElement>(CARD)];
     const overlays = () => [...root.querySelectorAll<HTMLElement>(OVERLAYS)];
 
     function point(element: HTMLElement, text = false): Point {
@@ -302,9 +301,6 @@ export function useDemoAutoplay(options: Options) {
     async function apply(actions: DemoAction[]) {
       if (!actions.length) return;
       phase("responding");
-      const before = new Map(
-        cards().map((card) => [card.dataset.pageCard, demoRect(card)]),
-      );
       const previousOverlays = new Set(overlays());
       const scrolls = [
         ...root!.querySelectorAll<HTMLElement>(
@@ -327,56 +323,21 @@ export function useDemoAutoplay(options: Options) {
             })
           : [],
       );
-      const removed = actions.flatMap((action) =>
-        action.type === "delete-pages" ? action.ids : [],
-      );
-      await Promise.all(
-        cards()
-          .filter((card) => removed.includes(card.dataset.pageCard!))
-          .map((card) =>
-            motion.animate(
-              card,
-              [
-                { opacity: 1, transform: "scale(1)" },
-                { opacity: 0, transform: "scale(0.94)" },
-              ],
-              180,
-            ),
-          ),
-      );
       motion.check();
       flushSync(() => actions.forEach(send));
       const transitions: Promise<void>[] = [];
-      for (const card of cards()) {
-        const old = before.get(card.dataset.pageCard),
-          next = demoRect(card);
-        if (!old)
-          transitions.push(
-            motion.animate(
-              card,
-              [
-                { opacity: 0, transform: "translateY(12px) scale(0.96)" },
-                { opacity: 1, transform: "translateY(0) scale(1)" },
-              ],
-              360,
-            ),
-          );
-        else if (
-          Math.abs(old.left - next.left) + Math.abs(old.top - next.top) >
-          1
-        )
-          transitions.push(
-            motion.animate(
-              card,
-              [
-                {
-                  transform: `translate(${old.left - next.left}px, ${old.top - next.top}px)`,
-                },
-                { transform: "translate(0, 0)" },
-              ],
-              420,
-            ),
-          );
+      for (const content of root!.querySelectorAll<HTMLElement>(
+        "[data-page-card-content], [data-page-exits] > *",
+      )) {
+        for (const animation of content.getAnimations?.() ?? []) {
+          if (animation.id.startsWith("page-grid-"))
+            transitions.push(
+              animation.finished.then(
+                () => {},
+                () => {},
+              ),
+            );
+        }
       }
       for (const { element, before, delta } of rotations) {
         const after = demoRect(element);

@@ -4,6 +4,7 @@ import {
   previewPageMove,
 } from "@/components/page-editor/pageDrag";
 import { insertionIndex } from "@/components/page-editor/InsertionPosition";
+import { getPageGridLayout } from "@/components/page-editor/pageGridLayout";
 import { getPageId } from "@/services/pdfService/lib/pageStructure";
 import { createTestEditorStore, field, page } from "./helpers/editorStore";
 
@@ -65,13 +66,25 @@ it("previews a nonadjacent selected block in document order without mutating pag
 });
 
 it("maps file drop halves, row breaks and empty trailing space to insertion gaps", () => {
-  expect(fileInsertionIndex(20, 20, 800, 4, 10, 252)).toBe(0);
-  expect(fileInsertionIndex(180, 20, 800, 4, 10, 252)).toBe(1);
-  expect(fileInsertionIndex(20, 270, 800, 4, 10, 252)).toBe(4);
-  expect(fileInsertionIndex(780, 600, 800, 4, 10, 252)).toBe(10);
-  expect(fileInsertionIndex(20, 1200, 800, 4, 10, 252)).toBe(10);
-  expect(fileInsertionIndex(20, 810, 1000, 3, 20, 400)).toBe(6);
-  expect(fileInsertionIndex(980, 810, 1000, 3, 20, 400)).toBe(9);
+  const layout = getPageGridLayout(800, 1);
+  expect(fileInsertionIndex(20, 20, 10, layout)).toBe(0);
+  expect(fileInsertionIndex(210, 20, 10, layout)).toBe(1);
+  expect(fileInsertionIndex(20, layout.rowHeight + 20, 10, layout)).toBe(4);
+  expect(fileInsertionIndex(780, layout.rowHeight * 2 + 20, 10, layout)).toBe(
+    10,
+  );
+  expect(fileInsertionIndex(20, 1200, 10, layout)).toBe(10);
+
+  const compact = getPageGridLayout(800, 0.5);
+  expect(fileInsertionIndex(150, 20, 20, compact)).toBe(1);
+  expect(fileInsertionIndex(20, compact.rowHeight + 10, 20, compact)).toBe(6);
+  const enlarged = getPageGridLayout(1000, 1.6);
+  expect(
+    fileInsertionIndex(20, enlarged.rowHeight * 2 + 10, 20, enlarged),
+  ).toBe(6);
+  expect(
+    fileInsertionIndex(980, enlarged.rowHeight * 2 + 10, 20, enlarged),
+  ).toBe(9);
 });
 
 it("validates explicit page destinations and requires a selection for relative ones", () => {
@@ -81,4 +94,15 @@ it("validates explicit page destinations and requires a selection for relative o
   expect(insertionIndex("after_page", 11, 10, [])).toBeNull();
   expect(insertionIndex("after", 1, 10, [])).toBeNull();
   expect(insertionIndex("after", 1, 10, [1, 4])).toBe(5);
+});
+
+it("appends file drops in empty column slots without changing occupied drop targets", () => {
+  const layout = getPageGridLayout(800, 1);
+  expect(layout.columns).toBe(4);
+  expect(fileInsertionIndex(100, 20, 2, layout)).toBe(0);
+  expect(fileInsertionIndex(200, 20, 2, layout)).toBe(1);
+  expect(fileInsertionIndex(290, 20, 2, layout)).toBe(1);
+  expect(fileInsertionIndex(390, 20, 2, layout)).toBe(2);
+  expect(fileInsertionIndex(500, 20, 2, layout)).toBe(2);
+  expect(fileInsertionIndex(700, 20, 2, layout)).toBe(2);
 });

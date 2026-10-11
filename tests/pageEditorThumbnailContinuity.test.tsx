@@ -15,8 +15,8 @@ const drag = vi.hoisted(() => {
   };
   const handlers: {
     start: (id: string) => void;
-    over: (id: string) => void;
-    end: () => void;
+    over: (id: string | null) => void;
+    end: (canceled?: boolean, target?: string | null) => void;
   } = {
     start: () => {},
     over: () => {},
@@ -37,16 +37,22 @@ vi.mock("@dnd-kit/react", () => ({
   }: {
     children: ReactNode;
     onDragStart: (event: { operation: { source: { id: string } } }) => void;
-    onDragOver: (event: { operation: { target: { id: string } } }) => void;
+    onDragOver: (event: {
+      operation: { target: { id: string } | null };
+    }) => void;
     onDragEnd: (event: {
       canceled: boolean;
-      operation: { target: { id: string } };
+      operation: { target: { id: string } | null };
     }) => void;
   }) => {
     drag.start = (id) => onDragStart({ operation: { source: { id } } });
-    drag.over = (id) => onDragOver({ operation: { target: { id } } });
-    drag.end = () =>
-      onDragEnd({ canceled: false, operation: { target: { id: "page-2" } } });
+    drag.over = (id) =>
+      onDragOver({ operation: { target: id ? { id } : null } });
+    drag.end = (canceled = false, target = "page-2") =>
+      onDragEnd({
+        canceled,
+        operation: { target: target ? { id: target } : null },
+      });
     return children;
   },
   DragOverlay: () => null,
@@ -197,6 +203,86 @@ it("keeps each thumbnail and image node when page indices commit ahead of the dr
     host.remove();
   }
 });
+
+it.each([
+  { selectedPageIds: ["page-0"], canceled: false },
+  { selectedPageIds: ["page-0", "page-1"], canceled: false },
+  { selectedPageIds: ["page-0"], canceled: true },
+  { selectedPageIds: ["page-0", "page-1"], canceled: true },
+])(
+  "handles release outside all cards using the last insertion and cancellation state (selection $selectedPageIds, canceled $canceled)",
+  async ({ selectedPageIds, canceled }) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(500);
+    const pages = Array.from({ length: 4 }, (_, i) => ({
+      ...page(i),
+      id: `page-${i}`,
+    }));
+    const store = createTestEditorStore({
+      mode: "pages",
+      selectedPageIds,
+      pages,
+      thumbnailImages: Object.fromEntries(
+        pages.map((page, i) => [i, `blob:${page.id}`]),
+      ),
+    });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const cards = () => [
+      ...host.querySelectorAll<HTMLElement>("[data-page-card]"),
+    ];
+    const order = () => cards().map((card) => card.dataset.pageCard);
+    try {
+      await act(async () =>
+        root.render(
+          <EditorViewContext.Provider value={store}>
+            <LanguageProvider defaultLanguage="en">
+              <PageEditor />
+            </LanguageProvider>
+          </EditorViewContext.Provider>,
+        ),
+      );
+      const initial = order();
+      const images = new Map(
+        cards().map((card) => [
+          card.dataset.pageCard,
+          card.querySelector("img"),
+        ]),
+      );
+      await act(async () => drag.start("page-0"));
+      await act(async () => drag.over("page-2"));
+      const preview = order();
+      expect(preview).not.toEqual(initial);
+      expect(store.getState().past).toHaveLength(0);
+      await act(async () => drag.over(null));
+      expect(order()).toEqual(preview);
+      await act(async () => drag.end(canceled, null));
+      expect(order()).toEqual(canceled ? initial : preview);
+      expect(store.getState().pages.map((page) => page.id)).toEqual(order());
+      expect(store.getState().past).toHaveLength(canceled ? 0 : 1);
+      for (const card of cards()) {
+        expect(card.querySelector("img")).toBe(
+          images.get(card.dataset.pageCard),
+        );
+        expect(card.querySelector("img")?.getAttribute("src")).toBe(
+          `blob:${card.dataset.pageCard}`,
+        );
+      }
+      if (!canceled) {
+        await act(async () => store.getState().undo());
+        expect(order()).toEqual(initial);
+        await act(async () => store.getState().redo());
+        expect(order()).toEqual(preview);
+      }
+    } finally {
+      await act(async () => root.unmount());
+      store.dispose();
+      host.remove();
+    }
+  },
+);
 
 it("fills a cold drag preview from the shared cache and preserves captured images through reorder", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

@@ -42,7 +42,11 @@ import ZoomDropdownControl from "@/components/toolbar/ZoomDropdownControl";
 import PageSettingsDropdownControl from "@/components/toolbar/PageSettingsDropdownControl";
 import SaveMenu from "@/components/toolbar/SaveMenu";
 import { pdfViewerScaleToWorkspaceScale } from "@/lib/pdfScale";
-import { ANNOTATION_STYLES } from "@/constants";
+import {
+  ANNOTATION_STYLES,
+  MIN_PAGE_THUMBNAIL_SCALE,
+  MAX_PAGE_THUMBNAIL_SCALE,
+} from "@/constants";
 import { getContrastColor } from "@/utils/colors";
 import { cn } from "@/utils/cn";
 import {
@@ -347,8 +351,8 @@ export function DemoToolbar({
                   dispatch({ type: "thumbnail-scale", scale: percent / 100 })
               : undefined
           }
-          minZoomPercent={pageMode ? 75 : undefined}
-          maxZoomPercent={pageMode ? 200 : undefined}
+          minZoomPercent={pageMode ? MIN_PAGE_THUMBNAIL_SCALE * 100 : undefined}
+          maxZoomPercent={pageMode ? MAX_PAGE_THUMBNAIL_SCALE * 100 : undefined}
         />
       </div>
       {pageMode ? (

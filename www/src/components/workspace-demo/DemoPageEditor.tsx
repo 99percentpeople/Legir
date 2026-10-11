@@ -1,10 +1,12 @@
 import {
   useCallback,
   useLayoutEffect,
+  useMemo,
   useRef,
   type Dispatch,
   type RefObject,
 } from "react";
+import { PageGridTransitions } from "@/components/page-editor/PageGridTransitions";
 import { createPortal } from "react-dom";
 import {
   DragDropProvider,
@@ -182,11 +184,18 @@ export function DemoPageTools({
           }
         />
         <span
+          className="whitespace-nowrap"
           aria-live="polite"
           aria-label={selectionLabel}
           title={selectionLabel}
         >
-          {count ? `${count} / ${state.pages.length}` : state.pages.length}
+          <span
+            className="inline-block text-right"
+            style={{ width: `${String(state.pages.length).length}ch` }}
+          >
+            {count || "-"}
+          </span>
+          {` / ${state.pages.length}`}
         </span>
       </div>
       <div
@@ -210,14 +219,12 @@ function PageCard({
   state,
   dispatch,
   copy,
-  height,
   onOpen,
   moving,
 }: Props & {
   page: DemoPage;
   index: number;
   copy: DemoCopy;
-  height: number;
   onOpen: (index: number) => void;
   moving: boolean;
 }) {
@@ -249,15 +256,17 @@ function PageCard({
       className="relative min-w-0"
     >
       <div
+        data-page-card-content
         data-demo-page-card-content
-        className="relative flex min-w-0 flex-col items-center gap-1 p-2 pb-3"
+        className="relative flex min-w-0 flex-col items-center gap-(--page-card-gap) p-(--page-card-padding) pb-(--page-card-padding-bottom)"
       >
         <div
-          className="flex w-full items-center justify-center p-3"
-          style={{ height }}
+          data-page-paper-area
+          className="flex size-(--page-paper-size) shrink-0 items-center justify-center p-(--page-paper-padding)"
         >
           <button
             ref={dragHandle}
+            data-page-drag-handle
             type="button"
             className={cn(
               "demo-page-handle ring-offset-background focus-visible:ring-primary relative max-h-full max-w-full touch-pan-y p-0 ring-offset-3 outline-none select-none focus-visible:ring-2",
@@ -269,8 +278,8 @@ function PageCard({
             )}
             style={{
               aspectRatio: size.width / size.height,
-              width: size.width / size.height > 0.78 ? "100%" : undefined,
-              height: size.width / size.height <= 0.78 ? "100%" : undefined,
+              width: size.width >= size.height ? "100%" : undefined,
+              height: size.width < size.height ? "100%" : undefined,
             }}
             aria-label={t("sidebar.page", { page: index + 1 })}
             aria-pressed={selected}
@@ -280,8 +289,8 @@ function PageCard({
             <DemoPageThumbnail page={page} state={state} copy={copy} />
           </button>
         </div>
-        <div className="flex h-7 w-full items-center justify-center text-sm group-data-[grid-dense]/page-grid:h-12 group-data-[grid-dense]/page-grid:flex-col">
-          <span className="mr-auto tabular-nums group-data-[grid-dense]/page-grid:mr-0">
+        <div className="flex h-(--page-footer-height) w-full shrink-0 items-center justify-center text-sm group-data-[grid-dense]/page-grid:flex-col group-data-[grid-dense]/page-grid:gap-(--page-card-gap)">
+          <span className="mr-auto tabular-nums group-data-[grid-dense]/page-grid:mr-0 group-data-[grid-dense]/page-grid:leading-4">
             {index + 1}
           </span>
           <div className="flex items-center">
@@ -324,9 +333,14 @@ export function DemoPageEditor({
 }) {
   const { t } = useLanguage();
   const grid = useRef<HTMLDivElement>(null);
+  const transitions = useRef<PageGridTransitions>(null);
   const { width } = useDemoViewport(grid);
   const layout = getPageGridLayout(width, state.thumbnailScale);
   const drag = useDemoPageDrag(grid, state, dispatch, dragManager);
+  const pageIds = useMemo(
+    () => state.pages.map((page) => page.id),
+    [state.pages],
+  );
   return (
     <section
       className="bg-muted/40 flex min-h-0 flex-1 flex-col"
@@ -340,35 +354,52 @@ export function DemoPageEditor({
           pointerSensor,
         ]}
         onDragStart={drag.onDragStart}
+        onDragMove={() => transitions.current?.finish()}
         onDragOver={drag.onDragOver}
-        onDragEnd={drag.onDragEnd}
+        onDragEnd={(event) => {
+          transitions.current?.finish();
+          drag.onDragEnd(event);
+        }}
       >
-        <div
-          ref={grid}
-          className="group/page-grid min-h-0 flex-1 overflow-auto"
-          data-page-grid
-          data-grid-dense={layout.dense || undefined}
-          onClick={(event) => {
-            if (!(event.target as HTMLElement).closest("button"))
-              dispatch({ type: "select-pages", intent: "clear" });
-          }}
+        <PageGridTransitions
+          ref={transitions}
+          ids={pageIds}
+          gridRef={grid}
+          layout={layout}
+          disabled={drag.moving.length > 0}
         >
           <div
-            className="mx-4 grid gap-x-4"
-            style={{
-              gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))`,
+            ref={grid}
+            className="group/page-grid relative min-h-0 flex-1 overflow-auto"
+            style={layout.style}
+            data-page-grid
+            data-grid-dense={layout.dense || undefined}
+            onClick={(event) => {
+              if (!(event.target as HTMLElement).closest("button"))
+                dispatch({ type: "select-pages", intent: "clear" });
             }}
           >
-            {drag.displayed.map((page, index) => (
-              <PageCard
-                key={page.id}
-                {...{ page, index, state, dispatch, copy, onOpen }}
-                height={layout.thumbnailHeight}
-                moving={drag.moving.includes(page.id)}
-              />
-            ))}
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: `repeat(${layout.columns}, ${layout.cardWidth}px)`,
+                gridAutoRows: layout.rowHeight,
+                width: layout.gridWidth,
+                marginInline: "auto",
+                columnGap: layout.gap,
+                justifyContent: "space-around",
+              }}
+            >
+              {drag.displayed.map((page, index) => (
+                <PageCard
+                  key={page.id}
+                  {...{ page, index, state, dispatch, copy, onOpen }}
+                  moving={drag.moving.includes(page.id)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        </PageGridTransitions>
         <PageDragOverlay
           {...{ state, copy, dragManager }}
           dropAnimation={drag.dropAnimation}

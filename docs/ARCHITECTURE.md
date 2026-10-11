@@ -485,6 +485,17 @@ inline/overflow layout, and `PageActions` serves both cards and header actions.
 `pageThumbnailScale` stores thumbnail zoom independently of the reading scale.
 The grid viewport preserves visible pages when wheel or toolbar zoom changes
 column counts; virtualization and file-drop hit testing share its row height.
+Square paper areas scale independently of the column count, so rotation keeps
+the same thumbnail size and low zoom levels remain continuous. Grid padding and
+minimum gaps scale with the thumbnails; columns distribute spare width using
+`space-around`. Empty column tracks remain reserved for short documents, keeping
+spacing stable when pages are added or deleted. Wheel anchors and file-drop
+markers share that layout geometry.
+`PageGridTransitions` captures visible cards before a structural edit commits:
+new pages fade in, removed cards fade out as inert visual copies, and surviving
+content slides to its new slot. Decoded thumbnail pixels survive URL retirement
+without another PDF render. History commits immediately; sorting targets stay
+fixed, scrolling/zoom cancels stale motion, and reduced motion skips transitions.
 Cards, actions and drag previews are memoized with stable callbacks. Thumbnail
 URLs are subscribed to per page so one rendered image does not invalidate the
 grid. Native scrolling updates React only when the visible row range changes;

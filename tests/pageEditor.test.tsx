@@ -92,6 +92,7 @@ it("virtualizes long documents without reading a released scroll event", async (
     ),
   );
   const viewport = host.querySelector<HTMLDivElement>("[data-page-grid]")!;
+  const rowHeight = Number(viewport.dataset.gridRowHeight);
   const pageButtons = () =>
     host.querySelectorAll<HTMLButtonElement>("[data-page-drag-handle]");
   expect(pageButtons()[0].getAttribute("aria-label")).toBe("Page 1");
@@ -100,9 +101,9 @@ it("virtualizes long documents without reading a released scroll event", async (
   // Two events in one batch force React to process a queued state updater after
   // dispatch has cleared SyntheticEvent.currentTarget.
   await act(async () => {
-    viewport.scrollTop = 252 * 90;
+    viewport.scrollTop = rowHeight * 90;
     viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
-    viewport.scrollTop = 252 * 100;
+    viewport.scrollTop = rowHeight * 100;
     viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
   });
   expect(pageButtons()[0].getAttribute("aria-label")).toBe("Page 393");
@@ -201,8 +202,9 @@ it("keeps single-page rotation anchored to the edited page after scrolling", asy
     ),
   );
   const viewport = host.querySelector<HTMLDivElement>("[data-page-grid]")!;
+  const rowHeight = Number(viewport.dataset.gridRowHeight);
   await act(async () => {
-    viewport.scrollTop = 252 * 100;
+    viewport.scrollTop = rowHeight * 100;
     viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
   });
   const rotate = host.querySelector<HTMLButtonElement>(
@@ -210,7 +212,7 @@ it("keeps single-page rotation anchored to the edited page after scrolling", asy
   )!;
   await act(async () => rotate.click());
   expect(store.getState().pages[400].rotationDelta).toBe(90);
-  expect(viewport.scrollTop).toBe(252 * 100);
+  expect(viewport.scrollTop).toBe(rowHeight * 100);
 });
 
 it("zooms the virtual grid around the visible pages without editing or zooming the PDF", async () => {
@@ -225,9 +227,10 @@ it("zooms the virtual grid around the visible pages without editing or zooming t
     ),
   );
   const viewport = host.querySelector<HTMLDivElement>("[data-page-grid]")!;
+  const rowHeight = Number(viewport.dataset.gridRowHeight);
   const readingScale = store.getState().scale;
   await act(async () => {
-    viewport.scrollTop = 252 * 100;
+    viewport.scrollTop = rowHeight * 100;
     viewport.dispatchEvent(new Event("scroll", { bubbles: true }));
   });
   const plainWheel = new WheelEvent("wheel", {
@@ -255,7 +258,7 @@ it("zooms the virtual grid around the visible pages without editing or zooming t
   }
   expect(store.getState().pageThumbnailScale).toBeGreaterThan(1);
   expect(Number(viewport.dataset.gridColumns)).toBeLessThan(4);
-  expect(Number(viewport.dataset.gridRowHeight)).toBeGreaterThan(252);
+  expect(Number(viewport.dataset.gridRowHeight)).toBeGreaterThan(rowHeight);
   expect(viewport.querySelector('[data-page-index="400"]')).not.toBeNull();
 
   await act(async () => store.getState().setPageThumbnailScale(0.5));

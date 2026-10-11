@@ -11,18 +11,17 @@ import {
   type PlatformDroppedPdf,
 } from "@/services/platform";
 import { fileInsertionIndex } from "./pageDrag";
+import type { PageGridLayout } from "./pageGridLayout";
 
 export function usePageFileDrop({
   scrollRef,
-  columns,
-  rowHeight,
+  layout,
   total,
   enabled,
   onDrop,
 }: {
   scrollRef: RefObject<HTMLDivElement | null>;
-  columns: number;
-  rowHeight: number;
+  layout: PageGridLayout;
   total: number;
   enabled: boolean;
   onDrop: (files: Promise<PlatformDroppedPdf[]>, index: number) => void;
@@ -36,10 +35,8 @@ export function usePageFileDrop({
     return fileInsertionIndex(
       x - rect.left,
       y - rect.top + el.scrollTop,
-      el.clientWidth,
-      columns,
       total,
-      rowHeight,
+      layout,
     );
   };
   const active = fileDropIndex !== null;
@@ -64,10 +61,8 @@ export function usePageFileDrop({
             fileInsertionIndex(
               point.x - rect.left,
               point.y - rect.top + el.scrollTop,
-              el.clientWidth,
-              columns,
               total,
-              rowHeight,
+              layout,
             ),
           );
         }
@@ -76,7 +71,7 @@ export function usePageFileDrop({
     };
     frame = requestAnimationFrame(scroll);
     return () => cancelAnimationFrame(frame);
-  }, [active, columns, rowHeight, total, scrollRef]);
+  }, [active, layout, total, scrollRef]);
   const reset = () => {
     pointer.current = null;
     setFileDropIndex(null);

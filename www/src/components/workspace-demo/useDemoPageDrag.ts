@@ -157,9 +157,9 @@ export function useDemoPageDrag(
     current.current = null;
     setDropping(value?.ids ?? []);
     setDrag(null);
+    // The visible placeholder owns the drop position even outside the cards.
     if (
       !event.canceled &&
-      event.operation.target &&
       value &&
       value.pages === state.pages &&
       value.beforeIndex !== null
@@ -183,7 +183,8 @@ export function useDemoPageDrag(
         `[data-page-card="${source.id}"] .demo-page-handle`,
       );
       const cancel = () => abort.abort();
-      grid.current?.addEventListener("scroll", cancel, { once: true });
+      // Scrolling the surrounding website also changes the slot's viewport position.
+      window.addEventListener("scroll", cancel, { capture: true, once: true });
       window.addEventListener("resize", cancel, { once: true });
       try {
         if (!preview || !target) return;
@@ -206,7 +207,7 @@ export function useDemoPageDrag(
         // dnd-kit resets the feedback position before unmounting its contents.
         if (preview) preview.style.visibility = "hidden";
         grid.current?.setAttribute("data-page-drop-complete", "");
-        grid.current?.removeEventListener("scroll", cancel);
+        window.removeEventListener("scroll", cancel, true);
         window.removeEventListener("resize", cancel);
         if (dropMotion.current === abort) {
           dropMotion.current = null;

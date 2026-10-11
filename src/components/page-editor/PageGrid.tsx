@@ -27,6 +27,7 @@ import { getPageView } from "@/components/workspace/lib/pageViewRotation";
 import { PageThumbnail } from "./PageThumbnail";
 import { PageActions } from "./PageActions";
 import { PageDragPreview } from "./PageDragPreview";
+import { PageGridTransitions } from "./PageGridTransitions";
 import { PageSelectionMenu } from "./PageSelectionMenu";
 import { previewPageMove } from "./pageDrag";
 import { usePageGridViewport } from "./usePageGridViewport";
@@ -120,69 +121,74 @@ const PageCard = memo(function PageCard({
       data-page-card={id}
       data-page-index={index}
       className={cn(
-        "relative flex h-full min-w-0 flex-col items-center gap-1 p-2 pb-3",
+        "relative h-full min-w-0",
         moving &&
           "opacity-25 group-data-[page-drop-complete]/page-grid:opacity-100",
       )}
     >
       <div
-        data-page-paper-area
-        className="flex min-h-0 w-full flex-1 items-center justify-center p-3"
+        data-page-card-content
+        className="relative flex h-full min-w-0 flex-col items-center gap-(--page-card-gap) p-(--page-card-padding) pb-(--page-card-padding-bottom)"
       >
-        <PageSelectionMenu
-          selected={selected}
-          canSelectRange={canSelectRange}
-          disabled={moving}
-          onSelect={select}
+        <div
+          data-page-paper-area
+          className="flex size-(--page-paper-size) shrink-0 items-center justify-center p-(--page-paper-padding)"
         >
-          <button
-            ref={handleRef}
-            data-thumbnail-page-id={id}
-            type="button"
-            className={cn(
-              "ring-offset-background focus-visible:ring-primary relative flex max-h-full max-w-full touch-pan-y items-center justify-center p-0 ring-offset-3 outline-none select-none group-data-[page-dragging]/page-grid:ring-0 group-data-[page-dragging]/page-grid:ring-offset-0 focus-visible:ring-2 group-data-[page-dragging]/page-grid:focus-visible:ring-0",
-              selected
-                ? "ring-primary ring-2"
-                : "hover:ring-primary/30 hover:ring-2 group-data-[page-dragging]/page-grid:hover:ring-0",
-            )}
-            style={{
-              width: aspectRatio > 0.78 ? "100%" : undefined,
-              height: aspectRatio <= 0.78 ? "100%" : undefined,
-              aspectRatio,
-            }}
-            data-page-drag-handle
-            aria-pressed={selected}
-            aria-label={t("sidebar.page", { page: index + 1 })}
-            onClick={(event) => {
-              const toggle = event.ctrlKey || event.metaKey;
-              select(
-                event.shiftKey
-                  ? toggle
-                    ? "addRange"
-                    : "range"
-                  : toggle
-                    ? "toggle"
-                    : "single",
-              );
-            }}
-            onDoubleClick={() => onOpen(page.pageIndex)}
+          <PageSelectionMenu
+            selected={selected}
+            canSelectRange={canSelectRange}
+            disabled={moving}
+            onSelect={select}
           >
-            <DocumentPageThumbnail ref={sourceRef} page={page} />
-          </button>
-        </PageSelectionMenu>
-      </div>
-      <div className="flex h-7 w-full shrink-0 items-center justify-center text-sm group-data-[grid-dense]/page-grid:h-12 group-data-[grid-dense]/page-grid:flex-col group-data-[grid-dense]/page-grid:gap-1">
-        <span className="mr-auto tabular-nums group-data-[grid-dense]/page-grid:mr-0 group-data-[grid-dense]/page-grid:leading-4">
-          {index + 1}
-        </span>
-        <div className="flex items-center">
-          <PageActions
-            ids={ids}
-            total={total}
-            enabled={enabled}
-            compact
-            run={run}
-          />
+            <button
+              ref={handleRef}
+              data-thumbnail-page-id={id}
+              type="button"
+              className={cn(
+                "ring-offset-background focus-visible:ring-primary relative flex max-h-full max-w-full touch-pan-y items-center justify-center p-0 ring-offset-3 outline-none select-none group-data-[page-dragging]/page-grid:ring-0 group-data-[page-dragging]/page-grid:ring-offset-0 focus-visible:ring-2 group-data-[page-dragging]/page-grid:focus-visible:ring-0",
+                selected
+                  ? "ring-primary ring-2"
+                  : "hover:ring-primary/30 hover:ring-2 group-data-[page-dragging]/page-grid:hover:ring-0",
+              )}
+              style={{
+                width: aspectRatio >= 1 ? "100%" : undefined,
+                height: aspectRatio < 1 ? "100%" : undefined,
+                aspectRatio,
+              }}
+              data-page-drag-handle
+              aria-pressed={selected}
+              aria-label={t("sidebar.page", { page: index + 1 })}
+              onClick={(event) => {
+                const toggle = event.ctrlKey || event.metaKey;
+                select(
+                  event.shiftKey
+                    ? toggle
+                      ? "addRange"
+                      : "range"
+                    : toggle
+                      ? "toggle"
+                      : "single",
+                );
+              }}
+              onDoubleClick={() => onOpen(page.pageIndex)}
+            >
+              <DocumentPageThumbnail ref={sourceRef} page={page} />
+            </button>
+          </PageSelectionMenu>
+        </div>
+        <div className="flex h-(--page-footer-height) w-full shrink-0 items-center justify-center text-sm group-data-[grid-dense]/page-grid:flex-col group-data-[grid-dense]/page-grid:gap-(--page-card-gap)">
+          <span className="mr-auto tabular-nums group-data-[grid-dense]/page-grid:mr-0 group-data-[grid-dense]/page-grid:leading-4">
+            {index + 1}
+          </span>
+          <div className="flex items-center">
+            <PageActions
+              ids={ids}
+              total={total}
+              enabled={enabled}
+              compact
+              run={run}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -207,10 +213,12 @@ export const PageGrid = memo(function PageGrid({
   run,
 }: GridProps) {
   const store = useEditorViewApi();
+  const pageIds = useMemo(() => pages.map(getPageId), [pages]);
   const selection = useMemo(() => new Set(selectedPageIds), [selectedPageIds]);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [overlay, setOverlay] = useState<PageDragPreviewData | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const transitions = useRef<PageGridTransitions>(null);
   const { scrollRef, viewport, layout, layoutRef, updateScroll } =
     usePageGridViewport(dragRef);
   useThumbnailViewport(scrollRef);
@@ -227,8 +235,7 @@ export const PageGrid = memo(function PageGrid({
   const { columns, rowHeight } = layout;
   const { fileDropIndex, fileDropProps } = usePageFileDrop({
     scrollRef,
-    columns,
-    rowHeight,
+    layout,
     total: pages.length,
     enabled,
     onDrop: onFilesDrop,
@@ -377,6 +384,7 @@ export const PageGrid = memo(function PageGrid({
         });
         setDrag(dragRef.current);
       }}
+      onDragMove={() => transitions.current?.finish()}
       onDragOver={(event) => {
         const current = dragRef.current;
         const targetId = event.operation.target?.id;
@@ -403,13 +411,14 @@ export const PageGrid = memo(function PageGrid({
         setDrag(dragRef.current);
       }}
       onDragEnd={(event) => {
+        transitions.current?.finish();
         const current = dragRef.current;
         prepareDrop(current?.ids);
         dragRef.current = null;
         setDrag(null);
+        // The visible placeholder owns the drop position even outside the cards.
         if (
           !event.canceled &&
-          event.operation.target &&
           current &&
           current.beforeIndex !== null &&
           store.getState().pages === current.pages
@@ -419,84 +428,109 @@ export const PageGrid = memo(function PageGrid({
           );
       }}
     >
-      <div
-        ref={scrollRef}
-        className="group/page-grid min-h-0 flex-1 overflow-auto"
-        data-page-grid
-        data-grid-dense={layout.dense || undefined}
-        data-grid-columns={columns}
-        data-grid-row-height={rowHeight}
-        data-page-dragging={drag || dropping ? "true" : undefined}
-        data-page-dropping={dropping ? "true" : undefined}
-        {...fileDropProps}
-        onContextMenuCapture={(event) => {
-          if (dragRef.current) {
-            event.preventDefault();
-            event.stopPropagation();
-          }
-        }}
-        onClick={(event) => {
-          if (
-            !dragRef.current &&
-            event.target instanceof Element &&
-            event.currentTarget.contains(event.target) &&
-            !event.target.closest("button, [role='menuitem']")
-          ) {
-            anchor.current = null;
-            store.getState().setSelectedPageIds([]);
-          }
-        }}
-        onScroll={(event) => {
-          const top = event.currentTarget.scrollTop;
-          updateScroll(top);
-        }}
+      <PageGridTransitions
+        ref={transitions}
+        ids={pageIds}
+        gridRef={scrollRef}
+        layout={layout}
+        disabled={dragging}
       >
-        <div className="relative mx-4" style={{ height: rowCount * rowHeight }}>
+        <div
+          ref={scrollRef}
+          className="group/page-grid relative min-h-0 flex-1 overflow-auto"
+          style={layout.style}
+          data-page-grid
+          data-grid-dense={layout.dense || undefined}
+          data-grid-columns={columns}
+          data-grid-row-height={rowHeight}
+          data-page-dragging={drag || dropping ? "true" : undefined}
+          data-page-dropping={dropping ? "true" : undefined}
+          {...fileDropProps}
+          onContextMenuCapture={(event) => {
+            if (dragRef.current) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
+          onClick={(event) => {
+            if (
+              !dragRef.current &&
+              event.target instanceof Element &&
+              event.currentTarget.contains(event.target) &&
+              !event.target.closest("button, [role='menuitem']")
+            ) {
+              anchor.current = null;
+              store.getState().setSelectedPageIds([]);
+            }
+          }}
+          onScroll={(event) => {
+            const top = event.currentTarget.scrollTop;
+            updateScroll(top);
+          }}
+        >
           <div
-            className="absolute inset-x-0 grid gap-x-4"
+            className="relative"
             style={{
-              top: startRow * rowHeight,
-              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-              gridAutoRows: rowHeight,
+              height: rowCount * rowHeight,
+              width: layout.gridWidth,
+              marginInline: "auto",
             }}
           >
-            {displayed
-              .slice(startRow * columns, endRow * columns)
-              .map((page, offset) => {
-                const id = getPageId(page);
-                return (
-                  <PageCard
-                    key={id}
-                    page={page}
-                    index={startRow * columns + offset}
-                    total={pages.length}
-                    selected={selection.has(id)}
-                    moving={(drag?.ids ?? dropping)?.has(id) ?? false}
-                    canSelectRange={canSelectRange}
-                    enabled={enabled}
-                    onSelect={selectPage}
-                    onOpen={onOpen}
-                    run={run}
-                  />
-                );
-              })}
-          </div>
-          {fileDropIndex !== null && markerIndex !== null && (
             <div
-              className="bg-primary pointer-events-none absolute z-10 w-1 rounded-full"
-              data-file-insertion-index={fileDropIndex}
+              className="absolute inset-x-0 grid"
               style={{
-                top: Math.floor(markerIndex / columns) * rowHeight + 8,
-                height: rowHeight - 16,
-                left:
-                  fileDropIndex === pages.length
-                    ? `calc(${(((markerIndex % columns) + 1) * 100) / columns}% + ${(((markerIndex % columns) + 1) * 16) / columns - 12}px)`
-                    : `calc(${((markerIndex % columns) * 100) / columns}% + ${((markerIndex % columns) * 16) / columns - 4}px)`,
+                top: startRow * rowHeight,
+                gridTemplateColumns: `repeat(${columns}, ${layout.cardWidth}px)`,
+                gridAutoRows: rowHeight,
+                columnGap: layout.gap,
+                justifyContent: "space-around",
               }}
-            />
-          )}
+            >
+              {displayed
+                .slice(startRow * columns, endRow * columns)
+                .map((page, offset) => {
+                  const id = getPageId(page);
+                  return (
+                    <PageCard
+                      key={id}
+                      page={page}
+                      index={startRow * columns + offset}
+                      total={pages.length}
+                      selected={selection.has(id)}
+                      moving={(drag?.ids ?? dropping)?.has(id) ?? false}
+                      canSelectRange={canSelectRange}
+                      enabled={enabled}
+                      onSelect={selectPage}
+                      onOpen={onOpen}
+                      run={run}
+                    />
+                  );
+                })}
+            </div>
+            {fileDropIndex !== null && markerIndex !== null && (
+              <div
+                className="bg-primary pointer-events-none absolute z-10 w-1 rounded-full"
+                data-file-insertion-index={fileDropIndex}
+                style={{
+                  top:
+                    Math.floor(markerIndex / columns) * rowHeight +
+                    layout.cardPadding,
+                  height: rowHeight - layout.cardPadding * 2,
+                  left:
+                    layout.offset -
+                    layout.padding +
+                    (markerIndex % columns) *
+                      (layout.cardWidth + layout.columnGap) +
+                    (fileDropIndex === pages.length
+                      ? layout.cardWidth + layout.gap / 2
+                      : -layout.gap / 2) -
+                    2,
+                }}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      </PageGridTransitions>
       <DragOverlay
         className="group/page-drag m-0 hidden overflow-visible border-0 bg-transparent p-0 shadow-none outline-none data-[dnd-dragging]:block"
         dropAnimation={dropAnimation}
