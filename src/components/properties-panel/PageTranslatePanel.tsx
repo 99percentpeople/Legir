@@ -1,3 +1,4 @@
+import { parsePageRange } from "@/utils/pageRange";
 import React, { useEffect, useMemo, useState } from "react";
 import { Languages } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
@@ -89,75 +90,6 @@ const TARGET_LANG_OPTIONS = [
   { value: "de", label: "Deutsch" },
   { value: "es", label: "Español" },
 ] as const;
-
-const parsePageRange = (input: string, totalPages: number) => {
-  const raw = input.trim();
-  if (!raw || raw.toLowerCase() === "all") {
-    return {
-      ok: true as const,
-      pageIndices: [...Array(totalPages)].map((_, i) => i),
-    };
-  }
-
-  const parts = raw.split(",");
-  const pages = new Set<number>();
-
-  for (const part of parts) {
-    const p = part.trim();
-    if (!p) continue;
-
-    if (p.includes("-")) {
-      const rangeParts = p.split("-");
-      if (rangeParts.length !== 2) {
-        return {
-          ok: false as const,
-          errorKey: "properties.form_detection.err_format",
-        };
-      }
-      const start = parseInt(rangeParts[0]!, 10);
-      const end = parseInt(rangeParts[1]!, 10);
-      if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
-        return {
-          ok: false as const,
-          errorKey: "properties.form_detection.err_format",
-        };
-      }
-      if (start < 1 || end > totalPages) {
-        return {
-          ok: false as const,
-          errorKey: "properties.form_detection.err_bounds",
-        };
-      }
-      for (let i = start; i <= end; i++) pages.add(i - 1);
-      continue;
-    }
-
-    const num = parseInt(p, 10);
-    if (!Number.isFinite(num)) {
-      return {
-        ok: false as const,
-        errorKey: "properties.form_detection.err_format",
-      };
-    }
-    if (num < 1 || num > totalPages) {
-      return {
-        ok: false as const,
-        errorKey: "properties.form_detection.err_bounds",
-      };
-    }
-    pages.add(num - 1);
-  }
-
-  const pageIndices = Array.from(pages).sort((a, b) => a - b);
-  if (pageIndices.length === 0) {
-    return {
-      ok: false as const,
-      errorKey: "properties.form_detection.err_format",
-    };
-  }
-
-  return { ok: true as const, pageIndices };
-};
 
 export function PageTranslatePanel({
   isFloating,

@@ -1,3 +1,5 @@
+import { parsePageRange } from "@/utils/pageRange";
+export type { ParsePageRangeResult } from "@/utils/pageRange";
 import type { TextContent, TextStyle } from "pdfjs-dist/types/src/display/api";
 import {
   pdfWorkerService,
@@ -294,10 +296,6 @@ export type PageTranslationResult = {
   >;
 };
 
-export type ParsePageRangeResult =
-  | { ok: true; pageIndices: number[] }
-  | { ok: false };
-
 const rectOverlaps = (
   a: { x: number; y: number; width: number; height: number },
   b: { x: number; y: number; width: number; height: number },
@@ -329,60 +327,6 @@ const getStructuredTranslateProviderId = (
 
 const canUseStructuredTranslate = (translateOption?: TranslateOptionId) => {
   return getStructuredTranslateProviderId(translateOption) !== null;
-};
-
-const parsePageRange = (
-  input: string,
-  totalPages: number,
-): ParsePageRangeResult => {
-  const raw = input.trim();
-  if (!raw || raw.toLowerCase() === "all") {
-    return {
-      ok: true,
-      pageIndices: [...Array(totalPages)].map((_, i) => i),
-    };
-  }
-
-  const parts = raw.split(",");
-  const pages = new Set<number>();
-
-  for (const part of parts) {
-    const p = part.trim();
-    if (!p) continue;
-
-    if (p.includes("-")) {
-      const rangeParts = p.split("-");
-      if (rangeParts.length !== 2) {
-        return { ok: false };
-      }
-      const start = parseInt(rangeParts[0]!, 10);
-      const end = parseInt(rangeParts[1]!, 10);
-      if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
-        return { ok: false };
-      }
-      if (start < 1 || end > totalPages) {
-        return { ok: false };
-      }
-      for (let i = start; i <= end; i++) pages.add(i - 1);
-      continue;
-    }
-
-    const num = parseInt(p, 10);
-    if (!Number.isFinite(num)) {
-      return { ok: false };
-    }
-    if (num < 1 || num > totalPages) {
-      return { ok: false };
-    }
-    pages.add(num - 1);
-  }
-
-  const pageIndices = Array.from(pages).sort((a, b) => a - b);
-  if (pageIndices.length === 0) {
-    return { ok: false };
-  }
-
-  return { ok: true, pageIndices };
 };
 
 const getContextPageIndices = (
