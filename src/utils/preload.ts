@@ -77,14 +77,34 @@ export function preload<T extends AnyComponent>(
   let modulePromise: Promise<LazyModule<T>> | undefined;
   let preloadPromise: Promise<LazyModule<T>> | undefined;
 
-  const load = () => (modulePromise ??= loader());
+  const load = () => {
+    if (!modulePromise) {
+      const request = Promise.resolve().then(loader);
+      modulePromise = request;
+      // A failed background request must not poison the first real render.
+      void request.catch(() => {
+        if (modulePromise === request) modulePromise = undefined;
+      });
+    }
+    return modulePromise;
+  };
   const component = React.lazy(load) as PreloadableLazyComponent<T>;
 
-  component.preload = () =>
-    (preloadPromise ??= load().then(async (module) => {
-      await warmLazyPayload(component);
-      return module;
-    }));
+  component.preload = () => {
+    if (!preloadPromise) {
+      const request = load().then(async (module) => {
+        await warmLazyPayload(component);
+        return module;
+      });
+      preloadPromise = request;
+      // Fire-and-forget warming is safe; callers awaiting preload still see
+      // the failure, and rendering retains normal Suspense/error handling.
+      void request.catch(() => {
+        if (preloadPromise === request) preloadPromise = undefined;
+      });
+    }
+    return preloadPromise;
+  };
 
   return component;
 }

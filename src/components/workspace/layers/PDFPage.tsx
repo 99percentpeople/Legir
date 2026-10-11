@@ -5,10 +5,7 @@ import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { getWorkspaceRenderMetrics } from "../lib/renderPerformance";
 import PDFCanvasLayer from "./PDFCanvasLayer";
 import PDFTextLayer from "./PDFTextLayer";
-
-const PDFPageRenderDebugOverlay = React.lazy(
-  () => import("../debug/PDFPageRenderDebugOverlay"),
-);
+import { PDFPageRenderDebugOverlay } from "../debug/modules";
 
 interface PDFPageProps {
   workerService: PDFWorkerService | null;

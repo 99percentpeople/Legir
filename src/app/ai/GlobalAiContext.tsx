@@ -8,11 +8,19 @@ import React, {
 import type { useAiChatController } from "@/hooks/useAiChatController";
 import type { AiWorkspace } from "@/services/ai/chat/workspace";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
+import { preload } from "@/utils/preload";
+import { preloadProviderLogos } from "@/components/ProviderLogo";
 
 type Controller = ReturnType<typeof useAiChatController>;
-const GlobalAiControllerHost = React.lazy(
+const GlobalAiControllerHost = preload(
   () => import("./GlobalAiControllerHost"),
 );
+export async function preloadGlobalAiController() {
+  await Promise.allSettled([
+    GlobalAiControllerHost.preload(),
+    preloadProviderLogos(),
+  ]);
+}
 interface GlobalAiState {
   controller: Controller | null;
   requestController: () => void;
@@ -41,7 +49,10 @@ export function GlobalAiProvider({
   const [controller, setController] = useState<Controller | null>(null);
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState<AiChatMessageAttachment[]>([]);
-  const requestController = useCallback(() => setRequested(true), []);
+  const requestController = useCallback(() => {
+    void preloadGlobalAiController();
+    setRequested(true);
+  }, []);
   const value = useMemo(
     () => ({
       controller,

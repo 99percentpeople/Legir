@@ -111,9 +111,11 @@ import { useStampLibraryStore } from "@/store/stampLibraryStore";
 import { useLanguage } from "@/components/language-provider";
 import { toast } from "sonner";
 
-const WorkspaceZoomJankOverlay = React.lazy(
-  () => import("./debug/WorkspaceZoomJankOverlay"),
-);
+import { schedulePreload } from "@/lib/schedulePreload";
+import {
+  WorkspaceZoomJankOverlay,
+  PDFPageRenderDebugOverlay,
+} from "./debug/modules";
 
 const EMPTY_PDF_SEARCH_RESULTS: PDFSearchResult[] = [];
 
@@ -340,6 +342,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   // Only allow selection when tool is "select"
   const isDocumentReady = editorState.documentLoadState === "ready";
+  useEffect(() => {
+    if (!isDocumentReady) return;
+    return schedulePreload([
+      WorkspaceZoomJankOverlay.preload,
+      PDFPageRenderDebugOverlay.preload,
+    ]);
+  }, [isDocumentReady]);
   const isSelectable =
     isDocumentReady && editorState.tool === "select" && !isPanModeActive;
   const canModifyAnnotations =

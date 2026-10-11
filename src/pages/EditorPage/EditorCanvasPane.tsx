@@ -32,10 +32,7 @@ import {
   useEditorShellCommands,
 } from "@/app/editorShellContext";
 
-const PageEditor = React.lazy(
-  () => import("@/components/page-editor/PageEditor"),
-);
-const Workspace = React.lazy(() => import("@/components/workspace/Workspace"));
+import { PageEditor, Workspace } from "@/app/componentModules";
 const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
   "[data-app-block-modifier-wheel-zoom='1']";
 
@@ -388,6 +385,7 @@ export const EditorCanvasPane: React.FC<{
         <FloatingBar
           commands={commands}
           enablePageEditing
+          onPreloadPageEditing={PageEditor.preload}
           onOverlayInsetChange={setToolbarOverlayInset}
           state={state}
           isMobile={isMobile}

@@ -5,11 +5,7 @@ import type { WorkspacePage } from "./app/workspaceNavigation/types";
 import { EditorTabStrip } from "./pages/EditorPage/components/EditorTabStrip";
 import { Spinner } from "./components/ui/spinner";
 import type { HomePageProps } from "./pages/HomePage";
-
-const HomePage = React.lazy(() => import("./pages/HomePage"));
-const EditorPage = React.lazy(
-  () => import("./pages/EditorPage/KeepAliveEditor"),
-);
+import { HomePage, EditorPage } from "./app/componentModules";
 
 interface AppRoutesProps {
   homeProps: HomePageProps;

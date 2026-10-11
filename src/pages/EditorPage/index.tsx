@@ -45,8 +45,10 @@ import { EditorRightPanelSkeleton } from "./components/EditorRightPanelSkeleton"
 import { useEditorPageLifecycle } from "./hooks/useEditorPageLifecycle";
 import {
   EditorRightPanel,
-  scheduleEditorRightPanelBranchPreload,
+  preloadEditorRightPanelBranches,
 } from "./rightPanelModules";
+import { PageEditor } from "@/app/componentModules";
+import { schedulePreload } from "@/lib/schedulePreload";
 
 const EditorPage: React.FC = () => {
   const [pageToolbarHost, setPageToolbarHost] =
@@ -79,13 +81,22 @@ const EditorPage: React.FC = () => {
   >(() => new Map());
   const [hasInitializedRightPanel, setHasInitializedRightPanel] =
     React.useState(false);
+  const hasPages = state.pages.length > 0;
+  const isDocumentReady = state.documentLoadState === "ready";
 
   React.useEffect(() => {
-    if (state.pages.length === 0) return;
+    if (!hasPages) return;
     void EditorRightPanel.preload();
     setHasInitializedRightPanel(true);
-    return scheduleEditorRightPanelBranchPreload();
-  }, [state.pages.length]);
+  }, [hasPages]);
+
+  React.useEffect(() => {
+    if (!isActive || !isDocumentReady) return;
+    return schedulePreload([
+      PageEditor.preload,
+      preloadEditorRightPanelBranches,
+    ]);
+  }, [isActive, isDocumentReady]);
 
   const openAiChatPanel = React.useCallback(() => {
     state.openRightPanel("ai_chat");

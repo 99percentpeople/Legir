@@ -11,6 +11,17 @@ import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 
 import AppRoutes from "./AppRoutes";
+import {
+  HomePage,
+  EditorPage,
+  Workspace,
+  KeyboardShortcutsHelp,
+  SettingsDialog,
+  PdfPasswordDialog,
+  EditorCloseConfirmDialog,
+  preloadEditor,
+} from "./app/componentModules";
+import { schedulePreload } from "@/lib/schedulePreload";
 import { useWorkspaceNavigation } from "./app/workspaceNavigation/useWorkspaceNavigation";
 import type { WorkspacePage } from "./app/workspaceNavigation/types";
 import { GlobalAiProvider } from "./app/ai/GlobalAiContext";
@@ -110,21 +121,6 @@ import {
   type PlatformDroppedPdf,
   type SaveTarget,
 } from "@/services/platform";
-
-const KeyboardShortcutsHelp = React.lazy(
-  () => import("./components/KeyboardShortcutsHelp"),
-);
-const SettingsDialog = React.lazy(
-  () => import("./components/dialogs/SettingsDialog"),
-);
-const PdfPasswordDialog = React.lazy(
-  () => import("./components/dialogs/PdfPasswordDialog"),
-);
-const EditorCloseConfirmDialog = React.lazy(() =>
-  import("./pages/EditorPage/EditorCloseConfirmDialog").then((module) => ({
-    default: module.EditorCloseConfirmDialog,
-  })),
-);
 
 type ExtractedTransferTab = {
   session: EditorTabSession;
@@ -976,8 +972,7 @@ const App: React.FC = () => {
       skipInitialSourceKeyLookup?: boolean;
     }) => {
       markAppPerformance("pdf:open-requested", { once: true });
-      void import("./pages/EditorPage");
-      void import("./components/workspace/Workspace");
+      void preloadEditor();
       const pdfServiceModulePromise = import("./services/pdfService");
 
       const sourceKey = getEditorTabSourceKey({
@@ -1487,6 +1482,20 @@ const App: React.FC = () => {
   useLayoutEffect(() => {
     reconcileWorkspaceRoute(isWorkspaceLoading);
   }, [location, tabs, isWorkspaceLoading, reconcileWorkspaceRoute]);
+
+  const deferComponentPreload = isWorkspaceLoading || pdfLoadToast !== null;
+  useEffect(() => {
+    if (deferComponentPreload) return;
+    return schedulePreload([
+      HomePage.preload,
+      EditorPage.preload,
+      Workspace.preload,
+      PdfPasswordDialog.preload,
+      EditorCloseConfirmDialog.preload,
+      KeyboardShortcutsHelp.preload,
+      SettingsDialog.preload,
+    ]);
+  }, [deferComponentPreload]);
 
   useAppInitialization();
 

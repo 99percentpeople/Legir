@@ -47,6 +47,11 @@ import {
 } from "@/app/editorShellContext";
 import { EditorToolSelector } from "./EditorToolSelector";
 import { DocumentPermissionsPopover } from "./DocumentPermissionsPopover";
+import {
+  PageEditor,
+  SettingsDialog,
+  KeyboardShortcutsHelp,
+} from "@/app/componentModules";
 
 const Toolbar: React.FC<{
   pageToolsRef: React.Ref<HTMLDivElement>;
@@ -241,7 +246,10 @@ const Toolbar: React.FC<{
               <DropdownMenu
                 modal={false}
                 open={modeMenuOpen}
-                onOpenChange={setModeMenuOpen}
+                onOpenChange={(open) => {
+                  if (open) void PageEditor.preload();
+                  setModeMenuOpen(open);
+                }}
               >
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -250,6 +258,8 @@ const Toolbar: React.FC<{
                     className="h-8 w-8 sm:h-9 sm:w-9"
                     title={t("mode.select")}
                     aria-label={t("mode.select")}
+                    onPointerEnter={PageEditor.preload}
+                    onFocus={PageEditor.preload}
                   >
                     {mode === "pages" ? (
                       <LayoutGrid size={16} />
@@ -314,6 +324,8 @@ const Toolbar: React.FC<{
             variant="ghost"
             size="icon"
             onClick={onOpenSettings}
+            onPointerEnter={SettingsDialog.preload}
+            onFocus={SettingsDialog.preload}
             className="h-8 w-8 sm:h-9 sm:w-9"
             title={t("toolbar.settings")}
           >
@@ -325,6 +337,8 @@ const Toolbar: React.FC<{
               variant="ghost"
               size="icon"
               onClick={onOpenShortcuts}
+              onPointerEnter={KeyboardShortcutsHelp.preload}
+              onFocus={KeyboardShortcutsHelp.preload}
               className="h-8 w-8 sm:h-9 sm:w-9"
               title={t("toolbar.shortcuts")}
             >

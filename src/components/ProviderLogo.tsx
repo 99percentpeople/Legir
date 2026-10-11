@@ -2,6 +2,7 @@ import * as React from "react";
 
 import type { AiProviderId } from "@/services/ai/providers/catalog";
 import { cn } from "@/utils/cn";
+import { preload, type PreloadableLazyComponent } from "@/utils/preload";
 
 type ProviderLogoIconProps = {
   className?: string;
@@ -14,7 +15,7 @@ const lazyProviderLogo = (
   loader: () => Promise<{
     default: React.ComponentType<ProviderLogoIconProps>;
   }>,
-) => React.lazy(loader);
+) => preload(loader);
 
 const OpenAiLogo = lazyProviderLogo(
   () => import("@lobehub/icons/es/OpenAI/components/Mono"),
@@ -52,8 +53,14 @@ const providerLogos = {
   xai: lazyProviderLogo(() => import("@lobehub/icons/es/XAI/components/Mono")),
 } satisfies Record<
   AiProviderId,
-  React.LazyExoticComponent<React.ComponentType<ProviderLogoIconProps>>
+  PreloadableLazyComponent<React.ComponentType<ProviderLogoIconProps>>
 >;
+
+export async function preloadProviderLogos() {
+  await Promise.allSettled(
+    [...new Set(Object.values(providerLogos))].map((icon) => icon.preload()),
+  );
+}
 
 export function ProviderLogo(props: {
   providerId: AiProviderId;

@@ -133,6 +133,22 @@ and document views are inert; file-drop handlers and document shortcuts only run
 for the visible page. Window titles and browser unload protection are app-owned,
 so dirty background documents remain protected while Home is selected.
 
+### Component preloading
+
+`src/app/componentModules.ts` owns the shared preloadable route, canvas and dialog
+instances. PDF opening warms the editor route, reading workspace and password
+dialog alongside file I/O. The idle app warms other routes and common dialogs;
+an active, ready document warms the page editor before the secondary right-panel
+branches. Mode and dialog controls also preload on pointer/focus intent.
+The AI controller is downloaded with the AI panel but mounted only on request.
+
+`src/utils/preload.ts` shares the loader promise between preloading and rendering,
+prepares the resolved lazy component to avoid a first-use fallback flash, and
+allows retries after background failures. `src/lib/schedulePreload.ts` runs one
+task per idle turn, with a timer fallback and cancellation when its owner changes.
+Preloading never mounts components or creates document/AI runtimes. Opening a
+feature before preload completes retains normal Suspense behavior.
+
 ## Home Page and Recent Files
 
 The app home page is implemented in:

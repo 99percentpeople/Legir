@@ -46,6 +46,7 @@ interface FloatingBarProps {
   isFullscreen: boolean;
   onNavigatePage: (pageIndex: number) => void;
   enablePageEditing?: boolean;
+  onPreloadPageEditing?: () => void;
   onRotateView?: (direction: "clockwise" | "counterclockwise") => void;
   viewRotation?: number;
   onResetViewRotation?: () => void;
@@ -66,6 +67,7 @@ function ActiveFloatingBar({
   isFullscreen,
   onNavigatePage,
   enablePageEditing = false,
+  onPreloadPageEditing,
   onRotateView,
   viewRotation,
   onResetViewRotation,
@@ -173,7 +175,10 @@ function ActiveFloatingBar({
         <DropdownMenu
           modal={false}
           open={modeMenuOpen}
-          onOpenChange={setModeMenuOpen}
+          onOpenChange={(open) => {
+            if (open) onPreloadPageEditing?.();
+            setModeMenuOpen(open);
+          }}
         >
           <DropdownMenuTrigger asChild>
             <Button
@@ -182,6 +187,8 @@ function ActiveFloatingBar({
               className="h-8 w-8"
               title={t("mode.select")}
               aria-label={t("mode.select")}
+              onPointerEnter={onPreloadPageEditing}
+              onFocus={onPreloadPageEditing}
             >
               {state.mode === "pages" ? (
                 <LayoutGrid size={16} />

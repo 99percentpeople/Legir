@@ -15,7 +15,12 @@ vi.mock("@/pages/EditorPage/EditorPageTranslateRightPanel", () => {
   return { default: () => null };
 });
 
-import { scheduleEditorRightPanelBranchPreload } from "@/pages/EditorPage/rightPanelModules";
+vi.mock("@/app/ai/GlobalAiContext", () => ({
+  preloadGlobalAiController: vi.fn(async () => {}),
+}));
+
+import { preloadEditorRightPanelBranches } from "@/pages/EditorPage/rightPanelModules";
+import { schedulePreload } from "@/lib/schedulePreload";
 
 describe("right-panel deferred preload", () => {
   afterEach(() => {
@@ -34,7 +39,7 @@ describe("right-panel deferred preload", () => {
     );
     vi.stubGlobal("cancelIdleCallback", cancelIdleCallback);
 
-    const cancel = scheduleEditorRightPanelBranchPreload();
+    const cancel = schedulePreload([preloadEditorRightPanelBranches]);
 
     expect(metrics.aiLoads).toBe(0);
     expect(metrics.translateLoads).toBe(0);
@@ -60,7 +65,7 @@ describe("right-panel deferred preload", () => {
     );
     vi.stubGlobal("cancelIdleCallback", vi.fn());
 
-    const cancel = scheduleEditorRightPanelBranchPreload();
+    const cancel = schedulePreload([preloadEditorRightPanelBranches]);
     cancel();
     idleCallback?.();
 

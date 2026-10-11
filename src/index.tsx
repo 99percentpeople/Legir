@@ -32,8 +32,9 @@ if (isDesktopApp() && injectedBootstrap?.kind === "startup-open") {
     }
   });
   void import("./services/pdfService");
-  void import("./pages/EditorPage");
-  void import("./components/workspace/Workspace");
+  void import("./app/componentModules").then(({ preloadEditor }) =>
+    preloadEditor(),
+  );
 }
 
 if (!isDesktopApp()) {
