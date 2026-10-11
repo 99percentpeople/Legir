@@ -1,6 +1,6 @@
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@/types";
-import type { Tile } from "./types";
+import type { ThumbnailContent, Tile } from "./types";
 
 type CommandSpec<TRequest extends object, TResponse = never> =
   | TRequest
@@ -50,6 +50,7 @@ export type WorkerCommandPayloadMap = {
       scale?: number;
       targetWidth?: number;
       renderAnnotations?: boolean;
+      thumbnailContent?: ThumbnailContent;
       mimeType?: string;
       quality?: number;
       priority?: number;

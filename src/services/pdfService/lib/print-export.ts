@@ -13,7 +13,7 @@ const getAnnotSubtypeName = (annot: PDFDict) => {
   }
 };
 
-const drawAnnotationPrintFallbacks = async (options: {
+export const drawAnnotationPrintFallbacks = async (options: {
   pages: PDFPage[];
   annotations: Annotation[];
   getViewportForPage: (pageIndex: number) => Promise<ViewportLike | undefined>;

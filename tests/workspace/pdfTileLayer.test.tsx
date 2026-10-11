@@ -80,7 +80,7 @@ beforeEach(() => {
   );
   useEditorView.setState({
     pages: [page],
-    thumbnailImages: { 0: "data:image/png;base64,placeholder" },
+    pagePreviewImages: { 0: "data:image/png;base64,placeholder" },
   });
 });
 afterEach(async () => {
@@ -336,7 +336,7 @@ it("renders restored high zoom when its worker becomes available", async () => {
   ).toBe(true);
 });
 
-it("keeps the thumbnail behind partial tiles until the viewport is covered", async () => {
+it("keeps the annotation-free preview behind partial tiles until the viewport is covered", async () => {
   const w = worker();
   const pending: Array<(ok: boolean) => void> = [];
   w.renderPage.mockImplementation(

@@ -299,6 +299,8 @@ const buildQueueTaskKey = (
     req.type === "renderImage" && typeof req.quality === "number"
       ? req.quality
       : -1;
+  // Live snapshots must never deduplicate against another revision/copy.
+  if (req.type === "renderImage" && req.thumbnailContent) return req.id;
   return `${type}|${docId}|${pageIndex}|${scale}|${renderAnnotations}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}`;
 };
 
@@ -931,12 +933,26 @@ const renderToImage = async (
     const annotationMode = renderAnnotations
       ? pdfjsLib.AnnotationMode.ENABLE
       : pdfjsLib.AnnotationMode.DISABLE;
+    const overlayTools = params.thumbnailContent
+      ? await import("@/services/pdfService/lib/thumbnailOverlay")
+      : undefined;
+    const operationsFilter =
+      params.thumbnailContent && overlayTools
+        ? overlayTools.thumbnailAnnotationFilter(
+            params.thumbnailContent,
+            await page.getOperatorList({ annotationMode }),
+            pdfjsLib.OPS.beginAnnotation,
+            pdfjsLib.OPS.endAnnotation,
+          )
+        : undefined;
+    throwIfCancelled();
     renderTask = page.render({
       canvas: null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       canvasContext: ctx as any,
       viewport,
       annotationMode,
+      operationsFilter,
     });
     restoreImages = getDocState(resolvedDocId).imageCache.bindRenderTask(
       renderTask,
@@ -946,6 +962,48 @@ const renderToImage = async (
 
     await renderTask.promise;
     throwIfCancelled();
+
+    if (params.thumbnailContent && overlayTools) {
+      const bytes = await overlayTools.createThumbnailOverlay(
+        params.thumbnailContent,
+      );
+      throwIfCancelled();
+      if (bytes) {
+        const loading = pdfjsLib.getDocument({
+          data: bytes,
+          cMapUrl: PDFJS_CMAP_URL,
+          cMapPacked: true,
+          standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
+          wasmUrl: PDFJS_WASM_URL,
+          disableFontFace: true,
+          useSystemFonts: false,
+        });
+        try {
+          const overlayDocument = await loading.promise;
+          throwIfCancelled();
+          const overlayPage = await overlayDocument.getPage(1);
+          const overlayCanvas = new OffscreenCanvas(
+            canvas.width,
+            canvas.height,
+          );
+          const overlayContext = overlayCanvas.getContext("2d")!;
+          renderTask = overlayPage.render({
+            canvas: null,
+            canvasContext:
+              overlayContext as unknown as CanvasRenderingContext2D,
+            viewport: overlayPage.getViewport({ scale: finalScale }),
+            background: "rgba(0,0,0,0)",
+            annotationMode: pdfjsLib.AnnotationMode.ENABLE,
+          });
+          await renderTask.promise;
+          throwIfCancelled();
+          ctx.drawImage(overlayCanvas, 0, 0);
+          overlayCanvas.width = overlayCanvas.height = 0;
+        } finally {
+          await loading.destroy();
+        }
+      }
+    }
 
     const outMimeType = mimeType || "image/jpeg";
     const blob = await canvas.convertToBlob({

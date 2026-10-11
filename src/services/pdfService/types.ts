@@ -183,3 +183,11 @@ export interface IControlExporter {
     options?: ControlExportOptions,
   ): Promise<void> | void;
 }
+/** A page snapshot, expressed in the source viewport's unrotated UI coordinates. */
+export interface ThumbnailContent {
+  width: number;
+  height: number;
+  fields: FormField[];
+  annotations: Annotation[];
+  preserved: PreservedSourceAnnotationRef[];
+}

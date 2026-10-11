@@ -113,6 +113,13 @@ export interface EditorActions {
   warmupThumbnails: (workerService?: PDFWorkerService) => void;
   cancelThumbnailWarmup: () => void;
   deferThumbnailWarmup: () => void;
+  refreshThumbnails: (immediate?: boolean) => void;
+  setThumbnailViewport: (
+    owner: symbol,
+    pageIds: readonly string[] | null,
+  ) => void;
+  removeThumbnailViewport: (owner: symbol) => void;
+  holdThumbnailImages: () => () => void;
   loadDocument: (data: {
     pdfFile: File | null;
     pdfBytes: Uint8Array;

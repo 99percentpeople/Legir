@@ -26,10 +26,8 @@ export const TILE_MAX_DIM = 2048;
 export const WORKSPACE_HEAVY_PAGE_PIXEL_THRESHOLD = 8_000_000;
 export const WORKSPACE_HEAVY_PAGE_DPR_CAP = 1;
 
-// Thumbnail warmup (generate page preview images once per document).
-// Primary usage:
-// - `src/store/useEditorView.ts` -> `warmupThumbnails()` (calls `pdfWorkerService.renderPageImage`)
-// - Cached value stored in `EditorState.thumbnailImages` and displayed by `src/components/sidebar/ThumbnailsPanel.tsx`
+// Shared encoding for sidebar, page editor and import thumbnails. The document
+// queue refreshes only changed pages and yields to workspace interactions.
 export const THUMBNAIL_TARGET_WIDTH = 500;
 export const THUMBNAIL_MIME_TYPE = "image/jpeg";
 export const THUMBNAIL_JPEG_QUALITY = 0.7;

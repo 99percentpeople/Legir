@@ -1,6 +1,6 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
 import type { PageData, PageSource, HistorySnapshot } from "@/types";
-import type { Tile } from "./types";
+import type { ThumbnailContent, Tile } from "./types";
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@/types";
 import type {
@@ -836,6 +836,7 @@ class PDFWorkerService {
     scale?: number;
     targetWidth?: number;
     renderAnnotations?: boolean;
+    thumbnailContent?: ThumbnailContent;
     mimeType?: string;
     quality?: number;
     priority?: number;
@@ -857,6 +858,7 @@ class PDFWorkerService {
         scale,
         targetWidth,
         renderAnnotations,
+        thumbnailContent,
         mimeType,
         quality,
         priority,
@@ -942,6 +944,7 @@ class PDFWorkerService {
             scale,
             targetWidth,
             renderAnnotations,
+            thumbnailContent,
             mimeType,
             quality,
             priority: priority || 0,
@@ -956,6 +959,7 @@ class PDFWorkerService {
             scale,
             targetWidth,
             renderAnnotations,
+            thumbnailContent,
             mimeType,
             quality,
             priority: priority || 0,

@@ -69,7 +69,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   const setState = useEditorView.setState;
   const placeholderImage = useDocumentState((state) =>
     state.pages[pageIndex]?.rotation === page.rotation
-      ? state.thumbnailImages[pageIndex]
+      ? state.pagePreviewImages[pageIndex]
       : undefined,
   );
   const pageInfo = useMemo(
@@ -118,7 +118,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       if (
         !current.pages[pageIndex] ||
         current.pages[pageIndex].rotation !== page.rotation ||
-        current.thumbnailImages[pageIndex]
+        current.pagePreviewImages[pageIndex]
       ) {
         return;
       }
@@ -167,7 +167,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       if (
         !latest.pages[pageIndex] ||
         latest.pages[pageIndex].rotation !== page.rotation ||
-        latest.thumbnailImages[pageIndex]
+        latest.pagePreviewImages[pageIndex]
       ) {
         if (imageData.startsWith("blob:")) {
           try {
@@ -180,10 +180,10 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
       }
 
       setState((s) => {
-        if (!s.pages[pageIndex] || s.thumbnailImages[pageIndex]) return s;
+        if (!s.pages[pageIndex] || s.pagePreviewImages[pageIndex]) return s;
         return {
-          thumbnailImages: {
-            ...s.thumbnailImages,
+          pagePreviewImages: {
+            ...s.pagePreviewImages,
             [pageIndex]: imageData,
           },
         };

@@ -1,15 +1,6 @@
-import {
-  THUMBNAIL_JPEG_QUALITY,
-  THUMBNAIL_MIME_TYPE,
-  THUMBNAIL_TARGET_WIDTH,
-  THUMBNAIL_WARMUP_PRIORITY,
-} from "@/constants";
 import { pdfWorkerService } from "@/services/pdfService/pdfWorkerService";
-import { revokeObjectUrlIfNeeded } from "@/store/helpers";
+import { createDocumentThumbnails } from "@/store/documentThumbnails";
 import type { EditorStoreSlice } from "@/store/store.types";
-import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-
-const THUMBNAIL_INTERACTION_IDLE_MS = 600;
 
 export const createRuntimeSlice: EditorStoreSlice<
   Pick<
@@ -19,44 +10,22 @@ export const createRuntimeSlice: EditorStoreSlice<
     | "warmupThumbnails"
     | "cancelThumbnailWarmup"
     | "deferThumbnailWarmup"
+    | "refreshThumbnails"
+    | "setThumbnailViewport"
+    | "removeThumbnailViewport"
+    | "holdThumbnailImages"
   >
 > = (set, get) => {
-  let thumbnailWarmupEpoch = 0;
-  let thumbnailWarmupAbort: AbortController | null = null;
-  let thumbnailWarmupWorker: PDFWorkerService | null = null;
-  let thumbnailResumeTimer: ReturnType<typeof setTimeout> | null = null;
-  let thumbnailNotBefore = 0;
+  const thumbnails = createDocumentThumbnails(set, get);
   const processingTasks = new Map<symbol, string | null>();
-  const stopThumbnailWarmup = () => {
-    thumbnailWarmupEpoch += 1;
-    thumbnailWarmupAbort?.abort();
-    thumbnailWarmupAbort = null;
-    if (thumbnailResumeTimer !== null) clearTimeout(thumbnailResumeTimer);
-    thumbnailResumeTimer = null;
-  };
-  const cancelThumbnailWarmup = () => {
-    stopThumbnailWarmup();
-    thumbnailWarmupWorker = null;
-    thumbnailNotBefore = 0;
-  };
-  const scheduleThumbnailResume = () => {
-    if (!thumbnailWarmupWorker) return;
-    thumbnailResumeTimer = setTimeout(
-      () => {
-        thumbnailResumeTimer = null;
-        if (thumbnailWarmupWorker)
-          get().warmupThumbnails(thumbnailWarmupWorker);
-      },
-      Math.max(0, thumbnailNotBefore - Date.now()),
-    );
-  };
   return {
-    cancelThumbnailWarmup,
-    deferThumbnailWarmup: () => {
-      stopThumbnailWarmup();
-      thumbnailNotBefore = Date.now() + THUMBNAIL_INTERACTION_IDLE_MS;
-      scheduleThumbnailResume();
-    },
+    cancelThumbnailWarmup: thumbnails.cancel,
+    deferThumbnailWarmup: thumbnails.defer,
+    refreshThumbnails: thumbnails.changed,
+    setThumbnailViewport: thumbnails.setViewport,
+    removeThumbnailViewport: thumbnails.removeViewport,
+    holdThumbnailImages: thumbnails.holdImages,
+    warmupThumbnails: (worker) => thumbnails.warmup(worker ?? pdfWorkerService),
     withProcessing: async (status, fn) => {
       const token = Symbol();
       processingTasks.set(token, status ?? null);
@@ -78,121 +47,5 @@ export const createRuntimeSlice: EditorStoreSlice<
     },
 
     setProcessingStatus: (status) => set({ processingStatus: status }),
-
-    warmupThumbnails: (workerService?: PDFWorkerService) => {
-      const { pdfBytes, pdfOpenPassword } = get();
-      if (!pdfBytes || pdfBytes.byteLength === 0) return;
-      const runtimeWorkerService = workerService ?? pdfWorkerService;
-
-      stopThumbnailWarmup();
-      thumbnailWarmupWorker = runtimeWorkerService;
-      if (Date.now() < thumbnailNotBefore) {
-        scheduleThumbnailResume();
-        return;
-      }
-      const epoch = thumbnailWarmupEpoch;
-      thumbnailWarmupAbort = new AbortController();
-      const { signal } = thumbnailWarmupAbort;
-
-      void (async () => {
-        let workerLoaded = false;
-        const ensureWorkerLoaded = async () => {
-          if (workerLoaded) return;
-          await runtimeWorkerService.loadDocument(pdfBytes, {
-            signal,
-            password:
-              typeof pdfOpenPassword === "string" ? pdfOpenPassword : undefined,
-          });
-          workerLoaded = true;
-        };
-
-        for (let pageIndex = 0; ; pageIndex++) {
-          if (signal.aborted) return;
-          if (thumbnailWarmupEpoch !== epoch) return;
-
-          const state = get();
-          if (pageIndex >= state.pages.length) return;
-          const page = state.pages[pageIndex];
-          if (!page || state.thumbnailImages[pageIndex]) continue;
-
-          try {
-            let bytes: Uint8Array;
-            let mimeType: string;
-            try {
-              ({ bytes, mimeType } = await runtimeWorkerService.renderPageImage(
-                {
-                  pageIndex,
-                  targetWidth: THUMBNAIL_TARGET_WIDTH,
-                  mimeType: THUMBNAIL_MIME_TYPE,
-                  quality: THUMBNAIL_JPEG_QUALITY,
-                  renderAnnotations: true,
-                  priority: THUMBNAIL_WARMUP_PRIORITY,
-                  signal,
-                },
-              ));
-            } catch (error: unknown) {
-              const message =
-                typeof (error as { message?: unknown })?.message === "string"
-                  ? String((error as { message: string }).message)
-                  : String(error);
-              if (message.includes("PDF Document not loaded")) {
-                await ensureWorkerLoaded();
-                ({ bytes, mimeType } =
-                  await runtimeWorkerService.renderPageImage({
-                    pageIndex,
-                    targetWidth: THUMBNAIL_TARGET_WIDTH,
-                    mimeType: THUMBNAIL_MIME_TYPE,
-                    quality: THUMBNAIL_JPEG_QUALITY,
-                    priority: THUMBNAIL_WARMUP_PRIORITY,
-                    signal,
-                  }));
-              } else {
-                throw error;
-              }
-            }
-
-            if (signal.aborted) return;
-            if (!bytes || bytes.byteLength === 0) continue;
-
-            const objectUrl = URL.createObjectURL(
-              new Blob([new Uint8Array(bytes)], { type: mimeType }),
-            );
-
-            if (signal.aborted || thumbnailWarmupEpoch !== epoch) {
-              revokeObjectUrlIfNeeded(objectUrl);
-              return;
-            }
-
-            let didSet = false;
-
-            set((store) => {
-              if (!store.pages[pageIndex] || store.thumbnailImages[pageIndex]) {
-                return store;
-              }
-              didSet = true;
-              return {
-                thumbnailImages: {
-                  ...store.thumbnailImages,
-                  [pageIndex]: objectUrl,
-                },
-              };
-            });
-
-            if (!didSet) {
-              revokeObjectUrlIfNeeded(objectUrl);
-            }
-          } catch {
-            // Thumbnail warmup is opportunistic; a failed page should not block the editor.
-          }
-
-          await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        }
-      })().finally(() => {
-        if (thumbnailWarmupEpoch === epoch) {
-          thumbnailWarmupAbort = null;
-          thumbnailWarmupWorker = null;
-        }
-      });
-    },
   };
 };

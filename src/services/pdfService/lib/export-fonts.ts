@@ -1,6 +1,6 @@
 import type { PDFDocument, PDFFont } from "@cantoo/pdf-lib";
 import { FieldType, type Annotation, type FormField } from "@/types";
-import { isDesktopApp } from "@/services/platform";
+import { isDesktopApp } from "@/services/platform/runtime";
 import {
   loadAndEmbedExportFonts,
   loadAndEmbedSelectedSystemFonts,
@@ -49,11 +49,13 @@ export const prepareExportFonts = async (args: {
     ["Custom", "CustomSans", "CustomSerif"].some((family) =>
       families.has(family),
     );
-  const systemFamilies = isDesktopApp()
-    ? [...families].filter(
-        (family) => !fontMap.has(family) && !isExplicitCjkFontSelection(family),
-      )
-    : [];
+  const systemFamilies =
+    typeof window !== "undefined" && isDesktopApp()
+      ? [...families].filter(
+          (family) =>
+            !fontMap.has(family) && !isExplicitCjkFontSelection(family),
+        )
+      : [];
 
   let fontkit: Parameters<PDFDocument["registerFontkit"]>[0] | undefined;
   const getFontkit = async () =>

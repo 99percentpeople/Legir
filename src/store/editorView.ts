@@ -168,6 +168,22 @@ export function createEditorView(
     ...resources.getInitialState(),
     ...actions,
   };
+  const unsubscribeThumbnails = subscribe((state, previous) => {
+    if (
+      state.pdfBytes !== previous.pdfBytes ||
+      state.pages !== previous.pages ||
+      state.fields !== previous.fields ||
+      state.annotations !== previous.annotations ||
+      state.preservedSourceAnnotations !==
+        previous.preservedSourceAnnotations ||
+      state.documentLoadState !== previous.documentLoadState
+    )
+      state.refreshThumbnails(
+        state.pages !== previous.pages && state.pdfBytes === previous.pdfBytes,
+      );
+    else if (state.pageThumbnailScale !== previous.pageThumbnailScale)
+      state.deferThumbnailWarmup();
+  });
   return {
     document,
     resources,
@@ -178,6 +194,7 @@ export function createEditorView(
     setState,
     subscribe,
     dispose: () => {
+      unsubscribeThumbnails();
       getState().cancelThumbnailWarmup();
       unsubscriptions.forEach((unsubscribe) => unsubscribe());
       unsubscriptions = [];

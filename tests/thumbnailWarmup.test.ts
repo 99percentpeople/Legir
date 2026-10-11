@@ -23,12 +23,20 @@ const view = () => {
 };
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.stubGlobal(
+    "Image",
+    class {
+      src = "";
+      decode = async () => {};
+    },
+  );
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:thumbnail");
 });
 afterEach(() => {
   views.splice(0).forEach((store) => store.dispose());
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 it("cancels in-flight warmup during gestures and retries the same page after idle", async () => {
@@ -42,6 +50,7 @@ it("cancels in-flight warmup during gestures and retries the same page after idl
       }),
   );
   store.getState().warmupThumbnails(w as unknown as PDFWorkerService);
+  await vi.advanceTimersByTimeAsync(600);
   const firstSignal = w.renderPageImage.mock.calls[0][0].signal;
   store.getState().deferThumbnailWarmup();
   expect(firstSignal?.aborted).toBe(true);
@@ -84,9 +93,15 @@ it("pauses only the interacting document and retains completed thumbnails", asyn
   const second = view();
   const a = worker();
   const b = worker();
-  first.setState({ thumbnailImages: { 0: "blob:existing" } });
-  first.getState().deferThumbnailWarmup();
+  a.renderPageImage
+    .mockImplementationOnce(async () => image)
+    .mockImplementationOnce(() => new Promise(() => {}));
   first.getState().warmupThumbnails(a as unknown as PDFWorkerService);
+  await vi.advanceTimersByTimeAsync(610);
+  const existing = first.getState().thumbnailImages[0];
+  expect(existing).toBeTruthy();
+  a.renderPageImage.mockClear();
+  first.getState().deferThumbnailWarmup();
   second.getState().warmupThumbnails(b as unknown as PDFWorkerService);
   await vi.advanceTimersByTimeAsync(10);
   expect(a.renderPageImage).not.toHaveBeenCalled();
@@ -95,5 +110,5 @@ it("pauses only the interacting document and retains completed thumbnails", asyn
   expect(
     a.renderPageImage.mock.calls.map(([options]) => options.pageIndex),
   ).toEqual([1]);
-  expect(first.getState().thumbnailImages[0]).toBe("blob:existing");
+  expect(first.getState().thumbnailImages[0]).toBe(existing);
 });

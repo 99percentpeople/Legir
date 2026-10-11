@@ -107,8 +107,6 @@ import { getControlRotationFromWidgetRotation } from "@/lib/controlRotation";
 import {
   IAnnotationParser,
   IControlParser,
-  IAnnotationExporter,
-  IControlExporter,
   ParserContext,
   ViewportLike,
 } from "./types";
@@ -129,22 +127,7 @@ import {
   DropdownControlParser,
   SignatureControlParser,
 } from "./parsers/ControlParsers";
-import {
-  InkExporter,
-  HighlightExporter,
-  CommentExporter,
-  FreeTextExporter,
-  LinkExporter,
-  StampExporter,
-  ShapeExporter,
-} from "./exporters/AnnotationExporters";
-import {
-  TextControlExporter,
-  CheckboxControlExporter,
-  RadioControlExporter,
-  DropdownControlExporter,
-  SignatureControlExporter,
-} from "./exporters/ControlExporters";
+import { annotationExporters, controlExporters } from "./exporters";
 import {
   createPdfLibViewport,
   pdfJsRectToUiRect,
@@ -188,24 +171,6 @@ const controlParsers: IControlParser[] = [
   new RadioControlParser(),
   new DropdownControlParser(),
   new SignatureControlParser(),
-];
-
-const annotationExporters: IAnnotationExporter[] = [
-  new InkExporter(),
-  new HighlightExporter(),
-  new CommentExporter(),
-  new FreeTextExporter(),
-  new LinkExporter(),
-  new StampExporter(),
-  new ShapeExporter(),
-];
-
-const controlExporters: IControlExporter[] = [
-  new TextControlExporter(),
-  new CheckboxControlExporter(),
-  new RadioControlExporter(),
-  new DropdownControlExporter(),
-  new SignatureControlExporter(),
 ];
 
 const STAMP_RENDER_FALLBACK_SCALE = 2;

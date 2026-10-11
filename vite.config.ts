@@ -80,6 +80,11 @@ export default defineConfig(({ mode }) => {
     },
     // Env variables starting with the item of `envPrefix` will be exposed in tauri's source code through `import.meta.env`.
     envPrefix: ["VITE_", "TAURI_ENV_*"],
+    // Thumbnail appearances reuse the export/font pipeline inside the classic
+    // render worker. Keep its lazy imports in one file for WebView compatibility.
+    worker: {
+      rollupOptions: { output: { inlineDynamicImports: true } },
+    },
     build: {
       // Tauri uses Chromium on Windows and WebKit on macOS and Linux
       target:

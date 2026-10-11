@@ -3,8 +3,13 @@ import type { PageData, ThumbnailsLayoutMode } from "@/types";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useLanguage } from "../language-provider";
-import { getPageView } from "@/components/workspace/lib/pageViewRotation";
+import {
+  getPageView,
+  getPageDisplayRotation,
+} from "@/components/workspace/lib/pageViewRotation";
 import { useEditorView } from "@/store/useEditorView";
+import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import { useThumbnailViewport } from "@/hooks/useThumbnailViewport";
 
 interface ThumbnailItemProps {
   page: PageData;
@@ -53,6 +58,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
       onClick={() => onNavigate(pageIndex)}
     >
       <div
+        data-thumbnail-page-id={getPageId(page)}
         className={cn(
           "group-hover:ring-primary/20 relative w-full overflow-hidden rounded-sm border bg-white shadow-sm transition-shadow group-hover:shadow-md group-hover:ring-2",
           isActive && "ring-primary shadow-md ring-2",
@@ -67,7 +73,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
             style={{
               width: `${(page.width / viewPage.width) * 100}%`,
               height: `${(page.height / viewPage.height) * 100}%`,
-              transform: `translate(-50%, -50%) rotate(${viewRotation}deg)`,
+              transform: `translate(-50%, -50%) rotate(${getPageDisplayRotation(page, viewRotation)}deg)`,
             }}
           />
         ) : (
@@ -102,6 +108,8 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
     (state) => !!state.pendingViewStateRestore,
   );
   const scrollBehaviorRef = useRef<ScrollBehavior>("auto");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useThumbnailViewport(scrollRef);
   const lastDocKeyRef = useRef<string | null>(null);
 
   const docKey = (() => {
@@ -124,7 +132,7 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-2 pb-10">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 pb-10">
         <div
           className={cn(
             "grid gap-4",
@@ -133,7 +141,7 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
         >
           {pages?.map((page, idx) => (
             <ThumbnailItem
-              key={idx}
+              key={getPageId(page)}
               page={page}
               pageIndex={idx}
               onNavigate={onNavigate}
