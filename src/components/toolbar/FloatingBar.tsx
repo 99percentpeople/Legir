@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Edit3, PenTool, Undo2, X } from "lucide-react";
+import { Check, Edit3, LayoutGrid, PenTool, Undo2, X } from "lucide-react";
 import {
   useEditorEventBus,
   useEditorTabIsActive,
@@ -45,6 +45,7 @@ interface FloatingBarProps {
   pageFlow: PageFlowDirection;
   isFullscreen: boolean;
   onNavigatePage: (pageIndex: number) => void;
+  enablePageEditing?: boolean;
   onRotateView?: (direction: "clockwise" | "counterclockwise") => void;
   viewRotation?: number;
   onResetViewRotation?: () => void;
@@ -64,6 +65,7 @@ function ActiveFloatingBar({
   pageFlow,
   isFullscreen,
   onNavigatePage,
+  enablePageEditing = false,
   onRotateView,
   viewRotation,
   onResetViewRotation,
@@ -181,7 +183,9 @@ function ActiveFloatingBar({
               title={t("mode.select")}
               aria-label={t("mode.select")}
             >
-              {state.mode === "annotation" ? (
+              {state.mode === "pages" ? (
+                <LayoutGrid size={16} />
+              ) : state.mode === "annotation" ? (
                 <PenTool size={16} />
               ) : (
                 <Edit3 size={16} />
@@ -195,7 +199,13 @@ function ActiveFloatingBar({
                 commands.changeMode(mode as EditorState["mode"])
               }
             >
-              {(["annotation", "form"] as const).map((mode) => (
+              {(
+                [
+                  "annotation",
+                  "form",
+                  ...(enablePageEditing ? ["pages" as const] : []),
+                ] as const
+              ).map((mode) => (
                 <DropdownMenuRadioItem
                   key={mode}
                   value={mode}

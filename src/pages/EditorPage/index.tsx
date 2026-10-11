@@ -49,6 +49,10 @@ import {
 } from "./rightPanelModules";
 
 const EditorPage: React.FC = () => {
+  const [pageToolbarHost, setPageToolbarHost] =
+    React.useState<HTMLDivElement | null>(null);
+  const [pageFinishHost, setPageFinishHost] =
+    React.useState<HTMLDivElement | null>(null);
   const appEventBus = useEditorEventBus();
   const isActive = useEditorTabIsActive();
   const useEditorView = useEditorViewApi();
@@ -253,12 +257,18 @@ const EditorPage: React.FC = () => {
   }, [workspaceScrollContainerRef]);
 
   const handleZoomIn = React.useCallback(() => {
-    state.zoomBy(1.25);
-  }, [state.zoomBy]);
+    const live = useEditorView.getState();
+    if (live.mode === "pages")
+      live.setPageThumbnailScale(live.pageThumbnailScale * 1.25);
+    else live.zoomBy(1.25);
+  }, [useEditorView]);
 
   const handleZoomOut = React.useCallback(() => {
-    state.zoomBy(1 / 1.25);
-  }, [state.zoomBy]);
+    const live = useEditorView.getState();
+    if (live.mode === "pages")
+      live.setPageThumbnailScale(live.pageThumbnailScale / 1.25);
+    else live.zoomBy(1 / 1.25);
+  }, [useEditorView]);
 
   const handleFitWidth = React.useCallback(() => {
     const liveState = useEditorView.getState();
@@ -349,10 +359,14 @@ const EditorPage: React.FC = () => {
       onToggleFullscreen={toggleFullscreen}
     >
       <EditorShellCommandsProvider value={shellCommands}>
-        <Toolbar />
+        <Toolbar
+          pageToolsRef={setPageToolbarHost}
+          pageFinishRef={setPageFinishHost}
+        />
 
         <div className="relative flex flex-1 overflow-hidden">
-          {state.isPanelFloating &&
+          {state.mode !== "pages" &&
+            state.isPanelFloating &&
             (state.isSidebarOpen || state.isRightPanelOpen) && (
               <div
                 className="absolute inset-0 z-30 bg-black/20"
@@ -363,40 +377,46 @@ const EditorPage: React.FC = () => {
               />
             )}
 
-          <Sidebar />
-          <EditorCanvasPane />
-
-          <RightPanelTabDock
-            activeTabs={
-              state.isRightPanelOpen
-                ? [
-                    state.rightPanelTab,
-                    ...(isTranslateOpen ? ["translate" as const] : []),
-                  ]
-                : isTranslateOpen
-                  ? ["translate"]
-                  : []
-            }
-            isFloating={state.isPanelFloating}
-            rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
-            canOpenProperties={hasSelectedControl}
-            canOpenPageTranslate={permissionUi.canAll([
-              "extract_text",
-              "create_annotation",
-            ])}
-            onSelectTab={(tab) => {
-              if (tab !== "translate") state.openRightPanel(tab);
-            }}
+          {state.mode !== "pages" && <Sidebar />}
+          <EditorCanvasPane
+            pageToolbarHost={pageToolbarHost}
+            pageFinishHost={pageFinishHost}
           />
 
-          {state.isRightPanelOpen && !hasInitializedRightPanel && (
-            <EditorRightPanelSkeleton
+          {state.mode !== "pages" && (
+            <RightPanelTabDock
+              activeTabs={
+                state.isRightPanelOpen
+                  ? [
+                      state.rightPanelTab,
+                      ...(isTranslateOpen ? ["translate" as const] : []),
+                    ]
+                  : isTranslateOpen
+                    ? ["translate"]
+                    : []
+              }
               isFloating={state.isPanelFloating}
-              width={state.rightPanelWidth}
+              rightOffsetPx={state.isRightPanelOpen ? state.rightPanelWidth : 0}
+              canOpenProperties={hasSelectedControl}
+              canOpenPageTranslate={permissionUi.canAll([
+                "extract_text",
+                "create_annotation",
+              ])}
+              onSelectTab={(tab) => {
+                if (tab !== "translate") state.openRightPanel(tab);
+              }}
             />
           )}
+          {state.mode !== "pages" &&
+            state.isRightPanelOpen &&
+            !hasInitializedRightPanel && (
+              <EditorRightPanelSkeleton
+                isFloating={state.isPanelFloating}
+                width={state.rightPanelWidth}
+              />
+            )}
 
-          {hasInitializedRightPanel && (
+          {state.mode !== "pages" && hasInitializedRightPanel && (
             <React.Suspense
               fallback={
                 state.isRightPanelOpen ? (
@@ -415,7 +435,7 @@ const EditorPage: React.FC = () => {
           )}
 
           <TranslationFloatingWindow
-            isOpen={isTranslateOpen}
+            isOpen={isTranslateOpen && state.mode !== "pages"}
             sourceText={translateSourceText}
             autoTranslateToken={translateAutoToken}
             onClose={() => setIsTranslateOpen(false)}

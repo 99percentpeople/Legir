@@ -23,6 +23,7 @@ const es = {
     },
   },
   mode: {
+    pages: "Modo de páginas",
     annotation: "Modo Anotación",
     form: "Modo Formulario",
     select: "Modo Selección",

@@ -23,6 +23,7 @@ const ja = {
     },
   },
   mode: {
+    pages: "ページモード",
     annotation: "注釈モード",
     form: "フォームモード",
     select: "選択モード",

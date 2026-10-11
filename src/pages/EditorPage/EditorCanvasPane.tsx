@@ -32,11 +32,17 @@ import {
   useEditorShellCommands,
 } from "@/app/editorShellContext";
 
+const PageEditor = React.lazy(
+  () => import("@/components/page-editor/PageEditor"),
+);
 const Workspace = React.lazy(() => import("@/components/workspace/Workspace"));
 const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
   "[data-app-block-modifier-wheel-zoom='1']";
 
-export const EditorCanvasPane: React.FC = () => {
+export const EditorCanvasPane: React.FC<{
+  pageToolbarHost: HTMLElement | null;
+  pageFinishHost: HTMLElement | null;
+}> = ({ pageToolbarHost, pageFinishHost }) => {
   const appEventBus = useEditorEventBus();
   const isMobile = useIsMobile();
   const [toolbarOverlayInset, setToolbarOverlayInset] = useState(96);
@@ -321,69 +327,88 @@ export const EditorCanvasPane: React.FC = () => {
 
   return (
     <div className="relative z-0 flex min-w-0 flex-1 flex-col overflow-hidden">
-      <Suspense
-        fallback={
-          <div className="flex flex-1 items-center justify-center p-4">
-            <div className="flex gap-6">
-              <Skeleton className="h-[70vh] w-[48vh]" />
-            </div>
-          </div>
+      {state.mode === "pages" && (
+        <Suspense fallback={<div className="flex-1" />}>
+          <PageEditor
+            toolbarHost={pageToolbarHost}
+            finishHost={pageFinishHost}
+          />
+        </Suspense>
+      )}
+      <div
+        className={
+          state.mode === "pages" ? "hidden" : "flex min-h-0 flex-1 flex-col"
         }
       >
-        <Workspace
-          sessionRenderKey={sessionRenderKey}
-          workerService={workerService}
-          isFileDragActive={isFileDragActive}
-          editorState={workspaceState}
-          onAddField={addField}
-          onAddAnnotation={addAnnotation}
-          onSelectControl={selectControl}
-          onUpdateField={updateField}
-          onResetFieldToDefault={resetFieldToDefault}
-          onUpdateAnnotation={updateAnnotation}
-          onDeleteAnnotation={deleteAnnotation}
-          onReorderControlLayer={reorderControlLayer}
-          onEditAnnotation={onEditAnnotation}
-          onScaleChange={updateScale}
-          onTriggerHistorySave={saveCheckpoint}
-          onPageIndexChange={handlePageIndexChange}
-          onToolChange={handleToolChange}
-          onSelectPageTranslateParagraphId={selectPageTranslateParagraphId}
-          onClearPageTranslateParagraphSelection={
-            handleClearPageTranslateParagraphSelection
+        <Suspense
+          fallback={
+            <div className="flex flex-1 items-center justify-center p-4">
+              <div className="flex gap-6">
+                <Skeleton className="h-[70vh] w-[48vh]" />
+              </div>
+            </div>
           }
-          fitTrigger={state.fitTrigger}
-          initialScrollPosition={initialScrollPosition}
-          onInitialScrollApplied={handleInitialScrollApplied}
-          pdfSearchResultsByPage={pdfSearch.workspaceTextHighlightsByPage}
-          activePdfSearchResultId={
-            pdfSearch.isPdfSearchOpen ? pdfSearch.activePdfSearchResultId : null
-          }
-          bottomOverlayInsetPx={toolbarOverlayInset}
+        >
+          <Workspace
+            sessionRenderKey={sessionRenderKey}
+            workerService={workerService}
+            isFileDragActive={isFileDragActive}
+            editorState={workspaceState}
+            onAddField={addField}
+            onAddAnnotation={addAnnotation}
+            onSelectControl={selectControl}
+            onUpdateField={updateField}
+            onResetFieldToDefault={resetFieldToDefault}
+            onUpdateAnnotation={updateAnnotation}
+            onDeleteAnnotation={deleteAnnotation}
+            onReorderControlLayer={reorderControlLayer}
+            onEditAnnotation={onEditAnnotation}
+            onScaleChange={updateScale}
+            onTriggerHistorySave={saveCheckpoint}
+            onPageIndexChange={handlePageIndexChange}
+            onToolChange={handleToolChange}
+            onSelectPageTranslateParagraphId={selectPageTranslateParagraphId}
+            onClearPageTranslateParagraphSelection={
+              handleClearPageTranslateParagraphSelection
+            }
+            fitTrigger={state.fitTrigger}
+            initialScrollPosition={initialScrollPosition}
+            onInitialScrollApplied={handleInitialScrollApplied}
+            pdfSearchResultsByPage={pdfSearch.workspaceTextHighlightsByPage}
+            activePdfSearchResultId={
+              pdfSearch.isPdfSearchOpen
+                ? pdfSearch.activePdfSearchResultId
+                : null
+            }
+            bottomOverlayInsetPx={toolbarOverlayInset}
+          />
+        </Suspense>
+      </div>
+      {state.mode !== "pages" && (
+        <FloatingBar
+          commands={commands}
+          enablePageEditing
+          onOverlayInsetChange={setToolbarOverlayInset}
+          state={state}
+          isMobile={isMobile}
+          currentPageIndex={state.currentPageIndex}
+          pageCount={state.pages.length}
+          pageLayout={state.pageLayout}
+          pageFlow={state.pageFlow}
+          isFullscreen={state.isFullscreen}
+          onNavigatePage={handleNavigatePage}
+          onRotateView={handleRotateView}
+          viewRotation={state.viewRotation}
+          onResetViewRotation={handleResetViewRotation}
+          onPageLayoutChange={(layout) => {
+            setPageLayout(layout);
+          }}
+          onPageFlowChange={(flow) => {
+            setPageFlow(flow);
+          }}
+          onToggleFullscreen={onToggleFullscreen}
         />
-      </Suspense>
-      <FloatingBar
-        commands={commands}
-        onOverlayInsetChange={setToolbarOverlayInset}
-        state={state}
-        isMobile={isMobile}
-        currentPageIndex={state.currentPageIndex}
-        pageCount={state.pages.length}
-        pageLayout={state.pageLayout}
-        pageFlow={state.pageFlow}
-        isFullscreen={state.isFullscreen}
-        onNavigatePage={handleNavigatePage}
-        onRotateView={handleRotateView}
-        viewRotation={state.viewRotation}
-        onResetViewRotation={handleResetViewRotation}
-        onPageLayoutChange={(layout) => {
-          setPageLayout(layout);
-        }}
-        onPageFlowChange={(flow) => {
-          setPageFlow(flow);
-        }}
-        onToggleFullscreen={onToggleFullscreen}
-      />
+      )}
     </div>
   );
 };

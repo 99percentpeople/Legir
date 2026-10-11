@@ -8,6 +8,7 @@ import {
   Settings,
   PenTool,
   Edit3,
+  LayoutGrid,
   Search,
 } from "lucide-react";
 import { EditorState } from "@/types";
@@ -23,6 +24,11 @@ import {
 } from "../ui/dropdown-menu";
 import { useLanguage } from "../language-provider";
 import ZoomDropdownControl from "./ZoomDropdownControl";
+import { pdfViewerScaleToWorkspaceScale } from "@/lib/pdfScale";
+import {
+  MIN_PAGE_THUMBNAIL_SCALE,
+  MAX_PAGE_THUMBNAIL_SCALE,
+} from "@/constants";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import {
   canPrintPdf,
@@ -42,7 +48,10 @@ import {
 import { EditorToolSelector } from "./EditorToolSelector";
 import { DocumentPermissionsPopover } from "./DocumentPermissionsPopover";
 
-const Toolbar: React.FC = () => {
+const Toolbar: React.FC<{
+  pageToolsRef: React.Ref<HTMLDivElement>;
+  pageFinishRef: React.Ref<HTMLDivElement>;
+}> = ({ pageToolsRef, pageFinishRef }) => {
   const { t } = useLanguage();
   const editorState = useEditorView(useShallow(selectToolbarState));
   const {
@@ -58,8 +67,9 @@ const Toolbar: React.FC = () => {
   } = editorState;
   const isMobile = useIsMobile();
   const isDocumentReady = editorState.documentLoadState === "ready";
+  const pageMode = mode === "pages";
   const hideModeSelector = isMobile;
-  const hideToolSection = isMobile;
+  const hideToolSection = isMobile && !pageMode;
   const compactZoomControl = isMobile;
   const {
     zoomIn: onZoomIn,
@@ -83,7 +93,10 @@ const Toolbar: React.FC = () => {
   const onOpenShortcuts = () => openDialog("shortcuts");
   const onOpenSettings = () => openDialog("settings");
   const hasSaveAs = useRef(canSaveAs());
-  const liveScale = editorState.scale;
+  const liveScale =
+    mode === "pages"
+      ? pdfViewerScaleToWorkspaceScale(editorState.pageThumbnailScale)
+      : editorState.scale;
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const isModeAllowed = React.useCallback(
@@ -101,25 +114,29 @@ const Toolbar: React.FC = () => {
     <div
       className={cn(
         "bg-workspace-header border-border text-foreground relative z-30 flex h-12 items-center gap-2 border-b px-2 sm:px-4",
+        pageMode && "max-[400px]:gap-1",
         hideToolSection ? "justify-between" : "lg:justify-between",
       )}
       data-app-block-modifier-wheel-zoom="1"
+      data-editor-main-toolbar
     >
       <div className="flex shrink-0 items-center gap-2 sm:gap-2">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleFieldList}
-            className={cn(
-              "h-8 w-8 sm:h-9 sm:w-9",
-              isFieldListOpen && "bg-accent text-accent-foreground",
-            )}
-            title={t("toolbar.toggle_sidebar")}
-          >
-            <PanelLeft size={20} />
-          </Button>
-        </div>
+        {!pageMode && (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleFieldList}
+              className={cn(
+                "h-8 w-8 sm:h-9 sm:w-9",
+                isFieldListOpen && "bg-accent text-accent-foreground",
+              )}
+              title={t("toolbar.toggle_sidebar")}
+            >
+              <PanelLeft size={20} />
+            </Button>
+          </div>
+        )}
 
         <div className="flex items-center gap-1">
           <Button
@@ -142,19 +159,21 @@ const Toolbar: React.FC = () => {
           >
             <Redo2 size={20} />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onOpenSearch}
-            disabled={!editorState.hasPages}
-            className={cn(
-              "h-8 w-8 sm:h-9 sm:w-9",
-              isSearchOpen && "bg-accent text-accent-foreground",
-            )}
-            title={t("toolbar.search_pdf")}
-          >
-            <Search size={20} />
-          </Button>
+          {!pageMode && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenSearch}
+              disabled={!editorState.hasPages}
+              className={cn(
+                "h-8 w-8 sm:h-9 sm:w-9",
+                isSearchOpen && "bg-accent text-accent-foreground",
+              )}
+              title={t("toolbar.search_pdf")}
+            >
+              <Search size={20} />
+            </Button>
+          )}
         </div>
 
         <Separator orientation="vertical" />
@@ -164,12 +183,57 @@ const Toolbar: React.FC = () => {
             scale={liveScale}
             disabled={!editorState.hasPages}
             compact={compactZoomControl}
+            className={
+              pageMode
+                ? "max-[400px]:gap-0 max-[400px]:px-1 max-[400px]:text-xs max-[400px]:[&>span]:min-w-0 max-[400px]:[&>svg]:hidden"
+                : undefined
+            }
             open={zoomMenuOpen}
             onOpenChange={setZoomMenuOpen}
             onZoomIn={onZoomIn}
             onZoomOut={onZoomOut}
             onFitWidth={onFitWidth}
             onFitScreen={onFitScreen}
+            onSetZoomPercent={
+              mode === "pages"
+                ? (percent) => editorState.setPageThumbnailScale(percent / 100)
+                : undefined
+            }
+            minZoomPercent={
+              mode === "pages" ? MIN_PAGE_THUMBNAIL_SCALE * 100 : undefined
+            }
+            maxZoomPercent={
+              mode === "pages" ? MAX_PAGE_THUMBNAIL_SCALE * 100 : undefined
+            }
+          />
+        </div>
+      </div>
+
+      {pageMode ? (
+        <div
+          ref={pageToolsRef}
+          className="flex min-w-0 flex-1 items-center justify-center"
+          data-page-toolbar-host
+        />
+      ) : (
+        !hideToolSection && (
+          <div className="flex min-w-0 flex-1 items-center justify-center xl:absolute xl:top-0 xl:left-1/2 xl:h-full xl:flex-none xl:-translate-x-1/2">
+            <div className="no-scrollbar flex w-full overflow-x-auto px-1 xl:w-auto">
+              <EditorToolSelector
+                state={editorState}
+                onToolChange={onToolChange}
+              />
+            </div>
+          </div>
+        )
+      )}
+
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1">
+          <DocumentPermissionsPopover
+            documentPermissions={editorState.documentPermissions}
+            sourceDocumentPermissions={editorState.sourceDocumentPermissions}
+            pdfOwnerUnlocked={editorState.pdfOwnerUnlocked}
           />
 
           {!hideModeSelector && (
@@ -183,10 +247,13 @@ const Toolbar: React.FC = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="ml-2 h-8 w-8 sm:h-9 sm:w-9"
+                    className="h-8 w-8 sm:h-9 sm:w-9"
                     title={t("mode.select")}
+                    aria-label={t("mode.select")}
                   >
-                    {mode === "annotation" ? (
+                    {mode === "pages" ? (
+                      <LayoutGrid size={16} />
+                    ) : mode === "annotation" ? (
                       <PenTool size={16} />
                     ) : (
                       <Edit3 size={16} />
@@ -194,13 +261,17 @@ const Toolbar: React.FC = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  align="start"
+                  align="end"
                   data-app-block-modifier-wheel-zoom="1"
                 >
                   <DropdownMenuRadioGroup
                     value={mode}
                     onValueChange={(nextMode) => {
-                      if (nextMode === "annotation" || nextMode === "form") {
+                      if (
+                        nextMode === "annotation" ||
+                        nextMode === "form" ||
+                        nextMode === "pages"
+                      ) {
                         if (!isModeAllowed(nextMode)) return;
                         onModeChange(nextMode);
                       }
@@ -224,32 +295,20 @@ const Toolbar: React.FC = () => {
                         <span>{t("mode.form")}</span>
                       </div>
                     </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem
+                      value="pages"
+                      disabled={!isModeAllowed("pages")}
+                    >
+                      <div className="flex items-center gap-2">
+                        <LayoutGrid size={14} />
+                        <span>{t("mode.pages")}</span>
+                      </div>
+                    </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
           )}
-        </div>
-      </div>
-
-      {!hideToolSection && (
-        <div className="flex min-w-0 flex-1 items-center justify-center xl:absolute xl:top-0 xl:left-1/2 xl:h-full xl:flex-none xl:-translate-x-1/2">
-          <div className="no-scrollbar flex w-full overflow-x-auto px-1 xl:w-auto">
-            <EditorToolSelector
-              state={editorState}
-              onToolChange={onToolChange}
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-1">
-          <DocumentPermissionsPopover
-            documentPermissions={editorState.documentPermissions}
-            sourceDocumentPermissions={editorState.sourceDocumentPermissions}
-            pdfOwnerUnlocked={editorState.pdfOwnerUnlocked}
-          />
 
           <Button
             variant="ghost"
@@ -273,7 +332,13 @@ const Toolbar: React.FC = () => {
             </Button>
           )}
 
-          {!editorState.isPanelFloating && (
+          {pageMode ? (
+            <div
+              ref={pageFinishRef}
+              className="flex h-8 w-8 shrink-0 items-center sm:h-9 sm:w-9"
+              data-page-finish-host
+            />
+          ) : !editorState.isPanelFloating ? (
             <Button
               variant="ghost"
               size="icon"
@@ -286,6 +351,11 @@ const Toolbar: React.FC = () => {
             >
               <PanelRight size={20} />
             </Button>
+          ) : (
+            !isMobile && (
+              // Keep the mode controls anchored when the panel toggle is hidden.
+              <div aria-hidden="true" className="h-9 w-9" />
+            )
           )}
         </div>
 

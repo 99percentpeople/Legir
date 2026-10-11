@@ -1,3 +1,4 @@
+import { getPageId } from "@/services/pdfService/lib/pageStructure";
 import React from "react";
 import { toast } from "sonner";
 
@@ -98,6 +99,10 @@ export function useEditorPageKeyboardShortcuts({
         return;
       const currentState = useEditorView.getState();
       if (currentState.activeDialog) return;
+      if (currentState.mode === "pages") {
+        currentState.setSelectedPageIds([]);
+        return;
+      }
       const target = event.target;
       const input =
         target instanceof HTMLElement &&
@@ -142,6 +147,15 @@ export function useEditorPageKeyboardShortcuts({
         return;
       }
 
+      // The DnD sensor owns keyboard input until the preview ends.
+      if (
+        currentState.mode === "pages" &&
+        document.querySelector(
+          '[data-editor-active="true"] [data-page-dragging="true"]',
+        )
+      )
+        return;
+
       const target = event.target as HTMLElement;
       const isInput =
         target.tagName === "INPUT" ||
@@ -154,7 +168,34 @@ export function useEditorPageKeyboardShortcuts({
             "button, select, [role='button'], [role='checkbox'], [role='radio'], [role='switch'], [role='listbox'], [role='option'], [role^='menuitem'], [role='tab'], [role='slider'], [role='combobox']",
           ));
 
-      if (event.key === " " && !handlesSpace) {
+      if (
+        currentState.mode === "pages" &&
+        !isInput &&
+        (target.closest("[data-page-editor]") ||
+          !target.closest("[role=dialog]"))
+      ) {
+        const modifier = event.ctrlKey || event.metaKey;
+        const key = event.key.toLowerCase();
+        if (modifier && key === "a") {
+          event.preventDefault();
+          currentState.setSelectedPageIds(currentState.pages.map(getPageId));
+          return;
+        }
+        if (modifier && key === "d") {
+          event.preventDefault();
+          if (guardPdfPermission("assemble_pages", event))
+            currentState.duplicatePages(currentState.selectedPageIds);
+          return;
+        }
+        if (key === "delete" || key === "backspace") {
+          event.preventDefault();
+          if (guardPdfPermission("assemble_pages", event))
+            currentState.deletePages(currentState.selectedPageIds);
+          return;
+        }
+      }
+
+      if (event.key === " " && !handlesSpace && currentState.mode !== "pages") {
         event.preventDefault();
         event.stopPropagation();
         if (!currentState.keys.space) {

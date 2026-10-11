@@ -183,12 +183,13 @@ export const primeOpenFileFromPath = (filePath: string) => {
 };
 
 export const openFiles = async (options: {
+  multiple?: boolean;
   filters?: FilePickerFilter[];
 }): Promise<OpenFileSelection[]> => {
   if (isDesktopApp()) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({
-      multiple: true,
+      multiple: options.multiple ?? true,
       directory: false,
       filters: options.filters,
     });
@@ -204,7 +205,7 @@ export const openFiles = async (options: {
 
   if (canUseWindowPicker("showOpenFilePicker")) {
     const handles = await window.showOpenFilePicker({
-      multiple: true,
+      multiple: options.multiple ?? true,
       types: toWindowPickerTypes(options.filters),
     });
 

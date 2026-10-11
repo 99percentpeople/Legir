@@ -23,6 +23,7 @@ const de = {
     },
   },
   mode: {
+    pages: "Seitenmodus",
     annotation: "Anmerkungsmodus",
     form: "Formularmodus",
     select: "Auswahlmodus",

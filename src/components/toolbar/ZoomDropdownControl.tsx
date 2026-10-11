@@ -7,7 +7,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 
-import { workspaceScaleToZoomPercent } from "@/lib/pdfScale";
+import { workspaceScaleToPdfViewerScale } from "@/lib/pdfScale";
 import { cn } from "@/utils/cn";
 import { useLanguage } from "../language-provider";
 import { Button } from "../ui/button";
@@ -16,6 +16,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
@@ -33,6 +35,9 @@ type ZoomDropdownControlProps = {
   onZoomOut: () => void;
   onFitWidth: () => void;
   onFitScreen: () => void;
+  onSetZoomPercent?: (percent: number) => void;
+  minZoomPercent?: number;
+  maxZoomPercent?: number;
 };
 
 const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
@@ -48,9 +53,40 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
   onZoomOut,
   onFitWidth,
   onFitScreen,
+  onSetZoomPercent,
+  minZoomPercent,
+  maxZoomPercent,
 }) => {
   const { t } = useLanguage();
-  const percentage = `${workspaceScaleToZoomPercent(scale)}%`;
+  const zoomPercent = workspaceScaleToPdfViewerScale(scale) * 100;
+  const percentage = `${Math.round(zoomPercent)}%`;
+  const zoomOutDisabled =
+    disabled || (minZoomPercent !== undefined && zoomPercent <= minZoomPercent);
+  const zoomInDisabled =
+    disabled || (maxZoomPercent !== undefined && zoomPercent >= maxZoomPercent);
+  const zoomOptions = onSetZoomPercent ? (
+    <DropdownMenuRadioGroup
+      value={String(Math.round(zoomPercent))}
+      onValueChange={(value) => onSetZoomPercent(Number(value))}
+    >
+      {[50, 75, 100, 125, 150, 175, 200].map((percent) => (
+        <DropdownMenuRadioItem key={percent} value={String(percent)}>
+          {percent}%
+        </DropdownMenuRadioItem>
+      ))}
+    </DropdownMenuRadioGroup>
+  ) : (
+    <>
+      <DropdownMenuItem onClick={onFitWidth}>
+        <MoveHorizontal size={14} />
+        {t("toolbar.fit_width")}
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={onFitScreen}>
+        <Maximize2 size={14} />
+        {t("toolbar.fit_screen")}
+      </DropdownMenuItem>
+    </>
+  );
 
   if (!compact) {
     return (
@@ -58,7 +94,7 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
         <Button
           variant="ghost"
           size="icon"
-          disabled={disabled}
+          disabled={zoomOutDisabled}
           onClick={onZoomOut}
           title={t("toolbar.zoom_out")}
           className="h-8 w-8 sm:h-9 sm:w-9"
@@ -73,7 +109,9 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
               disabled={disabled}
               className="h-8 px-2 text-sm font-medium sm:h-9"
               title={t("toolbar.zoom")}
-              onDoubleClick={onFitWidth}
+              onDoubleClick={
+                onSetZoomPercent ? () => onSetZoomPercent(100) : onFitWidth
+              }
             >
               <span className="min-w-11 text-center">{percentage}</span>
             </Button>
@@ -86,20 +124,13 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
           >
             <DropdownMenuLabel>{t("toolbar.zoom")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onFitWidth}>
-              <MoveHorizontal size={14} />
-              {t("toolbar.fit_width")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onFitScreen}>
-              <Maximize2 size={14} />
-              {t("toolbar.fit_screen")}
-            </DropdownMenuItem>
+            {zoomOptions}
           </DropdownMenuContent>
         </DropdownMenu>
         <Button
           variant="ghost"
           size="icon"
-          disabled={disabled}
+          disabled={zoomInDisabled}
           onClick={onZoomIn}
           title={t("toolbar.zoom_in")}
           className="h-8 w-8 sm:h-9 sm:w-9"
@@ -132,23 +163,16 @@ const ZoomDropdownControl: React.FC<ZoomDropdownControlProps> = ({
       >
         <DropdownMenuLabel>{t("toolbar.zoom")}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onZoomIn}>
+        <DropdownMenuItem onClick={onZoomIn} disabled={zoomInDisabled}>
           <ZoomIn size={14} />
           {t("toolbar.zoom_in")}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onZoomOut}>
+        <DropdownMenuItem onClick={onZoomOut} disabled={zoomOutDisabled}>
           <ZoomOut size={14} />
           {t("toolbar.zoom_out")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onFitWidth}>
-          <MoveHorizontal size={14} />
-          {t("toolbar.fit_width")}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onFitScreen}>
-          <Maximize2 size={14} />
-          {t("toolbar.fit_screen")}
-        </DropdownMenuItem>
+        {zoomOptions}
       </DropdownMenuContent>
     </DropdownMenu>
   );

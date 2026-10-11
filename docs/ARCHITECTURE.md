@@ -48,6 +48,7 @@ src/
 
   components/
     workspace/              PDF pages, overlays, controls, interaction layers
+    page-editor/            Page structure editing and virtual thumbnail grid
     toolbar/                Editing commands and document actions
     sidebar/                Page list, outline, field/annotation navigation
     properties-panel/       Properties and optional AI-related panels
@@ -449,3 +450,74 @@ Current conventions worth preserving:
 - Keep browser and desktop recent-file backends behind a shared interface
 - Restore editor UI state through one global session path instead of multiple competing persistence systems
 - Prefer extending existing registries and pipelines over adding parallel special-case systems
+
+## Page Structure Editing
+
+The `pages` editor mode provides import, blank pages, duplication, deletion,
+rotation and reordering. `pageEditingSlice` applies one atomic transaction per
+operation, including fields, annotations, outline destinations, selection and
+permission scopes. `historySlice` restores these together. Tab snapshots and
+window transfers retain both page structure and imported source bytes.
+
+Page cards always expose their actions. Click selects one page; Ctrl/Cmd,
+Shift and the context menu extend selection. Shared actions remain visible and
+are disabled when no pages are selected. Selection remains document-scoped.
+Page controls render into the main toolbar's document-local host through a
+React portal. Their dialogs, callbacks and selection stay owned by `PageEditor`;
+no global command registry is needed. `ResponsiveToolbar` supplies the shared
+inline/overflow layout, and `PageActions` serves both cards and header actions.
+`pageThumbnailScale` stores thumbnail zoom independently of the reading scale.
+The grid viewport preserves visible pages when wheel or toolbar zoom changes
+column counts; virtualization and file-drop hit testing share its row height.
+Cards, actions and drag previews are memoized with stable callbacks. Thumbnail
+URLs are subscribed to per page so one rendered image does not invalidate the
+grid. Native scrolling updates React only when the visible row range changes;
+wheel zoom accumulates once per animation frame. Grid row sizing controls card
+geometry without re-rendering their contents, and zoom mounts the destination
+window directly instead of briefly requesting pages at the old scroll offset.
+The virtual grid uses dnd-kit for pointer, touch and keyboard sorting. React
+owns the tentative order; only drop commits a page transaction. External PDF
+drops use the platform file-transfer reader, preserve the insertion gap and
+open the import chooser. Multiple files are confirmed sequentially. Import
+and full-page translation share `src/utils/pageRange.ts`.
+
+Each page receives a stable `id` on its first structural edit. `source` identifies
+an immutable PDF and source page; `copyGroup` separates independent copies.
+Controls retain the source viewport coordinate system and their existing
+`pageIndex` contract. Transactions remap indexes by page identity. Source object
+references are resolved within each page's source/copy group at export.
+
+`PDFWorkerService.configurePages` routes logical page requests to immutable
+sources, loading imports and blank pages on demand. Its source lifetime includes
+undo/redo history. The page grid renders visible rows with overscan and shares
+thumbnail URLs with the sidebar. Editing does not rebuild the source PDF.
+
+Live thumbnails are owned by `store/documentThumbnails.ts`. A per-document
+subscription coalesces control edits, undo/redo and structural changes, then
+compares page snapshots by stable identity. Only changed pages enter the serial
+queue; reordering and CSS rotation retain existing URLs. The sidebar and page
+grid share `useThumbnailViewport`: observed, actually visible pages go first,
+then remaining pages in document order. Each job reads the latest visible set;
+scrolling, virtualization and mode switches replace previous priorities without
+discarding an in-flight render. Reader gestures and thumbnail zoom defer work,
+while page dragging, scrolling and drop animations keep the queue running.
+Drag previews retain their images until drop completes. The old image stays
+visible until its replacement has decoded; canceled or stale results are
+discarded before publishing.
+
+`pdfService/thumbnailRenderer.ts` supplies the same encoding and snapshot bucketing
+for the sidebar/page editor and the virtualized import preview. In the render
+worker, unchanged native/unsupported annotations retain their source appearance;
+edited controls use the shared PDF exporters on a small transparent single-page
+overlay. This never reparses or serializes the full source document for an edit.
+The import preview retains its rendered URLs until unmount. Reader canvas
+placeholders live separately in `pagePreviewImages`, without controls, so they
+cannot double-paint the live workspace overlays. Both resource caches follow
+page identity through edits and are released when their document closes.
+
+`exportPDF` assembles the final page sequence before exporting controls, repairs
+copied AcroForm trees and internal links, and applies `rotationDelta` after
+coordinate-dependent export. The independent `viewRotation` remains temporary.
+Saving compares page/source references as well as controls so edits made during
+an in-flight save remain dirty. See [page editing](PAGE_EDITING_MODE.md) for
+interaction rules and remaining platform acceptance checks.
