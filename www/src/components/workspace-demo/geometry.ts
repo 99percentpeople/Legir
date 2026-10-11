@@ -8,7 +8,7 @@ import {
   calculateWorkspaceFitScreenScale,
   calculateWorkspaceFitWidthScale,
 } from "@/components/workspace/lib/calculateWorkspaceFitScale";
-import type { DemoState } from "./types";
+import type { DemoPage, DemoState } from "./types";
 
 // The same A4 PDF-point dimensions as assets/workspace/reading-notes.pdf.
 export const DEMO_PAGES: PageData[] = Array.from(
@@ -27,11 +27,37 @@ export const PAPER_HEIGHT = 842 * PDF_TO_CSS_UNITS;
 // A compact display inset rather than the full editor's 96px fit-width allowance.
 export const DEMO_CANVAS_PADDING = 16;
 
-export function demoPageGroups(layout: PageLayoutMode): number[][] {
+export function demoPageGroups(layout: PageLayoutMode, count = 3): number[][] {
   // Mirrors useWorkspaceDerivedPages: even spreads keep the cover on its own.
-  if (layout === "double_even") return [[1], [2, 3]];
-  if (layout === "double_odd") return [[1, 2], [3]];
-  return [[1], [2], [3]];
+  const groups: number[][] = [];
+  for (let page = 1; page <= count; ) {
+    const size =
+      layout === "single" || (layout === "double_even" && page === 1) ? 1 : 2;
+    groups.push(
+      Array.from(
+        { length: Math.min(size, count - page + 1) },
+        (_, index) => page + index,
+      ),
+    );
+    page += size;
+  }
+  return groups;
+}
+
+export function demoPageSize(page: DemoPage) {
+  return page.rotation % 180
+    ? { width: PAPER_HEIGHT, height: PAPER_WIDTH }
+    : { width: PAPER_WIDTH, height: PAPER_HEIGHT };
+}
+
+export function demoDataPages(state: DemoState): PageData[] {
+  return state.pages.map((page, pageIndex) => ({
+    ...DEMO_PAGES[0],
+    id: page.id,
+    pageIndex,
+    width: page.rotation % 180 ? 842 : 595,
+    height: page.rotation % 180 ? 595 : 842,
+  }));
 }
 
 export function demoFitZoom(
@@ -39,7 +65,7 @@ export function demoFitZoom(
   viewport: { width: number; height: number },
 ) {
   const options = {
-    pages: DEMO_PAGES,
+    pages: demoDataPages(state),
     pageIndex: state.page - 1,
     pageLayout: state.layout,
     pageFlow: state.flow,

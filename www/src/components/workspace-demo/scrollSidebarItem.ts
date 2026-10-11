@@ -8,11 +8,12 @@ export function scrollSidebarItem(element: HTMLElement) {
     parent = parent.parentElement
   ) {
     if (!/^(auto|scroll)$/.test(getComputedStyle(parent).overflowY)) continue;
-    const viewport = parent.getBoundingClientRect();
-    const box = element.getBoundingClientRect();
+    const viewport = demoRect(parent);
+    const box = demoRect(element);
     if (box.top < viewport.top) parent.scrollTop += box.top - viewport.top;
     else if (box.bottom > viewport.bottom)
       parent.scrollTop += box.bottom - viewport.bottom;
     return;
   }
 }
+import { demoRect } from "./displayGeometry";

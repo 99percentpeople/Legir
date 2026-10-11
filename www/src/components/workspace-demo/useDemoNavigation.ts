@@ -6,8 +6,9 @@ import {
   type Dispatch,
   type RefObject,
 } from "react";
-import type { DemoAction, DemoState } from "./types";
+import { sourcePageNumber, type DemoAction, type DemoState } from "./types";
 import { DEMO_CANVAS_PADDING } from "./geometry";
+import { demoRect } from "./displayGeometry";
 
 type Anchor = { page: number; x: number; y: number };
 
@@ -33,8 +34,8 @@ export function useDemoNavigation(
         `[data-demo-page="${page}"]`,
       );
       if (!root || !paper || !root.clientHeight) return;
-      const view = root.getBoundingClientRect();
-      const box = paper.getBoundingClientRect();
+      const view = demoRect(root);
+      const box = demoRect(paper);
       if (!box.width || !box.height) return;
       anchor.current = {
         page,
@@ -46,6 +47,7 @@ export function useDemoNavigation(
   );
 
   useLayoutEffect(() => {
+    if (state.editorMode === "pages") return;
     const root = stage.current;
     if (!root || !root.clientHeight) return;
     const last = previous.current;
@@ -57,8 +59,8 @@ export function useDemoNavigation(
     const page = navigating ? state.page : (anchor.current?.page ?? state.page);
     const paper = root.querySelector<HTMLElement>(`[data-demo-page="${page}"]`);
     if (!paper) return;
-    const view = root.getBoundingClientRect();
-    const box = paper.getBoundingClientRect();
+    const view = demoRect(root);
+    const box = demoRect(paper);
     if (navigating || !anchor.current) {
       root.scrollTop += box.top - view.top - DEMO_CANVAS_PADDING;
       root.scrollLeft +=
@@ -91,6 +93,7 @@ export function useDemoNavigation(
     state.zoom,
     state.layout,
     state.flow,
+    state.editorMode,
     rememberAnchor,
   ]);
 
@@ -98,16 +101,13 @@ export function useDemoNavigation(
     if (!state.translationOpen) return;
     const root = stage.current;
     const excerpt = root?.querySelector<HTMLElement>(
-      '[data-demo-page="1"] [data-demo-excerpt="quote"]',
+      '[data-source-page="1"] [data-demo-excerpt="quote"]',
     );
     if (!root || !excerpt || !root.clientHeight) return;
     // Stage the fixed sample above the fixed translation card. Only the inner
     // canvas scrolls; no native selection, range measurement or page scrolling.
-    root.scrollTop +=
-      excerpt.getBoundingClientRect().top -
-      root.getBoundingClientRect().top -
-      100;
-    rememberAnchor(1);
+    root.scrollTop += demoRect(excerpt).top - demoRect(root).top - 100;
+    rememberAnchor(sourcePageNumber(state, 1));
   }, [
     stage,
     state.translationOpen,
@@ -120,15 +120,16 @@ export function useDemoNavigation(
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     // The translation scene always refers to page 1, even when a short viewport
     // also exposes the next sheet below the staged quote.
-    if (state.translationOpen) return;
+    if (state.translationOpen || state.editorMode === "pages") return;
     frame.current = requestAnimationFrame(() => {
       frame.current = null;
       const root = stage.current;
-      if (!root || !root.clientHeight) return;
-      const view = root.getBoundingClientRect();
+      if (!root || !root.clientHeight || root.dataset.demoScrolling === "true")
+        return;
+      const view = demoRect(root);
       const pages = [...root.querySelectorAll<HTMLElement>("[data-demo-page]")];
       const area = (element: HTMLElement) => {
-        const box = element.getBoundingClientRect();
+        const box = demoRect(element);
         return (
           Math.max(
             0,
@@ -156,7 +157,14 @@ export function useDemoNavigation(
       rememberAnchor(page);
       dispatch({ type: "visible-page", page });
     });
-  }, [stage, state.page, state.translationOpen, dispatch, rememberAnchor]);
+  }, [
+    stage,
+    state.page,
+    state.translationOpen,
+    state.editorMode,
+    dispatch,
+    rememberAnchor,
+  ]);
   useEffect(
     () => () => {
       if (frame.current !== null) cancelAnimationFrame(frame.current);

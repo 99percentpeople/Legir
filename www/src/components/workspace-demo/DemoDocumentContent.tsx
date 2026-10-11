@@ -17,12 +17,14 @@ export function DemoDocumentContent({
   copy,
   dispatch,
   thumbnail = false,
+  idPrefix = "demo",
   quote,
 }: {
   state: DemoState;
   copy: DemoCopy;
   dispatch?: Dispatch<DemoAction>;
   thumbnail?: boolean;
+  idPrefix?: string;
   quote?: ReactNode;
 }) {
   const { t, effectiveLanguage } = useLanguage();
@@ -94,7 +96,7 @@ export function DemoDocumentContent({
             )}
             {(["name", "email", "note"] as const).map((field) => (
               <div className="demo-form-field" key={field}>
-                <label htmlFor={thumbnail ? undefined : `demo-${field}`}>
+                <label htmlFor={thumbnail ? undefined : `${idPrefix}-${field}`}>
                   {copy[field]}
                 </label>
                 {thumbnail ? (
@@ -105,7 +107,7 @@ export function DemoDocumentContent({
                   </div>
                 ) : field === "note" ? (
                   <textarea
-                    id="demo-note"
+                    id={`${idPrefix}-note`}
                     maxLength={500}
                     rows={3}
                     value={state.fields.note}
@@ -119,7 +121,7 @@ export function DemoDocumentContent({
                   />
                 ) : (
                   <input
-                    id={`demo-${field}`}
+                    id={`${idPrefix}-${field}`}
                     type={field === "email" ? "email" : "text"}
                     autoComplete="off"
                     maxLength={field === "email" ? 160 : 80}
@@ -137,7 +139,7 @@ export function DemoDocumentContent({
             ))}
             <label
               className="demo-reviewed"
-              htmlFor={thumbnail ? undefined : "demo-reviewed"}
+              htmlFor={thumbnail ? undefined : `${idPrefix}-reviewed`}
             >
               {thumbnail ? (
                 <span className="demo-checkbox-value">
@@ -145,7 +147,7 @@ export function DemoDocumentContent({
                 </span>
               ) : (
                 <input
-                  id="demo-reviewed"
+                  id={`${idPrefix}-reviewed`}
                   type="checkbox"
                   checked={state.fields.reviewed}
                   onChange={(event) =>

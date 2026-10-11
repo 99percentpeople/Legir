@@ -5,7 +5,7 @@ import type {
 import type { AiReasoningLevel } from "@/services/ai";
 import type { DemoTokenPlan, DemoTokenStats } from "./types";
 
-// Authored demo allowances, not a DeepSeek tokenizer, context limit or bill.
+// Authored demo allowances, not a provider tokenizer, context limit or bill.
 const DOCUMENT_AND_PROMPT_TOKENS = 1180;
 const MESSAGE_OVERHEAD_TOKENS = 8;
 

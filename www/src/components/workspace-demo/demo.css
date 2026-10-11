@@ -3,6 +3,12 @@
 /* Only the synthetic document and host need custom CSS. Shared app controls keep
    their original classes, font sizes, backgrounds, borders and focus styles. */
 .demo-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 1200px;
+  height: 900px;
+  zoom: var(--demo-scale, 1);
   container-type: inline-size;
   background: var(--background);
   color: var(--foreground);
@@ -10,10 +16,87 @@
   font-size: 16px;
   text-align: left;
 }
+.demo-playback-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 80;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  color: #fff;
+  filter: drop-shadow(0 2px 3px #0005);
+}
+.demo-playback-cursor[data-visible="true"] {
+  opacity: 1;
+}
+.demo-cursor-arrow {
+  fill: #242424;
+  stroke-width: 1.5;
+  transform-origin: top left;
+  transition: transform 100ms ease;
+}
+.demo-playback-cursor[data-pressed="true"] .demo-cursor-arrow {
+  transform: scale(0.88);
+}
+.demo-cursor-text {
+  display: none;
+  transform: translate(-50%, -50%);
+  stroke: var(--foreground);
+}
+.demo-playback-cursor[data-kind="text"] .demo-cursor-arrow {
+  display: none;
+}
+.demo-playback-cursor[data-kind="text"] .demo-cursor-text {
+  display: block;
+}
+.demo-cursor-ring {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  left: -12px;
+  top: -12px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0;
+}
+.demo-editor button[data-demo-active="true"] {
+  background-color: var(--accent);
+}
+.demo-editor input[data-demo-active="true"],
+.demo-editor textarea[data-demo-active="true"] {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.demo-editor[data-autoplay="true"] .demo-stage {
+  scroll-behavior: auto;
+}
+@container (max-width: 767px) {
+  .demo-toolbar:has(.demo-page-tools) {
+    flex-wrap: wrap;
+    height: 96px;
+    min-height: 96px;
+    padding-block: 4px;
+  }
+  .demo-page-tools {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-playback-cursor,
+  .demo-cursor-arrow {
+    transition: none;
+  }
+  .demo-editor[data-autoplay="true"] .demo-stage {
+    scroll-behavior: auto;
+  }
+}
 .demo-editor svg {
   flex-shrink: 0;
 }
 .demo-editor:fullscreen {
+  zoom: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -25,52 +108,42 @@
 }
 .demo-filebar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 37px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--background) 95%, transparent);
+  flex-shrink: 0;
+  align-items: flex-end;
+  height: 40px;
+  padding: 6px 4px 0;
+}
+.demo-filebar > [data-slot="button"] {
+  align-self: center;
 }
 .demo-file-tab {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
-  gap: 6px;
-  align-self: end;
-  height: 30px;
+  gap: 8px;
+  height: 34px;
   min-width: 0;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-bottom-color: var(--foreground);
-  border-radius: 8px 8px 0 0;
-  background: color-mix(in oklab, var(--muted) 60%, transparent);
-  box-shadow:
-    0 1px 3px 0 #0000001a,
-    0 1px 2px -1px #0000001a;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 20px;
+  white-space: nowrap;
 }
 .demo-file-tab > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.demo-live-badge {
-  margin-left: auto;
-  white-space: nowrap;
-  font-size: 10px;
-  color: var(--muted-foreground);
-}
 .demo-toolbar {
   position: relative;
   z-index: 30;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   height: 48px;
   padding: 0 16px;
-  background: var(--background);
+  background: var(--workspace-header);
   color: var(--foreground);
   border-bottom: 1px solid var(--border);
 }
@@ -94,8 +167,9 @@
 .demo-editor-body {
   position: relative;
   display: flex;
+  flex: 1;
   min-width: 0;
-  height: 720px;
+  min-height: 0;
   overflow: hidden;
 }
 .demo-sidebar {
@@ -510,28 +584,6 @@
   line-height: 1.6;
   color: var(--muted-foreground);
 }
-.demo-statusbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 36px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--border);
-  color: var(--muted-foreground);
-  font-size: 11px;
-  line-height: 1.6;
-}
-.demo-statusbar > span {
-  min-width: 0;
-}
-.demo-statusbar a {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  color: var(--foreground);
-}
 .demo-translation-window {
   position: absolute;
   z-index: 45;
@@ -558,19 +610,12 @@
   .demo-toolbar {
     padding-inline: 8px;
   }
-  .demo-editor-body {
-    height: 630px;
-  }
-  .demo-statusbar {
-    align-items: start;
-    font-size: 10px;
-  }
 }
 @container (max-width: 460px) {
-  .demo-live-badge {
-    display: none;
-  }
-  .demo-toolbar > div:first-child > div:nth-child(2) {
+  .demo-editor:not([data-page-mode="true"])
+    .demo-toolbar
+    > div:first-child
+    > div:nth-child(2) {
     display: none;
   }
   .demo-toolbar {
@@ -582,5 +627,27 @@
   }
   .demo-toolbar > div:first-child > [data-slot="separator"] {
     display: none;
+  }
+}
+
+.demo-editor-body[data-page-mode="true"] > :not([data-page-editor]) {
+  display: none;
+}
+.demo-page-handle > .demo-mini-paper,
+.demo-page-drag-overlay .demo-mini-paper {
+  width: 100%;
+  border-radius: 0;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px #0002;
+}
+.demo-editor[data-page-mode="true"] .demo-toolbar {
+  gap: 4px;
+}
+@container (max-width: 460px) {
+  .demo-editor[data-page-mode="true"] .demo-toolbar > div:first-child {
+    gap: 0;
+  }
+  .demo-editor[data-page-mode="true"] .demo-toolbar > div:first-child > div {
+    gap: 0;
   }
 }

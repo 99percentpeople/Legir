@@ -2,6 +2,8 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspacePreview } from "../../www/src/components/WorkspacePreview";
+// Preload the desktop view; separate mobile tests verify the lazy boundary.
+import "../../www/src/components/workspace-demo/WorkspaceDemo";
 import { getLandingCopy, landingCopy } from "../../www/src/content";
 import { en } from "../../www/src/content/en";
 import { PREVIEW_MODES } from "../../www/src/content/types";
@@ -32,6 +34,15 @@ import {
 } from "@/components/workspace/lib/calculateWorkspaceFitScale";
 import { workspaceScaleToPdfViewerScale } from "@/lib/pdfScale";
 import { FIT_WIDTH_PADDING_X } from "@/constants";
+
+// The shared drag-and-drop runtime creates its observer during module loading.
+vi.hoisted(() => {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
 
 // Importing the editing runtime from a public demo would initialize PDF workers.
 vi.mock("@/store/useEditorView", () => {
@@ -271,8 +282,8 @@ describe("source-backed interactive workspace", () => {
     );
     vi.stubGlobal(
       "matchMedia",
-      vi.fn(() => ({
-        matches: true,
+      vi.fn((query: string) => ({
+        matches: query === "(prefers-reduced-motion: reduce)",
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       })),
@@ -282,6 +293,7 @@ describe("source-backed interactive workspace", () => {
     document.body.append(container);
     root = createRoot(container);
     await render();
+    await act(async () => vi.dynamicImportSettled());
   });
   afterEach(async () => {
     await act(async () => root.unmount());
@@ -322,7 +334,7 @@ describe("source-backed interactive workspace", () => {
   it("renders HTML pages and retains separate accessible preset and sidebar tabs", () => {
     expect(q("canvas,iframe,.workspace-screenshot")).toBeNull();
     expect(container.querySelectorAll("[data-demo-page]")).toHaveLength(3);
-    expect(tabs()).toHaveLength(5);
+    expect(tabs()).toHaveLength(6);
     expect(tabs().filter((tab) => tab.tabIndex === 0)).toHaveLength(1);
     const panel = q(".workspace-frame")!;
     for (const tab of tabs())
@@ -335,10 +347,10 @@ describe("source-backed interactive workspace", () => {
   });
   it("handles preset keyboard wrapping without changing sidebar selection", async () => {
     for (const [from, key, to] of [
-      [0, "ArrowLeft", 4],
-      [4, "ArrowRight", 0],
-      [0, "End", 4],
-      [4, "Home", 0],
+      [0, "ArrowLeft", 5],
+      [5, "ArrowRight", 0],
+      [0, "End", 5],
+      [5, "Home", 0],
     ] as const) {
       await act(async () =>
         tabs()[from].dispatchEvent(
@@ -353,6 +365,7 @@ describe("source-backed interactive workspace", () => {
     const write = vi.spyOn(Storage.prototype, "setItem");
     await mode(2);
     await change(q("#demo-name") as HTMLInputElement, "Reader");
+    expect(q(".preview-playback")?.getAttribute("aria-pressed")).toBe("false");
     await change(q("#demo-note") as HTMLTextAreaElement, "A local note");
     await click(q(".demo-reviewed input"));
     await mode(3);
@@ -363,6 +376,41 @@ describe("source-backed interactive workspace", () => {
     expect((q(".demo-reviewed input") as HTMLInputElement).checked).toBe(true);
     expect(write).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it("edits pages locally and shows the same rotation and page count in the reader", async () => {
+    await mode(5);
+    expect(q("[data-page-editor]")).not.toBeNull();
+    expect(container.querySelectorAll("[data-page-card]")).toHaveLength(3);
+    await click(q('[data-page-card="sample-1"] .demo-page-handle'));
+    await click(
+      q('[data-page-editor-toolbar] [aria-label="toolbar.rotate_clockwise"]'),
+    );
+    expect(q('[data-page-card="sample-1"]')?.dataset.rotation).toBe("90");
+    await mode(0);
+    expect(container.querySelectorAll("[data-demo-page]")).toHaveLength(3);
+    expect(q('[data-demo-page-id="sample-1"]')?.dataset.rotation).toBe("90");
+    await click(q('[aria-label="toolbar.undo"]'));
+    expect(q('[data-demo-page-id="sample-1"]')?.dataset.rotation).toBe("0");
+    await click(q('[aria-label="toolbar.redo"]'));
+    expect(q('[data-demo-page-id="sample-1"]')?.dataset.rotation).toBe("90");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("returns from a page thumbnail to the requested reading page", async () => {
+    await mode(5);
+    await act(async () =>
+      q('[data-page-card="sample-3"] .demo-page-handle')!.dispatchEvent(
+        new MouseEvent("dblclick", { bubbles: true }),
+      ),
+    );
+    expect(tabs()[0].getAttribute("aria-selected")).toBe("true");
+    expect(
+      q('.demo-thumbnail[aria-current="page"]')?.getAttribute("aria-label"),
+    ).toBe("sidebar.page");
+    expect(
+      container
+        .querySelectorAll(".demo-thumbnail")[2]
+        .getAttribute("aria-current"),
+    ).toBe("page");
   });
   it("deletes annotations and uses real undo and redo commands", async () => {
     await mode(1);
@@ -463,7 +511,8 @@ describe("source-backed interactive workspace", () => {
     expect(
       panel.querySelector('[aria-label="common.actions.send"]'),
     ).not.toBeNull();
-    expect(panel.textContent).toContain("DeepSeek · Demo");
+    expect(panel.textContent).toContain("Demo");
+    expect(panel.textContent).not.toContain("DeepSeek");
     expect(panel.textContent).toContain(demoCopy.en.aiNotice);
     expect(panel.textContent).not.toContain("empty_no_model");
   });

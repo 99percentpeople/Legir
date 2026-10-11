@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { Github, Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { LanguageDropdownToggle } from "@/components/LanguageToggle";
 import { ThemeDropdownToggle } from "@/components/ThemeToggle";
 import type { LandingCopy } from "../content/types";
+import { SOURCE_URL } from "../lib/app-url";
 
 export function Brand({ label }: { label: string }) {
   return (
@@ -15,11 +17,9 @@ export function Brand({ label }: { label: string }) {
 
 export function SiteHeader({
   copy,
-  appUrl,
   downloadLabel,
 }: {
   copy: LandingCopy;
-  appUrl: string;
   downloadLabel: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -53,10 +53,17 @@ export function SiteHeader({
         <div className="header-actions">
           <LanguageDropdownToggle />
           <ThemeDropdownToggle />
-          <a className="site-button button-small header-cta" href={appUrl}>
-            {copy.hero.cta}
-            <ArrowUpRight size={15} aria-hidden="true" />
-          </a>
+          <Button asChild variant="ghost" size="icon">
+            <a
+              href={SOURCE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={copy.hero.source}
+              title={copy.hero.source}
+            >
+              <Github className="size-[1.2rem]" aria-hidden="true" />
+            </a>
+          </Button>
           <button
             ref={menuButton}
             type="button"
@@ -85,10 +92,6 @@ export function SiteHeader({
             {link.label}
           </a>
         ))}
-        <a href={appUrl} onClick={() => setMenuOpen(false)}>
-          {copy.hero.cta}
-          <ArrowUpRight size={16} aria-hidden="true" />
-        </a>
       </nav>
     </header>
   );

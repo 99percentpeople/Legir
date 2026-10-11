@@ -1,5 +1,6 @@
 import { useState, type Dispatch, type ReactNode } from "react";
 import {
+  Check,
   ChevronDown,
   CircleDot,
   Edit3,
@@ -7,6 +8,7 @@ import {
   Hand,
   Highlighter,
   Keyboard,
+  LayoutGrid,
   List,
   MessageCircle,
   MousePointer2,
@@ -43,7 +45,13 @@ import { pdfViewerScaleToWorkspaceScale } from "@/lib/pdfScale";
 import { ANNOTATION_STYLES } from "@/constants";
 import { getContrastColor } from "@/utils/colors";
 import { cn } from "@/utils/cn";
-import type { DemoAction, DemoState, Tool } from "./types";
+import {
+  sourcePageNumber,
+  type DemoAction,
+  type DemoState,
+  type Tool,
+} from "./types";
+import { DemoPageTools } from "./DemoPageEditor";
 
 function ToolButton({
   label,
@@ -113,10 +121,11 @@ export function DemoToolbar({
     draw_highlight: 0.4,
   });
   const formMode = state.editorMode === "form";
+  const pageMode = state.editorMode === "pages";
   function selectTool(tool: Tool) {
     dispatch({ type: "tool", tool });
     if (tool === "draw_highlight") {
-      dispatch({ type: "page", page: 1 });
+      dispatch({ type: "page", page: sourcePageNumber(state, 1) });
       if (!state.highlighted) dispatch({ type: "highlight" });
     }
     if (tool === "eraser" && state.highlighted) dispatch({ type: "highlight" });
@@ -259,13 +268,15 @@ export function DemoToolbar({
   return (
     <div className="demo-toolbar" role="toolbar" aria-label={t("toolbar.view")}>
       <div className="flex shrink-0 items-center gap-2">
-        <ToolButton
-          label={t("toolbar.toggle_sidebar")}
-          active={state.sidebar}
-          onClick={() => dispatch({ type: "sidebar" })}
-        >
-          <PanelLeft size={20} />
-        </ToolButton>
+        {!pageMode && (
+          <ToolButton
+            label={t("toolbar.toggle_sidebar")}
+            active={state.sidebar}
+            onClick={() => dispatch({ type: "sidebar" })}
+          >
+            <PanelLeft size={20} />
+          </ToolButton>
+        )}
         <div className="flex items-center gap-1">
           <ToolButton
             label={t("toolbar.undo")}
@@ -281,75 +292,134 @@ export function DemoToolbar({
           >
             <Redo2 size={20} />
           </ToolButton>
-          <ToolButton
-            label={t("toolbar.search_pdf")}
-            active={state.sidebarView === "search" && state.sidebar}
-            onClick={() => dispatch({ type: "sidebar", view: "search" })}
-          >
-            <Search size={20} />
-          </ToolButton>
+          {!pageMode && (
+            <ToolButton
+              label={t("toolbar.search_pdf")}
+              active={state.sidebarView === "search" && state.sidebar}
+              onClick={() => dispatch({ type: "sidebar", view: "search" })}
+            >
+              <Search size={20} />
+            </ToolButton>
+          )}
         </div>
         <Separator orientation="vertical" className="h-7" />
         <ZoomDropdownControl
           compact={compact}
-          scale={pdfViewerScaleToWorkspaceScale(state.zoom / 100)}
+          scale={pdfViewerScaleToWorkspaceScale(
+            pageMode ? state.thumbnailScale : state.zoom / 100,
+          )}
           open={zoomOpen}
           onOpenChange={setZoomOpen}
-          onZoomIn={() => dispatch({ type: "zoom", delta: state.zoom * 0.25 })}
-          onZoomOut={() => dispatch({ type: "zoom", delta: -state.zoom * 0.2 })}
-          onFitWidth={() => dispatch({ type: "fit", fit: "width" })}
-          onFitScreen={() => dispatch({ type: "fit" })}
+          onZoomIn={() =>
+            dispatch(
+              pageMode
+                ? {
+                    type: "thumbnail-scale",
+                    scale: state.thumbnailScale * 1.25,
+                  }
+                : { type: "zoom", delta: state.zoom * 0.25 },
+            )
+          }
+          onZoomOut={() =>
+            dispatch(
+              pageMode
+                ? { type: "thumbnail-scale", scale: state.thumbnailScale * 0.8 }
+                : { type: "zoom", delta: -state.zoom * 0.2 },
+            )
+          }
+          onFitWidth={() =>
+            dispatch(
+              pageMode
+                ? { type: "thumbnail-scale", scale: 1 }
+                : { type: "fit", fit: "width" },
+            )
+          }
+          onFitScreen={() =>
+            dispatch(
+              pageMode
+                ? { type: "thumbnail-scale", scale: 1 }
+                : { type: "fit" },
+            )
+          }
+          onSetZoomPercent={
+            pageMode
+              ? (percent) =>
+                  dispatch({ type: "thumbnail-scale", scale: percent / 100 })
+              : undefined
+          }
+          minZoomPercent={pageMode ? 75 : undefined}
+          maxZoomPercent={pageMode ? 200 : undefined}
         />
-        {!compact && (
-          <DropdownMenu
-            modal={false}
-            open={modeOpen}
-            onOpenChange={setModeOpen}
-          >
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-2 h-9 w-9"
-                title={t("mode.select")}
-                aria-label={t("mode.select")}
-              >
-                {formMode ? <Edit3 size={16} /> : <PenTool size={16} />}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuRadioGroup
-                value={state.editorMode}
-                onValueChange={(value) =>
-                  dispatch({
-                    type: "editor-mode",
-                    mode: value as DemoState["editorMode"],
-                  })
-                }
-              >
-                <DropdownMenuRadioItem value="annotation">
-                  <PenTool size={14} />
-                  {t("mode.annotation")}
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="form">
-                  <Edit3 size={14} />
-                  {t("mode.form")}
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       </div>
-      {!compact && (
-        <div className="demo-tools-center">
-          <div className="no-scrollbar flex w-full overflow-x-auto px-1">
-            {editTools}
-          </div>
+      {pageMode ? (
+        <div className="demo-page-tools flex min-w-0 flex-1 items-center justify-center">
+          <DemoPageTools
+            state={state}
+            dispatch={dispatch}
+            onOpenApp={onOpenApp}
+          />
         </div>
+      ) : (
+        !compact && (
+          <div className="demo-tools-center">
+            <div className="no-scrollbar flex w-full overflow-x-auto px-1">
+              {editTools}
+            </div>
+          </div>
+        )
       )}
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-1">
-          {compact && (
+          {(!compact || pageMode) && (
+            <DropdownMenu
+              modal={false}
+              open={modeOpen}
+              onOpenChange={setModeOpen}
+            >
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 sm:h-9 sm:w-9"
+                  title={t("mode.select")}
+                  aria-label={t("mode.select")}
+                >
+                  {pageMode ? (
+                    <LayoutGrid size={16} />
+                  ) : formMode ? (
+                    <Edit3 size={16} />
+                  ) : (
+                    <PenTool size={16} />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup
+                  value={state.editorMode}
+                  onValueChange={(value) =>
+                    dispatch({
+                      type: "editor-mode",
+                      mode: value as DemoState["editorMode"],
+                    })
+                  }
+                >
+                  <DropdownMenuRadioItem value="annotation">
+                    <PenTool size={14} />
+                    {t("mode.annotation")}
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="form">
+                    <Edit3 size={14} />
+                    {t("mode.form")}
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="pages">
+                    <LayoutGrid size={14} />
+                    {t("mode.pages")}
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {compact && !pageMode && (
             <PageSettingsDropdownControl
               pageLayout={state.layout}
               pageFlow={state.flow}
@@ -363,60 +433,75 @@ export function DemoToolbar({
               onToggleFullscreen={onToggleFullscreen}
             />
           )}
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 sm:h-9 sm:w-9"
-                title={t("toolbar.settings")}
-              >
-                <Settings size={20} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={onOpenApp}>
-                {t("toolbar.settings")} ↗
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => dispatch({ type: "reset" })}>
-                {t("common.actions.reset_to_default")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {(!compact || !pageMode) && (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 sm:h-9 sm:w-9"
+                  title={t("toolbar.settings")}
+                >
+                  <Settings size={20} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={onOpenApp}>
+                  {t("toolbar.settings")} ↗
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => dispatch({ type: "reset" })}>
+                  {t("common.actions.reset_to_default")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {!compact && (
             <>
               <ToolButton label={t("toolbar.shortcuts")} onClick={onOpenApp}>
                 <Keyboard size={20} />
               </ToolButton>
-              <ToolButton
-                label={t("toolbar.toggle_properties")}
-                active={!!state.panel}
-                onClick={() =>
-                  dispatch({
-                    type: "panel",
-                    panel: state.panel ? null : "document",
-                  })
-                }
-              >
-                <PanelRight size={20} />
-              </ToolButton>
+              {!pageMode && (
+                <ToolButton
+                  label={t("toolbar.toggle_properties")}
+                  active={!!state.panel}
+                  onClick={() =>
+                    dispatch({
+                      type: "panel",
+                      panel: state.panel ? null : "document",
+                    })
+                  }
+                >
+                  <PanelRight size={20} />
+                </ToolButton>
+              )}
             </>
           )}
         </div>
-        <SaveMenu
-          disabled={false}
-          isDirty={state.dirty}
-          hasSaveAs={false}
-          canPrint={false}
-          onPrimary={async () => {
-            dispatch({ type: "save" });
-            return true;
-          }}
-          onSaveAs={async () => false}
-          onExit={onOpenApp}
-          onPrint={onOpenApp}
-          onClose={onOpenApp}
-        />
+        {pageMode ? (
+          <ToolButton
+            label={t("common.actions.done")}
+            onClick={() =>
+              dispatch({ type: "editor-mode", mode: "annotation" })
+            }
+          >
+            <Check size={18} />
+          </ToolButton>
+        ) : (
+          <SaveMenu
+            disabled={false}
+            isDirty={state.dirty}
+            hasSaveAs={false}
+            canPrint={false}
+            onPrimary={async () => {
+              dispatch({ type: "save" });
+              return true;
+            }}
+            onSaveAs={async () => false}
+            onExit={onOpenApp}
+            onPrint={onOpenApp}
+            onClose={onOpenApp}
+          />
+        )}
       </div>
     </div>
   );

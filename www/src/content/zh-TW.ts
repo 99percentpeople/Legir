@@ -18,7 +18,6 @@ export const zhTW: LandingCopy = {
       "一個安靜、順手的 PDF 工作空間。閱讀、註解、填寫表單，讓想法自然發生，讓檔案留在自己的裝置上。",
     cta: "開啟 Legir",
     source: "在 GitHub 查看",
-    note: "瀏覽器直接使用 · 本機優先 · 開源",
   },
   preview: {
     label: "Legir 工作台互動示範",
@@ -28,14 +27,13 @@ export const zhTW: LandingCopy = {
       forms: "表單",
       ai: "AI 助理",
       translate: "選取翻譯",
+      pages: "頁面",
     },
-    caption:
-      "可操作的介面示範，非完整編輯器。輸入僅保留在記憶體；AI 與翻譯使用本機預設，不傳送內容。處理自己的 PDF 請開啟 Legir。",
     appLabel: "開啟 Legir",
   },
   features: {
     eyebrow: "少些打斷，多些投入",
-    title: "從讀懂一頁，到完成一份。",
+    title: "閱讀與編輯 PDF，都在這裡。",
     description: "把需要的工具放在順手的位置，讓注意力回到文件本身。",
     items: [
       {
@@ -58,12 +56,18 @@ export const zhTW: LandingCopy = {
         description:
           "按需啟用 AI，輔助理解文件。自行選擇服務商，在應用程式設定中配置 API Key。",
       },
+      {
+        title: "按需整理 PDF 頁面。",
+        description:
+          "拖曳縮圖調整順序，旋轉、複製或刪除頁面。也可以插入空白頁，或從其他 PDF 匯入頁面。",
+      },
     ],
     tags: [
       "專注的閱讀空間",
       "螢光標記 · 註解 · 手繪",
       "填寫 · 建立 · 匯出",
       "服務由你選，是否啟用由你定",
+      "排序 · 旋轉 · 插入 · 複製 · 刪除",
     ],
   },
   privacy: {

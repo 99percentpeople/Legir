@@ -16,12 +16,14 @@ import type {
 import type { AiReasoningLevel } from "@/services/ai";
 import type { DemoCopy } from "./copy";
 import {
+  sourcePageNumber,
   type AnswerKind,
   type DemoAction,
   type DemoState,
   type DemoTokenPlan,
 } from "./types";
 import { useDemoPlayback } from "./useDemoPlayback";
+import type { DemoChatCue } from "./useDemoAutoplay";
 import {
   createDemoTokenPlan,
   getDemoTokenStats,
@@ -30,9 +32,8 @@ import {
 
 export const DEMO_MODELS = [
   {
-    id: "deepseek",
-    label: "DeepSeek",
-    options: [{ value: "demo-deepseek", label: "DeepSeek · Demo" }],
+    id: "demo",
+    options: [{ value: "demo", label: "Demo" }],
   },
 ];
 const DATE = "2026-09-18T00:00:00Z";
@@ -53,8 +54,10 @@ export function DemoAiPanel({
   width,
   onResize,
   floating,
+  autoplayCue,
 }: DemoPanelProps & {
   selectionRequest: { id: number; text: string; page: number } | null;
+  autoplayCue: DemoChatCue | null;
 }) {
   const { t, effectiveLanguage } = useLanguage();
   const tokenFormatter = useMemo(
@@ -227,11 +230,28 @@ export function DemoAiPanel({
     setHistoryOpen(false);
   }
   function activate(attachment: AiChatMessageAttachment) {
-    dispatch({ type: "page", page: attachment.pageIndex + 1 });
+    dispatch({
+      type: "page",
+      page: sourcePageNumber(state, attachment.pageIndex + 1),
+    });
   }
+  useEffect(() => {
+    if (!autoplayCue) return;
+    if (autoplayCue.kind === "stop") stop();
+    if (autoplayCue.kind === "reset") {
+      stop();
+      setItems([]);
+      setStreamId(null);
+      setDraft("");
+      setPending([]);
+    }
+    if (autoplayCue.kind === "draft") setDraft(autoplayCue.text ?? "");
+    if (autoplayCue.kind === "send") ask(autoplayCue.text, "summary", [], []);
+  }, [autoplayCue]);
   return (
     <div
       className="demo-runtime-panel"
+      data-demo-streaming={playing}
       hidden={!visible}
       data-context-tokens={contextTokens}
       data-input-tokens={tokenUsage.inputTokens}
@@ -254,7 +274,7 @@ export function DemoAiPanel({
             </div>
             <div className="max-w-full min-w-0 shrink-0">
               <ModelSelect
-                value="demo-deepseek"
+                value="demo"
                 onValueChange={() => {}}
                 groups={DEMO_MODELS}
                 placeholder={t("common.select")}
@@ -391,7 +411,9 @@ export function DemoAiPanel({
                 setStreamId(id);
                 start(answer);
               }}
-              onOpenDocumentLink={() => dispatch({ type: "page", page: 1 })}
+              onOpenDocumentLink={() =>
+                dispatch({ type: "page", page: sourcePageNumber(state, 1) })
+              }
               onActivateAttachment={activate}
               onInlineEditChange={(value) =>
                 setEdit((old) => (old ? { ...old, text: value } : old))
@@ -444,7 +466,7 @@ export function DemoAiPanel({
                 className="demo-citation h-auto text-xs"
                 variant="ghost"
                 onClick={() => {
-                  dispatch({ type: "page", page: 1 });
+                  dispatch({ type: "page", page: sourcePageNumber(state, 1) });
                   if (!state.highlighted) dispatch({ type: "highlight" });
                 }}
               >

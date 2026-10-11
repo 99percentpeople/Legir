@@ -18,7 +18,6 @@ export const fr: LandingCopy = {
       "Un espace serein pour vos PDF. Lisez, annotez et remplissez des formulaires, en gardant vos fichiers sur votre appareil.",
     cta: "Ouvrir Legir",
     source: "Voir sur GitHub",
-    note: "Dans votre navigateur · Local d’abord · Open source",
   },
   preview: {
     label: "Démo interactive de Legir",
@@ -28,9 +27,8 @@ export const fr: LandingCopy = {
       forms: "Formulaires",
       ai: "IA",
       translate: "Traduire",
+      pages: "Pages",
     },
-    caption:
-      "Démo d’interface, pas l’éditeur complet. Saisies en mémoire uniquement ; IA et traductions prédéfinies, sans envoi de contenu. Ouvrez Legir pour vos PDF.",
     appLabel: "Ouvrir Legir",
   },
   features: {
@@ -59,12 +57,18 @@ export const fr: LandingCopy = {
         description:
           "Explorez le document avec l’IA facultative. Choisissez votre fournisseur et configurez la clé API dans l’application.",
       },
+      {
+        title: "Organisez les pages de votre PDF.",
+        description:
+          "Réorganisez les pages en faisant glisser leurs miniatures. Faites-les pivoter, copiez-les ou supprimez-les, ajoutez une page vierge ou importez des pages d’un autre PDF.",
+      },
     ],
     tags: [
       "Un espace de lecture serein",
       "Surlignage · Notes · Dessin",
       "Remplir · Créer · Exporter",
       "Votre fournisseur, votre choix",
+      "Réorganiser · Pivoter · Insérer · Copier · Supprimer",
     ],
   },
   privacy: {

@@ -18,7 +18,6 @@ export const zhCN: LandingCopy = {
       "一个安静、顺手的 PDF 工作台。阅读、批注、填写表单，让想法自然发生，让文件留在自己的设备上。",
     cta: "打开 Legir",
     source: "在 GitHub 查看",
-    note: "浏览器直接使用 · 本地优先 · 开源",
   },
   preview: {
     label: "Legir 工作台交互演示",
@@ -28,14 +27,13 @@ export const zhCN: LandingCopy = {
       forms: "表单",
       ai: "AI 助手",
       translate: "划词翻译",
+      pages: "页面",
     },
-    caption:
-      "可操作的界面演示，非完整编辑器。输入仅保留在内存中；AI 与翻译使用本地预设，不发送内容。处理自己的 PDF 请打开 Legir。",
     appLabel: "打开 Legir",
   },
   features: {
     eyebrow: "少些打断，多些投入",
-    title: "从读懂一页，到完成一份。",
+    title: "阅读与编辑 PDF，都在这里。",
     description: "把需要的工具放在顺手的位置，让注意力回到文档本身。",
     items: [
       {
@@ -58,12 +56,18 @@ export const zhCN: LandingCopy = {
         description:
           "按需启用 AI，辅助理解文档。自行选择服务商，在应用设置中配置 API Key。",
       },
+      {
+        title: "按需整理 PDF 页面。",
+        description:
+          "拖动缩略图调整顺序，旋转、复制或删除页面。也可以插入空白页，或从其他 PDF 导入页面。",
+      },
     ],
     tags: [
       "专注的阅读空间",
       "高亮 · 批注 · 手绘",
       "填写 · 创建 · 导出",
       "服务由你选，是否启用由你定",
+      "排序 · 旋转 · 插入 · 复制 · 删除",
     ],
   },
   privacy: {

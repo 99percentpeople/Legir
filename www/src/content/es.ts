@@ -18,7 +18,6 @@ export const es: LandingCopy = {
       "Un espacio tranquilo para tus PDF. Lee, anota y rellena formularios, con tus archivos donde deben estar: en tu dispositivo.",
     cta: "Abrir Legir",
     source: "Ver en GitHub",
-    note: "En tu navegador · Primero local · Código abierto",
   },
   preview: {
     label: "Demo interactiva de Legir",
@@ -28,9 +27,8 @@ export const es: LandingCopy = {
       forms: "Formularios",
       ai: "Consultar IA",
       translate: "Traducir",
+      pages: "Páginas",
     },
-    caption:
-      "Demo interactiva con datos de ejemplo. Las entradas quedan en memoria; las respuestas y traducciones son locales. Abre Legir para editar tus documentos.",
     appLabel: "Abrir Legir",
   },
   features: {
@@ -59,12 +57,18 @@ export const es: LandingCopy = {
         description:
           "Explora tus documentos con IA opcional. Elige el proveedor y configura tu clave API en los ajustes de la aplicación.",
       },
+      {
+        title: "Organiza las páginas de tu PDF.",
+        description:
+          "Arrastra las miniaturas para cambiar el orden. Gira, copia o elimina páginas, inserta una página en blanco o importa páginas de otro PDF.",
+      },
     ],
     tags: [
       "Un espacio para concentrarse",
       "Resaltado · Notas · Dibujo",
       "Rellenar · Crear · Exportar",
       "Tu proveedor. Tu decisión.",
+      "Ordenar · Girar · Insertar · Copiar · Eliminar",
     ],
   },
   privacy: {

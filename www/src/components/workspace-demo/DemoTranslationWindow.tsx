@@ -14,11 +14,13 @@ export function DemoTranslationWindow({
   dispatch,
   copy,
   language,
+  stopToken,
 }: {
   state: DemoState;
   dispatch: Dispatch<DemoAction>;
   copy: DemoCopy;
   language: string;
+  stopToken?: number;
 }) {
   const { t } = useLanguage();
   const titleId = useId();
@@ -31,6 +33,9 @@ export function DemoTranslationWindow({
   const lastToken = useRef(-1);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { text, playing, start, stop } = useDemoPlayback("");
+  useEffect(() => {
+    if (stopToken !== undefined) stop();
+  }, [stopToken, stop]);
   function translate(value = input) {
     const id = getTranslationId(value);
     setCopied(false);
@@ -81,6 +86,7 @@ export function DemoTranslationWindow({
   return (
     <section
       className="demo-translation-window bg-background border-border rounded-xl border shadow-xl"
+      data-demo-streaming={playing}
       role="region"
       aria-labelledby={titleId}
       onKeyDown={(event) => {
@@ -100,7 +106,7 @@ export function DemoTranslationWindow({
         </h3>
         <div className="min-w-0 flex-1">
           <ModelSelect
-            value="demo-deepseek"
+            value="demo"
             onValueChange={() => {}}
             placeholder={t("translate.provider")}
             groups={DEMO_MODELS}

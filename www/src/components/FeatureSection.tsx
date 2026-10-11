@@ -1,7 +1,16 @@
-import { BookOpen, Check, Highlighter, ListTodo, Sparkles } from "lucide-react";
+import {
+  ArrowLeftRight,
+  BookOpen,
+  Check,
+  Highlighter,
+  LayoutGrid,
+  ListTodo,
+  RotateCw,
+  Sparkles,
+} from "lucide-react";
 import type { LandingCopy } from "../content/types";
 
-const ICONS = [BookOpen, Highlighter, ListTodo, Sparkles];
+const ICONS = [BookOpen, Highlighter, ListTodo, Sparkles, LayoutGrid];
 
 export function FeatureSection({ copy }: { copy: LandingCopy["features"] }) {
   return (
@@ -25,6 +34,9 @@ export function FeatureSection({ copy }: { copy: LandingCopy["features"] }) {
               className={`feature-tile feature-${index}`}
               key={feature.title}
             >
+              <span className="feature-number" aria-hidden="true">
+                0{index + 1}
+              </span>
               <div className="feature-copy">
                 <span className="feature-icon">
                   <Icon size={21} aria-hidden="true" />
@@ -96,6 +108,24 @@ export function FeatureSection({ copy }: { copy: LandingCopy["features"] }) {
                     <i />
                     <i />
                     <i />
+                  </div>
+                )}
+                {index === 4 && (
+                  <div className="mini-page-grid">
+                    {[2, 1, 3].map((page) => (
+                      <div
+                        className="mini-page-sheet"
+                        data-active={page === 1}
+                        key={page}
+                      >
+                        <span>0{page}</span>
+                        <i />
+                        <i />
+                        <i />
+                        {page === 1 && <RotateCw size={15} />}
+                      </div>
+                    ))}
+                    <ArrowLeftRight size={24} />
                   </div>
                 )}
               </div>

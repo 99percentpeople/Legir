@@ -22,23 +22,27 @@ export function isDemoField(id: string): id is keyof DemoFields {
   return DEMO_FIELD_IDS.some((field) => field === id);
 }
 export function demoFormFields(state: DemoState, copy: DemoCopy): FormField[] {
+  const pageIndex = state.pages.findIndex((page) => page.sourcePage === 2);
+  if (pageIndex < 0) return [];
+  const fields = state.fields;
   return DEMO_FIELD_IDS.map((id, index) => ({
     id,
-    pageIndex: 1,
+    pageIndex,
     type: id === "reviewed" ? FieldType.CHECKBOX : FieldType.TEXT,
     name: copy[id],
     rect: { x: 52, y: 220 + index * 64, width: 491, height: 32 },
-    value: typeof state.fields[id] === "string" ? state.fields[id] : undefined,
-    isChecked: id === "reviewed" ? state.fields.reviewed : undefined,
+    value: typeof fields[id] === "string" ? fields[id] : undefined,
+    isChecked: id === "reviewed" ? fields.reviewed : undefined,
     multiline: id === "note",
   }));
 }
 export function demoAnnotations(state: DemoState): Annotation[] {
-  return state.highlighted
+  const pageIndex = state.pages.findIndex((page) => page.sourcePage === 1);
+  return state.highlighted && pageIndex >= 0
     ? [
         {
           id: DEMO_ANNOTATION_ID,
-          pageIndex: 0,
+          pageIndex,
           type: "highlight",
           highlightedText: QUOTE,
           text: state.annotationText,

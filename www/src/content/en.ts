@@ -18,7 +18,6 @@ export const en: LandingCopy = {
       "A thoughtful workspace for your PDFs. Read, annotate, and fill forms — with your files right where they belong. On your device.",
     cta: "Open Legir",
     source: "View on GitHub",
-    note: "Right in your browser · Local-first · Open source",
   },
   preview: {
     label: "Interactive Legir workspace demo",
@@ -28,9 +27,8 @@ export const en: LandingCopy = {
       forms: "Fill forms",
       ai: "Ask AI",
       translate: "Translate",
+      pages: "Pages",
     },
-    caption:
-      "A hands-on interface demo, not the full editor. Inputs stay in memory; AI and translation use local presets. Open Legir to work with your own PDFs.",
     appLabel: "Open Legir",
   },
   features: {
@@ -59,12 +57,18 @@ export const en: LandingCopy = {
         description:
           "Use optional AI to explore your document. Choose your provider and configure your API key in the app settings.",
       },
+      {
+        title: "Organize your PDF pages.",
+        description:
+          "Drag thumbnails to reorder pages, then rotate, copy, or remove them. Insert a blank page or bring in pages from another PDF.",
+      },
     ],
     tags: [
       "A focused reading space",
       "Highlights · Notes · Drawing",
       "Fill · Create · Export",
       "Your provider. Your choice.",
+      "Reorder · Rotate · Insert · Copy · Delete",
     ],
   },
   privacy: {

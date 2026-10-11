@@ -1,10 +1,9 @@
-import type { PreviewMode } from "../../content/types";
 import type { AnswerKind, TranslationId } from "./types";
 
 type DemoCopy = {
-  badge: string;
+  play: string;
+  pause: string;
   reset: string;
-  hints: Record<PreviewMode, string>;
   name: string;
   email: string;
   note: string;
@@ -25,24 +24,15 @@ type DemoCopy = {
 };
 
 const en: DemoCopy = {
-  badge: "Interactive demo",
+  play: "Play demo",
+  pause: "Pause demo",
   reset: "Reset demo",
-  hints: {
-    read: "Turn a page, adjust the zoom, or explore the outline.",
-    annotate:
-      "Toggle the yellow highlighter. Your note stays beside the document.",
-    forms:
-      "Fill the actual demo fields. Switch views without losing your entries.",
-    ai: "Try a suggested question and watch the local response play back.",
-    translate:
-      "Click the sample sentence to preview a fixed selection and its translation.",
-  },
   name: "Reviewer",
   email: "Email",
   note: "One thought to take with you",
   reviewed: "I have reviewed this document.",
   aiNotice:
-    "DeepSeek demo · Scripted answers and simulated token counts; no API requests.",
+    "AI demo · Scripted answers and simulated token counts; no API requests.",
   placeholder: "Ask about the sample (local demo)…",
   prompts: ["Summarize this document", "Suggest three next steps"],
   answers: {
@@ -73,20 +63,14 @@ const en: DemoCopy = {
   },
 };
 const zhCN: DemoCopy = {
-  badge: "交互演示",
+  play: "播放演示",
+  pause: "暂停演示",
   reset: "重置演示",
-  hints: {
-    read: "试试切换页面、调整缩放，或展开文档大纲。",
-    annotate: "点击黄色高亮按钮，切换标记；批注会留在文档旁。",
-    forms: "这里的表单可以直接填写，切换视图也不会丢失输入。",
-    ai: "点击示例问题，体验回答逐字显示和引用跳转。",
-    translate: "点击示例句子，查看固定选区与译文；选区手柄仅作展示。",
-  },
   name: "审阅人",
   email: "邮箱",
   note: "记下一个值得保留的想法",
   reviewed: "我已阅读这份文档。",
-  aiNotice: "DeepSeek 界面演示 · 回答与 Token 统计均为本地模拟，不发送请求。",
+  aiNotice: "AI 界面演示 · 回答与 Token 统计均为本地模拟，不发送请求。",
   placeholder: "询问示例文档（本地演示）…",
   prompts: ["总结这份文档", "给出三个行动建议"],
   answers: {
@@ -116,20 +100,14 @@ const zhCN: DemoCopy = {
   },
 };
 const zhTW: DemoCopy = {
-  badge: "互動示範",
+  play: "播放示範",
+  pause: "暫停示範",
   reset: "重設示範",
-  hints: {
-    read: "試試切換頁面、調整縮放，或展開文件大綱。",
-    annotate: "點擊黃色螢光筆，切換標記；註解會留在文件旁。",
-    forms: "直接填寫表單，切換檢視也不會遺失輸入。",
-    ai: "點擊範例問題，體驗逐字回答和引用跳轉。",
-    translate: "點擊範例句子，查看固定選取範圍與譯文；選取控制點僅供展示。",
-  },
   name: "審閱人",
   email: "電子郵件",
   note: "記下一個值得保留的想法",
   reviewed: "我已閱讀這份文件。",
-  aiNotice: "DeepSeek 介面示範 · 回答與 Token 統計皆為本機模擬，不傳送請求。",
+  aiNotice: "AI 介面示範 · 回答與 Token 統計皆為本機模擬，不傳送請求。",
   placeholder: "詢問範例文件（本機示範）…",
   prompts: ["摘要這份文件", "提供三個行動建議"],
   answers: {
@@ -159,20 +137,14 @@ const zhTW: DemoCopy = {
   },
 };
 const ja: DemoCopy = {
-  badge: "操作デモ",
+  play: "デモを再生",
+  pause: "デモを一時停止",
   reset: "デモをリセット",
-  hints: {
-    read: "ページ移動、ズーム、目次を試してみましょう。",
-    annotate: "黄色のハイライトボタンでマークを切り替えます。",
-    forms: "フォームに入力できます。表示を切り替えても入力は残ります。",
-    ai: "質問例を選んで、回答の再生と引用への移動を試せます。",
-    translate: "サンプル文をクリックすると、固定の選択範囲と訳文を表示します。",
-  },
   name: "確認者",
   email: "メール",
   note: "覚えておきたい考え",
   reviewed: "この文書を確認しました。",
-  aiNotice: "DeepSeek デモ · 回答とトークン数はローカルで再現。API 通信なし。",
+  aiNotice: "AI デモ · 回答とトークン数はローカルで再現。API 通信なし。",
   placeholder: "サンプルについて質問（ローカルデモ）…",
   prompts: ["文書を要約して", "次の行動を3つ提案して"],
   answers: {
@@ -204,23 +176,15 @@ const ja: DemoCopy = {
   },
 };
 const fr: DemoCopy = {
-  badge: "Démo interactive",
+  play: "Lancer la démo",
+  pause: "Mettre la démo en pause",
   reset: "Réinitialiser",
-  hints: {
-    read: "Changez de page, zoomez ou explorez le sommaire.",
-    annotate: "Activez le surligneur jaune pour marquer le passage.",
-    forms:
-      "Remplissez les champs. Vos saisies restent lorsque vous changez de vue.",
-    ai: "Essayez une question proposée et la lecture progressive de la réponse.",
-    translate:
-      "Cliquez sur la phrase exemple pour afficher une sélection fixe et sa traduction.",
-  },
   name: "Relecteur",
   email: "E-mail",
   note: "Une idée à retenir",
   reviewed: "J’ai relu ce document.",
   aiNotice:
-    "Démo DeepSeek · Réponses et compteurs de tokens simulés, sans appel API.",
+    "Démo IA · Réponses et compteurs de tokens simulés, sans appel API.",
   placeholder: "Une question sur l’exemple (démo locale)…",
   prompts: ["Résumer ce document", "Proposer trois prochaines étapes"],
   answers: {
@@ -252,23 +216,15 @@ const fr: DemoCopy = {
   },
 };
 const de: DemoCopy = {
-  badge: "Interaktive Demo",
+  play: "Demo abspielen",
+  pause: "Demo pausieren",
   reset: "Zurücksetzen",
-  hints: {
-    read: "Blättern Sie, ändern Sie den Zoom oder öffnen Sie die Gliederung.",
-    annotate: "Schalten Sie die Markierung mit dem gelben Textmarker um.",
-    forms:
-      "Füllen Sie die Felder aus. Eingaben bleiben beim Ansichtswechsel erhalten.",
-    ai: "Wählen Sie eine Beispielfrage und erleben Sie die schrittweise Antwort.",
-    translate:
-      "Klicken Sie auf den Beispielsatz, um die feste Auswahl und ihre Übersetzung zu sehen.",
-  },
   name: "Prüfer",
   email: "E-Mail",
   note: "Ein Gedanke zum Mitnehmen",
   reviewed: "Ich habe das Dokument geprüft.",
   aiNotice:
-    "DeepSeek-Demo · Antworten und Token-Zähler simuliert, keine API-Aufrufe.",
+    "KI-Demo · Antworten und Token-Zähler simuliert, keine API-Aufrufe.",
   placeholder: "Frage zum Beispiel (lokale Demo)…",
   prompts: ["Dokument zusammenfassen", "Drei nächste Schritte vorschlagen"],
   answers: {
@@ -301,22 +257,15 @@ const de: DemoCopy = {
   },
 };
 const es: DemoCopy = {
-  badge: "Demo interactiva",
+  play: "Reproducir demo",
+  pause: "Pausar demo",
   reset: "Reiniciar demo",
-  hints: {
-    read: "Cambia de página, ajusta el zoom o explora el índice.",
-    annotate: "Activa el marcador amarillo para resaltar el pasaje.",
-    forms: "Rellena los campos. Tus entradas se conservan al cambiar de vista.",
-    ai: "Prueba una pregunta sugerida y la reproducción gradual de la respuesta.",
-    translate:
-      "Haz clic en la frase de ejemplo para ver una selección fija y su traducción.",
-  },
   name: "Revisor",
   email: "Correo",
   note: "Una idea para recordar",
   reviewed: "He revisado este documento.",
   aiNotice:
-    "Demo de DeepSeek · Respuestas y recuentos de tokens simulados, sin llamadas API.",
+    "Demo de IA · Respuestas y recuentos de tokens simulados, sin llamadas API.",
   placeholder: "Pregunta sobre el ejemplo (demo local)…",
   prompts: ["Resumir este documento", "Sugerir tres próximos pasos"],
   answers: {

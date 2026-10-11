@@ -18,7 +18,6 @@ export const de: LandingCopy = {
       "Ein ruhiger Arbeitsplatz für deine PDFs. Lesen, kommentieren und Formulare ausfüllen – mit deinen Dateien dort, wo sie hingehören: auf deinem Gerät.",
     cta: "Legir öffnen",
     source: "Auf GitHub ansehen",
-    note: "Direkt im Browser · Lokal zuerst · Open Source",
   },
   preview: {
     label: "Interaktive Legir-Demo",
@@ -28,9 +27,8 @@ export const de: LandingCopy = {
       forms: "Formulare",
       ai: "KI fragen",
       translate: "Übersetzen",
+      pages: "Seiten",
     },
-    caption:
-      "Bedienbare Oberflächendemo, kein vollständiger Editor. Eingaben bleiben im Speicher. KI und Übersetzungen sind lokale Vorlagen, ohne Versand. Eigene PDFs öffnen Sie in Legir.",
     appLabel: "Legir öffnen",
   },
   features: {
@@ -59,12 +57,18 @@ export const de: LandingCopy = {
         description:
           "Nutze optionale KI zum Erkunden deiner Dokumente. Wähle den Anbieter und hinterlege den API-Schlüssel in den Einstellungen.",
       },
+      {
+        title: "Ordne deine PDF-Seiten.",
+        description:
+          "Ziehe Miniaturen an die gewünschte Position. Drehe, kopiere oder lösche Seiten, füge leere Seiten ein oder importiere Seiten aus einer anderen PDF.",
+      },
     ],
     tags: [
       "Ein konzentrierter Leseraum",
       "Markierungen · Notizen · Zeichnen",
       "Ausfüllen · Erstellen · Exportieren",
       "Dein Anbieter. Deine Wahl.",
+      "Sortieren · Drehen · Einfügen · Kopieren · Löschen",
     ],
   },
   privacy: {

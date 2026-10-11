@@ -18,7 +18,6 @@ export const ja: LandingCopy = {
       "PDF を読む、注釈を付ける、フォームに記入する。ファイルを自分のデバイスに置いたまま、落ち着いて作業できる場所です。",
     cta: "Legir を開く",
     source: "GitHub で見る",
-    note: "ブラウザで使える · ローカル優先 · オープンソース",
   },
   preview: {
     label: "Legir ワークスペースの操作デモ",
@@ -28,9 +27,8 @@ export const ja: LandingCopy = {
       forms: "フォーム",
       ai: "AI に質問",
       translate: "選択翻訳",
+      pages: "ページ",
     },
-    caption:
-      "操作できる画面デモです。入力はメモリ内のみ。AI と翻訳は用意した内容を再生し、送信しません。実際の PDF 編集は Legir で。",
     appLabel: "Legir を開く",
   },
   features: {
@@ -58,12 +56,18 @@ export const ja: LandingCopy = {
         description:
           "任意の AI 機能で文書の理解をサポート。サービスを選び、アプリの設定で API キーを登録します。",
       },
+      {
+        title: "PDF のページを整理。",
+        description:
+          "サムネイルをドラッグして順序を変更。ページの回転、複製、削除に加え、空白ページの挿入や別の PDF からの取り込みもできます。",
+      },
     ],
     tags: [
       "集中できる読書空間",
       "ハイライト · メモ · 手描き",
       "入力 · 作成 · 書き出し",
       "使うサービスは自分で選ぶ",
+      "並べ替え · 回転 · 挿入 · 複製 · 削除",
     ],
   },
   privacy: {

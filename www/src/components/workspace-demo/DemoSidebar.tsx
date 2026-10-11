@@ -23,7 +23,7 @@ import {
   type SidebarView,
 } from "./types";
 import type { DemoCopy } from "./copy";
-import { DEMO_PAGES } from "./geometry";
+import { demoDataPages } from "./geometry";
 import {
   DEMO_ANNOTATION_ID,
   DEMO_OUTLINE,
@@ -32,6 +32,7 @@ import {
   isDemoField,
 } from "./sourceData";
 import { DemoThumbnails } from "./DemoThumbnails";
+import { demoRect } from "./displayGeometry";
 
 const VIEWS = ["thumbnails", "outline", "fields", "annotations"] as const;
 const ICONS = {
@@ -78,19 +79,22 @@ export function DemoSidebar({
       field?.focus({ preventScroll: true });
       const stage = field?.closest<HTMLElement>(".demo-stage");
       if (!field || !stage) return;
-      const rect = field.getBoundingClientRect();
-      const viewport = stage.getBoundingClientRect();
+      const rect = demoRect(field);
+      const viewport = demoRect(stage);
       if (rect.top < viewport.top || rect.bottom > viewport.bottom - 80)
         stage.scrollTop += rect.top - viewport.top - 80;
     });
   };
-  const results = PAGE_TITLES.flatMap((title, index) =>
-    (title + (index === 0 ? INTRO + PARAGRAPH + QUOTE : ""))
-      .toLowerCase()
-      .includes(query.trim().toLowerCase())
+  const results = state.pages.flatMap((page, index) => {
+    const title =
+      page.sourcePage === null ? "" : PAGE_TITLES[page.sourcePage - 1];
+    return title &&
+      (title + (page.sourcePage === 1 ? INTRO + PARAGRAPH + QUOTE : ""))
+        .toLowerCase()
+        .includes(query.trim().toLowerCase())
       ? [{ title, page: index + 1 }]
-      : [],
-  );
+      : [];
+  });
   return (
     <aside
       className={`demo-sidebar ${floating ? "demo-sidebar-floating" : ""}`}
@@ -160,7 +164,12 @@ export function DemoSidebar({
           </TabsContent>
           <TabsContent value="outline" className={CONTENT_CLASS}>
             <DocumentOutlinePanel
-              outline={DEMO_OUTLINE}
+              outline={DEMO_OUTLINE.flatMap((item) => {
+                const pageIndex = state.pages.findIndex(
+                  (page) => page.sourcePage === (item.pageIndex ?? 0) + 1,
+                );
+                return pageIndex < 0 ? [] : [{ ...item, pageIndex }];
+              })}
               currentPageIndex={state.page - 1}
               scrollIntoView={scrollSidebarItem}
               onNavigate={(pageIndex) =>
@@ -170,7 +179,7 @@ export function DemoSidebar({
           </TabsContent>
           <TabsContent value="fields" className={CONTENT_CLASS}>
             <FieldTreePanel
-              pages={DEMO_PAGES}
+              pages={demoDataPages(state)}
               fields={demoFormFields(state, copy)}
               selectedId={state.selectedField}
               onSelectControl={selectField}

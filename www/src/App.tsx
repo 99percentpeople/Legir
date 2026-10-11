@@ -45,11 +45,7 @@ export default function App() {
       <a className="skip-link" href="#main-content">
         {copy.nav.skip}
       </a>
-      <SiteHeader
-        copy={copy}
-        appUrl={appUrl}
-        downloadLabel={downloadCopy.nav}
-      />
+      <SiteHeader copy={copy} downloadLabel={downloadCopy.nav} />
       <main id="main-content" tabIndex={-1}>
         <div className="hero-scene">
           <HeroTidalBackground />
@@ -73,7 +69,6 @@ export default function App() {
                 {downloadCopy.cta}
               </a>
             </div>
-            <p className="hero-note">{copy.hero.note}</p>
           </section>
         </div>
 
@@ -175,10 +170,16 @@ export default function App() {
           />
           <h2 id="closing-title">{copy.closing.title}</h2>
           <p>{copy.closing.description}</p>
-          <a className="site-button" href={appUrl}>
-            {copy.hero.cta}
-            <ArrowRight size={18} aria-hidden="true" />
-          </a>
+          <div className="closing-actions">
+            <a className="site-button" href={appUrl}>
+              {copy.hero.cta}
+              <ArrowRight size={18} aria-hidden="true" />
+            </a>
+            <a className="site-button button-secondary" href="#downloads">
+              <Download size={18} aria-hidden="true" />
+              {downloadCopy.cta}
+            </a>
+          </div>
         </section>
       </main>
       <footer className="site-footer site-container">

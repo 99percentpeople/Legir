@@ -1,4 +1,10 @@
-export type PreviewMode = "read" | "annotate" | "forms" | "ai" | "translate";
+export type PreviewMode =
+  | "read"
+  | "annotate"
+  | "forms"
+  | "ai"
+  | "translate"
+  | "pages";
 
 export const PREVIEW_MODES: PreviewMode[] = [
   "read",
@@ -6,6 +12,7 @@ export const PREVIEW_MODES: PreviewMode[] = [
   "forms",
   "ai",
   "translate",
+  "pages",
 ];
 
 type TextBlock = { title: string; description: string };
@@ -27,20 +34,18 @@ export interface LandingCopy {
     description: string;
     cta: string;
     source: string;
-    note: string;
   };
   preview: {
     label: string;
     modes: Record<PreviewMode, string>;
-    caption: string;
     appLabel: string;
   };
   features: {
     eyebrow: string;
     title: string;
     description: string;
-    items: [TextBlock, TextBlock, TextBlock, TextBlock];
-    tags: [string, string, string, string];
+    items: [TextBlock, TextBlock, TextBlock, TextBlock, TextBlock];
+    tags: [string, string, string, string, string];
   };
   privacy: {
     eyebrow: string;

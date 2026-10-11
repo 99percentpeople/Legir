@@ -24,7 +24,7 @@ export function DemoTextSelection({
 }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
-  const selected = open || state.translationOpen;
+  const selected = open || state.translationOpen || state.showSelection;
   const scale = state.zoom / 100;
   useEffect(() => setOpen(false), [state.navigationToken, state.tool]);
 
