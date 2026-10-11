@@ -350,7 +350,10 @@ type PdfLoadSession = {
   finish: (ok: boolean) => void;
 };
 
-const createPdfLoadSession = (label?: string): PdfLoadSession => {
+const createPdfLoadSession = (
+  label?: string,
+  signal?: AbortSignal,
+): PdfLoadSession => {
   const id = `pdf_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let lastPassword: string | undefined = undefined;
 
@@ -371,15 +374,22 @@ const createPdfLoadSession = (label?: string): PdfLoadSession => {
       const submit = (password: string) => {
         if (settled) return;
         settled = true;
+        signal?.removeEventListener("abort", cancel);
         lastPassword = password;
         resolve(password);
       };
       const cancel = () => {
         if (settled) return;
         settled = true;
-        reject(new Error("Password prompt cancelled"));
+        signal?.removeEventListener("abort", cancel);
+        reject(new DOMException("Password prompt cancelled", "AbortError"));
       };
 
+      if (signal?.aborted) {
+        cancel();
+        return;
+      }
+      signal?.addEventListener("abort", cancel, { once: true });
       appEventBus.emit("pdf:passwordRequired", {
         id,
         reason,
@@ -1668,6 +1678,7 @@ const loadPDFInternal = async (
   } else {
     pdfBytes = input;
   }
+  throwIfPdfLoadAborted(options?.signal);
 
   let fontMap = new Map<string, string>();
   let globalDA: string | undefined = undefined;
@@ -1675,7 +1686,7 @@ const loadPDFInternal = async (
   let systemFontAliasToFamilyCompact: Record<string, string> | undefined =
     undefined;
 
-  const loadSession = createPdfLoadSession("loadPDF");
+  const loadSession = createPdfLoadSession("loadPDF", options?.signal);
   let loadOk = false;
   let openPassword: string | undefined = undefined;
   let pdfDoc: PDFDocument;

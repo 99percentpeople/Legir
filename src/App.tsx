@@ -276,6 +276,9 @@ const App: React.FC = () => {
   useAppEvent("pdf:passwordRequired", (payload) => {
     setPdfPasswordPrompt(payload);
   });
+  useAppEvent("pdf:loadEnd", ({ id }) => {
+    setPdfPasswordPrompt((current) => (current?.id === id ? null : current));
+  });
 
   useEffect(() => {
     return subscribePlatformRuntimeChange((nextSnapshot) => {
@@ -1183,6 +1186,8 @@ const App: React.FC = () => {
             void hydrateDocument();
           });
         } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError")
+            return;
           console.error("Error loading PDF:", error);
           toast.error(t("app.load_error"));
         } finally {
