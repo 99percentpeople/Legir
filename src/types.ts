@@ -21,7 +21,7 @@ export enum FieldType {
   SIGNATURE = "Signature",
 }
 
-export type EditorMode = "form" | "annotation";
+export type EditorMode = "form" | "annotation" | "pages";
 
 export type PageLayoutMode = "single" | "double_even" | "double_odd";
 
@@ -254,6 +254,7 @@ export interface PDFDocumentPermissions {
 }
 
 export interface PDFPermissionDirtyScopes {
+  assemble?: boolean;
   modifyContents: boolean;
   modifyAnnotations: boolean;
   fillForms: boolean;
@@ -266,6 +267,12 @@ export interface PDFOutlineItem {
 }
 
 export interface PageData {
+  /** Stable identity; absent on legacy snapshots until the first structural edit. */
+  id?: string;
+  source?: { documentId: string; pageIndex: number; copyGroup?: string };
+  blank?: boolean;
+  /** Saved page rotation, relative to the source viewport used by controls. */
+  rotationDelta?: number;
   pageIndex: number;
   width: number;
   height: number;
@@ -274,7 +281,19 @@ export interface PageData {
   rotation: number;
 }
 
+export interface PageSource {
+  bytes: Uint8Array;
+  password: string | null;
+  filename: string;
+}
+
 export interface HistorySnapshot {
+  pages?: PageData[];
+  pageSources?: Record<string, PageSource>;
+  preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
+  outline?: PDFOutlineItem[];
+  selectedPageIds?: string[];
+  currentPageIndex?: number;
   fields: FormField[];
   annotations: Annotation[];
   metadata: PDFMetadata;
@@ -516,6 +535,9 @@ export interface DocumentState {
   filename: string;
   saveTarget: EditorSaveTarget | null;
   pages: PageData[];
+  pageSources: Record<string, PageSource>;
+  selectedPageIds: string[];
+  previousEditorMode: "annotation" | "form";
   fields: FormField[];
   annotations: Annotation[];
   preservedSourceAnnotations: PreservedSourceAnnotationRef[];
@@ -526,6 +548,8 @@ export interface DocumentState {
   tool: Tool;
   selectedId: string | null;
   scale: number;
+  /** Page editor thumbnail zoom, independent of PDF reading zoom. */
+  pageThumbnailScale: number;
   /** Temporary reading direction; never changes source pages or PDF export. */
   viewRotation: number;
   isProcessing: boolean;
@@ -642,6 +666,8 @@ export interface EditorUiViewState {
 
 export interface DocumentResourceState {
   thumbnailImages: Record<number, string>;
+  /** Annotation-free reader placeholders; never used as final thumbnails. */
+  pagePreviewImages: Record<number, string>;
 }
 
 export type EditorState = DocumentState &

@@ -761,6 +761,10 @@ export const useAiChatController = (
         undefined,
         {
           openPassword: snapshot.pdfOpenPassword,
+          pageStructure: {
+            pages: snapshot.pages,
+            sources: snapshot.pageSources,
+          },
           removeTextUnderFlattenedFreetext:
             snapshot.options.removeTextUnderFlattenedFreetext,
           pageIndexes,

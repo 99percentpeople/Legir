@@ -11,6 +11,7 @@ const createTestStore = () =>
     (set, get) =>
       ({
         scale: 1,
+        pageThumbnailScale: 1,
         fitTrigger: 0,
         pageLayout: "single",
         pageFlow: "vertical",
@@ -23,6 +24,20 @@ const createTestStore = () =>
   );
 
 describe("editor view actions", () => {
+  it("bounds thumbnail zoom independently of reading zoom and fit requests", () => {
+    const store = createTestStore();
+    store.getState().setPageThumbnailScale(5);
+    expect(store.getState().pageThumbnailScale).toBe(2);
+    store.getState().setPageThumbnailScale(0.01);
+    expect(store.getState().pageThumbnailScale).toBe(0.5);
+    store.getState().setPageThumbnailScale(Number.NaN);
+    expect(store.getState().pageThumbnailScale).toBe(0.5);
+    expect(store.getState().scale).toBe(1);
+    expect(store.getState().fitTrigger).toBe(0);
+    store.getState().setScale(2);
+    expect(store.getState().pageThumbnailScale).toBe(0.5);
+  });
+
   it("uses the same scale bounds for direct and relative zoom", () => {
     const store = createTestStore();
 

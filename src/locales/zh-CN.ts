@@ -789,6 +789,7 @@ const zhCN = {
     save_success: "保存成功",
     save_fail: "保存失败",
     save_permission_denied: {
+      assemble: "此 PDF 不允许编辑页面。",
       modify_contents: "该 PDF 不允许修改文档内容。",
       modify_annotations: "该 PDF 不允许修改注释。",
       fill_forms: "该 PDF 不允许填写表单。",

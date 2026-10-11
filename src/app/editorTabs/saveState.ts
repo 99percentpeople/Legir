@@ -8,6 +8,8 @@ export const isSavedDocumentRevision = (
   saved: EditorState,
 ) =>
   current.pdfBytes === saved.pdfBytes &&
+  current.pages === saved.pages &&
+  current.pageSources === saved.pageSources &&
   current.fields === saved.fields &&
   current.annotations === saved.annotations &&
   current.metadata === saved.metadata &&

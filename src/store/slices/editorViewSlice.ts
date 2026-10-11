@@ -1,4 +1,10 @@
-import { MAX_EDITOR_SCALE, MIN_EDITOR_SCALE } from "@/constants";
+import { getPageId } from "@/services/pdfService/lib/pageStructure";
+import {
+  MAX_EDITOR_SCALE,
+  MIN_EDITOR_SCALE,
+  MIN_PAGE_THUMBNAIL_SCALE,
+  MAX_PAGE_THUMBNAIL_SCALE,
+} from "@/constants";
 import {
   canUseModeWithPdfPermissions,
   canUseToolWithPdfPermissions,
@@ -16,6 +22,7 @@ export const createEditorViewSlice: EditorStoreSlice<
   Pick<
     EditorActions,
     | "setScale"
+    | "setPageThumbnailScale"
     | "rotateView"
     | "resetViewRotation"
     | "zoomBy"
@@ -47,6 +54,19 @@ export const createEditorViewSlice: EditorStoreSlice<
       const nextScale = clampEditorScale(scale);
       return nextScale === state.scale ? state : { scale: nextScale };
     }),
+
+  setPageThumbnailScale: (scale) => {
+    if (!Number.isFinite(scale)) return;
+    set((state) => {
+      const next = Math.max(
+        MIN_PAGE_THUMBNAIL_SCALE,
+        Math.min(MAX_PAGE_THUMBNAIL_SCALE, scale),
+      );
+      return next === state.pageThumbnailScale
+        ? state
+        : { pageThumbnailScale: next };
+    });
+  },
 
   zoomBy: (factor) => {
     if (!Number.isFinite(factor) || factor <= 0) return;
@@ -82,12 +102,32 @@ export const createEditorViewSlice: EditorStoreSlice<
       ) {
         return state.tool === "select_text" ? state : { tool: "select_text" };
       }
-      if (!canUseModeWithPdfPermissions(mode, state.documentPermissions)) {
+      const leavingPageMode =
+        state.mode === "pages" && mode !== "pages" && defaultTool === "select";
+      if (
+        !leavingPageMode &&
+        !canUseModeWithPdfPermissions(mode, state.documentPermissions)
+      ) {
         return state.tool === "select" ? state : { tool: "select" };
       }
 
       if (state.mode === mode && state.tool === defaultTool) return state;
-      return { mode, tool: defaultTool };
+      return {
+        mode,
+        tool: mode === "pages" ? ("select" as const) : defaultTool,
+        selectedId: null,
+        ...(mode === "pages"
+          ? {
+              previousEditorMode:
+                state.mode === "form"
+                  ? ("form" as const)
+                  : ("annotation" as const),
+              selectedPageIds: state.pages[state.currentPageIndex]
+                ? [getPageId(state.pages[state.currentPageIndex])]
+                : [],
+            }
+          : {}),
+      };
     }),
 
   setEditorFullscreen: (isFullscreen) =>

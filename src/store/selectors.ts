@@ -15,8 +15,10 @@ export const selectAppShellState = (state: EditorStore) => ({
 });
 
 export const selectEditorPageState = (state: EditorStore) => ({
+  mode: state.mode,
   filename: state.filename,
   pages: state.pages,
+  pageSources: state.pageSources,
   pdfBytes: state.pdfBytes,
   documentLoadState: state.documentLoadState,
   documentPermissions: state.documentPermissions,
@@ -63,6 +65,7 @@ export type AiChatEditorState = Pick<
   | "pageFlow"
   | "pageLayout"
   | "pages"
+  | "pageSources"
   | "pdfBytes"
   | "pdfOpenPassword"
   | "pdfOwnerUnlocked"
@@ -88,6 +91,7 @@ export const selectAiChatEditorState = (
   pageFlow: state.pageFlow,
   pageLayout: state.pageLayout,
   pages: state.pages,
+  pageSources: state.pageSources,
   pdfBytes: state.pdfBytes,
   pdfOpenPassword: state.pdfOpenPassword,
   pdfOwnerUnlocked: state.pdfOwnerUnlocked,
@@ -101,6 +105,7 @@ export const selectAiChatEditorState = (
 export const selectAiChatReactiveState = (state: EditorStore) => ({
   filename: state.filename,
   pages: state.pages,
+  pageSources: state.pageSources,
   pdfBytes: state.pdfBytes,
   documentLoadState: state.documentLoadState,
   options: state.options,
@@ -111,6 +116,7 @@ export type AiChatReactiveState = ReturnType<typeof selectAiChatReactiveState>;
 
 export const selectPdfSearchControllerState = (state: EditorStore) => ({
   pages: state.pages,
+  pageSources: state.pageSources,
   isSidebarOpen: state.isSidebarOpen,
   openSidebar: state.openSidebar,
   closeSidebar: state.closeSidebar,
@@ -130,6 +136,7 @@ export const selectEditorCanvasState = (state: EditorStore) => ({
   keys: state.keys,
   mode: state.mode,
   pages: state.pages,
+  pageSources: state.pageSources,
   pageTranslateParagraphCandidates: state.pageTranslateParagraphCandidates,
   pageTranslateSelectedParagraphIds: state.pageTranslateSelectedParagraphIds,
   pdfBytes: state.pdfBytes,
@@ -163,6 +170,8 @@ export const selectEditorCanvasActions = (state: EditorStore) => ({
 });
 
 export const selectToolbarState = (state: EditorStore) => ({
+  pageThumbnailScale: state.pageThumbnailScale,
+  setPageThumbnailScale: state.setPageThumbnailScale,
   mode: state.mode,
   tool: state.tool,
   isDirty: state.isDirty,
@@ -196,6 +205,7 @@ export const selectToolbarState = (state: EditorStore) => ({
 
 export const selectSidebarState = (state: EditorStore) => ({
   pages: state.pages,
+  pageSources: state.pageSources,
   fields: state.fields,
   annotations: state.annotations,
   documentPermissions: state.documentPermissions,

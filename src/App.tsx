@@ -1709,6 +1709,10 @@ const App: React.FC = () => {
         undefined,
         {
           openPassword: snapshot.pdfOpenPassword,
+          pageStructure: {
+            pages: snapshot.pages,
+            sources: snapshot.pageSources,
+          },
           exportPassword: snapshot.exportPassword,
           removeTextUnderFlattenedFreetext:
             snapshot.options.removeTextUnderFlattenedFreetext,

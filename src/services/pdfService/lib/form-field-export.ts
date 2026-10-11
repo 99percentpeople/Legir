@@ -325,13 +325,22 @@ export const removeMissingSourcePdfFieldWidgets = (
     removeRefsFromPageAnnots(page, refKeysToRemove);
   }
 
+  const radio = field instanceof PDFRadioGroup ? field : undefined;
+  const radioOptions = radio?.acroField.Opt();
   for (const { index, ref } of refsToRemove.sort(
     (left, right) => right.index - left.index,
   )) {
     kids.remove(index);
+    if (radioOptions instanceof PDFArray && index < radioOptions.size())
+      radioOptions.remove(index);
     form.doc.context.delete(ref);
   }
 
+  if (
+    radio &&
+    !radio.acroField.getOnValues().includes(radio.acroField.getValue())
+  )
+    radio.clear();
   return refsToRemove.length;
 };
 

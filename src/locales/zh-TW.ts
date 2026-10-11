@@ -788,6 +788,7 @@ const zhTW = {
     save_success: "儲存成功",
     save_fail: "儲存失敗",
     save_permission_denied: {
+      assemble: "此 PDF 不允許編輯頁面。",
       modify_contents: "此 PDF 不允許修改文件內容。",
       modify_annotations: "此 PDF 不允許修改註釋。",
       fill_forms: "此 PDF 不允許填寫表單。",

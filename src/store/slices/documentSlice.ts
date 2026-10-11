@@ -24,6 +24,7 @@ export const createDocumentSlice: EditorStoreSlice<
   loadDocument: (data) => {
     // Replacing a document invalidates thumbnail caches and edit history.
     revokeThumbnailObjectUrls(get().thumbnailImages);
+    revokeThumbnailObjectUrls(get().pagePreviewImages);
     const normalized = normalizeControlLayerOrders(
       data.fields,
       prepareAnnotationsForStore(data.annotations),
@@ -45,6 +46,11 @@ export const createDocumentSlice: EditorStoreSlice<
       fields: normalized.fields,
       annotations: normalized.annotations,
       thumbnailImages: {},
+      pagePreviewImages: {},
+      pageSources: {},
+      selectedPageIds: [],
+      pageThumbnailScale: 1,
+      previousEditorMode: "annotation",
       past: [],
       future: [],
       selectedId: null,
@@ -201,6 +207,7 @@ export const createDocumentSlice: EditorStoreSlice<
   resetDocument: () => {
     get().cancelThumbnailWarmup();
     revokeThumbnailObjectUrls(get().thumbnailImages);
+    revokeThumbnailObjectUrls(get().pagePreviewImages);
 
     set(() => ({
       pdfFile: initialState.pdfFile,
@@ -218,7 +225,12 @@ export const createDocumentSlice: EditorStoreSlice<
       filename: initialState.filename,
       saveTarget: initialState.saveTarget,
       pages: initialState.pages,
+      pageSources: {},
+      selectedPageIds: [],
+      pageThumbnailScale: 1,
+      previousEditorMode: "annotation",
       thumbnailImages: initialState.thumbnailImages,
+      pagePreviewImages: initialState.pagePreviewImages,
       fields: initialState.fields,
       annotations: initialState.annotations,
       preservedSourceAnnotations: initialState.preservedSourceAnnotations,

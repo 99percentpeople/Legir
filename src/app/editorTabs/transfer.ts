@@ -2,7 +2,7 @@ import {
   createPdfWorkerService,
   type PDFWorkerService,
 } from "@/services/pdfService/pdfWorkerService";
-import type { EditorSaveTarget } from "@/types";
+import type { EditorSaveTarget, PageSource } from "@/types";
 import {
   createLoadedEditorTabSnapshot,
   getEditorTabDisplayTitle,
@@ -64,57 +64,83 @@ const cloneSaveTargetForTransfer = (
 
 const cloneEditorTabSnapshotForTransfer = (
   snapshot: EditorTabSnapshot,
-): EditorTabSnapshot => ({
-  ...snapshot,
-  pdfFile: null,
-  pdfBytes: snapshot.pdfBytes ? new Uint8Array(snapshot.pdfBytes) : null,
-  metadata: {
-    ...snapshot.metadata,
+): EditorTabSnapshot => {
+  const copiedSources = new Map<PageSource, PageSource>();
+  const cloneSources = (sources: Record<string, PageSource> = {}) =>
+    Object.fromEntries(
+      Object.entries(sources).map(([id, source]) => {
+        let copy = copiedSources.get(source);
+        if (!copy) {
+          copy = { ...source, bytes: new Uint8Array(source.bytes) };
+          copiedSources.set(source, copy);
+        }
+        return [id, copy];
+      }),
+    );
+  return {
+    ...snapshot,
+    pdfFile: null,
+    pdfBytes: snapshot.pdfBytes ? new Uint8Array(snapshot.pdfBytes) : null,
+    metadata: {
+      ...snapshot.metadata,
+      documentPermissions: snapshot.documentPermissions
+        ? { ...snapshot.documentPermissions }
+        : (snapshot.metadata.documentPermissions ?? null),
+    },
     documentPermissions: snapshot.documentPermissions
       ? { ...snapshot.documentPermissions }
-      : (snapshot.metadata.documentPermissions ?? null),
-  },
-  documentPermissions: snapshot.documentPermissions
-    ? { ...snapshot.documentPermissions }
-    : null,
-  sourceDocumentPermissions: snapshot.sourceDocumentPermissions
-    ? { ...snapshot.sourceDocumentPermissions }
-    : null,
-  pdfOwnerUnlocked: snapshot.pdfOwnerUnlocked,
-  pdfOwnerPassword: snapshot.pdfOwnerPassword,
-  preservePdfOwnerRestrictionsOnSave:
-    snapshot.preservePdfOwnerRestrictionsOnSave,
-  dirtyPermissionScopes: {
-    ...snapshot.dirtyPermissionScopes,
-  },
-  saveTarget: cloneSaveTargetForTransfer(snapshot.saveTarget),
-  pages: [...snapshot.pages],
-  fields: [...snapshot.fields],
-  annotations: [...snapshot.annotations],
-  preservedSourceAnnotations: [...snapshot.preservedSourceAnnotations],
-  outline: [...snapshot.outline],
+      : null,
+    sourceDocumentPermissions: snapshot.sourceDocumentPermissions
+      ? { ...snapshot.sourceDocumentPermissions }
+      : null,
+    pdfOwnerUnlocked: snapshot.pdfOwnerUnlocked,
+    pdfOwnerPassword: snapshot.pdfOwnerPassword,
+    preservePdfOwnerRestrictionsOnSave:
+      snapshot.preservePdfOwnerRestrictionsOnSave,
+    dirtyPermissionScopes: {
+      ...snapshot.dirtyPermissionScopes,
+    },
+    saveTarget: cloneSaveTargetForTransfer(snapshot.saveTarget),
+    pages: [...snapshot.pages],
+    pageSources: cloneSources(snapshot.pageSources),
+    selectedPageIds: [...(snapshot.selectedPageIds ?? [])],
+    fields: [...snapshot.fields],
+    annotations: [...snapshot.annotations],
+    preservedSourceAnnotations: [...snapshot.preservedSourceAnnotations],
+    outline: [...snapshot.outline],
 
-  past: [...snapshot.past],
-  future: [...snapshot.future],
-  clipboard: snapshot.clipboard
-    ? {
-        type: snapshot.clipboard.type,
-        data: snapshot.clipboard.data,
-      }
-    : null,
+    past: snapshot.past.map((item) => ({
+      ...item,
+      pageSources: item.pageSources
+        ? cloneSources(item.pageSources)
+        : undefined,
+    })),
+    future: snapshot.future.map((item) => ({
+      ...item,
+      pageSources: item.pageSources
+        ? cloneSources(item.pageSources)
+        : undefined,
+    })),
+    clipboard: snapshot.clipboard
+      ? {
+          type: snapshot.clipboard.type,
+          data: snapshot.clipboard.data,
+        }
+      : null,
 
-  pageTranslateParagraphCandidates: [
-    ...snapshot.pageTranslateParagraphCandidates,
-  ],
-  pageTranslateSelectedParagraphIds: [
-    ...snapshot.pageTranslateSelectedParagraphIds,
-  ],
-  lastSavedAt: snapshot.lastSavedAt ? new Date(snapshot.lastSavedAt) : null,
+    pageTranslateParagraphCandidates: [
+      ...snapshot.pageTranslateParagraphCandidates,
+    ],
+    pageTranslateSelectedParagraphIds: [
+      ...snapshot.pageTranslateSelectedParagraphIds,
+    ],
+    lastSavedAt: snapshot.lastSavedAt ? new Date(snapshot.lastSavedAt) : null,
 
-  pendingViewStateRestore: snapshot.pendingViewStateRestore
-    ? { ...snapshot.pendingViewStateRestore }
-    : null,
-});
+    pendingViewStateRestore: snapshot.pendingViewStateRestore
+      ? { ...snapshot.pendingViewStateRestore }
+      : null,
+  };
+};
 
 const mergeTransferredAnnotations = (
   annotations: EditorTabSnapshot["annotations"],
@@ -157,6 +183,7 @@ export const restoreEditorTabSessionTransfer = async (
   }
 
   const workerService = createPdfWorkerService();
+  let disposeOriginal: (() => void) | undefined;
   try {
     const { loadPDF } = await import("@/services/pdfService");
     const {
@@ -172,6 +199,41 @@ export const restoreEditorTabSessionTransfer = async (
       password: incomingSnapshot.pdfOpenPassword,
       workerService,
     });
+    disposeOriginal = dispose;
+    const hasPageEdits = incomingSnapshot.pages.some(
+      (page) => page.id || page.blank || page.rotationDelta,
+    );
+    const restoredPages = hasPageEdits ? incomingSnapshot.pages : pages;
+    const restoredAnnotations = hasPageEdits
+      ? incomingSnapshot.annotations
+      : mergeTransferredAnnotations(incomingSnapshot.annotations, annotations);
+    const restoredPreserved = hasPageEdits
+      ? incomingSnapshot.preservedSourceAnnotations
+      : preservedSourceAnnotations;
+    const restoredOutline = hasPageEdits ? incomingSnapshot.outline : outline;
+    const history = [...incomingSnapshot.past, ...incomingSnapshot.future];
+    workerService.configurePages(
+      restoredPages,
+      incomingSnapshot.pageSources,
+      history,
+    );
+    const sources = Object.assign(
+      {},
+      ...history.map((item) => item.pageSources),
+      incomingSnapshot.pageSources,
+    ) as EditorTabSnapshot["pageSources"];
+    for (const [id, source] of Object.entries(sources)) {
+      const sourceWorker = createPdfWorkerService();
+      try {
+        const loaded = await loadPDF(source.bytes, {
+          password: source.password,
+          workerService: sourceWorker,
+        });
+        workerService.retainSourceResources(id, loaded.dispose);
+      } finally {
+        sourceWorker.destroy();
+      }
+    }
 
     const baseSnapshot = createLoadedEditorTabSnapshot({
       pdfFile: null,
@@ -229,14 +291,11 @@ export const restoreEditorTabSessionTransfer = async (
         preservePdfOwnerRestrictionsOnSave:
           incomingSnapshot.preservePdfOwnerRestrictionsOnSave,
         saveTarget: cloneSaveTargetForTransfer(incomingSnapshot.saveTarget),
-        pages: [...pages],
+        pages: [...restoredPages],
         fields: [...incomingSnapshot.fields],
-        annotations: mergeTransferredAnnotations(
-          incomingSnapshot.annotations,
-          annotations,
-        ),
-        preservedSourceAnnotations: [...preservedSourceAnnotations],
-        outline: [...outline],
+        annotations: restoredAnnotations,
+        preservedSourceAnnotations: [...restoredPreserved],
+        outline: [...restoredOutline],
         past: [...incomingSnapshot.past],
         future: [...incomingSnapshot.future],
         clipboard: incomingSnapshot.clipboard
@@ -265,6 +324,7 @@ export const restoreEditorTabSessionTransfer = async (
       disposePdfResources: dispose,
     };
   } catch (error) {
+    disposeOriginal?.();
     workerService.destroy();
     throw error;
   }

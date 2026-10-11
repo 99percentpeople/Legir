@@ -351,7 +351,9 @@ export function WorkspaceDemo({ mode, language, appLabel }: Props) {
               changeTool: (tool) => dispatch({ type: "tool", tool }),
               exitTool: () =>
                 dispatch({ type: "tool", tool: compact ? "pan" : "select" }),
-              changeMode: (mode) => dispatch({ type: "editor-mode", mode }),
+              changeMode: (mode) => {
+                if (mode !== "pages") dispatch({ type: "editor-mode", mode });
+              },
               changePenStyle: () => {},
               changeHighlightStyle: (style) => {
                 if (style.color)

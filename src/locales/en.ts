@@ -814,6 +814,7 @@ const en = {
     save_success: "Saved successfully",
     save_fail: "Failed to save",
     save_permission_denied: {
+      assemble: "This PDF does not allow editing its pages.",
       modify_contents: "This PDF does not allow modifying document contents.",
       modify_annotations: "This PDF does not allow modifying annotations.",
       fill_forms: "This PDF does not allow filling forms.",

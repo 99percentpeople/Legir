@@ -6,8 +6,10 @@ export const disposeEditorTabSessionResources = (
 ) => {
   if (!session || session.runtime.disposed) return;
   const thumbnails = session.runtime.store.resources.getState().thumbnailImages;
+  const previews = session.runtime.store.resources.getState().pagePreviewImages;
   session.runtime.dispose();
   session.disposePdfResources?.();
   revokeThumbnailObjectUrls(thumbnails);
+  revokeThumbnailObjectUrls(previews);
   session.workerService.destroy();
 };

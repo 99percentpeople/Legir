@@ -2,11 +2,16 @@ import type { PageData } from "@/types";
 
 type Point = { x: number; y: number };
 type Rect = Point & { width: number; height: number };
-type PageSize = Pick<PageData, "width" | "height">;
+type PageSize = Pick<PageData, "width" | "height" | "rotationDelta">;
+export const getPageDisplayRotation = (
+  page: Pick<PageData, "rotationDelta">,
+  rotation: number,
+) => ((page.rotationDelta ?? 0) + rotation + 360) % 360;
 
 // View-only rotation is relative to the source viewport (including its /Rotate).
 // Stored control geometry and PDF export always keep using that source viewport.
 export const getPageView = (page: PageData, rotation: number): PageData => {
+  rotation = getPageDisplayRotation(page, rotation);
   if (!rotation) return page;
   const swap = rotation === 90 || rotation === 270;
   return {
@@ -22,7 +27,7 @@ export const pagePointToView = (
   page: PageSize,
   rotation: number,
 ): Point => {
-  switch (rotation) {
+  switch (getPageDisplayRotation(page, rotation)) {
     case 90:
       return { x: page.height - point.y, y: point.x };
     case 180:
@@ -39,7 +44,7 @@ export const viewPointToPage = (
   page: PageSize,
   rotation: number,
 ): Point => {
-  switch (rotation) {
+  switch (getPageDisplayRotation(page, rotation)) {
     case 90:
       return { x: point.y, y: page.height - point.x };
     case 180:
@@ -76,7 +81,8 @@ export const getPageOverlayTransform = (
   scale: number,
 ) => {
   const origin = pagePointToView({ x: 0, y: 0 }, page, rotation);
-  return rotation
-    ? `translate(${origin.x * scale}px, ${origin.y * scale}px) rotate(${rotation}deg)`
+  const angle = getPageDisplayRotation(page, rotation);
+  return angle
+    ? `translate(${origin.x * scale}px, ${origin.y * scale}px) rotate(${angle}deg)`
     : undefined;
 };

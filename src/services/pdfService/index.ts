@@ -2161,6 +2161,10 @@ export const exportPDF = async (
     removeTextUnderFlattenedFreetext?: boolean;
     imageCompression?: ImageCompressionOptions;
     pageIndexes?: number[];
+    pageStructure?: {
+      pages: import("@/types").PageData[];
+      sources: Record<string, import("@/types").PageSource>;
+    };
     preservedSourceAnnotations?: PreservedSourceAnnotationRef[];
     flattenFormFields?: boolean;
     syncFormFields?: boolean;
@@ -2191,6 +2195,31 @@ export const exportPDF = async (
   const pdfDoc = await PDFDocument.load(originalBytes, {
     password: resolvedOpenPassword ?? "",
   });
+
+  let applyPageRotation: (() => void) | undefined;
+  if (
+    options?.pageStructure &&
+    options.pageStructure.pages.some(
+      (page) => page.id || page.blank || page.rotationDelta,
+    )
+  ) {
+    const { assemblePages } = await import("./lib/assemblePages");
+    const assembled = await assemblePages(
+      pdfDoc,
+      originalBytes,
+      resolvedOpenPassword,
+      options.pageStructure,
+      {
+        fields,
+        annotations,
+        preserved: options.preservedSourceAnnotations ?? [],
+      },
+    );
+    fields = assembled.fields;
+    annotations = assembled.annotations;
+    options = { ...options, preservedSourceAnnotations: assembled.preserved };
+    applyPageRotation = assembled.applyRotation;
+  }
 
   const pdfLibPages = pdfDoc.getPages();
   const targetPageIndexes = Array.isArray(options?.pageIndexes)
@@ -2644,6 +2673,8 @@ export const exportPDF = async (
     }
   }
 
+  applyPageRotation?.();
+
   if (targetPageIndexes.length > 0) {
     const indexesToRemove = Array.from(
       { length: pages.length },
@@ -2658,7 +2689,7 @@ export const exportPDF = async (
   }
 
   const hasOwnerPassword = typeof options?.ownerPassword === "string";
-  const ownerPassword = hasOwnerPassword ? options.ownerPassword : undefined;
+  const ownerPassword = hasOwnerPassword ? options?.ownerPassword : undefined;
   const clearsRestrictionsByIgnoringPermissions =
     getPdfPermissionPolicy().ignorePdfPermissions && !hasOwnerPassword;
   const shouldPreserveSourceRestrictions =

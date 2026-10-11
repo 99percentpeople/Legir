@@ -1,3 +1,4 @@
+import { createPageEditingSlice } from "./slices/pageEditingSlice";
 import {
   createAppStateSlice,
   createControlSlice,
@@ -26,5 +27,6 @@ export const createEditorActions = (
   ...createSettingsSlice(set, get),
   ...createRuntimeSlice(set, get),
   ...createHistorySlice(set, get),
+  ...createPageEditingSlice(set, get),
   ...createPageTranslateSlice(set, get),
 });

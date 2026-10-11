@@ -11,6 +11,8 @@ export const DEFAULT_SCALE = pdfViewerScaleToWorkspaceScale(1);
 export const MIN_EDITOR_SCALE = pdfViewerScaleToWorkspaceScale(0.25);
 export const MAX_EDITOR_SCALE = pdfViewerScaleToWorkspaceScale(5);
 export const ZOOM_BASE = 1.25;
+export const MIN_PAGE_THUMBNAIL_SCALE = 0.5;
+export const MAX_PAGE_THUMBNAIL_SCALE = 2;
 export const MIN_FIELD_SIZE = 10;
 export const PAGE_PADDING = 24; // px
 

@@ -15,7 +15,7 @@ import { useEventListener } from "@/hooks/useEventListener";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { calculateWorkspaceInitialScale } from "@/components/workspace/lib/calculateWorkspaceFitScale";
 import { useEditorEventBus } from "@/app/editorTabs/context";
-import { useEditorView } from "@/store/useEditorView";
+import { useEditorView, useEditorViewApi } from "@/store/useEditorView";
 import {
   selectCanvasPreferences,
   selectCanvasLayout,
@@ -54,6 +54,28 @@ export const EditorCanvasPane: React.FC = () => {
   const preferences = usePreferencesStore(useShallow(selectCanvasPreferences));
   const layout = useWorkspaceStore(useShallow(selectCanvasLayout));
   const state = { ...documentState, ...preferences, ...layout };
+  const view = useEditorViewApi();
+  React.useLayoutEffect(() => {
+    if (!workerService?.configurePages) return;
+    const configure = () => {
+      const state = view.getState();
+      workerService.configurePages(state.pages, state.pageSources, [
+        ...state.past,
+        ...state.future,
+      ]);
+    };
+    configure();
+    view.getState().warmupThumbnails(workerService);
+    return view.subscribe((next, previous) => {
+      if (
+        next.pages !== previous.pages ||
+        next.pageSources !== previous.pageSources ||
+        next.past !== previous.past ||
+        next.future !== previous.future
+      )
+        configure();
+    });
+  }, [workerService, view]);
   const {
     addField,
     addAnnotation,
@@ -264,7 +286,7 @@ export const EditorCanvasPane: React.FC = () => {
       typeof state.pdfBytes?.byteLength === "number"
         ? state.pdfBytes.byteLength
         : state.pdfBytes?.length;
-    const fitKey = `${state.filename || ""}:${state.pages.length}:${bytesLen || 0}`;
+    const fitKey = `${state.filename || ""}:${bytesLen || 0}`;
     if (lastFitKeyRef.current === fitKey) return;
     lastFitKeyRef.current = fitKey;
 

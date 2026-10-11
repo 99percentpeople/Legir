@@ -92,6 +92,10 @@ export const createEditorTabSnapshotFromState = (options: {
     filename: state.filename,
     saveTarget: state.saveTarget,
     pages: createShallowArrayCopy(state.pages),
+    pageSources: state.pageSources,
+    selectedPageIds: state.selectedPageIds,
+    pageThumbnailScale: state.pageThumbnailScale,
+    previousEditorMode: state.previousEditorMode,
     fields: createShallowArrayCopy(state.fields),
     annotations: createShallowArrayCopy(state.annotations),
     preservedSourceAnnotations: createShallowArrayCopy(

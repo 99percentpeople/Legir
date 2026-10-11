@@ -51,6 +51,21 @@ export type EditorToolStyles = {
 };
 
 export interface EditorActions {
+  setSelectedPageIds: (ids: string[]) => void;
+  rotatePages: (ids: string[], degrees: number) => void;
+  deletePages: (ids: string[]) => void;
+  movePages: (ids: string[], beforeIndex: number) => void;
+  duplicatePages: (ids: string[]) => void;
+  addBlankPages: (options: {
+    width: number;
+    height: number;
+    count: number;
+    at: number;
+  }) => void;
+  insertPdfPages: (
+    payload: import("./slices/pageEditingSlice").ImportedPages,
+    at: number,
+  ) => void;
   setState: (
     updates:
       | Partial<EditorState>
@@ -81,6 +96,7 @@ export interface EditorActions {
     patch: Partial<EditorToolStyles[K]>,
   ) => void;
   setScale: (scale: number) => void;
+  setPageThumbnailScale: (scale: number) => void;
   rotateView: (direction: "clockwise" | "counterclockwise") => void;
   resetViewRotation: () => void;
   zoomBy: (factor: number) => void;

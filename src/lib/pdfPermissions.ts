@@ -38,6 +38,7 @@ export const mergePdfPermissionDirtyScopes = (
   modifyContents: base.modifyContents || !!patch.modifyContents,
   modifyAnnotations: base.modifyAnnotations || !!patch.modifyAnnotations,
   fillForms: base.fillForms || !!patch.fillForms,
+  ...(base.assemble || patch.assemble ? { assemble: true } : {}),
 });
 
 export const getEffectivePdfPermissions = (
@@ -99,7 +100,14 @@ export const canPrintPdf = (
   shouldIgnorePdfPermissions() ||
   getEffectivePdfPermissions(permissions).canPrint;
 
+export const canAssemblePdf = (
+  permissions: PDFDocumentPermissions | null | undefined,
+) =>
+  shouldIgnorePdfPermissions() ||
+  getEffectivePdfPermissions(permissions).canAssemble;
+
 export type PdfPermissionOperation =
+  | "assemble_pages"
   | "create_annotation"
   | "edit_annotation"
   | "delete_annotation"
@@ -135,6 +143,8 @@ export const canPerformPdfPermissionOperation = (
   permissions: PDFDocumentPermissions | null | undefined,
 ): boolean => {
   switch (operation) {
+    case "assemble_pages":
+      return canAssemblePdf(permissions);
     case "create_annotation":
     case "edit_annotation":
     case "delete_annotation":
@@ -203,6 +213,7 @@ export const canUseModeWithPdfPermissions = (
   mode: EditorMode,
   permissions: PDFDocumentPermissions | null | undefined,
 ): boolean => {
+  if (mode === "pages") return canAssemblePdf(permissions);
   return mode === "form"
     ? canModifyPdfContents(permissions) || canFillPdfForms(permissions)
     : canModifyPdfAnnotations(permissions);
@@ -211,9 +222,16 @@ export const canUseModeWithPdfPermissions = (
 export const getPdfPermissionSaveBlockReason = (
   permissions: PDFDocumentPermissions | null | undefined,
   dirtyScopes: PDFPermissionDirtyScopes | null | undefined,
-): "modify_contents" | "modify_annotations" | "fill_forms" | null => {
+):
+  | "modify_contents"
+  | "modify_annotations"
+  | "fill_forms"
+  | "assemble"
+  | null => {
   if (!dirtyScopes) return null;
   if (shouldIgnorePdfPermissions()) return null;
+
+  if (dirtyScopes.assemble && !canAssemblePdf(permissions)) return "assemble";
 
   if (dirtyScopes.modifyContents && !canModifyPdfContents(permissions)) {
     return "modify_contents";

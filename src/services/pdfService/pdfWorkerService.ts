@@ -1,4 +1,5 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
+import type { PageData, PageSource, HistorySnapshot } from "@/types";
 import type { Tile } from "./types";
 import type { TextContent } from "pdfjs-dist/types/src/display/api";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@/types";
@@ -80,6 +81,101 @@ class PDFWorkerService {
     PendingRequestHandlers<WorkerCommandType>
   >();
   private requestSeq = 0;
+  private logicalPages: PageData[] = [];
+  private pageSources: Record<string, PageSource> = {};
+  private sourceLoads = new Map<string, Promise<boolean>>();
+  private lifetime = new AbortController();
+  private sourceResources = new Map<string, () => void>();
+  public retainSourceResources(id: string, dispose: () => void) {
+    this.sourceResources.get(id)?.();
+    this.sourceResources.set(id, dispose);
+  }
+
+  private retainedSourceIds = new Set<string>();
+  public configurePages(
+    pages: PageData[],
+    sources: Record<string, PageSource>,
+    history: HistorySnapshot[] = [],
+  ) {
+    if (this.lifetime.signal.aborted) return;
+    this.logicalPages = pages;
+    this.pageSources = sources;
+    this.retainedSourceIds = new Set([
+      ...Object.keys(sources),
+      ...history.flatMap((item) => Object.keys(item.pageSources ?? {})),
+      ...[...pages, ...history.flatMap((item) => item.pages ?? [])]
+        .filter((page) => page.blank)
+        .map((page) => `blank:${page.width}:${page.height}`),
+    ]);
+    for (const id of new Set([
+      ...this.sourceLoads.keys(),
+      ...this.sourceResources.keys(),
+    ])) {
+      if (this.retainedSourceIds.has(id)) continue;
+      this.unloadDocument(id);
+      this.sourceLoads.delete(id);
+      this.sourceResources.get(id)?.();
+      this.sourceResources.delete(id);
+    }
+  }
+
+  private routePage<T extends { pageIndex: number; docId?: string }>(
+    options: T,
+  ): T {
+    if (options.docId !== undefined) return options;
+    const page = this.logicalPages[options.pageIndex];
+    if (!page) return options;
+    if (page.blank)
+      return {
+        ...options,
+        docId: `blank:${page.width}:${page.height}`,
+        pageIndex: 0,
+      };
+    return page.source
+      ? {
+          ...options,
+          docId: page.source.documentId,
+          pageIndex: page.source.pageIndex,
+        }
+      : options;
+  }
+
+  private async preparePage<
+    T extends { pageIndex: number; docId?: string; signal?: AbortSignal },
+  >(options: T): Promise<T> {
+    const routed = this.routePage(options);
+    const docId = routed.docId;
+    if (!docId || docId === this.defaultDocId || options.docId !== undefined)
+      return routed;
+    let pending = this.sourceLoads.get(docId);
+    if (!pending) {
+      const source = this.pageSources[docId];
+      pending = (async () => {
+        let bytes = source?.bytes;
+        if (docId.startsWith("blank:")) {
+          const [, width, height] = docId.split(":").map(Number);
+          const { PDFDocument } = await import("@cantoo/pdf-lib");
+          const pdf = await PDFDocument.create();
+          pdf.addPage([width, height]);
+          bytes = await pdf.save();
+        }
+        if (!bytes) throw new Error("PDF page source is unavailable");
+        this.lifetime.signal.throwIfAborted();
+        const loaded = await this.loadDocument(bytes, {
+          docId,
+          password: source?.password ?? undefined,
+          signal: this.lifetime.signal,
+        });
+        if (!this.retainedSourceIds.has(docId)) this.unloadDocument(docId);
+        return loaded;
+      })();
+      this.sourceLoads.set(docId, pending);
+      void pending.catch(() => this.sourceLoads.delete(docId));
+    }
+    await pending;
+    options.signal?.throwIfAborted();
+    return routed;
+  }
 
   private passwordByDocId = new Map<string, string>();
 
@@ -128,13 +224,14 @@ class PDFWorkerService {
   }
 
   @RequireWorkerPromise()
-  public reprioritize(options: {
+  public async reprioritize(options: {
     pageIndex: number;
     scale: number;
     viewportCenter: [number, number];
     docId?: string;
     signal?: AbortSignal;
   }): Promise<boolean> {
+    options = await this.preparePage(options);
     return new Promise((resolve, reject) => {
       const worker = this.worker;
       if (!worker) {
@@ -248,6 +345,12 @@ class PDFWorkerService {
   }
 
   public destroy() {
+    this.lifetime.abort();
+    this.logicalPages = [];
+    this.pageSources = {};
+    this.sourceLoads.clear();
+    this.sourceResources.forEach((dispose) => dispose());
+    this.sourceResources.clear();
     this.failAllPendingRequests("Worker terminated");
     this.passwordByDocId.clear();
     this.lastRenderScaleByDocPage.clear();
@@ -363,11 +466,12 @@ class PDFWorkerService {
   }
 
   @RequireWorkerPromise()
-  public getTextContent(options: {
+  public async getTextContent(options: {
     pageIndex: number;
     docId?: string;
     signal?: AbortSignal;
   }): Promise<TextContent | null> {
+    options = await this.preparePage(options);
     return new Promise((resolve, reject) => {
       const worker = this.worker;
       if (!worker) {
@@ -654,6 +758,7 @@ class PDFWorkerService {
     scale: number;
     docId?: string;
   }) {
+    options = this.routePage(options);
     const { pageIndex, scale, docId: requestedDocId } = options;
     const docId = requestedDocId ?? this.defaultDocId;
     const id = `cancelQueuedRenders_${docId}_${pageIndex}_${scale}_${this.requestSeq++}_${Date.now()}`;
@@ -726,7 +831,7 @@ class PDFWorkerService {
   }
 
   @RequireWorkerPromise()
-  public renderPageImage(options: {
+  public async renderPageImage(options: {
     pageIndex: number;
     scale?: number;
     targetWidth?: number;
@@ -740,6 +845,7 @@ class PDFWorkerService {
     password?: string;
     signal?: AbortSignal;
   }): Promise<{ bytes: Uint8Array; mimeType: string }> {
+    options = await this.preparePage(options);
     return new Promise((resolve, reject) => {
       const worker = this.worker;
       if (!worker) {
@@ -864,7 +970,7 @@ class PDFWorkerService {
   }
 
   @RequireWorkerPromise()
-  public renderPage(options: {
+  public async renderPage(options: {
     pageIndex: number;
     scale: number;
     rotation?: number;
@@ -876,6 +982,7 @@ class PDFWorkerService {
     docId?: string;
     signal?: AbortSignal;
   }): Promise<boolean> {
+    options = await this.preparePage(options);
     return new Promise((resolve, reject) => {
       const worker = this.worker;
       if (!worker) {

@@ -87,6 +87,7 @@ export function createEditorView(
   );
   const resources = createStore<DocumentResourceState>(() => ({
     thumbnailImages: options.state?.thumbnailImages ?? {},
+    pagePreviewImages: options.state?.pagePreviewImages ?? {},
   }));
   let cached: EditorStore | undefined;
   let previousOwners: unknown[] = [];
@@ -153,7 +154,7 @@ export function createEditorView(
       patchDomain(document, values(documentKeys));
       patchDomain(preferences, values(preferenceKeys));
       patchDomain(workspace, patchWorkspaceUi(workspace.getState(), patch));
-      patchDomain(resources, values(["thumbnailImages"]));
+      patchDomain(resources, values(["thumbnailImages", "pagePreviewImages"]));
     } finally {
       batching = false;
       publish();

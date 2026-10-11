@@ -62,6 +62,7 @@ import { pointsToPath as pointsToPathLib } from "./lib/pointsToPath";
 import { getFocusRect } from "./lib/getFocusRect";
 import {
   getPageView,
+  getPageDisplayRotation,
   getPageOverlayTransform,
   pagePointToView,
 } from "./lib/pageViewRotation";
@@ -3289,7 +3290,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         onContextMenu={(e) => handlePageContextMenu(e, page.pageIndex)}
       >
         <PDFPage
-          key={viewPage.rotation}
+          key={`${viewPage.id ?? page.pageIndex}:${viewPage.rotation}`}
           workerService={workerService}
           page={viewPage}
           scale={editorState.scale}
@@ -3321,7 +3322,10 @@ const Workspace: React.FC<WorkspaceProps> = ({
         <div
           className="pointer-events-none absolute top-0 left-0 origin-top-left"
           data-page-overlay="true"
-          data-page-view-rotation={editorState.viewRotation}
+          data-page-view-rotation={getPageDisplayRotation(
+            page,
+            editorState.viewRotation,
+          )}
           style={{
             width: page.width * editorState.scale,
             height: page.height * editorState.scale,
