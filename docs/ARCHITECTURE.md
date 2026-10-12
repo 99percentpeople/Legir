@@ -639,6 +639,11 @@ page identity through edits and are released when their document closes.
 `exportPDF` assembles the final page sequence before exporting controls, repairs
 copied AcroForm trees and internal links, and applies `rotationDelta` after
 coordinate-dependent export. The independent `viewRotation` remains temporary.
+Native assembly replaces the page tree in one batch and refreshes the pinned
+layout helper's page caches. Calling its single-page removal/insertion helpers
+for every output page repeatedly scans WASM-backed arrays. Readable inspection
+reads inherited geometry from page dictionaries without parsing drawing content;
+content parsing remains demand-driven when a page is rendered or extracted.
 Saving compares page/source references as well as controls so edits made during
 an in-flight save remain dirty. See [page editing](PAGE_EDITING_MODE.md) for
 interaction rules and remaining platform acceptance checks.

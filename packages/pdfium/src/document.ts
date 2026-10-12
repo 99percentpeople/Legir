@@ -268,6 +268,15 @@ export class PDFDocument {
         throw new Error("Invalid PDF page tree.");
     });
   }
+  /** Replace the page order in one pass, retaining inherited page attributes. */
+  setPages(pages: readonly PDFObject[]) {
+    for (const page of pages) {
+      if (page.document !== this)
+        throw new Error("Use a graft map to copy pages between documents.");
+      page.getType();
+    }
+    this.rewritePages([...pages]);
+  }
   insertPage(index: number, page: PDFObject) {
     this.insertPages(index, [page]);
   }

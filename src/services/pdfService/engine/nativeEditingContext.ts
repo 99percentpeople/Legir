@@ -12,6 +12,7 @@ import {
   PDFNull,
   PDFNumber,
   PDFObject,
+  PDFPage,
   PDFPageLeaf,
   PDFPageTree,
   PDFRawStream,
@@ -449,6 +450,30 @@ export class NativeEditingContext {
       }
     }
     this.pendingStreams.clear();
+  }
+
+  /** Avoid PDFPageTree's repeated linear scans through the WASM-backed arrays. */
+  replacePages(pages: readonly PDFPage[]) {
+    if (pages.some((page) => page.doc !== this.document))
+      throw new Error("Foreign PDF page.");
+    const refs = pages.map((page) =>
+      this.native.newIndirect(this.actual(page.ref.objectNumber)),
+    );
+    try {
+      this.native.setPages(refs);
+      // This view already depends on the pinned pdf-lib constructor. Refresh
+      // its layout caches after changing the same native tree in one batch.
+      const cache = this.document as unknown as {
+        pageCache: { invalidate(): void };
+        pageCount: number | undefined;
+        pageMap: Map<PDFPageLeaf, PDFPage>;
+      };
+      for (const page of pages) cache.pageMap.set(page.node, page);
+      cache.pageCount = undefined;
+      cache.pageCache.invalidate();
+    } finally {
+      for (const ref of refs) ref.destroy();
+    }
   }
 
   /** A copy group remaps object references inside WASM. Page assembly still

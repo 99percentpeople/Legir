@@ -64,10 +64,13 @@ its own assets. A host should serialize document jobs in one worker.
 - `addPage`, `insertPage`, `deletePage` and `newGraftMap` provide page/object
   primitives. Form field trees, outline remapping and unique imported names
   remain responsibilities of a higher-level editor, as implemented by Legir.
-  Use `insertPages`/`deletePages` to update the page tree once for a batch.
+  Use `insertPages`/`deletePages` to update the page tree once for a batch, or
+  `setPages` to replace its entire order while retaining inherited attributes.
   Grafts within one engine run in C++, preserving shared references, cycles,
-  encoded streams and numeric spelling; separate engines use a portable JS
-  fallback. `getReferences(source)` returns the source-to-target reference map.
+  encoded streams and numeric spelling. An explicit worklist follows indirect
+  references, so long outline/reply chains do not consume the C++ call stack;
+  inline container nesting still has a depth guard. Separate engines use a
+  portable JS fallback. `getReferences(source)` returns the source-to-target reference map.
   The `copyWithinDocument` option clones an independent copy group inside the
   same document; `copyPages` materializes inherited attributes and omits page
   parents, avoiding traversal into unselected pages. Dispose each graft map
@@ -83,8 +86,10 @@ its own assets. A host should serialize document jobs in one worker.
   without encryption options produces unencrypted output; hosts must explicitly
   forward their intended security policy.
   The writer estimates encoded stream sizes to reserve its output buffer and
-  avoid repeatedly reallocating/copying large PDFs; the initial reservation is
-  capped at 64 MiB and grows normally if required.
+  avoid repeatedly reallocating/copying large PDFs. The initial reservation
+  includes filtered stream sizes, limits the contribution from unfiltered
+  streams to 64 MiB, and is capped at 512 MiB in total. It grows normally if
+  required; these bounds do not limit the size of a saved PDF.
 
 Rendering, native annotation appearances, widget dictionaries, outlines,
 destinations and password verification are included. This is an engine API,

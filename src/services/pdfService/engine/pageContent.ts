@@ -24,6 +24,19 @@ export function getNativePageViewport(
   rotation?: number,
 ) {
   const object = page.getObject();
+  try {
+    return getNativePageObjectViewport(object, scale, rotation);
+  } finally {
+    object.destroy();
+  }
+}
+
+/** Geometry only: do not load/parse a page's drawing operators for inspection. */
+export function getNativePageObjectViewport(
+  object: PDFObject,
+  scale = 1,
+  rotation?: number,
+) {
   const crop = object.getInheritable("CropBox");
   const media = object.getInheritable("MediaBox");
   const unit = object.getInheritable("UserUnit");
@@ -53,7 +66,6 @@ export function getNativePageViewport(
     media.destroy();
     unit.destroy();
     rotate.destroy();
-    object.destroy();
   }
 }
 

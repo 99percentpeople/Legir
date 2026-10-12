@@ -4,12 +4,11 @@ import { executePdfEngineRequest, type PDFiumModule } from "./pdfium";
 import type { PdfEngineRequest } from "./types";
 import { createEditingView, disposeEditingDocument } from "./editingDocument";
 import {
-  getNativePageViewport,
+  getNativePageObjectViewport,
   getNativeOutline,
   getNativePermissions,
   resolveNativeDestination,
 } from "./pageContent";
-import { disposeNativePage } from "./raster";
 import type { ExportPdfRequest, ParsedPdfModels } from "./sessionTypes";
 import type { PDFWorkerService } from "../pdfWorkerService";
 
@@ -255,9 +254,9 @@ export class DocumentSession {
   async inspect() {
     const source = this.getSource();
     const pages = source.pages.map((_, pageIndex) => {
-      const page = this.loadPage(this.primaryId, pageIndex);
+      const page = this.document.findPage(source.pages[pageIndex]);
       try {
-        const viewport = getNativePageViewport(page);
+        const viewport = getNativePageObjectViewport(page);
         return {
           pageIndex,
           width: viewport.width,
@@ -267,7 +266,7 @@ export class DocumentSession {
           rotation: viewport.rotation,
         };
       } finally {
-        disposeNativePage(page);
+        page.destroy();
       }
     });
     return { pages, metadata: {} };

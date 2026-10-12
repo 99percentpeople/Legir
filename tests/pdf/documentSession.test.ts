@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PDFDocument, PDFName, StandardFonts } from "@cantoo/pdf-lib";
 import type { ExportPdfRequest } from "@/services/pdfService/engine/sessionTypes";
 import { DocumentSession } from "@/services/pdfService/engine/documentSession";
 import { getPDFium } from "@/services/pdfService/engine/runtime";
 import { disposeNativePage } from "@/services/pdfService/engine/raster";
+import { getNativePageViewport } from "@/services/pdfService/engine/pageContent";
 
 async function fixture(label: string) {
   const doc = await PDFDocument.create();
@@ -29,6 +30,52 @@ function pageText(session: DocumentSession, id = "default") {
 }
 
 describe("one native document session", () => {
+  it("inspects inherited crop, rotation and scale without parsing page contents", async () => {
+    const pdfium = await getPDFium();
+    const doc = new pdfium.PDFDocument();
+    let bytes: Uint8Array;
+    try {
+      const tree = doc.getTrailer().get("Root", "Pages");
+      const page = doc.addObject({ Type: "Page" });
+      tree.put("Kids", [page]);
+      tree.put("Count", 1);
+      tree.put("MediaBox", [10, 20, 610, 820]);
+      tree.put("CropBox", [30, 50, 580, 780]);
+      tree.put("Rotate", 270);
+      tree.put("UserUnit", 2);
+      page.put("Parent", tree);
+      const saved = doc.saveToBuffer();
+      try {
+        bytes = saved.asUint8Array().slice();
+      } finally {
+        saved.destroy();
+      }
+    } finally {
+      doc.destroy();
+    }
+    const session = new DocumentSession(pdfium, bytes!);
+    try {
+      const load = vi.spyOn(session.document, "loadPage");
+      const inspected = await session.inspect();
+      expect(load).not.toHaveBeenCalled();
+      const page = session.loadPage("default", 0);
+      try {
+        const viewport = getNativePageViewport(page);
+        expect(inspected.pages[0]).toMatchObject({
+          width: viewport.width,
+          height: viewport.height,
+          viewBox: [30, 50, 580, 780],
+          rotation: 270,
+          userUnit: 2,
+        });
+      } finally {
+        disposeNativePage(page);
+      }
+    } finally {
+      session.dispose();
+    }
+  });
+
   it("shares OCR/text extraction and restores encryption state after password probes", async () => {
     const pdfium = await getPDFium();
     const encoder = new pdfium.PDFDocument(await fixture("Encrypted source"));

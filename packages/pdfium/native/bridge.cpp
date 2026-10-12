@@ -259,7 +259,9 @@ static std::set<uint32_t> reachable_objects(Document *doc) {
 }
 
 // One map covers a whole import/copy group. References are reserved before
-// recursion so cycles and shared resources keep their identity. Stream data
+// traversal so cycles and shared resources keep their identity. Indirect edges
+// use a worklist: a long outline/reply chain is not deeply nested PDF syntax.
+// Only inline container nesting consumes the bounded C++ call stack. Stream data
 // stays inside WASM, retaining its original encoding and precision.
 struct GraftMap {
   Document *target;
@@ -267,6 +269,7 @@ struct GraftMap {
   bool copy_pages;
   bool failed = false;
   std::map<uint32_t, uint32_t> refs;
+  std::vector<std::pair<uint32_t, uint32_t>> pending;
   std::map<const CPDF_Object *, std::pair<Obj, Obj>> objects;
 
   Obj copy(Obj value, unsigned depth = 0) {
@@ -282,12 +285,7 @@ struct GraftMap {
       auto [entry, fresh] = refs.try_emplace(number, 0);
       if (fresh) {
         entry->second = core->AddIndirectObject(core->New<CPDF_Null>());
-        // Follow one xref edge at a time, preserving indirect reference bodies.
-        auto body =
-            copy(source->core()->GetOrParseIndirectObject(number), depth + 1);
-        if (failed)
-          return nullptr;
-        set_object(target, entry->second, std::move(body));
+        pending.emplace_back(number, entry->second);
       }
       return core->New<CPDF_Reference>(core, entry->second);
     }
@@ -596,7 +594,15 @@ LPDF_NewGraftMap(Document *target, Document *source, int copy_pages) {
 EMSCRIPTEN_KEEPALIVE void LPDF_DropGraftMap(GraftMap *map) { delete map; }
 EMSCRIPTEN_KEEPALIVE CPDF_Object *LPDF_GraftObject(GraftMap *map,
                                                    CPDF_Object *object) {
-  return keep(map->copy(pdfium::WrapRetain(object)));
+  auto output = map->copy(pdfium::WrapRetain(object));
+  while (!map->pending.empty() && !map->failed) {
+    const auto [source, target] = map->pending.back();
+    map->pending.pop_back();
+    auto body = map->copy(map->source->core()->GetOrParseIndirectObject(source));
+    if (!map->failed)
+      set_object(map->target, target, std::move(body));
+  }
+  return map->failed ? nullptr : keep(std::move(output));
 }
 EMSCRIPTEN_KEEPALIVE Blob *LPDF_GraftReferences(GraftMap *map) {
   std::vector<uint32_t> pairs;
@@ -847,16 +853,22 @@ EMSCRIPTEN_KEEPALIVE Blob *LPDF_Save(Document *doc, const char *user,
   doc->sync();
   auto stream = pdfium::MakeRetain<SaveStream>();
   auto objects = reachable_objects(doc);
-  // Large encoded images dominate output size. Reserve once instead of
-  // repeatedly copying the entire growing PDF. Bound the estimate for inputs
-  // with large uncompressed streams that will shrink when saved.
+  // The writer retains already-filtered stream bytes. Include their full size
+  // so large PDFs do not repeatedly reallocate/copy the output buffer. Streams
+  // without a filter may shrink dramatically, so bound their contribution.
   uint64_t reserve = 4096 + objects.size() * uint64_t{512};
+  uint64_t unfiltered = 0;
   for (auto number : objects) {
     auto object = doc->core()->GetOrParseIndirectObject(number);
-    if (auto image = ToStream(object))
-      reserve += image->GetRawSize();
+    if (auto data = ToStream(object)) {
+      if (data->HasFilter())
+        reserve += data->GetRawSize();
+      else
+        unfiltered += data->GetRawSize();
+    }
   }
-  stream->data.reserve(std::min<uint64_t>(reserve, 64 * 1024 * 1024));
+  reserve += std::min<uint64_t>(unfiltered, 64 * 1024 * 1024);
+  stream->data.reserve(std::min<uint64_t>(reserve, 512 * 1024 * 1024));
   {
     CPDF_Creator creator(doc->core(), stream);
     creator.SetObjectsForEditing(std::move(objects));

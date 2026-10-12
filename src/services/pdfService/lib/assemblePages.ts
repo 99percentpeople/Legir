@@ -206,8 +206,12 @@ export async function assemblePages(
     }
     // Original page objects keep their refs, so retained bookmarks still point at
     // the same page after reordering. Copies have their own object graph.
-    for (let i = doc.getPageCount() - 1; i >= 0; i--) doc.removePage(i);
-    for (const page of result) doc.addPage(page);
+    const nativeView = getEditingView(doc);
+    if (nativeView) nativeView.replacePages(result);
+    else {
+      for (let i = doc.getPageCount() - 1; i >= 0; i--) doc.removePage(i);
+      for (const page of result) doc.addPage(page);
+    }
 
     const mapRef = (pageIndex: number, ref: SourceRef | undefined) => {
       const group = groupByIndex.get(pageIndex);

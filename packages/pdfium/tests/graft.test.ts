@@ -16,6 +16,54 @@ function save(doc: PDFDocument) {
 }
 
 describe("native graft and batched page edits", () => {
+  it("copies a long indirect reply/outline chain with back edges and rolls it back", () => {
+    const source = new engine.PDFDocument(),
+      target = new engine.PDFDocument();
+    const nodes = Array.from({ length: 1200 }, (_, index) =>
+      source.addObject({ Index: index }),
+    );
+    for (let i = 1; i < nodes.length; i++) {
+      nodes[i - 1].put("Next", nodes[i]);
+      nodes[i].put("Prev", nodes[i - 1]);
+    }
+    nodes.at(-1)!.put("Next", nodes[0]);
+    const count = target.countObjects();
+    target.beginOperation();
+    const graft = target.newGraftMap();
+    try {
+      const copied = graft.graftObject(nodes[0]);
+      expect(graft.getReferences(source).size).toBe(nodes.length);
+      target.getTrailer().get("Root").put("Chain", copied);
+      graft.destroy();
+      source.destroy();
+      const reopened = new engine.PDFDocument(save(target));
+      try {
+        let node = reopened.getTrailer().get("Root", "Chain");
+        const first = node.asIndirect();
+        let previous: number | undefined;
+        for (let i = 0; i < nodes.length; i++) {
+          expect(node.get("Index").asNumber()).toBe(i);
+          if (previous !== undefined)
+            expect(node.get("Prev").asIndirect()).toBe(previous);
+          previous = node.asIndirect();
+          const next = node.get("Next");
+          node.destroy();
+          node = next;
+        }
+        expect(node.asIndirect()).toBe(first);
+      } finally {
+        reopened.destroy();
+      }
+      target.abandonOperation();
+      expect(target.countObjects()).toBe(count);
+      expect(target.getTrailer().get("Root", "Chain").isNull()).toBe(true);
+    } finally {
+      graft.destroy();
+      source.destroy();
+      target.destroy();
+    }
+  });
+
   it("can roll back a rejected deep graft without leaving new objects or handles", () => {
     const source = new engine.PDFDocument(),
       target = new engine.PDFDocument();
@@ -210,5 +258,37 @@ describe("native graft and batched page edits", () => {
       doc.destroy();
     }
     expect(() => graft.graftObject(page)).toThrow(/closed/);
+  });
+
+  it("reorders pages in one transaction, preserving inherited geometry and rollback", () => {
+    const doc = new engine.PDFDocument();
+    try {
+      const pages = [0, 1, 2].map(() => doc.addObject({ Type: "Page" }));
+      const tree = doc.getTrailer().get("Root", "Pages");
+      tree.put("MediaBox", [10, 20, 310, 220]);
+      tree.put("Rotate", 90);
+      doc.setPages(pages);
+      doc.beginOperation();
+      doc.setPages([pages[2], pages[0]]);
+      expect(doc.countPages()).toBe(2);
+      expect(doc.findPage(0).asIndirect()).toBe(pages[2].asIndirect());
+      const reopened = new engine.PDFDocument(save(doc));
+      try {
+        expect(reopened.countPages()).toBe(2);
+        expect(reopened.findPage(0).get("Rotate").asNumber()).toBe(90);
+        expect(reopened.findPage(1).get("MediaBox", 0).asNumber()).toBe(10);
+      } finally {
+        reopened.destroy();
+      }
+      expect(() => doc.setPages([pages[0], doc.newNull()])).toThrow(
+        /page tree/,
+      );
+      expect(doc.countPages()).toBe(2);
+      doc.abandonOperation();
+      expect(doc.countPages()).toBe(3);
+      expect(doc.findPage(0).asIndirect()).toBe(pages[0].asIndirect());
+    } finally {
+      doc.destroy();
+    }
   });
 });
