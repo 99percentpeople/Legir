@@ -64,6 +64,15 @@ its own assets. A host should serialize document jobs in one worker.
 - `addPage`, `insertPage`, `deletePage` and `newGraftMap` provide page/object
   primitives. Form field trees, outline remapping and unique imported names
   remain responsibilities of a higher-level editor, as implemented by Legir.
+  Use `insertPages`/`deletePages` to update the page tree once for a batch.
+  Grafts within one engine run in C++, preserving shared references, cycles,
+  encoded streams and numeric spelling; separate engines use a portable JS
+  fallback. `getReferences(source)` returns the source-to-target reference map.
+  The `copyWithinDocument` option clones an independent copy group inside the
+  same document; `copyPages` materializes inherited attributes and omits page
+  parents, avoiding traversal into unselected pages. Dispose each graft map
+  after its group; never reuse it after rolling back a transaction. On a failed
+  graft, discard the map and roll back the transaction.
 - `extractText` returns text, glyph geometry, fonts and colors; `redactText`
   removes glyphs intersecting PDF-coordinate quads while retaining surrounding
   operators, original encodings, subsequent glyph positions and shared Forms.
@@ -73,6 +82,9 @@ its own assets. A host should serialize document jobs in one worker.
   output or AES-256 with user/owner passwords and permission bits. Saving
   without encryption options produces unencrypted output; hosts must explicitly
   forward their intended security policy.
+  The writer estimates encoded stream sizes to reserve its output buffer and
+  avoid repeatedly reallocating/copying large PDFs; the initial reservation is
+  capped at 64 MiB and grows normally if required.
 
 Rendering, native annotation appearances, widget dictionaries, outlines,
 destinations and password verification are included. This is an engine API,

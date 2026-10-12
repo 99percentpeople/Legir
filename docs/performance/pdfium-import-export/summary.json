@@ -1,0 +1,524 @@
+{
+  "forms": {
+    "before": {
+      "timingsMs": {
+        "open": {
+          "median": 413.2,
+          "min": 410.9,
+          "max": 416
+        },
+        "firstRender": {
+          "median": 78.6,
+          "min": 72.7,
+          "max": 79.6
+        },
+        "hydrate": {
+          "median": 47.5,
+          "min": 47.3,
+          "max": 47.7
+        },
+        "warmRender": {
+          "median": 24.8,
+          "min": 24.2,
+          "max": 24.9
+        },
+        "lastRender": {
+          "median": 23.6,
+          "min": 23.4,
+          "max": 30.9
+        },
+        "export": {
+          "median": 126.7,
+          "min": 125.6,
+          "max": 131.3
+        },
+        "import": {
+          "median": 631.4,
+          "min": 610,
+          "max": 694
+        },
+        "mergedExport": {
+          "median": 80.5,
+          "min": 76.7,
+          "max": 81.5
+        },
+        "previewParse": {
+          "median": 517.1,
+          "min": 490.7,
+          "max": 524.5
+        },
+        "sourceRegistration": {
+          "median": 119.3,
+          "min": 106.9,
+          "max": 176.9
+        }
+      },
+      "memory": {
+        "baselinePssMiB": {
+          "median": 342.982,
+          "min": 342.786,
+          "max": 343.743
+        },
+        "peakPssMiB": {
+          "median": 639.85,
+          "min": 629.167,
+          "max": 642.504
+        },
+        "peakPssDeltaMiB": {
+          "median": 297.063,
+          "min": 286.185,
+          "max": 298.761
+        },
+        "hydratedPssDeltaMiB": {
+          "median": 64.16,
+          "min": 63.988,
+          "max": 64.164
+        },
+        "afterClosePssDeltaMiB": {
+          "median": 55.385,
+          "min": 54.748,
+          "max": 56.578
+        },
+        "wasmCapacityMiB": {
+          "median": 16.0,
+          "min": 16.0,
+          "max": 16.0
+        }
+      }
+    },
+    "after": {
+      "timingsMs": {
+        "open": {
+          "median": 417.7,
+          "min": 399.3,
+          "max": 474
+        },
+        "firstRender": {
+          "median": 73.2,
+          "min": 69.7,
+          "max": 73.9
+        },
+        "hydrate": {
+          "median": 41,
+          "min": 39.3,
+          "max": 42.8
+        },
+        "warmRender": {
+          "median": 26.9,
+          "min": 24.2,
+          "max": 29.2
+        },
+        "lastRender": {
+          "median": 24.4,
+          "min": 24.3,
+          "max": 24.7
+        },
+        "export": {
+          "median": 122.5,
+          "min": 121.6,
+          "max": 132.1
+        },
+        "import": {
+          "median": 488.2,
+          "min": 479,
+          "max": 521.5
+        },
+        "mergedExport": {
+          "median": 81.3,
+          "min": 50,
+          "max": 84.9
+        },
+        "previewParse": {
+          "median": 471.6,
+          "min": 464.9,
+          "max": 508.3
+        },
+        "sourceRegistration": {
+          "median": 14.1,
+          "min": 13.2,
+          "max": 16.6
+        }
+      },
+      "memory": {
+        "baselinePssMiB": {
+          "median": 342.777,
+          "min": 341.516,
+          "max": 344.322
+        },
+        "peakPssMiB": {
+          "median": 629.228,
+          "min": 626.498,
+          "max": 629.803
+        },
+        "peakPssDeltaMiB": {
+          "median": 285.48,
+          "min": 284.982,
+          "max": 286.45
+        },
+        "hydratedPssDeltaMiB": {
+          "median": 64.613,
+          "min": 63.646,
+          "max": 64.646
+        },
+        "afterClosePssDeltaMiB": {
+          "median": 54.327,
+          "min": 53.262,
+          "max": 54.981
+        },
+        "wasmCapacityMiB": {
+          "median": 16.0,
+          "min": 16.0,
+          "max": 16.0
+        }
+      }
+    }
+  },
+  "large-images": {
+    "before": {
+      "timingsMs": {
+        "open": {
+          "median": 535.5,
+          "min": 502.2,
+          "max": 535.6
+        },
+        "firstRender": {
+          "median": 92.3,
+          "min": 91.2,
+          "max": 93.5
+        },
+        "hydrate": {
+          "median": 136.8,
+          "min": 133.2,
+          "max": 141.8
+        },
+        "warmRender": {
+          "median": 59.5,
+          "min": 58.7,
+          "max": 61.1
+        },
+        "lastRender": {
+          "median": 52.3,
+          "min": 52.1,
+          "max": 53.4
+        },
+        "export": {
+          "median": 298.2,
+          "min": 293.7,
+          "max": 322.2
+        },
+        "import": {
+          "median": 675.8,
+          "min": 674.5,
+          "max": 720.2
+        },
+        "mergedExport": {
+          "median": 290.7,
+          "min": 282.6,
+          "max": 308.3
+        },
+        "previewParse": {
+          "median": 581.6,
+          "min": 566.2,
+          "max": 624.6
+        },
+        "sourceRegistration": {
+          "median": 95.6,
+          "min": 92.9,
+          "max": 109.6
+        }
+      },
+      "memory": {
+        "baselinePssMiB": {
+          "median": 388.837,
+          "min": 388.512,
+          "max": 389.749
+        },
+        "peakPssMiB": {
+          "median": 1029.48,
+          "min": 1024.645,
+          "max": 1029.523
+        },
+        "peakPssDeltaMiB": {
+          "median": 639.774,
+          "min": 636.133,
+          "max": 640.644
+        },
+        "hydratedPssDeltaMiB": {
+          "median": 158.238,
+          "min": 158.054,
+          "max": 159.52
+        },
+        "afterClosePssDeltaMiB": {
+          "median": 13.138,
+          "min": 11.708,
+          "max": 13.738
+        },
+        "wasmCapacityMiB": {
+          "median": 224.5,
+          "min": 224.5,
+          "max": 224.5
+        }
+      }
+    },
+    "after": {
+      "timingsMs": {
+        "open": {
+          "median": 541.5,
+          "min": 515.7,
+          "max": 549
+        },
+        "firstRender": {
+          "median": 92.3,
+          "min": 92.1,
+          "max": 93
+        },
+        "hydrate": {
+          "median": 95.7,
+          "min": 94.3,
+          "max": 102.8
+        },
+        "warmRender": {
+          "median": 59.7,
+          "min": 58.3,
+          "max": 61.2
+        },
+        "lastRender": {
+          "median": 60.2,
+          "min": 56.6,
+          "max": 61.4
+        },
+        "export": {
+          "median": 255.2,
+          "min": 244,
+          "max": 257.1
+        },
+        "import": {
+          "median": 592.5,
+          "min": 557.8,
+          "max": 682
+        },
+        "mergedExport": {
+          "median": 217.5,
+          "min": 212.5,
+          "max": 230.8
+        },
+        "previewParse": {
+          "median": 582.6,
+          "min": 547.9,
+          "max": 670.3
+        },
+        "sourceRegistration": {
+          "median": 9.9,
+          "min": 9.9,
+          "max": 11.7
+        }
+      },
+      "memory": {
+        "baselinePssMiB": {
+          "median": 388.604,
+          "min": 387.037,
+          "max": 388.976
+        },
+        "peakPssMiB": {
+          "median": 956.563,
+          "min": 950.974,
+          "max": 964.299
+        },
+        "peakPssDeltaMiB": {
+          "median": 569.526,
+          "min": 561.998,
+          "max": 575.694
+        },
+        "hydratedPssDeltaMiB": {
+          "median": 159.507,
+          "min": 157.907,
+          "max": 159.959
+        },
+        "afterClosePssDeltaMiB": {
+          "median": 13.749,
+          "min": 9.93,
+          "max": 13.932
+        },
+        "wasmCapacityMiB": {
+          "median": 143.5,
+          "min": 143.5,
+          "max": 143.5
+        }
+      }
+    }
+  },
+  "large-import": {
+    "before": {
+      "timingsMs": {
+        "open": {
+          "median": 437.5,
+          "min": 413.7,
+          "max": 472.1
+        },
+        "firstRender": {
+          "median": 76,
+          "min": 74.2,
+          "max": 80.5
+        },
+        "hydrate": {
+          "median": 48.4,
+          "min": 48.2,
+          "max": 55.3
+        },
+        "warmRender": {
+          "median": 26.3,
+          "min": 25.7,
+          "max": 30.5
+        },
+        "lastRender": {
+          "median": 25.1,
+          "min": 24.1,
+          "max": 25.9
+        },
+        "export": {
+          "median": 123.3,
+          "min": 120.3,
+          "max": 128
+        },
+        "import": {
+          "median": 1777.9,
+          "min": 1713.6,
+          "max": 1806.6
+        },
+        "mergedExport": {
+          "median": 567.4,
+          "min": 531.5,
+          "max": 579.4
+        },
+        "previewParse": {
+          "median": 869.8,
+          "min": 835.9,
+          "max": 875.8
+        },
+        "sourceRegistration": {
+          "median": 902.1,
+          "min": 877.7,
+          "max": 936.8
+        }
+      },
+      "memory": {
+        "baselinePssMiB": {
+          "median": 389.442,
+          "min": 388.286,
+          "max": 391.443
+        },
+        "peakPssMiB": {
+          "median": 963.761,
+          "min": 961.495,
+          "max": 965.036
+        },
+        "peakPssDeltaMiB": {
+          "median": 573.593,
+          "min": 573.209,
+          "max": 574.318
+        },
+        "hydratedPssDeltaMiB": {
+          "median": 64.674,
+          "min": 64.085,
+          "max": 66.064
+        },
+        "afterClosePssDeltaMiB": {
+          "median": 18.911,
+          "min": 18.542,
+          "max": 67.28
+        },
+        "wasmCapacityMiB": {
+          "median": 236.875,
+          "min": 236.875,
+          "max": 236.875
+        }
+      }
+    },
+    "after": {
+      "timingsMs": {
+        "open": {
+          "median": 422.2,
+          "min": 413.8,
+          "max": 432.2
+        },
+        "firstRender": {
+          "median": 74.7,
+          "min": 74.3,
+          "max": 92.3
+        },
+        "hydrate": {
+          "median": 43,
+          "min": 39.8,
+          "max": 49.7
+        },
+        "warmRender": {
+          "median": 24.8,
+          "min": 24.4,
+          "max": 29.6
+        },
+        "lastRender": {
+          "median": 23.6,
+          "min": 23.3,
+          "max": 23.7
+        },
+        "export": {
+          "median": 116.4,
+          "min": 116.3,
+          "max": 120.5
+        },
+        "import": {
+          "median": 1049.2,
+          "min": 969.1,
+          "max": 1054.7
+        },
+        "mergedExport": {
+          "median": 190,
+          "min": 189.8,
+          "max": 200
+        },
+        "previewParse": {
+          "median": 764,
+          "min": 732,
+          "max": 767.1
+        },
+        "sourceRegistration": {
+          "median": 285.2,
+          "min": 237.1,
+          "max": 287.6
+        }
+      },
+      "memory": {
+        "baselinePssMiB": {
+          "median": 389.371,
+          "min": 389.058,
+          "max": 390.564
+        },
+        "peakPssMiB": {
+          "median": 931.719,
+          "min": 928.493,
+          "max": 932.093
+        },
+        "peakPssDeltaMiB": {
+          "median": 541.154,
+          "min": 539.122,
+          "max": 543.035
+        },
+        "hydratedPssDeltaMiB": {
+          "median": 64.85,
+          "min": 64.411,
+          "max": 64.977
+        },
+        "afterClosePssDeltaMiB": {
+          "median": 13.264,
+          "min": 12.707,
+          "max": 13.668
+        },
+        "wasmCapacityMiB": {
+          "median": 187.812,
+          "min": 187.812,
+          "max": 187.812
+        }
+      }
+    }
+  }
+}

@@ -24,6 +24,7 @@ import type {
   PDFDocument as NativeDocument,
   PDFObject as NativeObject,
 } from "@legir/pdfium";
+import { ObjectType } from "@legir/pdfium";
 import type { PDFiumModule } from "./pdfium";
 import { dictionaryKeyNames, NativeNames } from "./objectNames";
 
@@ -217,24 +218,29 @@ export class NativeEditingContext {
     object: NativeObject,
     streamRef?: NativeObject,
   ): PDFObject | undefined {
-    if (object.isIndirect()) {
+    const objectType = object.getType();
+    if (objectType === ObjectType.Reference) {
       const result = PDFRef.of(this.virtual(object.asIndirect()));
       object.destroy();
       return result;
     }
-    if (!object.isDictionary() && !object.isArray()) {
+    if (
+      ![ObjectType.Dictionary, ObjectType.Stream, ObjectType.Array].includes(
+        objectType,
+      )
+    ) {
       try {
-        if (object.isNull()) return PDFNull;
-        if (object.isBoolean())
+        if (objectType === ObjectType.Null) return PDFNull;
+        if (objectType === ObjectType.Boolean)
           return object.asBoolean() ? PDFBool.True : PDFBool.False;
-        if (object.isNumber()) {
+        if (objectType === ObjectType.Number) {
           const value = Number(object.toString(true, true));
           this.names.rememberInteger(value, object);
           return PDFNumber.of(value);
         }
-        if (object.isName())
+        if (objectType === ObjectType.Name)
           return nameOf(object.toString(true, true).slice(1));
-        if (object.isString())
+        if (objectType === ObjectType.String)
           return PDFHexString.fromBytes(object.asByteString());
         throw new Error("Unsupported native PDF object.");
       } finally {
@@ -247,7 +253,8 @@ export class NativeEditingContext {
       return cached;
     }
     let result: PDFObject;
-    if (object.isArray()) result = PDFArray.withContext(this.context);
+    if (objectType === ObjectType.Array)
+      result = PDFArray.withContext(this.context);
     else {
       const type = object.get("Type");
       let kind: string;
@@ -265,9 +272,18 @@ export class NativeEditingContext {
             : kind === "Page"
               ? PDFPageLeaf.fromMapWithContext(map, this.context)
               : PDFDict.fromMapWithContext(map, this.context);
-      result = streamRef ? PDFRawStream.of(dict, new Uint8Array()) : dict;
+      result =
+        objectType === ObjectType.Stream
+          ? PDFRawStream.of(dict, new Uint8Array())
+          : dict;
     }
-    this.bind(result, object, streamRef?.asIndirect());
+    this.bind(
+      result,
+      object,
+      objectType === ObjectType.Stream
+        ? (streamRef?.asIndirect() ?? 0)
+        : undefined,
+    );
     return result;
   }
 
@@ -288,19 +304,18 @@ export class NativeEditingContext {
         Object.defineProperty(value, "contents", {
           configurable: true,
           get: () => {
-            const ref = this.native.newIndirect(streamNumber);
+            const buffer = object.readRawStream();
             try {
-              const buffer = ref.readRawStream();
-              try {
-                return buffer.asUint8Array().slice();
-              } finally {
-                buffer.destroy();
-              }
+              return buffer.asUint8Array().slice();
             } finally {
-              ref.destroy();
+              buffer.destroy();
             }
           },
           set: (bytes: Uint8Array) => {
+            if (!streamNumber)
+              throw new Error(
+                "Register a copied stream before replacing its bytes.",
+              );
             const ref = this.native.newIndirect(streamNumber);
             try {
               ref.writeRawStream(bytes);
@@ -320,10 +335,7 @@ export class NativeEditingContext {
         this.withNative(child, (native) => object.push(native));
       value.remove = (index) => object.delete(index);
       value.insert = (index, child) => {
-        const tail = value.asArray().slice(index);
-        while (object.length > index) object.delete(object.length - 1);
-        value.push(child);
-        for (const item of tail) value.push(item);
+        this.withNative(child, (native) => object.insert(index, native));
       };
       value.asArray = () =>
         Array.from({ length: object.length }, (_, i) => value.get(i));
@@ -437,6 +449,34 @@ export class NativeEditingContext {
       }
     }
     this.pendingStreams.clear();
+  }
+
+  /** A copy group remaps object references inside WASM. Page assembly still
+   * reconnects fields, destinations and selected widgets in the layout layer. */
+  async createCopier(target: NativeEditingContext) {
+    await this.flush();
+    const graft = target.native.newGraftMap({
+      copyWithinDocument: true,
+      copyPages: true,
+    });
+    return {
+      copy: <T extends PDFObject>(value: T): T => {
+        if (
+          !(
+            value instanceof PDFRef ||
+            value instanceof PDFDict ||
+            value instanceof PDFArray ||
+            value instanceof PDFStream
+          )
+        )
+          return value.clone() as T;
+        return this.withNative(value, (object) => {
+          const copied = graft.graftObject(object);
+          return target.read(copied) as T;
+        });
+      },
+      destroy: () => graft.destroy(),
+    };
   }
 
   dispose() {

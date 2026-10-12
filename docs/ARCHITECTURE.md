@@ -330,6 +330,12 @@ page attributes, AcroForm fields and outline destinations.
 Imported sources are grafted into the owning document's page bank, with source
 catalog views and original-to-native reference mappings. A donor PDF is open
 only during grafting (temporary peak: two native documents); it is then destroyed.
+The native graft map traverses reachable objects and copies encoded streams
+inside WASM. Source registration and removal update the page tree in a single
+batch. Export copy groups use the same native map, including copies within the
+owning document; the layout layer still reconnects selected form widgets,
+namespaced fonts and page destinations. Native type/name-key access avoids
+serializing temporary key buffers for each layout-helper lookup.
 An import preview is a separate open document until its preview closes. Blank
 pages are created directly in the owner. Source lifetimes include undo history;
 unloading removes source pages/objects and invalidates cached pages. Native

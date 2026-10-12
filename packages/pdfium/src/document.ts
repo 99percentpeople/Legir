@@ -1,13 +1,14 @@
 import { decodeName, PDFObject, type ObjectInput } from "./object.js";
 import { PDFPage } from "./page.js";
 import { Runtime } from "./runtime.js";
-import type { OutlineItem, Rect, SaveOptions } from "./types.js";
+import type { GraftOptions, OutlineItem, Rect, SaveOptions } from "./types.js";
 
 const encoder = new TextEncoder();
 
 export class PDFDocument {
   readonly objects = new Set<PDFObject>();
   readonly pages = new Set<PDFPage>();
+  readonly grafts = new Set<PDFGraftMap>();
   pointer: number;
   constructor(
     readonly runtime: Runtime,
@@ -230,8 +231,8 @@ export class PDFDocument {
       ),
     );
   }
-  newGraftMap() {
-    return new PDFGraftMap(this);
+  newGraftMap(options?: GraftOptions) {
+    return new PDFGraftMap(this, options);
   }
   graftObject(object: PDFObject) {
     const graft = this.newGraftMap();
@@ -261,54 +262,48 @@ export class PDFDocument {
     }
   }
   private rewritePages(pages: PDFObject[]) {
-    const trailer = this.getTrailer();
-    const root = trailer.get("Root", "Pages");
-    try {
-      for (const page of pages)
-        for (const key of [
-          "Resources",
-          "MediaBox",
-          "CropBox",
-          "Rotate",
-          "UserUnit",
-        ]) {
-          const value = page.getInheritable(key);
-          try {
-            if (!value.isNull()) page.put(key, value);
-          } finally {
-            value.destroy();
-          }
-        }
-      root.put("Kids", pages);
-      root.put("Count", pages.length);
-      for (const page of pages) page.put("Parent", root);
-      this.setPageTreeCache(false);
-    } finally {
-      root.destroy();
-      trailer.destroy();
-    }
+    const pointers = new Uint32Array(pages.map((page) => page.pointer));
+    this.runtime.withBytes(new Uint8Array(pointers.buffer), (pointer) => {
+      if (!this.call("LPDF_SetPages", pointer, pages.length))
+        throw new Error("Invalid PDF page tree.");
+    });
   }
   insertPage(index: number, page: PDFObject) {
+    this.insertPages(index, [page]);
+  }
+  insertPages(index: number, inserted: readonly PDFObject[]) {
+    if (!Number.isInteger(index) || index > this.countPages())
+      throw new Error("PDF page index is out of range.");
+    for (const page of inserted) {
+      if (page.document !== this)
+        throw new Error("Use a graft map to copy pages between documents.");
+      page.getType();
+    }
+    if (!inserted.length) return;
     const pages = Array.from({ length: this.countPages() }, (_, i) =>
       this.findPage(i),
     );
     try {
       if (index < 0) index = pages.length;
-      if (index > pages.length)
-        throw new Error("PDF page index is out of range.");
-      pages.splice(index, 0, page.copy());
+      const additions = inserted.map((page) => page.copy());
+      pages.splice(index, 0, ...additions);
       this.rewritePages(pages);
     } finally {
       for (const item of pages) item.destroy();
     }
   }
   deletePage(index: number) {
-    this.checkPage(index);
+    this.deletePages([index]);
+  }
+  deletePages(indexes: readonly number[]) {
+    for (const index of indexes) this.checkPage(index);
+    if (!indexes.length) return;
+    const removed = [...new Set(indexes)].sort((a, b) => b - a);
     const pages = Array.from({ length: this.countPages() }, (_, i) =>
       this.findPage(i),
     );
     try {
-      pages.splice(index, 1)[0].destroy();
+      for (const index of removed) pages.splice(index, 1)[0].destroy();
       this.rewritePages(pages);
     } finally {
       for (const item of pages) item.destroy();
@@ -467,6 +462,7 @@ export class PDFDocument {
   }
   destroy() {
     if (!this.pointer) return;
+    for (const graft of this.grafts) graft.destroy();
     for (const page of this.pages) page.destroy();
     for (const object of this.objects) object.destroy();
     this.runtime.call("LPDF_Close", this.pointer);
@@ -476,11 +472,61 @@ export class PDFDocument {
 
 export class PDFGraftMap {
   private refs = new Map<PDFDocument, Map<number, number>>();
-  constructor(readonly document: PDFDocument) {}
+  private nativeMaps = new Map<PDFDocument, number>();
+  private closed = false;
+  constructor(
+    readonly document: PDFDocument,
+    readonly options: GraftOptions = {},
+  ) {
+    document.assertOpen();
+    document.grafts.add(this);
+  }
+  getReferences(source: PDFDocument): Map<number, number> {
+    if (this.closed) throw new Error("PDF graft map is closed.");
+    const pointer = this.nativeMaps.get(source);
+    if (!pointer) return new Map(this.refs.get(source));
+    const buffer = this.document.runtime.buffer(
+      this.document.runtime.call("LPDF_GraftReferences", pointer),
+    );
+    try {
+      const bytes = buffer.asUint8Array();
+      const values = new Uint32Array(
+        bytes.buffer,
+        bytes.byteOffset,
+        bytes.length / 4,
+      );
+      const result = new Map<number, number>();
+      for (let i = 0; i < values.length; i += 2)
+        result.set(values[i], values[i + 1]);
+      return result;
+    } finally {
+      buffer.destroy();
+    }
+  }
   graftObject(source: PDFObject, depth = 0): PDFObject {
+    if (this.closed) throw new Error("PDF graft map is closed.");
+    this.document.assertOpen();
+    source.getType(); // Validate the source handle before passing its pointer.
     if (depth > 100) throw new Error("PDF object nesting limit exceeded.");
-    if (source.document === this.document) return source.copy();
+    if (source.document === this.document && !this.options.copyWithinDocument)
+      return source.copy();
     const doc = this.document;
+    if (source.document.runtime === doc.runtime) {
+      let map = this.nativeMaps.get(source.document);
+      if (!map) {
+        map = doc.runtime.call(
+          "LPDF_NewGraftMap",
+          doc.pointer,
+          source.document.pointer,
+          +!!this.options.copyPages,
+        );
+        this.nativeMaps.set(source.document, map);
+      }
+      const pointer = doc.runtime.call("LPDF_GraftObject", map, source.pointer);
+      if (!pointer)
+        throw new Error("PDF object graft failed (nesting limit exceeded).");
+      return new PDFObject(doc, pointer);
+    }
     if (source.isIndirect()) {
       let refs = this.refs.get(source.document);
       if (!refs) this.refs.set(source.document, (refs = new Map()));
@@ -523,6 +569,14 @@ export class PDFGraftMap {
       source.forEach((value, key) => {
         let cloned: PDFObject | undefined, name: PDFObject | undefined;
         try {
+          if (key === "Parent" && this.options.copyPages) {
+            const type = source.get("Type");
+            try {
+              if (type.asName() === "Page") return;
+            } finally {
+              type.destroy();
+            }
+          }
           cloned = this.graftObject(value, depth + 1);
           if (typeof key === "number") target.push(cloned);
           else {
@@ -535,6 +589,35 @@ export class PDFGraftMap {
           name?.destroy();
         }
       });
+      if (this.options.copyPages && source.isDictionary()) {
+        const type = source.get("Type");
+        try {
+          if (type.asName() === "Page")
+            for (const key of [
+              "Resources",
+              "MediaBox",
+              "CropBox",
+              "Rotate",
+              "UserUnit",
+            ]) {
+              const inherited = source.getInheritable(key);
+              try {
+                if (!inherited.isNull()) {
+                  const copy = this.graftObject(inherited, depth + 1);
+                  try {
+                    target.put(key, copy);
+                  } finally {
+                    copy.destroy();
+                  }
+                }
+              } finally {
+                inherited.destroy();
+              }
+            }
+        } finally {
+          type.destroy();
+        }
+      }
       return target;
     } catch (error) {
       target.destroy();
@@ -542,6 +625,12 @@ export class PDFGraftMap {
     }
   }
   destroy() {
+    if (this.closed) return;
+    this.closed = true;
+    for (const pointer of this.nativeMaps.values())
+      this.document.runtime.call("LPDF_DropGraftMap", pointer);
+    this.nativeMaps.clear();
     this.refs.clear();
+    this.document.grafts.delete(this);
   }
 }

@@ -1,0 +1,2276 @@
+[
+  {
+    "fixture": "forms",
+    "round": 0,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 341.515625,
+      "rssMiB": 741.34375
+    },
+    "phases": {
+      "open": {
+        "ms": 417.69999980926514,
+        "pages": 12,
+        "peak": {
+          "pssMiB": 420.44140625,
+          "rssMiB": 823.578125
+        },
+        "retained": {
+          "pssMiB": 398.2998046875,
+          "rssMiB": 801.640625
+        }
+      },
+      "firstRender": {
+        "ms": 69.69999980926514,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 420.3515625,
+          "rssMiB": 824.171875
+        },
+        "retained": {
+          "pssMiB": 406.076171875,
+          "rssMiB": 809.703125
+        }
+      },
+      "hydrate": {
+        "ms": 42.80000019073486,
+        "fields": 4,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 406.076171875,
+          "rssMiB": 809.703125
+        },
+        "retained": {
+          "pssMiB": 405.162109375,
+          "rssMiB": 809.078125
+        }
+      },
+      "warmRender": {
+        "ms": 29.199999809265137,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 427.615234375,
+          "rssMiB": 831.53125
+        },
+        "retained": {
+          "pssMiB": 410.990234375,
+          "rssMiB": 814.90625
+        }
+      },
+      "lastRender": {
+        "ms": 24.399999618530273,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 81900,
+        "hash": "b789e6c170b5e1f869f8694868809bf755d38837f20e2c9cc270b60f6f31224c",
+        "peak": {
+          "pssMiB": 427.833984375,
+          "rssMiB": 831.75
+        },
+        "retained": {
+          "pssMiB": 411.115234375,
+          "rssMiB": 815.03125
+        }
+      },
+      "export": {
+        "ms": 132.0999994277954,
+        "bytes": 30839,
+        "peak": {
+          "pssMiB": 446.240234375,
+          "rssMiB": 850.15625
+        },
+        "retained": {
+          "pssMiB": 495.505859375,
+          "rssMiB": 899.421875
+        }
+      },
+      "import": {
+        "ms": 479,
+        "parseMs": 464.9000005722046,
+        "pages": 4,
+        "peak": {
+          "pssMiB": 556.04296875,
+          "rssMiB": 960.21875
+        },
+        "retained": {
+          "pssMiB": 603.841796875,
+          "rssMiB": 1008.453125
+        }
+      },
+      "mergedExport": {
+        "ms": 84.89999961853027,
+        "bytes": 41592,
+        "peak": {
+          "pssMiB": 626.498046875,
+          "rssMiB": 1031.109375
+        },
+        "retained": {
+          "pssMiB": 647.513671875,
+          "rssMiB": 1052.125
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 12,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 16,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "donor-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "donor-field-3",
+          "value": "VALUE 3"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 16777216
+    },
+    "afterClose": {
+      "pssMiB": 395.8427734375,
+      "rssMiB": 800.515625
+    }
+  },
+  {
+    "fixture": "large-images",
+    "round": 0,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 388.9755859375,
+      "rssMiB": 789.9375
+    },
+    "phases": {
+      "open": {
+        "ms": 541.5,
+        "pages": 60,
+        "peak": {
+          "pssMiB": 588.3681640625,
+          "rssMiB": 991.921875
+        },
+        "retained": {
+          "pssMiB": 535.306640625,
+          "rssMiB": 938.890625
+        }
+      },
+      "firstRender": {
+        "ms": 92.30000019073486,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 595587,
+        "hash": "c910453da47978b8dca1474d1243768ab80f464a8413a36b6ac1c78150f7a3da",
+        "peak": {
+          "pssMiB": 566.322265625,
+          "rssMiB": 970.421875
+        },
+        "retained": {
+          "pssMiB": 546.4580078125,
+          "rssMiB": 950.328125
+        }
+      },
+      "hydrate": {
+        "ms": 94.30000019073486,
+        "fields": 20,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 547.0546875,
+          "rssMiB": 950.984375
+        },
+        "retained": {
+          "pssMiB": 546.8828125,
+          "rssMiB": 950.8125
+        }
+      },
+      "warmRender": {
+        "ms": 59.69999980926514,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 595587,
+        "hash": "c910453da47978b8dca1474d1243768ab80f464a8413a36b6ac1c78150f7a3da",
+        "peak": {
+          "pssMiB": 568.8515625,
+          "rssMiB": 972.78125
+        },
+        "retained": {
+          "pssMiB": 548.7109375,
+          "rssMiB": 952.640625
+        }
+      },
+      "lastRender": {
+        "ms": 61.39999961853027,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 592929,
+        "hash": "9a497aca8afdbdc43b23d15f9c45d6a5b3a039bebfd0e3233703b60981a4b765",
+        "peak": {
+          "pssMiB": 568.9296875,
+          "rssMiB": 972.859375
+        },
+        "retained": {
+          "pssMiB": 548.7734375,
+          "rssMiB": 952.703125
+        }
+      },
+      "export": {
+        "ms": 244,
+        "bytes": 47264374,
+        "peak": {
+          "pssMiB": 684.3515625,
+          "rssMiB": 1088.28125
+        },
+        "retained": {
+          "pssMiB": 716.9609375,
+          "rssMiB": 1120.890625
+        }
+      },
+      "import": {
+        "ms": 592.5,
+        "parseMs": 582.5999994277954,
+        "pages": 4,
+        "peak": {
+          "pssMiB": 950.9736328125,
+          "rssMiB": 1355.15625
+        },
+        "retained": {
+          "pssMiB": 857.7177734375,
+          "rssMiB": 1262.34375
+        }
+      },
+      "mergedExport": {
+        "ms": 230.79999923706055,
+        "bytes": 47275329,
+        "peak": {
+          "pssMiB": 914.3740234375,
+          "rssMiB": 1319
+        },
+        "retained": {
+          "pssMiB": 868.5146484375,
+          "rssMiB": 1273.140625
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 60,
+      "fields": [
+        {
+          "name": "large-images-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 64,
+      "fields": [
+        {
+          "name": "large-images-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "donor-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "donor-field-3",
+          "value": "VALUE 3"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 150470656
+    },
+    "afterClose": {
+      "pssMiB": 398.9052734375,
+      "rssMiB": 803.4375
+    }
+  },
+  {
+    "fixture": "large-import",
+    "round": 0,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 389.37109375,
+      "rssMiB": 789.765625
+    },
+    "phases": {
+      "open": {
+        "ms": 413.80000019073486,
+        "pages": 12,
+        "peak": {
+          "pssMiB": 466.697265625,
+          "rssMiB": 869.59375
+        },
+        "retained": {
+          "pssMiB": 446.3173828125,
+          "rssMiB": 849.53125
+        }
+      },
+      "firstRender": {
+        "ms": 92.30000019073486,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 469.9375,
+          "rssMiB": 873.46875
+        },
+        "retained": {
+          "pssMiB": 452.984375,
+          "rssMiB": 856.53125
+        }
+      },
+      "hydrate": {
+        "ms": 39.80000019073486,
+        "fields": 4,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 453.814453125,
+          "rssMiB": 857.4375
+        },
+        "retained": {
+          "pssMiB": 453.7822265625,
+          "rssMiB": 857.375
+        }
+      },
+      "warmRender": {
+        "ms": 24.800000190734863,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 470.8447265625,
+          "rssMiB": 874.4375
+        },
+        "retained": {
+          "pssMiB": 458.3134765625,
+          "rssMiB": 861.90625
+        }
+      },
+      "lastRender": {
+        "ms": 23.600000381469727,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 81900,
+        "hash": "b789e6c170b5e1f869f8694868809bf755d38837f20e2c9cc270b60f6f31224c",
+        "peak": {
+          "pssMiB": 475.2978515625,
+          "rssMiB": 878.890625
+        },
+        "retained": {
+          "pssMiB": 459.0322265625,
+          "rssMiB": 862.625
+        }
+      },
+      "export": {
+        "ms": 116.40000057220459,
+        "bytes": 30839,
+        "peak": {
+          "pssMiB": 506.9228515625,
+          "rssMiB": 910.515625
+        },
+        "retained": {
+          "pssMiB": 533.7353515625,
+          "rssMiB": 937.328125
+        }
+      },
+      "import": {
+        "ms": 969.0999994277954,
+        "parseMs": 732,
+        "pages": 60,
+        "peak": {
+          "pssMiB": 880.7431640625,
+          "rssMiB": 1285.09375
+        },
+        "retained": {
+          "pssMiB": 818.2431640625,
+          "rssMiB": 1222.59375
+        }
+      },
+      "mergedExport": {
+        "ms": 189.80000019073486,
+        "bytes": 47293047,
+        "peak": {
+          "pssMiB": 928.4931640625,
+          "rssMiB": 1332.84375
+        },
+        "retained": {
+          "pssMiB": 942.7431640625,
+          "rssMiB": 1347.09375
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 12,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 72,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "VALUE 3"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "VALUE 6"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "VALUE 9"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "VALUE 12"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "VALUE 15"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "VALUE 18"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "VALUE 21"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "VALUE 24"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "VALUE 27"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "VALUE 30"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "VALUE 33"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "VALUE 36"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "VALUE 39"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "VALUE 42"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "VALUE 45"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "VALUE 48"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "VALUE 51"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "VALUE 54"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "VALUE 57"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 196935680
+    },
+    "afterClose": {
+      "pssMiB": 403.0390625,
+      "rssMiB": 807.28125
+    }
+  },
+  {
+    "fixture": "forms",
+    "round": 1,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 344.322265625,
+      "rssMiB": 744.4375
+    },
+    "phases": {
+      "open": {
+        "ms": 399.30000019073486,
+        "pages": 12,
+        "peak": {
+          "pssMiB": 419.0908203125,
+          "rssMiB": 822.390625
+        },
+        "retained": {
+          "pssMiB": 401.3564453125,
+          "rssMiB": 804.78125
+        }
+      },
+      "firstRender": {
+        "ms": 73.90000057220459,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 428.6455078125,
+          "rssMiB": 832.6875
+        },
+        "retained": {
+          "pssMiB": 411.7783203125,
+          "rssMiB": 816.046875
+        }
+      },
+      "hydrate": {
+        "ms": 39.29999923706055,
+        "fields": 4,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 411.8095703125,
+          "rssMiB": 816.109375
+        },
+        "retained": {
+          "pssMiB": 408.935546875,
+          "rssMiB": 812.921875
+        }
+      },
+      "warmRender": {
+        "ms": 24.199999809265137,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 427.654296875,
+          "rssMiB": 831.640625
+        },
+        "retained": {
+          "pssMiB": 413.935546875,
+          "rssMiB": 817.921875
+        }
+      },
+      "lastRender": {
+        "ms": 24.300000190734863,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 81900,
+        "hash": "b789e6c170b5e1f869f8694868809bf755d38837f20e2c9cc270b60f6f31224c",
+        "peak": {
+          "pssMiB": 426.841796875,
+          "rssMiB": 830.828125
+        },
+        "retained": {
+          "pssMiB": 414.263671875,
+          "rssMiB": 818.25
+        }
+      },
+      "export": {
+        "ms": 122.5,
+        "bytes": 30839,
+        "peak": {
+          "pssMiB": 454.544921875,
+          "rssMiB": 858.53125
+        },
+        "retained": {
+          "pssMiB": 498.482421875,
+          "rssMiB": 902.46875
+        }
+      },
+      "import": {
+        "ms": 488.20000076293945,
+        "parseMs": 471.6000003814697,
+        "pages": 4,
+        "peak": {
+          "pssMiB": 560.59765625,
+          "rssMiB": 964.828125
+        },
+        "retained": {
+          "pssMiB": 608.662109375,
+          "rssMiB": 1013.296875
+        }
+      },
+      "mergedExport": {
+        "ms": 81.30000019073486,
+        "bytes": 41592,
+        "peak": {
+          "pssMiB": 629.802734375,
+          "rssMiB": 1034.484375
+        },
+        "retained": {
+          "pssMiB": 650.677734375,
+          "rssMiB": 1055.359375
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 12,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 16,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "donor-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "donor-field-3",
+          "value": "VALUE 3"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 16777216
+    },
+    "afterClose": {
+      "pssMiB": 399.3037109375,
+      "rssMiB": 804.046875
+    }
+  },
+  {
+    "fixture": "large-images",
+    "round": 1,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 388.6044921875,
+      "rssMiB": 789.34375
+    },
+    "phases": {
+      "open": {
+        "ms": 515.6999998092651,
+        "pages": 60,
+        "peak": {
+          "pssMiB": 589.2724609375,
+          "rssMiB": 992.515625
+        },
+        "retained": {
+          "pssMiB": 536.671875,
+          "rssMiB": 940.359375
+        }
+      },
+      "firstRender": {
+        "ms": 93,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 595587,
+        "hash": "c910453da47978b8dca1474d1243768ab80f464a8413a36b6ac1c78150f7a3da",
+        "peak": {
+          "pssMiB": 568.0322265625,
+          "rssMiB": 971.90625
+        },
+        "retained": {
+          "pssMiB": 548.0634765625,
+          "rssMiB": 951.9375
+        }
+      },
+      "hydrate": {
+        "ms": 95.69999980926514,
+        "fields": 20,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 548.267578125,
+          "rssMiB": 952.203125
+        },
+        "retained": {
+          "pssMiB": 548.111328125,
+          "rssMiB": 952.046875
+        }
+      },
+      "warmRender": {
+        "ms": 58.30000019073486,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 595587,
+        "hash": "c910453da47978b8dca1474d1243768ab80f464a8413a36b6ac1c78150f7a3da",
+        "peak": {
+          "pssMiB": 569.689453125,
+          "rssMiB": 973.625
+        },
+        "retained": {
+          "pssMiB": 550.017578125,
+          "rssMiB": 953.953125
+        }
+      },
+      "lastRender": {
+        "ms": 60.19999980926514,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 592929,
+        "hash": "9a497aca8afdbdc43b23d15f9c45d6a5b3a039bebfd0e3233703b60981a4b765",
+        "peak": {
+          "pssMiB": 570.236328125,
+          "rssMiB": 974.171875
+        },
+        "retained": {
+          "pssMiB": 550.142578125,
+          "rssMiB": 954.078125
+        }
+      },
+      "export": {
+        "ms": 257.0999994277954,
+        "bytes": 47264374,
+        "peak": {
+          "pssMiB": 693.095703125,
+          "rssMiB": 1097.09375
+        },
+        "retained": {
+          "pssMiB": 721.251953125,
+          "rssMiB": 1125.25
+        }
+      },
+      "import": {
+        "ms": 557.7999992370605,
+        "parseMs": 547.8999996185303,
+        "pages": 4,
+        "peak": {
+          "pssMiB": 964.298828125,
+          "rssMiB": 1368.328125
+        },
+        "retained": {
+          "pssMiB": 863.1611328125,
+          "rssMiB": 1267.546875
+        }
+      },
+      "mergedExport": {
+        "ms": 217.5,
+        "bytes": 47275329,
+        "peak": {
+          "pssMiB": 917.5048828125,
+          "rssMiB": 1321.890625
+        },
+        "retained": {
+          "pssMiB": 884.5986328125,
+          "rssMiB": 1288.953125
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 60,
+      "fields": [
+        {
+          "name": "large-images-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 64,
+      "fields": [
+        {
+          "name": "large-images-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "donor-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "donor-field-3",
+          "value": "VALUE 3"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 150470656
+    },
+    "afterClose": {
+      "pssMiB": 402.5361328125,
+      "rssMiB": 806.828125
+    }
+  },
+  {
+    "fixture": "large-import",
+    "round": 1,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 390.564453125,
+      "rssMiB": 791.203125
+    },
+    "phases": {
+      "open": {
+        "ms": 432.19999980926514,
+        "pages": 12,
+        "peak": {
+          "pssMiB": 468.0986328125,
+          "rssMiB": 871.25
+        },
+        "retained": {
+          "pssMiB": 448.70703125,
+          "rssMiB": 852.171875
+        }
+      },
+      "firstRender": {
+        "ms": 74.69999980926514,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 471.1611328125,
+          "rssMiB": 874.703125
+        },
+        "retained": {
+          "pssMiB": 454.91015625,
+          "rssMiB": 858.625
+        }
+      },
+      "hydrate": {
+        "ms": 49.70000076293945,
+        "fields": 4,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 455.744140625,
+          "rssMiB": 859.515625
+        },
+        "retained": {
+          "pssMiB": 455.541015625,
+          "rssMiB": 859.3125
+        }
+      },
+      "warmRender": {
+        "ms": 24.40000057220459,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 472.650390625,
+          "rssMiB": 876.421875
+        },
+        "retained": {
+          "pssMiB": 460.119140625,
+          "rssMiB": 863.890625
+        }
+      },
+      "lastRender": {
+        "ms": 23.300000190734863,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 81900,
+        "hash": "b789e6c170b5e1f869f8694868809bf755d38837f20e2c9cc270b60f6f31224c",
+        "peak": {
+          "pssMiB": 472.775390625,
+          "rssMiB": 876.546875
+        },
+        "retained": {
+          "pssMiB": 460.181640625,
+          "rssMiB": 863.953125
+        }
+      },
+      "export": {
+        "ms": 116.30000019073486,
+        "bytes": 30839,
+        "peak": {
+          "pssMiB": 508.103515625,
+          "rssMiB": 911.875
+        },
+        "retained": {
+          "pssMiB": 543.775390625,
+          "rssMiB": 947.546875
+        }
+      },
+      "import": {
+        "ms": 1054.7000007629395,
+        "parseMs": 767.1000003814697,
+        "pages": 60,
+        "peak": {
+          "pssMiB": 891.609375,
+          "rssMiB": 1296.046875
+        },
+        "retained": {
+          "pssMiB": 823.59375,
+          "rssMiB": 1228.09375
+        }
+      },
+      "mergedExport": {
+        "ms": 190,
+        "bytes": 47293047,
+        "peak": {
+          "pssMiB": 931.71875,
+          "rssMiB": 1336.234375
+        },
+        "retained": {
+          "pssMiB": 943.5322265625,
+          "rssMiB": 1348.125
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 12,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 72,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "VALUE 3"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "VALUE 6"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "VALUE 9"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "VALUE 12"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "VALUE 15"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "VALUE 18"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "VALUE 21"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "VALUE 24"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "VALUE 27"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "VALUE 30"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "VALUE 33"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "VALUE 36"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "VALUE 39"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "VALUE 42"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "VALUE 45"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "VALUE 48"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "VALUE 51"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "VALUE 54"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "VALUE 57"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 196935680
+    },
+    "afterClose": {
+      "pssMiB": 403.828125,
+      "rssMiB": 808.3125
+    }
+  },
+  {
+    "fixture": "forms",
+    "round": 2,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 342.77734375,
+      "rssMiB": 743.1875
+    },
+    "phases": {
+      "open": {
+        "ms": 474,
+        "pages": 12,
+        "peak": {
+          "pssMiB": 422.775390625,
+          "rssMiB": 825.96875
+        },
+        "retained": {
+          "pssMiB": 399.6376953125,
+          "rssMiB": 803.03125
+        }
+      },
+      "firstRender": {
+        "ms": 73.19999980926514,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 421.5673828125,
+          "rssMiB": 825.734375
+        },
+        "retained": {
+          "pssMiB": 407.638671875,
+          "rssMiB": 811.4375
+        }
+      },
+      "hydrate": {
+        "ms": 41,
+        "fields": 4,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 407.638671875,
+          "rssMiB": 811.4375
+        },
+        "retained": {
+          "pssMiB": 407.4228515625,
+          "rssMiB": 811.28125
+        }
+      },
+      "warmRender": {
+        "ms": 26.899999618530273,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 425.8447265625,
+          "rssMiB": 829.703125
+        },
+        "retained": {
+          "pssMiB": 413.3134765625,
+          "rssMiB": 817.171875
+        }
+      },
+      "lastRender": {
+        "ms": 24.699999809265137,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 81900,
+        "hash": "b789e6c170b5e1f869f8694868809bf755d38837f20e2c9cc270b60f6f31224c",
+        "peak": {
+          "pssMiB": 430.3603515625,
+          "rssMiB": 834.21875
+        },
+        "retained": {
+          "pssMiB": 413.8603515625,
+          "rssMiB": 817.71875
+        }
+      },
+      "export": {
+        "ms": 121.59999942779541,
+        "bytes": 30839,
+        "peak": {
+          "pssMiB": 452.7978515625,
+          "rssMiB": 856.65625
+        },
+        "retained": {
+          "pssMiB": 496.8447265625,
+          "rssMiB": 900.703125
+        }
+      },
+      "import": {
+        "ms": 521.5,
+        "parseMs": 508.29999923706055,
+        "pages": 4,
+        "peak": {
+          "pssMiB": 581.935546875,
+          "rssMiB": 986.125
+        },
+        "retained": {
+          "pssMiB": 615.0087890625,
+          "rssMiB": 1019.5625
+        }
+      },
+      "mergedExport": {
+        "ms": 50,
+        "bytes": 41592,
+        "peak": {
+          "pssMiB": 629.2275390625,
+          "rssMiB": 1033.78125
+        },
+        "retained": {
+          "pssMiB": 650.6337890625,
+          "rssMiB": 1055.1875
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 12,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 16,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "donor-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "donor-field-3",
+          "value": "VALUE 3"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 16777216
+    },
+    "afterClose": {
+      "pssMiB": 396.0390625,
+      "rssMiB": 800.734375
+    }
+  },
+  {
+    "fixture": "large-images",
+    "round": 2,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 387.037109375,
+      "rssMiB": 788.671875
+    },
+    "phases": {
+      "open": {
+        "ms": 549,
+        "pages": 60,
+        "peak": {
+          "pssMiB": 586.486328125,
+          "rssMiB": 991
+        },
+        "retained": {
+          "pssMiB": 536.572265625,
+          "rssMiB": 940.828125
+        }
+      },
+      "firstRender": {
+        "ms": 92.09999942779541,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 595587,
+        "hash": "c910453da47978b8dca1474d1243768ab80f464a8413a36b6ac1c78150f7a3da",
+        "peak": {
+          "pssMiB": 566.416015625,
+          "rssMiB": 971.1875
+        },
+        "retained": {
+          "pssMiB": 544.916015625,
+          "rssMiB": 949.6875
+        }
+      },
+      "hydrate": {
+        "ms": 102.80000019073486,
+        "fields": 20,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 547.12109375,
+          "rssMiB": 951.953125
+        },
+        "retained": {
+          "pssMiB": 546.99609375,
+          "rssMiB": 951.828125
+        }
+      },
+      "warmRender": {
+        "ms": 61.19999980926514,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 595587,
+        "hash": "c910453da47978b8dca1474d1243768ab80f464a8413a36b6ac1c78150f7a3da",
+        "peak": {
+          "pssMiB": 569.51171875,
+          "rssMiB": 974.34375
+        },
+        "retained": {
+          "pssMiB": 549.41796875,
+          "rssMiB": 954.25
+        }
+      },
+      "lastRender": {
+        "ms": 56.59999942779541,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 592929,
+        "hash": "9a497aca8afdbdc43b23d15f9c45d6a5b3a039bebfd0e3233703b60981a4b765",
+        "peak": {
+          "pssMiB": 569.62109375,
+          "rssMiB": 974.453125
+        },
+        "retained": {
+          "pssMiB": 549.46484375,
+          "rssMiB": 954.296875
+        }
+      },
+      "export": {
+        "ms": 255.19999980926514,
+        "bytes": 47264374,
+        "peak": {
+          "pssMiB": 674.017578125,
+          "rssMiB": 1078.859375
+        },
+        "retained": {
+          "pssMiB": 718.69921875,
+          "rssMiB": 1123.53125
+        }
+      },
+      "import": {
+        "ms": 682,
+        "parseMs": 670.2999992370605,
+        "pages": 4,
+        "peak": {
+          "pssMiB": 956.5634765625,
+          "rssMiB": 1361.65625
+        },
+        "retained": {
+          "pssMiB": 858.3173828125,
+          "rssMiB": 1263.84375
+        }
+      },
+      "mergedExport": {
+        "ms": 212.5,
+        "bytes": 47275329,
+        "peak": {
+          "pssMiB": 917.0673828125,
+          "rssMiB": 1322.59375
+        },
+        "retained": {
+          "pssMiB": 872.5673828125,
+          "rssMiB": 1278.09375
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 60,
+      "fields": [
+        {
+          "name": "large-images-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 64,
+      "fields": [
+        {
+          "name": "large-images-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "donor-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "donor-field-3",
+          "value": "VALUE 3"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 150470656
+    },
+    "afterClose": {
+      "pssMiB": 400.7861328125,
+      "rssMiB": 806.21875
+    }
+  },
+  {
+    "fixture": "large-import",
+    "round": 2,
+    "environment": {
+      "browser": "148.0.7778.167",
+      "platform": "linux",
+      "arch": "arm64"
+    },
+    "baseline": {
+      "pssMiB": 389.0576171875,
+      "rssMiB": 790.25
+    },
+    "phases": {
+      "open": {
+        "ms": 422.19999980926514,
+        "pages": 12,
+        "peak": {
+          "pssMiB": 463.8173828125,
+          "rssMiB": 867.609375
+        },
+        "retained": {
+          "pssMiB": 448.4189453125,
+          "rssMiB": 852.453125
+        }
+      },
+      "firstRender": {
+        "ms": 74.30000019073486,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 466.232421875,
+          "rssMiB": 870.5
+        },
+        "retained": {
+          "pssMiB": 453.716796875,
+          "rssMiB": 857.984375
+        }
+      },
+      "hydrate": {
+        "ms": 43,
+        "fields": 4,
+        "annotations": 0,
+        "peak": {
+          "pssMiB": 453.9541015625,
+          "rssMiB": 858.28125
+        },
+        "retained": {
+          "pssMiB": 453.9072265625,
+          "rssMiB": 858.234375
+        }
+      },
+      "warmRender": {
+        "ms": 29.600000381469727,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 84693,
+        "hash": "ab943929146bc59ba59f71403cad707406e5e557687b135e6aea180fc9f05c17",
+        "peak": {
+          "pssMiB": 471.9228515625,
+          "rssMiB": 876.25
+        },
+        "retained": {
+          "pssMiB": 459.3759765625,
+          "rssMiB": 863.703125
+        }
+      },
+      "lastRender": {
+        "ms": 23.699999809265137,
+        "width": 900,
+        "height": 1200,
+        "nonWhite": 81900,
+        "hash": "b789e6c170b5e1f869f8694868809bf755d38837f20e2c9cc270b60f6f31224c",
+        "peak": {
+          "pssMiB": 472.8134765625,
+          "rssMiB": 877.140625
+        },
+        "retained": {
+          "pssMiB": 460.3994140625,
+          "rssMiB": 864.734375
+        }
+      },
+      "export": {
+        "ms": 120.5,
+        "bytes": 30839,
+        "peak": {
+          "pssMiB": 503.8154296875,
+          "rssMiB": 908.15625
+        },
+        "retained": {
+          "pssMiB": 543.203125,
+          "rssMiB": 947.59375
+        }
+      },
+      "import": {
+        "ms": 1049.1999998092651,
+        "parseMs": 764,
+        "pages": 60,
+        "peak": {
+          "pssMiB": 888.6171875,
+          "rssMiB": 1293.828125
+        },
+        "retained": {
+          "pssMiB": 822.58984375,
+          "rssMiB": 1227.78125
+        }
+      },
+      "mergedExport": {
+        "ms": 200,
+        "bytes": 47293047,
+        "peak": {
+          "pssMiB": 932.0927734375,
+          "rssMiB": 1337.265625
+        },
+        "retained": {
+          "pssMiB": 942.0302734375,
+          "rssMiB": 1347.203125
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "exportValidation": {
+      "pages": 12,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        }
+      ]
+    },
+    "mergeValidation": {
+      "pages": 72,
+      "fields": [
+        {
+          "name": "forms-field-0",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-3",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-6",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "forms-field-9",
+          "value": "BENCHMARK EDIT"
+        },
+        {
+          "name": "large-images-field-0",
+          "value": "VALUE 0"
+        },
+        {
+          "name": "large-images-field-3",
+          "value": "VALUE 3"
+        },
+        {
+          "name": "large-images-field-6",
+          "value": "VALUE 6"
+        },
+        {
+          "name": "large-images-field-9",
+          "value": "VALUE 9"
+        },
+        {
+          "name": "large-images-field-12",
+          "value": "VALUE 12"
+        },
+        {
+          "name": "large-images-field-15",
+          "value": "VALUE 15"
+        },
+        {
+          "name": "large-images-field-18",
+          "value": "VALUE 18"
+        },
+        {
+          "name": "large-images-field-21",
+          "value": "VALUE 21"
+        },
+        {
+          "name": "large-images-field-24",
+          "value": "VALUE 24"
+        },
+        {
+          "name": "large-images-field-27",
+          "value": "VALUE 27"
+        },
+        {
+          "name": "large-images-field-30",
+          "value": "VALUE 30"
+        },
+        {
+          "name": "large-images-field-33",
+          "value": "VALUE 33"
+        },
+        {
+          "name": "large-images-field-36",
+          "value": "VALUE 36"
+        },
+        {
+          "name": "large-images-field-39",
+          "value": "VALUE 39"
+        },
+        {
+          "name": "large-images-field-42",
+          "value": "VALUE 42"
+        },
+        {
+          "name": "large-images-field-45",
+          "value": "VALUE 45"
+        },
+        {
+          "name": "large-images-field-48",
+          "value": "VALUE 48"
+        },
+        {
+          "name": "large-images-field-51",
+          "value": "VALUE 51"
+        },
+        {
+          "name": "large-images-field-54",
+          "value": "VALUE 54"
+        },
+        {
+          "name": "large-images-field-57",
+          "value": "VALUE 57"
+        }
+      ]
+    },
+    "nativeStats": {
+      "nativeDocuments": 1,
+      "peakNativeDocuments": 2,
+      "sources": 2,
+      "wasmCapacityBytes": 196935680
+    },
+    "afterClose": {
+      "pssMiB": 401.7646484375,
+      "rssMiB": 806.84375
+    }
+  }
+]

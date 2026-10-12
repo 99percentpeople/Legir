@@ -1,6 +1,7 @@
 import {
   loadEditingDocument,
   disposeEditingDocument,
+  getEditingView,
 } from "../engine/editingDocument";
 import {
   PDFArray,
@@ -68,6 +69,7 @@ export async function assemblePages(
 ) {
   const originalPages = doc.getPages();
   const sources = new Map<string, PDFDocument>();
+  const copiers: Array<{ destroy(): void }> = [];
   const getSource = async (id: string) => {
     let source = sources.get(id);
     if (!source) {
@@ -91,7 +93,7 @@ export async function assemblePages(
   };
   try {
     type Group = {
-      copier: PDFObjectCopier;
+      copier: Pick<PDFObjectCopier, "copy">;
       source: PDFDocument;
       sourceId: string;
       pages: Map<number, PDFPage>;
@@ -125,10 +127,17 @@ export async function assemblePages(
       let group = groups.get(groupKey);
       if (!group) {
         const source = await getSource(origin.documentId);
+        const sourceView = getEditingView(source),
+          targetView = getEditingView(doc);
+        const copier =
+          sourceView && targetView
+            ? await sourceView.createCopier(targetView)
+            : PDFObjectCopier.for(source.context, doc.context);
+        if ("destroy" in copier) copiers.push(copier);
         group = {
           source,
           sourceId: origin.documentId,
-          copier: PDFObjectCopier.for(source.context, doc.context),
+          copier,
           pages: new Map(),
           outputIndexes: new Set(),
           sourceAnnotKeys: new Set(),
@@ -454,6 +463,7 @@ export async function assemblePages(
         }),
     };
   } finally {
+    for (const copier of copiers) copier.destroy();
     if (!resolveSource)
       for (const source of sources.values()) disposeEditingDocument(source);
   }

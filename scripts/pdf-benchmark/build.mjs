@@ -2,6 +2,7 @@
 import { build } from "vite";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { profilePlugin } from "./profile-plugin.mjs";
 const [checkout, output] = process.argv.slice(2);
 if (!checkout || !output)
   throw new Error("Usage: node build.mjs CHECKOUT OUTPUT");
@@ -9,6 +10,9 @@ process.chdir(checkout);
 await build({
   configFile: resolve(checkout, "vite.config.ts"),
   root: checkout,
+  worker: {
+    plugins: () => (process.env.PDF_BENCH_PROFILE ? [profilePlugin()] : []),
+  },
   build: {
     outDir: output,
     emptyOutDir: true,

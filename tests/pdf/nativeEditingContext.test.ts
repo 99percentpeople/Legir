@@ -4,12 +4,43 @@ import {
   PDFDocument,
   PDFName,
   PDFString,
+  PDFStream,
   StandardFonts,
 } from "@cantoo/pdf-lib";
 import { getPDFium } from "@/services/pdfService/engine/runtime";
 import { NativeEditingContext } from "@/services/pdfService/engine/nativeEditingContext";
 
 describe("native editing views", () => {
+  it("copies native encoded streams and flushes newly authored streams before copying", async () => {
+    const pdfium = await getPDFium();
+    const native = new pdfium.PDFDocument();
+    const view = new NativeEditingContext(pdfium, native);
+    const original = view.context.flateStream("AUTHORED BEFORE COPY");
+    const ref = view.context.register(original);
+    const copier = await view.createCopier(view);
+    try {
+      const copiedRef = copier.copy(ref);
+      expect(copiedRef).not.toBe(ref);
+      const copiedStream = view.context.lookup(copiedRef, PDFStream);
+      expect(copiedStream.getContents()).toEqual(original.getContents());
+      const directCopy = copier.copy(copiedStream);
+      const directRef = view.context.register(directCopy);
+      view.document.catalog.set(PDFName.of("Copied"), directRef);
+      await view.flush();
+      const output = native.saveToBuffer();
+      try {
+        const reopened = await PDFDocument.load(output.asUint8Array().slice());
+        const saved = reopened.catalog.lookup(PDFName.of("Copied"), PDFStream);
+        expect(saved.getContents()).toEqual(original.getContents());
+      } finally {
+        output.destroy();
+      }
+    } finally {
+      copier.destroy();
+      view.dispose();
+      native.destroy();
+    }
+  });
   it("edits the existing native document without reading or copying untouched stream bodies", async () => {
     const source = await PDFDocument.create();
     const page = source.addPage([400, 500]);

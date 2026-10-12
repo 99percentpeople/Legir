@@ -258,6 +258,99 @@ static std::set<uint32_t> reachable_objects(Document *doc) {
   return numbers;
 }
 
+// One map covers a whole import/copy group. References are reserved before
+// recursion so cycles and shared resources keep their identity. Stream data
+// stays inside WASM, retaining its original encoding and precision.
+struct GraftMap {
+  Document *target;
+  Document *source;
+  bool copy_pages;
+  bool failed = false;
+  std::map<uint32_t, uint32_t> refs;
+  std::map<const CPDF_Object *, std::pair<Obj, Obj>> objects;
+
+  Obj copy(Obj value, unsigned depth = 0) {
+    auto core = target->core();
+    if (failed || depth > 100) {
+      failed = true;
+      return nullptr;
+    }
+    if (!value)
+      return core->New<CPDF_Null>();
+    if (auto ref = value->AsReference()) {
+      const auto number = ref->GetRefObjNum();
+      auto [entry, fresh] = refs.try_emplace(number, 0);
+      if (fresh) {
+        entry->second = core->AddIndirectObject(core->New<CPDF_Null>());
+        // Follow one xref edge at a time, preserving indirect reference bodies.
+        auto body =
+            copy(source->core()->GetOrParseIndirectObject(number), depth + 1);
+        if (failed)
+          return nullptr;
+        set_object(target, entry->second, std::move(body));
+      }
+      return core->New<CPDF_Reference>(core, entry->second);
+    }
+    const auto found = objects.find(value.Get());
+    if (found != objects.end())
+      return found->second.second;
+    if (auto array = value->AsMutableArray()) {
+      auto result = core->New<CPDF_Array>();
+      objects.emplace(value.Get(), std::make_pair(value, result));
+      for (size_t i = 0; i < array->size(); ++i) {
+        auto child = copy(array->GetMutableObjectAt(i), depth + 1);
+        if (failed)
+          return nullptr;
+        result->Append(inline_value(target, child.Get()));
+      }
+      return result;
+    }
+    if (auto dict = value->GetMutableDict()) {
+      auto result = core->New<CPDF_Dictionary>();
+      Obj output = result;
+      if (value->IsStream())
+        output = core->New<CPDF_Stream>(result);
+      objects.emplace(value.Get(), std::make_pair(value, output));
+      const bool page = copy_pages && dict->GetNameFor("Type") == "Page";
+      for (const auto &key : dict->GetKeys()) {
+        if (page && key == "Parent")
+          continue;
+        auto child =
+            copy(dict->GetMutableObjectFor(key.AsStringView()), depth + 1);
+        if (failed)
+          return nullptr;
+        result->SetFor(key, inline_value(target, child.Get()));
+      }
+      if (page) {
+        for (const char *key :
+             {"Resources", "MediaBox", "CropBox", "Rotate", "UserUnit"}) {
+          auto parent = dict;
+          std::set<const CPDF_Dictionary *> visited;
+          while (parent && visited.insert(parent.Get()).second) {
+            auto inherited = parent->GetMutableObjectFor(key);
+            if (inherited) {
+              auto child = copy(inherited, depth + 1);
+              if (failed)
+                return nullptr;
+              result->SetFor(key, inline_value(target, child.Get()));
+              break;
+            }
+            parent = parent->GetMutableDictFor("Parent");
+          }
+        }
+      }
+      if (auto stream = value->AsMutableStream()) {
+        auto acc =
+            pdfium::MakeRetain<CPDF_StreamAcc>(pdfium::WrapRetain(stream));
+        acc->LoadAllDataRaw();
+        output->AsMutableStream()->TakeData(acc->DetachData());
+      }
+      return output;
+    }
+    return value->Clone();
+  }
+};
+
 struct Archive final : IFX_ArchiveStream {
   std::vector<uint8_t> data;
   bool WriteBlock(pdfium::span<const uint8_t> block) override {
@@ -349,6 +442,52 @@ EMSCRIPTEN_KEEPALIVE CPDF_Object *LPDF_PageObject(Document *doc, int index) {
   return page ? keep(doc->core()->New<CPDF_Reference>(doc->core(),
                                                       page->GetObjNum()))
               : nullptr;
+}
+EMSCRIPTEN_KEEPALIVE int LPDF_SetPages(Document *doc, CPDF_Object **pages,
+                                       size_t count) {
+  auto catalog = doc->trailer->GetMutableDictFor("Root");
+  auto root_ref = catalog ? catalog->GetMutableObjectFor("Pages") : nullptr;
+  auto root = dictionary(root_ref.Get());
+  if (!root)
+    return 0;
+  std::vector<RetainPtr<CPDF_Dictionary>> dictionaries;
+  dictionaries.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    auto page = dictionary(pages[i]);
+    if (!page)
+      return 0;
+    dictionaries.push_back(std::move(page));
+  }
+  // Resolve all inherited attributes before changing any Parent edge.
+  for (auto page : dictionaries) {
+    for (const char *key :
+         {"Resources", "MediaBox", "CropBox", "Rotate", "UserUnit"}) {
+      auto parent = page;
+      std::set<const CPDF_Dictionary *> visited;
+      for (unsigned depth = 0;
+           parent && depth < 100 && visited.insert(parent.Get()).second;
+           ++depth) {
+        auto value = parent->GetMutableObjectFor(key);
+        auto resolved = direct(value.Get());
+        if (resolved && !resolved->IsNull()) {
+          if (value != page->GetMutableObjectFor(key))
+            set_key(doc, page, key, inline_value(doc, value.Get()));
+          break;
+        }
+        parent = parent->GetMutableDictFor("Parent");
+      }
+    }
+  }
+  auto kids = doc->core()->New<CPDF_Array>();
+  for (size_t i = 0; i < count; ++i) {
+    kids->Append(inline_value(doc, pages[i]));
+    set_key(doc, dictionaries[i], "Parent", inline_value(doc, root_ref.Get()));
+  }
+  set_key(doc, root, "Kids", kids);
+  set_key(doc, root, "Count",
+          doc->core()->New<CPDF_Number>(static_cast<int>(count)));
+  doc->sync();
+  return 1;
 }
 EMSCRIPTEN_KEEPALIVE FPDF_PAGE LPDF_LoadPage(Document *doc, int index) {
   return FPDF_LoadPage(doc->handle, index);
@@ -445,8 +584,28 @@ EMSCRIPTEN_KEEPALIVE void LPDF_Drop(CPDF_Object *object) {
   Obj owned;
   owned.Unleak(object);
 }
-EMSCRIPTEN_KEEPALIVE int LPDF_Type(CPDF_Object *object) {
+EMSCRIPTEN_KEEPALIVE int LPDF_Type(CPDF_Object *object, int resolve) {
+  auto value = resolve ? direct(object) : pdfium::WrapRetain(object);
+  object = value.Get();
   return object ? object->GetType() : CPDF_Object::kNullobj;
+}
+EMSCRIPTEN_KEEPALIVE GraftMap *
+LPDF_NewGraftMap(Document *target, Document *source, int copy_pages) {
+  return new GraftMap{target, source, copy_pages != 0};
+}
+EMSCRIPTEN_KEEPALIVE void LPDF_DropGraftMap(GraftMap *map) { delete map; }
+EMSCRIPTEN_KEEPALIVE CPDF_Object *LPDF_GraftObject(GraftMap *map,
+                                                   CPDF_Object *object) {
+  return keep(map->copy(pdfium::WrapRetain(object)));
+}
+EMSCRIPTEN_KEEPALIVE Blob *LPDF_GraftReferences(GraftMap *map) {
+  std::vector<uint32_t> pairs;
+  pairs.reserve(map->refs.size() * 2);
+  for (const auto &[source, target] : map->refs) {
+    pairs.push_back(source);
+    pairs.push_back(target);
+  }
+  return blob(pdfium::as_byte_span(pairs));
 }
 EMSCRIPTEN_KEEPALIVE CPDF_Object *LPDF_Resolve(CPDF_Object *object) {
   return keep(direct(object));
@@ -514,6 +673,22 @@ LPDF_GetKey(CPDF_Object *object, const uint8_t *key, size_t length) {
   return dict ? keep(dict->GetMutableObjectFor(
                     bytes(key, length).AsStringView()))
               : nullptr;
+}
+EMSCRIPTEN_KEEPALIVE CPDF_Object *LPDF_GetNameKey(CPDF_Object *object,
+                                                  CPDF_Object *key) {
+  auto dict = dictionary(object);
+  auto name = direct(key);
+  return dict && name
+             ? keep(dict->GetMutableObjectFor(name->GetString().AsStringView()))
+             : nullptr;
+}
+EMSCRIPTEN_KEEPALIVE void LPDF_SetNameKey(Document *doc, CPDF_Object *object,
+                                          CPDF_Object *key,
+                                          CPDF_Object *value) {
+  auto name = direct(key);
+  if (name)
+    set_key(doc, dictionary(object), name->GetString(),
+            inline_value(doc, value));
 }
 EMSCRIPTEN_KEEPALIVE CPDF_Object *LPDF_GetIndex(CPDF_Object *object,
                                                 int index) {
@@ -671,9 +846,20 @@ EMSCRIPTEN_KEEPALIVE Blob *LPDF_Save(Document *doc, const char *user,
                                      int encrypt) {
   doc->sync();
   auto stream = pdfium::MakeRetain<SaveStream>();
+  auto objects = reachable_objects(doc);
+  // Large encoded images dominate output size. Reserve once instead of
+  // repeatedly copying the entire growing PDF. Bound the estimate for inputs
+  // with large uncompressed streams that will shrink when saved.
+  uint64_t reserve = 4096 + objects.size() * uint64_t{512};
+  for (auto number : objects) {
+    auto object = doc->core()->GetOrParseIndirectObject(number);
+    if (auto image = ToStream(object))
+      reserve += image->GetRawSize();
+  }
+  stream->data.reserve(std::min<uint64_t>(reserve, 64 * 1024 * 1024));
   {
     CPDF_Creator creator(doc->core(), stream);
-    creator.SetObjectsForEditing(reachable_objects(doc));
+    creator.SetObjectsForEditing(std::move(objects));
     creator.SetTrailerForEditing(doc->trailer);
     if (encrypt) {
       auto dict = doc->core()->New<CPDF_Dictionary>();

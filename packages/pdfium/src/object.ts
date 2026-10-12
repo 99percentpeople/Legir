@@ -1,5 +1,6 @@
 import { decoder } from "./runtime.js";
 import type { PDFDocument } from "./document.js";
+import type { ObjectType } from "./types.js";
 
 export type ObjectInput =
   | PDFObject
@@ -37,45 +38,38 @@ export class PDFObject {
     this.closed = true;
     this.document.objects.delete(this);
   }
-  private type(resolve = false) {
-    const runtime = this.runtime;
-    if (!resolve) return runtime.call("LPDF_Type", this.pointer);
-    const pointer = runtime.call("LPDF_Resolve", this.pointer);
-    try {
-      return runtime.call("LPDF_Type", pointer);
-    } finally {
-      runtime.call("LPDF_Drop", pointer);
-    }
+  getType(resolve = false): ObjectType {
+    return this.runtime.call("LPDF_Type", this.pointer, +resolve);
   }
   isIndirect() {
-    return this.type() === 9;
+    return this.getType() === 9;
   }
   isNull() {
-    return this.type(true) === 8;
+    return this.getType(true) === 8;
   }
   isBoolean() {
-    return this.type(true) === 1;
+    return this.getType(true) === 1;
   }
   isNumber() {
-    return this.type(true) === 2;
+    return this.getType(true) === 2;
   }
   isInteger() {
     return this.isNumber() && Number.isInteger(this.asNumber());
   }
   isString() {
-    return this.type(true) === 3;
+    return this.getType(true) === 3;
   }
   isName() {
-    return this.type(true) === 4;
+    return this.getType(true) === 4;
   }
   isArray() {
-    return this.type(true) === 5;
+    return this.getType(true) === 5;
   }
   isDictionary() {
-    return [6, 7].includes(this.type(true));
+    return [6, 7].includes(this.getType(true));
   }
   isStream() {
-    return this.type(true) === 7;
+    return this.getType(true) === 7;
   }
   asIndirect() {
     return this.runtime.call("LPDF_RefNumber", this.pointer);
@@ -149,9 +143,11 @@ export class PDFObject {
       const pointer =
         typeof key === "number"
           ? this.runtime.call("LPDF_GetIndex", parent, key)
-          : this.keyBytes(key, (p, n) =>
-              this.runtime.call("LPDF_GetKey", parent, p, n),
-            );
+          : this.nativeKey(key)
+            ? this.runtime.call("LPDF_GetNameKey", parent, key.pointer)
+            : this.keyBytes(key, (p, n) =>
+                this.runtime.call("LPDF_GetKey", parent, p, n),
+              );
       object?.destroy();
       object = new PDFObject(this.document, pointer);
     }
@@ -185,6 +181,15 @@ export class PDFObject {
       ? this.runtime.withBytes(key.asNameBytes(), use)
       : this.runtime.withString(key, use);
   }
+  private nativeKey(key: Key): key is PDFObject {
+    if (
+      !(key instanceof PDFObject) ||
+      key.document.runtime !== this.document.runtime
+    )
+      return false;
+    key.getType(); // Check lifetime; names may be owned by another live document.
+    return true;
+  }
   put(key: Key, value: ObjectInput) {
     this.document.withObject(value, (child) => {
       if (typeof key === "number")
@@ -195,6 +200,14 @@ export class PDFObject {
           key,
           child.pointer,
           0,
+        );
+      else if (this.nativeKey(key))
+        this.runtime.call(
+          "LPDF_SetNameKey",
+          this.document.pointer,
+          this.pointer,
+          key.pointer,
+          child.pointer,
         );
       else
         this.keyBytes(key, (p, n) =>
@@ -219,6 +232,14 @@ export class PDFObject {
         0,
         2,
       );
+    else if (this.nativeKey(key))
+      this.runtime.call(
+        "LPDF_SetNameKey",
+        this.document.pointer,
+        this.pointer,
+        key.pointer,
+        0,
+      );
     else
       this.keyBytes(key, (p, n) =>
         this.runtime.call(
@@ -232,12 +253,15 @@ export class PDFObject {
       );
   }
   push(value: ObjectInput) {
+    this.insert(this.length, value);
+  }
+  insert(index: number, value: ObjectInput) {
     this.document.withObject(value, (child) =>
       this.runtime.call(
         "LPDF_SetIndex",
         this.document.pointer,
         this.pointer,
-        this.length,
+        index,
         child.pointer,
         1,
       ),

@@ -102,66 +102,27 @@ export class DocumentSession {
       } finally {
         trailer.destroy();
       }
-      const refs = new Map<number, number>();
-      for (let number = 1; number < donor.countObjects(); number++) {
-        const original = donor.newIndirect(number),
-          resolved = original.resolve();
-        try {
-          if (resolved.isNull()) continue;
-          const type = resolved.isDictionary()
-            ? resolved.get("Type")
-            : undefined;
-          try {
-            if (type?.isName() && ["XRef", "ObjStm"].includes(type.asName()))
-              continue;
-          } finally {
-            type?.destroy();
-          }
+      const pages: number[] = [];
+      const copiedPages: PDFObject[] = [];
+      const firstPage = doc.countPages();
+      try {
+        for (let index = 0; index < donor.countPages(); index++) {
+          const original = donor.findPage(index);
           const copied = graft.graftObject(original);
           try {
-            refs.set(number, copied.asIndirect());
+            // The batch materializes inherited attributes before reparenting.
+            pages.push(firstPage + index);
+            copiedPages.push(copied.copy());
           } finally {
             copied.destroy();
+            original.destroy();
           }
-        } finally {
-          resolved.destroy();
-          original.destroy();
         }
+        doc.insertPages(-1, copiedPages);
+      } finally {
+        for (const page of copiedPages) page.destroy();
       }
-      const pages: number[] = [];
-      for (let index = 0; index < donor.countPages(); index++) {
-        const original = donor.findPage(index);
-        const copied = graft.graftObject(original);
-        try {
-          // insertPage changes Parent; materialize inherited page properties.
-          for (const key of [
-            "Resources",
-            "MediaBox",
-            "CropBox",
-            "Rotate",
-            "UserUnit",
-          ]) {
-            const inherited = original.getInheritable(key);
-            try {
-              if (!inherited.isNull()) {
-                const value = graft.graftObject(inherited);
-                try {
-                  copied.put(key, value);
-                } finally {
-                  value.destroy();
-                }
-              }
-            } finally {
-              inherited.destroy();
-            }
-          }
-          pages.push(doc.countPages());
-          doc.insertPage(-1, copied);
-        } finally {
-          copied.destroy();
-          original.destroy();
-        }
-      }
+      const refs = graft.getReferences(donor);
       doc.endOperation();
       operation = false;
       this.sources.set(id, {
@@ -225,7 +186,7 @@ export class DocumentSession {
     const doc = this.document;
     doc.beginOperation("Release page source");
     try {
-      for (const index of removed) doc.deletePage(index);
+      doc.deletePages(removed);
       for (const number of source.ownedObjects ?? []) doc.deleteObject(number);
       doc.endOperation();
     } catch (error) {
@@ -272,15 +233,17 @@ export class DocumentSession {
     doc.beginOperation("Editor document operation");
     let view: EditingDocument | undefined;
     try {
-      view = this.view(id);
       // Trim the page tree before assembly while retaining form/link/outline
       // objects. Rollback restores the full source bank after the job.
       if (!keepAllSources && id === this.primaryId && this.sources.size > 1) {
         const retained = new Set(this.getSource(id).pages);
-        for (let index = view.getPageCount() - 1; index >= 0; index--)
-          if (!retained.has(index)) view.removePage(index);
-        doc.setPageTreeCache(false);
+        doc.deletePages(
+          Array.from({ length: doc.countPages() }, (_, index) => index).filter(
+            (index) => !retained.has(index),
+          ),
+        );
       }
+      view = this.view(id);
       return await run(view);
     } finally {
       if (view) disposeEditingDocument(view);

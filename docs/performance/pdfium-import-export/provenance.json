@@ -1,0 +1,158 @@
+{
+  "date": "2026-10-12T10:33:33.104606+00:00",
+  "host": "Raspberry Pi 5 Model B Rev 1.1, Linux ARM64, 8 GiB RAM",
+  "browser": "148.0.7778.167",
+  "node": "v24.18.0",
+  "bun": "1.4.2",
+  "baselineCommit": "cda31118acc0a7fca3ff88d7042d8cc596b6b8cc",
+  "optimizedBranch": "engine/pdfium",
+  "optimizedSourceSha256": {
+    "bun.lock": "91435d5755adf60c3fc4fe54b21c5a25c4f32cf4a52a0656369ee3da8bf2b43f",
+    "package.json": "a409b6ecea66f234c7079b1ed66aedd7fe62ed754e74223868ef18433894e4d7",
+    "packages/pdfium/src/document.ts": "cece1410baa5ceaa8a6409bde8ab26abe86fe16433af189fdf80440eae01ae87",
+    "packages/pdfium/src/index.ts": "42d5ad2b2783fe3cb086da23c73e9cbea6ab47e59e7b303fc88a6735edfc577f",
+    "packages/pdfium/src/matrix.ts": "2a100fd5d08be7abc1d7d7c74f48cf1ac324321d61485e9fe57d8578a46fc72c",
+    "packages/pdfium/src/object.ts": "d7ca9c34fa82d7f184943c57a031a051f031db52173960f4da26491d94207aad",
+    "packages/pdfium/src/page.ts": "26eabcf6f47581a485c1f9287499a777341a5ce821134e1ff8e3e40bd2c4a685",
+    "packages/pdfium/src/runtime.ts": "d3b4ed1b2d3aba070fafd5d190d7eddceb4cc78ca6c8fb82f6a3d07331c38373",
+    "packages/pdfium/src/types.ts": "1af7ffe0531fc4bf0e18c86e4d2e687c623e0574dc3ff8b9ecab45590ecac1e4",
+    "scripts/pdf-benchmark/build.mjs": "e27b78affc43ac22314c8714010cbd54daeeec08717e281a769c43401f81720b",
+    "scripts/pdf-benchmark/compare.mjs": "4658c1adb1c09dec09284df4036876954b0b9198ecd8d26b02db617e58d4a448",
+    "scripts/pdf-benchmark/entry.ts": "44dcfd7fb770a202ab658f83b35fa172c68d0a7a7bc335c36c6af69902f700c3",
+    "scripts/pdf-benchmark/profile-plugin.mjs": "75deba665214b935abb4270a01a01d75a23643743c6fd1610905b916c27ed09d",
+    "scripts/pdf-benchmark/run.mjs": "af46c8425d7929e4e1ec278fd67bcfbdac38b97e3c6994462411b7170834e15f",
+    "src/services/pdfService/engine/documentOwners.ts": "5e7ad56a5bf0d3b3207c91ad22a9baf714e48431657f73da580ec5d32de7c141",
+    "src/services/pdfService/engine/documentSession.ts": "ba414f71f64f09ca565f3755197681d0d212389bd169d1f7996734eeee38875e",
+    "src/services/pdfService/engine/editingDocument.ts": "aaaf9259f1e532844c4276c082dac0d99fa51c5390cc96786f9828f537cd4cff",
+    "src/services/pdfService/engine/fontHost.ts": "a46fbe7113c58e066078331d109875ef540cbac2282afd8d93a5407cc236d3b1",
+    "src/services/pdfService/engine/index.ts": "afb5b70cf38208dcf327062781a586f85a9f3fce66ca26a7d2caa5ca19ca2111",
+    "src/services/pdfService/engine/nativeEditingContext.ts": "29eabf12c12ff810a07d078677c6f5ce741fee43ab3f680d222c5564400e3e9a",
+    "src/services/pdfService/engine/objectGraph.ts": "6c2e484419087be96af8118aefe5e28daf45a9ed0f973c0a6fc2b6bfc0d3c398",
+    "src/services/pdfService/engine/objectNames.ts": "4f367534e74921a56f9e473673347b52952e22c99fdd074f3df816352a6be7e6",
+    "src/services/pdfService/engine/pageContent.ts": "5a2b8a54ce7fc841390df338506c86ff5f7af45eca47d53e6cca462fb3137523",
+    "src/services/pdfService/engine/pdfium.ts": "ddfc65040fa40955fa246f52a9a43612fea79280e1bdf9aa1ea3a77cf2d9104c",
+    "src/services/pdfService/engine/raster.ts": "429e0c7cb53914585fac9d22795a5d328c73edf639c2b01fae1129bc48621590",
+    "src/services/pdfService/engine/runtime.ts": "65c970b1793795949846c1903262ddabfd1c290452732e3a224a583049ba74e0",
+    "src/services/pdfService/engine/sessionTypes.ts": "5dad0080099e396395268c27c44e774c3c8e5d05645a30f0d511e4e73cffac05",
+    "src/services/pdfService/engine/textTypes.ts": "67e05ffd21b5edc539052c7f4ca0c173d3ce468024832bb0ecde295d5e6b83b5",
+    "src/services/pdfService/engine/types.ts": "09118dc24b4e640ddb00c95fdd3af8745eb0db53ea807a27e0fd348b4bd260a0",
+    "src/services/pdfService/lib/annotation-layer-order.ts": "d9bb8ebddedf366aacaf3583258905f3aac2167a82ac38514f4cf37013a0c368",
+    "src/services/pdfService/lib/annotationCommentMeta.ts": "6875a68855f0baa36510b06cf33abe8c96475dd5c3eb0ca3067d9aa0dd1e00be",
+    "src/services/pdfService/lib/annotationMetadata.ts": "2fd930e74406f84d10dffb22f09821ff7a0a2983f05b065de53e64cae33f33a8",
+    "src/services/pdfService/lib/appearance.ts": "70f91eb6f16d63c7be8ca96804c7879d04fcc7a20ff93b6ec5756db094c2dccc",
+    "src/services/pdfService/lib/appearanceRotation.ts": "0b752e56e0b6e3b496ab38fe47d9b675aea0b2e58efbf002ea9ec02e991023d8",
+    "src/services/pdfService/lib/assemblePages.ts": "b2a19feb84a16cfe535283de97ffbb777626ebf3ea306efe417d405d62f60687",
+    "src/services/pdfService/lib/built-in-fonts.ts": "82ac2466d3f4559b59262f69416506dd2ec13b2a39ebcce0ff3c4150d356c527",
+    "src/services/pdfService/lib/colors.ts": "1a42fcc1831496d5c4c777005dc31b549580024b6c36ecd6433d00f6e9d10c69",
+    "src/services/pdfService/lib/contentResourceBridge.ts": "9b1730cd62c09734f02bd69023ee4725ab525cc05dddf81573706aeb92a6b4f4",
+    "src/services/pdfService/lib/control-export.ts": "329280fba3518cfbb9f3123757959e195b1ec838dc073922a1b7d0c809c974c2",
+    "src/services/pdfService/lib/control-parsing.ts": "ed40a8ab431154f21e4ade1298339ed8c7c625de94d29dde5c57a567d2e27bf2",
+    "src/services/pdfService/lib/coords.ts": "1b3b9d9282e9cf5889f5fdf9600ca809a8774f228c7988030b81983c6bbae398",
+    "src/services/pdfService/lib/debug.ts": "6d6868947dd0b885fbfa15b1ce0697e12dcb0f3217a458546789def96086a445",
+    "src/services/pdfService/lib/embedded-fonts.ts": "08d5a9e1d2c0d9fb8df5fb88f77aaa2f55f151ceda7efd467eb88238526ec745",
+    "src/services/pdfService/lib/export-fonts.ts": "95f12e36b5ac99368753eb5d0555bc3586912f2db58aac7350becd3d01912ca7",
+    "src/services/pdfService/lib/font-selection.ts": "a5b99cd55ea36dfe7dfe9a810a2025297f1e789005fe199e1267fbadc2228d2f",
+    "src/services/pdfService/lib/form-export-context.ts": "9769abbe38228ac39f570251cf1340845f2b3618a1e6ad993933ba9f82f9f224",
+    "src/services/pdfService/lib/form-field-export.ts": "1d0b5f3ce9e3b5f60bf933dadebf36c5a08ce07ad052602cf471862b2277a009",
+    "src/services/pdfService/lib/image-export.ts": "e80d25ffa72d18f50ef8d4684a7f150f5999407823f5a4122f6a220189d326a4",
+    "src/services/pdfService/lib/ink.ts": "bfc1aa9f0527df663fd61595756e74a883958fdb2f30e976fb3dccd6831db600",
+    "src/services/pdfService/lib/owner-password.ts": "1ce82877c7391d514c4e5a274a8a99ce505a53bace366107480674e7e01c5d2e",
+    "src/services/pdfService/lib/pageDestinations.ts": "e6039c05f1851b36de8f6bdd11e800dbf4a0a21c4f2cb5bbd0ac1d01d7f42458",
+    "src/services/pdfService/lib/pageStructure.ts": "2ed3ea1653492b3b5d4bac32d91b28de3d0a28dfa72a08cecc7fdec9661aebca",
+    "src/services/pdfService/lib/pdf-font-names.ts": "98e5f9517fdb66335592ba7412149e7cb1d9df9cdd579b8fd063fc72ead3814b",
+    "src/services/pdfService/lib/pdf-import-utils.ts": "70d72b69a64f8b9abec91bdadc21f1b6d8d6ab9ad39eff17caa34c3c6b9b042c",
+    "src/services/pdfService/lib/pdf-objects.ts": "e456efa17a16fd4f300440bb17d1f60811a88ec93919e44b264d2e44dd73dcf1",
+    "src/services/pdfService/lib/print-export.ts": "bbbea6ead03098c41d1b7204f4d6dba5995bf657b7c4b6ea9dad8715cff8a087",
+    "src/services/pdfService/lib/renderedImageCrop.ts": "2082df9a9fbd7e609e4c237d9bc51b8e9ea8011cedd68ed023cbbcd52e95eebf",
+    "src/services/pdfService/lib/stampAppearance.ts": "b62205c97196a66f112db842413f4a8195a7c073a8151a620d4815c6c2ac1b09",
+    "src/services/pdfService/lib/stampVector.ts": "bb3ed861b90f5211a6a25f9510933a99ff7217be6796845497b71a65401acb87",
+    "src/services/pdfService/lib/text-field-appearance.ts": "e185e3143c833aeb04c3d0aafbf5b5134d6c0ae87fe9a7b27cb5059b91379f3d",
+    "src/services/pdfService/lib/text-field-metrics.ts": "465cfbcdea3dab9da0639a9275c43927bf3b52bf31894d8ffa00dcd2639b5f9d",
+    "src/services/pdfService/lib/text.ts": "ce6d34b0f2141d23990d769e55fa7a6b6cee364ca5b211490c02b15fe9a1bfe2",
+    "src/services/pdfService/lib/textGeometry.ts": "eb35ab4486896044c4e501406d51da235a17c7dac2fc5bc1883c86c284ba0a1f",
+    "src/services/pdfService/lib/textRedaction.ts": "378f1390b48039aae7b8e0a4fbef5cdb916de99bfe567442cf7f7fdf230c52e1",
+    "src/services/pdfService/lib/thumbnailOverlay.ts": "2e8edac197dee4a1e5934beea18b5a96dd13c0ff7d17b8aec05efe94e8ecee92",
+    "src/services/pdfService/lib/thumbnailSourceAnnotations.ts": "cfc8280602573b1ef2773888ea37d9e20e7ab30a0d6a8ce4234ab95b2c71b764",
+    "src/workers/pdf-render.worker.ts": "942f71f66ab2d2659460c971724b20ab280a9d89f0e39c4d17a7a450d7e6616a",
+    "vite.config.ts": "78643fadfc45ed7f1127765c3db94b8c19b0532828f35421682fdb821ab99b2e"
+  },
+  "nativeBuilds": {
+    "before": {
+      "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+      "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+      "emscripten": "5.0.3",
+      "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+      "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c",
+      "features": {
+        "v8": false,
+        "xfa": false,
+        "threads": false,
+        "renderer": "agg"
+      },
+      "sha256": {
+        "pdfium.js": "66821fb97ad708664acc5c5861afb2ad7ac39145f713b92d442c104ccf66228d",
+        "pdfium.wasm": "ea2a9b3b7624438b609fda9a91384832bda0ef4b1e4dd2159a85f13c72318d6f"
+      },
+      "sourceSha256": {
+        "native/bridge.cpp": "a056f7e86cd1cf5ccdb8ef8a2ee98c2a8dfb56be7f10e4b1017020d562bc4e88",
+        "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
+        "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
+        "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
+      },
+      "patchSha256": "63a8d0be2092fbdf1073336f49f5aa86cda3aea8647113ea30c2ea60c4cea31f",
+      "buildScriptSha256": "957a2751b62f0d73257324107de9b476d0a25dc4bdde01d8d84d2a36044010ca"
+    },
+    "after": {
+      "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+      "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+      "emscripten": "5.0.3",
+      "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+      "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c",
+      "features": {
+        "v8": false,
+        "xfa": false,
+        "threads": false,
+        "renderer": "agg"
+      },
+      "sha256": {
+        "pdfium.js": "d80f4a7ee419a03ec3a77e13bfbe22e47ed3bbda52863a581c90a6938181aa8e",
+        "pdfium.wasm": "4eac119cb2db06cbad46d3aaab3ba57284ad297fc24d45701559a561a953ae87"
+      },
+      "sourceSha256": {
+        "native/bridge.cpp": "a20fde0d077c71744dccb0e4feca8fb7eec2e96da9bb6f77dd50e5d9d57fe376",
+        "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
+        "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
+        "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
+      },
+      "patchSha256": "63a8d0be2092fbdf1073336f49f5aa86cda3aea8647113ea30c2ea60c4cea31f",
+      "buildScriptSha256": "957a2751b62f0d73257324107de9b476d0a25dc4bdde01d8d84d2a36044010ca"
+    }
+  },
+  "builtAssetsSha256": {
+    "before": {
+      "assets/pdf-render.worker-BawUoKjG.js": "43662ff6e36b3a21e8dab5a792da0fcb1c4b32aebcb24c0c71417afa373e06e8",
+      "benchmark.js": "1c9b1de72fc895e8830a86d51274c72ef68996f7aa2875b78923d707ca710ff6",
+      "pdfium/59ea54cce017-ea2a9b3b7624/pdfium.wasm": "ea2a9b3b7624438b609fda9a91384832bda0ef4b1e4dd2159a85f13c72318d6f",
+      "pdfium/59ea54cce017-ea2a9b3b7624/pdfium.js": "66821fb97ad708664acc5c5861afb2ad7ac39145f713b92d442c104ccf66228d"
+    },
+    "after": {
+      "assets/pdf-render.worker-TOs4mzxa.js": "47ccb8115c3244fc1d758ab7dff0e6f31b31b3da6224ac66ae285d8f0224f725",
+      "benchmark.js": "a013aa0770d8c36a9954b833a8a1abe4e5a227fc7fb21a92c5809154e5ada4a5",
+      "pdfium/59ea54cce017-4eac119cb2db/pdfium.wasm": "4eac119cb2db06cbad46d3aaab3ba57284ad297fc24d45701559a561a953ae87",
+      "pdfium/59ea54cce017-4eac119cb2db/pdfium.js": "d80f4a7ee419a03ec3a77e13bfbe22e47ed3bbda52863a581c90a6938181aa8e"
+    }
+  },
+  "validation": {
+    "applicationTests": 767,
+    "applicationTestFiles": 96,
+    "libraryTests": 16,
+    "eslint": true,
+    "webTypecheckAndBuild": true,
+    "wwwTypecheck": true,
+    "tauriFrontendBuild": true,
+    "tauriNativeRuntime": false,
+    "offlineBrowserUi": true,
+    "originalRenderPixelsIdentical": true,
+    "reopenedPagesAndFieldsIdentical": true
+  }
+}

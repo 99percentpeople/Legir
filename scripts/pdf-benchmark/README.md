@@ -9,6 +9,7 @@ node scripts/pdf-benchmark/fixtures.mjs /tmp/pdf-fixtures
 node scripts/pdf-benchmark/build.mjs /absolute/checkout /tmp/pdf-build
 node scripts/pdf-benchmark/run.mjs /tmp/pdf-build /tmp/pdf-fixtures /tmp/pdf-results 3
 node scripts/pdf-benchmark/visual.mjs /tmp/pdf-build /tmp/pdf-fixtures /tmp/pdf-images
+node scripts/pdf-benchmark/compare.mjs /tmp/before-build /tmp/after-build /tmp/pdf-fixtures /tmp/comparison 3
 # Separately serve the normal production app build (with its PWA service worker):
 node scripts/pdf-benchmark/ui.mjs http://127.0.0.1:5189 /tmp/pdf-fixtures/donor.pdf /tmp/pdf-ui
 ```
@@ -45,6 +46,17 @@ private files; it does not represent every real drawing, font, scan or PDF.
 `visual.mjs` captures rendering in a separate run so image transfer/inspection
 does not change the timed or memory-measured runs. The harness does not measure
 UI scrolling, zoom transitions, OS file pickers or Tauri WebView performance.
+
+`compare.mjs` runs both builds sequentially, alternating their order each round.
+It retains raw timing/memory samples and exported PDFs, checks original render
+pixel hashes and compares independently reopened page/field values. Use the
+same pinned fixtures and idle machine for both builds.
+
+For diagnostic builds, set `PDF_BENCH_PROFILE=1` on both `build.mjs` and `run.mjs`.
+The worker-only build plugin adds native call counts/timings and inclusive
+graft/page-tree/export stage timings to each phase's `profile`. This instrumentation
+adds overhead and stage times overlap; never use those timings as the final
+performance comparison. Ordinary builds include no profiling hooks.
 
 `ui.mjs` installs the production PWA, switches offline, edits a text field,
 inserts a blank page, undoes/redoes it, imports the four-page donor and saves.

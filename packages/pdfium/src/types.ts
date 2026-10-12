@@ -34,6 +34,23 @@ export interface SaveOptions {
   "owner-password"?: string;
   permissions?: number;
 }
+export interface GraftOptions {
+  /** Clone objects even when source and target are the same document. */
+  copyWithinDocument?: boolean;
+  /** Materialize inherited page attributes and omit page Parent references. */
+  copyPages?: boolean;
+}
+export enum ObjectType {
+  Boolean = 1,
+  Number = 2,
+  String = 3,
+  Name = 4,
+  Array = 5,
+  Dictionary = 6,
+  Stream = 7,
+  Null = 8,
+  Reference = 9,
+}
 export interface OutlineItem {
   title: string;
   page?: number;

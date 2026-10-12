@@ -8,6 +8,7 @@ export { PDFObject, decodeName } from "./object.js";
 export { PDFPage, PDFPixmap, PDFAnnotation } from "./page.js";
 export { PDFBuffer } from "./runtime.js";
 export { Matrix } from "./matrix.js";
+export { ObjectType } from "./types.js";
 export type * from "./types.js";
 
 export interface PDFium {

@@ -144,79 +144,102 @@ describe("one native document session", () => {
     }
   });
 
-  it("closes imported donors and retains source rendering after exporting reordered/copied pages", async () => {
-    const session = new DocumentSession(
-      await getPDFium(),
-      await fixture("Original"),
-    );
-    const bytes = await fixture("Imported");
-    try {
-      await session.addSource("imported", bytes);
-      expect(session.stats()).toMatchObject({
-        nativeDocuments: 1,
-        peakNativeDocuments: 2,
-        sources: 2,
-      });
-      const original = pageText(session),
-        imported = pageText(session, "imported");
-      const request: ExportPdfRequest = {
-        fields: [],
-        annotations: [],
-        options: {
-          syncFormFields: false,
-          pageStructure: {
-            pages: [
-              {
-                id: "b",
-                pageIndex: 0,
-                width: 400,
-                height: 500,
-                viewBox: [0, 0, 400, 500],
-                userUnit: 1,
-                rotation: 0,
-                source: { documentId: "imported", pageIndex: 0 },
-              },
-              {
-                id: "a",
-                pageIndex: 1,
-                width: 400,
-                height: 500,
-                viewBox: [0, 0, 400, 500],
-                userUnit: 1,
-                rotation: 0,
-                source: { documentId: "default", pageIndex: 0 },
-              },
-              {
-                id: "c",
-                pageIndex: 2,
-                width: 400,
-                height: 500,
-                viewBox: [0, 0, 400, 500],
-                userUnit: 1,
-                rotation: 0,
-                source: {
-                  documentId: "default",
+  it.each([false, true])(
+    "closes imported donors and retains source rendering after exporting reordered/copied pages (encrypted: %s)",
+    async (encrypted) => {
+      const pdfium = await getPDFium();
+      const session = new DocumentSession(pdfium, await fixture("Original"));
+      let bytes = await fixture("Imported");
+      const password = encrypted ? "import-reader" : undefined;
+      if (encrypted) {
+        const encoder = new pdfium.PDFDocument(bytes);
+        try {
+          const output = encoder.saveToBuffer({
+            encrypt: "aes-256",
+            "user-password": password,
+            "owner-password": "import-owner",
+          });
+          try {
+            bytes = output.asUint8Array().slice();
+          } finally {
+            output.destroy();
+          }
+        } finally {
+          encoder.destroy();
+        }
+      }
+      try {
+        await session.addSource("imported", bytes, password);
+        expect(session.stats()).toMatchObject({
+          nativeDocuments: 1,
+          peakNativeDocuments: 2,
+          sources: 2,
+        });
+        const original = pageText(session),
+          imported = pageText(session, "imported");
+        const request: ExportPdfRequest = {
+          fields: [],
+          annotations: [],
+          options: {
+            syncFormFields: false,
+            pageStructure: {
+              pages: [
+                {
+                  id: "b",
                   pageIndex: 0,
-                  copyGroup: "copy",
+                  width: 400,
+                  height: 500,
+                  viewBox: [0, 0, 400, 500],
+                  userUnit: 1,
+                  rotation: 0,
+                  source: { documentId: "imported", pageIndex: 0 },
+                },
+                {
+                  id: "a",
+                  pageIndex: 1,
+                  width: 400,
+                  height: 500,
+                  viewBox: [0, 0, 400, 500],
+                  userUnit: 1,
+                  rotation: 0,
+                  source: { documentId: "default", pageIndex: 0 },
+                },
+                {
+                  id: "c",
+                  pageIndex: 2,
+                  width: 400,
+                  height: 500,
+                  viewBox: [0, 0, 400, 500],
+                  userUnit: 1,
+                  rotation: 0,
+                  source: {
+                    documentId: "default",
+                    pageIndex: 0,
+                    copyGroup: "copy",
+                  },
+                },
+              ],
+              sources: {
+                imported: {
+                  bytes,
+                  password: password ?? null,
+                  filename: "imported.pdf",
                 },
               },
-            ],
-            sources: {
-              imported: { bytes, password: null, filename: "imported.pdf" },
             },
           },
-        },
-      };
-      for (let i = 0; i < 2; i++) {
-        const output = await session.export(request);
-        const saved = await PDFDocument.load(output);
-        expect(saved.getPageCount()).toBe(3);
-        expect(saved.getForm().getFields()).toHaveLength(3);
-        expect(pageText(session)).toBe(original);
-        expect(pageText(session, "imported")).toBe(imported);
+        };
+        for (let i = 0; i < 2; i++) {
+          const output = await session.export(request);
+          const saved = await PDFDocument.load(output);
+          expect(saved.getPageCount()).toBe(3);
+          expect(saved.getForm().getFields()).toHaveLength(3);
+          expect(pageText(session)).toBe(original);
+          expect(pageText(session, "imported")).toBe(imported);
+        }
+      } finally {
+        session.dispose();
       }
-    } finally {
-      session.dispose();
-    }
-  });
+    },
+  );
 });

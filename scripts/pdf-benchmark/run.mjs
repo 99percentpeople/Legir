@@ -136,6 +136,19 @@ try {
           }, 50);
           try {
             const value = await run();
+            if (process.env.PDF_BENCH_PROFILE) {
+              value.profile = await Promise.all(
+                page.workers().map((worker) =>
+                  worker
+                    .evaluate(() => {
+                      const profile = globalThis.__pdfProfile;
+                      globalThis.__pdfProfile = {};
+                      return profile;
+                    })
+                    .catch(() => null),
+                ),
+              );
+            }
             const beforeGC = await memory();
             peak = {
               pssMiB: Math.max(peak.pssMiB, beforeGC.pssMiB),
