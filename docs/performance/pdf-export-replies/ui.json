@@ -1,0 +1,140 @@
+{
+  "pdfjs": {
+    "engine": "pdfjs",
+    "result": {
+      "url": "/editor/tab_1791809216053_rj7llk",
+      "text": ["", "Native PDF page 2", ""],
+      "forms": [
+        {
+          "type": "text",
+          "value": "Bob"
+        },
+        {
+          "type": "text",
+          "value": "VALUE 0"
+        },
+        {
+          "type": "text",
+          "value": "VALUE 3"
+        },
+        {
+          "type": "text",
+          "value": ""
+        }
+      ],
+      "canvases": [
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [632, 790],
+        [300, 150],
+        [632, 790],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150]
+      ]
+    },
+    "errors": [],
+    "resourceFailures": [
+      {
+        "url": "http://127.0.0.1:5195/assets/ai-runtime-core-fH49wMyj.js",
+        "type": "script",
+        "error": "net::ERR_INTERNET_DISCONNECTED"
+      },
+      {
+        "url": "blob:http://127.0.0.1:5195/512224a5-9b5d-44e8-8187-2b04c33becf6",
+        "type": "image",
+        "error": "net::ERR_FILE_NOT_FOUND"
+      }
+    ],
+    "savedPages": 8,
+    "savedFields": ["name", "donor-field-0", "donor-field-3"],
+    "activeWorkers": 4,
+    "initialWorkerUrls": [
+      "http://127.0.0.1:5195/assets/pdf-render.worker-CrJMbpoF.js",
+      "blob:http://127.0.0.1:5195/93ea0301-9096-483e-99c3-8b4a7297c96c"
+    ],
+    "activeWorkerUrls": [
+      "http://127.0.0.1:5195/assets/pdf-render.worker-CrJMbpoF.js",
+      "blob:http://127.0.0.1:5195/93ea0301-9096-483e-99c3-8b4a7297c96c",
+      "http://127.0.0.1:5195/assets/pdf-render.worker-CrJMbpoF.js",
+      "blob:http://127.0.0.1:5195/7b8af1b8-6796-4e04-b9ce-2e0647d6ef68"
+    ],
+    "workersAfterClose": 4,
+    "workerUrlsAfterClose": [
+      "http://127.0.0.1:5195/assets/pdf-render.worker-CrJMbpoF.js",
+      "blob:http://127.0.0.1:5195/93ea0301-9096-483e-99c3-8b4a7297c96c",
+      "http://127.0.0.1:5195/assets/pdf-render.worker-CrJMbpoF.js",
+      "blob:http://127.0.0.1:5195/d25df125-dd4d-4814-9e31-bb5757518094"
+    ],
+    "brokenImages": []
+  },
+  "pdfium": {
+    "engine": "pdfium",
+    "result": {
+      "url": "/editor/tab_1791809228975_soc0bq",
+      "text": ["", "Native PDF page 2", ""],
+      "forms": [
+        {
+          "type": "text",
+          "value": "Bob"
+        },
+        {
+          "type": "text",
+          "value": "VALUE 0"
+        },
+        {
+          "type": "text",
+          "value": "VALUE 3"
+        },
+        {
+          "type": "text",
+          "value": ""
+        }
+      ],
+      "canvases": [
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [632, 790],
+        [300, 150],
+        [632, 790],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150],
+        [300, 150]
+      ]
+    },
+    "errors": [],
+    "resourceFailures": [
+      {
+        "url": "blob:http://127.0.0.1:5196/0e040f2f-96d1-4aa4-b489-0f9cdff10037",
+        "type": "image",
+        "error": "net::ERR_FILE_NOT_FOUND"
+      }
+    ],
+    "savedPages": 8,
+    "savedFields": ["name", "donor-field-0", "donor-field-3"],
+    "activeWorkers": 1,
+    "initialWorkerUrls": [],
+    "activeWorkerUrls": [
+      "http://127.0.0.1:5196/assets/pdf-render.worker-DvYg5jez.js"
+    ],
+    "workersAfterClose": 0,
+    "workerUrlsAfterClose": [],
+    "brokenImages": []
+  }
+}

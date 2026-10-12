@@ -23,8 +23,12 @@ const bytes = Array.from(await pdf.save());
 const baseUrl = process.argv[2];
 const donorFile = process.argv[3];
 const output = process.argv[4];
+const engine = process.argv[5] ?? "pdfium";
 if (!baseUrl || !donorFile || !output)
-  throw new Error("Usage: node ui.mjs PRODUCTION_URL DONOR_PDF OUTPUT");
+  throw new Error(
+    "Usage: node ui.mjs PRODUCTION_URL DONOR_PDF OUTPUT [pdfium|pdfjs]",
+  );
+if (!["pdfium", "pdfjs"].includes(engine)) throw new Error("Unknown engine");
 await (await import("node:fs/promises")).mkdir(output, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
@@ -64,6 +68,7 @@ try {
       );
   });
   await context.setOffline(true);
+  const initialWorkerUrls = page.workers().map((worker) => worker.url());
   await page.getByRole("button", { name: "Open PDF", exact: true }).waitFor();
   await page.waitForTimeout(250);
   await page.evaluate((bytes) => {
@@ -199,6 +204,7 @@ try {
     throw new Error(JSON.stringify({ result, errors }));
   await page.waitForTimeout(1500);
   const activeWorkers = page.workers().length;
+  const activeWorkerUrls = page.workers().map((worker) => worker.url());
   const brokenImages = await page.evaluate(() =>
     [...document.images]
       .filter(
@@ -207,7 +213,7 @@ try {
       )
       .map((i) => i.src),
   );
-  if (activeWorkers !== 1 || brokenImages.length)
+  if ((engine === "pdfium" && activeWorkers !== 1) || brokenImages.length)
     throw new Error(JSON.stringify({ activeWorkers, brokenImages }));
   await page.locator('[data-editor-tab-id] button[aria-label="Close"]').click();
   const discard = page.getByRole("button", {
@@ -226,11 +232,15 @@ try {
     });
   await page.waitForTimeout(500);
   const workersAfterClose = page.workers().length;
-  if (workersAfterClose !== 0)
+  const workerUrlsAfterClose = page.workers().map((worker) => worker.url());
+  // The original engine has an eager global render service and PDF.js workers.
+  // Record its lifecycle separately; single-owner assertions apply to PDFium.
+  if (engine === "pdfium" && workersAfterClose !== 0)
     throw new Error(`Workers remain after close: ${workersAfterClose}`);
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(
     JSON.stringify({
+      engine,
       result,
       errors,
       resourceFailures,
@@ -240,7 +250,10 @@ try {
         .getFields()
         .map((f) => f.getName()),
       activeWorkers,
+      initialWorkerUrls,
+      activeWorkerUrls,
       workersAfterClose,
+      workerUrlsAfterClose,
       brokenImages,
     }),
   );

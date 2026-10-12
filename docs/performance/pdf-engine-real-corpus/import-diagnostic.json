@@ -1,0 +1,80 @@
+[
+  {
+    "variant": "mupdf",
+    "events": [
+      {
+        "ms": 3853,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"default\",\"id\":\"load_default_1791803816596\"}"
+      },
+      {
+        "ms": 7041,
+        "message": "IMPORT_BEGIN"
+      },
+      {
+        "ms": 7541,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"default\",\"id\":\"load_default_1791803820542\"}"
+      },
+      {
+        "ms": 8780,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"corpus-donor\",\"id\":\"load_corpus-donor_1791803822014\"}"
+      }
+    ],
+    "open": {
+      "ms": 1324.3000001907349,
+      "pages": 288
+    },
+    "hydrate": {
+      "ms": 213.5,
+      "fields": 0,
+      "annotations": 349,
+      "preservedAnnotations": 0,
+      "outline": 20
+    },
+    "save": {
+      "ms": 147.69999980926514,
+      "bytes": 32266821
+    },
+    "error": "Error: diagnostic stopped after 60 seconds",
+    "importElapsed": 60001,
+    "workers": ["http://127.0.0.1:44549/assets/pdf-render.worker-AIMhH2vt.js"]
+  },
+  {
+    "variant": "pdfium",
+    "events": [
+      {
+        "ms": 2757,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"default\",\"id\":\"load_default_1791803884047\"}"
+      },
+      {
+        "ms": 6302,
+        "message": "IMPORT_BEGIN"
+      },
+      {
+        "ms": 7018,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"default\",\"id\":\"load_default_1791803887999\"}"
+      },
+      {
+        "ms": 32223,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"corpus-donor\",\"id\":\"load_corpus-donor_1791803913704\"}"
+      }
+    ],
+    "open": {
+      "ms": 1144.5,
+      "pages": 288
+    },
+    "hydrate": {
+      "ms": 296,
+      "fields": 0,
+      "annotations": 349,
+      "preservedAnnotations": 0,
+      "outline": 20
+    },
+    "save": {
+      "ms": 258.1000003814697,
+      "bytes": 32286642
+    },
+    "error": "Error: page.evaluate: Error: PDF object graft failed (nesting limit exceeded).\n    at Object.reject (http://127.0.0.1:44549/benchmark.js:2:9724)\n    at worker.worker.onmessage (http://127.0.0.1:44549/benchmark.js:2:7421)",
+    "importElapsed": 27114,
+    "workers": ["http://127.0.0.1:44549/assets/pdf-render.worker-TOs4mzxa.js"]
+  }
+]

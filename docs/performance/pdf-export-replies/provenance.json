@@ -1,0 +1,103 @@
+{
+  "created": "2026-10-12",
+  "variants": [
+    {
+      "id": "pdfjs",
+      "build": "/tmp/legir-export-replies/build-pdfjs",
+      "revision": "b55cad5904ea203f2f15e3eb662ad46a28d1f22a"
+    },
+    {
+      "id": "pdfium",
+      "build": "/tmp/legir-export-replies/build-pdfium",
+      "revision": "9b713456bd025afb515e01e6095462d3dd5e5aaf"
+    }
+  ],
+  "pdfiumSourceHashes": {
+    "src/types.ts": "8a778d26ae1bc618966f640af166e3f443a112f57bb72622b9758299abacd892",
+    "src/lib/annotationReplies.ts": "5c143d8e61d4b9c0fb56671d3fe4536003732578be4d3d0989e2333b5a458dc2",
+    "src/services/pdfService/lib/annotationReplies.ts": "118e79b97b31fecae13287b91952d2ceb5f2268a36f740e15d91363c7bcb9753",
+    "src/services/pdfService/documentPipeline.ts": "c52513b59626be9c0bed16515cd6571d688bcd32b778f3ef4b6a54e6d89aa34c",
+    "src/services/pdfService/engine/documentSession.ts": "67150e97d3288a980868b6028b4db16e0833fac5ed2e6eee7fde782cc9395050",
+    "src/services/pdfService/engine/nativeEditingContext.ts": "2516542f4286d7bdb971c88e37e1793da6c5700415cc8d7be889a57863957e07",
+    "src/services/pdfService/engine/pageContent.ts": "3736bb80eb09172c081c8b744b9f2cb7ac07b9dd33ece99b07bd06f5b83902bb",
+    "src/services/pdfService/lib/assemblePages.ts": "c200acbd3e373950bfee67eb8c757ed5c7e664dd32b8e018ac59157a619536f8",
+    "src/store/slices/controlSlice.ts": "e97f34dc33d9d32b4190af3ef1838d9034cff96aea9905d6ea30f91aba234890",
+    "src/store/slices/pageEditingSlice.ts": "cac1d564672f4b5fb3e217c02b527a137cf1ef5bb10358a96e23a5d2d537a440",
+    "src/components/workspace/lib/duplicateControlForDrag.ts": "262277eb6fa34d46a7aa41c2667af0c8d2ce8b7527a158ac1b7c13df8ac88c51",
+    "packages/pdfium/native/bridge.cpp": "6ff933e7184b903a27d843f89169c96235372a5a0f1b74ea3a4260b4ee4ee537",
+    "packages/pdfium/src/document.ts": "f59269b08d906d54bb0e74b212eebfb9709ff4a01e28753074a36b3eb59f351d",
+    "packages/pdfium/wasm/pdfium.wasm": "2af38633e23f71f52d94d8bcfa649af932f248d061f58ef56293842299e69ee1",
+    "tests/pdf/annotationReplies.test.ts": "65e5daafcb3a3fbbe3f2f4c29b9ad93473c4695c7ccdcd91ebd284a22eafb697"
+  },
+  "pdfjsSourceHashes": {
+    "src/types.ts": "8a778d26ae1bc618966f640af166e3f443a112f57bb72622b9758299abacd892",
+    "src/lib/annotationReplies.ts": "5c143d8e61d4b9c0fb56671d3fe4536003732578be4d3d0989e2333b5a458dc2",
+    "src/services/pdfService/lib/annotationReplies.ts": "118e79b97b31fecae13287b91952d2ceb5f2268a36f740e15d91363c7bcb9753",
+    "src/services/pdfService/index.ts": "2ff343dac307ad975bfe00fb968c2405729d072a9c2b567b331b2b840ed0a3b7",
+    "src/services/pdfService/lib/assemblePages.ts": "0df58456d8fd1b0427c21a76da428fe10ecd8bf8edf52a49c51296be6893d161",
+    "src/store/slices/controlSlice.ts": "e97f34dc33d9d32b4190af3ef1838d9034cff96aea9905d6ea30f91aba234890",
+    "src/store/slices/pageEditingSlice.ts": "cac1d564672f4b5fb3e217c02b527a137cf1ef5bb10358a96e23a5d2d537a440",
+    "src/components/workspace/lib/duplicateControlForDrag.ts": "262277eb6fa34d46a7aa41c2667af0c8d2ce8b7527a158ac1b7c13df8ac88c51",
+    "tests/pdf/annotationReplies.test.ts": "65e5daafcb3a3fbbe3f2f4c29b9ad93473c4695c7ccdcd91ebd284a22eafb697"
+  },
+  "native": {
+    "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+    "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+    "emscripten": "5.0.3",
+    "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+    "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c",
+    "features": {
+      "v8": false,
+      "xfa": false,
+      "threads": false,
+      "renderer": "agg"
+    },
+    "sha256": {
+      "pdfium.js": "d80f4a7ee419a03ec3a77e13bfbe22e47ed3bbda52863a581c90a6938181aa8e",
+      "pdfium.wasm": "2af38633e23f71f52d94d8bcfa649af932f248d061f58ef56293842299e69ee1"
+    },
+    "sourceSha256": {
+      "native/bridge.cpp": "6ff933e7184b903a27d843f89169c96235372a5a0f1b74ea3a4260b4ee4ee537",
+      "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
+      "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
+      "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
+    },
+    "patchSha256": "63a8d0be2092fbdf1073336f49f5aa86cda3aea8647113ea30c2ea60c4cea31f",
+    "buildScriptSha256": "957a2751b62f0d73257324107de9b476d0a25dc4bdde01d8d84d2a36044010ca"
+  },
+  "checks": {
+    "pdfjsApplicationTests": 749,
+    "pdfiumApplicationTests": 778,
+    "pdfiumLibraryTests": 18,
+    "builds": [
+      "pdfjs production",
+      "pdfium production",
+      "pdfjs corpus harness",
+      "pdfium corpus harness"
+    ],
+    "pdfiumLint": "bun run lint passed",
+    "pdfjsLint": "ESLint passed excluding pre-existing untracked bench-dist and generated-icons/generated-icons; application and www typechecks passed",
+    "negativeControl": "2 pre-fix original outputs failed annotation and reply relationship checks on page index 216; validator exit 1",
+    "completedBrowserRuns": 18,
+    "validatedExports": 36,
+    "passedExports": 36,
+    "exactRasterPairs": 198,
+    "equalTextPairs": 198,
+    "pdfiumOwnership": "All 9 samples retain 1 native document after import/save, transient donor peak 2, 0 workers after closing."
+  },
+  "builds": {
+    "pdfjs": {
+      "benchmark.js": "800bd598807616ce85626fbb700a74d136ab51971e86ef8514c7842293088117",
+      "assets/pdf-render.worker-CrJMbpoF.js": "1def757ae1d6bf91cdbbb2547c4b63c4be8dadb435c870bb3534c2326ddce352",
+      "pdfjs/wasm/quickjs-eval.wasm": "7bcacc9f22cacf7e9b23866d2a6d1639693d40c7f144e41b7c69ed37ba9cbe8f",
+      "pdfjs/wasm/jbig2.wasm": "e6bee67724a7b5436fe8162638e3708cfc8d52b6342db69a49715e30ff27cfdc",
+      "pdfjs/wasm/qcms_bg.wasm": "663d86126d5f5fcb1c61490f94353e2a8375660b8c5498ab3ebab5a34b08800e",
+      "pdfjs/wasm/openjpeg.wasm": "004a0e62db930ba9ff2a22212f4554d0bb57a0635a8287caf70f98117cee14ba"
+    },
+    "pdfium": {
+      "benchmark.js": "1bdc034383d64d21d5a3eadbe2e4d8530a464163332bfcfa7b0499ce9d370627",
+      "assets/pdf-render.worker-DvYg5jez.js": "7521316aabcd3023308ead853263412b189f285e04e576970726c4d5361ed73a",
+      "pdfium/59ea54cce017-2af38633e23f/pdfium.wasm": "2af38633e23f71f52d94d8bcfa649af932f248d061f58ef56293842299e69ee1"
+    }
+  }
+}

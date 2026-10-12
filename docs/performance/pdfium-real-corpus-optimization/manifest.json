@@ -1,0 +1,37 @@
+{
+  "variants": [
+    {
+      "id": "original",
+      "build": "/tmp/legir-three-engine/build-original",
+      "revision": "5c207b2"
+    },
+    {
+      "id": "pdfium-final",
+      "build": "/tmp/legir-pdfium-io/build-final",
+      "revision": "e4f3095+io-optimization+output-reservation"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "book",
+      "path": "/home/zach/Bookshelf/BeginnersGuide-5thEd-Eng_v4.pdf",
+      "donor": "indot",
+      "samplePages": [14, 143, 287],
+      "description": "Raspberry Pi Beginners Guide fifth edition, 288 pages"
+    },
+    {
+      "id": "indot",
+      "path": "/tmp/legir-three-engine/corpus/indot.pdf",
+      "donor": "book",
+      "samplePages": [1, 499, 999],
+      "source": "https://www.in.gov/dot/div/contracts/standards/drawings/sep25/Std%20Dwgs%20eff%20Sept%202025.pdf"
+    },
+    {
+      "id": "drawing405",
+      "path": "/tmp/legir-pan-audit-20261007/drawing.pdf",
+      "donor": "book",
+      "samplePages": [1, 21, 42],
+      "description": "User-supplied 43-page A0 drawing from previous audit; private fixture not redistributed"
+    }
+  ]
+}

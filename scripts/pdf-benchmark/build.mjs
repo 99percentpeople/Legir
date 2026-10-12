@@ -3,9 +3,9 @@ import { build } from "vite";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { profilePlugin } from "./profile-plugin.mjs";
-const [checkout, output] = process.argv.slice(2);
+const [checkout, output, entry = "entry.ts"] = process.argv.slice(2);
 if (!checkout || !output)
-  throw new Error("Usage: node build.mjs CHECKOUT OUTPUT");
+  throw new Error("Usage: node build.mjs CHECKOUT OUTPUT [ENTRY]");
 process.chdir(checkout);
 await build({
   configFile: resolve(checkout, "vite.config.ts"),
@@ -17,7 +17,7 @@ await build({
     outDir: output,
     emptyOutDir: true,
     rollupOptions: {
-      input: new URL("./entry.ts", import.meta.url).pathname,
+      input: new URL(entry, import.meta.url).pathname,
       output: { entryFileNames: "benchmark.js" },
     },
   },

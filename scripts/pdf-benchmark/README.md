@@ -61,10 +61,14 @@ performance comparison. Ordinary builds include no profiling hooks.
 `ui.mjs` installs the production PWA, switches offline, edits a text field,
 inserts a blank page, undoes/redoes it, imports the four-page donor and saves.
 It independently reopens the download (eight pages, three fields), checks for
-visible broken images and verifies one live worker followed by zero after
-closing the document. Its fixture and selectors assume the English UI.
+visible broken images and, for PDFium, verifies one live worker followed by zero
+after closing the document. Pass `pdfjs` as the optional final argument to test
+the baseline: it records that engine's initial/active/closed worker URLs without
+imposing PDFium's single-owner lifecycle. Retained PDF.js workers and failed
+resource requests must be reported separately from functional UI checks.
+Its fixture and selectors assume the English UI.
 
-`render.mjs` compares two already-built MuPDF variants, optionally alongside the
+The historical `render.mjs` compares two already-built MuPDF variants, optionally alongside the
 original PDF.js build. Preserve the previous build before changing the worker:
 
 ```sh
@@ -85,3 +89,90 @@ receipt and its request for an animation frame; the total also includes frame
 scheduling and RPC. These are elapsed times, not CPU samples or display latency.
 Stage medians need not add up to the median total. The renderer's rendering
 quality, animation-frame acknowledgment and production code are not overridden.
+
+## Real book and engineering drawing corpus
+
+Use `corpus-entry.ts` for arbitrary real PDFs. The active matrix is
+`engine/pdfjs` (PDF.js + pdf-lib) and `engine/pdfium`. Build the **same entry** against
+both revisions, including the shared export fixes. MuPDF builds and recorded
+three-engine results are historical references. No application source
+is patched; this entry invokes each revision's normal services and worker RPCs.
+
+```sh
+node scripts/pdf-benchmark/build.mjs /tmp/original /tmp/build-original corpus-entry.ts
+node scripts/pdf-benchmark/build.mjs /path/to/Legir /tmp/build-pdfium corpus-entry.ts
+node scripts/pdf-benchmark/corpus.mjs /tmp/manifest.json /tmp/corpus-results 3
+node scripts/pdf-benchmark/corpus-validate.mjs /tmp/manifest.json /tmp/corpus-results/results.json /tmp/corpus-validation
+node scripts/pdf-benchmark/corpus-summary.mjs /tmp/corpus-results/results.json /tmp/corpus-summary.json
+```
+
+The manifest has `variants: [{id, build, revision}]` and
+`fixtures: [{id, path, donor, samplePages}]`. Paths are absolute; `donor` names
+another fixture, and `samplePages` contains three zero-based page indexes. Select
+pages containing real content, including an interior page and the last page.
+See the recorded manifest in `docs/performance/pdf-engine-real-corpus/` for a
+complete example, sample hashes, sources, and exact versions. Source PDFs remain
+outside the repository.
+
+Each sample uses a fresh browser with local fixture bytes loaded before the
+memory baseline. Three rounds rotate engine order. The tasks are: readable open;
+first actual transferred canvas at 1600-pixel long edge; complete model hydration;
+first and repeated renders of three selected pages at 1600 pixels; full-page
+zoom at 3200 pixels; four 1024-square tiles and a rotated tile with the page's
+long edge at 6400 pixels; PNG export at 1600 pixels; metadata-edit save; importing
+the **entire donor** (preview hydration plus owner registration); and merged save.
+Merged saves append donor controls, preserved annotations and link targets with
+the same page offsets as the app's page import flow. Canvas timings retain the
+production animation-frame acknowledgment and exclude PNG encoding/readback.
+Canvas requests explicitly use rotation 0, with 90 for the rotated tile, even
+when the source page has a different intrinsic rotation. Tile coordinates are
+fixed by the manifest page dimensions and recorded in each result. The PNG
+operation retains source rotation. This measures identical transforms/clips
+across engines, not the application's initial page-orientation UI behavior.
+
+PSS, RSS and process swap are sampled every 50 ms across Chromium processes.
+Retained snapshots follow GC. Baseline includes both input byte arrays and any
+idle workers the revision starts. Record absolute totals as well as increments.
+WASM capacity is reported separately from resident memory. Download Blob creation
+is measured as a separate memory phase and is excluded from export time. Host
+temperature/load/swap counters and Chromium GPU feature flags accompany every
+record; CPU-only headless measurements do not predict GPU/Tauri performance.
+No validation subprocesses or builds run during the measured comparison.
+
+Validation runs **after timing** with pdf-lib and Poppler: all page dimensions,
+rotations, annotation subtype counts, nested reply parents, review states/flags,
+popup ownership, internal link targets, external link URIs
+and form values are checked, along with the
+edited title. Source/output text and 1200-pixel rasters are compared on the
+selected pages, plus first/middle/last imported pages. Subpixel antialiasing is
+allowed by a documented threshold (under 0.1% of pixels with a channel difference
+over 16); raw errors and exact hashes are retained. This is sampled visual
+validation, not a proof that every page or interactive destination is identical.
+The recorded real corpus has no fillable form fields; use the synthetic form
+suite above for form-editing coverage. This corpus harness does not implement
+the UI's renaming of colliding imported field names, so choose donors without
+those collisions.
+
+`PDF_BENCH_CASES=book,indot`, `PDF_BENCH_VARIANTS=pdfium`, and
+`PDF_BENCH_TIMEOUT_MS=180000` can scope diagnostic runs. `PDF_BENCH_CAPTURE=1`
+adds screenshots; use a separate output directory and exclude these runs from
+the final comparison. Existing results in an output directory are resumed by
+fixture/variant/round, including failures. Use a **new directory** after changing
+the harness, builds or manifest. Errors/timeouts are preserved, never silently
+dropped from the summary; check sample counts before comparing medians.
+
+For a separate import diagnosis, `corpus-diagnostic.mjs MANIFEST OUTPUT_JSON`
+replays the first fixture's render/save/import path with sparse logging of worker
+load messages. It stops an import after 60 seconds by default and records whether
+the donor reached its owning worker. Select one fixture/variants with the same
+environment variables above. This run is for locating failures, not timing:
+worker responses and exceptions can vary under instrumentation, so retain both
+the original timeout records and any diagnostic error rather than substituting
+one for the other.
+
+With `PDF_BENCH_PROFILE=1` on both build and diagnostic commands, the diagnostic
+also captures worker call counts after opening, before import, after owner
+registration and after merged export. The counters are reset between these
+stages. This adds a merged save to the diagnostic; these instrumented elapsed
+times are not performance comparison results. Use the ordinary corpus runner
+and uninstrumented builds for reported before/after timings.

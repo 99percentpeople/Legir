@@ -1,0 +1,624 @@
+[
+  {
+    "variant": "before",
+    "events": [
+      {
+        "ms": 2878,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"default\",\"id\":\"load_default_1791805529375\"}"
+      },
+      {
+        "ms": 33826,
+        "message": "IMPORT_BEGIN"
+      },
+      {
+        "ms": 34192,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"default\",\"id\":\"load_default_1791805561022\"}"
+      },
+      {
+        "ms": 35509,
+        "message": "CORPUS_STAGE {\"type\":\"load\",\"docId\":\"corpus-donor\",\"id\":\"load_corpus-donor_1791805562676\"}"
+      }
+    ],
+    "open": {
+      "ms": 25587.10000038147,
+      "pages": 1000
+    },
+    "openProfile": [
+      {
+        "LPDF_Init": {
+          "calls": 1,
+          "ms": 1.3999996185302734
+        },
+        "malloc": {
+          "calls": 16256,
+          "ms": 24.19999885559082
+        },
+        "Ii.copyBytes": {
+          "calls": 16256,
+          "ms": 417.00000190734863
+        },
+        "LPDF_Open": {
+          "calls": 1,
+          "ms": 36
+        },
+        "free": {
+          "calls": 16255,
+          "ms": 16.100003242492676
+        },
+        "LPDF_Error": {
+          "calls": 3,
+          "ms": 0.10000038146972656
+        },
+        "LPDF_PageCount": {
+          "calls": 170687,
+          "ms": 130.3000192642212
+        },
+        "LPDF_Trailer": {
+          "calls": 2,
+          "ms": 0.09999942779541016
+        },
+        "LPDF_GetKey": {
+          "calls": 14252,
+          "ms": 38.400004386901855
+        },
+        "LPDF_Type": {
+          "calls": 24660,
+          "ms": 39.099985122680664
+        },
+        "LPDF_Drop": {
+          "calls": 114506,
+          "ms": 106.60000514984131
+        },
+        "LPDF_Keep": {
+          "calls": 4206,
+          "ms": 4.200000762939453
+        },
+        "LPDF_RefNumber": {
+          "calls": 174901,
+          "ms": 139.20001697540283
+        },
+        "LPDF_GetIndex": {
+          "calls": 8201,
+          "ms": 11.5
+        },
+        "LPDF_PageObject": {
+          "calls": 84843,
+          "ms": 227.2999610900879
+        },
+        "LPDF_String": {
+          "calls": 9200,
+          "ms": 18.09999179840088
+        },
+        "LPDF_BufferData": {
+          "calls": 9200,
+          "ms": 10.099996566772461
+        },
+        "LPDF_BufferSize": {
+          "calls": 9200,
+          "ms": 6.899999618530273
+        },
+        "LPDF_BufferDrop": {
+          "calls": 9200,
+          "ms": 12.200003623962402
+        },
+        "LPDF_LoadPage": {
+          "calls": 1000,
+          "ms": 21986.800004005432
+        },
+        "LPDF_PageDictionary": {
+          "calls": 1000,
+          "ms": 8.699996948242188
+        },
+        "LPDF_ObjectNumber": {
+          "calls": 1000,
+          "ms": 1.7999992370605469
+        },
+        "LPDF_New": {
+          "calls": 2002,
+          "ms": 5.300004005432129
+        },
+        "LPDF_Length": {
+          "calls": 11994,
+          "ms": 11.799999237060547
+        },
+        "LPDF_ClosePage": {
+          "calls": 1000,
+          "ms": 826.8999919891357
+        }
+      }
+    ],
+    "hydrate": {
+      "ms": 903.4000005722046,
+      "fields": 0,
+      "annotations": 4,
+      "preservedAnnotations": 0,
+      "outline": 8
+    },
+    "save": {
+      "ms": 1760.6000003814697,
+      "bytes": 247352395
+    },
+    "beforeImportProfile": [
+      {
+        "LPDF_PageCount": {
+          "calls": 4,
+          "ms": 0
+        },
+        "LPDF_LoadPage": {
+          "calls": 4,
+          "ms": 46
+        },
+        "LPDF_PageDictionary": {
+          "calls": 16,
+          "ms": 0.09999942779541016
+        },
+        "LPDF_ObjectNumber": {
+          "calls": 16,
+          "ms": 0
+        },
+        "malloc": {
+          "calls": 21510,
+          "ms": 20.999998092651367
+        },
+        "Ii.copyBytes": {
+          "calls": 21510,
+          "ms": 70.49998664855957
+        },
+        "LPDF_New": {
+          "calls": 18735,
+          "ms": 16.00000286102295
+        },
+        "free": {
+          "calls": 21510,
+          "ms": 16.89999485015869
+        },
+        "LPDF_Drop": {
+          "calls": 81958,
+          "ms": 71.30000591278076
+        },
+        "LPDF_Keep": {
+          "calls": 79,
+          "ms": 0
+        },
+        "LPDF_Type": {
+          "calls": 131329,
+          "ms": 120.00000095367432
+        },
+        "LPDF_GetKey": {
+          "calls": 2758,
+          "ms": 7.7999982833862305
+        },
+        "LPDF_RefNumber": {
+          "calls": 18774,
+          "ms": 16.199992179870605
+        },
+        "LPDF_Length": {
+          "calls": 2856,
+          "ms": 3.8999948501586914
+        },
+        "LPDF_GetIndex": {
+          "calls": 10822,
+          "ms": 15
+        },
+        "LPDF_String": {
+          "calls": 12857,
+          "ms": 26.200005531311035
+        },
+        "LPDF_BufferData": {
+          "calls": 12879,
+          "ms": 12.800000190734863
+        },
+        "LPDF_BufferSize": {
+          "calls": 12879,
+          "ms": 10.200006484985352
+        },
+        "LPDF_BufferDrop": {
+          "calls": 12879,
+          "ms": 14.900002479553223
+        },
+        "LPDF_Render": {
+          "calls": 15,
+          "ms": 455.0999994277954
+        },
+        "LPDF_Begin": {
+          "calls": 2,
+          "ms": 0.10000038146972656
+        },
+        "LPDF_Error": {
+          "calls": 2,
+          "ms": 0
+        },
+        "LPDF_Trailer": {
+          "calls": 2,
+          "ms": 0
+        },
+        "LPDF_Version": {
+          "calls": 4,
+          "ms": 3.59999942779541
+        },
+        "LPDF_Resolve": {
+          "calls": 18606,
+          "ms": 21.89999485015869
+        },
+        "LPDF_GetNameKey": {
+          "calls": 30940,
+          "ms": 49.00000858306885
+        },
+        "LPDF_Keys": {
+          "calls": 4,
+          "ms": 0.39999961853027344
+        },
+        "LPDF_ReadStream": {
+          "calls": 2,
+          "ms": 0.20000076293945312
+        },
+        "LPDF_End": {
+          "calls": 2,
+          "ms": 24.799999237060547
+        },
+        "LPDF_Sync": {
+          "calls": 2,
+          "ms": 0.20000076293945312
+        },
+        "Dv.transaction": {
+          "calls": 2,
+          "ms": 2651.6000003814697
+        },
+        "LPDF_ClosePage": {
+          "calls": 4,
+          "ms": 1.7999992370605469
+        },
+        "LPDF_SetNameKey": {
+          "calls": 16,
+          "ms": 0.5000009536743164
+        },
+        "LPDF_CreateObject": {
+          "calls": 3,
+          "ms": 0.2999992370605469
+        },
+        "LPDF_SetIndex": {
+          "calls": 1,
+          "ms": 0.2999992370605469
+        },
+        "C1.graftObject": {
+          "calls": 12,
+          "ms": 0.3000001907348633
+        },
+        "LPDF_WriteObject": {
+          "calls": 3,
+          "ms": 0.6000003814697266
+        },
+        "Ev.flush": {
+          "calls": 1,
+          "ms": 2.8999996185302734
+        },
+        "LPDF_Save": {
+          "calls": 1,
+          "ms": 1112.3000001907349
+        },
+        "F1.saveToBuffer": {
+          "calls": 1,
+          "ms": 1112.8000001907349
+        },
+        "Dv.export": {
+          "calls": 1,
+          "ms": 1753.1999998092651
+        }
+      }
+    ],
+    "import": {
+      "ms": 2117.0999994277954,
+      "parseMs": 1655,
+      "registerMs": 462.0999994277954,
+      "pages": 288
+    },
+    "importProfile": [
+      {
+        "malloc": {
+          "calls": 1472,
+          "ms": 1.6999998092651367
+        },
+        "Ii.copyBytes": {
+          "calls": 1472,
+          "ms": 13.10000228881836
+        },
+        "LPDF_Open": {
+          "calls": 1,
+          "ms": 1.1000003814697266
+        },
+        "free": {
+          "calls": 1471,
+          "ms": 0.899998664855957
+        },
+        "LPDF_ObjectCount": {
+          "calls": 2,
+          "ms": 0
+        },
+        "LPDF_Error": {
+          "calls": 4,
+          "ms": 0.09999942779541016
+        },
+        "LPDF_Trailer": {
+          "calls": 3,
+          "ms": 0
+        },
+        "LPDF_GetKey": {
+          "calls": 1465,
+          "ms": 2.5
+        },
+        "LPDF_Type": {
+          "calls": 2529,
+          "ms": 6.200002670288086
+        },
+        "LPDF_Drop": {
+          "calls": 40103,
+          "ms": 35.000009536743164
+        },
+        "LPDF_Keep": {
+          "calls": 820,
+          "ms": 0.7000017166137695
+        },
+        "LPDF_RefNumber": {
+          "calls": 72229,
+          "ms": 54.59999179840088
+        },
+        "LPDF_GetIndex": {
+          "calls": 243,
+          "ms": 0.5
+        },
+        "LPDF_PageCount": {
+          "calls": 73566,
+          "ms": 49.800002098083496
+        },
+        "LPDF_PageObject": {
+          "calls": 37281,
+          "ms": 48.89998149871826
+        },
+        "LPDF_String": {
+          "calls": 243,
+          "ms": 1.3000011444091797
+        },
+        "LPDF_BufferData": {
+          "calls": 244,
+          "ms": 0.40000057220458984
+        },
+        "LPDF_BufferSize": {
+          "calls": 244,
+          "ms": 0.3000001907348633
+        },
+        "LPDF_BufferDrop": {
+          "calls": 244,
+          "ms": 0.2999992370605469
+        },
+        "LPDF_Begin": {
+          "calls": 1,
+          "ms": 0
+        },
+        "LPDF_New": {
+          "calls": 1,
+          "ms": 0
+        },
+        "LPDF_NewGraftMap": {
+          "calls": 1,
+          "ms": 0.09999942779541016
+        },
+        "LPDF_GraftObject": {
+          "calls": 291,
+          "ms": 64.39999961853027
+        },
+        "C1.graftObject": {
+          "calls": 291,
+          "ms": 65.19999885559082
+        },
+        "LPDF_SetKey": {
+          "calls": 3,
+          "ms": 0.10000038146972656
+        },
+        "LPDF_SetPages": {
+          "calls": 1,
+          "ms": 5.5
+        },
+        "F1.rewritePages": {
+          "calls": 1,
+          "ms": 5.600000381469727
+        },
+        "LPDF_GraftReferences": {
+          "calls": 1,
+          "ms": 0.6000003814697266
+        },
+        "LPDF_End": {
+          "calls": 1,
+          "ms": 1.1999998092651367
+        },
+        "LPDF_DropGraftMap": {
+          "calls": 1,
+          "ms": 2.5
+        },
+        "LPDF_Close": {
+          "calls": 1,
+          "ms": 8.600000381469727
+        },
+        "Dv.addSource": {
+          "calls": 1,
+          "ms": 436.19999980926514
+        }
+      }
+    ],
+    "merged": {
+      "ms": 28637.400000572205,
+      "bytes": 279575247
+    },
+    "mergedProfile": [
+      {
+        "Dv.addSource": {
+          "calls": 1,
+          "ms": 0.09999942779541016
+        },
+        "LPDF_Begin": {
+          "calls": 1,
+          "ms": 0
+        },
+        "LPDF_PageCount": {
+          "calls": 1578,
+          "ms": 1.1000003814697266
+        },
+        "LPDF_PageObject": {
+          "calls": 1288,
+          "ms": 3.299999237060547
+        },
+        "LPDF_Drop": {
+          "calls": 4050687,
+          "ms": 2882.0999116897583
+        },
+        "malloc": {
+          "calls": 1347988,
+          "ms": 810.1999635696411
+        },
+        "Ii.copyBytes": {
+          "calls": 1347988,
+          "ms": 3506.899800300598
+        },
+        "LPDF_SetPages": {
+          "calls": 1,
+          "ms": 3
+        },
+        "free": {
+          "calls": 1347988,
+          "ms": 814.6999979019165
+        },
+        "F1.rewritePages": {
+          "calls": 1,
+          "ms": 3.299999237060547
+        },
+        "LPDF_Error": {
+          "calls": 1,
+          "ms": 0.09999942779541016
+        },
+        "LPDF_Trailer": {
+          "calls": 1,
+          "ms": 0
+        },
+        "LPDF_Version": {
+          "calls": 4,
+          "ms": 0
+        },
+        "LPDF_GetKey": {
+          "calls": 2799,
+          "ms": 5.6999969482421875
+        },
+        "LPDF_Type": {
+          "calls": 5408871,
+          "ms": 3540.7000207901
+        },
+        "LPDF_RefNumber": {
+          "calls": 1342065,
+          "ms": 767.4999485015869
+        },
+        "LPDF_New": {
+          "calls": 1345186,
+          "ms": 1109.7001028060913
+        },
+        "LPDF_Resolve": {
+          "calls": 1337689,
+          "ms": 1498.2001085281372
+        },
+        "LPDF_String": {
+          "calls": 10264,
+          "ms": 28.59999179840088
+        },
+        "LPDF_BufferData": {
+          "calls": 10266,
+          "ms": 14.2000093460083
+        },
+        "LPDF_BufferSize": {
+          "calls": 10266,
+          "ms": 10.199995994567871
+        },
+        "LPDF_BufferDrop": {
+          "calls": 10266,
+          "ms": 11.699995040893555
+        },
+        "LPDF_GetNameKey": {
+          "calls": 23243,
+          "ms": 37.900004386901855
+        },
+        "LPDF_Length": {
+          "calls": 8963,
+          "ms": 12.800012588500977
+        },
+        "LPDF_GetIndex": {
+          "calls": 1338887,
+          "ms": 1378.0999813079834
+        },
+        "LPDF_Keep": {
+          "calls": 642,
+          "ms": 0.9000015258789062
+        },
+        "Ev.flush": {
+          "calls": 2,
+          "ms": 0.8000001907348633
+        },
+        "LPDF_NewGraftMap": {
+          "calls": 1,
+          "ms": 0
+        },
+        "LPDF_GraftObject": {
+          "calls": 952,
+          "ms": 35.09999179840088
+        },
+        "C1.graftObject": {
+          "calls": 1277,
+          "ms": 42.79999828338623
+        },
+        "LPDF_SetNameKey": {
+          "calls": 5412,
+          "ms": 21.000004768371582
+        },
+        "LPDF_SetIndex": {
+          "calls": 3854,
+          "ms": 10.900001525878906
+        },
+        "LPDF_Keys": {
+          "calls": 1,
+          "ms": 0
+        },
+        "LPDF_DropGraftMap": {
+          "calls": 1,
+          "ms": 1.8000001907348633
+        },
+        "LPDF_CreateObject": {
+          "calls": 3,
+          "ms": 0
+        },
+        "LPDF_WriteObject": {
+          "calls": 3,
+          "ms": 0
+        },
+        "LPDF_Save": {
+          "calls": 1,
+          "ms": 779.7000007629395
+        },
+        "F1.saveToBuffer": {
+          "calls": 1,
+          "ms": 779.8999996185303
+        },
+        "LPDF_End": {
+          "calls": 1,
+          "ms": 13.100000381469727
+        },
+        "LPDF_Sync": {
+          "calls": 1,
+          "ms": 0
+        },
+        "Dv.transaction": {
+          "calls": 1,
+          "ms": 28628.300000190735
+        },
+        "Dv.export": {
+          "calls": 1,
+          "ms": 28628.39999961853
+        }
+      }
+    ]
+  }
+]
