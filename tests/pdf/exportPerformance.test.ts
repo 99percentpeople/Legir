@@ -46,7 +46,7 @@ describe("form export work scales with fields, not repeated tree scans", () => {
     const bytes = await source.save();
     const lookups = vi.spyOn(PDFForm.prototype, "getFields");
     await exportPDF(bytes, []);
-    expect(lookups).toHaveBeenCalledTimes(1);
+    expect(lookups).not.toHaveBeenCalled();
   });
 
   it("tolerates unrelated malformed annotation arrays when field sync is disabled", async () => {

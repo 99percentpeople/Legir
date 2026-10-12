@@ -30,6 +30,34 @@ function pageText(session: DocumentSession, id = "default") {
 }
 
 describe("one native document session", () => {
+  it("exports metadata without creating fonts or a form, preserving the cached native page", async () => {
+    const source = await PDFDocument.create();
+    source.setTitle("Original title");
+    const font = await source.embedFont(StandardFonts.Helvetica);
+    source.addPage([200, 200]).drawText("Preserved page", { font, size: 12 });
+    const session = new DocumentSession(await getPDFium(), await source.save());
+    const page = session.loadPage("default", 0);
+    const count = session.document.countObjects();
+    try {
+      const original = page.extractText().text;
+      const output = await session.export({
+        fields: [],
+        annotations: [],
+        metadata: { title: "Updated title" },
+      });
+      expect(session.lastTransactionChanged).toBe(true);
+      expect(session.lastTransactionAffectsRendering).toBe(false);
+      expect(session.document.countObjects()).toBe(count);
+      expect(page.extractText().text).toBe(original);
+      const saved = await PDFDocument.load(output);
+      expect(saved.getTitle()).toBe("Updated title");
+      expect(saved.catalog.has(PDFName.of("AcroForm"))).toBe(false);
+      expect(saved.getPageCount()).toBe(1);
+    } finally {
+      page.destroy();
+      session.dispose();
+    }
+  });
   it("distinguishes read-only hydration from resource edits, including failed transactions", async () => {
     const session = new DocumentSession(
       await getPDFium(),

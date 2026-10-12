@@ -150,6 +150,30 @@ its byte/count/decode/eviction statistics are recorded after each render and
 document closure. This direct Node run excludes canvas/RPC/presentation costs;
 use `corpus.mjs` for browser performance and memory claims.
 
+Set `PDF_RENDER_PROGRESSIVE=1` on `native-render.mjs` to exercise the resumable
+native API against the same hashes. Per-render slice durations are diagnostic
+measurements; the requested 8 ms budget is cooperative, not a hard maximum.
+
+`preemption.mjs BEFORE_APP AFTER_APP DRAWING OUTPUT_JSON [ROUNDS]` runs the actual
+production workers against the 43-page drawing fixture. It first warms page 1,
+starts a page-21 thumbnail, then requests a foreground tile after 40 ms. It checks
+that the candidate completes the foreground request before resuming the preview.
+It separately cancels an active page-42 render, requires exactly one false reply,
+restarts that page, releases canvases and unloads the document. Run this separately
+from builds, other benchmarks and validation. It measures message response latency,
+not screen scanout; tiny native slices can still contain long synchronous work.
+The final stage hydrates the document, saves an edited title with all source
+annotations retained, and records cache residency and redraw time after saving.
+
+`canvas-plan.mjs PDFIUM_PACKAGE OUTPUT_JSON [PDF_FILES...]` tests the opt-in SDK
+Canvas display list with paths and an unprofiled JPEG, including a tile, rotation,
+cancellation, mask rejection and document cleanup. Optional real PDFs are sampled
+at first/middle/last pages; unsupported pages report `supported: false` and should
+use native rendering. It is a feasibility/correctness diagnostic, not a statistically
+controlled speed comparison. Its 5% gross-placement-error guard is intentionally
+loose; inspect the recorded pixel differences before considering a default switch.
+The normal native renderer must still pass the strict hash check above.
+
 Validation runs **after timing** with pdf-lib and Poppler: all page dimensions,
 rotations, annotation subtype counts, nested reply parents, review states/flags,
 popup ownership, internal link targets, external link URIs

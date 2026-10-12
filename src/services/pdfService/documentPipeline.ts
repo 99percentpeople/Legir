@@ -2194,18 +2194,28 @@ export const exportPDF = async (
       }
     }
 
-    // Embed Standard Fonts
-    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const timesRoman = await pdfDoc.embedFont(StandardFonts.TimesRoman);
-    const courier = await pdfDoc.embedFont(StandardFonts.Courier);
-
     const fontMap = new Map<string, PDFFont>();
-    fontMap.set("Helvetica", helvetica);
-    fontMap.set("Times Roman", timesRoman);
-    fontMap.set("Courier", courier);
+    // Metadata/preserved-content saves need no new appearance resources. Apart
+    // from needless serialization, allocating fonts invalidates native pages.
+    const needsAppearances =
+      fields.length > 0 ||
+      annotations.some(
+        (annotation) => !canPreserveSourceAnnotation(annotation),
+      );
+    if (needsAppearances) {
+      fontMap.set("Helvetica", await pdfDoc.embedFont(StandardFonts.Helvetica));
+      fontMap.set(
+        "Times Roman",
+        await pdfDoc.embedFont(StandardFonts.TimesRoman),
+      );
+      fontMap.set("Courier", await pdfDoc.embedFont(StandardFonts.Courier));
+    }
 
     const xfaEntry = captureAcroFormXfaEntry(pdfDoc);
-    const form = pdfDoc.getForm();
+    const form =
+      fields.length > 0 || pdfDoc.catalog.has(PDFName.of("AcroForm"))
+        ? pdfDoc.getForm()
+        : undefined;
     restoreAcroFormXfaEntry(xfaEntry);
 
     const orderedControlsByPage = getOrderedExportControlsByPage(
@@ -2213,25 +2223,26 @@ export const exportPDF = async (
       annotations,
     );
 
-    await prepareExportFonts({
-      pdfDoc,
-      fontMap,
-      fields: fields.filter(
-        (field) =>
-          field.pageIndex >= 0 &&
-          field.pageIndex < pdfLibPages.length &&
-          (!targetPageIndexSet || targetPageIndexSet.has(field.pageIndex)),
-      ),
-      annotations: annotations.filter(
-        (annotation) =>
-          annotation.pageIndex >= 0 &&
-          annotation.pageIndex < pdfLibPages.length &&
-          (!targetPageIndexSet ||
-            targetPageIndexSet.has(annotation.pageIndex)) &&
-          !canPreserveSourceAnnotation(annotation),
-      ),
-      customFont,
-    });
+    if (needsAppearances)
+      await prepareExportFonts({
+        pdfDoc,
+        fontMap,
+        fields: fields.filter(
+          (field) =>
+            field.pageIndex >= 0 &&
+            field.pageIndex < pdfLibPages.length &&
+            (!targetPageIndexSet || targetPageIndexSet.has(field.pageIndex)),
+        ),
+        annotations: annotations.filter(
+          (annotation) =>
+            annotation.pageIndex >= 0 &&
+            annotation.pageIndex < pdfLibPages.length &&
+            (!targetPageIndexSet ||
+              targetPageIndexSet.has(annotation.pageIndex)) &&
+            !canPreserveSourceAnnotation(annotation),
+        ),
+        customFont,
+      });
 
     const keepAnnotRefKeysByPage = new Map<number, Set<string>>();
     for (const a of annotations) {
@@ -2279,11 +2290,12 @@ export const exportPDF = async (
     const currentFieldNamesWithoutSourceRefs = new Set(
       fields.filter((field) => !field.sourcePdfRef).map((field) => field.name),
     );
-    if (shouldSyncFormFields) {
+    if (form && shouldSyncFormFields) {
       removeMissingOrphanSourcePdfFieldWidgets(form, sourceFieldRefKeys);
     }
-    const existingFields = form.getFields();
+    const existingFields = form?.getFields() ?? [];
     for (const field of existingFields) {
+      if (!form) break;
       let shouldRemove = false;
       try {
         const typeName = field.constructor.name;
@@ -2415,7 +2427,7 @@ export const exportPDF = async (
 
     // 2. Export Controls In Layer Order
     const formExportContext =
-      fields.length > 0 ? createFormExportContext(form) : undefined;
+      fields.length > 0 && form ? createFormExportContext(form) : undefined;
     const exportedAnnotationRefById = new Map<string, PDFRef>();
     for (const annotation of annotations) {
       if (!annotation.sourcePdfRef || !canPreserveSourceAnnotation(annotation))
@@ -2480,6 +2492,7 @@ export const exportPDF = async (
         }
 
         const field = entry.control;
+        if (!form) throw new Error("Missing export form for a field control.");
         const didUpdateExistingField = updateExistingSourceField(
           form,
           field,
@@ -2579,7 +2592,7 @@ export const exportPDF = async (
     );
     restoreAcroFormXfaEntry(xfaEntry);
 
-    if (options?.flattenFormFields && form.getFields().length > 0) {
+    if (options?.flattenFormFields && form && form.getFields().length > 0) {
       try {
         form.flatten({ updateFieldAppearances: false });
       } catch (error) {

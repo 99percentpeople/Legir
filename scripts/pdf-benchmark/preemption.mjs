@@ -139,6 +139,21 @@ for (let round = 0; round < Number(rounds); round++) {
           const cancelMs = performance.now() - cancelStart;
           const stats = await send("documentStats").done;
           const restarted = await render(42, scale, [0, 0, 512, 512]).done;
+          const parsed = await send("parseDocument").done;
+          const beforeSave = await send("documentStats").done;
+          const exported = await send("exportDocument", {
+            fields: parsed.fields,
+            annotations: parsed.annotations,
+            metadata: { ...parsed.metadata, title: "Metadata cache audit" },
+            options: {
+              preservedSourceAnnotations: parsed.preservedSourceAnnotations,
+              syncFormFields: false,
+            },
+          }).done;
+          const afterSave = await send("documentStats").done;
+          const redrawStart = performance.now();
+          await render(42, scale, [0, 0, 512, 512]).done;
+          const postSaveRedrawMs = performance.now() - redrawStart;
           await send("releaseCanvas", {
             canvasIds: Array.from(
               { length: sequence },
@@ -161,6 +176,10 @@ for (let round = 0; round < Number(rounds); round++) {
             cancelledReplies: replies.filter((r) => r.id === cancelled.id)
               .length,
             restarted,
+            beforeSave,
+            afterSave,
+            exportedBytes: exported.byteLength,
+            postSaveRedrawMs,
             stats,
             closed,
             replies,
