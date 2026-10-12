@@ -30,6 +30,41 @@ function pageText(session: DocumentSession, id = "default") {
 }
 
 describe("one native document session", () => {
+  it("distinguishes read-only hydration from resource edits, including failed transactions", async () => {
+    const session = new DocumentSession(
+      await getPDFium(),
+      await fixture("Retained"),
+    );
+    const page = session.loadPage("default", 0);
+    const pixels = () => {
+      const bitmap = page.toPixmap(session.pdfium.Matrix.scale(0.2, 0.2));
+      try {
+        return bitmap.getPixels().slice();
+      } finally {
+        bitmap.destroy();
+      }
+    };
+    try {
+      const original = pixels();
+      const parsed = await session.parse({}, async () => undefined);
+      expect(parsed.fields).toHaveLength(1);
+      expect(session.lastTransactionChanged).toBe(false);
+      expect(pixels()).toEqual(original);
+      await expect(
+        session.transaction("default", async (view) => {
+          view.catalog.delete(PDFName.of("AcroForm"));
+          throw Error("Cancelled edit");
+        }),
+      ).rejects.toThrow("Cancelled edit");
+      expect(session.lastTransactionChanged).toBe(true);
+      expect(pixels()).toEqual(original);
+      await session.transaction("default", async () => {});
+      expect(session.lastTransactionChanged).toBe(false);
+    } finally {
+      page.destroy();
+      session.dispose();
+    }
+  });
   it("inspects inherited crop, rotation and scale without parsing page contents", async () => {
     const pdfium = await getPDFium();
     const doc = new pdfium.PDFDocument();

@@ -60,7 +60,10 @@ its own assets. A host should serialize document jobs in one worker.
 - `beginOperation`, `endOperation` and `abandonOperation` implement one active
   transaction per document. Rollback covers edited dictionaries, arrays,
   streams, new objects and native annotation appearance generation. Release
-  cached pages and obtain fresh views after mutations or rollback.
+  cached pages and obtain fresh views after mutations or a rollback of mutations.
+  `operationHasChanges()` reports journaled writes/new objects in the active
+  transaction, so hosts can retain render pages after a read-only operation.
+  A true result is conservative; it does not identify individual dirty pages.
 - `addPage`, `insertPage`, `deletePage` and `newGraftMap` provide page/object
   primitives. Form field trees, outline remapping and unique imported names
   remain responsibilities of a higher-level editor, as implemented by Legir.
@@ -149,6 +152,9 @@ lazy path. Eviction and page destruction release these pixels; changing page
 contents still requires closing cached pages before obtaining fresh views.
 Images used during one render remain pinned until it returns; additional images
 use lazy decoding when the pinned images fill the budget.
+Pass `imageCache: "reuse"` to `page.render` for previews: resident pixels are
+reused, but cache misses use the original decoder without filling or evicting
+this cache. This protects reader images without increasing the memory budget.
 `engine.setLargeImageCacheLimit(bytes)` sets a 0–512 MiB budget (zero immediately
 evicts and disables this cache). `engine.largeImageCache()` reports its decoded
 pixel bytes, limit, entries, cumulative decodes and evictions. This budget does

@@ -31,8 +31,10 @@ function fixture(gray: number) {
   object.destroy();
   return { doc, image };
 }
-function render(page: PDFPage) {
-  const bitmap = page.render([1, 0, 0, -1, 0, 80], [0, 0, 80, 80]);
+function render(page: PDFPage, imageCache?: "populate" | "reuse") {
+  const bitmap = page.render([1, 0, 0, -1, 0, 80], [0, 0, 80, 80], {
+    imageCache,
+  });
   try {
     return bitmap.getPixels().slice();
   } finally {
@@ -41,6 +43,31 @@ function render(page: PDFPage) {
 }
 
 describe("bounded native large-image cache", () => {
+  it("lets previews reuse foreground pixels without filling or evicting the cache", () => {
+    engine.setLargeImageCacheLimit(64 * 1024 * 1024);
+    const first = fixture(73),
+      second = fixture(211);
+    const a = first.doc.loadPage(0),
+      b = second.doc.loadPage(0);
+    try {
+      const before = engine.largeImageCache();
+      const preview = render(b, "reuse");
+      expect(engine.largeImageCache()).toEqual(before);
+      const foreground = render(a);
+      const warm = engine.largeImageCache();
+      expect(render(a, "reuse")).toEqual(foreground);
+      expect(render(b, "reuse")).toEqual(preview);
+      expect(engine.largeImageCache()).toEqual(warm);
+      expect(render(a)).toEqual(foreground);
+      expect(engine.largeImageCache()).toEqual(warm);
+      expect(render(b)).toEqual(preview);
+      expect(engine.largeImageCache().evictions).toBe(warm.evictions + 1);
+    } finally {
+      first.doc.destroy();
+      second.doc.destroy();
+      engine.setLargeImageCacheLimit(256 * 1024 * 1024);
+    }
+  });
   it("reuses exact pixels, evicts across documents, and falls back above the budget", () => {
     engine.setLargeImageCacheLimit(64 * 1024 * 1024);
     const first = fixture(73),

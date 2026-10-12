@@ -345,8 +345,14 @@ the editor terminates the worker and releases its entire WASM arena.
 The worker serializes document jobs with rendering, retaining queue priorities,
 canvas ownership, cancellation and logical-page routing. Queued commands can be
 cancelled; native rasterization/serialization are synchronous and cannot be
-interrupted mid-call. Each source page cache retains at most twelve native pages;
-pixmaps and object handles are released explicitly. System-font bytes come from
+interrupted mid-call. Reader jobs precede preview jobs, with distance ordering
+within each class; selection happens after acquiring the document lock. Each
+source retains at most twelve reader pages plus two background pages, so
+thumbnail/text scans cannot evict the reader tier. Read-only hydration retains
+these pages; journaled hydration mutations and exports invalidate them safely.
+Preview rasterization reuses large decoded images without filling or evicting
+the foreground image cache. Pixmaps and object handles are released explicitly.
+System-font bytes come from
 the host through a narrow request/response bridge; embedded font bytes return once for main-thread `FontFace` registration.
 Permission preferences are snapshotted into each export request.
 
@@ -618,8 +624,11 @@ subscription coalesces control edits, undo/redo and structural changes, then
 compares page snapshots by stable identity. Only changed pages enter the serial
 queue; reordering and CSS rotation retain existing URLs. The sidebar and page
 grid share `useThumbnailViewport`: observed, actually visible pages go first,
-then remaining pages in document order. Each job reads the latest visible set;
-scrolling, virtualization and mode switches replace previous priorities without
+then remaining pages in document order. Expensive previews insert idle gaps
+before offscreen work, while newly visible
+items wake the queue immediately. This bounds background duty without removing
+eventual thumbnail warmup or changing resolution. Each job reads the latest
+visible set; scrolling, virtualization and mode switches replace previous priorities without
 discarding an in-flight render. Reader gestures and thumbnail zoom defer work,
 while page dragging, scrolling and drop animations keep the queue running.
 Drag previews retain their images until drop completes. The old image stays

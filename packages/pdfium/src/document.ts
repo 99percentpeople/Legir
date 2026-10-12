@@ -210,6 +210,10 @@ export class PDFDocument {
   endOperation() {
     this.call("LPDF_End", 0);
   }
+  /** Conservative: includes journaled writes and newly allocated objects. */
+  operationHasChanges() {
+    return !!this.call("LPDF_OperationHasChanges");
+  }
   abandonOperation() {
     this.call("LPDF_End", 1);
   }

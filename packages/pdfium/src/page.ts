@@ -122,6 +122,7 @@ export class PDFPage {
         rp,
         refs?.length ?? 0,
         options.transparent ? 1 : 0,
+        options.imageCache === "reuse" ? 0 : 1,
       );
     const pointer = rt.withBytes(new Uint8Array(m.buffer), (mp) =>
       refs

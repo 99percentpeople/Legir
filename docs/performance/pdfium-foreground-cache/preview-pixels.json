@@ -1,0 +1,228 @@
+[
+  {
+    "fixture": "drawing405",
+    "renders": [
+      {
+        "pageIndex": 1,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1138],
+        "ms": 1600.075744,
+        "hash": "79248b19f95228c94aee5e51bc9be2ce0ef4ca183fc7c6f7ac98dcce8089685e",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 1,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1138],
+        "ms": 1159.5192860000002,
+        "hash": "79248b19f95228c94aee5e51bc9be2ce0ef4ca183fc7c6f7ac98dcce8089685e",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1139],
+        "ms": 1181.9742620000002,
+        "hash": "ee56de65d5c0140d7a20018823228c3c0f4c7f8de92965e84dbe77c2f0e88cdc",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1139],
+        "ms": 1170.0212030000002,
+        "hash": "ee56de65d5c0140d7a20018823228c3c0f4c7f8de92965e84dbe77c2f0e88cdc",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 42,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1140],
+        "ms": 1249.1386380000004,
+        "hash": "d96b2d49e6e6ba3d6613851386302a6ff7c7b0db88fc30940ada44081cacb94f",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 42,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1140],
+        "ms": 1245.1048799999999,
+        "hash": "d96b2d49e6e6ba3d6613851386302a6ff7c7b0db88fc30940ada44081cacb94f",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 3200,
+        "rotation": 0,
+        "bounds": [0, 0, 3200, 2278],
+        "ms": 1407.2777609999994,
+        "hash": "aec2430eccdcd86e4f2040994cdd4dab732dd49de894f9eaee914c083048381f",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 3200,
+        "rotation": 0,
+        "bounds": [0, 0, 3200, 2278],
+        "ms": 1394.0260610000005,
+        "hash": "aec2430eccdcd86e4f2040994cdd4dab732dd49de894f9eaee914c083048381f",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2150, 1413, 3174, 2437],
+        "ms": 485.46769099999983,
+        "hash": "5192c3d438bbff51d58f0a34f9f22e59717e4c3c66de648c41ca79f1c065846e",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2956, 1413, 3980, 2437],
+        "ms": 481.8111259999987,
+        "hash": "3c7c91d6756ce03ae16e9e849874017daec36cbbab51e2e0df3a6f8a75232345",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2956, 1943, 3980, 2967],
+        "ms": 580.8163029999996,
+        "hash": "2f74413b064ad043603cf94519b904afc54aee6a8fae073d3830f295b761cff4",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2150, 1943, 3174, 2967],
+        "ms": 580.328872,
+        "hash": "8607447a14b4b2885a38637e7d605660244e1f25f184d8502b16be2c8831a195",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 90,
+        "bounds": [1766, 2688, 2790, 3712],
+        "ms": 577.0469940000003,
+        "hash": "d28c7048abf29d8086794ae292058becd281f028428c57dd1c2d654e62a60faf",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      },
+      {
+        "pageIndex": 1,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1138],
+        "ms": 1158.1789590000008,
+        "hash": "79248b19f95228c94aee5e51bc9be2ce0ef4ca183fc7c6f7ac98dcce8089685e",
+        "cache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        }
+      }
+    ],
+    "afterClose": {
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      },
+      "documents": 0
+    },
+    "matchesReference": true
+  }
+]

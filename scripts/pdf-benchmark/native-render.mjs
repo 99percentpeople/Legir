@@ -61,7 +61,11 @@ for (const fixture of manifest.fixtures) {
         y + (position ? 1024 : Math.floor(h)),
       ];
       const start = performance.now();
-      const pixmap = page.render(matrix, bounds, { annotations: true });
+      const pixmap = page.render(matrix, bounds, {
+        annotations: true,
+        imageCache:
+          process.env.PDF_IMAGE_CACHE_MODE === "reuse" ? "reuse" : "populate",
+      });
       const ms = performance.now() - start;
       try {
         record.renders.push({

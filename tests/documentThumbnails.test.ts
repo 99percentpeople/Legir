@@ -193,6 +193,31 @@ function coldStore(count = 7) {
 }
 const renderedPages = () => render.mock.calls.map((call) => call[1]);
 
+it("paces expensive offscreen previews and wakes immediately for newly visible pages", async () => {
+  const store = coldStore(4);
+  const viewport = Symbol();
+  let finish!: (url: string) => void;
+  render.mockImplementationOnce(
+    () =>
+      new Promise<string>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  store.getState().setThumbnailViewport(viewport, ["original:0"]);
+  store.getState().warmupThumbnails(worker);
+  await vi.advanceTimersByTimeAsync(600);
+  expect(renderedPages()).toEqual([0]);
+  await vi.advanceTimersByTimeAsync(400);
+  finish("blob:slow");
+  await vi.advanceTimersByTimeAsync(100);
+  expect(renderedPages()).toEqual([0]);
+  store.getState().setThumbnailViewport(viewport, ["original:3"]);
+  await vi.advanceTimersByTimeAsync(20);
+  expect(renderedPages()[1]).toBe(3);
+  await vi.advanceTimersByTimeAsync(2200);
+  expect(new Set(renderedPages())).toEqual(new Set([0, 1, 2, 3]));
+});
+
 it("waits for visibility, renders visible pages first, then warms the rest in page order", async () => {
   const store = coldStore();
   const viewport = Symbol();

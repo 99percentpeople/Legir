@@ -577,7 +577,13 @@ EMSCRIPTEN_KEEPALIVE int LPDF_Begin(Document *doc) {
   doc->first_new_object = doc->core()->GetLastObjNum() + 1;
   return 1;
 }
+EMSCRIPTEN_KEEPALIVE int LPDF_OperationHasChanges(Document *doc) {
+  return doc->transaction &&
+         (!doc->undo.empty() ||
+          doc->core()->GetLastObjNum() >= doc->first_new_object);
+}
 EMSCRIPTEN_KEEPALIVE void LPDF_End(Document *doc, int rollback) {
+  const bool changed = LPDF_OperationHasChanges(doc);
   doc->transaction = false;
   if (rollback) {
     for (auto it = doc->undo.rbegin(); it != doc->undo.rend(); ++it)
@@ -588,7 +594,7 @@ EMSCRIPTEN_KEEPALIVE void LPDF_End(Document *doc, int rollback) {
     doc->core()->SetLastObjNum(doc->first_new_object - 1);
   }
   doc->undo.clear();
-  doc->sync();
+  if (changed) doc->sync();
 }
 EMSCRIPTEN_KEEPALIVE CPDF_Object *LPDF_Keep(CPDF_Object *object) {
   return keep(pdfium::WrapRetain(object));
@@ -917,7 +923,8 @@ EMSCRIPTEN_KEEPALIVE Blob *LPDF_Save(Document *doc, const char *user,
 EMSCRIPTEN_KEEPALIVE Blob *
 LPDF_Render(Document *doc, FPDF_PAGE handle, int width, int height,
             const double *matrix, int contents, int annotations,
-            const uint32_t *keep_refs, size_t keep_count, int transparent) {
+            const uint32_t *keep_refs, size_t keep_count, int transparent,
+            int populate_cache) {
   auto page = CPDFPageFromFPDFPage(handle);
   if (!page || width <= 0 || height <= 0 ||
       static_cast<uint64_t>(width) * height > 64000000)
@@ -955,7 +962,7 @@ LPDF_Render(Document *doc, FPDF_PAGE handle, int width, int height,
     }
   }
   CPDF_RenderOptions options;
-  legir::BeginImageRender();
+  legir::BeginImageRender(populate_cache != 0);
   context.Render(device.get(), nullptr, &options, nullptr);
   return result.release();
 }

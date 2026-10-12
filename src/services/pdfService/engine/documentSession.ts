@@ -28,6 +28,7 @@ export class DocumentSession {
   readonly sources = new Map<string, NativeSource>();
   private nativeDocuments = 0;
   private peakNativeDocuments = 0;
+  lastTransactionChanged = false;
   readonly document: PDFDocument;
   constructor(
     readonly pdfium: PDFiumModule,
@@ -245,9 +246,12 @@ export class DocumentSession {
       view = this.view(id);
       return await run(view);
     } finally {
-      if (view) disposeEditingDocument(view);
-      doc.abandonOperation();
-      doc.setPageTreeCache(false);
+      this.lastTransactionChanged = doc.operationHasChanges();
+      try {
+        if (view) disposeEditingDocument(view);
+      } finally {
+        doc.abandonOperation();
+      }
     }
   }
 

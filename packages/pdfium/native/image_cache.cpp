@@ -10,6 +10,7 @@ class LargeImage;
 std::list<const LargeImage*> images;
 legir::LargeImageCacheStats stats;
 uint64_t render_epoch = 0;
+bool populate_cache = true;
 
 // PDFium deliberately leaves huge images as lazy scanline decoders. Keep a
 // bounded set of their exact decoded pixels, shared by all pages/documents in
@@ -53,6 +54,9 @@ class LargeImage final : public CFX_DIBBase {
       used_epoch_ = render_epoch;
       return bitmap_.Get();
     }
+    // Thumbnails may reuse foreground pixels, but must not evict them or
+    // decode a full-resolution bitmap just to fill a small preview.
+    if (!populate_cache) return source_.Get();
     const size_t size = size_t(GetPitch()) * GetHeight();
     if (size > stats.limit) return source_.Get();
     // If interleaved images exceed the budget, do not decode/evict each other
@@ -92,7 +96,10 @@ RetainPtr<CFX_DIBBase> LegirCacheLargeImage(RetainPtr<CFX_DIBBase> source) {
 }
 
 namespace legir {
-void BeginImageRender() { ++render_epoch; }
+void BeginImageRender(bool populate) {
+  ++render_epoch;
+  populate_cache = populate;
+}
 LargeImageCacheStats GetLargeImageCacheStats() { return stats; }
 void SetLargeImageCacheLimit(size_t bytes) {
   stats.limit = bytes;

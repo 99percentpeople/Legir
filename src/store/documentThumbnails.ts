@@ -56,6 +56,7 @@ export function createDocumentThumbnails(
   let abort: AbortController | undefined;
   let generation = 0;
   let notBefore = 0;
+  let backgroundNotBefore = 0;
   let enabled = true;
   let bytes: Uint8Array | null | undefined;
   const completed = new Map<string, Snapshot>();
@@ -94,12 +95,16 @@ export function createDocumentThumbnails(
       awaitingViewport()
     )
       return;
+    const hasVisible = [...visible].some((id) => !pending || pending.has(id));
     timer = setTimeout(
       () => {
         timer = undefined;
         void run();
       },
-      Math.max(0, notBefore - Date.now()),
+      Math.max(
+        0,
+        Math.max(notBefore, hasVisible ? 0 : backgroundNotBefore) - Date.now(),
+      ),
     );
   };
   async function run() {
@@ -154,6 +159,8 @@ export function createDocumentThumbnails(
         if (!snapshot) break;
         const { page, content } = snapshot;
         const id = getPageId(page);
+        if (!visible.has(id) && Date.now() < backgroundNotBefore) return;
+        const started = performance.now();
         try {
           const url = await render(
             service,
@@ -184,10 +191,19 @@ export function createDocumentThumbnails(
         }
         if (signal.aborted) return;
         queue.delete(id);
+        const elapsed = performance.now() - started;
+        // Expensive previews get idle gaps instead of monopolizing the owner
+        // worker. Cheap documents still warm quickly; visible items skip gaps.
+        backgroundNotBefore =
+          Date.now() +
+          (elapsed >= 50 ? Math.min(2000, Math.max(IDLE_MS, elapsed * 2)) : 0);
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
     } finally {
-      if (abort === controller) abort = undefined;
+      if (abort === controller) {
+        abort = undefined;
+        schedule();
+      }
     }
   }
   return {
@@ -214,11 +230,15 @@ export function createDocumentThumbnails(
     setViewport(owner: symbol, pageIds: readonly string[] | null) {
       viewports.set(owner, pageIds);
       visible = new Set([...viewports.values()].flatMap((ids) => ids ?? []));
+      clearTimeout(timer);
+      timer = undefined;
       schedule();
     },
     removeViewport(owner: symbol) {
       viewports.delete(owner);
       visible = new Set([...viewports.values()].flatMap((ids) => ids ?? []));
+      clearTimeout(timer);
+      timer = undefined;
       schedule();
     },
     holdImages() {

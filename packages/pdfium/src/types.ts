@@ -27,6 +27,8 @@ export interface RenderOptions {
   annotations?: boolean;
   keepAnnotations?: Set<number>;
   transparent?: boolean;
+  /** Reuse decoded images without filling/evicting the large-image cache. */
+  imageCache?: "populate" | "reuse";
 }
 export interface SaveOptions {
   encrypt?: "none" | "aes-256";

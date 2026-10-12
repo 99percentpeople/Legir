@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import type { PDFDocument, PDFPage } from "@legir/pdfium";
+import type { PDFDocument } from "@legir/pdfium";
 import type {
   WorkerErrorResponse,
   WorkerProgressResponse,
@@ -19,6 +19,7 @@ import {
 import { getThumbnailSourceAnnotations } from "@/services/pdfService/lib/thumbnailSourceAnnotations";
 
 import { DocumentSession } from "@/services/pdfService/engine/documentSession";
+import { NativePageCache } from "@/services/pdfService/engine/pageCache";
 import { getEditingView } from "@/services/pdfService/engine/editingDocument";
 import {
   setWorkerFontProvider,
@@ -45,12 +46,11 @@ const exclusive = (run: () => Promise<void>) => {
   return next;
 };
 
-type CachedPage = { page: PDFPage };
 type DocState = {
   pdfDoc: PDFDocument | null;
   loading: Promise<void> | null;
   generation: number;
-  pageCache: Map<number, CachedPage>;
+  pageCache: NativePageCache;
 };
 const docs = new Map<string, DocState>();
 const getDocId = (docId?: string) => docId || "default";
@@ -61,7 +61,9 @@ const getDocState = (docId: string): DocState => {
       pdfDoc: null,
       loading: null,
       generation: 0,
-      pageCache: new Map(),
+      pageCache: new NativePageCache((index) =>
+        session!.loadPage(docId, index),
+      ),
     };
     docs.set(docId, state);
   }
@@ -116,6 +118,9 @@ interface QueueItem {
   data: Extract<WorkerRequest, { type: "render" | "renderImage" }>;
 }
 const taskQueue: QueueItem[] = [];
+const compareRenderTasks = (a: QueueItem, b: QueueItem) =>
+  Number(a.data.type === "renderImage") -
+    Number(b.data.type === "renderImage") || a.priority - b.priority;
 let isProcessing = false;
 
 type TaskResult = {
@@ -233,10 +238,17 @@ const postProgress = (
 // Process the next task in the queue
 const processQueue = async () => {
   if (isProcessing || taskQueue.length === 0) return;
-  const item = taskQueue.shift();
-  if (!item) return;
   isProcessing = true;
-  await exclusive(() => handleQueuedTask(item.data));
+  await exclusive(async () => {
+    // A parse/export can hold the document while new reader work arrives.
+    // Choose at execution time so an earlier preview cannot jump the queue.
+    const item = taskQueue.shift();
+    if (item) await handleQueuedTask(item.data);
+    else {
+      isProcessing = false;
+      scheduleNext();
+    }
+  });
 };
 
 // MessageChannel for high-priority scheduling
@@ -254,9 +266,6 @@ const scheduleNext = () => {
 };
 
 const disposeState = (state: DocState) => {
-  for (const cached of state.pageCache.values()) {
-    disposeNativePage(cached.page);
-  }
   state.pageCache.clear();
   state.pdfDoc = null;
 };
@@ -331,23 +340,14 @@ const ensureDocumentLoaded = async (
   return state.pdfDoc;
 };
 
-const getPageForDoc = (docId: string, pageIndex: number) => {
+const getPageForDoc = (
+  docId: string,
+  pageIndex: number,
+  foreground = false,
+) => {
   const state = getDocState(docId);
   if (!state.pdfDoc) throw new Error("PDF Document not loaded");
-  let cached = state.pageCache.get(pageIndex);
-  if (cached) state.pageCache.delete(pageIndex);
-  else {
-    if (pageIndex < 0 || pageIndex >= session!.getSource(docId).pages.length)
-      throw new Error("PDF page index is out of range.");
-    cached = { page: session!.loadPage(docId, pageIndex) };
-  }
-  state.pageCache.set(pageIndex, cached);
-  while (state.pageCache.size > 12) {
-    const [index, old] = state.pageCache.entries().next().value!;
-    state.pageCache.delete(index);
-    disposeNativePage(old.page);
-  }
-  return cached;
+  return { page: state.pageCache.get(pageIndex, foreground) };
 };
 
 const readFromDocument = async (
@@ -412,7 +412,7 @@ const renderToCanvas = async (
     task.throwIfCancelled();
     const canvas = params.canvas ?? canvasMap.get(params.canvasId);
     if (!canvas) throw new Error("Missing render canvas");
-    const cached = getPageForDoc(docId, params.pageIndex);
+    const cached = getPageForDoc(docId, params.pageIndex, true);
     const viewport = getNativePageViewport(
       cached.page,
       params.scale,
@@ -491,6 +491,7 @@ const renderToImage = async (
       {
         annotations: !content && params.renderAnnotations === true,
         keepAnnotations,
+        imageCache: "reuse",
       },
     );
     if (content) {
@@ -513,7 +514,7 @@ const renderToImage = async (
               getNativePageViewport(page, scale),
               [0, 0, width, height],
               overlayCanvas.getContext("2d")!,
-              { annotations: true, transparent: true },
+              { annotations: true, transparent: true, imageCache: "reuse" },
             );
             ctx.drawImage(overlayCanvas, 0, 0);
           } finally {
@@ -704,7 +705,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
             item.data.priority = newPriority;
           }
 
-          taskQueue.sort((a, b) => a.priority - b.priority);
+          taskQueue.sort(compareRenderTasks);
         }
 
         result = { payload: true };
@@ -784,12 +785,13 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           task.throwIfCancelled();
         } finally {
           task.cleanup();
-          // Parsing/export can modify page resources before rolling back.
-          if (data.type === "parseDocument" || data.type === "exportDocument") {
+          // Read-only hydration retains the first page's parsed/decoded data.
+          // A journaled write may affect shared resources: invalidate safely.
+          if (
+            data.type === "exportDocument" ||
+            (data.type === "parseDocument" && session!.lastTransactionChanged)
+          ) {
             for (const state of docs.values()) {
-              for (const cached of state.pageCache.values()) {
-                disposeNativePage(cached.page);
-              }
               state.pageCache.clear();
             }
           }
@@ -909,8 +911,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest | FontHostResponse>) => {
         data: queuedData,
       });
 
-      // Sort queue: Lower priority value = Higher priority (closer to center)
-      taskQueue.sort((a, b) => a.priority - b.priority);
+      // Reader work wins even when tile distances exceed thumbnail priorities.
+      taskQueue.sort(compareRenderTasks);
 
       // Trigger processing
       scheduleNext();

@@ -11,13 +11,13 @@
     "renderer": "agg"
   },
   "sha256": {
-    "pdfium.js": "88f351b0180703222ac667b3a38c7b027c09eec5933e6e6481a0ac96df3ce044",
-    "pdfium.wasm": "93ee728b6b9f2838e55206d8e3cd5535130a21001e7ef48c6995ee551a775eab"
+    "pdfium.js": "64509625dd2832016d495c225ef1f1d19cdad2896b557bc55d8cfae53334f8d1",
+    "pdfium.wasm": "7576293953f6a8975599265e3d8115044f9a36ea80ec07d0ac8851327bb49f2f"
   },
   "sourceSha256": {
-    "native/bridge.cpp": "d285f02e6d2fef0077542fa0465a08b7432b5a6af1fc721b6d5919369c948cd7",
-    "native/image_cache.cpp": "298d06d6192bf9d7c5f7e58f71a30c134ea1ce64db810d8aa433336f136eea81",
-    "native/image_cache.h": "5c93a8b5d3f130aebd04ef6bf2b6b3c42606ac626a665be0f301bc63fde469e1",
+    "native/bridge.cpp": "9a1ae425796861f1695a0ace757f86b353a74d8f4af545011b581eb3846d545a",
+    "native/image_cache.cpp": "61eae5c165d9a520a3cb01c6fa0bcea8d7a7d6166cec09fe319a8bf5f1f1056c",
+    "native/image_cache.h": "b25cb662a7f29cd51c2ce4ccfaef6a8d2a9ef2b827033025e528637cc7d35c15",
     "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
     "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
     "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"

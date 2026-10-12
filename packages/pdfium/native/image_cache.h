@@ -14,7 +14,7 @@ struct LargeImageCacheStats {
 };
 LargeImageCacheStats GetLargeImageCacheStats();
 void SetLargeImageCacheLimit(size_t bytes);
-void BeginImageRender();
+void BeginImageRender(bool populate);
 }  // namespace legir
 
 #endif
