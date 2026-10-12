@@ -360,6 +360,7 @@ export class DocumentSession {
       peakNativeDocuments: this.peakNativeDocuments,
       sources: this.sources.size,
       wasmCapacityBytes: this.pdfium.memory(),
+      largeImageCache: this.pdfium.largeImageCache(),
     };
   }
 

@@ -139,6 +139,17 @@ temperature/load/swap counters and Chromium GPU feature flags accompany every
 record; CPU-only headless measurements do not predict GPU/Tauri performance.
 No validation subprocesses or builds run during the measured comparison.
 
+`native-render.mjs WASM_DIR MANIFEST OUTPUT_JSON` separately records exact RGBA
+hashes for three sampled pages, repeated renders, zoom, four tiles, a rotated
+tile and a revisit after cache eviction. Run it against archived and current
+WASM; pass the earlier output as an optional fourth argument to assert every
+hash and transform matches (nonzero exit on mismatch). Cache limits and cleanup
+after document closure are also asserted. Set
+`PDF_IMAGE_CACHE_BYTES=0` to diagnose the native large-image cache fallback;
+its byte/count/decode/eviction statistics are recorded after each render and
+document closure. This direct Node run excludes canvas/RPC/presentation costs;
+use `corpus.mjs` for browser performance and memory claims.
+
 Validation runs **after timing** with pdf-lib and Poppler: all page dimensions,
 rotations, annotation subtype counts, nested reply parents, review states/flags,
 popup ownership, internal link targets, external link URIs

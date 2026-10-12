@@ -71,6 +71,21 @@ def patch(source: Path):
             raise RuntimeError(f"PDFium patch does not match pinned source: {name}")
         path.write_text(text.replace(old, new))
 
+    cache = source / "core/fpdfapi/page/cpdf_pageimagecache.cpp"
+    text = cache.read_text()
+    cache_changes = [
+        ("namespace {", "RetainPtr<CFX_DIBBase> LegirCacheLargeImage(RetainPtr<CFX_DIBBase> image);\n\nnamespace {"),
+        ("return realize_hint ? image->Realize() : image;",
+         "return realize_hint ? image->Realize() : LegirCacheLargeImage(std::move(image));"),
+    ]
+    for old, new in cache_changes:
+        if new not in text:
+            if text.count(old) != 1:
+                raise RuntimeError("PDFium image cache patch does not match pinned source")
+            text = text.replace(old, new)
+    if text != cache.read_text():
+        cache.write_text(text)
+
     number = source / "core/fpdfapi/parser/cpdf_number.cpp"
     text = number.read_text()
     number_changes = [

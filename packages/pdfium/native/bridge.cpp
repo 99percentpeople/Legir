@@ -30,6 +30,7 @@
 #include "public/fpdf_text.h"
 #include "public/fpdfview.h"
 #include "text_edit.h"
+#include "image_cache.h"
 #include "third_party/zlib/zlib.h"
 #include <algorithm>
 #include <cmath>
@@ -369,6 +370,20 @@ public:
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void LPDF_Init() { FPDF_InitLibrary(); }
 EMSCRIPTEN_KEEPALIVE uint32_t LPDF_LiveDocuments() { return live_documents; }
+EMSCRIPTEN_KEEPALIVE size_t LPDF_LargeImageCache(int field) {
+  const auto stats = legir::GetLargeImageCacheStats();
+  switch (field) {
+  case 0: return stats.bytes;
+  case 1: return stats.limit;
+  case 2: return stats.entries;
+  case 3: return stats.decodes;
+  case 4: return stats.evictions;
+  default: return 0;
+  }
+}
+EMSCRIPTEN_KEEPALIVE void LPDF_SetLargeImageCacheLimit(size_t bytes) {
+  legir::SetLargeImageCacheLimit(std::min(bytes, size_t(512 * 1024 * 1024)));
+}
 // Always takes ownership of the caller's malloc buffer, including on failure.
 EMSCRIPTEN_KEEPALIVE Document *LPDF_Open(uint8_t *data, size_t length,
                                          const char *password) {
@@ -940,6 +955,7 @@ LPDF_Render(Document *doc, FPDF_PAGE handle, int width, int height,
     }
   }
   CPDF_RenderOptions options;
+  legir::BeginImageRender();
   context.Render(device.get(), nullptr, &options, nullptr);
   return result.release();
 }

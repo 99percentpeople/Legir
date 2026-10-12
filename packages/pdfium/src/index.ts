@@ -16,6 +16,16 @@ export interface PDFium {
   Matrix: typeof Matrix;
   memory(): number;
   liveDocuments(): number;
+  /** Decoded pixels of huge images only; excludes the WASM arena and small images. */
+  largeImageCache(): {
+    bytes: number;
+    limit: number;
+    entries: number;
+    decodes: number;
+    evictions: number;
+  };
+  /** Module-wide LRU budget, default 256 MiB. Zero evicts and disables it. */
+  setLargeImageCacheLimit(bytes: number): void;
 }
 
 export async function createPDFium(options: LoadOptions = {}): Promise<PDFium> {
@@ -29,5 +39,21 @@ export async function createPDFium(options: LoadOptions = {}): Promise<PDFium> {
     Matrix,
     memory: () => runtime.native.HEAPU8.buffer.byteLength,
     liveDocuments: () => runtime.call("LPDF_LiveDocuments"),
+    largeImageCache: () => ({
+      bytes: runtime.call("LPDF_LargeImageCache", 0),
+      limit: runtime.call("LPDF_LargeImageCache", 1),
+      entries: runtime.call("LPDF_LargeImageCache", 2),
+      decodes: runtime.call("LPDF_LargeImageCache", 3),
+      evictions: runtime.call("LPDF_LargeImageCache", 4),
+    }),
+    setLargeImageCacheLimit: (bytes) => {
+      if (
+        !Number.isSafeInteger(bytes) ||
+        bytes < 0 ||
+        bytes > 512 * 1024 * 1024
+      )
+        throw new Error("Image cache limit must be between 0 and 512 MiB.");
+      runtime.call("LPDF_SetLargeImageCacheLimit", bytes);
+    },
   };
 }

@@ -141,5 +141,18 @@ document also closes its tracked pages/object handles; independent output
 buffers and pixmaps must still be destroyed by the caller. `engine.memory()`
 reports arena capacity, not resident memory or live allocation size.
 
+Huge images that PDFium normally leaves as lazy scanline decoders can retain
+their exact decoded pixels in a module-wide LRU cache. Its default budget is
+256 MiB across all open pages and documents, so repeated tiles and zooms do not
+restart a large JPEG decode. Images larger than the budget use the original
+lazy path. Eviction and page destruction release these pixels; changing page
+contents still requires closing cached pages before obtaining fresh views.
+`engine.setLargeImageCacheLimit(bytes)` sets a 0–512 MiB budget (zero immediately
+evicts and disables this cache). `engine.largeImageCache()` reports its decoded
+pixel bytes, limit, entries, cumulative decodes and evictions. This budget does
+not include PDFium's existing small-image caches, compressed inputs, render
+targets or WASM arena capacity. Decoding resolution and rendering options are
+unchanged.
+
 The package is BSD-3-Clause; the surrounding Legir application keeps its own
 license. See `LICENSE` and `wasm/licenses/`.

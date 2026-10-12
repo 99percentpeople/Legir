@@ -48,6 +48,9 @@ export type DocumentCommands = {
       peakNativeDocuments: number;
       sources: number;
       wasmCapacityBytes: number;
+      largeImageCache: ReturnType<
+        import("@legir/pdfium").PDFium["largeImageCache"]
+      >;
     };
   };
 };
