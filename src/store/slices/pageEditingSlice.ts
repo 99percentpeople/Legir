@@ -18,6 +18,7 @@ import {
   remapOutline,
 } from "@/services/pdfService/lib/pageStructure";
 import { captureHistorySnapshot } from "./historySlice";
+import { cloneAnnotationReplies } from "@/lib/annotationReplies";
 import { revokeObjectUrlIfNeeded } from "../helpers";
 
 export type ImportedPages = {
@@ -205,11 +206,7 @@ export const createPageEditingSlice: EditorStoreSlice<
                   (annotation.linkDestPageIndex >= position
                     ? pages.length
                     : 0))),
-        replies: annotation.replies?.map((reply) => ({
-          ...reply,
-          id: newId(),
-          parentAnnotationId: id,
-        })),
+        replies: cloneAnnotationReplies(annotation.replies, id, newId),
       };
     });
     const next: PageData[] = identifyPages(state.pages);

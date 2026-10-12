@@ -317,7 +317,7 @@ describe("reuse source annotation appearances on form pages", () => {
     ).toHaveLength(2);
   });
 
-  it("regenerates an edited reply but not its unchanged parent", async () => {
+  it("updates an edited reply in place without rebuilding its parent", async () => {
     const { doc, fields, annotation, rootRef, replyRef } = await makeFixture();
     const save = vi.spyOn(FreeTextExporter.prototype, "save");
     const output = await exportPDF(await doc.save(), fields, undefined, [
@@ -330,7 +330,7 @@ describe("reuse source annotation appearances on form pages", () => {
     ]);
     expect(save).not.toHaveBeenCalled();
     const reopened = await PDFDocument.load(output);
-    expect(refsOnPage(reopened)).not.toContainEqual(replyRef);
+    expect(refsOnPage(reopened)).toContainEqual(replyRef);
     const reply = refsOnPage(reopened)
       .map((ref) => reopened.context.lookup(ref))
       .find(

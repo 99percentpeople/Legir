@@ -558,9 +558,18 @@ export const createControlSlice: EditorStoreSlice<
 
           return prepareInkAnnotationForStore({
             ...annotation,
-            replies: (annotation.replies ?? []).filter(
-              (reply) => reply.id !== replyId,
-            ),
+            replies: (annotation.replies ?? [])
+              .filter((reply) => reply.id !== replyId)
+              .map((reply) =>
+                reply.inReplyToReplyId === replyId
+                  ? {
+                      ...reply,
+                      inReplyToReplyId: targetAnnotation.replies?.find(
+                        (parent) => parent.id === replyId,
+                      )?.inReplyToReplyId,
+                    }
+                  : reply,
+              ),
             updatedAt: now,
             ...(shouldMarkEdited ? { isEdited: true } : null),
           });
