@@ -1,0 +1,233 @@
+{
+  "created": "2026-10-12",
+  "appRevision": "902e0a53495bebbadf64b6d007a2b95e31b1c15f",
+  "variants": [
+    {
+      "id": "pdfjs",
+      "build": "/tmp/legir-export-replies/build-pdfjs",
+      "revision": "b55cad5904ea203f2f15e3eb662ad46a28d1f22a"
+    },
+    {
+      "id": "pdfium-before",
+      "build": "/tmp/legir-export-replies/build-pdfium",
+      "revision": "9b713456bd025afb515e01e6095462d3dd5e5aaf"
+    },
+    {
+      "id": "pdfium",
+      "build": "/tmp/legir-render-cache/build-pinned",
+      "revision": "902e0a53495bebbadf64b6d007a2b95e31b1c15f"
+    }
+  ],
+  "candidateVariant": {
+    "id": "pdfium",
+    "build": "/tmp/legir-render-cache/build-pdfium",
+    "revision": "e6e64d55a95cbd295ccc613ea9c3997b2b22dd63"
+  },
+  "sourceSha256": {
+    "packages/pdfium/native/image_cache.cpp": "298d06d6192bf9d7c5f7e58f71a30c134ea1ce64db810d8aa433336f136eea81",
+    "packages/pdfium/native/image_cache.h": "5c93a8b5d3f130aebd04ef6bf2b6b3c42606ac626a665be0f301bc63fde469e1",
+    "packages/pdfium/native/bridge.cpp": "d285f02e6d2fef0077542fa0465a08b7432b5a6af1fc721b6d5919369c948cd7",
+    "packages/pdfium/scripts/patch_source.py": "2bd39aa18d05ec1ca93fd71160d3dc0c968962c65ecb4026f999daf9a20829ca",
+    "packages/pdfium/scripts/build.py": "f94a0b4d51b386578176265dc28a8aecc8f2fb43261beb8908b68dcb0b2d7c44",
+    "packages/pdfium/src/index.ts": "963d20a85c4490c41768f378eeb6ec64d83852f9b8f2e480a08fea7347458ab6",
+    "packages/pdfium/tests/imageCache.test.ts": "bb3c05487b1618acd8e0beaad0e25d59c13ce097eb04cedb3124d52efa20dfad",
+    "src/services/pdfService/engine/documentSession.ts": "a0db2070512d03f766328a91384601517160d743124dd1316e3dd476c183f77e",
+    "scripts/pdf-benchmark/corpus.mjs": "8d339ff22e811fa29422cb4dd8d6772e957576d76fb8f063d1d97a788b717c55",
+    "scripts/pdf-benchmark/corpus-entry.ts": "9c36c1f8e593f3f4c2e7c63524c08753d7957c25a9aa96e3ea6b085c3e95b63d",
+    "scripts/pdf-benchmark/native-render.mjs": "1d2bd8906b7c091a370abd90b3e299efb035c63f4fe1837c7e85687c2f2e8a1c",
+    "scripts/pdf-benchmark/corpus-summary.mjs": "ca3fed5d3d8139abdb87b2ecc558c82c72eb824ec33ff7f6982b6b0c9bb718bc",
+    "scripts/pdf-benchmark/corpus-validate.mjs": "3ff7730456484ae2262fba04d351c5b90c210231dd9344595a0ca29f1246cb8f",
+    "scripts/pdf-benchmark/ui.mjs": "a8b1a7657a3a4f8583beb58ab43185ec27f3412a1aaf8883fcd72cc020dc5e09"
+  },
+  "native": {
+    "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+    "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+    "emscripten": "5.0.3",
+    "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+    "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c",
+    "features": {
+      "v8": false,
+      "xfa": false,
+      "threads": false,
+      "renderer": "agg"
+    },
+    "sha256": {
+      "pdfium.js": "88f351b0180703222ac667b3a38c7b027c09eec5933e6e6481a0ac96df3ce044",
+      "pdfium.wasm": "93ee728b6b9f2838e55206d8e3cd5535130a21001e7ef48c6995ee551a775eab"
+    },
+    "sourceSha256": {
+      "native/bridge.cpp": "d285f02e6d2fef0077542fa0465a08b7432b5a6af1fc721b6d5919369c948cd7",
+      "native/image_cache.cpp": "298d06d6192bf9d7c5f7e58f71a30c134ea1ce64db810d8aa433336f136eea81",
+      "native/image_cache.h": "5c93a8b5d3f130aebd04ef6bf2b6b3c42606ac626a665be0f301bc63fde469e1",
+      "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
+      "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
+      "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
+    },
+    "patchSha256": "2bd39aa18d05ec1ca93fd71160d3dc0c968962c65ecb4026f999daf9a20829ca",
+    "buildScriptSha256": "f94a0b4d51b386578176265dc28a8aecc8f2fb43261beb8908b68dcb0b2d7c44"
+  },
+  "builds": {
+    "pdfjs": {
+      "assets/pdf-render.worker-CrJMbpoF.js": "1def757ae1d6bf91cdbbb2547c4b63c4be8dadb435c870bb3534c2326ddce352",
+      "benchmark.js": "800bd598807616ce85626fbb700a74d136ab51971e86ef8514c7842293088117",
+      "pdfjs/wasm/jbig2.wasm": "e6bee67724a7b5436fe8162638e3708cfc8d52b6342db69a49715e30ff27cfdc",
+      "pdfjs/wasm/openjpeg.wasm": "004a0e62db930ba9ff2a22212f4554d0bb57a0635a8287caf70f98117cee14ba",
+      "pdfjs/wasm/qcms_bg.wasm": "663d86126d5f5fcb1c61490f94353e2a8375660b8c5498ab3ebab5a34b08800e",
+      "pdfjs/wasm/quickjs-eval.wasm": "7bcacc9f22cacf7e9b23866d2a6d1639693d40c7f144e41b7c69ed37ba9cbe8f",
+      "sw.js": "81351e927d412aaedc0f29c23534bd0e9277e1ae6b57297d102a543b153c347d"
+    },
+    "pdfium-before": {
+      "assets/pdf-render.worker-DvYg5jez.js": "7521316aabcd3023308ead853263412b189f285e04e576970726c4d5361ed73a",
+      "benchmark.js": "1bdc034383d64d21d5a3eadbe2e4d8530a464163332bfcfa7b0499ce9d370627",
+      "pdfium/59ea54cce017-2af38633e23f/pdfium.js": "d80f4a7ee419a03ec3a77e13bfbe22e47ed3bbda52863a581c90a6938181aa8e",
+      "pdfium/59ea54cce017-2af38633e23f/pdfium.wasm": "2af38633e23f71f52d94d8bcfa649af932f248d061f58ef56293842299e69ee1",
+      "sw.js": "b85250b5c024b7ee399db063dfc2ff6d2d207a2b4ffa8ba9e86d6721b8a81660"
+    },
+    "pdfium": {
+      "assets/pdf-render.worker-B2tFzgq3.js": "29e6684e5c2e258aff55f93392d8db1c5d2c7d930fb1e318acecb4d2ebdeb550",
+      "benchmark.js": "b6b9f45defff08a15a77db4b172ac5dec17efbc95a1ce1b7a5b43cfe83684c2f",
+      "pdfium/59ea54cce017-93ee728b6b9f/pdfium.js": "88f351b0180703222ac667b3a38c7b027c09eec5933e6e6481a0ac96df3ce044",
+      "pdfium/59ea54cce017-93ee728b6b9f/pdfium.wasm": "93ee728b6b9f2838e55206d8e3cd5535130a21001e7ef48c6995ee551a775eab",
+      "sw.js": "8a08542d3f9e77a67400e53d118efa37fdfc121852b196216706af04406189fa"
+    },
+    "pdfium-candidate": {
+      "assets/pdf-render.worker-D-JpuLJX.js": "b8b5260e9bdbdedaad882bdef2230dd5157844d48ad566444b2d3fd788516193",
+      "benchmark.js": "fa96f27097a52396938845aa1175eadc80fed8afc45baad1adcf3761bb1bf4b6",
+      "pdfium/59ea54cce017-798031664292/pdfium.js": "88f351b0180703222ac667b3a38c7b027c09eec5933e6e6481a0ac96df3ce044",
+      "pdfium/59ea54cce017-798031664292/pdfium.wasm": "7980316642922274f0c6775bcff25d56c324f7f1505488a467d19eefe59ac74b",
+      "sw.js": "3f35846ab55602783c5d056498c5090b77ecff9b3608708323a5b92aac167052"
+    },
+    "production": {
+      "assets/pdf-render.worker-B2tFzgq3.js": "29e6684e5c2e258aff55f93392d8db1c5d2c7d930fb1e318acecb4d2ebdeb550",
+      "index.html": "aa7cf6ad8b08f595b8cb960d19967b6f7bc2f6c34f84dc8acd702e7bbfe1ac7a",
+      "pdfium/59ea54cce017-93ee728b6b9f/pdfium.js": "88f351b0180703222ac667b3a38c7b027c09eec5933e6e6481a0ac96df3ce044",
+      "pdfium/59ea54cce017-93ee728b6b9f/pdfium.wasm": "93ee728b6b9f2838e55206d8e3cd5535130a21001e7ef48c6995ee551a775eab",
+      "sw.js": "665db5800791b584f1ba94097c651ff98a82462bc1a991c64e821a7bd18d6aa5"
+    }
+  },
+  "environment": {
+    "machine": "Raspberry Pi 5",
+    "cpu": "4 x Cortex-A76",
+    "totalMemoryBytes": 8454733824,
+    "platform": "linux-arm64",
+    "browser": "148.0.7778.167",
+    "node": "24.18.0",
+    "bun": "1.4.2",
+    "poppler": "22.12.0",
+    "renderer": "headless software",
+    "samplingMs": 50
+  },
+  "checks": {
+    "applicationTests": 778,
+    "libraryTests": 22,
+    "lint": "passed including application and www typechecks",
+    "builds": ["native WASM", "production app with PWA", "corpus harness"],
+    "readerRuns": 27,
+    "readerPassed": 27,
+    "candidateCompleteRuns": 27,
+    "candidateCompletePassed": 27,
+    "finalCompleteRuns": 3,
+    "finalCompletePassed": 3,
+    "nativeExactPairs": 42,
+    "pairedBookExactPairs": 24,
+    "exports": {
+      "candidate": {
+        "exports": 54,
+        "passed": 54,
+        "exactRasterPairs": 297,
+        "equalTextPairs": 297
+      },
+      "final": {
+        "exports": 6,
+        "passed": 6,
+        "exactRasterPairs": 33,
+        "equalTextPairs": 33
+      }
+    },
+    "ownership": {
+      "reader": {
+        "runs": 9,
+        "activeWorkers": 1,
+        "persistentNativeDocuments": 1,
+        "peakNativeDocuments": 1,
+        "workersAfterClose": 0,
+        "allCacheSnapshotsWithinLimit": true
+      },
+      "smoke": {
+        "runs": 3,
+        "activeWorkers": 1,
+        "persistentNativeDocuments": 1,
+        "peakNativeDocuments": 2,
+        "workersAfterClose": 0,
+        "allCacheSnapshotsWithinLimit": true
+      },
+      "native": {
+        "renders": 42,
+        "exact": true
+      }
+    },
+    "productionUI": {
+      "offline": true,
+      "savedPages": 8,
+      "savedFields": 3,
+      "activeWorkers": 1,
+      "workersAfterClose": 0,
+      "pageErrors": 0,
+      "visibleBrokenImages": 0,
+      "resourceFailures": 1,
+      "resourceFailureDetail": "revoked Blob image ERR_FILE_NOT_FOUND"
+    }
+  },
+  "logSha256": {
+    "pinned-native-tests.txt": "d51adce71b95875af0c371049ba0d89b3ca1352918a71c34a0ddf4701dcd2b1b",
+    "pinned-app-tests.txt": "e849648a35a323319cc243f73fc0feafb207f79d538a96b284fed160066347aa",
+    "pinned-lint.txt": "b6e08f662ad2ce8036a19f204620a1cc10df27e8146752cd41b6dffacb889d27",
+    "pinned-app-build.txt": "35852e6afd149054711857383174186dfd365c6fa3f55877b68c9bf026eac770",
+    "pinned-harness-build.txt": "a8308a57baf6ca4c9346aafe544592ce14f255b4324a789948e58ac9c0b0686b",
+    "pinned-native-build.txt": "365ceed68e350abcafb763bbcb972b234a2b83761c4fa25dff410e9d05fbdd73",
+    "final-validation.txt": "d4ce4b67aa65734bbe70a1dad9952aa91fdf951047b32e65dd27a22fbffe1214"
+  },
+  "timingLimitations": [
+    "Builds, unit tests, UI checks and validators belonging to this task did not overlap timed benchmarks.",
+    "Host was shared with other development work. Earlier candidate reader overlapped external Weblink Vitest; its records are diagnostic only.",
+    "Final reader ran 2026-10-12T14:14:18Z through approximately 14:20:28Z. External Weblink Vite dev server was observed; no exclusive idle-host guarantee.",
+    "competition.json monitors only selected test/compiler processes and starts at 14:15:47Z, after the final reader began; it does not rule out other interference.",
+    "Final reader retained all samples, including pdfjs book round 1 firstCanvasMs=11086.5. Book timing differences remain unresolved.",
+    "Paired native book diagnostic 14:28:12Z-14:28:46Z overlapped external Weblink typecheck and native-screen browser test (observed PIDs 1501150 and 1501187); its timings do not establish non-regression.",
+    "Full-workflow scan runs incurred swap. PSS excludes swapped pages and PSS/SwapPSS maxima need not coincide.",
+    "Final complete smoke has one sample per fixture; do not compare it as a three-round performance ranking.",
+    "No Windows/Tauri or interactive scrolling-frame-rate measurement."
+  ],
+  "artifactSha256": {
+    "candidate-manifest.json": "4ccb55dc9575ebad9c9fa93b3facb074376f321f1e12e5fed4a4bc5762b65dac",
+    "candidate-results.json": "d1077e98a0982bdef5c2b547aed8aa3d8325efa13ad2e5f682c057e8d1d936b8",
+    "candidate-summary.json": "2224e11c6aab4f5fe92ebd8ccd5a0dff80c7d7b4019ca4ac66bf91872c7f2063",
+    "candidate-ui.json": "597001bee390d87826bcc3b359f5d94974f94eac95a4d49b370f696fd6deef40",
+    "candidate-validation.json": "a26cee8fa32cf80d7bfe5dbfa1e2023c75ce43d4b0e2c080343dd6040a280b8b",
+    "competition.json": "ed1f8cfc417442ac2486ed82a825f4316d9e08233785ce45f2849fd8a80b1d96",
+    "final-validation.txt": "d4ce4b67aa65734bbe70a1dad9952aa91fdf951047b32e65dd27a22fbffe1214",
+    "fixtures.json": "919c9b890b47da828870ffe4dbd52706b44c90ccde0f134cc6f5b6da2e53f164",
+    "interfered-reader-results.json": "4a5a86c066502b50f566b462170dadff1ac2294bdd00e6283f24e647940c3e73",
+    "manifest.json": "dec48f8c23638c99cbf7534903c17980983596a8c5f17af4da0f2569debcc47b",
+    "native-after.json": "5c875db0dfe9339f87667948837d88b3727790acfbb7b319f190b940b1e366e8",
+    "native-before.json": "5f28a70c0f00d167026e62d684299c5403065d7f8ea21798061dc4ee14766037",
+    "ownership.json": "54f51ddb7148c560026226e017b26b60d92ca82715efb1e3ad4fb9ae6fbf984e",
+    "paired-book-script.txt": "01a73e118e49279f653e5c36ae0fb3c1830f36e85074d5f553818e443d530710",
+    "paired-book.json": "91320ba89863c82c94c1365057771081f419ed472bbb2ac8d7452f58f0962502",
+    "pinned-app-build.txt": "35852e6afd149054711857383174186dfd365c6fa3f55877b68c9bf026eac770",
+    "pinned-app-tests.txt": "e849648a35a323319cc243f73fc0feafb207f79d538a96b284fed160066347aa",
+    "pinned-harness-build.txt": "a8308a57baf6ca4c9346aafe544592ce14f255b4324a789948e58ac9c0b0686b",
+    "pinned-lint.txt": "b6e08f662ad2ce8036a19f204620a1cc10df27e8146752cd41b6dffacb889d27",
+    "pinned-native-build.txt": "365ceed68e350abcafb763bbcb972b234a2b83761c4fa25dff410e9d05fbdd73",
+    "pinned-native-tests.txt": "d51adce71b95875af0c371049ba0d89b3ca1352918a71c34a0ddf4701dcd2b1b",
+    "reader-results.json": "ce10253c5b5c4e00715c89a0990c32888c9e2c34a2ba41eb33c6e9ca63aaed12",
+    "reader-summary.json": "9a2e407de142771f31f3ef993795065634b76ee92816780cbaa16b83a8f7775f",
+    "smoke-results.json": "d1a5b1f554b70c0bd56147cdf24c70bbd33d04d3bed6a78b76865edb59a227a2",
+    "smoke-summary.json": "140a86fcb2f203c4e620fa9078f1d9fdf01088aed676e4424ffc450c09810a7d",
+    "smoke-validation.json": "ece1d587c1776072e2e05da04baec8a5662f13ae744cd233832e947d9cb1186a",
+    "ui.json": "985854bdd69cf838669e533b0bc711c9b20fd530f52f98bc1386696f9e3a821e",
+    "ui.png": "050b8c5433a85fac67bfd8d512c4a942a06f1d7b39e4e180ca9d34c97c0428e3"
+  },
+  "logNormalization": "Trailing whitespace and extra EOF blank lines removed from archived text logs; raw logs remain in /tmp/legir-render-cache.",
+  "artifactFormatting": "JSON records formatted by the repository Prettier commit hook; primary raw benchmark, validation and native comparison data verified unchanged."
+}

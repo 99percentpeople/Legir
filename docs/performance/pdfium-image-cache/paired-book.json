@@ -1,0 +1,719 @@
+{
+  "kind": "paired-native-diagnostic",
+  "started": "2026-10-12T14:28:12.214Z",
+  "finished": "2026-10-12T14:28:46.809Z",
+  "fixture": "/home/zach/Bookshelf/BeginnersGuide-5thEd-Eng_v4.pdf",
+  "fixtureSha256": "d3b83cf842a1e05c36de3bce9a375369f6fc6ed32eafe3f7a52aeb6f3df2c230",
+  "method": "Two distinct WASM modules in one Node process, retained page handles, six alternating rounds, identical 1600-pixel transforms; only render() timed; hashes outside timing; not a browser or application-memory benchmark.",
+  "variants": [
+    {
+      "id": "before",
+      "provenance": {
+        "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+        "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+        "emscripten": "5.0.3",
+        "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+        "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c",
+        "features": {
+          "v8": false,
+          "xfa": false,
+          "threads": false,
+          "renderer": "agg"
+        },
+        "sha256": {
+          "pdfium.js": "d80f4a7ee419a03ec3a77e13bfbe22e47ed3bbda52863a581c90a6938181aa8e",
+          "pdfium.wasm": "2af38633e23f71f52d94d8bcfa649af932f248d061f58ef56293842299e69ee1"
+        },
+        "sourceSha256": {
+          "native/bridge.cpp": "6ff933e7184b903a27d843f89169c96235372a5a0f1b74ea3a4260b4ee4ee537",
+          "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
+          "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
+          "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
+        },
+        "patchSha256": "63a8d0be2092fbdf1073336f49f5aa86cda3aea8647113ea30c2ea60c4cea31f",
+        "buildScriptSha256": "957a2751b62f0d73257324107de9b476d0a25dc4bdde01d8d84d2a36044010ca"
+      },
+      "afterCloseDocuments": 0
+    },
+    {
+      "id": "after",
+      "provenance": {
+        "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+        "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+        "emscripten": "5.0.3",
+        "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+        "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c",
+        "features": {
+          "v8": false,
+          "xfa": false,
+          "threads": false,
+          "renderer": "agg"
+        },
+        "sha256": {
+          "pdfium.js": "88f351b0180703222ac667b3a38c7b027c09eec5933e6e6481a0ac96df3ce044",
+          "pdfium.wasm": "93ee728b6b9f2838e55206d8e3cd5535130a21001e7ef48c6995ee551a775eab"
+        },
+        "sourceSha256": {
+          "native/bridge.cpp": "d285f02e6d2fef0077542fa0465a08b7432b5a6af1fc721b6d5919369c948cd7",
+          "native/image_cache.cpp": "298d06d6192bf9d7c5f7e58f71a30c134ea1ce64db810d8aa433336f136eea81",
+          "native/image_cache.h": "5c93a8b5d3f130aebd04ef6bf2b6b3c42606ac626a665be0f301bc63fde469e1",
+          "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
+          "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
+          "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
+        },
+        "patchSha256": "2bd39aa18d05ec1ca93fd71160d3dc0c968962c65ecb4026f999daf9a20829ca",
+        "buildScriptSha256": "f94a0b4d51b386578176265dc28a8aecc8f2fb43261beb8908b68dcb0b2d7c44"
+      },
+      "afterCloseDocuments": 0
+    }
+  ],
+  "exactPairs": 24,
+  "summary": [
+    {
+      "pageIndex": 0,
+      "before": {
+        "coldMs": 4545.0785670000005,
+        "warmMedianMs": 378.5201179999967
+      },
+      "after": {
+        "coldMs": 3578.8856479999995,
+        "warmMedianMs": 574.7945280000022
+      }
+    },
+    {
+      "pageIndex": 14,
+      "before": {
+        "coldMs": 319.5948279999993,
+        "warmMedianMs": 122.82475400000112
+      },
+      "after": {
+        "coldMs": 434.2674139999999,
+        "warmMedianMs": 84.87501599999814
+      }
+    },
+    {
+      "pageIndex": 143,
+      "before": {
+        "coldMs": 516.920979999999,
+        "warmMedianMs": 196.01353899999958
+      },
+      "after": {
+        "coldMs": 576.5593430000008,
+        "warmMedianMs": 248.29192200000034
+      }
+    },
+    {
+      "pageIndex": 287,
+      "before": {
+        "coldMs": 2423.8896330000007,
+        "warmMedianMs": 328.1705559999973
+      },
+      "after": {
+        "coldMs": 2806.027911000001,
+        "warmMedianMs": 320.6090570000015
+      }
+    }
+  ],
+  "records": [
+    {
+      "variant": "before",
+      "round": 0,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 4545.0785670000005,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4"
+    },
+    {
+      "variant": "after",
+      "round": 0,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 3578.8856479999995,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 0,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 319.5948279999993,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+    },
+    {
+      "variant": "after",
+      "round": 0,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 434.2674139999999,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 0,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 516.920979999999,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7"
+    },
+    {
+      "variant": "after",
+      "round": 0,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 576.5593430000008,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 0,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 2423.8896330000007,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d"
+    },
+    {
+      "variant": "after",
+      "round": 0,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 2806.027911000001,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "after",
+      "round": 1,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 1082.0752250000005,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 1,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 1120.7655760000016,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4"
+    },
+    {
+      "variant": "after",
+      "round": 1,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 185.49492100000134,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 1,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 322.75433800000246,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+    },
+    {
+      "variant": "after",
+      "round": 1,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 426.01884099999734,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 1,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 289.0315539999974,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7"
+    },
+    {
+      "variant": "after",
+      "round": 1,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 880.8143429999982,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 1,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 797.8774259999991,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d"
+    },
+    {
+      "variant": "before",
+      "round": 2,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 1150.3829079999996,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4"
+    },
+    {
+      "variant": "after",
+      "round": 2,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 1376.4096280000012,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 2,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 247.8116430000009,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+    },
+    {
+      "variant": "after",
+      "round": 2,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 269.7373430000007,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 2,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 485.8820769999984,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7"
+    },
+    {
+      "variant": "after",
+      "round": 2,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 560.3423079999993,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 2,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 294.79047600000195,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d"
+    },
+    {
+      "variant": "after",
+      "round": 2,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 377.6700979999987,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "after",
+      "round": 3,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 574.7945280000022,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 3,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 378.5201179999967,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4"
+    },
+    {
+      "variant": "after",
+      "round": 3,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 83.67201299999942,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 3,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 122.82475400000112,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+    },
+    {
+      "variant": "after",
+      "round": 3,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 248.29192200000034,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 3,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 196.01353899999958,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7"
+    },
+    {
+      "variant": "after",
+      "round": 3,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 292.8702310000008,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 3,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 343.4861839999976,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d"
+    },
+    {
+      "variant": "before",
+      "round": 4,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 307.54346899999655,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4"
+    },
+    {
+      "variant": "after",
+      "round": 4,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 409.96910099999513,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 4,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 115.81784799999878,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+    },
+    {
+      "variant": "after",
+      "round": 4,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 82.53897299999517,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 4,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 161.20762299999478,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7"
+    },
+    {
+      "variant": "after",
+      "round": 4,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 115.43512499999633,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 4,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 202.35125800000242,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d"
+    },
+    {
+      "variant": "after",
+      "round": 4,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 182.8488970000035,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "after",
+      "round": 5,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 415.72056000000157,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 5,
+      "pageIndex": 0,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 355.7543430000005,
+      "hash": "e87d4416d5da93e069e1bebd0eee8edc0f6a0ca3a76df08811599ed922c5a7c4"
+    },
+    {
+      "variant": "after",
+      "round": 5,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 84.87501599999814,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 5,
+      "pageIndex": 14,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 84.35632899999473,
+      "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+    },
+    {
+      "variant": "after",
+      "round": 5,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 156.16985199999908,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 5,
+      "pageIndex": 143,
+      "matrix": [2.412155696810723, 0, 0, -2.412155696810723, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 139.4901269999973,
+      "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7"
+    },
+    {
+      "variant": "after",
+      "round": 5,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 320.6090570000015,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d",
+      "cache": {
+        "bytes": 0,
+        "limit": 268435456,
+        "entries": 0,
+        "decodes": 0,
+        "evictions": 0
+      }
+    },
+    {
+      "variant": "before",
+      "round": 5,
+      "pageIndex": 287,
+      "matrix": [2.412156060466722, 0, 0, -2.412156060466722, 0, 1600],
+      "bounds": [0, 0, 1066, 1600],
+      "ms": 328.1705559999973,
+      "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d"
+    }
+  ]
+}

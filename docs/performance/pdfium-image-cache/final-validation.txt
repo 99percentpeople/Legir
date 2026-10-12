@@ -1,0 +1,10 @@
+Inspecting book
+Inspecting indot
+Inspecting drawing405
+Checking pdfium/book/0/export
+Checking pdfium/book/0/merged
+Checking pdfium/indot/0/export
+Checking pdfium/indot/0/merged
+Checking pdfium/drawing405/0/export
+Checking pdfium/drawing405/0/merged
+{"exports":6,"passed":6}

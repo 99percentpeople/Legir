@@ -1,0 +1,362 @@
+[
+  {
+    "fixture": "book",
+    "renders": [
+      {
+        "pageIndex": 14,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1066, 1600],
+        "ms": 99.95331099999999,
+        "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+      },
+      {
+        "pageIndex": 14,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1066, 1600],
+        "ms": 38.091834000000006,
+        "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1066, 1600],
+        "ms": 75.523369,
+        "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1066, 1600],
+        "ms": 55.34790300000003,
+        "hash": "1d3f0b0c60a9627df5ca9588ad0f2435edd3c4646c2f06145a821a9f8bed74c7"
+      },
+      {
+        "pageIndex": 287,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1066, 1600],
+        "ms": 432.6465989999999,
+        "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d"
+      },
+      {
+        "pageIndex": 287,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1066, 1600],
+        "ms": 144.04910700000005,
+        "hash": "a8b2d059cf9d58f59e79f25212670f2ed0da9b12136f41265ee693a13e07a36d"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 3200,
+        "rotation": 0,
+        "bounds": [0, 0, 2133, 3200],
+        "ms": 129.98097299999995,
+        "hash": "8294054d73f6f11903d678d2f5faeead38a31fba2c8837bb3f2a0ce13a024cab"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 3200,
+        "rotation": 0,
+        "bounds": [0, 0, 2133, 3200],
+        "ms": 109.52369099999987,
+        "hash": "8294054d73f6f11903d678d2f5faeead38a31fba2c8837bb3f2a0ce13a024cab"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [1297, 2150, 2321, 3174],
+        "ms": 42.587679999999864,
+        "hash": "f33a67c5cc7cad07dfa5e70421e6c15e8178d5b2cd1ef17ae4baa784662eb361"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [1783, 2150, 2807, 3174],
+        "ms": 39.0636320000001,
+        "hash": "d48317a166d44ffc2ccd7911d68dc8adf3451196dc7a07be5d1681f71d69dbb3"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [1783, 2956, 2807, 3980],
+        "ms": 57.18407499999989,
+        "hash": "03dc70438993f586d5e1c209ac69aab04d728fb14d14d966a28f6f9515d02564"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [1297, 2956, 2321, 3980],
+        "ms": 55.7991820000002,
+        "hash": "ea42b5cba538d3e2e306e1c34d732da378c8c04d7b29a3f2b244ed07477ba4f4"
+      },
+      {
+        "pageIndex": 143,
+        "longEdge": 6400,
+        "rotation": 90,
+        "bounds": [2688, 1621, 3712, 2645],
+        "ms": 76.74598300000002,
+        "hash": "367ed2ca29fbf1d472db058c5298eaa1e54ed668469d5c53624ae6b723a31420"
+      },
+      {
+        "pageIndex": 14,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1066, 1600],
+        "ms": 30.961497999999892,
+        "hash": "3f86deb73ff17178371d9cd2bbaabdc036935b64aa1ae36ee7ab973d741b340c"
+      }
+    ],
+    "afterClose": {
+      "documents": 0
+    }
+  },
+  {
+    "fixture": "indot",
+    "renders": [
+      {
+        "pageIndex": 216,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1035, 1600],
+        "ms": 42.17095599999993,
+        "hash": "33a4566744bce37e8ae018501268a4340019532266d9065592157e78d33eaec2"
+      },
+      {
+        "pageIndex": 216,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1035, 1600],
+        "ms": 30.542034000000058,
+        "hash": "33a4566744bce37e8ae018501268a4340019532266d9065592157e78d33eaec2"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1252, 1600],
+        "ms": 21.478913999999804,
+        "hash": "2cbcdf11479a5888356f2fe35347a768c93c31940ab7062d32a44b8b861ff50c"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1252, 1600],
+        "ms": 19.98685499999965,
+        "hash": "2cbcdf11479a5888356f2fe35347a768c93c31940ab7062d32a44b8b861ff50c"
+      },
+      {
+        "pageIndex": 999,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1236, 1600],
+        "ms": 35.114622000000054,
+        "hash": "2bb9f35c44d167b52929fe82a499bd6fcf4934adb0061721fc67a893668f2291"
+      },
+      {
+        "pageIndex": 999,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1236, 1600],
+        "ms": 34.47261900000012,
+        "hash": "2bb9f35c44d167b52929fe82a499bd6fcf4934adb0061721fc67a893668f2291"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 3200,
+        "rotation": 0,
+        "bounds": [0, 0, 2505, 3200],
+        "ms": 42.50144,
+        "hash": "584eb9883691fde96707761f10be9a9d1eed131f4db4491963dcb9c5f1e58d18"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 3200,
+        "rotation": 0,
+        "bounds": [0, 0, 2505, 3200],
+        "ms": 43.57825699999967,
+        "hash": "584eb9883691fde96707761f10be9a9d1eed131f4db4491963dcb9c5f1e58d18"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [1595, 2150, 2619, 3174],
+        "ms": 2.871748999999909,
+        "hash": "5d1908028001b4f200b4fe3e920ccd11738d88f6348a7b6db84c05c3aa919045"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2193, 2150, 3217, 3174],
+        "ms": 6.210721999999805,
+        "hash": "5a079e402d961a3ce5d5ad16d7f3aa64771ef5a01e3ff90888f17cfbe36f8ddc"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2193, 2956, 3217, 3980],
+        "ms": 6.235591999999997,
+        "hash": "4cfc026bf914deaaf3ccbcf89227fb7648684ceb3f72bea22f879fa8130b9820"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [1595, 2956, 2619, 3980],
+        "ms": 3.0810089999999946,
+        "hash": "b78dd09d704454862365b3fb70db99e9e5f2b6239d7e8d0ea264640fa5598a1b"
+      },
+      {
+        "pageIndex": 499,
+        "longEdge": 6400,
+        "rotation": 90,
+        "bounds": [2688, 1993, 3712, 3017],
+        "ms": 4.556994999999915,
+        "hash": "a5ef4e55afe437a52bd51364e2ea7e9917764290f12095a44f5ae23a47f49ce3"
+      },
+      {
+        "pageIndex": 216,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1035, 1600],
+        "ms": 29.921864999999798,
+        "hash": "33a4566744bce37e8ae018501268a4340019532266d9065592157e78d33eaec2"
+      }
+    ],
+    "afterClose": {
+      "documents": 0
+    }
+  },
+  {
+    "fixture": "drawing405",
+    "renders": [
+      {
+        "pageIndex": 1,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1138],
+        "ms": 1164.1548870000001,
+        "hash": "79248b19f95228c94aee5e51bc9be2ce0ef4ca183fc7c6f7ac98dcce8089685e"
+      },
+      {
+        "pageIndex": 1,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1138],
+        "ms": 1146.7322810000005,
+        "hash": "79248b19f95228c94aee5e51bc9be2ce0ef4ca183fc7c6f7ac98dcce8089685e"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1139],
+        "ms": 1164.6789630000003,
+        "hash": "ee56de65d5c0140d7a20018823228c3c0f4c7f8de92965e84dbe77c2f0e88cdc"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1139],
+        "ms": 1150.7478300000012,
+        "hash": "ee56de65d5c0140d7a20018823228c3c0f4c7f8de92965e84dbe77c2f0e88cdc"
+      },
+      {
+        "pageIndex": 42,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1140],
+        "ms": 1196.526722999999,
+        "hash": "d96b2d49e6e6ba3d6613851386302a6ff7c7b0db88fc30940ada44081cacb94f"
+      },
+      {
+        "pageIndex": 42,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1140],
+        "ms": 1164.1939619999994,
+        "hash": "d96b2d49e6e6ba3d6613851386302a6ff7c7b0db88fc30940ada44081cacb94f"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 3200,
+        "rotation": 0,
+        "bounds": [0, 0, 3200, 2278],
+        "ms": 1358.6326049999989,
+        "hash": "aec2430eccdcd86e4f2040994cdd4dab732dd49de894f9eaee914c083048381f"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 3200,
+        "rotation": 0,
+        "bounds": [0, 0, 3200, 2278],
+        "ms": 1367.2088330000006,
+        "hash": "aec2430eccdcd86e4f2040994cdd4dab732dd49de894f9eaee914c083048381f"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2150, 1413, 3174, 2437],
+        "ms": 466.63584699999956,
+        "hash": "5192c3d438bbff51d58f0a34f9f22e59717e4c3c66de648c41ca79f1c065846e"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2956, 1413, 3980, 2437],
+        "ms": 466.46914300000026,
+        "hash": "3c7c91d6756ce03ae16e9e849874017daec36cbbab51e2e0df3a6f8a75232345"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2956, 1943, 3980, 2967],
+        "ms": 566.5270459999992,
+        "hash": "2f74413b064ad043603cf94519b904afc54aee6a8fae073d3830f295b761cff4"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 0,
+        "bounds": [2150, 1943, 3174, 2967],
+        "ms": 566.556564999999,
+        "hash": "8607447a14b4b2885a38637e7d605660244e1f25f184d8502b16be2c8831a195"
+      },
+      {
+        "pageIndex": 21,
+        "longEdge": 6400,
+        "rotation": 90,
+        "bounds": [1766, 2688, 2790, 3712],
+        "ms": 561.9470700000002,
+        "hash": "d28c7048abf29d8086794ae292058becd281f028428c57dd1c2d654e62a60faf"
+      },
+      {
+        "pageIndex": 1,
+        "longEdge": 1600,
+        "rotation": 0,
+        "bounds": [0, 0, 1600, 1138],
+        "ms": 1123.8624359999976,
+        "hash": "79248b19f95228c94aee5e51bc9be2ce0ef4ca183fc7c6f7ac98dcce8089685e"
+      }
+    ],
+    "afterClose": {
+      "documents": 0
+    }
+  }
+]

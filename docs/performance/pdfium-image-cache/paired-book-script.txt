@@ -1,0 +1,66 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
+import assert from 'node:assert/strict';
+import { createPDFium } from '/home/zach/Legir/packages/pdfium/dist/index.js';
+const fixture = '/home/zach/Bookshelf/BeginnersGuide-5thEd-Eng_v4.pdf';
+const bytes = new Uint8Array(await readFile(fixture));
+const variants = [];
+for (const [id, directory] of [
+  ['before', '/tmp/legir-render-cache/before-wasm'],
+  ['after', '/home/zach/Legir/packages/pdfium/wasm'],
+]) {
+  const engine = await createPDFium({ moduleUrl: pathToFileURL(`${directory}/pdfium.js`).href });
+  const doc = new engine.PDFDocument(bytes);
+  variants.push({ id, engine, doc, pages: new Map(), provenance: JSON.parse(await readFile(`${directory}/provenance.json`, 'utf8')) });
+}
+const started = new Date().toISOString();
+const records = [];
+try {
+  for (let round = 0; round < 6; round++) {
+    for (const pageIndex of [0, 14, 143, 287]) {
+      const pair = [];
+      for (const v of round % 2 ? [...variants].reverse() : variants) {
+        let page = v.pages.get(pageIndex);
+        if (!page) v.pages.set(pageIndex, page = v.doc.loadPage(pageIndex));
+        const { box: [x0, y0, x1, y1] } = page.geometry();
+        const scale = 1600 / Math.max(x1 - x0, y1 - y0);
+        const matrix = [scale, 0, 0, -scale, -x0 * scale, y1 * scale];
+        const bounds = [0, 0, Math.floor((x1 - x0) * scale), Math.floor((y1 - y0) * scale)];
+        const start = performance.now();
+        const pixmap = page.render(matrix, bounds, { annotations: true });
+        const ms = performance.now() - start;
+        let hash;
+        try { hash = createHash('sha256').update(pixmap.getPixels()).digest('hex'); }
+        finally { pixmap.destroy(); }
+        let cache;
+        try { cache = v.engine.largeImageCache(); } catch { }
+        const record = { variant: v.id, round, pageIndex, matrix, bounds, ms, hash, cache };
+        pair.push(record);
+        records.push(record);
+      }
+      assert.equal(pair[0].hash, pair[1].hash);
+    }
+  }
+} finally {
+  for (const v of variants) v.doc.destroy();
+}
+const median = a => { a.sort((x,y) => x-y); return (a[(a.length-1)>>1] + a[a.length>>1])/2; };
+const summary = [0,14,143,287].map(pageIndex => ({
+  pageIndex,
+  ...Object.fromEntries(variants.map(v => [v.id, {
+    coldMs: records.find(r => r.variant === v.id && r.pageIndex === pageIndex).ms,
+    warmMedianMs: median(records.filter(r => r.variant === v.id && r.pageIndex === pageIndex && r.round > 0).map(r => r.ms)),
+  }]))
+}));
+const result = {
+  kind: 'paired-native-diagnostic', started, finished: new Date().toISOString(), fixture,
+  fixtureSha256: createHash('sha256').update(bytes).digest('hex'),
+  method: 'Two distinct WASM modules in one Node process, retained page handles, six alternating rounds, identical 1600-pixel transforms; only render() timed; hashes outside timing; not a browser or application-memory benchmark.',
+  variants: variants.map(v => ({ id: v.id, provenance: v.provenance, afterCloseDocuments: v.engine.liveDocuments() })),
+  exactPairs: records.length / 2, summary, records,
+};
+assert.ok(result.variants.every(v => v.afterCloseDocuments === 0));
+await writeFile('/tmp/legir-render-cache/paired-book.json', JSON.stringify(result, null, 2));
+console.log(JSON.stringify({ exactPairs: result.exactPairs, summary }, null, 2));

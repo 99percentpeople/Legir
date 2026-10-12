@@ -2,6 +2,8 @@
 
 日期：2026-10-12。当前维护与性能对照采用 `engine/pdfjs`（PDF.js + pdf-lib）和 `engine/pdfium`，MuPDF 保留历史快照，不参与本次修改和复测。
 
+后续的大图解码缓存优化、独立阅读测试及导出复验见 [PDFium 大型扫描图解码缓存](pdfium-image-cache.md)。下文保留本轮导出修复时的原始结果。
+
 ## 问题与修复
 
 INDOT 千页工程图集的第 217 页有三个 Text 批注及各自的 Popup，审核状态依次为 Accepted、Completed、Corrected。后两个对象通过 `/IRT` 形成两层回复。之前两版只将第一层回复纳入编辑模型，导出清理 `/Annots` 时删掉第二层回复的列表项。其对象仍可能被 Popup 引用，因此不能仅靠搜索文件中的文字判断是否保存完整。
