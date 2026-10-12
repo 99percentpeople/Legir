@@ -21,6 +21,7 @@ const spread = (values) => {
 };
 function metrics(record) {
   const phases = record.phases;
+  const tiles = Object.values(phases).filter((phase) => phase.kind === "tile");
   const byKind = (kind) =>
     median(
       Object.values(phases)
@@ -44,6 +45,10 @@ function metrics(record) {
     zoomColdMs: phases.zoomCold?.ms,
     zoomWarmMs: phases.zoomWarm?.ms,
     tileMs: byKind("tile"),
+    tilesTotalMs:
+      tiles.length === 4
+        ? tiles.reduce((total, phase) => total + phase.ms, 0)
+        : undefined,
     rotatedTileMs: phases.rotatedTile?.ms,
     pngMs: phases.png?.ms,
     exportMs: phases.export?.ms,
