@@ -23,8 +23,8 @@ import {
 import type {
   PDFDocument as NativeDocument,
   PDFObject as NativeObject,
-} from "mupdf";
-import type { MuPdfModule } from "./mupdf";
+} from "@legir/pdfium";
+import type { PDFiumModule } from "./pdfium";
 import { dictionaryKeyNames, NativeNames } from "./objectNames";
 
 const spelling = (name: PDFName) => name.asString().slice(1);
@@ -32,9 +32,9 @@ const nameOf = (name: string) =>
   PDFName.of(name.replace(/#[\da-f]{2}/gi, (part) => part.toUpperCase()));
 
 /** A view over the native xref, NOT a second parsed PDF object graph. Dictionaries
- * and arrays read/write MuPDF on demand; original stream bytes are never retained
+ * and arrays read/write PDFium on demand; original stream bytes are never retained
  * by the view. Existing layout/appearance helpers can use their object vocabulary
- * while the only document data lives in the worker's MuPDF instance. */
+ * while the only document data lives in the worker's PDFium instance. */
 export class NativeEditingContext {
   readonly context = PDFContext.create();
   readonly document: PDFDocument;
@@ -49,14 +49,14 @@ export class NativeEditingContext {
   private nextVirtualRef = 1;
 
   constructor(
-    readonly mupdf: MuPdfModule,
+    readonly pdfium: PDFiumModule,
     readonly native: NativeDocument,
     readonly options: {
       refs?: Map<number, number>;
       trailer?: NativeObject;
     } = {},
   ) {
-    this.names = new NativeNames(mupdf, native);
+    this.names = new NativeNames(pdfium, native);
     for (const [virtual, actual] of options.refs ?? []) {
       this.reverseRefs.set(actual, virtual);
       this.nextVirtualRef = Math.max(this.nextVirtualRef, virtual + 1);
@@ -119,7 +119,10 @@ export class NativeEditingContext {
             };
           }
         }
-        this.bind(object, nativeRef.resolve());
+        const resolved = nativeRef.resolve();
+        if (object instanceof PDFStream)
+          this.bind(object.dict, resolved.getDictionary());
+        this.bind(object, resolved);
         this.references.set(object, ref);
       } finally {
         nativeRef.destroy();
@@ -270,10 +273,12 @@ export class NativeEditingContext {
 
   private bind(value: PDFObject, object: NativeObject, streamNumber?: number) {
     const existing = this.bindings.get(value);
-    if (existing) {
+    if (existing?.pointer === object.pointer) {
       object.destroy();
       return;
     }
+    if (existing && this.wrappers.get(existing.pointer) === value)
+      this.wrappers.delete(existing.pointer);
     this.handles.add(object);
     this.bindings.set(value, object);
     this.wrappers.set(object.pointer, value);

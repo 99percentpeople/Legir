@@ -1,12 +1,12 @@
 /// <reference lib="webworker" />
-import type { PDFDocument, PDFPage, DisplayList } from "mupdf";
+import type { PDFDocument, PDFPage } from "@legir/pdfium";
 import type {
   WorkerErrorResponse,
   WorkerProgressResponse,
   WorkerRequest,
   WorkerSuccessResponse,
 } from "@/services/pdfService/workerProtocol";
-import { getMuPdf } from "@/services/pdfService/engine/runtime";
+import { getPDFium } from "@/services/pdfService/engine/runtime";
 import {
   getNativePageViewport,
   getNativeTextContent,
@@ -45,7 +45,7 @@ const exclusive = (run: () => Promise<void>) => {
   return next;
 };
 
-type CachedPage = { page: PDFPage; lists: Map<boolean, DisplayList> };
+type CachedPage = { page: PDFPage };
 type DocState = {
   pdfDoc: PDFDocument | null;
   loading: Promise<void> | null;
@@ -255,7 +255,6 @@ const scheduleNext = () => {
 
 const disposeState = (state: DocState) => {
   for (const cached of state.pageCache.values()) {
-    for (const list of cached.lists.values()) list.destroy();
     disposeNativePage(cached.page);
   }
   state.pageCache.clear();
@@ -273,7 +272,7 @@ const loadDocument = async (
   const generation = ++state.generation;
   const pending = (async () => {
     await previous?.catch(() => {});
-    const mupdf = await getMuPdf();
+    const pdfium = await getPDFium();
     if (state.generation !== generation || docs.get(docId) !== state) return;
     disposeState(state);
     if (!session || docId === session.primaryId) {
@@ -282,7 +281,7 @@ const loadDocument = async (
       session = null;
       docs.clear();
       docs.set(docId, state);
-      session = new DocumentSession(mupdf, bytes, password, docId);
+      session = new DocumentSession(pdfium, bytes, password, docId);
     } else await session.addSource(docId, bytes, password);
     state.pdfDoc = session.document;
     if (progressId)
@@ -340,25 +339,15 @@ const getPageForDoc = (docId: string, pageIndex: number) => {
   else {
     if (pageIndex < 0 || pageIndex >= session!.getSource(docId).pages.length)
       throw new Error("PDF page index is out of range.");
-    cached = { page: session!.loadPage(docId, pageIndex), lists: new Map() };
+    cached = { page: session!.loadPage(docId, pageIndex) };
   }
   state.pageCache.set(pageIndex, cached);
   while (state.pageCache.size > 12) {
     const [index, old] = state.pageCache.entries().next().value!;
     state.pageCache.delete(index);
-    for (const list of old.lists.values()) list.destroy();
     disposeNativePage(old.page);
   }
   return cached;
-};
-
-const getDisplayList = (cached: CachedPage, annotations: boolean) => {
-  let list = cached.lists.get(annotations);
-  if (!list) {
-    list = cached.page.toDisplayList(annotations);
-    cached.lists.set(annotations, list);
-  }
-  return list;
 };
 
 const readFromDocument = async (
@@ -382,10 +371,10 @@ const readFromDocument = async (
 const getTextContentForPage = async (
   params: Extract<WorkerRequest, { type: "getTextContent" }>,
 ) => {
-  const mupdf = await getMuPdf();
+  const pdfium = await getPDFium();
   return readFromDocument(params, () =>
     getNativeTextContent(
-      mupdf,
+      pdfium,
       getPageForDoc(getDocId(params.docId), params.pageIndex).page,
       params.pageIndex,
     ),
@@ -419,7 +408,7 @@ const renderToCanvas = async (
   });
   try {
     await ensureDocumentLoaded(docId);
-    const mupdf = await getMuPdf();
+    const pdfium = await getPDFium();
     task.throwIfCancelled();
     const canvas = params.canvas ?? canvasMap.get(params.canvasId);
     if (!canvas) throw new Error("Missing render canvas");
@@ -438,12 +427,12 @@ const renderToCanvas = async (
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Could not get canvas context");
     drawPageToCanvas(
-      mupdf,
+      pdfium,
       cached.page,
       viewport,
       [x, y, x + width, y + height],
       ctx,
-      { list: getDisplayList(cached, params.renderAnnotations === true) },
+      { annotations: params.renderAnnotations === true },
     );
     task.throwIfCancelled();
     // Acknowledge after the transferred canvas can be presented.
@@ -470,7 +459,7 @@ const renderToImage = async (
   const task = registerCancellableTask(params.id, docId);
   try {
     await ensureDocumentLoaded(docId, params.isNewDoc ? params : undefined);
-    const mupdf = await getMuPdf();
+    const pdfium = await getPDFium();
     task.throwIfCancelled();
     const cached = getPageForDoc(docId, params.pageIndex);
     const base = getNativePageViewport(cached.page);
@@ -493,13 +482,17 @@ const renderToImage = async (
     const canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Could not get canvas context");
-    drawPageToCanvas(mupdf, cached.page, viewport, [0, 0, width, height], ctx, {
-      list: getDisplayList(
-        cached,
-        !content && params.renderAnnotations === true,
-      ),
-      keepAnnotations,
-    });
+    drawPageToCanvas(
+      pdfium,
+      cached.page,
+      viewport,
+      [0, 0, width, height],
+      ctx,
+      {
+        annotations: !content && params.renderAnnotations === true,
+        keepAnnotations,
+      },
+    );
     if (content) {
       const { drawThumbnailOverlay } =
         await import("@/services/pdfService/lib/thumbnailOverlay");
@@ -515,7 +508,7 @@ const renderToImage = async (
           const overlayCanvas = new OffscreenCanvas(width, height);
           try {
             drawPageToCanvas(
-              mupdf,
+              pdfium,
               page,
               getNativePageViewport(page, scale),
               [0, 0, width, height],
@@ -748,7 +741,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
             const payload = await session!.parse(
               data,
               async (index) => {
-                const mupdf = await getMuPdf();
+                const pdfium = await getPDFium();
                 const page = session!.document.loadPage(index);
                 try {
                   const viewport = getNativePageViewport(page, 2);
@@ -756,7 +749,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
                     height = Math.max(1, Math.floor(viewport.height));
                   const canvas = new OffscreenCanvas(width, height);
                   drawPageToCanvas(
-                    mupdf,
+                    pdfium,
                     page,
                     viewport,
                     [0, 0, width, height],
@@ -795,7 +788,6 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           if (data.type === "parseDocument" || data.type === "exportDocument") {
             for (const state of docs.values()) {
               for (const cached of state.pageCache.values()) {
-                for (const list of cached.lists.values()) list.destroy();
                 disposeNativePage(cached.page);
               }
               state.pageCache.clear();

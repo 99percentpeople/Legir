@@ -16,7 +16,7 @@ import {
   loadEditingDocument,
   saveEditingDocument,
 } from "@/services/pdfService/engine/editingDocument";
-import { getMuPdf } from "@/services/pdfService/engine/runtime";
+import { getPDFium } from "@/services/pdfService/engine/runtime";
 import {
   getNativePageViewport,
   getNativeTextContent,
@@ -71,8 +71,8 @@ describe("native PDF pipeline", () => {
           },
         ],
       );
-      const mupdf = await getMuPdf();
-      const doc = new mupdf.PDFDocument(output);
+      const pdfium = await getPDFium();
+      const doc = new pdfium.PDFDocument(output);
       const nativePage = doc.loadPage(0);
       try {
         expect(nativePage.getWidgets()[0].getValue()).toBe("Bob");
@@ -120,8 +120,8 @@ describe("native PDF pipeline", () => {
     // A source with a 2.0 header must keep its version semantics after writing.
     const bytes = await source.save();
     bytes.set(new TextEncoder().encode("2.0"), 5);
-    const mupdf = await getMuPdf();
-    const nativeSource = new mupdf.PDFDocument(bytes);
+    const pdfium = await getPDFium();
+    const nativeSource = new pdfium.PDFDocument(bytes);
     const sourceSpelling = nativeSource
       .getTrailer()
       .get("Root", "Custom", "First")
@@ -129,7 +129,7 @@ describe("native PDF pipeline", () => {
       .toString();
     nativeSource.destroy();
     const document = await loadEditingDocument(bytes);
-    const doc = new mupdf.PDFDocument(await saveEditingDocument(document));
+    const doc = new pdfium.PDFDocument(await saveEditingDocument(document));
     const custom = doc.getTrailer().get("Root", "Custom");
     try {
       expect(doc.getVersion()).toBe(20);
@@ -169,8 +169,8 @@ describe("native PDF pipeline", () => {
     expect(await verifyPdfOwnerPassword(bytes, "owner,=密碼")).toEqual({
       ok: true,
     });
-    const mupdf = await getMuPdf();
-    const doc = new mupdf.PDFDocument(bytes);
+    const pdfium = await getPDFium();
+    const doc = new pdfium.PDFDocument(bytes);
     try {
       expect(doc.authenticatePassword("user,=密碼")).toBe(2);
       expect(getNativePermissions(doc)).toMatchObject({
@@ -204,11 +204,11 @@ describe("native PDF pipeline", () => {
         height: 30,
         color: rgb(1, 0, 0),
       });
-      const mupdf = await getMuPdf();
-      const doc = new mupdf.PDFDocument(await source.save());
+      const pdfium = await getPDFium();
+      const doc = new pdfium.PDFDocument(await source.save());
       const page = doc.loadPage(0);
       try {
-        const text = getNativeTextContent(mupdf, page, 0);
+        const text = getNativeTextContent(pdfium, page, 0);
         const first = text.items.find(
           (item) => "str" in item && item.str.includes("Native"),
         );
@@ -227,7 +227,7 @@ describe("native PDF pipeline", () => {
             rotation: uiRotation,
           });
           expect(viewport.transform).toEqual(expected.transform);
-          const full = rasterizePage(mupdf, page, viewport, [
+          const full = rasterizePage(pdfium, page, viewport, [
             0,
             0,
             viewport.width,
@@ -242,7 +242,7 @@ describe("native PDF pipeline", () => {
               (y * full.width + x) * 4 + 4,
             ),
           ]).toEqual([255, 0, 0, 255]);
-          const tile = rasterizePage(mupdf, page, viewport, [
+          const tile = rasterizePage(pdfium, page, viewport, [
             x - 20,
             y - 20,
             x + 20,
@@ -277,15 +277,15 @@ describe("native PDF pipeline", () => {
     const field = source.getForm().createTextField("name");
     field.setText("Visible");
     field.addToPage(p, { x: 40, y: 30, width: 100, height: 30 });
-    const mupdf = await getMuPdf();
-    const doc = new mupdf.PDFDocument(await source.save());
+    const pdfium = await getPDFium();
+    const doc = new pdfium.PDFDocument(await source.save());
     const page = doc.loadPage(0);
     try {
       const vp = getNativePageViewport(page);
-      const base = rasterizePage(mupdf, page, vp, [0, 0, 200, 200], {
+      const base = rasterizePage(pdfium, page, vp, [0, 0, 200, 200], {
         transparent: true,
       });
-      const all = rasterizePage(mupdf, page, vp, [0, 0, 200, 200], {
+      const all = rasterizePage(pdfium, page, vp, [0, 0, 200, 200], {
         transparent: true,
         annotations: true,
       });
@@ -331,8 +331,8 @@ describe("native PDF pipeline", () => {
     root.set(PDFName.of("First"), item);
     root.set(PDFName.of("Last"), item);
     root.set(PDFName.of("Count"), PDFNumber.of(1));
-    const mupdf = await getMuPdf();
-    const doc = new mupdf.PDFDocument(await source.save());
+    const pdfium = await getPDFium();
+    const doc = new pdfium.PDFDocument(await source.save());
     try {
       expect(getNativeOutline(doc)).toEqual([
         { title: "Second", pageIndex: 1, items: [] },

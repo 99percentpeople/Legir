@@ -1,0 +1,17 @@
+{
+  "forms": {
+    "pages": 12,
+    "bytes": 30324,
+    "sha256": "8986d7abc8eeda04334dac36788269c030d377109638450eab0dfa9c4b4bcddf"
+  },
+  "large-images": {
+    "pages": 60,
+    "bytes": 47260228,
+    "sha256": "01db70beaefb0efe41204f7ac2c1fadac89e847c5e5319056c4922a5084a8dcf"
+  },
+  "donor": {
+    "pages": 4,
+    "bytes": 11188,
+    "sha256": "def6148b0af342a024fec15c206b0b18de3b8b17d5491f3c18514ef1bc09f21a"
+  }
+}

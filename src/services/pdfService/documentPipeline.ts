@@ -150,7 +150,7 @@ import {
 // - Importing existing PDF form fields / annotations into our internal models
 // - Exporting internal models back into a new PDF
 //
-// MuPDF owns file parsing, rasterization, text, security and serialization.
+// PDFium owns file parsing, rasterization, text, security and serialization.
 // The existing authoring graph/layout helpers preserve form and annotation
 // behavior; file I/O goes exclusively through engine/editingDocument.
 //

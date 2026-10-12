@@ -8,6 +8,7 @@ export default defineConfig({
     },
   },
   test: {
+    server: { deps: { external: [/\/packages\/pdfium\/dist\//] } },
     environment: "jsdom",
     globals: false,
     include: [

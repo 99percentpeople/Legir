@@ -84,7 +84,7 @@ export const createPwaPlugin = (displayName: string) =>
         "assets/ai-provider-*.js",
         "assets/ai-runtime-*.js",
       ],
-      // MuPDF is needed even for the first PDF opened after going offline.
+      // PDFium is needed even for the first PDF opened after going offline.
       maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
       globPatterns: ["**/*.{js,wasm,css,html,ico,png,svg,woff2,ttf,json}"],
     },

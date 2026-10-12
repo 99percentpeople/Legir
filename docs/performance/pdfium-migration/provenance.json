@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-12",
+  "host": "Raspberry Pi 5 Model B Rev 1.1, Linux ARM64, 8 GiB RAM",
+  "kernel": "Linux 6.12.87+rpt-rpi-2712 aarch64 GNU/Linux",
+  "browser": "Chromium 148.0.7778.167, /usr/bin/chromium, headless",
+  "node": "v24.18.0",
+  "bun": "1.4.2",
+  "mupdfCommit": "b6790f0a43280fd1e40ebc974e79c5fbef141e88",
+  "mupdfVersion": "1.28.1",
+  "pdfiumNativeBuild": {
+    "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+    "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+    "emscripten": "5.0.3",
+    "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+    "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c",
+    "features": {
+      "v8": false,
+      "xfa": false,
+      "threads": false,
+      "renderer": "agg"
+    },
+    "sha256": {
+      "pdfium.js": "66821fb97ad708664acc5c5861afb2ad7ac39145f713b92d442c104ccf66228d",
+      "pdfium.wasm": "ea2a9b3b7624438b609fda9a91384832bda0ef4b1e4dd2159a85f13c72318d6f"
+    },
+    "sourceSha256": {
+      "native/bridge.cpp": "a056f7e86cd1cf5ccdb8ef8a2ee98c2a8dfb56be7f10e4b1017020d562bc4e88",
+      "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
+      "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
+      "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
+    },
+    "patchSha256": "63a8d0be2092fbdf1073336f49f5aa86cda3aea8647113ea30c2ea60c4cea31f",
+    "buildScriptSha256": "957a2751b62f0d73257324107de9b476d0a25dc4bdde01d8d84d2a36044010ca"
+  },
+  "applicationSha256": {
+    "bun.lock": "91435d5755adf60c3fc4fe54b21c5a25c4f32cf4a52a0656369ee3da8bf2b43f",
+    "package.json": "a409b6ecea66f234c7079b1ed66aedd7fe62ed754e74223868ef18433894e4d7",
+    "src/services/pdfService/engine/documentOwners.ts": "5e7ad56a5bf0d3b3207c91ad22a9baf714e48431657f73da580ec5d32de7c141",
+    "src/services/pdfService/engine/documentSession.ts": "93bc19b6e6ebd93523a6f6ae711300099a676d0e73788877743577d40dd104d2",
+    "src/services/pdfService/engine/editingDocument.ts": "aaaf9259f1e532844c4276c082dac0d99fa51c5390cc96786f9828f537cd4cff",
+    "src/services/pdfService/engine/fontHost.ts": "a46fbe7113c58e066078331d109875ef540cbac2282afd8d93a5407cc236d3b1",
+    "src/services/pdfService/engine/index.ts": "afb5b70cf38208dcf327062781a586f85a9f3fce66ca26a7d2caa5ca19ca2111",
+    "src/services/pdfService/engine/nativeEditingContext.ts": "1206062a1eb05ee2e308543636c5c27e5faa23fa11eaf5ec08f89257c12d7bbd",
+    "src/services/pdfService/engine/objectGraph.ts": "6c2e484419087be96af8118aefe5e28daf45a9ed0f973c0a6fc2b6bfc0d3c398",
+    "src/services/pdfService/engine/objectNames.ts": "4f367534e74921a56f9e473673347b52952e22c99fdd074f3df816352a6be7e6",
+    "src/services/pdfService/engine/pageContent.ts": "5a2b8a54ce7fc841390df338506c86ff5f7af45eca47d53e6cca462fb3137523",
+    "src/services/pdfService/engine/pdfium.ts": "ddfc65040fa40955fa246f52a9a43612fea79280e1bdf9aa1ea3a77cf2d9104c",
+    "src/services/pdfService/engine/raster.ts": "429e0c7cb53914585fac9d22795a5d328c73edf639c2b01fae1129bc48621590",
+    "src/services/pdfService/engine/runtime.ts": "65c970b1793795949846c1903262ddabfd1c290452732e3a224a583049ba74e0",
+    "src/services/pdfService/engine/sessionTypes.ts": "5dad0080099e396395268c27c44e774c3c8e5d05645a30f0d511e4e73cffac05",
+    "src/services/pdfService/engine/textTypes.ts": "67e05ffd21b5edc539052c7f4ca0c173d3ce468024832bb0ecde295d5e6b83b5",
+    "src/services/pdfService/engine/types.ts": "09118dc24b4e640ddb00c95fdd3af8745eb0db53ea807a27e0fd348b4bd260a0",
+    "src/workers/pdf-content.worker.ts": "bc3cc964bcf7bb8a97829c19f6eb7a41eb5e31828ba823252ff3b074bd833d28",
+    "src/workers/pdf-render.worker.ts": "942f71f66ab2d2659460c971724b20ab280a9d89f0e39c4d17a7a450d7e6616a",
+    "vite.config.ts": "78643fadfc45ed7f1127765c3db94b8c19b0532828f35421682fdb821ab99b2e"
+  },
+  "validation": {
+    "applicationTests": 765,
+    "testFiles": 96,
+    "libraryTests": 11,
+    "lint": true,
+    "webBuild": true,
+    "tauriFrontendBuild": true,
+    "tauriNativeRuntime": false,
+    "standalonePackageSmoke": true,
+    "pinnedPatchMatchesCleanReapplication": true,
+    "patchIdempotentFiles": 10,
+    "sdkBootstrapFreshAndReusedCheckout": true
+  },
+  "method": "Three fresh-browser rounds per fixture. MuPDF then PDFium, sequentially without concurrent builds/tests. PNG at 1.5 scale. PSS sampled every 50 ms; phase end follows explicit GC. Medians of per-run measurements/deltas. Not a scrolling or desktop WebView benchmark.",
+  "bindingSha256": {
+    "packages/pdfium/src/document.ts": "686c5f5d4cca7ee0f64aa456d386705da5fd6575ede756ac22721bb820d8eaed",
+    "packages/pdfium/src/index.ts": "59ebfe14c494f55989d0189a3aef2c6ece0f261dfa4e5ef580e1e81e55f83462",
+    "packages/pdfium/src/matrix.ts": "2a100fd5d08be7abc1d7d7c74f48cf1ac324321d61485e9fe57d8578a46fc72c",
+    "packages/pdfium/src/object.ts": "31d3a10700e0193e7a941bc6c5e62714a803d2f7b96469142656709f780ae511",
+    "packages/pdfium/src/page.ts": "26eabcf6f47581a485c1f9287499a777341a5ce821134e1ff8e3e40bd2c4a685",
+    "packages/pdfium/src/runtime.ts": "d3b4ed1b2d3aba070fafd5d190d7eddceb4cc78ca6c8fb82f6a3d07331c38373",
+    "packages/pdfium/src/types.ts": "86acbb1da3ff320ef1f5c0778e49013db3f6b5b07690145fe3fd1c95b3a2c079"
+  }
+}

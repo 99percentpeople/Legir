@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import { PDFObject as NativeObject } from "@legir/pdfium";
 import {
   PDFDocument,
   PDFName,
   PDFString,
   StandardFonts,
 } from "@cantoo/pdf-lib";
-import { getMuPdf } from "@/services/pdfService/engine/runtime";
+import { getPDFium } from "@/services/pdfService/engine/runtime";
 import { NativeEditingContext } from "@/services/pdfService/engine/nativeEditingContext";
 
 describe("native editing views", () => {
@@ -18,12 +19,12 @@ describe("native editing views", () => {
     const field = source.getForm().createTextField("name");
     field.setText("Alice");
     field.addToPage(page, { x: 30, y: 100, width: 150, height: 30 });
-    const mupdf = await getMuPdf();
-    const native = new mupdf.PDFDocument(await source.save());
+    const pdfium = await getPDFium();
+    const native = new pdfium.PDFDocument(await source.save());
     native.enableJournal();
     native.beginOperation("edit");
-    const reads = vi.spyOn(mupdf.PDFObject.prototype, "readRawStream");
-    const view = new NativeEditingContext(mupdf, native);
+    const reads = vi.spyOn(NativeObject.prototype, "readRawStream");
+    const view = new NativeEditingContext(pdfium, native);
     try {
       expect(view.document.getPages()).toHaveLength(1);
       expect(view.document.getForm().getTextField("name").getText()).toBe(
@@ -47,12 +48,12 @@ describe("native editing views", () => {
       view.document.getPage(0).drawText("AFTER FLUSH", { x: 30, y: 350 });
       await view.flush();
       const nativePage = native.loadPage(0);
-      const text = nativePage.toStructuredText("");
+      const text = nativePage.extractText();
       try {
         expect(nativePage.getWidgets()[0].getValue()).toBe("Bob");
-        expect(text.asText()).toContain("NEW");
-        expect(text.asText()).toContain("KEEP");
-        expect(text.asText()).toContain("AFTER FLUSH");
+        expect(text.text).toContain("NEW");
+        expect(text.text).toContain("KEEP");
+        expect(text.text).toContain("AFTER FLUSH");
         const trailer = native.getTrailer();
         const custom = trailer.get("Root", "Custom");
         try {
@@ -63,8 +64,6 @@ describe("native editing views", () => {
           trailer.destroy();
         }
       } finally {
-        text.destroy();
-        for (const widget of nativePage._widgets ?? []) widget.destroy();
         nativePage.destroy();
       }
     } finally {
@@ -72,7 +71,7 @@ describe("native editing views", () => {
       view.dispose();
       native.abandonOperation();
     }
-    const restored = new NativeEditingContext(mupdf, native);
+    const restored = new NativeEditingContext(pdfium, native);
     try {
       expect(restored.document.getForm().getTextField("name").getText()).toBe(
         "Alice",

@@ -293,7 +293,8 @@ The PDF pipeline lives in:
 - `src/services/pdfService/pdfRenderer.ts`
 - `src/services/pdfService/workerProtocol.ts`
 
-MuPDF is the PDF file engine for both Web and Tauri:
+`packages/pdfium` is an independent PDFium WASM/TypeScript package used by both
+Web and Tauri. Its native bridge and pinned source patches supply:
 
 - Parsing, repair, decryption, encryption and final serialization
 - Page/tile/thumbnail rendering, including native form and annotation appearances
@@ -302,7 +303,7 @@ MuPDF is the PDF file engine for both Web and Tauri:
 - Content-level text removal and bounded page images for model-based OCR
 
 `src/services/pdfService/engine/` is the engine boundary. Each open document
-has one persistent `pdf-render.worker` and one native MuPDF `PDFDocument` in
+has one persistent `pdf-render.worker` and one native PDFium `PDFDocument` in
 `DocumentSession`. Rendering, model hydration, export, text extraction, password
 verification and OCR image generation all use that instance. The main thread
 owns UI models, immutable source bytes and DOM font faces, never a parsed PDF
@@ -315,16 +316,16 @@ helpers. `@cantoo/pdf-lib` remains an appearance/layout dependency; its facade
 has no independent parsed xref or copied stream graph. Its parser, file writer
 and encryption implementation are not used by the application. Unchanged stream
 bodies are read only when a helper actually needs them. The adapter depends on
-the pinned helper constructor/object vocabulary and MuPDF bindings; upgrade
+the pinned helper constructor/object vocabulary and PDFium bindings; upgrade
 these with native-adapter, source-assembly and browser round-trip tests.
 
 Hydration, thumbnail overlays and export use native journal transactions. The
 UI/history models describe draft edits; success, failure and cancellation all
 restore the immutable native source state after a job. Thumbnails draw a
 short-lived transparent page in the same document, then roll it back. Export
-uses the same xref and serializes through MuPDF without reopening the input.
-Trim only the page tree before assembly: MuPDF `rearrangePages` removes AcroForm
-and cannot preserve this editor's form/outline behavior.
+uses the same xref and serializes through PDFium without reopening the input.
+Page assembly rewrites the page tree while preserving source catalogs, inherited
+page attributes, AcroForm fields and outline destinations.
 
 Imported sources are grafted into the owning document's page bank, with source
 catalog views and original-to-native reference mappings. A donor PDF is open
@@ -338,15 +339,15 @@ the editor terminates the worker and releases its entire WASM arena.
 The worker serializes document jobs with rendering, retaining queue priorities,
 canvas ownership, cancellation and logical-page routing. Queued commands can be
 cancelled; native rasterization/serialization are synchronous and cannot be
-interrupted mid-call. Native pages, lists, pixmaps and object handles are released
-explicitly. System-font bytes come from the host through a narrow request/response
-bridge; embedded font bytes return once for main-thread `FontFace` registration.
+interrupted mid-call. Each source page cache retains at most twelve native pages;
+pixmaps and object handles are released explicitly. System-font bytes come from
+the host through a narrow request/response bridge; embedded font bytes return once for main-thread `FontFace` registration.
 Permission preferences are snapshotted into each export request.
 
-`raster.ts:drawPageToCanvas` writes directly from the live MuPDF pixmap to Canvas
+`raster.ts:drawPageToCanvas` writes directly from the live PDFium pixmap to Canvas
 before destroying the pixmap. Pixel access and `putImageData` stay synchronous;
 no native allocation or async boundary may detach the borrowed WASM memory.
-Transparent overlays unpremultiply their scratch pixels in place. Consumers that
+The bridge requests straight RGBA output from PDFium. Consumers that
 retain/transfer pixels use `rasterizePage`, which still returns an owned copy.
 Canvas resizing happens only after successful rasterization, preserving the
 previous frame if native rendering fails.
@@ -359,7 +360,7 @@ route through the owner, never call the helper library's `load` / `save`. PDF.js
 is a development-only independent reader; no runtime PDF.js assets are shipped.
 
 `textTypes.ts` defines the application text-layer contract independently of the
-engine. MuPDF glyphs are mapped into original PDF coordinates, split at word,
+engine. PDFium glyphs are mapped into original PDF coordinates, split at word,
 font and direction boundaries, and consumed by the existing selection/search
 code. `raster.ts` composes the native page transform with the UI viewport so
 crop offsets, UserUnit, source rotation and temporary UI rotation agree.
@@ -374,17 +375,22 @@ credentials or OCR text-layer persistence is implemented by this engine.
 
 Saving flattened free text removes covered glyphs directly in the shared native
 transaction, preserving images, line art and unrelated redaction annotations,
-then draws replacement text before serialization. Export fails if requested
-text removal fails. This is text replacement, not document-wide sanitization.
+then draws replacement text before serialization. The bridge preserves original
+encoded glyphs, spacing and unrelated content operators, including shared Form instances. Edits intersecting `/ActualText`
+replacement strings currently fail rather than retain stale logical text.
+Export fails if requested text removal fails. This is text replacement, not
+document-wide sanitization.
 The standalone authoring fallback can still stage affected pages; live documents
 do not use that path.
 
-MuPDF's ESM loader and WASM binary are copied together under
-`mupdf/<pinned-version>/` and instantiated on first PDF use. The PWA precaches
-these essential assets so the first document can open offline after installation.
-Keep the asset URL version synchronized with the exact dependency pin. MuPDF
-uses AGPL-3.0-or-later, matching this project. Browser and Tauri web builds share
-the assets; native WebView behavior requires separate platform validation.
+The package's ESM loader, WASM binary, provenance and third-party notices are
+copied under `pdfium/<source-revision>-<binary-hash>/`. The PWA precaches the
+loader and binary so the first PDF can open offline after installation. Builds
+verify that native sources, patches, toolchain pins and compiled assets match.
+The wrapper is BSD-3-Clause; PDFium and linked libraries retain their bundled
+notices. Legir remains AGPL-3.0-or-later. Browser and Tauri web builds share these
+assets; native WebView behavior requires separate platform validation. V8 PDF
+actions and XFA are disabled in this build.
 
 ### Why a Worker Service Exists
 

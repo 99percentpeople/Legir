@@ -1,0 +1,55 @@
+{
+  "result": {
+    "url": "/editor/tab_1791797633156_7vdcbe",
+    "text": ["", "Native PDF page 2", ""],
+    "forms": [
+      {
+        "type": "text",
+        "value": "Bob"
+      },
+      {
+        "type": "text",
+        "value": "VALUE 0"
+      },
+      {
+        "type": "text",
+        "value": "VALUE 3"
+      },
+      {
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "canvases": [
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [632, 790],
+      [300, 150],
+      [632, 790],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150]
+    ]
+  },
+  "errors": [],
+  "resourceFailures": [
+    {
+      "url": "blob:http://127.0.0.1:5195/bdfed7d5-4c0f-4bcb-b7ed-23c7b11bf8bc",
+      "type": "image",
+      "error": "net::ERR_FILE_NOT_FOUND"
+    }
+  ],
+  "savedPages": 8,
+  "savedFields": ["name", "donor-field-0", "donor-field-3"],
+  "activeWorkers": 1,
+  "workersAfterClose": 0,
+  "brokenImages": []
+}

@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
 import { PDFDocument, degrees, rgb } from "@cantoo/pdf-lib";
-import { getMuPdf } from "@/services/pdfService/engine/runtime";
+import { PDFPixmap } from "@legir/pdfium";
+import { getPDFium } from "@/services/pdfService/engine/runtime";
 import { getNativePageViewport } from "@/services/pdfService/engine/pageContent";
 import {
   disposeNativePage,
@@ -33,9 +34,9 @@ async function fixture() {
     width: 100,
     height: 20,
   });
-  const mupdf = await getMuPdf();
-  const doc = new mupdf.PDFDocument(await source.save());
-  return { mupdf, doc, page: doc.loadPage(0) };
+  const pdfium = await getPDFium();
+  const doc = new pdfium.PDFDocument(await source.save());
+  return { pdfium, doc, page: doc.loadPage(0) };
 }
 
 // Node has no pixel canvas. Keep ImageData's array identity here; browser
@@ -55,15 +56,15 @@ function stubImageData() {
 
 it("writes live WASM pixels synchronously with identical crop, rotation and transparency", async () => {
   stubImageData();
-  const { mupdf, doc, page } = await fixture();
-  const pixels = vi.spyOn(mupdf.Pixmap.prototype, "getPixels");
-  const destroy = vi.spyOn(mupdf.Pixmap.prototype, "destroy");
+  const { pdfium, doc, page } = await fixture();
+  const pixels = vi.spyOn(PDFPixmap.prototype, "getPixels");
+  const destroy = vi.spyOn(PDFPixmap.prototype, "destroy");
   try {
     const viewport = getNativePageViewport(page, 1.5);
     for (const transparent of [false, true]) {
       const options = { transparent, annotations: true };
       const bounds: [number, number, number, number] = [15, 25, 195, 220];
-      const expected = rasterizePage(mupdf, page, viewport, bounds, options);
+      const expected = rasterizePage(pdfium, page, viewport, bounds, options);
       const destroyedBefore = destroy.mock.calls.length;
       let written: Uint8ClampedArray | undefined;
       const canvas = { width: 1, height: 1 };
@@ -77,7 +78,7 @@ it("writes live WASM pixels synchronously with identical crop, rotation and tran
         written = image.data.slice();
       });
       drawPageToCanvas(
-        mupdf,
+        pdfium,
         page,
         viewport,
         bounds,
@@ -96,41 +97,38 @@ it("writes live WASM pixels synchronously with identical crop, rotation and tran
 
 it("preserves the old canvas on raster failure and releases resources after failed writes", async () => {
   stubImageData();
-  const { mupdf, doc, page } = await fixture();
-  const pixmapDestroy = vi.spyOn(mupdf.Pixmap.prototype, "destroy");
-  const deviceDestroy = vi.spyOn(mupdf.DrawDevice.prototype, "destroy");
+  const { pdfium, doc, page } = await fixture();
+  const pixmapDestroy = vi.spyOn(PDFPixmap.prototype, "destroy");
   try {
     const viewport = getNativePageViewport(page);
     const bounds: [number, number, number, number] = [0, 0, 200, 180];
     const canvas = { width: 12, height: 15 };
-    vi.spyOn(page, "runPageContents").mockImplementationOnce(() => {
+    vi.spyOn(page, "render").mockImplementationOnce(() => {
       throw new Error("Raster failed");
     });
     expect(() =>
-      drawPageToCanvas(mupdf, page, viewport, bounds, {
+      drawPageToCanvas(pdfium, page, viewport, bounds, {
         canvas,
         putImageData: vi.fn(),
       }),
     ).toThrow("Raster failed");
     expect(canvas).toEqual({ width: 12, height: 15 });
     expect(() =>
-      drawPageToCanvas(mupdf, page, viewport, bounds, {
+      drawPageToCanvas(pdfium, page, viewport, bounds, {
         canvas: { width: 200, height: 180 },
         putImageData: () => {
           throw new Error("Canvas closed");
         },
       }),
     ).toThrow("Canvas closed");
-    expect(pixmapDestroy).toHaveBeenCalledTimes(2);
-    expect(deviceDestroy).toHaveBeenCalledTimes(2);
+    expect(pixmapDestroy).toHaveBeenCalledTimes(1);
     const putImageData = vi.fn();
-    drawPageToCanvas(mupdf, page, viewport, bounds, {
+    drawPageToCanvas(pdfium, page, viewport, bounds, {
       canvas: { width: 200, height: 180 },
       putImageData,
     });
     expect(putImageData).toHaveBeenCalledOnce();
-    expect(pixmapDestroy).toHaveBeenCalledTimes(3);
-    expect(deviceDestroy).toHaveBeenCalledTimes(3);
+    expect(pixmapDestroy).toHaveBeenCalledTimes(2);
   } finally {
     disposeNativePage(page);
     doc.destroy();

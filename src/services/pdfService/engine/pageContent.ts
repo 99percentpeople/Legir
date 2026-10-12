@@ -1,8 +1,8 @@
-import type { PDFDocument, PDFPage, PDFObject, Rect } from "mupdf";
+import type { PDFDocument, PDFPage, PDFObject, Rect } from "@legir/pdfium";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@/types";
 import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
 import { createViewportFromPageInfo } from "../lib/coords";
-import { extractPageText, type MuPdfModule } from "./mupdf";
+import { extractPageText, type PDFiumModule } from "./pdfium";
 import type { TextContent, TextItem } from "./textTypes";
 
 const readBox = (object: PDFObject): Rect | undefined => {
@@ -58,15 +58,15 @@ export function getNativePageViewport(
 }
 
 export function getNativeTextContent(
-  mupdf: MuPdfModule,
+  pdfium: PDFiumModule,
   page: PDFPage,
   pageIndex: number,
 ): TextContent {
-  const text = extractPageText(mupdf, page, pageIndex);
+  const text = extractPageText(pdfium, page, pageIndex);
   const content: TextContent = {
     items: [],
     styles: {},
-    lang: page._doc.getLanguage(),
+    lang: page.document.getLanguage() ?? null,
   };
   for (const line of text.lines) {
     let run: TextItem | undefined;

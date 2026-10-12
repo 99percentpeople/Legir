@@ -1,0 +1,7 @@
+{
+  "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+  "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+  "emscripten": "5.0.3",
+  "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+  "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c"
+}

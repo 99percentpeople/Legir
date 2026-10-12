@@ -1,6 +1,6 @@
-import type { PDFDocument, PDFObject } from "mupdf";
+import type { PDFDocument, PDFObject } from "@legir/pdfium";
 import type { PDFDocument as EditingDocument } from "@cantoo/pdf-lib";
-import { executePdfEngineRequest, type MuPdfModule } from "./mupdf";
+import { executePdfEngineRequest, type PDFiumModule } from "./pdfium";
 import type { PdfEngineRequest } from "./types";
 import { createEditingView, disposeEditingDocument } from "./editingDocument";
 import {
@@ -31,12 +31,12 @@ export class DocumentSession {
   private peakNativeDocuments = 0;
   readonly document: PDFDocument;
   constructor(
-    readonly mupdf: MuPdfModule,
+    readonly pdfium: PDFiumModule,
     bytes: Uint8Array,
-    private readonly password?: string,
+    password?: string,
     readonly primaryId = "default",
   ) {
-    const doc = new mupdf.PDFDocument(bytes);
+    const doc = new pdfium.PDFDocument(bytes);
     try {
       if (doc.needsPassword() && !doc.authenticatePassword(password ?? ""))
         throw new Error("The PDF password is missing or incorrect.");
@@ -62,7 +62,7 @@ export class DocumentSession {
 
   async addSource(id: string, bytes: Uint8Array, password?: string) {
     if (this.sources.has(id)) return;
-    const donor = new this.mupdf.PDFDocument(bytes);
+    const donor = new this.pdfium.PDFDocument(bytes);
     this.nativeDocuments++;
     this.peakNativeDocuments = Math.max(
       this.peakNativeDocuments,
@@ -252,7 +252,7 @@ export class DocumentSession {
 
   private view(id: string) {
     const source = this.getSource(id);
-    return createEditingView(this.mupdf, this.document, {
+    return createEditingView(this.pdfium, this.document, {
       refs: source.refs,
       trailer: source.trailer
         ? this.document._fromPDFObjectKeep(source.trailer.pointer)
@@ -273,9 +273,8 @@ export class DocumentSession {
     let view: EditingDocument | undefined;
     try {
       view = this.view(id);
-      // MuPDF rearrangePages intentionally removes AcroForm and other document
-      // structures. Trim only the page tree; our assembler preserves fields,
-      // links and outlines, and the journal restores the full source bank.
+      // Trim the page tree before assembly while retaining form/link/outline
+      // objects. Rollback restores the full source bank after the job.
       if (!keepAllSources && id === this.primaryId && this.sources.size > 1) {
         const retained = new Set(this.getSource(id).pages);
         for (let index = view.getPageCount() - 1; index >= 0; index--)
@@ -388,29 +387,17 @@ export class DocumentSession {
   }
 
   async content(request: PdfEngineRequest) {
-    try {
-      return await this.transaction(this.primaryId, async () =>
-        executePdfEngineRequest(this.mupdf, request, this.document),
-      );
-    } finally {
-      // Password probes can replace MuPDF's decryption key even on failure.
-      if (
-        request.operation === "verifyOwnerPassword" &&
-        this.getSource().permissions.isEncrypted
-      )
-        this.document.authenticatePassword(this.password ?? "");
-    }
+    return this.transaction(this.primaryId, async () =>
+      executePdfEngineRequest(this.pdfium, request, this.document),
+    );
   }
 
   stats() {
-    const wasm = globalThis.$libmupdf_wasm_Module as
-      | { HEAPU8?: Uint8Array }
-      | undefined;
     return {
       nativeDocuments: this.nativeDocuments,
       peakNativeDocuments: this.peakNativeDocuments,
       sources: this.sources.size,
-      wasmCapacityBytes: wasm?.HEAPU8?.buffer.byteLength ?? 0,
+      wasmCapacityBytes: this.pdfium.memory(),
     };
   }
 

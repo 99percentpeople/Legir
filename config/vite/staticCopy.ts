@@ -1,13 +1,18 @@
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
-export const createStaticCopyPlugin = (mupdfVersion: string) =>
+export const createStaticCopyPlugin = (pdfiumVersion: string) =>
   viteStaticCopy({
     targets: [
       {
         // Keep the ESM loader beside its WASM files. Versioned URLs prevent a
         // PWA update from mixing the JS bindings with a cached older binary.
-        src: ["node_modules/mupdf/dist/*.js", "node_modules/mupdf/dist/*.wasm"],
-        dest: `mupdf/${mupdfVersion}`,
+        src: [
+          "packages/pdfium/wasm/*.js",
+          "packages/pdfium/wasm/*.wasm",
+          "packages/pdfium/wasm/provenance.json",
+          "packages/pdfium/wasm/licenses",
+        ],
+        dest: `pdfium/${pdfiumVersion}`,
       },
       {
         src: "generated-icons/app/128x128@2x.png",

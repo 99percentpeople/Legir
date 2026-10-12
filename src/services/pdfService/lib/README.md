@@ -6,7 +6,7 @@ Put code here when it is:
 
 - Specific to PDF parsing, rendering, text geometry, annotations, export, or coordinate conversion
 - Shared by multiple PDF pipeline modules
-- Allowed to depend on lazy native editing views, the MuPDF engine service, viewport math, or PDF-specific data structures
+- Allowed to depend on lazy native editing views, the PDFium engine service, viewport math, or PDF-specific data structures
 
 Do not put code here when it is:
 
@@ -26,7 +26,7 @@ Live PDF parsing, mutation and serialization run inside the owning worker's
 that same native xref; never load another document for a live edit. Do not call
 `PDFDocument.load` or `PDFDocument.save` in application code.
 
-MuPDF/WASM calls belong in `src/services/pdfService/engine/`. The
+PDFium/WASM calls belong in `src/services/pdfService/engine/`. The
 `textRedaction` helper edits the live native transaction directly. Its
 `contentResourceBridge` fallback is for standalone authoring; both paths must
 preserve unrelated document structures and source resource identity.

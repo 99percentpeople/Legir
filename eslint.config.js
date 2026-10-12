@@ -5,7 +5,11 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{js,jsx,ts,tsx}", "www/**/*.{js,jsx,ts,tsx}"],
+    files: [
+      "src/**/*.{js,jsx,ts,tsx}",
+      "www/**/*.{js,jsx,ts,tsx}",
+      "packages/pdfium/src/**/*.{js,ts}",
+    ],
     rules: {
       semi: "error",
       "prefer-const": "error",
@@ -24,6 +28,8 @@ export default tseslint.config(
       "**/dist/**",
       "**/dev-dist/**",
       "**/node_modules/**",
+      "**/.cache/**",
+      "packages/pdfium/wasm/**",
       "src-tauri/**",
     ],
   },

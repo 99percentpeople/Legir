@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 import {
   executePdfEngineRequest,
-  loadMuPdf,
-} from "@/services/pdfService/engine/mupdf";
+  loadPDFium,
+} from "@/services/pdfService/engine/pdfium";
 import type {
   PdfEngineRequest,
   PdfEngineResponse,
@@ -26,8 +26,8 @@ self.onmessage = async ({
   data,
 }: MessageEvent<{ request: PdfEngineRequest; moduleUrl: string }>) => {
   try {
-    const mupdf = await loadMuPdf(data.moduleUrl);
-    const result = executePdfEngineRequest(mupdf, data.request);
+    const pdfium = await loadPDFium(data.moduleUrl);
+    const result = executePdfEngineRequest(pdfium, data.request);
     const bytes =
       result instanceof Uint8Array
         ? result

@@ -1,0 +1,36 @@
+{
+  "name": "@legir/pdfium",
+  "version": "0.1.0",
+  "description": "Standalone PDFium WebAssembly engine and TypeScript bindings",
+  "type": "module",
+  "license": "BSD-3-Clause",
+  "files": [
+    "dist",
+    "wasm",
+    "src",
+    "native",
+    "scripts/*.py",
+    "scripts/*.mjs",
+    "tsconfig.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./wasm/*": "./wasm/*"
+  },
+  "scripts": {
+    "build": "node scripts/verify-artifacts.mjs && tsc -p tsconfig.json",
+    "build:native": "python3 scripts/build.py",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "prepack": "bun run build"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "4.1.11"
+  }
+}

@@ -8,6 +8,10 @@ import { viteDevApiProxyPlugin } from "./config/vite/devApiProxy";
 import { createPwaPlugin } from "./config/vite/pwa";
 import { createStaticCopyPlugin } from "./config/vite/staticCopy";
 
+const pdfiumBuild = JSON.parse(
+  readFileSync("./packages/pdfium/wasm/provenance.json", "utf-8"),
+);
+const pdfiumVersion = `${pdfiumBuild.pdfium.slice(0, 12)}-${pdfiumBuild.sha256["pdfium.wasm"].slice(0, 12)}`;
 const host = process.env.TAURI_DEV_HOST;
 const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
 
@@ -64,7 +68,7 @@ export default defineConfig(({ mode }) => {
       viteDevApiProxyPlugin(),
       react(),
       tailwindcss(),
-      createStaticCopyPlugin(packageJson.dependencies.mupdf),
+      createStaticCopyPlugin(pdfiumVersion),
       ...(!isTauriEnv ? createPwaPlugin(packageJson.displayName) : []),
     ],
     define: {
@@ -72,7 +76,7 @@ export default defineConfig(({ mode }) => {
       // API credentials are intentionally configured only inside the app and
       // must never be embedded into browser/Tauri frontend bundles at build time.
       "process.env.APP_NAME": JSON.stringify(packageJson.displayName),
-      __MUPDF_VERSION__: JSON.stringify(packageJson.dependencies.mupdf),
+      __PDFIUM_VERSION__: JSON.stringify(pdfiumVersion),
     },
     resolve: {
       alias: {

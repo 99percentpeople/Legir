@@ -15,10 +15,10 @@ import {
 import { pdfEngine } from "./index";
 import type { PdfEncryption, PdfObjectGraph, PdfObjectValue } from "./types";
 
-import { getMuPdf } from "./runtime";
+import { getPDFium } from "./runtime";
 import { NativeEditingContext } from "./nativeEditingContext";
-import type { MuPdfModule } from "./mupdf";
-import type { PDFDocument as NativeDocument } from "mupdf";
+import type { PDFiumModule } from "./pdfium";
+import type { PDFDocument as NativeDocument } from "@legir/pdfium";
 
 const views = new WeakMap<
   PDFDocument,
@@ -26,11 +26,11 @@ const views = new WeakMap<
 >();
 
 export function createEditingView(
-  mupdf: MuPdfModule,
+  pdfium: PDFiumModule,
   native: NativeDocument,
   options?: ConstructorParameters<typeof NativeEditingContext>[2],
 ) {
-  const view = new NativeEditingContext(mupdf, native, options);
+  const view = new NativeEditingContext(pdfium, native, options);
   views.set(view.document, { view, owned: false });
   return view.document;
 }
@@ -83,16 +83,16 @@ export async function loadEditingDocument(
   options?: { password?: string; signal?: AbortSignal },
 ): Promise<PDFDocument> {
   options?.signal?.throwIfAborted();
-  const mupdf = await getMuPdf();
+  const pdfium = await getPDFium();
   options?.signal?.throwIfAborted();
-  const native = new mupdf.PDFDocument(bytes);
+  const native = new pdfium.PDFDocument(bytes);
   try {
     if (
       native.needsPassword() &&
       !native.authenticatePassword(options?.password ?? "")
     )
       throw new Error("The PDF password is missing or incorrect.");
-    const document = createEditingView(mupdf, native);
+    const document = createEditingView(pdfium, native);
     views.get(document)!.owned = true;
     return document;
   } catch (error) {
@@ -111,9 +111,6 @@ export async function saveEditingDocument(
     await view.flush();
     const security = options?.security;
     const buffer = view.native.saveToBuffer({
-      garbage: 1,
-      compress: true,
-      "regenerate-id": false,
       encrypt: security ? "aes-256" : "none",
       ...(security
         ? {

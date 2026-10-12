@@ -1,0 +1,25 @@
+{
+  "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+  "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+  "emscripten": "5.0.3",
+  "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+  "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c",
+  "features": {
+    "v8": false,
+    "xfa": false,
+    "threads": false,
+    "renderer": "agg"
+  },
+  "sha256": {
+    "pdfium.js": "66821fb97ad708664acc5c5861afb2ad7ac39145f713b92d442c104ccf66228d",
+    "pdfium.wasm": "ea2a9b3b7624438b609fda9a91384832bda0ef4b1e4dd2159a85f13c72318d6f"
+  },
+  "sourceSha256": {
+    "native/bridge.cpp": "a056f7e86cd1cf5ccdb8ef8a2ee98c2a8dfb56be7f10e4b1017020d562bc4e88",
+    "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
+    "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
+    "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
+  },
+  "patchSha256": "63a8d0be2092fbdf1073336f49f5aa86cda3aea8647113ea30c2ea60c4cea31f",
+  "buildScriptSha256": "957a2751b62f0d73257324107de9b476d0a25dc4bdde01d8d84d2a36044010ca"
+}

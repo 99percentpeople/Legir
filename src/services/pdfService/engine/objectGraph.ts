@@ -1,5 +1,5 @@
-import type { PDFDocument, PDFObject } from "mupdf";
-import type { MuPdfModule } from "./mupdf";
+import type { PDFDocument, PDFObject } from "@legir/pdfium";
+import type { PDFiumModule } from "./pdfium";
 import type { PdfEncryption, PdfObjectGraph, PdfObjectValue } from "./types";
 import { dictionaryKeyNames, NativeNames } from "./objectNames";
 
@@ -48,10 +48,10 @@ const readValue = (
 };
 
 export function readObjectGraph(
-  mupdf: MuPdfModule,
+  pdfium: PDFiumModule,
   doc: PDFDocument,
 ): PdfObjectGraph {
-  const names = new NativeNames(mupdf, doc);
+  const names = new NativeNames(pdfium, doc);
   const trailer = doc.getTrailer();
   const graph: PdfObjectGraph = {
     version: doc.getVersion(),
@@ -163,12 +163,12 @@ function writeValue(
 }
 
 export function writeObjectGraph(
-  mupdf: MuPdfModule,
+  pdfium: PDFiumModule,
   graph: PdfObjectGraph,
   security?: PdfEncryption,
 ): Uint8Array {
-  const doc = new mupdf.PDFDocument();
-  const names = new NativeNames(mupdf, doc);
+  const doc = new pdfium.PDFDocument();
+  const names = new NativeNames(pdfium, doc);
   try {
     const largest = graph.objects.reduce(
       (max, item) => Math.max(max, item.number),
@@ -224,9 +224,6 @@ export function writeObjectGraph(
     }
     // Use JSON options, so commas/equal signs in passwords stay literal.
     const buffer = doc.saveToBuffer({
-      garbage: 1,
-      compress: true,
-      "regenerate-id": false,
       encrypt: security ? "aes-256" : "none",
       ...(security
         ? {

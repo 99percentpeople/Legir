@@ -38,6 +38,20 @@ Landing site: `bun run dev:www`
 
 To build native installers, run `bun run build:app --ci -- --locked` after installing the platform prerequisites. Rust is pinned in `rust-toolchain.toml` and does not require nightly. See [Desktop builds and releases](docs/DESKTOP_RELEASE.md) for OS-specific commands, signing requirements, and the tag-driven release pipeline.
 
+## PDF Engine
+
+This branch uses the independent [@legir/pdfium package](packages/pdfium/README.md)
+for rendering, parsing and editing. The saved MuPDF implementation is on
+`engine/mupdf`; the PDFium implementation is on `engine/pdfium`.
+
+The compiled WASM, loader and license notices are included. Normal `dev`, `build`
+and `test` commands validate the assets and build the package's TypeScript API.
+Use `bun run build:native:pdfium` to rebuild the pinned native sources, and
+`bun run test:pdfium` for the standalone library tests.
+
+See the [migration validation and performance comparison](docs/performance/pdfium-migration.md)
+for current compatibility, browser checks and measured tradeoffs against MuPDF.
+
 ## Deployment
 
 Deploy the repository root as the app project, and deploy `www/` as a separate Vercel project with `Root Directory = www`.

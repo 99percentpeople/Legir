@@ -18,6 +18,8 @@ import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createEditorView } from "@/store/editorView";
 import { getPageId } from "@/services/pdfService/lib/pageStructure";
 import { pdfContentEngine } from "@/services/pdfService/engine";
+import { getPDFium } from "@/services/pdfService/engine/runtime";
+import { PDFPage as NativePage } from "@legir/pdfium";
 import type { PdfQuad } from "@/services/pdfService/engine/types";
 import { applyTextRedactionsUnderFlattenedFreetext } from "@/services/pdfService/lib/textRedaction";
 import { createPdfLibViewport } from "@/services/pdfService/lib/coords";
@@ -101,7 +103,7 @@ const apply = (doc: PDFDocument, annotations: Annotation[]) =>
       createPdfLibViewport(doc.getPage(index)),
   });
 
-describe("MuPDF content engine", () => {
+describe("PDFium content engine", () => {
   it("removes only the requested part of a text operator and preserves following glyph positions", async () => {
     const { doc, width } = await fixture();
     const bytes = await doc.save();
@@ -373,11 +375,7 @@ describe("MuPDF content engine", () => {
 
   it("fails export if text removal fails instead of silently retaining old text", async () => {
     const { doc, page, width } = await fixture();
-    const mupdf = await import("mupdf");
-    vi.spyOn(
-      mupdf.PDFAnnotation.prototype,
-      "applyRedaction",
-    ).mockImplementation(() => {
+    vi.spyOn(NativePage.prototype, "redactText").mockImplementation(() => {
       throw new Error("Engine unavailable");
     });
     await expect(
@@ -391,15 +389,13 @@ describe("MuPDF content engine", () => {
   });
 
   it("keeps image resources and pixels outside the removed text unchanged", async () => {
-    const mupdf = await import("mupdf");
-    const bitmap = new mupdf.Pixmap(
-      mupdf.ColorSpace.DeviceRGB,
-      [0, 0, 2, 2],
-      false,
+    const pdfium = await getPDFium();
+    const png = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGM4AQYMEAoAQa4JYQOnncMAAAAASUVORK5CYII=",
+      ),
+      (c) => c.charCodeAt(0),
     );
-    bitmap.clear(200);
-    const png = new Uint8Array(bitmap.asPNG());
-    bitmap.destroy();
     const doc = await PDFDocument.create();
     const image = await doc.embedPng(png);
     const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -414,11 +410,11 @@ describe("MuPDF content engine", () => {
     page.drawText("REMOVE KEEP", { x: 70, y: 350, size: 20, font });
     const width = font.widthOfTextAtSize("REMOVE", 20);
     const raster = (bytes: Uint8Array) => {
-      const nativeDoc = new mupdf.PDFDocument(bytes);
+      const nativeDoc = new pdfium.PDFDocument(bytes);
       const nativePage = nativeDoc.loadPage(0);
       const pixmap = nativePage.toPixmap(
-        mupdf.Matrix.identity,
-        mupdf.ColorSpace.DeviceRGB,
+        pdfium.Matrix.identity,
+        undefined,
         false,
         false,
       );
@@ -441,7 +437,7 @@ describe("MuPDF content engine", () => {
     for (let y = 0; y < 500; y++)
       for (let x = 0; x < 400; x++) {
         const changed = [0, 1, 2].some(
-          (c) => before[(y * 400 + x) * 3 + c] !== after[(y * 400 + x) * 3 + c],
+          (c) => before[(y * 400 + x) * 4 + c] !== after[(y * 400 + x) * 4 + c],
         );
         if (!changed) continue;
         if (x >= 70 && x <= 70 + width && y >= 127 && y <= 156) changedInside++;
@@ -451,7 +447,7 @@ describe("MuPDF content engine", () => {
     expect(changedOutside).toBe(0);
     // Blue line through the replacement region survives text removal.
     expect([
-      ...after.slice((140 * 400 + 80) * 3, (140 * 400 + 80) * 3 + 3),
+      ...after.slice((140 * 400 + 80) * 4, (140 * 400 + 80) * 4 + 3),
     ]).toEqual([0, 0, 255]);
   });
 

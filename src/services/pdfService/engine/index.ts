@@ -4,7 +4,7 @@ import type {
   PdfEngineResponse,
 } from "./types";
 import { getPdfWorkerForBytes } from "./documentOwners";
-import { getMuPdf, getMuPdfModuleUrl } from "./runtime";
+import { getPDFium, getPDFiumModuleUrl } from "./runtime";
 
 const run = async <K extends keyof PdfEngineOperations>(
   operation: K,
@@ -31,11 +31,11 @@ const run = async <K extends keyof PdfEngineOperations>(
     (typeof WorkerGlobalScope !== "undefined" &&
       globalThis instanceof WorkerGlobalScope)
   ) {
-    const { executePdfEngineRequest } = await import("./mupdf");
-    const mupdf = await getMuPdf();
+    const { executePdfEngineRequest } = await import("./pdfium");
+    const pdfium = await getPDFium();
     signal?.throwIfAborted();
     return executePdfEngineRequest(
-      mupdf,
+      pdfium,
       request,
     ) as PdfEngineOperations[K]["output"];
   }
@@ -81,7 +81,7 @@ const run = async <K extends keyof PdfEngineOperations>(
       worker.postMessage(
         {
           request: bytes ? { ...request, bytes } : request,
-          moduleUrl: getMuPdfModuleUrl(),
+          moduleUrl: getPDFiumModuleUrl(),
         },
         bytes ? [bytes.buffer] : [],
       );

@@ -37,7 +37,15 @@ try {
   });
   const page = await context.newPage();
   const errors = [];
+  const resourceFailures = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("requestfailed", (request) =>
+    resourceFailures.push({
+      url: request.url(),
+      type: request.resourceType(),
+      error: request.failure()?.errorText,
+    }),
+  );
   page.on("console", (m) => {
     if (m.type() === "error") console.log("console", m.text());
   });
@@ -225,6 +233,7 @@ try {
     JSON.stringify({
       result,
       errors,
+      resourceFailures,
       savedPages: check.getPageCount(),
       savedFields: check
         .getForm()

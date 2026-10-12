@@ -40,7 +40,7 @@ const annotationQuad = (
   ) as PdfQuad;
 };
 
-/** Stage only page contents/resources, so MuPDF cannot change the document's
+/** Stage only page contents/resources, so PDFium cannot change the document's
  * form tree, annotation refs, replies, links, outline, metadata or encryption.
  * Source pages stay untouched until the entire engine operation succeeds. */
 export const applyTextRedactionsUnderFlattenedFreetext = async (args: {
@@ -80,27 +80,7 @@ export const applyTextRedactionsUnderFlattenedFreetext = async (args: {
     for (const [pageIndex, quads] of byPage) {
       const page = live.native.loadPage(pageIndex);
       try {
-        const matrix = page.getTransform();
-        const annotation = page.createAnnotation("Redact");
-        try {
-          annotation.setQuadPoints(
-            quads.map(
-              (quad) =>
-                [0, 2, 4, 6].flatMap((i) => [
-                  quad[i] * matrix[0] + quad[i + 1] * matrix[2] + matrix[4],
-                  quad[i] * matrix[1] + quad[i + 1] * matrix[3] + matrix[5],
-                ]) as PdfQuad,
-            ),
-          );
-          annotation.applyRedaction(
-            0,
-            live.mupdf.PDFPage.REDACT_IMAGE_NONE,
-            live.mupdf.PDFPage.REDACT_LINE_ART_NONE,
-            live.mupdf.PDFPage.REDACT_TEXT_REMOVE,
-          );
-        } finally {
-          annotation.destroy();
-        }
+        page.redactText(quads);
       } finally {
         page.destroy();
       }

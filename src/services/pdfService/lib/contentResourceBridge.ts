@@ -10,7 +10,7 @@ import {
 } from "@cantoo/pdf-lib";
 
 /** Copy a page-content graph with explicit reference tracking. A second pass
- * can reuse original images, fonts and optional-content groups that MuPDF did
+ * can reuse original images, fonts and optional-content groups that PDFium did
  * not change, including resources nested inside a rewritten Form XObject. */
 export class ContentResourceCopier {
   readonly references = new Map<PDFRef, PDFRef>();
@@ -109,7 +109,7 @@ const referencesIn = (
   return result;
 };
 
-/** MuPDF's garbage=1 removes unused objects without renumbering them. Reuse is
+/** PDFium's garbage=1 removes unused objects without renumbering them. Reuse is
  * permitted only when the object AND all its referenced descendants match. */
 export const unchangedContentResources = (
   staged: PDFContext,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PDFDocument, PDFName, StandardFonts } from "@cantoo/pdf-lib";
 import type { ExportPdfRequest } from "@/services/pdfService/engine/sessionTypes";
 import { DocumentSession } from "@/services/pdfService/engine/documentSession";
-import { getMuPdf } from "@/services/pdfService/engine/runtime";
+import { getPDFium } from "@/services/pdfService/engine/runtime";
 import { disposeNativePage } from "@/services/pdfService/engine/raster";
 
 async function fixture(label: string) {
@@ -20,20 +20,18 @@ async function fixture(label: string) {
 }
 
 function pageText(session: DocumentSession, id = "default") {
-  const page = session.loadPage(id, 0),
-    text = page.toStructuredText("");
+  const page = session.loadPage(id, 0);
   try {
-    return text.asText();
+    return page.extractText().text;
   } finally {
-    text.destroy();
     disposeNativePage(page);
   }
 }
 
 describe("one native document session", () => {
   it("shares OCR/text extraction and restores encryption state after password probes", async () => {
-    const mupdf = await getMuPdf();
-    const encoder = new mupdf.PDFDocument(await fixture("Encrypted source"));
+    const pdfium = await getPDFium();
+    const encoder = new pdfium.PDFDocument(await fixture("Encrypted source"));
     let bytes: Uint8Array;
     try {
       const buffer = encoder.saveToBuffer({
@@ -49,7 +47,7 @@ describe("one native document session", () => {
     } finally {
       encoder.destroy();
     }
-    const session = new DocumentSession(mupdf, bytes!, "reader");
+    const session = new DocumentSession(pdfium, bytes!, "reader");
     try {
       for (const [password, owner] of [
         ["wrong", false],
@@ -89,7 +87,7 @@ describe("one native document session", () => {
   });
   it("rolls back failed edits and releases imported/blank sources without disturbing retained pages", async () => {
     const session = new DocumentSession(
-      await getMuPdf(),
+      await getPDFium(),
       await fixture("Original"),
     );
     try {
@@ -120,7 +118,7 @@ describe("one native document session", () => {
   });
   it("shares parsing, rendering and repeated export, restoring source state after every save", async () => {
     const session = new DocumentSession(
-      await getMuPdf(),
+      await getPDFium(),
       await fixture("Alice"),
     );
     try {
@@ -148,7 +146,7 @@ describe("one native document session", () => {
 
   it("closes imported donors and retains source rendering after exporting reordered/copied pages", async () => {
     const session = new DocumentSession(
-      await getMuPdf(),
+      await getPDFium(),
       await fixture("Original"),
     );
     const bytes = await fixture("Imported");
