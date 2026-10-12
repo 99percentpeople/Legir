@@ -34,7 +34,7 @@
     "buildScriptSha256": "d1c639795505199d84a9468282f00524f8a85b71561dfb9542b592ab1f045fd9"
   },
   "validation": {
-    "applicationTests": 786,
+    "applicationTests": 787,
     "applicationTestFiles": 99,
     "libraryTests": 32,
     "nativePixelCases": 42,
@@ -43,5 +43,6 @@
     "webBuild": true,
     "tauriFrontendBuild": true,
     "desktopRuntimeTested": false
-  }
+  },
+  "pdfiumRelease": "69958ba31467214fb801adb5355a7f2e20785c6b"
 }

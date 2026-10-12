@@ -1,7 +1,7 @@
 {
   "engine": "pdfium",
   "result": {
-    "url": "/editor/tab_1791824896641_omt6yz",
+    "url": "/editor/tab_1791825794056_3bb1l1",
     "text": ["", "Native PDF page 2", ""],
     "forms": [
       {
@@ -43,7 +43,7 @@
   "errors": [],
   "resourceFailures": [
     {
-      "url": "blob:http://127.0.0.1:5199/764141dd-8245-416d-a7c8-83ba95eae218",
+      "url": "blob:http://127.0.0.1:5199/75dbb329-504b-4322-bd28-5eec4f70ff63",
       "type": "image",
       "error": "net::ERR_FILE_NOT_FOUND"
     }
@@ -53,7 +53,7 @@
   "activeWorkers": 1,
   "initialWorkerUrls": [],
   "activeWorkerUrls": [
-    "http://127.0.0.1:5199/assets/pdf-render.worker-irfcgMla.js"
+    "http://127.0.0.1:5199/assets/pdf-render.worker-CAeLPvqc.js"
   ],
   "workersAfterClose": 0,
   "workerUrlsAfterClose": [],
