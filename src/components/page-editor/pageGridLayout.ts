@@ -43,7 +43,6 @@ export function getPageGridLayout(width: number, scale: number) {
     rowHeight: thumbnailSize + 24 * scale + footerHeight,
     style: {
       "--page-paper-size": `${thumbnailSize}px`,
-      "--page-paper-padding": `${12 * scale}px`,
       "--page-card-padding": `${cardPadding}px`,
       "--page-card-padding-bottom": `${12 * scale}px`,
       "--page-card-gap": `${cardGap}px`,

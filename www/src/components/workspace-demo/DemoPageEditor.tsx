@@ -262,7 +262,7 @@ function PageCard({
       >
         <div
           data-page-paper-area
-          className="flex size-(--page-paper-size) shrink-0 items-center justify-center p-(--page-paper-padding)"
+          className="flex size-(--page-paper-size) shrink-0 items-center justify-center"
         >
           <button
             ref={dragHandle}
