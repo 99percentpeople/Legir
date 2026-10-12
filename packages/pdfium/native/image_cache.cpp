@@ -50,6 +50,7 @@ class LargeImage final : public CFX_DIBBase {
     if (bitmap_) {
       if (images.front() != this)
         images.splice(images.begin(), images, position_);
+      used_epoch_ = render_epoch;
       return bitmap_.Get();
     }
     const size_t size = size_t(GetPitch()) * GetHeight();
@@ -59,6 +60,11 @@ class LargeImage final : public CFX_DIBBase {
     if (attempt_epoch_ == render_epoch) return source_.Get();
     attempt_epoch_ = render_epoch;
     while (stats.bytes > stats.limit - size) {
+      // GetScanline() lends its pixels to the compositor. Keep images used by
+      // this render alive until it returns, even when another image is sampled
+      // before the compositor has consumed the first image's borrowed span.
+      // The LRU tail being pinned means every remaining entry is pinned.
+      if (images.back()->used_epoch_ == render_epoch) return source_.Get();
       images.back()->Release();
       stats.evictions++;
     }
@@ -69,6 +75,7 @@ class LargeImage final : public CFX_DIBBase {
     stats.bytes += size_t(bitmap_->GetPitch()) * bitmap_->GetHeight();
     stats.entries++;
     stats.decodes++;
+    used_epoch_ = render_epoch;
     return bitmap_.Get();
   }
 
@@ -76,6 +83,7 @@ class LargeImage final : public CFX_DIBBase {
   mutable RetainPtr<CFX_DIBitmap> bitmap_;
   mutable std::list<const LargeImage*>::iterator position_;
   mutable uint64_t attempt_epoch_ = UINT64_MAX;
+  mutable uint64_t used_epoch_ = UINT64_MAX;
 };
 }  // namespace
 

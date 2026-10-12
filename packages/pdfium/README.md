@@ -147,6 +147,8 @@ their exact decoded pixels in a module-wide LRU cache. Its default budget is
 restart a large JPEG decode. Images larger than the budget use the original
 lazy path. Eviction and page destruction release these pixels; changing page
 contents still requires closing cached pages before obtaining fresh views.
+Images used during one render remain pinned until it returns; additional images
+use lazy decoding when the pinned images fill the budget.
 `engine.setLargeImageCacheLimit(bytes)` sets a 0–512 MiB budget (zero immediately
 evicts and disables this cache). `engine.largeImageCache()` reports its decoded
 pixel bytes, limit, entries, cumulative decodes and evictions. This budget does

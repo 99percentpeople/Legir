@@ -117,7 +117,7 @@ describe("bounded native large-image cache", () => {
     expect(engine.largeImageCache().limit).toBe(before);
   });
 
-  it("does not repeatedly fill an evicted image within the same render", () => {
+  it("pins borrowed scanlines until rendering ends when images exceed the budget", () => {
     engine.setLargeImageCacheLimit(64 * 1024 * 1024);
     const { doc, image } = fixture(73);
     const other = doc.addObject({
@@ -149,7 +149,7 @@ describe("bounded native large-image cache", () => {
         expect([pixels[40 * 4], pixels[120 * 4], pixels[200 * 4]]).toEqual([
           73, 211, 73,
         ]);
-        expect(engine.largeImageCache().decodes).toBe(before + 2);
+        expect(engine.largeImageCache().decodes).toBe(before + 1);
         expect(engine.largeImageCache().bytes).toBe(imageBytes);
       } finally {
         bitmap.destroy();
