@@ -228,7 +228,7 @@ const removeRefFromPdfArray = (array: PDFArray, refKey: string) => {
 };
 
 export const removeMissingOrphanSourcePdfFieldWidgets = (
-  form: PDFForm,
+  form: Pick<PDFForm, "doc" | "getFields">,
   sourceKeys: Set<string>,
 ) => {
   const registeredFieldRefKeys = new Set(

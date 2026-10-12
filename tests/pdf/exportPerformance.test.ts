@@ -40,6 +40,27 @@ const style = { fontFamily: "Helvetica", fontSize: 12 };
 afterEach(() => vi.restoreAllMocks());
 
 describe("form export work scales with fields, not repeated tree scans", () => {
+  it("removes the last orphan widget without creating an AcroForm", async () => {
+    const source = await PDFDocument.create();
+    const page = source.addPage([300, 300]);
+    const widget = source.context.register(
+      source.context.obj({
+        Type: "Annot",
+        Subtype: "Widget",
+        FT: "Tx",
+        Rect: [10, 10, 100, 30],
+        P: page.ref,
+      }),
+    );
+    page.node.addAnnot(widget);
+    const bytes = await source.save();
+    const output = await exportPDF(bytes, [], undefined, [], undefined, {
+      syncFormFields: true,
+    });
+    const saved = await PDFDocument.load(output);
+    expect(saved.catalog.has(PDFName.of("AcroForm"))).toBe(false);
+    expect(saved.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
+  });
   it("does not build an unused index when there are no editor fields", async () => {
     const source = await PDFDocument.create();
     source.addPage([300, 300]);

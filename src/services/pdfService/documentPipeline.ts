@@ -2290,8 +2290,13 @@ export const exportPDF = async (
     const currentFieldNamesWithoutSourceRefs = new Set(
       fields.filter((field) => !field.sourcePdfRef).map((field) => field.name),
     );
-    if (form && shouldSyncFormFields) {
-      removeMissingOrphanSourcePdfFieldWidgets(form, sourceFieldRefKeys);
+    if (shouldSyncFormFields) {
+      // A PDF can have page widgets without a catalog AcroForm. Deleting the
+      // last orphan still needs the page scan, without creating an empty form.
+      removeMissingOrphanSourcePdfFieldWidgets(
+        form ?? { doc: pdfDoc, getFields: () => [] },
+        sourceFieldRefKeys,
+      );
     }
     const existingFields = form?.getFields() ?? [];
     for (const field of existingFields) {

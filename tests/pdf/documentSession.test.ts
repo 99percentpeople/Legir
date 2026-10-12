@@ -44,6 +44,7 @@ describe("one native document session", () => {
         fields: [],
         annotations: [],
         metadata: { title: "Updated title" },
+        options: { syncFormFields: true },
       });
       expect(session.lastTransactionChanged).toBe(true);
       expect(session.lastTransactionAffectsRendering).toBe(false);
