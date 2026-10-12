@@ -42,7 +42,10 @@ To build native installers, run `bun run build:app --ci -- --locked` after insta
 
 This branch uses the independent [@legir/pdfium package](packages/pdfium/README.md)
 for rendering, parsing and editing. The saved MuPDF implementation is on
-`engine/mupdf`; the PDFium implementation is on `engine/pdfium`.
+`engine/mupdf` as a historical snapshot. Active development and comparisons use
+`engine/pdfium` (PDFium) and `engine/pdfjs` (PDF.js + pdf-lib). Shared document
+correctness fixes must be applied to both active branches before comparing
+performance; MuPDF is not part of the current benchmark matrix.
 
 The compiled WASM, loader and license notices are included. Normal `dev`, `build`
 and `test` commands validate the assets and build the package's TypeScript API.
@@ -50,7 +53,8 @@ Use `bun run build:native:pdfium` to rebuild the pinned native sources, and
 `bun run test:pdfium` for the standalone library tests.
 
 See the [migration validation and performance comparison](docs/performance/pdfium-migration.md)
-for current compatibility, browser checks and measured tradeoffs against MuPDF.
+for the initial migration record. Ongoing performance work compares the two active
+branches with the [real-file benchmark](scripts/pdf-benchmark/README.md).
 
 ## Deployment
 

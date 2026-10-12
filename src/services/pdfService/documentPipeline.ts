@@ -51,9 +51,10 @@ import { createRenderedPageImageCropper } from "./lib/renderedImageCrop";
 import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
 import { getAppHighlightedText } from "./lib/annotationMetadata";
 import {
-  applyPdfAnnotationCommentMetadata,
-  readPdfJsAnnotationCommentMeta,
-} from "./lib/annotationCommentMeta";
+  attachAnnotationReplies,
+  reconcileAnnotationPopups,
+} from "./lib/annotationReplies";
+import { applyPdfAnnotationCommentMetadata } from "./lib/annotationCommentMeta";
 import {
   PDFDocument,
   EncryptedPDFError,
@@ -424,45 +425,6 @@ const pdfRefToKey = (ref: PDFRef | undefined | null) => {
   });
 };
 
-const attachAnnotationReplies = (
-  annotations: Annotation[],
-  pageAnnotations: PdfJsAnnotation[],
-) => {
-  const rootsByPdfRef = new Map<string, Annotation>();
-  for (const annotation of annotations) {
-    const key = sourcePdfRefToKey(annotation.sourcePdfRef);
-    if (!key) continue;
-    rootsByPdfRef.set(key, annotation);
-  }
-
-  for (let index = 0; index < pageAnnotations.length; index++) {
-    const annotation = pageAnnotations[index];
-    if (!annotation.inReplyTo) continue;
-    if (annotation.replyType === "Group") continue;
-
-    const parent = rootsByPdfRef.get(annotation.inReplyTo);
-    if (!parent) continue;
-
-    const commentMeta = readPdfJsAnnotationCommentMeta(annotation);
-    const replyKey = sourcePdfRefToKey(annotation.sourcePdfRef);
-    const suffix = replyKey
-      ? replyKey.replace(/[^a-zA-Z0-9]+/g, "_")
-      : `${parent.pageIndex + 1}_${index}`;
-
-    const reply: AnnotationReply = {
-      id: `imported_reply_${suffix}`,
-      parentAnnotationId: parent.id,
-      text: commentMeta.text,
-      author: commentMeta.author,
-      updatedAt: commentMeta.updatedAt,
-      sourcePdfRef: annotation.sourcePdfRef,
-      isEdited: false,
-    };
-
-    parent.replies = [...(parent.replies ?? []), reply];
-  }
-};
-
 const exportAnnotationReply = (options: {
   pdfDoc: PDFDocument;
   page: PDFPage;
@@ -473,6 +435,22 @@ const exportAnnotationReply = (options: {
 }) => {
   const { pdfDoc, page, parentAnnotation, parentRef, reply, viewport } =
     options;
+  // Keep the source dictionary for edits: review state, flags, appearances and
+  // popup references are not all represented in the editor model.
+  if (reply.sourcePdfRef) {
+    const ref = PDFRef.of(
+      reply.sourcePdfRef.objectNumber,
+      reply.sourcePdfRef.generationNumber,
+    );
+    const existing = pdfDoc.context.lookup(ref);
+    if (existing instanceof PDFDict) {
+      if (reply.isEdited) {
+        applyPdfAnnotationCommentMetadata(existing, reply);
+        existing.delete(PDFName.of("RC"));
+      }
+      return ref;
+    }
+  }
   const baseRect =
     parentAnnotation.rect ??
     (parentAnnotation.rects && parentAnnotation.rects.length > 0
@@ -1961,7 +1939,12 @@ export const loadPDFInternal = async (
             console.warn(`Annotation parser failed for page ${pageNumber}`, e);
           }
         }
-        attachAnnotationReplies(annotsForPage, pageAnnotations);
+        attachAnnotationReplies(
+          annotsForPage,
+          pageAnnotations,
+          preservedSourceAnnotationsForPage,
+          idx,
+        );
 
         const fieldsForPage: FormField[] = [];
         for (const parser of controlParsers) {
@@ -2252,15 +2235,16 @@ export const exportPDF = async (
 
     const keepAnnotRefKeysByPage = new Map<number, Set<string>>();
     for (const a of annotations) {
-      if (!a.sourcePdfRef || !canPreserveSourceAnnotation(a)) continue;
-      const key = `${a.sourcePdfRef.objectNumber}:${a.sourcePdfRef.generationNumber}`;
+      if (a.type === "freetext" && a.flatten) continue;
       const setForPage =
         keepAnnotRefKeysByPage.get(a.pageIndex) || new Set<string>();
-      setForPage.add(key);
+      if (a.sourcePdfRef && canPreserveSourceAnnotation(a))
+        setForPage.add(
+          `${a.sourcePdfRef.objectNumber}:${a.sourcePdfRef.generationNumber}`,
+        );
 
       for (const reply of a.replies ?? []) {
         if (!reply.sourcePdfRef) continue;
-        if (reply.isEdited) continue;
         setForPage.add(
           `${reply.sourcePdfRef.objectNumber}:${reply.sourcePdfRef.generationNumber}`,
         );
@@ -2358,6 +2342,8 @@ export const exportPDF = async (
     }
 
     // 1.5 Cleanup Existing Annotations (Ink, Highlight, Comment)
+    const removedAnnotationRefs = new Map<number, Set<string>>();
+    const replacementAnnotationRefs = new Map<string, PDFRef>();
     const pages = pdfDoc.getPages();
     for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
       if (targetPageIndexSet && !targetPageIndexSet.has(pageIndex)) continue;
@@ -2395,6 +2381,13 @@ export const exportPDF = async (
                 subtype === PDFName.of("Polygon")
               ) {
                 toRemove.push(i);
+                const raw = annots.get(i);
+                if (raw instanceof PDFRef) {
+                  const removed =
+                    removedAnnotationRefs.get(pageIndex) ?? new Set<string>();
+                  removed.add(raw.toString());
+                  removedAnnotationRefs.set(pageIndex, removed);
+                }
               }
             }
           }
@@ -2463,6 +2456,22 @@ export const exportPDF = async (
             );
             if (exportedRef) {
               exportedAnnotationRefById.set(annot.id, exportedRef);
+              if (annot.sourcePdfRef) {
+                const oldRef = PDFRef.of(
+                  annot.sourcePdfRef.objectNumber,
+                  annot.sourcePdfRef.generationNumber,
+                );
+                replacementAnnotationRefs.set(oldRef.toString(), exportedRef);
+                const source = pdfDoc.context.lookup(oldRef);
+                const target = pdfDoc.context.lookup(exportedRef);
+                if (source instanceof PDFDict && target instanceof PDFDict) {
+                  for (const key of ["Popup", "F", "State", "StateModel"]) {
+                    const name = PDFName.of(key);
+                    const value = source.get(name);
+                    if (value) target.set(name, value);
+                  }
+                }
+              }
             }
           } catch (e) {
             console.error(`Failed to export annotation ${annot.id}`, e);
@@ -2512,29 +2521,38 @@ export const exportPDF = async (
       const page = pdfDoc.getPage(annotation.pageIndex);
       const viewport = await getViewportForPage(annotation.pageIndex);
 
+      const replyRefs = new Map<string, PDFRef>();
+      // Allocate/reuse all objects before linking them; /Annots may list children first.
       for (const reply of annotation.replies) {
-        const shouldPreserveExistingReply =
-          !!reply.sourcePdfRef &&
-          !reply.isEdited &&
-          canPreserveSourceAnnotation(annotation);
-        if (shouldPreserveExistingReply) continue;
-
-        try {
-          exportAnnotationReply({
-            pdfDoc,
-            page,
-            parentAnnotation: annotation,
-            parentRef,
-            reply,
-            viewport,
-          });
-        } catch (e) {
-          console.error(
-            `Failed to export reply ${reply.id} for annotation ${annotation.id}`,
-            e,
-          );
-        }
+        const ref = exportAnnotationReply({
+          pdfDoc,
+          page,
+          parentAnnotation: annotation,
+          parentRef,
+          reply,
+          viewport,
+        });
+        replyRefs.set(reply.id, ref);
       }
+      for (const reply of annotation.replies) {
+        const ref = replyRefs.get(reply.id)!;
+        const dict = pdfDoc.context.lookup(ref, PDFDict);
+        const target =
+          (reply.inReplyToReplyId && replyRefs.get(reply.inReplyToReplyId)) ||
+          parentRef;
+        if (dict.get(PDFName.of("IRT")) !== target)
+          dict.set(PDFName.of("IRT"), target);
+        if (dict.get(PDFName.of("P")) !== page.ref)
+          dict.set(PDFName.of("P"), page.ref);
+      }
+    }
+
+    for (const [pageIndex, removed] of removedAnnotationRefs) {
+      reconcileAnnotationPopups(
+        pages[pageIndex],
+        replacementAnnotationRefs,
+        removed,
+      );
     }
 
     for (const [pageIndex, controls] of orderedControlsByPage) {

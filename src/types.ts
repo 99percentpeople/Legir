@@ -216,7 +216,10 @@ export interface Annotation {
 
 export interface AnnotationReply {
   id: string;
+  // The owning thread stays flat for the comments panel.
   parentAnnotationId: string;
+  // Immediate reply parent, when /IRT points to another reply in this thread.
+  inReplyToReplyId?: string;
   text?: string;
   author?: string;
   updatedAt?: string;

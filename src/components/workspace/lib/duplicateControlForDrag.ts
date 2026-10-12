@@ -1,4 +1,5 @@
 import { Annotation, FieldType, FormField } from "@/types";
+import { cloneAnnotationReplies } from "@/lib/annotationReplies";
 
 const createDuplicateToken = () =>
   `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -44,10 +45,10 @@ export const duplicateAnnotationForDrag = (
     sourcePdfFontName: undefined,
     sourcePdfFontIsSubset: undefined,
     sourcePdfFontMissing: undefined,
-    replies: annotation.replies?.map((reply) => ({
+    replies: cloneAnnotationReplies(annotation.replies, duplicatedId, () =>
+      createDuplicateId("annotation_reply"),
+    )?.map((reply) => ({
       ...reply,
-      id: createDuplicateId("annotation_reply"),
-      parentAnnotationId: duplicatedId,
       updatedAt: undefined,
       sourcePdfRef: undefined,
       isEdited: undefined,
