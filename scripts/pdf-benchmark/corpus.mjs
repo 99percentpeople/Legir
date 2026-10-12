@@ -63,6 +63,7 @@ await new Promise((done) => server.listen(0, "127.0.0.1", done));
 const url = `http://127.0.0.1:${server.address().port}/benchmark.html`;
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 const timeoutMs = Number(process.env.PDF_BENCH_TIMEOUT_MS ?? 180000);
+const renderOnly = process.env.PDF_BENCH_RENDER_ONLY === "1";
 async function deadline(promise, name) {
   let timer;
   try {
@@ -124,6 +125,7 @@ try {
           round,
           started: new Date().toISOString(),
           status: "running",
+          mode: renderOnly ? "render-only" : "complete",
           environment: {
             platform: process.platform,
             arch: process.arch,
@@ -391,20 +393,22 @@ try {
               { kind: "downloadExcludedFromTiming" },
             );
           };
-          await phase("export", () =>
-            page.evaluate(() => globalThis.pdfCorpus.save()),
-          );
-          await snapshot("exported");
-          await saveDownload("export");
-          await phase("import", () =>
-            page.evaluate(() => globalThis.pdfCorpus.importSource()),
-          );
-          await snapshot("imported");
-          await phase("mergedExport", () =>
-            page.evaluate(() => globalThis.pdfCorpus.save(true)),
-          );
-          await snapshot("merged");
-          await saveDownload("merged");
+          if (!renderOnly) {
+            await phase("export", () =>
+              page.evaluate(() => globalThis.pdfCorpus.save()),
+            );
+            await snapshot("exported");
+            await saveDownload("export");
+            await phase("import", () =>
+              page.evaluate(() => globalThis.pdfCorpus.importSource()),
+            );
+            await snapshot("imported");
+            await phase("mergedExport", () =>
+              page.evaluate(() => globalThis.pdfCorpus.save(true)),
+            );
+            await snapshot("merged");
+            await saveDownload("merged");
+          }
           await deadline(
             page.evaluate(() => globalThis.pdfCorpus.close()),
             "close",

@@ -172,6 +172,14 @@ fixture/variant/round, including failures. Use a **new directory** after changin
 the harness, builds or manifest. Errors/timeouts are preserved, never silently
 dropped from the summary; check sample counts before comparing medians.
 
+`PDF_BENCH_RENDER_ONLY=1` retains the same prepare/open/hydrate/render/PNG
+sequence and memory sampling, then closes without export, import or download.
+Use a separate output directory to investigate render regressions without the
+large allocation/swap pressure of preceding merge/download tasks. Records carry
+`mode: "render-only"`; do not mix them with complete runs or treat their smaller
+peak as a full-workflow memory result. Input and donor bytes are still preloaded
+to keep the opening conditions identical.
+
 For a separate import diagnosis, `corpus-diagnostic.mjs MANIFEST OUTPUT_JSON`
 replays the first fixture's render/save/import path with sparse logging of worker
 load messages. It stops an import after 60 seconds by default and records whether
