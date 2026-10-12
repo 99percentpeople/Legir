@@ -10,7 +10,7 @@ import {
   projectPointsInterval,
   transform,
 } from "@/services/pdfService/lib/textGeometry";
-import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { TextContent } from "@/services/pdfService/engine/textTypes";
 import type { PageData } from "@/types";
 
 type SerializablePageInfo = Pick<PageData, "rotation" | "userUnit" | "viewBox">;

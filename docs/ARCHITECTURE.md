@@ -293,16 +293,98 @@ The PDF pipeline lives in:
 - `src/services/pdfService/pdfRenderer.ts`
 - `src/services/pdfService/workerProtocol.ts`
 
-Responsibilities are split roughly like this:
+MuPDF is the PDF file engine for both Web and Tauri:
 
-- `pdf-lib`
-  - PDF mutation and export
-  - form and annotation write-back
-  - metadata-oriented document manipulation
-- `pdfjs-dist`
-  - rendering
-  - text extraction
-  - outline/destination support
+- Parsing, repair, decryption, encryption and final serialization
+- Page/tile/thumbnail rendering, including native form and annotation appearances
+- Text extraction and geometry for selection, search, translation and AI
+- Outlines, destinations, permissions and owner-password verification
+- Content-level text removal and bounded page images for model-based OCR
+
+`src/services/pdfService/engine/` is the engine boundary. Each open document
+has one persistent `pdf-render.worker` and one native MuPDF `PDFDocument` in
+`DocumentSession`. Rendering, model hydration, export, text extraction, password
+verification and OCR image generation all use that instance. The main thread
+owns UI models, immutable source bytes and DOM font faces, never a parsed PDF
+object graph. `index.ts` is the client; `documentPipeline.ts` runs in the worker.
+`documentOwners.ts` routes operations on a loaded byte buffer back to its worker.
+
+`NativeEditingContext` supplies lazy dictionary/array/stream views over the
+native xref to the existing form, annotation, font-layout and page-assembly
+helpers. `@cantoo/pdf-lib` remains an appearance/layout dependency; its facade
+has no independent parsed xref or copied stream graph. Its parser, file writer
+and encryption implementation are not used by the application. Unchanged stream
+bodies are read only when a helper actually needs them. The adapter depends on
+the pinned helper constructor/object vocabulary and MuPDF bindings; upgrade
+these with native-adapter, source-assembly and browser round-trip tests.
+
+Hydration, thumbnail overlays and export use native journal transactions. The
+UI/history models describe draft edits; success, failure and cancellation all
+restore the immutable native source state after a job. Thumbnails draw a
+short-lived transparent page in the same document, then roll it back. Export
+uses the same xref and serializes through MuPDF without reopening the input.
+Trim only the page tree before assembly: MuPDF `rearrangePages` removes AcroForm
+and cannot preserve this editor's form/outline behavior.
+
+Imported sources are grafted into the owning document's page bank, with source
+catalog views and original-to-native reference mappings. A donor PDF is open
+only during grafting (temporary peak: two native documents); it is then destroyed.
+An import preview is a separate open document until its preview closes. Blank
+pages are created directly in the owner. Source lifetimes include undo history;
+unloading removes source pages/objects and invalidates cached pages. Native
+journal/allocator storage can remain reserved until the worker closes. Closing
+the editor terminates the worker and releases its entire WASM arena.
+
+The worker serializes document jobs with rendering, retaining queue priorities,
+canvas ownership, cancellation and logical-page routing. Queued commands can be
+cancelled; native rasterization/serialization are synchronous and cannot be
+interrupted mid-call. Native pages, lists, pixmaps and object handles are released
+explicitly. System-font bytes come from the host through a narrow request/response
+bridge; embedded font bytes return once for main-thread `FontFace` registration.
+Permission preferences are snapshotted into each export request.
+
+`raster.ts:drawPageToCanvas` writes directly from the live MuPDF pixmap to Canvas
+before destroying the pixmap. Pixel access and `putImageData` stay synchronous;
+no native allocation or async boundary may detach the borrowed WASM memory.
+Transparent overlays unpremultiply their scratch pixels in place. Consumers that
+retain/transfer pixels use `rasterizePage`, which still returns an owned copy.
+Canvas resizing happens only after successful rasterization, preserving the
+previous frame if native rendering fails.
+
+Standalone content operations without a live owner use a disposable
+`pdf-content.worker`; Node/test authoring also supports the native engine without
+a browser worker. `objectGraph.ts` is restricted to standalone authoring/diagnostic
+operations, not the live document pipeline. New application PDF operations must
+route through the owner, never call the helper library's `load` / `save`. PDF.js
+is a development-only independent reader; no runtime PDF.js assets are shipped.
+
+`textTypes.ts` defines the application text-layer contract independently of the
+engine. MuPDF glyphs are mapped into original PDF coordinates, split at word,
+font and direction boundaries, and consumed by the existing selection/search
+code. `raster.ts` composes the native page transform with the UI viewport so
+crop offsets, UserUnit, source rotation and temporary UI rotation agree.
+Thumbnail rendering draws immutable page contents, retains only untouched or
+unsupported source annotation appearances, then composites current editable
+controls using a transparent native-rendered overlay.
+
+`renderOcrImage` returns PNG bytes and `pixelToPdf` so an OCR provider can map
+pixel-space results without guessing about rotation, crop origins, DPI or
+UserUnit. It excludes annotations and widgets. No recognition model,
+credentials or OCR text-layer persistence is implemented by this engine.
+
+Saving flattened free text removes covered glyphs directly in the shared native
+transaction, preserving images, line art and unrelated redaction annotations,
+then draws replacement text before serialization. Export fails if requested
+text removal fails. This is text replacement, not document-wide sanitization.
+The standalone authoring fallback can still stage affected pages; live documents
+do not use that path.
+
+MuPDF's ESM loader and WASM binary are copied together under
+`mupdf/<pinned-version>/` and instantiated on first PDF use. The PWA precaches
+these essential assets so the first document can open offline after installation.
+Keep the asset URL version synchronized with the exact dependency pin. MuPDF
+uses AGPL-3.0-or-later, matching this project. Browser and Tauri web builds share
+the assets; native WebView behavior requires separate platform validation.
 
 ### Why a Worker Service Exists
 

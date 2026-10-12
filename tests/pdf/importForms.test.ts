@@ -14,12 +14,14 @@ const createMockWorkerService = () =>
   }) as unknown as PDFWorkerService;
 
 const createEmptyAppearance = async (pdfDoc: PDFDocument) => {
-  return pdfDoc.context.flateStream("", {
-    Type: PDFName.of("XObject"),
-    Subtype: PDFName.of("Form"),
-    BBox: [0, 0, 12, 12],
-    Resources: {},
-  });
+  return pdfDoc.context.register(
+    pdfDoc.context.flateStream("", {
+      Type: PDFName.of("XObject"),
+      Subtype: PDFName.of("Form"),
+      BBox: [0, 0, 12, 12],
+      Resources: {},
+    }),
+  );
 };
 
 const createRadioPdfWithWidgetFlags = async () => {

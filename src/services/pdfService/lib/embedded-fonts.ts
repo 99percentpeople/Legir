@@ -75,11 +75,15 @@ export const ensurePdfEmbeddedFontLoaded = async (
   pdfFontName: string,
   cache: EmbeddedFontLoadCache,
   loadedFaces?: Set<FontFace>,
+  collectFont?: (family: string, bytes: Uint8Array) => void,
 ): Promise<string | undefined> => {
-  if (typeof window === "undefined" || typeof FontFace === "undefined") {
+  if (
+    !collectFont &&
+    (typeof window === "undefined" || typeof FontFace === "undefined")
+  ) {
     return undefined;
   }
-  if (!document.fonts) return undefined;
+  if (!collectFont && !document.fonts) return undefined;
 
   const embedded = extractEmbeddedFontProgram(fontDict);
   if (!embedded) return undefined;
@@ -96,6 +100,12 @@ export const ensurePdfEmbeddedFontLoaded = async (
   const loadAndRegister = async (): Promise<string | undefined> => {
     let decodedBytes: Uint8Array | undefined;
     try {
+      if (collectFont) {
+        decodedBytes = decodePdfStreamBytes(embedded.stream);
+        if (!decodedBytes?.length) return undefined;
+        collectFont(family, decodedBytes);
+        return family;
+      }
       // fonts.check() also succeeds for fallback fonts. Inspect registered faces.
       for (const face of document.fonts) {
         if (face.family === family) {

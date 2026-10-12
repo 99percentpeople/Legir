@@ -7,7 +7,11 @@ type PageSpaceRect = {
 
 const blobToDataUrl = async (blob: Blob) => {
   if (typeof FileReader === "undefined") {
-    throw new Error("Data URL conversion is unavailable in this environment.");
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    for (let start = 0; start < bytes.length; start += 8192)
+      binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
+    return `data:${blob.type};base64,${btoa(binary)}`;
   }
 
   return await new Promise<string>((resolve, reject) => {

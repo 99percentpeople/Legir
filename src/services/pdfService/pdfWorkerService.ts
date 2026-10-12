@@ -1,7 +1,10 @@
 import PDFRenderWorker from "@/workers/pdf-render.worker?worker";
+import type { DocumentCommands, ExportPdfRequest } from "./engine/sessionTypes";
+import type { FontHostRequest } from "./engine/fontHost";
+import { getPlatformSystemFontBytes } from "@/services/platform/fonts";
 import type { PageData, PageSource, HistorySnapshot } from "@/types";
 import type { ThumbnailContent, Tile } from "./types";
-import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { TextContent } from "@/services/pdfService/engine/textTypes";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@/types";
 import type {
   WorkerCommandType,
@@ -74,7 +77,12 @@ type PendingRequestHandlers<TType extends WorkerCommandType> = {
   onProgress?: (payload: { loaded: number; total?: number }) => void;
 };
 
+import { documentOwners as byteOwners } from "./engine/documentOwners";
+export { getPdfWorkerForBytes } from "./engine/documentOwners";
+
 class PDFWorkerService {
+  private ownedBytes = new Set<Uint8Array>();
+  private loadedSourceIds = new Set<string>();
   private worker: Worker | null = null;
   private pendingRequests = new Map<
     string,
@@ -110,6 +118,7 @@ class PDFWorkerService {
     for (const id of new Set([
       ...this.sourceLoads.keys(),
       ...this.sourceResources.keys(),
+      ...this.loadedSourceIds,
     ])) {
       if (this.retainedSourceIds.has(id)) continue;
       this.unloadDocument(id);
@@ -151,13 +160,14 @@ class PDFWorkerService {
     if (!pending) {
       const source = this.pageSources[docId];
       pending = (async () => {
-        let bytes = source?.bytes;
+        const bytes = source?.bytes;
         if (docId.startsWith("blank:")) {
           const [, width, height] = docId.split(":").map(Number);
-          const { PDFDocument } = await import("@cantoo/pdf-lib");
-          const pdf = await PDFDocument.create();
-          pdf.addPage([width, height]);
-          bytes = await pdf.save();
+          return await this.documentCommand(
+            "addBlankSource",
+            { docId, width, height },
+            this.lifetime.signal,
+          );
         }
         if (!bytes) throw new Error("PDF page source is unavailable");
         this.lifetime.signal.throwIfAborted();
@@ -219,8 +229,8 @@ class PDFWorkerService {
     this.permissionsCacheByDocId.delete(docId);
   }
 
-  constructor() {
-    this.initWorker();
+  constructor(options?: { lazy?: boolean }) {
+    if (!options?.lazy) this.initWorker();
   }
 
   @RequireWorkerPromise()
@@ -297,13 +307,31 @@ class PDFWorkerService {
   }
 
   private initWorker() {
-    if (typeof Worker === "undefined") return;
+    // Canvas/thumbnail cleanup may arrive after the tab's owner is destroyed.
+    // Those callbacks must never resurrect a worker (and its WASM arena).
+    if (this.lifetime.signal.aborted || typeof Worker === "undefined") return;
 
     try {
       this.worker = new PDFRenderWorker();
       if (this.worker) {
-        this.worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+        this.worker.onmessage = (
+          e: MessageEvent<WorkerMessage | FontHostRequest>,
+        ) => {
           const msg = e.data;
+          if ("type" in msg && msg.type === "fontRequest") {
+            const worker = this.worker;
+            void getPlatformSystemFontBytes(msg.request)
+              .catch(() => undefined)
+              .then((bytes) => {
+                if (worker !== this.worker) return;
+                const copied = bytes?.slice();
+                worker?.postMessage(
+                  { type: "fontResponse", id: msg.id, bytes: copied },
+                  copied ? [copied.buffer] : [],
+                );
+              });
+            return;
+          }
           if ("type" in msg && msg.type === "loadProgress") {
             const request = this.pendingRequests.get(msg.id);
             if (request?.onProgress) {
@@ -345,6 +373,10 @@ class PDFWorkerService {
   }
 
   public destroy() {
+    for (const bytes of this.ownedBytes)
+      if (byteOwners.get(bytes) === this) byteOwners.delete(bytes);
+    this.ownedBytes.clear();
+    this.loadedSourceIds.clear();
     this.lifetime.abort();
     this.logicalPages = [];
     this.pageSources = {};
@@ -428,6 +460,18 @@ class PDFWorkerService {
         this.pendingRequests.set(id, {
           resolve: (msg: WorkerSuccessResponse<"load">) => {
             if (signal) signal.removeEventListener("abort", onAbort);
+            if (msg.payload !== false && docId !== this.defaultDocId)
+              this.loadedSourceIds.add(docId);
+            if (docId === this.defaultDocId && msg.payload !== false) {
+              this.loadedSourceIds.clear();
+              this.sourceLoads.clear();
+              for (const previous of this.ownedBytes)
+                if (byteOwners.get(previous) === this)
+                  byteOwners.delete(previous);
+              this.ownedBytes.clear();
+              byteOwners.set(data, this);
+              this.ownedBytes.add(data);
+            }
             resolve(Boolean(msg.payload ?? true));
           },
           reject: (msg: WorkerErrorResponse) => {
@@ -453,8 +497,76 @@ class PDFWorkerService {
     });
   }
 
+  public documentCommand<K extends keyof DocumentCommands>(
+    type: K,
+    input: DocumentCommands[K]["input"],
+    signal?: AbortSignal,
+  ): Promise<DocumentCommands[K]["output"]> {
+    signal?.throwIfAborted();
+    if (!this.worker) this.initWorker();
+    const worker = this.worker;
+    if (!worker) return Promise.reject(new Error("Worker not initialized"));
+    const request =
+      type === "exportDocument" ? (input as ExportPdfRequest) : undefined;
+    const structure = request?.options?.pageStructure;
+    const payload = structure
+      ? {
+          ...request,
+          options: {
+            ...request!.options,
+            pageStructure: {
+              ...structure,
+              sources: Object.fromEntries(
+                Object.entries(structure.sources).map(([id, source]) => [
+                  id,
+                  this.loadedSourceIds.has(id)
+                    ? { ...source, bytes: new Uint8Array() }
+                    : source,
+                ]),
+              ),
+            },
+          },
+        }
+      : input;
+    return new Promise((resolve, reject) => {
+      const id = `${type}_${this.requestSeq++}`;
+      const abort = () => {
+        this.pendingRequests.delete(id);
+        worker.postMessage({ type: "cancel", id });
+        reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      this.pendingRequests.set(id, {
+        resolve: (message) => {
+          signal?.removeEventListener("abort", abort);
+          if (structure)
+            for (const id of Object.keys(structure.sources))
+              this.loadedSourceIds.add(id);
+          resolve(message.payload as DocumentCommands[K]["output"]);
+        },
+        reject: (message) => {
+          signal?.removeEventListener("abort", abort);
+          reject(new Error(message.error));
+        },
+      });
+      try {
+        worker.postMessage({ ...payload, type, id });
+      } catch (error) {
+        this.pendingRequests.delete(id);
+        signal?.removeEventListener("abort", abort);
+        reject(error);
+      }
+    });
+  }
+
   @RequireWorkerVoid()
   public unloadDocument(docId: string) {
+    this.loadedSourceIds.delete(docId);
+    if (docId === this.defaultDocId) {
+      for (const bytes of this.ownedBytes)
+        if (byteOwners.get(bytes) === this) byteOwners.delete(bytes);
+      this.ownedBytes.clear();
+    }
     this.clearLastRenderScaleForDoc(docId);
     this.passwordByDocId.delete(docId);
     this.clearTextContentCacheForDoc(docId);
@@ -772,7 +884,6 @@ class PDFWorkerService {
     this.worker?.postMessage(message);
   }
 
-  @RequireWorkerPromise()
   public releaseCanvas(options: {
     canvasIds: string[];
     signal?: AbortSignal;
@@ -780,7 +891,9 @@ class PDFWorkerService {
     return new Promise((resolve, reject) => {
       const worker = this.worker;
       if (!worker) {
-        reject(new Error("Worker not initialized"));
+        // Terminating a worker already releases every owned canvas. Cleanup
+        // must be idempotent and must never initialize another worker.
+        resolve(true);
         return;
       }
       const { canvasIds, signal } = options;
@@ -812,7 +925,8 @@ class PDFWorkerService {
           },
           reject: (msg: WorkerErrorResponse) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            reject(new Error(msg.error));
+            if (this.lifetime.signal.aborted) resolve(true);
+            else reject(new Error(msg.error));
           },
         });
 
@@ -1074,4 +1188,6 @@ export { PDFWorkerService };
 
 export const createPdfWorkerService = () => new PDFWorkerService();
 
-export const pdfWorkerService = new PDFWorkerService();
+// Legacy convenience callers can still use the singleton; live tabs have
+// their own owner. Do not create an idle extra worker at application startup.
+export const pdfWorkerService = new PDFWorkerService({ lazy: true });

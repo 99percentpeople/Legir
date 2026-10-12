@@ -1,10 +1,8 @@
+import { getThumbnailSourceAnnotations } from "@/services/pdfService/lib/thumbnailSourceAnnotations";
 import { expect, it } from "vitest";
 import { PDFDocument } from "@cantoo/pdf-lib";
 import { FieldType, type Annotation } from "@/types";
-import {
-  createThumbnailOverlay,
-  thumbnailAnnotationFilter,
-} from "@/services/pdfService/lib/thumbnailOverlay";
+import { createThumbnailOverlay } from "@/services/pdfService/lib/thumbnailOverlay";
 import type { ThumbnailContent } from "@/services/pdfService/types";
 import { field } from "../helpers/editorStore";
 
@@ -29,38 +27,13 @@ const content = (): ThumbnailContent => ({
   preserved: [],
 });
 
-it("filters complete native annotation blocks, preserving untouched/unsupported appearances while removing edited/deleted annotations and widgets", () => {
+it("preserves untouched/unsupported native appearances while replacing edited annotations and widgets", () => {
   const snapshot = content();
   snapshot.annotations = [shape("untouched", 1), shape("edited", 2, true)];
   snapshot.preserved = [
     { pageIndex: 7, sourcePdfRef: { objectNumber: 5, generationNumber: 3 } },
   ];
-  const operators = {
-    fnArray: [0, 80, 9, 81, 80, 9, 81, 80, 9, 81, 80, 9, 81, 80, 9, 81, 0],
-    argsArray: [
-      [],
-      ["1R"],
-      [],
-      [],
-      ["2R"],
-      [],
-      [],
-      ["3R"],
-      [],
-      [],
-      ["4R"],
-      [],
-      [],
-      ["5R3"],
-      [],
-      [],
-      [],
-    ],
-  };
-  const include = thumbnailAnnotationFilter(snapshot, operators, 80, 81);
-  expect(operators.fnArray.map((_, index) => index).filter(include)).toEqual([
-    0, 1, 2, 3, 13, 14, 15, 16,
-  ]);
+  expect([...getThumbnailSourceAnnotations(snapshot)].sort()).toEqual([1, 5]);
 });
 
 it("builds a single-page overlay from current text, checkbox and choice values without loading a source document", async () => {

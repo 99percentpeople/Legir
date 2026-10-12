@@ -1,7 +1,7 @@
 import {
   getPlatformSystemFontCatalog,
   type PlatformSystemFontCatalog,
-} from "@/services/platform";
+} from "@/services/platform/fonts";
 
 let cachedCatalogPromise: Promise<PlatformSystemFontCatalog> | null = null;
 

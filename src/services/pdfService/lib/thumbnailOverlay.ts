@@ -1,4 +1,10 @@
-import { PDFDocument, StandardFonts, type PDFFont } from "@cantoo/pdf-lib";
+import { saveEditingDocument } from "../engine/editingDocument";
+import {
+  PDFDocument,
+  PDFName,
+  StandardFonts,
+  type PDFFont,
+} from "@cantoo/pdf-lib";
 import type { Annotation } from "@/types";
 import type { ThumbnailContent } from "../types";
 import { annotationExporters, controlExporters } from "../exporters";
@@ -16,21 +22,26 @@ const preserveAppearance = (annotation: Annotation) =>
 
 /** Reuse save appearances on a tiny, transparent single-page PDF in the render worker.
  * Never parse/copy the source PDF or move its bytes through the UI for an edit. */
-export async function createThumbnailOverlay(content: ThumbnailContent) {
+export async function drawThumbnailOverlay(
+  pdfDoc: PDFDocument,
+  content: ThumbnailContent,
+) {
+  const pageIndex = pdfDoc.getPageCount();
+  // This page and form tree exist only within the worker's native transaction.
+  pdfDoc.catalog.delete(PDFName.of("AcroForm"));
   const annotations = content.annotations
     .filter((annotation) => !preserveAppearance(annotation))
     .map((annotation) => ({
       ...annotation,
-      pageIndex: 0,
+      pageIndex,
       sourcePdfRef: undefined,
     }));
   const fields = content.fields.map((field) => ({
     ...field,
-    pageIndex: 0,
+    pageIndex,
     sourcePdfRef: undefined,
   }));
   if (!annotations.length && !fields.length) return null;
-  const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([content.width, content.height]);
   const viewport = createPdfLibViewport(page, { scale: 1 });
   const fontMap = new Map<string, PDFFont>();
@@ -44,14 +55,14 @@ export async function createThumbnailOverlay(content: ThumbnailContent) {
   const form = pdfDoc.getForm();
   const context = createFormExportContext(form);
   for (const entry of getOrderedExportControlsByPage(fields, annotations).get(
-    0,
+    pageIndex,
   ) ?? []) {
     if (entry.kind === "annotation") {
       if (entry.control.type === "comment") {
         // Text notes have no PDF appearance stream; use the same visible
         // fallback as printing instead of silently omitting the note icon.
         await drawAnnotationPrintFallbacks({
-          pages: [page],
+          pages: pdfDoc.getPages(),
           annotations: [entry.control],
           getViewportForPage: async () => viewport,
           targetPageIndexSet: null,
@@ -70,33 +81,13 @@ export async function createThumbnailOverlay(content: ThumbnailContent) {
     }
   }
   context.flushAppearanceUpdates();
-  return pdfDoc.save({ updateFieldAppearances: false });
+  return pageIndex;
 }
 
-/** Keep original appearances only for untouched and unsupported annotations.
- * Removed/edited annotations and widgets are replaced by current controls. */
-export function thumbnailAnnotationFilter(
-  content: ThumbnailContent,
-  operators: { fnArray: number[]; argsArray: unknown[][] },
-  beginAnnotation: number,
-  endAnnotation: number,
-) {
-  const keep = new Set(
-    [
-      ...content.preserved.map((item) => item.sourcePdfRef),
-      ...content.annotations
-        .filter(preserveAppearance)
-        .map((item) => item.sourcePdfRef!),
-    ].map((ref) => `${ref.objectNumber}R${ref.generationNumber || ""}`),
-  );
-  const excluded = new Set<number>();
-  let omit = false;
-  for (let index = 0; index < operators.fnArray.length; index++) {
-    const op = operators.fnArray[index];
-    if (op === beginAnnotation)
-      omit = !keep.has(String(operators.argsArray[index][0]));
-    if (omit) excluded.add(index);
-    if (op === endAnnotation) omit = false;
-  }
-  return (index: number) => !excluded.has(index);
+/** Standalone authoring helper for regression fixtures. Live thumbnails call
+ * drawThumbnailOverlay on the worker-owned document, without serialization. */
+export async function createThumbnailOverlay(content: ThumbnailContent) {
+  const pdfDoc = await PDFDocument.create();
+  const pageIndex = await drawThumbnailOverlay(pdfDoc, content);
+  return pageIndex === null ? null : saveEditingDocument(pdfDoc);
 }

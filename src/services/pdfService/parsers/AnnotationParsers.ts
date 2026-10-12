@@ -1470,6 +1470,7 @@ export class FreeTextParser implements IAnnotationParser {
                             baseFontName || resourceName,
                             context.embeddedFontCache,
                             context.embeddedFontFaces,
+                            context.collectFont,
                           )
                         : undefined;
 
@@ -1698,6 +1699,7 @@ export class FreeTextParser implements IAnnotationParser {
                                 resolvedBase || apFont.resourceName,
                                 context.embeddedFontCache,
                                 context.embeddedFontFaces,
+                                context.collectFont,
                               )
                             : undefined;
 

@@ -1,4 +1,4 @@
-import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { TextContent } from "@/services/pdfService/engine/textTypes";
 import type { PageData, PDFSearchResult } from "@/types";
 import { createViewportFromPageInfo } from "@/services/pdfService/lib/coords";
 import {

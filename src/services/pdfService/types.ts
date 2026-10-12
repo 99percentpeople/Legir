@@ -1,8 +1,8 @@
 /**
  * PDF pipeline contracts.
  *
- * Keep parser/exporter interfaces, viewport abstractions, and pdfjs/pdf-lib
- * bridge types here. Do not put editor-wide models here; those belong in
+ * Keep parser/exporter interfaces, viewport abstractions, and engine/authoring-model
+ * adapter types here. Do not put editor-wide models here; those belong in
  * `src/types.ts`.
  */
 import {
@@ -130,6 +130,7 @@ export interface ParserContext {
   systemFontFamilies?: string[];
   systemFontAliasToFamilyCompact?: Record<string, string>;
   embeddedFontCache?: Map<string, Promise<string | undefined>>;
+  collectFont?: (family: string, bytes: Uint8Array) => void;
   embeddedFontFaces?: Set<FontFace>;
   readStreamText?: (stream: PDFStream) => Promise<string>;
 }

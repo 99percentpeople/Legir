@@ -1,4 +1,7 @@
-import { pdfWorkerService } from "./pdfService/pdfWorkerService";
+import {
+  createPdfWorkerService,
+  getPdfWorkerForBytes,
+} from "./pdfService/pdfWorkerService";
 
 const bytesToDataUrl = async (bytes: Uint8Array, mimeType: string) => {
   const safeBytes = new Uint8Array(bytes);
@@ -19,13 +22,13 @@ export const renderPdfPreviewDataUrl = async (options: {
   renderAnnotations?: boolean;
   signal?: AbortSignal;
 }) => {
-  const docId = `recent_preview_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
+  const existing = getPdfWorkerForBytes(options.pdfBytes);
+  const worker = existing ?? createPdfWorkerService();
   try {
-    const { bytes, mimeType } = await pdfWorkerService.renderPageImage({
-      docId,
-      data: options.pdfBytes,
-      isNewDoc: true,
+    if (!existing)
+      await worker.loadDocument(options.pdfBytes, { signal: options.signal });
+    const { bytes, mimeType } = await worker.renderPageImage({
+      docId: "default",
       pageIndex: 0,
       targetWidth: options.targetWidth ?? 240,
       renderAnnotations: options.renderAnnotations ?? true,
@@ -38,6 +41,6 @@ export const renderPdfPreviewDataUrl = async (options: {
     if (!bytes || bytes.length === 0) return null;
     return await bytesToDataUrl(bytes, mimeType || "image/jpeg");
   } finally {
-    pdfWorkerService.unloadDocument(docId);
+    if (!existing) worker.destroy();
   }
 };

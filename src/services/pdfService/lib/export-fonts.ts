@@ -1,6 +1,7 @@
 import type { PDFDocument, PDFFont } from "@cantoo/pdf-lib";
 import { FieldType, type Annotation, type FormField } from "@/types";
 import { isDesktopApp } from "@/services/platform/runtime";
+import { hasWorkerFontProvider } from "../engine/fontHost";
 import {
   loadAndEmbedExportFonts,
   loadAndEmbedSelectedSystemFonts,
@@ -50,7 +51,7 @@ export const prepareExportFonts = async (args: {
       families.has(family),
     );
   const systemFamilies =
-    typeof window !== "undefined" && isDesktopApp()
+    hasWorkerFontProvider() || (typeof window !== "undefined" && isDesktopApp())
       ? [...families].filter(
           (family) =>
             !fontMap.has(family) && !isExplicitCjkFontSelection(family),

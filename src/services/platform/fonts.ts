@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { isDesktopApp } from "./runtime";
+import {
+  hasWorkerFontProvider,
+  requestHostFont,
+} from "@/services/pdfService/engine/fontHost";
 
 const normalizeFontBytes = (value: Uint8Array | number[] | null) => {
   if (!value) return undefined;
@@ -78,6 +82,7 @@ export const getPlatformSystemFontBytes = async (args: {
   families: string[];
   generic: "serif" | "sans-serif" | null;
 }): Promise<Uint8Array | undefined> => {
+  if (hasWorkerFontProvider()) return requestHostFont(args);
   if (!isDesktopApp()) return undefined;
 
   const result = await invoke<Uint8Array | number[] | null>(

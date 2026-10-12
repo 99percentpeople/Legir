@@ -1,6 +1,7 @@
-import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { TextContent } from "@/services/pdfService/engine/textTypes";
 import type { PDFDocumentPermissions, PDFOutlineItem } from "@/types";
 import type { ThumbnailContent, Tile } from "./types";
+import type { DocumentCommands } from "./engine/sessionTypes";
 
 type CommandSpec<TRequest extends object, TResponse = never> =
   | TRequest
@@ -10,6 +11,11 @@ type SpecRequest<T> = T extends [infer Req, unknown] ? Req : T;
 type SpecResponse<T> = T extends [unknown, infer Res] ? Res : never;
 
 export type WorkerCommandPayloadMap = {
+  [K in keyof DocumentCommands]: [
+    DocumentCommands[K]["input"],
+    DocumentCommands[K]["output"],
+  ];
+} & {
   render: CommandSpec<
     {
       docId?: string;

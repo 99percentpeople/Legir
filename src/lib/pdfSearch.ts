@@ -1,4 +1,4 @@
-import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { TextContent } from "@/services/pdfService/engine/textTypes";
 import { isTextItem } from "@/services/pdfService/lib/textGeometry";
 import type {
   PageData,

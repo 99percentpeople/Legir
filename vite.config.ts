@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => {
       viteDevApiProxyPlugin(),
       react(),
       tailwindcss(),
-      createStaticCopyPlugin(),
+      createStaticCopyPlugin(packageJson.dependencies.mupdf),
       ...(!isTauriEnv ? createPwaPlugin(packageJson.displayName) : []),
     ],
     define: {
@@ -72,6 +72,7 @@ export default defineConfig(({ mode }) => {
       // API credentials are intentionally configured only inside the app and
       // must never be embedded into browser/Tauri frontend bundles at build time.
       "process.env.APP_NAME": JSON.stringify(packageJson.displayName),
+      __MUPDF_VERSION__: JSON.stringify(packageJson.dependencies.mupdf),
     },
     resolve: {
       alias: {

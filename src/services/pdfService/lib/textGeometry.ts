@@ -2,7 +2,7 @@ import type {
   TextItem,
   TextMarkedContent,
   TextStyle,
-} from "pdfjs-dist/types/src/display/api";
+} from "@/services/pdfService/engine/textTypes";
 
 export const DEFAULT_PDF_TEXT_STYLE: TextStyle = {
   ascent: 0.8,

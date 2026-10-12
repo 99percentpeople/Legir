@@ -1,4 +1,7 @@
-import type { TextContent, TextStyle } from "pdfjs-dist/types/src/display/api";
+import type {
+  TextContent,
+  TextStyle,
+} from "@/services/pdfService/engine/textTypes";
 import {
   DEFAULT_PDF_TEXT_STYLE,
   getItemTransform,

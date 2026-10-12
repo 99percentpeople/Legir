@@ -1,6 +1,7 @@
 import type { PDFFont, PDFDocument } from "@cantoo/pdf-lib";
 import { getPlatformSystemFontBytes } from "@/services/platform/fonts";
 import { isDesktopApp } from "@/services/platform/runtime";
+import { hasWorkerFontProvider } from "../engine/fontHost";
 
 type Fontkit = Parameters<PDFDocument["registerFontkit"]>[0];
 
@@ -162,18 +163,22 @@ export const loadAndEmbedExportFonts = async (args: {
     if (includeFontIds && !includeFontIds.has(def.id)) continue;
 
     const bytes =
-      typeof window !== "undefined" && isDesktopApp()
+      hasWorkerFontProvider() ||
+      (typeof window !== "undefined" && isDesktopApp())
         ? await getPlatformSystemFontBytes({
             families: def.systemFamilies,
             generic: def.generic,
           })
         : await fetchFontBytes(def.path);
-    if (!bytes) {
+    const resolvedBytes =
+      bytes ??
+      (hasWorkerFontProvider() ? await fetchFontBytes(def.path) : undefined);
+    if (!resolvedBytes) {
       console.warn("[PDF Export] Built-in font not found", def.path);
       continue;
     }
 
-    const embedded = await embedFont(bytes, subset);
+    const embedded = await embedFont(resolvedBytes, subset);
     if (embedded) {
       for (const key of def.exportKeys) {
         setFontMapIfMissing(fontMap, key, embedded, key.startsWith("Custom"));
@@ -192,7 +197,11 @@ export const loadAndEmbedSelectedSystemFonts = async (args: {
   families: string[];
   subset?: boolean;
 }) => {
-  if (!(typeof window !== "undefined" && isDesktopApp())) return;
+  if (
+    !hasWorkerFontProvider() &&
+    !(typeof window !== "undefined" && isDesktopApp())
+  )
+    return;
 
   const { pdfDoc, fontMap, fontkit } = args;
   const subset = args.subset ?? true;

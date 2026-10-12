@@ -1,6 +1,9 @@
 import { parsePageRange } from "@/utils/pageRange";
 export type { ParsePageRangeResult } from "@/utils/pageRange";
-import type { TextContent, TextStyle } from "pdfjs-dist/types/src/display/api";
+import type {
+  TextContent,
+  TextStyle,
+} from "@/services/pdfService/engine/textTypes";
 import {
   pdfWorkerService,
   type PDFWorkerService,
