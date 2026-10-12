@@ -7,12 +7,86 @@ import { getNativePageViewport } from "@/services/pdfService/engine/pageContent"
 import {
   disposeNativePage,
   drawPageToCanvas,
+  drawPageToCanvasCooperatively,
   rasterizePage,
 } from "@/services/pdfService/engine/raster";
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it("cancels a running native render without painting and can immediately restart", async () => {
+  stubImageData();
+  const engine = await getPDFium();
+  const doc = new engine.PDFDocument();
+  doc.insertPage(
+    -1,
+    doc.addPage(
+      [0, 0, 400, 400],
+      0,
+      {},
+      Array.from(
+        { length: 18000 },
+        (_, i) => `${i % 400} ${Math.floor(i / 400) * 7} 3 6 re f`,
+      ).join("\n"),
+    ),
+  );
+  const page = doc.loadPage(0);
+  const viewport = getNativePageViewport(page);
+  const canvas = { width: 12, height: 15 },
+    putImageData = vi.fn();
+  let cancelled = false;
+  try {
+    await expect(
+      drawPageToCanvasCooperatively(
+        page,
+        viewport,
+        [0, 0, 400, 400],
+        { canvas, putImageData },
+        {},
+        () => {
+          if (cancelled) throw new DOMException("Cancelled", "AbortError");
+        },
+        async () => {
+          cancelled = true;
+        },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(putImageData).not.toHaveBeenCalled();
+    expect(canvas).toEqual({ width: 12, height: 15 });
+    expect(page.renderTasks.size).toBe(0);
+    await drawPageToCanvasCooperatively(
+      page,
+      viewport,
+      [0, 0, 400, 400],
+      { canvas, putImageData },
+      {},
+      () => {},
+      async () => {},
+    );
+    expect(putImageData).toHaveBeenCalledOnce();
+    expect(page.renderTasks.size).toBe(0);
+    await expect(
+      drawPageToCanvasCooperatively(
+        page,
+        viewport,
+        [0, 0, 400, 400],
+        {
+          canvas,
+          putImageData: () => {
+            throw Error("Canvas closed");
+          },
+        },
+        {},
+        () => {},
+        async () => {},
+      ),
+    ).rejects.toThrow("Canvas closed");
+    expect(page.renderTasks.size).toBe(0);
+  } finally {
+    doc.destroy();
+  }
 });
 
 async function fixture() {

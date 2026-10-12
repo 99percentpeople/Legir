@@ -59,10 +59,10 @@ const toWindowPickerTypes = (filters?: FilePickerFilter[]) => {
   }));
 };
 
-const toByteChunk = (bytes: Uint8Array): ArrayBuffer => {
+const toByteChunk = (bytes: Uint8Array): Uint8Array<ArrayBuffer> => {
   return bytes.buffer instanceof ArrayBuffer
-    ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-    : new Uint8Array(bytes).buffer;
+    ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    : new Uint8Array(bytes);
 };
 
 function guessMimeType(extensions: string[]): `${string}/${string}` {
@@ -273,7 +273,7 @@ export const saveFileAs = async (options: {
     (options.filters && options.filters.length > 0
       ? guessMimeType(options.filters[0].extensions)
       : "application/octet-stream");
-  const blob = new Blob([new Uint8Array(options.bytes)], {
+  const blob = new Blob([toByteChunk(options.bytes)], {
     type: fallbackMimeType,
   });
   const url = URL.createObjectURL(blob);
@@ -302,7 +302,7 @@ export const savePdfBytes = async (options: {
     return { ok: false, reason: "unsupported" };
   }
 
-  const blob = new Blob([new Uint8Array(options.bytes)], {
+  const blob = new Blob([toByteChunk(options.bytes)], {
     type: "application/pdf",
   });
   const url = URL.createObjectURL(blob);

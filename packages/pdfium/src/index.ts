@@ -5,9 +5,11 @@ import type { LoadOptions } from "./types.js";
 
 export { PDFDocument, PDFGraftMap } from "./document.js";
 export { PDFObject, decodeName } from "./object.js";
-export { PDFPage, PDFPixmap, PDFAnnotation } from "./page.js";
+export { PDFPage, PDFPixmap, PDFAnnotation, PDFRenderTask } from "./page.js";
 export { PDFBuffer } from "./runtime.js";
 export { Matrix } from "./matrix.js";
+export { createCanvasPlan, drawCanvasPlan } from "./canvas.js";
+export type { PDFCanvasPlan } from "./canvas.js";
 export { ObjectType } from "./types.js";
 export type * from "./types.js";
 

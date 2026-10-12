@@ -49,6 +49,7 @@ describe("one native document session", () => {
       const parsed = await session.parse({}, async () => undefined);
       expect(parsed.fields).toHaveLength(1);
       expect(session.lastTransactionChanged).toBe(false);
+      expect(session.lastTransactionAffectsRendering).toBe(false);
       expect(pixels()).toEqual(original);
       await expect(
         session.transaction("default", async (view) => {
@@ -57,9 +58,16 @@ describe("one native document session", () => {
         }),
       ).rejects.toThrow("Cancelled edit");
       expect(session.lastTransactionChanged).toBe(true);
+      expect(session.lastTransactionAffectsRendering).toBe(true);
       expect(pixels()).toEqual(original);
       await session.transaction("default", async () => {});
       expect(session.lastTransactionChanged).toBe(false);
+      await session.transaction("default", async (view) => {
+        view.setTitle("Metadata only");
+      });
+      expect(session.lastTransactionChanged).toBe(true);
+      expect(session.lastTransactionAffectsRendering).toBe(false);
+      expect(pixels()).toEqual(original);
     } finally {
       page.destroy();
       session.dispose();

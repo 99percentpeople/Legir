@@ -43,6 +43,51 @@ function render(page: PDFPage, imageCache?: "populate" | "reuse") {
 }
 
 describe("bounded native large-image cache", () => {
+  it("keeps partially decoded pixels pinned while paused and releases them on cancellation", () => {
+    engine.setLargeImageCacheLimit(64 * 1024 * 1024);
+    const source = fixture(73);
+    const page = source.doc.loadPage(0);
+    const task = page.startRender([1, 0, 0, -1, 0, 80], [0, 0, 80, 80]);
+    try {
+      let done = false;
+      for (let i = 0; i < 1000 && !engine.largeImageCache().bytes && !done; i++)
+        done = task.continue(1);
+      expect(done).toBe(false);
+      expect(engine.largeImageCache().bytes).toBe(imageBytes);
+      engine.setLargeImageCacheLimit(0);
+      // The lowered budget takes effect after borrowed scanlines are released.
+      expect(engine.largeImageCache().bytes).toBe(imageBytes);
+      task.destroy();
+      expect(engine.largeImageCache()).toMatchObject({ bytes: 0, entries: 0 });
+      expect([...render(page).slice(0, 4)]).toEqual([73, 73, 73, 255]);
+    } finally {
+      task.destroy();
+      source.doc.destroy();
+      engine.setLargeImageCacheLimit(256 * 1024 * 1024);
+    }
+  });
+  it("finishes a paused cache fill with identical pixels and reuses it for subsequent tiles", () => {
+    const source = fixture(129);
+    const page = source.doc.loadPage(0);
+    const task = page.startRender([1, 0, 0, -1, 0, 80], [0, 0, 80, 80]);
+    try {
+      const before = engine.largeImageCache().decodes;
+      let slices = 1;
+      while (!task.continue(1)) {
+        if (++slices > 10000) throw Error("Image rendering did not finish");
+      }
+      expect(slices).toBeGreaterThan(1);
+      const output = task.finish();
+      const expected = output.getPixels().slice();
+      output.destroy();
+      expect([...expected.slice(0, 4)]).toEqual([129, 129, 129, 255]);
+      expect(render(page)).toEqual(expected);
+      expect(engine.largeImageCache().decodes).toBe(before + 1);
+    } finally {
+      task.destroy();
+      source.doc.destroy();
+    }
+  });
   it("lets previews reuse foreground pixels without filling or evicting the cache", () => {
     engine.setLargeImageCacheLimit(64 * 1024 * 1024);
     const first = fixture(73),

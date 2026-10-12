@@ -61,11 +61,25 @@ for (const fixture of manifest.fixtures) {
         y + (position ? 1024 : Math.floor(h)),
       ];
       const start = performance.now();
-      const pixmap = page.render(matrix, bounds, {
+      const options = {
         annotations: true,
         imageCache:
           process.env.PDF_IMAGE_CACHE_MODE === "reuse" ? "reuse" : "populate",
-      });
+      };
+      let pixmap;
+      const slices = [];
+      if (process.env.PDF_RENDER_PROGRESSIVE === "1") {
+        const job = page.startRender(matrix, bounds, options);
+        try {
+          let done = false;
+          while (!done) {
+            const sliceStart = performance.now();
+            done = job.continue(8);
+            slices.push(performance.now() - sliceStart);
+          }
+          pixmap = job.finish();
+        } finally { job.destroy(); }
+      } else pixmap = page.render(matrix, bounds, options);
       const ms = performance.now() - start;
       try {
         record.renders.push({
@@ -74,6 +88,7 @@ for (const fixture of manifest.fixtures) {
           rotation,
           bounds,
           ms,
+          ...(slices.length ? { slices } : {}),
           hash: createHash("sha256").update(pixmap.getPixels()).digest("hex"),
           cache: cache(),
         });

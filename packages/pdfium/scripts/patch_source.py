@@ -4,6 +4,10 @@ from pathlib import Path
 
 def patch(source: Path):
     changes = {
+        "core/fpdfapi/parser/cpdf_stream.h": (
+            "  void TakeData(DataVector<uint8_t> data);",
+            "  void TakeData(DataVector<uint8_t> data);\n  void CopyDataForEditing(const CPDF_Stream& source);",
+        ),
         "core/fpdfapi/parser/cpdf_number.h": (
             "  FX_Number number_;",
             "  FX_Number number_;\n  ByteString original_spelling_;",

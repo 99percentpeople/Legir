@@ -11,17 +11,19 @@
     "renderer": "agg"
   },
   "sha256": {
-    "pdfium.js": "64509625dd2832016d495c225ef1f1d19cdad2896b557bc55d8cfae53334f8d1",
-    "pdfium.wasm": "7576293953f6a8975599265e3d8115044f9a36ea80ec07d0ac8851327bb49f2f"
+    "pdfium.js": "fb0e9f0e6f69e5d323447bce13410ba7acf66876b4a20a9fd4efaf0e52b18290",
+    "pdfium.wasm": "e277457dd37cb2c33db4ed17d84d4c79904dd1348b2025a5cbd112ad740e2adc"
   },
   "sourceSha256": {
-    "native/bridge.cpp": "9a1ae425796861f1695a0ace757f86b353a74d8f4af545011b581eb3846d545a",
-    "native/image_cache.cpp": "61eae5c165d9a520a3cb01c6fa0bcea8d7a7d6166cec09fe319a8bf5f1f1056c",
-    "native/image_cache.h": "b25cb662a7f29cd51c2ce4ccfaef6a8d2a9ef2b827033025e528637cc7d35c15",
+    "native/bridge.cpp": "b306f2a649ecc74667e0aadc7b48ff50bc447c258f6e39567189821643e30a1e",
+    "native/canvas_plan.cpp": "8a83bddb597ae6e8a1026253274aae7e8d58fb0add162275aba094d240e18884",
+    "native/canvas_plan.h": "75d87de68b736a7766d51db1409cc9dbd47448c59efeab2785e766b81eab32ae",
+    "native/image_cache.cpp": "8606addc82ed8d8e8db02076439a61edb5bb171d2556dfce800c36c9b0a3e339",
+    "native/image_cache.h": "eaef89b2d624c16db12445ae4c151a59f762450c824ab95595f83c2eceec9ca4",
     "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
     "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
     "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0"
   },
-  "patchSha256": "2bd39aa18d05ec1ca93fd71160d3dc0c968962c65ecb4026f999daf9a20829ca",
-  "buildScriptSha256": "f94a0b4d51b386578176265dc28a8aecc8f2fb43261beb8908b68dcb0b2d7c44"
+  "patchSha256": "4f770df2869fc03bc41da6cdfaba607b9343746e88cd288e34fef131897170e0",
+  "buildScriptSha256": "d1c639795505199d84a9468282f00524f8a85b71561dfb9542b592ab1f045fd9"
 }

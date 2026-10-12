@@ -114,6 +114,12 @@ const loadPDFInternal = async (
 ): Promise<LoadedPdfDocument> => {
   const worker = options?.workerService ?? pdfWorkerService;
   options?.signal?.throwIfAborted();
+  // Only an explicit open initializes the owner. Compile WASM while the host
+  // reads the file instead of placing both operations on the critical path.
+  const warming = isNode()
+    ? undefined
+    : worker.documentCommand("warmup", {}, options?.signal);
+  void warming?.catch(() => {});
   const bytes =
     input instanceof Uint8Array
       ? input
@@ -124,6 +130,7 @@ const loadPDFInternal = async (
       ...options,
       workerService: worker,
     });
+  await warming;
   const session = createPdfLoadSession("loadPDF", options?.signal);
   let password = options?.password ?? undefined;
   let prompted = !!password;

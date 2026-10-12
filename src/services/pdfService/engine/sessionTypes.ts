@@ -22,6 +22,7 @@ export type ParsedPdfModels = Omit<
   fonts: { family: string; bytes: Uint8Array }[];
 };
 export type DocumentCommands = {
+  warmup: { input: object; output: boolean };
   addBlankSource: {
     input: { docId: string; width: number; height: number };
     output: boolean;

@@ -14,7 +14,9 @@ import {
 } from "@/services/pdfService/engine/pageContent";
 import {
   drawPageToCanvas,
+  drawPageToCanvasCooperatively,
   disposeNativePage,
+  yieldRenderTask,
 } from "@/services/pdfService/engine/raster";
 import { getThumbnailSourceAnnotations } from "@/services/pdfService/lib/thumbnailSourceAnnotations";
 
@@ -74,7 +76,13 @@ const canvasMap = new Map<string, OffscreenCanvas>();
 // Store active render tasks to allow cancellation
 const activeRenderTasks = new Map<
   string,
-  { cancel: () => void; docId: string; canvasId?: string }
+  {
+    cancel: () => void;
+    docId: string;
+    canvasId?: string;
+    pageIndex?: number;
+    scale?: number;
+  }
 >();
 
 const registerCancellableTask = (
@@ -83,12 +91,16 @@ const registerCancellableTask = (
   onCancel?: () => void,
   meta?: {
     canvasId?: string;
+    pageIndex?: number;
+    scale?: number;
   },
 ) => {
   let isCancelled = false;
   activeRenderTasks.set(id, {
     docId,
     canvasId: meta?.canvasId,
+    pageIndex: meta?.pageIndex,
+    scale: meta?.scale,
     cancel: () => {
       isCancelled = true;
       try {
@@ -122,6 +134,7 @@ const compareRenderTasks = (a: QueueItem, b: QueueItem) =>
   Number(a.data.type === "renderImage") -
     Number(b.data.type === "renderImage") || a.priority - b.priority;
 let isProcessing = false;
+class RenderPreempted extends Error {}
 
 type TaskResult = {
   payload?: unknown;
@@ -405,10 +418,11 @@ const renderToCanvas = async (
   const docId = getDocId(params.docId);
   const task = registerCancellableTask(params.id, docId, undefined, {
     canvasId: params.canvasId,
+    pageIndex: params.pageIndex,
+    scale: params.scale,
   });
   try {
     await ensureDocumentLoaded(docId);
-    const pdfium = await getPDFium();
     task.throwIfCancelled();
     const canvas = params.canvas ?? canvasMap.get(params.canvasId);
     if (!canvas) throw new Error("Missing render canvas");
@@ -426,13 +440,13 @@ const renderToCanvas = async (
     ];
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Could not get canvas context");
-    drawPageToCanvas(
-      pdfium,
+    await drawPageToCanvasCooperatively(
       cached.page,
       viewport,
       [x, y, x + width, y + height],
       ctx,
       { annotations: params.renderAnnotations === true },
+      task.throwIfCancelled,
     );
     task.throwIfCancelled();
     // Acknowledge after the transferred canvas can be presented.
@@ -457,6 +471,7 @@ const renderToImage = async (
 ): Promise<TaskResult> => {
   const docId = getDocId(params.docId);
   const task = registerCancellableTask(params.id, docId);
+  let canvas: OffscreenCanvas | undefined;
   try {
     await ensureDocumentLoaded(docId, params.isNewDoc ? params : undefined);
     const pdfium = await getPDFium();
@@ -479,11 +494,10 @@ const renderToImage = async (
           ),
         )
       : undefined;
-    const canvas = new OffscreenCanvas(width, height);
+    canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Could not get canvas context");
-    drawPageToCanvas(
-      pdfium,
+    await drawPageToCanvasCooperatively(
       cached.page,
       viewport,
       [0, 0, width, height],
@@ -492,6 +506,16 @@ const renderToImage = async (
         annotations: !content && params.renderAnnotations === true,
         keepAnnotations,
         imageCache: "reuse",
+      },
+      task.throwIfCancelled,
+      async () => {
+        await yieldRenderTask();
+        task.throwIfCancelled();
+        if (
+          taskQueue.some((item) => item.data.type === "render") ||
+          waitingCommands.size
+        )
+          throw new RenderPreempted();
       },
     );
     if (content) {
@@ -543,6 +567,7 @@ const renderToImage = async (
     throw error;
   } finally {
     task.cleanup();
+    if (canvas) canvas.width = canvas.height = 0;
   }
 };
 
@@ -628,6 +653,8 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
             activeRenderTasks.delete(taskId);
           }
           for (const cid of idsToRelease) {
+            const canvas = canvasMap.get(cid);
+            if (canvas) canvas.width = canvas.height = 0;
             canvasMap.delete(cid);
           }
         }
@@ -639,6 +666,18 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
         const incomingScale = data.scale;
         const incomingDocId = getDocId(data.docId);
         const incomingPageIndex = data.pageIndex;
+
+        for (const task of activeRenderTasks.values()) {
+          if (
+            task.canvasId &&
+            task.docId === incomingDocId &&
+            task.pageIndex === incomingPageIndex &&
+            task.scale !== undefined &&
+            incomingScale !== undefined &&
+            Math.abs(task.scale - incomingScale) > 0.001
+          )
+            task.cancel();
+        }
 
         if (
           incomingScale !== undefined &&
@@ -788,8 +827,8 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           // Read-only hydration retains the first page's parsed/decoded data.
           // A journaled write may affect shared resources: invalidate safely.
           if (
-            data.type === "exportDocument" ||
-            (data.type === "parseDocument" && session!.lastTransactionChanged)
+            (data.type === "exportDocument" || data.type === "parseDocument") &&
+            session!.lastTransactionAffectsRendering
           ) {
             for (const state of docs.values()) {
               state.pageCache.clear();
@@ -804,6 +843,11 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
 
     postSuccess(id, result?.payload, result?.transfer);
   } catch (err) {
+    if (err instanceof RenderPreempted && data?.type === "renderImage") {
+      taskQueue.push({ id: data.id, priority: data.priority ?? 0, data });
+      taskQueue.sort(compareRenderTasks);
+      return;
+    }
     if (id) {
       postError(id, err?.message || "Unknown error");
     }
@@ -826,6 +870,13 @@ self.onmessage = async (e: MessageEvent<WorkerRequest | FontHostResponse>) => {
   const { type, id } = data;
 
   switch (type) {
+    case "warmup":
+      void getPDFium().then(
+        () => postSuccess(id, true),
+        (error) =>
+          postError(id, error instanceof Error ? error.message : String(error)),
+      );
+      return;
     case "cancel": {
       const waiting = waitingCommands.get(id);
       if (waiting) waiting.cancelled = true;
@@ -841,8 +892,6 @@ self.onmessage = async (e: MessageEvent<WorkerRequest | FontHostResponse>) => {
       const task = activeRenderTasks.get(id);
       if (task) {
         task.cancel();
-        activeRenderTasks.delete(id);
-        postSuccess(id, false);
       }
       return;
     }

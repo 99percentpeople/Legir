@@ -12,6 +12,7 @@ import type {
 } from "./types.js";
 
 export class PDFPage {
+  readonly renderTasks = new Set<PDFRenderTask>();
   constructor(
     readonly document: PDFDocument,
     public pointer: number,
@@ -92,7 +93,29 @@ export class PDFPage {
     return [0, 0, rotation % 180 ? h : w, rotation % 180 ? w : h];
   }
   render(matrix: MatrixType, bounds: Rect, options: RenderOptions = {}) {
+    const raster = this.createRaster("LPDF_Render", matrix, bounds, options);
+    return new PDFPixmap(this.document.runtime, ...raster);
+  }
+  /** A cooperative render owned by this page. Continue synchronously, yield in
+   * the host, and always finish or destroy it before editing the document. */
+  startRender(matrix: MatrixType, bounds: Rect, options: RenderOptions = {}) {
+    const raster = this.createRaster(
+      "LPDF_RenderStart",
+      matrix,
+      bounds,
+      options,
+    );
+    return new PDFRenderTask(this, ...raster);
+  }
+  private createRaster(
+    name: "LPDF_Render" | "LPDF_RenderStart",
+    matrix: MatrixType,
+    bounds: Rect,
+    options: RenderOptions,
+  ): [number, number, number, number, number] {
     this.assertOpen();
+    if (this.renderTasks.size)
+      throw new Error("The PDF page already has an active render task.");
     const rt = this.document.runtime;
     const width = Math.ceil(bounds[2]) - Math.floor(bounds[0]),
       height = Math.ceil(bounds[3]) - Math.floor(bounds[1]);
@@ -111,7 +134,7 @@ export class PDFPage {
       : undefined;
     const call = (mp: number, rp = 0) =>
       rt.call(
-        "LPDF_Render",
+        name,
         this.document.pointer,
         this.pointer,
         width,
@@ -130,14 +153,13 @@ export class PDFPage {
         : call(mp),
     );
     if (!pointer) throw new Error("PDFium could not render the page.");
-    return new PDFPixmap(
-      rt,
+    return [
       pointer,
       width,
       height,
       Math.floor(bounds[0]),
       Math.floor(bounds[1]),
-    );
+    ];
   }
   toPixmap(
     matrix: MatrixType,
@@ -263,6 +285,7 @@ export class PDFPage {
   }
   redactText(quads: Quad[]) {
     this.assertOpen();
+    for (const task of this.renderTasks) task.destroy();
     if (
       !quads.every((quad) => quad.length === 8 && quad.every(Number.isFinite))
     )
@@ -315,9 +338,53 @@ export class PDFPage {
   }
   destroy() {
     if (!this.pointer) return;
+    for (const task of this.renderTasks) task.destroy();
     this.document.runtime.call("LPDF_ClosePage", this.pointer);
     this.pointer = 0;
     this.document.pages.delete(this);
+  }
+}
+
+export class PDFRenderTask {
+  private done = false;
+  constructor(
+    readonly page: PDFPage,
+    public pointer: number,
+    readonly width: number,
+    readonly height: number,
+    readonly x: number,
+    readonly y: number,
+  ) {
+    page.renderTasks.add(this);
+  }
+  /** Returns true when finished. The budget is cooperative, not a hard limit. */
+  continue(milliseconds = 8) {
+    this.page.assertOpen();
+    if (!this.pointer) throw new Error("PDF render task is closed.");
+    if (!Number.isFinite(milliseconds) || milliseconds <= 0)
+      throw new Error("Render time budget must be positive.");
+    const status = this.page.document.runtime.call(
+      "LPDF_RenderContinue",
+      this.pointer,
+      milliseconds,
+    );
+    if (status === 3) throw new Error("PDFium could not continue rendering.");
+    return (this.done = status === 2);
+  }
+  finish() {
+    if (!this.pointer || !this.done)
+      throw new Error("PDF render task has not finished.");
+    const rt = this.page.document.runtime;
+    const pointer = rt.call("LPDF_RenderFinish", this.pointer);
+    if (!pointer) throw new Error("PDFium could not finish rendering.");
+    this.destroy();
+    return new PDFPixmap(rt, pointer, this.width, this.height, this.x, this.y);
+  }
+  destroy() {
+    if (this.pointer)
+      this.page.document.runtime.call("LPDF_RenderDrop", this.pointer);
+    this.pointer = 0;
+    this.page.renderTasks.delete(this);
   }
 }
 

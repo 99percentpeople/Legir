@@ -3,6 +3,7 @@
 #define LEGIR_IMAGE_CACHE_H_
 
 #include <cstddef>
+#include <cstdint>
 
 namespace legir {
 struct LargeImageCacheStats {
@@ -14,7 +15,9 @@ struct LargeImageCacheStats {
 };
 LargeImageCacheStats GetLargeImageCacheStats();
 void SetLargeImageCacheLimit(size_t bytes);
-void BeginImageRender(bool populate);
+uint64_t BeginImageRender(bool populate);
+void ResumeImageRender(uint64_t token);
+void EndImageRender(uint64_t token);
 }  // namespace legir
 
 #endif

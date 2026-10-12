@@ -126,7 +126,7 @@ emscripten_path = "{emsdk.resolve()}/upstream/emscripten"
     exported += ["_malloc", "_free", "_FPDFText_LoadPage", "_FPDFText_ClosePage", "_FPDFText_CountChars",
                  "_FPDFText_GetUnicode", "_FPDFText_GetFontSize", "_FPDFText_GetFontInfo", "_FPDFText_GetCharBox",
                  "_FPDFText_GetCharOrigin", "_FPDFText_GetCharAngle", "_FPDFText_GetFillColor"]
-    run([em / "em++", native, ROOT / "native/text_edit.cpp", ROOT / "native/image_cache.cpp", out / "obj/libpdfium.a", "-I" + str(source), "-I" + str(out / "gen"),
+    run([em / "em++", native, ROOT / "native/text_edit.cpp", ROOT / "native/image_cache.cpp", ROOT / "native/canvas_plan.cpp", out / "obj/libpdfium.a", "-I" + str(source), "-I" + str(out / "gen"),
          "-std=c++20", "-fno-rtti", "-fno-exceptions", "-msimd128", "-O2", "-DNDEBUG", "-DPDF_USE_AGG",
          "--no-entry", "-sSTACK_SIZE=1048576", "-sALLOW_MEMORY_GROWTH=1", "-sMAXIMUM_MEMORY=2147483648", "-sMODULARIZE=1", "-sEXPORT_ES6=1",
          "-sENVIRONMENT=web,worker,node", "-sEXPORTED_FUNCTIONS=" + json.dumps(exported),

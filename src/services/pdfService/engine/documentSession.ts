@@ -29,6 +29,7 @@ export class DocumentSession {
   private nativeDocuments = 0;
   private peakNativeDocuments = 0;
   lastTransactionChanged = false;
+  lastTransactionAffectsRendering = false;
   readonly document: PDFDocument;
   constructor(
     readonly pdfium: PDFiumModule,
@@ -42,10 +43,13 @@ export class DocumentSession {
         throw new Error("The PDF password is missing or incorrect.");
       this.document = doc;
       this.nativeDocuments = this.peakNativeDocuments = 1;
+      let outline: ReturnType<typeof getNativeOutline> | undefined;
       this.sources.set(primaryId, {
         pages: Array.from({ length: doc.countPages() }, (_, index) => index),
         permissions: getNativePermissions(doc),
-        outline: getNativeOutline(doc),
+        get outline() {
+          return (outline ??= getNativeOutline(doc));
+        },
       });
       doc.enableJournal();
     } catch (error) {
@@ -247,6 +251,7 @@ export class DocumentSession {
       return await run(view);
     } finally {
       this.lastTransactionChanged = doc.operationHasChanges();
+      this.lastTransactionAffectsRendering = doc.operationAffectsRendering();
       try {
         if (view) disposeEditingDocument(view);
       } finally {

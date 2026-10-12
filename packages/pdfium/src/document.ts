@@ -214,6 +214,10 @@ export class PDFDocument {
   operationHasChanges() {
     return !!this.call("LPDF_OperationHasChanges");
   }
+  /** Conservative invalidation; only existing Info text/date writes are exempt. */
+  operationAffectsRendering() {
+    return !!this.call("LPDF_OperationAffectsRendering");
+  }
   abandonOperation() {
     this.call("LPDF_End", 1);
   }

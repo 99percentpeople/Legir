@@ -64,6 +64,9 @@ its own assets. A host should serialize document jobs in one worker.
   `operationHasChanges()` reports journaled writes/new objects in the active
   transaction, so hosts can retain render pages after a read-only operation.
   A true result is conservative; it does not identify individual dirty pages.
+  `operationAffectsRendering()` additionally excludes standard text/date writes
+  to an existing Info dictionary. New objects and other writes still invalidate
+  rendering conservatively, including shared resources and failed edits.
 - `addPage`, `insertPage`, `deletePage` and `newGraftMap` provide page/object
   primitives. Form field trees, outline remapping and unique imported names
   remain responsibilities of a higher-level editor, as implemented by Legir.
@@ -79,6 +82,11 @@ its own assets. A host should serialize document jobs in one worker.
   parents, avoiding traversal into unselected pages. Dispose each graft map
   after its group; never reuse it after rolling back a transaction. On a failed
   graft, discard the map and roll back the transaction.
+  Parsed, immutable stream readers are retained across grafts rather than
+  copying their encoded bytes again. PDFium's parser gives these readers their
+  own storage; they do not borrow the donor document's input allocation.
+  Authored/decrypted stream vectors are copied. Subsequent writes replace a
+  stream's backing storage, preserving independence after donor closure.
 - `extractText` returns text, glyph geometry, fonts and colors; `redactText`
   removes glyphs intersecting PDF-coordinate quads while retaining surrounding
   operators, original encodings, subsequent glyph positions and shared Forms.
@@ -150,17 +158,47 @@ their exact decoded pixels in a module-wide LRU cache. Its default budget is
 restart a large JPEG decode. Images larger than the budget use the original
 lazy path. Eviction and page destruction release these pixels; changing page
 contents still requires closing cached pages before obtaining fresh views.
-Images used during one render remain pinned until it returns; additional images
+Images used during one render remain pinned until it completes or is cancelled; additional images
 use lazy decoding when the pinned images fill the budget.
 Pass `imageCache: "reuse"` to `page.render` for previews: resident pixels are
 reused, but cache misses use the original decoder without filling or evicting
 this cache. This protects reader images without increasing the memory budget.
-`engine.setLargeImageCacheLimit(bytes)` sets a 0–512 MiB budget (zero immediately
-evicts and disables this cache). `engine.largeImageCache()` reports its decoded
+`engine.setLargeImageCacheLimit(bytes)` sets a 0–512 MiB budget. Lowering it
+evicts unpinned images immediately; active render pins are released on completion
+or cancellation, so live bytes can temporarily exceed a newly reduced budget.
+Zero disables new entries. `engine.largeImageCache()` reports its decoded
 pixel bytes, limit, entries, cumulative decodes and evictions. This budget does
 not include PDFium's existing small-image caches, compressed inputs, render
 targets or WASM arena capacity. Decoding resolution and rendering options are
 unchanged.
+
+## Cooperative and experimental Canvas rendering
+
+`page.startRender(matrix, bounds, options)` returns a `PDFRenderTask`. Call
+`task.continue(8)` until it returns `true`, yielding to the worker event loop
+between calls; then `task.finish()` returns the usual owned `PDFPixmap`.
+Always call `task.destroy()` in `finally`. Destroying a task cancels it without
+publishing a partial image; destroying its page/document also closes it. Budget
+values are cooperative checkpoints, not a hard latency limit: parsing and some
+individual PDFium operations remain synchronous. A page allows one active task.
+Serialize document edits; never mutate a document while one of its jobs is paused.
+Large-image cache entries fill incrementally and remain pinned across yields.
+
+The opt-in `createCanvasPlan(page, options)` / `drawCanvasPlan(plan, context,
+matrix, bounds, { signal })` experiment exports parsed PDFium objects for browser
+Canvas 2D drawing. It supports opaque RGB/gray paths and unprofiled DeviceRGB/gray
+JPEGs, without first rasterizing the page in WASM. The plan owns its arrays and
+can outlive the document. Commands are bounded to 16 MiB, encoded JPEGs to 64 MiB
+and total image pixels to 64 Mi pixels. Decoded ImageBitmaps and staging canvases
+are released after use; cancelled or failed draws preserve the destination.
+
+`createCanvasPlan` returns `null` for unsupported pages. Callers must use the
+native renderer for those pages and for failed browser decodes. Text, Forms,
+shading, clipping, graphics-state resources, masks, transparency groups,
+profiled/oriented JPEGs and requested annotations are deliberately excluded.
+Canvas antialiasing/downsampling differ from PDFium. This is a feasibility API,
+not enabled by default in Legir; the real corpus currently falls back to native
+rendering. It is not a replacement for PDFium's complete rendering semantics.
 
 The package is BSD-3-Clause; the surrounding Legir application keeps its own
 license. See `LICENSE` and `wasm/licenses/`.

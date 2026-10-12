@@ -16,6 +16,96 @@ function save(doc: PDFDocument) {
 }
 
 describe("native graft and batched page edits", () => {
+  it.each([false, true])(
+    "shares parsed stream storage safely after donor close (encrypted: %s)",
+    (encrypted) => {
+      const authored = new engine.PDFDocument();
+      const original = "q 1 0 0 rg 10 10 50 50 re f Q";
+      authored.insertPage(
+        -1,
+        authored.addPage([0, 0, 100, 100], 0, {}, original),
+      );
+      const buffer = authored.saveToBuffer(
+        encrypted
+          ? {
+              encrypt: "aes-256",
+              "user-password": "reader",
+              "owner-password": "owner",
+            }
+          : {},
+      );
+      const bytes = buffer.asUint8Array().slice();
+      buffer.destroy();
+      authored.destroy();
+      const donor = new engine.PDFDocument(
+        bytes,
+        encrypted ? "reader" : undefined,
+      );
+      const first = new engine.PDFDocument(),
+        second = new engine.PDFDocument();
+      const read = (doc: PDFDocument) => {
+        const stream = doc.findPage(0).get("Contents").readStream();
+        try {
+          return new TextDecoder().decode(stream.asUint8Array());
+        } finally {
+          stream.destroy();
+        }
+      };
+      try {
+        for (const target of [first, second]) {
+          const graft = target.newGraftMap({ copyPages: true });
+          try {
+            target.insertPage(-1, graft.graftObject(donor.findPage(0)));
+          } finally {
+            graft.destroy();
+          }
+        }
+        donor
+          .findPage(0)
+          .get("Contents")
+          .writeStream(new TextEncoder().encode("DONOR EDIT"));
+        donor.destroy();
+        expect(read(first)).toBe(original);
+        first
+          .findPage(0)
+          .get("Contents")
+          .writeStream(
+            new TextEncoder().encode("q 0 0 1 rg 20 20 40 40 re f Q"),
+          );
+        first.destroy();
+        expect(read(second)).toBe(original);
+        second.beginOperation();
+        second
+          .findPage(0)
+          .get("Contents")
+          .writeStream(new TextEncoder().encode("TEMPORARY"));
+        second.abandonOperation();
+        expect(read(second)).toBe(original);
+        const reopened = new engine.PDFDocument(save(second));
+        try {
+          expect(read(reopened)).toBe(original);
+          const pixmap = reopened
+            .loadPage(0)
+            .render([1, 0, 0, -1, 0, 100], [0, 0, 100, 100]);
+          try {
+            expect([
+              ...pixmap
+                .getPixels()
+                .slice((60 * 100 + 30) * 4, (60 * 100 + 30) * 4 + 4),
+            ]).toEqual([255, 0, 0, 255]);
+          } finally {
+            pixmap.destroy();
+          }
+        } finally {
+          reopened.destroy();
+        }
+      } finally {
+        donor.destroy();
+        first.destroy();
+        second.destroy();
+      }
+    },
+  );
   it("copies a long indirect reply/outline chain with back edges and rolls it back", () => {
     const source = new engine.PDFDocument(),
       target = new engine.PDFDocument();

@@ -18,10 +18,12 @@
 #include "core/fpdfapi/parser/cpdf_string.h"
 #include "core/fpdfapi/render/cpdf_rendercontext.h"
 #include "core/fpdfapi/render/cpdf_renderoptions.h"
+#include "core/fpdfapi/render/cpdf_progressiverenderer.h"
 #include "core/fpdfdoc/cpdf_annot.h"
 #include "core/fpdfdoc/cpdf_annotlist.h"
 #include "core/fpdftext/cpdf_textpage.h"
 #include "core/fxcrt/fx_stream.h"
+#include "core/fxcrt/pauseindicator_iface.h"
 #include "core/fxge/cfx_renderdevice.h"
 #include "core/fxge/dib/cfx_dibitmap.h"
 #include "fpdfsdk/cpdfsdk_helpers.h"
@@ -31,6 +33,7 @@
 #include "public/fpdfview.h"
 #include "text_edit.h"
 #include "image_cache.h"
+#include "canvas_plan.h"
 #include "third_party/zlib/zlib.h"
 #include <algorithm>
 #include <cmath>
@@ -59,11 +62,14 @@ struct Document {
   std::vector<std::function<void()>> undo;
   uint32_t first_new_object = 0;
   bool transaction = false;
+  bool rendering_changed = false;
   int error = 0;
   CPDF_Document *core() const { return CPDFDocumentFromFPDFDocument(handle); }
-  void record(std::function<void()> fn) {
-    if (transaction)
+  void record(std::function<void()> fn, bool rendering = true) {
+    if (transaction) {
       undo.push_back(std::move(fn));
+      rendering_changed |= rendering;
+    }
   }
   void sync() {
     core()->SyncForEditing(trailer->GetMutableDictFor("Root"),
@@ -77,6 +83,39 @@ struct Document {
   }
 };
 static uint32_t live_documents = 0;
+
+void CPDF_Stream::CopyDataForEditing(const CPDF_Stream& source) {
+  // Parsed file-backed streams already own immutable encoded bytes. Sharing
+  // their reader survives donor closure; a later write replaces data_ (COW).
+  // Authored/decrypted memory streams retain the independent vector copy.
+  data_ = source.data_;
+  SetLengthInDict(static_cast<int>(GetRawSize()));
+}
+
+struct RenderJob {
+  std::unique_ptr<Blob> result = std::make_unique<Blob>();
+  RetainPtr<CPDF_Page> page;
+  RetainPtr<CFX_DIBitmap> bitmap;
+  std::unique_ptr<CFX_RenderDevice> device;
+  std::unique_ptr<CPDF_RenderContext> context;
+  std::unique_ptr<CPDF_AnnotList> annotations;
+  CPDF_RenderOptions options;
+  std::unique_ptr<CPDF_ProgressiveRenderer> renderer;
+  uint64_t cache_token = 0;
+  ~RenderJob() {
+    renderer.reset();
+    if (cache_token) legir::EndImageRender(cache_token);
+  }
+};
+
+class RenderPause final : public PauseIndicatorIface {
+ public:
+  explicit RenderPause(double milliseconds)
+      : deadline_(emscripten_get_now() + milliseconds) {}
+  bool NeedToPauseNow() override { return emscripten_get_now() >= deadline_; }
+ private:
+  double deadline_;
+};
 
 // Preserve object identities during rollback. Parsed pages can retain pointers
 // to dictionary/array children, so replacing a whole document is not
@@ -156,7 +195,11 @@ static void set_key(Document *doc, RetainPtr<CPDF_Dictionary> dict,
   if (!dict)
     return;
   auto old = dict->GetMutableObjectFor(key.AsStringView());
-  doc->record([dict, key, old] { dict->SetFor(key, old); });
+  const bool info_only = dict == doc->trailer->GetMutableDictFor("Info") &&
+      (key == "Title" || key == "Author" || key == "Subject" ||
+       key == "Keywords" || key == "Creator" || key == "Producer" ||
+       key == "CreationDate" || key == "ModDate");
+  doc->record([dict, key, old] { dict->SetFor(key, old); }, !info_only);
   dict->SetFor(key, std::move(value));
 }
 static void snapshot_dictionary(Document *doc,
@@ -339,10 +382,7 @@ struct GraftMap {
         }
       }
       if (auto stream = value->AsMutableStream()) {
-        auto acc =
-            pdfium::MakeRetain<CPDF_StreamAcc>(pdfium::WrapRetain(stream));
-        acc->LoadAllDataRaw();
-        output->AsMutableStream()->TakeData(acc->DetachData());
+        output->AsMutableStream()->CopyDataForEditing(*stream);
       }
       return output;
     }
@@ -574,6 +614,7 @@ EMSCRIPTEN_KEEPALIVE int LPDF_Begin(Document *doc) {
   if (doc->transaction)
     return 0;
   doc->transaction = true;
+  doc->rendering_changed = false;
   doc->first_new_object = doc->core()->GetLastObjNum() + 1;
   return 1;
 }
@@ -581,6 +622,10 @@ EMSCRIPTEN_KEEPALIVE int LPDF_OperationHasChanges(Document *doc) {
   return doc->transaction &&
          (!doc->undo.empty() ||
           doc->core()->GetLastObjNum() >= doc->first_new_object);
+}
+EMSCRIPTEN_KEEPALIVE int LPDF_OperationAffectsRendering(Document *doc) {
+  return doc->transaction && (doc->rendering_changed ||
+      doc->core()->GetLastObjNum() >= doc->first_new_object);
 }
 EMSCRIPTEN_KEEPALIVE void LPDF_End(Document *doc, int rollback) {
   const bool changed = LPDF_OperationHasChanges(doc);
@@ -920,8 +965,8 @@ EMSCRIPTEN_KEEPALIVE Blob *LPDF_Save(Document *doc, const char *user,
   } // Destroy the buffered archive to flush its final output block.
   return new Blob{std::move(stream->data)};
 }
-EMSCRIPTEN_KEEPALIVE Blob *
-LPDF_Render(Document *doc, FPDF_PAGE handle, int width, int height,
+static std::unique_ptr<RenderJob>
+create_render(Document *doc, FPDF_PAGE handle, int width, int height,
             const double *matrix, int contents, int annotations,
             const uint32_t *keep_refs, size_t keep_count, int transparent,
             int populate_cache) {
@@ -929,41 +974,101 @@ LPDF_Render(Document *doc, FPDF_PAGE handle, int width, int height,
   if (!page || width <= 0 || height <= 0 ||
       static_cast<uint64_t>(width) * height > 64000000)
     return nullptr;
-  auto result = std::make_unique<Blob>();
-  result->bytes.resize(static_cast<size_t>(width) * height * 4);
-  auto bitmap = pdfium::MakeRetain<CFX_DIBitmap>();
-  if (!bitmap->Create(width, height, FXDIB_Format::kBgra, result->bytes.data(),
+  auto job = std::make_unique<RenderJob>();
+  job->page = pdfium::WrapRetain(page);
+  job->result->bytes.resize(static_cast<size_t>(width) * height * 4);
+  job->bitmap = pdfium::MakeRetain<CFX_DIBitmap>();
+  if (!job->bitmap->Create(width, height, FXDIB_Format::kBgra, job->result->bytes.data(),
                       width * 4))
     return nullptr;
-  bitmap->Clear(transparent ? 0 : 0xffffffff);
-  auto device = CFX_RenderDevice::CreateForBitmap(bitmap, nullptr, true);
-  if (!device)
+  job->bitmap->Clear(transparent ? 0 : 0xffffffff);
+  job->device = CFX_RenderDevice::CreateForBitmap(job->bitmap, nullptr, true);
+  if (!job->device)
     return nullptr;
   CFX_Matrix transform(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
                        matrix[5]);
-  CPDF_RenderContext context(page->GetDocument(), page->GetMutableResources(),
-                             page->GetPageImageCache());
+  job->context = std::make_unique<CPDF_RenderContext>(
+      page->GetDocument(), page->GetMutableResources(), page->GetPageImageCache());
   if (contents)
-    context.AppendLayer(page, transform);
-  std::unique_ptr<CPDF_AnnotList> list;
+    job->context->AppendLayer(page, transform);
   if (annotations || keep_refs) {
     snapshot_appearances(doc, page);
-    list = std::make_unique<CPDF_AnnotList>(page);
-    for (size_t i = 0; i < list->Count(); i++) {
-      auto annot = list->GetAt(i);
+    job->annotations = std::make_unique<CPDF_AnnotList>(page);
+    for (size_t i = 0; i < job->annotations->Count(); i++) {
+      auto annot = job->annotations->GetAt(i);
       if (annot->IsHidden() || (annot->GetFlags() & 32))
         continue;
       if (keep_refs && std::find(keep_refs, keep_refs + keep_count,
                                  annot->GetAnnotDict()->GetObjNum()) ==
                            keep_refs + keep_count)
         continue;
-      annot->DrawInContext(page, &context, transform,
+      annot->DrawInContext(page, job->context.get(), transform,
                            CPDF_Annot::AppearanceMode::kNormal);
     }
   }
-  CPDF_RenderOptions options;
-  legir::BeginImageRender(populate_cache != 0);
-  context.Render(device.get(), nullptr, &options, nullptr);
-  return result.release();
+  job->cache_token = legir::BeginImageRender(populate_cache != 0);
+  return job;
 }
+EMSCRIPTEN_KEEPALIVE Blob *
+LPDF_Render(Document *doc, FPDF_PAGE handle, int width, int height,
+            const double *matrix, int contents, int annotations,
+            const uint32_t *keep_refs, size_t keep_count, int transparent,
+            int populate_cache) {
+  auto job = create_render(doc, handle, width, height, matrix, contents,
+                           annotations, keep_refs, keep_count, transparent,
+                           populate_cache);
+  if (!job) return nullptr;
+  job->context->Render(job->device.get(), nullptr, &job->options, nullptr);
+  return job->result.release();
+}
+EMSCRIPTEN_KEEPALIVE RenderJob *
+LPDF_RenderStart(Document *doc, FPDF_PAGE handle, int width, int height,
+                 const double *matrix, int contents, int annotations,
+                 const uint32_t *keep_refs, size_t keep_count, int transparent,
+                 int populate_cache) {
+  auto job = create_render(doc, handle, width, height, matrix, contents,
+                           annotations, keep_refs, keep_count, transparent,
+                           populate_cache);
+  if (!job) return nullptr;
+  job->renderer = std::make_unique<CPDF_ProgressiveRenderer>(
+      job->context.get(), job->device.get(), &job->options);
+  return job.release();
+}
+EMSCRIPTEN_KEEPALIVE int LPDF_RenderContinue(RenderJob *job, double milliseconds) {
+  if (!job || !std::isfinite(milliseconds) || milliseconds <= 0) return 3;
+  legir::ResumeImageRender(job->cache_token);
+  RenderPause pause(std::clamp(milliseconds, 1.0, 100.0));
+  if (job->renderer->GetStatus() == CPDF_ProgressiveRenderer::kReady)
+    job->renderer->Start(&pause);
+  else if (job->renderer->GetStatus() == CPDF_ProgressiveRenderer::kToBeContinued)
+    job->renderer->Continue(&pause);
+  return job->renderer->GetStatus();
+}
+EMSCRIPTEN_KEEPALIVE Blob *LPDF_RenderFinish(RenderJob *job) {
+  if (!job || job->renderer->GetStatus() != CPDF_ProgressiveRenderer::kDone)
+    return nullptr;
+  return job->result.release();
+}
+EMSCRIPTEN_KEEPALIVE void LPDF_RenderDrop(RenderJob *job) {
+  delete job;
+}
+EMSCRIPTEN_KEEPALIVE legir::CanvasPlan *LPDF_CanvasPlan(FPDF_PAGE handle) {
+  return legir::MakeCanvasPlan(CPDFPageFromFPDFPage(handle)).release();
+}
+EMSCRIPTEN_KEEPALIVE const double *LPDF_CanvasCommands(legir::CanvasPlan *plan) {
+  return plan->commands.data();
+}
+EMSCRIPTEN_KEEPALIVE size_t LPDF_CanvasCommandCount(legir::CanvasPlan *plan) {
+  return plan->commands.size();
+}
+EMSCRIPTEN_KEEPALIVE size_t LPDF_CanvasImageCount(legir::CanvasPlan *plan) {
+  return plan->images.size();
+}
+EMSCRIPTEN_KEEPALIVE const uint8_t *LPDF_CanvasImageData(legir::CanvasPlan *plan, size_t index) {
+  return index < plan->images.size() ? plan->images[index].data() : nullptr;
+}
+EMSCRIPTEN_KEEPALIVE size_t LPDF_CanvasImageSize(legir::CanvasPlan *plan, size_t index) {
+  return index < plan->images.size() ? plan->images[index].size() : 0;
+}
+EMSCRIPTEN_KEEPALIVE void LPDF_CanvasPlanDrop(legir::CanvasPlan *plan) { delete plan; }
 }
