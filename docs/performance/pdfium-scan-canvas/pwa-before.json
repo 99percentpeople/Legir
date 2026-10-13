@@ -1,0 +1,61 @@
+{
+  "engine": "pdfium",
+  "result": {
+    "url": "/editor/tab_1791892144962_unnnac",
+    "text": ["", "Native PDF page 2", ""],
+    "forms": [
+      {
+        "type": "text",
+        "value": "Bob"
+      },
+      {
+        "type": "text",
+        "value": "VALUE 0"
+      },
+      {
+        "type": "text",
+        "value": "VALUE 3"
+      },
+      {
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "canvases": [
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [632, 790],
+      [300, 150],
+      [632, 790],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150]
+    ]
+  },
+  "errors": [],
+  "resourceFailures": [
+    {
+      "url": "blob:http://127.0.0.1:5196/9d41ebbb-d872-4fd1-a43a-310905747126",
+      "type": "image",
+      "error": "net::ERR_FILE_NOT_FOUND"
+    }
+  ],
+  "savedPages": 8,
+  "savedFields": ["name", "donor-field-0", "donor-field-3"],
+  "activeWorkers": 1,
+  "initialWorkerUrls": [],
+  "activeWorkerUrls": [
+    "http://127.0.0.1:5196/assets/pdf-render.worker-CAeLPvqc.js"
+  ],
+  "workersAfterClose": 0,
+  "workerUrlsAfterClose": [],
+  "brokenImages": []
+}

@@ -1,0 +1,1982 @@
+[
+  {
+    "key": "book/pdfjs",
+    "fixture": "book",
+    "variant": "pdfjs",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 637.4000005722046,
+        "min": 630.7000007629395,
+        "max": 645.3999996185303
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 1087.6999998092651,
+        "min": 1034,
+        "max": 1103.3000001907349
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 1725.1000003814697,
+        "min": 1664.7000007629395,
+        "max": 1748.6999998092651
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 51.39999961853027,
+        "min": 47.5,
+        "max": 53.69999980926514
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 84.5,
+        "min": 73.39999961853027,
+        "max": 108.19999980926514
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 21,
+        "min": 19.600000381469727,
+        "max": 21.899999618530273
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 51,
+        "min": 49.40000057220459,
+        "max": 55.40000057220459
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 33.19999980926514,
+        "min": 32.19999980926514,
+        "max": 33.40000057220459
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 9.950000286102295,
+        "min": 9.25,
+        "max": 13.599999904632568
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 41.80000019073486,
+        "min": 37.60000038146973,
+        "max": 49.499999046325684
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 15.300000190734863,
+        "min": 14.800000190734863,
+        "max": 15.59999942779541
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 67.30000019073486,
+        "min": 66.5,
+        "max": 68.90000057220459
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 668.3984375,
+        "min": 665.0673828125,
+        "max": 673.8466796875
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 842.3095703125,
+        "min": 839.9921875,
+        "max": 849.5859375
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 174.9248046875,
+        "min": 173.9111328125,
+        "max": 175.7392578125
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 969.4033203125,
+        "min": 964.0859375,
+        "max": 974.9375
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 1036.3994140625,
+        "min": 1030.7470703125,
+        "max": 1055.046875
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 1036.3994140625,
+        "min": 1030.7470703125,
+        "max": 1055.046875
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 362.552734375,
+        "min": 362.3486328125,
+        "max": 389.9794921875
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 362.552734375,
+        "min": 362.3486328125,
+        "max": 389.9794921875
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 458.8896484375,
+        "min": 453.4326171875,
+        "max": 462.935546875
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": -210.9111328125,
+        "min": -211.634765625,
+        "max": -209.5087890625
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 47,
+        "min": 37,
+        "max": 244
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    }
+  },
+  {
+    "key": "book/pdfium-before",
+    "fixture": "book",
+    "variant": "pdfium-before",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 485.4000005722046,
+        "min": 484.30000019073486,
+        "max": 495.9000005722046
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 574.9000005722046,
+        "min": 571.5999994277954,
+        "max": 581.8000001907349
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 1067.2000007629395,
+        "min": 1059.2000007629395,
+        "max": 1067.5
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 283.5,
+        "min": 275.80000019073486,
+        "max": 318.6000003814697
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 79.30000019073486,
+        "min": 78.5,
+        "max": 121
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 55.5,
+        "min": 51.80000019073486,
+        "max": 57.39999961853027
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 110.19999980926514,
+        "min": 106.39999961853027,
+        "max": 115.19999980926514
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 89.5,
+        "min": 88.90000057220459,
+        "max": 95.19999980926514
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 44.60000038146973,
+        "min": 44.40000057220459,
+        "max": 45.25
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 175.50000095367432,
+        "min": 171.9000005722046,
+        "max": 181.89999961853027
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 61,
+        "min": 58.89999961853027,
+        "max": 65.90000057220459
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 79.5,
+        "min": 77.40000057220459,
+        "max": 80.10000038146973
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 610.3271484375,
+        "min": 605.240234375,
+        "max": 615.2490234375
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 765.181640625,
+        "min": 761.125,
+        "max": 770.9921875
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 155.7431640625,
+        "min": 154.8544921875,
+        "max": 155.884765625
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 855.892578125,
+        "min": 852.984375,
+        "max": 862.5224609375
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 896.5322265625,
+        "min": 890.9833984375,
+        "max": 901.341796875
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 896.5322265625,
+        "min": 890.9833984375,
+        "max": 901.341796875
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 286.0927734375,
+        "min": 285.7431640625,
+        "max": 286.205078125
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 286.0927734375,
+        "min": 285.7431640625,
+        "max": 286.205078125
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 380.7548828125,
+        "min": 378.986328125,
+        "max": 388.2763671875
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": -226.97265625,
+        "min": -229.572265625,
+        "max": -226.25390625
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 37,
+        "min": 33,
+        "max": 191
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    }
+  },
+  {
+    "key": "book/pdfium-canvas",
+    "fixture": "book",
+    "variant": "pdfium-canvas",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 485.5,
+        "min": 483.5,
+        "max": 495.0999994277954
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 589,
+        "min": 580.8999996185303,
+        "max": 598.5
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 1074.5,
+        "min": 1064.3999996185303,
+        "max": 1093.5999994277954
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 266,
+        "min": 265.30000019073486,
+        "max": 287.9000005722046
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 88.60000038146973,
+        "min": 76.19999980926514,
+        "max": 90.10000038146973
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 55.30000019073486,
+        "min": 52.89999961853027,
+        "max": 59.30000019073486
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 119,
+        "min": 109.80000019073486,
+        "max": 121.5
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 101.39999961853027,
+        "min": 92.69999980926514,
+        "max": 105.39999961853027
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 43.69999980926514,
+        "min": 43.05000019073486,
+        "max": 45.34999990463257
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 175.4000005722046,
+        "min": 172.5999994277954,
+        "max": 181.5999994277954
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 58.80000019073486,
+        "min": 56.19999980926514,
+        "max": 62
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 77.30000019073486,
+        "min": 74.59999942779541,
+        "max": 85.30000019073486
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 606.935546875,
+        "min": 606.3896484375,
+        "max": 615.1826171875
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 762.583984375,
+        "min": 762.1025390625,
+        "max": 771.2705078125
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 155.712890625,
+        "min": 155.6484375,
+        "max": 156.087890625
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 855.0380859375,
+        "min": 852.2431640625,
+        "max": 862.9111328125
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 898.759765625,
+        "min": 892.8662109375,
+        "max": 901.8017578125
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 898.759765625,
+        "min": 892.8662109375,
+        "max": 901.8017578125
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 286.619140625,
+        "min": 285.9306640625,
+        "max": 292.3701171875
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 286.619140625,
+        "min": 285.9306640625,
+        "max": 292.3701171875
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 379.9423828125,
+        "min": 376.8720703125,
+        "max": 388.0400390625
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": -227.142578125,
+        "min": -229.517578125,
+        "max": -226.9931640625
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 139,
+        "min": 6,
+        "max": 1648
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    }
+  },
+  {
+    "key": "indot/pdfjs",
+    "fixture": "indot",
+    "variant": "pdfjs",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 1556.4000005722046,
+        "min": 1522.5,
+        "max": 1592.1999998092651
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 231.39999961853027,
+        "min": 213.29999923706055,
+        "max": 264.19999980926514
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 1805.4999990463257,
+        "min": 1753.8999996185303,
+        "max": 1820.6000003814697
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 169.19999980926514,
+        "min": 155.69999980926514,
+        "max": 178.5
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 124.69999980926514,
+        "min": 115.5,
+        "max": 155
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 23.199999809265137,
+        "min": 21.300000190734863,
+        "max": 24.5
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 63.09999942779541,
+        "min": 57.5,
+        "max": 69
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 49.40000057220459,
+        "min": 46.69999980926514,
+        "max": 50.30000019073486
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 8.900000095367432,
+        "min": 8.699999809265137,
+        "max": 10.199999809265137
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 35.80000019073486,
+        "min": 34.39999961853027,
+        "max": 38.60000038146973
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 11.200000762939453,
+        "min": 11.100000381469727,
+        "max": 19.40000057220459
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 61.30000019073486,
+        "min": 58.19999980926514,
+        "max": 63.60000038146973
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 667.6513671875,
+        "min": 665.19921875,
+        "max": 674.7275390625
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 1313.14453125,
+        "min": 1311.185546875,
+        "max": 1321.9853515625
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 645.986328125,
+        "min": 645.4931640625,
+        "max": 647.2578125
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 1453.08203125,
+        "min": 1448.37109375,
+        "max": 1459.8896484375
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 1579.2529296875,
+        "min": 1561.4013671875,
+        "max": 1582.4345703125
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 1579.2529296875,
+        "min": 1561.4013671875,
+        "max": 1582.4345703125
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 907.70703125,
+        "min": 893.75,
+        "max": 914.0537109375
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 907.70703125,
+        "min": 893.75,
+        "max": 914.0537109375
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 517.599609375,
+        "min": 515.2646484375,
+        "max": 524.625
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": -150.0517578125,
+        "min": -150.1025390625,
+        "max": -149.9345703125
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 16,
+        "min": 4,
+        "max": 96
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 362
+      }
+    }
+  },
+  {
+    "key": "indot/pdfium-before",
+    "fixture": "indot",
+    "variant": "pdfium-before",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 1019.6999998092651,
+        "min": 955.6999998092651,
+        "max": 1243.9000005722046
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 111.10000038146973,
+        "min": 104.80000019073486,
+        "max": 117.5
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 1130.8000001907349,
+        "min": 1060.5,
+        "max": 1361.4000005722046
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 495.6000003814697,
+        "min": 484.8999996185303,
+        "max": 500.3999996185303
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 64.10000038146973,
+        "min": 58,
+        "max": 67.20000076293945
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 40.19999980926514,
+        "min": 39.19999980926514,
+        "max": 40.80000019073486
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 83.5,
+        "min": 77.39999961853027,
+        "max": 88.80000019073486
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 59.69999980926514,
+        "min": 58.5,
+        "max": 61.69999980926514
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 9.5,
+        "min": 9.349999904632568,
+        "max": 10.75
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 39.5,
+        "min": 35.60000038146973,
+        "max": 42.80000114440918
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 13.09999942779541,
+        "min": 12.09999942779541,
+        "max": 14.100000381469727
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 44.30000019073486,
+        "min": 43.89999961853027,
+        "max": 45.79999923706055
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 606.8046875,
+        "min": 606.6533203125,
+        "max": 614.333984375
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 951.1435546875,
+        "min": 950.708984375,
+        "max": 957.5791015625
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 344.0556640625,
+        "min": 343.2451171875,
+        "max": 344.3388671875
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 989.47265625,
+        "min": 988.9912109375,
+        "max": 1057.8291015625
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 1424.1904296875,
+        "min": 1423.943359375,
+        "max": 1431.2353515625
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 1424.1904296875,
+        "min": 1423.943359375,
+        "max": 1431.2353515625
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 817.2900390625,
+        "min": 816.9013671875,
+        "max": 817.3857421875
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 817.2900390625,
+        "min": 816.9013671875,
+        "max": 817.3857421875
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 398.443359375,
+        "min": 398.244140625,
+        "max": 405.00390625
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": -208.4091796875,
+        "min": -209.330078125,
+        "max": -208.361328125
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 97,
+        "min": 35,
+        "max": 229
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    }
+  },
+  {
+    "key": "indot/pdfium-canvas",
+    "fixture": "indot",
+    "variant": "pdfium-canvas",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 968.1999998092651,
+        "min": 952.8000001907349,
+        "max": 995.2000007629395
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 106.5,
+        "min": 101.90000057220459,
+        "max": 123.19999980926514
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 1091.3999996185303,
+        "min": 1054.7000007629395,
+        "max": 1101.7000007629395
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 488.69999980926514,
+        "min": 485.9000005722046,
+        "max": 493.5999994277954
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 60.20000076293945,
+        "min": 58.30000019073486,
+        "max": 61
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 40,
+        "min": 38.80000019073486,
+        "max": 40
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 91.5,
+        "min": 83.30000019073486,
+        "max": 93.69999980926514
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 65.09999942779541,
+        "min": 59.39999961853027,
+        "max": 67.80000019073486
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 10.050000190734863,
+        "min": 9.949999809265137,
+        "max": 11.199999809265137
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 43.89999961853027,
+        "min": 39.30000114440918,
+        "max": 45.59999942779541
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 13.5,
+        "min": 13.199999809265137,
+        "max": 14.100000381469727
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 45.30000019073486,
+        "min": 45,
+        "max": 50.89999961853027
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 607.66015625,
+        "min": 607.205078125,
+        "max": 611.958984375
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 951.87109375,
+        "min": 950.68359375,
+        "max": 956.71875
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 344.2109375,
+        "min": 343.478515625,
+        "max": 344.759765625
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 988.767578125,
+        "min": 988.2998046875,
+        "max": 993.328125
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 1425.33984375,
+        "min": 1424.54296875,
+        "max": 1430.265625
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 1425.33984375,
+        "min": 1424.54296875,
+        "max": 1430.265625
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 817.6796875,
+        "min": 817.337890625,
+        "max": 818.306640625
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 817.6796875,
+        "min": 817.337890625,
+        "max": 818.306640625
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 398.2548828125,
+        "min": 398.005859375,
+        "max": 404.236328125
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": -208.9501953125,
+        "min": -209.654296875,
+        "max": -207.72265625
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 36,
+        "min": 0,
+        "max": 86
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    }
+  },
+  {
+    "key": "drawing405/pdfjs",
+    "fixture": "drawing405",
+    "variant": "pdfjs",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 934.3999996185303,
+        "min": 917.5,
+        "max": 1174
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 919.8999996185303,
+        "min": 881,
+        "max": 1089.5
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 2023.8999996185303,
+        "min": 1798.5,
+        "max": 2093.8999996185303
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 41,
+        "min": 40.80000019073486,
+        "max": 44.69999980926514
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 874.6999998092651,
+        "min": 851.9000005722046,
+        "max": 926.7000007629395
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 137.10000038146973,
+        "min": 135.60000038146973,
+        "max": 149
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 455.69999980926514,
+        "min": 435.20000076293945,
+        "max": 485.19999980926514
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 168.69999980926514,
+        "min": 151.69999980926514,
+        "max": 178.30000019073486
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 9.749999523162842,
+        "min": 9.25,
+        "max": 10.199999809265137
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 40.80000019073486,
+        "min": 37.59999942779541,
+        "max": 41.5
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 19,
+        "min": 16.899999618530273,
+        "max": 19.799999237060547
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 801.4000005722046,
+        "min": 785.5,
+        "max": 849.5
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 823.953125,
+        "min": 822.3984375,
+        "max": 831.4931640625
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 2230.501953125,
+        "min": 2229.44921875,
+        "max": 2232.09375
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 1406.548828125,
+        "min": 1400.6005859375,
+        "max": 1407.05078125
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 2909.4580078125,
+        "min": 2895.5341796875,
+        "max": 2912.009765625
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 3021.357421875,
+        "min": 3021.2255859375,
+        "max": 3023.041015625
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 3021.357421875,
+        "min": 3021.2255859375,
+        "max": 3023.041015625
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 2198.958984375,
+        "min": 2189.732421875,
+        "max": 2199.087890625
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 2198.958984375,
+        "min": 2189.732421875,
+        "max": 2199.087890625
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 902.6328125,
+        "min": 889.099609375,
+        "max": 905.529296875
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": 80.234375,
+        "min": 57.6064453125,
+        "max": 81.576171875
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 316,
+        "min": 44,
+        "max": 412
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 7193,
+        "min": 4029,
+        "max": 8840
+      }
+    }
+  },
+  {
+    "key": "drawing405/pdfium-before",
+    "fixture": "drawing405",
+    "variant": "pdfium-before",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 764.8999996185303,
+        "min": 746.7999992370605,
+        "max": 824.8999996185303
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 1189.5,
+        "min": 1185.9000005722046,
+        "max": 1247.8000001907349
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 1954.3999996185303,
+        "min": 1932.6999998092651,
+        "max": 2072.699999809265
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 160.30000019073486,
+        "min": 151.60000038146973,
+        "max": 168.9000005722046
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 1124.8999996185303,
+        "min": 1119.9000005722046,
+        "max": 1170.1000003814697
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 260.8999996185303,
+        "min": 258,
+        "max": 261.8999996185303
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 1385.4000005722046,
+        "min": 1313.5,
+        "max": 1530.5
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 457.30000019073486,
+        "min": 456.5,
+        "max": 477.6000003814697
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 25.199999809265137,
+        "min": 24.550000190734863,
+        "max": 25.84999990463257
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 102.29999923706055,
+        "min": 100.10000038146973,
+        "max": 107
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 64.40000057220459,
+        "min": 55.80000019073486,
+        "max": 101.10000038146973
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 409.4000005722046,
+        "min": 393.80000019073486,
+        "max": 421.80000019073486
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 761.9638671875,
+        "min": 759.9208984375,
+        "max": 762.3984375
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 1450.4794921875,
+        "min": 1447.4189453125,
+        "max": 1450.53125
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 688.1328125,
+        "min": 687.498046875,
+        "max": 688.515625
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 1584.2890625,
+        "min": 1579.0830078125,
+        "max": 1584.388671875
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 2167.345703125,
+        "min": 2142.08984375,
+        "max": 2174.5546875
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 2167.345703125,
+        "min": 2142.08984375,
+        "max": 2174.5546875
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 1405.3818359375,
+        "min": 1379.69140625,
+        "max": 1414.6337890625
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 1405.3818359375,
+        "min": 1379.69140625,
+        "max": 1414.6337890625
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 375.65625,
+        "min": 371.6328125,
+        "max": 376.0888671875
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": -386.3095703125,
+        "min": -388.2880859375,
+        "max": -386.3076171875
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 222,
+        "min": 60,
+        "max": 766
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    }
+  },
+  {
+    "key": "drawing405/pdfium-canvas",
+    "fixture": "drawing405",
+    "variant": "pdfium-canvas",
+    "samples": 3,
+    "completed": 3,
+    "failures": [],
+    "metrics": {
+      "openMs": {
+        "n": 3,
+        "median": 805.5,
+        "min": 800.1999998092651,
+        "max": 819.4000005722046
+      },
+      "firstCanvasMs": {
+        "n": 3,
+        "median": 736,
+        "min": 728.3999996185303,
+        "max": 746.5
+      },
+      "openPlusFirstCanvasMs": {
+        "n": 3,
+        "median": 1547.8000001907349,
+        "min": 1536.1999998092651,
+        "max": 1552
+      },
+      "hydrationMs": {
+        "n": 3,
+        "median": 157.5999994277954,
+        "min": 155.19999980926514,
+        "max": 167
+      },
+      "pageColdMs": {
+        "n": 3,
+        "median": 638.8000001907349,
+        "min": 633.1000003814697,
+        "max": 653.7000007629395
+      },
+      "pageWarmMs": {
+        "n": 3,
+        "median": 11.199999809265137,
+        "min": 11.09999942779541,
+        "max": 11.699999809265137
+      },
+      "zoomColdMs": {
+        "n": 3,
+        "median": 696.1000003814697,
+        "min": 675.0999994277954,
+        "max": 721.5
+      },
+      "zoomWarmMs": {
+        "n": 3,
+        "median": 178.79999923706055,
+        "min": 174.5999994277954,
+        "max": 181
+      },
+      "tileMs": {
+        "n": 3,
+        "median": 13.350000381469727,
+        "min": 13.299999713897705,
+        "max": 13.649999618530273
+      },
+      "tilesTotalMs": {
+        "n": 3,
+        "median": 56.000000953674316,
+        "min": 55.09999942779541,
+        "max": 58.99999809265137
+      },
+      "rotatedTileMs": {
+        "n": 3,
+        "median": 22.59999942779541,
+        "min": 22.300000190734863,
+        "max": 22.800000190734863
+      },
+      "pngMs": {
+        "n": 3,
+        "median": 1228.4000005722046,
+        "min": 1224.6000003814697,
+        "max": 1235
+      },
+      "exportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importPreviewMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importRegisterMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "importAndMergedExportMs": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "exportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "mergedExportBytes": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "baselinePssMiB": {
+        "n": 3,
+        "median": 762.7255859375,
+        "min": 762.6962890625,
+        "max": 765.271484375
+      },
+      "readablePssMiB": {
+        "n": 3,
+        "median": 1332.0927734375,
+        "min": 1331.8798828125,
+        "max": 1335.2587890625
+      },
+      "readableDeltaMiB": {
+        "n": 3,
+        "median": 569.396484375,
+        "min": 569.154296875,
+        "max": 569.9873046875
+      },
+      "renderedPssMiB": {
+        "n": 3,
+        "median": 1611.451171875,
+        "min": 1611.326171875,
+        "max": 1614.9482421875
+      },
+      "importedPssMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "processingPeakPssMiB": {
+        "n": 3,
+        "median": 2433.7490234375,
+        "min": 2415.19140625,
+        "max": 2443.130859375
+      },
+      "includingDownloadPeakPssMiB": {
+        "n": 3,
+        "median": 2433.7490234375,
+        "min": 2415.19140625,
+        "max": 2443.130859375
+      },
+      "includingDownloadPeakDeltaMiB": {
+        "n": 3,
+        "median": 1668.4775390625,
+        "min": 1652.4658203125,
+        "max": 1680.4345703125
+      },
+      "processingPeakDeltaMiB": {
+        "n": 3,
+        "median": 1668.4775390625,
+        "min": 1652.4658203125,
+        "max": 1680.4345703125
+      },
+      "closedPssMiB": {
+        "n": 3,
+        "median": 436.1103515625,
+        "min": 434.4375,
+        "max": 440.04296875
+      },
+      "closedMinusBaselineMiB": {
+        "n": 3,
+        "median": -326.5859375,
+        "min": -328.2880859375,
+        "max": -325.228515625
+      },
+      "wasmCapacityMiB": {
+        "n": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "browserSwapPeakMiB": {
+        "n": 3,
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "hostSwapInPages": {
+        "n": 3,
+        "median": 1077,
+        "min": 453,
+        "max": 1744
+      },
+      "hostSwapOutPages": {
+        "n": 3,
+        "median": 327,
+        "min": 103,
+        "max": 509
+      }
+    }
+  }
+]

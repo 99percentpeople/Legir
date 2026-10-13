@@ -1,0 +1,150 @@
+{
+  "date": "2026-10-13",
+  "applicationRevision": "2cdb6d5bc80228023781ff227450c5d982b49644",
+  "mainRevision": "5e1efc4eee15f4ae7ec5f34b938a77de0ff75b2a",
+  "pdfjsRevision": "5e1efc4eee15f4ae7ec5f34b938a77de0ff75b2a",
+  "pdfiumBeforeRevision": "ccf4bc0d5ef5623a9ab90b571c7334671302d3ff",
+  "uiBeforeBuildRevision": "69958ba31467214fb801adb5355a7f2e20785c6b",
+  "uiBeforeNote": "Application, SDK and Vite sources identical between 69958ba and ccf4bc0; subsequent differences only investigation scripts and reports.",
+  "qualityReferenceRevision": "b5eeee7b34bff7bdd544c99eb5a5f38236d77390",
+  "qualityCacheRevision": "b198b95a89cd0e62e64450952eef9b036b5bf6e2",
+  "qualityFinalNote": "97 cases match the accepted reference exactly. Scan SDK source is identical at b198b95 and 2cdb6d5; final worker change isolates a memory callback from load scope.",
+  "sourceHashes": {
+    "packages/pdfium/src/scan.ts": "afb5d5a6f9feaf3fa12d168173a5ec402db9cfb545e5007695dd57d09249d27b",
+    "src/workers/pdf-render.worker.ts": "4b3c3b4f6490a04c3f1b1821c6cececdbed093848dc2bf873ecd0a033efada68",
+    "scripts/pdf-benchmark/corpus-entry.ts": "9c36c1f8e593f3f4c2e7c63524c08753d7957c25a9aa96e3ea6b085c3e95b63d"
+  },
+  "wasmSha256": "e277457dd37cb2c33db4ed17d84d4c79904dd1348b2025a5cbd112ad740e2adc",
+  "nativeVersions": {
+    "pdfium": "59ea54cce0179db3269c4c58874249597ca3b118",
+    "buildTools": "d53731b665185bc44adda26ab35918c387b1a3fd",
+    "emscripten": "5.0.3",
+    "depotTools": "21ae2d24f8ee0ca3459bda416129d7791c4313f1",
+    "gn": "git_revision:841e072bef419ae1116477dc75e8c5a662c0212c"
+  },
+  "fixtures": [
+    {
+      "id": "book",
+      "size": 32268253,
+      "sha256": "d3b83cf842a1e05c36de3bce9a375369f6fc6ed32eafe3f7a52aeb6f3df2c230",
+      "samplePages": [14, 143, 287]
+    },
+    {
+      "id": "indot",
+      "size": 245660530,
+      "sha256": "0dab19450341f1afa16d4304de83c6f5a097ea93c8782cca02f17279da03d836",
+      "samplePages": [216, 499, 999]
+    },
+    {
+      "id": "drawing405",
+      "size": 405260653,
+      "sha256": "c015167cf8d1865275f702438e7021152d286507b46e727add74223e378bad3a",
+      "samplePages": [1, 21, 42]
+    },
+    {
+      "id": "synthetic",
+      "size": 4232038,
+      "sha256": "e4abaef83d108435d1114f3c7293d395769b241df1ef3c61a0955a86ac2a4cc6",
+      "pages": 10,
+      "generator": "scripts/pdf-benchmark/scan-fixtures.mjs"
+    }
+  ],
+  "environment": {
+    "platform": "linux",
+    "arch": "arm64",
+    "cpu": "Cortex-A76",
+    "cpuCount": 4,
+    "totalMemory": 8454733824,
+    "browser": "148.0.7778.167",
+    "gpu": [
+      {
+        "vendorId": 0,
+        "deviceId": 0,
+        "vendorString": "",
+        "deviceString": "",
+        "driverVendor": "",
+        "driverVersion": ""
+      }
+    ],
+    "gpuFeatures": {
+      "2d_canvas": "disabled_software",
+      "direct_rendering_display_compositor": "disabled_off_ok",
+      "gpu_compositing": "disabled_software",
+      "multiple_raster_threads": "disabled_off",
+      "opengl": "disabled_off",
+      "rasterization": "disabled_software",
+      "raw_draw": "disabled_off_ok",
+      "skia_graphite": "disabled_off",
+      "trees_in_viz": "disabled_off",
+      "video_decode": "disabled_software",
+      "video_encode": "disabled_software",
+      "vulkan": "disabled_off",
+      "webgl": "disabled_off",
+      "webgpu": "disabled_off",
+      "webgpu_on_vk_via_gl_interop": "disabled_off",
+      "webnn": "disabled_off"
+    }
+  },
+  "mode": "render-only",
+  "rounds": 3,
+  "performanceSessions": 27,
+  "uiSessions": 18,
+  "preemptionSessions": 6,
+  "manualBrowserTools": {
+    "playwright": "1.56.1",
+    "pngjs": "7.0.0",
+    "nodePath": "/tmp/legir-pdfium-browser-tools/node_modules"
+  },
+  "managedBudgetsBytes": {
+    "retained": 268435456,
+    "working": 402653184,
+    "maximumCachedOutput": 8388608
+  },
+  "quality": {
+    "candidateCases": 97,
+    "canvasCases": 53,
+    "nativeFallbackCases": 44,
+    "overlapPairs": 19,
+    "maximumOverlapChannelError": 14,
+    "maximumOverlapMeanError": 0.008824956022350993,
+    "privatePngsCommitted": false
+  },
+  "builds": {
+    "corpus": "/tmp/legir-scan-canvas/corpus-memory",
+    "app": "/tmp/legir-scan-canvas/app-release",
+    "tauriFrontend": "/tmp/legir-scan-canvas/tauri-release"
+  },
+  "checks": [
+    {
+      "command": "bun run lint",
+      "revision": "2cdb6d5bc80228023781ff227450c5d982b49644",
+      "exitCode": 0
+    },
+    {
+      "command": "bun run test",
+      "revision": "2cdb6d5bc80228023781ff227450c5d982b49644",
+      "exitCode": 0,
+      "filesPassed": 99,
+      "testsPassed": 787
+    },
+    {
+      "command": "bun run --cwd packages/pdfium test",
+      "revision": "b198b95a89cd0e62e64450952eef9b036b5bf6e2",
+      "exitCode": 0,
+      "filesPassed": 6,
+      "testsPassed": 43,
+      "note": "SDK unchanged at final worker-only fix"
+    },
+    {
+      "command": "bun run build --outDir /tmp/legir-scan-canvas/app-release --emptyOutDir",
+      "revision": "2cdb6d5bc80228023781ff227450c5d982b49644",
+      "exitCode": 0
+    },
+    {
+      "command": "bun run build:web:tauri --outDir /tmp/legir-scan-canvas/tauri-release --emptyOutDir",
+      "revision": "2cdb6d5bc80228023781ff227450c5d982b49644",
+      "exitCode": 0,
+      "note": "Frontend only; not a Tauri native package or hardware test"
+    }
+  ]
+}
