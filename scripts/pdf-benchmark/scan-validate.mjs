@@ -37,12 +37,19 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const compareOnly = process.env.SCAN_VALIDATE_COMPARE_ONLY === "1";
+const selectedVariants = process.env.SCAN_VALIDATE_VARIANTS?.split(",");
 const results = compareOnly
   ? JSON.parse(await readFile(join(output, "renders.json"), "utf8"))
-  : [];
+  : selectedVariants
+    ? JSON.parse(await readFile(join(output, "renders.json"), "utf8")).filter(
+        (r) => !selectedVariants.includes(r.variant),
+      )
+    : [];
 try {
   for (const fixture of compareOnly ? [] : manifest.fixtures)
-    for (const variant of manifest.variants) {
+    for (const variant of manifest.variants.filter(
+      (v) => !selectedVariants || selectedVariants.includes(v.id),
+    )) {
       root = variant.build;
       const browser = await chromium.launch({
         executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
@@ -170,7 +177,11 @@ try {
         r.variant === (fixture.reference ?? manifest.variants[0].id),
     );
     for (const variant of results.filter(
-      (r) => r.fixture === fixture.id && r !== reference,
+      (r) =>
+        r.fixture === fixture.id &&
+        r !== reference &&
+        (!manifest.variants.some((v) => v.validate) ||
+          manifest.variants.find((v) => v.id === r.variant).validate),
     )) {
       for (const actual of variant.cases) {
         const expected = reference.cases.find(

@@ -53,22 +53,6 @@ beforeEach(() => {
   }));
   vi.stubGlobal("OffscreenCanvas", Surface);
   vi.stubGlobal(
-    "ImageDecoder",
-    class {
-      async decode() {
-        const bitmap = await createImageBitmap(new Blob());
-        return {
-          image: Object.assign(bitmap, {
-            displayWidth: bitmap.width,
-            displayHeight: bitmap.height,
-            allocationSize: () => bitmap.width * bitmap.height * 4,
-          }),
-        };
-      }
-      close() {}
-    },
-  );
-  vi.stubGlobal(
     "createImageBitmap",
     vi.fn(async () => {
       const bitmap = { width: 1024, height: 512, close: vi.fn() };
@@ -254,8 +238,8 @@ it("rejects a decode that would exceed the work budget and leaves native fallbac
   expect(cache.stats()).toMatchObject({ bytes: 0, reservedBytes: 0, pages: 0 });
 });
 
-it("uses native fallback when the browser has no ImageDecoder", async () => {
-  vi.stubGlobal("ImageDecoder", undefined);
+it("uses native fallback when the browser cannot decode ImageBitmaps", async () => {
+  vi.stubGlobal("createImageBitmap", undefined);
   const cache = new ScanCanvasRenderer(),
     ctx = target();
   expect(

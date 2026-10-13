@@ -201,7 +201,7 @@ remains a feasibility API, not a replacement for PDFium's complete semantics.
 
 `ScanCanvasRenderer` is the narrower browser scan renderer used by Legir. It
 accepts only one axis-aligned (including quarter-turns/reflections), opaque,
-unprofiled JPEG and requires `annotations: false` plus browser `ImageDecoder`
+unprofiled JPEG and requires `annotations: false` plus browser `createImageBitmap`
 support. A `false` result means the
 caller must render the entire page natively. Requested annotations, masks,
 complex contents, budget exhaustion and browser decode failures all fall back.
@@ -219,17 +219,18 @@ page; callbacks still allow foreground work to preempt them. Rotated nearest-
 neighbor magnification stays native because browser clipping can otherwise
 select different source pixels for overlapping tiles.
 
-Encoded JPEG blobs, decoded frames, pyramid surfaces and output tiles share an
+Encoded JPEG blobs, decoded bitmaps, pyramid surfaces and output tiles share an
 LRU budget (default 256 MiB). Active resources are pinned. A separate working
 limit (default 384 MiB) permits a source and destination to coexist during a
 resize; reserved decode memory remains accounted for until its promise settles.
-Frames are charged by their `allocationSize()` (including planar formats when
-available); decode reservations conservatively assume four bytes per pixel.
+Bitmaps and decode reservations are charged at four bytes per pixel. The browser
+decodes each JPEG into a reusable ImageBitmap; drawing VideoFrames directly can
+repeat full-frame conversions even for a small tile.
 `stats()` reports logical storage and cumulative counters, not process memory.
 Browser decoder/GPU allocations, destination canvases and WASM capacity are
 outside this accounting. `onMemoryChange` lets the host subtract managed usage
 from the native large-image cache budget; Legir uses a combined 256 MiB retained
-budget and measures browser PSS separately. `clear` closes frames and zeroes
+budget and measures browser PSS separately. `clear` closes bitmaps and zeroes
 owned canvases, including late results from invalidated decodes.
 
 The package is BSD-3-Clause; the surrounding Legir application keeps its own

@@ -3,7 +3,7 @@ import { Matrix } from "./matrix.js";
 import type { PDFPage } from "./page.js";
 import type { Matrix as Transform, Rect, RenderOptions } from "./types.js";
 
-type Surface = VideoFrame | OffscreenCanvas;
+type Surface = ImageBitmap | OffscreenCanvas;
 type Resource = {
   bytes: number;
   pins: number;
@@ -157,8 +157,8 @@ export class ScanCanvasRenderer {
     }
   }
   private reserve(bytes: number) {
-    // A conservative decode reservation can be larger than its eventual YUV
-    // frame. Evict only for the work cap now; trim retained storage on unpin.
+    // Keep useful levels while a resize uses temporary headroom; trim retained
+    // storage on unpin after the new level has been generated.
     this.trim(Math.max(0, this.workLimit - bytes));
     if (this.bytes + this.reserved + bytes > this.workLimit)
       throw new Error("Scan work budget exhausted");
@@ -207,7 +207,7 @@ export class ScanCanvasRenderer {
     };
     if (
       typeof OffscreenCanvas === "undefined" ||
-      typeof ImageDecoder === "undefined" ||
+      typeof createImageBitmap === "undefined" ||
       options.annotations !== false ||
       options.keepAnnotations?.size ||
       options.contents === false ||
@@ -368,30 +368,24 @@ export class ScanCanvasRenderer {
         if (!image) {
           if (options.populate === false) return fail();
           const release = this.reserve(scan.width * scan.height * 4);
-          let bitmap: VideoFrame | undefined;
-          let decoder: ImageDecoder | undefined;
+          let bitmap: ImageBitmap | undefined;
           try {
-            // Keep the browser's decoded frame, allowing planar storage where
-            // available instead of forcing an extra RGBA bitmap conversion.
-            decoder = new ImageDecoder({
-              data: (source.value as Blob).stream(),
-              type: "image/jpeg",
-              preferAnimation: false,
+            // Cache a Canvas-ready bitmap once. Drawing a VideoFrame directly
+            // can repeat a full-frame conversion even for a small clip.
+            bitmap = await createImageBitmap(source.value as Blob, {
+              imageOrientation: "none",
+              colorSpaceConversion: "none",
             });
-            bitmap = (await decoder.decode()).image;
             check();
-            if (
-              bitmap.displayWidth !== scan.width ||
-              bitmap.displayHeight !== scan.height
-            )
+            if (bitmap.width !== scan.width || bitmap.height !== scan.height)
               throw new Error("JPEG dimensions differ");
             const key = sizeKey(scan.width, scan.height);
-            const frameBytes = bitmap.allocationSize();
-            if (frameBytes <= 0 || frameBytes > scan.width * scan.height * 4)
-              throw new Error("Unsupported decoded frame storage");
             release();
-            image = this.adopt(options.key, bitmap, frameBytes, () =>
-              scan!.levels.delete(key),
+            image = this.adopt(
+              options.key,
+              bitmap,
+              scan.width * scan.height * 4,
+              () => scan!.levels.delete(key),
             );
             scan.levels.set(key, image);
             bitmap = undefined;
@@ -399,7 +393,6 @@ export class ScanCanvasRenderer {
             step = 0;
           } finally {
             bitmap?.close();
-            decoder?.close();
             release();
           }
         }
