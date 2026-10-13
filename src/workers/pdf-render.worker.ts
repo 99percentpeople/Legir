@@ -1,5 +1,9 @@
 /// <reference lib="webworker" />
-import { ScanCanvasRenderer, type PDFDocument } from "@legir/pdfium";
+import {
+  ScanCanvasRenderer,
+  type PDFDocument,
+  type PDFium,
+} from "@legir/pdfium";
 import type {
   WorkerErrorResponse,
   WorkerProgressResponse,
@@ -42,6 +46,14 @@ setWorkerFontProvider(
 let session: DocumentSession | null = null;
 let scanRenderer: ScanCanvasRenderer | undefined;
 const imageCacheBudget = 256 * 1024 * 1024;
+// Keep this callback out of loadDocument's closure: retaining that activation
+// also keeps its transferred input buffer alive after PDFium has copied it.
+const createScanRenderer = (pdfium: PDFium) =>
+  new ScanCanvasRenderer({
+    byteLimit: imageCacheBudget,
+    onMemoryChange: (bytes) =>
+      pdfium.setLargeImageCacheLimit(Math.max(0, imageCacheBudget - bytes)),
+  });
 const waitingCommands = new Map<string, { cancelled: boolean }>();
 let exclusiveTail: Promise<void> = Promise.resolve();
 const exclusive = (run: () => Promise<void>) => {
@@ -298,11 +310,7 @@ const loadDocument = async (
   const pending = (async () => {
     await previous?.catch(() => {});
     const pdfium = await getPDFium();
-    scanRenderer ??= new ScanCanvasRenderer({
-      byteLimit: imageCacheBudget,
-      onMemoryChange: (bytes) =>
-        pdfium.setLargeImageCacheLimit(Math.max(0, imageCacheBudget - bytes)),
-    });
+    scanRenderer ??= createScanRenderer(pdfium);
     if (state.generation !== generation || docs.get(docId) !== state) return;
     disposeState(state);
     if (!session || docId === session.primaryId) {
