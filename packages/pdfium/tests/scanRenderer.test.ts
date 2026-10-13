@@ -32,6 +32,11 @@ class Surface {
   getContext() {
     return this.context;
   }
+  transferToImageBitmap() {
+    const bitmap = { width: this.width, height: this.height, close: vi.fn() };
+    bitmaps.push(bitmap);
+    return bitmap;
+  }
 }
 const page = {} as PDFPage;
 const matrix: [number, number, number, number, number, number] = [
@@ -218,6 +223,8 @@ it("reuses foreground levels for a preview without a new JPEG decode or output t
     decodes: 1,
     renders: 2,
     tileBytes: before.tileBytes,
+    imageBytes: before.imageBytes,
+    bytes: before.bytes,
   });
   expect(createImageBitmap).toHaveBeenCalledOnce();
   cache.clear();
@@ -263,5 +270,67 @@ it("keeps rotated nearest-neighbor magnification on the native renderer", async 
   ).toBe(false);
   expect(createImageBitmap).not.toHaveBeenCalled();
   expect(ctx.drawImage).not.toHaveBeenCalled();
+  cache.clear();
+});
+
+it("does not evict a full foreground cache to stage a background preview", async () => {
+  const cache = new ScanCanvasRenderer({
+      byteLimit: 3 * 1024 * 1024 + 100,
+      workLimit: 5 * 1024 * 1024,
+    }),
+    ctx = target();
+  await cache.render(page, ctx, matrix, [0, 0, 512, 512], options());
+  const before = cache.stats();
+  expect(before.bytes).toBe(before.limit);
+  expect(
+    await cache.render(page, ctx, matrix, [0, 0, 128, 128], {
+      ...options(),
+      populate: false,
+    }),
+  ).toBe(true);
+  expect(cache.stats()).toMatchObject({
+    bytes: before.bytes,
+    tileBytes: before.tileBytes,
+    imageBytes: before.imageBytes,
+    evictions: before.evictions,
+  });
+  cache.clear();
+});
+
+it("keeps a zoom source resident across temporary scale levels for a subsequent larger tile", async () => {
+  plan.mockReturnValue({
+    commands: new Float64Array([2, 8192, 0, 0, 4096, 0, 0, 0, 8192, 4096, 0]),
+    images: [new Uint8Array(100)],
+    box: [0, 0, 8192, 4096],
+  });
+  vi.mocked(createImageBitmap).mockImplementation(
+    async () =>
+      ({ width: 8192, height: 4096, close: vi.fn() }) as unknown as ImageBitmap,
+  );
+  const cache = new ScanCanvasRenderer({
+      byteLimit: 150 * 1024 * 1024,
+      workLimit: 220 * 1024 * 1024,
+    }),
+    ctx = target();
+  expect(
+    await cache.render(
+      page,
+      ctx,
+      [3000 / 8192, 0, 0, -3000 / 8192, 0, 1500],
+      [0, 0, 3000, 1500],
+      options(),
+    ),
+  ).toBe(true);
+  expect(
+    await cache.render(
+      page,
+      ctx,
+      [6400 / 8192, 0, 0, -6400 / 8192, 0, 3200],
+      [500, 500, 1524, 1524],
+      options(),
+    ),
+  ).toBe(true);
+  expect(createImageBitmap).toHaveBeenCalledOnce();
+  expect(cache.stats().bytes).toBeLessThanOrEqual(cache.stats().limit);
   cache.clear();
 });

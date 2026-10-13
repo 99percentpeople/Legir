@@ -219,6 +219,13 @@ page; callbacks still allow foreground work to preempt them. Rotated nearest-
 neighbor magnification stays native because browser clipping can otherwise
 select different source pixels for overlapping tiles.
 
+Scale levels and tiles are materialized as ImageBitmaps before caching so Canvas
+recordings cannot retain a larger input image behind a small reported surface.
+At zooms above a 2048-pixel image edge, a decoded full source stays pinned through
+temporary downsampling and is preferred over intermediate levels. Previews use
+temporary levels, keep foreground images pinned and fall back if working
+headroom is insufficient; they do not evict the foreground cache.
+
 Encoded JPEG blobs, decoded bitmaps, pyramid surfaces and output tiles share an
 LRU budget (default 256 MiB). Active resources are pinned. A separate working
 limit (default 384 MiB) permits a source and destination to coexist during a

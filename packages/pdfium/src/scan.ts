@@ -156,12 +156,15 @@ export class ScanCanvasRenderer {
       this.drop(resource);
     }
   }
-  private reserve(bytes: number) {
+  private reserve(bytes: number, evict = true) {
     // Keep useful levels while a resize uses temporary headroom; trim retained
     // storage on unpin after the new level has been generated.
-    this.trim(Math.max(0, this.workLimit - bytes));
+    if (evict) this.trim(Math.max(0, this.workLimit - bytes));
     if (this.bytes + this.reserved + bytes > this.workLimit)
-      throw new Error("Scan work budget exhausted");
+      throw new DOMException(
+        "Scan work budget exhausted",
+        "QuotaExceededError",
+      );
     this.reserved += bytes;
     this.changed();
     let released = false;
@@ -247,7 +250,8 @@ export class ScanCanvasRenderer {
     };
     let source: Resource | undefined,
       image: Resource | undefined,
-      output: Resource | undefined;
+      output: Resource | undefined,
+      zoomSource: Resource | undefined;
     try {
       check();
       let scan = this.pages.get(options.key);
@@ -396,11 +400,21 @@ export class ScanCanvasRenderer {
             release();
           }
         }
+        // At reading zooms prefer a resident decoded source over disposable
+        // intermediate levels, so the next larger tile need not decode again.
+        if (
+          options.populate === false ||
+          (Math.max(imageWidth, imageHeight) > 2048 && step === 0)
+        ) {
+          zoomSource = image;
+          zoomSource.pins++;
+          this.touch(zoomSource);
+        }
         for (step++; step < steps.length; step++) {
           await pause();
           const [w, h] = steps[step],
             key = sizeKey(w, h);
-          const release = this.reserve(w * h * 4);
+          const release = this.reserve(w * h * 4, options.populate !== false);
           let surface: OffscreenCanvas | undefined;
           try {
             surface = new OffscreenCanvas(w, h);
@@ -408,13 +422,20 @@ export class ScanCanvasRenderer {
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "low";
             ctx.drawImage(image.value as Surface, 0, 0, w, h);
+            // Flush the raster before caching it. A retained Canvas recording
+            // can otherwise keep its much larger input image alive.
+            const bitmap = surface.transferToImageBitmap();
+            surface.width = surface.height = 0;
+            surface = undefined;
             release();
-            const next = this.adopt(options.key, surface, w * h * 4, () =>
+            const next = this.adopt(options.key, bitmap, w * h * 4, () =>
               scan!.levels.delete(key),
             );
-            scan.levels.set(key, next);
-            surface = undefined;
-            this.unpin(image);
+            if (options.populate !== false) scan.levels.set(key, next);
+            if (options.populate === false) {
+              if (image === zoomSource) image.pins--;
+              else this.drop(image);
+            } else this.unpin(image);
             image = next;
           } finally {
             if (surface) surface.width = surface.height = 0;
@@ -422,7 +443,10 @@ export class ScanCanvasRenderer {
           }
         }
         await pause();
-        const release = this.reserve(width * height * 4);
+        const release = this.reserve(
+          width * height * 4,
+          options.populate !== false,
+        );
         let stage: OffscreenCanvas | undefined;
         try {
           stage = new OffscreenCanvas(width, height);
@@ -460,11 +484,13 @@ export class ScanCanvasRenderer {
           ctx.drawImage(image.value as Surface, 0, 0, imageWidth, imageHeight);
           check();
           if (ctx.isContextLost()) throw new Error("Scan canvas context lost");
+          const bitmap = stage.transferToImageBitmap();
+          stage.width = stage.height = 0;
+          stage = undefined;
           release();
-          output = this.adopt(options.key, stage, width * height * 4, () =>
+          output = this.adopt(options.key, bitmap, width * height * 4, () =>
             scan!.tiles.delete(tileKey),
           );
-          stage = undefined;
           if (output.bytes <= 8 * MiB && options.populate !== false)
             scan.tiles.set(tileKey, output);
         } finally {
@@ -493,12 +519,23 @@ export class ScanCanvasRenderer {
     } catch (error) {
       if (interrupted) throw error;
       check();
-      this.forget(options.key);
+      if (
+        !(
+          options.populate === false &&
+          error instanceof DOMException &&
+          error.name === "QuotaExceededError"
+        )
+      )
+        this.forget(options.key);
       return fail();
     } finally {
-      if (image) this.unpin(image);
+      if (image) {
+        if (options.populate === false) {
+          if (image === zoomSource) image.pins--;
+          else this.drop(image);
+        } else this.unpin(image);
+      }
       if (output) {
-        this.unpin(output);
         if (
           !this.pages
             .get(options.key)
@@ -513,7 +550,9 @@ export class ScanCanvasRenderer {
             )
         )
           this.drop(output);
+        else this.unpin(output);
       }
+      if (zoomSource) this.unpin(zoomSource);
       if (source) this.unpin(source);
       this.trim();
     }
