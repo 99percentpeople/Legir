@@ -10,6 +10,12 @@ export { PDFBuffer } from "./runtime.js";
 export { Matrix } from "./matrix.js";
 export { createCanvasPlan, drawCanvasPlan } from "./canvas.js";
 export type { PDFCanvasPlan } from "./canvas.js";
+export { ScanCanvasRenderer } from "./scan.js";
+export type {
+  ScanCanvasOptions,
+  ScanCanvasStats,
+  ScanDrawOptions,
+} from "./scan.js";
 export { ObjectType } from "./types.js";
 export type * from "./types.js";
 

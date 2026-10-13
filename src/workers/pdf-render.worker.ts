@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import type { PDFDocument } from "@legir/pdfium";
+import { ScanCanvasRenderer, type PDFDocument } from "@legir/pdfium";
 import type {
   WorkerErrorResponse,
   WorkerProgressResponse,
@@ -40,6 +40,8 @@ setWorkerFontProvider(
 );
 
 let session: DocumentSession | null = null;
+let scanRenderer: ScanCanvasRenderer | undefined;
+const imageCacheBudget = 256 * 1024 * 1024;
 const waitingCommands = new Map<string, { cancelled: boolean }>();
 let exclusiveTail: Promise<void> = Promise.resolve();
 const exclusive = (run: () => Promise<void>) => {
@@ -279,6 +281,7 @@ const scheduleNext = () => {
 };
 
 const disposeState = (state: DocState) => {
+  scanRenderer?.clear();
   state.pageCache.clear();
   state.pdfDoc = null;
 };
@@ -295,6 +298,11 @@ const loadDocument = async (
   const pending = (async () => {
     await previous?.catch(() => {});
     const pdfium = await getPDFium();
+    scanRenderer ??= new ScanCanvasRenderer({
+      byteLimit: imageCacheBudget,
+      onMemoryChange: (bytes) =>
+        pdfium.setLargeImageCacheLimit(Math.max(0, imageCacheBudget - bytes)),
+    });
     if (state.generation !== generation || docs.get(docId) !== state) return;
     disposeState(state);
     if (!session || docId === session.primaryId) {
@@ -440,14 +448,33 @@ const renderToCanvas = async (
     ];
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Could not get canvas context");
-    await drawPageToCanvasCooperatively(
+    const bounds: [number, number, number, number] = [
+      x,
+      y,
+      x + width,
+      y + height,
+    ];
+    const drawn = await scanRenderer?.render(
       cached.page,
-      viewport,
-      [x, y, x + width, y + height],
       ctx,
-      { annotations: params.renderAnnotations === true },
-      task.throwIfCancelled,
+      viewport.transform,
+      bounds,
+      {
+        key: `${docId}:${params.pageIndex}`,
+        annotations: params.renderAnnotations === true,
+        checkpoint: task.throwIfCancelled,
+        yieldTask: yieldRenderTask,
+      },
     );
+    if (!drawn)
+      await drawPageToCanvasCooperatively(
+        cached.page,
+        viewport,
+        bounds,
+        ctx,
+        { annotations: params.renderAnnotations === true },
+        task.throwIfCancelled,
+      );
     task.throwIfCancelled();
     // Acknowledge after the transferred canvas can be presented.
     await new Promise<void>((resolve) =>
@@ -497,27 +524,43 @@ const renderToImage = async (
     canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Could not get canvas context");
-    await drawPageToCanvasCooperatively(
+    const yieldPreview = async () => {
+      await yieldRenderTask();
+      task.throwIfCancelled();
+      if (
+        taskQueue.some((item) => item.data.type === "render") ||
+        waitingCommands.size
+      )
+        throw new RenderPreempted();
+    };
+    const renderOptions = {
+      annotations: !content && params.renderAnnotations === true,
+      keepAnnotations,
+      imageCache: "reuse" as const,
+    };
+    const drawn = await scanRenderer?.render(
       cached.page,
-      viewport,
-      [0, 0, width, height],
       ctx,
+      viewport.transform,
+      [0, 0, width, height],
       {
-        annotations: !content && params.renderAnnotations === true,
-        keepAnnotations,
-        imageCache: "reuse",
-      },
-      task.throwIfCancelled,
-      async () => {
-        await yieldRenderTask();
-        task.throwIfCancelled();
-        if (
-          taskQueue.some((item) => item.data.type === "render") ||
-          waitingCommands.size
-        )
-          throw new RenderPreempted();
+        ...renderOptions,
+        key: `${docId}:${params.pageIndex}`,
+        populate: false,
+        checkpoint: task.throwIfCancelled,
+        yieldTask: yieldPreview,
       },
     );
+    if (!drawn)
+      await drawPageToCanvasCooperatively(
+        cached.page,
+        viewport,
+        [0, 0, width, height],
+        ctx,
+        renderOptions,
+        task.throwIfCancelled,
+        yieldPreview,
+      );
     if (content) {
       const { drawThumbnailOverlay } =
         await import("@/services/pdfService/lib/thumbnailOverlay");
@@ -759,8 +802,15 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
       }
       case "contentOperation": {
         await ensureDocumentLoaded("default");
-        const payload = await session!.content(data.request);
-        result = { payload };
+        try {
+          const payload = await session!.content(data.request);
+          result = { payload };
+        } finally {
+          if (session!.lastTransactionAffectsRendering) {
+            scanRenderer?.clear();
+            for (const state of docs.values()) state.pageCache.clear();
+          }
+        }
         break;
       }
       case "inspectDocument":
@@ -776,7 +826,12 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           if (data.type === "inspectDocument")
             result = { payload: await session!.inspect() };
           else if (data.type === "documentStats")
-            result = { payload: session!.stats() };
+            result = {
+              payload: {
+                ...session!.stats(),
+                scanCanvas: scanRenderer?.stats(),
+              },
+            };
           else if (data.type === "parseDocument") {
             const payload = await session!.parse(
               data,
@@ -830,6 +885,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
             (data.type === "exportDocument" || data.type === "parseDocument") &&
             session!.lastTransactionAffectsRendering
           ) {
+            scanRenderer?.clear();
             for (const state of docs.values()) {
               state.pageCache.clear();
             }

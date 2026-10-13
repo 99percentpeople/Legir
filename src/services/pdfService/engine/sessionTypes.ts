@@ -52,6 +52,7 @@ export type DocumentCommands = {
       largeImageCache: ReturnType<
         import("@legir/pdfium").PDFium["largeImageCache"]
       >;
+      scanCanvas?: import("@legir/pdfium").ScanCanvasStats;
     };
   };
 };

@@ -217,6 +217,31 @@ an automatic quality pass. `bitmapBytes` is logical decoded RGBA size and
 `wasmCapacity` is arena capacity, not measured process memory. Every session closes
 native documents and decoded bitmaps. Do not run builds/tests concurrently.
 
+`scan-fixtures.mjs PDFIUM_PACKAGE OUTPUT_PDF` generates ten deterministic scan
+cases (fine text/lines/colors, crop origins, reflections, quarter-turns,
+interpolation, annotations, non-scan content and a soft mask).
+`scan-validate.mjs MANIFEST OUTPUT_DIRECTORY` separately captures actual worker
+canvases from the common corpus entry; it needs the manual `pngjs` dependency
+alongside Playwright. A fixture can specify `reference`, `expectScan`, `exact`
+and custom `tasks`; set `validate: true` only on the candidate variant. The
+default gate allows fewer than 0.1% pixels with any channel difference over 16
+and mean absolute channel error at most 0.5 against PDF.js. Native fallback
+fixtures use `exact: true` against the previous PDFium build. Overlapping tiles
+must have maximum channel error at most 16 and mean channel error at most 0.05;
+browser interpolation can differ by a few levels at different clip origins.
+Rotated nearest-neighbor magnification, which exceeds this bound, falls back
+to native rendering. Ownership and managed cache limits are asserted as well.
+Inspect text/line crops before treating a numeric pass as a quality result.
+For the saturated-color synthetic JPEG, PDF.js's JPEG decoder has different
+chroma reconstruction from the browser/PDFium decoder. That fixture additionally
+requires exact native-resolution pixels against PDFium, luminance RMSE below 1
+and zero pixels with luminance error over 16 against PDF.js. Its documented RGB
+edge tolerance is 2% severe pixels and mean channel error at most 0.75; the real
+scan gate keeps the stricter default. This separates decoded color differences
+from lost text/line detail instead of treating every RGB difference as blur.
+PNGs stay outside the repository; record only JSON diagnostics for private PDFs.
+Run this quality gate before the performance comparison, in a separate process.
+
 Validation runs **after timing** with pdf-lib and Poppler: all page dimensions,
 rotations, annotation subtype counts, nested reply parents, review states/flags,
 popup ownership, internal link targets, external link URIs

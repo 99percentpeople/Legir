@@ -196,9 +196,41 @@ are released after use; cancelled or failed draws preserve the destination.
 native renderer for those pages and for failed browser decodes. Text, Forms,
 shading, clipping, graphics-state resources, masks, transparency groups,
 profiled/oriented JPEGs and requested annotations are deliberately excluded.
-Canvas antialiasing/downsampling differ from PDFium. This is a feasibility API,
-not enabled by default in Legir; the real corpus currently falls back to native
-rendering. It is not a replacement for PDFium's complete rendering semantics.
+Canvas antialiasing/downsampling differ from PDFium. The general path replay
+remains a feasibility API, not a replacement for PDFium's complete semantics.
+
+`ScanCanvasRenderer` is the narrower browser scan renderer used by Legir. It
+accepts only one axis-aligned (including quarter-turns/reflections), opaque,
+unprofiled JPEG and requires `annotations: false` plus browser `ImageDecoder`
+support. A `false` result means the
+caller must render the entire page natively. Requested annotations, masks,
+complex contents, budget exhaustion and browser decode failures all fall back.
+Cancellation/preemption from `checkpoint` or `yieldTask` propagates without
+publishing a partial frame. Calls must be serialized with the document owner.
+
+The renderer borrows the existing `PDFPage` to extract the image and geometry;
+it never opens or owns a PDF. Give `render` a stable page `key` and call `clear`
+after content/page-tree mutations or document closure. Downsampling halves each
+axis until the source is at most twice the output dimension, reuses those
+levels, and rounds image placement in global pixel coordinates before applying
+the tile offset. Small outputs (up to 8 MiB) are cached by transform and bounds.
+`populate: false` lets previews reuse existing levels without decoding a new
+page; callbacks still allow foreground work to preempt them. Rotated nearest-
+neighbor magnification stays native because browser clipping can otherwise
+select different source pixels for overlapping tiles.
+
+Encoded JPEG blobs, decoded frames, pyramid surfaces and output tiles share an
+LRU budget (default 256 MiB). Active resources are pinned. A separate working
+limit (default 384 MiB) permits a source and destination to coexist during a
+resize; reserved decode memory remains accounted for until its promise settles.
+Frames are charged by their `allocationSize()` (including planar formats when
+available); decode reservations conservatively assume four bytes per pixel.
+`stats()` reports logical storage and cumulative counters, not process memory.
+Browser decoder/GPU allocations, destination canvases and WASM capacity are
+outside this accounting. `onMemoryChange` lets the host subtract managed usage
+from the native large-image cache budget; Legir uses a combined 256 MiB retained
+budget and measures browser PSS separately. `clear` closes frames and zeroes
+owned canvases, including late results from invalidated decodes.
 
 The package is BSD-3-Clause; the surrounding Legir application keeps its own
 license. See `LICENSE` and `wasm/licenses/`.

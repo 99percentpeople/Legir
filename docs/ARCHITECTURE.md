@@ -364,6 +364,20 @@ retain/transfer pixels use `rasterizePage`, which still returns an owned copy.
 Canvas resizing happens only after successful rasterization, preserving the
 previous frame if native rendering fails.
 
+For a body containing one supported opaque JPEG, `ScanCanvasRenderer` in
+`packages/pdfium/src/scan.ts` extracts geometry and encoded bytes from that same
+native page, then draws through worker Canvas 2D. It opens no additional PDF.
+Repeated half-size levels preserve fine detail during minification; global
+integer placement keeps neighboring tiles aligned. Decoded images, scale levels,
+encoded blobs and small output tiles share a 256 MiB LRU; temporary resizing has
+a 384 MiB working cap. The host reduces PDFium's large-image cache by the managed
+Canvas usage. Browser/GPU allocations and WASM capacity are measured separately.
+Foreground pages may populate the cache; thumbnails only reuse existing images.
+Edits, page-source changes and document disposal invalidate owned scan resources.
+Metadata-only saves retain them. Requested annotation appearances, complex pages,
+masks/profiles, unsupported transforms and failed decodes use the full native
+renderer. Cancellation preserves the previously published canvas.
+
 Standalone content operations without a live owner use a disposable
 `pdf-content.worker`; Node/test authoring also supports the native engine without
 a browser worker. `objectGraph.ts` is restricted to standalone authoring/diagnostic
