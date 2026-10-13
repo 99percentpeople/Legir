@@ -1,0 +1,95 @@
+[
+  {
+    "fixture": "drawing",
+    "variant": "pdfjs",
+    "firstCanvasMs": {
+      "median": 3000.8999996185303,
+      "samples": [3220.699999809265, 3000.8999996185303, 2851.699999809265]
+    },
+    "zoomFirstTileMs": {
+      "median": 488.80000019073486,
+      "samples": [1005.2999992370605, 488.80000019073486, 467.79999923706055]
+    },
+    "warmProbes": {
+      "median": 1269.5,
+      "samples": [1269.5, 1172, 1939.8999996185303]
+    },
+    "pssMiB": 3131.1728515625
+  },
+  {
+    "fixture": "drawing",
+    "variant": "before",
+    "firstCanvasMs": {
+      "median": 2585.1000003814697,
+      "samples": [2694.800000190735, 2585.1000003814697, 2466.199999809265]
+    },
+    "zoomFirstTileMs": {
+      "median": 448.3999996185303,
+      "samples": [406.5, 448.3999996185303, 773.2999992370605]
+    },
+    "warmProbes": {
+      "median": 262.70000076293945,
+      "samples": [265.19999980926514, 262.70000076293945, 260.69999980926514]
+    },
+    "pssMiB": 2302.345703125
+  },
+  {
+    "fixture": "drawing",
+    "variant": "after",
+    "firstCanvasMs": {
+      "median": 2367.5,
+      "samples": [2655.9000005722046, 2367.5, 2283.5]
+    },
+    "zoomFirstTileMs": {
+      "median": 398.5,
+      "samples": [398.5, 403.3999996185303, 392.8999996185303]
+    },
+    "warmProbes": {
+      "median": 100,
+      "samples": [96.20000076293945, 100, 106.30000019073486]
+    },
+    "pssMiB": 2362.60546875
+  },
+  {
+    "fixture": "book",
+    "variant": "pdfjs",
+    "firstCanvasMs": {
+      "median": 3438.8999996185303,
+      "samples": [3665.699999809265, 3438.8999996185303, 3362.6000003814697]
+    },
+    "zoomFirstTileMs": null,
+    "warmProbes": {
+      "median": 1578,
+      "samples": [1461.2999992370605, 1578, 1591.8999996185303]
+    },
+    "pssMiB": 1159.21484375
+  },
+  {
+    "fixture": "book",
+    "variant": "before",
+    "firstCanvasMs": {
+      "median": 2501.300000190735,
+      "samples": [2479.5, 2501.300000190735, 2627.5]
+    },
+    "zoomFirstTileMs": null,
+    "warmProbes": {
+      "median": 94.19999980926514,
+      "samples": [94.19999980926514, 106.89999961853027, 80.09999942779541]
+    },
+    "pssMiB": 760.8369140625
+  },
+  {
+    "fixture": "book",
+    "variant": "after",
+    "firstCanvasMs": {
+      "median": 2663.6000003814697,
+      "samples": [2663.6000003814697, 2626.5, 4873.5]
+    },
+    "zoomFirstTileMs": null,
+    "warmProbes": {
+      "median": 88.80000019073486,
+      "samples": [83.69999980926514, 88.80000019073486, 100.30000019073486]
+    },
+    "pssMiB": 759.716796875
+  }
+]

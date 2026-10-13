@@ -1,0 +1,61 @@
+{
+  "engine": "pdfium",
+  "result": {
+    "url": "/editor/tab_1791903306601_orouye",
+    "text": ["", "Native PDF page 2", ""],
+    "forms": [
+      {
+        "type": "text",
+        "value": "Bob"
+      },
+      {
+        "type": "text",
+        "value": "VALUE 0"
+      },
+      {
+        "type": "text",
+        "value": "VALUE 3"
+      },
+      {
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "canvases": [
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [632, 790],
+      [300, 150],
+      [632, 790],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150]
+    ]
+  },
+  "errors": [],
+  "resourceFailures": [
+    {
+      "url": "blob:http://127.0.0.1:5199/84841a4e-6f02-45e2-b05f-ca3d33a7e551",
+      "type": "image",
+      "error": "net::ERR_FILE_NOT_FOUND"
+    }
+  ],
+  "savedPages": 8,
+  "savedFields": ["name", "donor-field-0", "donor-field-3"],
+  "activeWorkers": 1,
+  "initialWorkerUrls": [],
+  "activeWorkerUrls": [
+    "http://127.0.0.1:5199/assets/pdf-render.worker-U-mHC-BS.js"
+  ],
+  "workersAfterClose": 0,
+  "workerUrlsAfterClose": [],
+  "brokenImages": []
+}

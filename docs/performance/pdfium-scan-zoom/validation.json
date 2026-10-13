@@ -1,0 +1,30 @@
+{
+  "sdkTests": 49,
+  "applicationTests": 787,
+  "testFiles": {
+    "sdk": 6,
+    "application": 99
+  },
+  "lint": "passed",
+  "webBuild": "passed",
+  "tauriFrontendBuild": "passed",
+  "nativeBuild": "passed",
+  "qualityCases": 127,
+  "scanCases": 83,
+  "nativeFallbackCases": 44,
+  "overlapPairs": 22,
+  "maxOverlapChannelError": 14,
+  "maxOverlapMeanError": 0.008824956022350993,
+  "annotationCases": 7,
+  "annotationMaxExcess": 0,
+  "timedSessions": 27,
+  "timedFailures": 0,
+  "uiSessions": 18,
+  "uiFailures": 0,
+  "preemptionSessions": 6,
+  "finalScanPngHashesMatchQualityCapture": true,
+  "nativeDocumentsAndPeak": 1,
+  "closedWorkers": 0,
+  "pwa": "8 pages, 3 fields, edited name Bob; 1 worker then 0; no broken visible images",
+  "knownIssue": "One revoked Blob thumbnail ERR_FILE_NOT_FOUND in both current and previous PWA runs; no visible broken image."
+}
