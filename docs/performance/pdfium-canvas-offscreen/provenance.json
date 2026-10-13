@@ -1,0 +1,24 @@
+{
+  "fixtures": [
+    {
+      "id": "book",
+      "size": 32268253,
+      "sha256": "d3b83cf842a1e05c36de3bce9a375369f6fc6ed32eafe3f7a52aeb6f3df2c230",
+      "samplePages": [14, 143, 287]
+    },
+    {
+      "id": "indot",
+      "size": 245660530,
+      "sha256": "0dab19450341f1afa16d4304de83c6f5a097ea93c8782cca02f17279da03d836",
+      "samplePages": [216, 499, 999]
+    },
+    {
+      "id": "drawing405",
+      "size": 405260653,
+      "sha256": "c015167cf8d1865275f702438e7021152d286507b46e727add74223e378bad3a",
+      "samplePages": [1, 21, 42]
+    }
+  ],
+  "wasmSha256": "e277457dd37cb2c33db4ed17d84d4c79904dd1348b2025a5cbd112ad740e2adc",
+  "revision": "cc817a0"
+}

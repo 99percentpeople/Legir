@@ -174,6 +174,49 @@ controlled speed comparison. Its 5% gross-placement-error guard is intentionally
 loose; inspect the recorded pixel differences before considering a default switch.
 The normal native renderer must still pass the strict hash check above.
 
+`canvas-offscreen.mjs PDFIUM_PACKAGE MANIFEST OUTPUT_JSON [ROUNDS]` compares
+cooperative native RGBA rendering, the current Canvas-plan SDK, and a diagnostic
+replay with cached Path2D/ImageBitmap objects and conservative viewport culling.
+All three draw in a worker into the same kind of transferred HTML canvas. The
+cached replay exists only in the benchmark worker; it is not a production backend.
+
+```sh
+node scripts/pdf-benchmark/canvas-offscreen.mjs packages/pdfium /tmp/manifest.json /tmp/canvas-results.json 3
+# Explicitly benchmark supported real pages from the manifest:
+CANVAS_BENCH_REAL=drawing405 node scripts/pdf-benchmark/canvas-offscreen.mjs packages/pdfium /tmp/manifest.json /tmp/canvas-real-results.json 3
+# Separately test high-quality minification, using a zero-based page index:
+CANVAS_BENCH_REAL=drawing405 CANVAS_BENCH_PAGES=21 CANVAS_BENCH_MODES=native,cached-high node scripts/pdf-benchmark/canvas-offscreen.mjs packages/pdfium /tmp/manifest.json /tmp/canvas-quality-results.json 3
+```
+
+The default run measures deterministic 10,000-curve and 12-megapixel JPEG
+fixtures, then checks the manifest's real pages with `annotations: false`, matching
+the application's body rendering. Including annotations can reject a page whose
+body is otherwise supported. `CANVAS_BENCH_REAL` selects comma-separated fixture
+IDs and measures each listed sample page; it fails if a selected page is unsupported.
+`cached-high` enables smoothing during minification and uses the browser's high
+quality setting. It does not implement PDF.js's multistage downsampling. Setting
+`CANVAS_BENCH_CAPTURE=1` saves private validation PNGs beside the JSON, after all
+timed runs; do not commit source-document screenshots without authorization.
+Each mode/page/round opens a fresh browser, worker and single PDF document, with
+mode order rotated across rounds. WASM initialization, document/page loading,
+command extraction and Path2D/image preparation are recorded separately. Six
+draws per size include two warmups and four measured repetitions. Report the
+median within each round, then the median of those three round medians; also
+report the first render including preparation rather than presenting cached-only
+figures as first-open performance. File fetching and synthetic fixture construction
+are outside rendering time.
+
+The software-only Chromium configuration is deliberate and recorded with GPU
+feature status. `drawMs` includes the drawing calls and cooperative yields;
+`responseMs` also includes a worker animation-frame acknowledgment. Neither is
+physical display scanout. Pixel readback runs in separate post-timing sessions,
+with channel-difference statistics against native PDFium and exact comparison
+between the SDK replay and cached replay. Different browser resampling/antialiasing
+may invalidate an otherwise fast candidate; these statistics are diagnostic, not
+an automatic quality pass. `bitmapBytes` is logical decoded RGBA size and
+`wasmCapacity` is arena capacity, not measured process memory. Every session closes
+native documents and decoded bitmaps. Do not run builds/tests concurrently.
+
 Validation runs **after timing** with pdf-lib and Poppler: all page dimensions,
 rotations, annotation subtype counts, nested reply parents, review states/flags,
 popup ownership, internal link targets, external link URIs

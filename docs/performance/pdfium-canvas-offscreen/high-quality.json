@@ -1,0 +1,2605 @@
+{
+  "date": "2026-10-13T01:01:52.705Z",
+  "revision": "cc817a07c2b96789f71f01e204ae7678c28b111f",
+  "environment": {
+    "cpu": "Cortex-A76",
+    "arch": "arm64",
+    "totalMemory": 8454733824,
+    "args": ["--no-sandbox", "--disable-gpu"],
+    "browser": "148.0.7778.167",
+    "gpu": {
+      "devices": [
+        {
+          "vendorId": 0,
+          "deviceId": 0,
+          "vendorString": "",
+          "deviceString": "",
+          "driverVendor": "",
+          "driverVersion": ""
+        }
+      ],
+      "auxAttributes": {
+        "amdSwitchable": false,
+        "canSupportThreadedTextureMailbox": false,
+        "directRenderingVersion": "",
+        "displayType": "",
+        "glExtensions": "",
+        "glImplementationParts": "(gl=disabled,angle=none)",
+        "glRenderer": "",
+        "glResetNotificationStrategy": 0,
+        "glVendor": "",
+        "glVersion": "",
+        "glWsExtensions": "",
+        "glWsVendor": "",
+        "glWsVersion": "",
+        "hardwareSupportsVulkan": false,
+        "inProcessGpu": false,
+        "initializationTime": 0,
+        "isAsan": false,
+        "isClangCoverage": false,
+        "jpegDecodeAcceleratorSupported": false,
+        "maxMsaaSamples": "",
+        "optimus": false,
+        "passthroughCmdDecoder": false,
+        "pixelShaderVersion": "",
+        "processCrashCount": 0,
+        "sandboxed": false,
+        "skiaBackendType": "None",
+        "subpixelFontRendering": true,
+        "targetCpuBits": 64,
+        "vertexShaderVersion": "",
+        "visibilityCallbackCallCount": 0
+      },
+      "featureStatus": {
+        "2d_canvas": "disabled_software",
+        "direct_rendering_display_compositor": "disabled_off_ok",
+        "gpu_compositing": "disabled_software",
+        "multiple_raster_threads": "disabled_off",
+        "opengl": "disabled_off",
+        "rasterization": "disabled_software",
+        "raw_draw": "disabled_off_ok",
+        "skia_graphite": "disabled_off",
+        "trees_in_viz": "disabled_off",
+        "video_decode": "disabled_software",
+        "video_encode": "disabled_software",
+        "vulkan": "disabled_off",
+        "webgl": "disabled_off",
+        "webgpu": "disabled_off",
+        "webgpu_on_vk_via_gl_interop": "disabled_off",
+        "webnn": "disabled_off"
+      },
+      "driverBugWorkarounds": [],
+      "videoDecoding": [],
+      "videoEncoding": []
+    }
+  },
+  "rounds": 3,
+  "tasks": [
+    {
+      "name": "page1600",
+      "longEdge": 1600
+    },
+    {
+      "name": "page3200",
+      "longEdge": 3200
+    },
+    {
+      "name": "tile1024at6400",
+      "longEdge": 6400,
+      "tile": true
+    }
+  ],
+  "measurements": [
+    {
+      "round": 0,
+      "kind": "drawing405",
+      "fixture": 2,
+      "pageIndex": 21,
+      "mode": "native",
+      "init": {
+        "wasmMs": 88.5,
+        "context": {
+          "alpha": false,
+          "colorSpace": "srgb",
+          "colorType": "unorm8",
+          "desynchronized": false,
+          "toneMapping": {
+            "mode": "standard"
+          },
+          "willReadFrequently": false
+        }
+      },
+      "opened": {
+        "openMs": 119.90000057220459,
+        "pageLoadMs": 14.699999809265137,
+        "liveDocuments": 1,
+        "rpcMs": 2272.699999809265
+      },
+      "prepared": null,
+      "samples": [
+        {
+          "task": "page1600",
+          "iteration": 0,
+          "rasterMs": 1165.2999992370605,
+          "yields": 105,
+          "writeMs": 4.600000381469727,
+          "drawMs": 1169.8999996185303,
+          "responseMs": 1177.6999998092651,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 1178.8999996185303
+        },
+        {
+          "task": "page1600",
+          "iteration": 1,
+          "rasterMs": 249.60000038146973,
+          "yields": 28,
+          "writeMs": 1.3000001907348633,
+          "drawMs": 250.9000005722046,
+          "responseMs": 255.19999980926514,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 255.60000038146973
+        },
+        {
+          "task": "page1600",
+          "iteration": 2,
+          "rasterMs": 250.0999994277954,
+          "yields": 29,
+          "writeMs": 1.4000005722045898,
+          "drawMs": 251.5,
+          "responseMs": 253.5999994277954,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 254.10000038146973
+        },
+        {
+          "task": "page1600",
+          "iteration": 3,
+          "rasterMs": 278.30000019073486,
+          "yields": 31,
+          "writeMs": 1.3999996185302734,
+          "drawMs": 279.69999980926514,
+          "responseMs": 282.30000019073486,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 282.69999980926514
+        },
+        {
+          "task": "page1600",
+          "iteration": 4,
+          "rasterMs": 249.80000019073486,
+          "yields": 28,
+          "writeMs": 1.3000001907348633,
+          "drawMs": 251.19999980926514,
+          "responseMs": 253.29999923706055,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 253.70000076293945
+        },
+        {
+          "task": "page1600",
+          "iteration": 5,
+          "rasterMs": 250.89999961853027,
+          "yields": 29,
+          "writeMs": 1.3999996185302734,
+          "drawMs": 252.29999923706055,
+          "responseMs": 254.79999923706055,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 255.10000038146973
+        },
+        {
+          "task": "page3200",
+          "iteration": 0,
+          "rasterMs": 429.30000019073486,
+          "yields": 46,
+          "writeMs": 10.300000190734863,
+          "drawMs": 439.6000003814697,
+          "responseMs": 452.9000005722046,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 453.19999980926514
+        },
+        {
+          "task": "page3200",
+          "iteration": 1,
+          "rasterMs": 427.30000019073486,
+          "yields": 46,
+          "writeMs": 5.800000190734863,
+          "drawMs": 433.1000003814697,
+          "responseMs": 446.5,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 447
+        },
+        {
+          "task": "page3200",
+          "iteration": 2,
+          "rasterMs": 429.20000076293945,
+          "yields": 46,
+          "writeMs": 5.09999942779541,
+          "drawMs": 434.30000019073486,
+          "responseMs": 440.30000019073486,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 440.6000003814697
+        },
+        {
+          "task": "page3200",
+          "iteration": 3,
+          "rasterMs": 426.4000005722046,
+          "yields": 46,
+          "writeMs": 5,
+          "drawMs": 431.4000005722046,
+          "responseMs": 437.4000005722046,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 437.9000005722046
+        },
+        {
+          "task": "page3200",
+          "iteration": 4,
+          "rasterMs": 423.9000005722046,
+          "yields": 46,
+          "writeMs": 4.799999237060547,
+          "drawMs": 428.69999980926514,
+          "responseMs": 434.79999923706055,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 435.30000019073486
+        },
+        {
+          "task": "page3200",
+          "iteration": 5,
+          "rasterMs": 422.8999996185303,
+          "yields": 46,
+          "writeMs": 5.699999809265137,
+          "drawMs": 428.5999994277954,
+          "responseMs": 434.9000005722046,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 435.0999994277954
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 0,
+          "rasterMs": 22,
+          "yields": 2,
+          "writeMs": 3.40000057220459,
+          "drawMs": 25.40000057220459,
+          "responseMs": 28.399999618530273,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 28.799999237060547
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 1,
+          "rasterMs": 22.5,
+          "yields": 2,
+          "writeMs": 0.8999996185302734,
+          "drawMs": 23.399999618530273,
+          "responseMs": 27.199999809265137,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 27.300000190734863
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 2,
+          "rasterMs": 21.59999942779541,
+          "yields": 2,
+          "writeMs": 0.8000001907348633,
+          "drawMs": 22.5,
+          "responseMs": 28.5,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 28.90000057220459
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 3,
+          "rasterMs": 21.199999809265137,
+          "yields": 2,
+          "writeMs": 0.6999998092651367,
+          "drawMs": 21.899999618530273,
+          "responseMs": 28.399999618530273,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 30.300000190734863
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 4,
+          "rasterMs": 21.5,
+          "yields": 2,
+          "writeMs": 0.9000005722045898,
+          "drawMs": 22.40000057220459,
+          "responseMs": 31.100000381469727,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 31.300000190734863
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 5,
+          "rasterMs": 21.40000057220459,
+          "yields": 2,
+          "writeMs": 0.7999992370605469,
+          "drawMs": 22.199999809265137,
+          "responseMs": 31.399999618530273,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 31.600000381469727
+        }
+      ],
+      "closed": {
+        "liveDocuments": 0,
+        "imageCache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 1,
+          "evictions": 0
+        },
+        "rpcMs": 2.40000057220459
+      }
+    },
+    {
+      "round": 0,
+      "kind": "drawing405",
+      "fixture": 2,
+      "pageIndex": 21,
+      "mode": "cached-high",
+      "init": {
+        "wasmMs": 71.89999961853027,
+        "context": {
+          "alpha": false,
+          "colorSpace": "srgb",
+          "colorType": "unorm8",
+          "desynchronized": false,
+          "toneMapping": {
+            "mode": "standard"
+          },
+          "willReadFrequently": false
+        }
+      },
+      "opened": {
+        "openMs": 133.80000019073486,
+        "pageLoadMs": 14.800000190734863,
+        "liveDocuments": 1,
+        "rpcMs": 2011.4000005722046
+      },
+      "prepared": {
+        "supported": true,
+        "planMs": 28.100000381469727,
+        "compileMs": 466.29999923706055,
+        "commandBytes": 88,
+        "encodedImageBytes": 9451404,
+        "bitmapBytes": 249703264,
+        "rpcMs": 495
+      },
+      "samples": [
+        {
+          "task": "page1600",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 161.10000038146973,
+          "responseMs": 169.9000005722046,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 170.5
+        },
+        {
+          "task": "page1600",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91.29999923706055,
+          "responseMs": 98.89999961853027,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 99.19999980926514
+        },
+        {
+          "task": "page1600",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 90.20000076293945,
+          "responseMs": 95.40000057220459,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 95.90000057220459
+        },
+        {
+          "task": "page1600",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91.19999980926514,
+          "responseMs": 96.59999942779541,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 97.10000038146973
+        },
+        {
+          "task": "page1600",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91.10000038146973,
+          "responseMs": 96.30000019073486,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 96.89999961853027
+        },
+        {
+          "task": "page1600",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91.30000019073486,
+          "responseMs": 96.90000057220459,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 97.30000019073486
+        },
+        {
+          "task": "page3200",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 370.20000076293945,
+          "responseMs": 395.69999980926514,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 397
+        },
+        {
+          "task": "page3200",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 365.0999994277954,
+          "responseMs": 390.8999996185303,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 391.30000019073486
+        },
+        {
+          "task": "page3200",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 370.0999994277954,
+          "responseMs": 393.70000076293945,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 394.1000003814697
+        },
+        {
+          "task": "page3200",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 370.19999980926514,
+          "responseMs": 404.5999994277954,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 405.1000003814697
+        },
+        {
+          "task": "page3200",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 367.3999996185303,
+          "responseMs": 386.5,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 387
+        },
+        {
+          "task": "page3200",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 370.69999980926514,
+          "responseMs": 389.4000005722046,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 389.5
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 55.60000038146973,
+          "responseMs": 63.39999961853027,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 63.70000076293945
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 53,
+          "responseMs": 58.39999961853027,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 59.40000057220459
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 53.30000019073486,
+          "responseMs": 56.30000019073486,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 56.69999980926514
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 52.69999980926514,
+          "responseMs": 55.89999961853027,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 56.30000019073486
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 52.69999980926514,
+          "responseMs": 55.80000019073486,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 56.09999942779541
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 53.19999980926514,
+          "responseMs": 56.30000019073486,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 56.69999980926514
+        }
+      ],
+      "closed": {
+        "liveDocuments": 0,
+        "imageCache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        },
+        "rpcMs": 6.300000190734863
+      }
+    },
+    {
+      "round": 1,
+      "kind": "drawing405",
+      "fixture": 2,
+      "pageIndex": 21,
+      "mode": "cached-high",
+      "init": {
+        "wasmMs": 72.60000038146973,
+        "context": {
+          "alpha": false,
+          "colorSpace": "srgb",
+          "colorType": "unorm8",
+          "desynchronized": false,
+          "toneMapping": {
+            "mode": "standard"
+          },
+          "willReadFrequently": false
+        }
+      },
+      "opened": {
+        "openMs": 132.39999961853027,
+        "pageLoadMs": 13.800000190734863,
+        "liveDocuments": 1,
+        "rpcMs": 1927.3999996185303
+      },
+      "prepared": {
+        "supported": true,
+        "planMs": 19.899999618530273,
+        "compileMs": 466.30000019073486,
+        "commandBytes": 88,
+        "encodedImageBytes": 9451404,
+        "bitmapBytes": 249703264,
+        "rpcMs": 487.5
+      },
+      "samples": [
+        {
+          "task": "page1600",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 163.4000005722046,
+          "responseMs": 173.69999980926514,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 174.70000076293945
+        },
+        {
+          "task": "page1600",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 90.5,
+          "responseMs": 97.59999942779541,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 98
+        },
+        {
+          "task": "page1600",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91.70000076293945,
+          "responseMs": 96.90000057220459,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 97.19999980926514
+        },
+        {
+          "task": "page1600",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91,
+          "responseMs": 96.19999980926514,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 96.5
+        },
+        {
+          "task": "page1600",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 90.60000038146973,
+          "responseMs": 95.89999961853027,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 96.19999980926514
+        },
+        {
+          "task": "page1600",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 90.80000019073486,
+          "responseMs": 96.59999942779541,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 97
+        },
+        {
+          "task": "page3200",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 365.19999980926514,
+          "responseMs": 390.5999994277954,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 391
+        },
+        {
+          "task": "page3200",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 363.69999980926514,
+          "responseMs": 389.5,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 389.69999980926514
+        },
+        {
+          "task": "page3200",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 362.0999994277954,
+          "responseMs": 381.4000005722046,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 381.8999996185303
+        },
+        {
+          "task": "page3200",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 361.0999994277954,
+          "responseMs": 380.4000005722046,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 380.69999980926514
+        },
+        {
+          "task": "page3200",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 358.8999996185303,
+          "responseMs": 378.5,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 378.8999996185303
+        },
+        {
+          "task": "page3200",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 376.19999980926514,
+          "responseMs": 407.8999996185303,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 408.20000076293945
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 56.69999980926514,
+          "responseMs": 64,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 64.69999980926514
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 53.5,
+          "responseMs": 61.5,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 62
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 56.19999980926514,
+          "responseMs": 59.30000019073486,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 59.69999980926514
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 54.80000019073486,
+          "responseMs": 57.90000057220459,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 58.39999961853027
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 55.19999980926514,
+          "responseMs": 63.10000038146973,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 63.5
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 52.60000038146973,
+          "responseMs": 55.59999942779541,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 55.89999961853027
+        }
+      ],
+      "closed": {
+        "liveDocuments": 0,
+        "imageCache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        },
+        "rpcMs": 6.5
+      }
+    },
+    {
+      "round": 1,
+      "kind": "drawing405",
+      "fixture": 2,
+      "pageIndex": 21,
+      "mode": "native",
+      "init": {
+        "wasmMs": 65.79999923706055,
+        "context": {
+          "alpha": false,
+          "colorSpace": "srgb",
+          "colorType": "unorm8",
+          "desynchronized": false,
+          "toneMapping": {
+            "mode": "standard"
+          },
+          "willReadFrequently": false
+        }
+      },
+      "opened": {
+        "openMs": 125.79999923706055,
+        "pageLoadMs": 13.5,
+        "liveDocuments": 1,
+        "rpcMs": 1839.5
+      },
+      "prepared": null,
+      "samples": [
+        {
+          "task": "page1600",
+          "iteration": 0,
+          "rasterMs": 1176.8000001907349,
+          "yields": 107,
+          "writeMs": 4.699999809265137,
+          "drawMs": 1181.6999998092651,
+          "responseMs": 1191.8000001907349,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 1193
+        },
+        {
+          "task": "page1600",
+          "iteration": 1,
+          "rasterMs": 254,
+          "yields": 29,
+          "writeMs": 1.4000005722045898,
+          "drawMs": 255.4000005722046,
+          "responseMs": 260,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 260.4000005722046
+        },
+        {
+          "task": "page1600",
+          "iteration": 2,
+          "rasterMs": 252.69999980926514,
+          "yields": 29,
+          "writeMs": 1.4000005722045898,
+          "drawMs": 254.10000038146973,
+          "responseMs": 256.30000019073486,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 256.69999980926514
+        },
+        {
+          "task": "page1600",
+          "iteration": 3,
+          "rasterMs": 254.30000019073486,
+          "yields": 29,
+          "writeMs": 1.3999996185302734,
+          "drawMs": 255.69999980926514,
+          "responseMs": 257.79999923706055,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 258.20000076293945
+        },
+        {
+          "task": "page1600",
+          "iteration": 4,
+          "rasterMs": 254.60000038146973,
+          "yields": 29,
+          "writeMs": 1.5,
+          "drawMs": 256.1000003814697,
+          "responseMs": 258.19999980926514,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 258.69999980926514
+        },
+        {
+          "task": "page1600",
+          "iteration": 5,
+          "rasterMs": 255.19999980926514,
+          "yields": 29,
+          "writeMs": 1.4000005722045898,
+          "drawMs": 256.69999980926514,
+          "responseMs": 258.70000076293945,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 259.19999980926514
+        },
+        {
+          "task": "page3200",
+          "iteration": 0,
+          "rasterMs": 441.5,
+          "yields": 46,
+          "writeMs": 11.09999942779541,
+          "drawMs": 452.5999994277954,
+          "responseMs": 465.69999980926514,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 466.20000076293945
+        },
+        {
+          "task": "page3200",
+          "iteration": 1,
+          "rasterMs": 471.5,
+          "yields": 48,
+          "writeMs": 5.699999809265137,
+          "drawMs": 477.30000019073486,
+          "responseMs": 490.69999980926514,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 492.5
+        },
+        {
+          "task": "page3200",
+          "iteration": 2,
+          "rasterMs": 428.80000019073486,
+          "yields": 46,
+          "writeMs": 5.199999809265137,
+          "drawMs": 434,
+          "responseMs": 439.80000019073486,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 440.19999980926514
+        },
+        {
+          "task": "page3200",
+          "iteration": 3,
+          "rasterMs": 427.30000019073486,
+          "yields": 46,
+          "writeMs": 5,
+          "drawMs": 432.30000019073486,
+          "responseMs": 438.5999994277954,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 438.8999996185303
+        },
+        {
+          "task": "page3200",
+          "iteration": 4,
+          "rasterMs": 427.19999980926514,
+          "yields": 46,
+          "writeMs": 5,
+          "drawMs": 432.19999980926514,
+          "responseMs": 438.30000019073486,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 438.5999994277954
+        },
+        {
+          "task": "page3200",
+          "iteration": 5,
+          "rasterMs": 425.1000003814697,
+          "yields": 46,
+          "writeMs": 5.100000381469727,
+          "drawMs": 430.30000019073486,
+          "responseMs": 436.20000076293945,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 436.3999996185303
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 0,
+          "rasterMs": 22.399999618530273,
+          "yields": 2,
+          "writeMs": 3.3000001907348633,
+          "drawMs": 25.699999809265137,
+          "responseMs": 30.199999809265137,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 30.800000190734863
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 1,
+          "rasterMs": 22.90000057220459,
+          "yields": 2,
+          "writeMs": 0.8999996185302734,
+          "drawMs": 23.800000190734863,
+          "responseMs": 28.700000762939453,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 29.100000381469727
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 2,
+          "rasterMs": 22,
+          "yields": 2,
+          "writeMs": 0.6999998092651367,
+          "drawMs": 22.699999809265137,
+          "responseMs": 24.100000381469727,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 24.399999618530273
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 3,
+          "rasterMs": 21.199999809265137,
+          "yields": 2,
+          "writeMs": 0.8000001907348633,
+          "drawMs": 22,
+          "responseMs": 23.600000381469727,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 23.799999237060547
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 4,
+          "rasterMs": 21.199999809265137,
+          "yields": 2,
+          "writeMs": 1.1999998092651367,
+          "drawMs": 22.399999618530273,
+          "responseMs": 29.5,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 29.800000190734863
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 5,
+          "rasterMs": 21,
+          "yields": 2,
+          "writeMs": 0.8000001907348633,
+          "drawMs": 21.800000190734863,
+          "responseMs": 30,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 30.40000057220459
+        }
+      ],
+      "closed": {
+        "liveDocuments": 0,
+        "imageCache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 1,
+          "evictions": 0
+        },
+        "rpcMs": 2.5
+      }
+    },
+    {
+      "round": 2,
+      "kind": "drawing405",
+      "fixture": 2,
+      "pageIndex": 21,
+      "mode": "native",
+      "init": {
+        "wasmMs": 70.69999980926514,
+        "context": {
+          "alpha": false,
+          "colorSpace": "srgb",
+          "colorType": "unorm8",
+          "desynchronized": false,
+          "toneMapping": {
+            "mode": "standard"
+          },
+          "willReadFrequently": false
+        }
+      },
+      "opened": {
+        "openMs": 131.10000038146973,
+        "pageLoadMs": 10.299999237060547,
+        "liveDocuments": 1,
+        "rpcMs": 1885.5
+      },
+      "prepared": null,
+      "samples": [
+        {
+          "task": "page1600",
+          "iteration": 0,
+          "rasterMs": 1178.6999998092651,
+          "yields": 109,
+          "writeMs": 4.09999942779541,
+          "drawMs": 1183,
+          "responseMs": 1196,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 1197.5
+        },
+        {
+          "task": "page1600",
+          "iteration": 1,
+          "rasterMs": 255.9000005722046,
+          "yields": 29,
+          "writeMs": 1.3999996185302734,
+          "drawMs": 257.4000005722046,
+          "responseMs": 261.6000003814697,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 262.0999994277954
+        },
+        {
+          "task": "page1600",
+          "iteration": 2,
+          "rasterMs": 255.29999923706055,
+          "yields": 29,
+          "writeMs": 1.4000005722045898,
+          "drawMs": 256.69999980926514,
+          "responseMs": 259,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 259.30000019073486
+        },
+        {
+          "task": "page1600",
+          "iteration": 3,
+          "rasterMs": 255.29999923706055,
+          "yields": 29,
+          "writeMs": 1.3000001907348633,
+          "drawMs": 256.5999994277954,
+          "responseMs": 259.5,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 259.9000005722046
+        },
+        {
+          "task": "page1600",
+          "iteration": 4,
+          "rasterMs": 257.80000019073486,
+          "yields": 29,
+          "writeMs": 1.3000001907348633,
+          "drawMs": 259.20000076293945,
+          "responseMs": 261.5,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 261.79999923706055
+        },
+        {
+          "task": "page1600",
+          "iteration": 5,
+          "rasterMs": 256.80000019073486,
+          "yields": 29,
+          "writeMs": 1.5,
+          "drawMs": 258.30000019073486,
+          "responseMs": 260.8999996185303,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 261.20000076293945
+        },
+        {
+          "task": "page3200",
+          "iteration": 0,
+          "rasterMs": 443.8999996185303,
+          "yields": 46,
+          "writeMs": 10.600000381469727,
+          "drawMs": 454.5,
+          "responseMs": 468,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 469.1000003814697
+        },
+        {
+          "task": "page3200",
+          "iteration": 1,
+          "rasterMs": 440.3999996185303,
+          "yields": 46,
+          "writeMs": 5,
+          "drawMs": 445.3999996185303,
+          "responseMs": 458.30000019073486,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 458.80000019073486
+        },
+        {
+          "task": "page3200",
+          "iteration": 2,
+          "rasterMs": 436.8999996185303,
+          "yields": 46,
+          "writeMs": 5.600000381469727,
+          "drawMs": 442.5,
+          "responseMs": 448.5999994277954,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 449
+        },
+        {
+          "task": "page3200",
+          "iteration": 3,
+          "rasterMs": 434.30000019073486,
+          "yields": 46,
+          "writeMs": 5.100000381469727,
+          "drawMs": 439.4000005722046,
+          "responseMs": 445.9000005722046,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 446.5999994277954
+        },
+        {
+          "task": "page3200",
+          "iteration": 4,
+          "rasterMs": 435.5999994277954,
+          "yields": 46,
+          "writeMs": 6.100000381469727,
+          "drawMs": 441.69999980926514,
+          "responseMs": 447.5999994277954,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 448
+        },
+        {
+          "task": "page3200",
+          "iteration": 5,
+          "rasterMs": 432.30000019073486,
+          "yields": 46,
+          "writeMs": 31.5,
+          "drawMs": 463.80000019073486,
+          "responseMs": 490.1000003814697,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 490.3999996185303
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 0,
+          "rasterMs": 23.800000190734863,
+          "yields": 2,
+          "writeMs": 3.3999996185302734,
+          "drawMs": 27.300000190734863,
+          "responseMs": 30.5,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 31.899999618530273
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 1,
+          "rasterMs": 23.800000190734863,
+          "yields": 2,
+          "writeMs": 0.8000001907348633,
+          "drawMs": 24.600000381469727,
+          "responseMs": 29,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 29.399999618530273
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 2,
+          "rasterMs": 22.5,
+          "yields": 2,
+          "writeMs": 0.8000001907348633,
+          "drawMs": 23.300000190734863,
+          "responseMs": 29.5,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 29.899999618530273
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 3,
+          "rasterMs": 22,
+          "yields": 2,
+          "writeMs": 1,
+          "drawMs": 23,
+          "responseMs": 29.899999618530273,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 30.100000381469727
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 4,
+          "rasterMs": 21.800000190734863,
+          "yields": 2,
+          "writeMs": 0.8999996185302734,
+          "drawMs": 22.699999809265137,
+          "responseMs": 31.59999942779541,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 32.90000057220459
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 5,
+          "rasterMs": 22.100000381469727,
+          "yields": 2,
+          "writeMs": 0.8999996185302734,
+          "drawMs": 23,
+          "responseMs": 30.300000190734863,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 754843648,
+          "imageCache": {
+            "bytes": 187290784,
+            "limit": 268435456,
+            "entries": 1,
+            "decodes": 1,
+            "evictions": 0
+          },
+          "rpcMs": 30.59999942779541
+        }
+      ],
+      "closed": {
+        "liveDocuments": 0,
+        "imageCache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 1,
+          "evictions": 0
+        },
+        "rpcMs": 3.1000003814697266
+      }
+    },
+    {
+      "round": 2,
+      "kind": "drawing405",
+      "fixture": 2,
+      "pageIndex": 21,
+      "mode": "cached-high",
+      "init": {
+        "wasmMs": 77.69999980926514,
+        "context": {
+          "alpha": false,
+          "colorSpace": "srgb",
+          "colorType": "unorm8",
+          "desynchronized": false,
+          "toneMapping": {
+            "mode": "standard"
+          },
+          "willReadFrequently": false
+        }
+      },
+      "opened": {
+        "openMs": 140.5,
+        "pageLoadMs": 13.40000057220459,
+        "liveDocuments": 1,
+        "rpcMs": 1845.3000001907349
+      },
+      "prepared": {
+        "supported": true,
+        "planMs": 22.5,
+        "compileMs": 483.80000019073486,
+        "commandBytes": 88,
+        "encodedImageBytes": 9451404,
+        "bitmapBytes": 249703264,
+        "rpcMs": 506.8999996185303
+      },
+      "samples": [
+        {
+          "task": "page1600",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 162.5,
+          "responseMs": 171.19999980926514,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 172.0999994277954
+        },
+        {
+          "task": "page1600",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91.70000076293945,
+          "responseMs": 98.89999961853027,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 99.19999980926514
+        },
+        {
+          "task": "page1600",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91.5,
+          "responseMs": 96.60000038146973,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 97.19999980926514
+        },
+        {
+          "task": "page1600",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91.39999961853027,
+          "responseMs": 96.5,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 96.79999923706055
+        },
+        {
+          "task": "page1600",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 92.19999980926514,
+          "responseMs": 97.40000057220459,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 97.80000019073486
+        },
+        {
+          "task": "page1600",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 91,
+          "responseMs": 96.19999980926514,
+          "width": 1600,
+          "height": 1140,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 96.5
+        },
+        {
+          "task": "page3200",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 365.80000019073486,
+          "responseMs": 397.19999980926514,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 397.80000019073486
+        },
+        {
+          "task": "page3200",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 360.30000019073486,
+          "responseMs": 385.30000019073486,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 385.5999994277954
+        },
+        {
+          "task": "page3200",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 365.30000019073486,
+          "responseMs": 384.30000019073486,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 385.3999996185303
+        },
+        {
+          "task": "page3200",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 361.30000019073486,
+          "responseMs": 381.30000019073486,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 381.69999980926514
+        },
+        {
+          "task": "page3200",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 387,
+          "responseMs": 421.1000003814697,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 423.80000019073486
+        },
+        {
+          "task": "page3200",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 438.5,
+          "responseMs": 469.3999996185303,
+          "width": 3200,
+          "height": 2279,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 470.5
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 0,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 63.40000057220459,
+          "responseMs": 70,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 70.5
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 1,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 58.69999980926514,
+          "responseMs": 66.19999980926514,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 66.59999942779541
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 2,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 56.69999980926514,
+          "responseMs": 61.5,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 62.40000057220459
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 3,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 55.10000038146973,
+          "responseMs": 59,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 60.89999961853027
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 4,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 55,
+          "responseMs": 58.5,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 59
+        },
+        {
+          "task": "tile1024at6400",
+          "iteration": 5,
+          "drawn": 1,
+          "culled": 0,
+          "drawMs": 53.90000057220459,
+          "responseMs": 57,
+          "width": 1024,
+          "height": 1024,
+          "wasmCapacity": 489947136,
+          "imageCache": {
+            "bytes": 0,
+            "limit": 268435456,
+            "entries": 0,
+            "decodes": 0,
+            "evictions": 0
+          },
+          "rpcMs": 57.30000019073486
+        }
+      ],
+      "closed": {
+        "liveDocuments": 0,
+        "imageCache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 0,
+          "evictions": 0
+        },
+        "rpcMs": 8
+      }
+    }
+  ],
+  "realPages": [],
+  "validation": [
+    {
+      "kind": "drawing405",
+      "fixture": 2,
+      "pageIndex": 21,
+      "records": [
+        {
+          "mode": "commands",
+          "task": {
+            "name": "page1600",
+            "longEdge": 1600
+          },
+          "severeFraction": 0.15325109649122806,
+          "meanAbsoluteChannelError": 8.249289336622807
+        },
+        {
+          "mode": "cached",
+          "task": {
+            "name": "page1600",
+            "longEdge": 1600
+          },
+          "severeFraction": 0.15325109649122806,
+          "meanAbsoluteChannelError": 8.249289336622807,
+          "cachedDifferentChannels": 0
+        },
+        {
+          "mode": "cached-high",
+          "task": {
+            "name": "page1600",
+            "longEdge": 1600
+          },
+          "severeFraction": 0.0802938596491228,
+          "meanAbsoluteChannelError": 2.931968475877193
+        },
+        {
+          "mode": "commands",
+          "task": {
+            "name": "page3200",
+            "longEdge": 3200
+          },
+          "severeFraction": 0.11086921347082053,
+          "meanAbsoluteChannelError": 6.48297327501097
+        },
+        {
+          "mode": "cached",
+          "task": {
+            "name": "page3200",
+            "longEdge": 3200
+          },
+          "severeFraction": 0.11086921347082053,
+          "meanAbsoluteChannelError": 6.48297327501097,
+          "cachedDifferentChannels": 0
+        },
+        {
+          "mode": "cached-high",
+          "task": {
+            "name": "page3200",
+            "longEdge": 3200
+          },
+          "severeFraction": 0.07083520732777535,
+          "meanAbsoluteChannelError": 3.4684885434949537
+        },
+        {
+          "mode": "commands",
+          "task": {
+            "name": "tile1024at6400",
+            "longEdge": 6400,
+            "tile": true
+          },
+          "severeFraction": 0.17788124084472656,
+          "meanAbsoluteChannelError": 8.343898296356201
+        },
+        {
+          "mode": "cached",
+          "task": {
+            "name": "tile1024at6400",
+            "longEdge": 6400,
+            "tile": true
+          },
+          "severeFraction": 0.17788124084472656,
+          "meanAbsoluteChannelError": 8.343898296356201,
+          "cachedDifferentChannels": 0
+        },
+        {
+          "mode": "cached-high",
+          "task": {
+            "name": "tile1024at6400",
+            "longEdge": 6400,
+            "tile": true
+          },
+          "severeFraction": 0.11788558959960938,
+          "meanAbsoluteChannelError": 5.741142511367798
+        }
+      ],
+      "rpcMs": 6054.60000038147,
+      "inspected": {
+        "resources": {
+          "pageGroup": "",
+          "fonts": 0,
+          "graphicsStates": 0,
+          "forms": [],
+          "images": [
+            {
+              "name": "s2nimage",
+              "filter": "/DCTDecode",
+              "colorSpace": "224 0 R",
+              "width": 9362,
+              "height": 6668,
+              "hasMask": false
+            }
+          ]
+        },
+        "annotationsIncludedSupported": false,
+        "rpcMs": 2.1999998092651367
+      },
+      "closed": {
+        "liveDocuments": 0,
+        "imageCache": {
+          "bytes": 0,
+          "limit": 268435456,
+          "entries": 0,
+          "decodes": 1,
+          "evictions": 0
+        },
+        "rpcMs": 7.40000057220459
+      }
+    }
+  ],
+  "cases": [
+    {
+      "kind": "drawing405",
+      "fixture": 2,
+      "pageIndex": 21
+    }
+  ],
+  "modes": ["native", "cached-high"],
+  "harnessHashes": {
+    "canvas-offscreen.mjs": "450a9632df8aadcabb28d76299e61fd2db957ae6ebeae21a2b7ffa0b4a9926bb",
+    "canvas-offscreen.worker.mjs": "c4ba1066626fe829facd44ff37c1a3d518776aeed99a09366a2991cbbdfa4d04"
+  }
+}
