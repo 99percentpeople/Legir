@@ -217,13 +217,20 @@ an automatic quality pass. `bitmapBytes` is logical decoded RGBA size and
 `wasmCapacity` is arena capacity, not measured process memory. Every session closes
 native documents and decoded bitmaps. Do not run builds/tests concurrently.
 
-`scan-fixtures.mjs PDFIUM_PACKAGE OUTPUT_PDF` generates ten deterministic scan
+`scan-fixtures.mjs PDFIUM_PACKAGE OUTPUT_PDF` generates eleven deterministic scan
 cases (fine text/lines/colors, crop origins, reflections, quarter-turns,
-interpolation, annotations, non-scan content and a soft mask).
+interpolation, annotations including a Multiply transparency group, non-scan
+content and a soft mask). Set `SCAN_FIXTURE_LARGE=1` to use an 8190×5460 image,
+retaining the same page geometry and fine detail pattern. Fixture bytes are
+returned as base64 to avoid expanding large binary files into JSON number arrays.
 `scan-validate.mjs MANIFEST OUTPUT_DIRECTORY` separately captures actual worker
 canvases from the common corpus entry; it needs the manual `pngjs` dependency
 alongside Playwright. A fixture can specify `reference`, `expectScan`, `exact`
-and custom `tasks`; set `validate: true` only on the candidate variant. The
+and custom `tasks`; set `validate: true` only on the candidate variant. Tasks can
+override `expectScan`, and a warm render followed by a `png: true` task checks
+cache-backed PNG composition. With the current common entry, validation saves
+actual PNG bytes and compares pixels; older entries without capture support
+retain the exact decoded-pixel-hash check. The
 default gate allows fewer than 0.1% pixels with any channel difference over 16
 and mean absolute channel error at most 0.5 against PDF.js. Native fallback
 fixtures use `exact: true` against the previous PDFium build. Overlapping tiles
@@ -240,6 +247,16 @@ edge tolerance is 2% severe pixels and mean channel error at most 0.75; the real
 scan gate keeps the stricter default. This separates decoded color differences
 from lost text/line detail instead of treating every RGB difference as blur.
 PNGs stay outside the repository; record only JSON diagnostics for private PDFs.
+Warm PNG fixtures can set `annotationReference` to the native variant and
+`requireAnnotations: true` for known annotation cases. The validator separately
+checks annotation influence against native body/full-page captures: for Normal
+and Multiply, the change caused by switching the backdrop cannot exceed the
+body-channel difference plus two levels of integer rounding. Missing/displaced
+annotations fail this check. Task-specific gates allow the pure-body luminance
+checks to remain strict while native annotation antialiasing is checked against
+its own renderer; whole-PNG RGB gates still apply. Record `annotations.json`
+alongside the body comparisons and seams. This blend envelope is specific to the
+fixture's Normal/Multiply modes, not a proof for every possible PDF blend mode.
 Run this quality gate before the performance comparison, in a separate process.
 
 Validation runs **after timing** with pdf-lib and Poppler: all page dimensions,

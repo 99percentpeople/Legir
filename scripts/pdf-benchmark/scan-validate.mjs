@@ -93,9 +93,18 @@ try {
             const prior = record.cases.at(-1)?.stats?.scanCanvas;
             if (task.png) {
               const rendering = await page.evaluate(
-                (index) => globalThis.pdfCorpus.png(index),
+                (index) => globalThis.pdfCorpus.png(index, true),
                 pageIndex,
               );
+              const name = `${fixture.id}-${pageIndex}-${task.name}-${variant.id}.png`;
+              const captured = !!rendering.url;
+              if (rendering.url) {
+                await writeFile(
+                  join(output, name),
+                  Buffer.from(rendering.url.split(",")[1], "base64"),
+                );
+                delete rendering.url;
+              }
               const stats = await page.evaluate(() =>
                 globalThis.pdfCorpus.stats(),
               );
@@ -103,6 +112,7 @@ try {
                 pageIndex,
                 task: task.name,
                 png: true,
+                file: captured ? name : undefined,
                 rendering,
                 stats,
                 scanUsed: stats?.scanCanvas
@@ -187,7 +197,7 @@ try {
         const expected = reference.cases.find(
           (c) => c.pageIndex === actual.pageIndex && c.task === actual.task,
         );
-        if (actual.png) {
+        if (actual.png && (!actual.file || !expected.file)) {
           const changed = actual.rendering.hash !== expected.rendering.hash;
           comparisons.push({
             fixture: fixture.id,
@@ -274,24 +284,30 @@ try {
   // reference differences remain recorded without redefining the quality gate.
   for (const comparison of comparisons) {
     const fixture = manifest.fixtures.find((f) => f.id === comparison.fixture);
+    const gate = {
+      ...fixture,
+      ...fixture.tasks?.find((t) => t.name === comparison.task),
+    };
     if (!manifest.variants.find((v) => v.id === comparison.variant).validate)
       continue;
     if (
-      comparison.severeFraction > (fixture.maxSevereFraction ?? 0.001) ||
-      comparison.meanAbsoluteChannelError > (fixture.maxMeanError ?? 0.5) ||
-      (fixture.maxLuminanceRMSE !== undefined &&
-        comparison.luminanceRMSE > fixture.maxLuminanceRMSE) ||
-      (fixture.maxSevereLuminanceFraction !== undefined &&
-        comparison.severeLuminanceFraction >
-          fixture.maxSevereLuminanceFraction) ||
-      (fixture.exact && comparison.changedFraction !== 0)
+      comparison.severeFraction > (gate.maxSevereFraction ?? 0.001) ||
+      comparison.meanAbsoluteChannelError > (gate.maxMeanError ?? 0.5) ||
+      (gate.maxLuminanceRMSE != null &&
+        comparison.luminanceRMSE > gate.maxLuminanceRMSE) ||
+      (gate.maxSevereLuminanceFraction != null &&
+        comparison.severeLuminanceFraction > gate.maxSevereLuminanceFraction) ||
+      (gate.exact && comparison.changedFraction !== 0)
     )
       throw Error(
         `Quality gate failed: ${comparison.fixture}/${comparison.pageIndex}/${comparison.task}`,
       );
     if (
-      fixture.expectScan !== undefined &&
-      comparison.scanUsed !== fixture.expectScan
+      (fixture.tasks?.find((task) => task.name === comparison.task)
+        ?.expectScan ?? fixture.expectScan) !== undefined &&
+      comparison.scanUsed !==
+        (fixture.tasks?.find((task) => task.name === comparison.task)
+          ?.expectScan ?? fixture.expectScan)
     )
       throw Error(
         `Wrong renderer: ${comparison.fixture}/${comparison.pageIndex}/${comparison.task}`,
@@ -306,6 +322,98 @@ try {
     )
       throw Error("Document ownership or scan budget violation");
   }
+  // Compare the annotation's influence independently of the different body
+  // resamplers. For Normal and Multiply, changing the backdrop changes each
+  // composed channel by at most the backdrop difference (plus integer rounding).
+  // Missing, displaced or incorrectly blended annotations exceed this envelope.
+  const annotationChecks = [];
+  for (const fixture of manifest.fixtures.filter(
+    (f) => f.annotationReference,
+  )) {
+    const reference = results.find(
+      (r) =>
+        r.fixture === fixture.id && r.variant === fixture.annotationReference,
+    );
+    for (const variant of results.filter(
+      (r) =>
+        r.fixture === fixture.id &&
+        manifest.variants.find((v) => v.id === r.variant)?.validate,
+    )) {
+      for (const actual of variant.cases.filter((c) => c.png)) {
+        const native = reference.cases.find(
+          (c) =>
+            c.png && c.pageIndex === actual.pageIndex && c.task === actual.task,
+        );
+        const body = variant.cases.find(
+          (c) => !c.png && c.pageIndex === actual.pageIndex,
+        );
+        const nativeBody = reference.cases.find(
+          (c) => !c.png && c.pageIndex === actual.pageIndex,
+        );
+        const images = await Promise.all(
+          [actual, native, body, nativeBody].map(async (c) =>
+            PNG.sync.read(await readFile(join(output, c.file))),
+          ),
+        );
+        if (
+          images.some(
+            (img) =>
+              img.width !== images[0].width || img.height !== images[0].height,
+          )
+        )
+          throw Error("Annotation capture dimensions differ");
+        const [a, n, b, nb] = images.map((img) => img.data);
+        let maxExcess = 0,
+          excessivePixels = 0,
+          nativeAffectedPixels = 0,
+          actualAffectedPixels = 0;
+        for (let i = 0; i < a.length; i += 4) {
+          let excess = 0,
+            nativeAffected = false,
+            actualAffected = false;
+          for (let c = 0; c < 3; c++) {
+            const j = i + c,
+              nativeEffect = n[j] - nb[j],
+              actualEffect = a[j] - b[j];
+            nativeAffected ||= nativeEffect !== 0;
+            actualAffected ||= actualEffect !== 0;
+            excess = Math.max(
+              excess,
+              Math.abs(actualEffect - nativeEffect) - Math.abs(b[j] - nb[j]),
+            );
+          }
+          maxExcess = Math.max(maxExcess, excess);
+          excessivePixels += +(excess > 2);
+          nativeAffectedPixels += +nativeAffected;
+          actualAffectedPixels += +actualAffected;
+        }
+        annotationChecks.push({
+          fixture: fixture.id,
+          variant: variant.variant,
+          pageIndex: actual.pageIndex,
+          task: actual.task,
+          maxExcess,
+          excessivePixels,
+          nativeAffectedPixels,
+          actualAffectedPixels,
+          requireAnnotations: fixture.requireAnnotations === true,
+        });
+      }
+    }
+  }
+  await writeFile(
+    join(output, "annotations.json"),
+    JSON.stringify(annotationChecks, null, 2),
+  );
+  if (
+    annotationChecks.some(
+      (r) =>
+        r.excessivePixels ||
+        (r.requireAnnotations &&
+          (!r.nativeAffectedPixels || !r.actualAffectedPixels)),
+    )
+  )
+    throw Error("Native annotation influence differs");
   const seams = [];
   for (const record of results) {
     for (const actual of record.cases.filter(

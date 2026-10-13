@@ -48,12 +48,17 @@ let scanRenderer: ScanCanvasRenderer | undefined;
 const imageCacheBudget = 256 * 1024 * 1024;
 // Keep this callback out of loadDocument's closure: retaining that activation
 // also keeps its transferred input buffer alive after PDFium has copied it.
-const createScanRenderer = (pdfium: PDFium) =>
-  new ScanCanvasRenderer({
-    byteLimit: imageCacheBudget,
-    onMemoryChange: (bytes) =>
-      pdfium.setLargeImageCacheLimit(Math.max(0, imageCacheBudget - bytes)),
+const createScanRenderer = (pdfium: PDFium) => {
+  const renderer = new ScanCanvasRenderer({
+    onMemoryChange: (bytes) => {
+      // An uncancellable browser decode may settle after its document unloads.
+      // Its accounting must not replace the new owner's native cache budget.
+      if (scanRenderer === renderer)
+        pdfium.setLargeImageCacheLimit(Math.max(0, imageCacheBudget - bytes));
+    },
   });
+  return renderer;
+};
 const waitingCommands = new Map<string, { cancelled: boolean }>();
 let exclusiveTail: Promise<void> = Promise.resolve();
 const exclusive = (run: () => Promise<void>) => {
@@ -110,6 +115,7 @@ const registerCancellableTask = (
   },
 ) => {
   let isCancelled = false;
+  const controller = new AbortController();
   activeRenderTasks.set(id, {
     docId,
     canvasId: meta?.canvasId,
@@ -117,6 +123,7 @@ const registerCancellableTask = (
     scale: meta?.scale,
     cancel: () => {
       isCancelled = true;
+      controller.abort();
       try {
         onCancel?.();
       } catch {
@@ -134,7 +141,7 @@ const registerCancellableTask = (
     activeRenderTasks.delete(id);
   };
 
-  return { throwIfCancelled, cleanup };
+  return { throwIfCancelled, cleanup, signal: controller.signal };
 };
 
 // Priority Queue Implementation
@@ -470,6 +477,8 @@ const renderToCanvas = async (
       {
         key: `${docId}:${params.pageIndex}`,
         annotations: params.renderAnnotations === true,
+        cacheOutput: !params.tile,
+        signal: task.signal,
         checkpoint: task.throwIfCancelled,
         yieldTask: yieldRenderTask,
       },
@@ -553,12 +562,30 @@ const renderToImage = async (
       [0, 0, width, height],
       {
         ...renderOptions,
+        annotations: false,
+        keepAnnotations: undefined,
         key: `${docId}:${params.pageIndex}`,
         populate: false,
+        signal: task.signal,
         checkpoint: task.throwIfCancelled,
         yieldTask: yieldPreview,
       },
     );
+    if (drawn && (renderOptions.annotations || keepAnnotations?.size)) {
+      // Seed native annotation rendering with the actual Canvas backdrop.
+      // A transparent overlay alone loses Multiply/other blend semantics.
+      const pixels = ctx.getImageData(0, 0, width, height).data;
+      await drawPageToCanvasCooperatively(
+        cached.page,
+        viewport,
+        [0, 0, width, height],
+        ctx,
+        { ...renderOptions, contents: false },
+        task.throwIfCancelled,
+        yieldPreview,
+        pixels,
+      );
+    }
     if (!drawn)
       await drawPageToCanvasCooperatively(
         cached.page,

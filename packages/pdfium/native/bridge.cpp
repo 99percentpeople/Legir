@@ -1044,6 +1044,13 @@ EMSCRIPTEN_KEEPALIVE int LPDF_RenderContinue(RenderJob *job, double milliseconds
     job->renderer->Continue(&pause);
   return job->renderer->GetStatus();
 }
+// An opaque, already-rendered backdrop lets annotation blending use the real
+// page pixels without parsing/rasterizing the page contents a second time.
+EMSCRIPTEN_KEEPALIVE uint8_t *LPDF_RenderBackground(RenderJob *job) {
+  if (!job || job->renderer->GetStatus() != CPDF_ProgressiveRenderer::kReady)
+    return nullptr;
+  return job->result->bytes.data();
+}
 EMSCRIPTEN_KEEPALIVE Blob *LPDF_RenderFinish(RenderJob *job) {
   if (!job || job->renderer->GetStatus() != CPDF_ProgressiveRenderer::kDone)
     return nullptr;

@@ -101,7 +101,7 @@ const bench = {
     if (!rendered) throw new Error("Render was cancelled");
     return { ms: now() - start, pageIndex, scale, longEdge, rotation, tile };
   },
-  async png(pageIndex: number) {
+  async png(pageIndex: number, capture = false) {
     const start = now();
     const page = pages[pageIndex];
     const result = await worker!.renderPageImage({
@@ -136,6 +136,16 @@ const bench = {
       height: target.height,
       nonWhite,
       hash,
+      url: capture
+        ? await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(
+              new Blob([result.bytes.slice()], { type: "image/png" }),
+            );
+          })
+        : undefined,
     };
   },
   async importSource() {

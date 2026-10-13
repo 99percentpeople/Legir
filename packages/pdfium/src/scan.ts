@@ -9,10 +9,11 @@ type Resource = {
   pins: number;
   owner: string;
   value: Surface | Blob;
+  priority: number;
   remove: () => void;
 };
 type Scan = {
-  source: Resource;
+  source?: Resource;
   matrix: Transform;
   box: Rect;
   width: number;
@@ -51,6 +52,9 @@ export interface ScanDrawOptions extends RenderOptions {
   key: string;
   /** Background work can reuse existing levels without decoding other pages. */
   populate?: boolean;
+  /** The host can publish prepared tiles directly without retaining a copy. */
+  cacheOutput?: boolean;
+  signal?: AbortSignal;
   checkpoint: () => void;
   yieldTask: () => Promise<void>;
 }
@@ -63,6 +67,11 @@ const context2d = (canvas: OffscreenCanvas) => {
   return context;
 };
 const sizeKey = (width: number, height: number) => `${width}x${height}`;
+const removeKey = (map: Map<string, Resource>, key: string) => () =>
+  map.delete(key);
+const removeSource = (scan: Scan) => () => {
+  scan.source = undefined;
+};
 const close = (value: Resource["value"]) => {
   if (value instanceof Blob) return;
   if ("close" in value) value.close();
@@ -91,8 +100,8 @@ export class ScanCanvasRenderer {
   };
 
   constructor(private readonly options: ScanCanvasOptions = {}) {
-    this.limit = options.byteLimit ?? 256 * MiB;
-    this.workLimit = options.workLimit ?? 384 * MiB;
+    this.limit = options.byteLimit ?? 512 * MiB;
+    this.workLimit = options.workLimit ?? 640 * MiB;
     if (
       !Number.isSafeInteger(this.limit) ||
       this.limit < 0 ||
@@ -108,7 +117,7 @@ export class ScanCanvasRenderer {
       tileBytes = 0;
     for (const page of this.pages.values()) {
       if (!page) continue;
-      encodedBytes += page.source.bytes;
+      encodedBytes += page.source?.bytes ?? 0;
       for (const image of page.levels.values()) imageBytes += image.bytes;
       for (const tile of page.tiles.values()) tileBytes += tile.bytes;
     }
@@ -149,16 +158,20 @@ export class ScanCanvasRenderer {
     this.changed();
   }
   private trim(limit = this.limit) {
-    for (const resource of this.lru) {
-      if (this.bytes + this.reserved <= limit) break;
-      if (resource.pins) continue;
-      this.counters.evictions++;
-      this.drop(resource);
-    }
+    // Regenerating encoded bytes/derived levels is cheaper than decoding a
+    // source again. Within each tier retain normal least-recently-used order.
+    for (let priority = 0; priority <= 3; priority++)
+      for (const resource of this.lru) {
+        if (this.bytes + this.reserved <= limit) return;
+        if (resource.pins || resource.priority !== priority) continue;
+        this.counters.evictions++;
+        this.drop(resource);
+      }
   }
   private reserve(bytes: number, evict = true) {
-    // Keep useful levels while a resize uses temporary headroom; trim retained
-    // storage on unpin after the new level has been generated.
+    // Use temporary headroom throughout the resize. Trimming on intermediate
+    // unpins can evict a source while the final, much smaller level is pending.
+    // Apply the retained limit only once all resources in this render unpin.
     if (evict) this.trim(Math.max(0, this.workLimit - bytes));
     if (this.bytes + this.reserved + bytes > this.workLimit)
       throw new DOMException(
@@ -180,8 +193,16 @@ export class ScanCanvasRenderer {
     value: Resource["value"],
     bytes: number,
     remove: () => void,
+    priority = 1,
   ) {
-    const resource: Resource = { owner, value, bytes, pins: 1, remove };
+    const resource: Resource = {
+      owner,
+      value,
+      bytes,
+      pins: 1,
+      remove,
+      priority,
+    };
     this.bytes += bytes;
     this.lru.add(resource);
     this.changed();
@@ -189,12 +210,67 @@ export class ScanCanvasRenderer {
   }
   private unpin(resource: Resource) {
     resource.pins--;
-    this.trim();
   }
   private forget(key: string) {
     this.pages.delete(key);
     for (const resource of [...this.lru])
       if (resource.owner === key) this.drop(resource);
+  }
+  private encoded(key: string, scan: Scan, bytes: Uint8Array<ArrayBuffer>) {
+    const release = this.reserve(bytes.byteLength);
+    try {
+      const blob = new Blob([bytes], { type: "image/jpeg" });
+      release();
+      return (scan.source = this.adopt(
+        key,
+        blob,
+        blob.size,
+        removeSource(scan),
+        0,
+      ));
+    } finally {
+      release();
+    }
+  }
+  /** Return promptly on abort, but keep outstanding browser allocations charged
+   * until they settle. A late result can never enter a newer generation. */
+  private image(
+    promise: Promise<ImageBitmap>,
+    signal: AbortSignal | undefined,
+    check: () => void,
+    release: () => void,
+  ): Promise<ImageBitmap> {
+    return new Promise((resolve, reject) => {
+      let abandoned = false;
+      const abort = () => {
+        abandoned = true;
+        reject(new DOMException("Scan cancelled", "AbortError"));
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      if (signal?.aborted) abort();
+      void promise.then(
+        (value) => {
+          signal?.removeEventListener("abort", abort);
+          release();
+          if (abandoned) {
+            value.close();
+            return;
+          }
+          try {
+            check();
+            resolve(value);
+          } catch (error) {
+            value.close();
+            reject(error);
+          }
+        },
+        (error) => {
+          signal?.removeEventListener("abort", abort);
+          release();
+          if (!abandoned) reject(error);
+        },
+      );
+    });
   }
 
   async render(
@@ -231,6 +307,7 @@ export class ScanCanvasRenderer {
     let interrupted = false;
     const check = () => {
       try {
+        options.signal?.throwIfAborted();
         options.checkpoint();
         if (this.generation !== generation)
           throw new DOMException("Scan invalidated", "AbortError");
@@ -271,29 +348,20 @@ export class ScanCanvasRenderer {
           this.pages.set(options.key, null);
           return fail();
         }
-        const release = this.reserve(plan.images[0].byteLength);
-        try {
-          const blob = new Blob([plan.images[0]], { type: "image/jpeg" });
-          release();
-          const resource = this.adopt(options.key, blob, blob.size, () =>
-            this.forget(options.key),
-          );
-          scan = {
-            source: resource,
-            matrix: Array.from(plan.commands.subarray(1, 7)) as Transform,
-            width: plan.commands[8],
-            height: plan.commands[9],
-            interpolate: !!plan.commands[10],
-            box: plan.box,
-            levels: new Map(),
-            tiles: new Map(),
-          };
-          this.pages.set(options.key, scan);
-          source = resource;
-        } finally {
-          release();
-        }
-      } else {
+        scan = {
+          matrix: Array.from(plan.commands.subarray(1, 7)) as Transform,
+          width: plan.commands[8],
+          height: plan.commands[9],
+          interpolate: !!plan.commands[10],
+          box: plan.box,
+          levels: new Map(),
+          tiles: new Map(),
+        };
+        if (this.pages.size >= 256)
+          this.forget(this.pages.keys().next().value!);
+        this.pages.set(options.key, scan);
+        source = this.encoded(options.key, scan, plan.images[0]);
+      } else if (scan.source) {
         source = scan.source;
         source.pins++;
         this.touch(source);
@@ -371,16 +439,21 @@ export class ScanCanvasRenderer {
         }
         if (!image) {
           if (options.populate === false) return fail();
+          if (!source) {
+            const plan = createCanvasPlan(page, { annotations: false });
+            if (!plan || plan.images.length !== 1) return fail();
+            source = this.encoded(options.key, scan, plan.images[0]);
+          }
           const release = this.reserve(scan.width * scan.height * 4);
           let bitmap: ImageBitmap | undefined;
+          let pending = false;
           try {
-            // Cache a Canvas-ready bitmap once. Drawing a VideoFrame directly
-            // can repeat a full-frame conversion even for a small clip.
-            bitmap = await createImageBitmap(source.value as Blob, {
+            const decoding = createImageBitmap(source.value as Blob, {
               imageOrientation: "none",
               colorSpaceConversion: "none",
             });
-            check();
+            pending = true;
+            bitmap = await this.image(decoding, options.signal, check, release);
             if (bitmap.width !== scan.width || bitmap.height !== scan.height)
               throw new Error("JPEG dimensions differ");
             const key = sizeKey(scan.width, scan.height);
@@ -389,7 +462,7 @@ export class ScanCanvasRenderer {
               options.key,
               bitmap,
               scan.width * scan.height * 4,
-              () => scan!.levels.delete(key),
+              removeKey(scan.levels, key),
             );
             scan.levels.set(key, image);
             bitmap = undefined;
@@ -397,16 +470,16 @@ export class ScanCanvasRenderer {
             step = 0;
           } finally {
             bitmap?.close();
-            release();
+            if (!pending) release();
           }
         }
-        // At reading zooms prefer a resident decoded source over disposable
-        // intermediate levels, so the next larger tile need not decode again.
-        if (
-          options.populate === false ||
-          (Math.max(imageWidth, imageHeight) > 2048 && step === 0)
-        ) {
+        // Keep a source through intermediate resize levels. Two recent large
+        // scans can remain decoded, so the first zoom does not decode again.
+        if (options.populate === false || step === 0) {
           zoomSource = image;
+          if (options.populate !== false) {
+            image.priority = image.bytes <= this.limit ? 3 : 1;
+          }
           zoomSource.pins++;
           this.touch(zoomSource);
         }
@@ -428,8 +501,16 @@ export class ScanCanvasRenderer {
             surface.width = surface.height = 0;
             surface = undefined;
             release();
-            const next = this.adopt(options.key, bitmap, w * h * 4, () =>
-              scan!.levels.delete(key),
+            const next = this.adopt(
+              options.key,
+              bitmap,
+              w * h * 4,
+              removeKey(scan.levels, key),
+              Math.max(imageWidth, imageHeight) > 2048 &&
+                step === steps.length - 1 &&
+                scan.width * scan.height * 4 + w * h * 4 <= this.limit
+                ? 3
+                : 1,
             );
             if (options.populate !== false) scan.levels.set(key, next);
             if (options.populate === false) {
@@ -443,53 +524,90 @@ export class ScanCanvasRenderer {
           }
         }
         await pause();
-        const release = this.reserve(
-          width * height * 4,
-          options.populate !== false,
-        );
+        const direct =
+          options.cacheOutput === false || width * height * 4 > 8 * MiB;
+        const release = direct
+          ? () => {}
+          : this.reserve(width * height * 4, options.populate !== false);
         let stage: OffscreenCanvas | undefined;
         try {
-          stage = new OffscreenCanvas(width, height);
-          const ctx = context2d(stage);
-          ctx.fillStyle = "white";
-          ctx.fillRect(0, 0, width, height);
-          ctx.setTransform(
-            transform[0],
-            transform[1],
-            transform[2],
-            transform[3],
-            transform[4] - x,
-            transform[5] - y,
-          );
-          ctx.beginPath();
-          ctx.rect(
-            scan.box[0],
-            scan.box[1],
-            scan.box[2] - scan.box[0],
-            scan.box[3] - scan.box[1],
-          );
-          ctx.clip();
-          // Match PDF.js's small-scale smoothing boundary (PDF points to CSS
-          // pixels). Larger magnification retains the PDF Interpolate choice.
-          ctx.imageSmoothingEnabled = smooth;
-          ctx.imageSmoothingQuality = "low";
-          ctx.setTransform(
-            normal ? Math.sign(m[0]) : 0,
-            rotated ? Math.sign(m[1]) : 0,
-            rotated ? Math.sign(m[2]) : 0,
-            normal ? Math.sign(m[3]) : 0,
-            startX - x,
-            startY - y,
-          );
-          ctx.drawImage(image.value as Surface, 0, 0, imageWidth, imageHeight);
-          check();
-          if (ctx.isContextLost()) throw new Error("Scan canvas context lost");
-          const bitmap = stage.transferToImageBitmap();
-          stage.width = stage.height = 0;
+          if (direct) {
+            if (target.isContextLost())
+              throw new Error("Destination canvas context lost");
+            if (
+              target.canvas.width !== width ||
+              target.canvas.height !== height
+            ) {
+              target.canvas.width = width;
+              target.canvas.height = height;
+            }
+          } else stage = new OffscreenCanvas(width, height);
+          const ctx = direct ? target : context2d(stage!);
+          ctx.save();
+          try {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = "source-over";
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, width, height);
+            ctx.setTransform(
+              transform[0],
+              transform[1],
+              transform[2],
+              transform[3],
+              transform[4] - x,
+              transform[5] - y,
+            );
+            ctx.beginPath();
+            ctx.rect(
+              scan.box[0],
+              scan.box[1],
+              scan.box[2] - scan.box[0],
+              scan.box[3] - scan.box[1],
+            );
+            ctx.clip();
+            // Match PDF.js's small-scale smoothing boundary (PDF points to CSS
+            // pixels). Larger magnification retains the PDF Interpolate choice.
+            ctx.imageSmoothingEnabled = smooth;
+            ctx.imageSmoothingQuality = "low";
+            ctx.setTransform(
+              normal ? Math.sign(m[0]) : 0,
+              rotated ? Math.sign(m[1]) : 0,
+              rotated ? Math.sign(m[2]) : 0,
+              normal ? Math.sign(m[3]) : 0,
+              startX - x,
+              startY - y,
+            );
+            ctx.drawImage(
+              image.value as Surface,
+              0,
+              0,
+              imageWidth,
+              imageHeight,
+            );
+            if (!direct) check();
+            if (ctx.isContextLost())
+              throw new Error("Scan canvas context lost");
+          } finally {
+            ctx.restore();
+          }
+          // All potentially asynchronous work and cancellation checks precede
+          // this synchronous tile publication. Avoid an output-sized bitmap
+          // allocation and copy for every new viewport tile.
+          if (direct) {
+            this.counters.renders++;
+            return true;
+          }
+          const bitmap = stage!.transferToImageBitmap();
+          stage!.width = stage!.height = 0;
           stage = undefined;
           release();
-          output = this.adopt(options.key, bitmap, width * height * 4, () =>
-            scan!.tiles.delete(tileKey),
+          output = this.adopt(
+            options.key,
+            bitmap,
+            width * height * 4,
+            removeKey(scan.tiles, tileKey),
+            2,
           );
           if (output.bytes <= 8 * MiB && options.populate !== false)
             scan.tiles.set(tileKey, output);

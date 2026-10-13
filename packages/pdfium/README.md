@@ -184,6 +184,11 @@ individual PDFium operations remain synchronous. A page allows one active task.
 Serialize document edits; never mutate a document while one of its jobs is paused.
 Large-image cache entries fill incrementally and remain pinned across yields.
 
+`task.setBackground(opaqueRGBA)` may seed the bitmap before its first continuation.
+Dimensions must match and every alpha value must be 255. Rendering with
+`contents: false` then composites native annotations against that backdrop,
+including Multiply and transparency groups, without rasterizing the body again.
+
 The opt-in `createCanvasPlan(page, options)` / `drawCanvasPlan(plan, context,
 matrix, bounds, { signal })` experiment exports parsed PDFium objects for browser
 Canvas 2D drawing. It supports opaque RGB/gray paths and unprofiled DeviceRGB/gray
@@ -205,8 +210,9 @@ unprofiled JPEG and requires `annotations: false` plus browser `createImageBitma
 support. A `false` result means the
 caller must render the entire page natively. Requested annotations, masks,
 complex contents, budget exhaustion and browser decode failures all fall back.
-Cancellation/preemption from `checkpoint` or `yieldTask` propagates without
-publishing a partial frame. Calls must be serialized with the document owner.
+Cancellation/preemption from `signal`, `checkpoint` or `yieldTask` propagates
+before publishing a new frame. An abort returns promptly even when a browser
+bitmap decode cannot stop; its late result is closed and never cached. Calls must be serialized with the document owner.
 
 The renderer borrows the existing `PDFPage` to extract the image and geometry;
 it never opens or owns a PDF. Give `render` a stable page `key` and call `clear`
@@ -214,6 +220,8 @@ after content/page-tree mutations or document closure. Downsampling halves each
 axis until the source is at most twice the output dimension, reuses those
 levels, and rounds image placement in global pixel coordinates before applying
 the tile offset. Small outputs (up to 8 MiB) are cached by transform and bounds.
+Larger outputs and `cacheOutput: false` draw synchronously to the destination
+after asynchronous preparation/checkpoints, avoiding an output-sized copy.
 `populate: false` lets previews reuse existing levels without decoding a new
 page; callbacks still allow foreground work to preempt them. Rotated nearest-
 neighbor magnification stays native because browser clipping can otherwise
@@ -221,24 +229,30 @@ select different source pixels for overlapping tiles.
 
 Scale levels and tiles are materialized as ImageBitmaps before caching so Canvas
 recordings cannot retain a larger input image behind a small reported surface.
-At zooms above a 2048-pixel image edge, a decoded full source stays pinned through
-temporary downsampling and is preferred over intermediate levels. Previews use
-temporary levels, keep foreground images pinned and fall back if working
-headroom is insufficient; they do not evict the foreground cache.
+Full sources stay pinned through temporary downsampling. The cache favors decoded
+sources and the level needed at reading zoom over overview levels and encoded
+bytes. Removing an encoded Blob leaves the decoded images usable. Retained
+storage is trimmed after rendering, so a temporary level does not prematurely
+evict a source needed by the next zoom or tile. Previews use temporary levels,
+keep foreground images pinned and fall back if working headroom is insufficient;
+they do not evict the foreground cache.
 
-Encoded JPEG blobs, decoded bitmaps, pyramid surfaces and output tiles share an
-LRU budget (default 256 MiB). Active resources are pinned. A separate working
-limit (default 384 MiB) permits a source and destination to coexist during a
-resize; reserved decode memory remains accounted for until its promise settles.
-Bitmaps and decode reservations are charged at four bytes per pixel. The browser
-decodes each JPEG into a reusable ImageBitmap; drawing VideoFrames directly can
-repeat full-frame conversions even for a small tile.
-`stats()` reports logical storage and cumulative counters, not process memory.
-Browser decoder/GPU allocations, destination canvases and WASM capacity are
-outside this accounting. `onMemoryChange` lets the host subtract managed usage
-from the native large-image cache budget; Legir uses a combined 256 MiB retained
-budget and measures browser PSS separately. `clear` closes bitmaps and zeroes
-owned canvases, including late results from invalidated decodes.
+Encoded JPEG blobs, decoded bitmaps, pyramid surfaces and small output tiles
+share a tiered LRU budget (default 512 MiB). This fits two approximately 62 MP
+RGBA sources, subject to other cached resources. A separate working limit
+(default 640 MiB) permits a source and destination to coexist during a resize.
+Both limits are configurable. Bitmaps and decode reservations are charged at
+four bytes per pixel; pending reservations remain charged until the promise
+settles, including after an abort or `clear`. JPEGs decode directly into reusable
+ImageBitmaps. `stats()` reports logical storage and cumulative counters, not
+process memory. Browser decoder/GPU allocations, destination canvases, PDF bytes
+and WASM capacity are outside this accounting.
+
+`onMemoryChange` lets the host subtract managed usage from PDFium's native image
+cache. Legir retains its native 256 MiB cap, reduces it as scan storage grows,
+and measures browser PSS separately; the combined retained cap is 512 MiB.
+`clear` closes owned bitmaps and invalidates late asynchronous results. The host
+must ignore memory notifications from an owner that has been replaced.
 
 The package is BSD-3-Clause; the surrounding Legir application keeps its own
 license. See `LICENSE` and `wasm/licenses/`.

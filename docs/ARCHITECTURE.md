@@ -369,14 +369,23 @@ For a body containing one supported opaque JPEG, `ScanCanvasRenderer` in
 native page, then draws through worker Canvas 2D. It opens no additional PDF.
 Repeated half-size levels preserve fine detail during minification; global
 integer placement keeps neighboring tiles aligned. Decoded images, scale levels,
-encoded blobs and small output tiles share a 256 MiB LRU; temporary resizing has
-a 384 MiB working cap. The host reduces PDFium's large-image cache by the managed
-Canvas usage. Browser/GPU allocations and WASM capacity are measured separately.
+encoded blobs and small output tiles share a 512 MiB tiered LRU; temporary
+resizing has a 640 MiB working cap. Decoded sources and reading levels take
+priority over encoded bytes and overview levels; retained trimming happens once
+per render. This keeps recent large sources available for the first zoom and
+subsequent tiles. Large full pages and tiles publish directly after asynchronous
+preparation, avoiding an intermediate output bitmap. The host subtracts managed
+Canvas usage from PDFium's native 256 MiB image-cache cap. Browser/GPU allocations,
+PDF bytes and WASM capacity are measured separately.
 Foreground pages may populate the cache; thumbnails only reuse existing images.
-Edits, page-source changes and document disposal invalidate owned scan resources.
-Metadata-only saves retain them. Requested annotation appearances, complex pages,
-masks/profiles, unsupported transforms and failed decodes use the full native
-renderer. Cancellation preserves the previously published canvas.
+PNG output reuses a cached scan body and seeds the same PDF page's native
+annotation renderer with its opaque pixels, preserving blend modes. Cold PNGs,
+complex pages, masks/profiles, unsupported transforms and failed decodes use the
+full native renderer. Edits, page-source changes and disposal invalidate owned
+scan resources; metadata-only saves retain them. AbortSignal cancellation returns
+without waiting for an uncancellable bitmap decode; its allocation stays charged
+until the late bitmap is closed, and stale owners cannot change a new owner's
+native cache budget. Cancellation never publishes the abandoned result.
 
 Standalone content operations without a live owner use a disposable
 `pdf-content.worker`; Node/test authoring also supports the native engine without

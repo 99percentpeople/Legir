@@ -94,10 +94,12 @@ export async function drawPageToCanvasCooperatively(
   options: RenderOptions,
   checkpoint: () => void,
   yieldTask: () => Promise<void> = yieldRenderTask,
+  background?: Uint8Array | Uint8ClampedArray,
 ) {
   checkpoint();
   const job = page.startRender(viewport.transform, bounds, options);
   try {
+    if (background) job.setBackground(background);
     while (!job.continue(8)) {
       await yieldTask();
       checkpoint();

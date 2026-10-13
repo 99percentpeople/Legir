@@ -1,4 +1,4 @@
-/* global process, console, URL, OffscreenCanvas, Blob */
+/* global process, console, URL, OffscreenCanvas, Blob, btoa, TextEncoder */
 // Synthetic scan geometry/quality cases; no source-document images are embedded.
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -39,7 +39,7 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage();
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (large) => {
     const { createPDFium } = await import("/dist/index.js");
     const engine = await createPDFium({ moduleUrl: "/wasm/pdfium.js" });
     const doc = new engine.PDFDocument();
@@ -65,9 +65,16 @@ try {
       ctx.lineTo(2450, y + 58);
       ctx.stroke();
     }
+    const source = large ? new OffscreenCanvas(8190, 5460) : canvas;
+    if (large) {
+      const tiled = source.getContext("2d");
+      for (let y = 0; y < source.height; y += canvas.height)
+        for (let x = 0; x < source.width; x += canvas.width)
+          tiled.drawImage(canvas, x, y);
+    }
     const encoded = new Uint8Array(
       await (
-        await canvas.convertToBlob({ type: "image/jpeg", quality: 0.96 })
+        await source.convertToBlob({ type: "image/jpeg", quality: 0.96 })
       ).arrayBuffer(),
     );
     const parts = [encoded.slice(0, 2)];
@@ -87,8 +94,8 @@ try {
       const image = doc.addObject({
         Type: "XObject",
         Subtype: "Image",
-        Width: 3072,
-        Height: 2048,
+        Width: source.width,
+        Height: source.height,
         ColorSpace: "DeviceRGB",
         BitsPerComponent: 8,
         Filter: "DCTDecode",
@@ -116,7 +123,30 @@ try {
         `q ${matrix.join(" ")} cm /Im Do Q ${suffix}`,
       );
       if (crop) object.put("CropBox", crop);
-      if (annotations)
+      if (annotations === "multiply") {
+        const appearance = doc.addObject({
+          Type: "XObject",
+          Subtype: "Form",
+          BBox: [0, 0, 100, 100],
+          Group: { S: "Transparency", I: false, K: false },
+          Resources: { ExtGState: { GS: { BM: "Multiply", ca: 0.65 } } },
+        });
+        appearance.writeStream(
+          new TextEncoder().encode(
+            "/GS gs 0.9 0.8 0.1 rg 0 0 100 100 re f 0.2 0.9 0.7 rg 20 20 60 60 re f",
+          ),
+        );
+        object.put("Annots", [
+          {
+            Type: "Annot",
+            Subtype: "Stamp",
+            Rect: [100, 100, 650, 650],
+            F: 4,
+            AP: { N: appearance },
+          },
+        ]);
+        appearance.destroy();
+      } else if (annotations)
         object.put("Annots", [
           {
             Type: "Annot",
@@ -154,8 +184,13 @@ try {
     mask.writeRawStream(new Uint8Array([160]));
     const masked = makeImage({ SMask: mask });
     add([1200, 0, 0, 800, 0, 0], { source: masked });
+    add([1200, 0, 0, 800, 0, 0], { annotations: "multiply" });
     const bytes = doc.saveToBuffer();
-    const result = Array.from(bytes.asUint8Array());
+    const data = bytes.asUint8Array();
+    const chunks = [];
+    for (let i = 0; i < data.length; i += 32768)
+      chunks.push(String.fromCharCode(...data.subarray(i, i + 32768)));
+    const result = btoa(chunks.join(""));
     bytes.destroy();
     masked.destroy();
     mask.destroy();
@@ -163,9 +198,10 @@ try {
     image.destroy();
     doc.destroy();
     return result;
-  });
-  await writeFile(output, Buffer.from(result));
-  console.log(JSON.stringify({ output, bytes: result.length, pages: 10 }));
+  }, process.env.SCAN_FIXTURE_LARGE === "1");
+  const bytes = Buffer.from(result, "base64");
+  await writeFile(output, bytes);
+  console.log(JSON.stringify({ output, bytes: bytes.length, pages: 11 }));
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

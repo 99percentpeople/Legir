@@ -357,6 +357,23 @@ export class PDFRenderTask {
   ) {
     page.renderTasks.add(this);
   }
+  /** Seed an opaque RGBA backdrop before the first continuation. Annotation
+   * blend modes then see the actual page background, including its text/image. */
+  setBackground(pixels: Uint8Array | Uint8ClampedArray) {
+    this.page.assertOpen();
+    if (!this.pointer) throw new Error("PDF render task is closed.");
+    if (pixels.byteLength !== this.width * this.height * 4)
+      throw new Error("PDF render background dimensions differ.");
+    for (let i = 3; i < pixels.length; i += 4)
+      if (pixels[i] !== 255)
+        throw new Error("PDF render background must be opaque RGBA.");
+    const rt = this.page.document.runtime;
+    const pointer = rt.call("LPDF_RenderBackground", this.pointer);
+    if (!pointer)
+      throw new Error("PDF render background must precede rendering.");
+    // No allocation or async boundary between obtaining and filling the view.
+    rt.native.HEAPU8.set(pixels, pointer);
+  }
   /** Returns true when finished. The budget is cooperative, not a hard limit. */
   continue(milliseconds = 8) {
     this.page.assertOpen();

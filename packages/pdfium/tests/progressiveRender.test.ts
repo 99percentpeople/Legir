@@ -96,3 +96,102 @@ it("cancels without poisoning the page and closes outstanding tasks with the doc
     doc.destroy();
   }
 });
+
+it.each([
+  { matrix: [1, 0, 0, -1, 0, 160], bounds: [0, 0, 240, 160] },
+  { matrix: [0, 2, 2, 0, 0, 0], bounds: [31, 57, 271, 377] },
+])(
+  "blends annotations onto an opaque backdrop with full-render parity: $matrix",
+  ({ matrix, bounds }) => {
+    const doc = new engine.PDFDocument();
+    try {
+      const appearance = doc.addObject({
+        Type: "XObject",
+        Subtype: "Form",
+        BBox: [0, 0, 100, 100],
+        Resources: { ExtGState: { GS: { BM: "Multiply", ca: 0.6 } } },
+        Group: { S: "Transparency", I: false, K: false },
+      });
+      appearance.writeStream(
+        new TextEncoder().encode(
+          "/GS gs 0.9 0.8 0.1 rg 0 0 100 100 re f 0.2 0.9 0.7 rg 20 20 60 60 re f",
+        ),
+      );
+      const object = doc.addPage(
+        [0, 0, 240, 160],
+        0,
+        {},
+        "0.3 0.5 0.8 rg 0 0 240 160 re f 0.8 0.1 0.2 rg 50 20 80 120 re f",
+      );
+      object.put("Annots", [
+        doc.addObject({
+          Type: "Annot",
+          Subtype: "Stamp",
+          Rect: [30, 30, 130, 130],
+          F: 4,
+          AP: { N: appearance },
+        }),
+      ]);
+      doc.insertPage(-1, object);
+      const page = doc.loadPage(0);
+      const expected = page.render(matrix as Matrix, bounds as Rect, {
+        annotations: true,
+      });
+      const body = page.render(matrix as Matrix, bounds as Rect, {
+        annotations: false,
+      });
+      try {
+        expect(
+          Buffer.from(body.getPixels()).equals(
+            Buffer.from(expected.getPixels()),
+          ),
+        ).toBe(false);
+        const task = page.startRender(matrix as Matrix, bounds as Rect, {
+          contents: false,
+          annotations: true,
+        });
+        try {
+          task.setBackground(body.getPixels().slice());
+          while (!task.continue(1)) {
+            /* cooperative render */
+          }
+          expect(() => task.setBackground(body.getPixels())).toThrow("precede");
+          const actual = task.finish();
+          try {
+            expect(
+              Buffer.from(actual.getPixels()).equals(
+                Buffer.from(expected.getPixels()),
+              ),
+            ).toBe(true);
+            expect(engine.liveDocuments()).toBe(1);
+          } finally {
+            actual.destroy();
+          }
+        } finally {
+          task.destroy();
+        }
+      } finally {
+        body.destroy();
+        expected.destroy();
+      }
+    } finally {
+      doc.destroy();
+    }
+    expect(engine.liveDocuments()).toBe(0);
+  },
+);
+
+it("rejects invalid or closed render backdrops", () => {
+  const doc = fixture();
+  const page = doc.loadPage(0);
+  const task = page.startRender([1, 0, 0, -1, 0, 400], [0, 0, 10, 10]);
+  try {
+    expect(() => task.setBackground(new Uint8Array(4))).toThrow("dimensions");
+    expect(() => task.setBackground(new Uint8Array(400))).toThrow("opaque");
+    task.destroy();
+    expect(() => task.setBackground(new Uint8Array(400))).toThrow("closed");
+  } finally {
+    task.destroy();
+    doc.destroy();
+  }
+});

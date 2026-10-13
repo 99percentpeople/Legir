@@ -11,11 +11,11 @@
     "renderer": "agg"
   },
   "sha256": {
-    "pdfium.js": "fb0e9f0e6f69e5d323447bce13410ba7acf66876b4a20a9fd4efaf0e52b18290",
-    "pdfium.wasm": "e277457dd37cb2c33db4ed17d84d4c79904dd1348b2025a5cbd112ad740e2adc"
+    "pdfium.js": "dc3b758c1307926c6be77881b2db1bad665fb026425a63b345a8d987188d7e5b",
+    "pdfium.wasm": "ce4dfd95189b860d5de408797e5fd17a707bbba6b0ab5f96203f320c022a9be4"
   },
   "sourceSha256": {
-    "native/bridge.cpp": "b306f2a649ecc74667e0aadc7b48ff50bc447c258f6e39567189821643e30a1e",
+    "native/bridge.cpp": "d10182ba3eefc49485db8967a8475dc522df8f0cefe4bc5a6e8ea88b0dfc5ccb",
     "native/canvas_plan.cpp": "8a83bddb597ae6e8a1026253274aae7e8d58fb0add162275aba094d240e18884",
     "native/canvas_plan.h": "75d87de68b736a7766d51db1409cc9dbd47448c59efeab2785e766b81eab32ae",
     "native/image_cache.cpp": "8606addc82ed8d8e8db02076439a61edb5bb171d2556dfce800c36c9b0a3e339",

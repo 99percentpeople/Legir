@@ -334,3 +334,142 @@ it("keeps a zoom source resident across temporary scale levels for a subsequent 
   expect(cache.stats().bytes).toBeLessThanOrEqual(cache.stats().limit);
   cache.clear();
 });
+
+it("acknowledges abort before an uncancellable bitmap decode settles, then closes its late result", async () => {
+  let finish!: (value: ImageBitmap) => void;
+  vi.mocked(createImageBitmap).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const cache = new ScanCanvasRenderer({
+      byteLimit: 1024 * 1024,
+      workLimit: 3 * 1024 * 1024,
+    }),
+    ctx = target(),
+    controller = new AbortController();
+  const pending = cache.render(page, ctx, matrix, [0, 0, 512, 512], {
+    ...options(),
+    signal: controller.signal,
+  });
+  controller.abort();
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  expect(cache.stats().reservedBytes).toBe(1024 * 512 * 4);
+  expect(ctx.drawImage).not.toHaveBeenCalled();
+  expect([ctx.canvas.width, ctx.canvas.height]).toEqual([17, 19]);
+  cache.clear();
+  // A replacement cannot allocate another full bitmap while the abandoned
+  // browser operation still owns its working reservation.
+  expect(
+    await cache.render(
+      page,
+      ctx,
+      matrix,
+      [0, 0, 128, 128],
+      options("replacement"),
+    ),
+  ).toBe(false);
+  expect(createImageBitmap).toHaveBeenCalledOnce();
+  const bitmap = { width: 1024, height: 512, close: vi.fn() };
+  finish(bitmap as unknown as ImageBitmap);
+  await Promise.resolve();
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(cache.stats()).toMatchObject({ bytes: 0, reservedBytes: 0 });
+  expect(
+    await cache.render(
+      page,
+      ctx,
+      matrix,
+      [0, 0, 128, 128],
+      options("replacement"),
+    ),
+  ).toBe(true);
+  cache.clear();
+});
+
+function largeScan() {
+  plan.mockReturnValue({
+    commands: new Float64Array([2, 8192, 0, 0, 4096, 0, 0, 0, 8192, 4096, 0]),
+    images: [new Uint8Array(100)],
+    box: [0, 0, 8192, 4096],
+  });
+  vi.mocked(createImageBitmap).mockImplementation(
+    async () =>
+      ({ width: 8192, height: 4096, close: vi.fn() }) as unknown as ImageBitmap,
+  );
+}
+
+it("retains recent decoded pages after discarding encoded bytes and reuses zoom levels for larger tiles", async () => {
+  largeScan();
+  const cache = new ScanCanvasRenderer({
+      byteLimit: 280 * 1024 * 1024,
+      workLimit: 384 * 1024 * 1024,
+    }),
+    ctx = target();
+  for (const key of ["first", "middle", "last"]) {
+    expect(
+      await cache.render(
+        page,
+        ctx,
+        [0.125, 0, 0, -0.125, 0, 512],
+        [0, 0, 1024, 512],
+        options(key),
+      ),
+    ).toBe(true);
+    expect(cache.stats().bytes).toBeLessThanOrEqual(cache.stats().limit);
+  }
+  expect(cache.stats().decodes).toBe(3);
+  expect(cache.stats().encodedBytes).toBe(0);
+  expect(
+    await cache.render(
+      page,
+      ctx,
+      [0.4, 0, 0, -0.4, 0, 1638.4],
+      [0, 0, 3000, 1500],
+      options("middle"),
+    ),
+  ).toBe(true);
+  const beforeWarm = surfaces.length;
+  expect(
+    await cache.render(
+      page,
+      ctx,
+      [0.4, 0, 0, -0.4, 0, 1638.4],
+      [0, 0, 3000, 1500],
+      options("middle"),
+    ),
+  ).toBe(true);
+  // The large destination and cached scale level need no staging surface.
+  expect(surfaces.length).toBe(beforeWarm);
+  for (const x of [100, 500]) {
+    expect(
+      await cache.render(
+        page,
+        ctx,
+        [0.8, 0, 0, -0.8, 0, 3276.8],
+        [x, 100, x + 1024, 1124],
+        { ...options("middle"), cacheOutput: false },
+      ),
+    ).toBe(true);
+  }
+  expect(createImageBitmap).toHaveBeenCalledTimes(3);
+  expect(cache.stats().bytes).toBeLessThanOrEqual(cache.stats().limit);
+  expect(cache.stats().peakBytes).toBeLessThanOrEqual(cache.stats().workLimit);
+  cache.clear();
+});
+
+it("draws prepared tiles directly without allocating or retaining an output bitmap", async () => {
+  const cache = new ScanCanvasRenderer(),
+    ctx = target();
+  expect(
+    await cache.render(page, ctx, matrix, [10, 20, 138, 148], {
+      ...options(),
+      cacheOutput: false,
+    }),
+  ).toBe(true);
+  expect(surfaces).toHaveLength(1);
+  expect(ctx.drawImage).toHaveBeenCalledOnce();
+  expect(cache.stats()).toMatchObject({ tileBytes: 0, renders: 1 });
+  cache.clear();
+});
