@@ -57,6 +57,7 @@ const createScanRenderer = (pdfium: PDFium) => {
         pdfium.setLargeImageCacheLimit(Math.max(0, imageCacheBudget - bytes));
     },
   });
+  pdfium.setLargeImageCacheLimit(imageCacheBudget);
   return renderer;
 };
 const waitingCommands = new Map<string, { cancelled: boolean }>();
