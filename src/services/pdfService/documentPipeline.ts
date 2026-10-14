@@ -2122,24 +2122,30 @@ export const exportPDF = async (
 
   try {
     const structure = options?.pageStructure;
+    const keepsOriginalPages =
+      !structure ||
+      (structure.pages.length === pdfDoc.getPageCount() &&
+        structure.pages.every(
+          (page, index) =>
+            !page.blank &&
+            !page.source?.copyGroup &&
+            (page.source?.documentId ?? "default") === "default" &&
+            (page.source?.pageIndex ?? page.pageIndex) === index,
+        ));
     const incremental =
       options?.incremental !== false &&
       !!options?.onSaveMode &&
       !options?.flattenFormFields &&
       !options?.pageIndexes &&
-      (!structure ||
-        (structure.pages.length === pdfDoc.getPageCount() &&
-          structure.pages.every(
-            (page, index) =>
-              !page.blank &&
-              !page.source?.copyGroup &&
-              (page.source?.documentId ?? "default") === "default" &&
-              (page.source?.pageIndex ?? page.pageIndex) === index,
-          )));
+      keepsOriginalPages;
     let applyPageRotation: (() => void) | undefined;
     if (
-      options?.pageStructure &&
-      options.pageStructure.pages.some(
+      structure &&
+      // The UI always supplies page IDs. An unchanged order needs no page-tree,
+      // form-tree or destination rebuild; rotations still use the assembly path.
+      (!keepsOriginalPages ||
+        structure.pages.some((page) => page.rotationDelta)) &&
+      structure.pages.some(
         (page) => page.id || page.blank || page.rotationDelta,
       )
     ) {
@@ -2148,11 +2154,11 @@ export const exportPDF = async (
         pdfDoc,
         originalBytes,
         resolvedOpenPassword,
-        options.pageStructure,
+        structure,
         {
           fields,
           annotations,
-          preserved: options.preservedSourceAnnotations ?? [],
+          preserved: options?.preservedSourceAnnotations ?? [],
         },
         options?.resolveSource,
         options?.signal,

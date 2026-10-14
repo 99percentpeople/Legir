@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { PDFDocument, PDFRef, StandardFonts } from "@cantoo/pdf-lib";
 import { exportPDFBlob } from "@/services/pdfService";
 import { FieldType } from "@/types";
@@ -126,12 +126,29 @@ it("reuses one owner for successive deltas and restores it after a cancelled sav
   const owner = new DocumentSession(engine, bytes);
   const documents = engine.liveDocuments();
   const objects = owner.document.countObjects();
+  const rewritePages = vi.spyOn(owner.document, "setPages");
+  const options = {
+    syncFormFields: true,
+    pageStructure: {
+      pages: [0, 1].map((pageIndex) => ({
+        id: `original-${pageIndex}`,
+        pageIndex,
+        width: 300,
+        height: 300,
+        rotation: 0,
+        userUnit: 1,
+        viewBox: [0, 0, 300, 300] as [number, number, number, number],
+        source: { documentId: "default", pageIndex },
+      })),
+      sources: {},
+    },
+  };
   try {
     for (const value of ["First value", "Second value"]) {
       const parts: Blob[] = [];
       let incremental = false;
       await owner.export(
-        { fields: [{ ...field, value }], annotations: [] },
+        { fields: [{ ...field, value }], annotations: [], options },
         undefined,
         {
           writeBlob: (blob) => {
@@ -148,6 +165,7 @@ it("reuses one owner for successive deltas and restores it after a cancelled sav
       expect(reopened.getForm().getTextField("name").getText()).toBe(value);
       expect(engine.liveDocuments()).toBe(documents);
       expect(owner.document.countObjects()).toBe(objects);
+      expect(rewritePages).not.toHaveBeenCalled();
     }
     const controller = new AbortController();
     await expect(
@@ -174,6 +192,7 @@ it("reuses one owner for successive deltas and restores it after a cancelled sav
     );
     expect(engine.liveDocuments()).toBe(documents);
   } finally {
+    rewritePages.mockRestore();
     owner.dispose();
   }
 });

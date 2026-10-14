@@ -364,6 +364,9 @@ write-file fallback for restored targets lacking an open-file scope.
 
 Blob exports request an incremental PDF revision when the original page order
 is retained and the export is not flattened or restricted to selected pages.
+An unchanged page list without rotation deltas bypasses page/form/destination
+assembly even though the UI supplies page IDs on every save. Structural changes
+and rotations still use the shared assembly path.
 Native dirty tracking follows inline containment, stopping at reference edges;
 only changed original objects and their reachable new resources are serialized.
 The native task reports whether its output is a suffix or a complete rewrite.
