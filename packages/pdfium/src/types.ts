@@ -31,6 +31,9 @@ export interface RenderOptions {
   imageCache?: "populate" | "reuse";
 }
 export interface SaveOptions {
+  /** Request an append-only delta from startSave. Check task.incremental:
+   * prepend the original input bytes only when true. Unsafe inputs fall back. */
+  incremental?: boolean;
   encrypt?: "none" | "aes-256";
   "user-password"?: string;
   "owner-password"?: string;

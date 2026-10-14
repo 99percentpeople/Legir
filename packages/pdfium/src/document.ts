@@ -255,6 +255,7 @@ export class PDFDocument {
             owner,
             config.permissions ?? -4,
             config.encrypt === "aes-256" ? 1 : 0,
+            config.incremental ? 1 : 0,
           ),
         ),
     );
@@ -513,10 +514,16 @@ export class PDFDocument {
 }
 
 export class PDFSaveTask {
+  readonly incremental: boolean;
   constructor(
     readonly document: PDFDocument,
     private pointer: number,
-  ) {}
+  ) {
+    this.incremental = !!document.runtime.call(
+      "LPDF_SaveIsIncremental",
+      pointer,
+    );
+  }
   next(): { done: boolean; bytes: Uint8Array } {
     const { done, value } = this.readChunk((bytes) => bytes.slice());
     return { done, bytes: value };

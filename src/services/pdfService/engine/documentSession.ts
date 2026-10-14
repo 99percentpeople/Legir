@@ -358,6 +358,7 @@ export class DocumentSession {
     output?: {
       writeChunk?: (bytes: Uint8Array) => void | Promise<void>;
       writeBlob?: (chunk: Blob) => void;
+      onSaveMode?: (incremental: boolean) => void;
       onSavedDocument?: (document: EditingDocument) => Promise<void>;
     },
   ) {

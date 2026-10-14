@@ -358,10 +358,30 @@ cancellation and reuses one working allocation. A large individual stream,
 graph traversal, encryption setup or xref finalization remains synchronous.
 `exportPDFBlob` uses `PDFSaveTask.nextBlob` to copy directly from WASM into Blob
 storage; file/print flows avoid a full output buffer in WASM and an additional
-full JS array. `exportPDF` retains its byte-array API. Browser file writes abort
+full JS array. `exportPDF` retains its byte-array API and performs a full rewrite. Browser file writes abort
 on failure. Desktop Blob writes use bounded chunks, with the existing full-buffer
-write-file fallback for restored targets lacking an open-file scope. This is a
-full PDF rewrite, not incremental append saving.
+write-file fallback for restored targets lacking an open-file scope.
+
+Blob exports request an incremental PDF revision when the original page order
+is retained and the export is not flattened or restricted to selected pages.
+Native dirty tracking follows inline containment, stopping at reference edges;
+only changed original objects and their reachable new resources are serialized.
+The native task reports whether its output is a suffix or a complete rewrite.
+The host prepends the exact original bytes as an immutable Blob, created in
+8 MiB pieces with cancellation checkpoints, and caches that original Blob weakly
+by input identity for repeated saves. It does not reopen the PDF or construct a
+file-sized JS output array. Every save uses the same original base, so repeated
+saves in one session do not accumulate revisions. Reopening a saved file makes
+that revision the new base. File writers still persist the complete Blob;
+incremental serialization does not imply in-place filesystem append.
+
+Imports, page reorder/deletion/duplication, print flattening and page extraction
+use a full rewrite. The native writer also rejects incremental output for new,
+encrypted, repaired or nonzero-generation inputs, encryption changes and native
+text redaction. `incremental: false` explicitly requests compact output without
+retaining old revisions. Incremental saves retain previous form values,
+annotations and metadata in the original prefix; they are not sanitization.
+The original immutable Blob is retained only as long as its input byte array.
 
 Persistent saves request a small cover before the export transaction rolls back.
 `exportPreviews.ts` associates it with the output Blob, so recent-file updates do

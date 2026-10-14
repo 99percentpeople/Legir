@@ -109,6 +109,8 @@ export async function saveEditingDocument(
     signal?: AbortSignal;
     writeChunk?: (bytes: Uint8Array) => void | Promise<void>;
     writeBlob?: (chunk: Blob) => void;
+    incremental?: boolean;
+    onSaveMode?: (incremental: boolean) => void;
   },
 ): Promise<Uint8Array> {
   const view = getEditingView(document);
@@ -118,6 +120,7 @@ export async function saveEditingDocument(
     const security = options?.security;
     options?.signal?.throwIfAborted();
     const task = view.native.startSave({
+      incremental: options?.incremental,
       encrypt: security ? "aes-256" : "none",
       ...(security
         ? {
@@ -130,6 +133,7 @@ export async function saveEditingDocument(
     const chunks: Uint8Array[] = [];
     let size = 0;
     try {
+      options?.onSaveMode?.(task.incremental);
       for (;;) {
         options?.signal?.throwIfAborted();
         if (options?.writeBlob) {

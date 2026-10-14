@@ -2061,6 +2061,9 @@ export const exportPDF = async (
     signal?: AbortSignal;
     writeChunk?: (bytes: Uint8Array) => void | Promise<void>;
     writeBlob?: (chunk: Blob) => void;
+    onSaveMode?: (incremental: boolean) => void;
+    /** Disable append saving when compact output or history removal is needed. */
+    incremental?: boolean;
     onSavedDocument?: (document: PDFDocument) => Promise<void>;
     /** Include a cover only when the caller will persist a recent-file entry. */
     includePreview?: boolean;
@@ -2118,6 +2121,21 @@ export const exportPDF = async (
     }));
 
   try {
+    const structure = options?.pageStructure;
+    const incremental =
+      options?.incremental !== false &&
+      !!options?.onSaveMode &&
+      !options?.flattenFormFields &&
+      !options?.pageIndexes &&
+      (!structure ||
+        (structure.pages.length === pdfDoc.getPageCount() &&
+          structure.pages.every(
+            (page, index) =>
+              !page.blank &&
+              !page.source?.copyGroup &&
+              (page.source?.documentId ?? "default") === "default" &&
+              (page.source?.pageIndex ?? page.pageIndex) === index,
+          )));
     let applyPageRotation: (() => void) | undefined;
     if (
       options?.pageStructure &&
@@ -2709,6 +2727,8 @@ export const exportPDF = async (
     restoreAcroFormXfaEntry(xfaEntry);
     options?.signal?.throwIfAborted();
     const output = await saveEditingDocument(pdfDoc, {
+      incremental,
+      onSaveMode: options?.onSaveMode,
       security,
       signal: options?.signal,
       writeChunk: options?.writeChunk,

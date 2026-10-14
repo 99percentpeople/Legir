@@ -12,6 +12,7 @@ export type ExportPdfOptions = Omit<
   | "writeChunk"
   | "writeBlob"
   | "onSavedDocument"
+  | "onSaveMode"
 >;
 export type ExportPdfRequest = {
   fields: FormField[];
@@ -55,7 +56,11 @@ export type DocumentCommands = {
   exportDocument: { input: ExportPdfRequest; output: Uint8Array };
   exportDocumentBlob: {
     input: ExportPdfRequest;
-    output: { blob: Blob; preview?: { bytes: Uint8Array; mimeType: string } };
+    output: {
+      blob: Blob;
+      incremental?: boolean;
+      preview?: { bytes: Uint8Array; mimeType: string };
+    };
   };
   documentStats: {
     input: object;

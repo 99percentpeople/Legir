@@ -980,6 +980,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
             };
           } else {
             const parts: Blob[] = [];
+            let incremental = false;
             let preview: { bytes: Uint8Array; mimeType: string } | undefined;
             const blobOutput = data.type === "exportDocumentBlob";
             const payload = await session!.export(
@@ -987,6 +988,9 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
               controller.signal,
               blobOutput
                 ? {
+                    onSaveMode: (value) => {
+                      incremental = value;
+                    },
                     writeBlob: (blob) => {
                       parts.push(blob);
                     },
@@ -1040,6 +1044,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
               ? {
                   payload: {
                     blob: new Blob(parts, { type: "application/pdf" }),
+                    incremental,
                     preview,
                   },
                 }

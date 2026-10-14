@@ -6,6 +6,7 @@
 #include "core/fpdfapi/page/cpdf_textobject.h"
 #include "core/fpdfapi/parser/cpdf_array.h"
 #include "core/fpdfapi/parser/cpdf_boolean.h"
+#include "core/fpdfapi/parser/cpdf_cross_ref_table.h"
 #include "core/fpdfapi/parser/cpdf_dictionary.h"
 #include "core/fpdfapi/parser/cpdf_document.h"
 #include "core/fpdfapi/parser/cpdf_name.h"
@@ -63,6 +64,12 @@ struct Document {
   uint32_t first_new_object = 0;
   bool transaction = false;
   bool rendering_changed = false;
+  std::set<const CPDF_Object *> modified;
+  std::set<uint32_t> replaced;
+  std::set<const CPDF_Object *> modified_before;
+  std::set<uint32_t> replaced_before;
+  bool require_rewrite = false;
+  bool require_rewrite_before = false;
   int error = 0;
   CPDF_Document *core() const { return CPDFDocumentFromFPDFDocument(handle); }
   void record(std::function<void()> fn, bool rendering = true) {
@@ -186,6 +193,7 @@ static Blob *blob(pdfium::span<const uint8_t> data) {
   return new Blob{std::vector<uint8_t>(data.begin(), data.end())};
 }
 static void set_object(Document *doc, uint32_t number, Obj value) {
+  doc->replaced.insert(number);
   auto old = doc->core()->GetOrParseIndirectObject(number);
   doc->record([doc, number, old] { doc->core()->SetForEditing(number, old); });
   doc->core()->SetForEditing(number, std::move(value));
@@ -194,6 +202,7 @@ static void set_key(Document *doc, RetainPtr<CPDF_Dictionary> dict,
                     const ByteString &key, Obj value) {
   if (!dict)
     return;
+  doc->modified.insert(dict.Get());
   auto old = dict->GetMutableObjectFor(key.AsStringView());
   const bool info_only = dict == doc->trailer->GetMutableDictFor("Info") &&
       (key == "Title" || key == "Author" || key == "Subject" ||
@@ -206,6 +215,7 @@ static void snapshot_dictionary(Document *doc,
                                 RetainPtr<CPDF_Dictionary> dict) {
   if (!dict)
     return;
+  doc->modified.insert(dict.Get());
   std::map<ByteString, Obj> values;
   for (const auto &key : dict->GetKeys())
     values[key] = dict->GetMutableObjectFor(key.AsStringView());
@@ -222,6 +232,7 @@ static void snapshot_appearances(Document *doc, CPDF_Page *page) {
   auto array = page->GetMutableAnnotsArray();
   if (!array)
     return;
+  doc->modified.insert(array.Get());
   std::vector<std::pair<Obj, uint32_t>> values;
   for (size_t i = 0; i < array->size(); ++i) {
     auto value = array->GetMutableObjectAt(i);
@@ -300,6 +311,81 @@ static std::set<uint32_t> reachable_objects(Document *doc) {
     }
   }
   return numbers;
+}
+
+// Only inline containment determines the owner of a modified child. Following
+// references here would mark every ancestor/page as dirty and parse the file.
+static bool contains_modified(Document *doc, Obj root) {
+  std::set<const CPDF_Object *> visited;
+  std::vector<Obj> pending{root};
+  while (!pending.empty()) {
+    auto object = std::move(pending.back());
+    pending.pop_back();
+    if (!object || !visited.insert(object.Get()).second) continue;
+    if (doc->modified.contains(object.Get())) return true;
+    // GetMutableDict() resolves references too. Stop here before calling it:
+    // a /Parent reference must not turn every sibling page into a dirty owner.
+    if (object->IsReference()) continue;
+    if (auto array = object->AsMutableArray()) {
+      for (size_t i = 0; i < array->size(); ++i)
+        pending.push_back(array->GetMutableObjectAt(i));
+    } else if (auto dict = object->GetMutableDict()) {
+      if (doc->modified.contains(dict.Get())) return true;
+      for (const auto &key : dict->GetKeys())
+        pending.push_back(dict->GetMutableObjectFor(key.AsStringView()));
+    }
+  }
+  return false;
+}
+static std::set<uint32_t> incremental_objects(Document *doc) {
+  const auto original_last = doc->core()->GetParser()->GetLastObjNum();
+  std::set<uint32_t> changed;
+  for (const auto &[number, object] : *doc->core()) {
+    if (number <= original_last &&
+        (doc->replaced.contains(number) || contains_modified(doc, object)))
+      changed.insert(number);
+  }
+  std::set<uint32_t> output;
+  std::set<const CPDF_Object *> visited;
+  std::vector<Obj> pending{doc->trailer};
+  for (const auto number : changed) {
+    output.insert(number);
+    pending.push_back(doc->core()->GetMutableIndirectObject(number));
+  }
+  while (!pending.empty()) {
+    auto object = std::move(pending.back());
+    pending.pop_back();
+    if (!object || !visited.insert(object.Get()).second) continue;
+    if (auto ref = object->AsReference()) {
+      const auto number = ref->GetRefObjNum();
+      if (number > original_last || changed.contains(number)) {
+        output.insert(number);
+        pending.push_back(object->GetMutableDirect());
+      }
+    } else if (auto array = object->AsMutableArray()) {
+      for (size_t i = 0; i < array->size(); ++i)
+        pending.push_back(array->GetMutableObjectAt(i));
+    } else if (auto dict = object->GetMutableDict()) {
+      for (const auto &key : dict->GetKeys())
+        pending.push_back(dict->GetMutableObjectFor(key.AsStringView()));
+    }
+  }
+  if (output.empty()) output.insert(doc->core()->GetRoot()->GetObjNum());
+  return output;
+}
+static bool can_append(Document *doc) {
+  const auto parser = doc->core()->GetParser();
+  if (!parser || !doc->input_size || doc->require_rewrite ||
+      parser->GetEncryptDict() || parser->xref_table_rebuilt() ||
+      !parser->GetLastXRefOffset() ||
+      parser->GetDocumentSize() != static_cast<FX_FILESIZE>(doc->input_size))
+    return false;
+  // The writer emits generation zero. Recycled-generation PDFs need a rewrite
+  // so unchanged references cannot disagree with the appended cross-reference.
+  for (const auto &[number, info] : parser->GetCrossRefTableForTesting()->objects_info())
+    if (info.type != CPDF_CrossRefTable::ObjectType::kFree && info.gennum)
+      return false;
+  return true;
 }
 
 // One map covers a whole import/copy group. References are reserved before
@@ -611,6 +697,7 @@ EMSCRIPTEN_KEEPALIVE int LPDF_RedactText(Document *doc, FPDF_PAGE handle,
     return -1;
   if (!result.changed)
     return 0;
+  doc->require_rewrite = true; // Removed text must not remain in an older revision.
   const auto number = doc->core()->AddIndirectObject(result.content);
   set_key(doc, page->GetMutableDict(), "Contents",
           doc->core()->New<CPDF_Reference>(doc->core(), number));
@@ -622,6 +709,9 @@ EMSCRIPTEN_KEEPALIVE int LPDF_Begin(Document *doc) {
     return 0;
   doc->transaction = true;
   doc->rendering_changed = false;
+  doc->modified_before = doc->modified;
+  doc->replaced_before = doc->replaced;
+  doc->require_rewrite_before = doc->require_rewrite;
   doc->first_new_object = doc->core()->GetLastObjNum() + 1;
   return 1;
 }
@@ -644,7 +734,12 @@ EMSCRIPTEN_KEEPALIVE void LPDF_End(Document *doc, int rollback) {
     for (auto n = doc->first_new_object; n <= last; n++)
       doc->core()->DeleteIndirectObject(n);
     doc->core()->SetLastObjNum(doc->first_new_object - 1);
+    doc->modified = std::move(doc->modified_before);
+    doc->replaced = std::move(doc->replaced_before);
+    doc->require_rewrite = doc->require_rewrite_before;
   }
+  doc->modified_before.clear();
+  doc->replaced_before.clear();
   doc->undo.clear();
   if (changed) doc->sync();
 }
@@ -790,6 +885,7 @@ EMSCRIPTEN_KEEPALIVE void LPDF_SetIndex(Document *doc, CPDF_Object *object,
   auto array = ToArray(direct(object));
   if (!array || index < 0)
     return;
+  doc->modified.insert(array.Get());
   if (mode == 1) { // insertion
     if (static_cast<size_t>(index) > array->size())
       return;
@@ -850,6 +946,7 @@ EMSCRIPTEN_KEEPALIVE void LPDF_WriteStream(Document *doc, uint32_t number,
                                            int raw) {
   auto previous = doc->core()->GetOrParseIndirectObject(number);
   if (auto existing = ToStream(previous)) {
+    doc->replaced.insert(number);
     if (doc->transaction) {
       auto acc = pdfium::MakeRetain<CPDF_StreamAcc>(existing);
       acc->LoadAllDataRaw();
@@ -929,20 +1026,23 @@ struct SaveJob {
   std::unique_ptr<CPDF_Creator> creator;
   int version = 17;
   bool encrypt = false;
+  bool incremental = false;
   bool started = false;
   int status = 2;
   double deadline = 0;
 };
 static std::unique_ptr<SaveJob> create_save(Document *doc, const char *user,
                                           const char *owner, int permissions,
-                                          int encrypt, bool progressive = true) {
+                                          int encrypt, bool progressive = true,
+                                          bool incremental = false) {
   doc->sync();
   auto job = std::make_unique<SaveJob>();
   job->version = LPDF_Version(doc);
   job->encrypt = encrypt;
+  job->incremental = incremental && !encrypt && can_append(doc);
   job->creator = std::make_unique<CPDF_Creator>(doc->core(), job->stream);
   auto &creator = *job->creator;
-  auto objects = reachable_objects(doc);
+  auto objects = job->incremental ? incremental_objects(doc) : reachable_objects(doc);
   if (!progressive) {
     uint64_t reserve = 4096 + objects.size() * uint64_t{512};
     uint64_t unfiltered = 0;
@@ -958,6 +1058,7 @@ static std::unique_ptr<SaveJob> create_save(Document *doc, const char *user,
   }
   creator.SetObjectsForEditing(std::move(objects));
   creator.SetTrailerForEditing(doc->trailer);
+  if (job->incremental) creator.SetDeltaForEditing();
     if (encrypt) {
       auto dict = doc->core()->New<CPDF_Dictionary>();
       dict->SetNewFor<CPDF_Name>("Filter", "Standard");
@@ -982,8 +1083,8 @@ static std::unique_ptr<SaveJob> create_save(Document *doc, const char *user,
 }
 EMSCRIPTEN_KEEPALIVE SaveJob *LPDF_SaveStart(Document *doc, const char *user,
                                             const char *owner, int permissions,
-                                            int encrypt) {
-  auto job = create_save(doc, user, owner, permissions, encrypt);
+                                            int encrypt, int incremental) {
+  auto job = create_save(doc, user, owner, permissions, encrypt, true, incremental);
   job->stream->data.reserve(4 * 1024 * 1024 + 4096);
   auto raw = job.get();
   job->creator->SetPauseForEditing([raw]() {
@@ -992,12 +1093,16 @@ EMSCRIPTEN_KEEPALIVE SaveJob *LPDF_SaveStart(Document *doc, const char *user,
   });
   return job.release();
 }
+EMSCRIPTEN_KEEPALIVE int LPDF_SaveIsIncremental(SaveJob *job) {
+  return job->incremental;
+}
 EMSCRIPTEN_KEEPALIVE int LPDF_SaveContinue(SaveJob *job) {
   if (job->status != 2) return job->status;
   job->deadline = emscripten_get_now() + 8;
   if (!job->started) {
     job->started = true;
-    const auto flags = job->encrypt ? CPDF_Creator::kNone : CPDF_Creator::kRemoveSecurity;
+    const auto flags = job->incremental ? CPDF_Creator::kIncremental :
+        job->encrypt ? CPDF_Creator::kNone : CPDF_Creator::kRemoveSecurity;
     job->status = !job->creator->Create(flags, job->version) ? 0 :
                   job->creator->IsPausedForEditing() ? 2 : 1;
   } else {

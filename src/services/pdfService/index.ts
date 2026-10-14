@@ -14,6 +14,7 @@ import { getPdfPermissionPolicy } from "@/lib/pdfPermissions";
 import { appEventBus } from "@/lib/eventBus";
 import { getSystemFontCatalog } from "@/lib/system-fonts";
 import { exportPreviews } from "./engine/exportPreviews";
+import { yieldPdfTask } from "./engine/yieldTask";
 export type {
   LoadedPdfDocument,
   ReadablePdfDocument,
@@ -365,6 +366,36 @@ export async function exportPDF(
 
 /** File/print output avoids a second file-sized JS array. Byte-array callers
  * retain exportPDF; both use the same native writer and transaction. */
+const originalBlobs = new WeakMap<Uint8Array, Blob>();
+const appendSavedRevision = async (
+  originalBytes: Uint8Array,
+  delta: Blob,
+  signal?: AbortSignal,
+) => {
+  signal?.throwIfAborted();
+  let original = originalBlobs.get(originalBytes);
+  if (!original) {
+    const parts: Blob[] = [];
+    for (
+      let offset = 0;
+      offset < originalBytes.length;
+      offset += 8 * 1024 * 1024
+    ) {
+      signal?.throwIfAborted();
+      parts.push(
+        new Blob([
+          originalBytes.subarray(offset, offset + 8 * 1024 * 1024) as BlobPart,
+        ]),
+      );
+      await yieldPdfTask();
+    }
+    signal?.throwIfAborted();
+    original = new Blob(parts);
+    originalBlobs.set(originalBytes, original);
+  }
+  return new Blob([original, delta], { type: "application/pdf" });
+};
+
 export async function exportPDFBlob(
   originalBytes: Uint8Array,
   fields: FormField[],
@@ -376,16 +407,23 @@ export async function exportPDFBlob(
   const { signal, ...settings } = options ?? {};
   if (isNode()) {
     const parts: Blob[] = [];
+    let incremental = false;
     await (
       await import("./documentPipeline")
     ).exportPDF(originalBytes, fields, metadata, annotations, customFont, {
       ...settings,
       signal,
+      onSaveMode: (value) => {
+        incremental = value;
+      },
       writeBlob: (blob) => {
         parts.push(blob);
       },
     });
-    return new Blob(parts, { type: "application/pdf" });
+    const blob = new Blob(parts, { type: "application/pdf" });
+    return incremental
+      ? appendSavedRevision(originalBytes, blob, signal)
+      : blob;
   }
   let worker = getPdfWorkerForBytes(originalBytes);
   const owned = !worker;
@@ -407,8 +445,12 @@ export async function exportPDFBlob(
       },
       signal,
     );
-    exportPreviews.set(output.blob, output.preview ?? null);
-    return output.blob;
+    const blob = output.incremental
+      ? await appendSavedRevision(originalBytes, output.blob, signal)
+      : output.blob;
+    signal?.throwIfAborted();
+    exportPreviews.set(blob, output.preview ?? null);
+    return blob;
   } finally {
     if (owned) worker.destroy();
   }

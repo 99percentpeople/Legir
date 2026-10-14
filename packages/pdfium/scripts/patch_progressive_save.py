@@ -51,3 +51,37 @@ def patch_progressive_save(source: Path):
                 raise RuntimeError("Progressive writer patch does not match pinned PDFium")
             text = text.replace(old, new)
     cpp.write_text(text)
+
+    text = header.read_text()
+    if "SetDeltaForEditing" not in text:
+        text = text.replace("  bool Create(Mask<CreateFlags>",
+            "  void SetDeltaForEditing() { delta_for_editing_ = true; }\n\n  bool Create(Mask<CreateFlags>")
+        text = text.replace("  bool is_incremental_ = false;",
+            "  bool delta_for_editing_ = false;\n  bool is_incremental_ = false;")
+        header.write_text(text)
+    text = cpp.read_text()
+    changes = [
+        ("  FX_FILESIZE CurrentOffset() const override { return offset_; }",
+         "  FX_FILESIZE CurrentOffset() const override { return offset_; }\n  void SetOffsetForEditing(FX_FILESIZE offset) { offset_ = offset; }"),
+        ("  is_original_ = !(flags & CreateFlags::kNoOriginal);",
+         "  is_original_ = !(flags & CreateFlags::kNoOriginal) && !delta_for_editing_;"),
+        # A classic xref can append to either kind of original xref. Use it for
+        # deltas rather than PDFium's legacy xref-stream branch, which omits the
+        # xref stream's own entry and endobj terminator in this pin.
+        ("    if (!is_incremental_ || !parser_->IsXRefStream()) {",
+         "    if (delta_for_editing_ || !is_incremental_ || !parser_->IsXRefStream()) {"),
+        ("  bool bXRefStream = is_incremental_ && parser_->IsXRefStream();",
+         "  bool bXRefStream = !delta_for_editing_ && is_incremental_ && parser_->IsXRefStream();"),
+        ("      saved_offset_ = parser_->GetDocumentSize();",
+         """      saved_offset_ = parser_->GetDocumentSize();
+      if (delta_for_editing_) {
+        static_cast<FileBufferArchive*>(archive_.get())->SetOffsetForEditing(saved_offset_);
+        if (!archive_->WriteString("\\r\\n")) return Stage::kInvalid;
+      }"""),
+    ]
+    for old, new in changes:
+        if new not in text:
+            if text.count(old) != 1:
+                raise RuntimeError("Incremental writer patch does not match pinned PDFium")
+            text = text.replace(old, new)
+    cpp.write_text(text)

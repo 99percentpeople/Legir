@@ -11,11 +11,11 @@
     "renderer": "agg"
   },
   "sha256": {
-    "pdfium.js": "1a4b0f866fad4e221779ab2d49d5ee9094c57f621d762d72d5aed8be91f945f1",
-    "pdfium.wasm": "d31ba19b338de813316744afe3e397ffff7bdd5f639907ba1175fabb8d8ebb3b"
+    "pdfium.js": "4b517e7effb584f6da70625f4a7fd18a89a21074416500a36c676b48b9a2f6ce",
+    "pdfium.wasm": "d92e2c7b6a1db8246c33f2f4033184c4284370608cdcefd27271a06e4df6f19b"
   },
   "sourceSha256": {
-    "native/bridge.cpp": "f4153aaea94c2b07f278ad5823848d6e264499c8a5ecab019677a628bba05e05",
+    "native/bridge.cpp": "1cc44bfc111b358abacd5e6db0ddcf85109b738065a4fc4db28a2ee5e961613f",
     "native/canvas_plan.cpp": "8a83bddb597ae6e8a1026253274aae7e8d58fb0add162275aba094d240e18884",
     "native/canvas_plan.h": "75d87de68b736a7766d51db1409cc9dbd47448c59efeab2785e766b81eab32ae",
     "native/image_cache.cpp": "8606addc82ed8d8e8db02076439a61edb5bb171d2556dfce800c36c9b0a3e339",
@@ -23,7 +23,7 @@
     "native/text_edit.cpp": "5ef50b1309668b96c6c1e22f80d5b0fd7e1ff9a1461c1bd9c2db41d74e2e7b21",
     "native/text_edit.h": "2515b929e99b2c03989a61897e4eb39308349e0a30ff086c2203c02caf61680d",
     "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0",
-    "scripts/patch_progressive_save.py": "3a5ae302363df94078e80f685c69265402ce938c945d64e92315190ba5119761"
+    "scripts/patch_progressive_save.py": "098e6e06b1bdb4d735a484733b0deee7cf711287546ffecc2ac5b8127b46d076"
   },
   "patchSha256": "7216d5d393228364ad1992cd6c6e65afcd27bb7440a060b1df55247f425eb73e",
   "buildScriptSha256": "8c0e9bfe0664cf5bbeccc45d61bc56a05a8535db9176956847e2f6c96b91bff5"
