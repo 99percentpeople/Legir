@@ -400,7 +400,10 @@ try {
             await snapshot("exported");
             await saveDownload("export");
             await phase("import", () =>
-              page.evaluate(() => globalThis.pdfCorpus.importSource()),
+              page.evaluate(
+                (indexes) => globalThis.pdfCorpus.importSource(indexes),
+                fixture.importPages,
+              ),
             );
             await snapshot("imported");
             await phase("mergedExport", () =>

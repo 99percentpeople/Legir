@@ -278,8 +278,19 @@ for (const record of results) {
       const actual = await inspect(file);
       const source = fixtureInfo.get(fixture.id),
         imported = fixtureInfo.get(donor.id);
+      const selectedPages =
+        record.phases.import?.selectedPages ?? imported.pages.map((_, i) => i);
+      const donorPages = selectedPages.map((index) => imported.pages[index]);
       const expected =
-        mode === "merged" ? [...source.pages, ...imported.pages] : source.pages;
+        mode === "merged" ? [...source.pages, ...donorPages] : source.pages;
+      if (
+        mode === "merged" &&
+        selectedPages.length !== imported.pages.length &&
+        imported.fields.length
+      )
+        throw new Error(
+          "Partial-form selection needs a dedicated field/widget validator",
+        );
       validation.pages = actual.pages.length;
       validation.expectedPages = expected.length;
       validation.titleEdited = actual.title === "Legir corpus benchmark";
@@ -320,7 +331,11 @@ for (const record of results) {
           index >= source.pages.length &&
           link.kind === "GoTo" &&
           link.targetPage !== null
-            ? { targetPage: link.targetPage + source.pages.length }
+            ? {
+                targetPage: selectedPages.includes(link.targetPage)
+                  ? selectedPages.indexOf(link.targetPage) + source.pages.length
+                  : null,
+              }
             : {}),
         }));
         const sortedLinks = (links) =>
@@ -347,11 +362,15 @@ for (const record of results) {
       }));
       if (mode === "merged")
         for (const index of [
-          ...new Set([0, donor.samplePages[1], imported.pages.length - 1]),
+          ...new Set([
+            0,
+            Math.floor(selectedPages.length / 2),
+            selectedPages.length - 1,
+          ]),
         ])
           checks.push({
             source: donor.path,
-            sourcePage: index,
+            sourcePage: selectedPages[index],
             outputPage: source.pages.length + index,
           });
       validation.samples = [];

@@ -107,12 +107,20 @@ node scripts/pdf-benchmark/corpus-summary.mjs /tmp/corpus-results/results.json /
 ```
 
 The manifest has `variants: [{id, build, revision}]` and
-`fixtures: [{id, path, donor, samplePages}]`. Paths are absolute; `donor` names
+`fixtures: [{id, path, donor, samplePages, importPages?}]`. Paths are absolute; `donor` names
 another fixture, and `samplePages` contains three zero-based page indexes. Select
 pages containing real content, including an interior page and the last page.
 See the recorded manifest in `docs/performance/pdf-engine-real-corpus/` for a
 complete example, sample hashes, sources, and exact versions. Source PDFs remain
 outside the repository.
+
+Optional `importPages` selects zero-based donor pages in the requested order;
+omitting it imports the entire donor. The common entry detects whether the
+revision supports native import previews: newer PDFium revisions keep the donor
+in the owner's worker and hydrate/graft only those pages; earlier builds use
+their separate preview worker and normal source registration. The source SDK
+alias always resolves inside the selected checkout, including when dependencies
+are shared through a symlink. Do not compare builds made from different entries.
 
 Each sample uses a fresh browser with local fixture bytes loaded before the
 memory baseline. Three rounds rotate engine order. The tasks are: readable open;
@@ -120,7 +128,7 @@ first actual transferred canvas at 1600-pixel long edge; complete model hydratio
 first and repeated renders of three selected pages at 1600 pixels; full-page
 zoom at 3200 pixels; four 1024-square tiles and a rotated tile with the page's
 long edge at 6400 pixels; PNG export at 1600 pixels; metadata-edit save; importing
-the **entire donor** (preview hydration plus owner registration); and merged save.
+the selected donor pages (preview hydration plus owner registration); and merged save.
 Merged saves append donor controls, preserved annotations and link targets with
 the same page offsets as the app's page import flow. Canvas timings retain the
 production animation-frame acknowledgment and exclude PNG encoding/readback.
@@ -133,11 +141,27 @@ across engines, not the application's initial page-orientation UI behavior.
 PSS, RSS and process swap are sampled every 50 ms across Chromium processes.
 Retained snapshots follow GC. Baseline includes both input byte arrays and any
 idle workers the revision starts. Record absolute totals as well as increments.
-WASM capacity is reported separately from resident memory. Download Blob creation
-is measured as a separate memory phase and is excluded from export time. Host
+WASM capacity is reported separately from resident memory. The entry uses the
+normal `exportPDFBlob` API when available and the byte API on older revisions;
+the new API's native chunking and Blob assembly are included in export time.
+Download URL construction and download consumption are a separate memory phase,
+excluded from export time. Byte output is wrapped directly in a Blob without
+an extra full-file slice for any revision. The `exportPeakPssMiB` summary metric
+is the larger peak of the two save phases, distinct from the whole-workflow peak.
+Recent-file previews are excluded from these download-only tasks. Host
 temperature/load/swap counters and Chromium GPU feature flags accompany every
 record; CPU-only headless measurements do not predict GPU/Tauri performance.
 No validation subprocesses or builds run during the measured comparison.
+
+`io-probes.mjs BUILD FIXTURE OUTPUT [cancel|preview]` separately tests save
+cancellation or saved-revision preview reuse. Cancellation repeats three times,
+measures both caller rejection and worker readiness after rollback, requires one
+surviving native document, compares page pixels, and retries a complete save.
+Preview mode needs the synthetic donor with an editable text field. It compares
+the cached preview with the independently reopened edited PDF, requires it to
+differ from the original preview, then reopens the downloaded file with pdf-lib.
+The verification worker is confined to the probe. These are correctness and
+response-latency diagnostics, not part of the timed performance comparison.
 
 `native-render.mjs WASM_DIR MANIFEST OUTPUT_JSON` separately records exact RGBA
 hashes for three sampled pages, repeated renders, zoom, four tiles, a rotated

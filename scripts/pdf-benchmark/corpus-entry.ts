@@ -1,6 +1,8 @@
+import * as pdfService from "@/services/pdfService";
 import { startPdfOpenSession, loadPDF, exportPDF } from "@/services/pdfService";
 import { createPdfWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { PageData } from "@/types";
+import { renderPdfPreviewDataUrl } from "@/services/recentFilePreview";
 
 // This identical entry is compiled against each revision's production services.
 // It deliberately does not import, patch, or call an engine directly.
@@ -10,7 +12,9 @@ let loaded: Awaited<ReturnType<typeof loadPDF>> | undefined;
 let donor: Awaited<ReturnType<typeof loadPDF>> | undefined;
 let bytes: Uint8Array | undefined;
 let donorBytes: Uint8Array | undefined;
-let output: Uint8Array | undefined;
+let output: Uint8Array | Blob | undefined;
+let selectedDonorPages: number[] | undefined;
+let compactDonor = false;
 let pages: PageData[] = [];
 let canvas: HTMLCanvasElement | undefined;
 let canvasSequence = 0;
@@ -148,25 +152,49 @@ const bench = {
         : undefined,
     };
   },
-  async importSource() {
+  async importSource(selection?: number[]) {
     const start = now();
-    const preview = createPdfWorkerService();
-    try {
-      donor = await loadPDF(donorBytes!, { workerService: preview });
-    } finally {
-      preview.destroy();
+    const nativePreview = "supportsImportPreview" in worker!;
+    const preview = nativePreview ? worker! : createPdfWorkerService();
+    let readableMs = 0;
+    if (nativePreview) {
+      const opening = startPdfOpenSession(donorBytes!, {
+        workerService: preview,
+        importId: "corpus-donor",
+      });
+      const readable = await opening.readable;
+      readableMs = now() - start;
+      selectedDonorPages = selection ?? readable.pages.map((_, i) => i);
+      donor = await opening.hydrate(selectedDonorPages);
+    } else {
+      try {
+        donor = await loadPDF(donorBytes!, { workerService: preview });
+      } finally {
+        preview.destroy();
+      }
+      readableMs = now() - start;
+      selectedDonorPages = selection ?? donor.pages.map((_, i) => i);
     }
     const parseMs = now() - start;
-    await worker!.loadDocument(donorBytes!, { docId: "corpus-donor" });
+    if (nativePreview)
+      await worker!.documentCommand("commitImport", {
+        docId: "corpus-donor",
+        pageIndexes: selectedDonorPages,
+      });
+    else await worker!.loadDocument(donorBytes!, { docId: "corpus-donor" });
+    compactDonor = nativePreview;
     const ms = now() - start;
     return {
       ms,
+      readableMs,
       parseMs,
       registerMs: ms - parseMs,
       pages: donor!.pages.length,
+      selectedPages: selectedDonorPages,
+      nativePreview,
     };
   },
-  async save(merged = false) {
+  async save(merged = false, includePreview = false) {
     const start = now();
     const originalPages = loaded!.pages.map((page, index) => ({
       ...page,
@@ -174,63 +202,81 @@ const bench = {
       source: { documentId: "default", pageIndex: index },
     }));
     const importedPages =
-      donor?.pages.map((page, index) => ({
-        ...page,
-        id: `donor-${index}`,
-        pageIndex: originalPages.length + index,
-        source: { documentId: "corpus-donor", pageIndex: index },
-      })) ?? [];
+      donor?.pages
+        .filter((page) => selectedDonorPages?.includes(page.pageIndex))
+        .map((page, index) => ({
+          ...page,
+          id: `donor-${index}`,
+          pageIndex: originalPages.length + index,
+          source: {
+            documentId: "corpus-donor",
+            pageIndex: compactDonor ? index : page.pageIndex,
+          },
+        })) ?? [];
     // Match pageEditingSlice's append semantics: imported controls and link
     // targets move with the pages. Omitting these models requests their deletion.
     const offset = originalPages.length;
+    const importedIndex = (index: number) => {
+      const selected = selectedDonorPages?.indexOf(index) ?? -1;
+      return selected < 0 ? undefined : offset + selected;
+    };
     const annotations = merged
       ? [
           ...loaded!.annotations,
-          ...donor!.annotations.map((annotation) => ({
-            ...annotation,
-            id: `donor-${annotation.id}`,
-            pageIndex: offset + annotation.pageIndex,
-            linkDestPageIndex:
-              annotation.linkDestPageIndex === undefined
-                ? undefined
-                : offset + annotation.linkDestPageIndex,
-            replies: annotation.replies?.map((reply) => ({
-              ...reply,
-              id: `donor-${reply.id}`,
-              parentAnnotationId: `donor-${annotation.id}`,
-              inReplyToReplyId: reply.inReplyToReplyId
-                ? `donor-${reply.inReplyToReplyId}`
-                : undefined,
+          ...donor!.annotations
+            .filter((a) => importedIndex(a.pageIndex) !== undefined)
+            .map((annotation) => ({
+              ...annotation,
+              id: `donor-${annotation.id}`,
+              pageIndex: importedIndex(annotation.pageIndex)!,
+              linkDestPageIndex:
+                annotation.linkDestPageIndex === undefined
+                  ? undefined
+                  : importedIndex(annotation.linkDestPageIndex),
+              replies: annotation.replies?.map((reply) => ({
+                ...reply,
+                id: `donor-${reply.id}`,
+                parentAnnotationId: `donor-${annotation.id}`,
+                inReplyToReplyId: reply.inReplyToReplyId
+                  ? `donor-${reply.inReplyToReplyId}`
+                  : undefined,
+              })),
             })),
-          })),
         ]
       : loaded!.annotations;
     const fields = merged
       ? [
           ...loaded!.fields,
-          ...donor!.fields.map((field) => ({
-            ...field,
-            id: `donor-${field.id}`,
-            pageIndex: offset + field.pageIndex,
-          })),
+          ...donor!.fields
+            .filter((f) => importedIndex(f.pageIndex) !== undefined)
+            .map((field) => ({
+              ...field,
+              id: `donor-${field.id}`,
+              pageIndex: importedIndex(field.pageIndex)!,
+            })),
         ]
       : loaded!.fields;
     const preserved = merged
       ? [
           ...loaded!.preservedSourceAnnotations,
-          ...donor!.preservedSourceAnnotations.map((annotation) => ({
-            ...annotation,
-            pageIndex: offset + annotation.pageIndex,
-          })),
+          ...donor!.preservedSourceAnnotations
+            .filter((a) => importedIndex(a.pageIndex) !== undefined)
+            .map((annotation) => ({
+              ...annotation,
+              pageIndex: importedIndex(annotation.pageIndex)!,
+            })),
         ]
       : loaded!.preservedSourceAnnotations;
-    output = await exportPDF(
+    const save =
+      "exportPDFBlob" in pdfService ? pdfService.exportPDFBlob : exportPDF;
+    output = await save(
       bytes!,
       fields,
       { ...loaded!.metadata, title: "Legir corpus benchmark" },
       annotations,
       undefined,
       {
+        includePreview,
         preservedSourceAnnotations: preserved,
         syncFormFields: false,
         ...(merged
@@ -242,6 +288,7 @@ const bench = {
                     bytes: donorBytes!,
                     password: null,
                     filename: "donor.pdf",
+                    pageIndexes: compactDonor ? selectedDonorPages : undefined,
                   },
                 },
               },
@@ -249,12 +296,103 @@ const bench = {
           : {}),
       },
     );
-    return { ms: now() - start, bytes: output.byteLength };
+    return {
+      ms: now() - start,
+      bytes: output instanceof Blob ? output.size : output.byteLength,
+      blob: output instanceof Blob,
+    };
+  },
+  async cancelExport(delayMs = 20) {
+    if (!("exportPDFBlob" in pdfService)) return { supported: false };
+    const controller = new AbortController();
+    const start = now();
+    let abortedAt = 0;
+    const timer = setTimeout(() => {
+      abortedAt = now();
+      controller.abort();
+    }, delayMs);
+    let aborted = false;
+    try {
+      await pdfService.exportPDFBlob(
+        bytes!,
+        loaded!.fields,
+        loaded!.metadata,
+        loaded!.annotations,
+        undefined,
+        {
+          preservedSourceAnnotations: loaded!.preservedSourceAnnotations,
+          signal: controller.signal,
+        },
+      );
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") throw error;
+      aborted = true;
+    } finally {
+      clearTimeout(timer);
+    }
+    const rejectedAt = now();
+    const stats = await worker!.documentCommand("documentStats", {});
+    return {
+      supported: true,
+      aborted,
+      abortAfterMs: abortedAt - start,
+      rejectionMs: rejectedAt - abortedAt,
+      workerReadyMs: now() - abortedAt,
+      stats,
+    };
+  },
+  async previewProbe() {
+    if (!("exportPDFBlob" in pdfService))
+      throw new Error("Requires Blob export");
+    if (!loaded!.fields.some((field) => typeof field.value === "string"))
+      throw new Error("Preview probe needs a text-field fixture");
+    const settings = {
+      pageIndex: 0,
+      targetWidth: 240,
+      renderAnnotations: true,
+      mimeType: "image/jpeg",
+      quality: 0.8,
+    };
+    const original = await worker!.renderPageImage(settings);
+    output = await pdfService.exportPDFBlob(
+      bytes!,
+      loaded!.fields.map((field) =>
+        typeof field.value === "string"
+          ? { ...field, value: "Saved preview revision" }
+          : field,
+      ),
+      loaded!.metadata,
+      loaded!.annotations,
+      undefined,
+      {
+        preservedSourceAnnotations: loaded!.preservedSourceAnnotations,
+        includePreview: true,
+      },
+    );
+    const dataUrl = await renderPdfPreviewDataUrl({ pdfBytes: output });
+    if (!dataUrl) throw new Error("No saved preview");
+    const preview = new Uint8Array(await (await fetch(dataUrl)).arrayBuffer());
+    const verifier = createPdfWorkerService();
+    try {
+      await verifier.loadDocument(new Uint8Array(await output.arrayBuffer()));
+      const reopened = await verifier.renderPageImage(settings);
+      const equal = (a: Uint8Array, b: Uint8Array) =>
+        a.length === b.length && a.every((x, i) => x === b[i]);
+      return {
+        matchesReopened: equal(preview, reopened.bytes),
+        differsFromOriginal: !equal(preview, original.bytes),
+        previewBytes: preview.length,
+      };
+    } finally {
+      verifier.destroy();
+    }
   },
   download() {
     const link = document.createElement("a");
     downloadUrl = URL.createObjectURL(
-      new Blob([output!.slice()], { type: "application/pdf" }),
+      output instanceof Blob
+        ? output
+        : new Blob([output! as BlobPart], { type: "application/pdf" }),
     );
     link.href = downloadUrl;
     link.download = "corpus.pdf";

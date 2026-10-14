@@ -53,6 +53,7 @@ function metrics(record) {
     pngMs: phases.png?.ms,
     exportMs: phases.export?.ms,
     importMs: phases.import?.ms,
+    importReadableMs: phases.import?.readableMs,
     importPreviewMs: phases.import?.parseMs,
     importRegisterMs: phases.import?.registerMs,
     mergedExportMs: phases.mergedExport?.ms,
@@ -65,6 +66,11 @@ function metrics(record) {
     renderedPssMiB: memory.rendered?.pssMiB,
     importedPssMiB: memory.imported?.pssMiB,
     processingPeakPssMiB: peak(false),
+    exportPeakPssMiB: Math.max(
+      ...[phases.export, phases.mergedExport]
+        .filter(Boolean)
+        .map((phase) => phase.peak.pssMiB),
+    ),
     includingDownloadPeakPssMiB: peak(true),
     includingDownloadPeakDeltaMiB: peak(true) - memory.baseline?.pssMiB,
     processingPeakDeltaMiB: peak(false) - memory.baseline?.pssMiB,
