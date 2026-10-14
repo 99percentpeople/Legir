@@ -541,6 +541,8 @@ const toPdfPermissionBits = (permissions: PDFDocumentPermissions) =>
 const buildPdfLibAnnotsByPageIndex = async (
   pdfDoc: PDFDocument,
   options?: {
+    pageIndexes?: ReadonlySet<number>;
+    signal?: AbortSignal;
     resolveDest?: (dest: unknown) => Promise<number | null>;
     readStreamText?: (stream: PDFStream) => Promise<string>;
   },
@@ -770,7 +772,14 @@ const buildPdfLibAnnotsByPageIndex = async (
     return resolveFromValue(value);
   };
 
+  let lastAnnotationYield = performance.now();
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    if (options?.pageIndexes && !options.pageIndexes.has(pageIndex)) continue;
+    if (performance.now() - lastAnnotationYield > 8) {
+      await yieldPdfHydrationWork();
+      lastAnnotationYield = performance.now();
+    }
+    options?.signal?.throwIfAborted();
     const page = pages[pageIndex];
     let annots: unknown;
     try {
@@ -1582,6 +1591,10 @@ export type ReadablePdfDocument = Omit<
 };
 
 export type LoadPDFInternalOptions = {
+  /** A transient import donor in the existing document worker. */
+  importId?: string;
+  pageIndexes?: number[];
+  getImportPageIndexes?: () => number[] | undefined;
   editingDocument?: PDFDocument;
   fontCatalog?: { families: string[]; aliases: Record<string, string> };
   collectFont?: (family: string, bytes: Uint8Array) => void;
@@ -1836,6 +1849,10 @@ export const loadPDFInternal = async (
       pdfLibAnnotsByPageIndex = await buildPdfLibAnnotsByPageIndex(pdfDoc, {
         resolveDest: resolveDestWithWorker,
         readStreamText,
+        pageIndexes: options?.pageIndexes
+          ? new Set(options.pageIndexes)
+          : undefined,
+        signal: options?.signal,
       });
     } catch (e) {
       console.warn("Failed to extract annotations from the editing graph", e);
@@ -1879,6 +1896,10 @@ export const loadPDFInternal = async (
 
     const maxConcurrency = Math.min(options?.onReadable ? 2 : 4, numPages);
     let nextPageIndex = 0;
+    let lastPageYield = performance.now();
+    const selectedPages = options?.pageIndexes
+      ? new Set(options.pageIndexes)
+      : undefined;
 
     const worker = async () => {
       while (true) {
@@ -1886,7 +1907,9 @@ export const loadPDFInternal = async (
         nextPageIndex += 1;
         if (idx >= numPages) return;
 
-        if (idx >= maxConcurrency) {
+        if (selectedPages && !selectedPages.has(idx)) continue;
+        if (performance.now() - lastPageYield > 8) {
+          lastPageYield = performance.now();
           await yieldPdfHydrationWork();
         }
         throwIfPdfLoadAborted(options?.signal);
@@ -2035,6 +2058,12 @@ export const exportPDF = async (
   customFont?: { bytes?: Uint8Array; name?: string },
   options?: {
     editingDocument?: PDFDocument;
+    signal?: AbortSignal;
+    writeChunk?: (bytes: Uint8Array) => void | Promise<void>;
+    writeBlob?: (chunk: Blob) => void;
+    onSavedDocument?: (document: PDFDocument) => Promise<void>;
+    /** Include a cover only when the caller will persist a recent-file entry. */
+    includePreview?: boolean;
     permissionPolicy?: { ignorePdfPermissions: boolean };
     resolveSource?: (id: string) => Promise<PDFDocument>;
     openPassword?: string | null;
@@ -2056,6 +2085,15 @@ export const exportPDF = async (
 ): Promise<Uint8Array> => {
   if (originalBytes.byteLength === 0) throw new Error("PDF buffer is empty.");
 
+  options?.signal?.throwIfAborted();
+  let lastYield = performance.now();
+  const checkpoint = async () => {
+    if (performance.now() - lastYield > 8) {
+      await yieldPdfHydrationWork();
+      lastYield = performance.now();
+    }
+    options?.signal?.throwIfAborted();
+  };
   const openPassword =
     typeof options?.openPassword === "string" && options.openPassword
       ? options.openPassword
@@ -2099,6 +2137,7 @@ export const exportPDF = async (
           preserved: options.preservedSourceAnnotations ?? [],
         },
         options?.resolveSource,
+        options?.signal,
       );
       fields = assembled.fields;
       annotations = assembled.annotations;
@@ -2300,6 +2339,7 @@ export const exportPDF = async (
     }
     const existingFields = form?.getFields() ?? [];
     for (const field of existingFields) {
+      await checkpoint();
       if (!form) break;
       let shouldRemove = false;
       try {
@@ -2363,6 +2403,7 @@ export const exportPDF = async (
     const replacementAnnotationRefs = new Map<string, PDFRef>();
     const pages = pdfDoc.getPages();
     for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+      await checkpoint();
       if (targetPageIndexSet && !targetPageIndexSet.has(pageIndex)) continue;
       const page = pages[pageIndex];
       try {
@@ -2435,6 +2476,7 @@ export const exportPDF = async (
       fields.length > 0 && form ? createFormExportContext(form) : undefined;
     const exportedAnnotationRefById = new Map<string, PDFRef>();
     for (const annotation of annotations) {
+      await checkpoint();
       if (!annotation.sourcePdfRef || !canPreserveSourceAnnotation(annotation))
         continue;
       exportedAnnotationRefById.set(
@@ -2447,6 +2489,7 @@ export const exportPDF = async (
     }
 
     for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+      await checkpoint();
       if (targetPageIndexSet && !targetPageIndexSet.has(pageIndex)) continue;
       const orderedControls = orderedControlsByPage.get(pageIndex) ?? [];
       if (orderedControls.length === 0) continue;
@@ -2528,6 +2571,7 @@ export const exportPDF = async (
     formExportContext?.flushAppearanceUpdates();
 
     for (const annotation of annotations) {
+      await checkpoint();
       if (targetPageIndexSet && !targetPageIndexSet.has(annotation.pageIndex)) {
         continue;
       }
@@ -2663,7 +2707,15 @@ export const exportPDF = async (
           }
         : undefined;
     restoreAcroFormXfaEntry(xfaEntry);
-    return await saveEditingDocument(pdfDoc, { security });
+    options?.signal?.throwIfAborted();
+    const output = await saveEditingDocument(pdfDoc, {
+      security,
+      signal: options?.signal,
+      writeChunk: options?.writeChunk,
+      writeBlob: options?.writeBlob,
+    });
+    await options?.onSavedDocument?.(pdfDoc);
+    return output;
   } finally {
     if (!options?.editingDocument) disposeEditingDocument(pdfDoc);
   }

@@ -11,6 +11,8 @@ import {
 } from "./pageContent";
 import type { ExportPdfRequest, ParsedPdfModels } from "./sessionTypes";
 import type { PDFWorkerService } from "../pdfWorkerService";
+import { prepareImportSource } from "./importSource";
+import { yieldPdfTask } from "./yieldTask";
 
 export type NativeSource = {
   pages: number[];
@@ -64,9 +66,20 @@ export class DocumentSession {
     return source;
   }
 
-  async addSource(id: string, bytes: Uint8Array, password?: string) {
+  async addSource(
+    id: string,
+    input: Uint8Array | PDFDocument,
+    password?: string,
+    options?: {
+      pageIndexes?: number[];
+      signal?: AbortSignal;
+      sourceInfo?: Pick<NativeSource, "permissions" | "outline">;
+    },
+  ) {
     if (this.sources.has(id)) return;
-    const donor = new this.pdfium.PDFDocument(bytes);
+    options?.signal?.throwIfAborted();
+    const ownsDonor = input instanceof Uint8Array;
+    const donor = ownsDonor ? new this.pdfium.PDFDocument(input) : input;
     this.nativeDocuments++;
     this.peakNativeDocuments = Math.max(
       this.peakNativeDocuments,
@@ -75,43 +88,55 @@ export class DocumentSession {
     const doc = this.document;
     let graft: ReturnType<PDFDocument["newGraftMap"]> | undefined;
     let importedTrailer: PDFObject | undefined;
+    let preparedTrailer: PDFObject | undefined;
     let operation = false;
+    let donorOperation = false;
     const firstObject = doc.countObjects();
     try {
       if (donor.needsPassword() && !donor.authenticatePassword(password ?? ""))
         throw new Error("The PDF password is missing or incorrect.");
-      const permissions = getNativePermissions(donor),
-        outline = getNativeOutline(donor);
+      const permissions =
+          options?.sourceInfo?.permissions ?? getNativePermissions(donor),
+        outline = options?.sourceInfo?.outline ?? getNativeOutline(donor);
+      const indexes =
+        options?.pageIndexes ??
+        Array.from({ length: donor.countPages() }, (_, i) => i);
+      if (
+        !indexes.length ||
+        new Set(indexes).size !== indexes.length ||
+        indexes.some(
+          (i) => !Number.isInteger(i) || i < 0 || i >= donor.countPages(),
+        )
+      )
+        throw new Error("Invalid imported page selection.");
+      donor.beginOperation("Prepare selected source");
+      donorOperation = true;
+      preparedTrailer = await prepareImportSource(
+        donor,
+        indexes,
+        options?.signal,
+      );
       doc.beginOperation("Import page source");
       operation = true;
-      graft = doc.newGraftMap();
-      const trailer = donor.getTrailer();
-      importedTrailer = doc.newDictionary();
-      try {
-        for (const key of ["Root", "Info", "ID"]) {
-          const value = trailer.get(key);
+      graft = doc.newGraftMap({
+        copyPages: true,
+        selectedPageNumbers: indexes.map((index) => {
+          const page = donor.findPage(index);
           try {
-            if (!value.isNull()) {
-              const copied = graft.graftObject(value);
-              try {
-                importedTrailer.put(key, copied);
-              } finally {
-                copied.destroy();
-              }
-            }
+            return page.asIndirect();
           } finally {
-            value.destroy();
+            page.destroy();
           }
-        }
-      } finally {
-        trailer.destroy();
-      }
+        }),
+      });
       const pages: number[] = [];
       const copiedPages: PDFObject[] = [];
       const firstPage = doc.countPages();
       try {
-        for (let index = 0; index < donor.countPages(); index++) {
-          const original = donor.findPage(index);
+        for (let index = 0; index < indexes.length; index++) {
+          if (index % 32 === 0) await yieldPdfTask();
+          options?.signal?.throwIfAborted();
+          const original = donor.findPage(indexes[index]);
           const copied = graft.graftObject(original);
           try {
             // The batch materializes inherited attributes before reparenting.
@@ -126,6 +151,7 @@ export class DocumentSession {
       } finally {
         for (const page of copiedPages) page.destroy();
       }
+      importedTrailer = graft.graftObject(preparedTrailer);
       const refs = graft.getReferences(donor);
       doc.endOperation();
       operation = false;
@@ -144,8 +170,10 @@ export class DocumentSession {
     } finally {
       if (operation) doc.abandonOperation();
       importedTrailer?.destroy();
+      preparedTrailer?.destroy();
       graft?.destroy();
-      donor.destroy();
+      if (donorOperation) donor.abandonOperation();
+      if (ownsDonor) donor.destroy();
       this.nativeDocuments--;
     }
   }
@@ -283,6 +311,7 @@ export class DocumentSession {
 
   async parse(
     input: {
+      pageIndexes?: number[];
       fontCatalog?: { families: string[]; aliases: Record<string, string> };
     },
     renderStamp: (
@@ -307,6 +336,7 @@ export class DocumentSession {
         workerService: services,
         signal,
         fontCatalog: input.fontCatalog,
+        pageIndexes: input.pageIndexes,
         collectFont: (family, bytes) => fonts.push({ family, bytes }),
       });
       return {
@@ -322,13 +352,24 @@ export class DocumentSession {
     });
   }
 
-  async export(request: ExportPdfRequest, signal?: AbortSignal) {
+  async export(
+    request: ExportPdfRequest,
+    signal?: AbortSignal,
+    output?: {
+      writeChunk?: (bytes: Uint8Array) => void | Promise<void>;
+      writeBlob?: (chunk: Blob) => void;
+      onSavedDocument?: (document: EditingDocument) => Promise<void>;
+    },
+  ) {
     for (const [id, source] of Object.entries(
       request.options?.pageStructure?.sources ?? {},
     )) {
       signal?.throwIfAborted();
       if (id !== this.primaryId)
-        await this.addSource(id, source.bytes, source.password ?? undefined);
+        await this.addSource(id, source.bytes, source.password ?? undefined, {
+          pageIndexes: source.pageIndexes,
+          signal,
+        });
     }
     const { exportPDF } = await import("../documentPipeline");
     return this.transaction(this.primaryId, async (view) => {
@@ -342,6 +383,8 @@ export class DocumentSession {
           request.customFont,
           {
             ...request.options,
+            ...output,
+            signal,
             editingDocument: view,
             resolveSource: async (id) => {
               if (id === this.primaryId) return view;

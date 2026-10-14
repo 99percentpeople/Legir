@@ -81,6 +81,7 @@ import { documentOwners as byteOwners } from "./engine/documentOwners";
 export { getPdfWorkerForBytes } from "./engine/documentOwners";
 
 class PDFWorkerService {
+  readonly supportsImportPreview = true;
   private ownedBytes = new Set<Uint8Array>();
   private loadedSourceIds = new Set<string>();
   private worker: Worker | null = null;
@@ -156,6 +157,7 @@ class PDFWorkerService {
     const docId = routed.docId;
     if (!docId || docId === this.defaultDocId || options.docId !== undefined)
       return routed;
+    if (this.loadedSourceIds.has(docId)) return routed;
     let pending = this.sourceLoads.get(docId);
     if (!pending) {
       const source = this.pageSources[docId];
@@ -174,6 +176,7 @@ class PDFWorkerService {
         const loaded = await this.loadDocument(bytes, {
           docId,
           password: source?.password ?? undefined,
+          pageIndexes: source?.pageIndexes,
           signal: this.lifetime.signal,
         });
         if (!this.retainedSourceIds.has(docId)) this.unloadDocument(docId);
@@ -410,6 +413,8 @@ class PDFWorkerService {
     data: Uint8Array,
     options?: {
       docId?: string;
+      preview?: boolean;
+      pageIndexes?: number[];
       signal?: AbortSignal;
       password?: string;
       onProgress?: (payload: { loaded: number; total?: number }) => void;
@@ -460,7 +465,11 @@ class PDFWorkerService {
         this.pendingRequests.set(id, {
           resolve: (msg: WorkerSuccessResponse<"load">) => {
             if (signal) signal.removeEventListener("abort", onAbort);
-            if (msg.payload !== false && docId !== this.defaultDocId)
+            if (
+              msg.payload !== false &&
+              docId !== this.defaultDocId &&
+              !options?.preview
+            )
               this.loadedSourceIds.add(docId);
             if (docId === this.defaultDocId && msg.payload !== false) {
               this.loadedSourceIds.clear();
@@ -483,6 +492,8 @@ class PDFWorkerService {
 
         const message: WorkerRequest = {
           type: "load",
+          preview: options?.preview,
+          pageIndexes: options?.pageIndexes,
           id,
           docId,
           data,
@@ -507,7 +518,9 @@ class PDFWorkerService {
     const worker = this.worker;
     if (!worker) return Promise.reject(new Error("Worker not initialized"));
     const request =
-      type === "exportDocument" ? (input as ExportPdfRequest) : undefined;
+      type === "exportDocument" || type === "exportDocumentBlob"
+        ? (input as ExportPdfRequest)
+        : undefined;
     const structure = request?.options?.pageStructure;
     const payload = structure
       ? {
@@ -539,6 +552,10 @@ class PDFWorkerService {
       this.pendingRequests.set(id, {
         resolve: (message) => {
           signal?.removeEventListener("abort", abort);
+          if (type === "commitImport")
+            this.loadedSourceIds.add(
+              (input as DocumentCommands["commitImport"]["input"]).docId,
+            );
           if (structure)
             for (const id of Object.keys(structure.sources))
               this.loadedSourceIds.add(id);

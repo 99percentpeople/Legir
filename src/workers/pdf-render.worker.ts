@@ -75,6 +75,10 @@ type DocState = {
   pageCache: NativePageCache;
 };
 const docs = new Map<string, DocState>();
+// An import donor lives only while the selection dialog is open. It shares the
+// owner's worker/WASM runtime and is destroyed after grafting or cancellation.
+const importPreviews = new Map<string, DocumentSession>();
+const sessionFor = (docId: string) => importPreviews.get(docId) ?? session!;
 const getDocId = (docId?: string) => docId || "default";
 const getDocState = (docId: string): DocState => {
   let state = docs.get(docId);
@@ -84,7 +88,7 @@ const getDocState = (docId: string): DocState => {
       loading: null,
       generation: 0,
       pageCache: new NativePageCache((index) =>
-        session!.loadPage(docId, index),
+        sessionFor(docId).loadPage(docId, index),
       ),
     };
     docs.set(docId, state);
@@ -300,8 +304,8 @@ const scheduleNext = () => {
   port.postMessage(null);
 };
 
-const disposeState = (state: DocState) => {
-  scanRenderer?.clear();
+const disposeState = (state: DocState, clearScan = true) => {
+  if (clearScan) scanRenderer?.clear();
   state.pageCache.clear();
   state.pdfDoc = null;
 };
@@ -311,6 +315,7 @@ const loadDocument = async (
   bytes: Uint8Array,
   password?: string,
   progressId?: string,
+  options?: { preview?: boolean; pageIndexes?: number[]; signal?: AbortSignal },
 ) => {
   const state = getDocState(docId);
   const previous = state.loading;
@@ -320,15 +325,25 @@ const loadDocument = async (
     const pdfium = await getPDFium();
     scanRenderer ??= createScanRenderer(pdfium);
     if (state.generation !== generation || docs.get(docId) !== state) return;
-    disposeState(state);
+    disposeState(state, !options?.preview);
+    if (options?.preview && session && docId !== session.primaryId) {
+      importPreviews.get(docId)?.dispose();
+      importPreviews.delete(docId);
+      const donor = new DocumentSession(pdfium, bytes, password, docId);
+      importPreviews.set(docId, donor);
+      state.pdfDoc = donor.document;
+      return;
+    }
     if (!session || docId === session.primaryId) {
       for (const current of docs.values()) disposeState(current);
       session?.dispose();
+      for (const donor of importPreviews.values()) donor.dispose();
+      importPreviews.clear();
       session = null;
       docs.clear();
       docs.set(docId, state);
       session = new DocumentSession(pdfium, bytes, password, docId);
-    } else await session.addSource(docId, bytes, password);
+    } else await session.addSource(docId, bytes, password, options);
     state.pdfDoc = session.document;
     if (progressId)
       postProgress(progressId, {
@@ -350,11 +365,19 @@ const disposeDocument = async (docId: string) => {
   if (!state) return;
   docs.delete(docId);
   await state.loading?.catch(() => {});
-  disposeState(state);
+  disposeState(state, !importPreviews.has(docId));
+  const donor = importPreviews.get(docId);
+  if (donor) {
+    donor.dispose();
+    importPreviews.delete(docId);
+    return;
+  }
   if (session?.primaryId === docId) {
     for (const current of docs.values()) disposeState(current);
     docs.clear();
     session.dispose();
+    for (const donor of importPreviews.values()) donor.dispose();
+    importPreviews.clear();
     session = null;
   } else if (session) {
     for (const current of docs.values()) {
@@ -421,14 +444,18 @@ const getOutlineForDoc = (params: WorkerRequest) =>
   readFromDocument(
     params,
     () =>
-      session!.getSource(getDocId("docId" in params ? params.docId : undefined))
+      sessionFor(
+        getDocId("docId" in params ? params.docId : undefined),
+      ).getSource(getDocId("docId" in params ? params.docId : undefined))
         .outline,
   );
 const getPermissionsForDoc = (params: WorkerRequest) =>
   readFromDocument(
     params,
     () =>
-      session!.getSource(getDocId("docId" in params ? params.docId : undefined))
+      sessionFor(
+        getDocId("docId" in params ? params.docId : undefined),
+      ).getSource(getDocId("docId" in params ? params.docId : undefined))
         .permissions,
   );
 const resolveDestForDoc = (
@@ -520,6 +547,7 @@ const renderToImage = async (
   try {
     await ensureDocumentLoaded(docId, params.isNewDoc ? params : undefined);
     const pdfium = await getPDFium();
+    const currentSession = sessionFor(docId);
     task.throwIfCancelled();
     const cached = getPageForDoc(docId, params.pageIndex);
     const base = getNativePageViewport(cached.page);
@@ -535,7 +563,7 @@ const renderToImage = async (
     const keepAnnotations = content
       ? new Set(
           [...getThumbnailSourceAnnotations(content)].map(
-            (ref) => session!.getSource(docId).refs?.get(ref) ?? ref,
+            (ref) => currentSession.getSource(docId).refs?.get(ref) ?? ref,
           ),
         )
       : undefined;
@@ -600,15 +628,15 @@ const renderToImage = async (
     if (content) {
       const { drawThumbnailOverlay } =
         await import("@/services/pdfService/lib/thumbnailOverlay");
-      await session!.transaction(
-        session!.primaryId,
+      await currentSession.transaction(
+        currentSession.primaryId,
         async (view) => {
           const index = await drawThumbnailOverlay(view, content);
           task.throwIfCancelled();
           if (index === null) return;
           await getEditingView(view)!.flush();
-          session!.document.setPageTreeCache(false);
-          const page = session!.document.loadPage(index);
+          currentSession.document.setPageTreeCache(false);
+          const page = currentSession.document.loadPage(index);
           const overlayCanvas = new OffscreenCanvas(width, height);
           try {
             drawPageToCanvas(
@@ -692,7 +720,20 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           postSuccess(rid, false);
         }
         cancelActiveTasksForDoc(resolvedDocId);
-        await loadDocument(resolvedDocId, data.data, data.password, data.id);
+        const controller = new AbortController();
+        const task = registerCancellableTask(id, resolvedDocId, () =>
+          controller.abort(),
+        );
+        try {
+          await loadDocument(resolvedDocId, data.data, data.password, data.id, {
+            preview: data.preview,
+            pageIndexes: data.pageIndexes,
+            signal: controller.signal,
+          });
+          task.throwIfCancelled();
+        } finally {
+          task.cleanup();
+        }
         result = { payload: true };
         break;
       }
@@ -836,6 +877,32 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
         result = { payload: true };
         break;
       }
+      case "commitImport": {
+        const donor = importPreviews.get(data.docId);
+        if (!session || !donor)
+          throw new Error("Import preview is no longer available.");
+        const controller = new AbortController();
+        const task = registerCancellableTask(id, data.docId, () =>
+          controller.abort(),
+        );
+        const state = getDocState(data.docId);
+        state.pageCache.clear();
+        try {
+          await session.addSource(data.docId, donor.document, undefined, {
+            pageIndexes: data.pageIndexes,
+            signal: controller.signal,
+            sourceInfo: donor.getSource(),
+          });
+          task.throwIfCancelled();
+          donor.dispose();
+          importPreviews.delete(data.docId);
+          state.pdfDoc = session.document;
+          result = { payload: true };
+        } finally {
+          task.cleanup();
+        }
+        break;
+      }
       case "contentOperation": {
         await ensureDocumentLoaded("default");
         try {
@@ -852,28 +919,33 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
       case "inspectDocument":
       case "parseDocument":
       case "exportDocument":
+      case "exportDocumentBlob":
       case "documentStats": {
-        await ensureDocumentLoaded("default");
+        const documentId = "docId" in data ? getDocId(data.docId) : "default";
+        await ensureDocumentLoaded(documentId);
+        const currentSession = sessionFor(documentId);
         const controller = new AbortController();
-        const task = registerCancellableTask(id, "default", () =>
+        const task = registerCancellableTask(id, documentId, () =>
           controller.abort(),
         );
         try {
           if (data.type === "inspectDocument")
-            result = { payload: await session!.inspect() };
+            result = { payload: await currentSession.inspect() };
           else if (data.type === "documentStats")
             result = {
               payload: {
                 ...session!.stats(),
+                nativeDocuments:
+                  session!.stats().nativeDocuments + importPreviews.size,
                 scanCanvas: scanRenderer?.stats(),
               },
             };
           else if (data.type === "parseDocument") {
-            const payload = await session!.parse(
+            const payload = await currentSession.parse(
               data,
               async (index) => {
                 const pdfium = await getPDFium();
-                const page = session!.document.loadPage(index);
+                const page = currentSession.document.loadPage(index);
                 try {
                   const viewport = getNativePageViewport(page, 2);
                   const width = Math.max(1, Math.floor(viewport.width)),
@@ -907,10 +979,71 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
               ),
             };
           } else {
-            const payload = await session!.export(data, controller.signal);
+            const parts: Blob[] = [];
+            let preview: { bytes: Uint8Array; mimeType: string } | undefined;
+            const blobOutput = data.type === "exportDocumentBlob";
+            const payload = await session!.export(
+              data,
+              controller.signal,
+              blobOutput
+                ? {
+                    writeBlob: (blob) => {
+                      parts.push(blob);
+                    },
+                    onSavedDocument: async () => {
+                      if (
+                        !data.options?.includePreview ||
+                        !session!.document.countPages()
+                      )
+                        return;
+                      controller.signal.throwIfAborted();
+                      const page = session!.document.loadPage(0);
+                      try {
+                        const base = getNativePageViewport(page, 1);
+                        const viewport = getNativePageViewport(
+                          page,
+                          240 / base.width,
+                        );
+                        const width = Math.max(1, Math.floor(viewport.width));
+                        const height = Math.max(1, Math.floor(viewport.height));
+                        const canvas = new OffscreenCanvas(width, height);
+                        await drawPageToCanvasCooperatively(
+                          page,
+                          viewport,
+                          [0, 0, width, height],
+                          canvas.getContext("2d")!,
+                          { contents: true, annotations: true },
+                          () => controller.signal.throwIfAborted(),
+                          yieldRenderTask,
+                        );
+                        const image = await canvas.convertToBlob({
+                          type: "image/jpeg",
+                          quality: 0.8,
+                        });
+                        preview = {
+                          bytes: new Uint8Array(await image.arrayBuffer()),
+                          mimeType: image.type,
+                        };
+                      } catch {
+                        /* A cover failure must not fail a valid PDF export. */
+                      } finally {
+                        disposeNativePage(page);
+                      }
+                      controller.signal.throwIfAborted();
+                    },
+                  }
+                : undefined,
+            );
             for (const sourceId of session!.sources.keys())
               getDocState(sourceId).pdfDoc = session!.document;
-            result = { payload, transfer: [payload.buffer as ArrayBuffer] };
+            result = blobOutput
+              ? {
+                  payload: {
+                    blob: new Blob(parts, { type: "application/pdf" }),
+                    preview,
+                  },
+                }
+              : { payload, transfer: [payload.buffer as ArrayBuffer] };
           }
           task.throwIfCancelled();
         } finally {
@@ -918,8 +1051,10 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           // Read-only hydration retains the first page's parsed/decoded data.
           // A journaled write may affect shared resources: invalidate safely.
           if (
-            (data.type === "exportDocument" || data.type === "parseDocument") &&
-            session!.lastTransactionAffectsRendering
+            (data.type === "exportDocument" ||
+              data.type === "exportDocumentBlob" ||
+              data.type === "parseDocument") &&
+            currentSession.lastTransactionAffectsRendering
           ) {
             scanRenderer?.clear();
             for (const state of docs.values()) {
@@ -997,10 +1132,12 @@ self.onmessage = async (e: MessageEvent<WorkerRequest | FontHostResponse>) => {
       return;
 
     case "addBlankSource":
+    case "commitImport":
     case "contentOperation":
     case "inspectDocument":
     case "parseDocument":
     case "exportDocument":
+    case "exportDocumentBlob":
     case "documentStats":
     case "getTextContent":
     case "getOutline":

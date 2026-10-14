@@ -101,6 +101,18 @@ its own assets. A host should serialize document jobs in one worker.
   includes filtered stream sizes, limits the contribution from unfiltered
   streams to 64 MiB, and is capped at 512 MiB in total. It grows normally if
   required; these bounds do not limit the size of a saved PDF.
+- `startSave(options)` creates a cooperative full-save task. Call `next()` to
+  obtain an owned JS byte chunk and `done`, then yield to the event loop and
+  await the destination before continuing. For Blob destinations, `nextBlob()`
+  copies the current native span directly into an immutable Blob, without an
+  intermediate JS byte array. Both methods consume the chunk and reuse the native
+  working buffer. Always `destroy()` the task on failure or cancellation. The
+  document owns outstanding tasks and closes them on destroy. Do not mutate/render
+  the document during a save. Slices aim for 4 MiB or 8 ms at indirect-object
+  boundaries; one large stream, graph discovery, encryption setup or the final
+  cross-reference table can exceed that limit. This is a bounded working-buffer
+  improvement, not incremental PDF revision saving. `saveToBuffer()` remains
+  synchronous.
 
 Rendering, native annotation appearances, widget dictionaries, outlines,
 destinations and password verification are included. This is an engine API,

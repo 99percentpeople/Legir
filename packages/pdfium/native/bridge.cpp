@@ -313,6 +313,7 @@ struct GraftMap {
   bool copy_pages;
   bool failed = false;
   std::map<uint32_t, uint32_t> refs;
+  std::optional<std::set<uint32_t>> selected_pages;
   std::vector<std::pair<uint32_t, uint32_t>> pending;
   std::map<const CPDF_Object *, std::pair<Obj, Obj>> objects;
 
@@ -326,6 +327,12 @@ struct GraftMap {
       return core->New<CPDF_Null>();
     if (auto ref = value->AsReference()) {
       const auto number = ref->GetRefObjNum();
+      if (selected_pages && !selected_pages->contains(number)) {
+        const auto object = source->core()->GetOrParseIndirectObject(number);
+        const auto dict = ToDictionary(object);
+        if (dict && dict->GetNameFor("Type") == "Page")
+          return core->New<CPDF_Null>();
+      }
       auto [entry, fresh] = refs.try_emplace(number, 0);
       if (fresh) {
         entry->second = core->AddIndirectObject(core->New<CPDF_Null>());
@@ -658,6 +665,10 @@ LPDF_NewGraftMap(Document *target, Document *source, int copy_pages) {
   return new GraftMap{target, source, copy_pages != 0};
 }
 EMSCRIPTEN_KEEPALIVE void LPDF_DropGraftMap(GraftMap *map) { delete map; }
+EMSCRIPTEN_KEEPALIVE void LPDF_GraftSelectedPages(GraftMap *map,
+                                                const uint32_t *pages, size_t count) {
+  map->selected_pages.emplace(pages, pages + count);
+}
 EMSCRIPTEN_KEEPALIVE CPDF_Object *LPDF_GraftObject(GraftMap *map,
                                                    CPDF_Object *object) {
   auto output = map->copy(pdfium::WrapRetain(object));
@@ -913,32 +924,40 @@ EMSCRIPTEN_KEEPALIVE Blob *LPDF_EncodePng(Blob *pixels, uint32_t width,
   chunk("IEND", {});
   return result.release();
 }
-EMSCRIPTEN_KEEPALIVE Blob *LPDF_Save(Document *doc, const char *user,
-                                     const char *owner, int permissions,
-                                     int encrypt) {
+struct SaveJob {
+  RetainPtr<SaveStream> stream = pdfium::MakeRetain<SaveStream>();
+  std::unique_ptr<CPDF_Creator> creator;
+  int version = 17;
+  bool encrypt = false;
+  bool started = false;
+  int status = 2;
+  double deadline = 0;
+};
+static std::unique_ptr<SaveJob> create_save(Document *doc, const char *user,
+                                          const char *owner, int permissions,
+                                          int encrypt, bool progressive = true) {
   doc->sync();
-  auto stream = pdfium::MakeRetain<SaveStream>();
+  auto job = std::make_unique<SaveJob>();
+  job->version = LPDF_Version(doc);
+  job->encrypt = encrypt;
+  job->creator = std::make_unique<CPDF_Creator>(doc->core(), job->stream);
+  auto &creator = *job->creator;
   auto objects = reachable_objects(doc);
-  // The writer retains already-filtered stream bytes. Include their full size
-  // so large PDFs do not repeatedly reallocate/copy the output buffer. Streams
-  // without a filter may shrink dramatically, so bound their contribution.
-  uint64_t reserve = 4096 + objects.size() * uint64_t{512};
-  uint64_t unfiltered = 0;
-  for (auto number : objects) {
-    auto object = doc->core()->GetOrParseIndirectObject(number);
-    if (auto data = ToStream(object)) {
-      if (data->HasFilter())
-        reserve += data->GetRawSize();
-      else
-        unfiltered += data->GetRawSize();
+  if (!progressive) {
+    uint64_t reserve = 4096 + objects.size() * uint64_t{512};
+    uint64_t unfiltered = 0;
+    for (auto number : objects) {
+      auto object = doc->core()->GetOrParseIndirectObject(number);
+      if (auto stream = ToStream(object)) {
+        if (stream->HasFilter()) reserve += stream->GetRawSize();
+        else unfiltered += stream->GetRawSize();
+      }
     }
+    reserve += std::min<uint64_t>(unfiltered, 64 * 1024 * 1024);
+    job->stream->data.reserve(std::min<uint64_t>(reserve, 512 * 1024 * 1024));
   }
-  reserve += std::min<uint64_t>(unfiltered, 64 * 1024 * 1024);
-  stream->data.reserve(std::min<uint64_t>(reserve, 512 * 1024 * 1024));
-  {
-    CPDF_Creator creator(doc->core(), stream);
-    creator.SetObjectsForEditing(std::move(objects));
-    creator.SetTrailerForEditing(doc->trailer);
+  creator.SetObjectsForEditing(std::move(objects));
+  creator.SetTrailerForEditing(doc->trailer);
     if (encrypt) {
       auto dict = doc->core()->New<CPDF_Dictionary>();
       dict->SetNewFor<CPDF_Name>("Filter", "Standard");
@@ -959,11 +978,54 @@ EMSCRIPTEN_KEEPALIVE Blob *LPDF_Save(Document *doc, const char *user,
                                               ByteString(owner));
       creator.SetEncryptionForEditing(dict, security);
     }
-    auto flags = encrypt ? CPDF_Creator::kNone : CPDF_Creator::kRemoveSecurity;
-    if (!creator.Create(flags, LPDF_Version(doc)))
-      return nullptr;
-  } // Destroy the buffered archive to flush its final output block.
-  return new Blob{std::move(stream->data)};
+  return job;
+}
+EMSCRIPTEN_KEEPALIVE SaveJob *LPDF_SaveStart(Document *doc, const char *user,
+                                            const char *owner, int permissions,
+                                            int encrypt) {
+  auto job = create_save(doc, user, owner, permissions, encrypt);
+  job->stream->data.reserve(4 * 1024 * 1024 + 4096);
+  auto raw = job.get();
+  job->creator->SetPauseForEditing([raw]() {
+    return raw->stream->data.size() >= 4 * 1024 * 1024 ||
+           emscripten_get_now() >= raw->deadline;
+  });
+  return job.release();
+}
+EMSCRIPTEN_KEEPALIVE int LPDF_SaveContinue(SaveJob *job) {
+  if (job->status != 2) return job->status;
+  job->deadline = emscripten_get_now() + 8;
+  if (!job->started) {
+    job->started = true;
+    const auto flags = job->encrypt ? CPDF_Creator::kNone : CPDF_Creator::kRemoveSecurity;
+    job->status = !job->creator->Create(flags, job->version) ? 0 :
+                  job->creator->IsPausedForEditing() ? 2 : 1;
+  } else {
+    job->status = job->creator->ContinueForEditing();
+  }
+  if (job->status != 2) job->creator.reset(); // Flush the final archive block.
+  return job->status;
+}
+EMSCRIPTEN_KEEPALIVE const uint8_t *LPDF_SaveChunkData(SaveJob *job) {
+  return job->stream->data.data();
+}
+EMSCRIPTEN_KEEPALIVE size_t LPDF_SaveChunkSize(SaveJob *job) {
+  return job->stream->data.size();
+}
+EMSCRIPTEN_KEEPALIVE void LPDF_SaveConsumeChunk(SaveJob *job) {
+  // Retain one working allocation across slices, avoiding vector growth and
+  // repeated large allocations/copies for every output chunk.
+  job->stream->data.clear();
+}
+EMSCRIPTEN_KEEPALIVE void LPDF_SaveDrop(SaveJob *job) { delete job; }
+EMSCRIPTEN_KEEPALIVE Blob *LPDF_Save(Document *doc, const char *user,
+                                     const char *owner, int permissions,
+                                     int encrypt) {
+  auto job = create_save(doc, user, owner, permissions, encrypt, false);
+  const auto flags = encrypt ? CPDF_Creator::kNone : CPDF_Creator::kRemoveSecurity;
+  if (!job->creator->Create(flags, job->version)) return nullptr;
+  job->creator.reset();
+  return new Blob{std::move(job->stream->data)};
 }
 static std::unique_ptr<RenderJob>
 create_render(Document *doc, FPDF_PAGE handle, int width, int height,

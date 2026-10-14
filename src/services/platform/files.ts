@@ -122,17 +122,55 @@ export const pickSaveTarget = async (options: {
 
 export const writeToSaveTarget = async (
   target: SaveTarget,
-  bytes: Uint8Array,
+  bytes: Uint8Array | Blob,
 ) => {
   if (target.kind === "tauri") {
-    const { writeFile } = await import("@tauri-apps/plugin-fs");
-    await writeFile(target.path, bytes);
+    const fs = await import("@tauri-apps/plugin-fs");
+    if (bytes instanceof Uint8Array) await fs.writeFile(target.path, bytes);
+    else {
+      const file = await fs
+        .open(target.path, {
+          write: true,
+          create: true,
+          truncate: true,
+        })
+        .catch(() => null);
+      if (!file) {
+        // Restored/CLI targets may have the existing write-file capability but
+        // no open scope. Keep that path working without widening permissions.
+        await fs.writeFile(
+          target.path,
+          new Uint8Array(await bytes.arrayBuffer()),
+        );
+        return;
+      }
+      try {
+        for (let offset = 0; offset < bytes.size; offset += 4 * 1024 * 1024) {
+          const chunk = new Uint8Array(
+            await bytes.slice(offset, offset + 4 * 1024 * 1024).arrayBuffer(),
+          );
+          let written = 0;
+          while (written < chunk.length) {
+            const count = await file.write(chunk.subarray(written));
+            if (count <= 0) throw new Error("PDF file write made no progress.");
+            written += count;
+          }
+        }
+      } finally {
+        await file.close();
+      }
+    }
     return;
   }
 
   const writable = await target.handle.createWritable();
-  await writable.write(toByteChunk(bytes));
-  await writable.close();
+  try {
+    await writable.write(bytes instanceof Blob ? bytes : toByteChunk(bytes));
+    await writable.close();
+  } catch (error) {
+    await writable.abort().catch(() => {});
+    throw error;
+  }
 };
 
 export const openFileFromPath = async (
@@ -289,7 +327,7 @@ export const saveFileAs = async (options: {
 };
 
 export const savePdfBytes = async (options: {
-  bytes: Uint8Array;
+  bytes: Uint8Array | Blob;
   filename: string;
   existingTarget?: SaveTarget | null;
 }): Promise<SavePdfResult> => {
@@ -302,9 +340,12 @@ export const savePdfBytes = async (options: {
     return { ok: false, reason: "unsupported" };
   }
 
-  const blob = new Blob([toByteChunk(options.bytes)], {
-    type: "application/pdf",
-  });
+  const blob =
+    options.bytes instanceof Blob
+      ? options.bytes
+      : new Blob([toByteChunk(options.bytes)], {
+          type: "application/pdf",
+        });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

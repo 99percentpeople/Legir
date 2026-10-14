@@ -136,12 +136,17 @@ def patch(source: Path):
         ("    const uint32_t objnum = pair.first;", "    const uint32_t objnum = pair.first;\n    if (objects_for_editing_ && !objects_for_editing_->contains(objnum)) continue;"),
     ]
     for old, new in updates:
+        if old == "      GetObjectsWithReferences(document_);" and "fallback_refs" in text:
+            continue
         if new not in text:
             if text.count(old) != 1:
                 raise RuntimeError("PDFium reachable-object patch does not match pinned source")
             text = text.replace(old, new)
     if text != creator.read_text():
         creator.write_text(text)
+
+    from patch_progressive_save import patch_progressive_save
+    patch_progressive_save(source)
 
     parser = source / "core/fpdfapi/page/cpdf_streamcontentparser.cpp"
     text = parser.read_text()

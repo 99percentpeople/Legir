@@ -41,6 +41,9 @@ export interface GraftOptions {
   copyWithinDocument?: boolean;
   /** Materialize inherited page attributes and omit page Parent references. */
   copyPages?: boolean;
+  /** Source page object numbers allowed in this copy group. Other page
+   * references become null instead of pulling in an unselected page graph. */
+  selectedPageNumbers?: number[];
 }
 export enum ObjectType {
   Boolean = 1,

@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { LanguageProvider } from "@/components/language-provider";
 import { usePageImport } from "@/components/page-editor/usePageImport";
 import type { LoadedPdfDocument } from "@/services/pdfService";
+import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
+import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
 
 const mocks = vi.hoisted(() => ({
   start: vi.fn(),
@@ -37,7 +39,7 @@ function deferred<T>() {
 }
 
 function session() {
-  const readable = deferred<void>();
+  const readable = deferred<LoadedPdfDocument | void>();
   const hydrated = deferred<LoadedPdfDocument>();
   const worker = { destroy: vi.fn() };
   const document = {
@@ -60,11 +62,13 @@ let root: Root;
 let importer: ReturnType<typeof usePageImport>;
 const onLoaded = vi.fn();
 const onStart = vi.fn();
+let owner: PDFWorkerService | undefined;
 function Harness() {
-  importer = usePageImport(onLoaded, onStart);
+  importer = usePageImport(onLoaded, onStart, owner);
   return null;
 }
 beforeEach(async () => {
+  owner = undefined;
   vi.useFakeTimers();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   mocks.start.mockReset();
@@ -80,6 +84,55 @@ beforeEach(async () => {
       </LanguageProvider>,
     ),
   );
+});
+
+it("shows native preview before hydration and commits the selection through the existing owner", async () => {
+  const task = session();
+  const nativeOwner = {
+    getPermissions: vi.fn().mockResolvedValue(UNRESTRICTED_PDF_PERMISSIONS),
+    renderPageImage: vi.fn(),
+    unloadDocument: vi.fn(),
+    destroy: vi.fn(),
+    documentCommand: vi.fn().mockResolvedValue(true),
+  };
+  owner = nativeOwner as unknown as PDFWorkerService;
+  await act(async () =>
+    root.render(
+      <LanguageProvider>
+        <Harness />
+      </LanguageProvider>,
+    ),
+  );
+  const { completion } = await begin();
+  await act(async () => {
+    task.readable.resolve(task.document);
+    await completion;
+  });
+  expect(mocks.worker).not.toHaveBeenCalled();
+  expect(task.open.hydrate).not.toHaveBeenCalled();
+  expect(onLoaded).toHaveBeenCalledOnce();
+  const sourceId = importer.imported!.sourceId;
+  let committed!: Promise<LoadedPdfDocument>;
+  await act(async () => {
+    committed = importer.commit([1, 9]);
+  });
+  expect(task.open.hydrate).toHaveBeenCalledWith([1, 9]);
+  await act(async () => {
+    task.hydrated.resolve(task.document);
+    await committed;
+  });
+  expect(nativeOwner.documentCommand).toHaveBeenCalledWith(
+    "commitImport",
+    { docId: sourceId, pageIndexes: [1, 9] },
+    expect.any(AbortSignal),
+  );
+  await act(async () => {
+    importer.release();
+    importer.clear();
+  });
+  expect(nativeOwner.destroy).not.toHaveBeenCalled();
+  expect(nativeOwner.unloadDocument).not.toHaveBeenCalled();
+  expect(task.document.dispose).not.toHaveBeenCalled();
 });
 afterEach(async () => {
   await act(async () => root.unmount());

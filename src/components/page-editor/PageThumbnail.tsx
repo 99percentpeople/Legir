@@ -20,7 +20,7 @@ export const PageThumbnail = React.memo(function PageThumbnail({
   unframed = false,
 }: {
   page: PageData;
-  worker: PDFWorkerService | null;
+  worker: Pick<PDFWorkerService, "renderPageImage"> | null;
   image?: string;
   onImage?: (url: string) => boolean;
   content?: ThumbnailContent;

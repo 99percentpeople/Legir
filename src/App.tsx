@@ -1709,13 +1709,14 @@ const App: React.FC = () => {
       options?: {
         flattenFormFields?: boolean;
         preserveOwnerRestrictions?: boolean;
+        includePreview?: boolean;
       },
     ) => {
       if (!snapshot.pdfBytes) return null;
       if (snapshot.documentLoadState !== "ready") return null;
 
-      const { exportPDF } = await import("./services/pdfService");
-      return await exportPDF(
+      const { exportPDFBlob } = await import("./services/pdfService");
+      return await exportPDFBlob(
         snapshot.pdfBytes,
         snapshot.fields,
         snapshot.metadata,
@@ -1733,6 +1734,7 @@ const App: React.FC = () => {
           imageCompression: snapshot.options.imageCompression,
           preservedSourceAnnotations: snapshot.preservedSourceAnnotations,
           flattenFormFields: options?.flattenFormFields,
+          includePreview: options?.includePreview,
           syncFormFields: true,
           sourceDocumentPermissions:
             snapshot.sourceDocumentPermissions ?? snapshot.documentPermissions,
@@ -1751,7 +1753,7 @@ const App: React.FC = () => {
       store: EditorViewApi;
       snapshot: ReturnType<EditorViewApi["getState"]>;
       target: SaveTarget;
-      pdfBytes: Uint8Array;
+      pdfBytes: Blob;
       fallbackFilename?: string;
     }) => {
       const { target, pdfBytes } = options;
@@ -1843,7 +1845,9 @@ const App: React.FC = () => {
     return await initialSnapshot
       .withProcessing(t("app.generating"), async () => {
         const snapshot = store.getState();
-        const modifiedBytes = await generatePDF(snapshot);
+        const modifiedBytes = await generatePDF(snapshot, {
+          includePreview: true,
+        });
         if (!modifiedBytes) return false;
 
         await writeToSaveTarget(target, modifiedBytes);
@@ -1907,7 +1911,9 @@ const App: React.FC = () => {
     return await initialSnapshot
       .withProcessing(t("app.generating"), async () => {
         const snapshot = store.getState();
-        const modifiedBytes = await generatePDF(snapshot);
+        const modifiedBytes = await generatePDF(snapshot, {
+          includePreview: !!(preselectedTarget ?? snapshot.saveTarget),
+        });
         if (!modifiedBytes) return false;
 
         let result: Awaited<ReturnType<typeof savePdfBytes>>;
@@ -1967,9 +1973,7 @@ const App: React.FC = () => {
       });
       if (!modifiedBytes) return;
 
-      const blob = new Blob([new Uint8Array(modifiedBytes)], {
-        type: "application/pdf",
-      });
+      const blob = modifiedBytes;
       const url = URL.createObjectURL(blob);
 
       const iframe = document.createElement("iframe");

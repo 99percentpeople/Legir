@@ -2,6 +2,10 @@ import {
   createPdfWorkerService,
   getPdfWorkerForBytes,
 } from "./pdfService/pdfWorkerService";
+import {
+  exportPreviews,
+  type PdfFileData,
+} from "./pdfService/engine/exportPreviews";
 
 const bytesToDataUrl = async (bytes: Uint8Array, mimeType: string) => {
   const safeBytes = new Uint8Array(bytes);
@@ -17,16 +21,25 @@ const bytesToDataUrl = async (bytes: Uint8Array, mimeType: string) => {
 };
 
 export const renderPdfPreviewDataUrl = async (options: {
-  pdfBytes: Uint8Array;
+  pdfBytes: PdfFileData;
   targetWidth?: number;
   renderAnnotations?: boolean;
   signal?: AbortSignal;
 }) => {
-  const existing = getPdfWorkerForBytes(options.pdfBytes);
+  options.signal?.throwIfAborted();
+  if (exportPreviews.has(options.pdfBytes)) {
+    const preview = exportPreviews.get(options.pdfBytes);
+    return preview ? bytesToDataUrl(preview.bytes, preview.mimeType) : null;
+  }
+  const pdfBytes =
+    options.pdfBytes instanceof Blob
+      ? new Uint8Array(await options.pdfBytes.arrayBuffer())
+      : options.pdfBytes;
+  const existing = getPdfWorkerForBytes(pdfBytes);
   const worker = existing ?? createPdfWorkerService();
   try {
     if (!existing)
-      await worker.loadDocument(options.pdfBytes, { signal: options.signal });
+      await worker.loadDocument(pdfBytes, { signal: options.signal });
     const { bytes, mimeType } = await worker.renderPageImage({
       docId: "default",
       pageIndex: 0,

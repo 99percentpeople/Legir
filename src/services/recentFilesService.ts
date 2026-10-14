@@ -245,7 +245,7 @@ export class RecentFilesService {
   upsertWithBytesPreview(options: {
     path: string;
     filename: string;
-    pdfBytes: Uint8Array;
+    pdfBytes: Uint8Array | Blob;
     lastOpenedAt?: number;
     targetWidth?: number;
     renderAnnotations?: boolean;

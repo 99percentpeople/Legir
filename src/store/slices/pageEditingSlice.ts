@@ -22,6 +22,7 @@ import { cloneAnnotationReplies } from "@/lib/annotationReplies";
 import { revokeObjectUrlIfNeeded } from "../helpers";
 
 export type ImportedPages = {
+  sourceId?: string;
   source: PageSource;
   pages: PageData[];
   fields: FormField[];
@@ -147,7 +148,7 @@ export const createPageEditingSlice: EditorStoreSlice<
     source?: PageSource,
   ) => {
     const state = check();
-    const sourceId = source ? newId() : null;
+    const sourceId = source ? (payload.sourceId ?? newId()) : null;
     const copyGroup = newId();
     const selected = new Set(payload.indexes);
     const donorPages = identifyPages(payload.pages).filter((page) =>
@@ -165,7 +166,11 @@ export const createPageEditingSlice: EditorStoreSlice<
         ? undefined
         : {
             documentId: sourceId ?? page.source!.documentId,
-            pageIndex: sourceId ? page.pageIndex : page.source!.pageIndex,
+            pageIndex: sourceId
+              ? source?.pageIndexes
+                ? source.pageIndexes.indexOf(page.pageIndex)
+                : page.pageIndex
+              : page.source!.pageIndex,
             copyGroup: sourceId
               ? copyGroup
               : `${copyGroup}:${page.source?.copyGroup ?? "original"}`,

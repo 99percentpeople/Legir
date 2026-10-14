@@ -13,6 +13,7 @@ import type { FormField, Annotation, PDFMetadata } from "@/types";
 import { getPdfPermissionPolicy } from "@/lib/pdfPermissions";
 import { appEventBus } from "@/lib/eventBus";
 import { getSystemFontCatalog } from "@/lib/system-fonts";
+import { exportPreviews } from "./engine/exportPreviews";
 export type {
   LoadedPdfDocument,
   ReadablePdfDocument,
@@ -144,6 +145,8 @@ const loadPDFInternal = async (
     while (true) {
       try {
         await worker.loadDocument(bytes, {
+          docId: options?.importId,
+          preview: !!options?.importId,
           password,
           signal: options?.signal,
           onProgress: (p) => session.markProgress(p.loaded, p.total),
@@ -158,7 +161,7 @@ const loadPDFInternal = async (
     }
     const basic = await worker.documentCommand(
       "inspectDocument",
-      {},
+      { docId: options?.importId },
       options?.signal,
     );
     const readable: ReadablePdfDocument = {
@@ -177,7 +180,11 @@ const loadPDFInternal = async (
     options?.signal?.throwIfAborted();
     const details = await worker.documentCommand(
       "parseDocument",
-      { fontCatalog: await getSystemFontCatalog() },
+      {
+        docId: options?.importId,
+        pageIndexes: options?.getImportPageIndexes?.(),
+        fontCatalog: await getSystemFontCatalog(),
+      },
       options?.signal,
     );
     const { fonts, ...models } = details;
@@ -204,11 +211,14 @@ const loadPDFInternal = async (
 
 export const loadPDF = async (
   input: File | Uint8Array,
-  options?: Pick<LoadPDFInternalOptions, "password" | "workerService">,
+  options?: Pick<
+    LoadPDFInternalOptions,
+    "password" | "workerService" | "importId"
+  >,
 ) => loadPDFInternal(input, options);
 export type PdfOpenSession = {
   readable: Promise<ReadablePdfDocument>;
-  hydrate: () => Promise<LoadedPdfDocument>;
+  hydrate: (pageIndexes?: number[]) => Promise<LoadedPdfDocument>;
   retryHydration: () => Promise<LoadedPdfDocument>;
   abort: () => void;
   dispose: () => void;
@@ -216,9 +226,13 @@ export type PdfOpenSession = {
 
 export const startPdfOpenSession = (
   input: File | Uint8Array,
-  options?: Pick<LoadPDFInternalOptions, "password" | "workerService">,
+  options?: Pick<
+    LoadPDFInternalOptions,
+    "password" | "workerService" | "importId"
+  >,
 ): PdfOpenSession => {
   let hydrationReleased = false;
+  let selectedImportPages: number[] | undefined;
   let releaseHydration: (() => void) | null = null;
   let readableResolved = false;
   let readableDispose: (() => void) | null = null;
@@ -240,6 +254,7 @@ export const startPdfOpenSession = (
     const abortController = currentAbortController;
     return loadPDFInternal(input, {
       ...options,
+      getImportPageIndexes: () => selectedImportPages,
       signal: abortController.signal,
       waitForHydrationStart,
       onReadable: (document) => {
@@ -260,7 +275,17 @@ export const startPdfOpenSession = (
     if (!readableResolved) rejectReadable(error);
   });
 
-  const hydrate = () => {
+  const hydrate = (pageIndexes?: number[]) => {
+    const changed = pageIndexes?.join(",") !== selectedImportPages?.join(",");
+    selectedImportPages = pageIndexes;
+    if (hydrationReleased && changed) {
+      // A failed insert may be retried with a different selection. Reopening
+      // this transient donor is an error-recovery path, never a normal insert.
+      currentAbortController.abort();
+      readableDispose?.();
+      currentAbortController = new AbortController();
+      currentRun = run();
+    }
     if (!hydrationReleased) {
       hydrationReleased = true;
       releaseHydration?.();
@@ -283,6 +308,8 @@ export const startPdfOpenSession = (
     abort: () => currentAbortController.abort(),
     dispose: () => {
       currentAbortController.abort();
+      releaseHydration?.();
+      releaseHydration = null;
       readableDispose?.();
       readableDispose = null;
     },
@@ -295,7 +322,7 @@ export async function exportPDF(
   metadata?: PDFMetadata,
   annotations: Annotation[] = [],
   customFont?: { bytes?: Uint8Array; name?: string },
-  options?: ExportPdfOptions,
+  options?: ExportPdfOptions & { signal?: AbortSignal },
 ): Promise<Uint8Array> {
   if (isNode())
     return (await import("./documentPipeline")).exportPDF(
@@ -313,15 +340,75 @@ export async function exportPDF(
     if (owned)
       await worker.loadDocument(originalBytes, {
         password: options?.openPassword ?? undefined,
+        signal: options?.signal,
       });
     const request: ExportPdfRequest = {
       fields,
       metadata,
       annotations,
       customFont,
-      options: { ...options, permissionPolicy: getPdfPermissionPolicy() },
+      options: {
+        ...options,
+        signal: undefined,
+        permissionPolicy: getPdfPermissionPolicy(),
+      } as ExportPdfOptions,
     };
-    return await worker.documentCommand("exportDocument", request);
+    return await worker.documentCommand(
+      "exportDocument",
+      request,
+      options?.signal,
+    );
+  } finally {
+    if (owned) worker.destroy();
+  }
+}
+
+/** File/print output avoids a second file-sized JS array. Byte-array callers
+ * retain exportPDF; both use the same native writer and transaction. */
+export async function exportPDFBlob(
+  originalBytes: Uint8Array,
+  fields: FormField[],
+  metadata?: PDFMetadata,
+  annotations: Annotation[] = [],
+  customFont?: { bytes?: Uint8Array; name?: string },
+  options?: ExportPdfOptions & { signal?: AbortSignal },
+): Promise<Blob> {
+  const { signal, ...settings } = options ?? {};
+  if (isNode()) {
+    const parts: Blob[] = [];
+    await (
+      await import("./documentPipeline")
+    ).exportPDF(originalBytes, fields, metadata, annotations, customFont, {
+      ...settings,
+      signal,
+      writeBlob: (blob) => {
+        parts.push(blob);
+      },
+    });
+    return new Blob(parts, { type: "application/pdf" });
+  }
+  let worker = getPdfWorkerForBytes(originalBytes);
+  const owned = !worker;
+  worker ??= createPdfWorkerService();
+  try {
+    if (owned)
+      await worker.loadDocument(originalBytes, {
+        password: settings.openPassword ?? undefined,
+        signal,
+      });
+    const output = await worker.documentCommand(
+      "exportDocumentBlob",
+      {
+        fields,
+        metadata,
+        annotations,
+        customFont,
+        options: { ...settings, permissionPolicy: getPdfPermissionPolicy() },
+      },
+      signal,
+    );
+    exportPreviews.set(output.blob, output.preview ?? null);
+    return output.blob;
   } finally {
     if (owned) worker.destroy();
   }

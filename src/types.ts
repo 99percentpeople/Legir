@@ -285,6 +285,8 @@ export interface PageData {
 }
 
 export interface PageSource {
+  /** Original file indexes represented by this compact native source. */
+  pageIndexes?: number[];
   bytes: Uint8Array;
   password: string | null;
   filename: string;

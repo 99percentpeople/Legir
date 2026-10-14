@@ -70,7 +70,7 @@ const PageEditor = memo(function PageEditor({
     setError("");
     setDialog(null);
   }, []);
-  const importer = usePageImport(showImportDialog, startImport);
+  const importer = usePageImport(showImportDialog, startImport, workerService);
   const { imported, loading, fileInput, loadDropped, chooseFile } = importer;
   const initialPages = useRef(pages);
   const dropGeneration = useRef(0);
@@ -173,9 +173,9 @@ const PageEditor = memo(function PageEditor({
     [loadDropped, setDropPosition, t],
   );
   const run = useCallback(
-    (action: () => void) => {
+    async (action: () => void | Promise<void>) => {
       try {
-        action();
+        await action();
         setError("");
       } catch (e) {
         setError(e instanceof Error ? e.message : t("page_editor.failed"));
@@ -201,7 +201,8 @@ const PageEditor = memo(function PageEditor({
     [events, store],
   );
   const accept = () =>
-    run(() => {
+    run(async () => {
+      if (importer.loading) return;
       if (at === null) throw new Error(t("page_editor.invalid_range"));
       const state = store.getState();
       if (dialog === "blank") {
@@ -219,14 +220,17 @@ const PageEditor = memo(function PageEditor({
         parsed?.ok &&
         parsed.pageIndices.length
       ) {
+        const document = await importer.commit(parsed.pageIndices);
         state.insertPdfPages(
           {
-            ...imported.document,
+            ...document,
+            sourceId: imported.sourceId,
             indexes: parsed.pageIndices,
             source: {
               bytes: imported.document.pdfBytes,
               password: imported.document.openPassword ?? null,
               filename: imported.filename,
+              pageIndexes: imported.sourceId ? parsed.pageIndices : undefined,
             },
           },
           at,

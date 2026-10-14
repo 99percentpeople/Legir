@@ -3,7 +3,7 @@ import { Matrix } from "./matrix.js";
 import { loadRuntime } from "./runtime.js";
 import type { LoadOptions } from "./types.js";
 
-export { PDFDocument, PDFGraftMap } from "./document.js";
+export { PDFDocument, PDFGraftMap, PDFSaveTask } from "./document.js";
 export { PDFObject, decodeName } from "./object.js";
 export { PDFPage, PDFPixmap, PDFAnnotation, PDFRenderTask } from "./page.js";
 export { PDFBuffer } from "./runtime.js";

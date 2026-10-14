@@ -6,7 +6,12 @@ export type ExportPdfOptions = Omit<
   NonNullable<
     Parameters<(typeof import("../documentPipeline"))["exportPDF"]>[5]
   >,
-  "editingDocument" | "resolveSource"
+  | "editingDocument"
+  | "resolveSource"
+  | "signal"
+  | "writeChunk"
+  | "writeBlob"
+  | "onSavedDocument"
 >;
 export type ExportPdfRequest = {
   fields: FormField[];
@@ -27,21 +32,31 @@ export type DocumentCommands = {
     input: { docId: string; width: number; height: number };
     output: boolean;
   };
+  commitImport: {
+    input: { docId: string; pageIndexes: number[] };
+    output: boolean;
+  };
   contentOperation: {
     input: { request: PdfEngineRequest };
     output: Extract<PdfEngineResponse, { ok: true }>["result"];
   };
   inspectDocument: {
-    input: object;
+    input: { docId?: string };
     output: Pick<LoadedPdfDocument, "pages" | "metadata">;
   };
   parseDocument: {
     input: {
+      docId?: string;
+      pageIndexes?: number[];
       fontCatalog?: { families: string[]; aliases: Record<string, string> };
     };
     output: ParsedPdfModels;
   };
   exportDocument: { input: ExportPdfRequest; output: Uint8Array };
+  exportDocumentBlob: {
+    input: ExportPdfRequest;
+    output: { blob: Blob; preview?: { bytes: Uint8Array; mimeType: string } };
+  };
   documentStats: {
     input: object;
     output: {

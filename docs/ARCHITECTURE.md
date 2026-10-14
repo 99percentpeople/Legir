@@ -328,24 +328,45 @@ Page assembly rewrites the page tree while preserving source catalogs, inherited
 page attributes, AcroForm fields and outline destinations.
 
 Imported sources are grafted into the owning document's page bank, with source
-catalog views and original-to-native reference mappings. A donor PDF is open
-only during grafting (temporary peak: two native documents); it is then destroyed.
+catalog views and original-to-native reference mappings. The import chooser opens
+one transient donor in the existing worker/WASM runtime (temporary peak: two
+native documents). Geometry and native thumbnails are available before hydration;
+only the confirmed pages' controls/fonts are hydrated. The same donor is grafted
+without reopening it, then destroyed. Cancel/close also destroys the donor.
+`engine/importSource.ts` builds a selected-page catalog, prunes widget trees,
+resolves named destinations and prevents references from copying unselected pages.
+`PageSource.pageIndexes` maps the compact source bank back to original file indexes
+for restoration and cross-window transfer; source object references retain their
+original donor numbers through the graft map.
 The native graft map traverses reachable objects and copies encoded streams
 inside WASM. Source registration and removal update the page tree in a single
 batch. Export copy groups use the same native map, including copies within the
 owning document; the layout layer still reconnects selected form widgets,
 namespaced fonts and page destinations. Native type/name-key access avoids
 serializing temporary key buffers for each layout-helper lookup.
-An import preview is a separate open document until its preview closes. Blank
-pages are created directly in the owner. Source lifetimes include undo history;
+The import preview uses a document-ID-bound thumbnail facade, not another worker.
+Blank pages are created directly in the owner. Source lifetimes include undo history;
 unloading removes source pages/objects and invalidates cached pages. Native
 journal/allocator storage can remain reserved until the worker closes. Closing
 the editor terminates the worker and releases its entire WASM arena.
 
 The worker serializes document jobs with rendering, retaining queue priorities,
 canvas ownership, cancellation and logical-page routing. Queued commands can be
-cancelled; native rasterization/serialization are synchronous and cannot be
-interrupted mid-call. Reader jobs precede preview jobs, with distance ordering
+cancelled. Save preparation and page graft batches yield cooperatively. The native
+writer pauses at indirect-object boundaries (normally 4 MiB or 8 ms), checks
+cancellation and reuses one working allocation. A large individual stream,
+graph traversal, encryption setup or xref finalization remains synchronous.
+`exportPDFBlob` uses `PDFSaveTask.nextBlob` to copy directly from WASM into Blob
+storage; file/print flows avoid a full output buffer in WASM and an additional
+full JS array. `exportPDF` retains its byte-array API. Browser file writes abort
+on failure. Desktop Blob writes use bounded chunks, with the existing full-buffer
+write-file fallback for restored targets lacking an open-file scope. This is a
+full PDF rewrite, not incremental append saving.
+
+Persistent saves request a small cover before the export transaction rolls back.
+`exportPreviews.ts` associates it with the output Blob, so recent-file updates do
+not reopen the exported PDF or render a newer live draft. Plain downloads and
+printing skip this work. A preview failure does not fail the PDF save. Reader jobs precede preview jobs, with distance ordering
 within each class; selection happens after acquiring the document lock. Each
 source retains at most twelve reader pages plus two background pages, so
 thumbnail/text scans cannot evict the reader tier. Read-only hydration retains

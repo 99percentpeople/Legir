@@ -30,6 +30,171 @@ function pageText(session: DocumentSession, id = "default") {
 }
 
 describe("one native document session", () => {
+  it("grafts only selected pages from an already-open donor and restores both documents on cancellation", async () => {
+    const source = await PDFDocument.create();
+    const pages = [0, 1, 2].map(() => source.addPage([200, 300]));
+    const shared = source.getForm().createTextField("shared");
+    shared.setText("kept");
+    for (const page of pages)
+      shared.addToPage(page, { x: 20, y: 30, width: 100, height: 20 });
+    const excluded = source.context.register(
+      source.context.flateStream("DO NOT COPY"),
+    );
+    pages[1].node.set(PDFName.of("ExcludedResource"), excluded);
+    pages[0].node.set(PDFName.of("UnknownPageRef"), pages[1].ref);
+    for (const [name, target] of [
+      ["kept", 2],
+      ["removed", 1],
+    ] as const) {
+      pages[0].node.addAnnot(
+        source.context.register(
+          source.context.obj({
+            Type: "Annot",
+            Subtype: "Link",
+            Rect: [0, 0, 10, 10],
+            NM: source.context.obj(name),
+            Dest: [pages[target].ref, "XYZ", 10, 20, 2],
+          }),
+        ),
+      );
+    }
+    const bytes = await source.save();
+    const pdfium = await getPDFium();
+    const donor = new pdfium.PDFDocument(bytes);
+    const owner = new DocumentSession(pdfium, await fixture("Owner"));
+    try {
+      const before = pdfium.liveDocuments();
+      await owner.addSource("selected", donor, undefined, {
+        pageIndexes: [0, 2],
+      });
+      expect(pdfium.liveDocuments()).toBe(before);
+      expect(owner.document.countPages()).toBe(3);
+      expect(owner.getSource("selected").refs!.has(excluded.objectNumber)).toBe(
+        false,
+      );
+      expect(donor.countPages()).toBe(3);
+      const selectedPage = owner.document.findPage(
+        owner.getSource("selected").pages[0],
+      );
+      const unknown = selectedPage.get("UnknownPageRef");
+      const annots = selectedPage.get("Annots");
+      try {
+        expect(unknown.isNull()).toBe(true);
+        const firstLink = annots.get(1),
+          secondLink = annots.get(2);
+        const kept = firstLink.get("Dest"),
+          removed = secondLink.get("Dest");
+        const target = kept.get(0),
+          zoom = kept.get(4);
+        const expectedTarget = owner.document.findPage(
+          owner.getSource("selected").pages[1],
+        );
+        try {
+          expect(target.asIndirect()).toBe(expectedTarget.asIndirect());
+          expect(zoom.asNumber()).toBe(2);
+          expect(removed.isNull()).toBe(true);
+        } finally {
+          firstLink.destroy();
+          secondLink.destroy();
+          kept.destroy();
+          removed.destroy();
+          target.destroy();
+          zoom.destroy();
+          expectedTarget.destroy();
+        }
+      } finally {
+        annots.destroy();
+        unknown.destroy();
+        selectedPage.destroy();
+      }
+      const output = await owner.export({
+        fields: [],
+        annotations: [],
+        options: {
+          syncFormFields: false,
+          pageStructure: {
+            pages: [0, 1].map((pageIndex) => ({
+              id: `selected-${pageIndex}`,
+              pageIndex,
+              width: 200,
+              height: 300,
+              viewBox: [0, 0, 200, 300],
+              rotation: 0,
+              userUnit: 1,
+              source: { documentId: "selected", pageIndex },
+            })),
+            sources: {
+              selected: {
+                bytes,
+                filename: "donor.pdf",
+                password: null,
+                pageIndexes: [0, 2],
+              },
+            },
+          },
+        },
+      });
+      const reopened = await PDFDocument.load(output);
+      expect(reopened.getPageCount()).toBe(2);
+      expect(reopened.getForm().getTextField("shared").getText()).toBe("kept");
+      expect(
+        reopened.getForm().getTextField("shared").acroField.getWidgets(),
+      ).toHaveLength(2);
+      const abort = new AbortController();
+      setTimeout(() => abort.abort(), 0);
+      await expect(
+        owner.addSource("cancelled", donor, undefined, {
+          pageIndexes: [0, 2],
+          signal: abort.signal,
+        }),
+      ).rejects.toMatchObject({ name: "AbortError" });
+      expect(owner.sources.has("cancelled")).toBe(false);
+      expect(owner.document.countPages()).toBe(3);
+      expect(donor.countPages()).toBe(3);
+      expect(pageText(owner)).toContain("Owner");
+    } finally {
+      donor.destroy();
+      owner.dispose();
+    }
+  });
+
+  it("rolls back an export when the chunk consumer fails or cancels, and can save again", async () => {
+    const owner = new DocumentSession(
+      await getPDFium(),
+      await fixture("Original"),
+    );
+    const original = pageText(owner);
+    try {
+      const request = {
+        fields: [],
+        annotations: [],
+        metadata: { title: "Export" },
+      };
+      await expect(
+        owner.export(request, undefined, {
+          writeChunk: () => {
+            throw new Error("Disk full");
+          },
+        }),
+      ).rejects.toThrow("Disk full");
+      expect(pageText(owner)).toBe(original);
+      const controller = new AbortController();
+      await expect(
+        owner.export(request, controller.signal, {
+          writeChunk: () => {
+            controller.abort();
+          },
+        }),
+      ).rejects.toMatchObject({ name: "AbortError" });
+      expect(owner.document.saves.size).toBe(0);
+      expect(
+        (await PDFDocument.load(await owner.export(request))).getTitle(),
+      ).toBe("Export");
+      expect(pageText(owner)).toBe(original);
+    } finally {
+      owner.dispose();
+    }
+  });
   it("exports metadata without creating fonts or a form, preserving the cached native page", async () => {
     const source = await PDFDocument.create();
     source.setTitle("Original title");

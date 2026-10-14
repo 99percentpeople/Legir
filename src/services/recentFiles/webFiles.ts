@@ -42,7 +42,7 @@ export const rememberWebRecentFile = async (options: {
   handle: FileSystemFileHandle;
   path?: string;
   filename?: string;
-  pdfBytes?: Uint8Array;
+  pdfBytes?: Uint8Array | Blob;
   forcePreviewRender?: boolean;
   lastOpenedAt?: number;
 }) => {

@@ -37,7 +37,7 @@ export function getThumbnailContents(document: {
 
 /** One raster/encoding path for document thumbnails and read-only import previews. */
 export async function renderThumbnail(
-  worker: PDFWorkerService,
+  worker: Pick<PDFWorkerService, "renderPageImage">,
   pageIndex: number,
   signal: AbortSignal,
   content?: ThumbnailContent,

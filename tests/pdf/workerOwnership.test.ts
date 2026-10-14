@@ -15,6 +15,23 @@ vi.mock("@/services/pdfService/pdfWorkerService", () => ({
 }));
 import { renderPdfPreviewDataUrl } from "@/services/recentFilePreview";
 import { renderPageBytes } from "@/services/pdfService/pdfRenderer";
+import { exportPreviews } from "@/services/pdfService/engine/exportPreviews";
+
+it("uses the saved revision's preview without opening exported bytes or reading the live draft", async () => {
+  const blob = new Blob(["saved output"]);
+  exportPreviews.set(blob, {
+    bytes: new Uint8Array([4, 5, 6]),
+    mimeType: "image/jpeg",
+  });
+  expect(await renderPdfPreviewDataUrl({ pdfBytes: blob })).toMatch(
+    /^data:image\/jpeg/,
+  );
+  expect(mocks.create).not.toHaveBeenCalled();
+  expect(mocks.worker.renderPageImage).not.toHaveBeenCalled();
+  exportPreviews.set(blob, null);
+  expect(await renderPdfPreviewDataUrl({ pdfBytes: blob })).toBeNull();
+  expect(mocks.create).not.toHaveBeenCalled();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

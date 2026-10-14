@@ -19,6 +19,7 @@ import { getPDFium } from "./runtime";
 import { NativeEditingContext } from "./nativeEditingContext";
 import type { PDFiumModule } from "./pdfium";
 import type { PDFDocument as NativeDocument } from "@legir/pdfium";
+import { yieldPdfTask } from "./yieldTask";
 
 const views = new WeakMap<
   PDFDocument,
@@ -103,14 +104,20 @@ export async function loadEditingDocument(
 
 export async function saveEditingDocument(
   document: PDFDocument,
-  options?: { security?: PdfEncryption; signal?: AbortSignal },
+  options?: {
+    security?: PdfEncryption;
+    signal?: AbortSignal;
+    writeChunk?: (bytes: Uint8Array) => void | Promise<void>;
+    writeBlob?: (chunk: Blob) => void;
+  },
 ): Promise<Uint8Array> {
   const view = getEditingView(document);
   if (view) {
     options?.signal?.throwIfAborted();
     await view.flush();
     const security = options?.security;
-    const buffer = view.native.saveToBuffer({
+    options?.signal?.throwIfAborted();
+    const task = view.native.startSave({
       encrypt: security ? "aes-256" : "none",
       ...(security
         ? {
@@ -120,10 +127,40 @@ export async function saveEditingDocument(
           }
         : {}),
     });
+    const chunks: Uint8Array[] = [];
+    let size = 0;
     try {
-      return buffer.asUint8Array().slice();
+      for (;;) {
+        options?.signal?.throwIfAborted();
+        if (options?.writeBlob) {
+          const { done, blob } = task.nextBlob();
+          if (blob.size) options.writeBlob(blob);
+          if (done) break;
+          await yieldPdfTask();
+          continue;
+        }
+        const { done, bytes } = task.next();
+        if (bytes.length) {
+          if (options?.writeChunk) await options.writeChunk(bytes);
+          else {
+            chunks.push(bytes);
+            size += bytes.length;
+          }
+        }
+        if (done) break;
+        await yieldPdfTask();
+      }
+      options?.signal?.throwIfAborted();
+      if (chunks.length === 1) return chunks[0];
+      const output = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) {
+        output.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return output;
     } finally {
-      buffer.destroy();
+      task.destroy();
     }
   }
   await document.flush();
@@ -142,8 +179,17 @@ export async function saveEditingDocument(
       .filter(([key, value]) => key !== "Encrypt" && value !== undefined)
       .map(([key, value]) => [key, toValue(value!)]),
   };
-  return pdfEngine.writeDocument(
+  const output = await pdfEngine.writeDocument(
     { graph, security: options?.security },
     options?.signal,
   );
+  if (options?.writeChunk) {
+    await options.writeChunk(output);
+    return new Uint8Array();
+  }
+  if (options?.writeBlob) {
+    options.writeBlob(new Blob([output as BlobPart]));
+    return new Uint8Array();
+  }
+  return output;
 }

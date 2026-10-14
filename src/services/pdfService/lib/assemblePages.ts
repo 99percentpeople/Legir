@@ -26,6 +26,7 @@ import type {
   PreservedSourceAnnotationRef,
 } from "@/types";
 import { lookupInFieldChain } from "./pdf-import-utils";
+import { yieldPdfTask } from "../engine/yieldTask";
 import {
   readNamedPageDestinations,
   resolvePageDestination,
@@ -66,7 +67,16 @@ export async function assemblePages(
     preserved: PreservedSourceAnnotationRef[];
   },
   resolveSource?: (id: string) => Promise<PDFDocument>,
+  signal?: AbortSignal,
 ) {
+  let lastYield = performance.now();
+  const checkpoint = async () => {
+    if (performance.now() - lastYield > 8) {
+      await yieldPdfTask();
+      lastYield = performance.now();
+    }
+    signal?.throwIfAborted();
+  };
   const originalPages = doc.getPages();
   const sources = new Map<string, PDFDocument>();
   const copiers: Array<{ destroy(): void }> = [];
@@ -87,6 +97,15 @@ export async function assemblePages(
             id === "default" ? (openPassword ?? "") : (data.password ?? ""),
         },
       );
+      if (id !== "default" && data.pageIndexes) {
+        const original = source.getPages();
+        const selected = data.pageIndexes.map((index) => original[index]);
+        if (selected.some((page) => !page)) {
+          disposeEditingDocument(source);
+          throw new Error("Invalid imported source page selection");
+        }
+        getEditingView(source)!.replacePages(selected);
+      }
       sources.set(id, source);
     }
     return source;
@@ -107,6 +126,7 @@ export async function assemblePages(
     const groupByIndex = new Map<number, Group>();
     const result: PDFPage[] = [];
     for (const [index, page] of structure.pages.entries()) {
+      await checkpoint();
       if (page.blank) {
         const blank = PDFPage.create(doc);
         blank.setSize(page.width, page.height);
@@ -284,6 +304,7 @@ export async function assemblePages(
         }
       }
       for (const sourceField of sourceForm.getFields()) {
+        await checkpoint();
         const widgets = sourceField.acroField.getWidgets();
         const kids = sourceField.acroField.Kids();
         const selected = widgets.flatMap((widget, index) => {

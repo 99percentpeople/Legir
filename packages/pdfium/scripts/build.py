@@ -144,7 +144,7 @@ emscripten_path = "{emsdk.resolve()}/upstream/emscripten"
     manifest = {**VERSIONS, "features": {"v8": False, "xfa": False, "threads": False, "renderer": "agg"},
                 "sha256": {name: hashlib.sha256((dest / name).read_bytes()).hexdigest() for name in ["pdfium.js", "pdfium.wasm"]},
                 "sourceSha256": {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-                                  for path in sorted((ROOT / "native").glob("*")) if path.is_file()},
+                                  for path in sorted((ROOT / "native").glob("*")) + [ROOT / "scripts/patch_progressive_save.py"] if path.is_file()},
                 "patchSha256": hashlib.sha256((ROOT / "scripts/patch_source.py").read_bytes()).hexdigest(),
                 "buildScriptSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
     (dest / "provenance.json").write_text(json.dumps(manifest, indent=2) + "\n")

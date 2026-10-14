@@ -9,6 +9,7 @@ export class PDFDocument {
   readonly objects = new Set<PDFObject>();
   readonly pages = new Set<PDFPage>();
   readonly grafts = new Set<PDFGraftMap>();
+  readonly saves = new Set<PDFSaveTask>();
   pointer: number;
   constructor(
     readonly runtime: Runtime,
@@ -238,6 +239,29 @@ export class PDFDocument {
         ),
       ),
     );
+  }
+  /** Serialize cooperatively. Do not mutate or render this document until the
+   * task is closed. Each chunk ends at an object boundary, so a single large
+   * stream can exceed the usual 4 MiB / 8 ms slice. */
+  startSave(config: SaveOptions = {}) {
+    if (this.saves.size) throw new Error("A PDF save is already running.");
+    const pointer = this.runtime.withString(
+      config["user-password"] ?? "",
+      (user) =>
+        this.runtime.withString(config["owner-password"] ?? "", (owner) =>
+          this.call(
+            "LPDF_SaveStart",
+            user,
+            owner,
+            config.permissions ?? -4,
+            config.encrypt === "aes-256" ? 1 : 0,
+          ),
+        ),
+    );
+    if (!pointer) throw new Error("PDF save could not start.");
+    const task = new PDFSaveTask(this, pointer);
+    this.saves.add(task);
+    return task;
   }
   newGraftMap(options?: GraftOptions) {
     return new PDFGraftMap(this, options);
@@ -479,11 +503,60 @@ export class PDFDocument {
   }
   destroy() {
     if (!this.pointer) return;
+    for (const save of this.saves) save.destroy();
     for (const graft of this.grafts) graft.destroy();
     for (const page of this.pages) page.destroy();
     for (const object of this.objects) object.destroy();
     this.runtime.call("LPDF_Close", this.pointer);
     this.pointer = 0;
+  }
+}
+
+export class PDFSaveTask {
+  constructor(
+    readonly document: PDFDocument,
+    private pointer: number,
+  ) {}
+  next(): { done: boolean; bytes: Uint8Array } {
+    const { done, value } = this.readChunk((bytes) => bytes.slice());
+    return { done, bytes: value };
+  }
+  /** Copy directly from the working WASM span into immutable Blob storage,
+   * avoiding an intermediate JS byte array for file-oriented consumers. */
+  nextBlob(): { done: boolean; blob: Blob } {
+    const { done, value } = this.readChunk(
+      (bytes) => new Blob([bytes as BlobPart]),
+    );
+    return { done, blob: value };
+  }
+  private readChunk<T>(copy: (bytes: Uint8Array) => T): {
+    done: boolean;
+    value: T;
+  } {
+    if (!this.pointer) throw new Error("PDF save task is closed.");
+    this.document.assertOpen();
+    const runtime = this.document.runtime;
+    const status = runtime.call("LPDF_SaveContinue", this.pointer);
+    if (!status) {
+      this.destroy();
+      throw new Error("PDF save failed.");
+    }
+    const start = runtime.call("LPDF_SaveChunkData", this.pointer);
+    const size = runtime.call("LPDF_SaveChunkSize", this.pointer);
+    try {
+      return {
+        done: status === 1,
+        value: copy(runtime.native.HEAPU8.subarray(start, start + size)),
+      };
+    } finally {
+      runtime.call("LPDF_SaveConsumeChunk", this.pointer);
+      if (status === 1) this.destroy();
+    }
+  }
+  destroy() {
+    if (this.pointer) this.document.runtime.call("LPDF_SaveDrop", this.pointer);
+    this.pointer = 0;
+    this.document.saves.delete(this);
   }
 }
 
@@ -538,6 +611,17 @@ export class PDFGraftMap {
           +!!this.options.copyPages,
         );
         this.nativeMaps.set(source.document, map);
+        if (this.options.selectedPageNumbers) {
+          const pages = new Uint32Array(this.options.selectedPageNumbers);
+          doc.runtime.withBytes(new Uint8Array(pages.buffer), (pointer) =>
+            doc.runtime.call(
+              "LPDF_GraftSelectedPages",
+              map!,
+              pointer,
+              pages.length,
+            ),
+          );
+        }
       }
       const pointer = doc.runtime.call("LPDF_GraftObject", map, source.pointer);
       if (!pointer)
@@ -545,6 +629,17 @@ export class PDFGraftMap {
       return new PDFObject(doc, pointer);
     }
     if (source.isIndirect()) {
+      if (
+        this.options.selectedPageNumbers &&
+        !this.options.selectedPageNumbers.includes(source.asIndirect())
+      ) {
+        const type = source.get("Type");
+        try {
+          if (type.asName() === "Page") return doc.newNull();
+        } finally {
+          type.destroy();
+        }
+      }
       let refs = this.refs.get(source.document);
       if (!refs) this.refs.set(source.document, (refs = new Map()));
       const number = source.asIndirect(),

@@ -38,6 +38,8 @@ export type WorkerCommandPayloadMap = {
       docId?: string;
       data: Uint8Array;
       password?: string;
+      preview?: boolean;
+      pageIndexes?: number[];
     },
     boolean
   >;

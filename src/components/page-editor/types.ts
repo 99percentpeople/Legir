@@ -27,8 +27,11 @@ export type PageDragPreviewData = {
 };
 
 export type ImportedDocument = {
+  sourceId?: string;
+  disposePreview?: () => void;
+  session?: import("@/services/pdfService").PdfOpenSession;
   document: LoadedPdfDocument;
-  worker: PDFWorkerService;
+  worker: Pick<PDFWorkerService, "renderPageImage">;
   filename: string;
 };
 
