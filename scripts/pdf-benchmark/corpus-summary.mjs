@@ -52,6 +52,7 @@ function metrics(record) {
     rotatedTileMs: phases.rotatedTile?.ms,
     pngMs: phases.png?.ms,
     exportMs: phases.export?.ms,
+    repeatExportMs: phases.repeatExport?.ms,
     importMs: phases.import?.ms,
     importReadableMs: phases.import?.readableMs,
     importPreviewMs: phases.import?.parseMs,
@@ -64,10 +65,16 @@ function metrics(record) {
     readablePssMiB: memory.readable?.pssMiB,
     readableDeltaMiB: memory.readable?.pssMiB - memory.baseline?.pssMiB,
     renderedPssMiB: memory.rendered?.pssMiB,
+    exportedPssMiB: memory.exported?.pssMiB,
+    repeatExportedPssMiB: memory.repeatExported?.pssMiB,
+    standaloneExportPeakPssMiB: phases.export?.peak.pssMiB,
+    standaloneExportPeakDeltaMiB:
+      phases.export?.peak.pssMiB - memory.rendered?.pssMiB,
+    repeatExportPeakPssMiB: phases.repeatExport?.peak.pssMiB,
     importedPssMiB: memory.imported?.pssMiB,
     processingPeakPssMiB: peak(false),
     exportPeakPssMiB: Math.max(
-      ...[phases.export, phases.mergedExport]
+      ...[phases.export, phases.repeatExport, phases.mergedExport]
         .filter(Boolean)
         .map((phase) => phase.peak.pssMiB),
     ),

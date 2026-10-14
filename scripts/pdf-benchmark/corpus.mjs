@@ -399,6 +399,13 @@ try {
             );
             await snapshot("exported");
             await saveDownload("export");
+            if (process.env.PDF_BENCH_REPEAT_SAVE) {
+              await phase("repeatExport", () =>
+                page.evaluate(() => globalThis.pdfCorpus.save()),
+              );
+              await snapshot("repeatExported");
+              await saveDownload("repeatExport");
+            }
             await phase("import", () =>
               page.evaluate(
                 (indexes) => globalThis.pdfCorpus.importSource(indexes),

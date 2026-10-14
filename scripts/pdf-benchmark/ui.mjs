@@ -125,6 +125,31 @@ try {
     );
     return i && i.src !== before && i.complete && i.naturalWidth > 0;
   }, beforeThumb);
+  const plainSaves = [];
+  for (let revision = 0; revision < 2; revision++) {
+    const pending = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    const file = `${output}/ui-plain-${revision}.pdf`;
+    await (await pending).saveAs(file);
+    const savedBytes = await (await import("node:fs/promises")).readFile(file);
+    const saved = await PDFDocument.load(savedBytes);
+    const prefix = bytes.every((value, index) => savedBytes[index] === value);
+    if (
+      saved.getPageCount() !== 3 ||
+      saved.getForm().getTextField("name").getText() !== "Bob"
+    )
+      throw new Error("Plain UI save lost the edited form or pages");
+    if (engine === "pdfium" && !prefix)
+      throw new Error("Plain PDFium UI save did not use incremental output");
+    plainSaves.push({
+      bytes: savedBytes.length,
+      originalPrefixRetained: prefix,
+    });
+  }
+  if (engine === "pdfium" && plainSaves[0].bytes !== plainSaves[1].bytes)
+    throw new Error(
+      "Repeated UI save accumulated a revision instead of reusing the original base",
+    );
   await page.getByRole("button", { name: "Select Mode", exact: true }).click();
   await page
     .getByRole("menuitemradio", { name: "Page mode", exact: true })
@@ -241,6 +266,7 @@ try {
   console.log(
     JSON.stringify({
       engine,
+      plainSaves,
       result,
       errors,
       resourceFailures,

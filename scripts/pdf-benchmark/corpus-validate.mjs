@@ -1,5 +1,5 @@
 /* global process, console */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -25,9 +25,13 @@ const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const results = JSON.parse(await readFile(resultsPath, "utf8"));
 await mkdir(output, { recursive: true });
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-async function fileHash(file) {
+async function fileHash(file, length) {
   const digest = createHash("sha256");
-  for await (const chunk of createReadStream(file)) digest.update(chunk);
+  for await (const chunk of createReadStream(
+    file,
+    length === undefined ? undefined : { start: 0, end: length - 1 },
+  ))
+    digest.update(chunk);
   return digest.digest("hex");
 }
 async function inspect(path) {
@@ -174,6 +178,7 @@ for (const fixture of manifest.fixtures) {
   console.log(`Inspecting ${fixture.id}`);
   fixtureInfo.set(fixture.id, await inspect(fixture.path));
   fixture.sha256 = await fileHash(fixture.path);
+  fixture.bytes = (await stat(fixture.path)).size;
   fixture.pages = fixtureInfo.get(fixture.id).pages.length;
 }
 await writeFile(
@@ -261,7 +266,11 @@ const validations = [];
 for (const record of results) {
   const fixture = manifest.fixtures.find((f) => f.id === record.fixture);
   const donor = manifest.fixtures.find((f) => f.id === record.donor);
-  for (const mode of ["export", "merged"]) {
+  for (const mode of [
+    "export",
+    ...(record.phases.repeatExportDownload ? ["repeatExport"] : []),
+    "merged",
+  ]) {
     const file = record.phases[`${mode}Download`]?.file;
     if (!file) continue;
     console.log(
@@ -275,6 +284,13 @@ for (const record of results) {
       file,
     };
     try {
+      validation.bytes = (await stat(file)).size;
+      validation.originalPrefixRetained =
+        validation.bytes >= fixture.bytes &&
+        (await fileHash(file, fixture.bytes)) === fixture.sha256;
+      validation.appendedBytes = validation.originalPrefixRetained
+        ? validation.bytes - fixture.bytes
+        : null;
       const actual = await inspect(file);
       const source = fixtureInfo.get(fixture.id),
         imported = fixtureInfo.get(donor.id);

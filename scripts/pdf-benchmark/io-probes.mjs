@@ -68,13 +68,21 @@ try {
   } else {
     result.before = await page.evaluate(() => globalThis.pdfCorpus.png(0));
     result.cancellations = [];
-    for (const abortAfterMs of [20, 250, 500]) {
+    for (const [abortAfterMs, mode] of [
+      [20, "full"],
+      [250, "full"],
+      [500, "full"],
+      [0, "incremental"],
+      [0, "prefix"],
+    ]) {
       const cancelled = await page.evaluate(
-        (delay) => globalThis.pdfCorpus.cancelExport(delay),
-        abortAfterMs,
+        ([delay, mode]) => globalThis.pdfCorpus.cancelExport(delay, mode),
+        [abortAfterMs, mode],
       );
       if (!cancelled.aborted || cancelled.stats.nativeDocuments !== 1)
         throw new Error("Export did not cancel with one surviving owner");
+      if (mode === "prefix" && !cancelled.prefixReached)
+        throw new Error("Incremental prefix cancellation was not exercised");
       result.cancellations.push(cancelled);
     }
     result.after = await page.evaluate(() => globalThis.pdfCorpus.png(0));

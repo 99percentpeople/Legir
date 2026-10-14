@@ -38,12 +38,14 @@ export function profilePlugin() {
     name: "pdf-benchmark-profile",
     transform(code, id) {
       let hooks = "";
-      if (/packages\/pdfium\/dist\/runtime\.js$/.test(id))
+      if (/packages\/pdfium\/(?:dist\/runtime\.js|src\/runtime\.ts)$/.test(id))
         hooks =
           'profileMethods(Runtime, ["call"], true); profileMethods(Runtime, ["copyBytes"]);';
-      if (/packages\/pdfium\/dist\/document\.js$/.test(id))
+      if (
+        /packages\/pdfium\/(?:dist\/document\.js|src\/document\.ts)$/.test(id)
+      )
         hooks =
-          'profileMethods(PDFDocument, ["saveToBuffer", "insertPage", "rewritePages"]); profileMethods(PDFGraftMap, ["graftObject"]);';
+          'profileMethods(PDFDocument, ["saveToBuffer", "startSave", "insertPage", "rewritePages"]); if (typeof PDFSaveTask !== "undefined") profileMethods(PDFSaveTask, ["nextBlob"]); profileMethods(PDFGraftMap, ["graftObject"]);';
       if (id.endsWith("/engine/documentSession.ts"))
         hooks =
           'profileMethods(DocumentSession, ["addSource", "export", "transaction"]);';

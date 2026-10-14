@@ -278,7 +278,7 @@ const bench = {
       {
         includePreview,
         preservedSourceAnnotations: preserved,
-        syncFormFields: false,
+        syncFormFields: true,
         ...(merged
           ? {
               pageStructure: {
@@ -293,7 +293,7 @@ const bench = {
                 },
               },
             }
-          : {}),
+          : { pageStructure: { pages: originalPages, sources: {} } }),
       },
     );
     return {
@@ -302,15 +302,35 @@ const bench = {
       blob: output instanceof Blob,
     };
   },
-  async cancelExport(delayMs = 20) {
+  async cancelExport(
+    delayMs = 20,
+    mode: "full" | "incremental" | "prefix" = "full",
+  ) {
     if (!("exportPDFBlob" in pdfService)) return { supported: false };
     const controller = new AbortController();
     const start = now();
     let abortedAt = 0;
-    const timer = setTimeout(() => {
+    const abort = () => {
       abortedAt = now();
       controller.abort();
-    }, delayMs);
+    };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const command = worker!.documentCommand;
+    let prefixReached = false;
+    if (mode === "prefix") {
+      // Diagnostic-only checkpoint: abort after the native delta has returned,
+      // while the public service constructs its cancellable original Blob.
+      worker!.documentCommand = (async (
+        ...args: Parameters<typeof command>
+      ) => {
+        const result = await command.apply(worker, args);
+        if (args[0] === "exportDocumentBlob") {
+          prefixReached = !!(result as { incremental?: boolean }).incremental;
+          timer = setTimeout(abort, delayMs);
+        }
+        return result;
+      }) as typeof command;
+    } else timer = setTimeout(abort, delayMs);
     let aborted = false;
     try {
       await pdfService.exportPDFBlob(
@@ -322,6 +342,7 @@ const bench = {
         {
           preservedSourceAnnotations: loaded!.preservedSourceAnnotations,
           signal: controller.signal,
+          incremental: mode !== "full",
         },
       );
     } catch (error) {
@@ -329,11 +350,14 @@ const bench = {
       aborted = true;
     } finally {
       clearTimeout(timer);
+      worker!.documentCommand = command;
     }
     const rejectedAt = now();
     const stats = await worker!.documentCommand("documentStats", {});
     return {
       supported: true,
+      mode,
+      prefixReached,
       aborted,
       abortAfterMs: abortedAt - start,
       rejectionMs: rejectedAt - abortedAt,

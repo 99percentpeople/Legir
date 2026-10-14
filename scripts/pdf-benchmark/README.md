@@ -58,8 +58,10 @@ graft/page-tree/export stage timings to each phase's `profile`. This instrumenta
 adds overhead and stage times overlap; never use those timings as the final
 performance comparison. Ordinary builds include no profiling hooks.
 
-`ui.mjs` installs the production PWA, switches offline, edits a text field,
-inserts a blank page, undoes/redoes it, imports the four-page donor and saves.
+`ui.mjs` installs the production PWA, switches offline, edits a text field and
+saves it twice. PDFium must retain the exact original prefix without growing a
+revision chain. It then inserts a blank page, undoes/redoes it, imports the
+four-page donor and saves again.
 It independently reopens the download (eight pages, three fields), checks for
 visible broken images and, for PDFium, verifies one live worker followed by zero
 after closing the document. Pass `pdfjs` as the optional final argument to test
@@ -129,6 +131,11 @@ first and repeated renders of three selected pages at 1600 pixels; full-page
 zoom at 3200 pixels; four 1024-square tiles and a rotated tile with the page's
 long edge at 6400 pixels; PNG export at 1600 pixels; metadata-edit save; importing
 the selected donor pages (preview hydration plus owner registration); and merged save.
+Every save supplies the full page structure and enables form synchronization,
+matching the UI's export request. Previews and physical file writes remain
+separate from this export timing. Earlier harness revisions omitted the page
+structure on standalone saves; rebuild every variant with the same updated entry
+before comparing these numbers.
 Merged saves append donor controls, preserved annotations and link targets with
 the same page offsets as the app's page import flow. Canvas timings retain the
 production animation-frame acknowledgment and exclude PNG encoding/readback.
@@ -144,17 +151,28 @@ idle workers the revision starts. Record absolute totals as well as increments.
 WASM capacity is reported separately from resident memory. The entry uses the
 normal `exportPDFBlob` API when available and the byte API on older revisions;
 the new API's native chunking and Blob assembly are included in export time.
+`PDF_BENCH_REPEAT_SAVE=1` adds a second identical standalone save before import,
+with a separate memory snapshot and retained download. This distinguishes initial
+immutable-prefix Blob construction from reuse on incremental engines; all engines
+run the same additional operation. Validation includes that repeated output and
+records whether each file retains the exact source prefix and its appended size.
 Download URL construction and download consumption are a separate memory phase,
 excluded from export time. Byte output is wrapped directly in a Blob without
 an extra full-file slice for any revision. The `exportPeakPssMiB` summary metric
-is the larger peak of the two save phases, distinct from the whole-workflow peak.
+is the largest peak of all save phases, distinct from the whole-workflow peak.
+`standaloneExportPeakPssMiB` and `repeatExportPeakPssMiB` isolate the individual
+saves; the standalone delta is relative to the post-render snapshot.
 Recent-file previews are excluded from these download-only tasks. Host
 temperature/load/swap counters and Chromium GPU feature flags accompany every
 record; CPU-only headless measurements do not predict GPU/Tauri performance.
 No validation subprocesses or builds run during the measured comparison.
 
 `io-probes.mjs BUILD FIXTURE OUTPUT [cancel|preview]` separately tests save
-cancellation or saved-revision preview reuse. Cancellation repeats three times,
+cancellation or saved-revision preview reuse. Cancellation covers full writes at
+20/250/500 ms, an early incremental cancellation, and cancellation while building
+the original-prefix Blob (use a large fixture). The latter uses a diagnostic-only
+wrapper to schedule an abort after the native delta RPC returns; production
+services are unchanged. Each attempt
 measures both caller rejection and worker readiness after rollback, requires one
 surviving native document, compares page pixels, and retries a complete save.
 Preview mode needs the synthetic donor with an editable text field. It compares
