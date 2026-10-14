@@ -54,6 +54,49 @@ export class PDFDocument {
   countObjects() {
     return this.call("LPDF_ObjectCount");
   }
+  /** Resolve font encoding and glyph metrics using this document's font cache. */
+  fontMetrics(
+    fontObjectNumber: number,
+    unicode: readonly number[],
+  ): Float64Array {
+    if (unicode.length > 65536)
+      throw new Error("Font metric request is too large.");
+    const codes = new Uint32Array(unicode);
+    return this.runtime.withBytes(new Uint8Array(codes.buffer), (pointer) => {
+      const result = this.runtime.buffer(
+        this.call("LPDF_FontMetrics", fontObjectNumber, pointer, codes.length),
+      );
+      try {
+        return new Float64Array(result.asUint8Array().slice().buffer);
+      } finally {
+        result.destroy();
+      }
+    });
+  }
+  /** Unicode coverage of a simple (including Standard 14) font. */
+  fontCharacterSet(fontObjectNumber: number): number[] {
+    const result = this.runtime.buffer(
+      this.call("LPDF_FontCharacterSet", fontObjectNumber),
+    );
+    try {
+      return Array.from(new Uint32Array(result.asUint8Array().slice().buffer));
+    } finally {
+      result.destroy();
+    }
+  }
+  /** Native lossless stream compression for newly authored resources. */
+  deflate(bytes: Uint8Array): Uint8Array {
+    return this.runtime.withBytes(bytes, (pointer, length) => {
+      const result = this.runtime.buffer(
+        this.runtime.call("LPDF_Deflate", pointer, length),
+      );
+      try {
+        return Uint8Array.from(result.asUint8Array());
+      } finally {
+        result.destroy();
+      }
+    });
+  }
   getTrailer() {
     if (this.needsPassword())
       throw new Error("The PDF password is missing or incorrect.");

@@ -17,7 +17,7 @@ import {
   PDFRadioGroup,
   degrees,
   PDFObject,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import type {
   Annotation,
   FormField,

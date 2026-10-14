@@ -1,10 +1,20 @@
 import { getThumbnailSourceAnnotations } from "@/services/pdfService/lib/thumbnailSourceAnnotations";
 import { expect, it } from "vitest";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { PDFDocument } from "@legir/pdfium/authoring";
 import { FieldType, type Annotation } from "@/types";
-import { createThumbnailOverlay } from "@/services/pdfService/lib/thumbnailOverlay";
+import { drawThumbnailOverlay } from "@/services/pdfService/lib/thumbnailOverlay";
 import type { ThumbnailContent } from "@/services/pdfService/types";
 import { field } from "../helpers/editorStore";
+
+async function createThumbnailOverlay(content: ThumbnailContent) {
+  const pdfDoc = await PDFDocument.create();
+  try {
+    const pageIndex = await drawThumbnailOverlay(pdfDoc, content);
+    return pageIndex === null ? null : await pdfDoc.save();
+  } finally {
+    pdfDoc.destroy();
+  }
+}
 
 const shape = (
   id: string,

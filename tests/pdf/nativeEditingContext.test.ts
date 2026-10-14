@@ -6,7 +6,7 @@ import {
   PDFString,
   PDFStream,
   StandardFonts,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { getPDFium } from "@/services/pdfService/engine/runtime";
 import { NativeEditingContext } from "@/services/pdfService/engine/nativeEditingContext";
 

@@ -6,7 +6,7 @@ import {
   PDFName,
   PDFRawStream,
   PDFStream,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import {
   createPdfStreamTextReader,
   decodePdfStreamBytes,

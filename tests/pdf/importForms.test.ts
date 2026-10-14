@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PDFDocument, PDFName, PDFString } from "@cantoo/pdf-lib";
+import { PDFDocument, PDFName, PDFString } from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF, startPdfOpenSession } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { FieldType } from "@/types";

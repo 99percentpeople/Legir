@@ -1,19 +1,11 @@
-/* global process, console */
+/* global process, console, URL */
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
-import {
-  PDFDocument,
-  PDFName,
-  PDFArray,
-  PDFDict,
-  PDFRef,
-  PDFString,
-  PDFHexString,
-} from "@cantoo/pdf-lib";
+import { fileURLToPath } from "node:url";
 
 const exec = promisify(execFile);
 const [manifestPath, resultsPath, output] = process.argv.slice(2);
@@ -35,143 +27,12 @@ async function fileHash(file, length) {
   return digest.digest("hex");
 }
 async function inspect(path) {
-  const pdf = await PDFDocument.load(await readFile(path), {
-    updateMetadata: false,
-  });
-  const pageList = pdf.getPages();
-  const indexes = new Map(
-    pageList.map((page, index) => [page.ref.toString(), index]),
+  const { stdout } = await exec(
+    process.env.PDF_BENCH_PYTHON ?? "python3",
+    [fileURLToPath(new URL("./inspect_pdf.py", import.meta.url)), path],
+    { maxBuffer: 32 * 1024 * 1024, timeout: 180000 },
   );
-  const names = new Map();
-  const decode = (value) =>
-    value instanceof PDFName ||
-    value instanceof PDFString ||
-    value instanceof PDFHexString
-      ? value.decodeText()
-      : null;
-  const oldDests = pdf.catalog.lookupMaybe(PDFName.of("Dests"), PDFDict);
-  if (oldDests)
-    for (const [key, value] of oldDests.entries())
-      names.set(key.decodeText(), value);
-  const visited = new Set();
-  const readNames = (node) => {
-    if (!node || visited.has(node)) return;
-    visited.add(node);
-    const entries = node.lookupMaybe(PDFName.of("Names"), PDFArray);
-    if (entries)
-      for (let i = 0; i + 1 < entries.size(); i += 2)
-        names.set(decode(entries.lookup(i)), entries.get(i + 1));
-    const kids = node.lookupMaybe(PDFName.of("Kids"), PDFArray);
-    if (kids)
-      for (let i = 0; i < kids.size(); i++) readNames(kids.lookup(i, PDFDict));
-  };
-  readNames(
-    pdf.catalog
-      .lookupMaybe(PDFName.of("Names"), PDFDict)
-      ?.lookupMaybe(PDFName.of("Dests"), PDFDict),
-  );
-  const destination = (value, depth = 0) => {
-    if (!value || depth > 32) return null;
-    const resolved = pdf.context.lookup(value);
-    if (resolved instanceof PDFDict)
-      return destination(resolved.get(PDFName.of("D")), depth + 1);
-    if (resolved instanceof PDFArray) {
-      const first = resolved.get(0);
-      return first instanceof PDFRef
-        ? (indexes.get(first.toString()) ?? null)
-        : null;
-    }
-    const name = decode(resolved);
-    return name === null ? null : destination(names.get(name), depth + 1);
-  };
-  const pages = pageList.map((page) => {
-    const annotations = {};
-    const links = [];
-    const replies = [];
-    const annots = page.node.lookupMaybe(PDFName.of("Annots"), PDFArray);
-    const annotationRefs = new Set(annots?.asArray().map(String) ?? []);
-    const identity = (dict) =>
-      dict instanceof PDFDict
-        ? ["Subtype", "Contents", "T", "State", "StateModel"].map((key) =>
-            decode(dict.lookup(PDFName.of(key))),
-          )
-        : null;
-    if (annots)
-      for (let i = 0; i < annots.size(); i++) {
-        const item = annots.lookup(i, PDFDict);
-        const name =
-          item.lookupMaybe(PDFName.of("Subtype"), PDFName)?.decodeText() ??
-          "unknown";
-        annotations[name] = (annotations[name] ?? 0) + 1;
-        const inReplyTo = item.get(PDFName.of("IRT"));
-        if (inReplyTo) {
-          const popupRef = item.get(PDFName.of("Popup"));
-          const popup = popupRef && pdf.context.lookup(popupRef);
-          replies.push({
-            identity: identity(item),
-            flags: item.lookup(PDFName.of("F"))?.toString() ?? null,
-            parent: identity(pdf.context.lookup(inReplyTo)),
-            parentOnPage: annotationRefs.has(String(inReplyTo)),
-            replyType: decode(item.lookup(PDFName.of("RT"))),
-            popupOnPage: popupRef ? annotationRefs.has(String(popupRef)) : null,
-            popupParentMatches:
-              popup instanceof PDFDict
-                ? String(popup.get(PDFName.of("Parent"))) ===
-                  String(annots.get(i))
-                : null,
-          });
-        }
-        if (name === "Link") {
-          const action = item.lookupMaybe(PDFName.of("A"), PDFDict);
-          const kind =
-            action?.lookupMaybe(PDFName.of("S"), PDFName)?.decodeText() ??
-            "GoTo";
-          const rect = item
-            .lookupMaybe(PDFName.of("Rect"), PDFArray)
-            ?.asArray()
-            .map((n) => Math.round(Number(n.toString()) * 100) / 100);
-          links.push({
-            kind,
-            rect,
-            ...(kind === "URI"
-              ? { uri: decode(action.lookup(PDFName.of("URI"))) }
-              : {}),
-            ...(kind === "GoTo"
-              ? {
-                  targetPage: destination(
-                    action?.get(PDFName.of("D")) ??
-                      item.get(PDFName.of("Dest")),
-                  ),
-                }
-              : {}),
-          });
-        }
-      }
-    return {
-      size: page.getSize(),
-      rotation: page.getRotation().angle,
-      annotations,
-      replies: replies.map((reply) => JSON.stringify(reply)).sort(),
-      links,
-    };
-  });
-  const fields = pdf
-    .getForm()
-    .getFields()
-    .map((field) => ({
-      name: field.getName(),
-      type: field.constructor.name,
-      value:
-        typeof field.getText === "function"
-          ? field.getText()
-          : typeof field.isChecked === "function"
-            ? field.isChecked()
-            : typeof field.getSelected === "function"
-              ? field.getSelected()
-              : null,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return { pages, fields, title: pdf.getTitle() };
+  return JSON.parse(stdout);
 }
 const fixtureInfo = new Map();
 for (const fixture of manifest.fixtures) {
@@ -292,6 +153,7 @@ for (const record of results) {
         ? validation.bytes - fixture.bytes
         : null;
       const actual = await inspect(file);
+      validation.syntaxWarnings = actual.warnings;
       const source = fixtureInfo.get(fixture.id),
         imported = fixtureInfo.get(donor.id);
       const selectedPages =
@@ -404,6 +266,7 @@ for (const record of results) {
         });
       }
       validation.ok =
+        !validation.syntaxWarnings.length &&
         validation.pages === expected.length &&
         validation.titleEdited &&
         !validation.geometryMismatches.length &&

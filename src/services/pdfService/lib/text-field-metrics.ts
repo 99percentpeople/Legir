@@ -1,4 +1,4 @@
-import type { PDFFont } from "@cantoo/pdf-lib";
+import type { PDFFont } from "@legir/pdfium/authoring";
 import { DEFAULT_FORM_TEXT_VISUAL_CENTER_ABOVE_BASELINE_EM } from "@/lib/fonts";
 
 type FontkitBBoxLike = {

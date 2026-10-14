@@ -7,7 +7,7 @@ import {
   PDFName,
   PDFObject,
   degrees,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createEditorView } from "@/store/editorView";

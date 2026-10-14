@@ -6,10 +6,12 @@ import { resolve, extname, sep } from "node:path";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
-const { PDFDocument } = require("@cantoo/pdf-lib");
+import { PDFDocument } from "@legir/pdfium/authoring";
 const [build, fixture, output, mode = "cancel"] = process.argv.slice(2);
 if (!build || !fixture || !output)
-  throw new Error("Usage: io-probes.mjs BUILD FIXTURE OUTPUT [cancel|preview]");
+  throw new Error(
+    "Usage: io-probes.mjs BUILD FIXTURE OUTPUT [cancel|cancel-merged|preview]",
+  );
 await mkdir(output, { recursive: true });
 const root = resolve(build);
 const server = createServer(async (request, response) => {
@@ -66,29 +68,49 @@ try {
     if (!result.preview.matchesReopened || !result.preview.differsFromOriginal)
       throw new Error("Saved preview does not match the edited revision");
   } else {
+    if (mode === "cancel-merged") {
+      result.import = await page.evaluate(
+        (count) =>
+          globalThis.pdfCorpus.importSource([
+            0,
+            Math.floor(count / 2),
+            count - 1,
+          ]),
+        result.open.pages,
+      );
+    }
     result.before = await page.evaluate(() => globalThis.pdfCorpus.png(0));
     result.cancellations = [];
-    for (const [abortAfterMs, mode] of [
-      [20, "full"],
-      [250, "full"],
-      [500, "full"],
-      [0, "incremental"],
-      [0, "prefix"],
-    ]) {
+    for (const [abortAfterMs, exportMode] of mode === "cancel-merged"
+      ? [
+          [20, "merged"],
+          [250, "merged"],
+          [500, "merged"],
+        ]
+      : [
+          [20, "full"],
+          [250, "full"],
+          [500, "full"],
+          [0, "incremental"],
+          [0, "prefix"],
+        ]) {
       const cancelled = await page.evaluate(
         ([delay, mode]) => globalThis.pdfCorpus.cancelExport(delay, mode),
-        [abortAfterMs, mode],
+        [abortAfterMs, exportMode],
       );
       if (!cancelled.aborted || cancelled.stats.nativeDocuments !== 1)
         throw new Error("Export did not cancel with one surviving owner");
-      if (mode === "prefix" && !cancelled.prefixReached)
+      if (exportMode === "prefix" && !cancelled.prefixReached)
         throw new Error("Incremental prefix cancellation was not exercised");
       result.cancellations.push(cancelled);
     }
     result.after = await page.evaluate(() => globalThis.pdfCorpus.png(0));
     if (result.before.hash !== result.after.hash)
       throw new Error("Cancel changed page pixels");
-    result.retry = await page.evaluate(() => globalThis.pdfCorpus.save());
+    result.retry = await page.evaluate(
+      (merged) => globalThis.pdfCorpus.save(merged),
+      mode === "cancel-merged",
+    );
   }
   const downloaded = page.waitForEvent("download");
   await page.evaluate(() => globalThis.pdfCorpus.download());
@@ -104,7 +126,10 @@ try {
   await browser.close();
   const reopened = await PDFDocument.load(await readFile(file));
   result.savedPages = reopened.getPageCount();
-  if (result.savedPages !== result.open.pages)
+  if (
+    result.savedPages !==
+    result.open.pages + (result.import?.selectedPages.length ?? 0)
+  )
     throw new Error("Saved page count changed");
   result.fields = reopened
     .getForm()
@@ -113,6 +138,7 @@ try {
       name: field.getName(),
       value: typeof field.getText === "function" ? field.getText() : null,
     }));
+  reopened.destroy();
   if (
     mode === "preview" &&
     !result.fields.some((field) => field.value === "Saved preview revision")

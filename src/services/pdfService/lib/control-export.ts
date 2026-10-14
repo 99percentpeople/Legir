@@ -1,5 +1,5 @@
 import type { FormField } from "@/types";
-import type { PDFPage } from "@cantoo/pdf-lib";
+import type { PDFPage } from "@legir/pdfium/authoring";
 import type { ViewportLike } from "../types";
 import { hexToPdfColor } from "./colors";
 import { uiRectToPdfBounds } from "./coords";

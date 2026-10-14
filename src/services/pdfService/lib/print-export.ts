@@ -1,4 +1,10 @@
-import { PDFArray, PDFDict, PDFName, type PDFPage, rgb } from "@cantoo/pdf-lib";
+import {
+  PDFArray,
+  PDFDict,
+  PDFName,
+  type PDFPage,
+  rgb,
+} from "@legir/pdfium/authoring";
 import type { Annotation } from "@/types";
 import { hexToPdfColor } from "./colors";
 import { uiRectToPdfBounds } from "./coords";

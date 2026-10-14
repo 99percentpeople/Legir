@@ -27,6 +27,7 @@ that same native xref; never load another document for a live edit. Do not call
 `PDFDocument.load` or `PDFDocument.save` in application code.
 
 PDFium/WASM calls belong in `src/services/pdfService/engine/`. The
-`textRedaction` helper edits the live native transaction directly. Its
-`contentResourceBridge` fallback is for standalone authoring; both paths must
-preserve unrelated document structures and source resource identity.
+`textRedaction` helper edits the live native transaction directly, preserving
+unrelated document structures and source resource identity. Standalone test
+fixture helpers must destroy their owned authoring documents in `finally`;
+live thumbnails and stamp fallbacks reuse the owning native document.

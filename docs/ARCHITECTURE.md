@@ -310,14 +310,22 @@ owns UI models, immutable source bytes and DOM font faces, never a parsed PDF
 object graph. `index.ts` is the client; `documentPipeline.ts` runs in the worker.
 `documentOwners.ts` routes operations on a loaded byte buffer back to its worker.
 
-`NativeEditingContext` supplies lazy dictionary/array/stream views over the
-native xref to the existing form, annotation, font-layout and page-assembly
-helpers. `@cantoo/pdf-lib` remains an appearance/layout dependency; its facade
-has no independent parsed xref or copied stream graph. Its parser, file writer
-and encryption implementation are not used by the application. Unchanged stream
-bodies are read only when a helper actually needs them. The adapter depends on
-the pinned helper constructor/object vocabulary and PDFium bindings; upgrade
-these with native-adapter, source-assembly and browser round-trip tests.
+`@legir/pdfium/authoring` supplies lazy dictionary/array/stream views over the
+native xref and owns form fields, font resources/subsets, text layout, image
+embedding and vector appearance generation. The application has no pdf-lib or
+PDF.js dependency, including test dependencies. Authoring values are thin native
+views, not a second parsed xref or a JavaScript PDF serializer. `pdf-fontkit`
+shapes/subsets custom fonts; `fast-png` and `@xmldom/xmldom` decode PNG/SVG inputs.
+PDF parsing, encryption, grafts and file writing remain native. Native glyph
+advances/encodings use PDFium; standard Base-14 vertical metrics keep existing
+form layout stable despite substituted font outlines.
+
+The native parser retains views of its owned immutable input for unmodified
+encoded streams. Same-document assembly shares these readers. Cross-document
+grafts copy only selected streams so closing a donor releases its whole input.
+Authored and decrypted vectors remain independent. The authoring context flushes
+pending appearances and font subsets into that same native document before
+rendering/saving; appended page content isolates prior graphics state.
 
 Hydration, thumbnail overlays and export use native journal transactions. The
 UI/history models describe draft edits; success, failure and cancellation all
@@ -441,8 +449,10 @@ Standalone content operations without a live owner use a disposable
 `pdf-content.worker`; Node/test authoring also supports the native engine without
 a browser worker. `objectGraph.ts` is restricted to standalone authoring/diagnostic
 operations, not the live document pipeline. New application PDF operations must
-route through the owner, never call the helper library's `load` / `save`. PDF.js
-is a development-only independent reader; no runtime PDF.js assets are shipped.
+route through the owner, never open another authoring document for a live tab.
+Standalone SDK authors must explicitly destroy their owned documents. Tests
+check native round trips; the manual export audit uses qpdf (pikepdf) and Poppler
+as independent structure/text/raster oracles.
 
 `textTypes.ts` defines the application text-layer contract independently of the
 engine. PDFium glyphs are mapped into original PDF coordinates, split at word,
@@ -465,8 +475,8 @@ encoded glyphs, spacing and unrelated content operators, including shared Form i
 replacement strings currently fail rather than retain stale logical text.
 Export fails if requested text removal fails. This is text replacement, not
 document-wide sanitization.
-The standalone authoring fallback can still stage affected pages; live documents
-do not use that path.
+Text replacement and unknown-stamp fallback rendering also borrow the current
+native document, without creating temporary PDFs.
 
 The package's ESM loader, WASM binary, provenance and third-party notices are
 copied under `pdfium/<source-revision>-<binary-hash>/`. The PWA precaches the

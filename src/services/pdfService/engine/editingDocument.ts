@@ -1,24 +1,11 @@
-import {
-  PDFArray,
-  PDFBool,
-  PDFDict,
-  PDFDocument,
-  PDFHexString,
-  PDFName,
-  PDFNull,
-  PDFNumber,
-  PDFObject,
-  PDFRef,
-  PDFStream,
-  PDFString,
-} from "@cantoo/pdf-lib";
-import { pdfEngine } from "./index";
-import type { PdfEncryption, PdfObjectGraph, PdfObjectValue } from "./types";
+import type { PDFDocument } from "@legir/pdfium/authoring";
+import type { PdfEncryption } from "./types";
 
 import { getPDFium } from "./runtime";
 import { NativeEditingContext } from "./nativeEditingContext";
 import type { PDFiumModule } from "./pdfium";
 import type { PDFDocument as NativeDocument } from "@legir/pdfium";
+import { getNativePageViewport } from "./pageContent";
 import { yieldPdfTask } from "./yieldTask";
 
 const views = new WeakMap<
@@ -37,46 +24,17 @@ export function createEditingView(
 }
 
 export const getEditingView = (document: PDFDocument) =>
-  views.get(document)?.view;
+  views.get(document)?.view ?? document.nativeView;
 
 export function disposeEditingDocument(document: PDFDocument) {
   const entry = views.get(document);
-  if (!entry) return;
+  if (!entry) {
+    document.destroy();
+    return;
+  }
   entry.view.dispose();
   if (entry.owned) entry.view.native.destroy();
   views.delete(document);
-}
-
-const toNativeName = (name: PDFName) => name.asString().slice(1);
-
-function toValue(object: PDFObject): PdfObjectValue {
-  if (object === PDFNull) return null;
-  if (object instanceof PDFBool) return object.asBoolean();
-  if (object instanceof PDFNumber) return object.asNumber();
-  if (object instanceof PDFName) return { name: toNativeName(object) };
-  if (object instanceof PDFRef)
-    return { ref: object.objectNumber, generation: object.generationNumber };
-  if (object instanceof PDFString || object instanceof PDFHexString)
-    return { string: object.asBytes() };
-  if (object instanceof PDFArray)
-    return { array: object.asArray().map(toValue) };
-  if (object instanceof PDFStream) {
-    // getContents also resolves deferred compression on authored appearances.
-    const stream = object.getContents();
-    return {
-      dict: object.dict
-        .entries()
-        .map(([key, value]) => [toNativeName(key), toValue(value)]),
-      stream,
-    };
-  }
-  if (object instanceof PDFDict)
-    return {
-      dict: object
-        .entries()
-        .map(([key, value]) => [toNativeName(key), toValue(value)]),
-    };
-  throw new Error(`Unsupported editing object: ${object.constructor.name}`);
 }
 
 export async function loadEditingDocument(
@@ -167,33 +125,47 @@ export async function saveEditingDocument(
       task.destroy();
     }
   }
-  await document.flush();
-  const graph: PdfObjectGraph = {
-    version: Math.round(
-      Number(document.context.header.getVersionString()) * 10,
-    ),
-    objects: document.context
-      .enumerateIndirectObjects()
-      .map(([ref, object]) => ({
-        number: ref.objectNumber,
-        generation: ref.generationNumber,
-        value: toValue(object),
-      })),
-    trailer: Object.entries(document.context.trailerInfo)
-      .filter(([key, value]) => key !== "Encrypt" && value !== undefined)
-      .map(([key, value]) => [key, toValue(value!)]),
-  };
-  const output = await pdfEngine.writeDocument(
-    { graph, security: options?.security },
-    options?.signal,
-  );
-  if (options?.writeChunk) {
-    await options.writeChunk(output);
-    return new Uint8Array();
+  throw new Error("Saving requires a live PDFium editing view.");
+}
+
+/** Render annotation-only fallback images from the same native owner. */
+export async function renderEditingAnnotations(
+  document: PDFDocument,
+  pageIndex: number,
+  scale: number,
+  signal?: AbortSignal,
+) {
+  const view = getEditingView(document);
+  if (!view)
+    throw new Error("Annotation rendering requires a live PDFium document.");
+  signal?.throwIfAborted();
+  await view.flush();
+  signal?.throwIfAborted();
+  const page = view.native.loadPage(pageIndex);
+  try {
+    const viewport = getNativePageViewport(page, scale);
+    const width = Math.max(1, Math.floor(viewport.width)),
+      height = Math.max(1, Math.floor(viewport.height));
+    const task = page.startRender(viewport.transform, [0, 0, width, height], {
+      contents: false,
+      annotations: true,
+    });
+    try {
+      while (!task.continue(8)) {
+        await yieldPdfTask();
+        signal?.throwIfAborted();
+      }
+      signal?.throwIfAborted();
+      const bitmap = task.finish();
+      try {
+        return { bytes: bitmap.asPNG(), mimeType: "image/png" };
+      } finally {
+        bitmap.destroy();
+      }
+    } finally {
+      task.destroy();
+    }
+  } finally {
+    page.destroy();
   }
-  if (options?.writeBlob) {
-    options.writeBlob(new Blob([output as BlobPart]));
-    return new Uint8Array();
-  }
-  return output;
 }

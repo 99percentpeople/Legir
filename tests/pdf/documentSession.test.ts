@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PDFDocument, PDFName, StandardFonts } from "@cantoo/pdf-lib";
+import { PDFDocument, PDFName, StandardFonts } from "@legir/pdfium/authoring";
 import type { ExportPdfRequest } from "@/services/pdfService/engine/sessionTypes";
 import { DocumentSession } from "@/services/pdfService/engine/documentSession";
 import { getPDFium } from "@/services/pdfService/engine/runtime";
@@ -141,7 +141,13 @@ describe("one native document session", () => {
         reopened.getForm().getTextField("shared").acroField.getWidgets(),
       ).toHaveLength(2);
       const abort = new AbortController();
-      setTimeout(() => abort.abort(), 0);
+      const insertPages = owner.document.insertPages.bind(owner.document);
+      vi.spyOn(owner.document, "insertPages").mockImplementationOnce(
+        (...args) => {
+          insertPages(...args);
+          abort.abort();
+        },
+      );
       await expect(
         owner.addSource("cancelled", donor, undefined, {
           pageIndexes: [0, 2],

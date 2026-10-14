@@ -1,4 +1,9 @@
-import { PDFDocument, PDFDict, PDFName, PDFNumber } from "@cantoo/pdf-lib";
+import {
+  PDFDocument,
+  PDFDict,
+  PDFName,
+  PDFNumber,
+} from "@legir/pdfium/authoring";
 import { rgbArrayToHex } from "./colors";
 import { pdfDebug } from "./debug";
 import {

@@ -2,7 +2,7 @@
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
-const { PDFDocument, StandardFonts, rgb } = require("@cantoo/pdf-lib");
+import { PDFDocument, StandardFonts, rgb } from "@legir/pdfium/authoring";
 const pdf = await PDFDocument.create();
 const font = await pdf.embedFont(StandardFonts.Helvetica);
 for (let i = 0; i < 3; i++) {
@@ -20,6 +20,7 @@ const field = pdf.getForm().createTextField("name");
 field.setText("Alice");
 field.addToPage(pdf.getPage(0), { x: 40, y: 200, width: 180, height: 30 });
 const bytes = Array.from(await pdf.save());
+pdf.destroy();
 const baseUrl = process.argv[2];
 const donorFile = process.argv[3];
 const output = process.argv[4];
@@ -139,6 +140,7 @@ try {
       saved.getForm().getTextField("name").getText() !== "Bob"
     )
       throw new Error("Plain UI save lost the edited form or pages");
+    saved.destroy();
     if (engine === "pdfium" && !prefix)
       throw new Error("Plain PDFium UI save did not use incremental output");
     plainSaves.push({
@@ -208,6 +210,12 @@ try {
     throw new Error(
       "UI save did not preserve edited/imported fields and blank page",
     );
+  const savedPages = check.getPageCount();
+  const savedFields = check
+    .getForm()
+    .getFields()
+    .map((f) => f.getName());
+  check.destroy();
   await page.screenshot({ path: `${output}/ui.png` });
   const result = await page.evaluate(() => ({
     url: location.pathname,
@@ -270,11 +278,8 @@ try {
       result,
       errors,
       resourceFailures,
-      savedPages: check.getPageCount(),
-      savedFields: check
-        .getForm()
-        .getFields()
-        .map((f) => f.getName()),
+      savedPages,
+      savedFields,
       activeWorkers,
       initialWorkerUrls,
       activeWorkerUrls,

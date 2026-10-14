@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { PDFDocument } from "@legir/pdfium/authoring";
 import { loadPDF, exportPDF } from "@/services/pdfService";
 import { createEditorView } from "@/store/editorView";
 import { createPdfWorkerService } from "@/services/pdfService/pdfWorkerService";

@@ -1,5 +1,5 @@
 import { isSerifFamily } from "./text";
-import type { PDFFont, PDFForm } from "@cantoo/pdf-lib";
+import type { PDFFont, PDFForm } from "@legir/pdfium/authoring";
 import { FieldType, type FormField } from "@/types";
 
 // Font objects belong to one PDFDocument. Weak keys do not keep closed documents

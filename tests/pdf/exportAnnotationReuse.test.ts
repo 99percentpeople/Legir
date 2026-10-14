@@ -8,7 +8,7 @@ import {
   PDFRef,
   PDFStream,
   PDFString,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { FreeTextExporter } from "@/services/pdfService/exporters/AnnotationExporters";

@@ -1,4 +1,4 @@
-import type { PDFFont, PDFDocument } from "@cantoo/pdf-lib";
+import type { PDFFont, PDFDocument } from "@legir/pdfium/authoring";
 import { getPlatformSystemFontBytes } from "@/services/platform/fonts";
 import { isDesktopApp } from "@/services/platform/runtime";
 import { hasWorkerFontProvider } from "../engine/fontHost";

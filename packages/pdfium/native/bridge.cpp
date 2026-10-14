@@ -3,6 +3,7 @@
 #include "core/fpdfapi/edit/cpdf_creator.h"
 #include "core/fpdfapi/font/cpdf_font.h"
 #include "core/fpdfapi/page/cpdf_page.h"
+#include "core/fpdfapi/page/cpdf_docpagedata.h"
 #include "core/fpdfapi/page/cpdf_textobject.h"
 #include "core/fpdfapi/parser/cpdf_array.h"
 #include "core/fpdfapi/parser/cpdf_boolean.h"
@@ -17,7 +18,9 @@
 #include "core/fpdfapi/parser/cpdf_stream.h"
 #include "core/fpdfapi/parser/cpdf_stream_acc.h"
 #include "core/fpdfapi/parser/cpdf_string.h"
+#include "core/fpdfapi/parser/fpdf_parser_decode.h"
 #include "core/fpdfapi/render/cpdf_rendercontext.h"
+#include "core/fpdfapi/render/cpdf_docrenderdata.h"
 #include "core/fpdfapi/render/cpdf_renderoptions.h"
 #include "core/fpdfapi/render/cpdf_progressiverenderer.h"
 #include "core/fpdfdoc/cpdf_annot.h"
@@ -55,8 +58,35 @@ struct Blob {
 struct FreeInput {
   void operator()(uint8_t *data) const { std::free(data); }
 };
+// Parsed stream slices retain this reader, whose immutable input remains valid
+// until the final slice is released. No separate encoded-stream copy is needed.
+class OwnedInput final : public IFX_SeekableReadStream {
+ public:
+  OwnedInput(uint8_t* data, size_t size) : data_(data), size_(size) {}
+  FX_FILESIZE GetSize() override { return size_; }
+  bool RetainsDataForEditing() const override { return true; }
+  bool ReadBlockAtOffset(pdfium::span<uint8_t> out, FX_FILESIZE offset) override {
+    if (offset < 0 || static_cast<uint64_t>(offset) > size_ ||
+        out.size() > size_ - static_cast<size_t>(offset)) return false;
+    if (!out.empty()) std::memcpy(out.data(), data_.get() + offset, out.size());
+    return true;
+  }
+ private:
+  std::unique_ptr<uint8_t, FreeInput> data_;
+  size_t size_;
+};
+static FPDF_DOCUMENT load_owned(RetainPtr<OwnedInput> input, const char* password) {
+  auto core = std::make_unique<CPDF_Document>(
+      std::make_unique<CPDF_DocRenderData>(), std::make_unique<CPDF_DocPageData>());
+  const auto error = core->LoadDoc(std::move(input), password);
+  if (error != CPDF_Parser::SUCCESS) {
+    ProcessParseError(error);
+    return nullptr;
+  }
+  return FPDFDocumentFromCPDFDocument(core.release());
+}
 struct Document {
-  std::unique_ptr<uint8_t, FreeInput> input;
+  RetainPtr<OwnedInput> input;
   size_t input_size = 0;
   FPDF_DOCUMENT handle = nullptr;
   RetainPtr<CPDF_Dictionary> trailer;
@@ -92,9 +122,9 @@ struct Document {
 static uint32_t live_documents = 0;
 
 void CPDF_Stream::CopyDataForEditing(const CPDF_Stream& source) {
-  // Parsed file-backed streams already own immutable encoded bytes. Sharing
-  // their reader survives donor closure; a later write replaces data_ (COW).
-  // Authored/decrypted memory streams retain the independent vector copy.
+  // Within one document, readers retain its immutable owned input allocation.
+  // A write replaces the reader (COW); authored/decrypted vectors copy normally.
+  // Cross-document grafts copy selected bytes instead of pinning donor input.
   data_ = source.data_;
   SetLengthInDict(static_cast<int>(GetRawSize()));
 }
@@ -475,7 +505,14 @@ struct GraftMap {
         }
       }
       if (auto stream = value->AsMutableStream()) {
-        output->AsMutableStream()->CopyDataForEditing(*stream);
+        if (source == target) {
+          output->AsMutableStream()->CopyDataForEditing(*stream);
+        } else {
+          // A selected import must not keep the donor's entire input alive.
+          auto data = pdfium::MakeRetain<CPDF_StreamAcc>(pdfium::WrapRetain(stream));
+          data->LoadAllDataRaw();
+          output->AsMutableStream()->TakeData(data->DetachData());
+        }
       }
       return output;
     }
@@ -521,10 +558,10 @@ EMSCRIPTEN_KEEPALIVE void LPDF_SetLargeImageCacheLimit(size_t bytes) {
 EMSCRIPTEN_KEEPALIVE Document *LPDF_Open(uint8_t *data, size_t length,
                                          const char *password) {
   auto doc = std::make_unique<Document>();
-  doc->input.reset(data);
+  doc->input = pdfium::MakeRetain<OwnedInput>(data, length);
   doc->input_size = length;
   if (length) {
-    doc->handle = FPDF_LoadMemDocument64(doc->input.get(), length, password);
+    doc->handle = load_owned(doc->input, password);
   } else
     doc->handle = FPDF_CreateNewDocument();
   if (!doc->handle) {
@@ -538,6 +575,50 @@ EMSCRIPTEN_KEEPALIVE Document *LPDF_Open(uint8_t *data, size_t length,
   return doc.release();
 }
 EMSCRIPTEN_KEEPALIVE int LPDF_Error(Document *doc) { return doc->error; }
+// Eight doubles per Unicode scalar: charcode, advance, glyph bounds, ascent,
+// descent. Font dictionaries and metrics are resolved by the owning PDFium.
+EMSCRIPTEN_KEEPALIVE Blob *LPDF_FontMetrics(Document *doc, uint32_t number,
+                                            const uint32_t *codes, size_t count) {
+  auto object = doc->core()->GetOrParseIndirectObject(number);
+  auto dict = object ? object->GetMutableDict() : nullptr;
+  if (!dict || count > 65536) return nullptr;
+  auto font = static_cast<CPDF_DocPageData*>(doc->core()->GetPageData())->GetFont(dict);
+  if (!font) return nullptr;
+  auto result = std::make_unique<Blob>();
+  result->bytes.resize(count * 8 * sizeof(double));
+  for (size_t i = 0; i < count; ++i) {
+    const uint32_t code = font->CharCodeFromUnicode(codes[i]);
+    const bool valid = code != 0xffffffff;
+    const auto bbox = valid ? font->GetCharBBox(code) : FX_RECT();
+    const double values[8] = {static_cast<double>(code),
+        valid ? static_cast<double>(font->GetCharWidth(code)) : 0,
+        static_cast<double>(bbox.left), static_cast<double>(bbox.bottom),
+        static_cast<double>(bbox.right), static_cast<double>(bbox.top),
+        static_cast<double>(font->GetTypeAscent()),
+        static_cast<double>(font->GetTypeDescent())};
+    std::memcpy(result->bytes.data() + i * sizeof(values), values, sizeof(values));
+  }
+  return result.release();
+}
+EMSCRIPTEN_KEEPALIVE Blob *LPDF_FontCharacterSet(Document *doc, uint32_t number) {
+  auto object = doc->core()->GetOrParseIndirectObject(number);
+  auto dict = object ? object->GetMutableDict() : nullptr;
+  if (!dict) return nullptr;
+  auto font = static_cast<CPDF_DocPageData*>(doc->core()->GetPageData())->GetFont(dict);
+  if (!font) return nullptr;
+  auto result = std::make_unique<Blob>();
+  for (uint32_t code = 0; code < 256; ++code) {
+    const auto unicode = font->UnicodeFromCharCode(code);
+    if (unicode.GetLength() != 1) continue;
+    const uint32_t scalar = unicode[0];
+    if (scalar && font->CharCodeFromUnicode(scalar) != 0xffffffff) {
+      const auto offset = result->bytes.size();
+      result->bytes.resize(offset + sizeof(scalar));
+      std::memcpy(result->bytes.data() + offset, &scalar, sizeof(scalar));
+    }
+  }
+  return result.release();
+}
 EMSCRIPTEN_KEEPALIVE void LPDF_Close(Document *doc) {
   if (doc && doc->handle)
     live_documents--;
@@ -547,7 +628,7 @@ EMSCRIPTEN_KEEPALIVE int LPDF_Authenticate(Document *doc,
                                            const char *password) {
   if (!doc->handle) {
     doc->handle =
-        FPDF_LoadMemDocument64(doc->input.get(), doc->input_size, password);
+        load_owned(doc->input, password);
     if (!doc->handle)
       return 0;
     live_documents++;
@@ -939,7 +1020,48 @@ EMSCRIPTEN_KEEPALIVE Blob *LPDF_ReadStream(CPDF_Object *object, int raw) {
     acc->LoadAllDataRaw();
   else
     acc->LoadAllDataFiltered();
+  if (raw == 2 && stream->HasFilter()) {
+    const auto decoders = GetDecoderArray(stream->GetDict());
+    if (!decoders) return nullptr;
+    if (!decoders->empty()) {
+      auto input = acc->GetSpan();
+      DataVector<uint8_t> decoded;
+      for (const auto& decoder : *decoders) {
+        if (decoder.first == "Crypt") continue;
+        auto result = PDF_DataDecode(input, 0, false, DecoderArray{decoder});
+        if (!result || !result->image_encoding.IsEmpty()) return nullptr;
+        // PDFium's tolerant Flate decoder can return empty data for malformed
+        // input. Distinguish that from a valid compressed empty appearance.
+        if (result->data.empty() && !input.empty() &&
+            (decoder.first == "FlateDecode" || decoder.first == "Fl")) {
+          z_stream check{};
+          uint8_t byte = 0;
+          check.next_in = const_cast<uint8_t*>(input.data());
+          check.avail_in = input.size();
+          check.next_out = &byte;
+          check.avail_out = 1;
+          if (inflateInit(&check) != Z_OK) return nullptr;
+          const bool empty = inflate(&check, Z_FINISH) == Z_STREAM_END &&
+                             check.total_out == 0;
+          inflateEnd(&check);
+          if (!empty) return nullptr;
+        }
+        decoded = std::move(result->data);
+        input = decoded;
+      }
+      return blob(input);
+    }
+  }
   return blob(acc->GetSpan());
+}
+EMSCRIPTEN_KEEPALIVE Blob *LPDF_Deflate(const uint8_t* bytes, size_t size) {
+  auto result = std::make_unique<Blob>();
+  uLongf length = compressBound(size);
+  result->bytes.resize(length);
+  if (compress2(result->bytes.data(), &length, bytes, size, Z_DEFAULT_COMPRESSION) != Z_OK)
+    return nullptr;
+  result->bytes.resize(length);
+  return result.release();
 }
 EMSCRIPTEN_KEEPALIVE void LPDF_WriteStream(Document *doc, uint32_t number,
                                            const uint8_t *data, size_t length,

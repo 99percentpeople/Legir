@@ -1,4 +1,9 @@
-import { PDFArray, PDFRef, type PDFField, type PDFForm } from "@cantoo/pdf-lib";
+import {
+  PDFArray,
+  PDFRef,
+  type PDFField,
+  type PDFForm,
+} from "@legir/pdfium/authoring";
 import type { FormExportContext } from "../types";
 
 const refKey = (ref: { objectNumber: number; generationNumber: number }) =>

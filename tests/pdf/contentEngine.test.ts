@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import fontkit from "pdf-fontkit";
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import { readPageText } from "./nativeVerification";
 import {
   degrees,
   PDFDict,
@@ -11,7 +11,7 @@ import {
   PDFString,
   StandardFonts,
   rgb,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import type { Annotation } from "@/types";
 import { exportPDF, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
@@ -37,26 +37,11 @@ const quad = (x: number, y: number, width: number, height: number): PdfQuad => [
   y,
 ];
 
-const readText = async (
-  bytes: Uint8Array,
-  pageIndex = 0,
-  password?: string,
-) => {
-  const task = pdfjs.getDocument({
-    data: bytes.slice(),
-    password,
-    useSystemFonts: true,
-  });
-  const doc = await task.promise;
-  try {
-    const content = await (await doc.getPage(pageIndex + 1)).getTextContent();
-    return content.items
-      .filter((item) => "str" in item)
-      .map((item) => ({ text: item.str, transform: item.transform }));
-  } finally {
-    await task.destroy();
-  }
-};
+const readText = async (bytes: Uint8Array, pageIndex = 0, password?: string) =>
+  (await readPageText(bytes, pageIndex, password)).map((item) => ({
+    text: item.str.trim(),
+    transform: item.transform,
+  }));
 
 const fixture = async () => {
   const doc = await PDFDocument.create();

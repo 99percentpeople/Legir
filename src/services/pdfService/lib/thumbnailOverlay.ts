@@ -1,10 +1,9 @@
-import { saveEditingDocument } from "../engine/editingDocument";
 import {
-  PDFDocument,
+  type PDFDocument,
   PDFName,
   StandardFonts,
   type PDFFont,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import type { Annotation } from "@/types";
 import type { ThumbnailContent } from "../types";
 import { annotationExporters, controlExporters } from "../exporters";
@@ -82,12 +81,4 @@ export async function drawThumbnailOverlay(
   }
   context.flushAppearanceUpdates();
   return pageIndex;
-}
-
-/** Standalone authoring helper for regression fixtures. Live thumbnails call
- * drawThumbnailOverlay on the worker-owned document, without serialization. */
-export async function createThumbnailOverlay(content: ThumbnailContent) {
-  const pdfDoc = await PDFDocument.create();
-  const pageIndex = await drawThumbnailOverlay(pdfDoc, content);
-  return pageIndex === null ? null : saveEditingDocument(pdfDoc);
 }

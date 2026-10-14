@@ -9,7 +9,7 @@ import {
   rgb,
   degrees,
   StandardFonts,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { loadPDF, exportPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import {
@@ -107,7 +107,7 @@ describe("native PDF pipeline", () => {
     );
     const sharedDict = source.context.lookup(
       shared,
-    ) as import("@cantoo/pdf-lib").PDFDict;
+    ) as import("@legir/pdfium/authoring").PDFDict;
     sharedDict.set(PDFName.of("Key#FF#80"), PDFName.of("Value#E9#23AA"));
     source.catalog.set(
       PDFName.of("Custom"),
@@ -327,7 +327,9 @@ describe("native PDF pipeline", () => {
       }),
     );
     source.catalog.set(PDFName.of("Outlines"), outline);
-    const root = context.lookup(outline) as import("@cantoo/pdf-lib").PDFDict;
+    const root = context.lookup(
+      outline,
+    ) as import("@legir/pdfium/authoring").PDFDict;
     root.set(PDFName.of("First"), item);
     root.set(PDFName.of("Last"), item);
     root.set(PDFName.of("Count"), PDFNumber.of(1));

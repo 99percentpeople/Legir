@@ -13,9 +13,19 @@ await build({
   // A detached baseline may share installed dependencies with the working tree.
   // Resolve its SDK from its own sources, never the other workspace's symlink.
   resolve: {
-    alias: {
-      "@legir/pdfium": resolve(checkout, "packages/pdfium/src/index.ts"),
-    },
+    alias: [
+      {
+        find: /^@legir\/pdfium\/authoring$/,
+        replacement: resolve(
+          checkout,
+          "packages/pdfium/src/authoring/index.ts",
+        ),
+      },
+      {
+        find: /^@legir\/pdfium$/,
+        replacement: resolve(checkout, "packages/pdfium/src/index.ts"),
+      },
+    ],
   },
   worker: {
     plugins: () => (process.env.PDF_BENCH_PROFILE ? [profilePlugin()] : []),

@@ -7,7 +7,7 @@ import {
   PDFStream,
   PDFString,
   PDFHexString,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { Annotation } from "@/types";
 import {
   createStampImageAppearance,

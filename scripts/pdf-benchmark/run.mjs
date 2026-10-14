@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { createRequire } from "node:module";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { PDFDocument } from "@legir/pdfium/authoring";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const [root, fixtureDir, output, rounds = "3"] = process.argv.slice(2);
@@ -192,19 +192,23 @@ try {
           const file = join(output, `${fixture}-${round}-${name}.pdf`);
           await download.saveAs(file);
           const pdf = await PDFDocument.load(await readFile(file));
-          return {
-            pages: pdf.getPageCount(),
-            fields: pdf
-              .getForm()
-              .getFields()
-              .map((field) => ({
-                name: field.getName(),
-                value:
-                  typeof field.getText === "function"
-                    ? field.getText()
-                    : undefined,
-              })),
-          };
+          try {
+            return {
+              pages: pdf.getPageCount(),
+              fields: pdf
+                .getForm()
+                .getFields()
+                .map((field) => ({
+                  name: field.getName(),
+                  value:
+                    typeof field.getText === "function"
+                      ? field.getText()
+                      : undefined,
+                })),
+            };
+          } finally {
+            pdf.destroy();
+          }
         };
         record.exportValidation = await save("export");
         if (

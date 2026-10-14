@@ -25,7 +25,7 @@ Times cover worker initialization/loading, PNG rendering at 1.5 scale, hydration
 export, and importing/parsing a four-page donor. Import timing includes parsing
 the source preview and registering the source with the owning worker. The
 `large-import` case imports the 60-page image file into the small form file;
-the other cases import the four-page donor. Merged export retains all original and imported fields. An independent pdf-lib reader
+the other cases import the four-page donor. Merged export retains all original and imported fields. A native SDK reader
 checks page counts, field counts and edited values; exported files are retained
 with the raw JSON. The fixture seed and date fields are fixed; record the actual
 fixture hashes because serializers may add identifiers.
@@ -62,7 +62,7 @@ performance comparison. Ordinary builds include no profiling hooks.
 saves it twice. PDFium must retain the exact original prefix without growing a
 revision chain. It then inserts a blank page, undoes/redoes it, imports the
 four-page donor and saves again.
-It independently reopens the download (eight pages, three fields), checks for
+It reopens the download with the native SDK (eight pages, three fields), checks for
 visible broken images and, for PDFium, verifies one live worker followed by zero
 after closing the document. Pass `pdfjs` as the optional final argument to test
 the baseline: it records that engine's initial/active/closed worker URLs without
@@ -167,17 +167,17 @@ temperature/load/swap counters and Chromium GPU feature flags accompany every
 record; CPU-only headless measurements do not predict GPU/Tauri performance.
 No validation subprocesses or builds run during the measured comparison.
 
-`io-probes.mjs BUILD FIXTURE OUTPUT [cancel|preview]` separately tests save
+`io-probes.mjs BUILD FIXTURE OUTPUT [cancel|cancel-merged|preview]` separately tests save
 cancellation or saved-revision preview reuse. Cancellation covers full writes at
 20/250/500 ms, an early incremental cancellation, and cancellation while building
-the original-prefix Blob (use a large fixture). The latter uses a diagnostic-only
+the original-prefix Blob (use a large fixture). `cancel-merged` imports three selected pages, cancels merged saves at the same three delays, and retries the complete assembled output. The latter uses a diagnostic-only
 wrapper to schedule an abort after the native delta RPC returns; production
 services are unchanged. Each attempt
 measures both caller rejection and worker readiness after rollback, requires one
 surviving native document, compares page pixels, and retries a complete save.
 Preview mode needs the synthetic donor with an editable text field. It compares
 the cached preview with the independently reopened edited PDF, requires it to
-differ from the original preview, then reopens the downloaded file with pdf-lib.
+differ from the original preview, then reopens the downloaded file with the native SDK.
 The verification worker is confined to the probe. These are correctness and
 response-latency diagnostics, not part of the timed performance comparison.
 
@@ -301,7 +301,7 @@ alongside the body comparisons and seams. This blend envelope is specific to the
 fixture's Normal/Multiply modes, not a proof for every possible PDF blend mode.
 Run this quality gate before the performance comparison, in a separate process.
 
-Validation runs **after timing** with pdf-lib and Poppler: all page dimensions,
+Validation runs **after timing** with qpdf (pikepdf) and Poppler: all page dimensions,
 rotations, annotation subtype counts, nested reply parents, review states/flags,
 popup ownership, internal link targets, external link URIs
 and form values are checked, along with the
@@ -314,6 +314,24 @@ The recorded real corpus has no fillable form fields; use the synthetic form
 suite above for form-editing coverage. This corpus harness does not implement
 the UI's renaming of colliding imported field names, so choose donors without
 those collisions.
+
+The independent structure reader is `inspect_pdf.py`. Install the pinned
+`scripts/pdf-benchmark/requirements.txt` in a separate Python venv and set
+`PDF_BENCH_PYTHON=/absolute/venv/bin/python` when running `corpus-validate.mjs`.
+Neither this reader nor Poppler is an application dependency. qpdf syntax
+warnings are retained in the structural JSON and make an export validation fail. The small UI/synthetic probes
+use the native SDK for secondary checks; they do not replace this independent
+corpus validation.
+
+`authoring-audit.mjs OUTPUT [HISTORICAL_AUTHORING_MODULE]` creates a synthetic
+editable/flattened document covering both bundled CJK fonts, standard fonts,
+SVG/text/path/PNG appearances, all editable form kinds, wrapping/combing,
+password presentation and rotated widgets. With no module override it uses the
+current SDK. A historical module path allows a separate reference checkout to
+supply fixtures without reintroducing an old package into this branch. Run `python authoring-validate.py CANDIDATE_DIR REFERENCE_DIR OUTPUT_JSON`
+with the verification venv to check field values, Chinese text and exact editable
+versus flattened Poppler pixels; a historical library's own flattening failure must be reported,
+not treated as a valid visual reference.
 
 `PDF_BENCH_CASES=book,indot`, `PDF_BENCH_VARIANTS=pdfium`, and
 `PDF_BENCH_TIMEOUT_MS=180000` can scope diagnostic runs. `PDF_BENCH_CAPTURE=1`

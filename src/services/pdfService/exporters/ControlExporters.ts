@@ -5,7 +5,7 @@ import {
   TextAlignment,
   degrees,
   type PDFFont,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { FormField, FieldType } from "@/types";
 import { PDF_CUSTOM_KEYS } from "@/constants";
 import {

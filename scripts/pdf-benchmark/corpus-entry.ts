@@ -194,7 +194,7 @@ const bench = {
       nativePreview,
     };
   },
-  async save(merged = false, includePreview = false) {
+  async save(merged = false, includePreview = false, signal?: AbortSignal) {
     const start = now();
     const originalPages = loaded!.pages.map((page, index) => ({
       ...page,
@@ -277,6 +277,7 @@ const bench = {
       undefined,
       {
         includePreview,
+        signal,
         preservedSourceAnnotations: preserved,
         syncFormFields: true,
         ...(merged
@@ -304,7 +305,7 @@ const bench = {
   },
   async cancelExport(
     delayMs = 20,
-    mode: "full" | "incremental" | "prefix" = "full",
+    mode: "full" | "incremental" | "prefix" | "merged" = "full",
   ) {
     if (!("exportPDFBlob" in pdfService)) return { supported: false };
     const controller = new AbortController();
@@ -333,18 +334,20 @@ const bench = {
     } else timer = setTimeout(abort, delayMs);
     let aborted = false;
     try {
-      await pdfService.exportPDFBlob(
-        bytes!,
-        loaded!.fields,
-        loaded!.metadata,
-        loaded!.annotations,
-        undefined,
-        {
-          preservedSourceAnnotations: loaded!.preservedSourceAnnotations,
-          signal: controller.signal,
-          incremental: mode !== "full",
-        },
-      );
+      if (mode === "merged") await this.save(true, false, controller.signal);
+      else
+        await pdfService.exportPDFBlob(
+          bytes!,
+          loaded!.fields,
+          loaded!.metadata,
+          loaded!.annotations,
+          undefined,
+          {
+            preservedSourceAnnotations: loaded!.preservedSourceAnnotations,
+            signal: controller.signal,
+            incremental: mode !== "full",
+          },
+        );
     } catch (error) {
       if ((error as Error).name !== "AbortError") throw error;
       aborted = true;

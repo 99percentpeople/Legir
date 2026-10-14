@@ -8,7 +8,7 @@ import {
   PDFName,
   PDFRawStream,
   rgb,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 const output = process.argv[2];
 if (!output) throw new Error("Usage: node fixtures.mjs OUTPUT");
 await mkdir(output, { recursive: true });
@@ -78,6 +78,7 @@ for (const [name, count, image] of [
     }
   }
   const bytes = await pdf.save();
+  pdf.destroy();
   await writeFile(`${output}/${name}.pdf`, bytes);
   hashes[name] = {
     pages: count,

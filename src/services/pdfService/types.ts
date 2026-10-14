@@ -13,7 +13,7 @@ import {
   type PDFFont,
   type PDFField,
   type PDFStream,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import {
   Annotation,
   FormField,

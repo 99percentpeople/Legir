@@ -9,12 +9,12 @@ import {
   PDFStream,
   decodePDFRawStream,
   PDFString,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import type { PdfJsAnnotationOption } from "../types";
 import { decodePdfString } from "./pdf-objects";
 
 /**
- * Utilities for importing/parsing PDF objects (mostly from `pdf-lib` structures)
+ * Utilities for importing/parsing native-backed PDF authoring objects
  * into our internal representation.
  *
  * Keep these helpers pure (no global state) so `index.ts` can stay focused on

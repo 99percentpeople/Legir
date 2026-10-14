@@ -5,7 +5,7 @@ import {
   PDFHexString,
   StandardFonts,
   type PDFFont,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import fontkit from "pdf-fontkit";
 import { FieldType, type FormField, type Annotation } from "@/types";
 import {

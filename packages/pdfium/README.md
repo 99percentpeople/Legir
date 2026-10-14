@@ -82,11 +82,11 @@ its own assets. A host should serialize document jobs in one worker.
   parents, avoiding traversal into unselected pages. Dispose each graft map
   after its group; never reuse it after rolling back a transaction. On a failed
   graft, discard the map and roll back the transaction.
-  Parsed, immutable stream readers are retained across grafts rather than
-  copying their encoded bytes again. PDFium's parser gives these readers their
-  own storage; they do not borrow the donor document's input allocation.
-  Authored/decrypted stream vectors are copied. Subsequent writes replace a
-  stream's backing storage, preserving independence after donor closure.
+  Parsed, immutable stream readers retain a view of the document's owned input
+  allocation. Same-document grafts share these readers; cross-document grafts
+  copy selected encoded streams so closing a donor cannot pin its entire input.
+  Authored/decrypted vectors are copied. Subsequent writes replace a stream's
+  backing storage, preserving copy independence.
 - `extractText` returns text, glyph geometry, fonts and colors; `redactText`
   removes glyphs intersecting PDF-coordinate quads while retaining surrounding
   operators, original encodings, subsequent glyph positions and shared Forms.
@@ -131,9 +131,43 @@ its own assets. A host should serialize document jobs in one worker.
 Rendering, native annotation appearances, widget dictionaries, outlines,
 destinations and password verification are included. This is an engine API,
 not a ready-made paragraph editor. OCR inference, OCR layer creation, UI undo,
-font selection/layout, signature validation and PDF JavaScript execution are
+font selection policy, signature validation and PDF JavaScript execution are
 not implemented by the library. Legir supplies its existing editing UI and
 appearance helpers; OCR models can consume its `renderOcrImage` result.
+
+## Authoring views
+
+`@legir/pdfium/authoring` is the package's own higher-level editing layer. It
+provides the object/field vocabulary used by Legir, Standard-14 and caller-supplied
+fontkit fonts, PNG/JPEG, vector SVG shapes/text/images, page drawing and metadata.
+It is not a drop-in implementation of every API from other PDF libraries.
+
+```ts
+import { NativeEditingContext, StandardFonts } from "@legir/pdfium/authoring";
+const view = new NativeEditingContext(engine, document); // Borrow the existing owner.
+try {
+  const font = view.document.embedStandardFont(StandardFonts.Helvetica);
+  view.document.getPage(0).drawText("Edited", { font, size: 12, x: 20, y: 30 });
+  await view.flush(); // Makes pending fonts/appearances visible to native render/save.
+} finally {
+  view.dispose(); // Releases the view, not the borrowed PDF document.
+}
+```
+
+Standalone `PDFDocument.create()` / `load(bytes, {password})` own a native document;
+call `destroy()` after use. `save()` is a convenience full-buffer writer; live
+applications should use the owner's cooperative `startSave()` for bounded output
+and cancellation. `PDFContext` only constructs values; it cannot parse or save
+files independently. Native object graph copying is used whenever views share
+an engine. The application retains its page-assembly policies for forms, links,
+annotations/replies and source identity.
+
+SVG vector authoring supports paths (including arcs), shapes, transforms,
+text/font mapping, clipping, embedded PNG/JPEG images and transparency. Filters,
+masks and gradient paints are rejected so callers can supply a raster appearance;
+this is not a general browser SVG renderer. Custom fonts require a supplied
+font shaper/subsetter; the package does not fetch fonts or embed a second PDF
+engine. `fast-png` and `@xmldom/xmldom` are image/XML codecs only.
 
 ## Build
 

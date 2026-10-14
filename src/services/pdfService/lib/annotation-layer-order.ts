@@ -4,7 +4,7 @@ import {
   PDFName,
   PDFRef,
   type PDFPage,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import type { Annotation, FormField } from "@/types";
 import {
   getOrderedPageControls,

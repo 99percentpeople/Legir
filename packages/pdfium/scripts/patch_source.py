@@ -4,6 +4,18 @@ from pathlib import Path
 
 def patch(source: Path):
     changes = {
+        "core/fxcrt/fx_stream.h": (
+            "  virtual bool IsEOF();",
+            "  // Only immutable readers owning their input can be retained by parsed streams.\n  virtual bool RetainsDataForEditing() const { return false; }\n  virtual bool IsEOF();",
+        ),
+        "core/fpdfapi/parser/cpdf_read_validator.h": (
+            "  void ResetErrors();",
+            "  bool RetainsDataForEditing() const override { return !file_avail_ && file_read_->RetainsDataForEditing(); }\n  void ResetErrors();",
+        ),
+        "core/fpdfapi/parser/cpdf_syntax_parser.cpp": (
+            "  if (substream) {\n    // It is unclear",
+            "  if (substream && file_access_->RetainsDataForEditing()) {\n    stream = pdfium::MakeRetain<CPDF_Stream>(std::move(substream), std::move(dict));\n  } else if (substream) {\n    // It is unclear",
+        ),
         "core/fpdfapi/parser/cpdf_stream.h": (
             "  void TakeData(DataVector<uint8_t> data);",
             "  void TakeData(DataVector<uint8_t> data);\n  void CopyDataForEditing(const CPDF_Stream& source);",

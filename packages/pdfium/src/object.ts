@@ -302,6 +302,12 @@ export class PDFObject {
       this.runtime.call("LPDF_ReadStream", this.pointer, 0),
     );
   }
+  /** Decode non-image filters strictly; reject unsupported/corrupt pipelines. */
+  readStreamStrict() {
+    return this.runtime.buffer(
+      this.runtime.call("LPDF_ReadStream", this.pointer, 2),
+    );
+  }
   writeRawStream(bytes: Uint8Array) {
     this.writeStream(bytes, true);
   }

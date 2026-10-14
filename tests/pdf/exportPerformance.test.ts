@@ -15,8 +15,8 @@ import {
   decodePDFRawStream,
   PDFTextField,
   StandardFonts,
-} from "@cantoo/pdf-lib";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+} from "@legir/pdfium/authoring";
+import { readPageText } from "./nativeVerification";
 import { exportPDF } from "@/services/pdfService";
 import { FieldType, type FormField } from "@/types";
 
@@ -186,20 +186,14 @@ describe("form export work scales with fields, not repeated tree scans", () => {
       const reopened = await PDFDocument.load(output);
       if (flatten) {
         expect(reopened.getForm().getFields()).toHaveLength(0);
-        const task = pdfjsLib.getDocument({ data: new Uint8Array(output) });
-        const document = await task.promise;
-        try {
-          for (let pageNumber = 1; pageNumber <= 2; pageNumber++) {
-            const page = await document.getPage(pageNumber);
-            const content = await page.getTextContent();
-            expect(
-              content.items.filter(
-                (item) => "str" in item && item.str === "Final 5",
-              ),
-            ).toHaveLength(3);
-          }
-        } finally {
-          await task.destroy();
+        for (let pageIndex = 0; pageIndex < 2; pageIndex++) {
+          const items = await readPageText(output, pageIndex);
+          expect(
+            items
+              .map((item) => item.str)
+              .join(" ")
+              .match(/Final 5/g),
+          ).toHaveLength(3);
         }
       } else {
         const exported = reopened.getForm().getTextField("shared");

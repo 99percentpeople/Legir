@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { PDFDocument } from "@legir/pdfium/authoring";
 import { appEventBus } from "@/lib/eventBus";
 import { exportPDF, loadPDF, startPdfOpenSession } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";

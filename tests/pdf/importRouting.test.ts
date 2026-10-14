@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PDFDocument, PDFString } from "@cantoo/pdf-lib";
+import { PDFDocument, PDFString } from "@legir/pdfium/authoring";
 import { loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import * as stampVector from "@/services/pdfService/lib/stampVector";

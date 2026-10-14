@@ -1,4 +1,9 @@
-import { PDFDict, PDFName, PDFRef, type PDFPage } from "@cantoo/pdf-lib";
+import {
+  PDFDict,
+  PDFName,
+  PDFRef,
+  type PDFPage,
+} from "@legir/pdfium/authoring";
 import type { Annotation, PreservedSourceAnnotationRef } from "@/types";
 import type { PdfJsAnnotation } from "../types";
 import { readPdfJsAnnotationCommentMeta } from "./annotationCommentMeta";

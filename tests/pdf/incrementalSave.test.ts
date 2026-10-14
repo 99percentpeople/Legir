@@ -1,5 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { expect, it, vi } from "vitest";
-import { PDFDocument, PDFRef, StandardFonts } from "@cantoo/pdf-lib";
+import { PDFDocument, PDFRef } from "@legir/pdfium/authoring";
 import { exportPDFBlob } from "@/services/pdfService";
 import { FieldType } from "@/types";
 import { DocumentSession } from "@/services/pdfService/engine/documentSession";
@@ -10,15 +11,16 @@ const hasOriginalPrefix = (output: Uint8Array, input: Uint8Array) =>
   output.length >= input.length &&
   input.every((value, index) => output[index] === value);
 async function fixture(useObjectStreams = true) {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  doc
-    .addPage([300, 300])
-    .drawText("Original body text", { font, x: 20, y: 200 });
-  doc.addPage([300, 300]);
-  const text = doc.getForm().createTextField("name");
-  text.setText("Original value");
-  text.addToPage(doc.getPage(0), { x: 20, y: 40, width: 200, height: 30 });
+  const bytes = new Uint8Array(
+    await readFile(
+      `tests/fixtures/pdf/${useObjectStreams ? "xref-stream" : "classic"}-form.pdf`,
+    ),
+  );
+  expect(new TextDecoder().decode(bytes).includes("/Type /XRef")).toBe(
+    useObjectStreams,
+  );
+  const doc = await PDFDocument.load(bytes);
+  const text = doc.getForm().getTextField("name");
   const ref = text.acroField.Kids()!.get(0) as PDFRef;
   const field = {
     id: "name",
@@ -33,11 +35,11 @@ async function fixture(useObjectStreams = true) {
       generationNumber: ref.generationNumber,
     },
   };
-  return { bytes: await doc.save({ useObjectStreams }), field };
+  return { bytes, field };
 }
 
 it.each([true, false])(
-  "independently reopens appended metadata and edited fields (xref stream: %s)",
+  "reopens appended metadata and edited fields (xref stream: %s)",
   async (useObjectStreams) => {
     const { bytes, field } = await fixture(useObjectStreams);
     const output = await asBytes(

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { PDFDocument } from "@legir/pdfium/authoring";
+import { PDFPage as NativePage, PDFRenderTask } from "@legir/pdfium";
+import * as editing from "@/services/pdfService/engine/editingDocument";
+import { getPDFium } from "@/services/pdfService/engine/runtime";
 import { loadPDF, startPdfOpenSession } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import {
@@ -188,8 +191,19 @@ const mockWorker = () => ({
 });
 
 describe("stamp render fallback batching", () => {
-  it("renders/unloads once per page and decodes once for all stamps", async () => {
+  it("renders from the existing owner once per page and decodes once for all stamps", async () => {
     const worker = mockWorker();
+    const pdfium = await getPDFium();
+    const before = pdfium.liveDocuments();
+    const render = editing.renderEditingAnnotations;
+    const counts: number[] = [];
+    const fallback = vi
+      .spyOn(editing, "renderEditingAnnotations")
+      .mockImplementation(async (...args) => {
+        counts.push(pdfium.liveDocuments());
+        return render(...args);
+      });
+    const startRender = vi.spyOn(NativePage.prototype, "startRender");
     const result = await loadPDF(await stampSource(), {
       workerService: worker as unknown as PDFWorkerService,
     });
@@ -197,10 +211,16 @@ describe("stamp render fallback batching", () => {
       expect(
         result.annotations.filter((annotation) => annotation.type === "stamp"),
       ).toHaveLength(10);
-      expect(worker.renderPageImage).toHaveBeenCalledTimes(1);
-      const docId = worker.renderPageImage.mock.calls[0][0].docId;
-      expect(docId).toMatch(/^stamp-fallback-/);
-      expect(worker.unloadDocument).toHaveBeenCalledExactlyOnceWith(docId);
+      expect(fallback).toHaveBeenCalledTimes(1);
+      expect(startRender).toHaveBeenCalledExactlyOnceWith(
+        expect.any(Array),
+        [0, 0, 400, 600],
+        { contents: false, annotations: true },
+      );
+      expect(counts).toEqual([before + 1]);
+      expect(pdfium.liveDocuments()).toBe(before);
+      expect(worker.renderPageImage).not.toHaveBeenCalled();
+      expect(worker.unloadDocument).not.toHaveBeenCalled();
       expect(createImageBitmap).toHaveBeenCalledTimes(1);
       expect(bitmaps[0].close).toHaveBeenCalledTimes(1);
     } finally {
@@ -208,23 +228,30 @@ describe("stamp render fallback batching", () => {
     }
   });
 
-  it("unloads a temporary document even when rendering rejects", async () => {
+  it("releases the native page and owner even when rendering rejects", async () => {
     const worker = mockWorker();
-    worker.renderPageImage.mockRejectedValueOnce(new Error("Render failed"));
-    const result = await loadPDF(await stampSource(), {
+    const bytes = await stampSource();
+    const pdfium = await getPDFium();
+    const before = pdfium.liveDocuments();
+    vi.spyOn(NativePage.prototype, "startRender").mockImplementationOnce(() => {
+      throw new Error("Render failed");
+    });
+    const destroyPage = vi.spyOn(NativePage.prototype, "destroy");
+    const result = await loadPDF(bytes, {
       workerService: worker as unknown as PDFWorkerService,
     });
     result.dispose();
-    expect(worker.unloadDocument).toHaveBeenCalledExactlyOnceWith(
-      worker.renderPageImage.mock.calls[0][0].docId,
-    );
+    expect(destroyPage).toHaveBeenCalledTimes(1);
+    expect(pdfium.liveDocuments()).toBe(before);
+    expect(worker.renderPageImage).not.toHaveBeenCalled();
+    expect(worker.unloadDocument).not.toHaveBeenCalled();
     expect(createImageBitmap).not.toHaveBeenCalled();
   });
 
-  it("isolates concurrent fallback document IDs even in the same millisecond", async () => {
+  it("keeps concurrent fallback renders attached to their respective owners", async () => {
     const worker = mockWorker();
     const bytes = await stampSource(1);
-    vi.spyOn(Date, "now").mockReturnValue(123456);
+    const fallback = vi.spyOn(editing, "renderEditingAnnotations");
     const results = await Promise.all(
       [0, 1].map(() =>
         loadPDF(bytes, {
@@ -233,31 +260,32 @@ describe("stamp render fallback batching", () => {
       ),
     );
     results.forEach((result) => result.dispose());
-    const ids = worker.renderPageImage.mock.calls.map(
-      ([options]) => options.docId,
-    );
-    expect(new Set(ids).size).toBe(2);
-    expect(worker.unloadDocument.mock.calls.map(([id]) => id).sort()).toEqual(
-      [...ids].sort(),
-    );
+    expect(fallback).toHaveBeenCalledTimes(2);
+    expect(
+      new Set(fallback.mock.calls.map(([document]) => document)).size,
+    ).toBe(2);
+    expect(worker.renderPageImage).not.toHaveBeenCalled();
+    expect(worker.unloadDocument).not.toHaveBeenCalled();
     expect(bitmaps).toHaveLength(2);
     expect(
       bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1),
     ).toBe(true);
   });
 
-  it("aborts pending hydration without decoding and still unloads the scratch document", async () => {
+  it("aborts pending hydration without decoding or creating a scratch document", async () => {
     const worker = mockWorker();
     let complete!: (value: {
       bytes: Uint8Array<ArrayBuffer>;
       mimeType: string;
     }) => void;
-    worker.renderPageImage.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          complete = resolve;
-        }),
-    );
+    const fallback = vi
+      .spyOn(editing, "renderEditingAnnotations")
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+      );
     const session = startPdfOpenSession(await stampSource(1), {
       workerService: worker as unknown as PDFWorkerService,
     });
@@ -266,15 +294,34 @@ describe("stamp render fallback batching", () => {
     const rejected = expect(pending).rejects.toMatchObject({
       name: "AbortError",
     });
-    await vi.waitFor(() =>
-      expect(worker.renderPageImage).toHaveBeenCalledTimes(1),
-    );
+    await vi.waitFor(() => expect(fallback).toHaveBeenCalledTimes(1));
     session.abort();
     complete({ bytes: new Uint8Array([1]), mimeType: "image/png" });
     await rejected;
     session.dispose();
-    expect(worker.renderPageImage.mock.calls[0][0].signal?.aborted).toBe(true);
-    expect(worker.unloadDocument).toHaveBeenCalledTimes(1);
+    expect(fallback.mock.calls[0][3]?.aborted).toBe(true);
+    expect(worker.renderPageImage).not.toHaveBeenCalled();
+    expect(worker.unloadDocument).not.toHaveBeenCalled();
     expect(createImageBitmap).not.toHaveBeenCalled();
+  });
+
+  it("cancels a progressive annotation render and releases its task and page", async () => {
+    const document = await PDFDocument.load(await stampSource(1));
+    const controller = new AbortController();
+    vi.spyOn(PDFRenderTask.prototype, "continue").mockImplementationOnce(() => {
+      controller.abort();
+      return false;
+    });
+    const destroyTask = vi.spyOn(PDFRenderTask.prototype, "destroy");
+    const destroyPage = vi.spyOn(NativePage.prototype, "destroy");
+    await expect(
+      editing.renderEditingAnnotations(document, 0, 2, controller.signal),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(destroyTask).toHaveBeenCalled();
+    expect(destroyPage).toHaveBeenCalledTimes(1);
+    expect(document.getPageCount()).toBe(1);
+    expect(
+      (await editing.renderEditingAnnotations(document, 0, 2)).bytes.length,
+    ).toBeGreaterThan(8);
   });
 });

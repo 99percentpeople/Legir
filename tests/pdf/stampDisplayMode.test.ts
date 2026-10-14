@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { PDFDict, PDFDocument, PDFName, PDFStream } from "@cantoo/pdf-lib";
+import {
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFStream,
+} from "@legir/pdfium/authoring";
 import { exportPDF, loadPDF } from "@/services/pdfService";
 import { decodePdfStreamToText } from "@/services/pdfService/lib/pdf-import-utils";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";

@@ -2,6 +2,7 @@ import {
   loadEditingDocument,
   saveEditingDocument,
   disposeEditingDocument,
+  renderEditingAnnotations,
 } from "./engine/editingDocument";
 import type { PDFWorkerService } from "./pdfWorkerService";
 import { getFontMap, getGlobalDA } from "./lib/appearance";
@@ -76,8 +77,7 @@ import {
   PDFSignature,
   PDFNull,
   PDFPage,
-  rgb,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { pdfDebug, pdfDebugEnabled } from "./lib/debug";
 import { appEventBus } from "@/lib/eventBus";
 import { PDF_CUSTOM_KEYS } from "@/constants";
@@ -179,7 +179,6 @@ const controlParsers: IControlParser[] = [
 ];
 
 const STAMP_RENDER_FALLBACK_SCALE = 2;
-let nextStampFallbackId = 0;
 
 const populateRenderedStampFallbacksForPage = async (options: {
   pageAnnotations: PdfJsAnnotation[];
@@ -244,37 +243,13 @@ const populateRenderedStampFallbacksForPage = async (options: {
   try {
     if (nativeStampRenderer)
       renderedPage = await nativeStampRenderer(pageIndex);
-    else {
-      const scratchDoc = await PDFDocument.create();
-      const [copiedPage] = await scratchDoc.copyPages(pdfDoc, [pageIndex]);
-      const { width, height } = copiedPage.getSize();
-      copiedPage.drawRectangle({
-        x: 0,
-        y: 0,
-        width,
-        height,
-        color: rgb(1, 1, 1),
-        opacity: 1,
-        borderWidth: 0,
-      });
-      scratchDoc.addPage(copiedPage);
-      const scratchBytes = await saveEditingDocument(scratchDoc);
-      const docId = `stamp-fallback-${pageIndex}-${Date.now()}-${nextStampFallbackId++}`;
-      try {
-        renderedPage = await workerService.renderPageImage({
-          pageIndex: 0,
-          scale: STAMP_RENDER_FALLBACK_SCALE,
-          renderAnnotations: true,
-          mimeType: "image/png",
-          docId,
-          data: scratchBytes,
-          isNewDoc: true,
-          signal,
-        });
-      } finally {
-        workerService.unloadDocument(docId);
-      }
-    }
+    else
+      renderedPage = await renderEditingAnnotations(
+        pdfDoc,
+        pageIndex,
+        STAMP_RENDER_FALLBACK_SCALE,
+        signal,
+      );
   } catch {
     return;
   }

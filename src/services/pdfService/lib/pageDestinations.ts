@@ -7,7 +7,7 @@ import {
   PDFObject,
   PDFRef,
   PDFString,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 
 /** Resolve both the legacy /Dests dictionary and a /Names/Dests name tree. */
 export function readNamedPageDestinations(doc: PDFDocument) {

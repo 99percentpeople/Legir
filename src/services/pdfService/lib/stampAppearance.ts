@@ -10,7 +10,7 @@ import {
   PDFStream,
   PDFString,
   decodePDFRawStream,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import {
   applyPdfMatrixToPoint,
   getAppearanceStreamMetadata,

@@ -23,7 +23,7 @@ import {
   pushGraphicsState,
   popGraphicsState,
   concatTransformationMatrix,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { Annotation } from "@/types";
 import { PDF_CUSTOM_KEYS } from "@/constants";
 import {

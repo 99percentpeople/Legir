@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { readPageText, renderPageBody } from "./nativeVerification";
 import { readFile } from "node:fs/promises";
 import fontkit from "pdf-fontkit";
 import {
@@ -13,7 +13,7 @@ import {
   PDFString,
   PDFWidgetAnnotation,
   StandardFonts,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { decodePdfStreamToText } from "@/services/pdfService/lib/pdf-import-utils";
 import { exportPDF } from "@/services/pdfService";
 import {
@@ -164,15 +164,6 @@ const getPageContentText = async (pdfDoc: PDFDocument, pageIndex = 0) => {
     return chunks.join("\n");
   }
   return "";
-};
-
-const getPdfJsPage = async (bytes: Uint8Array, pageNumber = 1) => {
-  const task = pdfjsLib.getDocument({
-    data: new Uint8Array(bytes),
-    disableWorker: true,
-  } as unknown as Parameters<typeof pdfjsLib.getDocument>[0]);
-  const pdfDoc = await task.promise;
-  return await pdfDoc.getPage(pageNumber);
 };
 
 const toSourcePdfRef = (ref: PDFRef) => ({
@@ -497,8 +488,7 @@ describe("exportPDF form handling", () => {
       { flattenFormFields: true },
     );
 
-    const pdfJsPage = await getPdfJsPage(exportedBytes);
-    const textContent = await pdfJsPage.getTextContent();
+    const textContent = { items: await readPageText(exportedBytes) };
     const item = textContent.items.find(
       (entry) => "str" in entry && entry.str === "New value",
     );
@@ -551,8 +541,7 @@ describe("exportPDF form handling", () => {
       { flattenFormFields: true },
     );
 
-    const pdfJsPage = await getPdfJsPage(exportedBytes);
-    const textContent = await pdfJsPage.getTextContent();
+    const textContent = { items: await readPageText(exportedBytes) };
     const item = textContent.items.find(
       (entry) => "str" in entry && entry.str === "中文",
     );
@@ -644,18 +633,15 @@ describe("exportPDF form handling", () => {
     expect(exportedDoc.getForm().getFields()).toHaveLength(0);
     expect(getPageAnnotationCount(exportedDoc)).toBe(0);
 
-    const pdfJsPage = await getPdfJsPage(exportedBytes);
-    const textContent = await pdfJsPage.getTextContent();
+    const textContent = { items: await readPageText(exportedBytes) };
     const text = textContent.items
       .map((item) => ("str" in item ? item.str : ""))
       .join(" ");
     expect(text).toContain("Source Alice");
     expect(text).not.toContain("Clear All");
-    await expect(
-      pdfJsPage.getOperatorList({
-        annotationMode: pdfjsLib.AnnotationMode.DISABLE,
-      }),
-    ).resolves.toBeTruthy();
+    expect(
+      (await renderPageBody(exportedBytes!)).coloredPixels,
+    ).toBeGreaterThan(0);
   });
 
   it("prints highlight and comment fallbacks as static page content", async () => {
@@ -689,11 +675,9 @@ describe("exportPDF form handling", () => {
 
     expect(getPageAnnotationCount(exportedDoc)).toBe(0);
 
-    const pdfJsPage = await getPdfJsPage(exportedBytes);
-    const operatorList = await pdfJsPage.getOperatorList({
-      annotationMode: pdfjsLib.AnnotationMode.DISABLE,
-    });
-    expect(operatorList.fnArray.length).toBeGreaterThan(0);
+    expect((await renderPageBody(exportedBytes)).coloredPixels).toBeGreaterThan(
+      0,
+    );
   });
 
   it("updates imported source fields without removing and recreating malformed widgets", async () => {
@@ -878,12 +862,10 @@ describe("exportPDF form handling", () => {
     ).toEqual(["name"]);
     expect(getPageAnnotationCount(exportedDoc)).toBe(1);
 
-    const pdfJsPage = await getPdfJsPage(exportedBytes!);
-    await expect(
-      pdfJsPage.getOperatorList({
-        annotationMode: pdfjsLib.AnnotationMode.DISABLE,
-      }),
-    ).resolves.toBeTruthy();
+    expect(await renderPageBody(exportedBytes!)).toMatchObject({
+      width: 240,
+      height: 200,
+    });
 
     await expect(
       exportPDF(exportedBytes!, [filledNameField], undefined, []),

@@ -17,7 +17,7 @@ import {
   type PDFHexString,
   type PDFTextField,
   type PDFWidgetAnnotation,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { getPdfTextVisualCenterAboveBaselineEm } from "./text-field-metrics";
 
 const tfRegex =

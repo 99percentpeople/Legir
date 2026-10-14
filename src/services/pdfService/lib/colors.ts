@@ -1,4 +1,4 @@
-import { rgb } from "@cantoo/pdf-lib";
+import { rgb } from "@legir/pdfium/authoring";
 import { pdfDebug } from "./debug";
 
 export const hexToPdfColor = (hex: string | undefined) => {

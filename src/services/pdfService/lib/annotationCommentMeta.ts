@@ -1,4 +1,9 @@
-import { PDFDict, PDFHexString, PDFName, PDFString } from "@cantoo/pdf-lib";
+import {
+  PDFDict,
+  PDFHexString,
+  PDFName,
+  PDFString,
+} from "@legir/pdfium/authoring";
 import { Annotation, AnnotationReply } from "@/types";
 import { parsePDFDate } from "@/utils/pdfUtils";
 import { PdfJsAnnotation } from "../types";

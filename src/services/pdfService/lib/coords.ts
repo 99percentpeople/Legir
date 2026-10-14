@@ -1,4 +1,4 @@
-import { PDFName, PDFNumber, PDFPage } from "@cantoo/pdf-lib";
+import { PDFName, PDFNumber, PDFPage } from "@legir/pdfium/authoring";
 import type { ViewportLike } from "../types";
 import { pdfDebug } from "./debug";
 

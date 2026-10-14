@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
-import { PDFDocument, degrees, rgb } from "@cantoo/pdf-lib";
+import { PDFDocument, degrees, rgb } from "@legir/pdfium/authoring";
 import { PDFPixmap } from "@legir/pdfium";
 import { getPDFium } from "@/services/pdfService/engine/runtime";
 import { getNativePageViewport } from "@/services/pdfService/engine/pageContent";

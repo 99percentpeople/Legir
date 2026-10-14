@@ -1,0 +1,2 @@
+# Independent structure oracle. Install in a task-specific venv, not the app.
+pikepdf==10.17.0

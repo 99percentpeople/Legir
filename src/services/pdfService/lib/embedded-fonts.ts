@@ -1,4 +1,4 @@
-import { PDFArray, PDFDict, PDFName, PDFStream } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFName, PDFStream } from "@legir/pdfium/authoring";
 import { normalizePdfFontName } from "./pdf-font-names";
 import {
   decodePdfStreamBytes,

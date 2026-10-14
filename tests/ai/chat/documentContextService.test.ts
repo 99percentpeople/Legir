@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { TextContent } from "pdfjs-dist/types/src/display/api";
+import type { TextContent } from "@/services/pdfService/engine/textTypes";
 
 import {
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT,

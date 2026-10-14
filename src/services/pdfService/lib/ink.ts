@@ -1,4 +1,4 @@
-import { PDFDict, PDFName, PDFStream } from "@cantoo/pdf-lib";
+import { PDFDict, PDFName, PDFStream } from "@legir/pdfium/authoring";
 
 export const generateInkAppearanceOps = (
   points: { x: number; y: number }[],

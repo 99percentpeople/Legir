@@ -6,7 +6,7 @@ import {
   PDFNumber,
   PDFStream,
   degrees,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { exportPDF } from "@/services/pdfService";
 import {
   getImageExportPixelSize,

@@ -1,5 +1,5 @@
 import type { PDFDocument, PDFObject } from "@legir/pdfium";
-import type { PDFDocument as EditingDocument } from "@cantoo/pdf-lib";
+import type { PDFDocument as EditingDocument } from "@legir/pdfium/authoring";
 import { executePdfEngineRequest, type PDFiumModule } from "./pdfium";
 import type { PdfEngineRequest } from "./types";
 import { createEditingView, disposeEditingDocument } from "./editingDocument";
@@ -151,8 +151,12 @@ export class DocumentSession {
       } finally {
         for (const page of copiedPages) page.destroy();
       }
+      // Let queued cancellation run before copying the catalog and committing.
+      await yieldPdfTask();
+      options?.signal?.throwIfAborted();
       importedTrailer = graft.graftObject(preparedTrailer);
       const refs = graft.getReferences(donor);
+      options?.signal?.throwIfAborted();
       doc.endOperation();
       operation = false;
       this.sources.set(id, {

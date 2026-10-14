@@ -20,7 +20,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./wasm/*": "./wasm/*"
+    "./wasm/*": "./wasm/*",
+    "./authoring": {
+      "types": "./dist/authoring/index.d.ts",
+      "import": "./dist/authoring/index.js"
+    }
   },
   "scripts": {
     "build": "node scripts/verify-artifacts.mjs && tsc -p tsconfig.json",
@@ -32,5 +36,9 @@
   "devDependencies": {
     "typescript": "~5.9.3",
     "vitest": "4.1.11"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.12",
+    "fast-png": "^8.0.0"
   }
 }

@@ -1,4 +1,4 @@
-import { PDFDict, PDFHexString, PDFName } from "@cantoo/pdf-lib";
+import { PDFDict, PDFHexString, PDFName } from "@legir/pdfium/authoring";
 
 import { decodePdfString } from "./pdf-objects";
 

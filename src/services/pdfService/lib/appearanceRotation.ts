@@ -4,7 +4,7 @@ import {
   PDFName,
   PDFNumber,
   PDFStream,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 
 export type PdfTransformMatrix = [
   number,

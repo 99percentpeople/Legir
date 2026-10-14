@@ -1,4 +1,4 @@
-import type { PDFDocument, PDFFont } from "@cantoo/pdf-lib";
+import type { PDFDocument, PDFFont } from "@legir/pdfium/authoring";
 import { FieldType, type Annotation, type FormField } from "@/types";
 import { isDesktopApp } from "@/services/platform/runtime";
 import { hasWorkerFontProvider } from "../engine/fontHost";

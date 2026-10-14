@@ -7,7 +7,7 @@ import {
   PDFNumber,
   PDFRef,
   PDFString,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { exportPDF, exportPDFBlob, loadPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { createTestEditorStore } from "../helpers/editorStore";

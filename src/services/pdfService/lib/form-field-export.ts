@@ -17,7 +17,7 @@ import {
   PDFTextField,
   PDFWidgetAnnotation,
   TextAlignment,
-} from "@cantoo/pdf-lib";
+} from "@legir/pdfium/authoring";
 import { FieldType, type FormField } from "@/types";
 import type {
   ControlExportOptions,
