@@ -366,11 +366,15 @@ export async function exportPDF(
 
 /** File/print output avoids a second file-sized JS array. Byte-array callers
  * retain exportPDF; both use the same native writer and transaction. */
-const originalBlobs = new WeakMap<Uint8Array, Blob>();
+const originalBlobs = new WeakMap<
+  Uint8Array,
+  { blob: Blob; pageCount?: number }
+>();
 const appendSavedRevision = async (
   originalBytes: Uint8Array,
   delta: Blob,
   signal?: AbortSignal,
+  pageCount?: number,
 ) => {
   signal?.throwIfAborted();
   let original = originalBlobs.get(originalBytes);
@@ -390,10 +394,11 @@ const appendSavedRevision = async (
       await yieldPdfTask();
     }
     signal?.throwIfAborted();
-    original = new Blob(parts);
+    original = { blob: new Blob(parts), pageCount };
     originalBlobs.set(originalBytes, original);
   }
-  return new Blob([original, delta], { type: "application/pdf" });
+  original.pageCount ??= pageCount;
+  return new Blob([original.blob, delta], { type: "application/pdf" });
 };
 
 export async function exportPDFBlob(
@@ -405,6 +410,34 @@ export async function exportPDFBlob(
   options?: ExportPdfOptions & { signal?: AbortSignal },
 ): Promise<Blob> {
   const { signal, ...settings } = options ?? {};
+  const structure = settings.pageStructure;
+  const cachedPageCount = originalBlobs.get(originalBytes)?.pageCount;
+  // Retire the repeat-save prefix before a known full rewrite allocates its
+  // working graph/output. Hidden imported sources conservatively drop it too.
+  // Native save eligibility remains authoritative; this only manages storage.
+  if (
+    originalBlobs.has(originalBytes) &&
+    (settings.incremental === false ||
+      settings.flattenFormFields ||
+      settings.pageIndexes ||
+      settings.exportPassword ||
+      (settings.removeTextUnderFlattenedFreetext !== false &&
+        annotations.some(
+          (annotation) => annotation.type === "freetext" && annotation.flatten,
+        )) ||
+      (structure &&
+        (Object.keys(structure.sources).length > 0 ||
+          (cachedPageCount !== undefined &&
+            cachedPageCount !== structure.pages.length) ||
+          structure.pages.some(
+            (page, index) =>
+              page.blank ||
+              page.source?.copyGroup ||
+              (page.source?.documentId ?? "default") !== "default" ||
+              (page.source?.pageIndex ?? page.pageIndex) !== index,
+          ))))
+  )
+    originalBlobs.delete(originalBytes);
   if (isNode()) {
     const parts: Blob[] = [];
     let incremental = false;
@@ -421,8 +454,14 @@ export async function exportPDFBlob(
       },
     });
     const blob = new Blob(parts, { type: "application/pdf" });
+    if (!incremental) originalBlobs.delete(originalBytes);
     return incremental
-      ? appendSavedRevision(originalBytes, blob, signal)
+      ? appendSavedRevision(
+          originalBytes,
+          blob,
+          signal,
+          structure?.pages.length,
+        )
       : blob;
   }
   let worker = getPdfWorkerForBytes(originalBytes);
@@ -445,8 +484,14 @@ export async function exportPDFBlob(
       },
       signal,
     );
+    if (!output.incremental) originalBlobs.delete(originalBytes);
     const blob = output.incremental
-      ? await appendSavedRevision(originalBytes, output.blob, signal)
+      ? await appendSavedRevision(
+          originalBytes,
+          output.blob,
+          signal,
+          structure?.pages.length,
+        )
       : output.blob;
     signal?.throwIfAborted();
     exportPreviews.set(blob, output.preview ?? null);

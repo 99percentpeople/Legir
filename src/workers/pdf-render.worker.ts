@@ -990,6 +990,14 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
                 ? {
                     onSaveMode: (value) => {
                       incremental = value;
+                      // A full rewrite needs its own stream/object working
+                      // storage. Release reader images before output grows;
+                      // the exclusive lease prevents concurrent reader jobs.
+                      if (!value) {
+                        scanRenderer?.clear();
+                        for (const state of docs.values())
+                          state.pageCache.clear();
+                      }
                     },
                     writeBlob: (blob) => {
                       parts.push(blob);

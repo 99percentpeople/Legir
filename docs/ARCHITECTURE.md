@@ -384,7 +384,13 @@ encrypted, repaired or nonzero-generation inputs, encryption changes and native
 text redaction. `incremental: false` explicitly requests compact output without
 retaining old revisions. Incremental saves retain previous form values,
 annotations and metadata in the original prefix; they are not sanitization.
-The original immutable Blob is retained only as long as its input byte array.
+The original immutable Blob is retained only as long as its input byte array,
+and is evicted before known full rewrites (including imports, page changes,
+flattening and encryption) to avoid retaining a file-sized prefix alongside the
+full writer's working graph/output. Other native fallbacks evict it on completion.
+Full rewrites also release reader image/page caches before emitting their output
+chunks, rather than retaining those surfaces until export rollback. Incremental
+metadata-only saves keep their reader caches for subsequent zoom and tile work.
 
 Persistent saves request a small cover before the export transaction rolls back.
 `exportPreviews.ts` associates it with the output Blob, so recent-file updates do
