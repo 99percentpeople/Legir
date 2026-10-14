@@ -124,6 +124,8 @@ function same(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 const validations = [];
+let pendingWrite = Promise.resolve();
+const jobs = [];
 for (const record of results) {
   const fixture = manifest.fixtures.find((f) => f.id === record.fixture);
   const donor = manifest.fixtures.find((f) => f.id === record.donor);
@@ -137,160 +139,180 @@ for (const record of results) {
     console.log(
       `Checking ${record.variant}/${record.fixture}/${record.round}/${mode}`,
     );
-    const validation = {
-      variant: record.variant,
-      fixture: record.fixture,
-      round: record.round,
-      mode,
-      file,
-    };
-    try {
-      validation.bytes = (await stat(file)).size;
-      validation.originalPrefixRetained =
-        validation.bytes >= fixture.bytes &&
-        (await fileHash(file, fixture.bytes)) === fixture.sha256;
-      validation.appendedBytes = validation.originalPrefixRetained
-        ? validation.bytes - fixture.bytes
-        : null;
-      const actual = await inspect(file);
-      validation.syntaxWarnings = actual.warnings;
-      const source = fixtureInfo.get(fixture.id),
-        imported = fixtureInfo.get(donor.id);
-      const selectedPages =
-        record.phases.import?.selectedPages ?? imported.pages.map((_, i) => i);
-      const donorPages = selectedPages.map((index) => imported.pages[index]);
-      const expected =
-        mode === "merged" ? [...source.pages, ...donorPages] : source.pages;
-      if (
-        mode === "merged" &&
-        selectedPages.length !== imported.pages.length &&
-        imported.fields.length
-      )
-        throw new Error(
-          "Partial-form selection needs a dedicated field/widget validator",
-        );
-      validation.pages = actual.pages.length;
-      validation.expectedPages = expected.length;
-      validation.titleEdited = actual.title === "Legir corpus benchmark";
-      validation.geometryMismatches = [];
-      validation.annotationMismatches = [];
-      validation.replyMismatches = [];
-      validation.linkMismatches = [];
-      for (const [index, page] of expected.entries()) {
-        const result = actual.pages[index];
+    jobs.push(async () => {
+      const validation = {
+        variant: record.variant,
+        fixture: record.fixture,
+        round: record.round,
+        mode,
+        file,
+      };
+      try {
+        validation.bytes = (await stat(file)).size;
+        validation.originalPrefixRetained =
+          validation.bytes >= fixture.bytes &&
+          (await fileHash(file, fixture.bytes)) === fixture.sha256;
+        validation.appendedBytes = validation.originalPrefixRetained
+          ? validation.bytes - fixture.bytes
+          : null;
+        const actual = await inspect(file);
+        validation.parserWarnings = actual.parserWarnings;
+        validation.contentSyntaxChecked = actual.contentSyntaxChecked;
+        const source = fixtureInfo.get(fixture.id),
+          imported = fixtureInfo.get(donor.id);
+        const selectedPages =
+          record.phases.import?.selectedPages ??
+          imported.pages.map((_, i) => i);
+        const donorPages = selectedPages.map((index) => imported.pages[index]);
+        const expected =
+          mode === "merged" ? [...source.pages, ...donorPages] : source.pages;
         if (
-          !result ||
-          Math.abs(result.size.width - page.size.width) > 0.01 ||
-          Math.abs(result.size.height - page.size.height) > 0.01 ||
-          result.rotation !== page.rotation
+          mode === "merged" &&
+          selectedPages.length !== imported.pages.length &&
+          imported.fields.length
         )
-          validation.geometryMismatches.push(index);
-        if (
-          !result ||
-          !same(
-            Object.entries(result.annotations).sort(),
-            Object.entries(page.annotations).sort(),
+          throw new Error(
+            "Partial-form selection needs a dedicated field/widget validator",
+          );
+        validation.pages = actual.pages.length;
+        validation.expectedPages = expected.length;
+        validation.titleEdited = actual.title === "Legir corpus benchmark";
+        validation.geometryMismatches = [];
+        validation.annotationMismatches = [];
+        validation.replyMismatches = [];
+        validation.linkMismatches = [];
+        for (const [index, page] of expected.entries()) {
+          const result = actual.pages[index];
+          if (
+            !result ||
+            Math.abs(result.size.width - page.size.width) > 0.01 ||
+            Math.abs(result.size.height - page.size.height) > 0.01 ||
+            result.rotation !== page.rotation
           )
-        )
-          validation.annotationMismatches.push({
-            page: index,
-            expected: page.annotations,
-            actual: result?.annotations,
-          });
-        if (!result || !same(result.replies, page.replies))
-          validation.replyMismatches.push({
-            page: index,
-            expected: page.replies,
-            actual: result?.replies,
-          });
-        const expectedLinks = page.links.map((link) => ({
-          ...link,
-          ...(mode === "merged" &&
-          index >= source.pages.length &&
-          link.kind === "GoTo" &&
-          link.targetPage !== null
-            ? {
-                targetPage: selectedPages.includes(link.targetPage)
-                  ? selectedPages.indexOf(link.targetPage) + source.pages.length
-                  : null,
-              }
-            : {}),
-        }));
-        const sortedLinks = (links) =>
-          links.map((link) => JSON.stringify(link)).sort();
-        if (
-          !result ||
-          !same(sortedLinks(result.links), sortedLinks(expectedLinks))
-        )
-          validation.linkMismatches.push(index);
-      }
-      // For these fixtures names do not collide; include values, not just counts.
-      const fields =
-        mode === "merged"
-          ? [...source.fields, ...imported.fields].sort((a, b) =>
-              a.name.localeCompare(b.name),
+            validation.geometryMismatches.push(index);
+          if (
+            !result ||
+            !same(
+              Object.entries(result.annotations).sort(),
+              Object.entries(page.annotations).sort(),
             )
-          : source.fields;
-      validation.fieldsMatch = same(actual.fields, fields);
-      validation.fields = actual.fields;
-      const checks = [...new Set([0, ...fixture.samplePages])].map((index) => ({
-        source: fixture.path,
-        sourcePage: index,
-        outputPage: index,
-      }));
-      if (mode === "merged")
-        for (const index of [
-          ...new Set([
-            0,
-            Math.floor(selectedPages.length / 2),
-            selectedPages.length - 1,
-          ]),
-        ])
-          checks.push({
-            source: donor.path,
-            sourcePage: selectedPages[index],
-            outputPage: source.pages.length + index,
-          });
-      validation.samples = [];
-      for (const check of checks) {
-        const before = await raster(check.source, check.sourcePage),
-          after = await raster(file, check.outputPage);
-        const sourceText = await textHash(check.source, check.sourcePage),
-          outputText = await textHash(file, check.outputPage);
-        validation.samples.push({
-          ...check,
-          pixels: comparePixels(before, after),
-          textEqual: sourceText.hash === outputText.hash,
-          sourceText,
-          outputText,
-        });
-      }
-      validation.ok =
-        !validation.syntaxWarnings.length &&
-        validation.pages === expected.length &&
-        validation.titleEdited &&
-        !validation.geometryMismatches.length &&
-        !validation.annotationMismatches.length &&
-        !validation.replyMismatches.length &&
-        !validation.linkMismatches.length &&
-        validation.fieldsMatch &&
-        validation.samples.every(
-          (s) =>
-            s.textEqual &&
-            s.pixels.dimensionsMatch &&
-            s.pixels.changedPixelFraction < 0.001,
+          )
+            validation.annotationMismatches.push({
+              page: index,
+              expected: page.annotations,
+              actual: result?.annotations,
+            });
+          if (!result || !same(result.replies, page.replies))
+            validation.replyMismatches.push({
+              page: index,
+              expected: page.replies,
+              actual: result?.replies,
+            });
+          const expectedLinks = page.links.map((link) => ({
+            ...link,
+            ...(mode === "merged" &&
+            index >= source.pages.length &&
+            link.kind === "GoTo" &&
+            link.targetPage !== null
+              ? {
+                  targetPage: selectedPages.includes(link.targetPage)
+                    ? selectedPages.indexOf(link.targetPage) +
+                      source.pages.length
+                    : null,
+                }
+              : {}),
+          }));
+          const sortedLinks = (links) =>
+            links.map((link) => JSON.stringify(link)).sort();
+          if (
+            !result ||
+            !same(sortedLinks(result.links), sortedLinks(expectedLinks))
+          )
+            validation.linkMismatches.push(index);
+        }
+        // For these fixtures names do not collide; include values, not just counts.
+        const fields =
+          mode === "merged"
+            ? [...source.fields, ...imported.fields].sort((a, b) =>
+                a.name.localeCompare(b.name),
+              )
+            : source.fields;
+        validation.fieldsMatch = same(actual.fields, fields);
+        validation.fields = actual.fields;
+        const checks = [...new Set([0, ...fixture.samplePages])].map(
+          (index) => ({
+            source: fixture.path,
+            sourcePage: index,
+            outputPage: index,
+          }),
         );
-    } catch (error) {
-      validation.ok = false;
-      validation.error = String(error);
-    }
-    validations.push(validation);
-    await writeFile(
-      join(output, "validation.json"),
-      JSON.stringify(validations, null, 2),
-    );
+        if (mode === "merged")
+          for (const index of [
+            ...new Set([
+              0,
+              Math.floor(selectedPages.length / 2),
+              selectedPages.length - 1,
+            ]),
+          ])
+            checks.push({
+              source: donor.path,
+              sourcePage: selectedPages[index],
+              outputPage: source.pages.length + index,
+            });
+        validation.samples = [];
+        for (const check of checks) {
+          const before = await raster(check.source, check.sourcePage),
+            after = await raster(file, check.outputPage);
+          const sourceText = await textHash(check.source, check.sourcePage),
+            outputText = await textHash(file, check.outputPage);
+          validation.samples.push({
+            ...check,
+            pixels: comparePixels(before, after),
+            textEqual: sourceText.hash === outputText.hash,
+            sourceText,
+            outputText,
+          });
+        }
+        validation.ok =
+          !validation.parserWarnings.length &&
+          validation.pages === expected.length &&
+          validation.titleEdited &&
+          !validation.geometryMismatches.length &&
+          !validation.annotationMismatches.length &&
+          !validation.replyMismatches.length &&
+          !validation.linkMismatches.length &&
+          validation.fieldsMatch &&
+          validation.samples.every(
+            (s) =>
+              s.textEqual &&
+              s.pixels.dimensionsMatch &&
+              s.pixels.changedPixelFraction < 0.001,
+          );
+      } catch (error) {
+        validation.ok = false;
+        validation.error = String(error);
+      }
+      validations.push(validation);
+      pendingWrite = pendingWrite.then(() =>
+        writeFile(
+          join(output, "validation.json"),
+          JSON.stringify(validations, null, 2),
+        ),
+      );
+      await pendingWrite;
+    });
   }
 }
+let nextJob = 0;
+const concurrency = Math.max(
+  1,
+  Math.min(4, Number(process.env.PDF_BENCH_VALIDATION_JOBS ?? 1)),
+);
+await Promise.all(
+  Array.from({ length: concurrency }, async () => {
+    while (nextJob < jobs.length) await jobs[nextJob++]();
+  }),
+);
 console.log(
   JSON.stringify({
     exports: validations.length,

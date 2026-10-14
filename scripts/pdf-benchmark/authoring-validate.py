@@ -30,8 +30,8 @@ def text(path):
 
 candidate, baseline, output = map(Path, sys.argv[1:4])
 editable, flat = candidate / "editable.pdf", candidate / "flattened.pdf"
-current, flattened, previous = inspect(editable), inspect(flat), inspect(baseline / "editable.pdf")
-assert not current["warnings"] and not flattened["warnings"]
+current, flattened, previous = inspect(editable, check_content_syntax=True), inspect(flat, check_content_syntax=True), inspect(baseline / "editable.pdf", check_content_syntax=True)
+assert not current["parserWarnings"] and not flattened["parserWarnings"]
 assert len(current["pages"]) == len(flattened["pages"]) == 1
 assert current["fields"] == previous["fields"] and len(current["fields"]) == 10
 assert not flattened["fields"]
@@ -49,8 +49,8 @@ result = {
     "baselineFlattenedCompared": False,
     "fields": current["fields"],
     "fieldValuesMatchHistoricalAuthoring": True,
-    "editableSyntaxWarnings": current["warnings"],
-    "flattenedSyntaxWarnings": flattened["warnings"],
+    "editableSyntaxWarnings": current["parserWarnings"],
+    "flattenedSyntaxWarnings": flattened["parserWarnings"],
     "flattenedFields": len(flattened["fields"]),
     "editableAndFlattenedPixelsExact": True,
     "rasterPpmSha256": hashlib.sha256(current_raster).hexdigest(),

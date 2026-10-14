@@ -318,10 +318,22 @@ those collisions.
 The independent structure reader is `inspect_pdf.py`. Install the pinned
 `scripts/pdf-benchmark/requirements.txt` in a separate Python venv and set
 `PDF_BENCH_PYTHON=/absolute/venv/bin/python` when running `corpus-validate.mjs`.
-Neither this reader nor Poppler is an application dependency. qpdf syntax
-warnings are retained in the structural JSON and make an export validation fail. The small UI/synthetic probes
+Every indirect object is resolved and parser/xref warnings fail structural
+validation. The corpus validator checks all page/annotation/form/link structures
+plus sampled text/raster output. It does not parse every page's content operators;
+use `content-syntax.mjs` for that separate qpdf check. This distinction matters
+because the public INDOT source already has compressed-stream warnings.
+Neither these tools nor Poppler are application dependencies. The small UI/synthetic probes
 use the native SDK for secondary checks; they do not replace this independent
 corpus validation.
+
+`content-syntax.mjs MANIFEST RESULTS_JSON OUTPUT` runs qpdf 12's native Job API
+through the pinned pikepdf package on the sources and first-round candidate
+standalone/merged outputs. Install `jbig2dec` on PATH for source JBIG2 streams.
+Exact diagnostic logs are retained; normalized warning categories/counts are
+compared with the source documents. This is not a zero-warning assertion or proof
+that warnings refer to identical streams. `PDF_BENCH_VALIDATION_JOBS` (1–4) can
+parallelize the separate structure/raster validator after timing has finished.
 
 `authoring-audit.mjs OUTPUT [HISTORICAL_AUTHORING_MODULE]` creates a synthetic
 editable/flattened document covering both bundled CJK fonts, standard fonts,

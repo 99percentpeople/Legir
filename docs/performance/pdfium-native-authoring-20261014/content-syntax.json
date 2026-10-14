@@ -1,0 +1,168 @@
+[
+  {
+    "id": "source-book",
+    "fixture": "book",
+    "file": "/home/zach/Bookshelf/BeginnersGuide-5thEd-Eng_v4.pdf",
+    "mode": "source",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 0,
+    "error": null,
+    "hasWarnings": false,
+    "seconds": 3.4588565789163113,
+    "warningCategories": {},
+    "sourceWarningCategories": {},
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  },
+  {
+    "id": "source-drawing405",
+    "fixture": "drawing405",
+    "file": "/tmp/legir-pan-audit-20261007/drawing.pdf",
+    "mode": "source",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 0,
+    "error": null,
+    "hasWarnings": false,
+    "seconds": 26.703292766585946,
+    "warningCategories": {},
+    "sourceWarningCategories": {},
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  },
+  {
+    "id": "book-export",
+    "fixture": "book",
+    "donor": "indot",
+    "mode": "export",
+    "file": "/tmp/legir-authoring-20261014/corpus/after-book-0-export.pdf",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 0,
+    "error": null,
+    "hasWarnings": false,
+    "seconds": 2.557825823314488,
+    "warningCategories": {},
+    "sourceWarningCategories": {},
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  },
+  {
+    "id": "source-indot",
+    "fixture": "indot",
+    "file": "/tmp/legir-three-engine/corpus/indot.pdf",
+    "mode": "source",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 3,
+    "error": null,
+    "hasWarnings": true,
+    "seconds": 63.05579079221934,
+    "warningCategories": {
+      "input stream is complete but output may still be valid": 100
+    },
+    "sourceWarningCategories": {
+      "input stream is complete but output may still be valid": 100
+    },
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  },
+  {
+    "id": "book-merged",
+    "fixture": "book",
+    "donor": "indot",
+    "mode": "merged",
+    "file": "/tmp/legir-authoring-20261014/corpus/after-book-0-merged.pdf",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 3,
+    "error": null,
+    "hasWarnings": true,
+    "seconds": 69.05740027036518,
+    "warningCategories": {
+      "input stream is complete but output may still be valid": 100
+    },
+    "sourceWarningCategories": {
+      "input stream is complete but output may still be valid": 100
+    },
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  },
+  {
+    "id": "indot-export",
+    "fixture": "indot",
+    "donor": "book",
+    "mode": "export",
+    "file": "/tmp/legir-authoring-20261014/corpus/after-indot-0-export.pdf",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 3,
+    "error": null,
+    "hasWarnings": true,
+    "seconds": 68.16507248301059,
+    "warningCategories": {
+      "input stream is complete but output may still be valid": 100
+    },
+    "sourceWarningCategories": {
+      "input stream is complete but output may still be valid": 100
+    },
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  },
+  {
+    "id": "drawing405-export",
+    "fixture": "drawing405",
+    "donor": "book",
+    "mode": "export",
+    "file": "/tmp/legir-authoring-20261014/corpus/after-drawing405-0-export.pdf",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 0,
+    "error": null,
+    "hasWarnings": false,
+    "seconds": 21.692136720754206,
+    "warningCategories": {},
+    "sourceWarningCategories": {},
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  },
+  {
+    "id": "indot-merged",
+    "fixture": "indot",
+    "donor": "book",
+    "mode": "merged",
+    "file": "/tmp/legir-authoring-20261014/corpus/after-indot-0-merged.pdf",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 3,
+    "error": null,
+    "hasWarnings": true,
+    "seconds": 60.16256196703762,
+    "warningCategories": {
+      "input stream is complete but output may still be valid": 100
+    },
+    "sourceWarningCategories": {
+      "input stream is complete but output may still be valid": 100
+    },
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  },
+  {
+    "id": "drawing405-merged",
+    "fixture": "drawing405",
+    "donor": "book",
+    "mode": "merged",
+    "file": "/tmp/legir-authoring-20261014/corpus/after-drawing405-0-merged.pdf",
+    "qpdf": "12.4.2",
+    "pikepdf": "10.17.0",
+    "exitCode": 0,
+    "error": null,
+    "hasWarnings": false,
+    "seconds": 24.07438860833645,
+    "warningCategories": {},
+    "sourceWarningCategories": {},
+    "noAdditionalWarningCategoriesOrCounts": true,
+    "ok": true
+  }
+]

@@ -1,0 +1,181 @@
+{
+  "engine": "pdfium",
+  "plainSaves": [
+    {
+      "bytes": 4012,
+      "originalPrefixRetained": true
+    },
+    {
+      "bytes": 4012,
+      "originalPrefixRetained": true
+    }
+  ],
+  "result": {
+    "url": "/editor/tab_1791986513639_al7bo2",
+    "text": ["", "Native PDF page 2", ""],
+    "forms": [
+      {
+        "type": "text",
+        "value": "Bob"
+      },
+      {
+        "type": "text",
+        "value": "VALUE 0"
+      },
+      {
+        "type": "text",
+        "value": "VALUE 3"
+      },
+      {
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "canvases": [
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [632, 790],
+      [300, 150],
+      [632, 790],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150],
+      [300, 150]
+    ]
+  },
+  "errors": [],
+  "resourceFailures": [
+    {
+      "url": "blob:http://127.0.0.1:5197/137c5276-5bb9-4739-883d-6db0ab7c4069",
+      "type": "image",
+      "error": "net::ERR_FILE_NOT_FOUND"
+    }
+  ],
+  "savedPages": 8,
+  "savedFields": ["name", "donor-field-0", "donor-field-3"],
+  "activeWorkers": 1,
+  "initialWorkerUrls": [],
+  "activeWorkerUrls": [
+    "http://127.0.0.1:5197/assets/pdf-render.worker-6MRXiC4-.js"
+  ],
+  "workersAfterClose": 0,
+  "workerUrlsAfterClose": [],
+  "brokenImages": [],
+  "independentVerification": {
+    "pages": [
+      {
+        "size": {
+          "width": 400.0,
+          "height": 500.0
+        },
+        "rotation": 0,
+        "annotations": {
+          "Widget": 1
+        },
+        "replies": [],
+        "links": []
+      },
+      {
+        "size": {
+          "width": 400.0,
+          "height": 500.0
+        },
+        "rotation": 0,
+        "annotations": {},
+        "replies": [],
+        "links": []
+      },
+      {
+        "size": {
+          "width": 400.0,
+          "height": 500.0
+        },
+        "rotation": 0,
+        "annotations": {},
+        "replies": [],
+        "links": []
+      },
+      {
+        "size": {
+          "width": 600.0,
+          "height": 800.0
+        },
+        "rotation": 0,
+        "annotations": {
+          "Widget": 1
+        },
+        "replies": [],
+        "links": []
+      },
+      {
+        "size": {
+          "width": 600.0,
+          "height": 800.0
+        },
+        "rotation": 0,
+        "annotations": {},
+        "replies": [],
+        "links": []
+      },
+      {
+        "size": {
+          "width": 600.0,
+          "height": 800.0
+        },
+        "rotation": 0,
+        "annotations": {},
+        "replies": [],
+        "links": []
+      },
+      {
+        "size": {
+          "width": 600.0,
+          "height": 800.0
+        },
+        "rotation": 0,
+        "annotations": {
+          "Widget": 1
+        },
+        "replies": [],
+        "links": []
+      },
+      {
+        "size": {
+          "width": 400.0,
+          "height": 500.0
+        },
+        "rotation": 0,
+        "annotations": {},
+        "replies": [],
+        "links": []
+      }
+    ],
+    "fields": [
+      {
+        "name": "donor-field-0",
+        "type": "PDFTextField",
+        "value": "VALUE 0"
+      },
+      {
+        "name": "donor-field-3",
+        "type": "PDFTextField",
+        "value": "VALUE 3"
+      },
+      {
+        "name": "name",
+        "type": "PDFTextField",
+        "value": "Bob"
+      }
+    ],
+    "title": null,
+    "parserWarnings": [],
+    "contentSyntaxChecked": true
+  }
+}

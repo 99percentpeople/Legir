@@ -4,7 +4,7 @@ import sys
 import pikepdf
 
 
-def inspect(path):
+def inspect(path, *, check_content_syntax=False):
     with pikepdf.open(path) as pdf:
         pages = list(pdf.pages)
         indexes = {page.obj.objgen: i for i, page in enumerate(pages)}
@@ -112,7 +112,13 @@ def inspect(path):
 
         for field in pdf.Root.get('/AcroForm',{}).get('/Fields',[]):
             read_field(field)
-        return dict(pages=out_pages,fields=sorted(fields,key=lambda f:f['name']),title=text(pdf.docinfo.get('/Title')),warnings=pdf.check_pdf_syntax())
+        # Resolve every indirect object so malformed dictionaries/xrefs surface,
+        # including objects outside the sampled page images. Content operators
+        # and compressed-stream warnings are audited separately from structure.
+        for obj in pdf.objects:
+            _ = getattr(obj, "_type_code", None)
+        warnings = pdf.check_pdf_syntax() if check_content_syntax else pdf.get_warnings()
+        return dict(pages=out_pages,fields=sorted(fields,key=lambda f:f['name']),title=text(pdf.docinfo.get('/Title')),parserWarnings=warnings,contentSyntaxChecked=check_content_syntax)
 
 
 if __name__ == '__main__':
