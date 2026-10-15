@@ -1652,7 +1652,6 @@ export class StampExporter implements IAnnotationExporter {
         : 1;
     const pageRotationDeg =
       viewport && typeof viewport.rotation === "number" ? viewport.rotation : 0;
-    const isImportedStamp = !!annotation.sourcePdfRef;
     const stamp = annotation.stamp;
     const stampKind = stamp?.kind ?? "preset";
     const stampPresetId = stamp?.presetId;
@@ -1661,30 +1660,22 @@ export class StampExporter implements IAnnotationExporter {
     const stampAppearance = stamp?.appearance;
     const stampImageData = stampImage?.dataUrl;
     const stampIntrinsicSize = stampImage?.intrinsicSize;
-    const isBakedStampImage = stampAppearance?.source === "baked";
-    const needsAppearanceBoundsCompensation =
-      pageRotationDeg !== 0 &&
-      (!isImportedStamp || (stampKind === "image" && isBakedStampImage));
-    const needsPageRotationCompensation =
-      pageRotationDeg !== 0 &&
-      (!isImportedStamp || (stampKind === "image" && isBakedStampImage));
     const rotationDeg =
       typeof annotation.rotationDeg === "number" &&
       Number.isFinite(annotation.rotationDeg)
         ? annotation.rotationDeg
         : 0;
-    const effectiveRotationDeg = needsPageRotationCompensation
-      ? getAppearanceRotationFromControlRotation({
-          controlRotationDeg: rotationDeg,
-          pageRotationDeg,
-          compensatePageRotation: true,
-        })
-      : getAppearanceRotationFromControlRotation({
-          controlRotationDeg: rotationDeg,
-        });
-    const appearanceBounds = needsAppearanceBoundsCompensation
-      ? getPageRotationCompensatedRect(bounds, pageRotationDeg)
-      : bounds;
+    // New and imported controls use the same viewport-relative geometry.
+    // Convert its local axes back to PDF space before constructing the AP.
+    const effectiveRotationDeg = getAppearanceRotationFromControlRotation({
+      controlRotationDeg: rotationDeg,
+      pageRotationDeg,
+      compensatePageRotation: true,
+    });
+    const appearanceBounds = getPageRotationCompensatedRect(
+      bounds,
+      pageRotationDeg,
+    );
     const bbox: [number, number, number, number] = [
       appearanceBounds.x,
       appearanceBounds.y,

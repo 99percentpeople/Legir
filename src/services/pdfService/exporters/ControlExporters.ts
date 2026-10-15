@@ -20,7 +20,7 @@ import {
 } from "../lib/control-export";
 import {
   getInnerSizeFromOuterAabb,
-  normalizeRightAngleRotationDeg,
+  getWidgetRotationFromControlRotation,
 } from "@/lib/controlRotation";
 import { flattenTextFieldAppearanceProvider } from "../lib/text-field-appearance";
 import {
@@ -350,7 +350,8 @@ export class SignatureControlExporter implements IControlExporter {
       const common = getCommonControlExportOpts(field, page, viewport);
       const boxWidth = common.width;
       const boxHeight = common.height;
-      const rotationDeg = normalizeRightAngleRotationDeg(
+      const rotationDeg = getWidgetRotationFromControlRotation(
+        viewport?.rotation ?? page.getRotation().angle,
         field.rotationDeg ?? 0,
       );
       const innerBox =

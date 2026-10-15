@@ -32,6 +32,9 @@ export const getCommonControlExportOpts = (
 export const applyWidgetExportRotation = (
   widget:
     | {
+        getAppearanceCharacteristics?: () =>
+          | { getRotation: () => number | undefined }
+          | undefined;
         getOrCreateAppearanceCharacteristics: () => {
           setRotation: (rotation: number) => void;
         };
@@ -46,7 +49,11 @@ export const applyWidgetExportRotation = (
     page.getRotation().angle,
     fieldRotationDeg ?? 0,
   );
-  if (widgetRotation === 0) return 0;
+  if (
+    widgetRotation === 0 &&
+    !widget.getAppearanceCharacteristics?.()?.getRotation()
+  )
+    return 0;
 
   widget.getOrCreateAppearanceCharacteristics().setRotation(widgetRotation);
   return widgetRotation;

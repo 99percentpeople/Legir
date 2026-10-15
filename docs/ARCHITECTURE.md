@@ -181,6 +181,7 @@ Persistence follows state ownership:
 - `legir.preferences` stores app options, annotation style defaults and translation defaults through `src/store/preferencesStore.ts`. Fetched model caches are transient.
 - Custom stamp images live in IndexedDB under `stamp-image:` keys in the workspace store, through `src/services/stampLibrary/`. `src/store/stampLibraryStore.ts` shares the list across editor tabs and sorts it by last use, falling back to creation time for older entries. Placed annotations retain their own image resource, so removing a library entry does not change a document.
 - Image stamp `appearance.scaleMode` selects `contain` (default) or `fill` for both workspace display and PDF appearances. `FFStampImageScaleMode` preserves the choice and full annotation bounds across PDF saves; restoring the original ratio changes the rectangle around its center without changing the source image or display mode.
+- Stamp geometry uses the displayed source-page viewport: its rectangle describes the local unrotated image, and its angle includes the source page rotation minus the PDF appearance rotation. Import and export apply inverse transforms for both new and imported stamps. Extracted path SVGs remain `native` appearances (their internal transforms are already in the paths); only rendered-page crops are `baked` and need no further import rotation. Path extraction rejects text drawing so it cannot silently remove stamp lettering.
 - `options.imageCompression` selects original resolution or a target DPI for newly exported image stamps. Export downsamples according to physical image dimensions in PDF points (including page `UserUnit`), independently of viewer zoom. Image resources in the editor and library remain original; unchanged imported annotation appearances and SVG vectors retain their existing preservation path.
 - `legir.workspace-layout` stores panel visibility, selected sections, widths and page arrangement through `src/store/workspaceStore.ts`. Active tabs, dialogs, floating mode and fullscreen are transient.
 - `legir.document-views` stores each document's zoom, page and scroll position under its source key, through `src/services/platform/documentSession.ts`.
@@ -530,6 +531,19 @@ Important supporting areas:
 - `src/components/toolbar/`
 
 The control system is registry-driven. New form controls or annotation-like tools should be added through the existing control registration flow instead of introducing special-case rendering paths.
+
+Form rectangles are viewport outer bounds, while rotatable annotation rectangles
+describe their local unrotated geometry. Missing PDF widget/FreeText rotation means
+zero in PDF space; import must still include the source page rotation. Widget export
+clears an old nonzero angle when returning to zero, and flattened image signatures
+use the same page-to-control angle conversion as widgets. FreeText appearance sizes
+use the viewport transform scale, not width/height ratios that exchange axes on
+quarter-turn pages. Shape import removes cloud margins after undoing the appearance
+rotation, includes stroke/arrow/cloud margins when distinguishing local from rotated
+vertices, and uses the appearance box aspect ratio to recover 45-degree rectangles.
+These transformations reuse the owning PDF document and preserve unsupported native
+appearances. `tests/pdf/pageRotationRoundTrip.test.ts` covers saved/reopened geometry,
+regenerated appearances and subsequent value edits.
 
 ### Tool selection and options
 

@@ -79,6 +79,7 @@ export type PdfJsAnnotation = Record<string, unknown> & {
   cloudSpacing?: number;
   shapeFillOpacity?: number;
   appearanceRotation?: number;
+  appearanceSize?: { width: number; height: number };
   defaultAppearance?: string;
   DA?: string;
   textAlignment?: number;

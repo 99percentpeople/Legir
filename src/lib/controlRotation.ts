@@ -315,6 +315,7 @@ export const resizeRectFromRotatedHandle = (options: {
 export const getInnerSizeFromOuterAabb = (
   outer: Pick<RotationRect, "width" | "height">,
   rotationDeg: number,
+  aspectRatio?: number,
 ) => {
   if (!Number.isFinite(rotationDeg) || rotationDeg === 0) {
     return { width: outer.width, height: outer.height };
@@ -326,6 +327,13 @@ export const getInnerSizeFromOuterAabb = (
   const det = absCos * absCos - absSin * absSin;
 
   if (!Number.isFinite(det) || Math.abs(det) < 1e-6) {
+    // At 45 degrees the outer bounds lose the original aspect ratio. A PDF
+    // appearance can supply it; bounds alone cannot recover the local axes.
+    if (aspectRatio && Number.isFinite(aspectRatio) && aspectRatio > 0) {
+      const height =
+        (outer.width + outer.height) / ((absCos + absSin) * (aspectRatio + 1));
+      return { width: aspectRatio * height, height };
+    }
     return { width: outer.width, height: outer.height };
   }
 
@@ -347,12 +355,17 @@ export const getInnerSizeFromOuterAabb = (
 export const getInnerRectFromRotatedOuterAabb = (
   outerRect: RotationRect,
   rotationDeg: number,
+  aspectRatio?: number,
 ): RotationRect => {
   if (!Number.isFinite(rotationDeg) || rotationDeg === 0) {
     return outerRect;
   }
 
-  const innerSize = getInnerSizeFromOuterAabb(outerRect, rotationDeg);
+  const innerSize = getInnerSizeFromOuterAabb(
+    outerRect,
+    rotationDeg,
+    aspectRatio,
+  );
   const cx = outerRect.x + outerRect.width / 2;
   const cy = outerRect.y + outerRect.height / 2;
 

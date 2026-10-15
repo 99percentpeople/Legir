@@ -1034,13 +1034,12 @@ const buildPdfLibAnnotsByPageIndex = async (
           if (typeof r !== "number" || !Number.isFinite(r)) return undefined;
           return r;
         })();
-        const rotation =
-          typeof rawWidgetRotation === "number"
-            ? getControlRotationFromWidgetRotation(
-                page.getRotation().angle,
-                rawWidgetRotation,
-              )
-            : undefined;
+        // An absent widget angle means zero in PDF space, not in the page's
+        // displayed viewport. The page rotation still applies to its contents.
+        const rotation = getControlRotationFromWidgetRotation(
+          page.getRotation().angle,
+          rawWidgetRotation ?? 0,
+        );
 
         pushForPage({
           subtype: "Widget",
@@ -1262,28 +1261,31 @@ const buildPdfLibAnnotsByPageIndex = async (
         height: stampSourceSvgSize?.height,
       });
       let stampAppearance = createStampImageAppearance();
+      let extractedStampSvg = false;
       const appearance = getAppearanceStreamMetadata(annot);
       if (subtypeName === "Stamp" && !stampImage?.dataUrl) {
         try {
-          const extractedStampSvg =
-            await extractStampSvgDataFromAppearance(annot);
-          if (extractedStampSvg) {
+          const extractedSvg = await extractStampSvgDataFromAppearance(annot);
+          if (extractedSvg) {
+            extractedStampSvg = true;
             if (!stampImage?.dataUrl) {
               stampImage = createStampImageResource({
-                dataUrl: extractedStampSvg.dataUrl,
-                width: extractedStampSvg.width,
-                height: extractedStampSvg.height,
+                dataUrl: extractedSvg.dataUrl,
+                width: extractedSvg.width,
+                height: extractedSvg.height,
               });
             }
             stampImage ??= createStampImageResource({
-              dataUrl: extractedStampSvg.dataUrl,
-              width: extractedStampSvg.width,
-              height: extractedStampSvg.height,
+              dataUrl: extractedSvg.dataUrl,
+              width: extractedSvg.width,
+              height: extractedSvg.height,
             });
             stampAppearance = createStampImageAppearance({
               frame: stampAppearance?.frame ?? "plain",
               box: stampAppearance?.box,
-              source: stampSourceSvgData ? "native" : "baked",
+              // The SVG contains AP content transforms, but not the outer AP
+              // matrix or page rotation. It is not a rendered-page crop.
+              source: "native",
             });
           }
         } catch {
@@ -1345,7 +1347,7 @@ const buildPdfLibAnnotsByPageIndex = async (
         return appearanceContent;
       };
 
-      const rotation = (() => {
+      let rotation = (() => {
         let value: number | undefined = undefined;
         try {
           const rotateObj = annot.lookup(PDFName.of("Rotate"));
@@ -1376,6 +1378,13 @@ const buildPdfLibAnnotsByPageIndex = async (
       })();
       let appearanceRotation =
         appearance.matrix && getRotationDegFromPdfMatrix(appearance.matrix);
+
+      if (extractedStampSvg) {
+        // Internal cm operators are already baked into the extracted paths.
+        // Only the outer AP matrix still needs applying to this image.
+        rotation = appearanceRotation ?? 0;
+        appearanceRotation = rotation;
+      }
 
       if (
         typeof finalBorderWidth !== "number" ||
@@ -1453,6 +1462,14 @@ const buildPdfLibAnnotsByPageIndex = async (
         endArrowStyle,
         rotation,
         appearanceRotation,
+        appearanceSize:
+          (subtypeName === "Square" || subtypeName === "Circle") &&
+          appearance.bbox
+            ? {
+                width: Math.abs(appearance.bbox[2] - appearance.bbox[0]),
+                height: Math.abs(appearance.bbox[3] - appearance.bbox[1]),
+              }
+            : undefined,
       };
 
       if (

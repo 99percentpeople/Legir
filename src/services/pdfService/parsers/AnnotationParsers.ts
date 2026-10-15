@@ -38,6 +38,8 @@ import {
 import {
   getShapeDashDensityFromPattern,
   getRectAndNormalizedShapePoints,
+  getPolygonCloudGeometry,
+  getDefaultArrowSize,
   normalizeShapeBorderStyle,
   normalizeShapeDashDensity,
   resolveShapeArrowStyleFromPdf,
@@ -1082,15 +1084,9 @@ export class FreeTextParser implements IAnnotationParser {
             rotation: annotation.rotation,
             appearanceRotation: annotation.appearanceRotation,
           });
-          if (
-            typeof nativeRotationSource !== "number" ||
-            !Number.isFinite(nativeRotationSource)
-          ) {
-            return undefined;
-          }
           return getControlRotationFromPdfAnnotationRotation(
             pageRotationDeg,
-            nativeRotationSource,
+            nativeRotationSource ?? 0,
           );
         })();
         const initialColorArray = annotation.color;
@@ -1149,16 +1145,9 @@ export class FreeTextParser implements IAnnotationParser {
           if (rotationDeg === 0) return { width: outerW, height: outerH };
 
           if (apInnerPdfSize && outerPdfWidth > 0 && outerPdfHeight > 0) {
-            const sfX = outerW / outerPdfWidth;
-            const sfY = outerH / outerPdfHeight;
-            const sf =
-              Number.isFinite(sfX) && Number.isFinite(sfY) && sfX > 0 && sfY > 0
-                ? (sfX + sfY) / 2
-                : Number.isFinite(sfX) && sfX > 0
-                  ? sfX
-                  : Number.isFinite(sfY) && sfY > 0
-                    ? sfY
-                    : 1;
+            // Width/height ratios mix different axes on quarter-turn pages.
+            // Use the viewport's PDF-to-display scale, including UserUnit.
+            const sf = Math.hypot(viewport.transform[0], viewport.transform[1]);
 
             const w = apInnerPdfSize.width * sf;
             const h = apInnerPdfSize.height * sf;
@@ -1958,6 +1947,22 @@ export class ShapeParser implements IAnnotationParser {
 
       if (annotation.subtype === "Square" || annotation.subtype === "Circle") {
         const importedRect = pdfJsRectToUiRect(annotation.rect, viewport);
+        const apSize = annotation.appearanceSize;
+        const swapAppearanceAxes = viewport.rotation % 180 !== 0;
+        const aspectRatio =
+          apSize && apSize.width > 0 && apSize.height > 0
+            ? swapAppearanceAxes
+              ? apSize.height / apSize.width
+              : apSize.width / apSize.height
+            : undefined;
+        const localRect =
+          typeof shapeRotationDeg === "number" && shapeRotationDeg !== 0
+            ? getInnerRectFromRotatedOuterAabb(
+                importedRect,
+                shapeRotationDeg,
+                aspectRatio,
+              )
+            : importedRect;
         const cloudInset =
           isCloud &&
           Array.isArray(annotation.rectDifferences) &&
@@ -1970,19 +1975,15 @@ export class ShapeParser implements IAnnotationParser {
                 ) / 4,
               )
             : 0;
-        const adjustedRect =
+        const rect =
           isCloud && cloudInset > 0
             ? {
-                x: importedRect.x + cloudInset,
-                y: importedRect.y + cloudInset,
-                width: Math.max(1, importedRect.width - cloudInset * 2),
-                height: Math.max(1, importedRect.height - cloudInset * 2),
+                x: localRect.x + cloudInset,
+                y: localRect.y + cloudInset,
+                width: Math.max(1, localRect.width - cloudInset * 2),
+                height: Math.max(1, localRect.height - cloudInset * 2),
               }
-            : importedRect;
-        const rect =
-          typeof shapeRotationDeg === "number" && shapeRotationDeg !== 0
-            ? getInnerRectFromRotatedOuterAabb(adjustedRect, shapeRotationDeg)
-            : adjustedRect;
+            : localRect;
         annotations.push({
           id: `imported_shape_${pageIndex + 1}_${index}`,
           pageIndex,
@@ -2060,12 +2061,32 @@ export class ShapeParser implements IAnnotationParser {
               rotateShapePoint(point, center, -nativeRotationDeg),
             ),
           );
+          // /Rect includes stroke, arrowhead and cloud margins. Ignoring them
+          // can make already-local vertices look like rotated page vertices.
+          const padding = Math.max(
+            thickness,
+            isArrow
+              ? (annotation.arrowSize ?? getDefaultArrowSize(thickness))
+              : 0,
+            isCloudPolygon
+              ? getPolygonCloudGeometry(points, {
+                  intensity: annotation.borderEffect?.intensity ?? 2,
+                  strokeWidth: thickness,
+                  spacing: annotation.cloudSpacing,
+                }).overflow
+              : 0,
+          );
           const scoreCandidate = (
             candidate: ReturnType<typeof getRectAndNormalizedShapePoints>,
           ) => {
             if (!candidate) return Number.POSITIVE_INFINITY;
             const predictedOuter = getRotatedOuterRect(
-              candidate.rect,
+              {
+                x: candidate.rect.x - padding,
+                y: candidate.rect.y - padding,
+                width: candidate.rect.width + padding * 2,
+                height: candidate.rect.height + padding * 2,
+              },
               nativeRotationDeg,
             );
             return (
@@ -2182,10 +2203,14 @@ export class StampParser implements IAnnotationParser {
             rotation: annotation.rotation,
             appearanceRotation: annotation.appearanceRotation,
           });
-      const rotationDeg =
-        typeof nativeRotationSource === "number"
-          ? normalizeRotationDeg(-nativeRotationSource)
-          : 0;
+      // Stored control geometry is in the page's displayed source viewport.
+      // Only a rendered-page crop already contains both page and AP rotation.
+      const rotationDeg = hasBakedAppearance
+        ? 0
+        : getControlRotationFromPdfAnnotationRotation(
+            viewport?.rotation ?? 0,
+            nativeRotationSource ?? 0,
+          );
       const rect =
         !hasBakedAppearance && rotationDeg !== 0
           ? getInnerRectFromRotatedOuterAabb(importedRect, rotationDeg)

@@ -428,6 +428,13 @@ const renderStreamToSvg = async (options: {
     }
 
     switch (operand) {
+      case "Tj":
+      case "TJ":
+      case "'":
+      case '"':
+        // This extractor only reconstructs paths. Returning a partial SVG
+        // would drop the lettering when a stamp is reopened or edited.
+        throw new Error("Text stamp requires the preset or rendered fallback");
       case "q":
         stateStack.push(cloneGraphicsState(state));
         clearOperands();
