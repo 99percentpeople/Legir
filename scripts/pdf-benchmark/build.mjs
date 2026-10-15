@@ -3,7 +3,7 @@ import { build } from "vite";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { profilePlugin } from "./profile-plugin.mjs";
-const [checkout, output, entry = "entry.ts"] = process.argv.slice(2);
+const [checkout, output, entry = "corpus-entry.ts"] = process.argv.slice(2);
 if (!checkout || !output)
   throw new Error("Usage: node build.mjs CHECKOUT OUTPUT [ENTRY]");
 process.chdir(checkout);

@@ -1,5 +1,8 @@
 # PDF 单实例迁移与性能对比
 
+> 本文记录历史版本。旧合成跑分入口已合并到 corpus 工具；复现本文请使用
+> [归档脚本及对应版本](../../scripts/pdf-benchmark/ARCHIVE.md)。
+
 测试日期：2026-10-12。修改覆盖 Web 和 Tauri 共用前端；这里的运行结果来自 Linux Chromium，未验证 Tauri 原生 WebView。
 
 每个打开的编辑文档现在由一个常驻 `pdf-render.worker` 和一个原生 MuPDF `PDFDocument` 负责渲染、解析、批注/表单处理、导出、文本提取及 OCR 图片准备。主线程保留编辑模型和源字节，不再解析另一份 PDF 对象图。导入时临时打开 donor，graft 到同一文档后销毁，所以这里的“单实例”指常驻实例；导入峰值为两个。导入预览作为独立打开的文档，关闭预览时释放自己的 Worker。

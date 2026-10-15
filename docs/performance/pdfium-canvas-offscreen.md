@@ -86,8 +86,8 @@ Linux ARM64 Cortex-A76、Chromium 148；`--disable-gpu`，浏览器报告 2D Can
 
 测试期间没有并行运行构建、其他性能测试或验证程序。没有变更应用渲染代码或原生库；新增手动测试脚本通过 ESLint 和语法检查。没有为这次纯实验重新运行应用完整测试。
 
-- [测试脚本](../../scripts/pdf-benchmark/canvas-offscreen.mjs)与[实验 Worker](../../scripts/pdf-benchmark/canvas-offscreen.worker.mjs)
-- [运行方法](../../scripts/pdf-benchmark/README.md)
+- [历史测试脚本、实验 Worker 与运行方法的取回说明](../../scripts/pdf-benchmark/ARCHIVE.md)
+- [当前扫描页验证工具](../../scripts/pdf-benchmark/README.md)
 - [合成与真实页面覆盖率原始数据](pdfium-canvas-offscreen/synthetic-and-coverage.json)
 - [真实扫描图纸原始数据](pdfium-canvas-offscreen/real-scan.json)
 - [高质量缩放原始数据](pdfium-canvas-offscreen/high-quality.json)

@@ -38,13 +38,13 @@ const fixture = manifest.fixtures.find(
   (f) => f.id === (process.env.PDF_BENCH_CASES || manifest.fixtures[0].id),
 );
 if (!fixture) throw new Error("Unknown fixture");
-const selectedVariants = (
-  process.env.PDF_BENCH_VARIANTS || "mupdf,pdfium"
-).split(",");
+const selectedVariants = process.env.PDF_BENCH_VARIANTS?.split(",");
+const variants = selectedVariants
+  ? manifest.variants.filter((variant) => selectedVariants.includes(variant.id))
+  : manifest.variants;
+if (!variants.length) throw new Error("No selected variants");
 const timeoutMs = Number(process.env.PDF_BENCH_TIMEOUT_MS || 60000);
-for (const variant of manifest.variants.filter((v) =>
-  selectedVariants.includes(v.id),
-)) {
+for (const variant of variants) {
   root = variant.build;
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",

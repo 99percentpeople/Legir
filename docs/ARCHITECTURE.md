@@ -1,6 +1,7 @@
 # Legir Architecture
 
 This document describes the internal architecture of Legir's main application.
+For the PDFium branch's current maintenance findings, see [PDFium architecture review](PDFIUM_REVIEW.md).
 
 It intentionally avoids repeating setup, build, and deployment instructions that already live in the root [README.md](../README.md). The focus here is module boundaries, data flow, persistence strategy, and extension points.
 

@@ -55,8 +55,10 @@ Use `bun run build:native:pdfium` to rebuild the pinned native sources, and
 See the [migration validation and performance comparison](docs/performance/pdfium-migration.md)
 for the initial migration record. Ongoing performance work compares the two active
 branches with the [real-file benchmark](scripts/pdf-benchmark/README.md).
-The latest [export repair and two-engine results](docs/performance/pdf-export-replies.md)
-include nested reply validation on books and large engineering drawings.
+The latest [native authoring and export audit](docs/performance/pdfium-native-authoring-20261014.json)
+records the completed helper-library replacement and comparison limits. See the
+[current architecture review](docs/PDFIUM_REVIEW.md) and [test map](tests/README.md)
+for ownership boundaries, remaining maintenance work and validation commands.
 
 ## Deployment
 

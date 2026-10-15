@@ -1,5 +1,8 @@
 # PDFium import/export optimization
 
+> 本文记录历史版本。旧合成跑分入口已合并到 corpus 工具；复现本文请使用
+> [归档脚本及对应版本](../../scripts/pdf-benchmark/ARCHIVE.md)。
+
 On the 60-page image import, median end-to-end import fell from **1777.9 to
 1049.2 ms (41.0%)**, and merged export fell from **567.4 to 190.0 ms (66.5%)**.
 Exporting the 60-page image document directly improved from **298.2 to 255.2 ms

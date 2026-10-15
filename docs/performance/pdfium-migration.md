@@ -1,5 +1,8 @@
 # PDFium migration and MuPDF comparison
 
+> 本文记录历史版本。旧合成跑分入口已合并到 corpus 工具；复现本文请使用
+> [归档脚本及对应版本](../../scripts/pdf-benchmark/ARCHIVE.md)。
+
 Measured on 2026-10-12. The MuPDF implementation is preserved on `engine/mupdf`
 at `b6790f0a43280fd1e40ebc974e79c5fbef141e88`. `engine/pdfium` uses the independent
 [`@legir/pdfium` package](../../packages/pdfium/README.md), built locally from

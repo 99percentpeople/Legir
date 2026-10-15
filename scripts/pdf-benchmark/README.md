@@ -1,62 +1,55 @@
-# PDF engine comparison
+# PDF regression and performance tools
 
 Run from an installed Legir checkout with Node, Playwright and Chromium available.
 The reference run used `/usr/bin/chromium`; override with `CHROMIUM_PATH`.
-The browser automation dependency is used only by this manual benchmark.
+Browser automation and independent PDF readers are manual-test dependencies only.
+For automated application/SDK coverage, see [tests/README.md](../../tests/README.md).
+
+## Maintained entry points
+
+| Task                                                              | Tools                                                                    |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| App workflow performance and PSS/RSS                              | `build.mjs`, `corpus-entry.ts`, `corpus.mjs`, `corpus-summary.mjs`       |
+| Independent export structure, sampled text/pixels, content syntax | `corpus-validate.mjs`, `inspect_pdf.py`, `content-syntax.mjs`            |
+| Native pixels and cache lifetime                                  | `native-render.mjs`                                                      |
+| Production canvas quality and tile seams                          | `scan-fixtures.mjs`, `scan-validate.mjs`                                 |
+| Reader responsiveness and foreground scheduling                   | `reader-ui.mjs`, `preemption.mjs`                                        |
+| Export cancellation and saved-preview reuse                       | `io-probes.mjs`                                                          |
+| PWA, forms and authoring appearances                              | `fixtures.mjs`, `ui.mjs`, `authoring-audit.mjs`, `authoring-validate.py` |
+| Opt-in diagnosis                                                  | `corpus-diagnostic.mjs`, `profile-plugin.mjs`, `canvas-plan.mjs`         |
+
+`build.mjs` defaults to `corpus-entry.ts`. It builds the common harness against
+the selected checkout's own source and Vite/worker configuration, without editing
+that checkout. Use the same entry for every compared revision. Run variants
+sequentially without concurrent builds/tests; validate outputs after timing.
+The normal production app build is tested separately.
+
+The retired synthetic runner, MuPDF instrumentation and benchmark-only Canvas
+replay are listed in [ARCHIVE.md](ARCHIVE.md), with replacements and the Git
+snapshot needed to reproduce historical reports. Formal measurements and their
+provenance remain in `docs/performance`. Keep new temporary logs, PDFs, screenshots
+and intermediate runs in `/tmp` or the ignored `.tmp/` directory.
+
+## Synthetic fixtures and production PWA
 
 ```sh
+bun run build:pdfium
 node scripts/pdf-benchmark/fixtures.mjs /tmp/pdf-fixtures
-node scripts/pdf-benchmark/build.mjs /absolute/checkout /tmp/pdf-build
-node scripts/pdf-benchmark/run.mjs /tmp/pdf-build /tmp/pdf-fixtures /tmp/pdf-results 3
-node scripts/pdf-benchmark/visual.mjs /tmp/pdf-build /tmp/pdf-fixtures /tmp/pdf-images
-node scripts/pdf-benchmark/compare.mjs /tmp/before-build /tmp/after-build /tmp/pdf-fixtures /tmp/comparison 3
 # Separately serve the normal production app build (with its PWA service worker):
 node scripts/pdf-benchmark/ui.mjs http://127.0.0.1:5189 /tmp/pdf-fixtures/donor.pdf /tmp/pdf-ui
 ```
 
-`build.mjs` builds the common harness against the selected checkout's own source
-and Vite/worker configuration, without editing that checkout. The normal
-production app build is tested separately. Run variants sequentially, without
-concurrent builds/tests. Each sample starts a fresh browser context/process,
-preloads identical fixture bytes, and opens one document. First render precedes
-model hydration, matching the app's readable-first pipeline.
-
-Times cover worker initialization/loading, PNG rendering at 1.5 scale, hydration,
-export, and importing/parsing a four-page donor. Import timing includes parsing
-the source preview and registering the source with the owning worker. The
-`large-import` case imports the 60-page image file into the small form file;
-the other cases import the four-page donor. Merged export retains all original and imported fields. A native SDK reader
-checks page counts, field counts and edited values; exported files are retained
-with the raw JSON. The fixture seed and date fields are fixed; record the actual
-fixture hashes because serializers may add identifiers.
-
-Memory uses `/proc/<pid>/smaps_rollup` for the processes listed by Chromium's
-`SystemInfo.getProcessInfo`. PSS avoids counting shared pages fully in every
-process. RSS is also retained in JSON. This includes native/WASM memory, unlike
-JS heap size. Samples are collected at 50 ms intervals; peaks can miss shorter
-spikes. Retained samples follow explicit GC in the main thread and workers.
-Closing samples wait for download Blob URLs to be revoked. Browser/module/cache
-memory can remain after document closure; absolute totals and baseline deltas
-are both useful. The harness baseline already includes fixture bytes. Native
-`wasmCapacityBytes` reports reserved arena capacity, not live allocation or PSS.
-
-The image fixture intentionally contains 60 distinct Flate-compressed noise
-images (about 45 MiB). It stresses byte/object ownership without depending on
-private files; it does not represent every real drawing, font, scan or PDF.
-`visual.mjs` captures rendering in a separate run so image transfer/inspection
-does not change the timed or memory-measured runs. The harness does not measure
-UI scrolling, zoom transitions, OS file pickers or Tauri WebView performance.
-
-`compare.mjs` runs both builds sequentially, alternating their order each round.
-It retains raw timing/memory samples and exported PDFs, checks original render
-pixel hashes and compares independently reopened page/field values. Use the
-same pinned fixtures and idle machine for both builds.
-
-For diagnostic builds, set `PDF_BENCH_PROFILE=1` on both `build.mjs` and `run.mjs`.
-The worker-only build plugin adds native call counts/timings and inclusive
-graft/page-tree/export stage timings to each phase's `profile`. This instrumentation
-adds overhead and stage times overlap; never use those timings as the final
-performance comparison. Ordinary builds include no profiling hooks.
+The generator supplies a 12-page form file, a 60-page image file and a four-page
+donor. Its fixed seed/date and distinct field names permit a synthetic corpus
+manifest; still record actual file hashes because serializers can add IDs.
+The image file has distinct Flate-compressed noise images (about 45 MiB); it
+stresses ownership, not real-world scan quality. Use `scan-fixtures.mjs` for that.
+The [form appearance regression](../../docs/PDFIUM_REVIEW.md#已修复未编辑表单的外观一致性)
+demonstrates why field-value checks must also include pixels: unnecessarily setting
+`NeedAppearances` made independent readers regenerate otherwise valid appearances.
+The save policy now inspects retained widgets and tracks successful appearance
+updates, while preserving missing/stale appearance and XFA fallbacks. Keep the
+strict validator thresholds when using form fixtures.
 
 `ui.mjs` installs the production PWA, switches offline, edits a text field and
 saves it twice. PDFium must retain the exact original prefix without growing a
@@ -70,31 +63,9 @@ imposing PDFium's single-owner lifecycle. Retained PDF.js workers and failed
 resource requests must be reported separately from functional UI checks.
 Its fixture and selectors assume the English UI.
 
-The historical `render.mjs` compares two already-built MuPDF variants, optionally alongside the
-original PDF.js build. Preserve the previous build before changing the worker:
-
-```sh
-node scripts/pdf-benchmark/render.mjs /tmp/before-build /tmp/after-build /tmp/pdf-fixtures /tmp/render-results 3 /tmp/pdfjs-build
-```
-
-It alternates variant order across three rounds, starts fresh browsers for each
-fixture/variant, warms each case twice and measures eight further renders. Cases
-cover PNG output, a transferred HTML canvas at 1.5 and 3 times page size, and a
-rotated tile. Pixel hashes are checked only after timing to avoid canvas readback
-affecting its rendering backend during measurements. Before/after MuPDF pixels
-must match, and the optimized path must allocate no intermediate RGBA copies.
-The optional PDF.js build is a timing reference, not a pixel equality reference.
-
-Scoped browser-only instrumentation measures native draw, pixel copy, Canvas
-write and PNG encoding. `beforePresentation` measures the interval between worker
-receipt and its request for an animation frame; the total also includes frame
-scheduling and RPC. These are elapsed times, not CPU samples or display latency.
-Stage medians need not add up to the median total. The renderer's rendering
-quality, animation-frame acknowledgment and production code are not overridden.
-
 ## Real book and engineering drawing corpus
 
-Use `corpus-entry.ts` for arbitrary real PDFs. The active matrix is
+Use `corpus-entry.ts` for synthetic fixtures and arbitrary real PDFs. The active matrix is
 `engine/pdfjs` (PDF.js + pdf-lib) and `engine/pdfium`. Build the **same entry** against
 both revisions, including the shared export fixes. MuPDF builds and recorded
 three-engine results are historical references. No application source
@@ -216,49 +187,6 @@ controlled speed comparison. Its 5% gross-placement-error guard is intentionally
 loose; inspect the recorded pixel differences before considering a default switch.
 The normal native renderer must still pass the strict hash check above.
 
-`canvas-offscreen.mjs PDFIUM_PACKAGE MANIFEST OUTPUT_JSON [ROUNDS]` compares
-cooperative native RGBA rendering, the current Canvas-plan SDK, and a diagnostic
-replay with cached Path2D/ImageBitmap objects and conservative viewport culling.
-All three draw in a worker into the same kind of transferred HTML canvas. The
-cached replay exists only in the benchmark worker; it is not a production backend.
-
-```sh
-node scripts/pdf-benchmark/canvas-offscreen.mjs packages/pdfium /tmp/manifest.json /tmp/canvas-results.json 3
-# Explicitly benchmark supported real pages from the manifest:
-CANVAS_BENCH_REAL=drawing405 node scripts/pdf-benchmark/canvas-offscreen.mjs packages/pdfium /tmp/manifest.json /tmp/canvas-real-results.json 3
-# Separately test high-quality minification, using a zero-based page index:
-CANVAS_BENCH_REAL=drawing405 CANVAS_BENCH_PAGES=21 CANVAS_BENCH_MODES=native,cached-high node scripts/pdf-benchmark/canvas-offscreen.mjs packages/pdfium /tmp/manifest.json /tmp/canvas-quality-results.json 3
-```
-
-The default run measures deterministic 10,000-curve and 12-megapixel JPEG
-fixtures, then checks the manifest's real pages with `annotations: false`, matching
-the application's body rendering. Including annotations can reject a page whose
-body is otherwise supported. `CANVAS_BENCH_REAL` selects comma-separated fixture
-IDs and measures each listed sample page; it fails if a selected page is unsupported.
-`cached-high` enables smoothing during minification and uses the browser's high
-quality setting. It does not implement PDF.js's multistage downsampling. Setting
-`CANVAS_BENCH_CAPTURE=1` saves private validation PNGs beside the JSON, after all
-timed runs; do not commit source-document screenshots without authorization.
-Each mode/page/round opens a fresh browser, worker and single PDF document, with
-mode order rotated across rounds. WASM initialization, document/page loading,
-command extraction and Path2D/image preparation are recorded separately. Six
-draws per size include two warmups and four measured repetitions. Report the
-median within each round, then the median of those three round medians; also
-report the first render including preparation rather than presenting cached-only
-figures as first-open performance. File fetching and synthetic fixture construction
-are outside rendering time.
-
-The software-only Chromium configuration is deliberate and recorded with GPU
-feature status. `drawMs` includes the drawing calls and cooperative yields;
-`responseMs` also includes a worker animation-frame acknowledgment. Neither is
-physical display scanout. Pixel readback runs in separate post-timing sessions,
-with channel-difference statistics against native PDFium and exact comparison
-between the SDK replay and cached replay. Different browser resampling/antialiasing
-may invalidate an otherwise fast candidate; these statistics are diagnostic, not
-an automatic quality pass. `bitmapBytes` is logical decoded RGBA size and
-`wasmCapacity` is arena capacity, not measured process memory. Every session closes
-native documents and decoded bitmaps. Do not run builds/tests concurrently.
-
 `scan-fixtures.mjs PDFIUM_PACKAGE OUTPUT_PDF` generates eleven deterministic scan
 cases (fine text/lines/colors, crop origins, reflections, quarter-turns,
 interpolation, annotations including a Multiply transparency group, non-scan
@@ -323,7 +251,7 @@ validation. The corpus validator checks all page/annotation/form/link structures
 plus sampled text/raster output. It does not parse every page's content operators;
 use `content-syntax.mjs` for that separate qpdf check. This distinction matters
 because the public INDOT source already has compressed-stream warnings.
-Neither these tools nor Poppler are application dependencies. The small UI/synthetic probes
+Neither these tools nor Poppler are application dependencies. The small UI/fixture probes
 use the native SDK for secondary checks; they do not replace this independent
 corpus validation.
 
@@ -370,6 +298,7 @@ worker responses and exceptions can vary under instrumentation, so retain both
 the original timeout records and any diagnostic error rather than substituting
 one for the other.
 
+All manifest variants run by default; `PDF_BENCH_VARIANTS` can select a subset.
 With `PDF_BENCH_PROFILE=1` on both build and diagnostic commands, the diagnostic
 also captures worker call counts after opening, before import, after owner
 registration and after merged export. The counters are reset between these

@@ -49,7 +49,11 @@ export function profilePlugin() {
       if (id.endsWith("/engine/documentSession.ts"))
         hooks =
           'profileMethods(DocumentSession, ["addSource", "export", "transaction"]);';
-      if (id.endsWith("/engine/nativeEditingContext.ts"))
+      if (
+        /packages\/pdfium\/(?:dist\/authoring\/nativeContext\.js|src\/authoring\/nativeContext\.ts)$/.test(
+          id,
+        )
+      )
         hooks = 'profileMethods(NativeEditingContext, ["flush"]);';
       return hooks ? { code: code + instrument + hooks, map: null } : null;
     },
