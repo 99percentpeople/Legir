@@ -328,6 +328,15 @@ Authored and decrypted vectors remain independent. The authoring context flushes
 pending appearances and font subsets into that same native document before
 rendering/saving; appended page content isolates prior graphics state.
 
+Form export batches appearance updates once per field. Before saving,
+`lib/form-appearances.ts` checks the widgets on retained pages, including inherited
+field types and selected button states. Complete appearances remain authoritative;
+missing/dirty appearances, or an input regeneration request for a field we did
+not regenerate, retain the viewer fallback through `NeedAppearances`. Editable
+XFA retains its source policy; print disables regeneration. This inspection borrows
+the existing document, never decodes appearance streams and uses cancellable
+checkpoints rather than reopening the PDF.
+
 Hydration, thumbnail overlays and export use native journal transactions. The
 UI/history models describe draft edits; success, failure and cancellation all
 restore the immutable native source state after a job. Thumbnails draw a

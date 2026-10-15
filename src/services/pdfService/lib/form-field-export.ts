@@ -1,6 +1,5 @@
 import {
   PDFArray,
-  PDFBool,
   PDFCheckBox,
   PDFDict,
   PDFDocument,
@@ -71,23 +70,6 @@ export const restoreAcroFormXfaEntry = (
     entry.acroForm.set(PDFName.of("XFA"), entry.value);
   } catch (error) {
     console.warn("Failed to restore XFA form data", error);
-  }
-};
-
-export const setAcroFormNeedAppearances = (
-  pdfDoc: PDFDocument,
-  value: boolean,
-) => {
-  try {
-    const acroForm = pdfDoc.catalog.lookup(PDFName.of("AcroForm"));
-    if (acroForm instanceof PDFDict) {
-      acroForm.set(
-        PDFName.of("NeedAppearances"),
-        value ? PDFBool.True : PDFBool.False,
-      );
-    }
-  } catch (error) {
-    console.warn("Failed to set NeedAppearances", error);
   }
 };
 
@@ -453,6 +435,7 @@ export const updateExistingSourceField = (
   const runExistingFieldUpdate = (step: string, update: () => void) => {
     try {
       update();
+      return true;
     } catch (error) {
       pdfDebug("export:forms", "sourceFieldUpdateFailed", () => ({
         name: field.name,
@@ -460,6 +443,7 @@ export const updateExistingSourceField = (
         step,
         error: error instanceof Error ? error.message : String(error),
       }));
+      return false;
     }
   };
 

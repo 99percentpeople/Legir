@@ -166,7 +166,11 @@ export type FormExportContext = {
   ) => PDFField | undefined;
   registerField: (field: PDFField) => void;
   widgetRefsByPage: Map<PDFPage, Set<string>>;
-  scheduleAppearanceUpdate: (field: PDFField, update: () => void) => void;
+  regeneratedAppearances: ReadonlySet<PDFRef>;
+  scheduleAppearanceUpdate: (
+    field: PDFField,
+    update: () => void | boolean,
+  ) => void;
   flushAppearanceUpdates: () => void;
 };
 

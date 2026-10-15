@@ -13,7 +13,8 @@ const refKey = (ref: { objectNumber: number; generationNumber: number }) =>
 export const createFormExportContext = (form: PDFForm): FormExportContext => {
   const fieldsByName = new Map<string, PDFField>();
   const fieldsByRef = new Map<string, PDFField>();
-  const pendingAppearances = new Map<PDFRef, () => void>();
+  const pendingAppearances = new Map<PDFRef, () => void | boolean>();
+  const regeneratedAppearances = new Set<PDFRef>();
   const widgetRefsByPage: FormExportContext["widgetRefsByPage"] = new Map();
 
   const registerField = (field: PDFField) => {
@@ -62,13 +63,22 @@ export const createFormExportContext = (form: PDFForm): FormExportContext => {
         : undefined) ?? fieldsByName.get(field.name),
     registerField,
     widgetRefsByPage,
+    regeneratedAppearances,
     scheduleAppearanceUpdate: (field, update) => {
       // A PDF field can own many widgets. Its last update must render all of
       // them once, after every widget's geometry and the shared value are final.
+      regeneratedAppearances.delete(field.ref);
       pendingAppearances.set(field.ref, update);
     },
     flushAppearanceUpdates: () => {
-      for (const update of pendingAppearances.values()) update();
+      for (const [ref, update] of pendingAppearances) {
+        if (update() === false) {
+          // Geometry-only edits need the fallback too, even without a dirty /V.
+          form.markFieldAsDirty(ref);
+        } else if (!form.fieldIsDirty(ref)) {
+          regeneratedAppearances.add(ref);
+        }
+      }
       pendingAppearances.clear();
     },
   };
@@ -95,7 +105,7 @@ export const getOrCreateExportField = <T extends PDFField>(
 
 export const updateExportFieldAppearance = (
   field: PDFField,
-  update: () => void,
+  update: () => void | boolean,
   context?: FormExportContext,
 ) => {
   if (context) context.scheduleAppearanceUpdate(field, update);

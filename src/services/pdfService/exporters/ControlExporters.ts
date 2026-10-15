@@ -99,6 +99,7 @@ export class TextControlExporter implements IControlExporter {
           }
         } catch (e) {
           console.warn("Failed to update text field appearances", e);
+          return false;
         }
       },
       options?.context,
@@ -148,6 +149,7 @@ export class CheckboxControlExporter implements IControlExporter {
           cb.updateAppearances();
         } catch (e) {
           console.warn("Failed to update checkbox appearances", e);
+          return false;
         }
       },
       options?.context,
@@ -212,6 +214,7 @@ export class DropdownControlExporter implements IControlExporter {
             ol.updateAppearances(appearanceFont);
           } catch (e) {
             console.warn("Failed to update option list appearances", e);
+            return false;
           }
         },
         options?.context,
@@ -254,6 +257,7 @@ export class DropdownControlExporter implements IControlExporter {
             dd.updateAppearances(appearanceFont);
           } catch (e) {
             console.warn("Failed to update dropdown appearances", e);
+            return false;
           }
         },
         options?.context,
@@ -312,6 +316,7 @@ export class RadioControlExporter implements IControlExporter {
           rg.updateAppearances();
         } catch (e) {
           console.warn("Failed to update radio appearances", e);
+          return false;
         }
       },
       options?.context,
@@ -437,6 +442,7 @@ export class SignatureControlExporter implements IControlExporter {
           tf.updateAppearances(appearanceFont);
         } catch (e) {
           console.warn("Failed to update signature appearances", e);
+          return false;
         }
       },
       options?.context,

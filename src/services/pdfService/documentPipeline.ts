@@ -16,11 +16,11 @@ import {
   removeMissingSourcePdfFieldWidgets,
   restoreAcroFormXfaEntry,
   safeRemovePdfField,
-  setAcroFormNeedAppearances,
   sourcePdfRefToFormKey,
   updateExistingSourceField,
 } from "./lib/form-field-export";
 import { createFormExportContext } from "./lib/form-export-context";
+import { finalizeFormAppearances } from "./lib/form-appearances";
 import { prepareAnnotationsForPrint } from "./lib/print-export";
 import {
   buildFullFieldNameFromChain,
@@ -2331,10 +2331,6 @@ export const exportPDF = async (
       keepAnnotRefKeysByPage.set(preserved.pageIndex, setForPage);
     }
 
-    const hasNonFlattenFreeText = annotations.some(
-      (annotation) => annotation?.type === "freetext" && !annotation.flatten,
-    );
-
     // 1. Cleanup Existing Fields
     const sourceFieldRefKeys = new Set(
       fields
@@ -2649,12 +2645,6 @@ export const exportPDF = async (
       }
     }
 
-    setAcroFormNeedAppearances(
-      pdfDoc,
-      options?.flattenFormFields
-        ? false
-        : fields.length > 0 && !hasNonFlattenFreeText,
-    );
     restoreAcroFormXfaEntry(xfaEntry);
 
     if (options?.flattenFormFields && form && form.getFields().length > 0) {
@@ -2663,7 +2653,6 @@ export const exportPDF = async (
       } catch (error) {
         console.warn("Failed to flatten form fields", error);
       }
-      setAcroFormNeedAppearances(pdfDoc, false);
       restoreAcroFormXfaEntry(xfaEntry);
     }
 
@@ -2723,6 +2712,12 @@ export const exportPDF = async (
           }
         : undefined;
     restoreAcroFormXfaEntry(xfaEntry);
+    await finalizeFormAppearances(pdfDoc, {
+      form,
+      flatten: options?.flattenFormFields,
+      regenerated: formExportContext?.regeneratedAppearances,
+      checkpoint,
+    });
     options?.signal?.throwIfAborted();
     const output = await saveEditingDocument(pdfDoc, {
       incremental,
