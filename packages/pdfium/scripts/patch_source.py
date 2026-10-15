@@ -141,11 +141,24 @@ def patch(source: Path):
         ('  if (parser_) {\n    CPDF_DictionaryLocker locker(', '  if (parser_ || trailer_for_editing_) {\n    CPDF_DictionaryLocker locker('),
         ('      dwObjNum = document_->GetLastObjNum() + 1;', '      dwObjNum = last_obj_num_;'),
         ('archive_->WriteString("%PDF-1.")', 'archive_->WriteString("%PDF-")'),
+        ('      int32_t version = 7;', '      int32_t version = 17;'),
         ('      if (!archive_->WriteDWord(version % 10) ||', '      if (!archive_->WriteDWord(version / 10) || !archive_->WriteString(".") ||\n          !archive_->WriteDWord(version % 10) ||'),
         ('  if (file_version >= 10 && file_version <= 17) {', '  if ((file_version >= 10 && file_version <= 17) || file_version == 20) {'),
         ("      GetObjectsWithReferences(document_);", "      objects_for_editing_ ? *objects_for_editing_ : GetObjectsWithReferences(document_);"),
         ("    uint32_t objnum = new_obj_num_array_[i];\n    RetainPtr<const CPDF_Object> obj", "    uint32_t objnum = new_obj_num_array_[i];\n    if (objects_for_editing_ && !objects_for_editing_->contains(objnum)) continue;\n    RetainPtr<const CPDF_Object> obj"),
         ("    const uint32_t objnum = pair.first;", "    const uint32_t objnum = pair.first;\n    if (objects_for_editing_ && !objects_for_editing_->contains(objnum)) continue;"),
+        ("  if (stage_ == Stage::kWriteEncryptDict27) {", """  if (stage_ == Stage::kWriteEncryptDict27) {
+    // Reachability filtering may omit the highest allocated object. Recompute
+    // the extent after all old/new objects, including progressive continuations,
+    // have been written, before allocating an inline encryption dictionary.
+    if (objects_for_editing_) {
+      last_obj_num_ = object_offsets_.empty() ? 0 : object_offsets_.rbegin()->first;
+      // A delta still refers to the original xref, even when it only writes a
+      // low-numbered object or no newly allocated objects survived filtering.
+      if (is_incremental_) {
+        last_obj_num_ = std::max(last_obj_num_, parser_->GetLastObjNum());
+      }
+    }"""),
     ]
     for old, new in updates:
         if old == "      GetObjectsWithReferences(document_);" and "fallback_refs" in text:

@@ -96,6 +96,10 @@ its own assets. A host should serialize document jobs in one worker.
   output or AES-256 with user/owner passwords and permission bits. Saving
   without encryption options produces unencrypted output; hosts must explicitly
   forward their intended security policy.
+  New documents default to PDF 1.7; rewrites preserve the source version and
+  honor a higher catalog `/Version`. Full saves derive trailer `/Size` from the
+  objects actually written, including encryption dictionaries. Incremental
+  saves also retain the original cross-reference range.
   The writer estimates encoded stream sizes to reserve its output buffer and
   avoid repeatedly reallocating/copying large PDFs. The initial reservation
   includes filtered stream sizes, limits the contribution from unfiltered

@@ -12,10 +12,10 @@
   },
   "sha256": {
     "pdfium.js": "d13fa28459b2d3d66e2e7f212dfbe53b6f9e16f3d2357f4c78ce511b45fee272",
-    "pdfium.wasm": "316de4bcbafcb95a273935193602fdc8ecc1d02b42e4f5719f46b9552abd5e37"
+    "pdfium.wasm": "90c3224b67787eadcfd7306e6c9d1f70503f596c37d7426946c38aa84627f050"
   },
   "sourceSha256": {
-    "native/bridge.cpp": "2f5e23fc94a0907b86abdab0028ef3f1e34f98167de38b7192295461216f459b",
+    "native/bridge.cpp": "629805944c696e5080594c006664e033025319f04c8c12feb944e86f912aee7c",
     "native/canvas_plan.cpp": "8a83bddb597ae6e8a1026253274aae7e8d58fb0add162275aba094d240e18884",
     "native/canvas_plan.h": "75d87de68b736a7766d51db1409cc9dbd47448c59efeab2785e766b81eab32ae",
     "native/image_cache.cpp": "8606addc82ed8d8e8db02076439a61edb5bb171d2556dfce800c36c9b0a3e339",
@@ -25,6 +25,6 @@
     "native/versions.json": "8577ec77be4e212ef1818b7098589a55ea2bb38cc85d475c65131577fbb5c1b0",
     "scripts/patch_progressive_save.py": "098e6e06b1bdb4d735a484733b0deee7cf711287546ffecc2ac5b8127b46d076"
   },
-  "patchSha256": "e9040dace6ef5b4ba52892ae90cbe26ee7284a76753a29b734c081af4d5f1a8e",
+  "patchSha256": "ea93a2be01dc7c4a35f32cf1d93bd9d002f996b52ab4065a1900a03b7486fa56",
   "buildScriptSha256": "8c0e9bfe0664cf5bbeccc45d61bc56a05a8535db9176956847e2f6c96b91bff5"
 }

@@ -648,7 +648,8 @@ EMSCRIPTEN_KEEPALIVE int LPDF_Authenticate(Document *doc,
 }
 EMSCRIPTEN_KEEPALIVE int LPDF_Version(Document *doc) {
   int version = 17;
-  FPDF_GetFileVersion(doc->handle, &version);
+  // PDFium clears the out parameter when a new document has no parser.
+  if (!FPDF_GetFileVersion(doc->handle, &version)) version = 17;
   auto override = doc->core()->GetRoot()->GetNameFor("Version");
   if (override.GetLength() >= 3)
     version = std::max(version, (override[0] - '0') * 10 + override[2] - '0');
