@@ -1270,12 +1270,14 @@ const Workspace: React.FC<WorkspaceProps> = ({
   ]);
 
   const pageIndexToItemIndex = useMemo(() => {
+    // Control edits do not change page positions. Keeping this lookup stable
+    // also keeps coordinate/drag callbacks stable for every unchanged control.
     const map = new Map<number, number>();
-    pagesWithControls.forEach((p, i) => {
+    editorState.pages.forEach((p, i) => {
       map.set(p.pageIndex, i);
     });
     return map;
-  }, [pagesWithControls]);
+  }, [editorState.pages]);
 
   const getPageRectByPageIndex = useCallback(
     (pageIndex: number) => {
@@ -2581,7 +2583,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (activePageIndex === null) return;
 
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-    setSnapLines([]);
+    setSnapLines((lines) => (lines.length ? [] : lines));
 
     const coords = getRelativeCoords(e, activePageIndex);
     const pendingTouchMove = pendingTouchMoveRef.current;
