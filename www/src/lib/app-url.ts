@@ -1,4 +1,4 @@
-type AppLocation = Pick<Location, "protocol" | "host" | "hostname">;
+type AppLocation = Pick<Location, "hostname">;
 
 /** Keep the public website independent of the editor's deployment host. */
 export function resolveAppUrl(
@@ -7,17 +7,16 @@ export function resolveAppUrl(
 ): string {
   const override = configuredUrl?.trim();
   if (override) return override;
-  if (!location) return "/";
-
-  const { protocol, host, hostname } = location;
   if (
-    ["localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"].includes(hostname)
+    location &&
+    ["localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"].includes(
+      location.hostname,
+    )
   ) {
     return "http://localhost:5173";
   }
 
-  const appHost = host.startsWith("www.") ? host.slice(4) : host;
-  return `${protocol}//${appHost.startsWith("app.") ? appHost : `app.${appHost}`}`;
+  return "https://legir.app";
 }
 
 export const SOURCE_URL = "https://github.com/99percentpeople/Legir";

@@ -61,15 +61,19 @@ for ownership boundaries, remaining maintenance work and validation commands.
 
 ## Deployment
 
-Deploy the repository root as the app project, and deploy `www/` as a separate Vercel project with `Root Directory = www`.
+Deploy the repository root as the app project at `https://legir.app`, and deploy `www/` as a separate Vercel project at `https://www.legir.app` with `Root Directory = www`. Bind each domain to its project's production deployment without a redirect between the two domains.
 
-The landing page's download section reads the latest stable GitHub Release and links directly to its actual installers. Before the first release, it shows an explicit preparation notice instead of broken download links.
+The landing project shares source files and assets with the repository root, so enable **Include source files outside of the Root Directory in the Build Step** in its Vercel settings.
 
-If the landing site needs to link to the app, set:
+The landing site's app links default to `https://legir.app`, including on preview deployments. Local development uses `http://localhost:5173`. To explicitly configure the destination, set `VITE_APP_URL` in the landing project's environment:
 
 ```bash
-VITE_APP_URL=https://app.your-domain.com
+VITE_APP_URL=https://legir.app
 ```
+
+This optional override takes precedence over both defaults and is applied at build time; redeploy the landing site after changing it.
+
+The landing page's download section reads the latest stable GitHub Release and links directly to its actual installers. Before the first release, it shows an explicit preparation notice instead of broken download links.
 
 ## For Contributors
 

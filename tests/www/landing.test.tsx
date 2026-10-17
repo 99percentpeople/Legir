@@ -82,26 +82,40 @@ describe("landing page copy", () => {
   );
 });
 describe("landing app URL", () => {
-  it("respects the deployment override", () =>
-    expect(
-      resolveAppUrl(
-        " https://reader.example.com/workspace ",
-        new URL("https://www.example.com"),
-      ),
-    ).toBe("https://reader.example.com/workspace"));
+  it.each(["https://www.legir.app", "http://localhost:5174"])(
+    "respects the deployment override from %s",
+    (source) =>
+      expect(
+        resolveAppUrl(
+          " https://reader.example.com/workspace ",
+          new URL(source),
+        ),
+      ).toBe("https://reader.example.com/workspace"),
+  );
   it.each([
     ["http://localhost:5174", "http://localhost:5173"],
     ["http://127.0.0.1:5174", "http://localhost:5173"],
     ["http://[::1]:5174", "http://localhost:5173"],
     ["http://0.0.0.0:5174", "http://localhost:5173"],
-    ["https://www.example.com", "https://app.example.com"],
-    ["https://example.com", "https://app.example.com"],
-    ["https://app.example.com", "https://app.example.com"],
-    ["http://www.example.com:8080", "http://app.example.com:8080"],
+    ["https://www.legir.app", "https://legir.app"],
+    ["https://legir.app", "https://legir.app"],
+    ["https://www.example.com", "https://legir.app"],
+    ["https://example.com", "https://legir.app"],
+    ["https://app.example.com", "https://legir.app"],
+    ["http://www.example.com:8080", "https://legir.app"],
+    ["https://legir-www-preview.vercel.app", "https://legir.app"],
   ])("routes %s to %s", (source, target) =>
     expect(resolveAppUrl("", new URL(source))).toBe(target),
   );
-  it("falls back outside a browser", () => expect(resolveAppUrl()).toBe("/"));
+  it.each([undefined, "", "   "])(
+    "uses the production app for an unset or blank override (%s)",
+    (configuredUrl) =>
+      expect(
+        resolveAppUrl(configuredUrl, new URL("https://www.legir.app")),
+      ).toBe("https://legir.app"),
+  );
+  it("falls back to the production app outside a browser", () =>
+    expect(resolveAppUrl()).toBe("https://legir.app"));
 });
 describe("demo document state and source geometry", () => {
   it("separates scroll feedback from explicit navigation, including same-page navigation", () => {
