@@ -4,7 +4,7 @@
 
 - `src/` houses the React + Vite app. Key areas: `src/pages/` (screens), `src/components/` (UI + workspace layers), `src/store/` (Zustand SSOT), `src/services/` (PDF pipeline, file ops, AI), `src/workers/`, `src/styles/`, `src/locales/`.
 - `src-tauri/` contains the desktop wrapper and Rust entry points.
-- `public/` stores static assets like pdfjs resources and bundled fonts.
+- `public/` stores static assets and bundled fonts. The PDFium runtime lives in `packages/pdfium/wasm/` and is copied into versioned build assets.
 - `docs/ARCHITECTURE.md` is the canonical map of data flow and extension points.
 - If a directory contains `README.md`, read it before adding or moving code there.
 - Keep shared code in the narrowest valid home: `src/lib/` for cross-feature helpers, `src/utils/` for pure utilities, `src/services/pdfService/lib/` for PDF-domain helpers, `src/components/workspace/lib/` for workspace-only helpers. Keep data contracts in the nearest `types.ts`.

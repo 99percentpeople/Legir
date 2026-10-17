@@ -89,7 +89,7 @@ bun run build:app
   -> native bundler
 ```
 
-There is no need to build the web application separately first. The desktop frontend deliberately excludes the browser PWA/service worker and the large `public/fonts` library; it uses the existing desktop font integration. PDF.js CMaps, standard fonts and WASM resources remain bundled.
+There is no need to build the web application separately first. The desktop frontend deliberately excludes the browser PWA/service worker and the large `public/fonts` library; it uses the existing desktop font integration. The PDFium JavaScript loader, WASM binaries, provenance manifest and license notices are bundled under the versioned `pdfium/<version>/` path by `config/vite/staticCopy.ts`.
 
 ### Linuxbrew linker conflicts
 
