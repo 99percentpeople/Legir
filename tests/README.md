@@ -30,6 +30,13 @@ share the engine under test and do not replace the independent corpus validator.
 The two small [PDF fixtures](fixtures/pdf/README.md) cover classic and object-stream
 cross-reference formats and must both remain.
 
+`pdfiumArtifacts.test.ts` checks a Git checkout with `core.autocrlf=true` and
+ensures the provenance verifier still rejects modified source/loader/WASM bytes.
+`pdfBenchmarkFixtures.test.ts` runs the documented fixture CLI, reopens all three
+PDFs, checks their page/field counts and manifest hashes, and renders sampled
+image pages. It generates the full 60-page image fixture in a temporary directory
+and removes the outputs after the test.
+
 Do not infer browser scheduling, display quality, process peak memory or Tauri
 WebView behavior from jsdom/Node tests. Run the relevant manual browser tools when
 those paths change, and keep performance measurement separate from validation.
