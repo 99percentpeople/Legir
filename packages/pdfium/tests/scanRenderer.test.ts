@@ -473,3 +473,30 @@ it("draws prepared tiles directly without allocating or retaining an output bitm
   expect(cache.stats()).toMatchObject({ tileBytes: 0, renders: 1 });
   cache.clear();
 });
+
+it("preserves the scheduler's abort reason while releasing a late decode", async () => {
+  let finish!: (value: ImageBitmap) => void;
+  vi.mocked(createImageBitmap).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const cache = new ScanCanvasRenderer(),
+    ctx = target(),
+    controller = new AbortController();
+  const pending = cache.render(page, ctx, matrix, [0, 0, 512, 512], {
+    ...options(),
+    signal: controller.signal,
+  });
+  const preemption = new Error("reader arrived");
+  controller.abort(preemption);
+  await expect(pending).rejects.toBe(preemption);
+  expect(ctx.drawImage).not.toHaveBeenCalled();
+  cache.clear();
+  const bitmap = { width: 1024, height: 512, close: vi.fn() };
+  finish(bitmap as unknown as ImageBitmap);
+  await Promise.resolve();
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(cache.stats()).toMatchObject({ bytes: 0, reservedBytes: 0 });
+});

@@ -10,6 +10,7 @@ import type { EditorStore, EditorStoreSlice } from "./store.types";
 import type { PageData } from "@/types";
 
 const IDLE_MS = 600;
+const VISIBLE_IDLE_MS = 80;
 type Snapshot = { page: PageData; content: ThumbnailContent };
 type SetState = Parameters<EditorStoreSlice<object>>[0];
 
@@ -54,6 +55,7 @@ export function createDocumentThumbnails(
   let worker: PDFWorkerService | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let abort: AbortController | undefined;
+  let activePageId: string | undefined;
   let generation = 0;
   let notBefore = 0;
   let backgroundNotBefore = 0;
@@ -81,6 +83,7 @@ export function createDocumentThumbnails(
     generation++;
     abort?.abort();
     abort = undefined;
+    activePageId = undefined;
     clearTimeout(timer);
     timer = undefined;
   };
@@ -161,6 +164,7 @@ export function createDocumentThumbnails(
         const id = getPageId(page);
         if (!visible.has(id) && Date.now() < backgroundNotBefore) return;
         const started = performance.now();
+        activePageId = id;
         try {
           const url = await render(
             service,
@@ -194,14 +198,19 @@ export function createDocumentThumbnails(
         const elapsed = performance.now() - started;
         // Expensive previews get idle gaps instead of monopolizing the owner
         // worker. Cheap documents still warm quickly; visible items skip gaps.
-        backgroundNotBefore =
+        backgroundNotBefore = Math.max(
+          backgroundNotBefore,
           Date.now() +
-          (elapsed >= 50 ? Math.min(2000, Math.max(IDLE_MS, elapsed * 2)) : 0);
+            (elapsed >= 50
+              ? Math.min(2000, Math.max(IDLE_MS, elapsed * 2))
+              : 0),
+        );
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
     } finally {
       if (abort === controller) {
         abort = undefined;
+        activePageId = undefined;
         schedule();
       }
     }
@@ -213,6 +222,11 @@ export function createDocumentThumbnails(
         stop();
         worker = workerService;
       }
+      if (visible.size && !completed.size) {
+        notBefore = Math.min(notBefore, Date.now() + VISIBLE_IDLE_MS);
+        clearTimeout(timer);
+        timer = undefined;
+      }
       schedule();
     },
     changed(immediate = false) {
@@ -223,13 +237,19 @@ export function createDocumentThumbnails(
       schedule();
     },
     defer() {
+      backgroundNotBefore = Date.now() + IDLE_MS;
+      // A visible request stays alive: the worker yields it to actual reader
+      // work. Repeated input events must not discard the same useful preview.
+      if (activePageId && visible.has(activePageId)) return;
       stop();
-      notBefore = Date.now() + IDLE_MS;
+      notBefore = Date.now() + (visible.size ? VISIBLE_IDLE_MS : IDLE_MS);
       schedule();
     },
     setViewport(owner: symbol, pageIds: readonly string[] | null) {
       viewports.set(owner, pageIds);
       visible = new Set([...viewports.values()].flatMap((ids) => ids ?? []));
+      if (visible.size && !completed.size)
+        notBefore = Math.min(notBefore, Date.now() + VISIBLE_IDLE_MS);
       clearTimeout(timer);
       timer = undefined;
       schedule();

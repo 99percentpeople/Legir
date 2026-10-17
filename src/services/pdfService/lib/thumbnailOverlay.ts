@@ -19,12 +19,17 @@ import { drawAnnotationPrintFallbacks } from "./print-export";
 const preserveAppearance = (annotation: Annotation) =>
   annotation.type !== "comment" && canPreserveSourceAnnotation(annotation);
 
+export const hasThumbnailOverlay = (content: ThumbnailContent) =>
+  content.fields.length > 0 ||
+  content.annotations.some((annotation) => !preserveAppearance(annotation));
+
 /** Reuse save appearances on a tiny, transparent single-page PDF in the render worker.
  * Never parse/copy the source PDF or move its bytes through the UI for an edit. */
 export async function drawThumbnailOverlay(
   pdfDoc: PDFDocument,
   content: ThumbnailContent,
 ) {
+  if (!hasThumbnailOverlay(content)) return null;
   const pageIndex = pdfDoc.getPageCount();
   // This page and form tree exist only within the worker's native transaction.
   pdfDoc.catalog.delete(PDFName.of("AcroForm"));

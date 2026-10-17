@@ -14,6 +14,7 @@ For automated application/SDK coverage, see [tests/README.md](../../tests/README
 | Native pixels and cache lifetime                                  | `native-render.mjs`                                                      |
 | Production canvas quality and tile seams                          | `scan-fixtures.mjs`, `scan-validate.mjs`                                 |
 | Reader responsiveness and foreground scheduling                   | `reader-ui.mjs`, `preemption.mjs`                                        |
+| Sidebar thumbnail cache, pixels, cancellation and process memory  | `thumbnails.mjs`                                                         |
 | Export cancellation and saved-preview reuse                       | `io-probes.mjs`                                                          |
 | PWA, forms and authoring appearances                              | `fixtures.mjs`, `ui.mjs`, `authoring-audit.mjs`, `authoring-validate.py` |
 | Opt-in diagnosis                                                  | `corpus-diagnostic.mjs`, `profile-plugin.mjs`, `canvas-plan.mjs`         |
@@ -305,3 +306,32 @@ registration and after merged export. The counters are reset between these
 stages. This adds a merged save to the diagnostic; these instrumented elapsed
 times are not performance comparison results. Use the ordinary corpus runner
 and uninstrumented builds for reported before/after timings.
+
+`thumbnails.mjs MANIFEST OUTPUT [ROUNDS=3] [measure|validate]` uses unmodified
+workers from normal production app builds. Its manifest contains
+`variants: [{id, build, revision}]` and `fixtures: [{id, path, samplePages}]`.
+All page indexes are zero-based. It hydrates the normal model, then sends the
+sidebar's 500-pixel / JPEG quality 0.7 requests, including current controls and
+preserved source annotations. Cold and repeated requests are separate; elapsed
+time ends after the returned image decodes on the main thread. Three rounds
+alternate variant order. Chromium PSS/RSS/SwapPss are sampled every 50 ms after
+hydration, with GC snapshots before and after the thumbnail phase. These RPC
+measurements exclude the sidebar's scheduling delay; use an actual UI run to
+assess first visible thumbnails.
+Set a fixture's `editRepeat: true` to measure an added note (and changed text
+fields, if present) on the repeated request, exercising a live overlay over the
+cached body. Keep this run separate from unchanged repeated previews.
+
+Run `validate` separately, with one round. It uses lossless PNG, requires exact
+RGBA equality against the first variant, and checks an added note followed by
+restoring the original controls. Optional `stressPages` visits more pages after
+warming the reader and checks its scan storage is unchanged. Optional
+`readerPage` selects that foreground page; `requireReaderCache: true` fails if
+the selected page did not populate the scan cache. Optional
+`preemptionPages: [a,b,c]` should select three cold, expensive pages: it checks
+reader priority, cancellation immediately after preemption, active cancellation
+and retry. Native owner counts must remain one, the thumbnail cache must stay
+within its budget, and unload must leave no loaded document. Include scan
+rotation/crop/reflection/Normal/Multiply fixtures and live form pages. Raw files
+and validation timings stay outside formal performance summaries. These checks
+do not establish Tauri WebView behavior or make cold JPEG decoding faster.

@@ -23,9 +23,11 @@ import {
   yieldRenderTask,
 } from "@/services/pdfService/engine/raster";
 import { getThumbnailSourceAnnotations } from "@/services/pdfService/lib/thumbnailSourceAnnotations";
+import { THUMBNAIL_TARGET_WIDTH } from "@/constants";
 
 import { DocumentSession } from "@/services/pdfService/engine/documentSession";
 import { NativePageCache } from "@/services/pdfService/engine/pageCache";
+import { ThumbnailRasterCache } from "@/services/pdfService/engine/thumbnailCache";
 import { getEditingView } from "@/services/pdfService/engine/editingDocument";
 import {
   setWorkerFontProvider,
@@ -45,6 +47,11 @@ setWorkerFontProvider(
 
 let session: DocumentSession | null = null;
 let scanRenderer: ScanCanvasRenderer | undefined;
+const thumbnailCache = new ThumbnailRasterCache();
+const clearScanCaches = () => {
+  scanRenderer?.clear();
+  thumbnailCache.clear();
+};
 const imageCacheBudget = 256 * 1024 * 1024;
 // Keep this callback out of loadDocument's closure: retaining that activation
 // also keeps its transferred input buffer alive after PDFium has copied it.
@@ -102,6 +109,7 @@ const activeRenderTasks = new Map<
   string,
   {
     cancel: () => void;
+    preempt?: () => void;
     docId: string;
     canvasId?: string;
     pageIndex?: number;
@@ -117,6 +125,7 @@ const registerCancellableTask = (
     canvasId?: string;
     pageIndex?: number;
     scale?: number;
+    preemptible?: boolean;
   },
 ) => {
   let isCancelled = false;
@@ -135,18 +144,37 @@ const registerCancellableTask = (
         // ignore
       }
     },
+    preempt: meta?.preemptible
+      ? () => {
+          if (!controller.signal.aborted)
+            controller.abort(new RenderPreempted());
+        }
+      : undefined,
   });
 
   const throwIfCancelled = () => {
     if (isCancelled)
       throw new DOMException("Rendering cancelled", "AbortError");
+    if (controller.signal.reason instanceof RenderPreempted)
+      throw controller.signal.reason;
   };
 
   const cleanup = () => {
     activeRenderTasks.delete(id);
   };
 
-  return { throwIfCancelled, cleanup, signal: controller.signal };
+  return {
+    throwIfCancelled,
+    cleanup,
+    signal: controller.signal,
+    get cancelled() {
+      return isCancelled;
+    },
+  };
+};
+
+const preemptPreviews = () => {
+  for (const task of activeRenderTasks.values()) task.preempt?.();
 };
 
 // Priority Queue Implementation
@@ -305,7 +333,8 @@ const scheduleNext = () => {
 };
 
 const disposeState = (state: DocState, clearScan = true) => {
-  if (clearScan) scanRenderer?.clear();
+  if (clearScan) clearScanCaches();
+  else thumbnailCache.clear();
   state.pageCache.clear();
   state.pdfDoc = null;
 };
@@ -542,7 +571,9 @@ const renderToImage = async (
   params: Extract<WorkerRequest, { type: "renderImage" }>,
 ): Promise<TaskResult> => {
   const docId = getDocId(params.docId);
-  const task = registerCancellableTask(params.id, docId);
+  const task = registerCancellableTask(params.id, docId, undefined, {
+    preemptible: !!params.thumbnailContent,
+  });
   let canvas: OffscreenCanvas | undefined;
   try {
     await ensureDocumentLoaded(docId, params.isNewDoc ? params : undefined);
@@ -584,23 +615,50 @@ const renderToImage = async (
       keepAnnotations,
       imageCache: "reuse" as const,
     };
-    const drawn = await scanRenderer?.render(
-      cached.page,
-      ctx,
-      viewport.transform,
-      [0, 0, width, height],
-      {
-        ...renderOptions,
-        annotations: false,
-        keepAnnotations: undefined,
-        key: `${docId}:${params.pageIndex}`,
-        populate: false,
-        signal: task.signal,
-        checkpoint: task.throwIfCancelled,
-        yieldTask: yieldPreview,
-      },
-    );
-    if (drawn && (renderOptions.annotations || keepAnnotations?.size)) {
+    const cacheKey =
+      content &&
+      params.targetWidth &&
+      params.targetWidth <= THUMBNAIL_TARGET_WIDTH &&
+      width <= THUMBNAIL_TARGET_WIDTH &&
+      height <= THUMBNAIL_TARGET_WIDTH * 4
+        ? `${docId}:${params.pageIndex}:${viewport.transform.join(",")}:${width}:${height}`
+        : undefined;
+    const cachedBody = !!cacheKey && thumbnailCache.draw(cacheKey, ctx);
+    const drawn =
+      cachedBody ||
+      (await scanRenderer?.render(
+        cached.page,
+        ctx,
+        viewport.transform,
+        [0, 0, width, height],
+        {
+          ...renderOptions,
+          annotations: false,
+          keepAnnotations: undefined,
+          key: `${docId}:${params.pageIndex}`,
+          populate: false,
+          signal: task.signal,
+          checkpoint: task.throwIfCancelled,
+          yieldTask: yieldPreview,
+        },
+      ));
+    if (!drawn)
+      await drawPageToCanvasCooperatively(
+        cached.page,
+        viewport,
+        [0, 0, width, height],
+        ctx,
+        cacheKey
+          ? { ...renderOptions, annotations: false, keepAnnotations: undefined }
+          : renderOptions,
+        task.throwIfCancelled,
+        yieldPreview,
+      );
+    if (cacheKey && !cachedBody) thumbnailCache.remember(cacheKey, canvas);
+    if (
+      (drawn || cacheKey) &&
+      (renderOptions.annotations || keepAnnotations?.size)
+    ) {
       // Seed native annotation rendering with the actual Canvas backdrop.
       // A transparent overlay alone loses Multiply/other blend semantics.
       const pixels = ctx.getImageData(0, 0, width, height).data;
@@ -615,46 +673,37 @@ const renderToImage = async (
         pixels,
       );
     }
-    if (!drawn)
-      await drawPageToCanvasCooperatively(
-        cached.page,
-        viewport,
-        [0, 0, width, height],
-        ctx,
-        renderOptions,
-        task.throwIfCancelled,
-        yieldPreview,
-      );
     if (content) {
-      const { drawThumbnailOverlay } =
+      const { drawThumbnailOverlay, hasThumbnailOverlay } =
         await import("@/services/pdfService/lib/thumbnailOverlay");
-      await currentSession.transaction(
-        currentSession.primaryId,
-        async (view) => {
-          const index = await drawThumbnailOverlay(view, content);
-          task.throwIfCancelled();
-          if (index === null) return;
-          await getEditingView(view)!.flush();
-          currentSession.document.setPageTreeCache(false);
-          const page = currentSession.document.loadPage(index);
-          const overlayCanvas = new OffscreenCanvas(width, height);
-          try {
-            drawPageToCanvas(
-              pdfium,
-              page,
-              getNativePageViewport(page, scale),
-              [0, 0, width, height],
-              overlayCanvas.getContext("2d")!,
-              { annotations: true, transparent: true, imageCache: "reuse" },
-            );
-            ctx.drawImage(overlayCanvas, 0, 0);
-          } finally {
-            overlayCanvas.width = overlayCanvas.height = 0;
-            disposeNativePage(page);
-          }
-        },
-        true,
-      );
+      if (hasThumbnailOverlay(content))
+        await currentSession.transaction(
+          currentSession.primaryId,
+          async (view) => {
+            const index = await drawThumbnailOverlay(view, content);
+            task.throwIfCancelled();
+            if (index === null) return;
+            await getEditingView(view)!.flush();
+            currentSession.document.setPageTreeCache(false);
+            const page = currentSession.document.loadPage(index);
+            const overlayCanvas = new OffscreenCanvas(width, height);
+            try {
+              drawPageToCanvas(
+                pdfium,
+                page,
+                getNativePageViewport(page, scale),
+                [0, 0, width, height],
+                overlayCanvas.getContext("2d")!,
+                { annotations: true, transparent: true, imageCache: "reuse" },
+              );
+              ctx.drawImage(overlayCanvas, 0, 0);
+            } finally {
+              overlayCanvas.width = overlayCanvas.height = 0;
+              disposeNativePage(page);
+            }
+          },
+          true,
+        );
     }
 
     task.throwIfCancelled();
@@ -669,6 +718,8 @@ const renderToImage = async (
       transfer: [imageBytes],
     };
   } catch (error) {
+    if (task.cancelled) return { payload: false };
+    if (task.signal.reason instanceof RenderPreempted) throw task.signal.reason;
     if (error instanceof Error && error.name === "AbortError")
       return { payload: false };
     throw error;
@@ -896,6 +947,8 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           task.throwIfCancelled();
           donor.dispose();
           importPreviews.delete(data.docId);
+          // Selected donor pages can acquire different source indexes.
+          thumbnailCache.clear();
           state.pdfDoc = session.document;
           result = { payload: true };
         } finally {
@@ -910,7 +963,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
           result = { payload };
         } finally {
           if (session!.lastTransactionAffectsRendering) {
-            scanRenderer?.clear();
+            clearScanCaches();
             for (const state of docs.values()) state.pageCache.clear();
           }
         }
@@ -938,6 +991,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
                 nativeDocuments:
                   session!.stats().nativeDocuments + importPreviews.size,
                 scanCanvas: scanRenderer?.stats(),
+                thumbnailRaster: thumbnailCache.stats(),
               },
             };
           else if (data.type === "parseDocument") {
@@ -994,7 +1048,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
                       // storage. Release reader images before output grows;
                       // the exclusive lease prevents concurrent reader jobs.
                       if (!value) {
-                        scanRenderer?.clear();
+                        clearScanCaches();
                         for (const state of docs.values())
                           state.pageCache.clear();
                       }
@@ -1069,7 +1123,7 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
               data.type === "parseDocument") &&
             currentSession.lastTransactionAffectsRendering
           ) {
-            scanRenderer?.clear();
+            clearScanCaches();
             for (const state of docs.values()) {
               state.pageCache.clear();
             }
@@ -1158,6 +1212,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest | FontHostResponse>) => {
     case "resolveDest":
     case "load":
     case "unload": {
+      preemptPreviews();
       const pending = { cancelled: false };
       waitingCommands.set(id, pending);
       void exclusive(async () => {
@@ -1173,6 +1228,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest | FontHostResponse>) => {
 
     case "render":
     case "renderImage": {
+      if (type === "render") preemptPreviews();
       // Early registration of canvas to prevent loss during cancellation or optimization
       if (type === "render" && data.canvas) {
         canvasMap.set(data.canvasId, data.canvas);

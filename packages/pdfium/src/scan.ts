@@ -244,7 +244,9 @@ export class ScanCanvasRenderer {
       let abandoned = false;
       const abort = () => {
         abandoned = true;
-        reject(new DOMException("Scan cancelled", "AbortError"));
+        reject(
+          signal?.reason ?? new DOMException("Scan cancelled", "AbortError"),
+        );
       };
       signal?.addEventListener("abort", abort, { once: true });
       if (signal?.aborted) abort();

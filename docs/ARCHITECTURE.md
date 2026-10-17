@@ -420,7 +420,12 @@ source retains at most twelve reader pages plus two background pages, so
 thumbnail/text scans cannot evict the reader tier. Read-only hydration retains
 these pages; journaled hydration mutations and exports invalidate them safely.
 Preview rasterization reuses large decoded images without filling or evicting
-the foreground image cache. Pixmaps and object handles are released explicitly.
+the foreground image cache. A separate 16 MiB `ThumbnailRasterCache` retains
+materialized, small page-body ImageBitmaps from the existing renderer. Native
+annotations are drawn over the cached backdrop, followed by current controls;
+empty overlays skip the journal transaction. It retains no PDF, native page or
+large decoded source. Content/source changes, donor commit and disposal invalidate
+the cache. Pixmaps and object handles are released explicitly.
 System-font bytes come from
 the host through a narrow request/response bridge; embedded font bytes return once for main-thread `FontFace` registration.
 Permission preferences are snapshotted into each export request.
@@ -736,7 +741,12 @@ before offscreen work, while newly visible
 items wake the queue immediately. This bounds background duty without removing
 eventual thumbnail warmup or changing resolution. Each job reads the latest
 visible set; scrolling, virtualization and mode switches replace previous priorities without
-discarding an in-flight render. Reader gestures and thumbnail zoom defer work,
+discarding an in-flight render. Initial visible thumbnails and pending visible
+work after gestures wait at most 80 ms for scheduling; background warmup waits
+600 ms. A gesture preserves an active visible thumbnail. Actual foreground
+worker jobs still preempt previews, and content edits/disposal cancel them.
+Completed visible work does not erase a pending background idle gap.
+Reader gestures and thumbnail zoom defer offscreen work,
 while page dragging, scrolling and drop animations keep the queue running.
 Drag previews retain their images until drop completes. The old image stays
 visible until its replacement has decoded; canceled or stale results are

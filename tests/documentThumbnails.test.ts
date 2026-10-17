@@ -253,6 +253,9 @@ it("updates the next job on scroll without canceling useful work or retaining ol
   expect(signal.aborted).toBe(false);
   finish("blob:first");
   await drain();
+  expect(renderedPages()).toEqual([2, 5, 6]);
+  // Fast visible completions must not erase the preceding expensive job's gap.
+  await vi.advanceTimersByTimeAsync(1500);
   expect(renderedPages()).toEqual([2, 5, 6, 0, 1, 3, 4]);
 });
 
@@ -335,4 +338,74 @@ it("resumes unfinished thumbnails immediately after a drop remaps page indexes",
   expect(Object.values(store.getState().thumbnailImages)).not.toContain(
     "blob:before-reorder",
   );
+});
+
+it("keeps a visible thumbnail alive during reader gestures but delays offscreen work", async () => {
+  const store = coldStore(3);
+  const viewport = Symbol();
+  let finish!: (url: string) => void;
+  render.mockImplementationOnce(
+    () => new Promise<string>((resolve) => (finish = resolve)),
+  );
+  store.getState().setThumbnailViewport(viewport, ["original:1"]);
+  store.getState().warmupThumbnails(worker);
+  await drain();
+  const signal = render.mock.calls[0][2] as AbortSignal;
+  store.getState().deferThumbnailWarmup();
+  expect(signal.aborted).toBe(false);
+  finish("blob:visible");
+  await vi.advanceTimersByTimeAsync(100);
+  expect(store.getState().thumbnailImages[1]).toBe("blob:visible");
+  expect(renderedPages()).toEqual([1]);
+  await vi.advanceTimersByTimeAsync(2200);
+  expect(renderedPages()).toEqual([1, 0, 2]);
+});
+
+it("starts visible thumbnails soon after a gesture and still cancels them on a real edit", async () => {
+  const store = coldStore(2);
+  const viewport = Symbol();
+  render.mockImplementation(() => new Promise(() => {}));
+  store.getState().setThumbnailViewport(viewport, ["original:0"]);
+  store.getState().deferThumbnailWarmup();
+  store.getState().warmupThumbnails(worker);
+  await vi.advanceTimersByTimeAsync(79);
+  expect(render).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(2);
+  expect(renderedPages()).toEqual([0]);
+  const signal = render.mock.calls[0][2] as AbortSignal;
+  store.getState().addAnnotation({
+    id: "live-note",
+    pageIndex: 0,
+    type: "comment",
+    rect: { x: 20, y: 20, width: 20, height: 20 },
+  });
+  expect(signal.aborted).toBe(true);
+  await vi.advanceTimersByTimeAsync(601);
+  expect(render).toHaveBeenCalledTimes(2);
+  const latest = render.mock.lastCall!;
+  expect(latest[3].annotations[0].id).toBe("live-note");
+  store.dispose();
+  expect((latest[2] as AbortSignal).aborted).toBe(true);
+});
+
+it("starts the initially visible sidebar within 80 ms when its worker becomes ready", async () => {
+  const store = coldStore(2);
+  store.getState().setThumbnailViewport(Symbol(), ["original:0"]);
+  store.getState().warmupThumbnails(worker);
+  await vi.advanceTimersByTimeAsync(81);
+  expect(store.getState().thumbnailImages[0]).toBeTruthy();
+});
+
+it("reschedules the existing hydration debounce when visible thumbnails become ready", async () => {
+  const store = coldStore(2);
+  store.setState({ documentLoadState: "hydrating" });
+  store.getState().setThumbnailViewport(Symbol(), ["original:0"]);
+  store.getState().warmupThumbnails(worker);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(render).not.toHaveBeenCalled();
+  store.setState({ documentLoadState: "ready" });
+  store.getState().refreshThumbnails();
+  store.getState().warmupThumbnails(worker);
+  await vi.advanceTimersByTimeAsync(81);
+  expect(store.getState().thumbnailImages[0]).toBeTruthy();
 });
