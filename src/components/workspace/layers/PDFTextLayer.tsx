@@ -647,7 +647,10 @@ const PDFTextLayer: React.FC<PDFTextLayerProps> = ({
           visibility: shouldHideByVisibility ? "hidden" : "visible",
           pointerEvents:
             shouldHideByVisibility || !hasSelectableText ? "none" : undefined,
-          cursor: hasSelectableText ? cursor : undefined,
+          ...(hasSelectableText &&
+            cursor && {
+              "--app-text-layer-cursor": cursor,
+            }),
           "--scale-factor": String(renderedScale ?? scale),
           "--user-unit": String(userUnit),
           ...(textLayerSmoothScale && {

@@ -6,6 +6,7 @@
   line-height: 1;
   text-size-adjust: none;
   forced-color-adjust: none;
+  cursor: var(--app-text-layer-cursor, inherit);
   transform-origin: 0% 0%;
   transform: scale(var(--app-smooth-scale, 1));
   --scale-round-x: 2px;
@@ -32,7 +33,7 @@
   color: transparent;
   position: absolute;
   white-space: pre;
-  cursor: text;
+  cursor: var(--app-text-layer-cursor, text);
   margin: 0;
   transform-origin: 0 0;
 }
@@ -150,7 +151,7 @@
   position: absolute;
   inset: 100% 0 0;
   z-index: -1;
-  cursor: default;
+  cursor: var(--app-text-layer-cursor, default);
   user-select: none;
 }
 

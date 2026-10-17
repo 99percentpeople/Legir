@@ -3292,8 +3292,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
         }
         data-workspace-page="true"
         style={{
-          cursor:
-            editorState.tool === "draw_highlight" ? "crosshair" : undefined,
+          // Drawing events pass through the overlay to the rendered page.
+          // Keep the tool cursor on their common ancestor so both inherit it.
+          cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
         }}
         onPointerDown={(e) => handlePointerDown(e, page.pageIndex)}
         onContextMenu={(e) => handlePageContextMenu(e, page.pageIndex)}
@@ -3464,7 +3465,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
           <div
             className={cn("absolute inset-0 scheme-light")}
             style={{
-              cursor: isPanModeActive ? "grab" : getCursor(editorState.tool),
               pointerEvents: isPanModeActive
                 ? "auto"
                 : editorState.tool === "select" ||
