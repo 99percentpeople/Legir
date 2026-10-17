@@ -1,2 +1,8 @@
+# Provenance hashes exact bytes; Windows checkouts must preserve these inputs.
+packages/pdfium/native/** text eol=lf
+packages/pdfium/scripts/*.py text eol=lf
+packages/pdfium/wasm/*.js text eol=lf
+packages/pdfium/wasm/*.wasm binary
+
 # Preserve third-party notices verbatim, including upstream whitespace.
 packages/pdfium/wasm/licenses/** -whitespace

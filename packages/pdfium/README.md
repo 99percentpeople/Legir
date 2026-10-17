@@ -194,6 +194,10 @@ with `native/bridge.cpp` and `native/text_edit.cpp`. No prebuilt third-party JS
 wrapper is used. `wasm/provenance.json` records pins and SHA-256 hashes; the normal
 TypeScript build rejects assets that no longer match native sources or scripts.
 Changing those files requires rebuilding WASM before running the app.
+Git attributes keep the hashed text inputs at LF even with `core.autocrlf=true`;
+the verifier still checks their exact bytes and the binary WASM hash. The app's
+`tests/pdfiumArtifacts.test.ts` exercises a CRLF checkout and rejects modified
+loader, native source and WASM bytes.
 
 `wasm/` contains the compiled module, ESM loader, provenance and third-party
 license notices. Release assets must always be distributed together.
