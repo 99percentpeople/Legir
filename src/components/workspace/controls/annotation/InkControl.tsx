@@ -12,7 +12,7 @@ import { ControlWrapper } from "../ControlWrapper";
 import {
   getInkBoundingRect,
   getInkStrokes,
-  getInkSvgPath,
+  getInkRenderPath,
 } from "@/lib/inkGeometry";
 import { getContrastColor } from "@/utils/colors";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
@@ -47,10 +47,13 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
     };
   }, [strokes, data.rect, data.thickness]);
 
-  const pathData = useMemo(() => {
-    if (data.svgPath) return data.svgPath;
-    return getInkSvgPath(strokes) || "";
-  }, [strokes, data.svgPath]);
+  const path = useMemo(
+    () => getInkRenderPath(data),
+    [data.points, data.strokes, data.svgPath],
+  );
+  const pathData = path.d;
+  const pathTransform =
+    path.dx || path.dy ? `translate(${path.dx} ${path.dy})` : undefined;
 
   if (!bounds || !pathData) return null;
 
@@ -121,6 +124,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
               {isSelected && !isInkHighlight && (
                 <path
                   d={pathData}
+                  transform={pathTransform}
                   fill="none"
                   stroke="#3b82f6"
                   strokeWidth={(data.thickness || 1) + 6}
@@ -134,6 +138,7 @@ export const InkControl: React.FC<AnnotationControlProps> = (props) => {
               )}
               <path
                 d={pathData}
+                transform={pathTransform}
                 fill="none"
                 stroke={data.color || "#000000"}
                 strokeWidth={data.thickness || 1}

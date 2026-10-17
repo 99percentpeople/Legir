@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useRef,
   type MouseEvent as ReactMouseEvent,
   type RefObject,
 } from "react";
@@ -22,20 +23,36 @@ export const useWorkspacePointerCoords = (opts: {
   getPageRectByPageIndex?: (pageIndex: number) => PageRect | null;
 }) => {
   const getElementById = useEditorElementById();
+  const measurements = useRef<Map<Element, DOMRect> | null>(null);
+  const getClientRect = useCallback((element: Element) => {
+    const cached = measurements.current?.get(element);
+    if (cached) return cached;
+    const rect = element.getBoundingClientRect();
+    measurements.current?.set(element, rect);
+    return rect;
+  }, []);
+  const withMeasurements = useCallback((run: () => void) => {
+    measurements.current = new Map();
+    try {
+      run();
+    } finally {
+      measurements.current = null;
+    }
+  }, []);
   // Prefer DOM measurement when the page is mounted (accurate and cheap).
   // Fallback to rect-based math when virtualization means the page element is missing.
   const getRelativeCoordsFromPointDom = useCallback(
     (clientX: number, clientY: number, pageIndex: number) => {
       const pageEl = getElementById(`page-${pageIndex}`);
       if (!pageEl) return null;
-      const rect = pageEl.getBoundingClientRect();
+      const rect = getClientRect(pageEl);
       const scale = opts.editorStateRef.current?.scale ?? 1;
       return {
         x: (clientX - rect.left) / scale,
         y: (clientY - rect.top) / scale,
       };
     },
-    [opts.editorStateRef],
+    [opts.editorStateRef, getClientRect, getElementById],
   );
 
   const getRelativeCoordsFromPointVirtual = useCallback(
@@ -47,14 +64,19 @@ export const useWorkspacePointerCoords = (opts: {
       const pageRect = getRect(pageIndex);
       if (!pageRect) return null;
 
-      const contentBox = contentEl.getBoundingClientRect();
+      const contentBox = getClientRect(contentEl);
       const scale = opts.editorStateRef.current?.scale ?? 1;
       return {
         x: (clientX - contentBox.left - pageRect.left) / scale,
         y: (clientY - contentBox.top - pageRect.top) / scale,
       };
     },
-    [opts.contentRef, opts.editorStateRef, opts.getPageRectByPageIndex],
+    [
+      opts.contentRef,
+      opts.editorStateRef,
+      opts.getPageRectByPageIndex,
+      getClientRect,
+    ],
   );
 
   const getRelativeCoordsFromPoint = useCallback(
@@ -87,5 +109,10 @@ export const useWorkspacePointerCoords = (opts: {
     [getRelativeCoordsFromPoint, getRelativeCoordsFromPointVirtual],
   );
 
-  return { getRelativeCoordsFromPoint, getRelativeCoords };
+  return {
+    getRelativeCoordsFromPoint,
+    getRelativeCoords,
+    getClientRect,
+    withMeasurements,
+  };
 };

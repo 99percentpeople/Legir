@@ -26,6 +26,21 @@ import {
 import PDFSearchHeader from "./PDFSearchHeader";
 import PDFSearchPanel from "./PDFSearchPanel";
 
+// Subscribe to controls only while their tab is mounted. Geometry changes must
+// not invalidate the navigation shell, outline or every thumbnail.
+const SidebarFields = (
+  props: Omit<React.ComponentProps<typeof FieldTreePanel>, "fields">,
+) => {
+  const fields = useEditorView((state) => state.fields);
+  return <FieldTreePanel {...props} fields={fields} />;
+};
+const SidebarAnnotations = (
+  props: Omit<React.ComponentProps<typeof AnnotationsPanel>, "annotations">,
+) => {
+  const annotations = useEditorView((state) => state.annotations);
+  return <AnnotationsPanel {...props} annotations={annotations} />;
+};
+
 const Sidebar: React.FC = () => {
   const appEventBus = useEditorEventBus();
   const { t } = useLanguage();
@@ -46,8 +61,6 @@ const Sidebar: React.FC = () => {
     isOpen,
     isFloating,
     pages,
-    fields,
-    annotations,
     documentPermissions,
     outline,
     selectedId,
@@ -67,23 +80,29 @@ const Sidebar: React.FC = () => {
   const onClose = state.closeSidebar;
   const onResize = (nextWidth: number) =>
     setUiState({ sidebarWidth: nextWidth });
-  const onNavigatePage = (pageIndex: number) => {
-    appEventBus.emit("workspace:navigatePage", {
-      pageIndex,
-      behavior: "smooth",
-    });
-  };
-  const onSelectControl = (
-    id: string,
-    options?: { behavior?: "auto" | "smooth"; skipScroll?: boolean },
-  ) => {
-    selectControl(id);
-    appEventBus.emit(
-      "workspace:focusControl",
-      { id, behavior: options?.behavior, skipScroll: options?.skipScroll },
-      { sticky: true },
-    );
-  };
+  const onNavigatePage = React.useCallback(
+    (pageIndex: number) => {
+      appEventBus.emit("workspace:navigatePage", {
+        pageIndex,
+        behavior: "smooth",
+      });
+    },
+    [appEventBus],
+  );
+  const onSelectControl = React.useCallback(
+    (
+      id: string,
+      options?: { behavior?: "auto" | "smooth"; skipScroll?: boolean },
+    ) => {
+      selectControl(id);
+      appEventBus.emit(
+        "workspace:focusControl",
+        { id, behavior: options?.behavior, skipScroll: options?.skipScroll },
+        { sticky: true },
+      );
+    },
+    [appEventBus, selectControl],
+  );
   const activeTab = search.isPdfSearchOpen ? "search" : sidebarTab;
   const isSearchActive = search.isPdfSearchOpen;
 
@@ -230,9 +249,8 @@ const Sidebar: React.FC = () => {
             value="fields"
             className="mt-0 flex h-full flex-1 flex-col data-[state=inactive]:hidden"
           >
-            <FieldTreePanel
+            <SidebarFields
               pages={pages}
-              fields={fields}
               selectedId={selectedId}
               onSelectControl={onSelectControl}
             />
@@ -241,8 +259,7 @@ const Sidebar: React.FC = () => {
             value="annotations"
             className="mt-0 flex h-full flex-1 flex-col data-[state=inactive]:hidden"
           >
-            <AnnotationsPanel
-              annotations={annotations}
+            <SidebarAnnotations
               documentPermissions={documentPermissions}
               onSelectControl={onSelectControl}
               onDeleteAnnotation={deleteAnnotation}

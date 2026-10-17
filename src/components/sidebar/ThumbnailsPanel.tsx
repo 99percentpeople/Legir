@@ -20,14 +20,14 @@ interface ThumbnailItemProps {
   isRestoringViewState: boolean;
 }
 
-const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
+const ThumbnailItem = React.memo(function ThumbnailItem({
   page,
   pageIndex,
   onNavigate,
   isActive,
   scrollBehaviorRef,
   isRestoringViewState,
-}) => {
+}: ThumbnailItemProps) {
   const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
   const viewRotation = useEditorView((state) => state.viewRotation);
@@ -88,7 +88,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({
       </span>
     </div>
   );
-};
+});
 
 interface ThumbnailsPanelProps {
   pages?: PageData[];
@@ -161,4 +161,4 @@ const ThumbnailsPanel: React.FC<ThumbnailsPanelProps> = ({
   );
 };
 
-export default ThumbnailsPanel;
+export default React.memo(ThumbnailsPanel);

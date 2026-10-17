@@ -302,33 +302,58 @@ const AnnotationReplyItem: React.FC<AnnotationReplyItemProps> = ({
   );
 };
 
-interface AnnotationCardProps {
+interface AnnotationCardProps extends Pick<
+  AnnotationsPanelViewProps,
+  | "onSelectControl"
+  | "onDeleteAnnotation"
+  | "onUpdateAnnotation"
+  | "onAddAnnotationReply"
+  | "onUpdateAnnotationReply"
+  | "onDeleteAnnotationReply"
+> {
   scrollIntoView: (element: HTMLElement) => void;
   annotation: Annotation;
   isSelected: boolean;
-  onSelect: () => void;
-  onDelete: () => void;
-  onUpdate: (updates: Partial<Annotation>) => void;
-  onAddReply: (reply: AnnotationReply) => void;
-  onUpdateReply: (replyId: string, updates: Partial<AnnotationReply>) => void;
-  onDeleteReply: (replyId: string) => void;
   canEdit: boolean;
   restrictedTitle: string;
 }
 
-const AnnotationCard: React.FC<AnnotationCardProps> = ({
+const AnnotationCard = React.memo(function AnnotationCard({
   scrollIntoView,
   annotation,
   isSelected,
-  onSelect,
-  onDelete,
-  onUpdate,
-  onAddReply,
-  onUpdateReply,
-  onDeleteReply,
+  onSelectControl,
+  onDeleteAnnotation,
+  onUpdateAnnotation,
+  onAddAnnotationReply,
+  onUpdateAnnotationReply,
+  onDeleteAnnotationReply,
   canEdit,
   restrictedTitle,
-}) => {
+}: AnnotationCardProps) {
+  const onSelect = React.useCallback(
+    () => onSelectControl(annotation.id, { behavior: "smooth" }),
+    [annotation.id, onSelectControl],
+  );
+  const onDelete = () => onDeleteAnnotation(annotation.id);
+  const onUpdate = React.useCallback(
+    (updates: Partial<Annotation>) =>
+      onUpdateAnnotation(annotation.id, updates),
+    [annotation.id, onUpdateAnnotation],
+  );
+  const onAddReply = React.useCallback(
+    (reply: AnnotationReply) => onAddAnnotationReply(annotation.id, reply),
+    [annotation.id, onAddAnnotationReply],
+  );
+  const onUpdateReply = React.useCallback(
+    (replyId: string, updates: Partial<AnnotationReply>) =>
+      onUpdateAnnotationReply(annotation.id, replyId, updates),
+    [annotation.id, onUpdateAnnotationReply],
+  );
+  const onDeleteReply = React.useCallback(
+    (replyId: string) => onDeleteAnnotationReply(annotation.id, replyId),
+    [annotation.id, onDeleteAnnotationReply],
+  );
   const { t } = useLanguage();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const appEventBus = useEditorEventBus();
@@ -460,6 +485,10 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
       )}
       style={{
         backgroundColor: annotation.color || "#000000",
+        // Keep drafts, focus and sticky event subscribers alive while allowing
+        // the browser to skip layout/paint of cards outside the scroll viewport.
+        contentVisibility: isSelected ? "visible" : "auto",
+        containIntrinsicSize: "auto 126px",
       }}
       onClick={onSelect}
     >
@@ -664,7 +693,7 @@ const AnnotationCard: React.FC<AnnotationCardProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export interface AnnotationsPanelViewProps {
   annotations: Annotation[];
@@ -750,12 +779,6 @@ export const AnnotationsPanelView: React.FC<AnnotationsPanelViewProps> = ({
       .sort((a, b) => a - b);
   }, [groupedAnnotations]);
 
-  const handleSelect = (annot: Annotation) => {
-    onSelectControl(annot.id, {
-      behavior: "smooth",
-    });
-  };
-
   return (
     <div className="flex h-full flex-col">
       <div className="border-border bg-muted/30 flex shrink-0 items-center gap-2 border-b p-2">
@@ -840,20 +863,12 @@ export const AnnotationsPanelView: React.FC<AnnotationsPanelViewProps> = ({
                       key={annot.id}
                       annotation={annot}
                       isSelected={selectedId === annot.id}
-                      onSelect={() => handleSelect(annot)}
-                      onDelete={() => onDeleteAnnotation(annot.id)}
-                      onUpdate={(updates) =>
-                        onUpdateAnnotation(annot.id, updates)
-                      }
-                      onAddReply={(reply) =>
-                        onAddAnnotationReply(annot.id, reply)
-                      }
-                      onUpdateReply={(replyId, updates) =>
-                        onUpdateAnnotationReply(annot.id, replyId, updates)
-                      }
-                      onDeleteReply={(replyId) =>
-                        onDeleteAnnotationReply(annot.id, replyId)
-                      }
+                      onSelectControl={onSelectControl}
+                      onDeleteAnnotation={onDeleteAnnotation}
+                      onUpdateAnnotation={onUpdateAnnotation}
+                      onAddAnnotationReply={onAddAnnotationReply}
+                      onUpdateAnnotationReply={onUpdateAnnotationReply}
+                      onDeleteAnnotationReply={onDeleteAnnotationReply}
                       canEdit={canEditAnnotations}
                       restrictedTitle={restrictedTitle}
                       scrollIntoView={scrollIntoView}

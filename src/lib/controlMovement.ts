@@ -1,4 +1,5 @@
 import type { Annotation, FormField, MoveDirection } from "@/types";
+import { cacheTranslatedInkPath } from "./inkGeometry";
 
 export const getMoveDelta = (
   direction: MoveDirection,
@@ -50,14 +51,19 @@ export const getMovedAnnotationUpdates = (
       stroke.map((point) => translatePoint(point, dx, dy)),
     );
     const nextPoints =
-      annotation.points?.map((point) => translatePoint(point, dx, dy)) ??
+      (annotation.points === annotation.strokes?.[0]
+        ? nextStrokes?.[0]
+        : annotation.points?.map((point) => translatePoint(point, dx, dy))) ??
       nextStrokes?.[0];
 
-    return {
+    const updates = {
       ...(nextPoints ? { points: nextPoints } : null),
       ...(nextStrokes ? { strokes: nextStrokes } : null),
+      svgPath: undefined,
       appearanceStreamContent: undefined,
     };
+    cacheTranslatedInkPath(annotation, updates, dx, dy);
+    return updates;
   }
 
   if (annotation.type === "highlight" && annotation.rects?.length) {

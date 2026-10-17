@@ -29,6 +29,7 @@ import FileDragOverlay from "@/components/FileDragOverlay";
 import { getMovedAnnotationUpdates } from "@/lib/controlMovement";
 import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 import { usePointerCapture } from "@/hooks/usePointerCapture";
+import { useEventListener } from "@/hooks/useEventListener";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useCanvasPanning } from "@/hooks/useCanvasPanning";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -42,6 +43,7 @@ import { WorkspaceTextSelectionPopover } from "./widgets/WorkspaceTextSelectionP
 import PDFPage from "./layers/PDFPage";
 import { ControlRenderer, preloadControls, registerControls } from "./controls";
 import { useWorkspaceDerivedPages } from "./hooks/useWorkspaceDerivedPages";
+import { useControlTransformFrame } from "./hooks/useControlTransformFrame";
 import {
   useWorkspaceTextSelection,
   type TextSelectionToolbarState,
@@ -1064,8 +1066,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
+  const transformFrameRef = useRef<ReturnType<
+    typeof useControlTransformFrame
+  > | null>(null);
 
   const clearActiveInteractionState = useCallback(() => {
+    transformFrameRef.current?.cancel();
     pendingTouchMoveRef.current = null;
     pendingTouchResizeRef.current = null;
     setDragStart(null);
@@ -1417,12 +1423,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
     wasRestoringRef.current = isRestoring;
   }, [editorState.pendingViewStateRestore, handleViewportScroll]);
 
-  const { getRelativeCoordsFromPoint, getRelativeCoords } =
-    useWorkspacePointerCoords({
-      editorStateRef,
-      contentRef,
-      getPageRectByPageIndex,
-    });
+  const {
+    getRelativeCoordsFromPoint,
+    getRelativeCoords,
+    getClientRect,
+    withMeasurements,
+  } = useWorkspacePointerCoords({
+    editorStateRef,
+    contentRef,
+    getPageRectByPageIndex,
+  });
 
   const activatePendingTouchMove = useCallback(
     (e: React.PointerEvent) => {
@@ -1601,6 +1611,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         contentEl: contentRef.current,
         axis: editorState.pageFlow === "vertical" ? "vertical" : "horizontal",
         getPageRectByPageIndex,
+        getClientRect,
       },
     );
   };
@@ -2287,28 +2298,63 @@ const Workspace: React.FC<WorkspaceProps> = ({
     });
   };
 
-  const handleScroll = () => {
-    if (isInteracting) {
+  const transformId =
+    movingFieldId ??
+    movingAnnotationId ??
+    resizingFieldId ??
+    resizingAnnotationId;
+  const transformFrame = useControlTransformFrame(({ x, y }) => {
+    // Undo/deletion or a tool switch can arrive before the next animation frame.
+    const state = editorStateRef.current;
+    if (
+      !transformId ||
+      state.selectedId !== transformId ||
+      state.tool !== "select"
+    )
+      return;
+    withMeasurements(() => {
+      setSnapLines((lines) => (lines.length ? [] : lines));
       if (movingFieldId) {
-        updateMovingField(lastMousePosRef.current.x, lastMousePosRef.current.y);
+        updateMovingField(x, y);
       } else if (movingAnnotationId) {
-        updateMovingAnnotation(
-          lastMousePosRef.current.x,
-          lastMousePosRef.current.y,
-        );
+        updateMovingAnnotation(x, y);
       } else if (resizingFieldId) {
-        updateResizingField(
-          lastMousePosRef.current.x,
-          lastMousePosRef.current.y,
-        );
+        updateResizingField(x, y);
       } else if (resizingAnnotationId) {
-        updateResizingAnnotation(
-          lastMousePosRef.current.x,
-          lastMousePosRef.current.y,
-        );
+        updateResizingAnnotation(x, y);
       }
+    });
+  });
+  transformFrameRef.current = transformFrame;
+  // Save/undo shortcuts read the document synchronously. Deliver the latest
+  // pointer sample before their bubbling key handler takes that snapshot.
+  useEventListener<KeyboardEvent>(
+    transformId ? window : null,
+    "keydown",
+    () => transformFrame.flush(),
+    true,
+  );
+  useEffect(() => {
+    if (
+      transformId &&
+      (editorState.selectedId !== transformId || editorState.tool !== "select")
+    ) {
+      resetGlobalCursor();
+      clearActiveInteractionState();
     }
+  }, [
+    transformId,
+    editorState.selectedId,
+    editorState.tool,
+    clearActiveInteractionState,
+  ]);
 
+  const handleScroll = () => {
+    if (transformId)
+      transformFrame.queue(
+        lastMousePosRef.current.x,
+        lastMousePosRef.current.y,
+      );
     handleViewportScroll();
   };
 
@@ -2583,9 +2629,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
     if (activePageIndex === null) return;
 
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-    setSnapLines((lines) => (lines.length ? [] : lines));
 
-    const coords = getRelativeCoords(e, activePageIndex);
     const pendingTouchMove = pendingTouchMoveRef.current;
     const pendingTouchResize = pendingTouchResizeRef.current;
 
@@ -2609,6 +2653,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
       return;
     }
 
+    if (transformId) {
+      transformFrame.queue(e.clientX, e.clientY);
+      return;
+    }
+    setSnapLines((lines) => (lines.length ? [] : lines));
+    const coords = getRelativeCoords(e, activePageIndex);
     if (
       shapeDraftSession &&
       shapeDraftSession.pageIndex === activePageIndex &&
@@ -2680,25 +2730,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
       setDragCurrent({ x: newX, y: newY });
     }
-    // --- MOVING FIELD ---
-    else if (movingFieldId && moveOffset && moveStartRaw) {
-      updateMovingField(e.clientX, e.clientY);
-    }
-    // --- MOVING ANNOTATION ---
-    else if (movingAnnotationId && moveOffset) {
-      updateMovingAnnotation(e.clientX, e.clientY);
-    }
-    // --- RESIZING ---
-    else if (resizingFieldId && resizeStart && resizeHandle) {
-      updateResizingField(e.clientX, e.clientY);
-    } else if (resizingAnnotationId && resizeStart && resizeHandle) {
-      updateResizingAnnotation(e.clientX, e.clientY);
-    }
   };
 
   const handlePointerUp = (e?: React.PointerEvent | React.MouseEvent) => {
     if (pinchGestureActiveRef.current) return;
     if (endPan(e)) return;
+    transformFrame.flush();
 
     if (e && "pointerId" in e) {
       const pendingTouchMove = pendingTouchMoveRef.current;

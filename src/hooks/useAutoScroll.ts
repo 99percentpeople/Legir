@@ -30,19 +30,35 @@ export const useAutoScroll = (
   // Animation loop
   useEffect(() => {
     if (!enabled) {
-      if (requestRef.current) {
+      mousePosRef.current = null;
+      if (requestRef.current !== null) {
         cancelAnimationFrame(requestRef.current);
         requestRef.current = null;
       }
       return;
     }
 
+    let bounds: DOMRect | null = null;
+    const invalidateBounds = (event?: Event) => {
+      // Scrolling the contents does not move the viewport's border box.
+      if (event?.type === "scroll" && event.target === containerRef.current)
+        return;
+      bounds = null;
+    };
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => invalidateBounds());
+    if (containerRef.current) observer?.observe(containerRef.current);
+    window.addEventListener("resize", invalidateBounds);
+    window.addEventListener("scroll", invalidateBounds, true);
+
     const scroll = () => {
       const container = containerRef.current;
       const mousePos = mousePosRef.current;
 
       if (container && mousePos) {
-        const rect = container.getBoundingClientRect();
+        const rect = (bounds ??= container.getBoundingClientRect());
         let dx = 0;
         let dy = 0;
 
@@ -88,7 +104,11 @@ export const useAutoScroll = (
     requestRef.current = requestAnimationFrame(scroll);
 
     return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
+      requestRef.current = null;
+      observer?.disconnect();
+      window.removeEventListener("resize", invalidateBounds);
+      window.removeEventListener("scroll", invalidateBounds, true);
     };
   }, [enabled, threshold, speed, containerRef]);
 };

@@ -20,8 +20,12 @@ export const getPageIndexFromPoint = (
     } | null;
     contentEl?: HTMLElement | null;
     axis?: "vertical" | "horizontal";
+    getClientRect?: (element: Element) => DOMRect;
   },
 ) => {
+  const getClientRect =
+    options?.getClientRect ??
+    ((element: Element) => element.getBoundingClientRect());
   // DOM fast-path: check current active page first for performance.
   if (activePageIndex !== null) {
     const pageEl = options?.contentEl
@@ -30,7 +34,7 @@ export const getPageIndexFromPoint = (
         )
       : document.getElementById(`page-${activePageIndex}`);
     if (pageEl) {
-      const rect = pageEl.getBoundingClientRect();
+      const rect = getClientRect(pageEl);
       if (
         x >= rect.left &&
         x <= rect.right &&
@@ -48,7 +52,7 @@ export const getPageIndexFromPoint = (
   if (contentEl && getRect) {
     // Rect-based hit-test: works even when pages are unmounted.
     // Requires rects to be in content-local coordinates.
-    const contentBox = contentEl.getBoundingClientRect();
+    const contentBox = getClientRect(contentEl);
     const cx = x - contentBox.left;
     const cy = y - contentBox.top;
 
@@ -134,7 +138,7 @@ export const getPageIndexFromPoint = (
       ? contentEl.querySelector<HTMLElement>(`[id="page-${i}"]`)
       : document.getElementById(`page-${i}`);
     if (pageEl) {
-      const rect = pageEl.getBoundingClientRect();
+      const rect = getClientRect(pageEl);
       if (
         x >= rect.left &&
         x <= rect.right &&

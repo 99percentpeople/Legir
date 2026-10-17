@@ -206,8 +206,6 @@ export const selectToolbarState = (state: EditorStore) => ({
 export const selectSidebarState = (state: EditorStore) => ({
   pages: state.pages,
   pageSources: state.pageSources,
-  fields: state.fields,
-  annotations: state.annotations,
   documentPermissions: state.documentPermissions,
   outline: state.outline,
   selectedId: state.selectedId,
