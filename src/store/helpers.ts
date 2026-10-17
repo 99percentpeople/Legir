@@ -1,9 +1,4 @@
-import {
-  AI_PROVIDER_IDS,
-  getAiProviderDefaultApiOptionId,
-  getAiProviderSelectedApiOption,
-  type AiProviderId,
-} from "@/services/ai/providers/catalog";
+import { normalizeAiConnections } from "@/services/ai/providers/connections";
 import { normalizeReasoningPreference } from "@/services/ai/providers/runtimeAdapters/shared";
 import {
   AI_CHAT_VISUAL_MODEL_AUTO_KEY,
@@ -24,8 +19,6 @@ import type {
   AppOptions,
   EditorState,
   ApiProxyOptions,
-  LLMCustomModelCapability,
-  LLMCustomModelConfig,
   LLMOptions,
   TranslationOptions,
 } from "@/types";
@@ -43,126 +36,17 @@ const clampAiChatInteger = (
   return Math.max(options.min, Math.min(options.max, next));
 };
 
-const CUSTOM_MODEL_CAPABILITY_ORDER: LLMCustomModelCapability[] = [
-  "text",
-  "image",
-  "tools",
-];
+export const createEmptyLlmOptions = (): LLMOptions => ({});
 
-const normalizeCustomModelCapability = (value: string) => {
-  if (value === "text" || value === "image" || value === "tools") {
-    return value;
-  }
-  return null;
-};
-
-const normalizeCustomModelCapabilities = (
-  values: readonly string[] | undefined,
-): LLMCustomModelCapability[] => {
-  const seen = new Set<LLMCustomModelCapability>(["text"]);
-  const normalized: LLMCustomModelCapability[] = ["text"];
-
-  for (const value of values ?? []) {
-    const capability = normalizeCustomModelCapability(value);
-    if (!capability || seen.has(capability)) continue;
-    seen.add(capability);
-    normalized.push(capability);
-  }
-
-  return CUSTOM_MODEL_CAPABILITY_ORDER.filter((capability) =>
-    normalized.includes(capability),
-  );
-};
-
-const normalizeCustomModelConfigs = (
-  customModels: readonly LLMCustomModelConfig[] | undefined,
-): LLMCustomModelConfig[] => {
-  const byId = new Map<string, Set<LLMCustomModelCapability>>();
-
-  const upsert = (
-    modelId: string,
-    capabilities: readonly LLMCustomModelCapability[],
-  ) => {
-    const normalizedId = modelId.trim();
-    if (!normalizedId) return;
-
-    const nextCapabilities =
-      byId.get(normalizedId) || new Set<LLMCustomModelCapability>();
-    for (const capability of normalizeCustomModelCapabilities(capabilities)) {
-      nextCapabilities.add(capability);
-    }
-    byId.set(normalizedId, nextCapabilities);
-  };
-
-  for (const model of customModels || []) {
-    if (!model?.id) continue;
-    upsert(model.id, normalizeCustomModelCapabilities(model.capabilities));
-  }
-
-  return [...byId.entries()].map(([id, capabilities]) => ({
-    id,
-    capabilities: normalizeCustomModelCapabilities([...capabilities]),
-  }));
-};
-
-// Keep provider keys stable even when individual provider config is missing.
-export const createEmptyLlmOptions = (): LLMOptions =>
-  AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
-    acc[providerId as AiProviderId] = {
-      enabled: true,
-      apiKey: "",
-      apiUrl: "",
-      apiOptionId: getAiProviderDefaultApiOptionId(providerId),
-      customModels: [],
-    };
-    return acc;
-  }, {} as LLMOptions);
-
+// A supplied connection map replaces the previous map so deletion is durable.
 export const mergeLlmOptions = (
   base: LLMOptions,
   patch?: Partial<LLMOptions>,
-): LLMOptions =>
-  AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
-    acc[providerId as AiProviderId] = {
-      ...base[providerId],
-      ...patch?.[providerId],
-    };
-    return acc;
-  }, {} as LLMOptions);
-
-export const trimLlmOptions = (options: LLMOptions): LLMOptions =>
-  AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
-    const providerOptions = options[providerId];
-    const apiOption = getAiProviderSelectedApiOption(
-      providerId,
-      providerOptions.apiOptionId,
-    );
-
-    acc[providerId as AiProviderId] = {
-      ...providerOptions,
-      enabled: providerOptions.enabled !== false,
-      apiKey: (providerOptions.apiKey || "").trim(),
-      apiUrl: (providerOptions.apiUrl || "").trim(),
-      apiOptionId:
-        apiOption?.id || getAiProviderDefaultApiOptionId(providerId) || "",
-      customModels: normalizeCustomModelConfigs(providerOptions.customModels),
-    };
-    return acc;
-  }, {} as LLMOptions);
-
-export const normalizeLlmOptions = (options: LLMOptions): LLMOptions =>
-  trimLlmOptions(options);
-
-export const createEmptyLlmModelCache = (): EditorState["llmModelCache"] =>
-  AI_PROVIDER_IDS.reduce<EditorState["llmModelCache"]>(
-    (acc, providerId) => {
-      acc[providerId as AiProviderId] = {
-        models: [],
-      };
-      return acc;
-    },
-    {} as EditorState["llmModelCache"],
-  );
+): LLMOptions => normalizeAiConnections((patch ?? base) as LLMOptions);
+export const trimLlmOptions = normalizeAiConnections;
+export const normalizeLlmOptions = trimLlmOptions;
+export const createEmptyLlmModelCache =
+  (): EditorState["llmModelCache"] => ({});
 
 export type PersistedAiChatOptions = Partial<AppOptions["aiChat"]>;
 

@@ -1,234 +1,109 @@
-export const AI_PROVIDER_IDS = [
-  "openai",
-  "openai-compatible",
-  "anthropic",
-  "anthropic-compatible",
-  "xiaomi-mimo",
-  "gemini",
-  "openrouter",
-  "deepseek",
-  "minimax",
-  "zhipu",
-  "groq",
-  "xai",
-] as const;
-
-export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
-
+/** Provider identities are catalog data; only supported wire protocols are code. */
+export type AiProviderId = string;
 export type AiProviderBackendKind =
   | "openai"
+  | "openai-compatible"
   | "anthropic"
   | "anthropic-compatible"
   | "google"
-  | "deepseek"
-  | "zhipu"
   | "openrouter"
   | "groq"
   | "xai"
-  | "openai-compatible";
-
-export interface AiProviderApiSpec {
+  | "deepseek"
+  | "zhipu";
+export const AI_CONNECTION_PROTOCOLS = [
+  { id: "openai-compatible", label: "OpenAI Chat Completions" },
+  { id: "openai", label: "OpenAI Responses" },
+  { id: "anthropic-compatible", label: "Anthropic Messages" },
+  { id: "google", label: "Google Generative AI" },
+] as const;
+export const isAiProviderId = (value: string): value is AiProviderId =>
+  /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value) &&
+  !["__proto__", "constructor", "prototype"].includes(value);
+/** Exclude known non-generation API families from generic /models responses. */
+export const isTextGenerationModelId = (id: string) =>
+  !/(?:^|[-_/])(?:embeddings?|moderation|tts|whisper|transcription|speech|image|realtime)(?:[-_/]|$)/i.test(
+    id,
+  );
+export interface AiProviderSpec {
   id: string;
   label: string;
-  labelKey?: string;
   backendKind: AiProviderBackendKind;
-  defaultBaseUrl?: string;
+  defaultBaseUrl: string;
 }
-
-export interface AiProviderSpec {
-  id: AiProviderId;
-  label: string;
-  labelKey?: string;
-  backendKind: AiProviderBackendKind;
-  defaultBaseUrl?: string;
-  apiOptions?: readonly AiProviderApiSpec[];
-  defaultApiOptionId?: string;
-  allowCustomBaseUrl: boolean;
-  fallbackModelId?: string;
-  unavailableMessageKey?: string;
-}
-
-export const AI_PROVIDER_SPECS: readonly AiProviderSpec[] = [
-  {
+export const catalogProviderId = (id: string): string =>
+  (
+    ({ gemini: "google", "xiaomi-mimo": "xiaomi", zhipu: "zhipuai" }) as Record<
+      string,
+      string
+    >
+  )[id] || id;
+/** Separate from connection IDs and SDK option namespaces. */
+export const runtimeProviderId = (id: string): string =>
+  (
+    ({ google: "gemini", xiaomi: "xiaomi-mimo", zhipuai: "zhipu" }) as Record<
+      string,
+      string
+    >
+  )[id] || id;
+const SDK_PROTOCOLS: Record<
+  string,
+  { kind: AiProviderBackendKind; id?: string; url?: string }
+> = {
+  "@ai-sdk/openai-compatible": { kind: "openai-compatible" },
+  "@ai-sdk/openai": {
+    kind: "openai",
     id: "openai",
-    label: "OpenAI",
-    backendKind: "openai",
-    defaultBaseUrl: "https://api.openai.com/v1",
-    allowCustomBaseUrl: true,
-    fallbackModelId: "gpt-5.4-mini",
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
+    url: "https://api.openai.com/v1",
   },
-  {
-    id: "openai-compatible",
-    label: "OpenAI Compatible",
-    backendKind: "openai-compatible",
-    allowCustomBaseUrl: true,
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
-  },
-  {
+  "@ai-sdk/anthropic": {
+    kind: "anthropic",
     id: "anthropic",
-    label: "Anthropic",
-    backendKind: "anthropic",
-    defaultBaseUrl: "https://api.anthropic.com/v1",
-    allowCustomBaseUrl: true,
-    fallbackModelId: "claude-sonnet-4-6",
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
+    url: "https://api.anthropic.com/v1",
   },
-  {
-    id: "anthropic-compatible",
-    label: "Anthropic Compatible",
-    backendKind: "anthropic-compatible",
-    allowCustomBaseUrl: true,
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
+  "@ai-sdk/google": {
+    kind: "google",
+    id: "google",
+    url: "https://generativelanguage.googleapis.com/v1beta",
   },
-  {
-    id: "xiaomi-mimo",
-    label: "Xiaomi MiMo",
-    backendKind: "openai-compatible",
-    defaultBaseUrl: "https://api.xiaomimimo.com/v1",
-    apiOptions: [
-      {
-        id: "openai",
-        label: "OpenAI Compatible",
-        backendKind: "openai-compatible",
-        defaultBaseUrl: "https://api.xiaomimimo.com/v1",
-      },
-      {
-        id: "anthropic",
-        label: "Anthropic Compatible",
-        backendKind: "anthropic-compatible",
-        defaultBaseUrl: "https://api.xiaomimimo.com/anthropic/v1",
-      },
-    ],
-    defaultApiOptionId: "openai",
-    allowCustomBaseUrl: true,
-    fallbackModelId: "mimo-v2.5-pro",
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
-  },
-  {
-    id: "gemini",
-    label: "Gemini",
-    backendKind: "google",
-    allowCustomBaseUrl: false,
-    fallbackModelId: "gemini-3.5-flash",
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
-  },
-  {
+  "@openrouter/ai-sdk-provider": {
+    kind: "openrouter",
     id: "openrouter",
-    label: "OpenRouter",
-    backendKind: "openrouter",
-    defaultBaseUrl: "https://openrouter.ai/api/v1",
-    allowCustomBaseUrl: true,
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
+    url: "https://openrouter.ai/api/v1",
   },
-  {
-    id: "deepseek",
-    label: "DeepSeek",
-    backendKind: "deepseek",
-    defaultBaseUrl: "https://api.deepseek.com/v1",
-    allowCustomBaseUrl: true,
-    fallbackModelId: "deepseek-chat",
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
-  },
-  {
-    id: "minimax",
-    label: "MiniMax",
-    backendKind: "anthropic-compatible",
-    defaultBaseUrl: "https://api.minimax.io/anthropic/v1",
-    apiOptions: [
-      {
-        id: "anthropic",
-        label: "Anthropic Compatible",
-        backendKind: "anthropic-compatible",
-        defaultBaseUrl: "https://api.minimax.io/anthropic/v1",
-      },
-      {
-        id: "openai",
-        label: "OpenAI Compatible",
-        backendKind: "openai-compatible",
-        defaultBaseUrl: "https://api.minimax.io/v1",
-      },
-    ],
-    defaultApiOptionId: "anthropic",
-    allowCustomBaseUrl: true,
-    fallbackModelId: "MiniMax-M2.7",
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
-  },
-  {
-    id: "zhipu",
-    label: "Zhipu",
-    backendKind: "zhipu",
-    defaultBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    allowCustomBaseUrl: true,
-    fallbackModelId: "glm-4.7",
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
-  },
-  {
+  "@ai-sdk/groq": {
+    kind: "groq",
     id: "groq",
-    label: "Groq",
-    backendKind: "groq",
-    defaultBaseUrl: "https://api.groq.com/openai/v1",
-    allowCustomBaseUrl: true,
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
+    url: "https://api.groq.com/openai/v1",
   },
-  {
-    id: "xai",
-    label: "xAI",
-    backendKind: "xai",
-    defaultBaseUrl: "https://api.x.ai/v1",
-    allowCustomBaseUrl: true,
-    unavailableMessageKey: "properties.form_detection.api_key_missing",
-  },
-] as const;
-
-export const AI_PROVIDER_LABELS = Object.fromEntries(
-  AI_PROVIDER_SPECS.map((spec) => [spec.id, spec.label]),
-) as Record<AiProviderId, string>;
-
-export const compareAiProviderIdsByLabel = (
-  left: AiProviderId,
-  right: AiProviderId,
-) => AI_PROVIDER_LABELS[left].localeCompare(AI_PROVIDER_LABELS[right], "en");
-
-export const AI_PROVIDER_IDS_SORTED_BY_LABEL = [...AI_PROVIDER_IDS].sort(
-  compareAiProviderIdsByLabel,
-);
-
-export const AI_PROVIDER_SPECS_SORTED_BY_LABEL = [...AI_PROVIDER_SPECS].sort(
-  (left, right) => compareAiProviderIdsByLabel(left.id, right.id),
-);
-
-export const isAiProviderId = (value: string): value is AiProviderId =>
-  AI_PROVIDER_IDS.includes(value as AiProviderId);
-
-export const getAiProviderSpec = (providerId: AiProviderId) =>
-  AI_PROVIDER_SPECS.find((spec) => spec.id === providerId)!;
-
-export const getAiProviderApiOptions = (providerId: AiProviderId) =>
-  getAiProviderSpec(providerId).apiOptions || [];
-
-export const getAiProviderDefaultApiOptionId = (providerId: AiProviderId) => {
-  const spec = getAiProviderSpec(providerId);
-  if (!spec.apiOptions || spec.apiOptions.length === 0) return "";
-  return spec.defaultApiOptionId || spec.apiOptions[0]!.id;
+  "@ai-sdk/xai": { kind: "xai", id: "xai", url: "https://api.x.ai/v1" },
 };
-
-export const getAiProviderSelectedApiOption = (
-  providerId: AiProviderId,
-  apiOptionId?: string,
-) => {
-  const spec = getAiProviderSpec(providerId);
-  if (!spec.apiOptions || spec.apiOptions.length === 0) {
+export const getCatalogProviderSpec = (provider: {
+  id: string;
+  name: string;
+  npm: string;
+  api?: string;
+}): AiProviderSpec | null => {
+  const protocol = SDK_PROTOCOLS[provider.npm];
+  if (!protocol) return null;
+  const defaultBaseUrl =
+    provider.api || (protocol.id === provider.id ? protocol.url : "");
+  if (!defaultBaseUrl) return null;
+  try {
+    const url = new URL(defaultBaseUrl);
+    if (
+      !["https:", "http:"].includes(url.protocol) ||
+      url.username ||
+      url.password
+    )
+      return null;
+  } catch {
     return null;
   }
-
-  const normalizedId = (apiOptionId || "").trim();
-  return (
-    spec.apiOptions.find((option) => option.id === normalizedId) ||
-    spec.apiOptions.find(
-      (option) => option.id === getAiProviderDefaultApiOptionId(providerId),
-    ) ||
-    spec.apiOptions[0] ||
-    null
-  );
+  return {
+    id: provider.id,
+    label: provider.name,
+    backendKind: protocol.kind,
+    defaultBaseUrl,
+  };
 };

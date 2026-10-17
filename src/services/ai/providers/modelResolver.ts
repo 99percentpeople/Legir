@@ -1,10 +1,7 @@
 import type { LanguageModel } from "ai";
+import { initializeModelsDev } from "./modelsDev";
 
-import {
-  AI_PROVIDER_IDS,
-  getAiProviderSpec,
-  isAiProviderId,
-} from "@/services/ai/providers/catalog";
+import { isAiProviderId } from "@/services/ai/providers/catalog";
 import { getAiRuntimeAdapter } from "@/services/ai/providers/registry";
 import { getAiSdkModelCatalogProvider } from "@/services/ai/providers/modelCatalogRegistry";
 import { getAiSdkProviderModelOptions } from "@/services/ai/providers/modelSelection";
@@ -23,7 +20,6 @@ import {
 import type {
   AiSdkModelSpecifier,
   AiSdkResolvedRuntime,
-  AiSdkProviderId,
   AiSdkResolvedLanguageModel,
   AiSdkTaskModelKind,
 } from "@/services/ai/providers/types";
@@ -37,9 +33,6 @@ export {
   getAiSdkModelGroups,
   getAiSdkProviderModelOptions,
 } from "@/services/ai/providers/modelSelection";
-
-const getFallbackModelId = (providerId: AiSdkProviderId) =>
-  getAiProviderSpec(providerId).fallbackModelId || "";
 
 export const parseAiSdkModelSpecifier = (
   value: string | null | undefined,
@@ -67,7 +60,7 @@ export const stringifyAiSdkModelSpecifier = (specifier: AiSdkModelSpecifier) =>
   `${specifier.providerId}:${specifier.modelId}`;
 
 export const getConfiguredAiSdkProviderIds = (options: AppOptions) =>
-  AI_PROVIDER_IDS.filter((providerId) =>
+  Object.keys(options.llm).filter((providerId) =>
     isAiSdkProviderConfigured(options, providerId),
   );
 
@@ -77,6 +70,7 @@ const createLanguageModel = async (options: {
   adapter: ReturnType<typeof getAiRuntimeAdapter>;
   modelId: string;
 }): Promise<LanguageModel> => {
+  await initializeModelsDev();
   const provider = await options.adapter.createSdkProvider({
     ...options.config,
     fetch: createApiProxyFetch(options.appOptions),
@@ -125,6 +119,7 @@ export const resolveAiSdkRuntime = async (options: {
   kind: AiSdkTaskModelKind;
   reasoning?: "chat-settings" | "none";
 }): Promise<AiSdkResolvedRuntime> => {
+  await initializeModelsDev();
   const config = getConfiguredAiSdkProvider(
     options.appOptions,
     options.specifier.providerId,
@@ -208,7 +203,7 @@ const getPreferredProviderId = (options: {
     return options.requestedProviderId;
   }
 
-  return AI_PROVIDER_IDS[0];
+  return Object.keys(options.appOptions.llm)[0] || "";
 };
 
 const getPreferredProviderIdForTask = (options: {
@@ -265,10 +260,17 @@ export const resolveAiSdkModelSpecifierForTask = (options: {
   modelId?: string;
 }): AiSdkModelSpecifier => {
   const explicitSpecifier = parseAiSdkModelSpecifier(options.modelKey);
-  if (
-    explicitSpecifier &&
-    isAiSdkProviderConfigured(options.appOptions, explicitSpecifier.providerId)
-  ) {
+  if (explicitSpecifier) {
+    if (
+      !isAiSdkProviderConfigured(
+        options.appOptions,
+        explicitSpecifier.providerId,
+      )
+    ) {
+      throw new Error(
+        `AI connection ${explicitSpecifier.providerId} is unavailable. Choose another model.`,
+      );
+    }
     return explicitSpecifier;
   }
 
@@ -297,7 +299,7 @@ export const resolveAiSdkModelSpecifierForTask = (options: {
     providerId,
     kind: options.kind,
   })[0]?.id;
-  const fallbackModelId = firstKnownModel || getFallbackModelId(providerId);
+  const fallbackModelId = firstKnownModel;
 
   if (!fallbackModelId) {
     throw new Error(`No available ${providerId} ${options.kind} models.`);

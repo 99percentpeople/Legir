@@ -1,7 +1,9 @@
-import { createBasicRuntimeAdapter } from "@/services/ai/providers/runtimeAdapters/shared";
+import type { AiRuntimeAdapter } from "./types";
+import { createCatalogReasoningAdapter } from "./catalogReasoning";
 
-export const groqAdapter = createBasicRuntimeAdapter({
+export const groqAdapter: AiRuntimeAdapter = {
   providerId: "groq",
+  ...createCatalogReasoningAdapter("groq"),
   createSdkProvider: async (config) => {
     const { createGroq } = await import("@ai-sdk/groq");
     return createGroq({
@@ -10,4 +12,4 @@ export const groqAdapter = createBasicRuntimeAdapter({
       fetch: config.fetch,
     });
   },
-});
+};

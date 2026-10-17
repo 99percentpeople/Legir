@@ -1,9 +1,4 @@
-import type { EditorUiState, LLMOptions, PageTranslateOptions } from "./types";
-import {
-  AI_PROVIDER_IDS,
-  getAiProviderDefaultApiOptionId,
-  type AiProviderId,
-} from "./services/ai/providers/catalog";
+import type { EditorUiState, PageTranslateOptions } from "./types";
 import { pdfViewerScaleToWorkspaceScale } from "./lib/pdfScale";
 import { DEFAULT_IMAGE_COMPRESSION } from "./lib/imageCompression";
 
@@ -114,16 +109,7 @@ export const DEFAULT_EDITOR_UI_STATE: EditorUiState = {
         apiKey: "",
       },
     },
-    llm: AI_PROVIDER_IDS.reduce<LLMOptions>((acc, providerId) => {
-      acc[providerId as AiProviderId] = {
-        enabled: true,
-        apiKey: "",
-        apiUrl: "",
-        apiOptionId: getAiProviderDefaultApiOptionId(providerId),
-        customModels: [],
-      };
-      return acc;
-    }, {} as LLMOptions),
+    llm: {},
     aiChat: {
       visualModelKey: AI_CHAT_VISUAL_MODEL_AUTO_KEY,
       formToolsEnabled: false,

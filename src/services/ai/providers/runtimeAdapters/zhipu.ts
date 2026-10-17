@@ -1,12 +1,9 @@
-import {
-  createNoReasoningResolution,
-  selectReasoningLevel,
-} from "@/services/ai/providers/runtimeAdapters/shared";
-import type { AiRuntimeAdapter } from "@/services/ai/providers/runtimeAdapters/types";
-import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/metadata";
+import type { AiRuntimeAdapter } from "./types";
+import { createCatalogReasoningAdapter } from "./catalogReasoning";
 
 export const zhipuAdapter: AiRuntimeAdapter = {
   providerId: "zhipu",
+  ...createCatalogReasoningAdapter("zhipu"),
   createSdkProvider: async (config) => {
     const { createZhipu } = await import("zhipu-ai-provider");
     return createZhipu({
@@ -14,40 +11,5 @@ export const zhipuAdapter: AiRuntimeAdapter = {
       ...(config.baseURL ? { baseURL: config.baseURL } : {}),
       fetch: config.fetch,
     });
-  },
-
-  getReasoningCapability: ({ modelId }) =>
-    getAiProviderModelReasoningMetadata("zhipu", modelId),
-
-  resolveReasoning: (request) => {
-    const capability = getAiProviderModelReasoningMetadata(
-      "zhipu",
-      request.modelId,
-    );
-    if (!capability.supported) {
-      return createNoReasoningResolution({
-        preference: request.preference,
-        capability,
-      });
-    }
-
-    const level = selectReasoningLevel(capability, request.preference.level);
-    const enabled = level !== "none";
-    return {
-      capability,
-      effectivePreference: {
-        ...request.preference,
-        level,
-        displayPolicy: enabled ? request.preference.displayPolicy : "hidden",
-      },
-      callOptions: {
-        providerOptions: {
-          zhipu: {
-            thinking: { type: enabled ? "enabled" : "disabled" },
-          },
-        },
-      },
-      replayPolicy: "none",
-    };
   },
 };

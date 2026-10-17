@@ -21,7 +21,6 @@ import {
 import { FONT_FAMILY_MAP } from "@/constants";
 import { resolveFontStackForDisplay } from "@/lib/fonts";
 import { getSystemFontFamilies } from "@/lib/system-fonts";
-import { AI_PROVIDER_IDS_SORTED_BY_LABEL } from "@/services/ai/providers/catalog";
 import { PanelLayout } from "./PanelLayout";
 import {
   translateService,
@@ -132,15 +131,7 @@ export function PageTranslatePanel({
   }, [registryVersion]);
 
   const modelSelectGroups = useMemo<ModelSelectGroup[]>(() => {
-    const weight = (groupId: string) => {
-      if (groupId === "cloud") return 0;
-      const providerIndex = AI_PROVIDER_IDS_SORTED_BY_LABEL.indexOf(
-        groupId as (typeof AI_PROVIDER_IDS_SORTED_BY_LABEL)[number],
-      );
-      return providerIndex >= 0
-        ? providerIndex + 1
-        : AI_PROVIDER_IDS_SORTED_BY_LABEL.length + 1;
-    };
+    const weight = (groupId: string) => (groupId === "cloud" ? 0 : 1);
 
     const sorted = optionGroups
       .map((g, idx) => ({ g, idx }))

@@ -16,6 +16,7 @@
     "www"
   ],
   "scripts": {
+    "update:ai-catalog": "bun scripts/update-models-dev.ts",
     "dev": "bun run build:pdfium && vite",
     "dev:www": "bun run --cwd www dev",
     "dev:app": "tauri dev",

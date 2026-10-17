@@ -621,6 +621,23 @@ These features should be integrated through service boundaries and editor action
 Provider runtime compatibility, reasoning controls, and transcript persistence
 live under `src/services/ai/providers/` and `src/hooks/useAiChatController/`.
 
+AI provider settings are dynamic connections with stable IDs. Each connection
+pins its endpoint, protocol and credentials, and may reference a models.dev
+provider for model metadata. The external catalog has a bundled offline snapshot
+and cached refresh; it does not rewrite saved connection settings. Supported
+protocol adapters remain bundled AI SDK integrations. Provider format choices
+follow the catalog's declared SDK; only custom connections expose all formats.
+Unlisted saved formats remain intact until the user explicitly changes them.
+Catalog connections use automatic provider names and SDK authentication defaults;
+custom connections expose name and supported authentication controls. Existing
+authentication overrides are retained. Thinking controls come from the selected
+provider/model's models.dev `reasoning_options`; runtime adapters only translate
+effort values, toggles and token budgets to SDK request formats. No model-name
+rules supply reasoning capabilities. Catalog refresh also updates the active
+chat's controls. See
+[`src/services/ai/README.md`](../src/services/ai/README.md) for migration,
+capability precedence and model-cache ownership.
+
 ## Extension Points
 
 ### Add a New Form Control

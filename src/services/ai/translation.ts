@@ -6,6 +6,8 @@ import {
   getCurrentOptions,
 } from "@/services/ai/editorState";
 
+const registeredConnectionIds = new Set<string>();
+
 export const registerTranslateOptionsFromProviders = () => {
   const appOptions = getCurrentOptions();
   const modelCache = getCurrentModelCache();
@@ -15,7 +17,16 @@ export const registerTranslateOptionsFromProviders = () => {
     kind: "translate",
   });
 
+  const currentIds = new Set(groups.map((group) => group.providerId));
+  for (const id of registeredConnectionIds) {
+    if (!currentIds.has(id)) {
+      translateService.unregisterOptionGroup(id);
+      registeredConnectionIds.delete(id);
+    }
+  }
+
   for (const group of groups) {
+    registeredConnectionIds.add(group.providerId);
     translateService.registerOptionGroup({
       id: group.providerId,
       label: group.label,

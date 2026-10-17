@@ -13,7 +13,6 @@ import type { LLMModelOption } from "@/services/ai/types";
 import type {
   AiProviderBackendKind,
   AiProviderId,
-  AiProviderSpec,
 } from "@/services/ai/providers/catalog";
 import type {
   AiReasoningResolution,
@@ -28,6 +27,9 @@ export type AiSdkBackendKind = AiProviderBackendKind;
 
 export interface AiSdkProviderConfig {
   providerId: AiSdkProviderId;
+  catalogId?: string;
+  runtimeProviderId?: string;
+  authMode?: "api-key" | "bearer" | "none";
   label: string;
   backendKind: AiSdkBackendKind;
   apiOptionId?: string;
@@ -101,11 +103,4 @@ export interface AiSdkModelCatalogProvider {
   checkConfig: (
     options: AiSdkModelCatalogProviderRequest,
   ) => Promise<void> | void;
-}
-
-export interface AiProviderDefinition {
-  readonly id: AiProviderId;
-  readonly spec: AiProviderSpec;
-  readonly modelCatalogProvider: AiSdkModelCatalogProvider;
-  readonly getRuntimeAdapter: (config: AiSdkProviderConfig) => AiRuntimeAdapter;
 }

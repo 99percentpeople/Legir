@@ -1,8 +1,4 @@
-import type {
-  LLMCustomModelCapability,
-  LLMModelCapabilities,
-  LLMModelModality,
-} from "@/types";
+import type { LLMModelCapabilities, LLMModelModality } from "@/types";
 import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/constants";
 
 const DEFAULT_OUTPUT_MODALITIES: LLMModelModality[] = ["text"];
@@ -49,24 +45,6 @@ export const createModelCapabilities = (options: {
       ),
     ),
   };
-};
-
-export const createCustomModelCapabilities = (
-  capabilities: readonly LLMCustomModelCapability[],
-): LLMModelCapabilities => {
-  const normalizedCapabilities = new Set<LLMCustomModelCapability>([
-    "text",
-    ...capabilities,
-  ]);
-
-  return createModelCapabilities({
-    inputModalities: normalizedCapabilities.has("image")
-      ? ["text", "image"]
-      : ["text"],
-    outputModalities: DEFAULT_OUTPUT_MODALITIES,
-    supportsToolCalls: normalizedCapabilities.has("tools"),
-    supportsImageToolResults: false,
-  });
 };
 
 export const createOpenAiLikeModelCapabilities = (options: {

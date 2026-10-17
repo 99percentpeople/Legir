@@ -1,7 +1,4 @@
-import {
-  AI_PROVIDER_IDS,
-  type AiProviderId,
-} from "@/services/ai/providers/catalog";
+import { type AiProviderId } from "@/services/ai/providers/catalog";
 import {
   getAiSdkModelGroups,
   getAiSdkProviderModelOptions,
@@ -12,12 +9,20 @@ import {
   getCurrentModelCache,
   getCurrentOptions,
   trimProviderOptions,
-  type SupportedLlmProviderId,
 } from "@/services/ai/editorState";
 import { registerTranslateOptionsFromProviders } from "@/services/ai/translation";
 import { preferencesStore } from "@/store/preferencesStore";
 import type { LLMModelOption } from "@/services/ai/types";
 import type { AppOptions } from "@/types";
+import {
+  initializeModelsDev,
+  refreshModelsDev,
+  subscribeModelsDev,
+} from "./providers/modelsDev";
+import {
+  getConnectionCacheKey,
+  MODEL_CACHE_TTL_MS,
+} from "./providers/modelCatalog/base";
 
 type ModelKind = "translate" | "vision" | "chat" | "summarize";
 
@@ -30,6 +35,15 @@ export const subscribeLLMModelRegistry = (listener: () => void) => {
   };
 };
 
+const notifyRegistry = () => {
+  registerTranslateOptionsFromProviders();
+  for (const listener of llmModelRegistryListeners) listener();
+};
+subscribeModelsDev(notifyRegistry);
+// Availability changes immediately, even if settings close before the fetch debounce.
+preferencesStore.subscribe((state, previous) => {
+  if (state.options.llm !== previous.options.llm) notifyRegistry();
+});
 registerTranslateOptionsFromProviders();
 
 const checkAiSdkProviderConfig = async (options: {
@@ -56,77 +70,65 @@ export type LoadModelsOptions = {
 };
 
 export const checkLlmProviderConfig = async (providerId: string) => {
-  if (!AI_PROVIDER_IDS.includes(providerId as SupportedLlmProviderId)) {
-    throw new Error(`Unknown LLM provider: ${providerId}`);
-  }
-
   const appOptions = trimProviderOptions();
-  await checkAiSdkProviderConfig({
-    appOptions,
-    providerId: providerId as SupportedLlmProviderId,
-  });
+  if (!Object.hasOwn(appOptions.llm, providerId))
+    throw new Error(`Unknown AI connection: ${providerId}`);
+  await checkAiSdkProviderConfig({ appOptions, providerId });
 };
 
 export const loadModels = async (options?: LoadModelsOptions) => {
-  const providerIdSet =
-    options?.providerIds && options.providerIds.length > 0
-      ? new Set(
-          options.providerIds.filter((id): id is SupportedLlmProviderId =>
-            AI_PROVIDER_IDS.includes(id as SupportedLlmProviderId),
-          ),
+  if (!Object.keys(getCurrentOptions().llm).length) {
+    notifyRegistry();
+    return;
+  }
+  await initializeModelsDev();
+  void refreshModelsDev().catch(() => {});
+  const appOptions = getCurrentOptions();
+  const ids = Object.keys(appOptions.llm).filter(
+    (id) => !options?.providerIds?.length || options.providerIds.includes(id),
+  );
+  notifyRegistry();
+  await Promise.all(
+    ids.map(async (providerId) => {
+      const key = getConnectionCacheKey(appOptions, providerId);
+      const cache = getCurrentModelCache()[providerId];
+      if (!isAiSdkProviderConfigured(appOptions, providerId)) return;
+      if (
+        !options?.force &&
+        cache?.configurationKey === key &&
+        cache.fetchedAt &&
+        Date.now() - cache.fetchedAt < MODEL_CACHE_TTL_MS
+      )
+        return;
+      try {
+        const models = await fetchAiSdkProviderModels({
+          appOptions,
+          providerId,
+        });
+        // A response from an edited/deleted connection must not overwrite the new configuration.
+        const current = getCurrentOptions();
+        if (
+          !Object.hasOwn(current.llm, providerId) ||
+          getConnectionCacheKey(current, providerId) !== key
         )
-      : null;
-  const force = options?.force === true;
-  const throwOnError = options?.throwOnError === true;
-  const appOptions = trimProviderOptions();
-  const previousCache = getCurrentModelCache();
-
-  const nextCache = {
-    ...previousCache,
-  };
-
-  for (const providerId of AI_PROVIDER_IDS) {
-    if (providerIdSet && !providerIdSet.has(providerId)) {
-      continue;
-    }
-
-    if (!isAiSdkProviderConfigured(appOptions, providerId)) {
-      nextCache[providerId] = {
-        models: [],
-      };
-      continue;
-    }
-
-    const currentModels = previousCache[providerId]?.models ?? [];
-    if (!force && currentModels.length > 0) {
-      continue;
-    }
-
-    try {
-      const fetchedModels = await fetchAiSdkProviderModels({
-        appOptions,
-        providerId,
-      });
-
-      nextCache[providerId] = {
-        models: fetchedModels,
-      };
-    } catch (error) {
-      if (throwOnError) {
-        throw error;
+          return;
+        preferencesStore.setState((state) => ({
+          llmModelCache: {
+            ...state.llmModelCache,
+            [providerId]: {
+              models,
+              configurationKey: key,
+              fetchedAt: Date.now(),
+            },
+          },
+        }));
+      } catch (error) {
+        if (options?.throwOnError) throw error;
+      } finally {
+        notifyRegistry();
       }
-    }
-  }
-
-  preferencesStore.setState({
-    llmModelCache: nextCache,
-  });
-
-  registerTranslateOptionsFromProviders();
-
-  for (const listener of llmModelRegistryListeners) {
-    listener();
-  }
+    }),
+  );
 };
 
 export type VisionModelGroup = {
@@ -155,7 +157,7 @@ export type ChatModelGroup = {
 };
 
 export const isChatAgentAvailable = () =>
-  AI_PROVIDER_IDS.some((providerId) =>
+  Object.keys(getCurrentOptions().llm).some((providerId) =>
     isAiSdkProviderConfigured(getCurrentOptions(), providerId),
   );
 

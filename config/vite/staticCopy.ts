@@ -4,6 +4,11 @@ export const createStaticCopyPlugin = (pdfiumVersion: string) =>
   viteStaticCopy({
     targets: [
       {
+        // Tauri disables publicDir, so retain the catalog license in both builds.
+        src: "public/models-dev.LICENSE.txt",
+        dest: ".",
+      },
+      {
         // Keep the ESM loader beside its WASM files. Versioned URLs prevent a
         // PWA update from mixing the JS bindings with a cached older binary.
         src: [

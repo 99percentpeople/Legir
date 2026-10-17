@@ -2,7 +2,6 @@ import type {
   AppOptions,
   DebugOptions,
   EditorState,
-  LLMCustomModelCapability,
   SnappingOptions,
 } from "@/types";
 import type { AiProviderId } from "@/services/ai/providers/catalog";
@@ -22,11 +21,6 @@ export type ProviderSyncStatus = {
 };
 
 export type LlmModelCache = EditorState["llmModelCache"];
-
-export type CustomModelCapabilityOption = {
-  value: LLMCustomModelCapability;
-  label: string;
-};
 
 export type UpdateApiProxyOptions = (
   patch: Partial<AppOptions["apiProxy"]>,

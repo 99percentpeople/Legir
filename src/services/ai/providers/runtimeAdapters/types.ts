@@ -17,7 +17,8 @@ export type AiReasoningLevel =
   | "low"
   | "medium"
   | "high"
-  | "xhigh";
+  | "xhigh"
+  | "max";
 export type AiReasoningActiveLevel = Exclude<AiReasoningLevel, "none" | "auto">;
 export type AiReasoningReplayPolicy = "none" | "tool-calls" | "all";
 export type AiReasoningDisplayPolicy =
@@ -25,7 +26,6 @@ export type AiReasoningDisplayPolicy =
   | "summary"
   | "full-if-provider-exposes";
 export type AiReasoningTextExposure = "none" | "summary" | "raw";
-export type AiReasoningProviderMode = "anthropic-adaptive";
 export type AiReasoningBudgetByLevel = Partial<
   Record<AiReasoningLevel, number>
 >;
@@ -38,8 +38,10 @@ export interface AiReasoningPreference {
 export interface AiReasoningCapability {
   supported: boolean;
   levels: readonly AiReasoningLevel[];
+  /** Exact effort values advertised by the catalog and accepted by this transport. */
+  effortValues?: Partial<Record<AiReasoningLevel, string>>;
+  supportsToggle?: boolean;
   budgetTokensByLevel?: AiReasoningBudgetByLevel;
-  providerMode?: AiReasoningProviderMode;
   textExposure: AiReasoningTextExposure;
   requiresReasoningReplay: AiReasoningReplayPolicy;
 }
@@ -53,6 +55,8 @@ export interface AiReasoningLevelControl {
 
 export interface AiRuntimeRequest {
   providerId: AiSdkProviderId;
+  /** Catalog identity is separate from the SDK option namespace and connection ID. */
+  catalogId?: string;
   backendKind: AiSdkBackendKind;
   apiOptionId?: string;
   modelId: string;

@@ -254,6 +254,18 @@ export class TranslateService {
     for (const listener of this.registryListeners) listener();
   }
 
+  unregisterOptionGroup(groupId: string) {
+    this.groups = this.groups.filter((group) => group.id !== groupId);
+    for (const [id, entry] of this.optionToGroup) {
+      if (entry.group.id === groupId) this.optionToGroup.delete(id);
+    }
+    if (!this.optionToGroup.has(this.defaultOptionId)) {
+      this.defaultOptionId =
+        this.optionToGroup.keys().next().value || "cloud:cloudv2";
+    }
+    for (const listener of this.registryListeners) listener();
+  }
+
   subscribe(listener: () => void) {
     this.registryListeners.add(listener);
     return () => {
@@ -305,7 +317,8 @@ export class TranslateService {
     opts: TranslateTextOptions,
   ): TranslateOptionId {
     if (opts.translateOption) {
-      return this.normalizeTranslateOption(opts.translateOption);
+      // An explicit selection must never silently switch to a different account.
+      return opts.translateOption;
     }
 
     if (opts.provider && opts.model) {
@@ -324,8 +337,7 @@ export class TranslateService {
   }
 
   isOptionAvailable(option: TranslateOptionId) {
-    const normalized = this.normalizeTranslateOption(option);
-    const entry = this.optionToGroup.get(normalized);
+    const entry = this.optionToGroup.get(option);
     if (!entry) return false;
     return entry.group.isAvailable(entry.localOptionId);
   }

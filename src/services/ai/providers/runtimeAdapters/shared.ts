@@ -1,7 +1,6 @@
 import type { AiSdkModelCallOptions } from "@/services/ai/providers/types";
 import type {
   AiReasoningResolution,
-  AiRuntimeAdapter,
   AiRuntimeRequest,
   AiReasoningActiveLevel,
   AiReasoningCapability,
@@ -24,6 +23,7 @@ export const AI_REASONING_LEVELS: readonly AiReasoningLevel[] = [
   "medium",
   "high",
   "xhigh",
+  "max",
 ];
 
 export const AI_REASONING_ACTIVE_LEVELS: readonly AiReasoningActiveLevel[] = [
@@ -32,6 +32,7 @@ export const AI_REASONING_ACTIVE_LEVELS: readonly AiReasoningActiveLevel[] = [
   "medium",
   "high",
   "xhigh",
+  "max",
 ];
 
 export const NO_REASONING_CAPABILITY: AiReasoningCapability = {
@@ -110,6 +111,9 @@ export const selectReasoningLevel = (
   const selectableLevels = getSelectableReasoningLevels(capability);
   if (selectableLevels.length === 0) return "none";
   if (selectableLevels.includes(level)) return level;
+
+  // Older preferences used xhigh for providers whose highest effort is max.
+  if (level === "xhigh" && selectableLevels.includes("max")) return "max";
 
   if (isAiReasoningActiveLevel(level)) {
     const fallback = selectActiveReasoningLevel(capability, level);
@@ -200,20 +204,3 @@ export const mergeAiSdkModelCallOptions = (
     ? { providerOptions }
     : undefined;
 };
-
-/**
- * Creates a minimal runtime adapter for providers without app-controlled
- * reasoning mapping. The provider/model may still reason internally; this only
- * means Legir will not expose reasoning controls, replay policy, or provider
- * options until a provider-specific adapter implements them.
- */
-export const createBasicRuntimeAdapter = (options: {
-  providerId: AiRuntimeAdapter["providerId"];
-  createSdkProvider: AiRuntimeAdapter["createSdkProvider"];
-}): AiRuntimeAdapter => ({
-  providerId: options.providerId,
-  createSdkProvider: options.createSdkProvider,
-  getReasoningCapability: () => NO_REASONING_CAPABILITY,
-  resolveReasoning: ({ preference }) =>
-    createNoReasoningResolution({ preference }),
-});

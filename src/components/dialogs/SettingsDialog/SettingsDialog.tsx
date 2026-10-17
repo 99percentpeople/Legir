@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   BrainCircuit,
   Bug,
@@ -22,26 +29,23 @@ import {
   type ModelSelectGroup,
 } from "@/components/ModelSelect";
 import {
-  checkLlmProviderConfig,
   getChatModelGroups,
   getVisionModelGroups,
   loadModels,
 } from "@/services/ai";
+import { createAiConnection } from "@/services/ai/providers/connections";
+import type { AiProviderSpec } from "@/services/ai/providers/catalog";
 import {
-  AI_PROVIDER_IDS,
-  AI_PROVIDER_SPECS_SORTED_BY_LABEL,
-} from "@/services/ai/providers/catalog";
+  getModelsDevRevision,
+  subscribeModelsDev,
+} from "@/services/ai/providers/modelsDev";
+import { getConnectionCacheKey } from "@/services/ai/providers/modelCatalog/base";
 import { translateService } from "@/services/translateService";
 import {
   preferencesStore,
   usePreferencesStore,
 } from "@/store/preferencesStore";
-import type {
-  AppOptions,
-  DebugOptions,
-  LLMCustomModelCapability,
-  SnappingOptions,
-} from "@/types";
+import type { AppOptions, DebugOptions, SnappingOptions } from "@/types";
 
 import { AiChatSettingsTab } from "./AiChatSettingsTab";
 import { DebugSettingsTab } from "./DebugSettingsTab";
@@ -56,15 +60,10 @@ import {
   SETTINGS_TABS_ROOT_CLASS,
 } from "./styles";
 import type {
-  CustomModelCapabilityOption,
   LlmProviderId,
   ProviderSyncStatus,
   SettingsDialogProps,
 } from "./types";
-import {
-  createProviderSyncStatusRecord,
-  normalizeCustomModelCapabilities,
-} from "./utils";
 
 const SettingsDialog = ({
   isOpen,
@@ -74,43 +73,34 @@ const SettingsDialog = ({
 }: SettingsDialogProps) => {
   const { t } = useLanguage();
   const llmModelCache = usePreferencesStore((s) => s.llmModelCache);
-
-  const [llmProviderTab, setLlmProviderTab] = useState<LlmProviderId>(
-    AI_PROVIDER_SPECS_SORTED_BY_LABEL[0]?.id ?? AI_PROVIDER_IDS[0],
+  const catalogRevision = useSyncExternalStore(
+    subscribeModelsDev,
+    getModelsDevRevision,
   );
+
+  const [expandedConnections, setExpandedConnections] = useState<string[]>([]);
+  const setConnectionOpen = (id: string, open: boolean) => {
+    setExpandedConnections((previous) =>
+      open
+        ? [...new Set([...previous, id])]
+        : previous.filter((value) => value !== id),
+    );
+  };
 
   const [llmSyncStatus, setLlmSyncStatus] = useState<
     Record<LlmProviderId, ProviderSyncStatus>
-  >(() => createProviderSyncStatusRecord({ state: "idle", message: "" }));
+  >({});
 
   const modelUpdateTimersRef = useRef<Partial<Record<LlmProviderId, number>>>(
     {},
   );
-  const [customModelNameByProvider, setCustomModelNameByProvider] = useState<
-    Partial<Record<LlmProviderId, string>>
-  >({});
-  const [customModelCapabilityByProvider, setCustomModelCapabilityByProvider] =
-    useState<Partial<Record<LlmProviderId, LLMCustomModelCapability[]>>>({});
-
-  const customModelCapabilityOptions = useMemo(
-    () =>
-      [
-        {
-          value: "text",
-          label: t("settings.llm.custom_model_capability_text"),
-        },
-        {
-          value: "image",
-          label: t("settings.llm.custom_model_capability_image"),
-        },
-        {
-          value: "tools",
-          label: t("settings.llm.custom_model_capability_tools"),
-        },
-      ] satisfies CustomModelCapabilityOption[],
-    [t],
+  useEffect(
+    () => () => {
+      for (const timer of Object.values(modelUpdateTimersRef.current))
+        window.clearTimeout(timer);
+    },
+    [],
   );
-
   const scheduleModelRegistryUpdate = (provider: LlmProviderId) => {
     const prev = modelUpdateTimersRef.current[provider];
     if (typeof prev === "number") window.clearTimeout(prev);
@@ -123,6 +113,7 @@ const SettingsDialog = ({
     provider: P,
     patch: Partial<AppOptions["llm"][P]>,
   ) => {
+    if (!options.llm[provider]) return;
     onChange({
       ...options,
       llm: {
@@ -133,62 +124,43 @@ const SettingsDialog = ({
         },
       },
     });
-  };
-
-  const updateLlmApiKey = (provider: LlmProviderId, value: string) => {
-    updateLlmProviderOptions(provider, { apiKey: value });
-  };
-
-  const updateLlmApiUrl = (provider: LlmProviderId, value: string) => {
-    updateLlmProviderOptions(provider, { apiUrl: value });
-  };
-
-  const isLlmProviderEnabled = (provider: LlmProviderId) =>
-    options.llm[provider].enabled !== false;
-
-  const setLlmProviderEnabled = (provider: LlmProviderId, enabled: boolean) => {
-    updateLlmProviderOptions(provider, { enabled });
-    setLlmSyncStatus((prev) => ({
-      ...prev,
+    if (
+      ["apiKey", "apiUrl", "backendKind", "authMode", "catalogId"].some(
+        (key) => key in patch,
+      )
+    ) {
+      clearFetchedLlmModels(provider);
+    }
+    setLlmSyncStatus((previous) => ({
+      ...previous,
       [provider]: { state: "idle", message: "" },
     }));
     scheduleModelRegistryUpdate(provider);
   };
 
-  const getCustomModelDraftCapabilities = (provider: LlmProviderId) =>
-    normalizeCustomModelCapabilities(customModelCapabilityByProvider[provider]);
-
-  const addCustomModel = (provider: LlmProviderId) => {
-    const id = (customModelNameByProvider[provider] || "").trim();
-    if (!id) return;
-
-    const capabilities = getCustomModelDraftCapabilities(provider);
-    const currentModels = options.llm[provider].customModels || [];
-    const hasExisting = currentModels.some((model) => model.id === id);
-    const nextCustomModels = hasExisting
-      ? currentModels.map((model) =>
-          model.id === id ? { id, capabilities } : model,
-        )
-      : [...currentModels, { id, capabilities }];
-
-    updateLlmProviderOptions(provider, {
-      customModels: nextCustomModels,
+  const addConnection = (spec?: AiProviderSpec) => {
+    const id = crypto.randomUUID();
+    const connection = createAiConnection(spec);
+    if (!spec) connection.name = t("settings.llm.custom_connection");
+    onChange({ ...options, llm: { ...options.llm, [id]: connection } });
+    setConnectionOpen(id, true);
+  };
+  const removeConnection = (id: string) => {
+    const next = { ...options.llm };
+    delete next[id];
+    onChange({ ...options, llm: next });
+    window.clearTimeout(modelUpdateTimersRef.current[id]);
+    preferencesStore.setState((state) => {
+      const cache = { ...state.llmModelCache };
+      delete cache[id];
+      return { llmModelCache: cache };
     });
-    setCustomModelNameByProvider((prev) => ({
-      ...prev,
-      [provider]: "",
-    }));
-    scheduleModelRegistryUpdate(provider);
+    setConnectionOpen(id, false);
+    void loadModels();
   };
 
-  const removeCustomModel = (provider: LlmProviderId, id: string) => {
-    updateLlmProviderOptions(provider, {
-      customModels: (options.llm[provider].customModels || []).filter(
-        (model) => model.id !== id,
-      ),
-    });
-    scheduleModelRegistryUpdate(provider);
-  };
+  const isLlmProviderEnabled = (provider: LlmProviderId) =>
+    !!options.llm[provider] && options.llm[provider].enabled !== false;
 
   const updateAiChatOptions = (patch: Partial<AppOptions["aiChat"]>) => {
     onChange({
@@ -223,21 +195,10 @@ const SettingsDialog = ({
       llmModelCache: {
         ...state.llmModelCache,
         [provider]: {
-          ...state.llmModelCache[provider],
           models: [],
         },
       },
     }));
-  };
-
-  const updateLlmApiOption = (provider: LlmProviderId, apiOptionId: string) => {
-    updateLlmProviderOptions(provider, { apiOptionId });
-    setLlmSyncStatus((prev) => ({
-      ...prev,
-      [provider]: { state: "idle", message: "" },
-    }));
-    clearFetchedLlmModels(provider);
-    scheduleModelRegistryUpdate(provider);
   };
 
   const aiToolModelGroups = useMemo<ModelSelectGroup[]>(() => {
@@ -251,7 +212,7 @@ const SettingsDialog = ({
         disabled: !group.isAvailable,
       })),
     }));
-  }, [llmModelCache, options.llm]);
+  }, [llmModelCache, options.llm, catalogRevision]);
 
   const imageModelFilter = useCallback(
     (option: { capabilities?: { supportsImageInput?: boolean } }) =>
@@ -273,7 +234,7 @@ const SettingsDialog = ({
       })),
       imageModelFilter,
     );
-  }, [imageModelFilter, llmModelCache, options.llm, t]);
+  }, [imageModelFilter, llmModelCache, options.llm, t, catalogRevision]);
 
   const syncLlmProviderModels = async (provider: LlmProviderId) => {
     if (!isLlmProviderEnabled(provider)) {
@@ -288,7 +249,7 @@ const SettingsDialog = ({
     }
 
     const apiKey = (options.llm[provider].apiKey || "").trim();
-    if (!apiKey) {
+    if (!apiKey && options.llm[provider].authMode !== "none") {
       setLlmSyncStatus((prev) => ({
         ...prev,
         [provider]: {
@@ -299,25 +260,47 @@ const SettingsDialog = ({
       return;
     }
 
+    if (!options.llm[provider].apiUrl?.trim()) {
+      setLlmSyncStatus((prev) => ({
+        ...prev,
+        [provider]: {
+          state: "error",
+          message: t("settings.llm.api_url_required"),
+        },
+      }));
+      return;
+    }
+
+    const configurationKey = getConnectionCacheKey(options, provider);
+    const isCurrent = () => {
+      const current = preferencesStore.getState().options;
+      return (
+        current.llm[provider]?.enabled !== false &&
+        !!current.llm[provider] &&
+        getConnectionCacheKey(current, provider) === configurationKey
+      );
+    };
+
     setLlmSyncStatus((prev) => ({
       ...prev,
       [provider]: { state: "syncing", message: "" },
     }));
 
     try {
-      await checkLlmProviderConfig(provider);
       await loadModels({
         providerIds: [provider],
         force: true,
         throwOnError: true,
       });
 
+      if (!isCurrent()) return;
+
       setLlmSyncStatus((prev) => ({
         ...prev,
         [provider]: { state: "ok", message: t("settings.llm.fetch_success") },
       }));
     } catch (err) {
-      clearFetchedLlmModels(provider);
+      if (!isCurrent()) return;
       const msg =
         err instanceof Error ? err.message : t("settings.llm.fetch_failed");
       setLlmSyncStatus((prev) => ({
@@ -404,24 +387,13 @@ const SettingsDialog = ({
             <LlmSettingsTab
               options={options}
               llmModelCache={llmModelCache}
-              llmProviderTab={llmProviderTab}
-              onLlmProviderTabChange={setLlmProviderTab}
+              expandedConnections={expandedConnections}
+              setConnectionOpen={setConnectionOpen}
               llmSyncStatus={llmSyncStatus}
-              customModelNameByProvider={customModelNameByProvider}
-              setCustomModelNameByProvider={setCustomModelNameByProvider}
-              customModelCapabilityOptions={customModelCapabilityOptions}
-              setCustomModelCapabilityByProvider={
-                setCustomModelCapabilityByProvider
-              }
-              isLlmProviderEnabled={isLlmProviderEnabled}
-              setLlmProviderEnabled={setLlmProviderEnabled}
-              updateLlmApiKey={updateLlmApiKey}
-              updateLlmApiUrl={updateLlmApiUrl}
-              updateLlmApiOption={updateLlmApiOption}
+              updateConnection={updateLlmProviderOptions}
+              addConnection={addConnection}
+              removeConnection={removeConnection}
               syncLlmProviderModels={syncLlmProviderModels}
-              getCustomModelDraftCapabilities={getCustomModelDraftCapabilities}
-              addCustomModel={addCustomModel}
-              removeCustomModel={removeCustomModel}
               updateApiProxyOptions={updateApiProxyOptions}
             />
             <TranslationSettingsTab

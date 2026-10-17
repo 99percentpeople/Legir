@@ -93,114 +93,119 @@ functions.
 
 It should not run document chat turns or implement document tools.
 
-### Provider Configuration
+### Connections and catalog
 
-- `providers/catalog.ts` defines provider ids, labels, default base URLs, API
-  options, fallback model ids, and provider-level settings metadata.
-  Official providers such as `openai` and `anthropic` may use custom base URLs,
-  but they keep their official runtime adapters. Third-party OpenAI/Anthropic
-  compatible services should use the dedicated `openai-compatible` and
-  `anthropic-compatible` providers. Xiaomi MiMo has its own provider because it
-  exposes both OpenAI-compatible and Anthropic-compatible API formats with
-  provider-specific reasoning behavior.
-- `providers/settings.ts` reads app options and normalizes configured provider
-  configs.
-- `providers/config.ts` builds the AI SDK provider registry with configured
-  providers and proxy fetch.
-- `providers/registry.ts` wires each provider id to a model catalog provider and
-  a runtime adapter.
+`AppOptions.llm` is a dynamic record keyed by stable connection IDs. Each entry
+stores its name, optional models.dev `catalogId`, protocol (`backendKind`), saved
+base URL, credential, authentication mode and enabled state.
+Multiple connections can use the same provider with different accounts/endpoints.
+Settings adds providers through a searchable dropdown and displays each connection
+in an independently collapsible row. Newly added connections open automatically;
+enable and remove actions remain available on collapsed rows.
+Catalog connections use the current provider name and SDK authentication by
+default, without name or authentication editors. Multiple connections to the
+same provider receive numbered labels, shared by settings and model selectors;
+their IDs and model selections remain stable. Custom connections retain editable
+names and protocol-appropriate authentication choices: SDK default, no
+authentication, and an explicit Bearer override for Anthropic-compatible APIs.
+Existing non-default authentication remains active and is shown with an explicit
+reset action. Switching protocols clears an override only when the new adapter
+cannot use it; no-auth connections remain no-auth.
+Model selectors continue to use `connectionId:modelId`; colons inside a model ID
+are preserved. Credentials remain user settings, never build-time variables.
 
-### Model Selection and Metadata
+- `connections.ts` normalizes connections and migrates old preferences. The
+  frozen `legacyProviders.ts` is only a migration schema, not an active provider
+  registry. Configured legacy IDs, endpoints, credentials and selected API modes
+  are retained; unused placeholders are omitted. Replacing the connection map
+  permits deletion without resurrecting defaults on reload.
+  It also resolves automatic display names and supported authentication modes.
+  The persisted `api-key` mode means SDK default authentication, including Bearer
+  headers for OpenAI-compatible APIs; it is not a separate header override.
+- `catalog.ts` maps supported SDK packages to executable protocols. Provider
+  names and available models are data, not an enum. Unsupported SDK/authentication
+  integrations are excluded instead of assuming every catalog entry is runnable.
+- `connectionProtocols.ts` limits catalog connections to the wire format declared
+  by their SDK; models.dev does not enumerate every compatible protocol. Native
+  adapters share readable format labels. Only custom connections offer all formats.
+  Settings hides the format field when no supported alternative can be selected.
+  Unlisted saved formats remain visible but cannot be newly selected. Explicitly
+  choosing the catalog format also restores its default endpoint; merely opening
+  settings or refreshing the catalog never changes saved configuration.
+- `modelsDev.ts` loads a bundled snapshot lazily, restores the last valid cached
+  catalog, and refreshes `https://models.dev/api.json` with a 24-hour TTL. Catalog
+  fetches carry no provider credentials. Invalid/failed responses retain the last
+  valid catalog. Refresh never changes saved connection URLs or keys.
+- `models-dev.snapshot.json` is generated data, not hand-maintained. Regenerate it
+  with `bun run update:ai-catalog` (or pass a downloaded API JSON file as the next
+  argument). It is lazy-loaded separately from normal PDF startup. Runtime
+  catalog refresh does not require rebuilding the application. The source catalog's
+  MIT license is retained in `public/models-dev.LICENSE.txt`.
+- `settings.ts` resolves a saved connection; `registry.ts` selects its protocol
+  adapter. Connection IDs and provider/SDK option namespaces are separate, so
+  multiple connections retain the correct reasoning parameters.
 
-- `providers/modelResolver.ts` resolves model specifiers, task-specific model
-  choices, model groups, and full runtime objects.
-- `providers/models.ts` is the source of truth for model facts. Put
-  model-specific context windows, modalities, tool support, image tool-result
-  support, automatic-selection `rank`, and reasoning metadata here as ordered
-  rules. A rule `id` is only a stable maintenance/debug identifier; exact
-  matching uses `modelIds`, family matching uses `patterns`, and curated
-  provider lists are emitted only from explicit model ids. Higher `rank` values
-  are preferred when the app auto-selects a model, while explicit user choices
-  are kept as-is. Reasoning metadata exposes one unified `levels` list for UI
-  and runtime selection: `none`, `auto`, `minimal`, `low`, `medium`, `high`,
-  and `xhigh`.
-- `providers/metadata.ts` resolves ordered model rules for a provider/model pair
-  and merges those facts with API-discovered or custom model capabilities.
-- `providers/capabilities.ts` only builds capability objects from explicit data.
-  It should not infer model behavior from model id strings.
-- `providers/types.ts` contains provider/model contracts shared across the
-  provider layer.
+### Model discovery and capabilities
 
-### Model Discovery
+`modelCatalog/base.ts` owns endpoint discovery for the supported protocols,
+including pagination, authentication and the shared web/Tauri proxy. A successful
+endpoint listing is authoritative for that connection's available models. The
+catalog supplies an offline fallback and fills missing model facts; a 404/405
+listing falls back to it. An empty successful listing remains empty. Catalog
+entries alone do not establish account access or authenticate credentials.
 
-`providers/modelCatalog/` fetches or provides available models for each
-provider. Catalog providers normalize provider API responses into
-`AiSdkDiscoveredModel` values. The shared base class applies central model
-metadata so dynamic API results, curated lists, and custom models behave
-consistently.
-Providers with OpenAI-compatible `/models` endpoints should use the shared
-base helper instead of duplicating bearer-auth request and fallback parsing.
+Explicit endpoint capability fields override catalog facts. Model lists come from
+endpoint discovery and the catalog; manually configured models and capability
+overrides are no longer supported. Legacy custom model fields are removed during
+preference normalization. Unknown models are not assumed to support tools or
+images. Image input and image tool-result support remain distinct.
 
-If a provider API returns real capability data, map it in the catalog provider.
-If it only returns ids, add or update explicit model rules in
-`providers/models.ts`.
+`modelCache.ts` keeps model lists per connection, with a one-hour freshness limit
+and a configuration fingerprint. Changes to endpoints, authentication or proxy
+settings invalidate cached results. Late responses from edited or deleted
+connections cannot restore stale lists. Failed refreshes retain prior results.
+`modelSelection.ts` builds groups from connections, and `modelResolver.ts`
+resolves selected models and task requirements.
+Model choices include only enabled connections with a valid HTTP(S) endpoint and
+a nonblank key/token, or explicit no-authentication mode. This is a local
+configuration check; it does not certify that a server accepts the credential.
+The same gate applies to catalog fallback and previously fetched models. Changes
+to connection settings update all model selectors and translation registrations
+immediately, without waiting for model discovery. Provider settings remain visible
+so disabled or incomplete connections can still be configured.
+Deleting a connection also removes its translation registry group. Explicit
+requests targeting a removed connection fail instead of using another account.
 
-Automatic task resolution can pass a soft preferred provider. This is used by
-visual tasks so a chat model selected from a provider such as Xiaomi MiMo or
-Gemini first looks for the highest-ranked vision-capable model from the same
-provider before falling back to another configured provider.
+### Runtime and reasoning
 
-### Runtime Adapters
+The AI SDK remains responsible for generation, streaming and tool execution.
+`runtimeAdapters/` contains protocol-specific thinking settings and message replay
+requirements. The shared proxy is injected as `fetch` for both discovery and model
+calls. Authentication can be disabled for local compatible endpoints.
 
-`providers/runtimeAdapters/` translates app-level runtime preferences into
-provider-specific AI SDK behavior:
+`metadata.ts` and `reasoning.ts` read model facts and thinking controls from
+models.dev. There are no model-name or family rules for reasoning. Adapters use
+the connection's catalog identity, independently of its connection ID and SDK
+option namespace. Catalog refresh recomputes the active chat model's controls.
 
-- create the correct AI SDK provider wrapper;
-- map reasoning settings to provider options;
-- enable or disable provider-specific thinking modes;
-- prepare or validate replayed messages when a provider requires reasoning
-  content for tool calls.
+`reasoning_options` supplies effort values, toggle support and token-budget bounds.
+Effort choices retain their exact meanings, including distinct `xhigh` and `max`.
+Budget-only models use shared low/medium/high token presets bounded by the
+catalog's minimum, maximum and output limit. These presets are translated to
+token budgets, not sent as effort values. Toggle-only models expose off/auto.
+Models without catalog controls use automatic behavior; missing models are never
+inferred from their names. Existing `xhigh` preferences select `max` when only the
+latter exists.
 
-Runtime adapters should not define general model facts. They should read
-reasoning metadata through `getAiProviderModelReasoningMetadata`.
-`openaiCompatible.ts` and `anthropicCompatible.ts` are the shared factories for
-OpenAI-like and Anthropic-like APIs. Provider-specific runtime behavior belongs
-in its own file, such as `openai.ts`, `anthropic.ts`, `mimo.ts`, `zhipu.ts`, or
-`openrouter.ts`. Providers that expose multiple wire formats, such as MiniMax
-or Xiaomi MiMo, should select between the shared compatible factories in
-`providers/registry.ts` instead of keeping duplicate provider-specific
-OpenAI/Anthropic adapter files.
+`runtimeAdapters/catalogReasoning.ts` translates these controls to the installed
+SDK's wire format. SDK enum restrictions may further limit the available effort
+values. Generic OpenAI-compatible endpoints support the standard effort field;
+provider-specific toggle and budget fields require a protocol adapter rather
+than guessing their request shape from a model name. Metadata never loads code.
 
-`createBasicRuntimeAdapter` is only for providers where Legir has no
-app-controlled reasoning mapping yet. A model may still reason internally, but
-the app will not expose reasoning controls, replay policy, or provider options
-until that provider gets an explicit adapter implementation.
-OpenAI-compatible chat-only providers with custom reasoning behavior can share
-`openAiCompatibleChat.ts` for the SDK wrapper and reasoning replay validation.
-
-### Reasoning Levels
-
-Reasoning support is model-based, not provider-default based:
-
-- `providers/models.ts` declares whether a model supports reasoning, which
-  select levels are valid, and optional `budgetTokensByLevel` mappings for
-  providers that expose thinking as token budgets. Use `providerMode` only when
-  a model family needs a different wire mode, such as Anthropic adaptive
-  thinking.
-- `providers/metadata.ts` exposes `resolveAiProviderModelReasoning`, which
-  returns the selectable levels, the clamped selected level, and whether a
-  select should be shown.
-- `providers/runtimeAdapters/shared.ts` normalizes the selected `level`, clamps
-  unsupported levels, and maps budget levels to token counts.
-- Runtime adapters translate the resolved level to provider-specific options
-  such as OpenAI `reasoningEffort`, Google `thinkingConfig`, Anthropic
-  `thinking.budgetTokens`, or provider thinking switches.
-- `auto` means provider default/dynamic behavior. Provider-specific adapters may
-  map app levels to provider names, for example DeepSeek `xhigh` -> `max`.
-
-UI should use the resolved levels as the only reasoning control surface. If the
-resolved model has no levels, or only one level, the UI should not show a
-reasoning-level select.
+The UI retains display controls. Replay rules,
+image tool-result handling, document targeting, chat history and tool permissions
+remain owned by their existing layers.
 
 ## `tasks/`
 
@@ -243,8 +248,8 @@ Shared app constants, including the default model context window, live in
 
 1. UI calls `chat/aiChatService.ts`.
 2. `providers/modelResolver.ts` resolves the selected provider/model.
-3. `providers/registry.ts` selects the model catalog provider and runtime
-   adapter.
+3. The connection resolves its model catalog and `providers/registry.ts`
+   selects the protocol runtime adapter.
 4. The runtime adapter contributes provider-specific call options and replay
    rules.
 5. `chat/runtime/` prepares messages, memory, compression, and tool execution.
@@ -260,10 +265,10 @@ Shared app constants, including the default model context window, live in
 
 ## Extension Rules
 
-- Add a new provider id in `providers/catalog.ts`.
-- Wire the provider's model catalog and runtime adapter in
-  `providers/registry.ts`.
-- Add or correct model facts in `providers/models.ts`.
+- Providers using supported protocols enter through models.dev or a custom
+  connection; do not add provider allowlists or duplicate model facts locally.
+- Add new protocol/SDK support in `catalog.ts` and `registry.ts` with transport
+  tests. Remote npm package names are data, not executable import instructions.
 - Add provider request-shape behavior in `providers/runtimeAdapters/`.
 - Add chat tools in `chat/tools/` and register them through
   `chat/aiToolRegistry.ts`.

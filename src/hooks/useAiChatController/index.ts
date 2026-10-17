@@ -641,7 +641,12 @@ export const useAiChatController = (
       capability,
       editorState.options.aiChat.reasoning,
     );
-  }, [editorState.options, selectedChatModel?.isAvailable, selectedModelKey]);
+  }, [
+    editorState.options,
+    registryVersion,
+    selectedChatModel?.isAvailable,
+    selectedModelKey,
+  ]);
 
   const setReasoningLevel = useCallback((level: AiReasoningLevel) => {
     setPreferenceOptions((options) => ({

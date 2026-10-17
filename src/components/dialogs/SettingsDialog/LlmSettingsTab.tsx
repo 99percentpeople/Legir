@@ -1,10 +1,20 @@
-import type { Dispatch, SetStateAction } from "react";
-import { AlertCircle, CheckCircle2, Loader2, Plus, Trash2 } from "lucide-react";
-
+import { useSyncExternalStore } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { ModelCapabilityBadges } from "@/components/ModelCapabilityBadges";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,20 +25,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { TabsContent } from "@/components/ui/tabs";
 import { DEV_API_PROXY_URL } from "@/constants";
+import type { AiProviderSpec } from "@/services/ai/providers/catalog";
 import {
-  AI_PROVIDER_SPECS_SORTED_BY_LABEL,
-  getAiProviderSelectedApiOption,
-} from "@/services/ai/providers/catalog";
-import { createCustomModelCapabilities } from "@/services/ai/providers/capabilities";
+  getAiConnectionProtocolPatch,
+  getAiConnectionProtocols,
+} from "@/services/ai/providers/connectionProtocols";
+import {
+  getModelsDevRevision,
+  subscribeModelsDev,
+} from "@/services/ai/providers/modelsDev";
+import {
+  getAiConnectionAuthMode,
+  getAiConnectionAuthModes,
+  getAiConnectionLabel,
+} from "@/services/ai/providers/connections";
 import { isDesktopApp } from "@/services/platform/runtime";
-import type { AppOptions, LLMCustomModelCapability } from "@/types";
-
+import type { AppOptions } from "@/types";
+import { cn } from "@/utils/cn";
+import { AddAiConnection } from "./AddAiConnection";
 import { SETTINGS_CARD_GAP_CLASS } from "./styles";
 import type {
-  CustomModelCapabilityOption,
   LlmModelCache,
   LlmProviderId,
   ProviderSyncStatus,
@@ -38,421 +56,344 @@ import type {
 interface LlmSettingsTabProps {
   options: AppOptions;
   llmModelCache: LlmModelCache;
-  llmProviderTab: LlmProviderId;
-  onLlmProviderTabChange: (provider: LlmProviderId) => void;
+  expandedConnections: string[];
+  setConnectionOpen: (id: string, open: boolean) => void;
   llmSyncStatus: Record<LlmProviderId, ProviderSyncStatus>;
-  customModelNameByProvider: Partial<Record<LlmProviderId, string>>;
-  setCustomModelNameByProvider: Dispatch<
-    SetStateAction<Partial<Record<LlmProviderId, string>>>
-  >;
-  customModelCapabilityOptions: CustomModelCapabilityOption[];
-  setCustomModelCapabilityByProvider: Dispatch<
-    SetStateAction<Partial<Record<LlmProviderId, LLMCustomModelCapability[]>>>
-  >;
-  isLlmProviderEnabled: (provider: LlmProviderId) => boolean;
-  setLlmProviderEnabled: (provider: LlmProviderId, enabled: boolean) => void;
-  updateLlmApiKey: (provider: LlmProviderId, value: string) => void;
-  updateLlmApiUrl: (provider: LlmProviderId, value: string) => void;
-  updateLlmApiOption: (provider: LlmProviderId, apiOptionId: string) => void;
+  updateConnection: (
+    id: string,
+    patch: Partial<AppOptions["llm"][string]>,
+  ) => void;
+  addConnection: (spec?: AiProviderSpec) => void;
+  removeConnection: (id: string) => void;
   syncLlmProviderModels: (provider: LlmProviderId) => Promise<void>;
-  getCustomModelDraftCapabilities: (
-    provider: LlmProviderId,
-  ) => LLMCustomModelCapability[];
-  addCustomModel: (provider: LlmProviderId) => void;
-  removeCustomModel: (provider: LlmProviderId, id: string) => void;
   updateApiProxyOptions: UpdateApiProxyOptions;
 }
 
 export const LlmSettingsTab = ({
   options,
   llmModelCache,
-  llmProviderTab,
-  onLlmProviderTabChange,
+  expandedConnections,
+  setConnectionOpen,
   llmSyncStatus,
-  customModelNameByProvider,
-  setCustomModelNameByProvider,
-  customModelCapabilityOptions,
-  setCustomModelCapabilityByProvider,
-  isLlmProviderEnabled,
-  setLlmProviderEnabled,
-  updateLlmApiKey,
-  updateLlmApiUrl,
-  updateLlmApiOption,
+  updateConnection,
+  addConnection,
+  removeConnection,
   syncLlmProviderModels,
-  getCustomModelDraftCapabilities,
-  addCustomModel,
-  removeCustomModel,
   updateApiProxyOptions,
 }: LlmSettingsTabProps) => {
   const { t } = useLanguage();
+  useSyncExternalStore(subscribeModelsDev, getModelsDevRevision);
   const isDesktopRuntime = isDesktopApp();
-  const selectedLlmProviderSpec =
-    AI_PROVIDER_SPECS_SORTED_BY_LABEL.find(
-      (spec) => spec.id === llmProviderTab,
-    ) ?? AI_PROVIDER_SPECS_SORTED_BY_LABEL[0];
-  const selectedLlmProviderEnabled = isLlmProviderEnabled(llmProviderTab);
+  const connections = Object.entries(options.llm);
+  const authenticationLabels = {
+    "api-key": t("settings.llm.default_authentication"),
+    bearer: "Bearer Token",
+    none: t("settings.llm.no_authentication"),
+  };
 
   return (
     <TabsContent value="llm">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label className="mb-0 font-semibold">
-            {t("settings.llm.title")}
-          </Label>
-        </div>
-
-        <div className="flex items-center justify-between gap-3">
-          <Label className="text-xs">{t("translate.provider")}</Label>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                id={`llm-provider-enabled-${llmProviderTab}`}
-                checked={selectedLlmProviderEnabled}
-                onCheckedChange={(checked) =>
-                  setLlmProviderEnabled(llmProviderTab, checked)
-                }
-              />
-              <Label
-                htmlFor={`llm-provider-enabled-${llmProviderTab}`}
-                className="text-xs font-normal"
-              >
-                {t("settings.llm.provider_enabled")}
-              </Label>
-            </div>
-            <Select
-              value={llmProviderTab}
-              onValueChange={(value) =>
-                onLlmProviderTabChange(value as LlmProviderId)
-              }
-            >
-              <SelectTrigger className="h-8 w-[160px]">
-                <SelectValue placeholder={t("common.select")}>
-                  <div className="flex items-center gap-1.5">
-                    <ProviderLogo
-                      providerId={selectedLlmProviderSpec.id}
-                      size={14}
-                      className="text-foreground/80"
-                    />
-                    <span>
-                      {selectedLlmProviderSpec.labelKey
-                        ? t(selectedLlmProviderSpec.labelKey)
-                        : selectedLlmProviderSpec.label}
-                    </span>
-                  </div>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {AI_PROVIDER_SPECS_SORTED_BY_LABEL.map((spec) => (
-                  <SelectItem
-                    key={spec.id}
-                    value={spec.id}
-                    itemText={spec.labelKey ? t(spec.labelKey) : spec.label}
-                  >
-                    <div className="flex items-center gap-2">
-                      <ProviderLogo
-                        providerId={spec.id}
-                        size={14}
-                        className="text-foreground/80"
-                      />
-                      <span>
-                        {spec.labelKey ? t(spec.labelKey) : spec.label}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <Tabs value={llmProviderTab}>
-          {AI_PROVIDER_SPECS_SORTED_BY_LABEL.map((spec) => {
-            const providerOptions = options.llm[spec.id];
-            const providerModelCache = llmModelCache[spec.id];
-            const fetchedModels = providerModelCache.models ?? [];
-            const syncStatus = llmSyncStatus[spec.id];
-            const showApiUrl = spec.allowCustomBaseUrl;
-            const providerEnabled = isLlmProviderEnabled(spec.id);
-            const selectedApiOption = getAiProviderSelectedApiOption(
-              spec.id,
-              providerOptions.apiOptionId,
+        <Label className="font-semibold">{t("settings.llm.title")}</Label>
+        <AddAiConnection onAdd={addConnection} />
+        {!connections.length && (
+          <p className="text-muted-foreground text-sm">
+            {t("settings.llm.connections_empty")}
+          </p>
+        )}
+        <div className="space-y-2">
+          {connections.map(([id, connection]) => {
+            const isCustom = !connection.catalogId;
+            const label = getAiConnectionLabel(
+              options.llm,
+              id,
+              t("settings.llm.custom_connection"),
             );
-            const selectedApiUrlPlaceholder =
-              selectedApiOption?.defaultBaseUrl ||
-              spec.defaultBaseUrl ||
-              t("settings.llm.api_url_placeholder");
-            const selectedApiOptionLabel = selectedApiOption
-              ? selectedApiOption.labelKey
-                ? t(selectedApiOption.labelKey)
-                : selectedApiOption.label
-              : "";
-
+            const authMode = getAiConnectionAuthMode(connection);
+            const fetchedModels = llmModelCache[id]?.models ?? [];
+            const syncStatus = llmSyncStatus[id] || {
+              state: "idle",
+              message: "",
+            };
+            const enabled = connection.enabled !== false;
+            const protocols = getAiConnectionProtocols(connection);
+            const canChangeProtocol = protocols.some(
+              (protocol) =>
+                protocol.available &&
+                protocol.id !== (connection.backendKind || "openai-compatible"),
+            );
+            const hasUnlistedProtocol = protocols.some(
+              (protocol) => !protocol.available,
+            );
             return (
-              <TabsContent key={spec.id} value={spec.id} className="space-y-4">
-                <div className="bg-muted/30 border-border flex flex-col gap-2 rounded-lg border p-3">
-                  {spec.apiOptions && spec.apiOptions.length > 1 ? (
-                    <div className="space-y-1">
-                      <Label className="text-xs">
-                        {t("settings.llm.api_option")}
-                      </Label>
-                      <Select
-                        value={
-                          selectedApiOption?.id ||
-                          spec.defaultApiOptionId ||
-                          spec.apiOptions[0]!.id
-                        }
-                        onValueChange={(value) =>
-                          updateLlmApiOption(spec.id, value)
-                        }
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder={t("common.select")}>
-                            {selectedApiOptionLabel}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {spec.apiOptions.map((apiOption) => (
-                            <SelectItem
-                              key={`${spec.id}:${apiOption.id}`}
-                              value={apiOption.id}
-                              itemText={
-                                apiOption.labelKey
-                                  ? t(apiOption.labelKey)
-                                  : apiOption.label
-                              }
-                            >
-                              {apiOption.labelKey
-                                ? t(apiOption.labelKey)
-                                : apiOption.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : null}
-
-                  <Input
-                    value={providerOptions.apiKey || ""}
-                    onChange={(event) =>
-                      updateLlmApiKey(spec.id, event.target.value)
-                    }
-                    placeholder={t("settings.llm.api_key_placeholder")}
-                    className="h-8"
-                    type="password"
-                  />
-                  <div className="flex items-center gap-2">
-                    {showApiUrl ? (
-                      <Input
-                        value={providerOptions.apiUrl || ""}
-                        onChange={(event) =>
-                          updateLlmApiUrl(spec.id, event.target.value)
-                        }
-                        placeholder={selectedApiUrlPlaceholder}
-                        className="h-8"
-                      />
-                    ) : null}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8"
-                      onClick={() => void syncLlmProviderModels(spec.id)}
-                      disabled={
-                        !providerEnabled || syncStatus.state === "syncing"
-                      }
-                    >
-                      {syncStatus.state === "syncing" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : null}
-                      {t("settings.llm.fetch_models")}
-                    </Button>
-                  </div>
-
-                  {syncStatus.state === "ok" ? (
-                    <div className="flex items-center gap-2 text-xs">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      <span className="text-muted-foreground">
-                        {syncStatus.message}
-                      </span>
-                    </div>
-                  ) : null}
-                  {syncStatus.state === "error" ? (
-                    <div className="flex items-center gap-2 text-xs">
-                      <AlertCircle className="text-destructive h-4 w-4" />
-                      <span className="text-destructive">
-                        {syncStatus.message}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className={SETTINGS_CARD_GAP_CLASS}>
-                  <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs">
-                      {t("settings.llm.fetched_models")}
-                    </Label>
-                    <span className="text-muted-foreground text-xs">
-                      {t("settings.llm.models_loaded_count", {
-                        count: fetchedModels.length,
-                      })}
-                    </span>
-                  </div>
-                  {fetchedModels.length > 0 ? (
-                    <div className="bg-background/80 max-h-36 overflow-auto rounded-md border p-2">
-                      <div className="flex flex-col gap-1.5">
-                        {fetchedModels.map((model) => (
-                          <span
-                            key={`${spec.id}:fetched:${model.id}`}
-                            className="bg-muted inline-flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-1 text-[11px]"
-                            title={model.id}
-                          >
-                            <span className="min-w-0 flex-1">{model.id}</span>
-                            <ModelCapabilityBadges
-                              capabilities={model.capabilities}
-                              className="shrink-0 flex-nowrap"
-                            />
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-xs">
-                      {t("settings.llm.fetched_models_empty")}
-                    </p>
-                  )}
-                </div>
-
-                <div className={SETTINGS_CARD_GAP_CLASS}>
-                  <div className="space-y-1">
-                    <Label className="text-xs">
-                      {t("settings.llm.custom_models")}
-                    </Label>
-                    <p className="text-muted-foreground text-xs">
-                      {t("settings.llm.custom_models_desc")}
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                    <Input
-                      id={`llm-${spec.id}-custom-model-name`}
-                      placeholder={t(
-                        "settings.llm.custom_model_name_placeholder",
-                      )}
-                      value={customModelNameByProvider[spec.id] || ""}
-                      onChange={(event) =>
-                        setCustomModelNameByProvider((prev) => ({
-                          ...prev,
-                          [spec.id]: event.target.value,
-                        }))
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key !== "Enter") return;
-                        event.preventDefault();
-                        addCustomModel(spec.id);
-                      }}
-                    />
-                    <Button
+              <Collapsible
+                key={id}
+                open={expandedConnections.includes(id)}
+                onOpenChange={(open) => setConnectionOpen(id, open)}
+                className="overflow-hidden rounded-lg border"
+              >
+                <div className="bg-muted/30 flex items-center gap-2 pr-2">
+                  <CollapsibleTrigger asChild>
+                    <button
                       type="button"
-                      onClick={() => addCustomModel(spec.id)}
-                      disabled={
-                        !(customModelNameByProvider[spec.id] || "").trim()
-                      }
+                      className="group hover:bg-accent/50 focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
                     >
-                      <Plus className="mr-1 h-4 w-4" />
-                      {t("settings.llm.custom_model_add")}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">
-                      {t("settings.llm.custom_model_capability")}
-                    </Label>
-                    <ToggleGroup
-                      type="multiple"
-                      variant="outline"
-                      size="sm"
-                      spacing={1}
-                      value={getCustomModelDraftCapabilities(spec.id)}
-                      onValueChange={(value) => {
-                        const nextValues = new Set<LLMCustomModelCapability>([
-                          "text",
-                        ]);
-                        for (const item of value) {
-                          if (
-                            item === "text" ||
-                            item === "image" ||
-                            item === "tools"
-                          ) {
-                            nextValues.add(item);
-                          }
-                        }
-                        setCustomModelCapabilityByProvider((prev) => ({
-                          ...prev,
-                          [spec.id]: ["text", "image", "tools"].filter((item) =>
-                            nextValues.has(item as LLMCustomModelCapability),
-                          ) as LLMCustomModelCapability[],
-                        }));
-                      }}
-                      className="w-full flex-wrap"
-                    >
-                      {customModelCapabilityOptions.map((option) => (
-                        <ToggleGroupItem
-                          key={option.value}
-                          value={option.value}
-                          disabled={option.value === "text"}
-                          className="min-w-20"
-                        >
-                          {option.label}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                  </div>
-
-                  {(providerOptions.customModels || []).length > 0 ? (
-                    <div className="bg-background/80 max-h-48 overflow-auto rounded-md border p-2">
-                      <div className="flex flex-col gap-1.5">
-                        {(providerOptions.customModels || []).map((model) => (
-                          <div
-                            key={`${spec.id}:custom:${model.id}`}
-                            className="bg-muted flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-1"
+                      <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+                      <ProviderLogo
+                        providerId={connection.catalogId || ""}
+                        size={16}
+                      />
+                      <span className="truncate text-sm font-medium">
+                        {label}
+                      </span>
+                    </button>
+                  </CollapsibleTrigger>
+                  <Switch
+                    checked={enabled}
+                    aria-label={`${t("settings.llm.provider_enabled")}: ${label}`}
+                    onCheckedChange={(checked) =>
+                      updateConnection(id, { enabled: checked })
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0"
+                    aria-label={`${t("settings.llm.remove_connection")}: ${label}`}
+                    onClick={() => removeConnection(id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <CollapsibleContent>
+                  <div className="space-y-4 border-t p-3">
+                    <div className="space-y-3">
+                      {isCustom && (
+                        <div className="space-y-1">
+                          <Label
+                            htmlFor={`connection-name-${id}`}
+                            className="text-xs"
                           >
-                            <span
-                              className="min-w-0 flex-1 text-[11px]"
+                            {t("settings.llm.connection_name")}
+                          </Label>
+                          <Input
+                            id={`connection-name-${id}`}
+                            value={connection.name || ""}
+                            onChange={(event) =>
+                              updateConnection(id, { name: event.target.value })
+                            }
+                            className="h-8"
+                          />
+                        </div>
+                      )}
+                      {(canChangeProtocol || isCustom) && (
+                        <div
+                          className={cn(
+                            "grid gap-3",
+                            isCustom && "sm:grid-cols-2",
+                          )}
+                        >
+                          {canChangeProtocol && (
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor={`connection-protocol-${id}`}
+                                className="text-xs"
+                              >
+                                {t("settings.llm.api_option")}
+                              </Label>
+                              <Select
+                                value={
+                                  connection.backendKind || "openai-compatible"
+                                }
+                                onValueChange={(value) => {
+                                  const patch = getAiConnectionProtocolPatch(
+                                    connection,
+                                    value,
+                                  );
+                                  if (patch) updateConnection(id, patch);
+                                }}
+                              >
+                                <SelectTrigger
+                                  id={`connection-protocol-${id}`}
+                                  className="h-8 w-full"
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {protocols.map((protocol) => (
+                                    <SelectItem
+                                      key={protocol.id}
+                                      value={protocol.id}
+                                      disabled={!protocol.available}
+                                    >
+                                      {protocol.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {hasUnlistedProtocol && (
+                                <p className="text-muted-foreground text-xs">
+                                  {t("settings.llm.api_option_unlisted")}
+                                  {protocols.some(
+                                    (protocol) => protocol.available,
+                                  ) &&
+                                    ` ${t("settings.llm.api_option_default_endpoint")}`}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {isCustom && (
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor={`connection-auth-${id}`}
+                                className="text-xs"
+                              >
+                                {t("settings.llm.authentication")}
+                              </Label>
+                              <Select
+                                value={authMode}
+                                onValueChange={(value) =>
+                                  updateConnection(id, {
+                                    authMode: value as
+                                      | "api-key"
+                                      | "bearer"
+                                      | "none",
+                                  })
+                                }
+                              >
+                                <SelectTrigger
+                                  id={`connection-auth-${id}`}
+                                  className="h-8 w-full"
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {getAiConnectionAuthModes(connection).map(
+                                    (mode) => (
+                                      <SelectItem key={mode} value={mode}>
+                                        {authenticationLabels[mode]}
+                                      </SelectItem>
+                                    ),
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {!isCustom && authMode !== "api-key" && (
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                          <span className="text-muted-foreground">
+                            {t("settings.llm.saved_authentication", {
+                              method: authenticationLabels[authMode],
+                            })}
+                          </span>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() =>
+                              updateConnection(id, { authMode: "api-key" })
+                            }
+                          >
+                            {t("settings.llm.restore_default_authentication")}
+                          </Button>
+                        </div>
+                      )}
+                      <Input
+                        value={connection.apiKey || ""}
+                        onChange={(event) =>
+                          updateConnection(id, { apiKey: event.target.value })
+                        }
+                        placeholder={t("settings.llm.api_key_placeholder")}
+                        aria-label={`${t("settings.llm.api_key_placeholder")}: ${label}`}
+                        disabled={authMode === "none"}
+                        className="h-8"
+                        type="password"
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          value={connection.apiUrl || ""}
+                          onChange={(event) =>
+                            updateConnection(id, { apiUrl: event.target.value })
+                          }
+                          placeholder={t("settings.llm.api_url_placeholder")}
+                          aria-label={`${t("settings.llm.api_url_placeholder")}: ${label}`}
+                          className="h-8 min-w-0 flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => void syncLlmProviderModels(id)}
+                          disabled={!enabled || syncStatus.state === "syncing"}
+                        >
+                          {syncStatus.state === "syncing" && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          {t("settings.llm.fetch_models")}
+                        </Button>
+                      </div>
+                      {syncStatus.state === "ok" && (
+                        <div
+                          role="status"
+                          className="text-muted-foreground flex items-center gap-2 text-xs"
+                        >
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          {syncStatus.message}
+                        </div>
+                      )}
+                      {syncStatus.state === "error" && (
+                        <div
+                          role="alert"
+                          className="text-destructive flex items-center gap-2 text-xs"
+                        >
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          {syncStatus.message}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2 border-t pt-3">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <Label className="text-xs">
+                          {t("settings.llm.fetched_models")}
+                        </Label>
+                        <span className="text-muted-foreground">
+                          {t("settings.llm.models_loaded_count", {
+                            count: fetchedModels.length,
+                          })}
+                        </span>
+                      </div>
+                      {fetchedModels.length ? (
+                        <div className="max-h-36 space-y-1.5 overflow-auto">
+                          {fetchedModels.map((model) => (
+                            <div
+                              key={model.id}
+                              className="bg-muted flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-1 text-[11px]"
                               title={model.id}
                             >
-                              {model.id}
-                            </span>
-                            <ModelCapabilityBadges
-                              capabilities={createCustomModelCapabilities(
-                                model.capabilities,
-                              )}
-                              className="shrink-0 flex-nowrap"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0"
-                              onClick={() =>
-                                removeCustomModel(spec.id, model.id)
-                              }
-                              aria-label={t("common.actions.delete")}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
+                              <span className="min-w-0 flex-1 truncate">
+                                {model.id}
+                              </span>
+                              <ModelCapabilityBadges
+                                capabilities={model.capabilities}
+                                className="shrink-0 flex-nowrap"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground text-xs">
+                          {t("settings.llm.fetched_models_empty")}
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="text-muted-foreground text-xs">
-                      {t("settings.llm.custom_models_empty")}
-                    </p>
-                  )}
-                </div>
-              </TabsContent>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             );
           })}
-        </Tabs>
+        </div>
 
         <div className={SETTINGS_CARD_GAP_CLASS}>
           <div className="space-y-1">

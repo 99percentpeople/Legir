@@ -6,7 +6,10 @@
  * Keep service-local or feature-local types in a nearby `types.ts` instead of
  * growing this file with implementation-specific details.
  */
-import type { AiProviderId } from "@/services/ai/providers/catalog";
+import type {
+  AiProviderId,
+  AiProviderBackendKind,
+} from "@/services/ai/providers/catalog";
 import type {
   AiReasoningDisplayPolicy,
   AiReasoningLevel,
@@ -393,21 +396,20 @@ export interface LLMModelCapabilities {
   contextWindowTokens: number;
 }
 
-export type LLMCustomModelCapability = "text" | "image" | "tools";
-
-export interface LLMCustomModelConfig {
-  id: string;
-  capabilities: LLMCustomModelCapability[];
-}
-
 export interface LLMProviderOptions {
+  /** Custom connection name, or a saved catalog label for offline display. */
+  name?: string;
+  catalogId?: string;
+  backendKind?: AiProviderBackendKind;
+  /** `api-key` delegates authentication to the selected SDK. */
+  authMode?: "api-key" | "bearer" | "none";
   enabled: boolean;
   apiKey?: string;
   apiUrl?: string;
   apiOptionId?: string;
-  customModels: LLMCustomModelConfig[];
 }
 
+/** Keys are stable connection IDs, independent of the catalog. */
 export type LLMOptions = Record<AiProviderId, LLMProviderOptions>;
 
 export interface ApiProxyOptions {
@@ -641,6 +643,8 @@ export interface EditorPreferencesState {
     AiProviderId,
     {
       models: AppLLMModelOption[];
+      fetchedAt?: number;
+      configurationKey?: string;
     }
   >;
   translateOption: TranslateOptionId;

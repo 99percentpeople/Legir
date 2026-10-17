@@ -1,91 +1,76 @@
+import { runtimeProviderId } from "./catalog";
 import {
-  AI_PROVIDER_SPECS,
-  getAiProviderSelectedApiOption,
-  getAiProviderSpec,
-} from "@/services/ai/providers/catalog";
+  getAiConnectionAuthMode,
+  getAiConnectionLabel,
+  normalizeAiConnection,
+} from "./connections";
 import type { AppOptions } from "@/types";
-import type {
-  AiSdkProviderConfig,
-  AiSdkProviderId,
-} from "@/services/ai/providers/types";
-
-export { AI_PROVIDER_LABELS } from "@/services/ai/providers/catalog";
+import type { AiSdkProviderConfig, AiSdkProviderId } from "./types";
 
 export const normalizeOptionalText = (value: string | undefined) =>
   value?.trim() || "";
-
+export const normalizeBaseUrl = (value: string | undefined) =>
+  normalizeOptionalText(value).replace(/\/+$/, "");
+const isValidBaseUrl = (value: string | undefined) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+};
 export const isAiSdkProviderEnabled = (
   options: AppOptions,
-  providerId: AiSdkProviderId,
-) => options.llm[providerId].enabled !== false;
-
-export const normalizeBaseUrl = (value: string | undefined) => {
-  const trimmed = normalizeOptionalText(value);
-  if (!trimmed) return "";
-  return trimmed.replace(/\/+$/, "");
-};
-
-const resolveBackendKind = (
+  providerId: string,
+) => !!options.llm[providerId] && options.llm[providerId].enabled !== false;
+export const getAiConnectionConfig = (
   options: AppOptions,
-  providerId: AiSdkProviderId,
-  spec = getAiProviderSpec(providerId),
-) => {
-  const selectedApiOption = getAiProviderSelectedApiOption(
-    providerId,
-    options.llm[providerId].apiOptionId,
-  );
-  if (selectedApiOption) {
-    return selectedApiOption.backendKind;
-  }
-
-  return spec.backendKind;
-};
-
-const getProviderConfig = (
-  options: AppOptions,
-  providerId: AiSdkProviderId,
+  connectionId: string,
 ): AiSdkProviderConfig | null => {
-  const spec = getAiProviderSpec(providerId);
-  if (!isAiSdkProviderEnabled(options, providerId)) return null;
-  const apiKey = normalizeOptionalText(options.llm[providerId].apiKey);
-  if (!apiKey) return null;
-
-  const selectedApiOption = getAiProviderSelectedApiOption(
-    providerId,
-    options.llm[providerId].apiOptionId,
-  );
-  const configuredBaseUrl = normalizeBaseUrl(options.llm[providerId].apiUrl);
-  const baseURL =
-    configuredBaseUrl ||
-    normalizeBaseUrl(selectedApiOption?.defaultBaseUrl || spec.defaultBaseUrl);
-  if (!baseURL && spec.allowCustomBaseUrl && !spec.defaultBaseUrl) {
-    return null;
-  }
-
+  const saved = options.llm[connectionId];
+  if (!saved) return null;
+  const value = normalizeAiConnection(connectionId, saved);
+  const authMode = getAiConnectionAuthMode(value);
   return {
-    providerId,
-    label: spec.label,
-    backendKind: resolveBackendKind(options, providerId, spec),
-    apiOptionId: selectedApiOption?.id,
-    apiKey,
-    baseURL: baseURL || undefined,
+    providerId: connectionId,
+    catalogId: value.catalogId || "",
+    runtimeProviderId: runtimeProviderId(
+      value.catalogId || value.backendKind || "openai-compatible",
+    ),
+    label: getAiConnectionLabel(options.llm, connectionId),
+    backendKind: value.backendKind!,
+    apiOptionId: value.apiOptionId,
+    authMode,
+    apiKey: authMode === "none" ? "" : normalizeOptionalText(value.apiKey),
+    baseURL: normalizeBaseUrl(value.apiUrl) || undefined,
   };
 };
-
-export const getConfiguredAiSdkProviders = (options: AppOptions) =>
-  AI_PROVIDER_SPECS.map((spec) => getProviderConfig(options, spec.id)).filter(
-    Boolean,
-  ) as AiSdkProviderConfig[];
-
 export const getConfiguredAiSdkProvider = (
   options: AppOptions,
   providerId: AiSdkProviderId,
-) =>
-  getConfiguredAiSdkProviders(options).find(
-    (provider) => provider.providerId === providerId,
-  ) || null;
-
+): AiSdkProviderConfig | null => {
+  const config = getAiConnectionConfig(options, providerId);
+  if (
+    !config ||
+    !isAiSdkProviderEnabled(options, providerId) ||
+    !isValidBaseUrl(config.baseURL)
+  )
+    return null;
+  // A compatible local endpoint may intentionally have no API key.
+  if (!config.apiKey && config.authMode !== "none") return null;
+  return config;
+};
+export const getConfiguredAiSdkProviders = (options: AppOptions) =>
+  Object.keys(options.llm).flatMap((id) => {
+    const config = getConfiguredAiSdkProvider(options, id);
+    return config ? [config] : [];
+  });
 export const isAiSdkProviderConfigured = (
   options: AppOptions,
-  providerId: AiSdkProviderId,
+  providerId: string,
 ) => getConfiguredAiSdkProvider(options, providerId) !== null;

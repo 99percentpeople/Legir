@@ -1,255 +1,214 @@
-import type { LLMModelOption } from "@/services/ai/types";
-import {
-  createCustomModelCapabilities,
-  modelSupportsInputModality,
-} from "@/services/ai/providers/capabilities";
-import {
-  createAiDiscoveredModel,
-  getCuratedAiProviderModels,
-} from "@/services/ai/providers/models";
-import {
-  mergeModelCapabilitiesWithMetadata,
-  resolveAiProviderModelMetadata,
-} from "@/services/ai/providers/metadata";
-import {
-  getAiProviderSpec,
-  type AiProviderId,
-} from "@/services/ai/providers/catalog";
-import {
-  getConfiguredAiSdkProvider,
-  normalizeBaseUrl,
-} from "@/services/ai/providers/settings";
+import { isTextGenerationModelId } from "../catalog";
+import type { AppOptions, LLMModelCapabilities } from "@/types";
+import { createAiDiscoveredModel, getCatalogModels } from "../models";
+import { resolveAiProviderModelMetadata } from "../metadata";
+import { getAiConnectionConfig, getConfiguredAiSdkProvider } from "../settings";
+import { initializeModelsDev } from "../modelsDev";
 import { fetchWithApiProxy } from "@/services/platform/apiProxy";
-import { joinUrl } from "@/services/ai/providers/modelCatalog/shared";
 import type {
-  AiSdkModelCallOptions,
   AiSdkDiscoveredModel,
   AiSdkModelCatalogProvider,
-  AiSdkModelCatalogProviderCallOptionsRequest,
   AiSdkModelCatalogProviderRequest,
   AiSdkModelCatalogProviderTaskRequest,
   AiSdkProviderConfig,
-} from "@/services/ai/providers/types";
-import type { LLMModelCapabilities } from "@/types";
+} from "../types";
 
-const readErrorText = async (response: Response) => {
-  const text = await response.text().catch(() => "");
-  return text || response.statusText || "Request failed.";
+export const MODEL_CACHE_TTL_MS = 60 * 60 * 1000;
+export const getConnectionCacheKey = (options: AppOptions, id: string) => {
+  // This identifier is only for invalidation, never authentication. Do not retain key plaintext in caches.
+  const config = getAiConnectionConfig(options, id);
+  const text = JSON.stringify([
+    config && { ...config, label: undefined },
+    options.apiProxy,
+  ]);
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index++)
+    hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
+  return (hash >>> 0).toString(16);
 };
-
-type OpenAiCompatibleModelsResponse = {
-  data?: Array<{ id?: string }>;
-};
-
-const OPENAI_COMPATIBLE_MODEL_FALLBACK_STATUSES = new Set([404, 405]);
-
-const normalizeModelOptions = (
-  providerId: AiProviderId,
-  models: AiSdkDiscoveredModel[],
-): LLMModelOption[] => {
-  const seen = new Set<string>();
-
-  return models
-    .map((model, index) => {
-      const discoveredModel = createAiDiscoveredModel({
-        modelId: model.id,
-        label: model.label,
-        rank: model.rank,
-        capabilities: model.capabilities,
-        inputModalities: model.inputModalities,
-        outputModalities: model.outputModalities,
-        supportsToolCalls: model.supportsToolCalls,
-        supportsImageToolResults: model.supportsImageToolResults,
-        contextWindowTokens: model.contextWindowTokens,
-      });
-      const metadata = resolveAiProviderModelMetadata(
-        providerId,
-        discoveredModel.id,
-      );
-      return {
-        id: discoveredModel.id,
-        label:
-          (discoveredModel.label || discoveredModel.id).trim() ||
-          discoveredModel.id,
-        rank: Math.max(discoveredModel.rank ?? 0, metadata.rank),
-        capabilities: mergeModelCapabilitiesWithMetadata(
-          providerId,
-          discoveredModel.id,
-          discoveredModel.capabilities,
-        ),
-        order: index,
-      };
-    })
-    .filter((model) => !!model.id)
-    .filter((model) => {
-      if (seen.has(model.id)) return false;
-      seen.add(model.id);
-      return true;
-    })
-    .sort((left, right) => right.rank - left.rank || left.order - right.order)
-    .map(({ order: _order, ...model }) => model);
-};
-
 export const modelMatchesTaskKind = (
   capabilities: LLMModelCapabilities,
   kind: AiSdkModelCatalogProviderTaskRequest["kind"],
-) => {
-  if (kind === "vision") {
-    return capabilities.supportsImageInput;
+) =>
+  kind === "vision"
+    ? capabilities.supportsImageInput
+    : kind === "chat"
+      ? capabilities.supportsToolCalls
+      : capabilities.inputModalities.includes("text");
+
+export class ConnectionModelCatalogProvider implements AiSdkModelCatalogProvider {
+  constructor(readonly providerId: string) {}
+
+  private normalize(
+    models: AiSdkDiscoveredModel[],
+    config: AiSdkProviderConfig,
+  ) {
+    const seen = new Set<string>();
+    return models.flatMap((model) => {
+      if (!model.id || seen.has(model.id)) return [];
+      seen.add(model.id);
+      const metadata = resolveAiProviderModelMetadata(
+        config.catalogId || "",
+        model.id,
+      );
+      return [
+        createAiDiscoveredModel({
+          modelId: model.id,
+          label: model.label,
+          rank: model.rank,
+          // Explicit endpoint facts win; catalog facts fill fields absent from the endpoint.
+          inputModalities:
+            model.inputModalities ?? metadata.capabilities?.inputModalities,
+          outputModalities:
+            model.outputModalities ?? metadata.capabilities?.outputModalities,
+          supportsToolCalls:
+            model.supportsToolCalls ?? metadata.capabilities?.supportsToolCalls,
+          supportsImageToolResults:
+            model.supportsImageToolResults ??
+            metadata.capabilities?.supportsImageToolResults,
+          contextWindowTokens:
+            model.contextWindowTokens ?? metadata.contextWindowTokens,
+          capabilities: model.capabilities,
+        }),
+      ];
+    });
   }
-
-  if (kind === "chat") {
-    return capabilities.supportsToolCalls;
-  }
-
-  return modelSupportsInputModality(capabilities, "text");
-};
-
-export abstract class BaseAiSdkModelCatalogProvider implements AiSdkModelCatalogProvider {
-  abstract readonly providerId: AiProviderId;
-
-  abstract fetchModels(
-    options: AiSdkModelCatalogProviderRequest,
-  ): Promise<LLMModelOption[]>;
 
   getModelsForTask(options: AiSdkModelCatalogProviderTaskRequest) {
-    return this.normalizeDiscoveredModels([
-      ...this.getCuratedModels(options.appOptions),
-      ...this.getCachedAndCustomModels(options),
-    ]).filter((model) =>
+    const config = getConfiguredAiSdkProvider(
+      options.appOptions,
+      this.providerId,
+    );
+    if (!config) return [];
+    const cached = options.modelCache[this.providerId];
+    const validCache =
+      cached &&
+      (!cached.configurationKey ||
+        cached.configurationKey ===
+          getConnectionCacheKey(options.appOptions, this.providerId));
+    const source =
+      validCache && cached.fetchedAt !== undefined
+        ? cached.models
+        : cached?.models.length && validCache
+          ? cached.models
+          : getCatalogModels(config.catalogId || "");
+    return this.normalize(source, config).filter((model) =>
       modelMatchesTaskKind(model.capabilities, options.kind),
     );
-  }
-
-  resolveCallOptions(
-    _options: AiSdkModelCatalogProviderCallOptionsRequest,
-  ): AiSdkModelCallOptions | undefined {
-    return undefined;
   }
 
   async checkConfig(options: AiSdkModelCatalogProviderRequest) {
     await this.fetchModels(options);
   }
 
-  protected getProviderSpec() {
-    return getAiProviderSpec(this.providerId);
-  }
-
-  protected getConfiguredProviderConfig(
-    appOptions: AiSdkModelCatalogProviderRequest["appOptions"],
-  ) {
-    return getConfiguredAiSdkProvider(appOptions, this.providerId);
-  }
-
-  protected getRequiredProviderConfig(
-    appOptions: AiSdkModelCatalogProviderRequest["appOptions"],
-  ) {
-    const config = this.getConfiguredProviderConfig(appOptions);
-    if (config) return config;
-
-    throw new Error(`Missing ${this.getProviderSpec().label} API key.`);
-  }
-
-  protected getProviderBaseUrl(config: Pick<AiSdkProviderConfig, "baseURL">) {
-    return normalizeBaseUrl(
-      config.baseURL || this.getProviderSpec().defaultBaseUrl,
+  async fetchModels(options: AiSdkModelCatalogProviderRequest) {
+    await initializeModelsDev();
+    const config = getConfiguredAiSdkProvider(
+      options.appOptions,
+      this.providerId,
     );
-  }
-
-  protected async fetchWithProxy(
-    options: AiSdkModelCatalogProviderRequest,
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ) {
-    return await fetchWithApiProxy(options.appOptions, input, {
-      ...init,
-      signal: init?.signal || options.signal,
-    });
-  }
-
-  protected normalizeDiscoveredModels(models: AiSdkDiscoveredModel[]) {
-    return normalizeModelOptions(this.providerId, models);
-  }
-
-  protected async fetchOpenAiCompatibleModels(options: {
-    request: AiSdkModelCatalogProviderRequest;
-    errorLabel: string;
-    requireCuratedFallback?: boolean;
-  }) {
-    const config = this.getRequiredProviderConfig(options.request.appOptions);
-    const curatedModels = this.getCuratedModels(options.request.appOptions);
-    const response = await this.fetchWithProxy(
-      options.request,
-      joinUrl(this.getProviderBaseUrl(config), "/models"),
-      {
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-      },
-    );
-
-    if (
-      OPENAI_COMPATIBLE_MODEL_FALLBACK_STATUSES.has(response.status) &&
-      (!options.requireCuratedFallback || curatedModels.length > 0)
-    ) {
-      return this.normalizeDiscoveredModels(curatedModels);
-    }
-
-    const json = await this.parseJsonOrThrow<OpenAiCompatibleModelsResponse>({
-      response,
-      errorLabel: options.errorLabel,
-    });
-
-    const discoveredModels = (json.data || []).flatMap((item) =>
-      typeof item.id === "string" ? [{ id: item.id }] : [],
-    );
-
-    return this.normalizeDiscoveredModels(
-      discoveredModels.length > 0
-        ? [...curatedModels, ...discoveredModels]
-        : curatedModels,
-    );
-  }
-
-  protected getCuratedModels(
-    appOptions: AiSdkModelCatalogProviderRequest["appOptions"],
-  ) {
-    const config = this.getConfiguredProviderConfig(appOptions);
-    if (!config) return [];
-
-    return getCuratedAiProviderModels({
-      providerId: this.providerId,
-      apiOptionId: config.apiOptionId,
-      baseURL: this.getProviderBaseUrl(config),
-    });
-  }
-
-  protected getCachedAndCustomModels(
-    options: AiSdkModelCatalogProviderTaskRequest,
-  ) {
-    const fetchedModels = options.modelCache[this.providerId]?.models ?? [];
-    const customModels = options.appOptions.llm[
-      this.providerId
-    ].customModels.map((model) => ({
-      id: model.id,
-      label: model.id,
-      capabilities: createCustomModelCapabilities(model.capabilities),
-    }));
-
-    return [...fetchedModels, ...customModels];
-  }
-
-  protected async parseJsonOrThrow<T>(options: {
-    response: Response;
-    errorLabel: string;
-  }): Promise<T> {
-    if (!options.response.ok) {
-      const errorText = await readErrorText(options.response);
+    if (!config?.baseURL)
       throw new Error(
-        `${options.errorLabel} (${options.response.status}): ${errorText}`,
+        "AI connection requires an enabled configuration, URL and credentials.",
       );
+    const models: AiSdkDiscoveredModel[] = [];
+    const headers: Record<string, string> = {};
+    const anthropic =
+      config.backendKind === "anthropic" ||
+      config.backendKind === "anthropic-compatible";
+    const google = config.backendKind === "google";
+    if (anthropic) {
+      headers[config.authMode === "bearer" ? "Authorization" : "x-api-key"] =
+        config.authMode === "bearer"
+          ? `Bearer ${config.apiKey}`
+          : config.apiKey;
+      headers["anthropic-version"] = "2023-06-01";
+      headers["anthropic-dangerous-direct-browser-access"] = "true";
+    } else if (google) {
+      headers["x-goog-api-key"] = config.apiKey;
+    } else if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
+    if (config.authMode === "none") {
+      delete headers.Authorization;
+      delete headers["x-api-key"];
+      delete headers["x-goog-api-key"];
     }
-
-    return (await options.response.json()) as T;
+    let cursor = "";
+    const cursors = new Set<string>();
+    do {
+      const url = new URL(
+        `${config.baseURL}/${config.backendKind === "xai" ? "language-models" : "models"}`,
+      );
+      if (anthropic) {
+        url.searchParams.set("limit", "1000");
+        if (cursor) url.searchParams.set("after_id", cursor);
+      }
+      if (google) {
+        url.searchParams.set("pageSize", "1000");
+        if (cursor) url.searchParams.set("pageToken", cursor);
+      }
+      const response = await fetchWithApiProxy(options.appOptions, url, {
+        headers,
+        signal: options.signal || AbortSignal.timeout(20_000),
+      });
+      if ([404, 405].includes(response.status))
+        return this.normalize(getCatalogModels(config.catalogId || ""), config);
+      if (!response.ok)
+        throw new Error(`Models request failed (${response.status}).`);
+      const json = await response.json();
+      const items =
+        google || config.backendKind === "xai" ? json.models : json.data;
+      if (!Array.isArray(items)) throw new Error("Invalid models response.");
+      for (const item of items) {
+        if (!item || typeof item !== "object") continue;
+        if (
+          google &&
+          Array.isArray(item.supportedGenerationMethods) &&
+          !item.supportedGenerationMethods.includes("generateContent")
+        )
+          continue;
+        const id = google
+          ? typeof item.name === "string"
+            ? item.name.replace(/^models\//, "")
+            : ""
+          : typeof item.id === "string"
+            ? item.id
+            : "";
+        if (!id || !isTextGenerationModelId(id)) continue;
+        const modalities = (value: unknown) =>
+          Array.isArray(value) &&
+          value.every((part) => typeof part === "string")
+            ? (value as string[])
+            : undefined;
+        models.push({
+          id,
+          label: item.display_name || item.displayName || item.name || id,
+          inputModalities: modalities(
+            item.input_modalities || item.architecture?.input_modalities,
+          ),
+          outputModalities: modalities(
+            item.output_modalities || item.architecture?.output_modalities,
+          ),
+          supportsToolCalls: Array.isArray(item.supported_parameters)
+            ? item.supported_parameters.includes("tools")
+            : undefined,
+          contextWindowTokens:
+            typeof item.context_length === "number"
+              ? item.context_length
+              : typeof item.inputTokenLimit === "number"
+                ? item.inputTokenLimit
+                : undefined,
+        });
+      }
+      cursor =
+        google && typeof json.nextPageToken === "string"
+          ? json.nextPageToken
+          : anthropic && json.has_more && typeof json.last_id === "string"
+            ? json.last_id
+            : "";
+      if (cursor && cursors.has(cursor))
+        throw new Error("Repeated models page cursor.");
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    return this.normalize(models, config);
   }
 }

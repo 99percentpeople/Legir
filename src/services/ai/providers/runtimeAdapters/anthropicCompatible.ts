@@ -1,33 +1,15 @@
-import type { AiSdkProviderConfig } from "@/services/ai/providers/types";
-import type {
-  AiReasoningLevel,
-  AiRuntimeAdapter,
-} from "@/services/ai/providers/runtimeAdapters/types";
-import {
-  createNoReasoningResolution,
-  getReasoningBudgetTokensForLevel,
-  selectReasoningLevel,
-} from "@/services/ai/providers/runtimeAdapters/shared";
-import { getAiProviderModelReasoningMetadata } from "@/services/ai/providers/metadata";
+import type { AiRuntimeAdapter } from "./types";
+import { createCatalogReasoningAdapter } from "./catalogReasoning";
 
-const DEFAULT_ANTHROPIC_BUDGET_TOKENS = 4096;
-
-type AnthropicCompatibleAdapterOptions = {
-  authMode?: "api-key" | "bearer";
-};
-
-const toAnthropicAdaptiveEffort = (level: AiReasoningLevel) => {
-  if (level === "low" || level === "medium" || level === "high") return level;
-  if (level === "xhigh") return "xhigh";
-  return undefined;
-};
+type AnthropicCompatibleAdapterOptions = { authMode?: "api-key" | "bearer" };
 
 export const createAnthropicCompatibleAdapter = (
   providerId: AiRuntimeAdapter["providerId"],
   options: AnthropicCompatibleAdapterOptions = {},
 ): AiRuntimeAdapter => ({
   providerId,
-  createSdkProvider: async (config: AiSdkProviderConfig) => {
+  ...createCatalogReasoningAdapter("anthropic"),
+  createSdkProvider: async (config) => {
     const { createAnthropic } = await import("@ai-sdk/anthropic");
     return createAnthropic({
       name: config.providerId,
@@ -38,82 +20,7 @@ export const createAnthropicCompatibleAdapter = (
       fetch: config.fetch,
     });
   },
-
-  getReasoningCapability: ({ providerId, modelId }) =>
-    getAiProviderModelReasoningMetadata(providerId, modelId),
-
-  resolveReasoning: (request) => {
-    const capability = getAiProviderModelReasoningMetadata(
-      request.providerId,
-      request.modelId,
-    );
-    if (!capability.supported) {
-      return createNoReasoningResolution({
-        preference: request.preference,
-        capability,
-      });
-    }
-
-    const level = selectReasoningLevel(capability, request.preference.level);
-    if (level === "none") {
-      return createNoReasoningResolution({
-        preference: request.preference,
-        capability,
-      });
-    }
-
-    if (capability.providerMode === "anthropic-adaptive") {
-      const effort = toAnthropicAdaptiveEffort(level);
-      return {
-        capability,
-        effectivePreference: {
-          ...request.preference,
-          level,
-        },
-        callOptions: {
-          providerOptions: {
-            [request.providerId]: {
-              thinking: {
-                type: "adaptive",
-                display:
-                  request.preference.displayPolicy === "hidden"
-                    ? "omitted"
-                    : "summarized",
-              },
-              ...(effort ? { effort } : {}),
-              sendReasoning: true,
-            },
-          },
-        },
-        replayPolicy: "all",
-      };
-    }
-
-    const budgetTokens =
-      getReasoningBudgetTokensForLevel(capability, level) ??
-      DEFAULT_ANTHROPIC_BUDGET_TOKENS;
-    return {
-      capability,
-      effectivePreference: {
-        ...request.preference,
-        level,
-      },
-      callOptions: {
-        providerOptions: {
-          [request.providerId]: {
-            thinking: {
-              type: "enabled",
-              budgetTokens,
-            },
-            sendReasoning: true,
-          },
-        },
-      },
-      replayPolicy: "all",
-    };
-  },
 });
-
 export const anthropicCompatibleAdapter = createAnthropicCompatibleAdapter(
   "anthropic-compatible",
 );

@@ -7,7 +7,6 @@ import { createApiProxyFetch } from "@/services/platform/apiProxy";
 import type { AppOptions } from "@/types";
 
 export {
-  AI_PROVIDER_LABELS,
   getConfiguredAiSdkProvider,
   getConfiguredAiSdkProviders,
   isAiSdkProviderConfigured,

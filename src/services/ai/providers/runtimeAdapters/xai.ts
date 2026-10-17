@@ -1,7 +1,9 @@
-import { createBasicRuntimeAdapter } from "@/services/ai/providers/runtimeAdapters/shared";
+import type { AiRuntimeAdapter } from "./types";
+import { createCatalogReasoningAdapter } from "./catalogReasoning";
 
-export const xaiAdapter = createBasicRuntimeAdapter({
+export const xaiAdapter: AiRuntimeAdapter = {
   providerId: "xai",
+  ...createCatalogReasoningAdapter("xai"),
   createSdkProvider: async (config) => {
     const { createXai } = await import("@ai-sdk/xai");
     return createXai({
@@ -10,4 +12,4 @@ export const xaiAdapter = createBasicRuntimeAdapter({
       fetch: config.fetch,
     });
   },
-});
+};

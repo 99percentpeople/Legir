@@ -1,6 +1,9 @@
 import * as React from "react";
 
-import type { AiProviderId } from "@/services/ai/providers/catalog";
+import {
+  runtimeProviderId,
+  type AiProviderId,
+} from "@/services/ai/providers/catalog";
 import { cn } from "@/utils/cn";
 import { preload, type PreloadableLazyComponent } from "@/utils/preload";
 
@@ -69,8 +72,21 @@ export function ProviderLogo(props: {
   title?: string;
 }) {
   const { providerId, className, size = 14, title } = props;
-  const Icon = providerLogos[providerId];
+  const Icon =
+    providerLogos[runtimeProviderId(providerId) as keyof typeof providerLogos];
   const iconClassName = cn("shrink-0", className);
+
+  if (!Icon)
+    return (
+      <span
+        aria-hidden
+        className={cn(
+          "inline-block rounded-sm bg-current opacity-30",
+          className,
+        )}
+        style={{ width: size, height: size }}
+      />
+    );
 
   return (
     <React.Suspense

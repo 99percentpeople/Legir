@@ -1,14 +1,16 @@
-import { createBasicRuntimeAdapter } from "@/services/ai/providers/runtimeAdapters/shared";
+import type { AiRuntimeAdapter } from "./types";
+import { createCatalogReasoningAdapter } from "./catalogReasoning";
 
-export const openRouterAdapter = createBasicRuntimeAdapter({
+export const openRouterAdapter: AiRuntimeAdapter = {
   providerId: "openrouter",
+  ...createCatalogReasoningAdapter("openrouter"),
   createSdkProvider: async (config) => {
     const { createOpenRouter } = await import("@openrouter/ai-sdk-provider");
     return createOpenRouter({
-      apiKey: config.apiKey,
       compatibility: "strict",
+      apiKey: config.apiKey,
       ...(config.baseURL ? { baseURL: config.baseURL } : {}),
       fetch: config.fetch,
     });
   },
-});
+};

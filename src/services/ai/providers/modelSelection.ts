@@ -1,9 +1,6 @@
-import {
-  AI_PROVIDER_SPECS_SORTED_BY_LABEL,
-  type AiProviderId,
-} from "@/services/ai/providers/catalog";
+import type { AiProviderId } from "./catalog";
+import { getConfiguredAiSdkProviders } from "./settings";
 import { getAiSdkModelCatalogProvider } from "@/services/ai/providers/modelCatalogRegistry";
-import { isAiSdkProviderConfigured } from "@/services/ai/providers/settings";
 import type {
   AiSdkProviderId,
   AiSdkTaskModelKind,
@@ -75,18 +72,18 @@ export const getAiSdkModelGroups = (options: {
   modelCache: AiSdkModelCache;
   kind: AiSdkTaskModelKind;
 }) =>
-  AI_PROVIDER_SPECS_SORTED_BY_LABEL.map(
-    (spec): AiSdkModelGroup => ({
-      providerId: spec.id,
-      label: spec.label,
-      labelKey: spec.labelKey,
-      isAvailable: isAiSdkProviderConfigured(options.appOptions, spec.id),
-      unavailableMessageKey: spec.unavailableMessageKey,
-      models: getAiSdkProviderModelOptions({
-        appOptions: options.appOptions,
-        modelCache: options.modelCache,
-        providerId: spec.id,
-        kind: options.kind,
+  getConfiguredAiSdkProviders(options.appOptions)
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .map(
+      (config): AiSdkModelGroup => ({
+        providerId: config.providerId,
+        label: config.label,
+        isAvailable: true,
+        unavailableMessageKey: "properties.form_detection.api_key_missing",
+        models: getAiSdkProviderModelOptions({
+          ...options,
+          providerId: config.providerId,
+        }),
       }),
-    }),
-  );
+    )
+    .filter((group) => group.models.length > 0);

@@ -1,1 +1,2 @@
 packages/pdfium/wasm/**
+src/services/ai/providers/models-dev.snapshot.json

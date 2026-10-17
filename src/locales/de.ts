@@ -454,6 +454,7 @@ const de = {
       medium: "Mittel",
       high: "Hoch",
       xhigh: "Sehr hoch",
+      max: "Maximum",
     },
     token_usage_context: "Kontext",
     token_usage_input: "Eingabe",
@@ -700,9 +701,28 @@ const de = {
     centers: "An Mitten einrasten",
     equal: "Äquidistantes Einrasten",
     llm: {
+      add_connection: "Anbieter hinzufügen",
+      refresh_catalog: "Katalog aktualisieren",
+      catalog_offline:
+        "Aktualisierung nicht verfügbar. Der gespeicherte Modellkatalog wird verwendet.",
+      choose_provider: "Anbieter auswählen",
+      search_providers: "Anbieter suchen",
+      custom_connection: "Benutzerdefinierte Verbindung",
+      no_providers: "Keine passenden Anbieter.",
+      connections_empty:
+        "Fügen Sie eine Verbindung hinzu, um KI-Modelle zu nutzen.",
+      connection: "Verbindung",
+      connection_name: "Verbindungsname",
+      remove_connection: "Verbindung entfernen",
+      authentication: "Authentifizierung",
+      default_authentication: "Standardauthentifizierung",
+      saved_authentication: "Gespeicherte Authentifizierung: {method}",
+      restore_default_authentication: "Standardauthentifizierung verwenden",
+      no_authentication: "Keine Authentifizierung",
       title: "LLM",
       api_key_placeholder: "API-Schlüssel",
-      api_url_placeholder: "API-URL (optional)",
+      api_url_placeholder: "API-URL",
+      api_url_required: "API-URL ist erforderlich.",
       provider_enabled: "Diesen Anbieter aktivieren",
       provider_enable_required: "Aktivieren Sie zuerst diesen Anbieter.",
       api_key_required: "API-Schlüssel ist erforderlich.",
@@ -712,16 +732,6 @@ const de = {
       fetched_models: "Abgerufene Modelle",
       fetched_models_empty: "Noch keine Modelle abgerufen.",
       models_loaded_count: "Geladen: {count} Modell(e)",
-      custom_models: "Benutzerdefinierte Modelle",
-      custom_models_desc:
-        "Modellnamen eingeben, Fähigkeitsprofil auswählen und hinzufügen.",
-      custom_models_empty: "Noch keine benutzerdefinierten Modelle.",
-      custom_model_name_placeholder: "Modellnamen eingeben",
-      custom_model_capability: "Fähigkeit",
-      custom_model_capability_text: "Text",
-      custom_model_capability_image: "Bild",
-      custom_model_capability_tools: "Tools",
-      custom_model_add: "Hinzufügen",
       proxy_title: "API Proxy",
       proxy_desc:
         "Applies to all configured API requests, including model sync, chat, and translation APIs.",
@@ -736,6 +746,10 @@ const de = {
       proxy_url_desc:
         "If the URL contains {url}, the target API URL will be substituted there. Otherwise the app appends ?url=<target> automatically.",
       api_option: "API Compatibility",
+      api_option_unlisted:
+        "Das gespeicherte Format ist im Katalog dieses Anbieters nicht aufgeführt.",
+      api_option_default_endpoint:
+        "Die Auswahl des Katalogformats stellt auch dessen Standard-API-URL wieder her.",
     },
     ai_chat: {
       context_pruning_enabled: "Kontextkomprimierung aktivieren",
