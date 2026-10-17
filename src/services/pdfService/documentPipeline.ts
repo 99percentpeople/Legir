@@ -48,6 +48,7 @@ import {
 } from "./lib/appearanceRotation";
 import { extractStampImageDataFromAppearance } from "./lib/stampAppearance";
 import { extractStampSvgDataFromAppearance } from "./lib/stampVector";
+import { getFreeTextAppearanceRotation } from "./lib/freeTextAppearance";
 import { createRenderedPageImageCropper } from "./lib/renderedImageCrop";
 import { applyTextRedactionsUnderFlattenedFreetext } from "./lib/textRedaction";
 import { getAppHighlightedText } from "./lib/annotationMetadata";
@@ -108,7 +109,10 @@ import {
   getOrderedExportControlsByPage,
   reorderExportedPageAnnotations,
 } from "./lib/annotation-layer-order";
-import { getControlRotationFromWidgetRotation } from "@/lib/controlRotation";
+import {
+  getControlRotationFromWidgetRotation,
+  normalizeRotationDeg,
+} from "@/lib/controlRotation";
 import {
   IAnnotationParser,
   IControlParser,
@@ -1422,6 +1426,31 @@ const buildPdfLibAnnotsByPageIndex = async (
         }
       }
 
+      if (subtypeName === "FreeText" && appearance.stream) {
+        try {
+          const textRotation = await getFreeTextAppearanceRotation(
+            appearance.stream,
+            readStreamText,
+            rectOrReplyFallback,
+          );
+          if (textRotation !== undefined) {
+            // Match the native AP, including when /Rotate uses the opposite
+            // sign. The parser applies page rotation and PDF-to-CSS conversion.
+            // Keep the exact editing angle if the serialized AP differs only
+            // by rounded matrix coefficients (e.g. cos(30deg) = 0.866025).
+            if (
+              rotation === undefined ||
+              Math.abs(normalizeRotationDeg(rotation - textRotation)) > 1e-3
+            ) {
+              rotation = textRotation;
+            }
+            appearanceRotation = textRotation;
+          }
+        } catch {
+          // Unreadable/unsupported appearances retain the metadata fallback.
+        }
+      }
+
       const base: PdfJsAnnotation = {
         subtype: subtypeName,
         rect: rectOrReplyFallback,
@@ -1503,36 +1532,11 @@ const buildPdfLibAnnotsByPageIndex = async (
         const q = annot.lookup(PDFName.of("Q"));
         const textAlignment = q instanceof PDFNumber ? q.asNumber() : undefined;
 
-        const rotation = (() => {
-          let r: number | undefined = undefined;
-          try {
-            const rotateObj = annot.lookup(PDFName.of("Rotate"));
-            if (rotateObj instanceof PDFNumber) r = rotateObj.asNumber();
-          } catch {
-            // ignore
-          }
-
-          if (typeof r !== "number") {
-            try {
-              const mk = annot.lookup(PDFName.of("MK"));
-              if (mk instanceof PDFDict) {
-                const mkR = mk.lookup(PDFName.of("R"));
-                if (mkR instanceof PDFNumber) r = mkR.asNumber();
-              }
-            } catch {
-              // ignore
-            }
-          }
-
-          if (typeof r !== "number" || !Number.isFinite(r)) return undefined;
-          return r;
-        })();
         pushForPage({
           ...base,
           defaultAppearance: da,
           DA: da,
           textAlignment,
-          rotation,
         });
         continue;
       }

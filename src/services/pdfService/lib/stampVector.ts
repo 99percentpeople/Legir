@@ -12,6 +12,7 @@ import {
   type PdfTransformMatrix,
 } from "./appearanceRotation";
 import { decodePdfStreamToText } from "./pdf-import-utils";
+import { tokenizePdfContent } from "./pdfContentTokens";
 
 const MAX_FORM_DEPTH = 8;
 
@@ -112,112 +113,6 @@ const cmykToHex = (c: number, m: number, y: number, k: number) => {
 
 const encodeSvgDataUrl = (svg: string) =>
   `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-
-const isWhitespace = (char: string) => /\s/.test(char);
-
-const isDelimiter = (char: string) =>
-  ["(", ")", "<", ">", "[", "]", "{", "}", "/", "%"].includes(char);
-
-const tokenizePdfContent = (content: string) => {
-  const tokens: string[] = [];
-  let index = 0;
-
-  while (index < content.length) {
-    const char = content[index];
-    if (!char) break;
-
-    if (isWhitespace(char)) {
-      index += 1;
-      continue;
-    }
-
-    if (char === "%") {
-      while (index < content.length && content[index] !== "\n") index += 1;
-      continue;
-    }
-
-    if (char === "[") {
-      tokens.push("[");
-      index += 1;
-      continue;
-    }
-
-    if (char === "]") {
-      tokens.push("]");
-      index += 1;
-      continue;
-    }
-
-    if (char === "/") {
-      let nextIndex = index + 1;
-      while (
-        nextIndex < content.length &&
-        !isWhitespace(content[nextIndex] || "") &&
-        !isDelimiter(content[nextIndex] || "")
-      ) {
-        nextIndex += 1;
-      }
-      tokens.push(content.slice(index, nextIndex));
-      index = nextIndex;
-      continue;
-    }
-
-    if (char === "(") {
-      let depth = 1;
-      let nextIndex = index + 1;
-      let token = "";
-      while (nextIndex < content.length && depth > 0) {
-        const nextChar = content[nextIndex];
-        if (nextChar === "\\") {
-          token += nextChar;
-          nextIndex += 1;
-          if (nextIndex < content.length) {
-            token += content[nextIndex];
-            nextIndex += 1;
-          }
-          continue;
-        }
-        if (nextChar === "(") depth += 1;
-        if (nextChar === ")") {
-          depth -= 1;
-          if (depth === 0) {
-            nextIndex += 1;
-            break;
-          }
-        }
-        token += nextChar;
-        nextIndex += 1;
-      }
-      tokens.push(`(${token})`);
-      index = nextIndex;
-      continue;
-    }
-
-    if (char === "<" && content[index + 1] !== "<") {
-      let nextIndex = index + 1;
-      while (nextIndex < content.length && content[nextIndex] !== ">") {
-        nextIndex += 1;
-      }
-      if (nextIndex < content.length) nextIndex += 1;
-      tokens.push(content.slice(index, nextIndex));
-      index = nextIndex;
-      continue;
-    }
-
-    let nextIndex = index + 1;
-    while (
-      nextIndex < content.length &&
-      !isWhitespace(content[nextIndex] || "") &&
-      !isDelimiter(content[nextIndex] || "")
-    ) {
-      nextIndex += 1;
-    }
-    tokens.push(content.slice(index, nextIndex));
-    index = nextIndex;
-  }
-
-  return tokens;
-};
 
 const decodeLiteralString = (token: string) => {
   let text = "";
