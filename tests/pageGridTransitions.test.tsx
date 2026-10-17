@@ -166,6 +166,70 @@ it("removes immediately while an inert copy preserves the decoded thumbnail", as
   expect(host.querySelector("[data-page-exits]")).toBeNull();
 });
 
+it.each([
+  { state: "decoded", complete: true, width: 24, context: true },
+  { state: "loading", complete: false, width: 0, context: true },
+  { state: "broken", complete: true, width: 0, context: true },
+  {
+    state: "without a canvas context",
+    complete: true,
+    width: 24,
+    context: false,
+  },
+])(
+  "does not request a released $state thumbnail during removal",
+  async (imageState) => {
+    await render({ ids: initial });
+    const source = content("b").querySelector("img")!;
+    source.src = "blob:released-thumbnail";
+    source.className = "thumbnail";
+    source.style.cssText =
+      "width: 80px; height: 60px; transform: rotate(90deg)";
+    Object.defineProperties(source, {
+      complete: { value: imageState.complete },
+      naturalWidth: { value: imageState.width },
+      naturalHeight: { value: imageState.width ? 32 : 0 },
+    });
+    const drawImage = vi.fn();
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(
+      imageState.context
+        ? ({ drawImage } as unknown as CanvasRenderingContext2D)
+        : null,
+    );
+    // Browsers start an image request even for a detached clone that is replaced
+    // immediately. Observe sources copied by cloneNode, not just the final DOM.
+    const requestedImages: string[] = [];
+    const cloneNode = Node.prototype.cloneNode;
+    vi.spyOn(Node.prototype, "cloneNode").mockImplementation(function (
+      this: Node,
+      deep = false,
+    ) {
+      if (this instanceof HTMLImageElement) requestedImages.push(this.src);
+      if (deep && this instanceof Element)
+        requestedImages.push(
+          ...[...this.querySelectorAll("img")].map((i) => i.src),
+        );
+      return cloneNode.call(this, deep);
+    });
+
+    await render({ ids: ["a", "c"] });
+    expect(requestedImages).toEqual([]);
+    const layer = host.querySelector<HTMLElement>("[data-page-exits]")!;
+    expect(layer.querySelector("img")).toBeNull();
+    const canvas = layer.querySelector("canvas")!;
+    expect(canvas.className).toBe(source.className);
+    expect(canvas.style.cssText).toBe(source.style.cssText);
+    if (imageState.complete && imageState.width && imageState.context) {
+      expect([canvas.width, canvas.height]).toEqual([24, 32]);
+      expect(drawImage).toHaveBeenCalledExactlyOnceWith(source, 0, 0);
+    } else {
+      expect(drawImage).not.toHaveBeenCalled();
+    }
+    await act(() => kind("exit")[0].finish());
+    expect(host.querySelector("[data-page-exits]")).toBeNull();
+  },
+);
+
 it("cancels a stale exit when undo restores the page during its animation", async () => {
   await render({ ids: initial });
   await render({ ids: ["a", "c"] });

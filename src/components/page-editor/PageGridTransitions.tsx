@@ -34,24 +34,28 @@ function resized(before: PageGridLayout, after: PageGridLayout) {
   );
 }
 
-function cloneContent(element: HTMLElement) {
-  const clone = element.cloneNode(true) as HTMLElement;
+function clonePreviewNode(source: Node): Node {
   // Deleted pages can release their blob URLs before React commits. Preserve
-  // the already decoded pixels without retaining a PDF or requesting a render.
-  const images = element.querySelectorAll("img");
-  clone.querySelectorAll("img").forEach((image, index) => {
-    const source = images[index];
-    if (!source.complete || !source.naturalWidth) return;
+  // decoded pixels directly: even a detached img clone requests its URL before
+  // it can be replaced. Undecoded images remain blank without retrying the URL.
+  if (source instanceof HTMLImageElement) {
     const canvas = document.createElement("canvas");
-    canvas.width = source.naturalWidth;
-    canvas.height = source.naturalHeight;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.drawImage(source, 0, 0);
-    canvas.className = image.className;
-    canvas.style.cssText = image.style.cssText;
-    image.replaceWith(canvas);
-  });
+    canvas.width = source.naturalWidth || source.width;
+    canvas.height = source.naturalHeight || source.height;
+    canvas.className = source.className;
+    canvas.style.cssText = source.style.cssText;
+    if (source.complete && source.naturalWidth && source.naturalHeight)
+      canvas.getContext("2d")?.drawImage(source, 0, 0);
+    return canvas;
+  }
+  const clone = source.cloneNode(false);
+  for (const child of source.childNodes)
+    clone.appendChild(clonePreviewNode(child));
+  return clone;
+}
+
+function cloneContent(element: HTMLElement) {
+  const clone = clonePreviewNode(element) as HTMLElement;
   for (const node of [clone, ...clone.querySelectorAll("*")]) {
     node.removeAttribute("id");
     for (const attribute of [...node.attributes]) {

@@ -62,8 +62,11 @@ It reopens the download with the native SDK (eight pages, three fields), checks 
 visible broken images and, for PDFium, verifies one live worker followed by zero
 after closing the document. Pass `pdfjs` as the optional final argument to test
 the baseline: it records that engine's initial/active/closed worker URLs without
-imposing PDFium's single-owner lifecycle. Retained PDF.js workers and failed
-resource requests must be reported separately from functional UI checks.
+imposing PDFium's single-owner lifecycle. PDFium runs also fail on Blob image
+request errors, including transient exit-animation clones that disappear before
+the broken-image DOM check; intentional `net::ERR_ABORTED` cancellations are
+excluded. Retained PDF.js workers and all failed resource requests remain in the
+results for separate inspection.
 Its fixture and selectors assume the English UI.
 
 ## Real book and engineering drawing corpus

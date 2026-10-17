@@ -271,6 +271,18 @@ try {
   if (engine === "pdfium" && workersAfterClose !== 0)
     throw new Error(`Workers remain after close: ${workersAfterClose}`);
   if (errors.length) throw new Error(errors.join("\n"));
+  // Exit-animation clones can disappear before the broken-image DOM check.
+  // Keep intentional request cancellation separate from failed Blob previews.
+  const failedBlobImages = resourceFailures.filter(
+    ({ url, type, error }) =>
+      url.startsWith("blob:") &&
+      type === "image" &&
+      error !== "net::ERR_ABORTED",
+  );
+  if (engine === "pdfium" && failedBlobImages.length)
+    throw new Error(
+      `Blob preview requests failed: ${JSON.stringify(failedBlobImages)}`,
+    );
   console.log(
     JSON.stringify({
       engine,
