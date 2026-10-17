@@ -28,8 +28,10 @@ The normal production app build is tested separately.
 The retired synthetic runner, MuPDF instrumentation and benchmark-only Canvas
 replay are listed in [ARCHIVE.md](ARCHIVE.md), with replacements and the Git
 snapshot needed to reproduce historical reports. Formal measurements and their
-provenance remain in `docs/performance`. Keep new temporary logs, PDFs, screenshots
-and intermediate runs in `/tmp` or the ignored `.tmp/` directory.
+provenance are available in Git history; see the
+[historical report instructions](ARCHIVE.md#historical-reports). Keep new reports,
+raw measurements, logs, PDFs and screenshots in `/tmp` or the ignored `.tmp/`
+directory. The legacy `docs/performance/` location is also ignored.
 
 ## Synthetic fixtures and production PWA
 
@@ -84,9 +86,9 @@ The manifest has `variants: [{id, build, revision}]` and
 `fixtures: [{id, path, donor, samplePages, importPages?}]`. Paths are absolute; `donor` names
 another fixture, and `samplePages` contains three zero-based page indexes. Select
 pages containing real content, including an interior page and the last page.
-See the recorded manifest in `docs/performance/pdf-engine-real-corpus/` for a
-complete example, sample hashes, sources, and exact versions. Source PDFs remain
-outside the repository.
+Historical manifests, sample hashes, sources and exact versions can be retrieved
+using the [archive instructions](ARCHIVE.md#historical-reports). Save new manifests
+alongside their measurement outputs; source PDFs remain outside the repository.
 
 Optional `importPages` selects zero-based donor pages in the requested order;
 omitting it imports the entire donor. The common entry detects whether the

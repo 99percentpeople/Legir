@@ -84,7 +84,8 @@ PNG 和日志加入仓库。当前正式真实语料没有可填写表单，所�
 移除 7 个重复或已结束实验的手动脚本，统一由 `corpus-entry.ts` /
 `corpus.mjs` 承担性能流程；详细替代关系和历史取回方式见
 [归档索引](../scripts/pdf-benchmark/ARCHIVE.md)。应用与 SDK 的自动回归用例、
-经典/xref-stream PDF 样本、正式测量原始数据、画质和独立导出校验全部保留。
+经典/xref-stream PDF 样本、画质和独立导出校验工具继续保留。历史性能报告和
+测量原始数据已从工作树移除，可按归档索引从 Git 历史取回；新的测量输出不再提交。
 
 具体执行入口与各层职责见 [tests/README.md](../tests/README.md)。最初的检查和
 脚本清理没有修改产品运行时；后续表单外观修复调整应用保存策略，印章旋转修复
@@ -121,7 +122,7 @@ PNG 和日志加入仓库。当前正式真实语料没有可填写表单，所�
 本轮也记录了两项既有异常，未把它们算作无错误通过：
 
 - PWA 有 1 次临时 Blob 图片 `ERR_FILE_NOT_FOUND`，最终可见破图为 0；
-  [修复前 UI 记录](performance/pdfium-native-authoring-20261014/ui.json) 已有同样现象。
+  修复前 UI 记录已有同样现象，现可按[归档索引](../scripts/pdf-benchmark/ARCHIVE.md#historical-reports)从 Git 历史取回。
 - 大图纸取消后重试的输出可读，但 qpdf 报 trailer `/Size` 为 408、最大对象号为
   406 的警告；上轮 `cancel-merged/saved.pdf` 也是同样的页数、对象号和警告。
   表单校验的三个输出及 PWA 的三个输出没有语法警告。预览 URL 生命周期和原生

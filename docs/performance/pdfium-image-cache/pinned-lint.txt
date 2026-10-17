@@ -1,5 +1,0 @@
-$ eslint . && bun run typecheck && bun run typecheck:www
-$ bun run build:pdfium && tsc --noEmit
-$ bun run --cwd packages/pdfium build
-$ node scripts/verify-artifacts.mjs && tsc -p tsconfig.json
-$ tsc --noEmit -p www/tsconfig.json

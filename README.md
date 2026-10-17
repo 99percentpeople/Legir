@@ -52,11 +52,10 @@ and `test` commands validate the assets and build the package's TypeScript API.
 Use `bun run build:native:pdfium` to rebuild the pinned native sources, and
 `bun run test:pdfium` for the standalone library tests.
 
-See the [migration validation and performance comparison](docs/performance/pdfium-migration.md)
-for the initial migration record. Ongoing performance work compares the two active
-branches with the [real-file benchmark](scripts/pdf-benchmark/README.md).
-The latest [native authoring and export audit](docs/performance/pdfium-native-authoring-20261014.json)
-records the completed helper-library replacement and comparison limits. See the
+Ongoing performance work compares the two active branches with the
+[real-file benchmark](scripts/pdf-benchmark/README.md). Historical reports can be
+retrieved using the [archive instructions](scripts/pdf-benchmark/ARCHIVE.md#historical-reports);
+new measurement outputs stay outside version control. See the
 [current architecture review](docs/PDFIUM_REVIEW.md) and [test map](tests/README.md)
 for ownership boundaries, remaining maintenance work and validation commands.
 
