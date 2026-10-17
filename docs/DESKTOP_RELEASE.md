@@ -127,12 +127,12 @@ The Linux ARM64 job uses GitHub's public-repository ARM runner. Private reposito
 - `src-tauri/tauri.conf.json` → `version`
 - `src-tauri/Cargo.toml` → `[package].version`
 
-The native Linux distribution change uses `0.1.1`. After reviewing, committing and pushing the release changes:
+Version `0.1.2` updates desktop packages to the current PDFium-based application, including the bundled engine loader, WASM and licenses. After reviewing, committing and pushing the release changes:
 
 ```bash
-bun run check:desktop v0.1.1
-git tag -a v0.1.1 -m "Legir v0.1.1"
-git push origin v0.1.1
+bun run check:desktop v0.1.2
+git tag -a v0.1.2 -m "Legir v0.1.2"
+git push origin v0.1.2
 ```
 
 For later releases, update all three version fields and run `bun install --lockfile-only` plus `cargo check --manifest-path src-tauri/Cargo.toml` to refresh lockfiles as needed. Commit the version and lockfile changes before tagging.
@@ -187,11 +187,11 @@ All no-install editions still use the application's normal per-user data locatio
 For the native Linux x64 file downloaded into the current directory:
 
 ```bash
-chmod +x ./Legir_0.1.1_linux_x64_portable
-./Legir_0.1.1_linux_x64_portable
+chmod +x ./Legir_0.1.2_linux_x64_portable
+./Legir_0.1.2_linux_x64_portable
 ```
 
-For ARM64 use `Legir_0.1.1_linux_arm64_portable` in both commands. Run as your normal user, not with `sudo`. `ldd ./Legir_0.1.1_linux_x64_portable` can inspect missing libraries on a trusted, checksum-verified download. Refer to `SHA256SUMS.txt` in the same release for file verification.
+For ARM64 use `Legir_0.1.2_linux_arm64_portable` in both commands. Run as your normal user, not with `sudo`. `ldd ./Legir_0.1.2_linux_x64_portable` can inspect missing libraries on a trusted, checksum-verified download. Refer to `SHA256SUMS.txt` in the same release for file verification.
 
 References: [WebView2 requirements](https://v2.tauri.app/distribute/windows-installer/#webview2-installation-options), [Tauri Linux dependencies and baseline](https://v2.tauri.app/distribute/debian/), [macOS application bundles](https://v2.tauri.app/distribute/macos-application-bundle/).
 

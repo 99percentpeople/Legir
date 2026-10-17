@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Legir",
   "mainBinaryName": "Legir",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.-99percent.legir",
   "build": {
     "frontendDist": "../dist",
