@@ -203,7 +203,11 @@ export class PDFPage {
       for (let i = 0; i < count; i++) {
         const code = rt.call("FPDFText_GetUnicode", text, i);
         if (!code) continue;
-        const char = String.fromCodePoint(code);
+        // PDFium replaces a line-end hyphen with U+0002 and omits the
+        // following CR/LF when joining a word. Restore the visible glyph and
+        // physical line boundary so text layers retain the PDF's geometry.
+        const lineEndHyphen = code === 0x02;
+        const char = lineEndHyphen ? "-" : String.fromCodePoint(code);
         if (char === "\r" || char === "\n") {
           line = undefined;
           continue;
@@ -271,6 +275,7 @@ export class PDFPage {
           lines.push(line);
         }
         line.glyphs.push(glyph);
+        if (lineEndHyphen) line = undefined;
       }
       return {
         text: lines

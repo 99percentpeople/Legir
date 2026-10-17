@@ -3315,11 +3315,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
             ANNOTATION_STYLES.highlight.opacity
           }
           textLayerCursor={
-            editorState.tool === "draw_highlight"
-              ? "crosshair"
-              : editorState.tool === "select_text"
-                ? "text"
-                : undefined
+            editorState.tool === "select_text" ? "text" : undefined
           }
           searchResults={
             pdfSearchResultsByPage?.get(page.pageIndex) ??

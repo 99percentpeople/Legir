@@ -41,6 +41,48 @@ const worker = {
 } as unknown as PDFWorkerService;
 
 describe("native PDF pipeline", () => {
+  it.each([0, 90, 180, 270])(
+    "keeps hyphenated line fragments separate in the text layer on a page rotated %i degrees",
+    async (rotation) => {
+      const source = await PDFDocument.create();
+      const p = source.addPage([300, 200]);
+      p.setRotation(degrees(rotation));
+      const font = await source.embedFont(StandardFonts.Helvetica);
+      p.drawText("compre-", { x: 30, y: 140, size: 20, font });
+      p.drawText("hensive", { x: 30, y: 116, size: 20, font });
+      const pdfium = await getPDFium();
+      const doc = new pdfium.PDFDocument(await source.save());
+      const page = doc.loadPage(0);
+      try {
+        const content = getNativeTextContent(pdfium, page, 0);
+        // PDFium's reading order may change with page rotation. Geometry
+        // must still place each fragment on its original physical line.
+        const items = content.items
+          .filter((item) => "str" in item)
+          .sort((a, b) => b.transform[5] - a.transform[5]);
+        expect(items.map((item) => item.str)).toEqual(["compre-", "hensive"]);
+        expect(items.map((item) => item.hasEOL)).toEqual([true, true]);
+        expect(items.map((item) => item.transform.slice(4))).toEqual([
+          [30, 140],
+          [30, 116],
+        ]);
+        const viewport = getNativePageViewport(page, 1.5);
+        const positions = items.map((item) =>
+          viewport.convertToViewportPoint(item.transform[4], item.transform[5]),
+        );
+        expect(
+          Math.hypot(
+            positions[1][0] - positions[0][0],
+            positions[1][1] - positions[0][1],
+          ),
+        ).toBeCloseTo(36);
+      } finally {
+        disposeNativePage(page);
+        doc.destroy();
+      }
+    },
+  );
+
   it("loads, edits and saves forms/annotations without the previous PDF parser or writer", async () => {
     const source = await PDFDocument.create();
     const page = source.addPage([400, 500]);

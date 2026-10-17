@@ -44,6 +44,39 @@ function read(doc: PDFDocument) {
 }
 
 describe("standalone PDFium engine", () => {
+  it("preserves physical lines and visible hyphens when PDFium joins a hyphenated word", () => {
+    const doc = fixture(
+      "BT /F1 20 Tf 30 140 Td (compre-) Tj 0 -24 Td (hensive multi-) Tj 0 -24 Td (line) Tj ET",
+    );
+    try {
+      const text = read(doc);
+      expect(text.text).toBe("compre-\nhensive multi-\nline");
+      expect(
+        text.lines.map((line) =>
+          line.glyphs.map((glyph) => glyph.text).join(""),
+        ),
+      ).toEqual(["compre-", "hensive multi-", "line"]);
+      expect(text.lines.map((line) => line.glyphs[0].origin)).toEqual([
+        [30, 140],
+        [30, 116],
+        [30, 92],
+      ]);
+    } finally {
+      doc.destroy();
+    }
+  });
+
+  it("keeps inline hyphens on the same line", () => {
+    const doc = fixture("BT /F1 20 Tf 30 140 Td (well-known) Tj ET");
+    try {
+      const text = read(doc);
+      expect(text.text).toBe("well-known");
+      expect(text.lines).toHaveLength(1);
+    } finally {
+      doc.destroy();
+    }
+  });
+
   it("preserves borrowed stream bytes when a native allocation grows WASM memory", () => {
     const doc = fixture();
     const runtime = doc.runtime;
