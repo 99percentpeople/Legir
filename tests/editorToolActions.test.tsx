@@ -1,10 +1,8 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  EditorTabActiveContext,
-  EditorTabContext,
-} from "@/app/editorTabs/context";
+import { EditorTabActiveContext } from "@/app/editorTabs/context";
+import { EditorTabProvider } from "@/app/editorTabs/runtimeContext";
 import type { EditorTabRuntime } from "@/app/editorTabs/runtime";
 import { EventBus, type AppEventMap } from "@/lib/eventBus";
 import { useEditorToolActions } from "@/hooks/useEditorToolActions";
@@ -45,13 +43,13 @@ function setup() {
     render: async (defaultTool: Tool = "select", active = true) =>
       act(async () =>
         root.render(
-          <EditorTabContext.Provider value={runtime}>
+          <EditorTabProvider value={runtime}>
             <EditorTabActiveContext.Provider value={active}>
               <EditorViewContext.Provider value={store}>
                 <Probe defaultTool={defaultTool} />
               </EditorViewContext.Provider>
             </EditorTabActiveContext.Provider>
-          </EditorTabContext.Provider>,
+          </EditorTabProvider>,
         ),
       ),
   };

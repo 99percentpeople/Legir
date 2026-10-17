@@ -72,8 +72,8 @@ import { resolvePdfTextRangeGeometry } from "./lib/pdfTextRangeGeometry";
 import {
   useEditorEventBus,
   useEditorElementById,
-  useEditorTabRuntime,
 } from "@/app/editorTabs/context";
+import { useEditorTabRuntime } from "@/app/editorTabs/runtimeContext";
 import { useAppEvent } from "@/hooks/useAppEventBus";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";

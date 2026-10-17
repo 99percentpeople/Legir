@@ -1,21 +1,8 @@
-import type { useAiChatController } from "@/hooks/useAiChatController";
 import type {
   AiChatMessageAttachment,
   AiChatTimelineItem,
   AiChatToolPreviewImage,
 } from "@/services/ai/chat/types";
-
-export type AiChatController = ReturnType<typeof useAiChatController>;
-
-export interface AiChatPanelProps {
-  isFloating: boolean;
-  isOpen: boolean;
-  onOpen: () => void;
-  width: number;
-  onResize: (width: number) => void;
-  onCollapse: () => void;
-  aiChat: AiChatController;
-}
 
 export type TranslateFn = (
   key: string,

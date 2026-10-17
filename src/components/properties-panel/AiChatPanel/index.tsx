@@ -15,11 +15,7 @@ import { ConversationEmptyState } from "./ConversationEmptyState";
 import { ConversationTimeline } from "./ConversationTimeline";
 import { SessionHistoryPopover } from "./SessionHistoryPopover";
 import { useTimelineBottomScroll } from "./useTimelineBottomScroll";
-import type {
-  AiChatPanelProps,
-  InlineEditState,
-  MessageTimelineItem,
-} from "./types";
+import type { InlineEditState, MessageTimelineItem } from "./types";
 import {
   getAttachmentOnlyMessage,
   getMessageAttachmentKey,
@@ -27,7 +23,17 @@ import {
 } from "./utils";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 
-export type { AiChatPanelProps } from "./types";
+import type { useAiChatController } from "@/hooks/useAiChatController";
+
+export interface AiChatPanelProps {
+  isFloating: boolean;
+  isOpen: boolean;
+  onOpen: () => void;
+  width: number;
+  onResize: (width: number) => void;
+  onCollapse: () => void;
+  aiChat: ReturnType<typeof useAiChatController>;
+}
 
 export function AiChatPanel({
   isFloating,

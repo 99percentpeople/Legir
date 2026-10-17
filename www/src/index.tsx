@@ -4,7 +4,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { LanguageProvider } from "@/components/language-provider";
 import { ThemeProvider } from "@/components/theme-provider";
-import { shouldLoadPlatformFontFaces } from "@/services/platform";
+import { shouldLoadPlatformFontFaces } from "@/services/platform/ui";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

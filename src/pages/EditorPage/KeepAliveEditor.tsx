@@ -6,10 +6,8 @@ import {
   useEditorTabsRuntime,
 } from "@/app/editorRuntime";
 import { EditorViewContext } from "@/store/useEditorView";
-import {
-  EditorTabContext,
-  EditorTabActiveContext,
-} from "@/app/editorTabs/context";
+import { EditorTabActiveContext } from "@/app/editorTabs/context";
+import { EditorTabProvider } from "@/app/editorTabs/runtimeContext";
 import EditorPage from "./index";
 
 /** Retain DOM, local React state and transferred canvases until a tab closes.
@@ -55,7 +53,7 @@ export default function KeepAliveEditor() {
               inert={!active}
               aria-hidden={!active}
             >
-              <EditorTabContext.Provider value={runtime}>
+              <EditorTabProvider value={runtime}>
                 <EditorTabActiveContext.Provider value={active}>
                   <EditorViewContext.Provider value={runtime.store}>
                     <EditorRuntimeProvider
@@ -71,7 +69,7 @@ export default function KeepAliveEditor() {
                     </EditorRuntimeProvider>
                   </EditorViewContext.Provider>
                 </EditorTabActiveContext.Provider>
-              </EditorTabContext.Provider>
+              </EditorTabProvider>
             </div>
           );
         })}

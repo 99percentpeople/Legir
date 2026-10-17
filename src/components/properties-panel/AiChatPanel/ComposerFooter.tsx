@@ -19,7 +19,10 @@ import type {
   AiChatMessageAttachment,
   AiChatTokenUsageSummary,
 } from "@/services/ai/chat/types";
-import type { AiReasoningLevel, AiReasoningLevelControl } from "@/services/ai";
+import type {
+  AiReasoningLevel,
+  AiReasoningLevelControl,
+} from "@/services/ai/providers/runtimeAdapters/types";
 import { MessageAttachmentChip } from "./MessagePrimitives";
 import { cn } from "@/utils/cn";
 import { getMessageAttachmentKey } from "./utils";

@@ -9,7 +9,7 @@ import { UNRESTRICTED_PDF_PERMISSIONS } from "@/lib/pdfPermissions";
 import type { WorkspaceEditorState } from "@/types";
 
 const runtime = vi.hoisted(() => ({ active: true, disposed: false }));
-vi.mock("@/app/editorTabs/context", () => ({
+vi.mock("@/app/editorTabs/runtimeContext", () => ({
   useEditorTabRuntime: () => runtime,
 }));
 

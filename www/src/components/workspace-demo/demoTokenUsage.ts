@@ -2,7 +2,7 @@ import type {
   AiChatMessageAttachment,
   AiChatTimelineItem,
 } from "@/services/ai/chat/types";
-import type { AiReasoningLevel } from "@/services/ai";
+import type { AiReasoningLevel } from "@/services/ai/providers/runtimeAdapters/types";
 import type { DemoTokenPlan, DemoTokenStats } from "./types";
 
 // Authored demo allowances, not a provider tokenizer, context limit or bill.

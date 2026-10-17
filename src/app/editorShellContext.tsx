@@ -1,28 +1,16 @@
 import React, { createContext, useContext } from "react";
 
-import type { EditorState, PDFSearchResult, PenStyle, Tool } from "@/types";
+import type { PDFSearchResult } from "@/types";
+import type { FloatingToolbarCommands } from "@/components/toolbar/types";
 import type { PDFSearchMode } from "@/lib/pdfSearch";
 
-export interface EditorShellCommands {
-  changeTool: (tool: Tool) => void;
-  exitTool: () => void;
+export interface EditorShellCommands extends FloatingToolbarCommands {
   zoomIn: () => void;
   zoomOut: () => void;
   fitWidth: () => void;
   fitScreen: () => void;
   toggleFullscreen: () => void;
   exitEditor: () => void;
-  changeMode: (mode: EditorState["mode"]) => void;
-  changePenStyle: (style: Partial<PenStyle>) => void;
-  changeHighlightStyle: (style: Partial<PenStyle>) => void;
-  changeCommentStyle: (style: { color: string }) => void;
-  changeFreetextStyle: (style: { color: string }) => void;
-  changeShapeStyle: (
-    style: Partial<NonNullable<EditorState["shapeStyle"]>>,
-  ) => void;
-  changeStampStyle: (
-    style: Partial<NonNullable<EditorState["stampStyle"]>>,
-  ) => void;
   editAnnotation: (id: string) => void;
   openSidebar: () => void;
   toggleSidebar: () => void;

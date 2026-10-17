@@ -1,5 +1,4 @@
-import type { EditorShellCommands } from "@/app/editorShellContext";
-import type { EditorState } from "@/types";
+import type { EditorState, PenStyle, Tool } from "@/types";
 import type { ShapeBorderStyle } from "@/lib/shapeGeometry";
 import type { ReactNode } from "react";
 
@@ -37,15 +36,21 @@ export type ToolOptionsState = Pick<
   | "stampStyle"
 >;
 
-export type ToolStyleCommands = Pick<
-  EditorShellCommands,
-  | "changePenStyle"
-  | "changeHighlightStyle"
-  | "changeCommentStyle"
-  | "changeFreetextStyle"
-  | "changeShapeStyle"
-  | "changeStampStyle"
->;
+export interface ToolStyleCommands {
+  changePenStyle: (style: Partial<PenStyle>) => void;
+  changeHighlightStyle: (style: Partial<PenStyle>) => void;
+  changeCommentStyle: (style: { color: string }) => void;
+  changeFreetextStyle: (style: { color: string }) => void;
+  changeShapeStyle: (
+    style: Partial<NonNullable<EditorState["shapeStyle"]>>,
+  ) => void;
+  changeStampStyle: (
+    style: Partial<NonNullable<EditorState["stampStyle"]>>,
+  ) => void;
+}
 
-export type FloatingToolbarCommands = ToolStyleCommands &
-  Pick<EditorShellCommands, "changeTool" | "exitTool" | "changeMode">;
+export interface FloatingToolbarCommands extends ToolStyleCommands {
+  changeTool: (tool: Tool) => void;
+  exitTool: () => void;
+  changeMode: (mode: EditorState["mode"]) => void;
+}

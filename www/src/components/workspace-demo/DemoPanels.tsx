@@ -13,7 +13,7 @@ import type {
   AiChatTimelineItem,
   AiChatMessageAttachment,
 } from "@/services/ai/chat/types";
-import type { AiReasoningLevel } from "@/services/ai";
+import type { AiReasoningLevel } from "@/services/ai/providers/runtimeAdapters/types";
 import type { DemoCopy } from "./copy";
 import {
   sourcePageNumber,

@@ -7,7 +7,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { useLanguage } from "@/components/language-provider";
-import { useEditorTabRuntime } from "@/app/editorTabs/context";
+import { useEditorTabRuntime } from "@/app/editorTabs/runtimeContext";
 import { useEventListeners } from "@/hooks/useEventListener";
 import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
 import {
