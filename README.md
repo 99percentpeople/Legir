@@ -65,6 +65,8 @@ Deploy the repository root as the app project at `https://legir.app`, and deploy
 
 The landing project shares source files and assets with the repository root, so enable **Include source files outside of the Root Directory in the Build Step** in its Vercel settings.
 
+Keep the landing project's Build Command as `bun run build` and Output Directory as `dist`. Its build first verifies the bundled PDFium assets and generates the SDK's JavaScript and type declarations, which the shared source requires during typechecking. This works on a fresh checkout without a previous application build or cached `packages/pdfium/dist` directory; rebuilding the native WASM is not required.
+
 The landing site's app links default to `https://legir.app`, including on preview deployments. Local development uses `http://localhost:5173`. To explicitly configure the destination, set `VITE_APP_URL` in the landing project's environment:
 
 ```bash

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "bun run --cwd .. build:pdfium && tsc --noEmit && vite build",
     "preview": "vite preview"
   }
 }
