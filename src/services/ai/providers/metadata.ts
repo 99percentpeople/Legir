@@ -1,7 +1,6 @@
 import { DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS } from "@/constants";
 import { getCatalogReasoningMetadata } from "./reasoning";
 import { getModelsDevModel } from "./modelsDev";
-import { runtimeProviderId } from "./catalog";
 import {
   getReasoningLevelControl,
   normalizeReasoningPreference,
@@ -14,11 +13,7 @@ export const resolveAiProviderModelMetadata = (
   modelId: string,
 ) => {
   const model = getModelsDevModel(providerId, modelId);
-  const runtimeId = runtimeProviderId(providerId);
   const reasoning = getCatalogReasoningMetadata(providerId, modelId);
-  const imageToolResults =
-    ["anthropic", "gemini"].includes(runtimeId) &&
-    model?.modalities?.input?.includes("image") === true;
   return {
     providerId,
     modelId,
@@ -31,7 +26,6 @@ export const resolveAiProviderModelMetadata = (
           inputModalities: model.modalities?.input,
           outputModalities: model.modalities?.output,
           supportsToolCalls: model.tool_call,
-          supportsImageToolResults: imageToolResults,
         }
       : undefined,
     reasoning,
@@ -69,9 +63,6 @@ export const mergeModelCapabilitiesWithMetadata = (
     supportsToolCalls:
       metadata.capabilities?.supportsToolCalls ??
       capabilities.supportsToolCalls,
-    supportsImageToolResults:
-      metadata.capabilities?.supportsImageToolResults ??
-      capabilities.supportsImageToolResults,
     contextWindowTokens: metadata.hasContextWindowMetadata
       ? metadata.contextWindowTokens
       : capabilities.contextWindowTokens,

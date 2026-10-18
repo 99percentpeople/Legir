@@ -11,7 +11,6 @@ const createCapabilities = (
   outputModalities: ["text"],
   supportsImageInput: false,
   supportsToolCalls: true,
-  supportsImageToolResults: false,
   contextWindowTokens: 128_000,
   ...overrides,
 });

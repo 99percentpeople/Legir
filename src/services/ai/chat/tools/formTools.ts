@@ -13,7 +13,7 @@ import { pruneUndefinedKeys } from "@/services/ai/utils/object";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 
 const FILL_FORM_FIELDS_TOOL_PROMPTS = [
-  "For fill_form_fields, send value for text or dropdown fields, an array for multi-select dropdowns, and checked for checkbox or radio fields. Only use a custom dropdown string when allow_custom_value is true. Never fill signature fields.",
+  "For fill_form_fields, send value for text or dropdown fields, an array for multi-select dropdowns, and checked for checkbox or radio fields. Only use a custom dropdown string when list_fields reports allowCustomValue true. Never fill signature fields.",
   "If the intended values come from annotations or review comments, inspect list_annotations first and map those instructions to field ids from list_fields.",
 ];
 

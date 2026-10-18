@@ -392,7 +392,6 @@ export interface LLMModelCapabilities {
   outputModalities: LLMModelModality[];
   supportsImageInput: boolean;
   supportsToolCalls: boolean;
-  supportsImageToolResults: boolean;
   contextWindowTokens: number;
 }
 

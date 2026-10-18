@@ -694,7 +694,7 @@ export const useAiChatController = (
       ? hasAvailableVisionModel
       : Boolean(explicitVisualModelAvailable);
   const canAttachPageVisuals =
-    selectedChatModel?.capabilities.supportsImageToolResults === true;
+    selectedChatModel?.capabilities.supportsImageInput === true;
 
   const analyzeRenderedPages = useCallback(
     async (options: {

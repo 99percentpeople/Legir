@@ -795,7 +795,7 @@ const zhCN = {
       visual_model_placeholder: "选择视觉模型",
       visual_model_auto: "自动",
       visual_model_desc:
-        "当当前对话模型不能直接接收渲染后的页面图片时，inspect_pages_visual 会自动使用这个模型，包括视觉结构检查和表单字段规划。",
+        "仅当对话模型不支持图片输入时使用。支持图片的对话模型会直接读取页面图片，无需调用其他视觉模型。",
       no_models: "无可用模型",
     },
   },

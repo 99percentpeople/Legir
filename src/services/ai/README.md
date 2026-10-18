@@ -28,6 +28,10 @@ assistant output. It should not know provider API request shapes directly.
   handlers.
 - `chat/documentContextService.ts` collects document context for chat.
 - `chat/prompts.ts` owns the chat system instruction and prompt fragments.
+  It includes the registered tools' `promptInstructions`, deduplicated against
+  each other and the shared instructions. Disabled tools do not contribute
+  their rules. Input names follow the tool schema; result names are consumed
+  as returned rather than assuming a casing conversion.
 - `chat/types.ts` owns chat-specific records, tool contracts, and stream update
   types.
 - `chat/workspace.ts` defines the current-window document access boundary.
@@ -104,6 +108,13 @@ requires a live document and never automatically reopens files.
 - `toolRuntime.ts` executes registered tools and reports tool lifecycle updates.
 - `requestRecovery.ts` handles retry/recovery behavior around model requests.
 - `imageCompression.ts` prepares image payloads for model context.
+- `toolImages.ts` projects image tool results onto the selected SDK transport.
+  Image-capable chat models always inspect rendered pages themselves. Responses,
+  Anthropic and Google accept native image tool results; text-only tool transports
+  receive the same images as a user message after the complete tool-result batch.
+  This adds no model call. Projection runs after image-history compression on
+  every step and never changes the canonical transcript. When switching to a
+  text-only model, prior tool images become explicit text placeholders.
 - `internalContext.ts` and `contextMemory.ts` build hidden/internal context.
 - `compression/` decides when and how to compress long conversations.
 - `memory/` plans, applies, and serializes conversation memory.
@@ -122,6 +133,13 @@ Shared permission and document-operation checks belong in the tool/helper layer
 or the underlying document service, not in provider adapters. This keeps user
 actions and AI tool actions aligned when they call the same lower-level
 functions.
+
+`inspect_pages_visual` chooses direct images from the active model's
+`supportsImageInput` capability (models.dev or explicit endpoint metadata), not
+from native tool-result support. The configured visual model is only a fallback
+for text-only chat models; a separate summary is never requested for a model
+that can read the images itself. Rendering still includes current document edits,
+page/crop geometry, document ownership, and cancellation.
 
 ## `providers/`
 

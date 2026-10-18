@@ -14,7 +14,6 @@ export const createAiDiscoveredModel = (
       inputModalities: options.inputModalities || ["text"],
       outputModalities: options.outputModalities || ["text"],
       supportsToolCalls: options.supportsToolCalls === true,
-      supportsImageToolResults: options.supportsImageToolResults,
       contextWindowTokens: options.contextWindowTokens,
     }),
 });

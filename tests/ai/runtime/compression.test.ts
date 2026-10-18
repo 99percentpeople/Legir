@@ -166,7 +166,6 @@ describe("AI chat context memory planning", () => {
           outputModalities: ["text"],
           supportsImageInput: false,
           supportsToolCalls: true,
-          supportsImageToolResults: false,
           contextWindowTokens: 1_000_000,
         },
       }),

@@ -35,7 +35,15 @@ vi.mock("@/services/ai", () => ({
           capabilities: {
             supportsToolCalls: true,
             supportsImageInput: false,
-            supportsImageToolResults: false,
+          },
+        },
+        {
+          id: "vision-model",
+          label: "Vision model with text-only tool transport",
+          capabilities: {
+            inputModalities: ["text", "image"],
+            supportsToolCalls: true,
+            supportsImageInput: true,
           },
         },
       ],
@@ -162,6 +170,20 @@ afterEach(async () => {
 });
 
 describe("AI controller request ownership", () => {
+  it("enables direct visual inspection for image input without native image tool results or a fallback model", async () => {
+    await act(async () =>
+      controller.setSelectedModelKey("test-provider:vision-model"),
+    );
+    const running = await send("Read the image on this page");
+    expect(
+      running.request.toolRegistry.getDefinitions().map((tool) => tool.name),
+    ).toContain("inspect_pages_visual");
+    await act(async () => {
+      running.transport.reject(new Error("Test finished"));
+      await running.completion;
+    });
+  });
+
   it("keeps page and control links bound through tab switches and asynchronous reopen", async () => {
     const docs = new Map(
       ["A", "B"].map((id) => [

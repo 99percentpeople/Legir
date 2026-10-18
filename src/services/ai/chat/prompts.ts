@@ -3,6 +3,7 @@ import { AI_CHAT_CONVERSATION_SUMMARY_MAX_CHARS } from "@/constants";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
 import {
   buildPromptSection,
+  collectToolPromptInstructions,
   createAiChatPromptContext,
   hasTool,
 } from "@/services/ai/utils/promptHelpers";
@@ -139,7 +140,7 @@ export const getAiChatSystemInstruction = (options?: {
     "Prefer one broader read call over many tiny ones when it covers the same need.",
     "After using tools, answer directly in user-facing text.",
     "If no tool is needed, answer directly.",
-    "Tool arguments and tool result field names use snake_case.",
+    "Use the argument names defined in each tool schema (snake_case). Read tool result properties exactly as returned; do not rename them.",
     "Do not describe fake tool calls or JSON wrappers.",
   ];
   if (canInspectPageVisuals) {
@@ -148,6 +149,20 @@ export const getAiChatSystemInstruction = (options?: {
     );
   }
   sections.push(buildPromptSection("Tool usage", toolUsageLines));
+
+  // Rules belong to the enabled tools. Share them once instead of repeating
+  // common coordinate/workspace instructions in every tool description.
+  const existingLines = new Set(
+    sections.flatMap((section) => section.split("\n")),
+  );
+  const toolInstructions = collectToolPromptInstructions(
+    context.toolDefinitions,
+  ).filter((line) => !existingLines.has(line));
+  if (toolInstructions.length > 0) {
+    sections.push(
+      buildPromptSection("Tool-specific instructions", toolInstructions),
+    );
+  }
 
   return sections.join("\n\n");
 };

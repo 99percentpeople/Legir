@@ -824,7 +824,7 @@ const en = {
       visual_model_placeholder: "Select a visual model",
       visual_model_auto: "Automatic",
       visual_model_desc:
-        "Used automatically by inspect_pages_visual when the active chat model cannot receive rendered page images directly, including visual-structure inspection and form-field planning.",
+        "Used only when the chat model does not support image input. Image-capable chat models read page images directly without calling another visual model.",
       no_models: "No available models",
     },
   },

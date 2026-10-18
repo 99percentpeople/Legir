@@ -23,7 +23,6 @@ export const createModelCapabilities = (options: {
   inputModalities?: readonly string[];
   outputModalities?: readonly string[];
   supportsToolCalls: boolean;
-  supportsImageToolResults?: boolean;
   contextWindowTokens?: number;
 }): LLMModelCapabilities => {
   const inputModalities = normalizeModalities(options.inputModalities);
@@ -37,7 +36,6 @@ export const createModelCapabilities = (options: {
         : DEFAULT_OUTPUT_MODALITIES,
     supportsImageInput: inputModalities.includes("image"),
     supportsToolCalls: options.supportsToolCalls,
-    supportsImageToolResults: options.supportsImageToolResults === true,
     contextWindowTokens: Math.max(
       1,
       Math.trunc(
@@ -48,14 +46,12 @@ export const createModelCapabilities = (options: {
 };
 
 export const createOpenAiLikeModelCapabilities = (options: {
-  supportsImageToolResults?: boolean;
   contextWindowTokens?: number;
 }) =>
   createModelCapabilities({
     inputModalities: ["text"],
     outputModalities: DEFAULT_OUTPUT_MODALITIES,
     supportsToolCalls: true,
-    supportsImageToolResults: options.supportsImageToolResults,
     contextWindowTokens: options.contextWindowTokens,
   });
 

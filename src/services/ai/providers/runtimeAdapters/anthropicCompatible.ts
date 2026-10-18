@@ -8,6 +8,7 @@ export const createAnthropicCompatibleAdapter = (
   options: AnthropicCompatibleAdapterOptions = {},
 ): AiRuntimeAdapter => ({
   providerId,
+  supportsImageToolResults: true,
   ...createCatalogReasoningAdapter("anthropic"),
   createSdkProvider: async (config) => {
     const { createAnthropic } = await import("@ai-sdk/anthropic");

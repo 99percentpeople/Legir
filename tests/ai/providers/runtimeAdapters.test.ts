@@ -98,7 +98,6 @@ describe("AI provider runtime adapters", () => {
       ),
     ).toMatchObject({
       supportsImageInput: true,
-      supportsImageToolResults: true,
     });
   });
 

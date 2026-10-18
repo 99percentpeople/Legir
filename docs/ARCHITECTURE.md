@@ -618,6 +618,14 @@ Relevant modules include:
 
 These features should be integrated through service boundaries and editor actions rather than by coupling provider-specific logic into core workspace components.
 
+Page visual tools give image-capable chat models the rendered pages directly.
+Model image capability comes from models.dev or endpoint metadata; the SDK adapter
+only determines how to transport those images. APIs with text-only tool results
+receive images in an accompanying user message after the tool-result batch,
+without calling a second model. The configured visual model remains a fallback
+for text-only chat models. Request projection follows image-history compression
+and leaves the stored tool transcript intact.
+
 Provider runtime compatibility, reasoning controls, and transcript persistence
 live under `src/services/ai/providers/` and `src/hooks/useAiChatController/`.
 Chat timelines preserve SDK block order across tool calls. Completed answers

@@ -787,7 +787,7 @@ const fr = {
       visual_model_placeholder: "Sélectionner un modèle visuel",
       visual_model_auto: "Automatique",
       visual_model_desc:
-        "Utilisé automatiquement par inspect_pages_visual lorsque le modèle de chat actif ne peut pas recevoir directement les images de page rendues, y compris pour l'inspection de la structure visuelle et la planification des champs de formulaire.",
+        "Utilisé uniquement si le modèle de chat ne prend pas en charge les images. Les modèles compatibles lisent directement les images des pages, sans appeler un autre modèle visuel.",
       no_models: "Aucun modèle disponible",
     },
   },

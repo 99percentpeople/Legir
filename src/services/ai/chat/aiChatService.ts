@@ -14,6 +14,7 @@ import {
 import { createDefaultAiChatCompressionPolicy } from "@/services/ai/chat/runtime/compression/types";
 import { sanitizeAiChatMessagesForReasoningReplay } from "@/services/ai/chat/runtime/reasoningReplay";
 import { createAiChatToolRuntime } from "@/services/ai/chat/runtime/toolRuntime";
+import { prepareToolImageMessages } from "@/services/ai/chat/runtime/toolImages";
 import {
   AI_CHAT_MAX_TOOL_ROUNDS_MAX,
   AI_CHAT_MAX_TOOL_ROUNDS_MIN,
@@ -23,6 +24,7 @@ import {
   canPreviewCollapsedReasoningText,
   resolveAiSdkRuntime,
   resolveAiSdkModelSpecifierForTask,
+  getAiSdkProviderModelOptions,
 } from "@/services/ai/providers";
 import type { AppOptions, EditorState } from "@/types";
 import type {
@@ -148,10 +150,13 @@ export const aiChatService = {
       specifier: modelSpecifier,
       kind: "chat",
     });
-    const requestBaseConversation = sanitizeAiChatMessagesForReasoningReplay({
-      messages: [...options.messages],
-      replayPolicy: runtime.reasoning.replayPolicy,
-    });
+    const modelCapabilities = getAiSdkProviderModelOptions({
+      appOptions,
+      modelCache,
+      providerId: modelSpecifier.providerId,
+      kind: "chat",
+    }).find((model) => model.id === modelSpecifier.modelId)?.capabilities;
+    const requestBaseConversation = [...options.messages];
     const persistedBaseConversation = sanitizeAiChatMessagesForReasoningReplay({
       messages: [...(options.persistedMessages ?? options.messages)],
       replayPolicy: runtime.reasoning.replayPolicy,
@@ -169,11 +174,16 @@ export const aiChatService = {
         contextMemory: getContextMemory?.(),
         policy: compressionPolicy,
       });
+      const imageMessages = prepareToolImageMessages(genericMessages, {
+        supportsImageInput: modelCapabilities?.supportsImageInput === true,
+        supportsImageToolResults:
+          runtime.adapter.supportsImageToolResults === true,
+      });
       const providerMessages =
-        runtime.adapter.prepareMessages?.(genericMessages, {
+        runtime.adapter.prepareMessages?.(imageMessages, {
           ...runtime.request,
           reasoning: runtime.reasoning,
-        }) ?? genericMessages;
+        }) ?? imageMessages;
       // New tool steps can also omit reasoning. Recover their completed tool
       // context before validation, just as we do for restored conversations.
       const preparedMessages = sanitizeAiChatMessagesForReasoningReplay({
@@ -186,9 +196,9 @@ export const aiChatService = {
       });
       return preparedMessages;
     };
-    const initialMessages = await buildStepMessages(requestBaseConversation);
-    let latestPreparedMessageTokenEstimate =
-      estimateAiChatMessageTokens(initialMessages);
+    let latestPreparedMessageTokenEstimate = estimateAiChatMessageTokens(
+      requestBaseConversation,
+    );
     const turnId = `ai_turn_${Date.now()}_${Math.random()
       .toString(36)
       .slice(2, 8)}`;
@@ -227,7 +237,9 @@ export const aiChatService = {
         system: getAiChatSystemInstruction({
           toolDefinitions,
         }),
-        messages: initialMessages,
+        // prepareStep projects each request without persisting transport-only
+        // image messages or bypassing visual-history compression on later steps.
+        messages: requestBaseConversation,
         prepareStep: async ({ messages }) => {
           const preparedMessages = await buildStepMessages(messages);
           latestPreparedMessageTokenEstimate =

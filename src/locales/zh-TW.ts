@@ -794,7 +794,7 @@ const zhTW = {
       visual_model_placeholder: "選擇視覺模型",
       visual_model_auto: "自動",
       visual_model_desc:
-        "當目前對話模型不能直接接收渲染後的頁面圖片時，inspect_pages_visual 會自動使用這個模型，包括視覺結構檢查和表單欄位規劃。",
+        "僅當對話模型不支援圖片輸入時使用。支援圖片的對話模型會直接讀取頁面圖片，無需呼叫其他視覺模型。",
       no_models: "沒有可用模型",
     },
   },

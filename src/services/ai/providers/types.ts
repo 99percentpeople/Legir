@@ -69,7 +69,6 @@ export interface AiSdkDiscoveredModel {
   inputModalities?: readonly string[];
   outputModalities?: readonly string[];
   supportsToolCalls?: boolean;
-  supportsImageToolResults?: boolean;
   contextWindowTokens?: number;
 }
 

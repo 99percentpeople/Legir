@@ -31,7 +31,7 @@ const HIGHLIGHT_RESULTS_TOOL_PROMPTS = [
   "Pass style to override the color or opacity of created highlights.",
   "end_inclusive_anchor is inclusive: the created highlight must include that text.",
   "Choose short, exact anchors from visible text. Do not infer sentence structure inside a selection attachment. Whitespace is flexible during matching. Prefer 2 to 8 words, extend only when needed for uniqueness, and shorten aggressively if a long anchor fails.",
-  "If highlight_results returns missing_count > 0, retry only the missing anchors with shorter, more distinctive text.",
+  "If highlight_results returns missingCount > 0, retry only the missing anchors with shorter, more distinctive text.",
 ];
 
 const CREATE_FREETEXT_ANNOTATIONS_TOOL_PROMPTS = [

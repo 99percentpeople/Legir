@@ -783,7 +783,7 @@ const es = {
       visual_model_placeholder: "Selecciona un modelo visual",
       visual_model_auto: "Automático",
       visual_model_desc:
-        "inspect_pages_visual lo usa automáticamente cuando el modelo de chat activo no puede recibir imágenes de página renderizadas directamente, incluida la inspección de estructura visual y la planificación de campos de formulario.",
+        "Solo se usa cuando el modelo de chat no admite imágenes. Los modelos que admiten imágenes leen las páginas directamente, sin llamar a otro modelo visual.",
       no_models: "No hay modelos disponibles",
     },
   },

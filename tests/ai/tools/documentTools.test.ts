@@ -47,7 +47,6 @@ const createCapabilities = (
   outputModalities: ["text"],
   supportsImageInput: true,
   supportsToolCalls: true,
-  supportsImageToolResults: false,
   contextWindowTokens: 128_000,
   ...overrides,
 });
@@ -300,7 +299,8 @@ describe("AI chat document tools", () => {
       } as unknown as AiToolContext,
       {
         modelCapabilities: createCapabilities({
-          supportsImageToolResults: false,
+          inputModalities: ["text"],
+          supportsImageInput: false,
         }),
       },
     );
@@ -310,7 +310,7 @@ describe("AI chat document tools", () => {
       } as unknown as AiToolContext,
       {
         modelCapabilities: createCapabilities({
-          supportsImageToolResults: true,
+          supportsImageInput: true,
         }),
       },
     );
@@ -328,7 +328,8 @@ describe("AI chat document tools", () => {
       } as unknown as AiToolContext,
       {
         modelCapabilities: createCapabilities({
-          supportsImageToolResults: false,
+          inputModalities: ["text"],
+          supportsImageInput: false,
         }),
       },
     );

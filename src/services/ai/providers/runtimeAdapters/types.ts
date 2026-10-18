@@ -74,6 +74,9 @@ export interface AiReasoningResolution {
 export interface AiRuntimeAdapter {
   providerId: AiSdkProviderId;
 
+  /** Whether this SDK transport accepts images inside tool results. */
+  supportsImageToolResults?: boolean;
+
   /** Build the AI SDK provider, including provider-specific SDK wrappers. */
   createSdkProvider: (
     config: AiSdkProviderConfig,

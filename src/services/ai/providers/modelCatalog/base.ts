@@ -63,9 +63,6 @@ export class ConnectionModelCatalogProvider implements AiSdkModelCatalogProvider
             model.outputModalities ?? metadata.capabilities?.outputModalities,
           supportsToolCalls:
             model.supportsToolCalls ?? metadata.capabilities?.supportsToolCalls,
-          supportsImageToolResults:
-            model.supportsImageToolResults ??
-            metadata.capabilities?.supportsImageToolResults,
           contextWindowTokens:
             model.contextWindowTokens ?? metadata.contextWindowTokens,
           capabilities: model.capabilities,
