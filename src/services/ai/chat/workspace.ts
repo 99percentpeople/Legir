@@ -23,4 +23,9 @@ export interface AiWorkspace {
   }>;
   getDocument: (documentId: string) => AiWorkspaceDocument | null;
   activateDocument: (documentId: string) => boolean;
+  /** Durable navigation identity; tool execution continues to use live tab IDs. */
+  getDocumentLinkId?: (documentId: string) => string;
+  openDocumentLink?: (
+    documentId?: string,
+  ) => Promise<AiWorkspaceDocument | null>;
 }

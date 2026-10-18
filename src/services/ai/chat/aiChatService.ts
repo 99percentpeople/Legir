@@ -123,6 +123,7 @@ export const aiChatService = {
     }) => void;
     maxToolRounds?: number;
   }) {
+    const startedAt = Date.now();
     const {
       appOptions,
       modelCache,
@@ -168,11 +169,17 @@ export const aiChatService = {
         contextMemory: getContextMemory?.(),
         policy: compressionPolicy,
       });
-      const preparedMessages =
+      const providerMessages =
         runtime.adapter.prepareMessages?.(genericMessages, {
           ...runtime.request,
           reasoning: runtime.reasoning,
         }) ?? genericMessages;
+      // New tool steps can also omit reasoning. Recover their completed tool
+      // context before validation, just as we do for restored conversations.
+      const preparedMessages = sanitizeAiChatMessagesForReasoningReplay({
+        messages: providerMessages,
+        replayPolicy: runtime.reasoning.replayPolicy,
+      });
       runtime.adapter.validateMessages?.(preparedMessages, {
         ...runtime.request,
         reasoning: runtime.reasoning,
@@ -270,12 +277,25 @@ export const aiChatService = {
           continue;
         }
 
+        if (part.type === "reasoning-end" || part.type === "text-end") {
+          if (part.type === "text-end" || shouldDisplayReasoning) {
+            onAssistantUpdate?.({
+              phase: "segment_end",
+              turnId,
+              role: part.type === "reasoning-end" ? "thinking" : "assistant",
+              segmentId: `${stepIndex}:${part.id}`,
+            });
+          }
+          continue;
+        }
+
         if (part.type === "reasoning-delta" && part.text) {
           reasoningText += part.text;
           if (shouldDisplayReasoning) {
             onAssistantUpdate?.({
               phase: "reasoning_delta",
               turnId,
+              segmentId: `${stepIndex}:${part.id}`,
               delta: part.text,
               showCollapsedPreview: showCollapsedReasoningPreview,
             });
@@ -288,6 +308,7 @@ export const aiChatService = {
           onAssistantUpdate?.({
             phase: "delta",
             turnId,
+            segmentId: `${stepIndex}:${part.id}`,
             delta: part.text,
           });
           continue;
@@ -353,6 +374,8 @@ export const aiChatService = {
         assistantMessage,
         toolCalls: Array.from(toolRuntime.toolCallsById.values()),
         finishReason: assistantMessage ? "stop" : "tool_calls",
+        isFinalAnswer: finishEvent.finishReason === "stop" && !awaitingContinue,
+        durationMs: Math.max(0, Date.now() - startedAt),
       });
 
       return {

@@ -460,6 +460,8 @@ const zhCN = {
   },
   ai_chat: {
     title: "AI 助手",
+    document_link_reopen_required:
+      "链接对应的文档无法打开，或原文件访问权限已失效。请重新打开原文档后再次点击链接。",
     history: "历史记录",
     sessions: "聊天记录",
     session_default: "新对话",
@@ -470,6 +472,8 @@ const zhCN = {
     tool_result: "原始结果",
     thinking: "思考中",
     thought_for: "已思考（{duration}）",
+    turn_activity: "处理过程",
+    turn_activity_duration: "处理过程 · {duration}",
     duration_seconds: "{count}秒",
     duration_minutes_seconds: "{minutes}分{seconds}秒",
     duration_hours_minutes: "{hours}小时{minutes}分",

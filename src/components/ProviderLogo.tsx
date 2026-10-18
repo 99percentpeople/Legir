@@ -1,110 +1,64 @@
-import * as React from "react";
+import { useState } from "react";
+import { Network } from "lucide-react";
 
-import {
-  runtimeProviderId,
-  type AiProviderId,
-} from "@/services/ai/providers/catalog";
+import { isAiProviderId } from "@/services/ai/providers/catalog";
 import { cn } from "@/utils/cn";
-import { preload, type PreloadableLazyComponent } from "@/utils/preload";
 
-type ProviderLogoIconProps = {
-  className?: string;
-  size?: number | string;
-  title?: string;
-  "aria-hidden"?: boolean;
-};
+function CatalogLogo({ catalogId }: { catalogId: string }) {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">(
+    "loading",
+  );
 
-const lazyProviderLogo = (
-  loader: () => Promise<{
-    default: React.ComponentType<ProviderLogoIconProps>;
-  }>,
-) => preload(loader);
-
-const OpenAiLogo = lazyProviderLogo(
-  () => import("@lobehub/icons/es/OpenAI/components/Mono"),
-);
-const AnthropicLogo = lazyProviderLogo(
-  () => import("@lobehub/icons/es/Anthropic/components/Mono"),
-);
-
-const providerLogos = {
-  openai: OpenAiLogo,
-  "openai-compatible": OpenAiLogo,
-  anthropic: AnthropicLogo,
-  "anthropic-compatible": AnthropicLogo,
-  "xiaomi-mimo": lazyProviderLogo(
-    () => import("@lobehub/icons/es/XiaomiMiMo/components/Mono"),
-  ),
-  gemini: lazyProviderLogo(
-    () => import("@lobehub/icons/es/Gemini/components/Mono"),
-  ),
-  openrouter: lazyProviderLogo(
-    () => import("@lobehub/icons/es/OpenRouter/components/Mono"),
-  ),
-  deepseek: lazyProviderLogo(
-    () => import("@lobehub/icons/es/DeepSeek/components/Mono"),
-  ),
-  minimax: lazyProviderLogo(
-    () => import("@lobehub/icons/es/Minimax/components/Mono"),
-  ),
-  zhipu: lazyProviderLogo(
-    () => import("@lobehub/icons/es/Zhipu/components/Mono"),
-  ),
-  groq: lazyProviderLogo(
-    () => import("@lobehub/icons/es/Groq/components/Mono"),
-  ),
-  xai: lazyProviderLogo(() => import("@lobehub/icons/es/XAI/components/Mono")),
-} satisfies Record<
-  AiProviderId,
-  PreloadableLazyComponent<React.ComponentType<ProviderLogoIconProps>>
->;
-
-export async function preloadProviderLogos() {
-  await Promise.allSettled(
-    [...new Set(Object.values(providerLogos))].map((icon) => icon.preload()),
+  return (
+    <>
+      {status !== "loaded" && (
+        <Network aria-hidden className="col-start-1 row-start-1 size-full" />
+      )}
+      {status !== "error" && (
+        <img
+          src={`https://models.dev/logos/${encodeURIComponent(catalogId)}.svg`}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          className={cn(
+            "col-start-1 row-start-1 size-full object-contain dark:invert",
+            status !== "loaded" && "opacity-0",
+          )}
+          onLoad={() => setStatus("loaded")}
+          onError={() => setStatus("error")}
+        />
+      )}
+    </>
   );
 }
 
 export function ProviderLogo(props: {
-  providerId: AiProviderId;
+  /** The models.dev provider ID, independent of the saved connection ID. */
+  catalogId?: string;
   className?: string;
   size?: number | string;
   title?: string;
 }) {
-  const { providerId, className, size = 14, title } = props;
-  const Icon =
-    providerLogos[runtimeProviderId(providerId) as keyof typeof providerLogos];
-  const iconClassName = cn("shrink-0", className);
-
-  if (!Icon)
-    return (
-      <span
-        aria-hidden
-        className={cn(
-          "inline-block rounded-sm bg-current opacity-30",
-          className,
-        )}
-        style={{ width: size, height: size }}
-      />
-    );
+  const { catalogId, className, size = 14, title } = props;
 
   return (
-    <React.Suspense
-      fallback={
-        <span
-          aria-hidden={title ? undefined : true}
-          title={title}
-          className={cn("inline-block shrink-0", className)}
-          style={{ width: size, height: size }}
-        />
-      }
+    <span
+      role={title ? "img" : undefined}
+      aria-label={title}
+      aria-hidden={title ? undefined : true}
+      title={title}
+      className={cn(
+        "inline-grid shrink-0 place-items-center align-middle",
+        className,
+      )}
+      style={{ width: size, height: size }}
     >
-      <Icon
-        size={size}
-        title={title}
-        aria-hidden={title ? undefined : true}
-        className={iconClassName}
-      />
-    </React.Suspense>
+      {catalogId && isAiProviderId(catalogId) ? (
+        <CatalogLogo key={catalogId} catalogId={catalogId} />
+      ) : (
+        <Network aria-hidden className="size-full" />
+      )}
+    </span>
   );
 }

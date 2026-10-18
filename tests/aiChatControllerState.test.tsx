@@ -17,7 +17,7 @@ import {
 import type { AiWorkspace } from "@/services/ai/chat/workspace";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 import { EventBus, type AppEventMap } from "@/lib/eventBus";
-import { page } from "./helpers/editorStore";
+import { field, page } from "./helpers/editorStore";
 import { GlobalAiProvider, useGlobalAi } from "@/app/ai/GlobalAiContext";
 
 // Exercise the real controller/session state. Only model discovery and the
@@ -162,6 +162,208 @@ afterEach(async () => {
 });
 
 describe("AI controller request ownership", () => {
+  it("keeps page and control links bound through tab switches and asynchronous reopen", async () => {
+    const docs = new Map(
+      ["A", "B"].map((id) => [
+        id,
+        createDocumentEditorView({
+          filename: `${id}.pdf`,
+          documentLoadState: "ready",
+          pdfBytes: new Uint8Array([1]),
+          pages: [page()],
+          fields: [field("shared-field")],
+          annotations: [{ id: "shared-note", type: "comment", pageIndex: 0 }],
+        }),
+      ]),
+    );
+    const events = new Map(
+      ["A", "B"].map((id) => [id, new EventBus<AppEventMap>()]),
+    );
+    const navigationA = vi.fn();
+    const navigationB = vi.fn();
+    const focusA = vi.fn();
+    events.get("A")!.on("workspace:navigatePage", navigationA);
+    events.get("B")!.on("workspace:navigatePage", navigationB);
+    events.get("A")!.on("workspace:focusControl", focusA);
+    let activeId = "A";
+    workspace = {
+      getActiveDocumentId: () => activeId,
+      listDocuments: () => [],
+      getDocumentLinkId: (id) => `source-${id}`,
+      openDocumentLink: async (id) =>
+        id ? workspace!.getDocument(id.replace(/^source-/, "")) : null,
+      getDocument: (id) =>
+        docs.has(id)
+          ? {
+              id,
+              store: docs.get(id)!.store,
+              events: events.get(id)!,
+              workerService: {} as PDFWorkerService,
+              signal: new AbortController().signal,
+              getRoot: () => null,
+            }
+          : null,
+      activateDocument: (id) => {
+        if (!docs.has(id)) return false;
+        activeId = id;
+        activateEditorView(docs.get(id)!.store);
+        return true;
+      },
+    };
+    const created = [...docs.values()];
+    try {
+      await act(async () => activateEditorView(docs.get("A")!.store));
+      await render();
+      const running = await send("Link to the page and field");
+      await act(async () => {
+        workspace!.activateDocument("B");
+      });
+      await act(async () => {
+        running.request.onAssistantUpdate?.({
+          phase: "delta",
+          turnId: "links",
+          delta: "[Page](#page=1&document=source-A)",
+        });
+        running.request.onAssistantUpdate?.({
+          phase: "end",
+          turnId: "links",
+          assistantMessage: "[Page](#page=1&document=source-A)",
+          reasoningText: "",
+          toolCalls: [],
+          finishReason: "stop",
+        });
+        running.transport.resolve({
+          turnId: "links",
+          conversation: [],
+          assistantMessage: "[Page](#page=1&document=source-A)",
+          awaitingContinue: false,
+          tokenUsage: usage.tokenUsage,
+          contextTokens: 0,
+          contextTokenOverhead: 0,
+        });
+        await running.completion;
+      });
+      expect(
+        controller.timeline.find((item) => item.id === "links"),
+      ).toMatchObject({ documentId: "source-A" });
+      await act(async () =>
+        controller.openDocumentLink({
+          kind: "page",
+          pageNumber: 1,
+          documentId: "source-A",
+        }),
+      );
+      expect(activeId).toBe("A");
+      expect(navigationA).toHaveBeenCalledWith({
+        pageIndex: 0,
+        behavior: "smooth",
+      });
+      expect(navigationB).not.toHaveBeenCalled();
+      await act(async () =>
+        controller.openDocumentLink({
+          kind: "control",
+          controlId: "shared-field",
+          documentId: "source-A",
+        }),
+      );
+      expect(focusA).toHaveBeenCalledWith({
+        id: "shared-field",
+        behavior: "smooth",
+      });
+      await act(async () =>
+        controller.openDocumentLink({
+          kind: "control",
+          controlId: "shared-note",
+          documentId: "source-A",
+        }),
+      );
+      expect(focusA).toHaveBeenLastCalledWith({
+        id: "shared-note",
+        behavior: "smooth",
+      });
+      await act(async () =>
+        controller.openDocumentLink({
+          kind: "page",
+          pageNumber: 1,
+          documentId: "source-B",
+        }),
+      );
+      expect(navigationB).toHaveBeenCalledTimes(1);
+      docs.delete("A");
+      await act(async () =>
+        controller.openDocumentLink({
+          kind: "page",
+          pageNumber: 1,
+          documentId: "source-A",
+        }),
+      );
+      await act(async () =>
+        controller.openDocumentLink({
+          kind: "page",
+          pageNumber: 1,
+          documentId: "missing",
+        }),
+      );
+      expect(navigationA).toHaveBeenCalledTimes(1);
+      expect(navigationB).toHaveBeenCalledTimes(1);
+      const reopened = createDocumentEditorView({
+        filename: "A.pdf",
+        documentLoadState: "ready",
+        pdfBytes: new Uint8Array([1]),
+        pages: [page()],
+        fields: [field("shared-field")],
+      });
+      created.push(reopened);
+      const reopenedEvents = new EventBus<AppEventMap>();
+      const reopenedNavigation = vi.fn();
+      const reopenedFocus = vi.fn();
+      reopenedEvents.on("workspace:navigatePage", reopenedNavigation);
+      reopenedEvents.on("workspace:focusControl", reopenedFocus);
+      let finishOpen!: (value: ReturnType<AiWorkspace["getDocument"]>) => void;
+      const pendingOpen = new Promise<ReturnType<AiWorkspace["getDocument"]>>(
+        (resolve) => {
+          finishOpen = resolve;
+        },
+      );
+      workspace.openDocumentLink = vi.fn(() => pendingOpen);
+      const click = controller.openDocumentLink({
+        kind: "page",
+        pageNumber: 1,
+        documentId: "source-A",
+      });
+      expect(workspace.openDocumentLink).toHaveBeenCalledWith("source-A");
+      expect(reopenedNavigation).not.toHaveBeenCalled();
+      docs.set("reopened-A", reopened);
+      events.set("reopened-A", reopenedEvents);
+      await act(async () => {
+        finishOpen(workspace!.getDocument("reopened-A"));
+        await click;
+      });
+      expect(activeId).toBe("reopened-A");
+      expect(reopenedNavigation).toHaveBeenCalledExactlyOnceWith({
+        pageIndex: 0,
+        behavior: "smooth",
+      });
+      await act(async () =>
+        controller.openDocumentLink({
+          kind: "control",
+          controlId: "shared-field",
+          documentId: "source-A",
+        }),
+      );
+      expect(reopenedFocus).toHaveBeenCalledExactlyOnceWith({
+        id: "shared-field",
+        behavior: "smooth",
+      });
+      expect(navigationB).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => {
+        activateEditorView();
+        created.forEach((doc) => doc.dispose());
+      });
+    }
+  });
+
   it("retains a unified conversation and keeps a turn bound to A while the user switches to B", async () => {
     const base = { pages: [page()], documentLoadState: "ready" as const };
     const a = createDocumentEditorView({

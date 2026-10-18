@@ -470,6 +470,8 @@ const en = {
   },
   ai_chat: {
     title: "AI Assistant",
+    document_link_reopen_required:
+      "The linked document is unavailable or its file access has expired. Please reopen the original document and click the link again.",
     history: "History",
     sessions: "Conversations",
     session_default: "New chat",
@@ -480,6 +482,8 @@ const en = {
     tool_result: "Raw result",
     thinking: "Thinking",
     thought_for: "Thought for {duration}",
+    turn_activity: "Activity",
+    turn_activity_duration: "Activity · {duration}",
     duration_seconds: "{count}s",
     duration_minutes_seconds: "{minutes}m {seconds}s",
     duration_hours_minutes: "{hours}h {minutes}m",

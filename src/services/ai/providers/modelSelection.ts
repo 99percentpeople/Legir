@@ -11,6 +11,7 @@ type AiSdkModelCache = EditorState["llmModelCache"];
 
 export type AiSdkModelGroup = {
   providerId: AiSdkProviderId;
+  catalogId?: string;
   label: string;
   labelKey?: string;
   isAvailable: boolean;
@@ -77,6 +78,7 @@ export const getAiSdkModelGroups = (options: {
     .map(
       (config): AiSdkModelGroup => ({
         providerId: config.providerId,
+        catalogId: config.catalogId || undefined,
         label: config.label,
         isAvailable: true,
         unavailableMessageKey: "properties.form_detection.api_key_missing",

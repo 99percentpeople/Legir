@@ -425,6 +425,8 @@ const de = {
   },
   ai_chat: {
     title: "AI-Assistent",
+    document_link_reopen_required:
+      "Das verknüpfte Dokument ist nicht verfügbar oder der Dateizugriff ist abgelaufen. Bitte öffnen Sie das Originaldokument erneut und klicken Sie nochmals auf den Link.",
     history: "Verlauf",
     sessions: "Unterhaltungen",
     session_default: "Neuer Chat",
@@ -435,6 +437,8 @@ const de = {
     tool_result: "Rohes Ergebnis",
     thinking: "Denken",
     thought_for: "Nachgedacht für {duration}",
+    turn_activity: "Verlauf",
+    turn_activity_duration: "Verlauf · {duration}",
     duration_seconds: "{count}s",
     duration_minutes_seconds: "{minutes}m {seconds}s",
     duration_hours_minutes: "{hours}h {minutes}m",

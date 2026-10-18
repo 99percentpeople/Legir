@@ -250,6 +250,7 @@ export interface AiRenderedPageVisualSummaryResult {
 
 export interface AiStoredSearchResult {
   documentId?: string;
+  documentLinkId?: string;
   id: string;
   query: string;
   result: PDFSearchResult;
@@ -710,8 +711,11 @@ export type AiChatTimelineItem =
       id: string;
       kind: "message";
       role: "user" | "assistant" | "thinking";
+      /** Persistent PDF identity selected when this model run began. */
+      documentId?: string;
       turnId?: string;
       segmentIndex?: number;
+      streamSegmentId?: string;
       text: string;
       showCollapsedPreview?: boolean;
       conversationText?: string;
@@ -721,6 +725,8 @@ export type AiChatTimelineItem =
       createdAt: string;
       isStreaming?: boolean;
       turnCompleted?: boolean;
+      isFinalAnswer?: boolean;
+      turnDurationMs?: number;
       tokenUsageSnapshot?: AiChatTokenUsageSummary;
       contextTokensSnapshot?: number;
     }
@@ -728,6 +734,8 @@ export type AiChatTimelineItem =
       id: string;
       kind: "tool";
       toolCallId: string;
+      /** Actual tool target, retained even when persisted result text is truncated. */
+      documentId?: string;
       turnId?: string;
       batchId?: string;
       isParallelBatch?: boolean;
@@ -742,6 +750,7 @@ export type AiChatTimelineItem =
       error?: string;
       createdAt: string;
       turnCompleted?: boolean;
+      turnDurationMs?: number;
       tokenUsageSnapshot?: AiChatTokenUsageSummary;
       contextTokensSnapshot?: number;
     };
@@ -846,12 +855,19 @@ export type AiChatAssistantUpdate = (
   | {
       phase: "reasoning_delta";
       delta: string;
+      segmentId?: string;
       showCollapsedPreview?: boolean;
     }
   | {
       phase: "delta";
       delta: string;
+      segmentId?: string;
       branchAnchorId?: string;
+    }
+  | {
+      phase: "segment_end";
+      role: "assistant" | "thinking";
+      segmentId: string;
     }
   | {
       phase: "end";
@@ -861,6 +877,8 @@ export type AiChatAssistantUpdate = (
       branchAnchorId?: string;
       toolCalls: AiChatToolCallRecord[];
       finishReason: "stop" | "tool_calls";
+      isFinalAnswer?: boolean;
+      durationMs?: number;
     }
 ) & { turnId: string };
 

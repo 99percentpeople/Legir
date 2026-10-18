@@ -121,6 +121,11 @@ describe("model picker availability", () => {
           "token",
         ]);
         expect(
+          Object.fromEntries(
+            groups.map((group) => [group.providerId, group.catalogId]),
+          ),
+        ).toEqual({ key: "openai", local: "openai", token: "anthropic" });
+        expect(
           groups.every((group) => group.isAvailable && group.models.length > 0),
         ).toBe(true);
         for (const id of Object.keys(app.llm).filter(

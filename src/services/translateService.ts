@@ -18,6 +18,7 @@ export interface TranslateOptionRegistration {
 
 export interface TranslateOptionGroup {
   id: string;
+  catalogId?: string;
   label: string;
   labelKey?: string;
   options: TranslateOption[];
@@ -25,6 +26,7 @@ export interface TranslateOptionGroup {
 
 export interface TranslateOptionGroupRegistration {
   id: string;
+  catalogId?: string;
   label: string;
   labelKey?: string;
   options: TranslateOptionRegistration[];
@@ -284,6 +286,7 @@ export class TranslateService {
   getOptionGroups(): TranslateOptionGroup[] {
     return this.groups.map((g) => ({
       id: g.id,
+      catalogId: g.catalogId,
       label: g.label,
       labelKey: g.labelKey,
       options: g.options.map((opt) => ({

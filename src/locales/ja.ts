@@ -420,6 +420,8 @@ const ja = {
   },
   ai_chat: {
     title: "AI アシスタント",
+    document_link_reopen_required:
+      "リンク先の文書を開けないか、ファイルへのアクセス権が失効しています。元の文書を開き直してから、もう一度リンクをクリックしてください。",
     history: "履歴",
     sessions: "会話",
     session_default: "新しいチャット",
@@ -430,6 +432,8 @@ const ja = {
     tool_result: "生の結果",
     thinking: "思考中",
     thought_for: "{duration}考えました",
+    turn_activity: "処理の過程",
+    turn_activity_duration: "処理の過程 · {duration}",
     duration_seconds: "{count}秒",
     duration_minutes_seconds: "{minutes}分{seconds}秒",
     duration_hours_minutes: "{hours}時間{minutes}分",

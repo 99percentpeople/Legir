@@ -33,15 +33,23 @@ export const createWorkspaceAiToolRegistry = (options: {
   createRegistry: (documentId: string) => AiToolRegistry;
 }): AiToolRegistry => {
   const { workspace, defaultDocumentId } = options;
+  const defaultDocumentLinkId = defaultDocumentId
+    ? (workspace.getDocumentLinkId?.(defaultDocumentId) ?? defaultDocumentId)
+    : null;
   const definitions: AiChatToolDefinition[] = [
     {
       name: "list_open_documents",
       accessType: "read",
       description:
-        "List every open document in this workspace, its stable document_id, filename, loading/dirty state, and the document the user is currently viewing. Call this before cross-document work or when the user refers to the current document.",
+        "List every open document in this workspace, its live document_id, persistent documentLinkId, filename, loading/dirty state, and the document the user is currently viewing. Call this before cross-document work or when the user refers to the current document.",
       inputSchema: z.object({}).strict(),
       promptInstructions: [
-        "Conversations span all open documents. Use list_open_documents to find document IDs. All document tools accept {document_id, args}. Omitted document_id is pinned to the document active when this user turn started, not the tab currently visible. Always specify document_id for cross-document work and keep it fixed throughout a document operation. Preserve document= in returned navigation links.",
+        "Conversations span all open documents. Use list_open_documents to find document IDs. All document tools accept {document_id, args}. Omitted document_id is pinned to the document active when this user turn started, not the tab currently visible. Always specify document_id for cross-document work and keep it fixed throughout a document operation. Preserve document= in returned navigation links. When composing navigation links yourself, use documentLinkId for document=; it remains bound to the file after reopening. documentLinkId is not a tool argument.",
+        ...(defaultDocumentLinkId
+          ? [
+              `The default PDF for this turn has documentLinkId ${JSON.stringify(defaultDocumentLinkId)}. Its navigation links must include &document=${encodeURIComponent(defaultDocumentLinkId)}.`,
+            ]
+          : []),
       ],
     },
     ...options.definitions.map((definition) => ({
@@ -53,7 +61,7 @@ export const createWorkspaceAiToolRegistry = (options: {
             .min(1)
             .optional()
             .describe(
-              "Stable ID from list_open_documents. Defaults to the document active at the beginning of this turn.",
+              "Live document_id from list_open_documents. Defaults to the document active at the beginning of this turn.",
             ),
           args: definition.inputSchema.describe(
             "Arguments for this document tool.",
@@ -90,7 +98,12 @@ export const createWorkspaceAiToolRegistry = (options: {
           payload: {
             activeDocumentId: workspace.getActiveDocumentId(),
             defaultDocumentId,
-            documents: workspace.listDocuments(),
+            documents: workspace.listDocuments().map((document) => ({
+              ...document,
+              documentLinkId:
+                workspace.getDocumentLinkId?.(document.documentId) ??
+                document.documentId,
+            })),
           },
           summary: "Listed open workspace documents.",
         };
@@ -142,6 +155,8 @@ export const createWorkspaceAiToolRegistry = (options: {
           "DOCUMENT_NOT_READY",
           `Document ${documentId} is not ready.`,
         );
+      const documentLinkId =
+        workspace.getDocumentLinkId?.(documentId) ?? documentId;
       const controller = new AbortController();
       const abort = () => controller.abort();
       signal?.addEventListener("abort", abort, { once: true });
@@ -169,7 +184,8 @@ export const createWorkspaceAiToolRegistry = (options: {
           ...result,
           payload: {
             documentId,
-            ...(scopeLinks(result.payload, documentId) as object),
+            documentLinkId,
+            ...(scopeLinks(result.payload, documentLinkId) as object),
           },
         };
       } catch (error) {

@@ -314,8 +314,12 @@ describe("models.dev catalog", () => {
           appOptions: appWithNew,
           modelCache: {},
           kind: "vision",
-        })[0].models[0].id,
-      ).toBe("new-model");
+        })[0],
+      ).toMatchObject({
+        providerId: "dynamic",
+        catalogId: "new-service",
+        models: [{ id: "new-model" }],
+      });
       expect(getConfiguredAiSdkProvider(appWithNew, "dynamic")).toMatchObject({
         backendKind: "openai-compatible",
         baseURL: "https://new.example/v1",

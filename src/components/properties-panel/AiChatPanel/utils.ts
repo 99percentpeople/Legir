@@ -136,40 +136,22 @@ export const isLastAssistantSegmentForTurn = (
     );
 };
 
-export const formatThinkingDuration = (t: TranslateFn, durationMs?: number) => {
-  if (typeof durationMs !== "number" || durationMs <= 0) {
-    return t("ai_chat.thought_for", {
-      duration: t("ai_chat.duration_seconds", { count: 0 }),
-    });
-  }
-
-  const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
+export const formatDuration = (t: TranslateFn, durationMs: number) => {
+  const totalSeconds =
+    durationMs > 0 && Number.isFinite(durationMs)
+      ? Math.max(1, Math.round(durationMs / 1000))
+      : 0;
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return t("ai_chat.thought_for", {
-      duration: t("ai_chat.duration_hours_minutes", {
-        hours,
-        minutes,
-      }),
-    });
-  }
-
-  if (minutes > 0) {
-    return t("ai_chat.thought_for", {
-      duration: t("ai_chat.duration_minutes_seconds", {
-        minutes,
-        seconds,
-      }),
-    });
-  }
-
-  return t("ai_chat.thought_for", {
-    duration: t("ai_chat.duration_seconds", { count: totalSeconds }),
-  });
+  if (hours > 0) return t("ai_chat.duration_hours_minutes", { hours, minutes });
+  if (minutes > 0)
+    return t("ai_chat.duration_minutes_seconds", { minutes, seconds });
+  return t("ai_chat.duration_seconds", { count: totalSeconds });
 };
+
+export const formatThinkingDuration = (t: TranslateFn, durationMs?: number) =>
+  t("ai_chat.thought_for", { duration: formatDuration(t, durationMs ?? 0) });
 
 export const getSessionTitle = (
   t: TranslateFn,

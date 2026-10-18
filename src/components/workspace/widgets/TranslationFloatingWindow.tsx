@@ -69,6 +69,7 @@ export const TranslationFloatingWindow: React.FC<
       const groupLabel = group.labelKey ? t(group.labelKey) : group.label;
       return {
         id: group.id,
+        catalogId: group.catalogId,
         label: groupLabel,
         options: group.options.map((opt) => {
           const optLabel = opt.labelKey ? t(opt.labelKey) : opt.label;

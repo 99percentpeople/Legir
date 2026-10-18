@@ -4,10 +4,7 @@ import {
 } from "@/store/preferencesStore";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPdfSearchSelectionOffsets } from "@/components/workspace/lib/pdfSearchHighlights";
-import {
-  resolvePdfSearchResultGeometry,
-  type PdfTextRangeGeometry,
-} from "@/components/workspace/lib/pdfTextRangeGeometry";
+import { resolvePdfSearchResultGeometry } from "@/components/workspace/lib/pdfTextRangeGeometry";
 import {
   getAiRuntimeAdapter,
   getChatModelGroups,
@@ -19,7 +16,6 @@ import {
   summarizeConversationMemory,
   subscribeLLMModelRegistry,
 } from "@/services/ai";
-import { useEditorView } from "@/store/useEditorView";
 import type { AiWorkspace } from "@/services/ai/chat/workspace";
 import { createWorkspaceAiToolRegistry } from "@/services/ai/chat/workspaceToolRegistry";
 import { restoreUnifiedAiChatState } from "./unifiedHistory";
@@ -98,7 +94,6 @@ import {
   applyToolUpdateToTimeline,
   settleIncompleteTimeline,
 } from "@/hooks/useAiChatController/timelineUpdates";
-import { appEventBus } from "@/lib/eventBus";
 import { exportPDF } from "@/services/pdfService";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
 
@@ -246,9 +241,6 @@ export const useAiChatController = (
   const searchResultsRef = useRef<Map<string, AiStoredSearchResult>>(
     sessionsRef.current.get(initialSession.id)!.searchResultsById,
   );
-  const searchResultGeometryCacheRef = useRef(
-    new Map<string, PdfTextRangeGeometry>(),
-  );
   const abortRef = useRef<AbortController | null>(null);
   const contextMemoryJobIdsRef = useRef<Map<string, number>>(new Map());
   const contextMemoryJobSeqRef = useRef(0);
@@ -284,10 +276,6 @@ export const useAiChatController = (
   useEffect(() => {
     sessionSummariesRef.current = sessions;
   }, [sessions]);
-
-  useEffect(() => {
-    searchResultGeometryCacheRef.current.clear();
-  }, [editorState.pages, workerService]);
 
   const touchSessionSummary = useCallback(
     (sessionId: string, patch: Partial<AiChatSessionSummary>) => {
@@ -582,6 +570,7 @@ export const useAiChatController = (
   const modelSelectGroups = useMemo<ModelSelectGroup[]>(() => {
     return toolCapableChatModelGroups.map((group) => ({
       id: group.providerId,
+      catalogId: group.catalogId,
       label: group.label,
       options: group.models.map((model) => ({
         value: `${group.providerId}:${model.id}`,
@@ -1154,6 +1143,7 @@ export const useAiChatController = (
         store: { ...document.store, getState: readSnapshot },
         events: document.events,
         documentId,
+        documentLinkId: workspace?.getDocumentLinkId?.(documentId),
       });
       return createAiToolRegistry(
         composeAiToolContext(documentContext, interactions),
@@ -1196,13 +1186,18 @@ export const useAiChatController = (
   );
 
   const applyAssistantUpdate = useCallback(
-    (update: AiChatAssistantUpdate) => {
+    (update: AiChatAssistantUpdate, documentId?: string) => {
       const nowIso = new Date().toISOString();
       const session = sessionsRef.current.get(activeSessionIdRef.current);
       if (!session) return;
 
       setTimeline((prev) => {
-        const result = applyAssistantUpdateToTimeline(prev, update, nowIso);
+        const result = applyAssistantUpdateToTimeline(
+          prev,
+          update,
+          nowIso,
+          documentId,
+        );
         session.timeline = result.timeline;
         if (result.touchedSession) {
           session.updatedAt = nowIso;
@@ -1218,13 +1213,19 @@ export const useAiChatController = (
   );
 
   const applyToolUpdate = useCallback(
-    (update: AiChatToolUpdate) => {
+    (update: AiChatToolUpdate, documentId?: string) => {
       const nowIso = new Date().toISOString();
       const session = sessionsRef.current.get(activeSessionIdRef.current);
       if (!session) return;
 
       setTimeline((prev) => {
-        const result = applyToolUpdateToTimeline(prev, update, nowIso);
+        const result = applyToolUpdateToTimeline(
+          prev,
+          update,
+          nowIso,
+          documentId,
+          workspace?.getDocumentLinkId,
+        );
         session.timeline = result.timeline;
         if (result.touchedSession) {
           session.updatedAt = nowIso;
@@ -1236,7 +1237,7 @@ export const useAiChatController = (
         return result.timeline;
       });
     },
-    [touchSessionSummary],
+    [touchSessionSummary, workspace],
   );
 
   const persistAiChatSessionsNow = useCallback(() => {
@@ -1467,6 +1468,11 @@ export const useAiChatController = (
       try {
         if (!isCurrentRun()) return;
         const appOptions = getEditorSnapshot().options;
+        const defaultDocumentId = workspace?.getActiveDocumentId() ?? undefined;
+        const documentLinkId = defaultDocumentId
+          ? (workspace?.getDocumentLinkId?.(defaultDocumentId) ??
+            defaultDocumentId)
+          : undefined;
         const result = await aiChatService.runConversation({
           appOptions,
           modelCache: editorState.llmModelCache,
@@ -1479,7 +1485,7 @@ export const useAiChatController = (
           toolRegistry: workspace
             ? createWorkspaceAiToolRegistry({
                 workspace,
-                defaultDocumentId: workspace.getActiveDocumentId(),
+                defaultDocumentId: defaultDocumentId ?? null,
                 definitions: toolRegistry.getDefinitions(),
                 createRegistry: createDocumentRegistry,
               })
@@ -1491,17 +1497,20 @@ export const useAiChatController = (
               assistantBranchAnchorId &&
               (update.phase === "delta" || update.phase === "end")
             ) {
-              applyAssistantUpdate({
-                ...update,
-                branchAnchorId: assistantBranchAnchorId,
-              });
+              applyAssistantUpdate(
+                {
+                  ...update,
+                  branchAnchorId: assistantBranchAnchorId,
+                },
+                documentLinkId,
+              );
               return;
             }
-            applyAssistantUpdate(update);
+            applyAssistantUpdate(update, documentLinkId);
           },
           onToolUpdate: (update) => {
             if (!isCurrentRun() || controller.signal.aborted) return;
-            applyToolUpdate(update);
+            applyToolUpdate(update, documentLinkId);
           },
           onUsageUpdate: (update) => {
             if (!isCurrentRun() || controller.signal.aborted) return;
@@ -2122,151 +2131,75 @@ export const useAiChatController = (
     abortRef.current.abort();
   }, []);
 
-  const resolveSearchResultGeometry = useCallback(
-    async (result: PDFSearchResult) => {
-      return resolvePdfSearchResultGeometry({
-        result,
-        pages: editorState.pages,
-        cache: searchResultGeometryCacheRef.current,
-        getTextContent: (pageIndex, signal) =>
-          workerService
-            ? workerService.getTextContent({ pageIndex, signal })
-            : Promise.resolve(null),
-      });
-    },
-    [editorState.pages, workerService],
-  );
-
   const openDocumentLink = useCallback(
-    (target: AiDocumentLinkTarget) => {
-      if (workspace) {
-        const stored =
-          target.kind === "result"
-            ? searchResultsRef.current.get(target.resultId)
-            : null;
-        const documentId = target.documentId ?? stored?.documentId;
-        if (!documentId) return; // Never retarget an old unscoped link to the active tab.
-        const document = workspace.getDocument(documentId);
-        if (!document || document.signal.aborted) return;
-        if (stored && stored.documentId !== documentId) return;
-        const state = document.store.getState();
-        if (target.kind === "page") {
-          if (
-            !Number.isInteger(target.pageNumber) ||
-            target.pageNumber < 1 ||
-            target.pageNumber > state.pages.length
-          )
-            return;
-          workspace.activateDocument(documentId);
-          document.events.emit("workspace:navigatePage", {
-            pageIndex: target.pageNumber - 1,
-            behavior: "smooth",
-          });
-        } else if (target.kind === "control") {
-          if (
-            !state.fields.some((field) => field.id === target.controlId) &&
-            !state.annotations.some(
-              (annotation) => annotation.id === target.controlId,
-            )
-          )
-            return;
-          workspace.activateDocument(documentId);
-          document.events.emit("workspace:focusControl", {
-            id: target.controlId,
-            behavior: "smooth",
-          });
-        } else if (stored) {
-          workspace.activateDocument(documentId);
-          void resolvePdfSearchResultGeometry({
-            result: stored.result,
-            pages: state.pages,
-            cache: new Map(),
-            signal: document.signal,
-            getTextContent: (pageIndex, signal) =>
-              document.workerService.getTextContent({ pageIndex, signal }),
-          })
-            .then((geometry) => {
-              if (document.signal.aborted) return;
-              if (geometry)
-                document.events.emit("workspace:focusTextRange", {
-                  ...stored.result,
-                  rect: geometry.rect,
-                  behavior: "smooth",
-                });
-              else
-                document.events.emit("workspace:navigatePage", {
-                  pageIndex: stored.result.pageIndex,
-                  behavior: "smooth",
-                });
-            })
-            .catch(() => {
-              /* Closing a document cancels its navigation. */
-            });
-        }
-        return;
-      }
-      switch (target.kind) {
-        case "page": {
-          const pageIndex = target.pageNumber - 1;
-          if (
-            !Number.isInteger(pageIndex) ||
-            pageIndex < 0 ||
-            pageIndex >= editorState.pages.length
-          ) {
-            return;
-          }
-          appEventBus.emit("workspace:navigatePage", {
-            pageIndex,
-            behavior: "smooth",
-          });
+    async (target: AiDocumentLinkTarget) => {
+      if (!workspace || !target.documentId) return;
+      const stored =
+        target.kind === "result"
+          ? searchResultsRef.current.get(target.resultId)
+          : null;
+      const documentId = target.documentId;
+      if (stored && stored.documentLinkId !== documentId) return;
+      const document = workspace.openDocumentLink
+        ? await workspace.openDocumentLink(documentId)
+        : workspace.getDocument(documentId);
+      if (!document || document.signal.aborted) return;
+      const state = document.store.getState();
+      if (target.kind === "page") {
+        if (
+          !Number.isInteger(target.pageNumber) ||
+          target.pageNumber < 1 ||
+          target.pageNumber > state.pages.length
+        )
           return;
-        }
-        case "control": {
-          const controlId = target.controlId.trim();
-          if (!controlId) return;
-
-          const store = useEditorView.getState();
-          const exists =
-            store.fields.some((field) => field.id === controlId) ||
-            store.annotations.some((annotation) => annotation.id === controlId);
-          if (!exists) return;
-
-          appEventBus.emit("workspace:focusControl", {
-            id: controlId,
-            behavior: "smooth",
-          });
+        workspace.activateDocument(document.id);
+        document.events.emit("workspace:navigatePage", {
+          pageIndex: target.pageNumber - 1,
+          behavior: "smooth",
+        });
+      } else if (target.kind === "control") {
+        if (
+          !state.fields.some((field) => field.id === target.controlId) &&
+          !state.annotations.some(
+            (annotation) => annotation.id === target.controlId,
+          )
+        )
           return;
-        }
-        case "result": {
-          const resultId = target.resultId.trim();
-          if (!resultId) return;
-
-          const stored = searchResultsRef.current.get(resultId);
-          if (!stored) return;
-
-          void (async () => {
-            const geometry = await resolveSearchResultGeometry(stored.result);
-            if (!geometry) {
-              appEventBus.emit("workspace:navigatePage", {
+        workspace.activateDocument(document.id);
+        document.events.emit("workspace:focusControl", {
+          id: target.controlId,
+          behavior: "smooth",
+        });
+      } else if (stored) {
+        workspace.activateDocument(document.id);
+        void resolvePdfSearchResultGeometry({
+          result: stored.result,
+          pages: state.pages,
+          cache: new Map(),
+          signal: document.signal,
+          getTextContent: (pageIndex, signal) =>
+            document.workerService.getTextContent({ pageIndex, signal }),
+        })
+          .then((geometry) => {
+            if (document.signal.aborted) return;
+            if (geometry)
+              document.events.emit("workspace:focusTextRange", {
+                ...stored.result,
+                rect: geometry.rect,
+                behavior: "smooth",
+              });
+            else
+              document.events.emit("workspace:navigatePage", {
                 pageIndex: stored.result.pageIndex,
                 behavior: "smooth",
               });
-              return;
-            }
-
-            appEventBus.emit("workspace:focusTextRange", {
-              pageIndex: stored.result.pageIndex,
-              startOffset: stored.result.startOffset,
-              endOffset: stored.result.endOffset,
-              rect: geometry.rect,
-              behavior: "smooth",
-            });
-          })();
-          return;
-        }
+          })
+          .catch(() => {
+            /* Closing a document cancels its navigation. */
+          });
       }
     },
-    [editorState.pages.length, resolveSearchResultGeometry, workspace],
+    [workspace],
   );
 
   const clearConversation = useCallback(() => {

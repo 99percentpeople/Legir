@@ -140,7 +140,7 @@ export const LlmSettingsTab = ({
                     >
                       <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
                       <ProviderLogo
-                        providerId={connection.catalogId || ""}
+                        catalogId={connection.catalogId}
                         size={16}
                       />
                       <span className="truncate text-sm font-medium">

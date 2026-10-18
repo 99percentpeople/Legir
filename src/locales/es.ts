@@ -423,6 +423,8 @@ const es = {
   },
   ai_chat: {
     title: "Asistente IA",
+    document_link_reopen_required:
+      "El documento enlazado no está disponible o el acceso al archivo ha caducado. Vuelve a abrir el documento original y pulsa el enlace de nuevo.",
     history: "Historial",
     sessions: "Conversaciones",
     session_default: "Nuevo chat",
@@ -433,6 +435,8 @@ const es = {
     tool_result: "Resultado bruto",
     thinking: "Pensando",
     thought_for: "Pensó durante {duration}",
+    turn_activity: "Actividad",
+    turn_activity_duration: "Actividad · {duration}",
     duration_seconds: "{count}s",
     duration_minutes_seconds: "{minutes}min {seconds}s",
     duration_hours_minutes: "{hours}h {minutes}min",

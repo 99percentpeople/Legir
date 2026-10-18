@@ -16,7 +16,7 @@ import type {
 import {
   type InlineEditState,
   type MessageTimelineItem,
-  type TimelineRenderEntry,
+  type TimelineContentEntry,
   type UserMessageTimelineItem,
 } from "./types";
 import {
@@ -33,6 +33,8 @@ import {
   ThinkingMessageBubble,
 } from "./MessagePrimitives";
 import { ToolTimelineCall } from "./ToolTimeline";
+import { TurnActivity } from "./TurnActivity";
+import { buildTimelineRenderEntries } from "./timeline";
 
 interface ConversationTimelineProps {
   timeline: AiChatTimelineItem[];
@@ -232,265 +234,229 @@ export function ConversationTimeline({
     });
   }, [isBusy, timeline]);
 
-  const renderEntries = React.useMemo<TimelineRenderEntry[]>(() => {
-    const entries: TimelineRenderEntry[] = [];
+  const renderEntries = React.useMemo(
+    () => buildTimelineRenderEntries(timeline),
+    [timeline],
+  );
 
-    for (let index = 0; index < timeline.length; index += 1) {
-      const item = timeline[index]!;
-      if (
-        item.kind === "tool" &&
-        item.isParallelBatch &&
-        typeof item.batchId === "string"
-      ) {
-        const items = [item];
-        let nextIndex = index + 1;
-
-        while (nextIndex < timeline.length) {
-          const nextItem = timeline[nextIndex]!;
-          if (
-            nextItem.kind !== "tool" ||
-            !nextItem.isParallelBatch ||
-            nextItem.batchId !== item.batchId
-          ) {
-            break;
-          }
-          items.push(nextItem);
-          nextIndex += 1;
-        }
-
-        if (items.length > 1) {
-          entries.push({
-            kind: "tool_batch",
-            id: `${item.batchId}:${item.id}`,
-            items,
-          });
-          index = nextIndex - 1;
-          continue;
-        }
-      }
-
-      entries.push({ kind: "item", item });
+  const renderContentEntry = (entry: TimelineContentEntry): React.ReactNode => {
+    if (entry.kind === "tool_batch") {
+      return (
+        <Card key={entry.id} className="bg-background overflow-hidden">
+          <div className="divide-border/70 divide-y">
+            {entry.items.map((item) => (
+              <ToolTimelineCall key={item.id} item={item} grouped />
+            ))}
+          </div>
+        </Card>
+      );
     }
 
-    return entries;
-  }, [timeline]);
+    const { item } = entry;
+    if (item.kind !== "message") {
+      return <ToolTimelineCall key={item.id} item={item} />;
+    }
 
-  return (
-    <div className="flex flex-col gap-1.5">
-      {renderEntries.map((entry) => {
-        if (entry.kind === "tool_batch") {
-          return (
-            <Card key={entry.id} className="bg-background overflow-hidden">
-              <div className="divide-border/70 divide-y">
-                {entry.items.map((item) => (
-                  <ToolTimelineCall key={item.id} item={item} grouped />
-                ))}
-              </div>
-            </Card>
-          );
-        }
+    const isUser = item.role === "user";
+    const isThinking = item.role === "thinking";
+    const userMessage = isUser ? (item as UserMessageTimelineItem) : null;
+    const hasVisibleText = item.text.trim().length > 0;
+    const branchOptions = getBranchOptions(item);
+    const selectedBranchOptionId =
+      branchOptions.length > 0
+        ? getSelectedBranchOptionId(branchOptions)
+        : undefined;
+    const isLastAssistantSegment =
+      item.role === "assistant"
+        ? isLastAssistantSegmentForTurn(timeline, item)
+        : true;
+    const isInlineEditingThisMessage = inlineEditState?.messageId === item.id;
+    const messageAttachments = userMessage?.attachments ?? [];
+    const hasMessageAttachments = messageAttachments.length > 0;
 
-        const { item } = entry;
-        if (item.kind !== "message") {
-          return <ToolTimelineCall key={item.id} item={item} />;
-        }
-
-        const isUser = item.role === "user";
-        const isThinking = item.role === "thinking";
-        const userMessage = isUser ? (item as UserMessageTimelineItem) : null;
-        const hasVisibleText = item.text.trim().length > 0;
-        const branchOptions = getBranchOptions(item);
-        const selectedBranchOptionId =
-          branchOptions.length > 0
-            ? getSelectedBranchOptionId(branchOptions)
-            : undefined;
-        const isLastAssistantSegment =
-          item.role === "assistant"
-            ? isLastAssistantSegmentForTurn(timeline, item)
-            : true;
-        const isInlineEditingThisMessage =
-          inlineEditState?.messageId === item.id;
-        const messageAttachments = userMessage?.attachments ?? [];
-        const hasMessageAttachments = messageAttachments.length > 0;
-
-        return (
+    return (
+      <div
+        key={item.id}
+        className={cn("flex", isUser ? "justify-end" : "justify-start")}
+      >
+        {isThinking ? (
+          <ThinkingMessageBubble
+            text={item.text}
+            isStreaming={item.isStreaming}
+            showCollapsedPreview={item.showCollapsedPreview}
+            thinkingLabel={t("ai_chat.thinking")}
+            completedLabel={formatThinkingDuration(t, item.durationMs)}
+          />
+        ) : (
           <div
-            key={item.id}
             className={cn(
-              "flex",
-              isThinking && item.isStreaming && "sticky top-0 z-10 items-start",
-              isUser ? "justify-end" : "justify-start",
+              "flex min-w-0 flex-col gap-2",
+              isUser ? "max-w-[90%] items-end" : "w-full items-start",
             )}
           >
-            {isThinking ? (
-              <ThinkingMessageBubble
-                text={item.text}
-                isStreaming={item.isStreaming}
-                showCollapsedPreview={item.showCollapsedPreview}
-                thinkingLabel={t("ai_chat.thinking")}
-                completedLabel={formatThinkingDuration(t, item.durationMs)}
-              />
-            ) : (
-              <div
-                className={cn(
-                  "flex min-w-0 flex-col gap-2",
-                  isUser ? "max-w-[90%] items-end" : "w-full items-start",
-                )}
-              >
-                {isUser &&
-                hasMessageAttachments &&
-                !isInlineEditingThisMessage ? (
-                  <div className="space-y-2">
-                    {messageAttachments.map((attachment, index) => (
+            {isUser && hasMessageAttachments && !isInlineEditingThisMessage ? (
+              <div className="space-y-2">
+                {messageAttachments.map((attachment, index) => (
+                  <MessageAttachmentChip
+                    key={`${item.id}:attachment:${index}:${getMessageAttachmentKey(attachment)}`}
+                    attachment={attachment}
+                    onActivate={(nextAttachment) => {
+                      onActivateAttachment(nextAttachment);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {isUser && isInlineEditingThisMessage ? (
+              <div className="bg-primary text-primary-foreground flex w-full min-w-0 flex-col gap-1.5 rounded-lg px-3 py-[7px]">
+                {inlineEditState.attachments.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {inlineEditState.attachments.map((attachment) => (
                       <MessageAttachmentChip
-                        key={`${item.id}:attachment:${index}:${getMessageAttachmentKey(attachment)}`}
+                        key={getMessageAttachmentKey(attachment)}
                         attachment={attachment}
+                        inverted
                         onActivate={(nextAttachment) => {
                           onActivateAttachment(nextAttachment);
+                        }}
+                        onRemove={() => {
+                          onRemoveInlineEditAttachment(attachment);
                         }}
                       />
                     ))}
                   </div>
                 ) : null}
-
-                {isUser && isInlineEditingThisMessage ? (
-                  <div className="bg-primary text-primary-foreground flex w-full min-w-0 flex-col gap-1.5 rounded-lg px-3 py-[7px]">
-                    {inlineEditState.attachments.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {inlineEditState.attachments.map((attachment) => (
-                          <MessageAttachmentChip
-                            key={getMessageAttachmentKey(attachment)}
-                            attachment={attachment}
-                            inverted
-                            onActivate={(nextAttachment) => {
-                              onActivateAttachment(nextAttachment);
-                            }}
-                            onRemove={() => {
-                              onRemoveInlineEditAttachment(attachment);
-                            }}
-                          />
-                        ))}
-                      </div>
-                    ) : null}
-                    <Textarea
-                      ref={inlineEditTextareaRef}
-                      rows={1}
-                      value={inlineEditState.text}
-                      onChange={(event) =>
-                        onInlineEditChange(event.target.value)
-                      }
-                      placeholder={t("ai_chat.input_placeholder")}
-                      className="text-primary-foreground placeholder:text-primary-foreground/60 field-sizing-content max-h-[180px] min-h-0 resize-none overflow-y-auto border-0 bg-transparent! px-0 py-px shadow-none focus-visible:ring-0"
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault();
-                          onInlineEditSubmit();
-                        }
-                      }}
-                    />
-                    <div className="flex items-center justify-end gap-1 py-px">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground h-6 w-6 rounded-md"
-                        onClick={onCancelInlineEdit}
-                        aria-label={t("common.actions.cancel")}
-                      >
-                        <X size={13} />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        className="bg-primary-foreground/12 text-primary-foreground hover:bg-primary-foreground/18 h-6 w-6 rounded-md"
-                        onClick={onInlineEditSubmit}
-                        disabled={
-                          inlineEditState.text.trim().length === 0 &&
-                          inlineEditState.attachments.length === 0
-                        }
-                        aria-label={t("common.actions.send")}
-                      >
-                        <Send size={13} />
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {hasVisibleText || (!isUser && item.isStreaming) ? (
-                      <div
-                        className={cn(
-                          "max-w-full min-w-0 rounded-lg px-3 py-2 text-sm",
-                          isUser
-                            ? "bg-primary text-primary-foreground whitespace-pre-wrap"
-                            : "text-foreground w-full",
-                        )}
-                      >
-                        {hasVisibleText ? (
-                          isUser ? (
-                            <p className="whitespace-pre-wrap">{item.text}</p>
-                          ) : (
-                            <StreamMarkdown
-                              source={item.text}
-                              streaming={item.isStreaming}
-                              trailing={
-                                item.isStreaming ? (
-                                  <StreamingCursor />
-                                ) : undefined
-                              }
-                              className="w-full"
-                              onOpenDocumentLink={onOpenDocumentLink}
-                            />
-                          )
-                        ) : null}
-                        {!isUser && item.isStreaming && !hasVisibleText ? (
-                          <div className="mt-1.5 flex items-center">
-                            <StreamingCursor />
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <MessageActionBar
-                      align={isUser ? "end" : "start"}
-                      copied={copiedMessageId === item.id}
-                      branchOptions={
-                        !isUser && !isLastAssistantSegment ? [] : branchOptions
-                      }
-                      activeBranchSessionId={selectedBranchOptionId}
-                      onSelectBranch={(sessionId) => {
-                        onSelectSession(sessionId);
-                      }}
-                      canEdit={isUser && !isBusy}
-                      canRegenerate={
-                        !isUser &&
-                        isLastAssistantSegment &&
-                        !item.isStreaming &&
-                        !isBusy
-                      }
-                      onCopy={() => {
-                        void onCopyMessage(item);
-                      }}
-                      onEdit={
-                        userMessage
-                          ? () => {
-                              onEditUserMessage(userMessage);
-                            }
-                          : undefined
-                      }
-                      onRegenerate={
-                        !isUser
-                          ? () => {
-                              void onRegenerateMessage(item.id);
-                            }
-                          : undefined
-                      }
-                    />
-                  </>
-                )}
+                <Textarea
+                  ref={inlineEditTextareaRef}
+                  rows={1}
+                  value={inlineEditState.text}
+                  onChange={(event) => onInlineEditChange(event.target.value)}
+                  placeholder={t("ai_chat.input_placeholder")}
+                  className="text-primary-foreground placeholder:text-primary-foreground/60 field-sizing-content max-h-[180px] min-h-0 resize-none overflow-y-auto border-0 bg-transparent! px-0 py-px shadow-none focus-visible:ring-0"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      onInlineEditSubmit();
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-end gap-1 py-px">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground h-6 w-6 rounded-md"
+                    onClick={onCancelInlineEdit}
+                    aria-label={t("common.actions.cancel")}
+                  >
+                    <X size={13} />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    className="bg-primary-foreground/12 text-primary-foreground hover:bg-primary-foreground/18 h-6 w-6 rounded-md"
+                    onClick={onInlineEditSubmit}
+                    disabled={
+                      inlineEditState.text.trim().length === 0 &&
+                      inlineEditState.attachments.length === 0
+                    }
+                    aria-label={t("common.actions.send")}
+                  >
+                    <Send size={13} />
+                  </Button>
+                </div>
               </div>
+            ) : (
+              <>
+                {hasVisibleText || (!isUser && item.isStreaming) ? (
+                  <div
+                    className={cn(
+                      "max-w-full min-w-0 rounded-lg px-3 py-2 text-sm",
+                      isUser
+                        ? "bg-primary text-primary-foreground whitespace-pre-wrap"
+                        : "text-foreground w-full",
+                    )}
+                  >
+                    {hasVisibleText ? (
+                      isUser ? (
+                        <p className="whitespace-pre-wrap">{item.text}</p>
+                      ) : (
+                        <StreamMarkdown
+                          source={item.text}
+                          streaming={item.isStreaming}
+                          trailing={
+                            item.isStreaming ? <StreamingCursor /> : undefined
+                          }
+                          className="w-full"
+                          onOpenDocumentLink={onOpenDocumentLink}
+                        />
+                      )
+                    ) : null}
+                    {!isUser && item.isStreaming && !hasVisibleText ? (
+                      <div className="mt-1.5 flex items-center">
+                        <StreamingCursor />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                <MessageActionBar
+                  align={isUser ? "end" : "start"}
+                  copied={copiedMessageId === item.id}
+                  branchOptions={
+                    !isUser && !isLastAssistantSegment ? [] : branchOptions
+                  }
+                  activeBranchSessionId={selectedBranchOptionId}
+                  onSelectBranch={(sessionId) => {
+                    onSelectSession(sessionId);
+                  }}
+                  canEdit={isUser && !isBusy}
+                  canRegenerate={
+                    !isUser &&
+                    isLastAssistantSegment &&
+                    !item.isStreaming &&
+                    !isBusy
+                  }
+                  onCopy={() => {
+                    void onCopyMessage(item);
+                  }}
+                  onEdit={
+                    userMessage
+                      ? () => {
+                          onEditUserMessage(userMessage);
+                        }
+                      : undefined
+                  }
+                  onRegenerate={
+                    !isUser
+                      ? () => {
+                          void onRegenerateMessage(item.id);
+                        }
+                      : undefined
+                  }
+                />
+              </>
             )}
           </div>
-        );
-      })}
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {renderEntries.map((entry) =>
+        entry.kind === "completed_turn" ? (
+          <React.Fragment key={`completed:${entry.id}`}>
+            <TurnActivity durationMs={entry.durationMs}>
+              {entry.activity.map(renderContentEntry)}
+            </TurnActivity>
+            {renderContentEntry({ kind: "item", item: entry.finalMessage })}
+          </React.Fragment>
+        ) : (
+          renderContentEntry(entry)
+        ),
+      )}
       {isAwaitingFirstResponse ? <PendingAssistantBubble /> : null}
       <div ref={endRef} className="h-px shrink-0" />
     </div>

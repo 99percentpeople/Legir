@@ -426,6 +426,8 @@ const fr = {
   },
   ai_chat: {
     title: "Assistant IA",
+    document_link_reopen_required:
+      "Le document lié est indisponible ou l’accès au fichier a expiré. Rouvrez le document d’origine, puis cliquez à nouveau sur le lien.",
     history: "Historique",
     sessions: "Conversations",
     session_default: "Nouveau chat",
@@ -436,6 +438,8 @@ const fr = {
     tool_result: "Résultat brut",
     thinking: "Réflexion",
     thought_for: "Réflexion pendant {duration}",
+    turn_activity: "Activité",
+    turn_activity_duration: "Activité · {duration}",
     duration_seconds: "{count}s",
     duration_minutes_seconds: "{minutes}min {seconds}s",
     duration_hours_minutes: "{hours}h {minutes}min",

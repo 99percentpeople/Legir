@@ -123,7 +123,7 @@ export function AddAiConnection({
                   onSelect={() => onAdd(spec)}
                   onPointerMove={preserveSearchFocus}
                 >
-                  <ProviderLogo providerId={spec.id} size={16} />
+                  <ProviderLogo catalogId={spec.id} size={16} />
                   <span className="truncate">{spec.label}</span>
                 </DropdownMenuItem>
               ))}

@@ -9,17 +9,13 @@ import type { useAiChatController } from "@/hooks/useAiChatController";
 import type { AiWorkspace } from "@/services/ai/chat/workspace";
 import type { AiChatMessageAttachment } from "@/services/ai/chat/types";
 import { preload } from "@/utils/preload";
-import { preloadProviderLogos } from "@/components/ProviderLogo";
 
 type Controller = ReturnType<typeof useAiChatController>;
 const GlobalAiControllerHost = preload(
   () => import("./GlobalAiControllerHost"),
 );
 export async function preloadGlobalAiController() {
-  await Promise.allSettled([
-    GlobalAiControllerHost.preload(),
-    preloadProviderLogos(),
-  ]);
+  await Promise.allSettled([GlobalAiControllerHost.preload()]);
 }
 interface GlobalAiState {
   controller: Controller | null;

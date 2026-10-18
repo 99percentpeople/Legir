@@ -1056,6 +1056,9 @@ const normalizeStoredSearchResultForPersist = (
     ...(typeof raw.documentId === "string"
       ? { documentId: raw.documentId }
       : {}),
+    ...(typeof raw.documentLinkId === "string"
+      ? { documentLinkId: raw.documentLinkId }
+      : {}),
     result: {
       ...result,
       id: result.id || id,

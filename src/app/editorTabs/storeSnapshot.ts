@@ -1,6 +1,7 @@
 import { normalizeControlLayerOrders } from "@/lib/controlLayerOrder";
 import { prepareAnnotationsForStore } from "@/lib/inkGeometry";
 import { initialState } from "@/store/helpers";
+import { createShortId } from "@/utils/createShortId";
 import type {
   Annotation,
   EditorSaveTarget,
@@ -12,8 +13,6 @@ import type {
 } from "@/types";
 import type { LoadedPdfDocument } from "@/services/pdfService";
 import type { EditorTabSnapshot, EditorTabSession } from "./types";
-
-const WINDOW_ID_FALLBACK = "tab";
 
 const createShallowArrayCopy = <T>(value: T[]) => [...value];
 
@@ -63,8 +62,7 @@ export const getEditorTabSourceKey = (options: {
   return null;
 };
 
-export const createEditorTabId = () =>
-  `${WINDOW_ID_FALLBACK}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+export const createEditorTabId = () => createShortId("t");
 
 export const createEditorTabSnapshotFromState = (options: {
   state: DocumentState;

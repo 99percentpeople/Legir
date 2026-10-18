@@ -43,8 +43,13 @@ export const StreamMarkdown = React.memo(function StreamMarkdown({
       const anchor = event.target.closest("a[href]");
       if (!anchor || !event.currentTarget.contains(anchor)) return;
 
-      const target = parseAiDocumentLinkHref(anchor.getAttribute("href"));
-      if (!target) return;
+      const href = anchor.getAttribute("href");
+      const target = parseAiDocumentLinkHref(href);
+      if (!target) {
+        if (/^#(?:page|control|result)=/.test(href ?? ""))
+          event.preventDefault();
+        return;
+      }
 
       event.preventDefault();
       onOpenDocumentLink(target);

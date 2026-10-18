@@ -13,11 +13,10 @@ import {
 } from "@/hooks/useAiChatController/sessionPersistence";
 
 type MessageTimelineItem = Extract<AiChatTimelineItem, { kind: "message" }>;
-type AssistantTimelineSegment = MessageTimelineItem & {
-  role: "assistant";
-};
-
-export const getThinkingItemId = (turnId: string) => `${turnId}:thinking`;
+export const getThinkingItemId = (turnId: string, segmentIndex = 0) =>
+  segmentIndex <= 0
+    ? `${turnId}:thinking`
+    : `${turnId}:thinking_${segmentIndex}`;
 export const getAssistantSegmentId = (turnId: string, segmentIndex: number) =>
   segmentIndex <= 0 ? turnId : `${turnId}:segment_${segmentIndex}`;
 
@@ -90,14 +89,6 @@ const extractToolPreviewImages = (
   return previews.length > 0 ? previews : undefined;
 };
 
-const isAssistantTurnSegment = (
-  item: AiChatTimelineItem,
-  turnId: string,
-): item is AssistantTimelineSegment =>
-  item.kind === "message" &&
-  item.role === "assistant" &&
-  (item.turnId === turnId || item.id === turnId);
-
 const isToolTurnItem = (item: AiChatTimelineItem, turnId: string) =>
   item.kind === "tool" &&
   (item.turnId === turnId ||
@@ -111,43 +102,73 @@ const isTurnItem = (item: AiChatTimelineItem, turnId: string) =>
       item.id === getThinkingItemId(turnId))) ||
   isToolTurnItem(item, turnId);
 
-const markTurnCompleted = (items: AiChatTimelineItem[], turnId: string) => {
-  let lastTurnItemIndex = -1;
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    if (item && isTurnItem(item, turnId)) lastTurnItemIndex = index;
-  }
-  if (lastTurnItemIndex < 0) return items;
+const markTurnCompleted = (
+  items: AiChatTimelineItem[],
+  update: Extract<AiChatAssistantUpdate, { phase: "end" }>,
+  nowIso: string,
+) => {
+  const turnItems = items.filter((item) => isTurnItem(item, update.turnId));
+  const last = turnItems.at(-1);
+  if (!last) return items;
+  const durationMs =
+    update.durationMs ?? calculateDurationMs(turnItems[0]!.createdAt, nowIso);
+  const isFinalAnswer =
+    (update.isFinalAnswer ?? update.finishReason === "stop") &&
+    !turnItems.some(
+      (item) => item.kind === "tool" && item.status === "running",
+    );
 
-  return items.map((item, index) =>
-    isTurnItem(item, turnId)
+  return items.map((item) =>
+    isTurnItem(item, update.turnId)
       ? {
           ...item,
-          turnCompleted: index === lastTurnItemIndex ? true : undefined,
+          turnCompleted: item.id === last.id ? true : undefined,
+          turnDurationMs: item.id === last.id ? durationMs : undefined,
+          ...(item.kind === "message"
+            ? {
+                isFinalAnswer:
+                  item.role === "assistant" && item.id === last.id
+                    ? isFinalAnswer && !!item.text.trim()
+                    : undefined,
+              }
+            : {}),
         }
       : item,
   );
 };
 
-const getAssistantTurnSegments = (
+const getTurnMessageSegments = (
   items: AiChatTimelineItem[],
   turnId: string,
+  role: "assistant" | "thinking",
 ) =>
   items.flatMap((item, index) =>
-    isAssistantTurnSegment(item, turnId) ? [{ item, index }] : [],
+    item.kind === "message" && item.role === role && isTurnItem(item, turnId)
+      ? [{ item, index }]
+      : [],
   );
 
-const resolveFinalThinkingText = (currentText: string, finalText: string) => {
-  const current = currentText.trim();
-  const final = finalText.trim();
+const finishMessageSegment = (
+  item: MessageTimelineItem,
+  nowIso: string,
+): MessageTimelineItem => ({
+  ...item,
+  isStreaming: false,
+  ...(item.role === "thinking"
+    ? { durationMs: calculateDurationMs(item.createdAt, nowIso) }
+    : {}),
+});
 
-  if (!current) return finalText;
-  if (!final) return currentText;
-  if (final.startsWith(current)) return finalText;
-  if (current.startsWith(final)) return currentText;
-
-  return currentText;
-};
+const finishTurnSegments = (
+  items: AiChatTimelineItem[],
+  turnId: string,
+  nowIso: string,
+) =>
+  items.map((item) =>
+    item.kind === "message" && item.isStreaming && isTurnItem(item, turnId)
+      ? finishMessageSegment(item, nowIso)
+      : item,
+  );
 
 export const calculateDurationMs = (createdAt: string, endedAtIso?: string) => {
   const started = Date.parse(createdAt);
@@ -165,265 +186,165 @@ export const applyAssistantUpdateToTimeline = (
   prev: AiChatTimelineItem[],
   update: AiChatAssistantUpdate,
   nowIso: string,
+  documentId?: string,
 ): TimelineMutationResult => {
-  if (update.phase === "reasoning_delta") {
-    const thinkingId = getThinkingItemId(update.turnId);
-    const idx = prev.findIndex((item) => item.id === thinkingId);
-    if (idx < 0) {
-      const nextItem: AiChatTimelineItem = {
-        id: thinkingId,
-        kind: "message",
-        role: "thinking",
-        turnId: update.turnId,
-        text: update.delta,
-        showCollapsedPreview: update.showCollapsedPreview,
-        createdAt: nowIso,
-        isStreaming: true,
-      };
-      const assistantIdx = prev.findIndex((item) => item.id === update.turnId);
+  if (update.phase === "reasoning_delta" || update.phase === "delta") {
+    if (!update.delta) return { timeline: prev, touchedSession: false };
+    const role = update.phase === "reasoning_delta" ? "thinking" : "assistant";
+    const segments = getTurnMessageSegments(prev, update.turnId, role);
+    const last = segments.at(-1);
+    const canAppend =
+      last?.item.isStreaming &&
+      last.item.streamSegmentId === update.segmentId &&
+      !prev
+        .slice(last.index + 1)
+        .some((item) => isTurnItem(item, update.turnId));
+    if (canAppend) {
       const next = prev.slice();
-      if (assistantIdx >= 0) next.splice(assistantIdx, 0, nextItem);
-      else next.push(nextItem);
-      return { timeline: next, touchedSession: true };
+      next[last.index] = {
+        ...last.item,
+        documentId: last.item.documentId ?? documentId,
+        text: last.item.text + update.delta,
+        ...(update.phase === "reasoning_delta"
+          ? {
+              showCollapsedPreview:
+                update.showCollapsedPreview ?? last.item.showCollapsedPreview,
+            }
+          : {
+              branchAnchorId: last.item.branchAnchorId ?? update.branchAnchorId,
+            }),
+      };
+      return { timeline: next, touchedSession: false };
     }
 
-    const current = prev[idx];
-    if (!current || current.kind !== "message") {
-      return { timeline: prev, touchedSession: false };
-    }
-
-    const next = prev.slice();
-    next[idx] = {
-      ...current,
-      role: "thinking",
-      text: `${current.text}${update.delta}`,
-      showCollapsedPreview:
-        update.showCollapsedPreview ?? current.showCollapsedPreview,
+    // Each SDK block (including blocks after tools) keeps its position in the stream.
+    const next = finishTurnSegments(prev, update.turnId, nowIso);
+    const segmentIndex = last
+      ? (last.item.segmentIndex ?? segments.length - 1) + 1
+      : 0;
+    next.push({
+      id:
+        role === "thinking"
+          ? getThinkingItemId(update.turnId, segmentIndex)
+          : getAssistantSegmentId(update.turnId, segmentIndex),
+      kind: "message",
+      role,
+      documentId,
+      turnId: update.turnId,
+      segmentIndex,
+      streamSegmentId: update.segmentId,
+      text: update.delta,
+      ...(update.phase === "reasoning_delta"
+        ? { showCollapsedPreview: update.showCollapsedPreview }
+        : { branchAnchorId: update.branchAnchorId }),
+      createdAt: nowIso,
       isStreaming: true,
-    };
-    return { timeline: next, touchedSession: false };
-  }
-
-  if (update.phase === "delta") {
-    const thinkingId = getThinkingItemId(update.turnId);
-    const next = prev.slice();
-    const thinkingIdx = next.findIndex((item) => item.id === thinkingId);
-    if (thinkingIdx >= 0) {
-      const thinkingItem = next[thinkingIdx];
-      if (
-        thinkingItem &&
-        thinkingItem.kind === "message" &&
-        thinkingItem.role === "thinking" &&
-        thinkingItem.isStreaming
-      ) {
-        next[thinkingIdx] = {
-          ...thinkingItem,
-          isStreaming: false,
-          durationMs: calculateDurationMs(thinkingItem.createdAt, nowIso),
-        };
-      }
-    }
-
-    const assistantSegments = getAssistantTurnSegments(next, update.turnId);
-    const lastSegment = assistantSegments.at(-1);
-    const shouldCreateNewSegment =
-      !lastSegment ||
-      next.some(
-        (item, index) =>
-          index > lastSegment.index && isToolTurnItem(item, update.turnId),
-      );
-
-    if (shouldCreateNewSegment) {
-      const segmentIndex =
-        (lastSegment?.item.segmentIndex ?? 0) + (lastSegment ? 1 : 0);
-      next.push({
-        id: getAssistantSegmentId(update.turnId, segmentIndex),
-        kind: "message",
-        role: "assistant",
-        turnId: update.turnId,
-        segmentIndex,
-        text: update.delta,
-        branchAnchorId: update.branchAnchorId,
-        createdAt: nowIso,
-        isStreaming: true,
-      });
-      return { timeline: next, touchedSession: true };
-    }
-
-    const current = lastSegment.item;
-
-    next[lastSegment.index] = {
-      ...current,
-      role: "assistant",
-      text: `${current.text}${update.delta}`,
-      branchAnchorId: current.branchAnchorId ?? update.branchAnchorId,
-      isStreaming: true,
-    };
-    return { timeline: next, touchedSession: false };
-  }
-
-  const thinkingId = getThinkingItemId(update.turnId);
-  if (!update.assistantMessage && !update.reasoningText) {
-    const next = prev.map((item) => {
-      if (isAssistantTurnSegment(item, update.turnId)) {
-        return { ...item, isStreaming: false };
-      }
-      if (item.id === thinkingId && item.kind === "message") {
-        return {
-          ...item,
-          isStreaming: false,
-          durationMs: calculateDurationMs(item.createdAt),
-        };
-      }
-      return item;
     });
+    return { timeline: next, touchedSession: true };
+  }
+
+  if (update.phase === "segment_end") {
     return {
-      timeline: markTurnCompleted(next, update.turnId),
+      timeline: prev.map((item) =>
+        item.kind === "message" &&
+        item.role === update.role &&
+        item.isStreaming &&
+        isTurnItem(item, update.turnId) &&
+        item.streamSegmentId === update.segmentId
+          ? finishMessageSegment(item, nowIso)
+          : item,
+      ),
       touchedSession: false,
     };
   }
 
-  const next = prev.slice();
-  const assistantSegments = getAssistantTurnSegments(next, update.turnId);
-  const assistantExistingIdx = assistantSegments[0]?.index ?? -1;
-
-  if (update.reasoningText) {
-    const thinkingIdx = next.findIndex((item) => item.id === thinkingId);
-    const existingThinkingText =
-      thinkingIdx >= 0 &&
-      next[thinkingIdx]?.kind === "message" &&
-      next[thinkingIdx]?.role === "thinking"
-        ? next[thinkingIdx].text
-        : "";
-    const thinkingItem: AiChatTimelineItem = {
-      id: thinkingId,
+  const next = finishTurnSegments(prev, update.turnId, nowIso);
+  const thinkingSegments = getTurnMessageSegments(
+    next,
+    update.turnId,
+    "thinking",
+  );
+  // The final aggregate is a fallback for non-streamed output. Never merge it back
+  // into the first thinking bubble after the stream has already supplied blocks.
+  if (update.reasoningText.trim() && !thinkingSegments.length) {
+    const assistant = getTurnMessageSegments(
+      next,
+      update.turnId,
+      "assistant",
+    ).at(-1);
+    next.splice(assistant?.index ?? next.length, 0, {
+      id: getThinkingItemId(update.turnId),
       kind: "message",
       role: "thinking",
-      turnId: update.turnId,
-      text: resolveFinalThinkingText(
-        existingThinkingText,
-        update.reasoningText,
-      ),
-      showCollapsedPreview:
-        update.showCollapsedPreview ??
-        (thinkingIdx >= 0 &&
-        next[thinkingIdx]?.kind === "message" &&
-        next[thinkingIdx]?.role === "thinking"
-          ? next[thinkingIdx].showCollapsedPreview
-          : undefined),
-      createdAt: thinkingIdx >= 0 ? next[thinkingIdx]!.createdAt : nowIso,
-      durationMs:
-        thinkingIdx >= 0 &&
-        next[thinkingIdx]?.kind === "message" &&
-        next[thinkingIdx]?.role === "thinking"
-          ? calculateDurationMs(next[thinkingIdx]!.createdAt, nowIso)
-          : 0,
-      isStreaming: false,
-    };
-    if (thinkingIdx < 0) {
-      if (assistantExistingIdx >= 0)
-        next.splice(assistantExistingIdx, 0, thinkingItem);
-      else next.push(thinkingItem);
-    } else {
-      next[thinkingIdx] = thinkingItem;
-    }
-  } else {
-    const thinkingIdx = next.findIndex((item) => item.id === thinkingId);
-    if (thinkingIdx >= 0) {
-      const current = next[thinkingIdx];
-      if (current?.kind === "message") {
-        next[thinkingIdx] = {
-          ...current,
-          isStreaming: false,
-          durationMs: calculateDurationMs(current.createdAt, nowIso),
-        };
-      }
-    }
-  }
-
-  if (!update.assistantMessage) {
-    return {
-      timeline: markTurnCompleted(next, update.turnId),
-      touchedSession: true,
-    };
-  }
-
-  const currentSegments = getAssistantTurnSegments(next, update.turnId);
-  const lastSegment = currentSegments.at(-1);
-  if (!lastSegment) {
-    next.push({
-      id: update.turnId,
-      kind: "message",
-      role: "assistant",
+      documentId,
       turnId: update.turnId,
       segmentIndex: 0,
-      text: update.assistantMessage,
-      branchAnchorId: update.branchAnchorId,
+      text: update.reasoningText,
+      showCollapsedPreview: update.showCollapsedPreview,
       createdAt: nowIso,
+      durationMs: 0,
       isStreaming: false,
     });
-  } else {
-    const current = lastSegment.item;
-    const existingText = currentSegments.map(({ item }) => item.text).join("");
-    const remainder = update.assistantMessage.startsWith(existingText)
-      ? update.assistantMessage.slice(existingText.length)
-      : "";
-    const hasToolAfterLastSegment = next.some(
-      (item, index) =>
-        index > lastSegment.index && isToolTurnItem(item, update.turnId),
-    );
+  }
 
-    if (remainder && hasToolAfterLastSegment) {
-      next[lastSegment.index] = {
-        ...current,
-        role: "assistant",
-        branchAnchorId: current.branchAnchorId ?? update.branchAnchorId,
-        isStreaming: false,
-      };
+  const segments = getTurnMessageSegments(next, update.turnId, "assistant");
+  const last = segments.at(-1);
+  if (update.assistantMessage.trim()) {
+    const existingText = segments
+      .map(({ item }) => item.text)
+      .join("")
+      .trimStart();
+    const finalText = update.assistantMessage.trimStart();
+    const remainder = finalText.startsWith(existingText)
+      ? finalText.slice(existingText.length)
+      : "";
+    const hasFollowingContent =
+      last &&
+      next
+        .slice(last.index + 1)
+        .some((item) => isTurnItem(item, update.turnId));
+    if (!last || (remainder && hasFollowingContent)) {
+      const segmentIndex = last
+        ? (last.item.segmentIndex ?? segments.length - 1) + 1
+        : 0;
       next.push({
-        id: getAssistantSegmentId(
-          update.turnId,
-          (lastSegment.item.segmentIndex ?? 0) + 1,
-        ),
+        id: getAssistantSegmentId(update.turnId, segmentIndex),
         kind: "message",
         role: "assistant",
+        documentId,
         turnId: update.turnId,
-        segmentIndex: (lastSegment.item.segmentIndex ?? 0) + 1,
-        text: remainder,
-        branchAnchorId: current.branchAnchorId ?? update.branchAnchorId,
+        segmentIndex,
+        text: last ? remainder : update.assistantMessage,
+        branchAnchorId: update.branchAnchorId,
         createdAt: nowIso,
         isStreaming: false,
       });
-    } else {
-      const shouldReplaceFinalText =
-        !remainder && !update.assistantMessage.startsWith(existingText);
-      next[lastSegment.index] = {
-        ...current,
-        role: "assistant",
-        text: shouldReplaceFinalText
-          ? update.assistantMessage
-          : remainder
-            ? `${current.text}${remainder}`
-            : current.text,
-        branchAnchorId: current.branchAnchorId ?? update.branchAnchorId,
-        isStreaming: false,
+    } else if (last) {
+      const prefix = segments
+        .slice(0, -1)
+        .map(({ item }) => item.text)
+        .join("")
+        .trimStart();
+      const replacement = finalText.startsWith(prefix)
+        ? finalText.slice(prefix.length)
+        : undefined;
+      next[last.index] = {
+        ...last.item,
+        documentId: last.item.documentId ?? documentId,
+        // Trimming the aggregate must not duplicate earlier replies into the final one.
+        text:
+          existingText.trimEnd() === finalText.trimEnd()
+            ? last.item.text
+            : remainder
+              ? last.item.text + remainder
+              : (replacement ?? last.item.text),
+        branchAnchorId: last.item.branchAnchorId ?? update.branchAnchorId,
       };
     }
-
-    for (const segment of currentSegments.slice(0, -1)) {
-      const segmentItem = next[segment.index];
-      if (segmentItem && isAssistantTurnSegment(segmentItem, update.turnId)) {
-        next[segment.index] = {
-          ...segmentItem,
-          isStreaming: false,
-        };
-      }
-    }
   }
-
   return {
-    timeline: markTurnCompleted(next, update.turnId),
-    touchedSession: false,
+    timeline: markTurnCompleted(next, update, nowIso),
+    touchedSession: next.length !== prev.length,
   };
 };
 
@@ -431,13 +352,22 @@ export const applyToolUpdateToTimeline = (
   prev: AiChatTimelineItem[],
   update: AiChatToolUpdate,
   nowIso: string,
+  defaultDocumentId?: string,
+  resolveDocumentId: (id: string) => string = (id) => id,
 ): TimelineMutationResult => {
   if (update.phase === "start") {
     const turnId = getTurnIdFromBatchId(update.batchId);
+    const explicitDocumentId = getObjectRecord(update.call.args)?.document_id;
     const item: AiChatTimelineItem = {
       id: update.call.id,
       kind: "tool",
       toolCallId: update.call.id,
+      documentId:
+        update.call.name === "list_open_documents"
+          ? undefined
+          : typeof explicitDocumentId === "string"
+            ? resolveDocumentId(explicitDocumentId)
+            : defaultDocumentId,
       turnId,
       batchId: update.batchId,
       isParallelBatch: update.isParallelBatch,
@@ -446,12 +376,7 @@ export const applyToolUpdateToTimeline = (
       argsText: stringifyToolArgs(update.call.args),
       createdAt: nowIso,
     };
-    const next = prev.map((entry) => {
-      if (isAssistantTurnSegment(entry, turnId) && entry.isStreaming) {
-        return { ...entry, isStreaming: false };
-      }
-      return entry;
-    });
+    const next = finishTurnSegments(prev, turnId, nowIso);
     return {
       timeline: [...next, item],
       touchedSession: true,
@@ -459,12 +384,18 @@ export const applyToolUpdateToTimeline = (
   }
 
   if (update.phase === "success") {
+    const payload = getObjectRecord(update.result.payload);
+    const resultDocumentId = payload?.documentLinkId ?? payload?.documentId;
     return {
       timeline: prev.map((item) =>
         item.id === update.call.id && item.kind === "tool"
           ? {
               ...item,
               status: "done",
+              documentId:
+                typeof resultDocumentId === "string"
+                  ? resolveDocumentId(resultDocumentId)
+                  : item.documentId,
               resultSummary: update.result.summary,
               progressItems: undefined,
               progressCounts: undefined,

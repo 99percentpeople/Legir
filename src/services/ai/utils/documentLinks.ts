@@ -1,4 +1,4 @@
-export type AiDocumentLinkTarget = { documentId?: string } & (
+export type AiDocumentLinkTarget = { documentId: string } & (
   | {
       kind: "page";
       pageNumber: number;
@@ -35,7 +35,8 @@ export const parseAiDocumentLinkHref = (
 
   const params = new URLSearchParams(href.slice(1));
   const documentId = params.get("document")?.trim();
-  const scope = documentId ? { documentId } : {};
+  if (!documentId) return null;
+  const scope = { documentId };
 
   const pageNumberParam = params.get(AI_DOCUMENT_PAGE_HASH_KEY);
   if (pageNumberParam !== null) {

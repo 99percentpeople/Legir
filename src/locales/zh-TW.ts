@@ -459,6 +459,8 @@ const zhTW = {
   },
   ai_chat: {
     title: "AI 助手",
+    document_link_reopen_required:
+      "無法開啟連結對應的文件，或原檔案存取權限已失效。請重新開啟原文件後再次點擊連結。",
     history: "歷史記錄",
     sessions: "聊天記錄",
     session_default: "新對話",
@@ -469,6 +471,8 @@ const zhTW = {
     tool_result: "原始結果",
     thinking: "思考中",
     thought_for: "已思考（{duration}）",
+    turn_activity: "處理過程",
+    turn_activity_duration: "處理過程 · {duration}",
     duration_seconds: "{count}秒",
     duration_minutes_seconds: "{minutes}分{seconds}秒",
     duration_hours_minutes: "{hours}小時{minutes}分",

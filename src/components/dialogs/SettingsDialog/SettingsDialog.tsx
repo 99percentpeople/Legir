@@ -204,6 +204,7 @@ const SettingsDialog = ({
   const aiToolModelGroups = useMemo<ModelSelectGroup[]>(() => {
     return getChatModelGroups().map((group) => ({
       id: group.providerId,
+      catalogId: group.catalogId,
       label: group.label,
       options: group.models.map((model) => ({
         value: `${group.providerId}:${model.id}`,
@@ -224,6 +225,7 @@ const SettingsDialog = ({
     return filterModelSelectGroups(
       getVisionModelGroups().map((group) => ({
         id: group.providerId,
+        catalogId: group.catalogId,
         label: group.labelKey ? t(group.labelKey) : group.label,
         options: group.models.map((model) => ({
           value: `${group.providerId}:${model.id}`,

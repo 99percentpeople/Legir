@@ -1,5 +1,4 @@
 import { preload } from "@/utils/preload";
-import { preloadProviderLogos } from "@/components/ProviderLogo";
 
 // Rendering and preloading share these instances. Importing the registry does
 // not mount UI or start document runtimes.
@@ -16,13 +15,9 @@ export const PageEditor = preload(
 export const KeyboardShortcutsHelp = preload(
   () => import("@/components/KeyboardShortcutsHelp"),
 );
-export const SettingsDialog = preload(async () => {
-  const [module] = await Promise.all([
-    import("@/components/dialogs/SettingsDialog"),
-    preloadProviderLogos(),
-  ]);
-  return module;
-});
+export const SettingsDialog = preload(
+  () => import("@/components/dialogs/SettingsDialog"),
+);
 export const PdfPasswordDialog = preload(
   () => import("@/components/dialogs/PdfPasswordDialog"),
 );

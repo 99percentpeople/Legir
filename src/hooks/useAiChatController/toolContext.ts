@@ -1334,6 +1334,7 @@ export const createAiChatToolContext = (options: {
   store?: EditorViewApi;
   events?: EventBus<AppEventMap>;
   documentId?: string;
+  documentLinkId?: string;
 }) => {
   const useEditorView = options.store ?? defaultEditorStore;
   const appEventBus = options.events ?? defaultEventBus;
@@ -1416,6 +1417,7 @@ export const createAiChatToolContext = (options: {
       const id = `ai_sr_${batch}_${result.pageIndex}_${index}`;
       options.searchResultsRef.current.set(id, {
         documentId: options.documentId,
+        documentLinkId: options.documentLinkId,
         id,
         query,
         result,

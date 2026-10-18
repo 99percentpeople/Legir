@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { isAiProviderId } from "@/services/ai/providers/catalog";
 import { ModelCapabilityBadges } from "@/components/ModelCapabilityBadges";
 import { cn } from "@/utils/cn";
 
@@ -25,6 +24,7 @@ export type ModelSelectOption = {
 
 export type ModelSelectGroup = {
   id: string;
+  catalogId?: string;
   label?: string;
   options: ModelSelectOption[];
 };
@@ -102,13 +102,11 @@ export function ModelSelect(props: {
             <SelectGroup>
               {group.label && (
                 <SelectLabel className="flex items-center gap-1.5">
-                  {isAiProviderId(group.id) && (
-                    <ProviderLogo
-                      providerId={group.id}
-                      size={12}
-                      className="text-foreground/80"
-                    />
-                  )}
+                  <ProviderLogo
+                    catalogId={group.catalogId}
+                    size={12}
+                    className="text-foreground/80"
+                  />
                   <span>{group.label}</span>
                 </SelectLabel>
               )}

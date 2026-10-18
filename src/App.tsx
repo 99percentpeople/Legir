@@ -25,6 +25,7 @@ import { schedulePreload } from "@/lib/schedulePreload";
 import { useWorkspaceNavigation } from "./app/workspaceNavigation/useWorkspaceNavigation";
 import type { WorkspacePage } from "./app/workspaceNavigation/types";
 import { GlobalAiProvider } from "./app/ai/GlobalAiContext";
+import { createAiDocumentLinkRegistry } from "./app/ai/documentLinks";
 import type { AiWorkspace } from "./services/ai/chat/workspace";
 import {
   createIndexedDbRecentFilesStore,
@@ -361,7 +362,7 @@ const App: React.FC = () => {
     void setPlatformWindowTitle(windowTitle).catch(() => {});
   }, [windowTitle]);
 
-  const aiWorkspace = useMemo<AiWorkspace>(
+  const liveAiWorkspace = useMemo<AiWorkspace>(
     () => ({
       getActiveDocumentId: () =>
         tabsBackend.getWindowSnapshot(platformWindowId).layout.activeTabId,
@@ -1338,6 +1339,53 @@ const App: React.FC = () => {
     },
     [openWebHandleFile],
   );
+
+  const aiWorkspace = useMemo<AiWorkspace>(() => {
+    const links = createAiDocumentLinkRegistry({
+      storage: window.localStorage,
+      getSessions: () =>
+        tabsBackend.getWindowSnapshot(platformWindowId).sessions,
+      getDocument: liveAiWorkspace.getDocument,
+      openSource: async (source) => {
+        if (source.kind === "tauri") {
+          // Link navigation needs a runtime here, not a focus-only response
+          // from another desktop window.
+          await openTauriFilePathInCurrentWindow(source.path, {
+            skipInitialSourceKeyLookup: true,
+          });
+        } else {
+          const { handle, file, bytes } = await readWebRecentFileByPath(
+            source.path,
+          );
+          await openWebHandleFile({
+            path: source.path,
+            handle,
+            filename: file.name,
+            bytes,
+          });
+        }
+      },
+    });
+    return {
+      ...liveAiWorkspace,
+      getDocumentLinkId: links.getDocumentLinkId,
+      openDocumentLink: async (documentId) => {
+        try {
+          return await links.openDocumentLink(documentId);
+        } catch {
+          toast.error(t("ai_chat.document_link_reopen_required"));
+          return null;
+        }
+      },
+    };
+  }, [
+    liveAiWorkspace,
+    tabsBackend,
+    platformWindowId,
+    openTauriFilePathInCurrentWindow,
+    openWebHandleFile,
+    t,
+  ]);
 
   const handleOpenRecent = useCallback(
     async (entry: RecentFileEntry) => {

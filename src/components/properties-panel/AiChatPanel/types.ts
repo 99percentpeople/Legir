@@ -16,9 +16,19 @@ export type MessageTimelineItem = Extract<
 >;
 export type UserMessageTimelineItem = MessageTimelineItem & { role: "user" };
 
-export type TimelineRenderEntry =
+export type TimelineContentEntry =
   | { kind: "item"; item: AiChatTimelineItem }
   | { kind: "tool_batch"; id: string; items: ToolTimelineItem[] };
+
+export type TimelineRenderEntry =
+  | TimelineContentEntry
+  | {
+      kind: "completed_turn";
+      id: string;
+      activity: TimelineContentEntry[];
+      finalMessage: MessageTimelineItem;
+      durationMs?: number;
+    };
 
 export interface InlineEditState {
   messageId: string;

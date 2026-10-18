@@ -48,17 +48,59 @@ conversation remains available.
 History is unified under `app-ai-chat:workspace`. `unifiedHistory.ts` imports
 legacy per-document histories once, retaining their original storage entries as
 backups. Search results, message attachments and navigation links carry document
-IDs to prevent collisions between PDFs. IDs refer to live tabs; stale history
-links do not silently point to a newly opened document. This is a current-window
+IDs to prevent collisions between PDFs. Tool IDs refer to live tabs. Navigation
+uses persistent file bindings in `app-ai-document-links:v1`, managed by
+`src/app/ai/documentLinks.ts`; the saved browser recent-file key or desktop path
+is kept outside the model transcript. Reopening a PDF may create a new tab while
+its link identity remains fixed. This is a current-window
 workspace, not a cross-window document/AI coordinator.
+
+New live tab IDs use `t_` and persistent PDF link IDs use `d_`, followed by
+12 URL-safe random characters (72 bits from Web Crypto), for 14 characters total.
+The link registry retries collisions against its saved bindings. The source key
+stays internal, so file paths and filenames do not inflate model-facing IDs.
+Only the short PDF ID format is registered; earlier link formats are not migrated.
+
+The visible timeline retains stream order: every SDK text/reasoning block is
+identified within its model step, so reasoning after a tool call creates a new
+bubble. Block-end events stop each thinking timer; tool execution and final
+completion also settle unfinished blocks without extending finished timers.
+Only a successful final answer collapses earlier replies, thinking and tools
+into expandable activity. Interrupted, truncated and tool-limited runs stay
+visible. Continued runs join the same activity until a final answer or a new
+user message. The activity duration sums measured model-run time, excluding
+manual pauses between Continue actions.
+
+Activity grouping is a rendering projection. Stored timelines remain flat,
+retain optional block/completion/timing metadata, and keep their existing IDs
+for branching and context boundaries. Legacy history without timing can still
+expand its activity without displaying an invented duration. Provider reasoning
+replay continues to use the runtime transcript, independently of collapsed UI.
+
+Every page, field, annotation and search-result link requires an explicit
+`document=<encoded_documentLinkId>`. Tool results and turn instructions provide
+this persistent PDF reference, independently of the live `document_id` used for
+tool calls. Unscoped links and old tab IDs are not supported; the controller never
+guesses ownership from the active tab or surrounding messages. References are
+stored in `app-ai-document-links:v1` by `src/app/ai/documentLinks.ts`. A click
+reuses the matching open document or opens its saved browser handle/desktop path,
+waits for hydration, then navigates using the new document's event bus. Repeated
+clicks share an in-flight open. Unavailable/revoked handles and unknown bindings
+prompt the user to reopen the original document; filenames alone never retarget
+a link. Save As creates a separate binding for new links. Tool execution still
+requires a live document and never automatically reopens files.
 
 ### Runtime Helpers
 
 `chat/runtime/` contains provider-agnostic chat runtime helpers:
 
 - `messageContext.ts` converts persisted chat records into AI SDK messages.
-- `reasoningReplay.ts` strips or keeps reasoning content according to the
-  provider runtime replay policy.
+- `reasoningReplay.ts` preserves reasoning required by the provider. Tool calls
+  without replayable reasoning become internal context with their completed
+  results. This recovery runs before validation on every SDK step, as well as
+  when restoring and persisting conversations, so a missing/empty reasoning
+  response does not interrupt the tool loop. Available reasoning stays intact;
+  recovery does not synthesize reasoning or execute completed tools again.
 - `toolRuntime.ts` executes registered tools and reports tool lifecycle updates.
 - `requestRecovery.ts` handles retry/recovery behavior around model requests.
 - `imageCompression.ts` prepares image payloads for model context.
@@ -113,6 +155,10 @@ reset action. Switching protocols clears an override only when the new adapter
 cannot use it; no-auth connections remain no-auth.
 Model selectors continue to use `connectionId:modelId`; colons inside a model ID
 are preserved. Credentials remain user settings, never build-time variables.
+Model and translation groups carry `catalogId` separately for provider logos,
+loaded from `https://models.dev/logos/{catalogId}.svg`. Custom connections and
+pending or failed image loads show a local generic icon. Logos have no separate
+provider registry and never use connection IDs as provider identities.
 
 - `connections.ts` normalizes connections and migrates old preferences. The
   frozen `legacyProviders.ts` is only a migration schema, not an active provider

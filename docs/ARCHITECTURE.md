@@ -607,7 +607,7 @@ AI is optional and should be treated as an enhancement layer, not as the primary
 
 History uses the unified `app-ai-chat:workspace` storage key. Legacy per-document histories are merged once without deleting their source keys. Workspace history does not apply the legacy 20-conversation cap; per-conversation size limits and browser storage quotas still apply. Quota failure retains the last durable history instead of replacing it with one conversation. Concurrent cross-window history synchronization is not implemented.
 
-`src/services/ai/chat/workspaceToolRegistry.ts` exposes `list_open_documents` and routes document tools using `{ document_id, args }`. IDs cover the documents in the current window. An omitted ID is pinned to the document active at the start of that turn, not whichever tab happens to be active later. Explicit IDs allow reading/editing other open documents with their own workers, stores and permission checks. Closing a document cancels its tool operations; missing IDs never fall back to a different document. Document links and attachments retain their document IDs.
+`src/services/ai/chat/workspaceToolRegistry.ts` exposes `list_open_documents` and routes document tools using `{ document_id, args }`. IDs cover the documents in the current window. An omitted ID is pinned to the document active at the start of that turn, not whichever tab happens to be active later. Explicit IDs allow reading/editing other open documents with their own workers, stores and permission checks. Closing a document cancels its tool operations; missing IDs never fall back to a different document. Attachments retain their document IDs. Every navigation link requires `document=<encoded_documentLinkId>`, a persistent PDF reference from `src/app/ai/documentLinks.ts`, stored in `app-ai-document-links:v1`. New tab IDs use `t_` and PDF link IDs use `d_`, each with 12 URL-safe random characters (72 bits) from `src/utils/createShortId.ts`. Persistent ID allocation retries collisions with saved bindings. Source paths stay outside the model transcript. Unscoped links and earlier ID formats are not supported. Clicking a link finds the matching open file or reopens its saved browser handle/desktop path, waits for hydration and navigates within that document. Missing references or expired file access prompt the user to reopen the original document; they never redirect to the active tab. This reopening is a user navigation action, not part of AI tool execution.
 
 Relevant modules include:
 
@@ -620,6 +620,10 @@ These features should be integrated through service boundaries and editor action
 
 Provider runtime compatibility, reasoning controls, and transcript persistence
 live under `src/services/ai/providers/` and `src/hooks/useAiChatController/`.
+Chat timelines preserve SDK block order across tool calls. Completed answers
+render their earlier activity as an expandable group with measured duration;
+the persisted timeline and provider replay transcript remain separate from this
+presentation. Incomplete runs remain visible for continuation or recovery.
 
 AI provider settings are dynamic connections with stable IDs. Each connection
 pins its endpoint, protocol and credentials, and may reference a models.dev

@@ -29,6 +29,7 @@ export const registerTranslateOptionsFromProviders = () => {
     registeredConnectionIds.add(group.providerId);
     translateService.registerOptionGroup({
       id: group.providerId,
+      catalogId: group.catalogId,
       label: group.label,
       labelKey: group.labelKey,
       options: group.models.map((model) => ({

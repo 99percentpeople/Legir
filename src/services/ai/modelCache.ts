@@ -2,6 +2,7 @@ import { type AiProviderId } from "@/services/ai/providers/catalog";
 import {
   getAiSdkModelGroups,
   getAiSdkProviderModelOptions,
+  type AiSdkModelGroup,
 } from "@/services/ai/providers/modelSelection";
 import { getAiSdkModelCatalogProvider } from "@/services/ai/providers/modelCatalogRegistry";
 import { isAiSdkProviderConfigured } from "@/services/ai/providers/settings";
@@ -12,7 +13,6 @@ import {
 } from "@/services/ai/editorState";
 import { registerTranslateOptionsFromProviders } from "@/services/ai/translation";
 import { preferencesStore } from "@/store/preferencesStore";
-import type { LLMModelOption } from "@/services/ai/types";
 import type { AppOptions } from "@/types";
 import {
   initializeModelsDev,
@@ -131,14 +131,7 @@ export const loadModels = async (options?: LoadModelsOptions) => {
   );
 };
 
-export type VisionModelGroup = {
-  providerId: string;
-  label: string;
-  labelKey?: string;
-  isAvailable: boolean;
-  unavailableMessageKey?: string;
-  models: LLMModelOption[];
-};
+export type VisionModelGroup = AiSdkModelGroup;
 
 export const getVisionModelGroups = (): VisionModelGroup[] =>
   getAiSdkModelGroups({
@@ -147,14 +140,7 @@ export const getVisionModelGroups = (): VisionModelGroup[] =>
     kind: "vision",
   });
 
-export type ChatModelGroup = {
-  providerId: string;
-  label: string;
-  labelKey?: string;
-  isAvailable: boolean;
-  unavailableMessageKey?: string;
-  models: LLMModelOption[];
-};
+export type ChatModelGroup = AiSdkModelGroup;
 
 export const isChatAgentAvailable = () =>
   Object.keys(getCurrentOptions().llm).some((providerId) =>

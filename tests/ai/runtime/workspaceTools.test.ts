@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { createWorkspaceAiToolRegistry } from "@/services/ai/chat/workspaceToolRegistry";
+import { getAiChatSystemInstruction } from "@/services/ai/chat/prompts";
 import type {
   AiWorkspace,
   AiWorkspaceDocument,
@@ -70,6 +71,51 @@ function setup() {
 }
 
 describe("workspace AI targeting", () => {
+  it("uses persistent document references in links while keeping tool execution bound to the live tab", async () => {
+    const { workspace, lifetimes } = setup();
+    workspace.getDocumentLinkId = (id) => `d_${id.repeat(12)}`;
+    const execute = vi.fn(async () => ({
+      payload: { links: ["#page=1", "#control=field"] },
+      summary: "read",
+    }));
+    const createRegistry = vi.fn(() => ({ getDefinitions: () => [], execute }));
+    const registry = createWorkspaceAiToolRegistry({
+      workspace,
+      defaultDocumentId: "A",
+      definitions: [
+        {
+          name: "read",
+          description: "read",
+          accessType: "read",
+          inputSchema: z.object({}),
+        },
+      ],
+      createRegistry,
+    });
+    expect(
+      registry.getDefinitions()[0].promptInstructions?.join("\n"),
+    ).toContain("&document=d_AAAAAAAAAAAA");
+    expect(
+      getAiChatSystemInstruction({
+        toolDefinitions: registry.getDefinitions(),
+      }),
+    ).toContain("&document=d_AAAAAAAAAAAA");
+    expect((await registry.execute("read", { args: {} })).payload).toEqual({
+      documentId: "A",
+      documentLinkId: "d_AAAAAAAAAAAA",
+      links: [
+        "#page=1&document=d_AAAAAAAAAAAA",
+        "#control=field&document=d_AAAAAAAAAAAA",
+      ],
+    });
+    expect(createRegistry).toHaveBeenCalledExactlyOnceWith("A");
+    lifetimes.get("A")!.abort();
+    expect(
+      (await registry.execute("read", { args: {} })).payload,
+    ).toMatchObject({ error: "DOCUMENT_CLOSED" });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
   it("pins defaults, validates explicit IDs and exposes the live active document", async () => {
     const { workspace } = setup();
     const execute = vi.fn(async () => ({
@@ -308,6 +354,15 @@ describe("workspace AI targeting", () => {
   });
 
   it("keeps document identity on links even when control IDs collide", () => {
+    for (const href of [
+      "#page=3",
+      "#control=shared",
+      "#result=match",
+      "#page=3&document=",
+      "#page=3&document=%20",
+    ]) {
+      expect(parseAiDocumentLinkHref(href)).toBeNull();
+    }
     expect(parseAiDocumentLinkHref("#control=shared&document=B")).toEqual({
       kind: "control",
       controlId: "shared",
