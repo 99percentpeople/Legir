@@ -482,11 +482,36 @@ export const annotationTypesSchema = z.array(
 );
 export const stringArraySchema = z.array(z.string());
 
+const resultOffsetSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(Number.MAX_SAFE_INTEGER)
+  .optional()
+  .default(0)
+  .describe(
+    "Zero-based result offset. Use nextOffset from the previous response, keeping filters unchanged. Restart at 0 after edits.",
+  );
+
 export const getPagesTextArgsSchema = z
   .object({
     page_numbers: requiredPageNumbersSchema.describe(
       "Required 1-based page selectors. Use [[1, 20]] for a continuous range; [1, 20] means only pages 1 and 20. Mixed selectors are allowed, e.g. [1, [5, 10], 20].",
     ),
+    cursor: z
+      .object({
+        page_number: positiveIntSchema,
+        char_offset: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(Number.MAX_SAFE_INTEGER),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Copy nextCursor to continue. Keep page_numbers and include_layout unchanged.",
+      ),
     include_layout: z
       .boolean()
       .optional()
@@ -504,6 +529,7 @@ export const searchDocumentArgsSchema = z
     regex_flags: z.string().optional(),
     page_numbers: pageNumbersSchema.optional().default([]),
     case_sensitive: z.boolean().optional().default(false),
+    offset: resultOffsetSchema,
     max_results: positiveIntSchema.optional().default(20),
   })
   .strict();
@@ -513,47 +539,10 @@ export const listAnnotationsArgsSchema = z
     query: z.string().optional(),
     page_numbers: pageNumbersSchema.optional().default([]),
     types: annotationTypesSchema.optional().default([]),
+    offset: resultOffsetSchema,
     max_results: positiveIntSchema.optional().default(100),
   })
   .strict();
-
-export const updateAnnotationTextsArgsSchema = z.preprocess(
-  (value) => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return value;
-    }
-    const record = value as Record<string, unknown>;
-    if ("updates" in record) return record;
-    if (
-      typeof record.annotation_id === "string" &&
-      typeof record.text === "string"
-    ) {
-      return {
-        updates: [
-          {
-            annotation_id: record.annotation_id,
-            text: record.text,
-          },
-        ],
-      };
-    }
-    return record;
-  },
-  z
-    .object({
-      updates: z
-        .array(
-          z
-            .object({
-              annotation_id: z.string().min(1),
-              text: z.string(),
-            })
-            .strict(),
-        )
-        .min(1),
-    })
-    .strict(),
-);
 
 export const deleteAnnotationsArgsSchema = z.preprocess(
   (value) => value,
@@ -584,6 +573,7 @@ export const listFormFieldsArgsSchema = z
       .describe(
         "When true, also return each field's page-space rectangle. Prefer true when the user asks for field locations or when a later action needs visual targeting.",
       ),
+    offset: resultOffsetSchema,
     max_results: positiveIntSchema.optional().default(100),
   })
   .strict();
@@ -882,74 +872,55 @@ const ensureAnnotationPatchPayload = (
   }
 };
 
-const highlightAnnotationUpdateInputSchema = z
+// Text-only edits work for any annotation. Geometry/style edits must name
+// the kind so incompatible properties are rejected before touching the store.
+export const updateAnnotationsArgsSchema = z
   .object({
-    annotation_id: z.string().min(1),
-    text: z.string().optional(),
-    rect: annotationRectPatchArgsSchema.optional(),
-    style: sharedAnnotationStyleArgsSchema.strict().optional(),
+    updates: z
+      .array(
+        z.union([
+          z
+            .object({
+              annotation_id: z.string().trim().min(1),
+              text: z.string(),
+            })
+            .strict(),
+          z
+            .discriminatedUnion("annotation_type", [
+              z
+                .object({
+                  annotation_id: z.string().trim().min(1),
+                  annotation_type: z.literal("highlight"),
+                  text: z.string().optional(),
+                  rect: annotationRectPatchArgsSchema.optional(),
+                  style: sharedAnnotationStyleArgsSchema.strict().optional(),
+                })
+                .strict(),
+              z
+                .object({
+                  annotation_id: z.string().trim().min(1),
+                  annotation_type: z.literal("freetext"),
+                  text: z.string().optional(),
+                  rect: annotationRectPatchArgsSchema.optional(),
+                  style: freetextAnnotationStyleArgsSchema.optional(),
+                })
+                .strict(),
+              z
+                .object({
+                  annotation_id: z.string().trim().min(1),
+                  annotation_type: z.literal("shape"),
+                  text: z.string().optional(),
+                  rect: annotationRectPatchArgsSchema.optional(),
+                  style: shapeAnnotationStyleArgsSchema.optional(),
+                })
+                .strict(),
+            ])
+            .superRefine(ensureAnnotationPatchPayload),
+        ]),
+      )
+      .min(1),
   })
-  .strict()
-  .superRefine(ensureAnnotationPatchPayload);
-
-const freetextAnnotationUpdateInputSchema = z
-  .object({
-    annotation_id: z.string().min(1),
-    text: z.string().optional(),
-    rect: annotationRectPatchArgsSchema.optional(),
-    style: freetextAnnotationStyleArgsSchema.optional(),
-  })
-  .strict()
-  .superRefine(ensureAnnotationPatchPayload);
-
-const shapeAnnotationUpdateInputSchema = z
-  .object({
-    annotation_id: z.string().min(1),
-    text: z.string().optional(),
-    rect: annotationRectPatchArgsSchema.optional(),
-    style: shapeAnnotationStyleArgsSchema.optional(),
-  })
-  .strict()
-  .superRefine(ensureAnnotationPatchPayload);
-
-const createSingleOrBatchAnnotationUpdateArgsSchema = <
-  TSchema extends ZodTypeAny,
->(
-  itemSchema: TSchema,
-) =>
-  z.preprocess(
-    (value) => {
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return value;
-      }
-      const record = value as Record<string, unknown>;
-      if ("updates" in record) return record;
-      if (typeof record.annotation_id === "string") {
-        return { updates: [record] };
-      }
-      return record;
-    },
-    z
-      .object({
-        updates: z.array(itemSchema).min(1),
-      })
-      .strict(),
-  );
-
-export const updateHighlightAnnotationsArgsSchema =
-  createSingleOrBatchAnnotationUpdateArgsSchema(
-    highlightAnnotationUpdateInputSchema,
-  );
-
-export const updateFreetextAnnotationsArgsSchema =
-  createSingleOrBatchAnnotationUpdateArgsSchema(
-    freetextAnnotationUpdateInputSchema,
-  );
-
-export const updateShapeAnnotationsArgsSchema =
-  createSingleOrBatchAnnotationUpdateArgsSchema(
-    shapeAnnotationUpdateInputSchema,
-  );
+  .strict();
 
 const createFreetextAnnotationInputSchema = z
   .object({
@@ -1026,28 +997,30 @@ export const createFormFieldsArgsSchema = z
   })
   .strict();
 
-export const focusControlArgsSchema = z
+export const navigateArgsSchema = z
   .object({
-    control_id: z.string().min(1),
-    select: z
-      .boolean()
-      .optional()
-      .default(false)
-      .describe(
-        "When true, also select the focused control in the workspace. Defaults to false to avoid switching the properties panel.",
-      ),
-  })
-  .strict();
-
-export const navigatePageArgsSchema = z
-  .object({
-    page_number: positiveIntSchema,
-  })
-  .strict();
-
-export const focusResultArgsSchema = z
-  .object({
-    result_id: z.string().min(1),
+    target: z.discriminatedUnion("type", [
+      z
+        .object({ type: z.literal("page"), page_number: positiveIntSchema })
+        .strict(),
+      z
+        .object({
+          type: z.literal("control"),
+          control_id: z.string().trim().min(1),
+          select: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("Also select the control. Defaults to false."),
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("result"),
+          result_id: z.string().trim().min(1),
+        })
+        .strict(),
+    ]),
   })
   .strict();
 

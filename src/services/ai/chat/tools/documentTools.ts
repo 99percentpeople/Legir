@@ -418,13 +418,17 @@ const summarizeUnlockStatus = (payload: {
 
 const GET_PAGES_TEXT_TOOL_PROMPTS = [
   "get_pages_text preserves inferred spaces and line breaks from the PDF while remaining compatible with anchor highlighting.",
-  "get_pages_text may truncate at the user-configured text budget. If the result is truncated, call it again with fewer or narrower page_numbers before making claims about omitted content.",
+  "get_pages_text may truncate at the user-configured text budget. If the result is truncated, pass nextCursor as cursor with the same page_numbers and include_layout to continue, including inside a long page. Stop when nextCursor is null; restart without a cursor after document edits.",
   "For tables, forms, multi-column pages, or irregular layout, call get_pages_text with include_layout true before creating document anchors.",
   "When get_pages_text returns line data, prefer anchors that stay within one line or two adjacent lines instead of stitching distant layout regions together.",
   "If get_pages_text returns no useful text for a page and inspect_pages_visual is available, follow up with inspect_pages_visual instead of assuming the page has no usable content.",
 ];
 
+const RESULT_PAGINATION_PROMPT =
+  "search_document, list_annotations and list_fields return total, returned, offset and nextOffset. When nextOffset is non-null, pass it as offset with the same filters to get more results. Collect all needed ids before edits; restart at offset 0 if edits change the result set.";
+
 const SEARCH_DOCUMENT_TOOL_PROMPTS = [
+  RESULT_PAGINATION_PROMPT,
   "search_document only works on documents or pages that have a usable text layer. It is ineffective for image-only scans unless OCR text is already present.",
   "When plain search may fail because of whitespace, punctuation, line breaks, or OCR noise, retry regex such as word1\\s*word2.",
   "search_document result_ids only refer to the exact matchText of each hit. snippet is surrounding context only.",
@@ -433,6 +437,7 @@ const SEARCH_DOCUMENT_TOOL_PROMPTS = [
 ];
 
 const LIST_ANNOTATIONS_TOOL_PROMPTS = [
+  RESULT_PAGINATION_PROMPT,
   "If the user asks about comments, notes, highlights, links, or annotations, call list_annotations.",
   "When list_annotations returns highlight annotations, check highlightedText to inspect the actual quoted source text when available.",
   "When list_annotations returns link annotations, inspect linkUrl and linkDestPageNumber to understand the hyperlink target.",
@@ -442,6 +447,7 @@ const LIST_ANNOTATIONS_TOOL_PROMPTS = [
 ];
 
 const LIST_FIELDS_TOOL_PROMPTS = [
+  RESULT_PAGINATION_PROMPT,
   "If the user asks to fill or update form fields and ids, options, or field mapping are unclear, call list_fields first.",
   "If the user asks where a field is, wants to inspect field geometry, or needs a visually targetable field list, call list_fields with include_layout: true.",
   "If form-filling instructions may be encoded in comments, highlights, or notes, call list_annotations together with list_fields before filling.",
@@ -678,7 +684,7 @@ export const documentToolModule = defineToolModule((ctx) => {
     get_pages_text: createToolBuilder("get_pages_text")
       .read()
       .description(
-        "Read full text for one or more pages. Text preserves PDF line breaks and inferred spaces. page_numbers is an array of selectors: use [[1, 20]] for pages 1-20; [1, 20] means only pages 1 and 20. Prefer the full relevant range, then narrow only if truncated. Optionally include per-line layout rectangles. The per-call text budget is configured in AI chat settings.",
+        "Read full text for one or more pages. Text preserves PDF line breaks and inferred spaces. page_numbers is an array of selectors: use [[1, 20]] for pages 1-20; [1, 20] means only pages 1 and 20. Use nextCursor to continue when truncated. Optionally include per-line layout rectangles. The per-call text budget is configured in AI chat settings.",
       )
       .promptInstructions(GET_PAGES_TEXT_TOOL_PROMPTS)
       .inputSchema(getPagesTextArgsSchema)
@@ -686,6 +692,7 @@ export const documentToolModule = defineToolModule((ctx) => {
         const result = await toolCtx.getPagesText({
           pageNumbers: args.page_numbers,
           includeLayout: args.include_layout,
+          cursor: args.cursor,
           signal,
         });
 
@@ -716,13 +723,14 @@ export const documentToolModule = defineToolModule((ctx) => {
           };
         }
 
-        const results = await toolCtx.searchDocument({
+        const { items: results, ...pagination } = await toolCtx.searchDocument({
           query,
           mode: args.mode,
           regexFlags: args.regex_flags?.trim() || undefined,
           pageNumbers: args.page_numbers,
           caseSensitive: args.case_sensitive,
           maxResults: args.max_results,
+          offset: args.offset,
           signal,
         });
         const remembered = toolCtx.rememberSearchResults(query, results);
@@ -730,7 +738,7 @@ export const documentToolModule = defineToolModule((ctx) => {
         return {
           payload: {
             query,
-            total: remembered.length,
+            ...pagination,
             results: remembered,
           },
           summary: summarizeSearchResults(remembered),
@@ -750,6 +758,7 @@ export const documentToolModule = defineToolModule((ctx) => {
           pageNumbers: args.page_numbers,
           types: args.types,
           maxResults: args.max_results,
+          offset: args.offset,
         });
 
         return {
@@ -773,6 +782,7 @@ export const documentToolModule = defineToolModule((ctx) => {
           includeReadOnly: args.include_read_only,
           includeLayout: args.include_layout,
           maxResults: args.max_results,
+          offset: args.offset,
         });
 
         return {

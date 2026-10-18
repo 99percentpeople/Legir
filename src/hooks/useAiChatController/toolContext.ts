@@ -1,3 +1,4 @@
+import { paginateAiResults } from "@/services/ai/chat/pagination";
 import type { MutableRefObject } from "react";
 
 import {
@@ -61,9 +62,7 @@ import type {
   AiCreateAnnotationsResult,
   AiCreateAnnotationResultItem,
   AiCreateFreetextAnnotationInput,
-  AiAnnotationTextBatchUpdateResult,
   AiAnnotationListResult,
-  AiAnnotationTextUpdateResult,
   AiChatSelectionAttachment,
   AiCreateFormFieldInput,
   AiCreateFormFieldsResult,
@@ -1284,9 +1283,6 @@ const annotationSupportsRectResize = (annotation: Annotation) =>
   annotation.type === "shape" ||
   annotation.type === "link";
 
-const annotationSupportsTextUpdate = (annotation: Annotation) =>
-  annotation.type !== "link";
-
 const unlockFailureMessage = (
   status: AiPdfPermissionUnlockResult["status"],
 ) => {
@@ -1440,16 +1436,12 @@ export const createAiChatToolContext = (options: {
     includeReadOnly?: boolean;
     includeLayout?: boolean;
     maxResults?: number;
+    offset?: number;
   }): AiFormFieldListResult => {
     const pageNumbers = (optionsInput.pageNumbers ?? [])
       .map((pageNumber) => Math.trunc(pageNumber))
       .filter((pageNumber) => Number.isFinite(pageNumber) && pageNumber >= 1);
     const pageNumberSet = pageNumbers.length > 0 ? new Set(pageNumbers) : null;
-    const maxResults = Math.min(
-      500,
-      Math.max(1, Math.trunc(optionsInput.maxResults ?? 100) || 100),
-    );
-
     const fields = [...useEditorView.getState().fields]
       .sort((a, b) => {
         if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex;
@@ -1469,12 +1461,8 @@ export const createAiChatToolContext = (options: {
         return matchesFormFieldQuery(field, optionsInput.query);
       });
 
-    return {
-      total: fields.length,
-      returned: Math.min(fields.length, maxResults),
-      truncated: fields.length > maxResults,
-      fields: fields.slice(0, maxResults),
-    };
+    const { items, ...pagination } = paginateAiResults(fields, optionsInput);
+    return { ...pagination, fields: items };
   };
 
   const fillFormFields = (optionsInput: {
@@ -2162,7 +2150,7 @@ export const createAiChatToolContext = (options: {
       store.setState((state) => ({
         fields: [...state.fields, ...createdFields],
         // Creating fields from AI should not steal focus from the chat panel.
-        // The model can call focus_control when the user explicitly asks to jump.
+        // The model can call navigate when the user explicitly asks to jump.
         isDirty: true,
       }));
     }
@@ -2249,6 +2237,7 @@ export const createAiChatToolContext = (options: {
     pageNumbers?: number[];
     types?: AiAnnotationKind[];
     maxResults?: number;
+    offset?: number;
   }): AiAnnotationListResult => {
     const store = useEditorView.getState();
     const selectedTypes = (optionsInput.types ?? []).filter(
@@ -2261,147 +2250,11 @@ export const createAiChatToolContext = (options: {
       selectedTypes,
     });
     const sorted = sortAnnotationsForList(filtered);
-    const limit = Math.max(1, Math.trunc(optionsInput.maxResults ?? 100));
-    const annotations = sorted
-      .slice(0, limit)
-      .flatMap((annotation) => summarizeAnnotation(annotation) ?? []);
-
-    return {
-      total: sorted.length,
-      returned: annotations.length,
-      truncated: annotations.length < sorted.length,
-      annotations,
-    };
-  };
-
-  const updateAnnotationText = (optionsInput: {
-    annotationId: string;
-    text: string;
-  }): AiAnnotationTextUpdateResult => {
-    const store = useEditorView.getState();
-    const annotation = store.annotations.find(
-      (item) => item.id === optionsInput.annotationId,
+    const summaries = sorted.flatMap(
+      (annotation) => summarizeAnnotation(annotation) ?? [],
     );
-
-    if (!annotation) {
-      return {
-        ok: false,
-        annotationId: optionsInput.annotationId,
-        status: "rejected",
-        reason: "Annotation not found.",
-      };
-    }
-
-    const type = getAiAnnotationKind(annotation);
-    const nextText = optionsInput.text;
-    const previousText = annotation.text ?? "";
-    if (previousText === nextText) {
-      return {
-        ok: true,
-        annotationId: annotation.id,
-        pageNumber: annotation.pageIndex + 1,
-        type: type ?? undefined,
-        previousText,
-        text: nextText,
-        status: "unchanged",
-      };
-    }
-
-    store.saveCheckpoint();
-    store.updateAnnotation(annotation.id, { text: nextText });
-
-    return {
-      ok: true,
-      annotationId: annotation.id,
-      pageNumber: annotation.pageIndex + 1,
-      type: type ?? undefined,
-      previousText,
-      text: nextText,
-      status: "updated",
-    };
-  };
-
-  const updateAnnotationTexts = (optionsInput: {
-    updates: Array<{
-      annotationId: string;
-      text: string;
-    }>;
-  }): AiAnnotationTextBatchUpdateResult => {
-    const results: AiAnnotationTextUpdateResult[] = [];
-    let updatedCount = 0;
-    let unchangedCount = 0;
-    let rejectedCount = 0;
-
-    const pendingUpdates = optionsInput.updates.filter(
-      (item) => item.annotationId.trim().length > 0,
-    );
-    if (pendingUpdates.length === 0) {
-      return {
-        updatedCount: 0,
-        unchangedCount: 0,
-        rejectedCount: 0,
-        updates: [],
-      };
-    }
-
-    let savedCheckpoint = false;
-    for (const item of pendingUpdates) {
-      const currentStore = useEditorView.getState();
-      const annotation = currentStore.annotations.find(
-        (candidate) => candidate.id === item.annotationId,
-      );
-
-      if (!annotation) {
-        rejectedCount += 1;
-        results.push({
-          ok: false,
-          annotationId: item.annotationId,
-          status: "rejected",
-          reason: "Annotation not found.",
-        });
-        continue;
-      }
-
-      const type = getAiAnnotationKind(annotation);
-      const previousText = annotation.text ?? "";
-      if (previousText === item.text) {
-        unchangedCount += 1;
-        results.push({
-          ok: true,
-          annotationId: annotation.id,
-          pageNumber: annotation.pageIndex + 1,
-          type: type ?? undefined,
-          previousText,
-          text: item.text,
-          status: "unchanged",
-        });
-        continue;
-      }
-
-      if (!savedCheckpoint) {
-        currentStore.saveCheckpoint();
-        savedCheckpoint = true;
-      }
-
-      currentStore.updateAnnotation(annotation.id, { text: item.text });
-      updatedCount += 1;
-      results.push({
-        ok: true,
-        annotationId: annotation.id,
-        pageNumber: annotation.pageIndex + 1,
-        type: type ?? undefined,
-        previousText,
-        text: item.text,
-        status: "updated",
-      });
-    }
-
-    return {
-      updatedCount,
-      unchangedCount,
-      rejectedCount,
-      updates: results,
-    };
+    const { items, ...pagination } = paginateAiResults(summaries, optionsInput);
+    return { ...pagination, annotations: items };
   };
 
   const updateAnnotations = (optionsInput: {
@@ -2430,7 +2283,10 @@ export const createAiChatToolContext = (options: {
       }
 
       const actualType = getAiAnnotationKind(target);
-      if (!actualType || actualType !== update.annotationType) {
+      if (
+        !actualType ||
+        (update.annotationType && actualType !== update.annotationType)
+      ) {
         results.push({
           annotationId: target.id,
           pageNumber: target.pageIndex + 1,
@@ -2438,6 +2294,15 @@ export const createAiChatToolContext = (options: {
           subType: target.type === "shape" ? target.shapeType : undefined,
           status: "rejected",
           reason: `annotation_type mismatch. Expected ${actualType ?? "unknown"} for this annotation.`,
+        });
+        continue;
+      }
+
+      if (!update.annotationType && (update.rect || update.style)) {
+        results.push({
+          annotationId: target.id,
+          status: "rejected",
+          reason: "annotation_type is required for geometry or style updates.",
         });
         continue;
       }
@@ -2470,10 +2335,7 @@ export const createAiChatToolContext = (options: {
       };
 
       if (update.text !== undefined) {
-        if (
-          annotationSupportsTextUpdate(target) &&
-          (target.text ?? "") !== update.text
-        ) {
+        if ((target.text ?? "") !== update.text) {
           patch.text = update.text;
           updatedProperties.push("text");
         }
@@ -3604,8 +3466,6 @@ export const createAiChatToolContext = (options: {
     updateDocumentMetadata,
     unlockPdfPermissions,
     rememberSearchResults,
-    updateAnnotationText,
-    updateAnnotationTexts,
     updateAnnotations,
     createFreetextAnnotations,
     createShapeAnnotations,

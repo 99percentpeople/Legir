@@ -24,12 +24,7 @@ export const getAiChatSystemInstruction = (options?: {
     context,
     "create_shape_annotations",
   );
-  const annotationUpdateToolNames = [
-    "update_highlight_annotations",
-    "update_freetext_annotations",
-    "update_shape_annotations",
-  ].filter((toolName) => hasTool(context, toolName));
-  const canUpdateAnnotations = annotationUpdateToolNames.length > 0;
+  const canUpdateAnnotations = hasTool(context, "update_annotations");
   const canCreateVisualAnnotations =
     canCreateFreetextAnnotations || canCreateShapeAnnotations;
 
@@ -89,7 +84,7 @@ export const getAiChatSystemInstruction = (options?: {
       "Actions",
       [
         "Prefer clickable links for optional navigation.",
-        "Use navigate_page, focus_control, or focus_result only when the user explicitly asks you to jump or focus now.",
+        "Use navigate only when the user explicitly asks you to jump or focus now.",
         canCreateFormFields || canUpdateFormFields
           ? [
               canCreateFormFields
@@ -120,10 +115,7 @@ export const getAiChatSystemInstruction = (options?: {
                 ? "Create boxes, circles, arrows, lines, or other drawn callouts only through create_shape_annotations."
                 : null,
               canUpdateAnnotations
-                ? `Update existing annotations only through the matching annotation update tool: ${annotationUpdateToolNames.join(", ")}. Prefer update_annotation_texts for note/comment text only.`
-                : null,
-              canInspectPageVisuals
-                ? "When annotation placement or styling depends on page appearance, inspect the page with inspect_pages_visual first."
+                ? "Update existing annotations through update_annotations; batch mixed annotation kinds in one call."
                 : null,
             ]
               .filter(Boolean)

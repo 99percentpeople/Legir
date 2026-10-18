@@ -1,3 +1,4 @@
+import { paginateAiResults } from "./pagination";
 import {
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_DEFAULT,
   AI_CHAT_GET_PAGES_TEXT_MAX_CHARS_MAX,
@@ -30,6 +31,7 @@ import type {
   AiDocumentSnapshot,
   AiReadablePage,
   AiReadablePageBatch,
+  AiPageTextCursor,
   AiReadablePageLine,
   AiTextSelectionContext,
 } from "./types";
@@ -424,30 +426,19 @@ export const createDocumentContextService = (options: {
     return normalized;
   };
 
-  const sliceLinesToCharBudget = (
+  const sliceLinesToTextRange = (
     lines: AiReadablePageLine[],
-    maxChars: number,
+    start: number,
+    end: number,
   ) => {
-    if (maxChars <= 0) return [];
-    let remaining = maxChars;
-    const out: AiReadablePageLine[] = [];
-
-    for (const line of lines) {
-      if (remaining <= 0) break;
-      if (line.text.length <= remaining) {
-        out.push(line);
-        remaining -= line.text.length;
-        continue;
-      }
-
-      out.push({
-        ...line,
-        text: line.text.slice(0, remaining),
-      });
-      break;
-    }
-
-    return out;
+    let offset = 0;
+    return lines.flatMap((line) => {
+      const lineStart = offset;
+      offset += line.text.length + 1; // Same newline separator as layout text.
+      const from = Math.max(0, start - lineStart);
+      const to = Math.min(line.text.length, end - lineStart);
+      return from < to ? [{ ...line, text: line.text.slice(from, to) }] : [];
+    });
   };
 
   const renderPageImageSourceFromCurrentDocument = async ({
@@ -1049,10 +1040,12 @@ export const createDocumentContextService = (options: {
     getPagesText: async ({
       pageNumbers,
       includeLayout = false,
+      cursor,
       signal,
     }: {
       pageNumbers: number[];
       includeLayout?: boolean;
+      cursor?: AiPageTextCursor;
       signal?: AbortSignal;
     }): Promise<AiReadablePageBatch> => {
       const snapshot = getSnapshot();
@@ -1061,58 +1054,91 @@ export const createDocumentContextService = (options: {
         snapshot.pages.length,
         snapshot.pages.length,
       );
-      const getPagesTextOptions = getPagesTextConfig?.();
-      const maxChars = clampGetPagesTextMaxChars(getPagesTextOptions?.maxChars);
-
+      const startIndex = cursor
+        ? requestedPageNumbers.indexOf(cursor.page_number)
+        : 0;
+      if (
+        startIndex < 0 ||
+        (cursor &&
+          (!Number.isSafeInteger(cursor.char_offset) || cursor.char_offset < 0))
+      ) {
+        throw new Error(
+          "Invalid text cursor. Keep the original page_numbers or restart without a cursor.",
+        );
+      }
+      const maxChars = clampGetPagesTextMaxChars(
+        getPagesTextConfig?.()?.maxChars,
+      );
       const pages: AiReadablePage[] = [];
       let returnedCharCount = 0;
-      let truncated = false;
+      let nextCursor: AiPageTextCursor | null = null;
 
-      for (const pageNumber of requestedPageNumbers) {
+      for (
+        let index = startIndex;
+        index < requestedPageNumbers.length;
+        index += 1
+      ) {
+        throwIfAborted(signal);
+        const pageNumber = requestedPageNumbers[index]!;
+        const startOffset =
+          index === startIndex ? (cursor?.char_offset ?? 0) : 0;
         const remainingChars = maxChars - returnedCharCount;
         if (remainingChars <= 0) {
-          truncated = true;
+          nextCursor = { page_number: pageNumber, char_offset: startOffset };
           break;
         }
-
         const pageIndex = pageNumber - 1;
-        const fullText = await readPageText(pageIndex, signal);
-        const pageTruncated = fullText.length > remainingChars;
-        const text = pageTruncated
-          ? fullText.slice(0, remainingChars)
-          : fullText;
-
+        const lines = includeLayout
+          ? await readPageLines(pageIndex, signal)
+          : undefined;
+        // A layout read uses the same ordered lines for text and rectangles,
+        // so continuation offsets cannot drift across synthetic whitespace.
+        const fullText = lines?.length
+          ? lines.map((line) => line.text).join("\n")
+          : await readPageText(pageIndex, signal);
+        throwIfAborted(signal);
+        if (startOffset > fullText.length) {
+          throw new Error(
+            "Text cursor exceeds the page length. Restart without a cursor after document edits.",
+          );
+        }
+        let endOffset = Math.min(fullText.length, startOffset + remainingChars);
+        // Never split a UTF-16 surrogate pair between responses.
+        if (
+          endOffset < fullText.length &&
+          /[\uD800-\uDBFF]/u.test(fullText[endOffset - 1] ?? "") &&
+          /[\uDC00-\uDFFF]/u.test(fullText[endOffset] ?? "")
+        ) {
+          endOffset -= 1;
+        }
+        const text = fullText.slice(startOffset, endOffset);
+        const pageTruncated = endOffset < fullText.length;
         const page: AiReadablePage = {
           pageNumber,
           text,
           charCount: text.length,
+          startOffset,
+          totalCharCount: fullText.length,
           ...(pageTruncated ? { truncated: true } : {}),
         };
-
-        if (includeLayout) {
-          const lines = await readPageLines(pageIndex, signal);
-          const returnedLines = pageTruncated
-            ? sliceLinesToCharBudget(lines, text.length)
-            : lines;
-          page.lineCount = returnedLines.length;
-          page.lines = returnedLines;
+        if (lines) {
+          page.lines = sliceLinesToTextRange(lines, startOffset, endOffset);
+          page.lineCount = page.lines.length;
         }
-
         pages.push(page);
         returnedCharCount += text.length;
-
         if (pageTruncated) {
-          truncated = true;
+          nextCursor = { page_number: pageNumber, char_offset: endOffset };
           break;
         }
       }
-
       return {
         requestedPageCount: requestedPageNumbers.length,
         returnedPageCount: pages.length,
         returnedCharCount,
-        truncated: truncated || requestedPageNumbers.length > pages.length,
+        truncated: nextCursor !== null,
         maxCharsPerCall: maxChars,
+        nextCursor,
         pages,
       };
     },
@@ -1124,6 +1150,7 @@ export const createDocumentContextService = (options: {
       mode = "plain",
       regexFlags,
       maxResults = 20,
+      offset = 0,
       signal,
     }: {
       query: string;
@@ -1132,6 +1159,7 @@ export const createDocumentContextService = (options: {
       mode?: PDFSearchMode;
       regexFlags?: string;
       maxResults?: number;
+      offset?: number;
       signal?: AbortSignal;
     }) => {
       const snapshot = getSnapshot();
@@ -1164,7 +1192,12 @@ export const createDocumentContextService = (options: {
         }),
       );
 
-      return allMatches.flat().slice(0, Math.max(1, Math.min(50, maxResults)));
+      throwIfAborted(signal);
+      return paginateAiResults(
+        allMatches.flat(),
+        { maxResults, offset },
+        { default: 20, max: 50 },
+      );
     },
   };
 };

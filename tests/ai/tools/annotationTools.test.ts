@@ -16,6 +16,28 @@ const createCapabilities = (
 });
 
 describe("AI chat annotation tools", () => {
+  test("publishes only the unified editing/navigation tools", () => {
+    const registry = createAiToolRegistry({
+      formToolsEnabled: true,
+      canAttachPageVisuals: () => true,
+    } as unknown as AiToolContext);
+    const names = registry.getDefinitions().map((tool) => tool.name);
+    expect(names).toHaveLength(19); // Workspace adds list_open_documents.
+    expect(names).toContain("update_annotations");
+    expect(names).toContain("navigate");
+    for (const removed of [
+      "update_annotation_texts",
+      "update_highlight_annotations",
+      "update_freetext_annotations",
+      "update_shape_annotations",
+      "navigate_page",
+      "focus_control",
+      "focus_result",
+    ]) {
+      expect(names).not.toContain(removed);
+    }
+  });
+
   test("exposes annotation creation tools to text-only models", () => {
     const registry = createAiToolRegistry({} as AiToolContext, {
       modelCapabilities: createCapabilities(),

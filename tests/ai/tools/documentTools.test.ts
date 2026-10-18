@@ -204,6 +204,7 @@ describe("AI chat document tools", () => {
       {
         pageNumbers: [1, 3, 4, 5],
         includeLayout: true,
+        cursor: undefined,
         signal: undefined,
       },
     ]);

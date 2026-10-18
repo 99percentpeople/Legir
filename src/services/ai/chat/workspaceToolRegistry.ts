@@ -167,8 +167,7 @@ export const createWorkspaceAiToolRegistry = (options: {
           registry = options.createRegistry(documentId);
           registries.set(documentId, registry);
         }
-        if (["navigate_page", "focus_control", "focus_result"].includes(name))
-          workspace.activateDocument(documentId);
+        if (name === "navigate") workspace.activateDocument(documentId);
         const result = await registry.execute(
           name,
           record.args ?? {},

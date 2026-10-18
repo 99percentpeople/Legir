@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { createAiToolRegistry } from "@/services/ai/chat/aiToolRegistry";
+import type { AiToolContext } from "@/services/ai/chat/aiToolContext";
 import { createWorkspaceAiToolRegistry } from "@/services/ai/chat/workspaceToolRegistry";
 import { getAiChatSystemInstruction } from "@/services/ai/chat/prompts";
 import type {
@@ -175,6 +177,56 @@ describe("workspace AI targeting", () => {
     expect(
       schema.safeParse({ document_id: "B", args: { page: "invalid" } }).success,
     ).toBe(false);
+  });
+
+  it("unified navigation activates only its pinned or explicit document", async () => {
+    const { workspace, documents, lifetimes } = setup();
+    const navigateA = vi.fn();
+    const navigateB = vi.fn();
+    const registries = new Map<string, ReturnType<typeof createAiToolRegistry>>(
+      (
+        [
+          ["A", navigateA],
+          ["B", navigateB],
+        ] as const
+      ).map(([id, navigatePage]) => [
+        id,
+        createAiToolRegistry({
+          navigatePage,
+          getDocumentContext: () => ({ pageCount: 1 }),
+        } as unknown as AiToolContext),
+      ]),
+    );
+    const registry = createWorkspaceAiToolRegistry({
+      workspace,
+      defaultDocumentId: "A",
+      definitions: registries.get("A")!.getDefinitions(),
+      createRegistry: (id) => registries.get(id)!,
+    });
+    workspace.activateDocument("B");
+    await registry.execute("navigate", {
+      args: { target: { type: "page", page_number: 1 } },
+    });
+    expect(workspace.getActiveDocumentId()).toBe("A");
+    expect(navigateA).toHaveBeenCalledExactlyOnceWith(0);
+    expect(navigateB).not.toHaveBeenCalled();
+    await registry.execute("navigate", {
+      document_id: "B",
+      args: { target: { type: "page", page_number: 1 } },
+    });
+    expect(workspace.getActiveDocumentId()).toBe("B");
+    expect(navigateB).toHaveBeenCalledExactlyOnceWith(0);
+    lifetimes.get("A")!.abort();
+    documents.delete("A");
+    expect(
+      (
+        await registry.execute("navigate", {
+          args: { target: { type: "page", page_number: 1 } },
+        })
+      ).payload,
+    ).toMatchObject({ error: "DOCUMENT_CLOSED" });
+    expect(workspace.getActiveDocumentId()).toBe("B");
+    expect(navigateA).toHaveBeenCalledTimes(1);
   });
 
   it("cancels an operation when its document closes without touching another tab", async () => {

@@ -7,20 +7,13 @@ import {
   defineToolModule,
   emptyObjectSchema,
   highlightResultsArgsSchema,
-  updateFreetextAnnotationsArgsSchema,
-  updateHighlightAnnotationsArgsSchema,
-  updateShapeAnnotationsArgsSchema,
-  updateAnnotationTextsArgsSchema,
+  updateAnnotationsArgsSchema,
 } from "./shared";
 import type {
   AiAnnotationStyleInput,
   AiAnnotationUpdateResult,
 } from "@/services/ai/chat/types";
 import { AI_PAGE_COORDINATE_CONVENTION } from "@/services/ai/utils/pageCoordinates";
-
-const UPDATE_ANNOTATION_TEXTS_TOOL_PROMPTS = [
-  "If the user asks to rename, rewrite, clear, or update annotation/comment text, call update_annotation_texts. It accepts either one annotation_id plus text or an updates array.",
-];
 
 const HIGHLIGHT_RESULTS_TOOL_PROMPTS = [
   "Selection attachment blocks include raw text plus attachment_index, page_number, and absolute offsets.",
@@ -55,39 +48,12 @@ const DELETE_ANNOTATIONS_TOOL_PROMPTS = [
   "Use clear_highlights only when the user wants to clear all AI-created highlights at once.",
 ];
 
-const createUpdateAnnotationToolPrompts = (
-  toolName: string,
-  typeLabel: string,
-  extraRule: string,
-) => [
-  `Use ${toolName} to move, resize when supported, restyle, or rewrite existing ${typeLabel} annotations by id.`,
-  `${toolName} is patch-style: annotation_id is required, and every other field is optional. Only send the properties you want to change; do not resend the full annotation payload.`,
-  `When updating one ${typeLabel} annotation, you may pass either a single object or an updates array.`,
-  extraRule,
-  "Call list_annotations first when annotation ids are unclear or when you need to confirm the current annotation type before editing.",
-  "When placement or styling depends on page appearance, inspect the relevant page with inspect_pages_visual first.",
+const UPDATE_ANNOTATIONS_TOOL_PROMPTS = [
+  "Use update_annotations to edit existing annotations in one updates array, including mixed types. For note/comment text alone, pass annotation_id and text; no annotation_type is needed.",
+  "For geometry or appearance, include annotation_type (highlight, freetext, or shape) and only the properties to change. Each type accepts only its compatible style properties. Call list_annotations first when ids or types are unclear.",
+  "When annotation placement or styling depends on page appearance, inspect the page with inspect_pages_visual first.",
   AI_PAGE_COORDINATE_CONVENTION,
 ];
-
-const UPDATE_HIGHLIGHT_ANNOTATIONS_TOOL_PROMPTS =
-  createUpdateAnnotationToolPrompts(
-    "update_highlight_annotations",
-    "highlight",
-    "Only highlight-compatible properties are allowed: text, rect, color, and opacity. Prefer update_annotation_texts when the task is limited to note/comment text.",
-  );
-
-const UPDATE_FREETEXT_ANNOTATIONS_TOOL_PROMPTS =
-  createUpdateAnnotationToolPrompts(
-    "update_freetext_annotations",
-    "free text",
-    "Only free-text-compatible properties are allowed: text, rect, color, opacity, background_color, border_color, border_width, font_size, font_family, line_height, alignment, flatten, and rotation_deg.",
-  );
-
-const UPDATE_SHAPE_ANNOTATIONS_TOOL_PROMPTS = createUpdateAnnotationToolPrompts(
-  "update_shape_annotations",
-  "shape",
-  "Only shape-compatible properties are allowed: text, rect, color, opacity, background_color, background_opacity, thickness, arrow_size, start_arrow_style, end_arrow_style, cloud_intensity, and cloud_spacing.",
-);
 
 const toRectPatch = (
   rect:
@@ -170,112 +136,30 @@ const summarizeAnnotationUpdateResult = (
     : `${toolName} completed with no changes`;
 
 export const annotationToolModule = defineToolModule((_ctx) => ({
-  update_annotation_texts: createToolBuilder("update_annotation_texts")
+  update_annotations: createToolBuilder("update_annotations")
     .write()
     .description(
-      "Update note/comment text on one or more annotations by id. Accepts either a single annotation_id plus text or an updates array. Use list_annotations first when you need ids or want to inspect the current note/highlight text before editing.",
+      "Patch existing annotations in one batch. For text only, send annotation_id and text. For geometry or style, also specify annotation_type matching list_annotations. Omitted properties are preserved; text may be empty to clear a note.",
     )
-    .promptInstructions(UPDATE_ANNOTATION_TEXTS_TOOL_PROMPTS)
-    .inputSchema(updateAnnotationTextsArgsSchema)
-    .build(async ({ args, ctx: toolCtx }) => {
-      const result = toolCtx.updateAnnotationTexts({
-        updates: args.updates.map((item) => ({
-          annotationId: item.annotation_id.trim(),
-          text: item.text,
-        })),
-      });
-
-      return {
-        payload: result,
-        summary:
-          result.updatedCount > 0
-            ? result.rejectedCount > 0 || result.unchangedCount > 0
-              ? `Updated ${result.updatedCount} annotation text entr${result.updatedCount === 1 ? "y" : "ies"}, ${result.unchangedCount} unchanged, ${result.rejectedCount} rejected`
-              : `Updated ${result.updatedCount} annotation text entr${result.updatedCount === 1 ? "y" : "ies"}`
-            : "update_annotation_texts completed with no changes",
-      };
-    }),
-
-  update_highlight_annotations: createToolBuilder(
-    "update_highlight_annotations",
-  )
-    .write()
-    .description(
-      "Update existing highlight annotations by id. Supports note text, page-space translation, and highlight-compatible appearance changes.",
-    )
-    .promptInstructions(UPDATE_HIGHLIGHT_ANNOTATIONS_TOOL_PROMPTS)
-    .inputSchema(updateHighlightAnnotationsArgsSchema)
+    .promptInstructions(UPDATE_ANNOTATIONS_TOOL_PROMPTS)
+    .inputSchema(updateAnnotationsArgsSchema)
     .build(async ({ args, ctx: toolCtx }) => {
       const result = toolCtx.updateAnnotations({
         updates: args.updates.map((item) => ({
-          annotationId: item.annotation_id.trim(),
-          annotationType: "highlight",
+          annotationId: item.annotation_id,
           text: item.text,
-          rect: toRectPatch(item.rect),
-          style: toAnnotationStyleInput(item.style),
+          ...("annotation_type" in item
+            ? {
+                annotationType: item.annotation_type,
+                rect: toRectPatch(item.rect),
+                style: toAnnotationStyleInput(item.style),
+              }
+            : {}),
         })),
       });
-
       return {
         payload: result,
-        summary: summarizeAnnotationUpdateResult(
-          "update_highlight_annotations",
-          result,
-        ),
-      };
-    }),
-
-  update_freetext_annotations: createToolBuilder("update_freetext_annotations")
-    .write()
-    .description(
-      "Update existing free text annotations by id. Supports visible text content, page-space geometry, and free-text-compatible appearance changes.",
-    )
-    .promptInstructions(UPDATE_FREETEXT_ANNOTATIONS_TOOL_PROMPTS)
-    .inputSchema(updateFreetextAnnotationsArgsSchema)
-    .build(async ({ args, ctx: toolCtx }) => {
-      const result = toolCtx.updateAnnotations({
-        updates: args.updates.map((item) => ({
-          annotationId: item.annotation_id.trim(),
-          annotationType: "freetext",
-          text: item.text,
-          rect: toRectPatch(item.rect),
-          style: toAnnotationStyleInput(item.style),
-        })),
-      });
-
-      return {
-        payload: result,
-        summary: summarizeAnnotationUpdateResult(
-          "update_freetext_annotations",
-          result,
-        ),
-      };
-    }),
-
-  update_shape_annotations: createToolBuilder("update_shape_annotations")
-    .write()
-    .description(
-      "Update existing shape annotations by id. Supports note text, page-space geometry, and shape-compatible appearance changes.",
-    )
-    .promptInstructions(UPDATE_SHAPE_ANNOTATIONS_TOOL_PROMPTS)
-    .inputSchema(updateShapeAnnotationsArgsSchema)
-    .build(async ({ args, ctx: toolCtx }) => {
-      const result = toolCtx.updateAnnotations({
-        updates: args.updates.map((item) => ({
-          annotationId: item.annotation_id.trim(),
-          annotationType: "shape",
-          text: item.text,
-          rect: toRectPatch(item.rect),
-          style: toAnnotationStyleInput(item.style),
-        })),
-      });
-
-      return {
-        payload: result,
-        summary: summarizeAnnotationUpdateResult(
-          "update_shape_annotations",
-          result,
-        ),
+        summary: summarizeAnnotationUpdateResult("update_annotations", result),
       };
     }),
 

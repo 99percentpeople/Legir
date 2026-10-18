@@ -603,6 +603,13 @@ It provides the IndexedDB setup used by browser recent-files storage. The browse
 
 AI is optional and should be treated as an enhancement layer, not as the primary architecture.
 
+AI document operations use a compact registry: mixed annotation patches share
+`update_annotations` and one undo checkpoint; `navigate` has explicit page,
+control and search-result targets. Search and annotation/field lists expose
+offset pagination with complete totals. Page-text reads expose a page/character
+cursor to continue beyond their configured text budget. These positions are
+scoped to the tool's document and must be restarted after edits to that content.
+
 `src/app/ai/GlobalAiContext.tsx` owns one lazily initialized AI controller per window. Panels share its conversation, history, composer draft and attachments. The controller remains mounted independently of tab/panel visibility, so switching tabs does not abort a turn. Translation tasks remain owned by their originating document.
 
 History uses the unified `app-ai-chat:workspace` storage key. Legacy per-document histories are merged once without deleting their source keys. Workspace history does not apply the legacy 20-conversation cap; per-conversation size limits and browser storage quotas still apply. Quota failure retains the last durable history instead of replacing it with one conversation. Concurrent cross-window history synchronization is not implemented.

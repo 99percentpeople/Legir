@@ -134,6 +134,34 @@ or the underlying document service, not in provider adapters. This keeps user
 actions and AI tool actions aligned when they call the same lower-level
 functions.
 
+The registry exposes at most 20 tools including `list_open_documents` (18 with
+form creation/editing disabled, 17 when visual inspection is also unavailable).
+`update_annotations` accepts one `updates` array for mixed annotation kinds.
+Text-only patches require just `annotation_id` and `text`; geometry/style patches
+also require `annotation_type`, with strict per-kind style validation. The batch
+shares one undo checkpoint. `navigate` accepts one discriminated `target`:
+`{ type: "page", page_number }`, `{ type: "control", control_id, select? }`, or
+`{ type: "result", result_id }`. Workspace routing activates the target document
+for navigation, and keeps all other edits bound to their originating document.
+
+`search_document`, `list_annotations` and `list_fields` accept zero-based
+`offset` and return `total`, `returned`, `offset`, `nextOffset` and `truncated`.
+Continue with `offset: nextOffset` and the same filters until `nextOffset` is
+null. Search returns at most 50 hits per call; annotation/field lists return at
+most 500 items. Collect the needed IDs before mutating the result set; restart
+at offset 0 after edits that change the list. Search totals count all hits,
+not just the current batch, and previously returned result IDs stay usable.
+
+`get_pages_text` returns `nextCursor: { page_number, char_offset }` when its
+configured text budget is exhausted, including in the middle of a page. Pass
+that object as `cursor`, preserving `page_numbers` and `include_layout`, to
+continue. Offsets index UTF-16 text; generated cursors never split a surrogate
+pair. `startOffset` and `totalCharCount` describe each page fragment. Layout
+reads derive text from the same ordered lines used for rectangles, so both
+continue together; a partial line retains its full line rectangle. Cursors are
+positions within the selected live document, not persisted snapshots. Restart
+without a cursor after document edits.
+
 `inspect_pages_visual` chooses direct images from the active model's
 `supportsImageInput` capability (models.dev or explicit endpoint metadata), not
 from native tool-result support. The configured visual model is only a fallback

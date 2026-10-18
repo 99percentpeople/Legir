@@ -31,19 +31,14 @@ export type AiToolName =
   | "get_pages_text"
   | "search_document"
   | "list_annotations"
-  | "update_annotation_texts"
-  | "update_highlight_annotations"
-  | "update_freetext_annotations"
-  | "update_shape_annotations"
+  | "update_annotations"
   | "create_freetext_annotations"
   | "create_shape_annotations"
   | "list_fields"
   | "fill_form_fields"
   | "update_form_fields"
   | "create_form_fields"
-  | "focus_control"
-  | "navigate_page"
-  | "focus_result"
+  | "navigate"
   | "highlight_results"
   | "delete_annotations"
   | "clear_highlights";
@@ -190,6 +185,8 @@ export interface AiReadablePage {
   pageNumber: number;
   text: string;
   charCount: number;
+  startOffset?: number;
+  totalCharCount?: number;
   truncated?: boolean;
   lineCount?: number;
   lines?: AiReadablePageLine[];
@@ -201,7 +198,22 @@ export interface AiReadablePageBatch {
   returnedCharCount: number;
   truncated: boolean;
   maxCharsPerCall: number;
+  nextCursor?: AiPageTextCursor | null;
   pages: AiReadablePage[];
+}
+
+// Returned verbatim as get_pages_text's next cursor argument.
+export interface AiPageTextCursor {
+  page_number: number;
+  char_offset: number;
+}
+
+export interface AiResultPage {
+  total: number;
+  returned: number;
+  offset: number;
+  nextOffset: number | null;
+  truncated: boolean;
 }
 
 export interface AiRenderedPageImage {
@@ -334,29 +346,8 @@ export interface AiAnnotationSummary {
   stampHasImage?: boolean;
 }
 
-export interface AiAnnotationListResult {
-  total: number;
-  returned: number;
-  truncated: boolean;
+export interface AiAnnotationListResult extends AiResultPage {
   annotations: AiAnnotationSummary[];
-}
-
-export interface AiAnnotationTextUpdateResult {
-  ok: boolean;
-  annotationId: string;
-  pageNumber?: number;
-  type?: AiAnnotationKind;
-  previousText?: string;
-  text?: string;
-  status: "updated" | "unchanged" | "rejected";
-  reason?: string;
-}
-
-export interface AiAnnotationTextBatchUpdateResult {
-  updatedCount: number;
-  unchangedCount: number;
-  rejectedCount: number;
-  updates: AiAnnotationTextUpdateResult[];
 }
 
 export interface AiHighlightAnnotationSummary {
@@ -456,7 +447,8 @@ export interface AiCreateShapeAnnotationInput {
 
 export interface AiUpdateAnnotationInput {
   annotationId: string;
-  annotationType: AiAnnotationKind;
+  // Omit only for a text-only patch, valid for any annotation kind.
+  annotationType?: AiAnnotationKind;
   text?: string;
   rect?: {
     x?: number;
@@ -513,10 +505,7 @@ export interface AiFormFieldSummary {
   unsupportedReason?: string;
 }
 
-export interface AiFormFieldListResult {
-  total: number;
-  returned: number;
-  truncated: boolean;
+export interface AiFormFieldListResult extends AiResultPage {
   fields: AiFormFieldSummary[];
 }
 

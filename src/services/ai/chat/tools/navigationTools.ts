@@ -2,102 +2,78 @@ import {
   createErrorPayload,
   createToolBuilder,
   defineToolModule,
-  focusControlArgsSchema,
-  focusResultArgsSchema,
-  navigatePageArgsSchema,
+  navigateArgsSchema,
 } from "./shared";
 
-const NAVIGATE_PAGE_TOOL_PROMPTS = [
-  "Use navigate_page only when the user explicitly asks you to go to a page now. If you are only referencing a page in the answer, prefer a clickable page link instead.",
-];
-
-const FOCUS_CONTROL_TOOL_PROMPTS = [
-  "Use focus_control only when the user explicitly asks you to open, focus, or select a specific field or annotation now. If the user mainly needs guidance, answer with a natural clickable control link instead.",
-];
-
-const FOCUS_RESULT_TOOL_PROMPTS = [
-  "Use focus_result only when the user explicitly asks you to jump to a search hit now. Otherwise prefer a clickable result link so the user can choose when to open it.",
-];
-
 export const navigationToolModule = defineToolModule((_ctx) => ({
-  navigate_page: createToolBuilder("navigate_page")
-    .write()
-    .description("Scroll the workspace to the top of a specific page.")
-    .promptInstructions(NAVIGATE_PAGE_TOOL_PROMPTS)
-    .inputSchema(navigatePageArgsSchema)
-    .build(async ({ args, ctx: toolCtx }) => {
-      const { page_number } = args;
-      toolCtx.navigatePage(page_number - 1);
-      return {
-        payload: {
-          ok: true,
-          pageNumber: page_number,
-        },
-        summary: `Navigated to page ${page_number}`,
-      };
-    }),
-
-  focus_control: createToolBuilder("focus_control")
+  navigate: createToolBuilder("navigate")
     .write()
     .description(
-      "Focus an existing field or annotation by id and scroll it into view. Use control_id from list_fields or list_annotations. Optionally set select true if the control should also become selected.",
+      "Navigate to a page, field/annotation, or remembered search hit. Use control_id from list_fields/list_annotations or result_id from search_document. Select exactly one target type.",
     )
-    .promptInstructions(FOCUS_CONTROL_TOOL_PROMPTS)
-    .inputSchema(focusControlArgsSchema)
-    .build(async ({ args, ctx: toolCtx }) => {
-      const control = args.control_id.trim()
-        ? toolCtx.focusControl(args.control_id.trim(), {
-            select: args.select,
-          })
-        : null;
-      if (!control) {
-        return {
-          payload: createErrorPayload(
-            "CONTROL_NOT_FOUND",
-            "focus_control requires a valid control_id from list_fields or list_annotations.",
-          ),
-          summary: "focus_control failed: control not found",
-        };
+    .promptInstructions([
+      "Use navigate only when the user explicitly asks you to jump, focus, or select now. For references in answers, prefer clickable document links.",
+    ])
+    .inputSchema(navigateArgsSchema)
+    .build(async ({ args: { target }, ctx, signal }) => {
+      switch (target.type) {
+        case "page": {
+          const { page_number } = target;
+          const { pageCount } = ctx.getDocumentContext();
+          if (page_number > pageCount) {
+            return {
+              payload: createErrorPayload(
+                "INVALID_PAGE",
+                `Page must be between 1 and ${pageCount}.`,
+              ),
+              summary: "navigate failed: page out of range",
+            };
+          }
+          ctx.navigatePage(page_number - 1);
+          return {
+            payload: { ok: true, pageNumber: page_number },
+            summary: `Navigated to page ${page_number}`,
+          };
+        }
+        case "control": {
+          const control = ctx.focusControl(target.control_id, {
+            select: target.select,
+          });
+          if (!control) {
+            return {
+              payload: createErrorPayload(
+                "CONTROL_NOT_FOUND",
+                "Use a valid control_id from list_fields or list_annotations.",
+              ),
+              summary: "navigate failed: control not found",
+            };
+          }
+          return {
+            payload: { ok: true, selected: target.select, ...control },
+            summary: `Focused ${control.controlType} on page ${control.pageNumber}`,
+          };
+        }
+        case "result": {
+          const stored = ctx.getStoredSearchResult(target.result_id);
+          if (!stored) {
+            return {
+              payload: createErrorPayload(
+                "RESULT_NOT_FOUND",
+                "Use a valid result_id from search_document.",
+              ),
+              summary: "navigate failed: result not found",
+            };
+          }
+          await ctx.focusSearchResult(stored.result, signal);
+          return {
+            payload: {
+              ok: true,
+              resultId: target.result_id,
+              pageNumber: stored.result.pageIndex + 1,
+            },
+            summary: `Focused result on page ${stored.result.pageIndex + 1}`,
+          };
+        }
       }
-
-      return {
-        payload: {
-          ok: true,
-          selected: args.select,
-          ...control,
-        },
-        summary: `Focused ${control.controlType} on page ${control.pageNumber}`,
-      };
-    }),
-
-  focus_result: createToolBuilder("focus_result")
-    .write()
-    .description(
-      "Scroll the workspace to a previously returned search result id.",
-    )
-    .promptInstructions(FOCUS_RESULT_TOOL_PROMPTS)
-    .inputSchema(focusResultArgsSchema)
-    .build(async ({ args, ctx: toolCtx, signal }) => {
-      const resultId = args.result_id.trim();
-      const stored = resultId ? toolCtx.getStoredSearchResult(resultId) : null;
-      if (!stored) {
-        return {
-          payload: createErrorPayload(
-            "RESULT_NOT_FOUND",
-            "focus_result requires a valid result_id from search_document.",
-          ),
-          summary: "focus_result failed: result not found",
-        };
-      }
-
-      await toolCtx.focusSearchResult(stored.result, signal);
-      return {
-        payload: {
-          ok: true,
-          resultId,
-          pageNumber: stored.result.pageIndex + 1,
-        },
-        summary: `Focused result on page ${stored.result.pageIndex + 1}`,
-      };
     }),
 }));
