@@ -169,6 +169,26 @@ for text-only chat models; a separate summary is never requested for a model
 that can read the images itself. Rendering still includes current document edits,
 page/crop geometry, document ownership, and cancellation.
 
+Page visuals have app-wide budgets: at most 2 images per tool call, 2048 pixels
+on the longest side, 2,000,000 pixels and 2 MiB of encoded data per image. Range
+selectors count each page; over-budget arguments are rejected before expanding
+the range. The rendering service also caps its batch independently. Scale is
+chosen before allocating a bitmap; crops use the worker's `clipRect` in displayed
+page space to render only the requested region. Large drawings return an overview
+and the model is instructed to request specific crops for unreadable details.
+PNG is preferred for linework; oversized encodings retry as JPEG and then at
+smaller dimensions. Exhausting that budget returns a crop instruction instead of
+sending an oversized image. Both direct inspection and the visual-model fallback
+use these limits, and both preserve original page-space coordinates.
+
+Each model request retains at most 4 page images across parallel tool calls and
+conversation history, even when context compression is disabled. Older images
+become explicit text notices while page/crop metadata and canonical history stay
+intact. Oversized or unreadable historical PNG/JPEG images are detected from their
+headers/encoded length before bitmap decoding and replaced with a request to
+inspect the region again. These are application budgets, not inferred provider
+capabilities or a model-name allowlist.
+
 ## `providers/`
 
 `providers/` is the provider and model resolution layer. It should answer:

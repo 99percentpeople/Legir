@@ -35,7 +35,7 @@ const createVisualBatch = (
   requestedPageCount: 0,
   returnedPageCount: 0,
   truncated: false,
-  maxPagesPerCall: 4,
+  maxPagesPerCall: 2,
   pages: [],
   ...overrides,
 });
@@ -279,18 +279,38 @@ describe("AI chat document tools", () => {
 
     await handlers.inspect_pages_visual!.execute(
       {
-        pages: [[1, 3], cropTarget],
+        pages: [[1, 1], cropTarget],
       },
       ctx,
     );
 
     expect(calls).toEqual([
       {
-        pageNumbers: [1, 2, 3, cropTarget],
+        pageNumbers: [1, cropTarget],
         renderAnnotations: true,
         signal: undefined,
       },
     ]);
+  });
+
+  test("rejects excessive image arrays and huge ranges before rendering or range expansion", async () => {
+    let renders = 0;
+    const ctx = {
+      getPagesVisual: () => {
+        renders += 1;
+      },
+      canAttachPageVisuals: () => true,
+    } as unknown as AiToolContext;
+    const registry = createAiToolRegistry(ctx);
+    for (const pages of [
+      [1, 2, 3, 4],
+      [[1, 1_000_000_000]],
+      [[1, 2], { page: 1, rect: { x: 0, y: 0, width: 10, height: 10 } }],
+    ]) {
+      const result = await registry.execute("inspect_pages_visual", { pages });
+      expect(result.payload).toMatchObject({ error: "INVALID_ARGUMENTS" });
+    }
+    expect(renders).toBe(0);
   });
 
   test("inspect_pages_visual is available for direct image or visual model paths", () => {
@@ -322,7 +342,7 @@ describe("AI chat document tools", () => {
           requestedPageCount: 1,
           returnedPageCount: 1,
           truncated: false,
-          maxPagesPerCall: 4,
+          maxPagesPerCall: 2,
           pages: [],
           summary: "summary",
         }),
@@ -366,7 +386,7 @@ describe("AI chat document tools", () => {
           requestedPageCount: 1,
           returnedPageCount: 1,
           truncated: false,
-          maxPagesPerCall: 4,
+          maxPagesPerCall: 2,
           pages: [],
           summary: "summary",
         };
@@ -408,7 +428,7 @@ describe("AI chat document tools", () => {
           requestedPageCount: 1,
           returnedPageCount: 1,
           truncated: false,
-          maxPagesPerCall: 4,
+          maxPagesPerCall: 2,
           request: "Locate the signature line and return a page-space box",
           pages: [],
           summary:
@@ -455,7 +475,7 @@ describe("AI chat document tools", () => {
           requestedPageCount: 1,
           returnedPageCount: 1,
           truncated: false,
-          maxPagesPerCall: 4,
+          maxPagesPerCall: 2,
           request: "Find form-like regions with labels and boxes",
           pages: [],
           summary:

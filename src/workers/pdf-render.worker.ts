@@ -227,6 +227,15 @@ const buildQueueTaskKey = (
   const renderAnnotations = req.renderAnnotations === true ? "1" : "0";
   const canvasId = req.type === "render" ? req.canvasId : "";
   const tile = req.type === "render" && req.tile ? req.tile.join(",") : "";
+  const clip =
+    req.type === "renderImage" && req.clipRect
+      ? [
+          req.clipRect.x,
+          req.clipRect.y,
+          req.clipRect.width,
+          req.clipRect.height,
+        ].join(",")
+      : "";
   const targetWidth =
     req.type === "renderImage" && typeof req.targetWidth === "number"
       ? req.targetWidth
@@ -238,7 +247,7 @@ const buildQueueTaskKey = (
       : -1;
   // Live snapshots must never deduplicate against another revision/copy.
   if (req.type === "renderImage" && req.thumbnailContent) return req.id;
-  return `${type}|${docId}|${pageIndex}|${scale}|${renderAnnotations}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}`;
+  return `${type}|${docId}|${pageIndex}|${scale}|${renderAnnotations}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}|${req.rotation ?? ""}|${clip}`;
 };
 
 const cancelQueuedTasksForDoc = (docId: string) => {
@@ -581,15 +590,38 @@ const renderToImage = async (
     const currentSession = sessionFor(docId);
     task.throwIfCancelled();
     const cached = getPageForDoc(docId, params.pageIndex);
-    const base = getNativePageViewport(cached.page);
+    const base = getNativePageViewport(cached.page, 1, params.rotation);
     const scale =
       params.scale ??
       (params.targetWidth
         ? Math.min(1, Math.max(0.05, params.targetWidth / base.width))
         : 1);
-    const viewport = getNativePageViewport(cached.page, scale);
-    const width = Math.max(1, Math.floor(viewport.width)),
-      height = Math.max(1, Math.floor(viewport.height));
+    const viewport = getNativePageViewport(cached.page, scale, params.rotation);
+    const clip = params.clipRect;
+    if (
+      clip &&
+      (![clip.x, clip.y, clip.width, clip.height].every(Number.isFinite) ||
+        clip.x < 0 ||
+        clip.y < 0 ||
+        clip.width <= 0 ||
+        clip.height <= 0 ||
+        clip.x + clip.width > base.width + 0.01 ||
+        clip.y + clip.height > base.height + 0.01 ||
+        params.thumbnailContent)
+    )
+      throw new Error("Invalid page image clip rectangle.");
+    if (clip) {
+      viewport.transform[4] -= clip.x * scale;
+      viewport.transform[5] -= clip.y * scale;
+    }
+    const width = Math.max(
+        1,
+        Math.floor(clip ? clip.width * scale : viewport.width),
+      ),
+      height = Math.max(
+        1,
+        Math.floor(clip ? clip.height * scale : viewport.height),
+      );
     const content = params.thumbnailContent;
     const keepAnnotations = content
       ? new Set(

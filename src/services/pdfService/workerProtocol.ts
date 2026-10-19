@@ -57,6 +57,9 @@ export type WorkerCommandPayloadMap = {
       pageIndex: number;
       scale?: number;
       targetWidth?: number;
+      rotation?: number;
+      /** Region in displayed page space at scale 1; rendered without a full-page bitmap. */
+      clipRect?: { x: number; y: number; width: number; height: number };
       renderAnnotations?: boolean;
       thumbnailContent?: ThumbnailContent;
       mimeType?: string;

@@ -91,8 +91,8 @@ export const summarizePageImagesWithAiSdk = async (options: {
             {
               type: "text" as const,
               text: page.cropRect
-                ? `Page ${page.pageNumber} cropped region x=${page.cropRect.x}, y=${page.cropRect.y}, width=${page.cropRect.width}, height=${page.cropRect.height}, rendered at ${page.renderedWidth}x${page.renderedHeight} with fixed pixel density ${page.pixelDensity}.`
-                : `Page ${page.pageNumber} image rendered at ${page.renderedWidth}x${page.renderedHeight} with fixed pixel density ${page.pixelDensity}.`,
+                ? `Page ${page.pageNumber} cropped region x=${page.cropRect.x}, y=${page.cropRect.y}, width=${page.cropRect.width}, height=${page.cropRect.height}, rendered at ${page.renderedWidth}x${page.renderedHeight} with pixel density ${page.pixelDensity}.`
+                : `Page ${page.pageNumber} image rendered at ${page.renderedWidth}x${page.renderedHeight} with pixel density ${page.pixelDensity}.`,
             },
             {
               type: "image" as const,

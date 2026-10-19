@@ -966,6 +966,8 @@ class PDFWorkerService {
     pageIndex: number;
     scale?: number;
     targetWidth?: number;
+    rotation?: number;
+    clipRect?: { x: number; y: number; width: number; height: number };
     renderAnnotations?: boolean;
     thumbnailContent?: ThumbnailContent;
     mimeType?: string;
@@ -988,6 +990,8 @@ class PDFWorkerService {
         pageIndex,
         scale,
         targetWidth,
+        rotation,
+        clipRect,
         renderAnnotations,
         thumbnailContent,
         mimeType,
@@ -1074,6 +1078,8 @@ class PDFWorkerService {
             pageIndex,
             scale,
             targetWidth,
+            rotation,
+            clipRect,
             renderAnnotations,
             thumbnailContent,
             mimeType,
@@ -1089,6 +1095,8 @@ class PDFWorkerService {
             pageIndex,
             scale,
             targetWidth,
+            rotation,
+            clipRect,
             renderAnnotations,
             thumbnailContent,
             mimeType,

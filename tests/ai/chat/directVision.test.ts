@@ -21,7 +21,7 @@ const batch: AiRenderedPageImageBatch = {
   requestedPageCount: 1,
   returnedPageCount: 1,
   truncated: false,
-  maxPagesPerCall: 4,
+  maxPagesPerCall: 2,
   pages: [
     {
       pageNumber: 2,
@@ -372,6 +372,54 @@ describe("direct image inspection through the installed SDK", () => {
       expect(requests).toHaveLength(4);
       expect(JSON.stringify(requests[3]).split(imageData)).toHaveLength(3);
       expect(getPagesVisual).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  test.each<AiProviderBackendKind>(["openai-compatible", "deepseek"])(
+    "%s bounds images across multiple SDK steps and the next turn even with context compression disabled",
+    async (backend) => {
+      const requests: unknown[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_url, init) => {
+          requests.push(JSON.parse(String(init.body)));
+          return streamReply(
+            requests.length <= 3 ? `look-${requests.length}` : undefined,
+          );
+        }),
+      );
+      const { registry, getPagesVisual } = createRegistry(true);
+      getPagesVisual.mockResolvedValue({
+        ...batch,
+        returnedPageCount: 2,
+        pages: [batch.pages[0]!, batch.pages[0]!],
+      });
+      const options = createOptions(backend);
+      const result = await aiChatService.runConversation({
+        ...options,
+        messages: [{ role: "user", content: "Inspect several details" }],
+        toolRegistry: registry,
+      });
+      expect(
+        requests.map(
+          (request) => JSON.stringify(request).split(imageData).length - 1,
+        ),
+      ).toEqual([0, 2, 4, 4]);
+      expect(JSON.stringify(requests[3])).toContain(
+        "request image count limit",
+      );
+      expect(JSON.stringify(result.conversation).split(imageData)).toHaveLength(
+        7,
+      );
+      await aiChatService.runConversation({
+        ...options,
+        messages: [
+          ...result.conversation,
+          { role: "user", content: "Continue" },
+        ],
+        toolRegistry: registry,
+      });
+      expect(JSON.stringify(requests[4]).split(imageData)).toHaveLength(5);
     },
   );
 

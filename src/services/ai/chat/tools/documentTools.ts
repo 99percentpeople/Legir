@@ -1,7 +1,10 @@
 import { z } from "zod";
 import {
   AI_CHAT_MAX_PAGE_IMAGES_PER_CALL,
-  AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY,
+  AI_CHAT_PAGE_IMAGE_MAX_DIMENSION,
+  AI_CHAT_PAGE_IMAGE_MAX_PIXELS,
+  AI_CHAT_PAGE_IMAGE_MAX_BYTES,
+  AI_CHAT_MAX_PAGE_IMAGES_PER_REQUEST,
 } from "@/constants";
 
 import {
@@ -60,12 +63,30 @@ const pageVisualTargetSchema = z.union([
     })
     .strict(),
 ]);
-const pageVisualTargetsSchema = z.preprocess((value) => {
-  if (value === undefined || value === null || value === "") {
-    return [];
-  }
-  return Array.isArray(value) ? value : [value];
-}, z.array(pageVisualTargetSchema).transform(expandPageVisualTargets));
+const pageVisualTargetsSchema = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null || value === "") {
+      return [];
+    }
+    return Array.isArray(value) ? value : [value];
+  },
+  z
+    .array(pageVisualTargetSchema)
+    .max(AI_CHAT_MAX_PAGE_IMAGES_PER_CALL)
+    .superRefine((targets, ctx) => {
+      const count = targets.reduce<number>(
+        (total, target) =>
+          total + (Array.isArray(target) ? target[1] - target[0] + 1 : 1),
+        0,
+      );
+      if (count > AI_CHAT_MAX_PAGE_IMAGES_PER_CALL)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Request at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} images, counting each page in a range and each crop. Read further pages in a later call.`,
+        });
+    })
+    .transform(expandPageVisualTargets),
+);
 
 const inspectPagesVisualArgsSchema = z
   .object({
@@ -73,7 +94,7 @@ const inspectPagesVisualArgsSchema = z
       .optional()
       .default([])
       .describe(
-        "Optional page visual requests. Each item may be a 1-based page number, a two-item inclusive range like [1, 22], or an object like { page, rect } to render a cropped page-space region. Defaults to the current page when omitted.",
+        `At most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} page visuals per call, counting each page in a range and each crop. Each item may be a 1-based page number, an inclusive range like [1, 2], or an object like { page, rect } to render a cropped page-space region. Defaults to the current page when omitted.`,
       ),
     request: z
       .string()
@@ -169,7 +190,7 @@ const toPagesVisualModelOutput = (options: {
   > = [
     {
       type: "text",
-      text: `Rendered page visuals for request${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageVisual, index) => `#${index + 1} (page ${pageVisual.pageNumber})`).join(", ")}. Requests may be full pages or cropped page-space regions. Use these visuals for inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss. Fixed pixel density ${pageVisualLabelDensity(attachedPages)}. ${AI_PAGE_COORDINATE_CONVENTION}`,
+      text: `Rendered page visuals for request${attachedPages.length === 1 ? "" : "s"} ${attachedPages.map((pageVisual, index) => `#${index + 1} (page ${pageVisual.pageNumber})`).join(", ")}. Requests may be full pages or cropped page-space regions. Use these visuals for inspection of layout, tables, handwriting, diagrams, stamps, or other details that extracted text may miss. Pixel density ${pageVisualLabelDensity(attachedPages)}; large pages are downscaled to an overview. Request a page-space crop for unreadable details. ${AI_PAGE_COORDINATE_CONVENTION}`,
     },
   ];
 
@@ -187,7 +208,7 @@ const toPagesVisualModelOutput = (options: {
       : " Full page render.";
     content.push({
       type: "text",
-      text: `Request #${index + 1}: page ${pageVisual.pageNumber} visual. Actual page size ${pageVisual.pageWidth}x${pageVisual.pageHeight}.${cropLabel} Rendered at ${pageVisual.renderedWidth}x${pageVisual.renderedHeight} using fixed pixel density ${pageVisual.pixelDensity} px per page-space unit.`,
+      text: `Request #${index + 1}: page ${pageVisual.pageNumber} visual. Actual page size ${pageVisual.pageWidth}x${pageVisual.pageHeight}.${cropLabel} Rendered at ${pageVisual.renderedWidth}x${pageVisual.renderedHeight} using pixel density ${pageVisual.pixelDensity} px per page-space unit.`,
     });
     content.push({
       type: "image-data",
@@ -228,8 +249,9 @@ const INSPECT_PAGE_VISUAL_TOOL_PROMPTS = [
   "Set request to the specific visual question or extraction target so the visual path returns only the information needed.",
   "When the result will be used for annotations, navigation, or form fields, ask in request for the relevant regions with editor page-space boxes and short labels.",
   "For form-building requests, ask inspect_pages_visual to identify form-like regions, labels, likely field types, and approximate boxes; then decide whether to call create_form_fields.",
-  "Each inspect_pages_visual pages item may be a page number for a full-page image, a two-item inclusive range like [1, 22], or an object like { page, rect } to render only a page-space region.",
-  `inspect_pages_visual uses a fixed pixel density of ${AI_CHAT_PAGE_IMAGE_PIXEL_DENSITY} px per page-space unit. Do not try to choose image size manually.`,
+  "Each inspect_pages_visual pages item may be a page number for a full-page image, a two-item inclusive range like [1, 2], or an object like { page, rect } to render only a page-space region.",
+  `inspect_pages_visual returns at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_CALL} images per call, including crops and expanded ranges. Each image is capped at ${AI_CHAT_PAGE_IMAGE_MAX_DIMENSION} pixels on its longest side, ${AI_CHAT_PAGE_IMAGE_MAX_PIXELS} total pixels and ${AI_CHAT_PAGE_IMAGE_MAX_BYTES} encoded bytes. Large drawings are downscaled before rendering; inspect the overview, then request only relevant page-space crops for details. Never assume small labels in an overview are readable.`,
+  `Each model request retains at most ${AI_CHAT_MAX_PAGE_IMAGES_PER_REQUEST} page images across tool calls and history. Older images may be replaced with a notice; use already recorded findings, or inspect the needed region again.`,
   AI_PAGE_COORDINATE_CONVENTION,
   "If get_pages_text or search_document returns empty text, OCR noise, or misses the needed content on a page, do not stop there. Call inspect_pages_visual for that page and inspect it visually.",
   "When the user asks about a page and the text layer is missing or unreliable, use inspect_pages_visual before concluding that the page content is unavailable.",
@@ -475,6 +497,8 @@ const summarizePageVisualBatchForPayload = (
     rotation: pageVisual.rotation,
     cropRect: pageVisual.cropRect,
     pixelDensity: pageVisual.pixelDensity,
+    downscaled: pageVisual.downscaled,
+    imageByteLength: pageVisual.imageByteLength,
     renderedWidth: pageVisual.renderedWidth,
     renderedHeight: pageVisual.renderedHeight,
     mimeType: pageVisual.mimeType,

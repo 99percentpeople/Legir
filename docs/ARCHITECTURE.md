@@ -603,6 +603,13 @@ It provides the IndexedDB setup used by browser recent-files storage. The browse
 
 AI is optional and should be treated as an enhancement layer, not as the primary architecture.
 
+AI page-image rendering is bounded before canvas/PDFium allocation: 2 images per
+call, a 2048-pixel maximum edge, 2,000,000 pixels and 2 MiB encoded per image.
+`renderImage.clipRect` renders a page-space region directly at the chosen scale;
+it does not materialize a full-page bitmap first. The model-request projection
+keeps at most 4 page images across tool calls/history and replaces excessive or
+oversized historical images with explicit notices without editing saved history.
+
 AI document operations use a compact registry: mixed annotation patches share
 `update_annotations` and one undo checkpoint; `navigate` has explicit page,
 control and search-result targets. Search and annotation/field lists expose

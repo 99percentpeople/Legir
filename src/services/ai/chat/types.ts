@@ -223,6 +223,8 @@ export interface AiRenderedPageImage {
   rotation: number;
   cropRect?: AiPageSpaceRect;
   pixelDensity: number;
+  downscaled?: boolean;
+  imageByteLength?: number;
   renderedWidth: number;
   renderedHeight: number;
   mimeType: string;
@@ -245,6 +247,8 @@ export interface AiRenderedPageVisualSummaryPage {
   rotation: number;
   cropRect?: AiPageSpaceRect;
   pixelDensity: number;
+  downscaled?: boolean;
+  imageByteLength?: number;
   renderedWidth: number;
   renderedHeight: number;
   renderAnnotations: boolean;

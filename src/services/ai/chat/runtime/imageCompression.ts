@@ -1,6 +1,14 @@
 import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 
 import type { AiChatMessageRecord } from "@/services/ai/chat/types";
+import {
+  AI_CHAT_MAX_PAGE_IMAGES_PER_REQUEST,
+  AI_CHAT_PAGE_IMAGE_MAX_BYTES,
+} from "@/constants";
+import {
+  isPageImageWithinPixelBudget,
+  readPageImageDimensions,
+} from "../pageImageLimits";
 
 const SUPPORTED_IMAGE_MIME_TYPES = new Set([
   "image/png",
@@ -52,6 +60,82 @@ const decodeBase64ToUint8Array = (value: string) => {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+};
+
+/** Bound the complete request, including parallel calls and restored history.
+ * Do this before decoding/downscaling old rasters. Persisted messages stay intact.
+ */
+export const limitVisualToolImagesForModel = (
+  messages: AiChatMessageRecord[],
+) => {
+  let retained = 0;
+  let changed = false;
+  const result = [...messages];
+  for (let i = result.length - 1; i >= 0; i -= 1) {
+    const message = result[i]!;
+    if (message.role !== "tool") continue;
+    let messageChanged = false;
+    const content = [...message.content];
+    for (let j = content.length - 1; j >= 0; j -= 1) {
+      const part = content[j]!;
+      if (
+        part.type !== "tool-result" ||
+        part.toolName !== "inspect_pages_visual" ||
+        part.output.type !== "content"
+      )
+        continue;
+      const value = [...part.output.value];
+      let outputChanged = false;
+      for (let k = value.length - 1; k >= 0; k -= 1) {
+        const item = value[k]!;
+        if (item.type !== "image-data" && item.type !== "image-url") continue;
+        let reason = "request image count limit";
+        let safe = false;
+        if (retained < AI_CHAT_MAX_PAGE_IMAGES_PER_REQUEST) {
+          reason =
+            "image dimensions or encoded size exceed the page image budget, or cannot be verified";
+          const payload = getBase64Payload(
+            item.type === "image-data" ? item.data : item.url,
+          );
+          // Reject large data before allocating its decoded bytes or bitmap.
+          if (
+            payload &&
+            payload.base64.length <=
+              4 * Math.ceil(AI_CHAT_PAGE_IMAGE_MAX_BYTES / 3)
+          ) {
+            try {
+              const bytes = decodeBase64ToUint8Array(payload.base64);
+              const size = readPageImageDimensions(bytes);
+              safe =
+                bytes.byteLength <= AI_CHAT_PAGE_IMAGE_MAX_BYTES &&
+                !!size &&
+                isPageImageWithinPixelBudget(size);
+            } catch {
+              /* Unreadable historical images must not break the next request. */
+            }
+          }
+        }
+        if (safe) {
+          retained += 1;
+          continue;
+        }
+        value[k] = {
+          type: "text",
+          text: `[Page image omitted: ${reason}. The surrounding page/crop metadata is retained. Use prior findings or call inspect_pages_visual again for the relevant region.]`,
+        };
+        outputChanged = true;
+      }
+      if (outputChanged) {
+        content[j] = { ...part, output: { ...part.output, value } };
+        messageChanged = true;
+      }
+    }
+    if (messageChanged) {
+      result[i] = { ...message, content };
+      changed = true;
+    }
+  }
+  return changed ? result : messages;
 };
 
 const loadCanvasImageSource = async (
@@ -350,10 +434,11 @@ export const compressVisualToolHistoryForModel = async (options: {
   keepWindow: number;
 }) => {
   const keepWindow = Math.max(0, Math.trunc(options.keepWindow || 0));
-  const targets = getVisualToolResultTargets(options.messages);
-  if (targets.length === 0) return options.messages;
+  const boundedMessages = limitVisualToolImagesForModel(options.messages);
+  const targets = getVisualToolResultTargets(boundedMessages);
+  if (targets.length === 0) return boundedMessages;
 
-  const nextMessages = [...options.messages];
+  const nextMessages = [...boundedMessages];
   let changed = false;
 
   for (const target of targets) {
@@ -406,5 +491,7 @@ export const compressVisualToolHistoryForModel = async (options: {
     changed = true;
   }
 
-  return changed ? nextMessages : options.messages;
+  return changed
+    ? limitVisualToolImagesForModel(nextMessages)
+    : boundedMessages;
 };
