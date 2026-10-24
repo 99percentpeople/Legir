@@ -970,6 +970,7 @@ class PDFWorkerService {
     clipRect?: { x: number; y: number; width: number; height: number };
     renderAnnotations?: boolean;
     thumbnailContent?: ThumbnailContent;
+    previewCanvasId?: string;
     mimeType?: string;
     quality?: number;
     priority?: number;
@@ -994,6 +995,7 @@ class PDFWorkerService {
         clipRect,
         renderAnnotations,
         thumbnailContent,
+        previewCanvasId,
         mimeType,
         quality,
         priority,
@@ -1082,6 +1084,7 @@ class PDFWorkerService {
             clipRect,
             renderAnnotations,
             thumbnailContent,
+            previewCanvasId,
             mimeType,
             quality,
             priority: priority || 0,
@@ -1099,6 +1102,7 @@ class PDFWorkerService {
             clipRect,
             renderAnnotations,
             thumbnailContent,
+            previewCanvasId,
             mimeType,
             quality,
             priority: priority || 0,

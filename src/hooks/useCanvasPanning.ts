@@ -1,5 +1,4 @@
 import { useRef, useCallback, useState, useEffect } from "react";
-import { setGlobalCursor, resetGlobalCursor } from "@/lib/cursor";
 
 interface UseCanvasPanningProps {
   containerRef: React.RefObject<HTMLElement | null>;
@@ -73,7 +72,6 @@ export const useCanvasPanning = ({
         };
       }
 
-      setGlobalCursor("grabbing");
       capturePointer(e);
       return true;
     },
@@ -122,10 +120,6 @@ export const useCanvasPanning = ({
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
-
-      // Reset cursor based on whether we are still in pan mode (tool) or not
-      // If we are in "tool" mode, cursor should go back to "grab" (handled by CSS/style usually, but we reset global override)
-      resetGlobalCursor();
 
       if (e) releasePointer(e);
       return true;

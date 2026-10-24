@@ -62,6 +62,8 @@ export type WorkerCommandPayloadMap = {
       clipRect?: { x: number; y: number; width: number; height: number };
       renderAnnotations?: boolean;
       thumbnailContent?: ThumbnailContent;
+      /** Downsample an existing reader canvas instead of rasterizing the PDF again. */
+      previewCanvasId?: string;
       mimeType?: string;
       quality?: number;
       priority?: number;

@@ -3874,7 +3874,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
         data-workspace-scroll-container="true"
         className="relative h-full overflow-auto bg-gray-100 transition-colors duration-200 dark:bg-gray-900"
         style={{
-          cursor: isPanModeActive ? "grab" : undefined,
+          // Pointer capture owns the cursor while panning. Avoid inserting a
+          // universal cursor stylesheet and restyling the entire document.
+          cursor: isPanning ? "grabbing" : isPanModeActive ? "grab" : undefined,
           touchAction: "none",
           scrollPaddingBottom: workspaceBottomPaddingPx,
           "--scale": editorState.scale,

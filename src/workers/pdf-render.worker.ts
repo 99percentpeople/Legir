@@ -246,7 +246,11 @@ const buildQueueTaskKey = (
       ? req.quality
       : -1;
   // Live snapshots must never deduplicate against another revision/copy.
-  if (req.type === "renderImage" && req.thumbnailContent) return req.id;
+  if (
+    req.type === "renderImage" &&
+    (req.thumbnailContent || req.previewCanvasId)
+  )
+    return req.id;
   return `${type}|${docId}|${pageIndex}|${scale}|${renderAnnotations}|${canvasId}|${tile}|${targetWidth}|${mimeType}|${quality}|${req.rotation ?? ""}|${clip}`;
 };
 
@@ -581,10 +585,46 @@ const renderToImage = async (
 ): Promise<TaskResult> => {
   const docId = getDocId(params.docId);
   const task = registerCancellableTask(params.id, docId, undefined, {
-    preemptible: !!params.thumbnailContent,
+    canvasId: params.previewCanvasId,
+    preemptible: !!params.thumbnailContent || !!params.previewCanvasId,
   });
   let canvas: OffscreenCanvas | undefined;
   try {
+    if (params.previewCanvasId) {
+      // The transferred canvas already contains the page. Reading it on the
+      // main thread forces a large bitmap readback during scrolling.
+      const source = canvasMap.get(params.previewCanvasId);
+      if (!source?.width || !source.height) return { payload: false };
+      const targetWidth = params.targetWidth ?? THUMBNAIL_TARGET_WIDTH;
+      if (!Number.isFinite(targetWidth) || targetWidth <= 0)
+        throw new Error("Invalid canvas preview width");
+      const ratio = Math.min(
+        1,
+        THUMBNAIL_TARGET_WIDTH / source.width,
+        targetWidth / source.width,
+      );
+      canvas = new OffscreenCanvas(
+        Math.max(1, Math.round(source.width * ratio)),
+        Math.max(1, Math.round(source.height * ratio)),
+      );
+      // Encoding immediately reads the pixels back. Keep the small copy on
+      // the CPU so its upload/readback does not stall GPU scrolling.
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("Could not get canvas context");
+      task.throwIfCancelled();
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      const blob = await canvas.convertToBlob({
+        type: params.mimeType ?? "image/jpeg",
+        quality: params.quality ?? 0.8,
+      });
+      task.throwIfCancelled();
+      const imageBytes = await blob.arrayBuffer();
+      task.throwIfCancelled();
+      return {
+        payload: { mimeType: blob.type, imageBytes },
+        transfer: [imageBytes],
+      };
+    }
     await ensureDocumentLoaded(docId, params.isNewDoc ? params : undefined);
     const pdfium = await getPDFium();
     const currentSession = sessionFor(docId);
@@ -836,9 +876,11 @@ const handleQueuedTask = async (data: WorkerRequest | null) => {
         if (idsToRelease.size > 0) {
           for (let i = taskQueue.length - 1; i >= 0; i--) {
             const queued = taskQueue[i].data;
-            if (queued.type !== "render") continue;
-            const cid = queued.canvasId;
-            if (!idsToRelease.has(cid)) continue;
+            const cid =
+              queued.type === "render"
+                ? queued.canvasId
+                : queued.previewCanvasId;
+            if (!cid || !idsToRelease.has(cid)) continue;
             const removed = taskQueue.splice(i, 1)[0];
             if (removed) {
               postSuccess(removed.id, false);

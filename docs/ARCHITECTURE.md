@@ -535,6 +535,11 @@ distant jumps do not mount the intervening pages. Container resizing refreshes
 the window. The right-panel dock coalesces scrollbar geometry reads per frame
 and caches the system scrollbar probe until window resize; canvas/text mutations
 must not repeatedly insert measurement elements and force document-wide layout.
+Text layers keep an unchanged empty selection state and subscribe to scroll/resize
+only while selection handles are active. Reader and sidebar scrolling must not
+re-render every mounted text layer when no text is selected. Hand panning updates
+the captured scroll container's cursor locally; it must not add/remove a universal
+cursor stylesheet and invalidate styles across the entire document.
 
 The floating toolbar's page settings menu rotates the whole document's reading
 view in 90-degree steps. Document-owned `viewRotation` is temporary, travels with a live tab during
@@ -845,8 +850,13 @@ edited controls use the shared PDF exporters on a small transparent single-page
 overlay. This never reparses or serializes the full source document for an edit.
 The import preview retains its rendered URLs until unmount. Reader canvas
 placeholders live separately in `pagePreviewImages`, without controls, so they
-cannot double-paint the live workspace overlays. Both resource caches follow
-page identity through edits and are released when their document closes.
+cannot double-paint the live workspace overlays. Their downsampling and encoding
+wait for an input idle gap, then reuse the completed canvas inside the render
+worker at background priority. Encoding uses a small CPU canvas to avoid extra GPU
+upload/readback work. The UI never reads back the large transferred canvas or
+rerasterizes the PDF for a placeholder. Render changes and disposal cancel pending
+captures. Both resource caches follow page identity through edits and are released
+when their document closes.
 
 `exportPDF` assembles the final page sequence before exporting controls, repairs
 copied AcroForm trees and internal links, and applies `rotationDelta` after

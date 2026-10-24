@@ -414,3 +414,98 @@ it.each([false, true])(
     expect(pageEl.querySelector("img")).toBeNull();
   },
 );
+
+it("creates reader placeholders from the worker canvas without a main-thread readback", async () => {
+  const w = {
+    ...worker(),
+    renderPageImage: vi.fn(async () => ({
+      bytes: new Uint8Array([1, 2]),
+      mimeType: "image/jpeg",
+    })),
+  };
+  useEditorView.setState({ pagePreviewImages: {} });
+  const context = vi.spyOn(HTMLCanvasElement.prototype, "getContext");
+  const createURL = vi.fn(() => "blob:worker-preview");
+  vi.stubGlobal("URL", {
+    createObjectURL: createURL,
+    revokeObjectURL: vi.fn(),
+  });
+  await act(async () =>
+    root.render(
+      <PDFCanvasLayer
+        workerService={w as unknown as PDFWorkerService}
+        page={page}
+        scale={0.1}
+        isInView
+      />,
+    ),
+  );
+  await frames();
+  expect(w.renderPageImage).toHaveBeenCalledOnce();
+  expect(w.renderPageImage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      previewCanvasId: expect.any(String),
+      pageIndex: 0,
+      signal: expect.any(AbortSignal),
+    }),
+  );
+  expect(context).not.toHaveBeenCalled();
+  expect(createURL).toHaveBeenCalledWith(expect.any(Blob));
+  expect(useEditorView.getState().pagePreviewImages[0]).toBe(
+    "blob:worker-preview",
+  );
+});
+
+it.each(["rotation", "unmount"])(
+  "discards a pending reader placeholder after %s",
+  async (change) => {
+    type Image = { bytes: Uint8Array; mimeType: string };
+    let finish!: (image: Image) => void;
+    const w = {
+      ...worker(),
+      renderPageImage: vi.fn((_options: { signal: AbortSignal }) => {
+        void _options;
+        return new Promise<Image>((resolve) => {
+          finish = resolve;
+        });
+      }),
+    };
+    useEditorView.setState({ pagePreviewImages: {} });
+    const createURL = vi.fn();
+    vi.stubGlobal("URL", {
+      createObjectURL: createURL,
+      revokeObjectURL: vi.fn(),
+    });
+    await act(async () =>
+      root.render(
+        <PDFCanvasLayer
+          workerService={w as unknown as PDFWorkerService}
+          page={page}
+          scale={0.1}
+          isInView
+        />,
+      ),
+    );
+    await frames();
+    const signal = w.renderPageImage.mock.calls[0][0].signal;
+    expect(signal.aborted).toBe(false);
+    await act(async () =>
+      root.render(
+        change === "unmount" ? null : (
+          <PDFCanvasLayer
+            workerService={w as unknown as PDFWorkerService}
+            page={{ ...page, rotation: 90 }}
+            scale={0.1}
+            isInView
+          />
+        ),
+      ),
+    );
+    expect(signal.aborted).toBe(true);
+    await act(async () =>
+      finish({ bytes: new Uint8Array([1, 2]), mimeType: "image/jpeg" }),
+    );
+    expect(createURL).not.toHaveBeenCalled();
+    expect(useEditorView.getState().pagePreviewImages).toEqual({});
+  },
+);

@@ -19,6 +19,7 @@ import {
   useEditorViewApi,
 } from "@/store/useEditorView";
 import { getWorkspaceRenderMetrics } from "../lib/renderPerformance";
+import { waitForReaderPreviewIdle } from "../lib/readerPreviewActivity";
 import {
   reportPDFPageRenderLayerReady,
   reportPDFPageRenderLayerState,
@@ -65,6 +66,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
   const renderedScaleRef = useRef<number | null>(null);
   const renderEpochRef = useRef(0);
+  const previewControllerRef = useRef<AbortController | null>(null);
   const dprRef = useRef<number>(1);
   const setState = useEditorView.setState;
   const placeholderImage = useDocumentState((state) =>
@@ -94,28 +96,11 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
   });
 
   const updateImageData = useCallback(
-    async (canvas: HTMLCanvasElement, renderEpoch?: number) => {
-      if (
-        typeof renderEpoch === "number" &&
-        renderEpoch !== renderEpochRef.current
-      ) {
-        return;
-      }
-      if (typeof document === "undefined") return;
-
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => resolve()),
-      );
-
-      if (
-        typeof renderEpoch === "number" &&
-        renderEpoch !== renderEpochRef.current
-      ) {
-        return;
-      }
-
+    async (canvasId: string, renderEpoch: number) => {
       const current = useEditorView.getState();
       if (
+        !workerService ||
+        renderEpoch !== renderEpochRef.current ||
         !current.pages[pageIndex] ||
         current.pages[pageIndex].rotation !== page.rotation ||
         current.pagePreviewImages[pageIndex]
@@ -123,73 +108,49 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         return;
       }
 
-      const sourceWidth = canvas.width;
-      const sourceHeight = canvas.height;
-      if (!sourceWidth || !sourceHeight) return;
-
-      const scale = Math.min(1, THUMBNAIL_TARGET_WIDTH / sourceWidth);
-      const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
-      const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
-
-      const thumbCanvas = document.createElement("canvas");
-      thumbCanvas.width = targetWidth;
-      thumbCanvas.height = targetHeight;
-      const ctx = thumbCanvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.drawImage(canvas, 0, 0, targetWidth, targetHeight);
-
-      const blob = await new Promise<Blob | null>((resolve) => {
-        thumbCanvas.toBlob(
-          (result) => resolve(result),
-          THUMBNAIL_MIME_TYPE,
-          THUMBNAIL_JPEG_QUALITY,
+      previewControllerRef.current?.abort();
+      const controller = new AbortController();
+      previewControllerRef.current = controller;
+      try {
+        if (!(await waitForReaderPreviewIdle(useEditorView, controller.signal)))
+          return;
+        const image = await workerService.renderPageImage({
+          pageIndex,
+          previewCanvasId: canvasId,
+          targetWidth: THUMBNAIL_TARGET_WIDTH,
+          mimeType: THUMBNAIL_MIME_TYPE,
+          quality: THUMBNAIL_JPEG_QUALITY,
+          priority: 1,
+          signal: controller.signal,
+        });
+        const latest = useEditorView.getState();
+        if (
+          controller.signal.aborted ||
+          renderEpoch !== renderEpochRef.current ||
+          !image.bytes.length ||
+          !latest.pages[pageIndex] ||
+          latest.pages[pageIndex].rotation !== page.rotation ||
+          latest.pagePreviewImages[pageIndex]
+        ) {
+          return;
+        }
+        const imageData = URL.createObjectURL(
+          new Blob([image.bytes as Uint8Array<ArrayBuffer>], {
+            type: image.mimeType,
+          }),
         );
-      });
-
-      let imageData: string | null = null;
-      if (blob) {
-        imageData = URL.createObjectURL(blob);
-      } else {
-        try {
-          imageData = thumbCanvas.toDataURL(
-            THUMBNAIL_MIME_TYPE,
-            THUMBNAIL_JPEG_QUALITY,
-          );
-        } catch {
-          imageData = null;
-        }
+        setState((s) => ({
+          pagePreviewImages: { ...s.pagePreviewImages, [pageIndex]: imageData },
+        }));
+      } catch {
+        // A preview is optional; a cancelled/released canvas must not disturb
+        // the completed reader render or fall back to main-thread readback.
+      } finally {
+        if (previewControllerRef.current === controller)
+          previewControllerRef.current = null;
       }
-
-      if (!imageData) return;
-
-      const latest = useEditorView.getState();
-      if (
-        !latest.pages[pageIndex] ||
-        latest.pages[pageIndex].rotation !== page.rotation ||
-        latest.pagePreviewImages[pageIndex]
-      ) {
-        if (imageData.startsWith("blob:")) {
-          try {
-            URL.revokeObjectURL(imageData);
-          } catch {
-            // ignore
-          }
-        }
-        return;
-      }
-
-      setState((s) => {
-        if (!s.pages[pageIndex] || s.pagePreviewImages[pageIndex]) return s;
-        return {
-          pagePreviewImages: {
-            ...s.pagePreviewImages,
-            [pageIndex]: imageData,
-          },
-        };
-      });
     },
-    [pageIndex, page.rotation, setState],
+    [pageIndex, page.rotation, workerService, useEditorView, setState],
   );
 
   useLayoutEffect(() => {
@@ -204,6 +165,8 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
 
   useLayoutEffect(() => {
     renderEpochRef.current += 1;
+    previewControllerRef.current?.abort();
+    return () => previewControllerRef.current?.abort();
   }, [pageIndex, pageInfo, renderScale, workerService]);
 
   // Stable IDs for canvas elements to allow reuse in Worker
@@ -382,11 +345,10 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
               pageIndex,
             });
           }
-          const targetCanvas =
-            targetId === "A" ? canvasARef.current : canvasBRef.current;
-          if (targetCanvas) {
-            void updateImageData(targetCanvas, epoch);
-          }
+          void updateImageData(
+            targetId === "A" ? canvasAId.current : canvasBId.current,
+            epoch,
+          );
         });
       });
     });

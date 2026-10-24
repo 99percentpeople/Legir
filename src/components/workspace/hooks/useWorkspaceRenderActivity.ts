@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import { useEditorViewApi } from "@/store/useEditorView";
+import { deferReaderPreviews } from "../lib/readerPreviewActivity";
 
 export const useWorkspaceRenderActivity = (
   containerRef: RefObject<HTMLElement | null>,
@@ -13,7 +14,10 @@ export const useWorkspaceRenderActivity = (
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isActive) return;
-    const defer = () => store.getState().deferThumbnailWarmup();
+    const defer = () => {
+      deferReaderPreviews(store);
+      store.getState().deferThumbnailWarmup();
+    };
     // Cancel background rasterization at input time, before zoom's deferred
     // render starts. Scroll also covers hand panning and keyboard navigation.
     const events = ["wheel", "scroll", "pointerdown", "touchmove"] as const;
@@ -26,6 +30,7 @@ export const useWorkspaceRenderActivity = (
 
   useEffect(() => {
     if (previousScale.current !== scale && isActive) {
+      deferReaderPreviews(store);
       store.getState().deferThumbnailWarmup();
     }
     previousScale.current = scale;

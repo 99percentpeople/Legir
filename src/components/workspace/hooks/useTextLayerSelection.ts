@@ -29,6 +29,11 @@ export type TextSelectionHandlesState = {
   end: TextSelectionHandleRect | null;
 };
 
+const emptySelectionHandles: TextSelectionHandlesState = {
+  start: null,
+  end: null,
+};
+
 type ManualSelectionState = {
   pointerId: number | null;
   pointerType: PointerEvent["pointerType"];
@@ -96,7 +101,10 @@ export const useTextLayerSelection = (opts: {
   const isPointerSelectingTextRef = useRef(false);
   const [isPointerSelectingText, setIsPointerSelectingText] = useState(false);
   const [selectionHandles, setSelectionHandles] =
-    useState<TextSelectionHandlesState>({ start: null, end: null });
+    useState<TextSelectionHandlesState>(emptySelectionHandles);
+  const hasSelectionHandles = !!(
+    selectionHandles.start || selectionHandles.end
+  );
 
   useEffect(() => {
     if (!isDraggingSelectionHandle) return;
@@ -498,7 +506,7 @@ export const useTextLayerSelection = (opts: {
 
   const updateSelectionHandles = useCallback(() => {
     if (!isSelectMode) {
-      setSelectionHandles({ start: null, end: null });
+      setSelectionHandles(emptySelectionHandles);
       return;
     }
 
@@ -506,11 +514,11 @@ export const useTextLayerSelection = (opts: {
     const pageEl = pagePortalEl;
     const sel = window.getSelection?.();
     if (!layerEl || !pageEl || !sel || sel.rangeCount === 0) {
-      setSelectionHandles({ start: null, end: null });
+      setSelectionHandles(emptySelectionHandles);
       return;
     }
     if (sel.isCollapsed && !isDraggingSelectionHandle) {
-      setSelectionHandles({ start: null, end: null });
+      setSelectionHandles(emptySelectionHandles);
       return;
     }
 
@@ -741,7 +749,7 @@ export const useTextLayerSelection = (opts: {
         }
       : null;
 
-    setSelectionHandles({ start, end });
+    setSelectionHandles(start || end ? { start, end } : emptySelectionHandles);
   }, [
     getCaretSpan,
     getCaretClientRect,
@@ -762,17 +770,25 @@ export const useTextLayerSelection = (opts: {
   useEffect(() => {
     if (typeof document === "undefined") return;
     const onSelection = () => updateSelectionHandles();
+    document.addEventListener("selectionchange", onSelection);
+    return () => document.removeEventListener("selectionchange", onSelection);
+  }, [updateSelectionHandles]);
+
+  useEffect(() => {
+    // Scrolling a reader or its sidebar must not update every mounted text
+    // layer when no selection handles are visible. At 120 Hz those otherwise
+    // empty state updates consume the frame budget for native scrolling.
+    if (!hasSelectionHandles && !isDraggingSelectionHandle) return;
+    if (typeof window === "undefined") return;
     const onScroll = () => updateSelectionHandles();
     const onResize = () => updateSelectionHandles();
-    document.addEventListener("selectionchange", onSelection);
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onResize);
     return () => {
-      document.removeEventListener("selectionchange", onSelection);
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
     };
-  }, [updateSelectionHandles]);
+  }, [hasSelectionHandles, isDraggingSelectionHandle, updateSelectionHandles]);
 
   useEffect(() => {
     const setPointerSelectingTextState = (isSelecting: boolean) => {
