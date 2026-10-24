@@ -87,6 +87,7 @@ const PageCard = memo(function PageCard({
   index,
   total,
   selected,
+  allSelected,
   moving,
   canSelectRange,
   enabled,
@@ -100,6 +101,7 @@ const PageCard = memo(function PageCard({
   index: number;
   total: number;
   selected: boolean;
+  allSelected: boolean;
   moving: boolean;
   canSelectRange: () => boolean;
   enabled: boolean;
@@ -110,6 +112,7 @@ const PageCard = memo(function PageCard({
   run: GridProps["run"];
 }) {
   const { t } = useLanguage();
+  const store = useEditorViewApi();
   const id = getPageId(page);
   const view = getPageView(page, 0);
   const aspectRatio = view.width / view.height;
@@ -155,6 +158,19 @@ const PageCard = memo(function PageCard({
               onCopy ? () => onCopy(selected ? undefined : ids) : undefined
             }
             onPaste={onPaste ? () => onPaste(index + 1) : undefined}
+            deleteDisabled={
+              !enabled || total === 1 || (selected && allSelected)
+            }
+            onDelete={() =>
+              run(() => {
+                const state = store.getState();
+                state.deletePages(
+                  state.selectedPageIds.includes(id)
+                    ? state.selectedPageIds
+                    : ids,
+                );
+              })
+            }
           >
             <button
               ref={handleRef}
@@ -531,6 +547,7 @@ export const PageGrid = memo(function PageGrid({
                           index={startRow * columns + offset}
                           total={pages.length}
                           selected={selection.has(id)}
+                          allSelected={selection.size === pages.length}
                           moving={(drag?.ids ?? dropping)?.has(id) ?? false}
                           canSelectRange={canSelectRange}
                           enabled={enabled}

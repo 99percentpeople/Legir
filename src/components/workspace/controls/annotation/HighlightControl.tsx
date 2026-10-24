@@ -24,6 +24,8 @@ interface HighlightRectProps {
   showToolbar?: boolean;
   onUpdate?: (id: string, updates: Partial<Annotation>) => void;
   onDelete?: (id: string) => void;
+  onCopy?: AnnotationControlProps["onCopy"];
+  onReorderLayer?: AnnotationControlProps["onReorderLayer"];
   onEdit?: (id: string) => void;
   onAskAi?: (id: string) => void;
   isAnnotationMode?: boolean;
@@ -41,6 +43,8 @@ interface HighlightPolygonProps {
   showToolbar?: boolean;
   onUpdate?: (id: string, updates: Partial<Annotation>) => void;
   onDelete?: (id: string) => void;
+  onCopy?: AnnotationControlProps["onCopy"];
+  onReorderLayer?: AnnotationControlProps["onReorderLayer"];
   onEdit?: (id: string) => void;
   onAskAi?: (id: string) => void;
   isAnnotationMode?: boolean;
@@ -96,6 +100,8 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
   showToolbar,
   onUpdate,
   onDelete,
+  onCopy,
+  onReorderLayer,
   onEdit,
   onAskAi,
   isAnnotationMode = true,
@@ -116,6 +122,9 @@ const HighlightRect: React.FC<HighlightRectProps> = ({
       isSelectable={isSelectable}
       onPointerDown={() => {}}
       onSelect={onSelect}
+      onDelete={onDelete}
+      onCopy={onCopy}
+      onReorderLayer={onReorderLayer}
       onUpdate={onUpdate || (() => {})}
       customRect={r}
       customElementId={elementId}
@@ -228,6 +237,8 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
   showToolbar,
   onUpdate,
   onDelete,
+  onCopy,
+  onReorderLayer,
   onEdit,
   onAskAi,
   isAnnotationMode = true,
@@ -250,6 +261,9 @@ const HighlightPolygon: React.FC<HighlightPolygonProps> = ({
       isSelectable={isSelectable}
       onPointerDown={() => {}}
       onSelect={onSelect}
+      onDelete={onDelete}
+      onCopy={onCopy}
+      onReorderLayer={onReorderLayer}
       onUpdate={onUpdate || (() => {})}
       customRect={bounds}
       customElementId={elementId}
@@ -368,6 +382,8 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
   isSelected,
   onUpdate,
   onDelete,
+  onCopy,
+  onReorderLayer,
   onEdit,
   onAskAi,
   isAnnotationMode,
@@ -381,11 +397,13 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
         data={data}
         isSelectable={!!isSelectable}
         onSelect={onSelect}
+        onDelete={onDelete}
+        onCopy={onCopy}
+        onReorderLayer={onReorderLayer}
         elementId={`annotation-${data.id}`}
         isSelected={!!isSelected}
         showToolbar={!!isSelected}
         onUpdate={onUpdate}
-        onDelete={onDelete}
         onEdit={onEdit}
         onAskAi={onAskAi}
         isAnnotationMode={!!isAnnotationMode}
@@ -400,11 +418,13 @@ export const HighlightControl: React.FC<AnnotationControlProps> = ({
         data={data}
         isSelectable={!!isSelectable}
         onSelect={onSelect}
+        onDelete={onDelete}
+        onCopy={onCopy}
+        onReorderLayer={onReorderLayer}
         elementId={`annotation-${data.id}`}
         isSelected={!!isSelected}
         showToolbar={!!isSelected}
         onUpdate={onUpdate}
-        onDelete={onDelete}
         onEdit={onEdit}
         onAskAi={onAskAi}
         isAnnotationMode={!!isAnnotationMode}

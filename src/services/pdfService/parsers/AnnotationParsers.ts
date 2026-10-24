@@ -9,6 +9,7 @@ import {
   PDFHexString,
 } from "@legir/pdfium/authoring";
 import { Annotation } from "@/types";
+import { freeTextPaddingFromPdf } from "../lib/freeTextLayout";
 import {
   createStampImageAppearance,
   createStampImageResource,
@@ -1800,21 +1801,36 @@ export class FreeTextParser implements IAnnotationParser {
         ) {
           borderColor = color || "#000000";
         }
+        const styleScale = Math.hypot(
+          viewport.transform[0],
+          viewport.transform[1],
+        );
         annotations.push({
           id: `imported_freetext_${pageIndex + 1}_${index}`,
           pageIndex: pageIndex,
           layerOrder: index,
           type: "freetext",
           rect: computeInnerUiRect(),
+          textPadding: freeTextPaddingFromPdf(
+            annotation.rectDifferences,
+            styleScale,
+          ),
+          alignment:
+            annotation.textAlignment === 1
+              ? "center"
+              : annotation.textAlignment === 2
+                ? "right"
+                : "left",
           color: color,
           backgroundColor,
           borderColor,
-          borderWidth,
+          borderWidth:
+            borderWidth === undefined ? undefined : borderWidth * styleScale,
           borderStyle,
           opacity: opacity,
           rotationDeg,
           text: contents,
-          size: fontSize,
+          size: fontSize === undefined ? undefined : fontSize * styleScale,
           lineHeight,
           fontFamily: fontFamily,
           author: author,

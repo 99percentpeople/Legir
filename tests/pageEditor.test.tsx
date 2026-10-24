@@ -191,6 +191,76 @@ it("selects pages with click and modifiers while retaining per-page actions", as
   expect(bulkRotate().disabled).toBe(true);
 });
 
+it("deletes the menu's page or selected group, supports undo/redo, and keeps at least one page", async () => {
+  store.setState({
+    pages: [page(0), page(1), page(2)],
+    selectedPageIds: ["original:0"],
+  });
+  await act(async () =>
+    root.render(
+      <EditorViewContext.Provider value={store}>
+        <LanguageProvider defaultLanguage="en">
+          <PageEditor toolbarHost={toolbarHost} />
+        </LanguageProvider>
+      </EditorViewContext.Provider>,
+    ),
+  );
+  const menuDelete = async (index: number) => {
+    await act(async () =>
+      host
+        .querySelector(`[data-page-index="${index}"] [data-page-drag-handle]`)!
+        .dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+          }),
+        ),
+    );
+    return Array.from(
+      document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((e) => e.textContent === "Delete")!;
+  };
+  const removeOtherPage = await menuDelete(2);
+  expect(removeOtherPage).toBeDefined();
+  await act(async () => removeOtherPage.click());
+  expect(store.getState().pages.map((p) => p.id)).toEqual([
+    "original:0",
+    "original:1",
+  ]);
+  await act(async () => store.getState().undo());
+  expect(store.getState().pages).toHaveLength(3);
+  await act(async () =>
+    store
+      .getState()
+      .setSelectedPageIds(["original:0", "original:1", "original:2"]),
+  );
+  const allPages = await menuDelete(1);
+  expect(allPages.hasAttribute("data-disabled")).toBe(true);
+  await act(async () =>
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    ),
+  );
+  await act(async () =>
+    store.getState().setSelectedPageIds(["original:0", "original:2"]),
+  );
+  const removeGroup = await menuDelete(0);
+  await act(async () => removeGroup.click());
+  expect(store.getState().pages.map((p) => p.id)).toEqual(["original:1"]);
+  const lastPage = await menuDelete(0);
+  expect(lastPage.hasAttribute("data-disabled")).toBe(true);
+  await act(async () =>
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    ),
+  );
+  await act(async () => store.getState().undo());
+  expect(store.getState().pages).toHaveLength(3);
+  await act(async () => store.getState().redo());
+  expect(store.getState().pages.map((p) => p.id)).toEqual(["original:1"]);
+});
+
 it("keeps single-page rotation anchored to the edited page after scrolling", async () => {
   await act(async () =>
     root.render(

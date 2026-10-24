@@ -149,6 +149,7 @@ describe("control clipboard across documents", () => {
         shapeType: "line",
         text: "review",
         fontFamily: "Helvetica",
+        textPadding: { top: 4, right: 9, bottom: 12, left: 7 },
         color: "#ee0000",
         linkUrl: "https://example.com",
         linkDestPageIndex: 4,
@@ -192,6 +193,7 @@ describe("control clipboard across documents", () => {
         pageIndex: 1,
         text: "review",
         stamp: annotation.stamp,
+        textPadding: annotation.textPadding,
         shapePoints: annotation.shapePoints,
         linkUrl: annotation.linkUrl,
       });

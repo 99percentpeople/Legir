@@ -29,6 +29,7 @@ function PopoverContent({
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
         data-slot="popover-content"
+        data-app-block-modifier-wheel-zoom="1"
         align={align}
         sideOffset={sideOffset}
         className={cn(

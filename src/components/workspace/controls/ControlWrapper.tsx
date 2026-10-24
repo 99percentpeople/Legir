@@ -1,4 +1,5 @@
 import React from "react";
+import { Trash2 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { ControlProps } from "./types";
 import { useEditorEventBus } from "@/app/editorTabs/context";
@@ -43,8 +44,10 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   id,
   isSelected,
   isSelectable,
+  isFormMode,
   onSelect,
   onCopy,
+  onDelete,
   onResizeStart,
   onUpdate,
   onTriggerHistorySave,
@@ -420,11 +423,13 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
     React.Children.count(contextMenuContent) > 0;
   const canResetFormControlToDefault =
     canModify && !isAnnotation && !!onResetToDefault;
+  const canDelete = canModify && !!onDelete && (isAnnotation || isFormMode);
   const hasControlContextMenu =
     !contextMenuDisabled &&
     isSelectable &&
     data.type !== "shape" &&
     (!!onCopy ||
+      canDelete ||
       (canShowLayerContextMenu &&
         (hasCustomContextMenuContent ||
           canResetFormControlToDefault ||
@@ -680,6 +685,22 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
                   onSelect={(move) => onReorderLayer(id, move)}
                 />
               )}
+            </>
+          )}
+          {canDelete && (
+            <>
+              {(onCopy ||
+                (canShowLayerContextMenu &&
+                  (hasCustomContextMenuContent ||
+                    canResetFormControlToDefault ||
+                    onReorderLayer))) && <ContextMenuSeparator />}
+              <ContextMenuItem
+                variant="destructive"
+                onSelect={() => onDelete?.(id)}
+              >
+                <Trash2 size={16} />
+                {t("common.actions.delete")}
+              </ContextMenuItem>
             </>
           )}
         </>

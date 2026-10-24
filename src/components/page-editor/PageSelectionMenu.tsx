@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Trash2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import {
   ContextMenu,
@@ -17,6 +18,8 @@ export function PageSelectionMenu({
   onSelect,
   onCopy,
   onPaste,
+  onDelete,
+  deleteDisabled = false,
 }: {
   children: ReactNode;
   selected: boolean;
@@ -25,6 +28,8 @@ export function PageSelectionMenu({
   onSelect: (intent: PageSelectionIntent) => void;
   onCopy?: () => void;
   onPaste?: () => void;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
 }) {
   const { t } = useLanguage();
   const [rangeAvailable, setRangeAvailable] = useState(false);
@@ -79,6 +84,19 @@ export function PageSelectionMenu({
         <ContextMenuItem onSelect={() => onSelect("clear")}>
           {t("page_editor.clear_selection")}
         </ContextMenuItem>
+        {onDelete && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              variant="destructive"
+              disabled={deleteDisabled}
+              onSelect={onDelete}
+            >
+              <Trash2 size={16} />
+              {t("common.actions.delete")}
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

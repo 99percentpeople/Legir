@@ -97,6 +97,17 @@ const annotation = base.extend({
   thickness: numeric,
   size: numeric,
   lineHeight: numeric,
+  textPadding: z
+    .union([
+      number.nonnegative(),
+      z.object({
+        top: number.nonnegative(),
+        right: number.nonnegative(),
+        bottom: number.nonnegative(),
+        left: number.nonnegative(),
+      }),
+    ])
+    .optional(),
   fontFamily: text,
   alignment,
   subtype: text,

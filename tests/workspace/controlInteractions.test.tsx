@@ -5,6 +5,8 @@ import { CheckboxControl } from "@/components/workspace/controls/form/CheckboxCo
 import { RadioControl } from "@/components/workspace/controls/form/RadioControl";
 import { SignatureControl } from "@/components/workspace/controls/form/SignatureControl";
 import { FloatingToolbar } from "@/components/workspace/controls/FloatingToolbar";
+import { ControlWrapper } from "@/components/workspace/controls/ControlWrapper";
+import { HighlightControl } from "@/components/workspace/controls/annotation/HighlightControl";
 import type { FormControlProps } from "@/components/workspace/controls/types";
 import { FieldType } from "@/types";
 import { useEditorPageKeyboardShortcuts } from "@/pages/EditorPage/hooks/useEditorPageKeyboardShortcuts";
@@ -59,6 +61,90 @@ const controlProps = (type: FieldType): FormControlProps => ({
 });
 
 describe("form control interaction", () => {
+  it("deletes the right-clicked form control and hides deletion outside form editing or without permission", async () => {
+    const props = {
+      ...controlProps(FieldType.TEXT),
+      onCopy: vi.fn(),
+      onDelete: vi.fn(),
+    };
+    const openMenu = () =>
+      act(async () => {
+        host.querySelector("#field-element-field")!.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+          }),
+        );
+      });
+    const deleteItem = () =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+      ).find((e) => e.textContent?.includes("common.actions.delete"));
+    await render(<ControlWrapper {...props} isFormMode />);
+    await openMenu();
+    expect(props.onSelect).toHaveBeenCalledWith("field");
+    expect(deleteItem()).toBeDefined();
+    await act(async () => deleteItem()!.click());
+    expect(props.onDelete).toHaveBeenCalledExactlyOnceWith("field");
+
+    for (const patch of [
+      { isFormMode: false },
+      { isFormMode: true, canModify: false },
+    ]) {
+      await render(<ControlWrapper {...props} {...patch} />);
+      await openMenu();
+      expect(deleteItem()).toBeUndefined();
+      await act(async () =>
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        ),
+      );
+    }
+  });
+
+  it.each([false, true])(
+    "keeps copy and delete in the highlight menu (multiple rectangles=%s)",
+    async (multiple) => {
+      const onDelete = vi.fn();
+      const onCopy = vi.fn();
+      const rect = { x: 0, y: 0, width: 80, height: 20 };
+      await render(
+        <HighlightControl
+          {...controlProps(FieldType.TEXT)}
+          data={{
+            id: "highlight",
+            type: "highlight",
+            pageIndex: 0,
+            rect,
+            rects: multiple ? [rect, { ...rect, y: 25 }] : undefined,
+          }}
+          onCopy={onCopy}
+          onDelete={onDelete}
+          onUpdate={vi.fn()}
+        />,
+      );
+      await act(async () =>
+        host.querySelector("#annotation-highlight")!.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+          }),
+        ),
+      );
+      const menu = document.querySelector(
+        '[data-slot="context-menu-content"]',
+      )!;
+      expect(menu.textContent).toContain("common.actions.copy");
+      const item = Array.from(
+        menu.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+      ).find((e) => e.textContent?.includes("common.actions.delete"))!;
+      await act(async () => item.click());
+      expect(onDelete).toHaveBeenCalledExactlyOnceWith("highlight");
+    },
+  );
+
   it.each([
     ["checkbox", FieldType.CHECKBOX, CheckboxControl],
     ["radio", FieldType.RADIO, RadioControl],

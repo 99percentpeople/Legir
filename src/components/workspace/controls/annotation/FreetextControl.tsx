@@ -21,6 +21,8 @@ import {
   isKnownFontKey,
   splitTextRuns,
 } from "@/lib/fonts";
+import { getFreeTextContentBox } from "@/services/pdfService/lib/freeTextLayout";
+import { useFreeTextLayout } from "../../lib/useFreeTextLayout";
 import { AnnotationAskAiButton } from "./AnnotationAskAiButton";
 
 export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
@@ -110,13 +112,19 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
       : 0;
   const hasBorder = borderWidth > 0;
   const borderColor = data.borderColor || data.color || "#000000";
-  const innerContentWidth = Math.max(
-    1,
-    (data.rect?.width ?? 1) - borderWidth * 2,
+  const content = getFreeTextContentBox(
+    data,
+    data.rect?.width ?? 0,
+    data.rect?.height ?? 0,
   );
-  const innerContentHeight = Math.max(
-    1,
-    (data.rect?.height ?? 1) - borderWidth * 2,
+  const { lines, baseline, editingOffset } = useFreeTextLayout(
+    data.text || "",
+    content.width,
+    data.size || 12,
+    baseLineHeightPx,
+    resolvedFontFamily,
+    nonAsciiFontFamily,
+    editFontFamily,
   );
   const effectiveOpacity =
     baseOpacity * (!hasText && !hasBackgroundColor ? 0.1 : 1);
@@ -124,9 +132,7 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
     backgroundColor: data.backgroundColor || undefined,
     borderStyle: hasBorder ? "solid" : "none",
     borderColor: hasBorder ? borderColor : undefined,
-    borderWidth: hasBorder
-      ? `calc(${borderWidth}px * var(--scale, 1))`
-      : undefined,
+    borderWidth: hasBorder ? borderWidth : undefined,
     boxSizing: "border-box",
   };
 
@@ -261,142 +267,101 @@ export const FreetextControl: React.FC<AnnotationControlProps> = (props) => {
       </FloatingToolbar>
 
       <div
-        className="relative flex h-full w-full items-start overflow-hidden transition-colors"
-        style={{
-          color: data.color || "#000000",
-          fontSize: `calc(${data.size || 12}px * var(--scale, 1))`,
-          fontFamily: resolvedFontFamily,
-          lineHeight: `calc(${baseLineHeightPx}px * var(--scale, 1))`,
-          opacity: effectiveOpacity,
-        }}
+        className="relative h-full w-full transition-colors"
+        style={{ color: data.color || "#000000", opacity: effectiveOpacity }}
         onPointerDown={handlePointerDown}
       >
-        {rotationDeg !== 0 && data.rect ? (
+        <div
+          className="absolute top-1/2 left-1/2 overflow-hidden"
+          style={{
+            width: data.rect?.width ?? 0,
+            height: data.rect?.height ?? 0,
+            transform: `translate(-50%, -50%) rotate(${rotationDeg}deg) scale(var(--scale, 1))`,
+            transformOrigin: "50% 50%",
+            fontSize: data.size || 12,
+            lineHeight: `${baseLineHeightPx}px`,
+          }}
+        >
+          <div className="absolute inset-0" style={contentBoxStyle} />
           <div
-            className="absolute top-1/2 left-1/2"
+            data-freetext-content
+            className="absolute overflow-hidden"
             style={{
-              width: `calc(${data.rect.width}px * var(--scale, 1))`,
-              height: `calc(${data.rect.height}px * var(--scale, 1))`,
-              transform: `translate(-50%, -50%) rotate(${rotationDeg}deg)`,
-              transformOrigin: "50% 50%",
+              left: content.x,
+              top: content.y,
+              width: content.width,
+              height: content.height,
             }}
           >
-            <div className="h-full w-full" style={contentBoxStyle}>
-              {isEditing ? (
-                <textarea
-                  ref={textareaRef}
-                  className="h-full w-full resize-none bg-transparent outline-none"
-                  value={data.text || ""}
-                  onChange={(e) =>
-                    onUpdate?.(data.id, { text: e.target.value })
-                  }
-                  onBlur={handleBlur}
-                  onPointerDown={(e) => {
-                    if (e.button === 1) return;
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    fontFamily: editFontFamily,
-                    fontSize: "inherit",
-                    color: "inherit",
-                    lineHeight: "inherit",
-                  }}
-                />
-              ) : (
-                <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
-                  {hasText
-                    ? data.text!.split(/\r\n|\r|\n/).map((line, idx, arr) => (
-                        <React.Fragment key={idx}>
-                          {splitTextRuns(line).map((run, rIdx) => (
-                            <span
-                              key={rIdx}
-                              style={{
-                                fontFamily: run.isAscii
-                                  ? resolvedFontFamily
-                                  : nonAsciiFontFamily,
-                              }}
-                            >
-                              {run.text}
-                            </span>
-                          ))}
-                          {idx < arr.length - 1 ? "\n" : null}
-                        </React.Fragment>
-                      ))
-                    : hasBackgroundColor
-                      ? null
-                      : "Double click to edit"}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="h-full w-full" style={contentBoxStyle}>
             {isEditing ? (
               <textarea
                 ref={textareaRef}
-                className="h-full w-full resize-none bg-transparent outline-none"
+                className="block w-full resize-none border-0 bg-transparent p-0 outline-none [&::-webkit-scrollbar]:hidden"
                 value={data.text || ""}
                 onChange={(e) => onUpdate?.(data.id, { text: e.target.value })}
                 onBlur={handleBlur}
                 onPointerDown={(e) => {
-                  if (e.button === 1) return;
-                  e.stopPropagation();
+                  if (e.button !== 1) e.stopPropagation();
                 }}
                 style={{
                   fontFamily: editFontFamily,
                   fontSize: "inherit",
                   color: "inherit",
                   lineHeight: "inherit",
+                  textAlign: data.alignment || "left",
+                  scrollbarWidth: "none",
+                  transform: `translateY(${editingOffset}px)`,
+                  height: Math.max(0, content.height - editingOffset),
                 }}
               />
             ) : (
-              <div
-                className="relative h-full w-full"
-                style={{
-                  color: "inherit",
-                }}
+              <svg
+                className="pointer-events-none block h-full w-full overflow-hidden"
+                fontSize={data.size || 12}
+                fill="currentColor"
+                style={{ whiteSpace: "pre" }}
               >
-                <div
-                  className="absolute top-0 left-0"
-                  style={{
-                    width: `${innerContentWidth}px`,
-                    height: `${innerContentHeight}px`,
-                    transform: "scale(var(--scale, 1))",
-                    transformOrigin: "0 0",
-                    fontFamily: resolvedFontFamily,
-                    fontSize: `${data.size || 12}px`,
-                    lineHeight: `${baseLineHeightPx}px`,
-                    color: "inherit",
-                  }}
-                >
-                  <div className="h-full w-full wrap-break-word whitespace-pre-wrap">
-                    {hasText
-                      ? data.text!.split(/\r\n|\r|\n/).map((line, idx, arr) => (
-                          <React.Fragment key={idx}>
-                            {splitTextRuns(line).map((run, rIdx) => (
-                              <span
-                                key={rIdx}
-                                style={{
-                                  fontFamily: run.isAscii
-                                    ? resolvedFontFamily
-                                    : nonAsciiFontFamily,
-                                }}
-                              >
-                                {run.text}
-                              </span>
-                            ))}
-                            {idx < arr.length - 1 ? "\n" : null}
-                          </React.Fragment>
-                        ))
-                      : hasBackgroundColor
-                        ? null
-                        : "Double click to edit"}
-                  </div>
-                </div>
-              </div>
+                {(hasText
+                  ? lines
+                  : hasBackgroundColor
+                    ? []
+                    : ["Double click to edit"]
+                ).map((line, index) => (
+                  <text
+                    key={index}
+                    x={
+                      data.alignment === "right"
+                        ? content.width
+                        : data.alignment === "center"
+                          ? content.width / 2
+                          : 0
+                    }
+                    y={baseline + index * baseLineHeightPx}
+                    textAnchor={
+                      data.alignment === "right"
+                        ? "end"
+                        : data.alignment === "center"
+                          ? "middle"
+                          : "start"
+                    }
+                    dominantBaseline="alphabetic"
+                  >
+                    {splitTextRuns(line).map((run, runIndex) => (
+                      <tspan
+                        key={runIndex}
+                        fontFamily={
+                          run.isAscii ? resolvedFontFamily : nonAsciiFontFamily
+                        }
+                      >
+                        {run.text}
+                      </tspan>
+                    ))}
+                  </text>
+                ))}
+              </svg>
             )}
           </div>
-        )}
+        </div>
       </div>
     </ControlWrapper>
   );

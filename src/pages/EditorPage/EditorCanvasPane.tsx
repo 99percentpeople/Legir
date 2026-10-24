@@ -60,6 +60,19 @@ export const EditorCanvasPane: React.FC<{
   const state = { ...documentState, ...preferences, ...layout };
   const view = useEditorViewApi();
   const clipboard = useEditorControlClipboardActions();
+  const deleteField = useCallback(
+    (id: string) => {
+      const state = view.getState();
+      if (
+        state.mode !== "form" ||
+        !state.fields.some((field) => field.id === id)
+      )
+        return;
+      state.selectControl(id);
+      state.deleteSelection();
+    },
+    [view],
+  );
   React.useLayoutEffect(() => {
     if (!workerService?.configurePages) return;
     const configure = () => {
@@ -357,6 +370,7 @@ export const EditorCanvasPane: React.FC<{
             onAddAnnotation={addAnnotation}
             onSelectControl={selectControl}
             onUpdateField={updateField}
+            onDeleteField={deleteField}
             onResetFieldToDefault={resetFieldToDefault}
             onCopyControl={clipboard.copyControl}
             onPasteControl={clipboard.pasteControl}

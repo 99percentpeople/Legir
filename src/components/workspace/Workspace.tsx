@@ -158,6 +158,7 @@ interface WorkspaceProps {
   onCopyControl?: (id: string) => void;
   onPasteControl?: (target: ControlPasteTarget) => void;
   onUpdateField: (id: string, updates: Partial<FormField>) => void;
+  onDeleteField?: (id: string) => void;
   onResetFieldToDefault: (id: string) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   onDeleteAnnotation: (id: string) => void;
@@ -290,6 +291,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onCopyControl,
   onPasteControl,
   onUpdateField,
+  onDeleteField,
   onResetFieldToDefault,
   onUpdateAnnotation,
   onDeleteAnnotation,
@@ -3560,6 +3562,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     onControlPointerDown={handleFieldPointerDown}
                     onSelect={onSelectControl}
                     onUpdate={onUpdateField}
+                    onDelete={
+                      editorState.mode === "form" ? onDeleteField : undefined
+                    }
                     onResetToDefault={onResetFieldToDefault}
                     onCopy={
                       editorState.mode === "form" ? copyControl : undefined

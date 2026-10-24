@@ -821,6 +821,18 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
           />
         </>
       )}
+      {canShowLayerContextMenu && onDelete && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            variant="destructive"
+            onSelect={() => onDelete(data.id)}
+          >
+            <Trash2 size={16} />
+            {t("common.actions.delete")}
+          </ContextMenuItem>
+        </>
+      )}
     </>
   );
 

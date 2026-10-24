@@ -152,6 +152,10 @@ export interface Annotation {
   thickness?: number; // For ink
   size?: number; // For text
   lineHeight?: number;
+  /** FreeText insets from the outer box, in points (including the border). */
+  textPadding?:
+    | number
+    | { top: number; right: number; bottom: number; left: number };
   fontFamily?: string; // For text
   rotationDeg?: number;
   alignment?: "left" | "center" | "right"; // For comment text alignment

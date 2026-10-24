@@ -23,6 +23,7 @@ import {
   pushGraphicsState,
   popGraphicsState,
   concatTransformationMatrix,
+  op,
 } from "@legir/pdfium/authoring";
 import { Annotation } from "@/types";
 import { PDF_CUSTOM_KEYS } from "@/constants";
@@ -36,6 +37,13 @@ import { setAppHighlightedText } from "../lib/annotationMetadata";
 import { hexToPdfColor } from "../lib/colors";
 import { generateInkAppearanceOps } from "../lib/ink";
 import { containsNonAscii, isSerifFamily } from "../lib/text";
+import {
+  getFreeTextBaseline,
+  getFreeTextContentBox,
+  getFreeTextPadding,
+  wrapFreeText,
+} from "../lib/freeTextLayout";
+import { getPdfTextVisualCenterAboveBaselineEm } from "../lib/text-field-metrics";
 import { canFontEncodeText } from "../lib/font-selection";
 import {
   getPdfLibPageInfo,
@@ -299,6 +307,9 @@ export class FreeTextExporter implements IAnnotationExporter {
     if (!annotation.rect) return undefined;
 
     const bounds = uiRectToPdfBounds(page, annotation.rect, viewport);
+    const styleScale = viewport
+      ? Math.hypot(viewport.transform[0], viewport.transform[1])
+      : (getPdfLibPageInfo(page).userUnit ?? 1);
     const pageRotationDeg =
       viewport && typeof viewport.rotation === "number" ? viewport.rotation : 0;
     const rotationDeg =
@@ -336,7 +347,7 @@ export class FreeTextExporter implements IAnnotationExporter {
     const borderWidth =
       typeof annotation.borderWidth === "number" &&
       Number.isFinite(annotation.borderWidth)
-        ? Math.max(0, annotation.borderWidth)
+        ? Math.max(0, annotation.borderWidth) / styleScale
         : 0;
     const hasBorder = borderWidth > 0;
     const borderColorObj = hasBorder
@@ -353,7 +364,7 @@ export class FreeTextExporter implements IAnnotationExporter {
         ? Math.min(1, Math.max(0, annotation.opacity))
         : undefined;
 
-    const fontSize = annotation.size || 12;
+    const fontSize = (annotation.size || 12) / styleScale;
 
     const resolveStandardFont = (fontFamily: string | undefined) => {
       const f = (fontFamily || "").toLowerCase();
@@ -454,16 +465,24 @@ export class FreeTextExporter implements IAnnotationExporter {
 
     const baseFontRef = baseFont.ref;
     const cjkFontRef = cjkFont?.ref;
-    const contentInset = hasBorder ? borderWidth : 0;
-    const contentX = x + contentInset;
-    const contentY = y + contentInset;
-    const contentW = Math.max(0, w - contentInset * 2);
-    const contentH = Math.max(0, h - contentInset * 2);
-
-    // 2. Prepare text wrapping
-    const paragraphs = text.split(/\r\n|\r|\n/);
-    const lines: string[] = [];
-    const availableWidth = contentW;
+    const uiPadding = getFreeTextPadding(annotation);
+    const content = getFreeTextContentBox(
+      {
+        textPadding: {
+          top: uiPadding.top / styleScale,
+          right: uiPadding.right / styleScale,
+          bottom: uiPadding.bottom / styleScale,
+          left: uiPadding.left / styleScale,
+        },
+      },
+      w,
+      h,
+    );
+    const { padding } = content;
+    const contentX = x + padding.left;
+    const contentY = y + padding.bottom;
+    const contentW = content.width;
+    const contentH = content.height;
 
     const measureWidth = (s: string) => {
       if (!useMixedFonts || !cjkFont) {
@@ -510,76 +529,15 @@ export class FreeTextExporter implements IAnnotationExporter {
       return total;
     };
 
-    const wrapParagraph = (paragraph: string) => {
-      if (paragraph === "") {
-        lines.push("");
-        return;
-      }
-
-      let current = "";
-      let lastBreakPos = -1; // position in `current` where we can break (after char)
-      let i = 0;
-
-      const recomputeLastBreakPos = () => {
-        lastBreakPos = -1;
-        for (let j = current.length - 1; j >= 0; j--) {
-          const ch = current[j];
-          const code = ch.charCodeAt(0);
-          if (ch === " " || ch === "\t" || ch === "-" || code > 0x7f) {
-            lastBreakPos = j + 1;
-            return;
-          }
-        }
-      };
-
-      while (i < paragraph.length) {
-        const ch = paragraph[i];
-        const next = current + ch;
-
-        let width = 0;
-        try {
-          width = measureWidth(next);
-        } catch {
-          width = Number.POSITIVE_INFINITY;
-        }
-
-        if (current === "" || width <= availableWidth) {
-          current = next;
-          const code = ch.charCodeAt(0);
-          if (ch === " " || ch === "\t" || ch === "-" || code > 0x7f) {
-            lastBreakPos = current.length;
-          }
-          i += 1;
-          continue;
-        }
-
-        // Overflow: break at last known opportunity; otherwise hard break.
-        if (lastBreakPos > 0 && lastBreakPos < current.length) {
-          lines.push(current.slice(0, lastBreakPos));
-          current = current.slice(lastBreakPos);
-          recomputeLastBreakPos();
-          continue;
-        }
-        if (lastBreakPos === current.length) {
-          lines.push(current);
-          current = "";
-          lastBreakPos = -1;
-          continue;
-        }
-
-        // No break opportunities; force break at current length.
-        lines.push(current);
-        current = "";
-        lastBreakPos = -1;
-      }
-
-      // Push remainder (including whitespace)
-      if (current !== "") lines.push(current);
+    const lines = wrapFreeText(text, contentW, measureWidth);
+    const alignedOffset = (line: string) => {
+      const width = measureWidth(line);
+      return annotation.alignment === "right"
+        ? contentW - width
+        : annotation.alignment === "center"
+          ? (contentW - width) / 2
+          : 0;
     };
-
-    for (const paragraph of paragraphs) {
-      wrapParagraph(paragraph);
-    }
 
     const theta = (-effectiveRotationDeg * Math.PI) / 180;
     const cos = Math.cos(theta);
@@ -592,6 +550,11 @@ export class FreeTextExporter implements IAnnotationExporter {
         ? annotation.lineHeight
         : 1;
     const lineHeight = fontSize * lineHeightMultiplier;
+    const baseline = getFreeTextBaseline(
+      fontSize,
+      lineHeight,
+      getPdfTextVisualCenterAboveBaselineEm(baseFont, "H"),
+    );
 
     if (annotation.flatten) {
       const bg =
@@ -651,72 +614,25 @@ export class FreeTextExporter implements IAnnotationExporter {
       }
       const textColor = rgb(r, g, bb);
 
-      const measureLineWidth = (s: string) => {
-        if (!useMixedFonts || !cjkFont || !cjkResourceName) {
-          const runFont =
-            userExplicitCustom &&
-            customFont &&
-            !isUserSelectedNonStandardEmbedded
-              ? customFont
-              : baseFont;
-          try {
-            return runFont.widthOfTextAtSize(s, fontSize);
-          } catch {
-            return 0;
-          }
-        }
-
-        let total = 0;
-        let buf = "";
-        let bufIsAscii: boolean | null = null;
-        const flushWidth = () => {
-          if (!buf) return;
-          const runFont = bufIsAscii ? baseFont : cjkFont;
-          try {
-            total += runFont.widthOfTextAtSize(buf, fontSize);
-          } catch {
-            // ignore
-          }
-          buf = "";
-          bufIsAscii = null;
-        };
-
-        for (let i = 0; i < s.length; i++) {
-          const ch = s[i];
-          const isAscii = ch.charCodeAt(0) <= 0x7f;
-          if (bufIsAscii === null) {
-            bufIsAscii = isAscii;
-            buf = ch;
-            continue;
-          }
-          if (isAscii === bufIsAscii) {
-            buf += ch;
-          } else {
-            flushWidth();
-            bufIsAscii = isAscii;
-            buf = ch;
-          }
-        }
-        flushWidth();
-        return total;
-      };
-
-      const getAlignedX = (lineText: string) => {
-        const lw = measureLineWidth(lineText);
-        const q =
-          annotation.alignment === "center"
-            ? 1
-            : annotation.alignment === "right"
-              ? 2
-              : 0;
-        if (q === 1) return contentX + (contentW - lw) / 2;
-        if (q === 2) return contentX + (contentW - lw);
-        return contentX;
-      };
+      const clipPoints = [
+        rotatePoint(contentX, contentY),
+        rotatePoint(contentX + contentW, contentY),
+        rotatePoint(contentX + contentW, contentY + contentH),
+        rotatePoint(contentX, contentY + contentH),
+      ];
+      page.pushOperators(
+        pushGraphicsState(),
+        op("m", clipPoints[0].x, clipPoints[0].y),
+        ...clipPoints.slice(1).map((point) => op("l", point.x, point.y)),
+        op("h"),
+        op("W"),
+        op("n"),
+      );
+      const getAlignedX = (line: string) => contentX + alignedOffset(line);
 
       for (let li = 0; li < lines.length; li++) {
         const lineText = lines[li]!;
-        const drawY = contentY + contentH - lineHeight - li * lineHeight;
+        const drawY = y + h - padding.top - baseline - li * lineHeight;
 
         if (!useMixedFonts || !cjkFont || !cjkResourceName) {
           const runFont =
@@ -782,6 +698,7 @@ export class FreeTextExporter implements IAnnotationExporter {
         flush();
       }
 
+      page.pushOperators(popGraphicsState());
       return undefined;
     }
 
@@ -808,8 +725,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       });
     }
 
-    const startX = contentInset;
-    const startY = contentInset + contentH - lineHeight;
+    const startY = h - padding.top - baseline;
 
     const pdfNum = (n: number) => {
       if (!Number.isFinite(n)) return "0";
@@ -853,10 +769,8 @@ export class FreeTextExporter implements IAnnotationExporter {
       const strokeH = Math.max(0, h - borderWidth);
       appearanceOps += ` ${borderR} ${borderG} ${borderB} RG ${pdfNum(borderWidth)} w ${pdfNum(inset)} ${pdfNum(inset)} ${pdfNum(strokeW)} ${pdfNum(strokeH)} re S`;
     }
+    appearanceOps += ` ${pdfNum(padding.left)} ${pdfNum(padding.bottom)} ${pdfNum(contentW)} ${pdfNum(contentH)} re W n`;
     appearanceOps += ` ${r} ${g} ${bb} rg BT /${baseResourceName} ${fontSize} Tf ${pdfNum(lineHeight)} TL`;
-
-    // Initial position
-    appearanceOps += ` ${pdfNum(startX)} ${pdfNum(startY)} Td`;
 
     let currentResource = baseResourceName;
 
@@ -874,7 +788,8 @@ export class FreeTextExporter implements IAnnotationExporter {
       }
     };
 
-    for (const line of lines) {
+    for (const [lineIndex, line] of lines.entries()) {
+      appearanceOps += ` 1 0 0 1 ${pdfNum(padding.left + alignedOffset(line))} ${pdfNum(startY - lineIndex * lineHeight)} Tm`;
       if (!useMixedFonts || !cjkFont || !cjkResourceName) {
         const runFont =
           userExplicitCustom && customFont && !isUserSelectedNonStandardEmbedded
@@ -968,7 +883,7 @@ export class FreeTextExporter implements IAnnotationExporter {
       Subtype: "FreeText",
       F: 4, // Print flag
       Rect: [rectX, rectY, rectX + aabbW, rectY + aabbH],
-      RD: [contentInset, contentInset, contentInset, contentInset],
+      RD: [padding.left, padding.bottom, padding.right, padding.top],
       DA: PDFString.of(da),
       AP: { N: appearanceRef },
       Q: q,
