@@ -529,6 +529,13 @@ The workspace combines:
 - hit-testing and selection
 - dragging/resizing/editing interactions
 
+Long documents mount only the viewport window and overscan, including on first
+open. An interaction's pinned page is retained separately from that window so
+distant jumps do not mount the intervening pages. Container resizing refreshes
+the window. The right-panel dock coalesces scrollbar geometry reads per frame
+and caches the system scrollbar probe until window resize; canvas/text mutations
+must not repeatedly insert measurement elements and force document-wide layout.
+
 The floating toolbar's page settings menu rotates the whole document's reading
 view in 90-degree steps. Document-owned `viewRotation` is temporary, travels with a live tab during
 window transfer, and resets when a document is reopened. It does not modify

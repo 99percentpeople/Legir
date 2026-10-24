@@ -19,8 +19,13 @@ export function useScrollbarWidthOffset(options: {
 
   const [scrollbarWidthPx, setScrollbarWidthPx] = React.useState(0);
   const [hasScrollbar, setHasScrollbar] = React.useState(false);
+  const systemScrollbarWidthRef = React.useRef<number | null>(null);
+  const measureRafRef = React.useRef<number | null>(null);
 
   const getSystemScrollbarWidthPx = React.useCallback(() => {
+    if (systemScrollbarWidthRef.current !== null) {
+      return systemScrollbarWidthRef.current;
+    }
     if (typeof document === "undefined") return 0;
     if (!document.body) return 0;
 
@@ -35,7 +40,10 @@ export function useScrollbarWidthOffset(options: {
 
     const w = el.offsetWidth - el.clientWidth;
     el.remove();
-    return w > 0 ? w : 0;
+    // A zero width is a valid cached result for overlay scrollbars. Repeating
+    // this DOM write/read for PDF canvas/text mutations forces full layouts.
+    systemScrollbarWidthRef.current = Math.max(0, w);
+    return systemScrollbarWidthRef.current;
   }, []);
 
   const measureScrollbarWidth = React.useCallback(() => {
@@ -77,28 +85,49 @@ export function useScrollbarWidthOffset(options: {
     options.scrollElement,
   ]);
 
+  const scheduleMeasurement = React.useCallback(() => {
+    if (measureRafRef.current !== null) return;
+    measureRafRef.current = requestAnimationFrame(() => {
+      measureRafRef.current = null;
+      measureScrollbarWidth();
+    });
+  }, [measureScrollbarWidth]);
+
+  const handleWindowResize = React.useCallback(() => {
+    // Browser zoom/display changes can change the system scrollbar width.
+    systemScrollbarWidthRef.current = null;
+    scheduleMeasurement();
+  }, [scheduleMeasurement]);
+
   useEventListener(
-    typeof window !== "undefined" ? window : null,
+    enabled && typeof window !== "undefined" ? window : null,
     "resize",
-    measureScrollbarWidth,
+    handleWindowResize,
   );
 
   React.useEffect(() => {
     measureScrollbarWidth();
 
     let ro: ResizeObserver | null = null;
-    if (options.scrollElement && typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => measureScrollbarWidth());
+    if (
+      enabled &&
+      options.scrollElement &&
+      typeof ResizeObserver !== "undefined"
+    ) {
+      ro = new ResizeObserver(scheduleMeasurement);
       ro.observe(options.scrollElement);
     }
 
     let mo: MutationObserver | null = null;
     if (
+      enabled &&
       observeMutations &&
       options.scrollElement &&
       typeof MutationObserver !== "undefined"
     ) {
-      mo = new MutationObserver(() => measureScrollbarWidth());
+      // Canvas swaps, text-layer changes and page virtualization can publish
+      // many mutations in one frame; read scroll geometry only once per frame.
+      mo = new MutationObserver(scheduleMeasurement);
       mo.observe(options.scrollElement, {
         subtree: true,
         childList: true,
@@ -109,8 +138,18 @@ export function useScrollbarWidthOffset(options: {
     return () => {
       ro?.disconnect();
       mo?.disconnect();
+      if (measureRafRef.current !== null) {
+        cancelAnimationFrame(measureRafRef.current);
+        measureRafRef.current = null;
+      }
     };
-  }, [measureScrollbarWidth, observeMutations, options.scrollElement]);
+  }, [
+    enabled,
+    measureScrollbarWidth,
+    observeMutations,
+    options.scrollElement,
+    scheduleMeasurement,
+  ]);
 
   return { scrollbarWidthPx, hasScrollbar, remeasure: measureScrollbarWidth };
 }

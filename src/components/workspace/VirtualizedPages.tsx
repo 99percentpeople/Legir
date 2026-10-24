@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -47,16 +48,14 @@ export function VirtualizedPages<T>(props: {
     );
   }, [props.axis, props.rects]);
 
-  const [range, setRange] = useState<Range>(() => {
-    const end = Math.max(0, props.items.length - 1);
-    return { start: 0, end };
-  });
+  // Start empty and measure once the ancestor's container ref is attached,
+  // instead of mounting the entire document for one frame.
+  const [range, setRange] = useState<Range | null>(null);
 
   const rafRef = useRef<number | null>(null);
 
   const updateRange = useCallback(() => {
     if (!props.enabled) {
-      setRange({ start: 0, end: Math.max(0, props.items.length - 1) });
       return;
     }
 
@@ -64,7 +63,10 @@ export function VirtualizedPages<T>(props: {
     if (!container) return;
 
     const count = props.items.length;
-    if (count === 0) return;
+    if (count === 0) {
+      setRange(null);
+      return;
+    }
 
     // Viewport range within the scroll container.
     const viewStart =
@@ -81,12 +83,11 @@ export function VirtualizedPages<T>(props: {
       viewStart,
       viewEnd,
       overscan,
-      pinIndex: props.pinIndex,
     });
     if (!nextRange) return;
 
     setRange((prev) =>
-      prev.start === nextRange.start && prev.end === nextRange.end
+      prev?.start === nextRange.start && prev.end === nextRange.end
         ? prev
         : nextRange,
     );
@@ -98,7 +99,6 @@ export function VirtualizedPages<T>(props: {
     props.containerRef,
     props.enabled,
     props.items.length,
-    props.pinIndex,
   ]);
 
   const scheduleUpdate = useCallback(() => {
@@ -112,30 +112,39 @@ export function VirtualizedPages<T>(props: {
     });
   }, [props.enabled, updateRange]);
 
-  useEffect(() => {
-    if (!props.enabled) {
-      setRange({ start: 0, end: Math.max(0, props.items.length - 1) });
-      return;
+  useLayoutEffect(() => {
+    // A queued scroll callback may refer to the previous layout/scale.
+    if (rafRef.current !== null) {
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
-    scheduleUpdate();
+    updateRange();
   }, [
     props.enabled,
     props.items.length,
     props.axis,
     props.rects,
     props.layoutEpoch,
-    scheduleUpdate,
+    updateRange,
   ]);
 
   useEffect(() => {
     const container = props.containerRef.current;
     if (!container) return;
+    // Ancestor refs can still be null in the child's initial layout effect.
+    updateRange();
     const onScroll = () => scheduleUpdate();
     container.addEventListener("scroll", onScroll, { passive: true });
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(scheduleUpdate);
+    observer?.observe(container);
     return () => {
       container.removeEventListener("scroll", onScroll);
+      observer?.disconnect();
     };
-  }, [props.containerRef, scheduleUpdate]);
+  }, [props.containerRef, scheduleUpdate, updateRange]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -166,10 +175,34 @@ export function VirtualizedPages<T>(props: {
     );
   }
 
+  const indexes: number[] = [];
+  if (range) {
+    for (
+      let index = range.start;
+      index <= Math.min(range.end, props.items.length - 1);
+      index++
+    ) {
+      indexes.push(index);
+    }
+  }
+  // Retain the interaction's page independently. Extending a contiguous range
+  // to a distant pin mounts every page crossed by a scrollbar drag/page jump.
+  const pin = props.pinIndex;
+  if (
+    typeof pin === "number" &&
+    Number.isInteger(pin) &&
+    pin >= 0 &&
+    pin < props.items.length &&
+    !indexes.includes(pin)
+  ) {
+    if (indexes.length && pin < indexes[0]) indexes.unshift(pin);
+    else indexes.push(pin);
+  }
+
   return (
     <>
-      {props.items.slice(range.start, range.end + 1).map((item, i) => {
-        const index = range.start + i;
+      {indexes.map((index) => {
+        const item = props.items[index];
         const rect = props.rects[index];
         return (
           <div
