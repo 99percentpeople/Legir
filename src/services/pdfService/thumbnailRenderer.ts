@@ -5,6 +5,7 @@ import {
 } from "@/constants";
 import type { PDFWorkerService } from "./pdfWorkerService";
 import type { ThumbnailContent } from "./types";
+import { encodedImageDataUrl } from "@/utils/encodedImageDataUrl";
 import type {
   PageData,
   FormField,
@@ -55,19 +56,14 @@ export async function renderThumbnail(
   });
   signal.throwIfAborted();
   if (!result.bytes.length) throw new Error("Empty thumbnail");
-  const url = URL.createObjectURL(
-    new Blob([new Uint8Array(result.bytes)], { type: result.mimeType }),
-  );
-  try {
-    // Decode before publishing: existing <img> nodes keep their old bitmap
-    // throughout regeneration and never pass through an empty/loading state.
-    const image = new Image();
-    image.src = url;
-    await image.decode();
-    signal.throwIfAborted();
-    return url;
-  } catch (error) {
-    URL.revokeObjectURL(url);
-    throw error;
-  }
+  // These are bounded thumbnail encodings. Blob URL registration can block
+  // the UI on a synchronous browser-process round trip during continuous input.
+  const url = encodedImageDataUrl(result.bytes, result.mimeType);
+  // Decode before publishing: existing <img> nodes keep their old bitmap
+  // throughout regeneration and never pass through an empty/loading state.
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  signal.throwIfAborted();
+  return url;
 }

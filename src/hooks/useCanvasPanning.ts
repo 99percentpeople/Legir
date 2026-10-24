@@ -114,6 +114,12 @@ export const useCanvasPanning = ({
       setIsPanning(false);
       setPanSource(null);
       panStartRef.current = null;
+      // Mouseup can arrive before the coalesced frame. Preserve the last
+      // movement instead of cancelling it and stopping short of the pointer.
+      if (containerRef.current && targetScrollRef.current) {
+        containerRef.current.scrollLeft = targetScrollRef.current.left;
+        containerRef.current.scrollTop = targetScrollRef.current.top;
+      }
       targetScrollRef.current = null;
 
       if (rafIdRef.current) {
@@ -124,7 +130,7 @@ export const useCanvasPanning = ({
       if (e) releasePointer(e);
       return true;
     },
-    [isPanning, releasePointer],
+    [isPanning, releasePointer, containerRef],
   );
 
   return {

@@ -450,9 +450,9 @@ it("creates reader placeholders from the worker canvas without a main-thread rea
     }),
   );
   expect(context).not.toHaveBeenCalled();
-  expect(createURL).toHaveBeenCalledWith(expect.any(Blob));
+  expect(createURL).not.toHaveBeenCalled();
   expect(useEditorView.getState().pagePreviewImages[0]).toBe(
-    "blob:worker-preview",
+    "data:image/jpeg;base64,AQI=",
   );
 });
 

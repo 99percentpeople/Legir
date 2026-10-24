@@ -540,6 +540,8 @@ only while selection handles are active. Reader and sidebar scrolling must not
 re-render every mounted text layer when no text is selected. Hand panning updates
 the captured scroll container's cursor locally; it must not add/remove a universal
 cursor stylesheet and invalidate styles across the entire document.
+Releasing a hand drag applies its last queued position before cancelling the
+animation frame, so a quick release does not discard the final movement.
 
 The floating toolbar's page settings menu rotates the whole document's reading
 view in 90-degree steps. Document-owned `viewRotation` is temporary, travels with a live tab during
@@ -857,6 +859,11 @@ upload/readback work. The UI never reads back the large transferred canvas or
 rerasterizes the PDF for a placeholder. Render changes and disposal cancel pending
 captures. Both resource caches follow page identity through edits and are released
 when their document closes.
+Small encoded reader previews and sidebar/import thumbnails use data URLs.
+Registering a Blob URL on the UI thread can synchronously wait for the browser
+process and interrupt continuous dragging even after rasterization and encoding
+have moved to the worker. Thumbnail bytes are preserved, and decoding still
+finishes before a thumbnail replaces the currently displayed image.
 
 `exportPDF` assembles the final page sequence before exporting controls, repairs
 copied AcroForm trees and internal links, and applies `rotationDelta` after

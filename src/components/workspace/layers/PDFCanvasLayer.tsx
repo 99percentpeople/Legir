@@ -20,6 +20,7 @@ import {
 } from "@/store/useEditorView";
 import { getWorkspaceRenderMetrics } from "../lib/renderPerformance";
 import { waitForReaderPreviewIdle } from "../lib/readerPreviewActivity";
+import { encodedImageDataUrl } from "@/utils/encodedImageDataUrl";
 import {
   reportPDFPageRenderLayerReady,
   reportPDFPageRenderLayerState,
@@ -134,11 +135,7 @@ const PDFCanvasLayer: React.FC<PDFCanvasLayerProps> = ({
         ) {
           return;
         }
-        const imageData = URL.createObjectURL(
-          new Blob([image.bytes as Uint8Array<ArrayBuffer>], {
-            type: image.mimeType,
-          }),
-        );
+        const imageData = encodedImageDataUrl(image.bytes, image.mimeType);
         setState((s) => ({
           pagePreviewImages: { ...s.pagePreviewImages, [pageIndex]: imageData },
         }));
