@@ -22,8 +22,7 @@ interface PropertiesPanelProps {
   onMetadataChange: (updates: Partial<PDFMetadata>) => void;
   onFilenameChange: (name: string) => void;
   onDelete: (id: string) => void;
-  onClose?: () => void;
-  onCollapse?: () => void;
+  onCollapse: () => void;
   isOpen: boolean;
   onOpen: () => void;
   isFloating: boolean;
@@ -42,7 +41,6 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
     onMetadataChange,
     onFilenameChange,
     onDelete,
-    onClose,
     onCollapse,
     isOpen,
     onOpen,
@@ -70,8 +68,6 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
       ) => {
         onChange({ ...selectedControl, ...updates } as FormField | Annotation);
       };
-      const handleClose = onClose ?? onCollapse ?? (() => {});
-      const handleCollapse = onCollapse ?? handleClose;
       const isField = "name" in selectedControl && "style" in selectedControl;
       const canEditControl =
         canPerformPdfPermissionOperation(
@@ -84,10 +80,10 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
           data={selectedControl}
           onChange={handleControlChange}
           onDelete={() => onDelete(selectedControl.id)}
-          onClose={handleClose}
+          onClose={onCollapse}
           isOpen={isOpen}
           onOpen={onOpen}
-          onCollapse={handleCollapse}
+          onCollapse={onCollapse}
           isFloating={isFloating}
           onTriggerHistorySave={onTriggerHistorySave}
           canEdit={canEditControl}
@@ -97,8 +93,6 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         />
       );
     }
-
-    const handleDocumentClose = onCollapse ?? onClose;
 
     return (
       <DocumentPropertiesPanel
@@ -145,7 +139,7 @@ export const PropertiesPanel = React.memo<PropertiesPanelProps>(
         isOpen={isOpen}
         onOpen={onOpen}
         onCollapse={onCollapse}
-        onClose={handleDocumentClose}
+        onClose={onCollapse}
         isFloating={isFloating}
         onTriggerHistorySave={onTriggerHistorySave}
         width={width}

@@ -251,7 +251,6 @@ export const selectPropertiesRightPanelState = (state: EditorStore) => {
     documentLoadState: state.documentLoadState,
     documentPermissions: state.documentPermissions,
     setState: state.setState,
-    selectControl: state.selectControl,
     deleteSelection: state.deleteSelection,
     saveCheckpoint: state.saveCheckpoint,
     updateField: state.updateField,

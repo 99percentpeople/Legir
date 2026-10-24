@@ -87,7 +87,6 @@ export function EditorPropertiesRightPanel(props: Props) {
       }}
       onFilenameChange={handleFilenameChange}
       onDelete={state.deleteSelection}
-      onClose={() => state.selectControl(null)}
       onTriggerHistorySave={state.saveCheckpoint}
     />
   );
