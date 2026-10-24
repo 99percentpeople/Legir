@@ -12,6 +12,7 @@ import { useEditorViewApi } from "@/store/useEditorView";
 import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import { useEditorToolActions } from "@/hooks/useEditorToolActions";
 import type { MoveDirection, Tool } from "@/types";
+import { useEditorControlClipboard } from "./useEditorControlClipboard";
 
 interface UseEditorPageKeyboardShortcutsOptions {
   defaultTool: Tool;
@@ -32,6 +33,7 @@ export function useEditorPageKeyboardShortcuts({
   onPrint,
   onToggleFullscreen,
 }: UseEditorPageKeyboardShortcutsOptions) {
+  useEditorControlClipboard();
   const useEditorView = useEditorViewApi();
   const isActive = useEditorTabIsActive();
   const { t } = useLanguage();
@@ -305,12 +307,14 @@ export function useEditorPageKeyboardShortcuts({
       }
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
         if (event.shiftKey) currentState.redo();
         else currentState.undo();
         return;
       }
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+        event.preventDefault();
         currentState.redo();
         return;
       }

@@ -561,10 +561,6 @@ export interface DocumentState {
   isProcessing: boolean;
   past: HistorySnapshot[];
   future: HistorySnapshot[];
-  clipboard: {
-    type: "field" | "annotation";
-    data: FormField | Annotation;
-  } | null;
   pageTranslateParagraphCandidates: PageTranslateParagraphCandidate[];
   pageTranslateSelectedParagraphIds: string[];
   lastSavedAt: Date | null;

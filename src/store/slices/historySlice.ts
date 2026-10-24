@@ -68,7 +68,6 @@ export const createHistorySlice: EditorStoreSlice<
         ? {
             thumbnailImages: images,
             pagePreviewImages: previews,
-            clipboard: null,
             pageTranslateParagraphCandidates: [],
             pageTranslateSelectedParagraphIds: [],
           }

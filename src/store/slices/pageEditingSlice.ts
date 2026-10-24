@@ -130,7 +130,6 @@ export const createPageEditingSlice: EditorStoreSlice<
         : [getPageId(pages[currentPageIndex])],
       currentPageIndex,
       selectedId: null,
-      clipboard: null,
       thumbnailImages: images,
       pagePreviewImages: previews,
       pageTranslateParagraphCandidates: [],

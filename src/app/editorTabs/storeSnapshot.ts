@@ -110,12 +110,6 @@ export const createEditorTabSnapshotFromState = (options: {
     viewRotation: state.viewRotation,
     past: createShallowArrayCopy(state.past),
     future: createShallowArrayCopy(state.future),
-    clipboard: state.clipboard
-      ? {
-          type: state.clipboard.type,
-          data: state.clipboard.data,
-        }
-      : null,
 
     pageTranslateParagraphCandidates: createShallowArrayCopy(
       state.pageTranslateParagraphCandidates,

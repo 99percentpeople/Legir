@@ -121,12 +121,6 @@ const cloneEditorTabSnapshotForTransfer = (
         ? cloneSources(item.pageSources)
         : undefined,
     })),
-    clipboard: snapshot.clipboard
-      ? {
-          type: snapshot.clipboard.type,
-          data: snapshot.clipboard.data,
-        }
-      : null,
 
     pageTranslateParagraphCandidates: [
       ...snapshot.pageTranslateParagraphCandidates,
@@ -298,12 +292,6 @@ export const restoreEditorTabSessionTransfer = async (
         outline: [...restoredOutline],
         past: [...incomingSnapshot.past],
         future: [...incomingSnapshot.future],
-        clipboard: incomingSnapshot.clipboard
-          ? {
-              type: incomingSnapshot.clipboard.type,
-              data: incomingSnapshot.clipboard.data,
-            }
-          : null,
 
         pageTranslateParagraphCandidates: [
           ...incomingSnapshot.pageTranslateParagraphCandidates,

@@ -547,6 +547,19 @@ Important supporting areas:
 
 The control system is registry-driven. New form controls or annotation-like tools should be added through the existing control registration flow instead of introducing special-case rendering paths.
 
+Control copy/paste uses native clipboard events in `useEditorControlClipboard`.
+Only the active, ready document handles them; focused text editors, dialogs and
+selected PDF text retain native clipboard behavior. `src/lib/controlClipboard/`
+validates a versioned, self-contained payload with a plain-text fallback for
+systems that discard custom MIME types. The system clipboard owns the snapshot,
+so closing the source PDF, changing tabs or undoing an edit does not erase it.
+`pasteControl` creates a new control on the current page through the existing
+permission/history actions, selects it and switches to its editing mode. Copies
+receive new IDs and nonconflicting field names, retain image data and reply
+relationships, and discard source PDF object/font references and raw appearance
+operators. Internal link destinations are retained only within their source
+document; URL links are portable.
+
 Form rectangles are viewport outer bounds, while rotatable annotation rectangles
 describe their local unrotated geometry. Missing PDF widget/FreeText rotation means
 zero in PDF space; import must still include the source page rotation. Widget export

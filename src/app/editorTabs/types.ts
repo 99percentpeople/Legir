@@ -40,7 +40,6 @@ export type EditorTabSnapshot = Pick<
   | "viewRotation"
   | "past"
   | "future"
-  | "clipboard"
   | "pageTranslateParagraphCandidates"
   | "pageTranslateSelectedParagraphIds"
   | "lastSavedAt"

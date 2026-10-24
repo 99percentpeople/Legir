@@ -1,4 +1,5 @@
 import { ANNOTATION_STYLES } from "@/constants";
+import { preparePastedControl } from "@/lib/controlClipboard";
 import {
   getMoveDelta,
   getMovedAnnotationUpdates,
@@ -40,6 +41,7 @@ export const createControlSlice: EditorStoreSlice<
   Pick<
     EditorActions,
     | "addField"
+    | "pasteControl"
     | "addAnnotation"
     | "addAnnotations"
     | "updateField"
@@ -60,6 +62,25 @@ export const createControlSlice: EditorStoreSlice<
     | "setAllFreetextFlatten"
   >
 > = (set, get) => ({
+  pasteControl: (clipboard) => {
+    const state = get();
+    const page = state.pages.find(
+      (item) => item.pageIndex === state.currentPageIndex,
+    );
+    if (!page || state.mode === "pages" || state.documentLoadState !== "ready")
+      return false;
+    const control = preparePastedControl(clipboard, page, state);
+    if (!control) return false;
+    // addField/addAnnotation own permission checks, one undo checkpoint and dirty scopes.
+    if (control.type === "field") state.addField(control.data);
+    else state.addAnnotation(control.data);
+    set({
+      mode: control.type === "field" ? "form" : "annotation",
+      tool: "select",
+    });
+    return true;
+  },
+
   addField: (field) => {
     assertPdfPermissionOperation(
       "edit_form_structure",

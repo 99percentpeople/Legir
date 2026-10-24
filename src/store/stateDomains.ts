@@ -58,7 +58,6 @@ export const documentKeys = [
   "isProcessing",
   "past",
   "future",
-  "clipboard",
   "pageTranslateParagraphCandidates",
   "pageTranslateSelectedParagraphIds",
   "lastSavedAt",

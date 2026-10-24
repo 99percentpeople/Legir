@@ -244,7 +244,6 @@ export const createDocumentSlice: EditorStoreSlice<
       tool: initialState.tool,
       past: initialState.past,
       future: initialState.future,
-      clipboard: initialState.clipboard,
       isProcessing: initialState.isProcessing,
       processingStatus: initialState.processingStatus,
       isSaving: initialState.isSaving,

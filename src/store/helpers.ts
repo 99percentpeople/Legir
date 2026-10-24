@@ -302,7 +302,6 @@ export const initialState: EditorState = {
   isProcessing: false,
   past: [],
   future: [],
-  clipboard: null,
   lastSavedAt: null,
   processingStatus: null,
   isPanelFloating: false,
