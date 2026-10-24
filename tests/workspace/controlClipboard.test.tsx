@@ -4,6 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorTabActiveContext } from "@/app/editorTabs/context";
 import { useEditorPageKeyboardShortcuts } from "@/pages/EditorPage/hooks/useEditorPageKeyboardShortcuts";
 import { EditorViewContext } from "@/store/useEditorView";
+import { useEditorControlClipboardActions } from "@/pages/EditorPage/hooks/useEditorControlClipboard";
+import { createClipboardData } from "@/lib/clipboard";
+import {
+  copySelectedControl,
+  readControlClipboard,
+  writeControlClipboard,
+} from "@/lib/controlClipboard";
 import { createTestEditorStore, field } from "../helpers/editorStore";
 
 let host: HTMLDivElement;
@@ -204,5 +211,96 @@ describe("control clipboard event ownership", () => {
       expect((await dispatch("paste", data)).defaultPrevented).toBe(false);
     }
     expect(view.getState().fields).toHaveLength(1);
+  });
+});
+
+function MenuProbe() {
+  const { copyControl, pasteControl } = useEditorControlClipboardActions();
+  return (
+    <>
+      <button data-copy onClick={() => void copyControl("clicked")}>
+        Copy
+      </button>
+      <button
+        data-paste
+        onClick={() =>
+          void pasteControl({ pageId: "original:0", x: 230, y: 310 })
+        }
+      >
+        Paste
+      </button>
+      <Probe />
+    </>
+  );
+}
+
+describe("control clipboard menu actions", () => {
+  it("copies the clicked control and uses menu coordinates without affecting keyboard paste", async () => {
+    const view = store();
+    view.setState({
+      fields: [field(), field("clicked", { value: "clicked value" })],
+    });
+    let text = "";
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        writeText: async (value: string) => {
+          text = value;
+        },
+        readText: async () => text,
+      },
+    });
+    await act(async () =>
+      root.render(
+        <EditorViewContext.Provider value={view}>
+          <MenuProbe />
+        </EditorViewContext.Provider>,
+      ),
+    );
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>("[data-copy]")!.click(),
+    );
+    expect(readControlClipboard(createClipboardData(text))?.data.id).toBe(
+      "clicked",
+    );
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>("[data-paste]")!.click(),
+    );
+    expect(view.getState().fields.at(-1)).toMatchObject({
+      value: "clicked value",
+      rect: { x: 230, y: 310 },
+    });
+    const data = clipboard();
+    data.setData("text/plain", text);
+    await dispatch("paste", data);
+    expect(view.getState().fields.at(-1)?.rect).toMatchObject({ x: 22, y: 22 });
+  });
+
+  it("discards a delayed clipboard read after the destination PDF changes", async () => {
+    const view = store();
+    const data = createClipboardData();
+    writeControlClipboard(data, copySelectedControl(view.getState())!);
+    let resolve!: (text: string) => void;
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        readText: () =>
+          new Promise<string>((yes) => {
+            resolve = yes;
+          }),
+      },
+    });
+    await act(async () =>
+      root.render(
+        <EditorViewContext.Provider value={view}>
+          <MenuProbe />
+        </EditorViewContext.Provider>,
+      ),
+    );
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>("[data-paste]")!.click(),
+    );
+    view.setState({ pdfBytes: new Uint8Array([2]) });
+    await act(async () => resolve(data.getData("text/plain")));
+    expect(view.getState().fields).toHaveLength(1);
+    expect(view.getState().past).toHaveLength(0);
   });
 });

@@ -1,10 +1,13 @@
 const zhCN = {
   common: {
+    clipboard_unavailable: "无法访问剪贴板，请使用键盘快捷键复制或粘贴。",
+    clipboard_empty: "剪贴板中没有可粘贴的对应内容。",
     select: "选择...",
     expand: "展开",
     collapse: "折叠",
     processing: "处理中...",
     actions: {
+      paste: "粘贴",
       cancel: "取消",
       done: "完成",
       continue: "继续",
@@ -23,6 +26,9 @@ const zhCN = {
     },
   },
   page_editor: {
+    copying: "正在复制选中的页面…",
+    copied: "已复制 {count} 页",
+    copy_failed: "无法复制选中的页面。",
     select_only: "只选择此页",
     add_selection: "添加到选择",
     remove_selection: "取消选择此页",
@@ -569,8 +575,8 @@ const zhCN = {
     move_1px: "移动选中字段 (1px)",
     shift_arrow: "Shift + 方向键",
     move_10px: "移动选中字段 (10px)",
-    copy: "复制选中的注释或表单控件",
-    paste: "粘贴注释或表单控件",
+    copy: "复制选中的页面、注释或表单控件",
+    paste: "粘贴页面、注释或表单控件",
     cut: "剪切选中字段",
     delete: "删除选中字段",
     deselect: "取消选择 / 切换选择工具",

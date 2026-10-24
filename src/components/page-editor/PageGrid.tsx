@@ -29,7 +29,13 @@ import { PageActions } from "./PageActions";
 import { PageDragPreview } from "./PageDragPreview";
 import { PageGridTransitions } from "./PageGridTransitions";
 import { PageSelectionMenu } from "./PageSelectionMenu";
-import { previewPageMove } from "./pageDrag";
+import { previewPageMove, fileInsertionIndex } from "./pageDrag";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@/components/ui/context-menu";
 import { usePageGridViewport } from "./usePageGridViewport";
 import { usePageFileDrop } from "./usePageFileDrop";
 import { usePageDropAnimation } from "./usePageDropAnimation";
@@ -71,6 +77,8 @@ type GridProps = {
   enabled: boolean;
   onOpen: (pageIndex: number) => void;
   onFilesDrop: (files: Promise<PlatformDroppedPdf[]>, index: number) => void;
+  onCopy?: (ids?: string[]) => void;
+  onPaste?: (index?: number) => void;
   run: (action: () => void) => void;
 };
 
@@ -84,6 +92,8 @@ const PageCard = memo(function PageCard({
   enabled,
   onSelect,
   onOpen,
+  onCopy,
+  onPaste,
   run,
 }: {
   page: PageData;
@@ -95,6 +105,8 @@ const PageCard = memo(function PageCard({
   enabled: boolean;
   onSelect: (page: PageData, intent: PageSelectionIntent) => void;
   onOpen: GridProps["onOpen"];
+  onCopy: GridProps["onCopy"];
+  onPaste: GridProps["onPaste"];
   run: GridProps["run"];
 }) {
   const { t } = useLanguage();
@@ -139,6 +151,10 @@ const PageCard = memo(function PageCard({
             canSelectRange={canSelectRange}
             disabled={moving}
             onSelect={select}
+            onCopy={
+              onCopy ? () => onCopy(selected ? undefined : ids) : undefined
+            }
+            onPaste={onPaste ? () => onPaste(index + 1) : undefined}
           >
             <button
               ref={handleRef}
@@ -210,8 +226,12 @@ export const PageGrid = memo(function PageGrid({
   enabled,
   onOpen,
   onFilesDrop,
+  onCopy,
+  onPaste,
   run,
 }: GridProps) {
+  const { t } = useLanguage();
+  const pasteIndex = useRef(0);
   const store = useEditorViewApi();
   const pageIds = useMemo(() => pages.map(getPageId), [pages]);
   const selection = useMemo(() => new Set(selectedPageIds), [selectedPageIds]);
@@ -435,101 +455,124 @@ export const PageGrid = memo(function PageGrid({
         layout={layout}
         disabled={dragging}
       >
-        <div
-          ref={scrollRef}
-          className="group/page-grid relative min-h-0 flex-1 overflow-auto"
-          style={layout.style}
-          data-page-grid
-          data-grid-dense={layout.dense || undefined}
-          data-grid-columns={columns}
-          data-grid-row-height={rowHeight}
-          data-page-dragging={drag || dropping ? "true" : undefined}
-          data-page-dropping={dropping ? "true" : undefined}
-          {...fileDropProps}
-          onContextMenuCapture={(event) => {
-            if (dragRef.current) {
-              event.preventDefault();
-              event.stopPropagation();
-            }
-          }}
-          onClick={(event) => {
-            if (
-              !dragRef.current &&
-              event.target instanceof Element &&
-              event.currentTarget.contains(event.target) &&
-              !event.target.closest("button, [role='menuitem']")
-            ) {
-              anchor.current = null;
-              store.getState().setSelectedPageIds([]);
-            }
-          }}
-          onScroll={(event) => {
-            const top = event.currentTarget.scrollTop;
-            updateScroll(top);
-          }}
-        >
-          <div
-            className="relative"
-            style={{
-              height: rowCount * rowHeight,
-              width: layout.gridWidth,
-              marginInline: "auto",
-            }}
-          >
+        <ContextMenu modal={false}>
+          <ContextMenuTrigger asChild disabled={!onPaste}>
             <div
-              className="absolute inset-x-0 grid"
-              style={{
-                top: startRow * rowHeight,
-                gridTemplateColumns: `repeat(${columns}, ${layout.cardWidth}px)`,
-                gridAutoRows: rowHeight,
-                columnGap: layout.gap,
-                justifyContent: "space-around",
+              ref={scrollRef}
+              className="group/page-grid relative min-h-0 flex-1 overflow-auto"
+              style={layout.style}
+              data-page-grid
+              data-grid-dense={layout.dense || undefined}
+              data-grid-columns={columns}
+              data-grid-row-height={rowHeight}
+              data-page-dragging={drag || dropping ? "true" : undefined}
+              data-page-dropping={dropping ? "true" : undefined}
+              {...fileDropProps}
+              onContextMenu={(event) => {
+                if (event.defaultPrevented) return;
+                event.stopPropagation();
+                const el = event.currentTarget;
+                const rect = el.getBoundingClientRect();
+                pasteIndex.current = fileInsertionIndex(
+                  event.clientX - rect.left,
+                  event.clientY - rect.top + el.scrollTop,
+                  pages.length,
+                  layout,
+                );
+              }}
+              onContextMenuCapture={(event) => {
+                if (dragRef.current) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }
+              }}
+              onClick={(event) => {
+                if (
+                  !dragRef.current &&
+                  event.target instanceof Element &&
+                  event.currentTarget.contains(event.target) &&
+                  !event.target.closest("button, [role='menuitem']")
+                ) {
+                  anchor.current = null;
+                  store.getState().setSelectedPageIds([]);
+                }
+              }}
+              onScroll={(event) => {
+                const top = event.currentTarget.scrollTop;
+                updateScroll(top);
               }}
             >
-              {displayed
-                .slice(startRow * columns, endRow * columns)
-                .map((page, offset) => {
-                  const id = getPageId(page);
-                  return (
-                    <PageCard
-                      key={id}
-                      page={page}
-                      index={startRow * columns + offset}
-                      total={pages.length}
-                      selected={selection.has(id)}
-                      moving={(drag?.ids ?? dropping)?.has(id) ?? false}
-                      canSelectRange={canSelectRange}
-                      enabled={enabled}
-                      onSelect={selectPage}
-                      onOpen={onOpen}
-                      run={run}
-                    />
-                  );
-                })}
-            </div>
-            {fileDropIndex !== null && markerIndex !== null && (
               <div
-                className="bg-primary pointer-events-none absolute z-10 w-1 rounded-full"
-                data-file-insertion-index={fileDropIndex}
+                className="relative"
                 style={{
-                  top:
-                    Math.floor(markerIndex / columns) * rowHeight +
-                    layout.cardPadding,
-                  height: rowHeight - layout.cardPadding * 2,
-                  left:
-                    layout.offset -
-                    layout.padding +
-                    (markerIndex % columns) *
-                      (layout.cardWidth + layout.columnGap) +
-                    (fileDropIndex === pages.length
-                      ? layout.cardWidth + layout.gap / 2
-                      : -layout.gap / 2) -
-                    2,
+                  height: rowCount * rowHeight,
+                  width: layout.gridWidth,
+                  marginInline: "auto",
                 }}
-              />
-            )}
-          </div>
-        </div>
+              >
+                <div
+                  className="absolute inset-x-0 grid"
+                  style={{
+                    top: startRow * rowHeight,
+                    gridTemplateColumns: `repeat(${columns}, ${layout.cardWidth}px)`,
+                    gridAutoRows: rowHeight,
+                    columnGap: layout.gap,
+                    justifyContent: "space-around",
+                  }}
+                >
+                  {displayed
+                    .slice(startRow * columns, endRow * columns)
+                    .map((page, offset) => {
+                      const id = getPageId(page);
+                      return (
+                        <PageCard
+                          key={id}
+                          page={page}
+                          index={startRow * columns + offset}
+                          total={pages.length}
+                          selected={selection.has(id)}
+                          moving={(drag?.ids ?? dropping)?.has(id) ?? false}
+                          canSelectRange={canSelectRange}
+                          enabled={enabled}
+                          onSelect={selectPage}
+                          onOpen={onOpen}
+                          onCopy={onCopy}
+                          onPaste={onPaste}
+                          run={run}
+                        />
+                      );
+                    })}
+                </div>
+                {fileDropIndex !== null && markerIndex !== null && (
+                  <div
+                    className="bg-primary pointer-events-none absolute z-10 w-1 rounded-full"
+                    data-file-insertion-index={fileDropIndex}
+                    style={{
+                      top:
+                        Math.floor(markerIndex / columns) * rowHeight +
+                        layout.cardPadding,
+                      height: rowHeight - layout.cardPadding * 2,
+                      left:
+                        layout.offset -
+                        layout.padding +
+                        (markerIndex % columns) *
+                          (layout.cardWidth + layout.columnGap) +
+                        (fileDropIndex === pages.length
+                          ? layout.cardWidth + layout.gap / 2
+                          : -layout.gap / 2) -
+                        2,
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onSelect={() => onPaste?.(pasteIndex.current)}>
+              {t("common.actions.paste")}
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       </PageGridTransitions>
       <DragOverlay
         className="group/page-drag m-0 hidden overflow-visible border-0 bg-transparent p-0 shadow-none outline-none data-[dnd-dragging]:block"

@@ -224,8 +224,62 @@ describe("control clipboard across documents", () => {
       expect(target.getState().annotations).toHaveLength(0);
       target.getState().redo();
       expect(target.getState().annotations[0]).toEqual(result);
+      // A menu target belongs to its clicked page, regardless of the active page.
+      target
+        .getState()
+        .pasteControl(payload, { pageId: "original:0", x: 240, y: 300 });
+      const placed = target.getState().annotations.at(-1)!;
+      expect(placed.pageIndex).toBe(0);
+      expect(placed.rect).toMatchObject({ x: 240, y: 300 });
+      if (type === "ink")
+        expect(placed.strokes![0]).toEqual([
+          { x: 241, y: 301 },
+          { x: 301, y: 321 },
+        ]);
+      if (type === "highlight")
+        expect(placed.rects![1]).toMatchObject({ x: 240, y: 312 });
+      expect(placed.shapePoints).toEqual(annotation.shapePoints);
+      expect(payload.data.rect).not.toEqual(placed.rect);
     },
   );
+
+  it("positions form controls by page identity, clamps edges, and rejects missing pages", () => {
+    const source = createStore({ fields: [field()], selectedId: "field-1" });
+    const payload = copySelectedControl(source.getState())!;
+    const target = createStore({
+      pages: [page(0), { ...page(1), id: "stable-page" }],
+    });
+    expect(
+      target
+        .getState()
+        .pasteControl(payload, { pageId: "stable-page", x: 250, y: 350 }),
+    ).toBe(true);
+    expect(target.getState().fields[0]).toMatchObject({
+      pageIndex: 1,
+      rect: { x: 250, y: 350 },
+    });
+    target
+      .getState()
+      .pasteControl(payload, { pageId: "stable-page", x: 590, y: 795 });
+    expect(target.getState().fields[1].rect).toMatchObject({ x: 500, y: 780 });
+    const before = target.getState();
+    expect(
+      target
+        .getState()
+        .pasteControl(payload, { pageId: "deleted", x: 10, y: 20 }),
+    ).toBe(false);
+    expect(
+      target
+        .getState()
+        .pasteControl(payload, { pageId: "stable-page", x: NaN, y: 20 }),
+    ).toBe(false);
+    expect(target.getState().past).toBe(before.past);
+    target.getState().pasteControl(payload);
+    expect(target.getState().fields.at(-1)).toMatchObject({
+      pageIndex: 0,
+      rect: { x: 22, y: 22 },
+    });
+  });
 
   it("clamps copies to smaller pages and retains internal links only in their source document", () => {
     const annotation: Annotation = {

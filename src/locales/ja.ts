@@ -1,10 +1,14 @@
 const ja = {
   common: {
+    clipboard_unavailable:
+      "クリップボードにアクセスできません。キーボードショートカットでコピーまたは貼り付けしてください。",
+    clipboard_empty: "クリップボードに対応する内容がありません。",
     select: "選択...",
     expand: "展開",
     collapse: "折りたたむ",
     processing: "処理中...",
     actions: {
+      paste: "貼り付け",
       cancel: "キャンセル",
       done: "完了",
       continue: "続ける",
@@ -534,8 +538,8 @@ const ja = {
     move_1px: "選択したフィールドを移動 (1px)",
     shift_arrow: "Shift + 矢印キー",
     move_10px: "選択したフィールドを移動 (10px)",
-    copy: "選択した注釈またはフォームをコピー",
-    paste: "注釈またはフォームを貼り付け",
+    copy: "選択したページ、注釈またはフォームをコピー",
+    paste: "ページ、注釈またはフォームを貼り付け",
     cut: "選択したフィールドを切り取り",
     delete: "選択したフィールドを削除",
     deselect: "選択解除 / 選択ツールに切り替え",

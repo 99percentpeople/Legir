@@ -1,10 +1,14 @@
 const en = {
   common: {
+    clipboard_unavailable:
+      "Cannot access the clipboard. Use keyboard shortcuts to copy or paste.",
+    clipboard_empty: "The clipboard contains no compatible content.",
     select: "Select...",
     expand: "Expand",
     collapse: "Collapse",
     processing: "Processing...",
     actions: {
+      paste: "Paste",
       cancel: "Cancel",
       done: "Done",
       continue: "Continue",
@@ -23,6 +27,9 @@ const en = {
     },
   },
   page_editor: {
+    copying: "Copying selected pages…",
+    copied: "Copied {count} pages",
+    copy_failed: "Could not copy the selected pages.",
     select_only: "Select only this page",
     add_selection: "Add to selection",
     remove_selection: "Remove from selection",
@@ -584,8 +591,8 @@ const en = {
     move_1px: "Move selected field (1px)",
     shift_arrow: "Shift + Arrow Keys",
     move_10px: "Move selected field (10px)",
-    copy: "Copy selected annotation or form control",
-    paste: "Paste annotation or form control",
+    copy: "Copy selected pages, annotation or form control",
+    paste: "Paste pages, annotation or form control",
     cut: "Cut selected field",
     delete: "Delete selected field",
     deselect: "Deselect / Switch to Select Tool",

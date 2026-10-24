@@ -1,10 +1,14 @@
 const de = {
   common: {
+    clipboard_unavailable:
+      "Kein Zugriff auf die Zwischenablage. Verwenden Sie Tastenkombinationen zum Kopieren oder Einfügen.",
+    clipboard_empty: "Die Zwischenablage enthält keine passenden Inhalte.",
     select: "Auswählen...",
     expand: "Erweitern",
     collapse: "Einklappen",
     processing: "Verarbeitung...",
     actions: {
+      paste: "Einfügen",
       cancel: "Abbrechen",
       done: "Fertig",
       continue: "Fortfahren",
@@ -541,8 +545,8 @@ const de = {
     move_1px: "Ausgewähltes Feld verschieben (1px)",
     shift_arrow: "Umschalt + Pfeiltasten",
     move_10px: "Ausgewähltes Feld verschieben (10px)",
-    copy: "Ausgewählte Anmerkung oder Formularfeld kopieren",
-    paste: "Anmerkung oder Formularfeld einfügen",
+    copy: "Ausgewählte Seiten, Anmerkung oder Formularfeld kopieren",
+    paste: "Seiten, Anmerkung oder Formularfeld einfügen",
     cut: "Ausgewähltes Feld ausschneiden",
     delete: "Ausgewähltes Feld löschen",
     deselect: "Abwählen / Zum Auswahlwerkzeug wechseln",

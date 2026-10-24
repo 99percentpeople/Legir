@@ -18,7 +18,10 @@ import {
 } from "@/components/ui/dialog";
 import type { PlatformDroppedPdf } from "@/services/platform";
 import { getPageId } from "@/services/pdfService/lib/pageStructure";
-import { canAssemblePdf } from "@/lib/pdfPermissions";
+import {
+  canAssemblePdf,
+  canPerformPdfPermissionOperation,
+} from "@/lib/pdfPermissions";
 import { getPageView } from "@/components/workspace/lib/pageViewRotation";
 import { parsePageRange, formatPageRange } from "@/utils/pageRange";
 import { cn } from "@/utils/cn";
@@ -28,6 +31,7 @@ import { ImportPreview } from "./ImportPreview";
 import { BlankPageOptions } from "./BlankPageOptions";
 import { InsertionPosition, insertionIndex } from "./InsertionPosition";
 import { usePageImport } from "./usePageImport";
+import { usePageClipboard } from "./usePageClipboard";
 import type { BlankPageSize, InsertPosition } from "./types";
 
 const PageEditor = memo(function PageEditor({
@@ -75,6 +79,34 @@ const PageEditor = memo(function PageEditor({
   const initialPages = useRef(pages);
   const dropGeneration = useRef(0);
   const queue = useRef<PlatformDroppedPdf[]>([]);
+  const setDropPosition = useCallback(
+    (index: number) => {
+      setPosition(
+        index === 0
+          ? "start"
+          : index >= store.getState().pages.length
+            ? "end"
+            : "before_page",
+      );
+      setTargetPage(index + 1);
+    },
+    [store],
+  );
+  const clipboard = usePageClipboard({
+    busy: loading || dialog !== null,
+    onPaste: (file, index) => {
+      dropGeneration.current++;
+      queue.current = [];
+      setError("");
+      if (index !== undefined) setDropPosition(index);
+      else
+        setPosition(store.getState().selectedPageIds.length ? "after" : "end");
+      void importer.loadInput(async () => {
+        const input = await file;
+        return { input, filename: input.name };
+      });
+    },
+  });
   useEffect(
     () => () => {
       dropGeneration.current++;
@@ -111,19 +143,6 @@ const PageEditor = memo(function PageEditor({
   const blankHeight = landscape
     ? Math.min(baseWidth, baseHeight)
     : Math.max(baseWidth, baseHeight);
-  const setDropPosition = useCallback(
-    (index: number) => {
-      setPosition(
-        index === 0
-          ? "start"
-          : index >= store.getState().pages.length
-            ? "end"
-            : "before_page",
-      );
-      setTargetPage(index + 1);
-    },
-    [store],
-  );
   const openDialog = useCallback(
     (next: "blank" | "import") => {
       const hasSelection = store.getState().selectedPageIds.length > 0;
@@ -316,6 +335,12 @@ const PageEditor = memo(function PageEditor({
         </p>
       )}
       <PageGrid
+        onCopy={
+          canPerformPdfPermissionOperation("copy_text", permissions)
+            ? clipboard.copyPages
+            : undefined
+        }
+        onPaste={enabled ? clipboard.pastePages : undefined}
         pages={pages}
         selectedPageIds={selectedPageIds}
         workerService={workerService}

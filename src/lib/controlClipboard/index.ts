@@ -23,12 +23,11 @@ const getDocumentId = (bytes: Uint8Array) => {
 
 export function copySelectedControl(
   state: EditorState,
+  id = state.selectedId,
 ): ControlClipboard | null {
   if (!state.pdfBytes || state.mode === "pages") return null;
-  const field = state.fields.find((item) => item.id === state.selectedId);
-  const annotation = state.annotations.find(
-    (item) => item.id === state.selectedId,
-  );
+  const field = state.fields.find((item) => item.id === id);
+  const annotation = state.annotations.find((item) => item.id === id);
   if (!field && !annotation) return null;
   assertPdfPermissionOperation("copy_text", state.documentPermissions);
   const data = field ?? prepareInkAnnotationForStore(annotation!);
@@ -43,7 +42,7 @@ export function copySelectedControl(
 }
 
 export function writeControlClipboard(
-  data: DataTransfer,
+  data: Pick<DataTransfer, "setData">,
   control: ControlClipboard,
 ) {
   const json = JSON.stringify(control);
@@ -57,7 +56,7 @@ export function writeControlClipboard(
 }
 
 export function readControlClipboard(
-  data: DataTransfer,
+  data: Pick<DataTransfer, "getData">,
 ): ControlClipboard | null {
   try {
     let custom = "";
@@ -92,16 +91,31 @@ export function preparePastedControl(
   clipboard: ControlClipboard,
   page: PageData,
   state: EditorState,
+  position?: { x: number; y: number },
 ): ControlClipboard | null {
   const parsed = controlClipboardSchema.safeParse(clipboard);
   if (!parsed.success || !state.pdfBytes) return null;
   const control = parsed.data;
-  const rect = control.data.rect;
+  // Imported ink rectangles can differ from their stroke bounds. Menu placement
+  // anchors the rendered bounds, while keyboard paste retains its original offset.
+  const rect =
+    position && control.type === "annotation"
+      ? prepareInkAnnotationForStore(control.data, { recomputeRect: true }).rect
+      : control.data.rect;
   if (!rect) return null;
+  if (
+    position &&
+    (!Number.isFinite(position.x) || !Number.isFinite(position.y))
+  )
+    return null;
   const dx =
-    Math.max(0, Math.min(rect.x + 12, page.width - rect.width)) - rect.x;
+    Math.max(0, Math.min(position?.x ?? rect.x + 12, page.width - rect.width)) -
+    rect.x;
   const dy =
-    Math.max(0, Math.min(rect.y + 12, page.height - rect.height)) - rect.y;
+    Math.max(
+      0,
+      Math.min(position?.y ?? rect.y + 12, page.height - rect.height),
+    ) - rect.y;
   const id = crypto.randomUUID();
   if (control.type === "field") {
     return {

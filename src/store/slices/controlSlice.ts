@@ -1,5 +1,6 @@
 import { ANNOTATION_STYLES } from "@/constants";
 import { preparePastedControl } from "@/lib/controlClipboard";
+import { getPageId } from "@/services/pdfService/lib/pageStructure";
 import {
   getMoveDelta,
   getMovedAnnotationUpdates,
@@ -62,14 +63,16 @@ export const createControlSlice: EditorStoreSlice<
     | "setAllFreetextFlatten"
   >
 > = (set, get) => ({
-  pasteControl: (clipboard) => {
+  pasteControl: (clipboard, target) => {
     const state = get();
-    const page = state.pages.find(
-      (item) => item.pageIndex === state.currentPageIndex,
+    const page = state.pages.find((item) =>
+      target
+        ? getPageId(item) === target.pageId
+        : item.pageIndex === state.currentPageIndex,
     );
     if (!page || state.mode === "pages" || state.documentLoadState !== "ready")
       return false;
-    const control = preparePastedControl(clipboard, page, state);
+    const control = preparePastedControl(clipboard, page, state, target);
     if (!control) return false;
     // addField/addAnnotation own permission checks, one undo checkpoint and dirty scopes.
     if (control.type === "field") state.addField(control.data);

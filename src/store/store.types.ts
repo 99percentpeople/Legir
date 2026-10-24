@@ -1,6 +1,9 @@
 import type { StateCreator } from "zustand";
 import type { PDFWorkerService } from "@/services/pdfService/pdfWorkerService";
-import type { ControlClipboard } from "@/lib/controlClipboard/types";
+import type {
+  ControlClipboard,
+  ControlPasteTarget,
+} from "@/lib/controlClipboard/types";
 
 import type {
   Annotation,
@@ -52,7 +55,10 @@ export type EditorToolStyles = {
 };
 
 export interface EditorActions {
-  pasteControl: (clipboard: ControlClipboard) => boolean;
+  pasteControl: (
+    clipboard: ControlClipboard,
+    target?: ControlPasteTarget,
+  ) => boolean;
   setSelectedPageIds: (ids: string[]) => void;
   rotatePages: (ids: string[], degrees: number) => void;
   deletePages: (ids: string[]) => void;

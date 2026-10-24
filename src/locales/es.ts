@@ -1,10 +1,14 @@
 const es = {
   common: {
+    clipboard_unavailable:
+      "No se puede acceder al portapapeles. Usa los atajos de teclado para copiar o pegar.",
+    clipboard_empty: "El portapapeles no contiene contenido compatible.",
     select: "Seleccionar...",
     expand: "Expandir",
     collapse: "Contraer",
     processing: "Procesando...",
     actions: {
+      paste: "Pegar",
       cancel: "Cancelar",
       done: "Listo",
       continue: "Continuar",
@@ -539,8 +543,8 @@ const es = {
     move_1px: "Mover campo seleccionado (1px)",
     shift_arrow: "Mayús + Teclas de flecha",
     move_10px: "Mover campo seleccionado (10px)",
-    copy: "Copiar anotación o campo seleccionado",
-    paste: "Pegar anotación o campo de formulario",
+    copy: "Copiar páginas, anotación o campo seleccionado",
+    paste: "Pegar páginas, anotación o campo de formulario",
     cut: "Cortar campo seleccionado",
     delete: "Eliminar campo seleccionado",
     deselect: "Deseleccionar / Cambiar a herramienta de selección",

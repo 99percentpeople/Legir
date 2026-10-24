@@ -1,10 +1,13 @@
 const zhTW = {
   common: {
+    clipboard_unavailable: "無法存取剪貼簿，請使用鍵盤快捷鍵複製或貼上。",
+    clipboard_empty: "剪貼簿中沒有可貼上的對應內容。",
     select: "選擇...",
     expand: "展開",
     collapse: "收合",
     processing: "處理中...",
     actions: {
+      paste: "貼上",
       cancel: "取消",
       done: "完成",
       continue: "繼續",
@@ -23,6 +26,9 @@ const zhTW = {
     },
   },
   page_editor: {
+    copying: "正在複製選取的頁面…",
+    copied: "已複製 {count} 頁",
+    copy_failed: "無法複製選取的頁面。",
     select_only: "只選取此頁",
     add_selection: "加入選取",
     remove_selection: "取消選取此頁",
@@ -568,8 +574,8 @@ const zhTW = {
     move_1px: "移動選取欄位 (1px)",
     shift_arrow: "Shift + 方向鍵",
     move_10px: "移動選取欄位 (10px)",
-    copy: "複製選取的註解或表單控制項",
-    paste: "貼上註解或表單控制項",
+    copy: "複製選取的頁面、註解或表單控制項",
+    paste: "貼上頁面、註解或表單控制項",
     cut: "剪下選取欄位",
     delete: "刪除選取欄位",
     deselect: "取消選取 / 切換選取工具",

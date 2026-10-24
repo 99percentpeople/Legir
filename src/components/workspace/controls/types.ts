@@ -31,6 +31,8 @@ export interface BaseControlProps<T = FormField | Annotation> {
   onPointerDown: (e: React.PointerEvent) => void;
   /** Callback when the control is selected */
   onSelect: (id: string) => void;
+  /** Copy the control itself, independently of any text selection. */
+  onCopy?: (id: string) => void;
   /** Callback to update control data */
   onUpdate: (id: string, updates: Partial<T>) => void;
   /** Optional callback to delete the control */

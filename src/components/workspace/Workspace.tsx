@@ -112,6 +112,14 @@ import { canPerformPdfPermissionOperation } from "@/lib/pdfPermissions";
 import { useStampLibraryStore } from "@/store/stampLibraryStore";
 import { useLanguage } from "@/components/language-provider";
 import { toast } from "sonner";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@/components/ui/context-menu";
+import type { ControlPasteTarget } from "@/lib/controlClipboard/types";
+import { getPageId } from "@/services/pdfService/lib/pageStructure";
 
 import { schedulePreload } from "@/lib/schedulePreload";
 import {
@@ -147,6 +155,8 @@ interface WorkspaceProps {
     opts?: { select?: boolean },
   ) => void;
   onSelectControl: (id: string | null) => void;
+  onCopyControl?: (id: string) => void;
+  onPasteControl?: (target: ControlPasteTarget) => void;
   onUpdateField: (id: string, updates: Partial<FormField>) => void;
   onResetFieldToDefault: (id: string) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
@@ -277,6 +287,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
   onAddField,
   onAddAnnotation,
   onSelectControl,
+  onCopyControl,
+  onPasteControl,
   onUpdateField,
   onResetFieldToDefault,
   onUpdateAnnotation,
@@ -303,6 +315,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const pasteTarget = useRef<ControlPasteTarget | null>(null);
+  const copyControl = canPerformPdfPermissionOperation(
+    "copy_text",
+    editorState.documentPermissions,
+  )
+    ? onCopyControl
+    : undefined;
   const pinchGestureActiveRef = useRef(false);
   const viewPages = useMemo(
     () =>
@@ -2604,9 +2623,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
     e: React.MouseEvent<HTMLDivElement>,
     pageIndex: number,
   ) => {
-    e.preventDefault();
+    // Nested control menus own their event and must not open the page menu.
+    if (e.defaultPrevented) return;
     e.stopPropagation();
-    if (!isDocumentReady) return;
+    if (!isDocumentReady) {
+      e.preventDefault();
+      return;
+    }
 
     const draft = shapeDraftSessionRef.current;
     const isShapeDraftTool =
@@ -2616,8 +2639,19 @@ const Workspace: React.FC<WorkspaceProps> = ({
         editorState.tool === "draw_shape_cloud_polygon");
 
     if (!isShapeDraftTool || !draft || draft.pageIndex !== pageIndex) {
+      if (!onPasteControl) {
+        e.preventDefault();
+        return;
+      }
+      const page = editorState.pages.find(
+        (page) => page.pageIndex === pageIndex,
+      );
+      pasteTarget.current = page
+        ? { pageId: getPageId(page), ...getRelativeCoords(e, pageIndex) }
+        : null;
       return;
     }
+    e.preventDefault();
     void finalizeShapeDraftSession(draft);
   };
 
@@ -3319,7 +3353,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
           }
         : null;
 
-    return (
+    const pageContent = (
       <div
         id={`page-${page.pageIndex}`}
         className={cn(
@@ -3527,6 +3561,9 @@ const Workspace: React.FC<WorkspaceProps> = ({
                     onSelect={onSelectControl}
                     onUpdate={onUpdateField}
                     onResetToDefault={onResetFieldToDefault}
+                    onCopy={
+                      editorState.mode === "form" ? copyControl : undefined
+                    }
                     onControlResizeStart={handleResizePointerDown}
                     onTriggerHistorySave={onTriggerHistorySave}
                     onReorderLayer={onReorderControlLayer}
@@ -3555,6 +3592,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   onDelete={onDeleteAnnotation}
                   onEdit={onEditAnnotation}
                   onAskAi={handleAskAiFromAnnotationId}
+                  onCopy={copyControl}
                   onControlResizeStart={handleResizePointerDown}
                   onTriggerHistorySave={onTriggerHistorySave}
                   onReorderLayer={onReorderControlLayer}
@@ -3798,6 +3836,27 @@ const Workspace: React.FC<WorkspaceProps> = ({
           )}
         </div>
       </div>
+    );
+    return (
+      <ContextMenu modal={false}>
+        <ContextMenuTrigger
+          asChild
+          className="select-auto"
+          disabled={!onPasteControl || !isDocumentReady}
+        >
+          {pageContent}
+        </ContextMenuTrigger>
+        <ContextMenuContent onPointerDown={(event) => event.stopPropagation()}>
+          <ContextMenuItem
+            onSelect={() => {
+              const target = pasteTarget.current;
+              if (target?.pageId === getPageId(page)) onPasteControl?.(target);
+            }}
+          >
+            {t("common.actions.paste")}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   };
 

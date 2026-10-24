@@ -15,12 +15,16 @@ export function PageSelectionMenu({
   canSelectRange,
   disabled,
   onSelect,
+  onCopy,
+  onPaste,
 }: {
   children: ReactNode;
   selected: boolean;
   canSelectRange: () => boolean;
   disabled: boolean;
   onSelect: (intent: PageSelectionIntent) => void;
+  onCopy?: () => void;
+  onPaste?: () => void;
 }) {
   const { t } = useLanguage();
   const [rangeAvailable, setRangeAvailable] = useState(false);
@@ -41,6 +45,17 @@ export function PageSelectionMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent>
+        {onCopy && (
+          <ContextMenuItem onSelect={onCopy}>
+            {t("common.actions.copy")}
+          </ContextMenuItem>
+        )}
+        {onPaste && (
+          <ContextMenuItem onSelect={onPaste}>
+            {t("common.actions.paste")}
+          </ContextMenuItem>
+        )}
+        {(onCopy || onPaste) && <ContextMenuSeparator />}
         <ContextMenuItem onSelect={() => onSelect("single")}>
           {t("page_editor.select_only")}
         </ContextMenuItem>

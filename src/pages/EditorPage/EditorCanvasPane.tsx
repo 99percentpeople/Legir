@@ -33,6 +33,7 @@ import {
 } from "@/app/editorShellContext";
 
 import { PageEditor, Workspace } from "@/app/componentModules";
+import { useEditorControlClipboardActions } from "./hooks/useEditorControlClipboard";
 const BLOCK_MODIFIER_WHEEL_ZOOM_SELECTOR =
   "[data-app-block-modifier-wheel-zoom='1']";
 
@@ -58,6 +59,7 @@ export const EditorCanvasPane: React.FC<{
   const layout = useWorkspaceStore(useShallow(selectCanvasLayout));
   const state = { ...documentState, ...preferences, ...layout };
   const view = useEditorViewApi();
+  const clipboard = useEditorControlClipboardActions();
   React.useLayoutEffect(() => {
     if (!workerService?.configurePages) return;
     const configure = () => {
@@ -356,6 +358,8 @@ export const EditorCanvasPane: React.FC<{
             onSelectControl={selectControl}
             onUpdateField={updateField}
             onResetFieldToDefault={resetFieldToDefault}
+            onCopyControl={clipboard.copyControl}
+            onPasteControl={clipboard.pasteControl}
             onUpdateAnnotation={updateAnnotation}
             onDeleteAnnotation={deleteAnnotation}
             onReorderControlLayer={reorderControlLayer}

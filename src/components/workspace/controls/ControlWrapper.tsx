@@ -44,6 +44,7 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   isSelected,
   isSelectable,
   onSelect,
+  onCopy,
   onResizeStart,
   onUpdate,
   onTriggerHistorySave,
@@ -420,10 +421,14 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
   const canResetFormControlToDefault =
     canModify && !isAnnotation && !!onResetToDefault;
   const hasControlContextMenu =
-    canShowLayerContextMenu &&
-    (hasCustomContextMenuContent ||
-      canResetFormControlToDefault ||
-      !!onReorderLayer);
+    !contextMenuDisabled &&
+    isSelectable &&
+    data.type !== "shape" &&
+    (!!onCopy ||
+      (canShowLayerContextMenu &&
+        (hasCustomContextMenuContent ||
+          canResetFormControlToDefault ||
+          !!onReorderLayer)));
   const renderedChildren =
     isFormField && formFieldContentGeometry ? (
       <div
@@ -645,23 +650,37 @@ export const ControlWrapper: React.FC<ControlWrapperProps> = ({
       }}
       content={
         <>
-          {hasCustomContextMenuContent && contextMenuContent}
-          {hasCustomContextMenuContent &&
-            (canResetFormControlToDefault || !!onReorderLayer) && (
-              <ContextMenuSeparator />
-            )}
-          {canResetFormControlToDefault && (
-            <>
-              <ContextMenuItem onSelect={() => onResetToDefault(id)}>
-                {t("common.actions.reset_to_default")}
-              </ContextMenuItem>
-              {!!onReorderLayer && <ContextMenuSeparator />}
-            </>
+          {onCopy && (
+            <ContextMenuItem onSelect={() => onCopy(id)}>
+              {t("common.actions.copy")}
+            </ContextMenuItem>
           )}
-          {!!onReorderLayer && (
-            <ControlLayerMenuItems
-              onSelect={(move) => onReorderLayer(id, move)}
-            />
+          {onCopy &&
+            canShowLayerContextMenu &&
+            (hasCustomContextMenuContent ||
+              canResetFormControlToDefault ||
+              !!onReorderLayer) && <ContextMenuSeparator />}
+          {canShowLayerContextMenu && (
+            <>
+              {hasCustomContextMenuContent && contextMenuContent}
+              {hasCustomContextMenuContent &&
+                (canResetFormControlToDefault || !!onReorderLayer) && (
+                  <ContextMenuSeparator />
+                )}
+              {canResetFormControlToDefault && (
+                <>
+                  <ContextMenuItem onSelect={() => onResetToDefault(id)}>
+                    {t("common.actions.reset_to_default")}
+                  </ContextMenuItem>
+                  {!!onReorderLayer && <ContextMenuSeparator />}
+                </>
+              )}
+              {!!onReorderLayer && (
+                <ControlLayerMenuItems
+                  onSelect={(move) => onReorderLayer(id, move)}
+                />
+              )}
+            </>
           )}
         </>
       }

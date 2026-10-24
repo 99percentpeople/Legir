@@ -560,6 +560,29 @@ relationships, and discard source PDF object/font references and raw appearance
 operators. Internal link destinations are retained only within their source
 document; URL links are portable.
 
+Control context menus call the same serializers through the Clipboard API's
+portable text format. A blank-page menu captures a stable page ID and PDF-space
+point (including zoom/view-rotation conversion) when opened. `pasteControl`
+accepts this optional target, clamps placement to the page and moves all geometry
+together; keyboard paste keeps its existing current-page offset. An asynchronous
+clipboard read is discarded if the destination document closes or changes.
+
+Page mode uses `usePageClipboard` to export the selected pages through the same
+PDF assembly pipeline, including unsaved controls, source pages and rotations.
+The native clipboard carries a small ticket while the latest copied PDF is kept
+in the shared workspace database; this avoids base64 encoding large documents
+on a keypress and lets other windows paste after the source document closes.
+Each copy replaces the shared record, and older exports cannot overwrite a
+newer ticket. A pending copy can be pasted immediately: `usePageImport.loadInput`
+waits for it, then opens the existing import preview and insertion-position
+dialog. Only confirming that dialog calls `insertPdfPages`, with its existing
+field renaming, source ownership and single undo checkpoint. Text inputs,
+background documents, loading documents and open dialogs retain their existing
+clipboard behavior.
+Page-card menus copy the selected group, or the clicked page if it is unselected.
+Menu paste supplies an insertion index to the same dialog: after the clicked card
+or at the blank-grid position. Keyboard paste keeps the selection-based default.
+
 Form rectangles are viewport outer bounds, while rotatable annotation rectangles
 describe their local unrotated geometry. Missing PDF widget/FreeText rotation means
 zero in PDF space; import must still include the source page rotation. Widget export

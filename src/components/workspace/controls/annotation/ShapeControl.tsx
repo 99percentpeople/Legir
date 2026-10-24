@@ -697,6 +697,14 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
 
   const contextMenuContent = (
     <>
+      {props.onCopy && (
+        <>
+          <ContextMenuItem onSelect={() => props.onCopy?.(data.id)}>
+            {t("common.actions.copy")}
+          </ContextMenuItem>
+          {canShowLayerContextMenu && <ContextMenuSeparator />}
+        </>
+      )}
       {shapeSupportsVertexInsertion(shapeType) &&
         contextState.segmentIndex !== null &&
         contextState.point && (
@@ -880,7 +888,7 @@ export const ShapeControl: React.FC<AnnotationControlProps> = (props) => {
   const handleShapeContextMenu = (
     event: React.MouseEvent<SVGElement | HTMLDivElement>,
   ) => {
-    if (!canShowLayerContextMenu) return;
+    if (!isSelectable || (!canShowLayerContextMenu && !props.onCopy)) return;
     event.preventDefault();
     event.stopPropagation();
     openContextMenu(event.clientX, event.clientY, {

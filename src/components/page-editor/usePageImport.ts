@@ -229,6 +229,7 @@ export function usePageImport(
     fileInput,
     clear,
     loadDropped,
+    loadInput: load,
     chooseFile,
     release,
   };

@@ -1,10 +1,14 @@
 const fr = {
   common: {
+    clipboard_unavailable:
+      "Impossible d’accéder au presse-papiers. Utilisez les raccourcis clavier pour copier ou coller.",
+    clipboard_empty: "Le presse-papiers ne contient aucun contenu compatible.",
     select: "Sélectionner...",
     expand: "Développer",
     collapse: "Réduire",
     processing: "Traitement...",
     actions: {
+      paste: "Coller",
       cancel: "Annuler",
       done: "Terminer",
       continue: "Continuer",
@@ -541,8 +545,8 @@ const fr = {
     move_1px: "Déplacer le champ sélectionné (1px)",
     shift_arrow: "Maj + Flèches directionnelles",
     move_10px: "Déplacer le champ sélectionné (10px)",
-    copy: "Copier l’annotation ou le champ sélectionné",
-    paste: "Coller l’annotation ou le champ de formulaire",
+    copy: "Copier les pages, l’annotation ou le champ sélectionné",
+    paste: "Coller les pages, l’annotation ou le champ de formulaire",
     cut: "Couper le champ sélectionné",
     delete: "Supprimer le champ sélectionné",
     deselect: "Désélectionner / Passer à l'outil de sélection",
