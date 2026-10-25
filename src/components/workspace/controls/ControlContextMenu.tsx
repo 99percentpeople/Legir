@@ -6,25 +6,10 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 
-export const dispatchSyntheticContextMenuEscape = () => {
-  if (typeof document === "undefined") return;
-  document.dispatchEvent(
-    new KeyboardEvent("keydown", {
-      key: "Escape",
-      bubbles: true,
-      cancelable: true,
-    }),
-  );
-};
-
-export const isContextMenuContentTarget = (target: EventTarget | null) => {
-  if (!(target instanceof HTMLElement)) return false;
-  return Boolean(
-    target.closest(
-      '[data-slot="context-menu-content"], [data-slot="context-menu-sub-content"]',
-    ),
-  );
-};
+export {
+  dispatchSyntheticContextMenuEscape,
+  isContextMenuContentTarget,
+} from "@/components/ui/context-menu";
 
 type ControlContextMenuProps = {
   disabled?: boolean;

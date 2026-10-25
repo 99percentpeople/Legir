@@ -580,6 +580,14 @@ point (including zoom/view-rotation conversion) when opened. `pasteControl`
 accepts this optional target, clamps placement to the page and moves all geometry
 together; keyboard paste keeps its existing current-page offset. An asynchronous
 clipboard read is discarded if the destination document closes or changes.
+Open context menus observe outside pointerdown and scroll in capture phase, so
+workspace handlers that stop propagation cannot strand a menu at stale page
+coordinates. Events within menu/submenu portals are excluded, and inactive tabs
+do not install dismissal listeners. Blank-page selection does not capture the
+pointer: touch move/up must still reach the page trigger to cancel its long-press
+timer. Viewport touch gestures disable page-menu triggers while active.
+Hand panning prevents the page trigger's touch default before the scroll
+container captures the pointer, so it cannot leave a delayed long-press menu.
 
 Page mode uses `usePageClipboard` to export the selected pages through the same
 PDF assembly pipeline, including unsaved controls, source pages and rotations.

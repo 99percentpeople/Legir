@@ -5,10 +5,61 @@ import { cn } from "@/utils/cn";
 import { useEditorTabIsActive } from "@/app/editorTabs/context";
 import { ChevronRightIcon, CheckIcon } from "lucide-react";
 
+export const dispatchSyntheticContextMenuEscape = () => {
+  if (typeof document === "undefined") return;
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+};
+
+export const isContextMenuContentTarget = (target: EventTarget | null) => {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      '[data-slot="context-menu-content"], [data-slot="context-menu-sub-content"]',
+    ),
+  );
+};
+
 function ContextMenu({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
-  return <ContextMenuPrimitive.Root data-slot="context-menu" {...props} />;
+  const [open, setOpen] = React.useState(false);
+  const isActive = useEditorTabIsActive();
+
+  React.useEffect(() => {
+    if (!open || !isActive) return;
+    const dismissOutside = (event: Event) => {
+      if (isContextMenuContentTarget(event.target)) return;
+      // Workspace interactions can stop pointerdown before Radix's document
+      // bubble listener. Use its Escape dismissal path from capture instead.
+      dispatchSyntheticContextMenuEscape();
+    };
+    document.addEventListener("pointerdown", dismissOutside, true);
+    // Scroll does not bubble. Dismiss stale page coordinates while preserving
+    // scrolling and interaction within menu/submenu portals.
+    document.addEventListener("scroll", dismissOutside, true);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside, true);
+      document.removeEventListener("scroll", dismissOutside, true);
+    };
+  }, [open, isActive]);
+
+  return (
+    <ContextMenuPrimitive.Root
+      data-slot="context-menu"
+      {...props}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        onOpenChange?.(nextOpen);
+      }}
+    />
+  );
 }
 
 function ContextMenuTrigger({

@@ -129,10 +129,12 @@ function Canvas() {
       onScaleChange={state.setScale}
       onTriggerHistorySave={state.saveCheckpoint}
       onToolChange={state.setTool}
+      onPasteControl={pasteControl}
     />
   );
 }
 const editAnnotation = () => {};
+const pasteControl = () => {};
 
 async function setupDrag() {
   let frameId = 0;
@@ -187,6 +189,58 @@ const pointer = (element: Element, type: string, x: number, y: number) => {
   });
   element.dispatchEvent(event);
 };
+
+it.each(["select", "pan"] as const)(
+  "does not open a delayed context menu after a touch tap with the %s tool",
+  async (tool) => {
+    store.setState({ tool });
+    await setupDrag();
+    const captured = { current: undefined as HTMLElement | undefined };
+    vi.spyOn(HTMLElement.prototype, "setPointerCapture").mockImplementation(
+      function (this: HTMLElement) {
+        captured.current = this;
+      },
+    );
+    const pageElement = host.querySelector<HTMLElement>("#page-0")!;
+    const touch = (type: string) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientX: 400,
+        clientY: 300,
+      });
+      Object.defineProperties(event, {
+        pointerId: { value: 1 },
+        pointerType: { value: "touch" },
+      });
+      // Model native pointer capture: subsequent events follow its owner.
+      (captured.current ?? pageElement).dispatchEvent(event);
+    };
+    const elementsFromPoint = Object.getOwnPropertyDescriptor(
+      document,
+      "elementsFromPoint",
+    );
+    Object.defineProperty(document, "elementsFromPoint", {
+      configurable: true,
+      value: () => [pageElement],
+    });
+    try {
+      await act(async () => touch("pointerdown"));
+      await act(async () => touch("pointerup"));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      });
+      expect(
+        document.querySelector('[data-slot="context-menu-content"]'),
+      ).toBeNull();
+    } finally {
+      if (elementsFromPoint)
+        Object.defineProperty(document, "elementsFromPoint", elementsFromPoint);
+      else Reflect.deleteProperty(document, "elementsFromPoint");
+    }
+  },
+);
 
 it("coalesces movement, flushes the final position on release and keeps one undo checkpoint", async () => {
   const { tick, reads } = await setupDrag();

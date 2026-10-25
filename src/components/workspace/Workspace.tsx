@@ -2415,7 +2415,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
   const handlePointerDown = (e: React.PointerEvent, pageIndex: number) => {
     if (pinchGestureActiveRef.current) return;
     if (e.button !== 0) return;
-    if (isPanModeActive) return;
+    if (isPanModeActive) {
+      // The page trigger runs before the container starts/captures the pan.
+      // Suppress its touch long-press timer before events are retargeted.
+      e.preventDefault();
+      return;
+    }
     if (!isDocumentReady && editorState.tool !== "select_text") return;
 
     const isTextLayerHit = (() => {
@@ -2478,15 +2483,16 @@ const Workspace: React.FC<WorkspaceProps> = ({
     // Ensure mouse position is tracked immediately
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
 
-    // Capture pointer for all interactions initiated here
-    capturePointer(e);
-
     if (editorState.tool === "select") {
       clearControlSelectionFromBlankPointerDown(e, {
         allowPageSurface: true,
       });
       return;
     }
+
+    // Blank-page selection has no drag to capture. Retargeting its touch up
+    // away from the page would leave the context menu's long-press timer alive.
+    capturePointer(e);
 
     // Prevent default behavior (like text selection) for drawing tools
     e.preventDefault();
@@ -3847,7 +3853,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
         <ContextMenuTrigger
           asChild
           className="select-auto"
-          disabled={!onPasteControl || !isDocumentReady}
+          disabled={!onPasteControl || !isDocumentReady || isPinchZooming}
         >
           {pageContent}
         </ContextMenuTrigger>
