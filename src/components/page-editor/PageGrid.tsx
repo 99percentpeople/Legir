@@ -472,7 +472,7 @@ export const PageGrid = memo(function PageGrid({
         disabled={dragging}
       >
         <ContextMenu modal={false}>
-          <ContextMenuTrigger asChild disabled={!onPaste}>
+          <ContextMenuTrigger asChild disabled={!onPaste || dragging}>
             <div
               ref={scrollRef}
               className="group/page-grid relative min-h-0 flex-1 overflow-auto"

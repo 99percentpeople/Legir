@@ -1,6 +1,7 @@
 import React, { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
+import type { DropAnimationFunction } from "@dnd-kit/dom";
 import PageEditor from "@/components/page-editor/PageEditor";
 import { PageDragPreview } from "@/components/page-editor/PageDragPreview";
 import { LanguageProvider } from "@/components/language-provider";
@@ -17,10 +18,12 @@ const drag = vi.hoisted(() => {
     start: (id: string) => void;
     over: (id: string | null) => void;
     end: (canceled?: boolean, target?: string | null) => void;
+    finishDrop: () => Promise<void>;
   } = {
     start: () => {},
     over: () => {},
     end: () => {},
+    finishDrop: async () => {},
   };
   return handlers;
 });
@@ -55,7 +58,26 @@ vi.mock("@dnd-kit/react", () => ({
       });
     return children;
   },
-  DragOverlay: () => null,
+  DragOverlay: ({
+    dropAnimation,
+  }: {
+    dropAnimation: DropAnimationFunction;
+  }) => {
+    drag.finishDrop = async () => {
+      const feedbackElement = document.createElement("div");
+      await dropAnimation({
+        feedbackElement,
+        element: feedbackElement,
+        placeholder: null,
+        translate: { x: 0, y: 0 },
+        moved: false,
+        source: {
+          id: "page-0",
+        } as Parameters<DropAnimationFunction>[0]["source"],
+      });
+    };
+    return null;
+  },
 }));
 vi.mock("@dnd-kit/react/sortable", () => ({
   useSortable: ({ id }: { id: string }) => {
@@ -68,6 +90,77 @@ vi.mock("@/app/editorRuntime", () => ({
 }));
 
 afterEach(() => vi.unstubAllGlobals());
+
+it("cancels both card and grid long-press menus when touch sorting starts", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(500);
+  const store = createTestEditorStore({
+    mode: "pages",
+    pages: Array.from({ length: 3 }, (_, i) => ({
+      ...page(i),
+      id: `page-${i}`,
+      blank: true,
+    })),
+  });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(
+        <EditorViewContext.Provider value={store}>
+          <LanguageProvider defaultLanguage="en">
+            <PageEditor />
+          </LanguageProvider>
+        </EditorViewContext.Provider>,
+      ),
+    );
+    const pointerDown = new MouseEvent("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    Object.defineProperty(pointerDown, "pointerType", { value: "touch" });
+    await act(async () => {
+      host.querySelector("[data-page-drag-handle]")!.dispatchEvent(pointerDown);
+    });
+    // The sorting sensor activates before the menu's longer press deadline.
+    // Its pointer capture can keep later movement/up away from both triggers.
+    await act(async () => drag.start("page-0"));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    });
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    await act(async () => drag.end(true));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    });
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(store.getState().past).toHaveLength(0);
+    await act(async () => drag.finishDrop());
+
+    // Cancelling a drag must restore ordinary grid right-click actions.
+    await act(async () => {
+      host.querySelector("[data-page-grid]")!.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+        }),
+      );
+    });
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain(
+      "Paste",
+    );
+  } finally {
+    await act(async () => root.unmount());
+    store.dispose();
+    host.remove();
+  }
+});
 
 it.each([
   { selectedPageIds: [] },

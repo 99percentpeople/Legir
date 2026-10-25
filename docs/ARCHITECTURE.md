@@ -816,10 +816,13 @@ wheel zoom accumulates once per animation frame. Grid row sizing controls card
 geometry without re-rendering their contents, and zoom mounts the destination
 window directly instead of briefly requesting pages at the old scroll offset.
 The virtual grid uses dnd-kit for pointer, touch and keyboard sorting. React
-owns the tentative order; only drop commits a page transaction. External PDF
-drops use the platform file-transfer reader, preserve the insertion gap and
-open the import chooser. Multiple files are confirmed sequentially. Import
-and full-page translation share `src/utils/pageRange.ts`.
+owns the tentative order; only drop commits a page transaction. During sorting
+and drop animation, both moving-card and grid-background menu triggers are
+disabled to cancel their pending touch long-press timers. A DOM
+`contextmenu` guard alone cannot cancel a menu's internal long-press callback.
+External PDF drops use the platform file-transfer reader, preserve the insertion
+gap and open the import chooser. Multiple files are confirmed sequentially.
+Import and full-page translation share `src/utils/pageRange.ts`.
 
 Each page receives a stable `id` on its first structural edit. `source` identifies
 an immutable PDF and source page; `copyGroup` separates independent copies.
