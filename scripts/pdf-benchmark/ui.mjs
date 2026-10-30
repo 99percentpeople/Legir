@@ -1,5 +1,6 @@
 /* global console, process, window, Window, location, document, navigator, DataTransfer, File, DragEvent */
 import { createRequire } from "node:module";
+import { URL } from "node:url";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 import { PDFDocument, StandardFonts, rgb } from "@legir/pdfium/authoring";
@@ -59,16 +60,26 @@ try {
     delete Window.prototype.showSaveFilePicker;
   });
   await page.goto(baseUrl);
-  await page.evaluate(async () => {
-    await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller)
-      await new Promise((resolve) =>
-        navigator.serviceWorker.addEventListener("controllerchange", resolve, {
-          once: true,
-        }),
-      );
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, {
+    timeout: 60000,
   });
+  // A warm page can hide missing precache dependencies in its loaded modules
+  // and HTTP cache. Cold-start the app using only the service worker's cache.
+  const network = await context.newCDPSession(page);
+  await network.send("Network.enable");
+  await network.send("Network.clearBrowserCache");
+  await network.send("Network.setCacheDisabled", { cacheDisabled: true });
   await context.setOffline(true);
+  await page.reload();
+  await page.getByRole("button", { name: "Open PDF", exact: true }).waitFor();
+  // File handling launches /editor directly, which needs the SPA fallback.
+  const reopenedPage = await context.newPage();
+  await reopenedPage.goto(new URL("/editor", baseUrl).href);
+  await reopenedPage
+    .getByRole("button", { name: "Open PDF", exact: true })
+    .waitFor();
+  await reopenedPage.close();
+  await page.bringToFront();
   const initialWorkerUrls = page.workers().map((worker) => worker.url());
   await page.getByRole("button", { name: "Open PDF", exact: true }).waitFor();
   await page.waitForTimeout(250);
@@ -107,23 +118,21 @@ try {
   );
   await page.waitForFunction(
     () =>
-      [...document.querySelectorAll("img")].filter(
-        (i) => i.src.startsWith("blob:") && i.complete && i.naturalWidth > 50,
+      [...document.querySelectorAll("[data-thumbnail-page-id] img")].filter(
+        (i) => i.complete && i.naturalWidth > 50,
       ).length >= 2,
     { timeout: 30000 },
   );
   await page
     .getByText("Parsing PDF...", { exact: true })
     .waitFor({ state: "hidden", timeout: 30000 });
-  const firstThumb = page.locator('img[src^="blob:"]').first();
+  const firstThumb = page.locator("[data-thumbnail-page-id] img").first();
   const beforeThumb = await firstThumb.getAttribute("src");
   const fieldInput = page.locator('input[type="text"]').first();
   await fieldInput.fill("Bob");
   await fieldInput.press("Tab");
   await page.waitForFunction((before) => {
-    const i = [...document.querySelectorAll("img")].find((i) =>
-      i.src.startsWith("blob:"),
-    );
+    const i = document.querySelector("[data-thumbnail-page-id] img");
     return i && i.src !== before && i.complete && i.naturalWidth > 0;
   }, beforeThumb);
   const plainSaves = [];

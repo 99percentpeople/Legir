@@ -78,11 +78,10 @@ export const createPwaPlugin = (displayName: string) =>
     injectManifest: {
       globIgnores: [
         "fonts/*.ttf",
-        // AI provider/runtime chunks require network-backed APIs anyway. Keep
-        // them lazy instead of spending PWA install bandwidth precaching every
-        // provider the user may never configure.
+        // Only provider chunks are optional offline. The AI runtime chunk also
+        // contains shared dependencies pulled in by manualChunks, so the app
+        // shell and PDF editor need it in the precache even without AI use.
         "assets/ai-provider-*.js",
-        "assets/ai-runtime-*.js",
       ],
       // PDFium is needed even for the first PDF opened after going offline.
       maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,

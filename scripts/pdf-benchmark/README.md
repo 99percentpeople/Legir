@@ -54,8 +54,11 @@ The save policy now inspects retained widgets and tracks successful appearance
 updates, while preserving missing/stale appearance and XFA fallbacks. Keep the
 strict validator thresholds when using form fixtures.
 
-`ui.mjs` installs the production PWA, switches offline, edits a text field and
-saves it twice. PDFium must retain the exact original prefix without growing a
+`ui.mjs` installs the production PWA, clears/disables the HTTP cache, switches
+offline, reloads Home and opens `/editor` in a new tab before opening its first PDF.
+This verifies that the app starts from Cache Storage without already-loaded
+modules hiding missing precache dependencies. It edits a text field and saves it
+twice. PDFium must retain the exact original prefix without growing a
 revision chain. It then inserts a blank page, undoes/redoes it, imports the
 four-page donor and saves again.
 It reopens the download with the native SDK (eight pages, three fields), checks for
